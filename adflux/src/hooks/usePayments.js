@@ -32,7 +32,7 @@ export function usePayments(quoteId) {
 
     const { data, error: err } = await supabase
       .from('payments')
-      .select('*, users(name), approver:approved_by(name)')
+      .select('*, users:received_by(name), approver:approved_by(name)')
       .eq('quote_id', quoteId)
       .order('payment_date', { ascending: false })
 
@@ -65,7 +65,7 @@ export function usePayments(quoteId) {
     const { data, error: insertErr } = await supabase
       .from('payments')
       .insert([row])
-      .select('*, users(name), approver:approved_by(name)')
+      .select('*, users:received_by(name), approver:approved_by(name)')
       .single()
 
     if (insertErr) {
@@ -102,7 +102,7 @@ export function usePayments(quoteId) {
       .from('payments')
       .update(updates)
       .eq('id', paymentId)
-      .select('*, users(name), approver:approved_by(name)')
+      .select('*, users:received_by(name), approver:approved_by(name)')
       .single()
 
     if (updateErr) {
@@ -152,7 +152,7 @@ export function usePayments(quoteId) {
         rejection_reason: null,
       })
       .eq('id', paymentId)
-      .select('*, users(name), approver:approved_by(name)')
+      .select('*, users:received_by(name), approver:approved_by(name)')
       .single()
 
     if (err) { setLoading(false); return { error: err } }
@@ -188,7 +188,7 @@ export function usePayments(quoteId) {
         sales_notified_at: null, // resets banner
       })
       .eq('id', paymentId)
-      .select('*, users(name), approver:approved_by(name)')
+      .select('*, users:received_by(name), approver:approved_by(name)')
       .single()
 
     setLoading(false)
@@ -249,7 +249,7 @@ export async function fetchPendingApprovals() {
     .from('payments')
     .select(`
       *,
-      users(name),
+      users:received_by(name),
       quotes(id, quote_number, client_name, client_company, total_amount, created_by, sales_person_name)
     `)
     .eq('approval_status', 'pending')
