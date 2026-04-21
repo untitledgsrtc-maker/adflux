@@ -76,9 +76,14 @@ export default function QuoteDetail() {
     fetchQuoteById(id).finally(() => setLoading(false))
   }, [id])
 
+  // Fetch payments on mount (and when quote id changes) so the Overview
+  // tab's PaymentSummary (totalPaid / hasFinalPayment / balance) reflects
+  // reality before the user ever clicks the Payments tab. Previously this
+  // only fetched when activeTab === 'payments', which left Overview stuck
+  // on "UNPAID" even after payments existed.
   useEffect(() => {
-    if (activeTab === 'payments') fetchPayments()
-  }, [activeTab, id])
+    if (id) fetchPayments()
+  }, [id, fetchPayments])
 
   const quote  = currentQuote
   const cities = quote?.quote_cities || []

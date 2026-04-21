@@ -2,9 +2,47 @@
 // Matches Untitled Adflux brand PDF exactly:
 // Yellow header block, UA logo, stats bar, location table with SR#, investment summary, T&C, footer
 import {
-  Document, Page, Text, View, StyleSheet, pdf,
+  Document, Page, Text, View, StyleSheet, Font, pdf,
 } from '@react-pdf/renderer'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+
+// ─── Font registration ──────────────────────────────────────────────
+// Why: @react-pdf/renderer's bundled Helvetica has no glyph for the
+// Indian Rupee Sign (₹, U+20B9). Without a Unicode-capable font the
+// symbol renders as a tofu box or a spurious "1" next to the number.
+//
+// Roboto (Apache 2.0) covers the Currency Symbols block including ₹
+// and is visually close to Helvetica so the PDF layout doesn't shift.
+//
+// Loading strategy — CDN at PDF-generation time:
+//   We fetch the TTF from jsDelivr, which mirrors the official
+//   google/fonts repo on GitHub. The TTFs are pulled once per browser
+//   session (cached after that) and the @react-pdf/renderer pipeline
+//   embeds a font subset into every generated PDF, so printed output
+//   remains standalone.
+//
+//   Tradeoff: if jsDelivr is unreachable, PDF generation fails. The
+//   jsDelivr CDN has very high uptime but not 100%. If this ever
+//   breaks in production, migrate to bundling the TTF in
+//   public/fonts/ (see git history for the pattern).
+Font.register({
+  family: 'Roboto',
+  fonts: [
+    {
+      src: 'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Regular.ttf',
+      fontWeight: 'normal',
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Bold.ttf',
+      fontWeight: 'bold',
+    },
+  ],
+})
+
+// Disable word-break hyphenation for Roboto — the default dictionary
+// splits Indian place names awkwardly ("Ahme-dabad"), and our PDF has
+// tight column widths where a rogue hyphen looks worse than overflow.
+Font.registerHyphenationCallback(word => [word])
 
 const YELLOW = '#FFE600'
 const DARK   = '#0f172a'
@@ -16,7 +54,7 @@ const WHITE  = '#ffffff'
 const S = StyleSheet.create({
   page: {
     backgroundColor: WHITE,
-    fontFamily: 'Helvetica',
+    fontFamily: 'Roboto',
     fontSize: 9,
     color: DARK,
   },
@@ -39,12 +77,12 @@ const S = StyleSheet.create({
     justifyContent: 'center',
   },
   uaBadgeText: {
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto', fontWeight: 'bold',
     fontSize: 14,
     color: DARK,
   },
   brandBlock: { gap: 2 },
-  brandName: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: WHITE },
+  brandName: { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', color: WHITE },
   brandSub:  { fontSize: 8,  color: LGRAY },
   brandNetwork: { fontSize: 8, color: LGRAY, marginTop: 2 },
   headerRight: { alignItems: 'flex-end', gap: 3 },
@@ -59,7 +97,7 @@ const S = StyleSheet.create({
     paddingVertical: 10,
   },
   statItem: { flex: 1, alignItems: 'center' },
-  statNum:  { fontSize: 16, fontFamily: 'Helvetica-Bold', color: DARK },
+  statNum:  { fontSize: 16, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
   statLabel:{ fontSize: 7,  color: DARK, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 1 },
 
   // ── MEDIA QUOTATION TITLE BLOCK ────────────────
@@ -73,12 +111,12 @@ const S = StyleSheet.create({
   },
   mediaQuotationText: {
     fontSize: 22,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Roboto', fontWeight: 'bold',
     color: YELLOW,
     letterSpacing: 1,
   },
   quoteMetaRight: { alignItems: 'flex-end', gap: 3 },
-  quoteNumText: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: WHITE },
+  quoteNumText: { fontSize: 11, fontFamily: 'Roboto', fontWeight: 'bold', color: WHITE },
   quoteDateSmall: { fontSize: 8, color: LGRAY },
   quoteValid: { fontSize: 8, color: LGRAY },
 
@@ -91,7 +129,7 @@ const S = StyleSheet.create({
     paddingLeft: 8,
     marginBottom: 10,
   },
-  sectionTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: DARK, textTransform: 'uppercase', letterSpacing: 0.8 },
+  sectionTitle: { fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK, textTransform: 'uppercase', letterSpacing: 0.8 },
 
   // ── CLIENT BOX ──────────────────────────────
   clientBox: {
@@ -104,7 +142,7 @@ const S = StyleSheet.create({
   },
   clientCol: { flex: 1 },
   clientFieldLabel: { fontSize: 7, color: LGRAY, marginBottom: 1, textTransform: 'uppercase', letterSpacing: 0.5 },
-  clientFieldValue: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: DARK, marginBottom: 8 },
+  clientFieldValue: { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK, marginBottom: 8 },
 
   // ── CAMPAIGN AT A GLANCE ─────────────────────
   glanceRow: {
@@ -120,7 +158,7 @@ const S = StyleSheet.create({
     padding: '10 6',
     borderRight: '0.5pt solid ' + BORDER,
   },
-  glanceNum:   { fontSize: 14, fontFamily: 'Helvetica-Bold', color: DARK },
+  glanceNum:   { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
   glanceLabel: { fontSize: 7, color: GRAY, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
 
   // ── LOCATION TABLE ──────────────────────────
@@ -136,9 +174,9 @@ const S = StyleSheet.create({
     borderBottom: '0.5pt solid ' + BORDER,
   },
   tableRowAlt: { backgroundColor: '#f8fafc' },
-  thText: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: WHITE, textTransform: 'uppercase', letterSpacing: 0.4 },
+  thText: { fontSize: 7, fontFamily: 'Roboto', fontWeight: 'bold', color: WHITE, textTransform: 'uppercase', letterSpacing: 0.4 },
   tdText: { fontSize: 8.5, color: DARK },
-  tdBold: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: DARK },
+  tdBold: { fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
   tdMuted:{ fontSize: 7.5, color: GRAY },
   colSr:       { width: 22 },
   colCity:     { flex: 2.2 },
@@ -156,8 +194,8 @@ const S = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     padding: '7 8',
   },
-  tableFootLabel: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: DARK },
-  tableFootValue: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: DARK },
+  tableFootLabel: { fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+  tableFootValue: { fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
 
   // ── INVESTMENT SUMMARY ──────────────────────
   investSection: { marginBottom: 20 },
@@ -175,15 +213,15 @@ const S = StyleSheet.create({
     borderBottom: '0.5pt solid ' + BORDER,
   },
   investLabel: { fontSize: 9, color: GRAY },
-  investValue: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: DARK },
+  investValue: { fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
   investGrandRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: '10 14',
     backgroundColor: YELLOW,
   },
-  investGrandLabel: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: DARK },
-  investGrandValue: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: DARK },
+  investGrandLabel: { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+  investGrandValue: { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
 
   // ── WHY BOX ─────────────────────────────────
   whyBox: {
@@ -192,10 +230,10 @@ const S = StyleSheet.create({
     padding: '14 16',
     marginBottom: 16,
   },
-  whyTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: YELLOW, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
+  whyTitle: { fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold', color: YELLOW, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
   whyItem:  { flexDirection: 'row', gap: 6, marginBottom: 5 },
   whyBullet:{ fontSize: 9, color: YELLOW, marginTop: 0.5 },
-  whyItemTitle:{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: WHITE },
+  whyItemTitle:{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: WHITE },
   whyItemBody: { fontSize: 7.5, color: LGRAY, lineHeight: 1.4 },
 
   // ── TERMS ───────────────────────────────────
@@ -205,7 +243,7 @@ const S = StyleSheet.create({
     padding: '12 14',
     marginBottom: 16,
   },
-  termsTitle: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: DARK, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 7 },
+  termsTitle: { fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 7 },
   termItem:   { flexDirection: 'row', gap: 5, marginBottom: 4 },
   termNum:    { fontSize: 7.5, color: GRAY, width: 12 },
   termText:   { fontSize: 7.5, color: GRAY, flex: 1, lineHeight: 1.4 },
@@ -229,8 +267,8 @@ const S = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  footerPrepared: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: DARK },
-  footerQuoteRef: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: DARK },
+  footerPrepared: { fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+  footerQuoteRef: { fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
   footerBottomBand: {
     backgroundColor: DARK,
     paddingHorizontal: 32,
@@ -417,7 +455,7 @@ function QuoteDocument({ quote, cities }) {
                   }}>
                     <Text style={[S.tdMuted, {
                       color: c.grade === 'A' ? '#166534' : c.grade === 'B' ? '#854d0e' : '#475569',
-                      fontFamily: 'Helvetica-Bold',
+                      fontFamily: 'Roboto', fontWeight: 'bold',
                     }]}>{c.grade}</Text>
                   </View>
                 </View>

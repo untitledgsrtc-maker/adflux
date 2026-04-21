@@ -15,6 +15,7 @@ import { useIncentive } from '../../hooks/useIncentive'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import { RenewalReminderBanner } from './RenewalReminderBanner'
 import { RejectionBanner } from './RejectionBanner'
+import { PendingApprovalsBanner } from './PendingApprovalsBanner'
 
 function daysBetween(a, b) {
   const MS = 1000 * 60 * 60 * 24
@@ -140,6 +141,10 @@ export function SalesDashboard() {
       {/* Payment rejection alerts — shown only when admin has
           rejected a payment the sales user hasn't dismissed yet */}
       <RejectionBanner />
+
+      {/* Pending approval alerts — payments this user punched that are
+          still waiting for an admin approve/reject decision */}
+      <PendingApprovalsBanner />
 
       {/* Renewal reminders */}
       <RenewalReminderBanner userId={profile?.id} scope="mine" />

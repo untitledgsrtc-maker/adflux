@@ -256,6 +256,21 @@ export async function fetchPendingApprovals() {
     .order('created_at', { ascending: false })
 }
 
+// Sales: their own pending payments (powers the "awaiting approval"
+// banner on the sales dashboard). Shows what they've punched that
+// admin hasn't approved or rejected yet.
+export async function fetchMyPendingPayments(userId) {
+  return supabase
+    .from('payments')
+    .select(`
+      *,
+      quotes!inner(id, quote_number, client_name, created_by)
+    `)
+    .eq('approval_status', 'pending')
+    .eq('received_by', userId)
+    .order('created_at', { ascending: false })
+}
+
 // Sales: rejections they haven't dismissed yet (powers the banner)
 export async function fetchMyRejectedPayments(userId) {
   return supabase
