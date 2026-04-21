@@ -3,13 +3,19 @@ import { supabase } from '../lib/supabase'
 import { useQuoteStore } from '../store/quoteStore'
 import { useAuthStore } from '../store/authStore'
 
-// Generate a fresh quote number. Uses timestamp + random suffix to
-// minimise collision risk; the DB has a UNIQUE constraint on
-// quote_number so if we still collide we retry inside createQuote().
+// Generate a fresh quote number. Uses full millisecond timestamp + a
+// 5-digit random suffix so two near-simultaneous submits (including
+// accidental double-clicks on "Send to Client") cannot produce the
+// same number. The DB has a UNIQUE constraint on quote_number and
+// createQuote() retries up to 4 times on a 23505 violation — with
+// this much entropy the retry is effectively never needed.
+//
+// Suffix layout: UA-YYYY-<8 digits of Date.now()><5-digit random>
+//   → ~10^13 distinct values per year
 function generateQuoteNumber() {
   const year = new Date().getFullYear()
-  const timestamp = Date.now().toString().slice(-6)
-  const rand = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+  const timestamp = Date.now().toString().slice(-8)
+  const rand = Math.floor(Math.random() * 100000).toString().padStart(5, '0')
   return `UA-${year}-${timestamp}${rand}`
 }
 

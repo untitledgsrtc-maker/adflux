@@ -1,6 +1,14 @@
 @import './tokens.css';
 @import './legacy-compat.css';
 @import './cities.css';
+@import './dashboard.css';
+@import './followups.css';
+@import './incentives.css';
+@import './payments.css';
+@import './quotes.css';
+@import './quotes_tab_additions.css';
+@import './team.css';
+@import './wizard.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
