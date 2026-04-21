@@ -576,7 +576,9 @@ tbody tr:hover td { background: var(--surface-2); }
    STAT / KPI CARDS
    ===================================================== */
 
-.db-kpi-grid, .stat-grid {
+/* .db-kpi-grid has a dedicated layout in dashboard.css (repeat(3, 1fr)
+   at desktop → 2 → 1). We only style .stat-grid here with auto-fit. */
+.stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 14px;
@@ -792,5 +794,6 @@ tbody tr:hover td { background: var(--surface-2); }
 
 @media (max-width: 480px) {
   .modal { border-radius: var(--radius); }
-  .db-kpi-grid, .stat-grid { grid-template-columns: 1fr 1fr; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+  /* .db-kpi-grid mobile layout owned by dashboard.css */
 }

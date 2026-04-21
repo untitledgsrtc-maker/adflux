@@ -5,7 +5,7 @@
 // - Active Campaigns card with countdown
 // - Per-quote potential badges in Recent Quotes list
 // - Follow-ups Due panel
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, CheckCircle2, Plus, CalendarDays, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -23,6 +23,44 @@ function daysBetween(a, b) {
   return Math.round((new Date(a) - new Date(b)) / MS)
 }
 
+// ── Date range helpers ────────────────────────────────────────────
+// Same presets as admin dashboard (RevenueSummary.jsx). We use local-time
+// date arithmetic rather than UTC ISO slicing because IST-morning users
+// were getting yesterday's date and "This Month" was excluding today.
+function pad(n) { return String(n).padStart(2, '0') }
+function localISO(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
+function startOfMonth(d)     { return new Date(d.getFullYear(), d.getMonth(), 1) }
+function startOfLastMonth(d) { return new Date(d.getFullYear(), d.getMonth() - 1, 1) }
+function endOfLastMonth(d)   { return new Date(d.getFullYear(), d.getMonth(), 0) }
+function startOfYear(d)      { return new Date(d.getFullYear(), 0, 1) }
+
+const PRESETS = [
+  { key: 'month',      label: 'This Month' },
+  { key: 'last_month', label: 'Last Month' },
+  { key: 'year',       label: 'This Year'  },
+  { key: 'all',        label: 'All Time'   },
+  { key: 'custom',     label: 'Custom'     },
+]
+
+function resolveRange(preset, customFrom, customTo) {
+  const now = new Date()
+  switch (preset) {
+    case 'month':      return { from: localISO(startOfMonth(now)),     to: localISO(now) }
+    case 'last_month': return { from: localISO(startOfLastMonth(now)), to: localISO(endOfLastMonth(now)) }
+    case 'year':       return { from: localISO(startOfYear(now)),      to: localISO(now) }
+    case 'all':        return { from: null,                            to: null }
+    case 'custom':     return { from: customFrom || null,              to: customTo || null }
+    default:           return { from: localISO(startOfMonth(now)),     to: localISO(now) }
+  }
+}
+
+function inRange(dateStr, from, to) {
+  if (!dateStr) return false
+  if (from && dateStr < from) return false
+  if (to && dateStr > to)     return false
+  return true
+}
+
 export function SalesDashboard() {
   const { profile } = useAuth()
   const { fetchProfileForUser, fetchSettings } = useIncentive()
@@ -37,6 +75,17 @@ export function SalesDashboard() {
   const [pendingCount, setPendingCount] = useState(0)
   const [loading,      setLoading]      = useState(true)
 
+  // Period filter — mirrors admin dashboard. Only "Won Revenue" is
+  // scoped to the range; the other KPIs represent current pipeline
+  // state ("live") and intentionally ignore the filter.
+  const [preset, setPreset]         = useState('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo]     = useState('')
+  const range = useMemo(
+    () => resolveRange(preset, customFrom, customTo),
+    [preset, customFrom, customTo]
+  )
+
   // Use local-time helpers — UTC slicing dropped today's rows for
   // morning users (00:00-05:30 IST window).
   const today = todayISO()
@@ -50,7 +99,7 @@ export function SalesDashboard() {
     const [qRes, fRes, settings, profRes, salesRes, pendRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('id, quote_number, client_name, subtotal, total_amount, status, revenue_type, campaign_start_date, campaign_end_date, created_at')
+        .select('id, quote_number, client_name, subtotal, total_amount, status, revenue_type, campaign_start_date, campaign_end_date, created_at, updated_at')
         .eq('created_by', uid)
         .order('created_at', { ascending: false }),
       supabase
@@ -99,7 +148,11 @@ export function SalesDashboard() {
       })
       setIncentive({ ...actual, profile: prof })
 
-      // Proposed: if every non-lost quote closed today + final payment
+      // Proposed: if every non-lost quote closed today + final payment.
+      // We show the INCREMENTAL upside (delta vs. current actual) — showing
+      // total was misleading because when a user had won everything and
+      // nothing was open, the "projected" number equalled the already-earned
+      // number, which looked like the won quote was counted twice.
       const openNew     = allQuotes.filter(q => !['lost','won'].includes(q.status) && q.revenue_type === 'new')
                                    .reduce((s, q) => s + (q.subtotal || 0), 0)
       const openRenewal = allQuotes.filter(q => !['lost','won'].includes(q.status) && q.revenue_type === 'renewal')
@@ -114,7 +167,15 @@ export function SalesDashboard() {
         newClientRevenue: (salesRes?.data?.new_client_revenue || 0) + openNew,
         renewalRevenue:   (salesRes?.data?.renewal_revenue    || 0) + openRenewal,
       })
-      setProposed({ ...proposedCalc, openNew, openRenewal, profile: prof, rates: { newRate, renewalRate } })
+      const deltaIncentive = Math.max(0, (proposedCalc.incentive || 0) - (actual.incentive || 0))
+      const deltaRevenue   = openNew + openRenewal
+      setProposed({
+        ...proposedCalc,
+        openNew, openRenewal,
+        deltaIncentive, deltaRevenue,
+        profile: prof,
+        rates: { newRate, renewalRate },
+      })
     }
 
     // Active campaigns = won quotes whose campaign window is today or future
@@ -135,7 +196,15 @@ export function SalesDashboard() {
   const won      = quotes.filter(q => q.status === 'won')
   const active   = quotes.filter(q => !['lost'].includes(q.status))
   const pipeline = active.reduce((s, q) => s + (q.total_amount || 0), 0)
-  const wonValue = won.reduce((s, q) => s + (q.total_amount || 0), 0)
+  // Won Revenue is scoped to the filter range — uses updated_at (when the
+  // status flipped to won) and falls back to created_at. The other KPIs
+  // stay "live" because they represent current pipeline state, which
+  // wouldn't make sense scoped to a past period.
+  const wonValue = won
+    .filter(q => range.from === null && range.to === null
+      ? true
+      : inRange(((q.updated_at || q.created_at || '')).slice(0, 10), range.from, range.to))
+    .reduce((s, q) => s + (q.total_amount || 0), 0)
 
   const STATUS_COLOR = { won: '#81c784', lost: '#ef9a9a', sent: '#64b5f6', negotiating: '#ffb74d', draft: '#888' }
 
@@ -168,8 +237,13 @@ export function SalesDashboard() {
           earn if everything in my pipeline closes" — and the user
           wants it read first, before the snapshot numbers. The
           trade-off is that the glance-value KPIs now come second,
-          but that's an intentional choice to lead with upside. */}
-      {proposed && (
+          but that's an intentional choice to lead with upside.
+
+          Hidden when deltaRevenue === 0 (no open pipeline). Without
+          this guard, the hero shows the already-earned incentive as
+          if it's "projected", which reads as double-counting the
+          won quote. */}
+      {proposed && proposed.deltaRevenue > 0 && (
         <div
           className="card"
           style={{
@@ -208,10 +282,10 @@ export function SalesDashboard() {
                 color: '#b39ddb',
                 textShadow: '0 0 24px rgba(179,157,219,.25)',
               }}>
-                {formatCurrency(proposed.incentive)}
+                +{formatCurrency(proposed.deltaIncentive)}
               </div>
               <div style={{ fontSize: '.7rem', color: 'var(--gray)', marginTop: 4 }}>
-                on {formatCurrency(proposed.total)} projected revenue
+                incremental on {formatCurrency(proposed.deltaRevenue)} open pipeline
               </div>
             </div>
 
@@ -219,7 +293,7 @@ export function SalesDashboard() {
             {[
               { label: 'Open New-Client', val: formatCurrency(proposed.openNew) },
               { label: 'Open Renewal',    val: formatCurrency(proposed.openRenewal) },
-              { label: 'Projected Revenue', val: formatCurrency(proposed.total), color: 'var(--y)' },
+              { label: 'Open Pipeline', val: formatCurrency(proposed.deltaRevenue), color: 'var(--y)' },
             ].map((f, i) => (
               <div key={i}>
                 <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>{f.label}</div>
@@ -235,12 +309,51 @@ export function SalesDashboard() {
         </div>
       )}
 
-      {/* KPI Cards — 6 tiles (moved below hero per user request) */}
+      {/* Date filter bar — same presets as admin dashboard. Only
+          Won Revenue is scoped; snapshot KPIs stay live. */}
+      <div className="db-filter-bar">
+        <div className="db-filter-presets">
+          {PRESETS.map(p => (
+            <button
+              key={p.key}
+              className={`db-filter-chip ${preset === p.key ? 'db-filter-chip--active' : ''}`}
+              onClick={() => setPreset(p.key)}
+              type="button"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {preset === 'custom' && (
+          <div className="db-filter-custom">
+            <input
+              type="date"
+              className="db-filter-date"
+              value={customFrom}
+              onChange={e => setCustomFrom(e.target.value)}
+              max={customTo || undefined}
+            />
+            <span className="db-filter-dash">→</span>
+            <input
+              type="date"
+              className="db-filter-date"
+              value={customTo}
+              onChange={e => setCustomTo(e.target.value)}
+              min={customFrom || undefined}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* KPI Cards — 6 tiles (moved below hero per user request).
+          `scoped: true` means the KPI respects the filter range;
+          everything else is rendered with a " · live" suffix so
+          the user knows it ignores the date filter. */}
       <div className="sg">
         {[
           { label: 'My Quotes',              val: quotes.length,              color: '#64b5f6' },
           { label: 'Pipeline Value',         val: formatCurrency(pipeline),   color: 'var(--y)' },
-          { label: 'Won Revenue',            val: formatCurrency(wonValue),   color: '#81c784' },
+          { label: 'Won Revenue',            val: formatCurrency(wonValue),   color: '#81c784', scoped: true },
           {
             label: 'Pending Approval',
             val:   formatCurrency(pendingTotal),
@@ -255,7 +368,10 @@ export function SalesDashboard() {
           },
         ].map((k, i) => (
           <div key={i} className="sc">
-            <div className="sc-lbl">{k.label}</div>
+            <div className="sc-lbl">
+              {k.label}
+              {!k.scoped && <span className="db-kpi-scope-note"> · live</span>}
+            </div>
             <div className="sc-val" style={{ color: k.color }}>{k.val}</div>
             {k.sub && (
               <div style={{ fontSize: '.68rem', color: 'var(--gray)', marginTop: 2 }}>{k.sub}</div>

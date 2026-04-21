@@ -14,15 +14,24 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { TrendingUp, FileText, IndianRupee, Clock, XCircle, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { formatCompact } from '../../utils/formatters'
+import { formatCompact, thisMonthISO } from '../../utils/formatters'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 
 // ── Date range helpers ─────────────────────────────────────────────
+// `iso()` formats local-time, NOT UTC. This matters in IST (UTC+5:30):
+// between 00:00 and 05:30 local, toISOString().slice(0,10) returns
+// yesterday's date, which would silently exclude today's payments
+// from "This Month".
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
 function startOfLastMonth(d) { return new Date(d.getFullYear(), d.getMonth() - 1, 1) }
 function endOfLastMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 0) }
 function startOfYear(d) { return new Date(d.getFullYear(), 0, 1) }
-function iso(d) { return d.toISOString().slice(0, 10) }
+function iso(d) {
+  const y  = d.getFullYear()
+  const m  = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
 
 const PRESETS = [
   { key: 'month',      label: 'This Month' },
@@ -143,7 +152,7 @@ export function RevenueSummary() {
     // Total Possible Incentive (company-wide projection).
     // For each active sales profile, compute incentive assuming current
     // month's actuals + all their open (non-lost, non-won) quotes close.
-    const thisMonth = new Date().toISOString().slice(0, 7)
+    const thisMonth = thisMonthISO()
     const possibleTotal = profiles.reduce((sum, prof) => {
       const openNew = quotes
         .filter(q => q.created_by === prof.user_id && !['lost', 'won'].includes(q.status) && q.revenue_type === 'new')
