@@ -6,8 +6,40 @@ export function useIncentive() {
   const store = useIncentiveStore()
 
   const fetchSettings = useCallback(async () => {
-    const { data } = await supabase.from('incentive_settings').select('*').single()
-    if (data) store.setSettings(data)
+    // Use maybeSingle() — returns null (not error) if 0 rows.
+    // If we still somehow get 0 rows, seed one so the UI doesn't
+    // get stuck on "Loading settings…".
+    let { data, error } = await supabase
+      .from('incentive_settings')
+      .select('*')
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      console.warn('fetchSettings error:', error.message)
+      return null
+    }
+
+    if (!data) {
+      // Self-heal: insert a default row so the admin can edit it.
+      const { data: seeded, error: seedErr } = await supabase
+        .from('incentive_settings')
+        .insert([{
+          default_multiplier: 5,
+          new_client_rate: 0.05,
+          renewal_rate: 0.02,
+          default_flat_bonus: 10000,
+        }])
+        .select()
+        .single()
+      if (seedErr) {
+        console.warn('fetchSettings seed failed:', seedErr.message)
+        return null
+      }
+      data = seeded
+    }
+
+    store.setSettings(data)
     return data
   }, [])
 

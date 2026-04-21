@@ -1,10 +1,11 @@
 -- =====================================================
--- UNTITLED ADFLUX — PHASE 2 SCHEMA ADDITIONS
+-- UNTITLED ADFLUX — PHASE 2 SCHEMA ADDITIONS (IDEMPOTENT)
 -- =====================================================
 -- RUN THIS ONCE in your Supabase SQL Editor AFTER Phase 1.
--- This file is ADDITIVE — it does not delete or modify any existing
--- data. Safe to run even if your database already has quotes,
--- payments, and users in it.
+-- This file is ADDITIVE and SAFE TO RE-RUN — it drops and
+-- recreates policies/triggers/functions so if you ran an
+-- earlier version and got the "policy already exists" error,
+-- just run this whole file again.
 -- =====================================================
 
 -- =====================================================
@@ -26,7 +27,10 @@ CREATE TABLE IF NOT EXISTS incentive_payouts (
 
 ALTER TABLE incentive_payouts ENABLE ROW LEVEL SECURITY;
 
--- Admin can do anything; sales can only read their own rows
+-- Drop first so re-running is safe
+DROP POLICY IF EXISTS "ip_admin_all" ON incentive_payouts;
+DROP POLICY IF EXISTS "ip_sales_own" ON incentive_payouts;
+
 CREATE POLICY "ip_admin_all" ON incentive_payouts FOR ALL
   USING (get_my_role() = 'admin');
 
@@ -37,6 +41,9 @@ CREATE POLICY "ip_sales_own" ON incentive_payouts FOR SELECT
 -- 2. PAYMENT POLICIES — sales can now add/edit/delete
 --    their OWN non-final payments on their OWN quotes.
 -- =====================================================
+
+DROP POLICY IF EXISTS "payments_sales_update_own" ON payments;
+DROP POLICY IF EXISTS "payments_sales_delete_own" ON payments;
 
 -- Sales UPDATE: allowed only if the row is currently non-final
 -- AND stays non-final AND belongs to the sales user's own quote.
@@ -139,6 +146,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS payments_update_recalc ON payments;
 CREATE TRIGGER payments_update_recalc
   AFTER UPDATE ON payments
   FOR EACH ROW EXECUTE FUNCTION handle_payment_update();
@@ -159,6 +167,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS payments_delete_recalc ON payments;
 CREATE TRIGGER payments_delete_recalc
   AFTER DELETE ON payments
   FOR EACH ROW EXECUTE FUNCTION handle_payment_delete();
@@ -179,6 +188,6 @@ BEGIN
 END $$;
 
 -- =====================================================
--- DONE. No data was changed. You can now redeploy the
--- frontend bundle from Phase 2 and everything will line up.
+-- DONE. No data was changed. Safe to re-run this whole
+-- file again if anything errors next time.
 -- =====================================================

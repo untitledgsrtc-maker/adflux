@@ -27,6 +27,12 @@ export function IncentiveSettings() {
     return (
       <div className="settings-card">
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading settings…</div>
+        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>
+          If this stays here more than a few seconds, either the
+          <code style={{ margin: '0 4px' }}>incentive_settings</code> table is empty
+          (the app will auto-seed it on next reload) or your session doesn't have
+          permission to read it. Try reloading the page.
+        </div>
       </div>
     )
   }
