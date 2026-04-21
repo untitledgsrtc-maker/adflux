@@ -13,6 +13,7 @@ import { formatCurrency } from '../../utils/formatters'
 import { useAuth } from '../../hooks/useAuth'
 import { useIncentive } from '../../hooks/useIncentive'
 import { calculateIncentive } from '../../utils/incentiveCalc'
+import { fetchMyPendingPayments } from '../../hooks/usePayments'
 import { RenewalReminderBanner } from './RenewalReminderBanner'
 import { RejectionBanner } from './RejectionBanner'
 import { PendingApprovalsBanner } from './PendingApprovalsBanner'
@@ -27,12 +28,14 @@ export function SalesDashboard() {
   const { fetchProfileForUser, fetchSettings } = useIncentive()
   const navigate = useNavigate()
 
-  const [quotes,    setQuotes]    = useState([])
-  const [followups, setFollowups] = useState([])
-  const [incentive, setIncentive] = useState(null)
-  const [proposed,  setProposed]  = useState(null)
-  const [campaigns, setCampaigns] = useState([])
-  const [loading,   setLoading]   = useState(true)
+  const [quotes,       setQuotes]       = useState([])
+  const [followups,    setFollowups]    = useState([])
+  const [incentive,    setIncentive]    = useState(null)
+  const [proposed,     setProposed]     = useState(null)
+  const [campaigns,    setCampaigns]    = useState([])
+  const [pendingTotal, setPendingTotal] = useState(0)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [loading,      setLoading]      = useState(true)
 
   const today = new Date().toISOString().split('T')[0]
   const thisMonth = today.slice(0, 7)
@@ -42,7 +45,7 @@ export function SalesDashboard() {
   async function load() {
     const uid = profile.id
 
-    const [qRes, fRes, settings, profRes, salesRes] = await Promise.all([
+    const [qRes, fRes, settings, profRes, salesRes, pendRes] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, client_name, subtotal, total_amount, status, revenue_type, campaign_start_date, campaign_end_date, created_at')
@@ -59,7 +62,15 @@ export function SalesDashboard() {
       fetchSettings(),
       fetchProfileForUser(uid),
       supabase.from('monthly_sales_data').select('*').eq('staff_id', uid).eq('month_year', thisMonth).single(),
+      fetchMyPendingPayments(uid),
     ])
+
+    // Pending payments — sum of amount_received this user submitted that
+    // admin hasn't approved or rejected yet. Kept separate from pipeline
+    // (which is quote-level) because this is a cash-flow / approval KPI.
+    const pendingRows = pendRes?.data || []
+    setPendingCount(pendingRows.length)
+    setPendingTotal(pendingRows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0))
 
     const allQuotes = qRes.data || []
     setQuotes(allQuotes)
@@ -149,12 +160,18 @@ export function SalesDashboard() {
       {/* Renewal reminders */}
       <RenewalReminderBanner userId={profile?.id} scope="mine" />
 
-      {/* KPI Cards — 5 tiles */}
+      {/* KPI Cards — 6 tiles */}
       <div className="sg">
         {[
           { label: 'My Quotes',              val: quotes.length,              color: '#64b5f6' },
           { label: 'Pipeline Value',         val: formatCurrency(pipeline),   color: 'var(--y)' },
           { label: 'Won Revenue',            val: formatCurrency(wonValue),   color: '#81c784' },
+          {
+            label: 'Pending Approval',
+            val:   formatCurrency(pendingTotal),
+            color: '#ffb74d',
+            sub:   pendingCount > 0 ? `${pendingCount} payment${pendingCount === 1 ? '' : 's'}` : null,
+          },
           { label: 'Follow-ups Due',         val: followups.length,           color: '#ffb74d' },
           {
             label: 'Total Possible Incentive',
@@ -165,70 +182,114 @@ export function SalesDashboard() {
           <div key={i} className="sc">
             <div className="sc-lbl">{k.label}</div>
             <div className="sc-val" style={{ color: k.color }}>{k.val}</div>
+            {k.sub && (
+              <div style={{ fontSize: '.68rem', color: 'var(--gray)', marginTop: 2 }}>{k.sub}</div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Incentive: earned + proposed, side-by-side */}
-      {incentive && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16 }}>
-          {/* Earned */}
-          <div className="card">
-            <div className="card-h">
-              <div className="card-t">My Incentive — {thisMonth}</div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 14, marginBottom: 14 }}>
-              {[
-                { label: 'Total Sales',                                        val: formatCurrency(incentive.total),     color: 'var(--wh)' },
-                { label: `Target (${incentive.profile?.sales_multiplier || 5}×)`, val: formatCurrency(incentive.target),   color: 'var(--y)' },
-                { label: 'Incentive Earned',                                   val: formatCurrency(incentive.incentive), color: '#81c784' },
-                { label: 'Flat Bonus',                                         val: incentive.flatBonus > 0 ? formatCurrency(incentive.flatBonus) : '—', color: 'var(--y)' },
-              ].map((f, i) => (
-                <div key={i}>
-                  <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>{f.label}</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: f.color }}>{f.val}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: '.72rem', color: 'var(--gray)', marginBottom: 5 }}>
-              {Math.min(100, Math.round((incentive.progressToTarget || 0) * 100))}% of target reached
-            </div>
-            <div style={{ height: 6, background: 'var(--brd)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', borderRadius: 3, transition: '.6s',
-                width: `${Math.min(100, (incentive.progressToTarget || 0) * 100)}%`,
-                background: incentive.targetExceeded ? '#81c784' : incentive.slabReached ? '#ffb74d' : '#ef9a9a',
-              }} />
+      {/* ── Proposed Incentive HERO ───────────────────────────────
+          Full-width hero treatment: this is the sales user's most
+          motivational number — "what could I earn if everything in
+          my pipeline closes". Pulled out of the side-by-side grid so
+          it reads as the headline KPI, with the projected-incentive
+          figure enlarged and a purple gradient to signal "upside". */}
+      {proposed && (
+        <div
+          className="card"
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderColor: 'rgba(179,157,219,.35)',
+            background: 'linear-gradient(135deg, rgba(179,157,219,.10) 0%, rgba(179,157,219,.02) 60%, transparent 100%)',
+            borderLeft: '4px solid #b39ddb',
+          }}
+        >
+          <div className="card-h">
+            <div className="card-t" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '1rem' }}>
+              <Zap size={18} color="#b39ddb" /> Proposed Incentive
+              <span style={{ fontSize: '.72rem', fontWeight: 400, color: 'var(--gray)', letterSpacing: 0, textTransform: 'none' }}>
+                if pipeline closes
+              </span>
             </div>
           </div>
 
-          {/* Proposed */}
-          {proposed && (
-            <div className="card" style={{ borderColor: 'rgba(179,157,219,.3)' }}>
-              <div className="card-h">
-                <div className="card-t" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Zap size={14} color="#b39ddb" /> Proposed Incentive (if pipeline closes)
-                </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(220px, 1.6fr) repeat(auto-fit, minmax(130px,1fr))',
+            gap: 20,
+            alignItems: 'center',
+            marginBottom: 12,
+          }}>
+            {/* Hero number */}
+            <div style={{ borderRight: '1px solid rgba(179,157,219,.2)', paddingRight: 16 }}>
+              <div style={{ fontSize: '.7rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
+                Projected Incentive
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 14, marginBottom: 10 }}>
-                {[
-                  { label: 'Open New-Client',    val: formatCurrency(proposed.openNew) },
-                  { label: 'Open Renewal',       val: formatCurrency(proposed.openRenewal) },
-                  { label: 'Projected Revenue',  val: formatCurrency(proposed.total), color: 'var(--y)' },
-                  { label: 'Projected Incentive', val: formatCurrency(proposed.incentive), color: '#b39ddb' },
-                ].map((f, i) => (
-                  <div key={i}>
-                    <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>{f.label}</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: f.color || 'var(--wh)' }}>{f.val}</div>
-                  </div>
-                ))}
+              <div style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '2.4rem',
+                lineHeight: 1.05,
+                color: '#b39ddb',
+                textShadow: '0 0 24px rgba(179,157,219,.25)',
+              }}>
+                {formatCurrency(proposed.incentive)}
               </div>
-              <div style={{ fontSize: '.7rem', color: 'var(--gray)', lineHeight: 1.5 }}>
-                Projection assumes every non-lost quote closes this month with final payment.
-                Actuals depend on payment receipts, not quote status.
+              <div style={{ fontSize: '.7rem', color: 'var(--gray)', marginTop: 4 }}>
+                on {formatCurrency(proposed.total)} projected revenue
               </div>
             </div>
-          )}
+
+            {/* Supporting breakdown */}
+            {[
+              { label: 'Open New-Client', val: formatCurrency(proposed.openNew) },
+              { label: 'Open Renewal',    val: formatCurrency(proposed.openRenewal) },
+              { label: 'Projected Revenue', val: formatCurrency(proposed.total), color: 'var(--y)' },
+            ].map((f, i) => (
+              <div key={i}>
+                <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>{f.label}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: f.color || 'var(--wh)' }}>{f.val}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: '.7rem', color: 'var(--gray)', lineHeight: 1.5 }}>
+            Projection assumes every non-lost quote closes this month with final payment.
+            Actuals depend on payment receipts, not quote status.
+          </div>
+        </div>
+      )}
+
+      {/* Earned incentive — this-month actuals */}
+      {incentive && (
+        <div className="card">
+          <div className="card-h">
+            <div className="card-t">My Incentive — {thisMonth}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 14, marginBottom: 14 }}>
+            {[
+              { label: 'Total Sales',                                        val: formatCurrency(incentive.total),     color: 'var(--wh)' },
+              { label: `Target (${incentive.profile?.sales_multiplier || 5}×)`, val: formatCurrency(incentive.target),   color: 'var(--y)' },
+              { label: 'Incentive Earned',                                   val: formatCurrency(incentive.incentive), color: '#81c784' },
+              { label: 'Flat Bonus',                                         val: incentive.flatBonus > 0 ? formatCurrency(incentive.flatBonus) : '—', color: 'var(--y)' },
+            ].map((f, i) => (
+              <div key={i}>
+                <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>{f.label}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: f.color }}>{f.val}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '.72rem', color: 'var(--gray)', marginBottom: 5 }}>
+            {Math.min(100, Math.round((incentive.progressToTarget || 0) * 100))}% of target reached
+          </div>
+          <div style={{ height: 6, background: 'var(--brd)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: 3, transition: '.6s',
+              width: `${Math.min(100, (incentive.progressToTarget || 0) * 100)}%`,
+              background: incentive.targetExceeded ? '#81c784' : incentive.slabReached ? '#ffb74d' : '#ef9a9a',
+            }} />
+          </div>
         </div>
       )}
 

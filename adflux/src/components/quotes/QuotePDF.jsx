@@ -14,28 +14,21 @@ import { formatCurrency, formatDate } from '../../utils/formatters'
 // Roboto (Apache 2.0) covers the Currency Symbols block including ₹
 // and is visually close to Helvetica so the PDF layout doesn't shift.
 //
-// Loading strategy — CDN at PDF-generation time:
-//   We fetch the TTF from jsDelivr, which mirrors the official
-//   google/fonts repo on GitHub. The TTFs are pulled once per browser
-//   session (cached after that) and the @react-pdf/renderer pipeline
-//   embeds a font subset into every generated PDF, so printed output
-//   remains standalone.
+// Loading strategy — LOCAL (bundled in repo):
+//   The TTFs live at public/fonts/Roboto-Regular.ttf and
+//   public/fonts/Roboto-Bold.ttf. Vite serves public/ at the site
+//   root, so these URLs resolve same-origin in every environment
+//   (localhost, preview deploys, production) with zero third-party
+//   network dependency at PDF-generation time.
 //
-//   Tradeoff: if jsDelivr is unreachable, PDF generation fails. The
-//   jsDelivr CDN has very high uptime but not 100%. If this ever
-//   breaks in production, migrate to bundling the TTF in
-//   public/fonts/ (see git history for the pattern).
+//   Earlier version tried jsDelivr CDN — failed in production because
+//   @react-pdf/renderer's fetch of cross-origin TTFs was blocked /
+//   mis-routed. Local paths are the reliable fix.
 Font.register({
   family: 'Roboto',
   fonts: [
-    {
-      src: 'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Regular.ttf',
-      fontWeight: 'normal',
-    },
-    {
-      src: 'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Bold.ttf',
-      fontWeight: 'bold',
-    },
+    { src: '/fonts/Roboto-Regular.ttf', fontWeight: 'normal' },
+    { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 'bold' },
   ],
 })
 
