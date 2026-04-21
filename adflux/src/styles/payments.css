@@ -1,0 +1,319 @@
+/* ─────────────────────────────────────────────────────────────
+   payments.css
+   Covers: PaymentModal, PaymentHistory, PaymentSummary
+   ───────────────────────────────────────────────────────────── */
+
+/* ── PaymentModal ────────────────────────────────────────────── */
+
+.pm-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 20px;
+}
+
+.pm-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  text-align: center;
+}
+
+.pm-summary-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pm-summary-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.pm-summary-value--paid   { color: var(--success); }
+.pm-summary-value--balance{ color: var(--warning); }
+.pm-summary-value--zero   { color: var(--text-muted); }
+
+.pm-summary-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.pm-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.pm-alert svg { margin-top: 1px; flex-shrink: 0; }
+
+.pm-alert--success {
+  background: rgba(34,197,94,0.10);
+  color: var(--success);
+  border: 1px solid rgba(34,197,94,0.25);
+}
+.pm-alert--error {
+  background: rgba(239,68,68,0.10);
+  color: var(--danger);
+  border: 1px solid rgba(239,68,68,0.25);
+}
+.pm-alert--warning {
+  background: rgba(245,158,11,0.10);
+  color: var(--warning);
+  border: 1px solid rgba(245,158,11,0.25);
+}
+
+.pm-balance-preview {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+
+/* Final payment checkbox row */
+.pm-final-row {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 4px;
+}
+
+.pm-final-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.pm-final-checkbox {
+  margin-top: 2px;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.pm-final-label span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pm-final-label strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.pm-final-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── PaymentHistory ──────────────────────────────────────────── */
+
+.ph-loading,
+.ph-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ph-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ph-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.ph-row:last-child { border-bottom: none; }
+
+.ph-row--final {
+  background: rgba(34,197,94,0.04);
+  border-radius: 6px;
+  padding: 14px 10px;
+}
+
+.ph-icon {
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.ph-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ph-amount {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ph-final-badge {
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(34,197,94,0.15);
+  color: var(--success);
+  border: 1px solid rgba(34,197,94,0.30);
+  border-radius: 4px;
+  padding: 1px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ph-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.ph-ref {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.ph-notes {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.ph-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── PaymentSummary card ─────────────────────────────────────── */
+
+.ps-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.ps-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.ps-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ps-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ps-badge--paid    { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.25); }
+.ps-badge--partial { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.25); }
+.ps-badge--unpaid  { background: rgba(148,163,184,0.12); color: var(--text-muted); border: 1px solid var(--border); }
+
+.ps-bar-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.ps-bar-fill {
+  height: 100%;
+  background: var(--warning);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.ps-bar-fill--done { background: var(--success); }
+
+.ps-pct {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.ps-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.ps-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ps-figure-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ps-figure-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.ps-figure-value--paid    { color: var(--success); }
+.ps-figure-value--balance { color: var(--warning); }
+.ps-figure-value--zero    { color: var(--text-muted); }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .pm-summary-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .pm-summary-divider { display: none; }
+  .pm-summary-item { text-align: left; }
+
+  .ps-figures {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+}

@@ -1,0 +1,692 @@
+/* =====================================================
+   CHAT 3 ADDITIONS — QUOTE WIZARD
+   Append this block to the bottom of src/styles/globals.css
+   ===================================================== */
+
+/* WIZARD SHELL */
+.page--wizard {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.wizard-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Steps indicator */
+.wizard-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.wizard-step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wizard-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.wizard-step-circle--active {
+  border-color: var(--accent);
+  background: rgba(255, 230, 0, 0.12);
+  color: var(--accent);
+}
+
+.wizard-step-circle--done {
+  border-color: var(--success);
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success);
+}
+
+.wizard-step-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.wizard-step-label--active {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.wizard-step-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  margin: 0 8px;
+}
+
+.wizard-step-line--done {
+  background: var(--success);
+}
+
+/* Wizard body */
+.wizard-body {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.wizard-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 24px 0;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* Wizard step */
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.wizard-step-header {
+  padding: 22px 24px 0;
+}
+
+.wizard-step-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.wizard-step-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.wizard-fields {
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wizard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px 22px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.wizard-inline-error {
+  margin: 0 24px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* ── STEP 2 — Campaign ── */
+
+.campaign-cities {
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.campaign-city-row {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.campaign-city-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
+.ccr-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ccr-station {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.campaign-city-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ccr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ccr-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.ccr-input {
+  width: 80px;
+  padding: 7px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ccr-input:focus {
+  border-color: var(--accent);
+}
+
+.ccr-input--accent {
+  border-color: rgba(255, 230, 0, 0.3);
+  color: var(--accent);
+}
+
+.ccr-input--accent:focus {
+  border-color: var(--accent);
+}
+
+.ccr-select {
+  padding: 7px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.ccr-total {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--success);
+  padding-bottom: 7px;
+}
+
+.ccr-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 7px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  margin-bottom: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.ccr-remove:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.campaign-subtotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 230, 0, 0.05);
+  border: 1px solid rgba(255, 230, 0, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.campaign-subtotal strong {
+  font-size: 16px;
+  color: var(--accent);
+}
+
+.campaign-add-btn {
+  margin: 0 24px;
+  justify-content: center;
+  border-style: dashed;
+}
+
+/* City Picker */
+.city-picker {
+  margin: 0 24px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.city-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.city-picker-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+}
+
+.city-picker-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.city-picker-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.city-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 11px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.city-picker-item:last-child {
+  border-bottom: none;
+}
+
+.city-picker-item:hover {
+  background: var(--border);
+}
+
+.city-picker-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.city-picker-station {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.city-picker-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.city-picker-grade {
+  padding: 2px 7px;
+  background: rgba(255, 230, 0, 0.1);
+  color: var(--accent);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.city-picker-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── STEP 3 — Review ── */
+
+.review-sections {
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.review-section {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+
+.review-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.review-field--span {
+  grid-column: 1 / -1;
+}
+
+.review-field-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.review-field-value {
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.review-tag {
+  margin-top: 4px;
+}
+
+.review-cities {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-city-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.review-city-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.review-city-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
+.review-city-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.review-city-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.review-city-rates {
+  text-align: right;
+}
+
+.review-listed {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.review-offered {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.review-total {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 3px;
+}
+
+.review-section--totals {
+  background: rgba(255, 230, 0, 0.04);
+  border-color: rgba(255, 230, 0, 0.15);
+}
+
+.totals-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.totals-row:last-child {
+  border-bottom: none;
+}
+
+.totals-row--grand {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.totals-row--grand span:last-child {
+  color: var(--accent);
+  font-size: 20px;
+}
+
+/* ── STEP 4 — Send ── */
+
+.wizard-step--send {
+  padding: 28px 24px !important;
+}
+
+.send-success {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.send-success-icon {
+  margin-bottom: 12px;
+}
+
+.send-success-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.send-success-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.send-summary {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.send-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.send-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.send-whatsapp-btn {
+  justify-content: center;
+  font-size: 15px;
+  padding: 12px;
+}
+
+.send-whatsapp-btn--done {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+}
+
+.send-no-phone {
+  padding: 14px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--warning);
+  font-size: 13px;
+  text-align: center;
+}
+
+.send-note {
+  padding: 12px 14px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-sm);
+  color: var(--blue);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .wizard-steps {
+    padding: 14px 16px;
+  }
+
+  .wizard-step-label {
+    display: none;
+  }
+
+  .wizard-step-item {
+    flex: 0 0 auto;
+  }
+
+  .wizard-step-line {
+    flex: 1;
+  }
+
+  .wizard-fields,
+  .campaign-cities,
+  .campaign-add-btn,
+  .city-picker,
+  .review-sections {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .campaign-add-btn {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .city-picker {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .wizard-footer {
+    padding: 14px 16px 18px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .campaign-city-controls {
+    gap: 8px;
+  }
+
+  .ccr-input {
+    width: 70px;
+  }
+
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-step--send {
+    padding: 20px 16px !important;
+  }
+}

@@ -1,0 +1,492 @@
+/* ═══════════════════════════════════════════════════
+   DASHBOARD — dashboard.css
+   Chat 9: Admin & Sales dashboard widgets
+═══════════════════════════════════════════════════ */
+
+/* ── Page header ─────────────────────────────────── */
+.db-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.db-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+.db-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── Layout helpers ──────────────────────────────── */
+.db-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+@media (max-width: 900px) {
+  .db-two-col { grid-template-columns: 1fr; }
+}
+
+/* ── Generic card ────────────────────────────────── */
+.db-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.db-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Badge ───────────────────────────────────────── */
+.db-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.db-badge--danger  { background: rgba(239,68,68,0.15);  color: var(--danger); }
+.db-badge--warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+
+/* ── Loading / empty states ──────────────────────── */
+.db-loading {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 16px 0;
+  text-align: center;
+}
+.db-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 24px 0;
+  text-align: center;
+}
+.db-empty p { margin: 0; }
+
+/* ══════════════════════════════════════════════════
+   KPI CARDS — RevenueSummary
+══════════════════════════════════════════════════ */
+.db-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .db-kpi-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+  .db-kpi-grid { grid-template-columns: 1fr; }
+}
+.db-kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.15s;
+}
+.db-kpi-card:hover {
+  border-color: var(--accent);
+}
+.db-kpi-card--loading {
+  height: 80px;
+  animation: db-pulse 1.4s ease-in-out infinite;
+}
+@keyframes db-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 0.3; }
+}
+.db-kpi-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.db-kpi-body {
+  flex: 1;
+  min-width: 0;
+}
+.db-kpi-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+}
+.db-kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ══════════════════════════════════════════════════
+   PIPELINE FUNNEL
+══════════════════════════════════════════════════ */
+.db-funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.db-funnel-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 80px;
+  align-items: center;
+  gap: 10px;
+}
+.db-funnel-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 500;
+}
+.db-funnel-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.db-funnel-bar-track {
+  height: 8px;
+  background: var(--surface2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.db-funnel-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.db-funnel-value {
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════════
+   OUTSTANDING PAYMENTS
+══════════════════════════════════════════════════ */
+.db-outstanding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.db-outstanding-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+  border-radius: 4px;
+}
+.db-outstanding-row:last-child { border-bottom: none; }
+.db-outstanding-row:hover { background: var(--surface2); padding-left: 8px; padding-right: 8px; }
+.db-outstanding-info { flex: 1; min-width: 0; }
+.db-outstanding-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-outstanding-company {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.db-outstanding-quote {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.db-outstanding-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.db-outstanding-balance {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--danger);
+}
+.db-outstanding-track {
+  width: 80px;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.db-outstanding-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+.db-outstanding-pct {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ══════════════════════════════════════════════════
+   TOP PERFORMERS
+══════════════════════════════════════════════════ */
+.db-performers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.db-performer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.db-performer-rank {
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.db-performer-num {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.db-performer-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.db-performer-info {
+  flex: 1;
+  min-width: 0;
+}
+.db-performer-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-performer-bar-track {
+  height: 5px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.db-performer-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #ffb700);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.db-performer-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════
+   INCENTIVE LIABILITY
+══════════════════════════════════════════════════ */
+.db-liability-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0;
+}
+.db-liability-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.db-liability-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.db-liability-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.db-liability-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.db-liability-row:last-child { border-bottom: none; }
+.db-liability-name {
+  font-size: 13px;
+  color: var(--text);
+}
+.db-liability-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--success);
+}
+
+/* ══════════════════════════════════════════════════
+   ACTIVITY FEED
+══════════════════════════════════════════════════ */
+.db-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.db-activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.db-activity-row:last-child { border-bottom: none; }
+.db-activity-row:hover { background: var(--surface2); padding-left: 8px; padding-right: 8px; }
+.db-activity-dot {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.db-activity-body { flex: 1; min-width: 0; }
+.db-activity-desc {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+.db-activity-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.db-activity-client { color: var(--text-muted); }
+.db-activity-quote  { color: var(--blue); }
+.db-activity-actor  { color: var(--text-muted); }
+.db-activity-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════
+   FOLLOW-UPS DUE TODAY
+══════════════════════════════════════════════════ */
+.db-fu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.db-fu-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border);
+}
+.db-fu-row:last-child { border-bottom: none; }
+.db-fu-row:hover { background: var(--surface2); }
+.db-fu-row--overdue { background: rgba(239,68,68,0.04); }
+.db-fu-info { flex: 1; min-width: 0; }
+.db-fu-client {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-fu-qnum {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+.db-fu-assignee {
+  font-size: 11px;
+  color: var(--blue);
+  margin-top: 2px;
+}
+.db-fu-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-fu-date {
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.db-fu-done-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  margin-top: 1px;
+}
+.db-fu-done-btn:hover { color: var(--success); }

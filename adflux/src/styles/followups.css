@@ -1,0 +1,452 @@
+/* src/styles/followups.css */
+
+/* ═══════════════════════════════════════════════
+   FOLLOW-UP BANNER
+   ═══════════════════════════════════════════════ */
+
+.fu-banner {
+  border-radius: 10px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.fu-banner--urgent {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.fu-banner--today {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.fu-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+}
+
+.fu-banner-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.fu-banner--urgent .fu-banner-icon { color: var(--danger); }
+.fu-banner--today  .fu-banner-icon { color: var(--warning); }
+
+.fu-banner-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.fu-banner-count {
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+}
+
+.fu-banner-count--overdue {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+.fu-banner-count--today {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+.fu-banner-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.fu-banner-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.fu-banner-action:hover {
+  background: var(--surface2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fu-banner-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.fu-banner-dismiss:hover { color: var(--text); }
+
+
+/* ═══════════════════════════════════════════════
+   FOLLOW-UP LIST (per-quote tab)
+   ═══════════════════════════════════════════════ */
+
+.fu-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.fu-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.fu-list-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fu-add-form {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.fu-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fu-add-row .field-input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.fu-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.fu-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.fu-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: background 0.12s;
+}
+
+.fu-row--overdue {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.fu-row--today {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.fu-row--done {
+  opacity: 0.55;
+}
+
+.fu-row-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.fu-row-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fu-row-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fu-row-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.fu-row-done-at {
+  font-size: 11px;
+  color: var(--success);
+}
+
+.fu-row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Shared action buttons */
+.fu-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.fu-action-btn--done {
+  color: var(--success);
+}
+
+.fu-action-btn--done:hover {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: var(--success);
+}
+
+.fu-action-btn--reschedule {
+  color: var(--blue);
+}
+
+.fu-action-btn--reschedule:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--blue);
+}
+
+
+/* ═══════════════════════════════════════════════
+   ADMIN VIEW
+   ═══════════════════════════════════════════════ */
+
+.fu-admin-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fu-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fu-summary-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+
+.fu-summary-chip--overdue {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.fu-summary-chip--today {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.fu-summary-chip--pending {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--blue);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.fu-summary-chip--done {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.fu-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fu-filter-btn {
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fu-filter-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.fu-filter-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* Admin table rows */
+.fu-admin-row {}
+
+.fu-admin-row--overdue td:first-child { border-left: 3px solid var(--danger); }
+.fu-admin-row--today  td:first-child  { border-left: 3px solid var(--warning); }
+.fu-admin-row--done   { opacity: 0.5; }
+
+/* Status chips */
+.fu-status-done     { color: var(--success); font-size: 12px; font-weight: 600; }
+.fu-status-overdue  { color: var(--danger);  font-size: 12px; font-weight: 600; }
+.fu-status-today    { color: var(--warning); font-size: 12px; font-weight: 600; }
+.fu-status-upcoming { color: var(--blue);    font-size: 12px; font-weight: 600; }
+
+/* Date chip */
+.fu-date-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-muted);
+}
+
+.fu-date-chip--overdue {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.fu-date-chip--today {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+.fu-date-chip--done {
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--success);
+}
+
+/* Quote link in admin table */
+.fu-quote-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+
+.fu-quote-link:hover { opacity: 0.8; }
+
+
+/* ═══════════════════════════════════════════════
+   MODAL OVERRIDES for follow-up
+   ═══════════════════════════════════════════════ */
+
+.fu-modal-qnum {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: rgba(255, 230, 0, 0.08);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-right: 6px;
+}
+
+.fu-done-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.fu-done-confirm p { margin: 0; }
+
+/* btn-success utility (if not in globals) */
+.btn-success {
+  background: var(--success);
+  color: #fff;
+  font-weight: 700;
+}
+
+.btn-success:hover {
+  filter: brightness(1.08);
+}
+
+/* modal-box small variant */
+.modal-box--sm {
+  max-width: 440px;
+}

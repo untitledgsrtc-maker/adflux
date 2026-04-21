@@ -1,0 +1,33 @@
+/* APPEND THIS TO THE BOTTOM OF src/styles/quotes.css */
+
+/* ── QuoteDetail tabs ─────────────────────────────── */
+.qd-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.qd-tab-btn {
+  padding: 9px 18px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.qd-tab-btn:hover {
+  color: var(--text);
+}
+
+.qd-tab-btn--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 700;
+}
