@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Search, Zap, X, Filter } from 'lucide-react'
+import { Plus, Search, Zap, X } from 'lucide-react'
 import { useCities } from '../hooks/useCities'
 import { CityGrid } from '../components/cities/CityGrid'
 import { CityModal } from '../components/cities/CityModal'
 import { BulkRateModal } from '../components/cities/BulkRateModal'
+import { formatNumber } from '../utils/formatters'
 
 const GRADES = ['A', 'B', 'C']
 
@@ -21,7 +22,7 @@ export default function Cities() {
   const [gradeFilter, setGradeFilter] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
-  const [cityModal, setCityModal] = useState(null) // null | 'new' | city object
+  const [cityModal, setCityModal] = useState(null)
   const [bulkModal, setBulkModal] = useState(false)
   const [savingCity, setSavingCity] = useState(false)
   const [bulkLoading, setBulkLoading] = useState(false)
@@ -51,6 +52,17 @@ export default function Cities() {
       return true
     })
   }, [cities, search, gradeFilter, showInactive])
+
+  // KPI roll-ups — run against the FULL active set, not the filtered view,
+  // so the header numbers don't jump around when the user is just searching.
+  const kpis = useMemo(() => {
+    const live = cities.filter(c => c.is_active)
+    return {
+      cityCount:  live.length,
+      screenSum:  live.reduce((s, c) => s + (Number(c.screens) || 0), 0),
+      imprSum:    live.reduce((s, c) => s + (Number(c.impressions_day) || 0), 0),
+    }
+  }, [cities])
 
   function toggleSelect(id) {
     setSelectedIds(prev => {
@@ -82,7 +94,7 @@ export default function Cities() {
     setSavingCity(false)
   }
 
-  async function handleDelete(city) {
+  function handleDelete(city) {
     setDeleteConfirm(city)
   }
 
@@ -116,7 +128,9 @@ export default function Cities() {
       <div className="page-header">
         <div>
           <h1 className="page-title">City Manager</h1>
-          <p className="page-subtitle">{filtered.length} location{filtered.length !== 1 ? 's' : ''}</p>
+          <p className="page-subtitle">
+            {filtered.length} location{filtered.length !== 1 ? 's' : ''}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {selectedIds.size > 0 && (
@@ -129,6 +143,22 @@ export default function Cities() {
             <Plus size={15} />
             Add City
           </button>
+        </div>
+      </div>
+
+      {/* KPI row — Cities / Screens / Daily Impressions */}
+      <div className="city-kpi-row">
+        <div className="city-kpi-card">
+          <p className="city-kpi-label">Cities</p>
+          <p className="city-kpi-value">{kpis.cityCount}</p>
+        </div>
+        <div className="city-kpi-card">
+          <p className="city-kpi-label">Screens</p>
+          <p className="city-kpi-value">{formatNumber(kpis.screenSum)}</p>
+        </div>
+        <div className="city-kpi-card">
+          <p className="city-kpi-label">Daily Impr.</p>
+          <p className="city-kpi-value">{formatNumber(kpis.imprSum)}</p>
         </div>
       </div>
 
@@ -166,7 +196,6 @@ export default function Cities() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-          {/* Select all */}
           {filtered.length > 0 && (
             <button className="btn btn-ghost btn-sm" onClick={selectAll}>
               {selectedIds.size === filtered.length ? 'Deselect All' : 'Select All'}

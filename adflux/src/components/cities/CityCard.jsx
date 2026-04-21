@@ -1,115 +1,111 @@
-import { Building2, Monitor, Eye, TrendingUp, MoreVertical, Edit2, Trash2 } from 'lucide-react'
-import { formatCurrency, formatNumber } from '../../utils/formatters'
-import { useState, useRef, useEffect } from 'react'
+// src/components/cities/CityCard.jsx
+//
+// Card design matches the target City Manager mock:
+//   - photo with a round grade-coloured badge top-left
+//   - uppercase city name
+//   - details line: "N screens · SIZE" · Station name
+//   - rates line: ₹offer (accent) + ₹listed (strikethrough)
+//   - impressions line below
+//   - inline yellow-outline "Edit" button + red X delete button at the bottom
+//
+// A small selection checkbox overlays the top-right corner so bulk-rate edits
+// still work.
 
-const GRADE_COLORS = {
-  A: { bg: 'rgba(255,230,0,0.12)', color: 'var(--accent)', label: 'Grade A' },
-  B: { bg: 'rgba(59,130,246,0.12)', color: 'var(--blue)', label: 'Grade B' },
-  C: { bg: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', label: 'Grade C' },
+import { Pencil, X, Check } from 'lucide-react'
+import { formatCurrency, formatNumber } from '../../utils/formatters'
+
+// Match the reference mock: rectangular pills with white text on
+// translucent colour backgrounds (green / orange / grey).
+const GRADE_STYLES = {
+  A: { bg: 'rgba(76,175,80,.92)',  color: '#fff' }, // green
+  B: { bg: 'rgba(255,152,0,.92)',  color: '#fff' }, // orange
+  C: { bg: 'rgba(136,136,136,.85)', color: '#fff' }, // grey
 }
 
 export function CityCard({ city, selected, onSelect, onEdit, onDelete }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef(null)
-  const grade = GRADE_COLORS[city.grade] || GRADE_COLORS.C
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false)
-      }
-    }
-    if (menuOpen) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [menuOpen])
+  const g = (city.grade || 'C').toUpperCase()
+  const badge = GRADE_STYLES[g] || GRADE_STYLES.C
+  const hasOffer =
+    city.offer_rate &&
+    city.monthly_rate &&
+    Number(city.offer_rate) !== Number(city.monthly_rate)
 
   return (
     <div className={`city-card${selected ? ' city-card--selected' : ''}`}>
-      {/* Selection checkbox */}
-      <div className="city-card-select" onClick={(e) => { e.stopPropagation(); onSelect(city.id) }}>
-        <div className={`city-checkbox${selected ? ' city-checkbox--checked' : ''}`}>
-          {selected && (
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-              <path d="M1 4L3.5 6.5L9 1" stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          )}
-        </div>
-      </div>
-
-      {/* Photo / placeholder */}
+      {/* Photo */}
       <div className="city-card-photo">
         {city.photo_url ? (
           <img src={city.photo_url} alt={city.name} />
         ) : (
-          <div className="city-card-photo-placeholder">
-            <Building2 size={28} color="var(--border)" />
-          </div>
+          <div className="city-card-photo-placeholder" />
         )}
-        <div className="city-card-grade" style={{ background: grade.bg, color: grade.color }}>
-          {city.grade || '—'}
+
+        {/* Grade badge — top-left, strong colour */}
+        <div className="city-card-grade" style={{ background: badge.bg, color: badge.color }}>
+          {g}
+        </div>
+
+        {/* Selection — top-right */}
+        <div
+          className="city-card-select"
+          onClick={(e) => { e.stopPropagation(); onSelect(city.id) }}
+          title={selected ? 'Deselect' : 'Select for bulk edit'}
+        >
+          <div className={`city-checkbox${selected ? ' city-checkbox--checked' : ''}`}>
+            {selected && <Check size={12} strokeWidth={3} />}
+          </div>
         </div>
       </div>
 
       {/* Body */}
       <div className="city-card-body">
-        <div className="city-card-header">
-          <div>
-            <p className="city-card-name">{city.name}</p>
-            {city.station_name && (
-              <p className="city-card-station">{city.station_name}</p>
-            )}
-          </div>
-          <div className="city-card-menu" ref={menuRef}>
-            <button
-              className="city-card-menu-btn"
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
-            >
-              <MoreVertical size={15} />
-            </button>
-            {menuOpen && (
-              <div className="city-card-dropdown">
-                <button onClick={() => { setMenuOpen(false); onEdit(city) }}>
-                  <Edit2 size={13} /> Edit
-                </button>
-                <button className="danger" onClick={() => { setMenuOpen(false); onDelete(city) }}>
-                  <Trash2 size={13} /> Deactivate
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <p className="city-card-name">{city.name}</p>
+        <p className="city-card-meta">
+          {city.screens} screens
+          {city.screen_size_inch ? ` · ${city.screen_size_inch}"` : ''}
+          {city.station_name ? ` · ${city.station_name}` : ''}
+        </p>
 
-        <div className="city-card-stats">
-          <div className="city-stat">
-            <Monitor size={12} />
-            <span>{city.screens} screen{city.screens !== 1 ? 's' : ''}</span>
-            {city.screen_size_inch && <span className="city-stat-sub">· {city.screen_size_inch}"</span>}
-          </div>
-          <div className="city-stat">
-            <Eye size={12} />
-            <span>{formatNumber(city.impressions_day)}/day</span>
-          </div>
-        </div>
+        <p className="city-card-rate-line">
+          {hasOffer ? (
+            <>
+              <span className="city-rate-offer">{formatCurrency(city.offer_rate)}</span>
+              <span className="city-rate-unit">/mo offer</span>
+              <span className="city-rate-listed">{formatCurrency(city.monthly_rate)}</span>
+            </>
+          ) : (
+            <>
+              <span className="city-rate-offer">{formatCurrency(city.monthly_rate || city.offer_rate || 0)}</span>
+              <span className="city-rate-unit">/mo</span>
+            </>
+          )}
+        </p>
 
-        <div className="city-card-rates">
-          <div className="city-rate">
-            <span className="city-rate-label">Listed</span>
-            <span className="city-rate-value">{formatCurrency(city.monthly_rate)}</span>
-            <span className="city-rate-unit">/mo</span>
-          </div>
-          <div className="city-rate city-rate--offer">
-            <span className="city-rate-label">Offer</span>
-            <span className="city-rate-value">{formatCurrency(city.offer_rate)}</span>
-            <span className="city-rate-unit">/mo</span>
-          </div>
-        </div>
-
-        {city.unique_viewers > 0 && (
-          <div className="city-card-viewers">
-            <TrendingUp size={11} />
-            <span>{formatNumber(city.unique_viewers)} unique viewers/mo</span>
-          </div>
+        {(city.impressions_day > 0 || city.unique_viewers > 0) && (
+          <p className="city-card-impr">
+            {city.impressions_day > 0 && <>{formatNumber(city.impressions_day)} impr/day</>}
+            {city.impressions_day > 0 && city.unique_viewers > 0 && ' · '}
+            {city.unique_viewers > 0 && <>{formatNumber(city.unique_viewers)} unique</>}
+          </p>
         )}
+
+        <div className="city-card-actions">
+          <button
+            className="city-edit-btn"
+            onClick={() => onEdit(city)}
+            type="button"
+          >
+            <Pencil size={13} /> Edit
+          </button>
+          <button
+            className="city-delete-btn"
+            onClick={() => onDelete(city)}
+            type="button"
+            title="Deactivate"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
     </div>
   )

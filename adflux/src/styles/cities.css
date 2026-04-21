@@ -1,12 +1,54 @@
 /* =====================================================
-   CHAT 2 ADDITIONS — CITY MANAGER
-   Append this to the bottom of src/styles/globals.css
+   CITY MANAGER — v3
+   Rebuilt to match target design: KPI header row, card grid
+   with photo + grade pill, inline yellow-outline Edit button
+   and red X delete button. Responsive down to small phones.
    ===================================================== */
+
+/* KPI ROW */
+.city-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.city-kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.city-kpi-card::after {
+  content: '';
+  position: absolute;
+  top: -10px; right: -10px;
+  width: 80px; height: 80px;
+  background: radial-gradient(circle at center, rgba(255,230,0,0.10), transparent 70%);
+  pointer-events: none;
+}
+.city-kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.city-kpi-value {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
 
 /* CITY GRID */
 .city-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 14px;
 }
 
@@ -17,44 +59,23 @@
   border-radius: var(--radius);
   overflow: hidden;
   position: relative;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  display: flex;
+  flex-direction: column;
 }
 .city-card:hover {
-  border-color: rgba(255,230,0,0.25);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  border-color: rgba(255,230,0,0.35);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  transform: translateY(-1px);
 }
 .city-card--selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(255,230,0,0.2);
 }
 
-/* Selection */
-.city-card-select {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 2;
-  cursor: pointer;
-}
-.city-checkbox {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  border: 1.5px solid var(--border);
-  background: var(--surface2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-.city-checkbox--checked {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
 /* Photo */
 .city-card-photo {
-  height: 130px;
+  height: 135px;
   background: var(--surface2);
   position: relative;
   overflow: hidden;
@@ -63,171 +84,164 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 .city-card-photo-placeholder {
   width: 100%;
   height: 100%;
+  background:
+    linear-gradient(135deg, rgba(255,230,0,0.05), transparent 70%),
+    var(--surface2);
+}
+
+/* Grade badge — pill, strong colour, top-left (matches reference mock) */
+.city-card-grade {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  text-transform: uppercase;
+}
+
+/* Select checkbox — top-right */
+.city-card-select {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  cursor: pointer;
+}
+.city-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(255,255,255,0.6);
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.15s;
+  color: #0f172a;
 }
-.city-card-grade {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+.city-checkbox--checked {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 /* Body */
 .city-card-body {
-  padding: 14px 14px 14px;
-}
-.city-card-header {
+  padding: 12px 14px 14px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.city-card-name {
-  font-size: 14.5px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.2;
-}
-.city-card-station {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-top: 2px;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
 }
 
-/* Menu */
-.city-card-menu {
-  position: relative;
-  flex-shrink: 0;
-}
-.city-card-menu-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  padding: 4px;
-  border-radius: 5px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  transition: color 0.15s, background 0.15s;
-}
-.city-card-menu-btn:hover {
+.city-card-name {
+  font-size: 13px;
+  font-weight: 700;
   color: var(--text);
-  background: var(--surface2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.2;
 }
-.city-card-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  min-width: 140px;
-  z-index: 50;
-  box-shadow: var(--shadow);
-  overflow: hidden;
+
+.city-card-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
-.city-card-dropdown button {
+
+/* Rate line: offer on left (yellow), listed strikethrough on right */
+.city-card-rate-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.city-rate-offer {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+.city-rate-unit {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-left: 3px;
+}
+.city-rate-listed {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.7;
+  margin-left: auto;
+}
+
+.city-card-impr {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* Inline action row */
+.city-card-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 9px 13px;
-  font-size: 13px;
-  color: var(--text);
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: background 0.12s;
+  margin-top: 8px;
 }
-.city-card-dropdown button:hover {
-  background: var(--border);
-}
-.city-card-dropdown button.danger {
-  color: var(--danger);
-}
-.city-card-dropdown button.danger:hover {
-  background: rgba(239,68,68,0.1);
-}
-
-/* Stats */
-.city-card-stats {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-.city-stat {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.city-stat-sub {
-  color: var(--text-muted);
-  opacity: 0.6;
-}
-
-/* Rates */
-.city-card-rates {
-  display: flex;
-  gap: 12px;
-  padding: 10px 12px;
-  background: var(--surface2);
-  border-radius: var(--radius-sm);
-  margin-bottom: 8px;
-}
-.city-rate {
+.city-edit-btn {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.city-rate--offer {}
-.city-rate-label {
-  font-size: 10px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-.city-rate-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
-}
-.city-rate--offer .city-rate-value {
+  background: transparent;
   color: var(--accent);
+  border: 1px solid rgba(255,230,0,0.55);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
-.city-rate-unit {
-  font-size: 10px;
-  color: var(--text-muted);
+.city-edit-btn:hover {
+  background: rgba(255,230,0,0.10);
+  border-color: var(--accent);
 }
-
-.city-card-viewers {
+.city-delete-btn {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
-  color: var(--text-muted);
+  justify-content: center;
+  border-radius: 8px;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
 }
+.city-delete-btn:hover { background: #dc2626; }
 
-/* FILTERS BAR */
+/* FILTER BAR */
 .city-filters {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 .search-box {
@@ -263,6 +277,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 .filter-pill {
   padding: 5px 12px;
@@ -285,7 +300,6 @@
   color: var(--accent);
 }
 
-/* Toggle label */
 .toggle-label {
   display: flex;
   align-items: center;
@@ -312,10 +326,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* Validation */
-.input-error {
-  border-color: var(--danger) !important;
-}
+.input-error { border-color: var(--danger) !important; }
 .field-error {
   font-size: 11.5px;
   color: var(--danger);
@@ -350,20 +361,39 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 768px) {
+/* RESPONSIVE */
+@media (max-width: 1100px) {
   .city-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+@media (max-width: 768px) {
+  .city-kpi-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .city-kpi-card:nth-child(3) { grid-column: 1 / -1; }
+  .city-kpi-value { font-size: 24px; }
+  .city-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
   .city-filters {
     flex-direction: column;
     align-items: stretch;
   }
-  .search-box {
-    width: 100%;
-  }
+  .search-box { width: 100%; }
   .toast {
-    bottom: 70px;
-    right: 16px;
-    left: 16px;
+    bottom: 80px;
+    right: 12px;
+    left: 12px;
+  }
+}
+@media (max-width: 420px) {
+  .city-kpi-row {
+    grid-template-columns: 1fr;
+  }
+  .city-kpi-card:nth-child(3) { grid-column: auto; }
+  .city-grid {
+    grid-template-columns: 1fr;
   }
 }

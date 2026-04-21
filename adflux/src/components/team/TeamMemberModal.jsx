@@ -2,7 +2,7 @@
 // Admin creates team member with password — no email invite, no session switch
 import { useState } from 'react'
 import { X } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseSignup } from '../../lib/supabase'
 import { useTeam } from '../../hooks/useTeam'
 
 const ROLES = [
@@ -61,11 +61,11 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     setServerError('')
 
     if (mode === 'add') {
-      // Save current admin session before signup changes it
-      const { data: { session: adminSession } } = await supabase.auth.getSession()
-
-      // Create new auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Create the new auth user on the ISOLATED signup client.
+      // That client has `persistSession: false`, so the SIGNED_IN auth
+      // event never fires on the primary `supabase` client and the
+      // admin stays logged in. No session save/restore dance needed.
+      const { data: authData, error: authError } = await supabaseSignup.auth.signUp({
         email:    form.email.trim().toLowerCase(),
         password: form.password,
         options:  { data: { name: form.name.trim() } }
@@ -84,13 +84,10 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         return
       }
 
-      // IMPORTANT: Restore admin session immediately so we don't get redirected
-      if (adminSession) {
-        await supabase.auth.setSession({
-          access_token:  adminSession.access_token,
-          refresh_token: adminSession.refresh_token,
-        })
-      }
+      // Drop the new user's session from the isolated client so we don't
+      // accidentally reuse it on a later call. The primary `supabase`
+      // client was never touched, so the admin's session is intact.
+      try { await supabaseSignup.auth.signOut() } catch (_) { /* ignore */ }
 
       // Insert into users table
       const { error: userError } = await supabase

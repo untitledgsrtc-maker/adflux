@@ -1,5 +1,6 @@
 @import './tokens.css';
 @import './legacy-compat.css';
+@import './cities.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
