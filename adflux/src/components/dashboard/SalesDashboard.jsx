@@ -70,7 +70,7 @@ export function SalesDashboard() {
       const multiplier   = prof.sales_multiplier   ?? s.default_multiplier ?? 5
       const newRate      = prof.new_client_rate    ?? s.new_client_rate    ?? 0.05
       const renewalRate  = prof.renewal_rate       ?? s.renewal_rate       ?? 0.02
-      const flatBonus    = prof.flat_bonus         ?? s.flat_bonus         ?? 10000
+      const flatBonus    = prof.flat_bonus         ?? s.default_flat_bonus ?? s.flat_bonus ?? 10000
 
       // Current-month actuals
       const actual = calculateIncentive({

@@ -17,7 +17,8 @@ export function IncentiveSettings() {
         default_multiplier: settings.default_multiplier ?? 5,
         new_client_rate:    settings.new_client_rate    ?? 0.05,
         renewal_rate:       settings.renewal_rate       ?? 0.02,
-        flat_bonus:         settings.flat_bonus         ?? 10000,
+        // DB column is `default_flat_bonus`; accept old `flat_bonus` as fallback
+        flat_bonus:         settings.default_flat_bonus ?? settings.flat_bonus ?? 10000,
       })
     }
   }, [settings])
@@ -43,7 +44,8 @@ export function IncentiveSettings() {
       default_multiplier: Number(form.default_multiplier),
       new_client_rate:    Number(form.new_client_rate),
       renewal_rate:       Number(form.renewal_rate),
-      flat_bonus:         Number(form.flat_bonus),
+      // Correct DB column is `default_flat_bonus`
+      default_flat_bonus: Number(form.flat_bonus),
     })
     setSaving(false)
     if (err) setError(err.message)

@@ -35,7 +35,7 @@ export function IncentiveLiability() {
         salesMultiplier:  p.sales_multiplier ?? settings.default_multiplier ?? 5,
         newClientRate:    p.new_client_rate  ?? settings.new_client_rate    ?? 0.05,
         renewalRate:      p.renewal_rate     ?? settings.renewal_rate       ?? 0.02,
-        flatBonus:        p.flat_bonus       ?? settings.flat_bonus         ?? 10000,
+        flatBonus:        p.flat_bonus       ?? settings.default_flat_bonus ?? settings.flat_bonus ?? 10000,
         newClientRevenue: md.new_client_revenue || 0,
         renewalRevenue:   md.renewal_revenue    || 0,
       })

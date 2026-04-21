@@ -52,52 +52,16 @@ export function usePayments(quoteId) {
       return { error: insertErr }
     }
 
-    // If final payment — update monthly_sales_data client-side
-    // (Supabase trigger also handles this server-side as a safety net)
+    // If final payment — auto-set quote status to Won.
+    // NOTE: monthly_sales_data is credited entirely by the Supabase
+    // trigger `handle_final_payment` (see supabase_schema.sql).
+    // Previously we ALSO wrote client-side, which double-counted
+    // revenue. That write has been removed.
     if (paymentData.is_final_payment) {
-      const { data: quote, error: qErr } = await supabase
+      await supabase
         .from('quotes')
-        .select('created_by, subtotal, revenue_type')
+        .update({ status: 'won' })
         .eq('id', quoteId)
-        .single()
-
-      if (!qErr && quote) {
-        const monthYear = paymentData.payment_date.slice(0, 7)
-        const field = quote.revenue_type === 'new' ? 'new_client_revenue' : 'renewal_revenue'
-
-        // Upsert monthly_sales_data
-        const { data: existing } = await supabase
-          .from('monthly_sales_data')
-          .select('id, new_client_revenue, renewal_revenue')
-          .eq('staff_id', quote.created_by)
-          .eq('month_year', monthYear)
-          .maybeSingle()
-
-        if (existing) {
-          await supabase
-            .from('monthly_sales_data')
-            .update({
-              [field]: (existing[field] || 0) + quote.subtotal,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existing.id)
-        } else {
-          await supabase
-            .from('monthly_sales_data')
-            .insert([{
-              staff_id: quote.created_by,
-              month_year: monthYear,
-              new_client_revenue: quote.revenue_type === 'new' ? quote.subtotal : 0,
-              renewal_revenue: quote.revenue_type === 'renewal' ? quote.subtotal : 0,
-            }])
-        }
-
-        // Auto-set quote status to Won
-        await supabase
-          .from('quotes')
-          .update({ status: 'won' })
-          .eq('id', quoteId)
-      }
     }
 
     // Prepend to local state (newest first)

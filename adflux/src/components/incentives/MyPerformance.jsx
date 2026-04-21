@@ -101,7 +101,7 @@ export function MyPerformance() {
     salesMultiplier:  multiplier,
     newClientRate:    myProfile.new_client_rate ?? settings?.new_client_rate ?? 0.05,
     renewalRate:      myProfile.renewal_rate    ?? settings?.renewal_rate    ?? 0.02,
-    flatBonus:        myProfile.flat_bonus      ?? settings?.flat_bonus      ?? 10000,
+    flatBonus:        myProfile.flat_bonus      ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
     newClientRevenue: md?.new_client_revenue || 0,
     renewalRevenue:   md?.renewal_revenue    || 0,
   })
@@ -318,7 +318,7 @@ export function MyPerformance() {
                 salesMultiplier:  multiplier,
                 newClientRate:    myProfile.new_client_rate ?? settings?.new_client_rate ?? 0.05,
                 renewalRate:      myProfile.renewal_rate    ?? settings?.renewal_rate    ?? 0.02,
-                flatBonus:        myProfile.flat_bonus      ?? settings?.flat_bonus      ?? 10000,
+                flatBonus:        myProfile.flat_bonus      ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
                 newClientRevenue: row.new_client_revenue || 0,
                 renewalRevenue:   row.renewal_revenue    || 0,
               })

@@ -50,6 +50,24 @@ export function PaymentSummary({ totalAmount = 0, totalPaid = 0, hasFinalPayment
           </span>
         </div>
       </div>
+
+      {/* Hint: revenue only counts after Final Payment is ticked */}
+      {!hasFinalPayment && (
+        <div style={{
+          marginTop: 10,
+          padding: '8px 10px',
+          background: 'rgba(245, 158, 11, 0.08)',
+          border: '1px solid rgba(245, 158, 11, 0.25)',
+          borderRadius: 6,
+          fontSize: 11,
+          color: 'var(--text-muted)',
+          lineHeight: 1.45,
+        }}>
+          <strong style={{ color: 'var(--text)' }}>Heads up:</strong> this quote will only
+          show up in <em>Revenue</em> and <em>Incentive</em> dashboards once a payment is
+          ticked as <strong>Final Payment</strong> (admin only).
+        </div>
+      )}
     </div>
   )
 }

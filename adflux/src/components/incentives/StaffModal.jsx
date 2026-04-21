@@ -14,7 +14,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
     sales_multiplier: profile.sales_multiplier  ?? settings?.default_multiplier ?? 5,
     new_client_rate:  profile.new_client_rate   ?? settings?.new_client_rate    ?? 0.05,
     renewal_rate:     profile.renewal_rate      ?? settings?.renewal_rate       ?? 0.02,
-    flat_bonus:       profile.flat_bonus        ?? settings?.flat_bonus         ?? 10000,
+    flat_bonus:       profile.flat_bonus        ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
     join_date:        profile.join_date         ?? '',
   })
   const [errors,  setErrors]  = useState({})

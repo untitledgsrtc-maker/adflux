@@ -52,7 +52,7 @@ export function MemberStatsCard({ member, settings }) {
         salesMultiplier:  profile.sales_multiplier || settings.default_multiplier,
         newClientRate:    profile.new_client_rate  || settings.new_client_rate,
         renewalRate:      profile.renewal_rate     || settings.renewal_rate,
-        flatBonus:        profile.flat_bonus       || settings.flat_bonus,
+        flatBonus:        profile.flat_bonus       || settings.default_flat_bonus || settings.flat_bonus,
         newClientRevenue: monthlyData?.new_client_revenue || 0,
         renewalRevenue:   monthlyData?.renewal_revenue    || 0,
       })

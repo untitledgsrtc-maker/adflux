@@ -22,7 +22,7 @@ export function WhatIfSimulator({ profiles, settings }) {
       salesMultiplier:  multiplier,
       newClientRate:    profile.new_client_rate ?? settings?.new_client_rate ?? 0.05,
       renewalRate:      profile.renewal_rate    ?? settings?.renewal_rate    ?? 0.02,
-      flatBonus:        profile.flat_bonus      ?? settings?.flat_bonus      ?? 10000,
+      flatBonus:        profile.flat_bonus      ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
       newClientRevenue: newRevenue,
       renewalRevenue:   renewalRevenue,
     })
