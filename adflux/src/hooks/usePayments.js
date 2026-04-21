@@ -18,6 +18,41 @@ import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 
+// ─── Helper: flip a quote to "won" when warranted ─────────────────
+// Call this after ANY approved payment lands (admin insert or admin
+// approval). Rule:
+//   • If is_final_payment is true → flip.
+//   • Else, check cumulative approved payments vs quote total —
+//     if the quote is paid off, flip anyway. Prevents the
+//     "Fully Paid but Sent" stuck state when is_final isn't ticked.
+// Safe to call multiple times: short-circuits when status is
+// already 'won'.
+async function maybeFlipQuoteWon(quoteId, isFinalPayment) {
+  if (!quoteId) return
+  if (isFinalPayment) {
+    await supabase.from('quotes').update({ status: 'won' }).eq('id', quoteId)
+    return
+  }
+  const [{ data: approvedRows }, { data: quoteRow }] = await Promise.all([
+    supabase
+      .from('payments')
+      .select('amount_received')
+      .eq('quote_id', quoteId)
+      .eq('approval_status', 'approved'),
+    supabase
+      .from('quotes')
+      .select('total_amount, status')
+      .eq('id', quoteId)
+      .single(),
+  ])
+  if (!quoteRow || quoteRow.status === 'won') return
+  const totalApproved = (approvedRows || [])
+    .reduce((s, r) => s + Number(r.amount_received || 0), 0)
+  if (totalApproved >= Number(quoteRow.total_amount || 0)) {
+    await supabase.from('quotes').update({ status: 'won' }).eq('id', quoteId)
+  }
+}
+
 export function usePayments(quoteId) {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(false)
@@ -74,15 +109,12 @@ export function usePayments(quoteId) {
       return { error: insertErr }
     }
 
-    // Only an admin recording an APPROVED final payment should flip
-    // the quote to "won" immediately. When sales punches a pending
-    // final, the quote stays in its current status until approval
-    // (approvePayment handles the flip).
-    if (isAdmin && paymentData.is_final_payment) {
-      await supabase
-        .from('quotes')
-        .update({ status: 'won' })
-        .eq('id', quoteId)
+    // Only an admin recording an APPROVED payment can flip the quote
+    // to "won" from this insert path. When sales punches a pending
+    // payment, the quote stays in its current status until approval
+    // (approvePayment handles the flip + safety net).
+    if (isAdmin) {
+      await maybeFlipQuoteWon(quoteId, paymentData.is_final_payment)
     }
 
     // Prepend to local state (newest first)
@@ -157,45 +189,10 @@ export function usePayments(quoteId) {
 
     if (err) { setLoading(false); return { error: err } }
 
-    // If this approved payment is final, flip the quote to "won"
-    // (the DB trigger handles monthly_sales_data — no double count).
-    //
-    // Safety net: also flip to "won" when cumulative approved
-    // payments >= total_amount, even if is_final_payment wasn't
-    // ticked on any individual row. This prevents the "Fully Paid
-    // but Sent" stuck state we hit in prod when a sales user
-    // submitted a full-amount payment without checking the final
-    // box. The system becomes self-healing — next approval will
-    // always close out a fully-paid quote.
-    let shouldFlipWon = !!data.is_final_payment
-    if (!shouldFlipWon) {
-      const { data: approvedRows } = await supabase
-        .from('payments')
-        .select('amount_received')
-        .eq('quote_id', data.quote_id)
-        .eq('approval_status', 'approved')
-      const { data: quoteRow } = await supabase
-        .from('quotes')
-        .select('total_amount, status')
-        .eq('id', data.quote_id)
-        .single()
-      const totalApproved = (approvedRows || [])
-        .reduce((s, r) => s + Number(r.amount_received || 0), 0)
-      if (
-        quoteRow &&
-        quoteRow.status !== 'won' &&
-        totalApproved >= Number(quoteRow.total_amount || 0)
-      ) {
-        shouldFlipWon = true
-      }
-    }
-
-    if (shouldFlipWon) {
-      await supabase
-        .from('quotes')
-        .update({ status: 'won' })
-        .eq('id', data.quote_id)
-    }
+    // Flip the quote to "won" if this is an explicit final, OR if
+    // cumulative approved payments now cover the quote total. The
+    // DB trigger still handles monthly_sales_data — no double count.
+    await maybeFlipQuoteWon(data.quote_id, data.is_final_payment)
 
     setPayments(prev => prev.map(p => p.id === paymentId ? data : p))
     setLoading(false)
