@@ -83,19 +83,19 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
           }}>
             <div>
               <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Computed</div>
-              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem' }}>
                 {formatCurrency(computed || 0)}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Paid</div>
-              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#81c784' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#81c784' }}>
                 {formatCurrency(totalPaid)}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Pending</div>
-              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', color: '#ffb74d' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#ffb74d' }}>
                 {formatCurrency(pendingPay)}
               </div>
             </div>

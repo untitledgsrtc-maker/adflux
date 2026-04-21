@@ -176,7 +176,7 @@ export function SalesDashboard() {
               ].map((f, i) => (
                 <div key={i}>
                   <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>{f.label}</div>
-                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.3rem', color: f.color }}>{f.val}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: f.color }}>{f.val}</div>
                 </div>
               ))}
             </div>
@@ -209,7 +209,7 @@ export function SalesDashboard() {
                 ].map((f, i) => (
                   <div key={i}>
                     <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>{f.label}</div>
-                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.3rem', color: f.color || 'var(--wh)' }}>{f.val}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: f.color || 'var(--wh)' }}>{f.val}</div>
                   </div>
                 ))}
               </div>

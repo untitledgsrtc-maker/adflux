@@ -20,8 +20,9 @@ const ADMIN_NAV = [
 ]
 
 const SALES_NAV = [
-  { to: '/quotes',         icon: FileText,  label: 'Quotes' },
-  { to: '/my-performance', icon: BarChart3, label: 'My Performance' },
+  { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/quotes',         icon: FileText,        label: 'Quotes' },
+  { to: '/my-performance', icon: BarChart3,       label: 'My Performance' },
 ]
 
 export function Sidebar() {

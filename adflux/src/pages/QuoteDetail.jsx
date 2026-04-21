@@ -224,10 +224,10 @@ export default function QuoteDetail() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1rem', color: 'var(--y)', letterSpacing: '.08em', marginBottom: 4 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', color: 'var(--y)', letterSpacing: '.08em', marginBottom: 4 }}>
               {quote.quote_number}
             </div>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.5rem', letterSpacing: '.03em', marginBottom: 4 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', letterSpacing: '.03em', marginBottom: 4 }}>
               {quote.client_name}
             </div>
             <div style={{ fontSize: '.82rem', color: 'var(--gray)' }}>
@@ -235,7 +235,7 @@ export default function QuoteDetail() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.8rem', color: 'var(--y)', lineHeight: 1 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--y)', lineHeight: 1 }}>
               {formatCurrency(quote.total_amount)}
             </div>
             <div style={{ fontSize: '.72rem', color: 'var(--gray)', marginTop: 3 }}>incl. GST</div>
@@ -402,7 +402,7 @@ export default function QuoteDetail() {
               <div className="sum-row"><span>GST (18%)</span><span>{formatCurrency(quote.gst_amount)}</span></div>
               <div className="sum-tot">
                 <span>Total</span>
-                <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.4rem' }}>{formatCurrency(quote.total_amount)}</span>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem' }}>{formatCurrency(quote.total_amount)}</span>
               </div>
             </div>
           </div>
@@ -571,7 +571,7 @@ function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '.72rem', color: 'var(--gray)' }}>Invoice Total</div>
-                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.4rem', color: 'var(--y)' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--y)' }}>
                   {formatCurrency(quote.total_amount)}
                 </div>
               </div>

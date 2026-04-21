@@ -31,10 +31,12 @@ function RequireAdmin({ children }) {
 }
 
 function RootRedirect() {
-  const { user, isAdmin, loading } = useAuth()
+  const { user, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!user) return <Navigate to="/login" replace />
-  return <Navigate to={isAdmin ? '/dashboard' : '/quotes'} replace />
+  // Both admin and sales land on /dashboard — Dashboard.jsx renders
+  // SalesDashboard or AdminDashboard based on role.
+  return <Navigate to="/dashboard" replace />
 }
 
 export default function App() {
@@ -45,7 +47,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<RootRedirect />} />
         <Route element={<RequireAuth><AppShell /></RequireAuth>}>
-          <Route path="/dashboard"      element={<RequireAdmin><Dashboard /></RequireAdmin>} />
+          <Route path="/dashboard"      element={<Dashboard />} />
           <Route path="/cities"         element={<RequireAdmin><Cities /></RequireAdmin>} />
           <Route path="/team"           element={<RequireAdmin><Team /></RequireAdmin>} />
           <Route path="/incentives"     element={<RequireAdmin><Incentives /></RequireAdmin>} />

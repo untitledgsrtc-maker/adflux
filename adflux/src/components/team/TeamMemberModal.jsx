@@ -109,17 +109,23 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         return
       }
 
-      // Create incentive profile
-      await supabase.from('staff_incentive_profiles').insert([{
-        user_id:          userId,
-        monthly_salary:   Number(form.monthly_salary),
-        sales_multiplier: 5,
-        new_client_rate:  0.05,
-        renewal_rate:     0.02,
-        flat_bonus:       10000,
-        join_date:        new Date().toISOString().split('T')[0],
-        is_active:        true,
-      }])
+      // Upsert the incentive profile. The DB trigger
+      // `auto_create_incentive_profile` has already inserted a row
+      // with monthly_salary=0 using the incentive_settings defaults.
+      // We upsert on user_id so the correct salary from the form
+      // replaces the trigger's placeholder. We intentionally DO NOT
+      // pass rate/multiplier/bonus here so whatever the trigger read
+      // from incentive_settings stays in place (admin-configured
+      // defaults, not the old hard-coded 5 / 0.05 / 0.02 / 10000).
+      await supabase.from('staff_incentive_profiles').upsert(
+        {
+          user_id:        userId,
+          monthly_salary: Number(form.monthly_salary),
+          join_date:      new Date().toISOString().split('T')[0],
+          is_active:      true,
+        },
+        { onConflict: 'user_id' }
+      )
 
     } else {
       const { error } = await updateMember(member.id, {

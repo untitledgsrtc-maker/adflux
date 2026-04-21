@@ -3,14 +3,14 @@ import { supabase } from '../lib/supabase'
 import { useQuoteStore } from '../store/quoteStore'
 import { useAuthStore } from '../store/authStore'
 
-// Generate quote number client-side as fallback
-async function generateQuoteNumber() {
+// Generate a fresh quote number. Uses timestamp + random suffix to
+// minimise collision risk; the DB has a UNIQUE constraint on
+// quote_number so if we still collide we retry inside createQuote().
+function generateQuoteNumber() {
   const year = new Date().getFullYear()
-  const { count } = await supabase
-    .from('quotes')
-    .select('*', { count: 'exact', head: true })
-  const seq = String((count || 0) + 1).padStart(4, '0')
-  return `UA-${year}-${seq}`
+  const timestamp = Date.now().toString().slice(-6)
+  const rand = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+  return `UA-${year}-${timestamp}${rand}`
 }
 
 export function useQuotes() {
@@ -53,25 +53,34 @@ export function useQuotes() {
   }
 
   const createQuote = async (quoteData, cities) => {
-    // Generate a unique quote number to avoid duplicate key errors
-    const year = new Date().getFullYear()
-    const timestamp = Date.now().toString().slice(-6)
-    const quoteNumber = `UA-${year}-${timestamp}`
+    // Retry up to 4 times on duplicate quote_number collisions.
+    // Postgres raises SQLSTATE 23505 for unique violation, which
+    // PostgREST surfaces as { code: '23505' }.
+    let quote = null
+    let lastError = null
 
-    const payload = {
-      ...quoteData,
-      quote_number:      quoteNumber,
-      created_by:        profile?.id,
-      sales_person_name: profile?.name,
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const payload = {
+        ...quoteData,
+        quote_number:      generateQuoteNumber(),
+        created_by:        profile?.id,
+        sales_person_name: profile?.name,
+      }
+
+      const { data, error } = await supabase
+        .from('quotes')
+        .insert([payload])
+        .select()
+        .single()
+
+      if (!error) { quote = data; break }
+
+      lastError = error
+      // Only retry on unique-violation; bail on any other error.
+      if (error.code !== '23505') return { error }
     }
 
-    const { data: quote, error } = await supabase
-      .from('quotes')
-      .insert([payload])
-      .select()
-      .single()
-
-    if (error) return { error }
+    if (!quote) return { error: lastError }
 
     if (cities?.length) {
       const cityRows = cities.map(c => ({ ...c, quote_id: quote.id }))

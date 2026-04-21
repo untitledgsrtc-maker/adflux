@@ -52,7 +52,7 @@ export default function RenewalTools() {
     <div className="page">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.8rem', marginBottom: 4 }}>Renewal Tools</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 4 }}>Renewal Tools</h1>
           <p style={{ fontSize: '.9rem', color: 'var(--gray)' }}>Quotes ending in next 60 days</p>
         </div>
       </div>
