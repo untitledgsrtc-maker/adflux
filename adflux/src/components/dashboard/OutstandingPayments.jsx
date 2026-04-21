@@ -24,9 +24,12 @@ export function OutstandingPayments() {
 
     // Get payments for those quotes
     const ids = wonQuotes.map(q => q.id)
+    // Only approved payments count toward "paid so far" — pending
+    // / rejected rows must not reduce the outstanding balance.
     const { data: payments } = await supabase
       .from('payments')
       .select('quote_id, amount_received, is_final_payment')
+      .eq('approval_status', 'approved')
       .in('quote_id', ids)
 
     const pMap = {}

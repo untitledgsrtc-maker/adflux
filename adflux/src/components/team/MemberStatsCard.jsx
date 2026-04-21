@@ -24,9 +24,11 @@ export function MemberStatsCard({ member, settings }) {
     const quoteIds = (quotes || []).map(q => q.id)
     let payments = []
     if (quoteIds.length) {
+      // Only approved payments count toward "Revenue Collected".
       const { data } = await supabase
         .from('payments')
         .select('amount_received, payment_date, is_final_payment, quote_id')
+        .eq('approval_status', 'approved')
         .in('quote_id', quoteIds)
         .order('payment_date', { ascending: false })
       payments = data || []

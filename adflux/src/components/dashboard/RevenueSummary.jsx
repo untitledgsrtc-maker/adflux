@@ -67,7 +67,8 @@ export function RevenueSummary() {
   const load = useCallback(async () => {
     const [quotesRes, paymentsRes, profilesRes, msdRes, settingsRes] = await Promise.all([
       supabase.from('quotes').select('id, status, total_amount, subtotal, revenue_type, created_by, updated_at, created_at, campaign_end_date'),
-      supabase.from('payments').select('amount_received, payment_date, is_final_payment'),
+      // Only approved payments count toward Revenue / Outstanding.
+      supabase.from('payments').select('amount_received, payment_date, is_final_payment').eq('approval_status', 'approved'),
       supabase.from('staff_incentive_profiles').select('*').eq('is_active', true),
       supabase.from('monthly_sales_data').select('staff_id, month_year, new_client_revenue, renewal_revenue'),
       supabase.from('incentive_settings').select('*').limit(1).maybeSingle(),

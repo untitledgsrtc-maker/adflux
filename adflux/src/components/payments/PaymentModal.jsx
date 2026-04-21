@@ -1,18 +1,44 @@
 // src/components/payments/PaymentModal.jsx
-import { useState, useEffect } from 'react'
-import { X, CreditCard, AlertTriangle, CheckCircle2 } from 'lucide-react'
+//
+// Phase 3C additions:
+//   • Soft-warn (not block) on duplicate amount + date + quote.
+//   • For sales users, surface an "awaiting admin approval" success
+//     state instead of closing silently — so they know the payment
+//     isn't live yet.
+//   • Surface pending-amount context in the summary bar so a sales
+//     user who already punched a payment isn't confused by a "Paid
+//     So Far" that excludes their still-unapproved submission.
+
+import { useState, useEffect, useMemo } from 'react'
+import { X, CreditCard, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
 import { useAuthStore } from '../../store/authStore'
 import { PAYMENT_MODES } from '../../utils/constants'
 
 const today = () => new Date().toISOString().split('T')[0]
 
-export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPayment = null }) {
+export function PaymentModal({
+  quote,
+  totalPaid = 0,
+  existingPayments = [],
+  onClose,
+  onSave,
+  initialPayment = null,
+}) {
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
   const isEdit = !!initialPayment
   const balance = (quote?.total_amount || 0) - totalPaid
-  const isFinalLocked = !isEdit && balance <= 0 // already fully paid
+  const isFinalLocked = !isEdit && balance <= 0 // already fully paid + approved
+
+  // Pending amount the sales user might be staring at — helps explain
+  // why "Paid So Far" hasn't moved.
+  const pendingAmount = useMemo(
+    () => existingPayments
+      .filter(p => p.approval_status === 'pending')
+      .reduce((s, p) => s + (p.amount_received || 0), 0),
+    [existingPayments]
+  )
 
   const [form, setForm] = useState(() => initialPayment ? {
     amount_received:   initialPayment.amount_received ?? '',
@@ -32,6 +58,8 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPay
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
   const [globalError, setGlobalError] = useState('')
+  const [dupConfirmed, setDupConfirmed] = useState(false) // has user acked the soft-warn?
+  const [submittedPending, setSubmittedPending] = useState(false) // sales success state
 
   // Auto-check final if amount fills the balance
   useEffect(() => {
@@ -44,6 +72,8 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPay
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => ({ ...e, [field]: '' }))
+    // Any edit after a dup warning resets the ack so we re-check.
+    if (dupConfirmed) setDupConfirmed(false)
   }
 
   function validate() {
@@ -59,10 +89,28 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPay
     return errs
   }
 
+  // Duplicate detection — any other payment with same amount + date.
+  const duplicate = useMemo(() => {
+    const amt = parseFloat(form.amount_received)
+    if (!amt || !form.payment_date) return null
+    return existingPayments.find(p =>
+      Math.abs((p.amount_received || 0) - amt) < 0.5 &&
+      p.payment_date === form.payment_date
+    ) || null
+  }, [existingPayments, form.amount_received, form.payment_date])
+
   async function handleSubmit(e) {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
+
+    // Soft-warn on duplicate — block the first submit only, let the
+    // user proceed on the second with an ack.
+    if (duplicate && !dupConfirmed) {
+      setDupConfirmed(true)
+      setGlobalError('') // clear any old error so the yellow banner shows instead
+      return
+    }
 
     setSaving(true)
     setGlobalError('')
@@ -71,8 +119,18 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPay
       amount_received: parseFloat(form.amount_received),
     })
     setSaving(false)
-    if (error) setGlobalError(error.message || 'Failed to save payment')
-    else onClose()
+    if (error) {
+      setGlobalError(error.message || 'Failed to save payment')
+      return
+    }
+
+    // Sales users see a success step so they know it's pending approval.
+    // Admins close immediately — there's nothing for them to wait on.
+    if (isAdmin) {
+      onClose()
+    } else {
+      setSubmittedPending(true)
+    }
   }
 
   const enteredAmt = parseFloat(form.amount_received) || 0
@@ -101,6 +159,11 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPay
           <div className="pm-summary-item">
             <span className="pm-summary-label">Paid So Far</span>
             <span className="pm-summary-value pm-summary-value--paid">{formatCurrency(totalPaid)}</span>
+            {pendingAmount > 0 && (
+              <span className="pm-summary-sub" style={{ fontSize: 11, color: 'var(--warning)', marginTop: 2 }}>
+                +{formatCurrency(pendingAmount)} pending approval
+              </span>
+            )}
           </div>
           <div className="pm-summary-divider" />
           <div className="pm-summary-item">
@@ -118,12 +181,49 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPay
           </div>
         )}
 
-        {!isFinalLocked && (
+        {/* Sales "awaiting approval" success state */}
+        {submittedPending && (
+          <>
+            <div className="modal-body">
+              <div className="pm-alert pm-alert--warning" style={{ alignItems: 'flex-start' }}>
+                <Clock size={16} style={{ marginTop: 2 }} />
+                <div>
+                  <strong>Payment submitted for admin approval.</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.9 }}>
+                    It won't appear in revenue / outstanding balances until admin approves it.
+                    You'll see a red banner on your dashboard if it's rejected.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={onClose}>Done</button>
+            </div>
+          </>
+        )}
+
+        {!isFinalLocked && !submittedPending && (
           <form onSubmit={handleSubmit}>
             <div className="modal-body">
               {globalError && (
                 <div className="pm-alert pm-alert--error">
                   <AlertTriangle size={14} /> {globalError}
+                </div>
+              )}
+
+              {/* Soft-warn: duplicate amount + date — shown as soon as
+                  the match is detected so the changing button label
+                  has context. */}
+              {duplicate && (
+                <div className="pm-alert pm-alert--warning">
+                  <AlertTriangle size={14} />
+                  <span>
+                    A payment of <strong>{formatCurrency(duplicate.amount_received)}</strong> on{' '}
+                    <strong>{duplicate.payment_date}</strong> already exists on this quote.
+                    {dupConfirmed
+                      ? <> Click <strong>Save Payment</strong> again to submit anyway.</>
+                      : <> Click the button below to confirm before submitting.</>}
+                  </span>
                 </div>
               )}
 
@@ -232,6 +332,19 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPay
                   )}
                 </>
               )}
+
+              {/* Sales context: explain approval flow */}
+              {!isAdmin && !isEdit && (
+                <div className="pm-alert pm-alert--info" style={{
+                  background: 'rgba(100,181,246,.08)',
+                  border: '1px solid rgba(100,181,246,.25)',
+                  color: 'var(--text)',
+                  fontSize: 12,
+                }}>
+                  <Clock size={13} />
+                  This payment will be sent to admin for approval before it counts toward revenue.
+                </div>
+              )}
             </div>
 
             <div className="modal-footer">
@@ -243,7 +356,11 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPay
                 className="btn btn-primary"
                 disabled={saving}
               >
-                {saving ? 'Saving…' : 'Save Payment'}
+                {saving
+                  ? 'Saving…'
+                  : duplicate && !dupConfirmed
+                    ? 'Check again & save'
+                    : 'Save Payment'}
               </button>
             </div>
           </form>

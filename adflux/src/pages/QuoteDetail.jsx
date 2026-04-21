@@ -472,6 +472,7 @@ export default function QuoteDetail() {
         <PaymentModal
           quote={quote}
           totalPaid={totalPaid}
+          existingPayments={payments}
           onClose={() => setShowPaymentModal(false)}
           onSave={async (paymentData) => {
             const result = await addPayment(paymentData)
@@ -489,6 +490,7 @@ export default function QuoteDetail() {
         <PaymentModal
           quote={quote}
           totalPaid={totalPaid - (editingPayment.amount_received || 0)}
+          existingPayments={payments.filter(p => p.id !== editingPayment.id)}
           initialPayment={editingPayment}
           onClose={() => { setShowEditPayment(false); setEditingPayment(null) }}
           onSave={async (paymentData) => {

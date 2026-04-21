@@ -1,22 +1,27 @@
 // src/components/layout/Sidebar.jsx
 //
-// Updated to match new globals.css classes and show the full
-// UNTITLED / ADFLUX branding in the sidebar.
+// Phase 3C: admin-only "Pending Approvals" nav entry with a live
+// count pill. The pill stays in sync via the `payments` realtime
+// channel, so admins see new submissions without a page refresh.
 
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2,
-  Users, TrendingUp, BarChart3, LogOut, RotateCcw
+  Users, TrendingUp, BarChart3, LogOut, RotateCcw, Inbox,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { supabase } from '../../lib/supabase'
+import { fetchPendingCount } from '../../hooks/usePayments'
 
 const ADMIN_NAV = [
-  { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/quotes',         icon: FileText,        label: 'Quotes' },
-  { to: '/renewal-tools',  icon: RotateCcw,       label: 'Renewal Tools' },
-  { to: '/cities',         icon: Building2,       label: 'Cities' },
-  { to: '/team',           icon: Users,           label: 'Team' },
-  { to: '/incentives',     icon: TrendingUp,      label: 'Incentives' },
+  { to: '/dashboard',         icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/quotes',            icon: FileText,        label: 'Quotes' },
+  { to: '/pending-approvals', icon: Inbox,           label: 'Pending Approvals', showPill: true },
+  { to: '/renewal-tools',     icon: RotateCcw,       label: 'Renewal Tools' },
+  { to: '/cities',            icon: Building2,       label: 'Cities' },
+  { to: '/team',              icon: Users,           label: 'Team' },
+  { to: '/incentives',        icon: TrendingUp,      label: 'Incentives' },
 ]
 
 const SALES_NAV = [
@@ -29,6 +34,26 @@ export function Sidebar() {
   const { profile, signOut, isAdmin } = useAuth()
   const nav = isAdmin ? ADMIN_NAV : SALES_NAV
   const initial = profile?.name?.[0]?.toUpperCase() || 'U'
+
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    let cancelled = false
+    const load = async () => {
+      const { count } = await fetchPendingCount()
+      if (!cancelled) setPendingCount(count)
+    }
+    load()
+
+    // Realtime: refetch count on any payment row change
+    const ch = supabase
+      .channel('sidebar-pending-count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, load)
+      .subscribe()
+
+    return () => { cancelled = true; supabase.removeChannel(ch) }
+  }, [isAdmin])
 
   return (
     <aside className="sidebar">
@@ -59,7 +84,7 @@ export function Sidebar() {
 
       {/* Main nav */}
       <nav className="sidebar-nav">
-        {nav.map(({ to, icon: Icon, label }) => (
+        {nav.map(({ to, icon: Icon, label, showPill }) => (
           <NavLink
             key={to}
             to={to}
@@ -68,7 +93,24 @@ export function Sidebar() {
             }
           >
             <Icon size={17} />
-            <span>{label}</span>
+            <span style={{ flex: 1 }}>{label}</span>
+            {showPill && pendingCount > 0 && (
+              <span
+                style={{
+                  background: 'var(--danger)',
+                  color: '#fff',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: '2px 7px',
+                  borderRadius: 10,
+                  minWidth: 20,
+                  textAlign: 'center',
+                  lineHeight: 1.4,
+                }}
+              >
+                {pendingCount > 99 ? '99+' : pendingCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
