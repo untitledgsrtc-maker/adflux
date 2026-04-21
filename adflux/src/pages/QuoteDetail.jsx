@@ -113,10 +113,24 @@ export default function QuoteDetail() {
     setShowWonModal(false)
     setUpdatingStatus(true)
 
-    // Add payment first if provided
+    // Add payment first if provided. CRITICAL: surface the RLS /
+    // constraint error. Silent failure here was the bug that made
+    // the flow appear to succeed (toast shown, status "pending
+    // admin approval") while nothing actually landed in the DB.
     const hasPayment = paymentData && paymentData.amount_received > 0
     if (hasPayment) {
-      await addPayment({ ...paymentData, is_final_payment: paymentData.is_final })
+      const result = await addPayment({
+        ...paymentData,
+        is_final_payment: paymentData.is_final,
+      })
+      if (result?.error) {
+        setUpdatingStatus(false)
+        setError(
+          `Payment could not be saved: ${result.error.message}. ` +
+          `This is usually a permissions issue — ask your admin to record the final payment.`
+        )
+        return
+      }
     }
 
     // Sales-side gate: a payment punched by sales lands as
@@ -129,10 +143,15 @@ export default function QuoteDetail() {
     // doesn't have to re-enter them on approval.
     if (!isAdmin && hasPayment) {
       if (paymentData.campaign_start_date || paymentData.campaign_end_date) {
-        await updateQuoteStatus(quote.id, quote.status, {
+        const { error: dateErr } = await updateQuoteStatus(quote.id, quote.status, {
           campaign_start_date: paymentData.campaign_start_date,
           campaign_end_date:   paymentData.campaign_end_date,
         })
+        if (dateErr) {
+          setUpdatingStatus(false)
+          setError(`Campaign dates could not be saved: ${dateErr.message}`)
+          return
+        }
       }
       setUpdatingStatus(false)
       setStatusMsg('Payment submitted for admin approval. Quote will be marked Won once approved.')
