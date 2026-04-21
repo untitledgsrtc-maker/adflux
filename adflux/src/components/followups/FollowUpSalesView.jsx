@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Calendar, CheckCircle, RefreshCw, ExternalLink, Clock } from 'lucide-react'
 import { useFollowUps } from '../../hooks/useFollowUps'
 import { FollowUpModal } from './FollowUpModal'
-import { formatDate } from '../../utils/formatters'
+import { formatDate, todayISO } from '../../utils/formatters'
 
 const FILTERS = [
   { key: 'pending', label: 'Pending' },
@@ -21,7 +21,7 @@ export function FollowUpSalesView() {
 
   useEffect(() => { fetchFollowUps() }, [])
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayISO()
 
   const filtered = followUps.filter(f => {
     if (filter === 'done')    return f.is_done

@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, CheckCircle2, Plus, CalendarDays, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency, todayISO, thisMonthISO } from '../../utils/formatters'
 import { useAuth } from '../../hooks/useAuth'
 import { useIncentive } from '../../hooks/useIncentive'
 import { calculateIncentive } from '../../utils/incentiveCalc'
@@ -37,8 +37,10 @@ export function SalesDashboard() {
   const [pendingCount, setPendingCount] = useState(0)
   const [loading,      setLoading]      = useState(true)
 
-  const today = new Date().toISOString().split('T')[0]
-  const thisMonth = today.slice(0, 7)
+  // Use local-time helpers — UTC slicing dropped today's rows for
+  // morning users (00:00-05:30 IST window).
+  const today = todayISO()
+  const thisMonth = thisMonthISO()
 
   useEffect(() => { if (profile?.id) load() }, [profile?.id])
 
@@ -160,41 +162,13 @@ export function SalesDashboard() {
       {/* Renewal reminders */}
       <RenewalReminderBanner userId={profile?.id} scope="mine" />
 
-      {/* KPI Cards — 6 tiles */}
-      <div className="sg">
-        {[
-          { label: 'My Quotes',              val: quotes.length,              color: '#64b5f6' },
-          { label: 'Pipeline Value',         val: formatCurrency(pipeline),   color: 'var(--y)' },
-          { label: 'Won Revenue',            val: formatCurrency(wonValue),   color: '#81c784' },
-          {
-            label: 'Pending Approval',
-            val:   formatCurrency(pendingTotal),
-            color: '#ffb74d',
-            sub:   pendingCount > 0 ? `${pendingCount} payment${pendingCount === 1 ? '' : 's'}` : null,
-          },
-          { label: 'Follow-ups Due',         val: followups.length,           color: '#ffb74d' },
-          {
-            label: 'Total Possible Incentive',
-            val: proposed ? formatCurrency(proposed.incentive) : '—',
-            color: '#b39ddb',
-          },
-        ].map((k, i) => (
-          <div key={i} className="sc">
-            <div className="sc-lbl">{k.label}</div>
-            <div className="sc-val" style={{ color: k.color }}>{k.val}</div>
-            {k.sub && (
-              <div style={{ fontSize: '.68rem', color: 'var(--gray)', marginTop: 2 }}>{k.sub}</div>
-            )}
-          </div>
-        ))}
-      </div>
-
       {/* ── Proposed Incentive HERO ───────────────────────────────
-          Full-width hero treatment: this is the sales user's most
-          motivational number — "what could I earn if everything in
-          my pipeline closes". Pulled out of the side-by-side grid so
-          it reads as the headline KPI, with the projected-incentive
-          figure enlarged and a purple gradient to signal "upside". */}
+          Lifted ABOVE the KPI row per user request (2026-04): this is
+          the most motivational number on the page — "what could I
+          earn if everything in my pipeline closes" — and the user
+          wants it read first, before the snapshot numbers. The
+          trade-off is that the glance-value KPIs now come second,
+          but that's an intentional choice to lead with upside. */}
       {proposed && (
         <div
           className="card"
@@ -260,6 +234,35 @@ export function SalesDashboard() {
           </div>
         </div>
       )}
+
+      {/* KPI Cards — 6 tiles (moved below hero per user request) */}
+      <div className="sg">
+        {[
+          { label: 'My Quotes',              val: quotes.length,              color: '#64b5f6' },
+          { label: 'Pipeline Value',         val: formatCurrency(pipeline),   color: 'var(--y)' },
+          { label: 'Won Revenue',            val: formatCurrency(wonValue),   color: '#81c784' },
+          {
+            label: 'Pending Approval',
+            val:   formatCurrency(pendingTotal),
+            color: '#ffb74d',
+            sub:   pendingCount > 0 ? `${pendingCount} payment${pendingCount === 1 ? '' : 's'}` : null,
+          },
+          { label: 'Follow-ups Due',         val: followups.length,           color: '#ffb74d' },
+          {
+            label: 'Total Possible Incentive',
+            val: proposed ? formatCurrency(proposed.incentive) : '—',
+            color: '#b39ddb',
+          },
+        ].map((k, i) => (
+          <div key={i} className="sc">
+            <div className="sc-lbl">{k.label}</div>
+            <div className="sc-val" style={{ color: k.color }}>{k.val}</div>
+            {k.sub && (
+              <div style={{ fontSize: '.68rem', color: 'var(--gray)', marginTop: 2 }}>{k.sub}</div>
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* Earned incentive — this-month actuals */}
       {incentive && (

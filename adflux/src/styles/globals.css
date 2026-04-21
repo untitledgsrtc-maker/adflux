@@ -289,6 +289,10 @@ button { cursor: pointer; font-family: inherit; }
   border-top: 1px solid var(--border);
   z-index: 40;
   padding-bottom: env(safe-area-inset-bottom);
+  /* flex layout lives here (previously on the unused `.mobile-nav-row`
+     wrapper) so items render horizontally across the bar. */
+  justify-content: space-around;
+  align-items: stretch;
 }
 
 .mobile-nav-row {
@@ -303,13 +307,22 @@ button { cursor: pointer; font-family: inherit; }
   align-items: center;
   justify-content: center;
   gap: 3px;
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0; /* allow ellipsis to fire when label overflows */
   color: var(--text-muted);
   font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   transition: color var(--transition);
+  text-decoration: none;
+}
+
+.mobile-nav-item > span {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mobile-nav-item--active {
@@ -767,7 +780,7 @@ tbody tr:hover td { background: var(--surface-2); }
 
   .topbar-hamburger { display: inline-flex; }
 
-  .mobile-nav { display: block; }
+  .mobile-nav { display: flex; }
   .app-content { padding: 16px 16px 90px; }
 
   .form-row, .form-grid-2 { grid-template-columns: 1fr; }

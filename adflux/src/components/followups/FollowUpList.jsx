@@ -4,7 +4,7 @@ import { Calendar, CheckCircle, Clock, RefreshCw, Plus } from 'lucide-react'
 import { useFollowUps } from '../../hooks/useFollowUps'
 import { useAuthStore } from '../../store/authStore'
 import { FollowUpModal } from './FollowUpModal'
-import { formatDate } from '../../utils/formatters'
+import { formatDate, todayISO } from '../../utils/formatters'
 
 /**
  * Props:
@@ -46,7 +46,7 @@ export function FollowUpList({ quoteId, assignedTo }) {
     fetchFollowUps()
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayISO()
 
   const getRowClass = (f) => {
     if (f.is_done) return 'fu-row fu-row--done'

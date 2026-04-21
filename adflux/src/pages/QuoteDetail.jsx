@@ -15,7 +15,7 @@ import { PaymentModal } from '../components/payments/PaymentModal'
 import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
 import { FollowUpList } from '../components/followups/FollowUpList'
-import { formatCurrency, formatDate, formatDateTime, formatPhone } from '../utils/formatters'
+import { formatCurrency, formatDate, formatDateTime, formatPhone, todayISO } from '../utils/formatters'
 import { STATUS_LABELS } from '../utils/constants'
 
 function getAllowedTransitions(quote, hasFinalPayment) {
@@ -537,7 +537,7 @@ export default function QuoteDetail() {
 
 // ── Won Payment Modal ────────────────────────────────────────────────────────
 function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayISO()
   const [form, setForm] = useState({
     amount_received: '',
     payment_mode: 'NEFT',

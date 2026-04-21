@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
+import { todayISO } from '../utils/formatters'
 
 export function useFollowUps(quoteId = null) {
   const [followUps, setFollowUps] = useState([])
@@ -37,7 +38,7 @@ export function useFollowUps(quoteId = null) {
   // ─── Due today / overdue (used for banners) ───────────────────────
   const fetchDue = useCallback(async () => {
     setLoading(true)
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayISO()
 
     let query = supabase
       .from('follow_ups')
@@ -111,7 +112,7 @@ export function useFollowUps(quoteId = null) {
   }
 
   // ─── Derived ──────────────────────────────────────────────────────
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayISO()
   const overdueCount = followUps.filter(
     f => !f.is_done && f.follow_up_date < today
   ).length

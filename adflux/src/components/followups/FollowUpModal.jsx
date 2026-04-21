@@ -1,6 +1,7 @@
 // src/components/followups/FollowUpModal.jsx
 import { useState } from 'react'
 import { X, Calendar, MessageSquare, CheckCircle } from 'lucide-react'
+import { todayISO, addDaysISO } from '../../utils/formatters'
 
 /**
  * Props:
@@ -11,12 +12,7 @@ import { X, Calendar, MessageSquare, CheckCircle } from 'lucide-react'
  *   onMarkDone    — fn(id)
  */
 export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onReschedule, onMarkDone }) {
-  const [date, setDate] = useState(() => {
-    // Default to tomorrow
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    return d.toISOString().split('T')[0]
-  })
+  const [date, setDate] = useState(() => addDaysISO(1))
   const [note, setNote] = useState(followUp?.note || '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -80,7 +76,7 @@ export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onResche
                   type="date"
                   className="field-input"
                   value={date}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={todayISO()}
                   onChange={e => setDate(e.target.value)}
                   required
                 />

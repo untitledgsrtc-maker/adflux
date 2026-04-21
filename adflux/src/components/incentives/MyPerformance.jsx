@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useIncentive } from '../../hooks/useIncentive'
 import { useAuthStore } from '../../store/authStore'
 import { calculateIncentive, calculateStreak, isIncrementEligible } from '../../utils/incentiveCalc'
-import { formatCurrency, formatMonthYear, initials } from '../../utils/formatters'
+import { formatCurrency, formatMonthYear, initials, todayISO } from '../../utils/formatters'
 
 function buildMonthOptions(count = 12) {
   const opts = []
@@ -47,7 +47,7 @@ export function MyPerformance() {
         setMyProfile(data)
         await fetchMonthlySales(profile.id, 24)
 
-        const today = new Date().toISOString().slice(0, 10)
+        const today = todayISO()
         const { data: camps } = await supabase
           .from('quotes')
           .select('id, quote_number, client_name, total_amount, campaign_start_date, campaign_end_date')

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RotateCcw, AlertTriangle, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency, todayISO, addDaysISO } from '../../utils/formatters'
 
 export function RenewalReminderBanner({ userId, scope = 'mine' }) {
   const [rows, setRows] = useState([])
@@ -14,8 +14,8 @@ export function RenewalReminderBanner({ userId, scope = 'mine' }) {
   useEffect(() => { load() }, [userId, scope])
 
   async function load() {
-    const today = new Date().toISOString().slice(0, 10)
-    const in30  = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+    const today = todayISO()
+    const in30  = addDaysISO(30)
 
     let q = supabase
       .from('quotes')
@@ -33,7 +33,7 @@ export function RenewalReminderBanner({ userId, scope = 'mine' }) {
 
   if (!rows.length) return null
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayISO()
   const MS = 86400000
   const bucket = (end) => {
     const diff = Math.round((new Date(end) - new Date(today)) / MS)

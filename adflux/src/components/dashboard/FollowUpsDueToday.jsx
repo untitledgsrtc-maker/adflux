@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { todayISO } from '../../utils/formatters'
 
 export function FollowUpsDueToday() {
   const [items, setItems]     = useState([])
@@ -12,7 +13,7 @@ export function FollowUpsDueToday() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayISO()
 
     const { data } = await supabase
       .from('follow_ups')
@@ -35,7 +36,7 @@ export function FollowUpsDueToday() {
     setItems(prev => prev.filter(f => f.id !== id))
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayISO()
 
   return (
     <div className="db-card">

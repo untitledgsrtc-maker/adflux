@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, AlertTriangle, ChevronRight } from 'lucide-react'
 import { useFollowUps } from '../../hooks/useFollowUps'
+import { todayISO } from '../../utils/formatters'
 
 export function FollowUpBanner() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export function FollowUpBanner() {
 
   if (dismissed || due.length === 0) return null
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayISO()
   const overdue = due.filter(f => f.follow_up_date < today)
   const todayOnly = due.filter(f => f.follow_up_date === today)
   const isUrgent = overdue.length > 0

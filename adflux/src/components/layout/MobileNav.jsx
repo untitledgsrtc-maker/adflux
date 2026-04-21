@@ -10,23 +10,33 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2,
-  Users, TrendingUp, BarChart3, Inbox,
+  Users, TrendingUp, BarChart3, Inbox, RotateCcw,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { fetchPendingCount } from '../../hooks/usePayments'
 
+// Mobile bottom-nav was losing coverage for sales users — they were
+// only getting Quotes + Performance, so Dashboard and Renewal Tools
+// were literally unreachable on mobile. Sync these arrays to the
+// Sidebar so every route is reachable from mobile too. Labels are
+// shortened because the bar is flex-equal-width and long labels
+// wrap awkwardly.
 const ADMIN_NAV = [
   { to: '/dashboard',         icon: LayoutDashboard, label: 'Home' },
   { to: '/quotes',            icon: FileText,        label: 'Quotes' },
   { to: '/pending-approvals', icon: Inbox,           label: 'Pending', showPill: true },
+  { to: '/renewal-tools',     icon: RotateCcw,       label: 'Renewals' },
+  { to: '/cities',            icon: Building2,       label: 'Cities' },
   { to: '/team',              icon: Users,           label: 'Team' },
   { to: '/incentives',        icon: TrendingUp,      label: 'Incentives' },
 ]
 
 const SALES_NAV = [
-  { to: '/quotes',         icon: FileText,  label: 'Quotes' },
-  { to: '/my-performance', icon: BarChart3, label: 'Performance' },
+  { to: '/dashboard',      icon: LayoutDashboard, label: 'Home' },
+  { to: '/quotes',         icon: FileText,        label: 'Quotes' },
+  { to: '/renewal-tools',  icon: RotateCcw,       label: 'Renewals' },
+  { to: '/my-performance', icon: BarChart3,       label: 'Perf' },
 ]
 
 export function MobileNav() {

@@ -29,6 +29,38 @@ export function formatCompact(amount) {
 
 // ─── Dates ───────────────────────────────────────────────────────
 
+/**
+ * Today's date as 'YYYY-MM-DD' in the user's LOCAL timezone.
+ * Why this exists: `new Date().toISOString().slice(0,10)` returns
+ * UTC, not IST. Between 00:00 and 05:30 IST the UTC date is still
+ * "yesterday", so every filter like `.gte('campaign_end_date', today)`
+ * or `follow_up_date <= today` silently excluded today's rows for
+ * users opening the app before dawn. Use this helper anywhere you're
+ * comparing against a DB date column.
+ */
+export function todayISO() {
+  const d = new Date()
+  const y  = d.getFullYear()
+  const m  = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
+/** Current month as 'YYYY-MM' in local timezone (see todayISO). */
+export function thisMonthISO() {
+  return todayISO().slice(0, 7)
+}
+
+/** Add N days to today in local time and return as 'YYYY-MM-DD'. */
+export function addDaysISO(days) {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  const y  = d.getFullYear()
+  const m  = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
 export function formatDate(date) {
   if (!date) return '—'
   const d = typeof date === 'string' ? parseISO(date) : date

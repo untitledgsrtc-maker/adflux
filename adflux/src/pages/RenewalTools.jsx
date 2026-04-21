@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Calendar } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { formatDate } from '../utils/formatters'
+import { formatDate, todayISO, addDaysISO } from '../utils/formatters'
 
 export default function RenewalTools() {
   const navigate = useNavigate()
@@ -19,10 +19,8 @@ export default function RenewalTools() {
   const [quotes, setQuotes] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const today = new Date().toISOString().split('T')[0]
-  const futureDate = new Date()
-  futureDate.setDate(futureDate.getDate() + 60)
-  const future60 = futureDate.toISOString().split('T')[0]
+  const today = todayISO()
+  const future60 = addDaysISO(60)
 
   useEffect(() => {
     if (profile?.id) load()

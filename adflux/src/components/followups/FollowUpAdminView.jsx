@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useFollowUps } from '../../hooks/useFollowUps'
 import { FollowUpModal } from './FollowUpModal'
-import { formatDate } from '../../utils/formatters'
+import { formatDate, todayISO } from '../../utils/formatters'
 
 // filter options
 const FILTERS = [
@@ -26,7 +26,7 @@ export function FollowUpAdminView() {
 
   useEffect(() => { fetchFollowUps() }, [])
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayISO()
 
   const filtered = followUps.filter(f => {
     if (filter === 'all')     return true

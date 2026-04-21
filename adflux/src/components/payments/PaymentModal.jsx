@@ -11,11 +11,11 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { X, CreditCard, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency, todayISO } from '../../utils/formatters'
 import { useAuthStore } from '../../store/authStore'
 import { PAYMENT_MODES } from '../../utils/constants'
 
-const today = () => new Date().toISOString().split('T')[0]
+const today = () => todayISO()
 
 export function PaymentModal({
   quote,
