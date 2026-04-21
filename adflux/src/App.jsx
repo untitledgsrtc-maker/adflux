@@ -52,7 +52,7 @@ export default function App() {
           <Route path="/cities"         element={<RequireAdmin><Cities /></RequireAdmin>} />
           <Route path="/team"           element={<RequireAdmin><Team /></RequireAdmin>} />
           <Route path="/incentives"     element={<RequireAdmin><Incentives /></RequireAdmin>} />
-          <Route path="/renewal-tools"  element={<RequireAdmin><RenewalTools /></RequireAdmin>} />
+          <Route path="/renewal-tools"  element={<RenewalTools />} />
           <Route path="/pending-approvals" element={<RequireAdmin><PendingApprovals /></RequireAdmin>} />
           <Route path="/quotes"         element={<Quotes />} />
           <Route path="/quotes/new"     element={<CreateQuote />} />

@@ -4,10 +4,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Download, MessageCircle, ChevronDown,
   Building2, Phone, Mail, MapPin, FileText, Calendar,
-  CheckCircle, CreditCard, X
+  CheckCircle, CreditCard, X, Pencil
 } from 'lucide-react'
 import { useQuotes } from '../hooks/useQuotes'
-import { useAuthStore } from '../store/authStore'
 import { usePayments } from '../hooks/usePayments'
 import { QuoteStatusBadge } from '../components/quotes/QuoteStatusBadge'
 import { downloadQuotePDF } from '../components/quotes/QuotePDF'
@@ -50,8 +49,6 @@ const STATUS_COLORS = {
 export default function QuoteDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const profile = useAuthStore(s => s.profile)
-  const isAdmin = profile?.role === 'admin'
 
   const { fetchQuoteById, updateQuoteStatus, currentQuote } = useQuotes()
   const { payments, loading: paymentsLoading, totalPaid, hasFinalPayment, fetchPayments, addPayment, updatePayment, deletePayment } = usePayments(id)
@@ -66,7 +63,6 @@ export default function QuoteDetail() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showWonModal, setShowWonModal]     = useState(false)
   const [showCampaignModal, setShowCampaignModal] = useState(false)
-  const [showEditClient, setShowEditClient] = useState(false)
   const [showEditPayment, setShowEditPayment] = useState(false)
   const [editingPayment, setEditingPayment] = useState(null)
   const [pendingStatus, setPendingStatus]   = useState(null)
@@ -203,6 +199,20 @@ export default function QuoteDetail() {
           <ArrowLeft size={15} /> Back
         </button>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Edit button: available to both admin and sales at every
+              status except 'lost' — lost quotes are archival. This lets
+              either role correct client details, swap cities, or
+              adjust rates even after a quote has been sent or won.
+              See WizardShell.jsx for status-preservation semantics. */}
+          {quote?.status !== 'lost' && (
+            <button
+              className="btn btn-sec btn-sm"
+              onClick={() => navigate(`/quotes/new?editOf=${id}`)}
+              title="Edit this quote"
+            >
+              <Pencil size={14} /> Edit
+            </button>
+          )}
           <button className="btn btn-sec btn-sm" onClick={handleWhatsApp}>
             <MessageCircle size={14} /> WhatsApp
           </button>
@@ -415,19 +425,14 @@ export default function QuoteDetail() {
           {/* Payment Summary */}
           <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} />
 
-          {/* Won quote actions */}
+          {/* Won quote actions — Create Renewal stays here so the
+              renewal CTA is visible at the bottom of the quote.
+              The previous "Edit Campaign Dates" / "Edit Client Details"
+              buttons opened a modal that was never rendered (dead state);
+              full editing now lives on the Edit button in the header
+              and is available for every status except 'lost'. */}
           {quote.status === 'won' && (
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              {isAdmin && (
-                <button className="btn btn-sec btn-sm" onClick={() => setShowEditClient(true)}>
-                  Edit Campaign Dates
-                </button>
-              )}
-              {!isAdmin && (
-                <button className="btn btn-sec btn-sm" onClick={() => setShowEditClient(true)}>
-                  Edit Client Details
-                </button>
-              )}
               <button className="btn btn-y btn-sm" onClick={() => navigate(`/quotes/new?renewalOf=${id}`)}>
                 Create Renewal Quote
               </button>

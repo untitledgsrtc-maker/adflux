@@ -35,8 +35,8 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
     )
   }, [cities, search, selectedCities])
 
-  function addCity(city) {
-    const newEntry = {
+  function buildEntry(city) {
+    return {
       city,
       screens: city.screens || 1,
       duration_months: 1,
@@ -45,7 +45,21 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       override_reason: '',
       campaign_total: calcTotal(city.offer_rate || 0, city.screens || 1, 1),
     }
-    onChange([...selectedCities, newEntry])
+  }
+
+  function addCity(city) {
+    onChange([...selectedCities, buildEntry(city)])
+    setShowPicker(false)
+    setSearch('')
+  }
+
+  // Bulk-add every city currently in view (respects the search filter).
+  // Common ask: a quote covers every city in a region, so forcing the
+  // user to click each one is tedious — and more importantly, they'd
+  // have to click ~30+ times with the picker closing after each.
+  function addAllVisible() {
+    if (!filteredCities.length) return
+    onChange([...selectedCities, ...filteredCities.map(buildEntry)])
     setShowPicker(false)
     setSearch('')
   }
@@ -208,6 +222,37 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
               <X size={14} />
             </button>
           </div>
+
+          {/* Select-all row — adds every visible (filtered) city at once.
+              Typing in search narrows the set first, e.g. "ahme" →
+              Ahmedabad stations, then "Add all" bulks them in. */}
+          {filteredCities.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '8px 12px',
+                borderBottom: '1px solid rgba(255,255,255,.06)',
+                fontSize: '.78rem',
+                color: 'var(--gray)',
+              }}
+            >
+              <span>
+                {filteredCities.length} {filteredCities.length === 1 ? 'city' : 'cities'}
+                {search && <> matching “{search}”</>}
+              </span>
+              <button
+                type="button"
+                className="btn btn-y btn-sm"
+                onClick={addAllVisible}
+                title="Add every city shown below"
+              >
+                <Plus size={12} /> Add all {filteredCities.length}
+              </button>
+            </div>
+          )}
+
           <div className="city-picker-list">
             {filteredCities.length === 0 ? (
               <p className="city-picker-empty">No cities found</p>

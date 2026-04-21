@@ -11,7 +11,18 @@ export function Step3Review({
   onSaveDraft,
   onSend,
   saving,
+  isEdit = false,
+  originalStatus = null,
 }) {
+  // In edit mode, "Save Draft" really means "Save Changes (preserve
+  // current status)" and "Send to Client" means "Save & re-send" —
+  // relabel so sales doesn't accidentally demote a won quote.
+  const saveLabel = isEdit
+    ? (saving ? 'Saving…' : 'Save Changes')
+    : (saving ? 'Saving…' : 'Save Draft')
+  const sendLabel = isEdit
+    ? (saving ? 'Sending…' : (originalStatus === 'draft' ? 'Save & Send' : 'Save & Re-send'))
+    : (saving ? 'Sending…' : 'Send to Client')
   return (
     <div className="wizard-step">
       <div className="wizard-step-header">
@@ -93,11 +104,11 @@ export function Step3Review({
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-secondary" onClick={onSaveDraft} disabled={saving}>
             <Save size={14} />
-            {saving ? 'Saving…' : 'Save Draft'}
+            {saveLabel}
           </button>
           <button className="btn btn-primary" onClick={onSend} disabled={saving}>
             <Send size={14} />
-            {saving ? 'Sending…' : 'Send to Client'}
+            {sendLabel}
           </button>
         </div>
       </div>

@@ -27,6 +27,7 @@ const ADMIN_NAV = [
 const SALES_NAV = [
   { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/quotes',         icon: FileText,        label: 'Quotes' },
+  { to: '/renewal-tools',  icon: RotateCcw,       label: 'Renewal Tools' },
   { to: '/my-performance', icon: BarChart3,       label: 'My Performance' },
 ]
 

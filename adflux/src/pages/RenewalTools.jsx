@@ -1,12 +1,21 @@
 // src/pages/RenewalTools.jsx
+//
+// Accessible by both admin and sales. Admin sees every won quote whose
+// campaign ends in the next 60 days; sales only sees their own clients.
+// The scope switch is implicit — we read `isAdmin` from useAuth and
+// filter by `created_by` for non-admins. The "Sales Person" column is
+// hidden for sales users (it's always them, so the column would be
+// noise).
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Calendar } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { formatDate, formatCurrency } from '../utils/formatters'
+import { useAuth } from '../hooks/useAuth'
+import { formatDate } from '../utils/formatters'
 
 export default function RenewalTools() {
   const navigate = useNavigate()
+  const { profile, isAdmin } = useAuth()
   const [quotes, setQuotes] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -16,12 +25,12 @@ export default function RenewalTools() {
   const future60 = futureDate.toISOString().split('T')[0]
 
   useEffect(() => {
-    load()
-  }, [])
+    if (profile?.id) load()
+  }, [profile?.id, isAdmin])
 
   async function load() {
     setLoading(true)
-    const { data, error } = await supabase
+    let q = supabase
       .from('quotes')
       .select('id, quote_number, client_name, campaign_end_date, created_by, users(name), total_amount')
       .eq('status', 'won')
@@ -29,17 +38,18 @@ export default function RenewalTools() {
       .lte('campaign_end_date', future60)
       .order('campaign_end_date', { ascending: true })
 
-    if (!error) {
-      setQuotes(data || [])
-    }
+    // Non-admin users see only their own clients. Admin sees everyone.
+    if (!isAdmin) q = q.eq('created_by', profile.id)
+
+    const { data, error } = await q
+    if (!error) setQuotes(data || [])
     setLoading(false)
   }
 
   function daysRemaining(endDate) {
     const end = new Date(endDate)
     const now = new Date(today)
-    const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24))
-    return diff
+    return Math.ceil((end - now) / (1000 * 60 * 60 * 24))
   }
 
   function getDaysColor(days) {
@@ -53,7 +63,11 @@ export default function RenewalTools() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 4 }}>Renewal Tools</h1>
-          <p style={{ fontSize: '.9rem', color: 'var(--gray)' }}>Quotes ending in next 60 days</p>
+          <p style={{ fontSize: '.9rem', color: 'var(--gray)' }}>
+            {isAdmin
+              ? 'Quotes ending in next 60 days — all sales reps'
+              : 'Your clients ending in next 60 days'}
+          </p>
         </div>
       </div>
 
@@ -64,7 +78,11 @@ export default function RenewalTools() {
       ) : quotes.length === 0 ? (
         <div className="empty-state">
           <Calendar size={40} />
-          <p>No campaigns ending in the next 60 days</p>
+          <p>
+            {isAdmin
+              ? 'No campaigns ending in the next 60 days'
+              : 'None of your clients have campaigns ending in the next 60 days'}
+          </p>
         </div>
       ) : (
         <div className="card">
@@ -74,7 +92,7 @@ export default function RenewalTools() {
                 <tr>
                   <th>Quote #</th>
                   <th>Client</th>
-                  <th>Sales Person</th>
+                  {isAdmin && <th>Sales Person</th>}
                   <th style={{ textAlign: 'center' }}>End Date</th>
                   <th style={{ textAlign: 'center' }}>Days Remaining</th>
                   <th>Action</th>
@@ -87,7 +105,7 @@ export default function RenewalTools() {
                     <tr key={q.id}>
                       <td style={{ fontWeight: 600, color: 'var(--y)' }}>{q.quote_number}</td>
                       <td>{q.client_name}</td>
-                      <td>{q.users?.name || '—'}</td>
+                      {isAdmin && <td>{q.users?.name || '—'}</td>}
                       <td style={{ textAlign: 'center', fontSize: '.9rem' }}>
                         {formatDate(q.campaign_end_date)}
                       </td>
