@@ -159,7 +159,38 @@ export function usePayments(quoteId) {
 
     // If this approved payment is final, flip the quote to "won"
     // (the DB trigger handles monthly_sales_data — no double count).
-    if (data.is_final_payment) {
+    //
+    // Safety net: also flip to "won" when cumulative approved
+    // payments >= total_amount, even if is_final_payment wasn't
+    // ticked on any individual row. This prevents the "Fully Paid
+    // but Sent" stuck state we hit in prod when a sales user
+    // submitted a full-amount payment without checking the final
+    // box. The system becomes self-healing — next approval will
+    // always close out a fully-paid quote.
+    let shouldFlipWon = !!data.is_final_payment
+    if (!shouldFlipWon) {
+      const { data: approvedRows } = await supabase
+        .from('payments')
+        .select('amount_received')
+        .eq('quote_id', data.quote_id)
+        .eq('approval_status', 'approved')
+      const { data: quoteRow } = await supabase
+        .from('quotes')
+        .select('total_amount, status')
+        .eq('id', data.quote_id)
+        .single()
+      const totalApproved = (approvedRows || [])
+        .reduce((s, r) => s + Number(r.amount_received || 0), 0)
+      if (
+        quoteRow &&
+        quoteRow.status !== 'won' &&
+        totalApproved >= Number(quoteRow.total_amount || 0)
+      ) {
+        shouldFlipWon = true
+      }
+    }
+
+    if (shouldFlipWon) {
       await supabase
         .from('quotes')
         .update({ status: 'won' })

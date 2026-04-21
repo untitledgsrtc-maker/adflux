@@ -629,6 +629,16 @@ function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
       end.setMonth(end.getMonth() + quote.duration_months)
       updated.campaign_end_date = end.toISOString().split('T')[0]
     }
+    // Auto-tick "final payment" when the entered amount covers the
+    // full quote. Sales users kept leaving it unchecked and their
+    // approved payments wouldn't flip the quote to Won, leaving the
+    // app in a "Fully Paid but Sent" stuck state.
+    if (k === 'amount_received') {
+      const amt = Number(v) || 0
+      if (amt >= Number(quote.total_amount || 0)) {
+        updated.is_final = true
+      }
+    }
     setForm(updated)
   }
 
