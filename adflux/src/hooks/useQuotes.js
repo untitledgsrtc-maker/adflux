@@ -94,10 +94,10 @@ export function useQuotes() {
     return { data, error }
   }
 
-  const updateQuoteStatus = async (id, status) => {
+  const updateQuoteStatus = async (id, status, additionalUpdates = {}) => {
     const { data, error } = await supabase
       .from('quotes')
-      .update({ status })
+      .update({ status, ...additionalUpdates })
       .eq('id', id)
       .select()
       .single()

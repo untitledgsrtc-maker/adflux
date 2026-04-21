@@ -8,6 +8,8 @@ import { IncentiveLiability }  from '../components/dashboard/IncentiveLiability'
 import { ActivityFeed }        from '../components/dashboard/ActivityFeed'
 import { FollowUpsDueToday }   from '../components/dashboard/FollowUpsDueToday'
 import { SalesDashboard }      from '../components/dashboard/SalesDashboard'
+import { ActiveCampaigns }     from '../components/dashboard/ActiveCampaigns'
+import { RenewalReminderBanner } from '../components/dashboard/RenewalReminderBanner'
 import '../styles/dashboard.css'
 
 export default function Dashboard() {
@@ -36,8 +38,14 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Admin-wide renewal reminder banners */}
+      <RenewalReminderBanner scope="all" />
+
       {/* Row 1 — KPI cards full width */}
       <RevenueSummary />
+
+      {/* Active campaigns */}
+      <ActiveCampaigns />
 
       {/* Row 2 — Funnel + Outstanding */}
       <div className="db-two-col">

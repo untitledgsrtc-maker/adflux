@@ -1,8 +1,11 @@
 // src/components/payments/PaymentHistory.jsx
-import { Banknote, CheckCircle2, Clock } from 'lucide-react'
+import { Banknote, CheckCircle2, Clock, Edit2, Trash2 } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+import { useAuthStore } from '../../store/authStore'
 
-export function PaymentHistory({ payments = [], loading }) {
+export function PaymentHistory({ payments = [], loading, onEdit, onDelete }) {
+  const profile = useAuthStore(s => s.profile)
+  const isAdmin = profile?.role === 'admin'
   if (loading) {
     return (
       <div className="ph-loading">
@@ -23,37 +26,65 @@ export function PaymentHistory({ payments = [], loading }) {
 
   return (
     <div className="ph-list">
-      {payments.map((p, i) => (
-        <div key={p.id || i} className={`ph-row ${p.is_final_payment ? 'ph-row--final' : ''}`}>
-          <div className="ph-icon">
-            {p.is_final_payment
-              ? <CheckCircle2 size={15} style={{ color: 'var(--success)' }} />
-              : <Clock size={15} style={{ color: 'var(--text-muted)' }} />
-            }
-          </div>
+      {payments.map((p, i) => {
+        const canEdit = isAdmin || (!p.is_final_payment && p.received_by === profile?.id)
+        return (
+          <div key={p.id || i} className={`ph-row ${p.is_final_payment ? 'ph-row--final' : ''}`}>
+            <div className="ph-icon">
+              {p.is_final_payment
+                ? <CheckCircle2 size={15} style={{ color: 'var(--success)' }} />
+                : <Clock size={15} style={{ color: 'var(--text-muted)' }} />
+              }
+            </div>
 
-          <div className="ph-info">
-            <div className="ph-amount">
-              {formatCurrency(p.amount_received)}
-              {p.is_final_payment && (
-                <span className="ph-final-badge">Final</span>
+            <div className="ph-info">
+              <div className="ph-amount">
+                {formatCurrency(p.amount_received)}
+                {p.is_final_payment && (
+                  <span className="ph-final-badge">Final</span>
+                )}
+              </div>
+              <div className="ph-meta">
+                {p.payment_mode}
+                {p.reference_number && <> · <span className="ph-ref">{p.reference_number}</span></>}
+                {p.users?.name && <> · by {p.users.name}</>}
+              </div>
+              {p.payment_notes && (
+                <div className="ph-notes">{p.payment_notes}</div>
               )}
             </div>
-            <div className="ph-meta">
-              {p.payment_mode}
-              {p.reference_number && <> · <span className="ph-ref">{p.reference_number}</span></>}
-              {p.users?.name && <> · by {p.users.name}</>}
+
+            <div className="ph-date">
+              {formatDate(p.payment_date)}
             </div>
-            {p.payment_notes && (
-              <div className="ph-notes">{p.payment_notes}</div>
+
+            {canEdit && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {onEdit && (
+                  <button
+                    onClick={() => onEdit(p)}
+                    style={{ background: 'none', border: 'none', color: '#64b5f6', cursor: 'pointer', padding: 4 }}
+                    title="Edit payment"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Delete this payment?')) onDelete(p.id)
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#ef9a9a', cursor: 'pointer', padding: 4 }}
+                    title="Delete payment"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
             )}
           </div>
-
-          <div className="ph-date">
-            {formatDate(p.payment_date)}
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

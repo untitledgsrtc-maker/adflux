@@ -1,6 +1,7 @@
 // src/components/incentives/MyPerformance.jsx
 import { useEffect, useState } from 'react'
-import { Flame, Trophy, TrendingUp, ChevronDown } from 'lucide-react'
+import { Flame, Trophy, TrendingUp, ChevronDown, CalendarDays } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { useIncentive } from '../../hooks/useIncentive'
 import { useAuthStore } from '../../store/authStore'
 import { calculateIncentive, calculateStreak, isIncrementEligible } from '../../utils/incentiveCalc'
@@ -29,6 +30,7 @@ export function MyPerformance() {
 
   const [myProfile,  setMyProfile]  = useState(null)
   const [loading,    setLoading]    = useState(true)
+  const [activeCampaigns, setActiveCampaigns] = useState([])
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -44,6 +46,16 @@ export function MyPerformance() {
         const { data } = await fetchProfileForUser(profile.id)
         setMyProfile(data)
         await fetchMonthlySales(profile.id, 24)
+
+        const today = new Date().toISOString().slice(0, 10)
+        const { data: camps } = await supabase
+          .from('quotes')
+          .select('id, quote_number, client_name, total_amount, campaign_start_date, campaign_end_date')
+          .eq('created_by', profile.id)
+          .eq('status', 'won')
+          .gte('campaign_end_date', today)
+          .order('campaign_end_date', { ascending: true })
+        setActiveCampaigns(camps || [])
       }
       setLoading(false)
     }
@@ -229,6 +241,56 @@ export function MyPerformance() {
           }}>
             You're earning incentive! Add <strong style={{ color: 'var(--text)' }}>{formatCurrency(target - result.total)}</strong> more to hit your target and unlock the <strong style={{ color: 'var(--accent)' }}>{formatCurrency(myProfile.flat_bonus ?? settings?.flat_bonus ?? 10000)}</strong> flat bonus.
           </div>
+        )}
+      </div>
+
+      {/* Active campaigns */}
+      <div className="perf-history-card">
+        <div className="perf-history-header">
+          <CalendarDays size={16} color="var(--accent)" />
+          My Active Campaigns
+          {activeCampaigns.length > 0 && (
+            <span style={{
+              marginLeft: 8, background: 'rgba(255,230,0,.15)', color: 'var(--accent)',
+              borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700,
+            }}>{activeCampaigns.length}</span>
+          )}
+        </div>
+        {activeCampaigns.length === 0 ? (
+          <div style={{ padding: '16px 8px', color: 'var(--text-muted)', fontSize: 13 }}>
+            No active campaigns right now. Won quotes with campaign dates show up here.
+          </div>
+        ) : (
+          <table className="perf-history-table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Quote #</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Days Left</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeCampaigns.map(c => {
+                const today = new Date()
+                const end   = new Date(c.campaign_end_date)
+                const days  = Math.max(0, Math.round((end - today) / 86400000))
+                const color = days <= 3 ? 'var(--danger, #ef5350)' : days <= 7 ? 'var(--warning, #ffb74d)' : days <= 30 ? 'var(--accent)' : 'var(--success, #81c784)'
+                return (
+                  <tr key={c.id}>
+                    <td style={{ fontWeight: 600 }}>{c.client_name}</td>
+                    <td>{c.quote_number}</td>
+                    <td>{c.campaign_start_date || '—'}</td>
+                    <td>{c.campaign_end_date || '—'}</td>
+                    <td style={{ color, fontWeight: 700 }}>{days}</td>
+                    <td>{formatCurrency(c.total_amount || 0)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 

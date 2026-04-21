@@ -2,11 +2,14 @@
 import { useState, useEffect } from 'react'
 import { X, CreditCard, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
+import { useAuthStore } from '../../store/authStore'
 import { PAYMENT_MODES } from '../../utils/constants'
 
 const today = () => new Date().toISOString().split('T')[0]
 
 export function PaymentModal({ quote, totalPaid = 0, onClose, onSave }) {
+  const profile = useAuthStore(s => s.profile)
+  const isAdmin = profile?.role === 'admin'
   const balance = (quote?.total_amount || 0) - totalPaid
   const isFinalLocked = balance <= 0 // already fully paid
 
@@ -192,30 +195,34 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave }) {
                 />
               </div>
 
-              {/* Final payment toggle */}
-              <div className="pm-final-row">
-                <label className="pm-final-label">
-                  <input
-                    type="checkbox"
-                    className="pm-final-checkbox"
-                    checked={form.is_final_payment}
-                    onChange={e => set('is_final_payment', e.target.checked)}
-                  />
-                  <span>
-                    <strong>Mark as Final Payment</strong>
-                    <span className="pm-final-hint">
-                      Confirms quote as fully settled. Triggers incentive calculation.
-                    </span>
-                  </span>
-                </label>
-              </div>
+              {/* Final payment toggle — admin only */}
+              {isAdmin && (
+                <>
+                  <div className="pm-final-row">
+                    <label className="pm-final-label">
+                      <input
+                        type="checkbox"
+                        className="pm-final-checkbox"
+                        checked={form.is_final_payment}
+                        onChange={e => set('is_final_payment', e.target.checked)}
+                      />
+                      <span>
+                        <strong>Mark as Final Payment</strong>
+                        <span className="pm-final-hint">
+                          Confirms quote as fully settled. Triggers incentive calculation.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
 
-              {form.is_final_payment && (
-                <div className="pm-alert pm-alert--warning">
-                  <AlertTriangle size={14} />
-                  Final payment will mark this quote as <strong>Won</strong> and credit the sale
-                  to the sales person's monthly incentive for {form.payment_date.slice(0, 7)}.
-                </div>
+                  {form.is_final_payment && (
+                    <div className="pm-alert pm-alert--warning">
+                      <AlertTriangle size={14} />
+                      Final payment will mark this quote as <strong>Won</strong> and credit the sale
+                      to the sales person's monthly incentive for {form.payment_date.slice(0, 7)}.
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

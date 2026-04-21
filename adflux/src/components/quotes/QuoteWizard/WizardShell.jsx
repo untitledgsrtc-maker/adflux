@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../../lib/supabase'
 import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
 import { Step1Client } from './Step1Client'
 import { Step2Campaign } from './Step2Campaign'
@@ -27,7 +28,7 @@ const EMPTY_QUOTE = {
   status: 'draft',
 }
 
-export function WizardShell() {
+export function WizardShell({ renewalOf = null }) {
   const navigate = useNavigate()
   const { createQuote } = useQuotes()
 
@@ -37,6 +38,50 @@ export function WizardShell() {
   const [saving, setSaving] = useState(false)
   const [savedQuote, setSavedQuote] = useState(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(!!renewalOf)
+
+  useEffect(() => {
+    if (!renewalOf) return
+
+    // Load renewal quote and pre-fill
+    async function loadRenewal() {
+      const { data: baseQuote, error: err } = await supabase
+        .from('quotes')
+        .select('*, quote_cities(*)')
+        .eq('id', renewalOf)
+        .single()
+
+      if (!err && baseQuote) {
+        // Pre-fill client details
+        setQuoteData(prev => ({
+          ...prev,
+          client_name: baseQuote.client_name,
+          client_company: baseQuote.client_company,
+          client_phone: baseQuote.client_phone,
+          client_email: baseQuote.client_email,
+          client_gst: baseQuote.client_gst,
+          client_address: baseQuote.client_address,
+          client_notes: baseQuote.client_notes,
+          revenue_type: 'renewal',
+        }))
+
+        // Pre-fill cities with same rates
+        const cities = baseQuote.quote_cities?.map(qc => ({
+          city: { id: qc.city_id, name: qc.city_name, grade: qc.grade, offer_rate: qc.offered_rate, monthly_rate: qc.listed_rate, screens: 1 },
+          screens: qc.screens,
+          duration_months: 1,
+          listed_rate: qc.listed_rate,
+          offered_rate: qc.offered_rate,
+          override_reason: '',
+          campaign_total: qc.campaign_total,
+        })) || []
+        setSelectedCities(cities)
+      }
+      setLoading(false)
+    }
+
+    loadRenewal()
+  }, [renewalOf])
 
   // Computed totals
   const subtotal = selectedCities.reduce((sum, c) => sum + (c.campaign_total || 0), 0)
@@ -78,6 +123,7 @@ export function WizardShell() {
       grade: c.city.grade,
       listed_rate: c.listed_rate,
       offered_rate: c.offered_rate,
+      override_reason: c.override_reason || null,
       campaign_total: c.campaign_total,
       duration_months: c.duration_months,
     }))
@@ -99,6 +145,14 @@ export function WizardShell() {
     if (quote) {
       setStep(4)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="loading-screen" style={{ minHeight: 400 }}>
+        <div className="spinner" />
+      </div>
+    )
   }
 
   return (

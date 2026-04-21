@@ -9,6 +9,7 @@ import { StaffTable } from './StaffTable'
 import { StaffModal } from './StaffModal'
 import { WhatIfSimulator } from './WhatIfSimulator'
 import { IncentiveSettings } from './IncentiveSettings'
+import { IncentivePayoutModal } from './IncentivePayoutModal'
 
 // Build last 12 month options
 function buildMonthOptions() {
@@ -32,6 +33,7 @@ export function IncentiveDashboard() {
   })
   const [activeTab, setActiveTab]   = useState('staff')
   const [editProfile, setEditProfile] = useState(null)
+  const [payoutFor, setPayoutFor]   = useState(null) // { staff, computed }
   const [loading, setLoading]       = useState(true)
 
   const monthOptions = buildMonthOptions()
@@ -168,6 +170,12 @@ export function IncentiveDashboard() {
             const m = members.find(mem => mem.id === p.user_id) || p.users || {}
             setEditProfile({ ...p, _member: { ...m, staff_incentive_profiles: [p] } })
           }}
+          onPayout={(p, computed) => {
+            setPayoutFor({
+              staff: { user_id: p.user_id, name: p.users?.name || '—' },
+              computed,
+            })
+          }}
         />
       ) : activeTab === 'simulator' ? (
         <WhatIfSimulator profiles={salesProfiles} settings={settings} />
@@ -185,6 +193,17 @@ export function IncentiveDashboard() {
             fetchProfiles()
             setEditProfile(null)
           }}
+        />
+      )}
+
+      {/* Incentive payout punch modal */}
+      {payoutFor && (
+        <IncentivePayoutModal
+          staff={payoutFor.staff}
+          monthYear={selectedMonth}
+          computed={payoutFor.computed}
+          onClose={() => setPayoutFor(null)}
+          onSaved={() => { /* no-op — modal reloads its own history */ }}
         />
       )}
     </div>

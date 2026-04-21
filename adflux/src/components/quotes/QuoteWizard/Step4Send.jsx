@@ -1,22 +1,28 @@
 import { useState } from 'react'
 import { CheckCircle, MessageCircle, FileText, ArrowRight } from 'lucide-react'
 import { buildWhatsAppMessage, openWhatsApp } from '../../../utils/whatsapp'
+import { downloadQuotePDF } from '../QuotePDF'
 import { formatCurrency } from '../../../utils/formatters'
 
 export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, onDone, onViewQuote }) {
   const [sent, setSent] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
 
-  // Build cities list for whatsapp in the format the util expects
-  const cityList = cities.map(sc => ({
-    city_name: sc.city.name,
-    screens: sc.screens,
-    offered_rate: sc.offered_rate,
-  }))
+  async function handleWhatsApp() {
+    try {
+      // First download PDF
+      await downloadQuotePDF(quote, cities)
+      setToastMsg('PDF downloaded — please attach it in WhatsApp.')
+      setTimeout(() => setToastMsg(''), 3000)
 
-  function handleWhatsApp() {
-    const message = buildWhatsAppMessage(quote, cityList)
-    openWhatsApp(quote.client_phone, message)
-    setSent(true)
+      // Then open WhatsApp
+      const message = buildWhatsAppMessage(quote, cities)
+      openWhatsApp(quote.client_phone, message)
+      setSent(true)
+    } catch (e) {
+      setToastMsg('Failed to download PDF')
+      setTimeout(() => setToastMsg(''), 3000)
+    }
   }
 
   return (
@@ -68,6 +74,12 @@ export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, o
           <ArrowRight size={14} />
         </button>
       </div>
+
+      {toastMsg && (
+        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '12px 16px', marginTop: 16, fontSize: '.82rem', color: '#81c784' }}>
+          {toastMsg}
+        </div>
+      )}
 
       {sent && (
         <div className="send-note">

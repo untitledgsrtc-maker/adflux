@@ -42,6 +42,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       duration_months: 1,
       listed_rate: city.monthly_rate || 0,
       offered_rate: city.offer_rate || 0,
+      override_reason: '',
       campaign_total: calcTotal(city.offer_rate || 0, city.screens || 1, 1),
     }
     onChange([...selectedCities, newEntry])
@@ -70,6 +71,15 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
     if (!selectedCities.length) {
       setError('Add at least one city to continue.')
       return
+    }
+    // Check override reasons are filled when offered_rate != default
+    for (const sc of selectedCities) {
+      const defaultRate = sc.city.offer_rate || 0
+      const offeredRate = sc.offered_rate || 0
+      if (Math.abs(offeredRate - defaultRate) > 0.01 && !sc.override_reason?.trim()) {
+        setError('Please provide reason for all rate overrides.')
+        return
+      }
     }
     setError('')
     onNext()
@@ -150,6 +160,19 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                   <label className="ccr-label">Total</label>
                   <p className="ccr-total">{formatCurrency(sc.campaign_total)}</p>
                 </div>
+
+                {Math.abs((sc.offered_rate || 0) - (sc.city.offer_rate || 0)) > 0.01 && (
+                  <div className="ccr-field" style={{ gridColumn: '1 / -1' }}>
+                    <label className="ccr-label" style={{ color: '#ffb74d' }}>Reason for Override *</label>
+                    <input
+                      type="text"
+                      className="ccr-input"
+                      placeholder="Why is the rate different?"
+                      value={sc.override_reason || ''}
+                      onChange={e => updateEntry(sc.city.id, 'override_reason', e.target.value)}
+                    />
+                  </div>
+                )}
 
                 <button
                   className="ccr-remove"

@@ -1,4 +1,5 @@
 @import './tokens.css';
+@import './legacy-compat.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -319,7 +320,7 @@ button { cursor: pointer; font-family: inherit; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 18px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -335,10 +336,12 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 .card-title {
-  font-family: var(--font-display);
-  font-size: 16px;
-  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text);
+  text-transform: none;
 }
 
 /* =====================================================
@@ -500,7 +503,7 @@ table {
 
 thead th {
   background: var(--surface-2);
-  padding: 11px 14px;
+  padding: 10px 12px;
   text-align: left;
   font-size: 11px;
   font-weight: 700;
@@ -512,7 +515,7 @@ thead th {
 }
 
 tbody td {
-  padding: 12px 14px;
+  padding: 10px 12px;
   color: var(--text);
   border-bottom: 1px solid var(--border);
 }
@@ -561,18 +564,21 @@ tbody tr:hover td { background: var(--surface-2); }
 .db-kpi-card, .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
   border-radius: var(--radius);
-  padding: 18px 20px;
+  padding: 16px 18px;
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
   box-shadow: var(--shadow-sm);
-  transition: transform var(--transition), box-shadow var(--transition);
+  transition: all var(--transition);
 }
 
 .db-kpi-card:hover, .stat-card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(255, 230, 0, 0.2);
 }
 
 .db-kpi-card--loading {
@@ -603,7 +609,8 @@ tbody tr:hover td { background: var(--surface-2); }
 
 .db-kpi-value, .stat-value {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 32px;
+  font-weight: 700;
   color: var(--text);
   line-height: 1;
   letter-spacing: 0.02em;
@@ -643,7 +650,7 @@ tbody tr:hover td { background: var(--surface-2); }
 .modal-overlay, .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(17, 24, 39, 0.55);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(3px);
   z-index: 200;
   display: flex;

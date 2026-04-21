@@ -106,6 +106,56 @@ export function usePayments(quoteId) {
     return { data }
   }
 
+  // ─── Update a payment ─────────────────────────────────────────────
+  const updatePayment = async (paymentId, updates) => {
+    if (!profile?.id) return { error: { message: 'Not authenticated' } }
+
+    setLoading(true)
+    setError(null)
+
+    const { data, error: updateErr } = await supabase
+      .from('payments')
+      .update(updates)
+      .eq('id', paymentId)
+      .select('*, users(name)')
+      .single()
+
+    if (updateErr) {
+      setError(updateErr.message)
+      setLoading(false)
+      return { error: updateErr }
+    }
+
+    // Update local state
+    setPayments(prev => prev.map(p => p.id === paymentId ? data : p))
+    setLoading(false)
+    return { data }
+  }
+
+  // ─── Delete a payment ─────────────────────────────────────────────
+  const deletePayment = async (paymentId) => {
+    if (!profile?.id) return { error: { message: 'Not authenticated' } }
+
+    setLoading(true)
+    setError(null)
+
+    const { error: delErr } = await supabase
+      .from('payments')
+      .delete()
+      .eq('id', paymentId)
+
+    if (delErr) {
+      setError(delErr.message)
+      setLoading(false)
+      return { error: delErr }
+    }
+
+    // Update local state
+    setPayments(prev => prev.filter(p => p.id !== paymentId))
+    setLoading(false)
+    return {}
+  }
+
   // ─── Derived values ───────────────────────────────────────────────
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount_received || 0), 0)
   const hasFinalPayment = payments.some(p => p.is_final_payment)
@@ -118,5 +168,7 @@ export function usePayments(quoteId) {
     hasFinalPayment,
     fetchPayments,
     addPayment,
+    updatePayment,
+    deletePayment,
   }
 }

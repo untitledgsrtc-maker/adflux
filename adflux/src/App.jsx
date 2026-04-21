@@ -10,6 +10,7 @@ import Cities from './pages/Cities'
 import Team from './pages/Team'
 import Incentives from './pages/Incentives'
 import MyPerformance from './pages/MyPerformance'
+import RenewalTools from './pages/RenewalTools'
 
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/cities"         element={<RequireAdmin><Cities /></RequireAdmin>} />
           <Route path="/team"           element={<RequireAdmin><Team /></RequireAdmin>} />
           <Route path="/incentives"     element={<RequireAdmin><Incentives /></RequireAdmin>} />
+          <Route path="/renewal-tools"  element={<RequireAdmin><RenewalTools /></RequireAdmin>} />
           <Route path="/quotes"         element={<Quotes />} />
           <Route path="/quotes/new"     element={<CreateQuote />} />
           <Route path="/quotes/:id"     element={<QuoteDetail />} />

@@ -19,12 +19,18 @@ import { FollowUpList } from '../components/followups/FollowUpList'
 import { formatCurrency, formatDate, formatDateTime, formatPhone } from '../utils/formatters'
 import { STATUS_LABELS } from '../utils/constants'
 
-const ALLOWED_TRANSITIONS = {
-  draft:       ['sent', 'lost'],
-  sent:        ['negotiating', 'won', 'lost'],
-  negotiating: ['won', 'lost', 'sent'],
-  won:         [],
-  lost:        ['negotiating'],
+function getAllowedTransitions(quote, hasFinalPayment) {
+  if (quote.status === 'won' && !hasFinalPayment) {
+    return ['negotiating', 'sent']
+  }
+  const BASE = {
+    draft:       ['sent', 'lost'],
+    sent:        ['negotiating', 'won', 'lost'],
+    negotiating: ['won', 'lost', 'sent'],
+    won:         [],
+    lost:        ['negotiating'],
+  }
+  return BASE[quote.status] || []
 }
 
 const TABS = [
@@ -48,7 +54,7 @@ export default function QuoteDetail() {
   const isAdmin = profile?.role === 'admin'
 
   const { fetchQuoteById, updateQuoteStatus, currentQuote } = useQuotes()
-  const { payments, loading: paymentsLoading, totalPaid, hasFinalPayment, fetchPayments, addPayment } = usePayments(id)
+  const { payments, loading: paymentsLoading, totalPaid, hasFinalPayment, fetchPayments, addPayment, updatePayment, deletePayment } = usePayments(id)
 
   const [loading, setLoading]               = useState(true)
   const [activeTab, setActiveTab]           = useState('overview')
@@ -59,6 +65,10 @@ export default function QuoteDetail() {
   const [statusMsg, setStatusMsg]           = useState('')
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showWonModal, setShowWonModal]     = useState(false)
+  const [showCampaignModal, setShowCampaignModal] = useState(false)
+  const [showEditClient, setShowEditClient] = useState(false)
+  const [showEditPayment, setShowEditPayment] = useState(false)
+  const [editingPayment, setEditingPayment] = useState(null)
   const [pendingStatus, setPendingStatus]   = useState(null)
 
   useEffect(() => {
@@ -105,14 +115,20 @@ export default function QuoteDetail() {
       await addPayment({ ...paymentData, is_final_payment: paymentData.is_final })
     }
 
-    // Then update status to won
-    const { error: err } = await updateQuoteStatus(quote.id, 'won')
+    // Update status and campaign dates
+    const updates = {
+      status: 'won',
+      campaign_start_date: paymentData.campaign_start_date,
+      campaign_end_date: paymentData.campaign_end_date,
+    }
+    const { error: err } = await updateQuoteStatus(quote.id, 'won', updates)
     setUpdatingStatus(false)
     if (err) {
       setError(err.message)
     } else {
       setStatusMsg('Quote marked as Won!')
       fetchPayments()
+      fetchQuoteById(id)
       setTimeout(() => setStatusMsg(''), 3000)
     }
   }
@@ -128,6 +144,27 @@ export default function QuoteDetail() {
   function handleWhatsApp() {
     if (!quote) return
     openWhatsApp(quote.client_phone, buildWhatsAppMessage(quote, cities))
+  }
+
+  async function handleEditPayment(updated) {
+    if (!editingPayment) return
+    const { error } = await updatePayment(editingPayment.id, updated)
+    if (error) {
+      setError(error.message)
+    } else {
+      setShowEditPayment(false)
+      setEditingPayment(null)
+      fetchPayments()
+    }
+  }
+
+  async function handleDeletePayment(paymentId) {
+    const { error } = await deletePayment(paymentId)
+    if (error) {
+      setError(error.message)
+    } else {
+      fetchPayments()
+    }
   }
 
   if (loading) {
@@ -151,7 +188,7 @@ export default function QuoteDetail() {
     )
   }
 
-  const allowed = ALLOWED_TRANSITIONS[quote.status] || []
+  const allowed = getAllowedTransitions(quote, hasFinalPayment)
 
   return (
     <div className="page">
@@ -373,6 +410,25 @@ export default function QuoteDetail() {
           {/* Payment Summary */}
           <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} />
 
+          {/* Won quote actions */}
+          {quote.status === 'won' && (
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {isAdmin && (
+                <button className="btn btn-sec btn-sm" onClick={() => setShowEditClient(true)}>
+                  Edit Campaign Dates
+                </button>
+              )}
+              {!isAdmin && (
+                <button className="btn btn-sec btn-sm" onClick={() => setShowEditClient(true)}>
+                  Edit Client Details
+                </button>
+              )}
+              <button className="btn btn-y btn-sm" onClick={() => navigate(`/quotes/new?renewalOf=${id}`)}>
+                Create Renewal Quote
+              </button>
+            </div>
+          )}
+
           {/* Add payment button — both admin and sales can add */}
           {quote.status !== 'lost' && !hasFinalPayment && (
             <div style={{ textAlign: 'center' }}>
@@ -388,7 +444,12 @@ export default function QuoteDetail() {
       {activeTab === 'payments' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} />
-          <PaymentHistory payments={payments} loading={paymentsLoading} />
+          <PaymentHistory
+            payments={payments}
+            loading={paymentsLoading}
+            onEdit={p => { setEditingPayment(p); setShowEditPayment(true) }}
+            onDelete={handleDeletePayment}
+          />
           {quote.status !== 'lost' && !hasFinalPayment && (
             <div style={{ textAlign: 'center', paddingBottom: 8 }}>
               <button className="btn btn-y" onClick={() => setShowPaymentModal(true)}>
@@ -445,17 +506,31 @@ export default function QuoteDetail() {
 
 // ── Won Payment Modal ────────────────────────────────────────────────────────
 function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
+  const today = new Date().toISOString().split('T')[0]
   const [form, setForm] = useState({
     amount_received: '',
     payment_mode: 'NEFT',
-    payment_date: new Date().toISOString().split('T')[0],
+    payment_date: today,
     payment_notes: '',
     is_final: false,
+    campaign_start_date: today,
+    campaign_end_date: '',
   })
 
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+  function set(k, v) {
+    const updated = { ...form, [k]: v }
+    // Auto-calculate end date if start changes and duration exists
+    if (k === 'campaign_start_date' && quote.duration_months) {
+      const start = new Date(v)
+      const end = new Date(start)
+      end.setMonth(end.getMonth() + quote.duration_months)
+      updated.campaign_end_date = end.toISOString().split('T')[0]
+    }
+    setForm(updated)
+  }
 
   const balance = quote.total_amount - (Number(form.amount_received) || 0)
+  const campaignDatesValid = form.campaign_start_date && form.campaign_end_date
 
   return (
     <div className="mo">
@@ -507,8 +582,25 @@ function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
             <textarea value={form.payment_notes} onChange={e => set('payment_notes', e.target.value)} placeholder="Optional" style={{ minHeight: 60 }} />
           </div>
 
+          <div style={{ borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: 14, marginTop: 14 }}>
+            <div style={{ fontSize: '.78rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, fontWeight: 600 }}>Campaign Dates *</div>
+            <div className="grid2">
+              <div className="fg">
+                <label>Start Date</label>
+                <input type="date" value={form.campaign_start_date} onChange={e => set('campaign_start_date', e.target.value)} />
+              </div>
+              <div className="fg">
+                <label>End Date</label>
+                <input type="date" value={form.campaign_end_date} onChange={e => set('campaign_end_date', e.target.value)} />
+              </div>
+            </div>
+            {!campaignDatesValid && (
+              <div style={{ fontSize: '.78rem', color: '#ef9a9a', marginTop: 6 }}>Both dates required to mark Won</div>
+            )}
+          </div>
+
           {form.amount_received > 0 && balance > 0 && (
-            <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: '.82rem' }}>
+            <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: '.82rem', marginTop: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#ef9a9a', fontWeight: 700 }}>Balance Due</span>
                 <span style={{ color: '#ef9a9a', fontWeight: 800 }}>{formatCurrency(balance)}</span>
@@ -516,7 +608,7 @@ function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
             <input type="checkbox" id="isFinal" checked={form.is_final} onChange={e => set('is_final', e.target.checked)} />
             <label htmlFor="isFinal" style={{ fontSize: '.82rem', cursor: 'pointer' }}>
               This is the final / full payment
@@ -525,7 +617,7 @@ function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
         </div>
         <div className="md-f">
           <button className="btn btn-ghost" onClick={onSkip}>Skip Payment for Now</button>
-          <button className="btn btn-y" onClick={() => onConfirm(form)}>✓ Confirm & Mark Won</button>
+          <button className="btn btn-y" onClick={() => onConfirm(form)} disabled={!campaignDatesValid}>✓ Confirm & Mark Won</button>
         </div>
       </div>
     </div>

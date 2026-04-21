@@ -1,6 +1,6 @@
 // src/components/incentives/StaffTable.jsx
 import { useState } from 'react'
-import { Pencil, Flame, Trophy, AlertCircle } from 'lucide-react'
+import { Pencil, Flame, Trophy, AlertCircle, IndianRupee } from 'lucide-react'
 import { calculateIncentive, calculateStreak, isIncrementEligible } from '../../utils/incentiveCalc'
 import { formatCurrency, initials, formatMonthYear } from '../../utils/formatters'
 
@@ -33,7 +33,7 @@ function StreakBadge({ streak, target }) {
   )
 }
 
-export function StaffTable({ profiles, settings, monthlySales, selectedMonth, onEdit }) {
+export function StaffTable({ profiles, settings, monthlySales, selectedMonth, onEdit, onPayout }) {
   const [expandedId, setExpandedId] = useState(null)
 
   function getMonthData(staffId) {
@@ -157,14 +157,28 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, on
                     )}
                   </td>
                   <td onClick={e => e.stopPropagation()}>
-                    <button
-                      className="btn btn-ghost"
-                      style={{ padding: '5px 10px', fontSize: 12 }}
-                      onClick={() => onEdit(p)}
-                    >
-                      <Pencil size={13} style={{ marginRight: 4 }} />
-                      Edit
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: '5px 10px', fontSize: 12 }}
+                        onClick={() => onEdit(p)}
+                        title="Edit profile"
+                      >
+                        <Pencil size={13} style={{ marginRight: 4 }} />
+                        Edit
+                      </button>
+                      {onPayout && (
+                        <button
+                          className="btn btn-ghost"
+                          style={{ padding: '5px 10px', fontSize: 12 }}
+                          onClick={() => onPayout(p, result.incentive)}
+                          title="Record incentive payout"
+                        >
+                          <IndianRupee size={13} style={{ marginRight: 4 }} />
+                          Payout
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )

@@ -7,33 +7,7 @@ import { formatCurrency } from './formatters'
  * @returns {string} message text
  */
 export function buildWhatsAppMessage(quote, cities = []) {
-  const cityLines = cities
-    .map(c => `  • ${c.city_name} (${c.screens} screen${c.screens > 1 ? 's' : ''}) — ${formatCurrency(c.offered_rate)}/month`)
-    .join('\n')
-
-  const message = `
-Hello ${quote.client_name},
-
-Thank you for your interest in *Untitled Advertising*.
-
-Here is your campaign quotation:
-
-*Quote No:* ${quote.quote_number}
-*Duration:* ${quote.duration_months} month${quote.duration_months > 1 ? 's' : ''}
-
-*Locations:*
-${cityLines}
-
-*Subtotal:* ${formatCurrency(quote.subtotal)}
-*GST (18%):* ${formatCurrency(quote.gst_amount)}
-*Total:* ${formatCurrency(quote.total_amount)}
-
-This is a customised offer. Prices are subject to availability.
-
-Looking forward to working with you!
-
-*Untitled Advertising*
-`.trim()
+  const message = `Dear ${quote.client_name}, Thank you for showing interest in our outdoor advertising solutions. Please find the detailed quotation attached for your review. Looking forward to working with you! Best regards, ${quote.sales_person_name || 'Sales Team'} | Untitled Adflux`
 
   return message
 }

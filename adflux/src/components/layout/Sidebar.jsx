@@ -6,13 +6,14 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2,
-  Users, TrendingUp, BarChart3, LogOut
+  Users, TrendingUp, BarChart3, LogOut, RotateCcw
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 const ADMIN_NAV = [
   { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/quotes',         icon: FileText,        label: 'Quotes' },
+  { to: '/renewal-tools',  icon: RotateCcw,       label: 'Renewal Tools' },
   { to: '/cities',         icon: Building2,       label: 'Cities' },
   { to: '/team',           icon: Users,           label: 'Team' },
   { to: '/incentives',     icon: TrendingUp,      label: 'Incentives' },

@@ -374,6 +374,15 @@ function QuoteDocument({ quote, cities }) {
             </View>
           </View>
 
+          {/* Campaign Period if set */}
+          {quote.campaign_start_date && quote.campaign_end_date && (
+            <View style={{ marginBottom: 16, paddingLeft: 8 }}>
+              <Text style={{ fontSize: 9, color: GRAY }}>
+                Campaign Period: {formatDate(quote.campaign_start_date)} — {formatDate(quote.campaign_end_date)}
+              </Text>
+            </View>
+          )}
+
           {/* Location Table */}
           <View style={S.sectionBar}>
             <Text style={S.sectionTitle}>Location Breakdown</Text>
