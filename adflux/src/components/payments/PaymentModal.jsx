@@ -7,13 +7,21 @@ import { PAYMENT_MODES } from '../../utils/constants'
 
 const today = () => new Date().toISOString().split('T')[0]
 
-export function PaymentModal({ quote, totalPaid = 0, onClose, onSave }) {
+export function PaymentModal({ quote, totalPaid = 0, onClose, onSave, initialPayment = null }) {
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
+  const isEdit = !!initialPayment
   const balance = (quote?.total_amount || 0) - totalPaid
-  const isFinalLocked = balance <= 0 // already fully paid
+  const isFinalLocked = !isEdit && balance <= 0 // already fully paid
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => initialPayment ? {
+    amount_received:   initialPayment.amount_received ?? '',
+    payment_mode:      initialPayment.payment_mode    ?? 'NEFT',
+    payment_date:      initialPayment.payment_date    ?? today(),
+    reference_number:  initialPayment.reference_number ?? '',
+    payment_notes:     initialPayment.payment_notes   ?? '',
+    is_final_payment:  !!initialPayment.is_final_payment,
+  } : {
     amount_received: '',
     payment_mode: 'NEFT',
     payment_date: today(),
@@ -76,7 +84,7 @@ export function PaymentModal({ quote, totalPaid = 0, onClose, onSave }) {
         {/* Header */}
         <div className="modal-header">
           <div className="modal-title">
-            <CreditCard size={16} /> Record Payment
+            <CreditCard size={16} /> {isEdit ? 'Edit Payment' : 'Record Payment'}
           </div>
           <button className="modal-close" onClick={onClose}>
             <X size={16} />

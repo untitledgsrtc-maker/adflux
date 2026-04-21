@@ -470,16 +470,35 @@ export default function QuoteDetail() {
       {/* ── Payment Modal ── */}
       {showPaymentModal && (
         <PaymentModal
-          quoteId={id}
-          totalAmount={quote.total_amount}
+          quote={quote}
           totalPaid={totalPaid}
           onClose={() => setShowPaymentModal(false)}
-          onSuccess={() => {
-            setShowPaymentModal(false)
-            fetchPayments()
-            fetchQuoteById(id)
+          onSave={async (paymentData) => {
+            const result = await addPayment(paymentData)
+            if (!result.error) {
+              fetchPayments()
+              fetchQuoteById(id)
+            }
+            return result
           }}
-          addPayment={addPayment}
+        />
+      )}
+
+      {/* ── Edit Payment Modal ── */}
+      {showEditPayment && editingPayment && (
+        <PaymentModal
+          quote={quote}
+          totalPaid={totalPaid - (editingPayment.amount_received || 0)}
+          initialPayment={editingPayment}
+          onClose={() => { setShowEditPayment(false); setEditingPayment(null) }}
+          onSave={async (paymentData) => {
+            const result = await updatePayment(editingPayment.id, paymentData)
+            if (!result.error) {
+              fetchPayments()
+              fetchQuoteById(id)
+            }
+            return result
+          }}
         />
       )}
 

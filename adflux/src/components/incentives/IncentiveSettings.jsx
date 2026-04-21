@@ -11,6 +11,13 @@ export function IncentiveSettings() {
   const [saved,  setSaved]  = useState(false)
   const [error,  setError]  = useState(null)
 
+  // Self-fetch on mount so this component works even if the parent
+  // hasn't loaded settings (e.g. user lands directly on Settings tab
+  // or the parent's fetch failed).
+  useEffect(() => {
+    if (!settings) fetchSettings()
+  }, [])
+
   useEffect(() => {
     if (settings) {
       setForm({
