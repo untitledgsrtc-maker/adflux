@@ -117,18 +117,27 @@ export default function QuoteDetail() {
     // constraint error. Silent failure here was the bug that made
     // the flow appear to succeed (toast shown, status "pending
     // admin approval") while nothing actually landed in the DB.
+    //
+    // Strip campaign_start_date / campaign_end_date before the
+    // insert — those belong on the quote row, not on payments, and
+    // spreading them in causes PostgREST to reject the insert with
+    // "Could not find the 'campaign_end_date' column of 'payments'
+    // in the schema cache."
     const hasPayment = paymentData && paymentData.amount_received > 0
     if (hasPayment) {
+      const {
+        campaign_start_date: _csd,
+        campaign_end_date:   _ced,
+        is_final:            _isFinal,
+        ...paymentFields
+      } = paymentData
       const result = await addPayment({
-        ...paymentData,
+        ...paymentFields,
         is_final_payment: paymentData.is_final,
       })
       if (result?.error) {
         setUpdatingStatus(false)
-        setError(
-          `Payment could not be saved: ${result.error.message}. ` +
-          `This is usually a permissions issue — ask your admin to record the final payment.`
-        )
+        setError(`Payment could not be saved: ${result.error.message}`)
         return
       }
     }
