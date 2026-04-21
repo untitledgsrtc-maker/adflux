@@ -7,7 +7,7 @@
 // - Follow-ups Due panel
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCircle2, Plus, CalendarDays, Zap } from 'lucide-react'
+import { Bell, CheckCircle2, Plus, CalendarDays, Zap, FileText, TrendingUp, IndianRupee, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency, todayISO, thisMonthISO } from '../../utils/formatters'
 import { useAuth } from '../../hooks/useAuth'
@@ -340,7 +340,10 @@ export function SalesDashboard() {
         )}
       </div>
 
-      {/* KPI Cards — 5 tiles (moved below hero per user request).
+      {/* KPI Cards — 5 tiles, unified with the admin dashboard layout.
+          Uses the shared .db-kpi-* classes so both dashboards render
+          identical icon + label + value tiles in an auto-fit grid.
+
           `scoped: true` means the KPI respects the filter range;
           everything else is rendered with a " · live" suffix so
           the user knows it ignores the date filter.
@@ -349,30 +352,38 @@ export function SalesDashboard() {
           duplicated the big Proposed Incentive hero above and confused
           users reading two different numbers representing the same
           thing. Removed per user request. */}
-      <div className="sg">
+      <div className="db-kpi-grid">
         {[
-          { label: 'My Quotes',              val: quotes.length,              color: '#64b5f6' },
-          { label: 'Pipeline Value',         val: formatCurrency(pipeline),   color: 'var(--y)' },
-          { label: 'Won Revenue',            val: formatCurrency(wonValue),   color: '#81c784', scoped: true },
+          { label: 'My Quotes',      value: quotes.length,             icon: FileText,    color: '#64b5f6', bg: 'rgba(100,181,246,.12)' },
+          { label: 'Pipeline Value', value: formatCurrency(pipeline),  icon: TrendingUp,  color: 'var(--accent-fg)', bg: 'var(--accent-soft)' },
+          { label: 'Won Revenue',    value: formatCurrency(wonValue),  icon: IndianRupee, color: '#81c784', bg: 'rgba(129,199,132,.12)', scoped: true },
           {
             label: 'Pending Approval',
-            val:   formatCurrency(pendingTotal),
+            value: formatCurrency(pendingTotal),
+            icon:  Clock,
             color: '#ffb74d',
+            bg:    'rgba(255,183,77,.12)',
             sub:   pendingCount > 0 ? `${pendingCount} payment${pendingCount === 1 ? '' : 's'}` : null,
           },
-          { label: 'Follow-ups Due',         val: followups.length,           color: '#ffb74d' },
-        ].map((k, i) => (
-          <div key={i} className="sc">
-            <div className="sc-lbl">
-              {k.label}
-              {!k.scoped && <span className="db-kpi-scope-note"> · live</span>}
+          { label: 'Follow-ups Due', value: followups.length,          icon: Bell,        color: '#ffb74d', bg: 'rgba(255,183,77,.12)' },
+        ].map(card => {
+          const Icon = card.icon
+          return (
+            <div key={card.label} className="db-kpi-card">
+              <div className="db-kpi-icon" style={{ background: card.bg, color: card.color }}>
+                <Icon size={16} />
+              </div>
+              <div className="db-kpi-body">
+                <p className="db-kpi-label">
+                  {card.label}
+                  {!card.scoped && <span className="db-kpi-scope-note"> · live</span>}
+                </p>
+                <p className="db-kpi-value">{card.value}</p>
+                {card.sub && <p className="db-kpi-sub">{card.sub}</p>}
+              </div>
             </div>
-            <div className="sc-val" style={{ color: k.color }}>{k.val}</div>
-            {k.sub && (
-              <div style={{ fontSize: '.68rem', color: 'var(--gray)', marginTop: 2 }}>{k.sub}</div>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Earned incentive — this-month actuals */}

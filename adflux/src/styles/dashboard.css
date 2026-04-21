@@ -152,13 +152,13 @@
 
 .db-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  /* Unified with sales dashboard: auto-fit packs 5-6 tiles on a wide screen
+     and naturally wraps on narrower viewports. Replaces the old fixed
+     3-col layout on admin — user wanted same spacing on both dashboards. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
 }
-@media (max-width: 1100px) {
-  .db-kpi-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 560px) {
+@media (max-width: 420px) {
   .db-kpi-grid { grid-template-columns: 1fr; }
 }
 .db-kpi-scope-note {
@@ -200,18 +200,21 @@
 .db-kpi-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 18px 20px;
+  /* Matches the sales .sc card (10px radius, 14x16 padding, box-shadow-sm)
+     so both dashboards visually align. Icon sits beside label+value. */
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   transition: border-color 0.15s;
 }
 .db-kpi-card:hover {
   border-color: var(--accent);
 }
 .db-kpi-card--loading {
-  height: 80px;
+  height: 72px;
   animation: db-pulse 1.4s ease-in-out infinite;
 }
 @keyframes db-pulse {
@@ -219,9 +222,9 @@
   50%       { opacity: 0.3; }
 }
 .db-kpi-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -230,22 +233,38 @@
 .db-kpi-body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .db-kpi-label {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
-  margin: 0 0 4px;
+  font-weight: 600;
+  margin: 0;
 }
 .db-kpi-value {
-  font-size: 22px;
-  font-weight: 700;
+  /* Use display font (Bebas) at sales-size so the big metric lines up
+     with the sales dashboard typographically, not just spatially. */
+  font-family: var(--font-display, 'Bebas Neue'), sans-serif;
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1;
   color: var(--text);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.db-kpi-sub {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 /* ══════════════════════════════════════════════════
