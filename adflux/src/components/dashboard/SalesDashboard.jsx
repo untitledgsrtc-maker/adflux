@@ -340,10 +340,15 @@ export function SalesDashboard() {
         )}
       </div>
 
-      {/* KPI Cards — 6 tiles (moved below hero per user request).
+      {/* KPI Cards — 5 tiles (moved below hero per user request).
           `scoped: true` means the KPI respects the filter range;
           everything else is rendered with a " · live" suffix so
-          the user knows it ignores the date filter. */}
+          the user knows it ignores the date filter.
+
+          "Total Possible Incentive" used to live here too, but it
+          duplicated the big Proposed Incentive hero above and confused
+          users reading two different numbers representing the same
+          thing. Removed per user request. */}
       <div className="sg">
         {[
           { label: 'My Quotes',              val: quotes.length,              color: '#64b5f6' },
@@ -356,11 +361,6 @@ export function SalesDashboard() {
             sub:   pendingCount > 0 ? `${pendingCount} payment${pendingCount === 1 ? '' : 's'}` : null,
           },
           { label: 'Follow-ups Due',         val: followups.length,           color: '#ffb74d' },
-          {
-            label: 'Total Possible Incentive',
-            val: proposed ? formatCurrency(proposed.incentive) : '—',
-            color: '#b39ddb',
-          },
         ].map((k, i) => (
           <div key={i} className="sc">
             <div className="sc-lbl">
