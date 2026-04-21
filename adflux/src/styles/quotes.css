@@ -481,6 +481,35 @@
   color: var(--success);
 }
 
+/* ── Quote totals block (Subtotal / GST / Total) ──
+   These classes were referenced in QuoteDetail.jsx with no
+   matching CSS, so the label and value spans collapsed next
+   to each other with no separation. Explicit flex pushes the
+   label left and the value right. */
+.sum-row,
+.sum-tot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.sum-row {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.sum-row span:last-child {
+  color: var(--text);
+  font-weight: 600;
+}
+.sum-tot {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 15px;
+}
+
 /* ── Responsive ───────────────────────────────────── */
 @media (max-width: 768px) {
   .page {

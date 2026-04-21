@@ -168,6 +168,35 @@
   color: var(--text-muted);
   opacity: 0.6;
 }
+
+/* ── Sales Dashboard — Proposed Incentive hero ───────
+   Desktop: hero number (main) + 3 supporting stats.
+   Mobile:  stack everything into a single column so
+            nothing bleeds off the right edge. */
+.sd-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.sd-hero-main {
+  border-right: 1px solid rgba(179,157,219,.2);
+  padding-right: 16px;
+}
+@media (max-width: 760px) {
+  .sd-hero-grid { grid-template-columns: 1fr 1fr; }
+  .sd-hero-main {
+    grid-column: 1 / -1;
+    border-right: none;
+    border-bottom: 1px solid rgba(179,157,219,.2);
+    padding-right: 0;
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 420px) {
+  .sd-hero-grid { grid-template-columns: 1fr; gap: 14px; }
+}
 .db-kpi-card {
   background: var(--surface);
   border: 1px solid var(--border);

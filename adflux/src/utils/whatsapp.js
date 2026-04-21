@@ -18,9 +18,16 @@ import { formatCurrency } from './formatters'
  *                          total_amount, sales_person_name, and
  *                          optionally campaign_start_date/end_date)
  * @param {Array}  cities - quote_cities rows OR wizard-state entries
+ * @param {Object} [opts]
+ * @param {string} [opts.pdfUrl] - public URL of the uploaded PDF.
+ *   When present, the message says "PDF is available here: <url>"
+ *   instead of "attached" — because wa.me click-to-chat cannot
+ *   actually attach files. Falls back to "please find attached"
+ *   phrasing when the upload is skipped or fails.
  * @returns {string} message text ready for encodeURIComponent
  */
-export function buildWhatsAppMessage(quote, cities = []) {
+export function buildWhatsAppMessage(quote, cities = [], opts = {}) {
+  const { pdfUrl } = opts
   const lines = []
 
   lines.push(`Dear ${quote.client_name || 'Sir/Madam'},`)
@@ -72,7 +79,12 @@ export function buildWhatsAppMessage(quote, cities = []) {
     lines.push('')
   }
 
-  lines.push(`The detailed PDF quotation is attached for your review.`)
+  if (pdfUrl) {
+    lines.push(`View the detailed PDF quotation here:`)
+    lines.push(pdfUrl)
+  } else {
+    lines.push(`The detailed PDF quotation is attached for your review.`)
+  }
   lines.push('')
   lines.push(`Best regards,`)
   lines.push(`${quote.sales_person_name || 'Sales Team'}`)

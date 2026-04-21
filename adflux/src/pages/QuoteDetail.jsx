@@ -6,10 +6,11 @@ import {
   Building2, Phone, Mail, MapPin, FileText, Calendar,
   CheckCircle, CreditCard, X, Pencil
 } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
 import { useQuotes } from '../hooks/useQuotes'
 import { usePayments } from '../hooks/usePayments'
 import { QuoteStatusBadge } from '../components/quotes/QuoteStatusBadge'
-import { downloadQuotePDF } from '../components/quotes/QuotePDF'
+import { downloadQuotePDF, uploadQuotePDF } from '../components/quotes/QuotePDF'
 import { buildWhatsAppMessage, openWhatsApp } from '../utils/whatsapp'
 import { PaymentModal } from '../components/payments/PaymentModal'
 import { PaymentHistory } from '../components/payments/PaymentHistory'
@@ -50,6 +51,7 @@ export default function QuoteDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
 
+  const { isAdmin } = useAuth()
   const { fetchQuoteById, updateQuoteStatus, currentQuote } = useQuotes()
   const { payments, loading: paymentsLoading, totalPaid, hasFinalPayment, fetchPayments, addPayment, updatePayment, deletePayment } = usePayments(id)
 
@@ -112,11 +114,35 @@ export default function QuoteDetail() {
     setUpdatingStatus(true)
 
     // Add payment first if provided
-    if (paymentData && paymentData.amount_received > 0) {
+    const hasPayment = paymentData && paymentData.amount_received > 0
+    if (hasPayment) {
       await addPayment({ ...paymentData, is_final_payment: paymentData.is_final })
     }
 
-    // Update status and campaign dates
+    // Sales-side gate: a payment punched by sales lands as
+    // approval_status='pending'. Flipping the quote to 'won' here
+    // would create the exact bug the user flagged — quote shows Won
+    // while its payment still sits in admin's Pending Approval list.
+    // When sales submits a pending payment, leave the quote in its
+    // current status; admin's approval (approvePayment) flips it to
+    // 'won' atomically. Campaign dates are still saved so admin
+    // doesn't have to re-enter them on approval.
+    if (!isAdmin && hasPayment) {
+      if (paymentData.campaign_start_date || paymentData.campaign_end_date) {
+        await updateQuoteStatus(quote.id, quote.status, {
+          campaign_start_date: paymentData.campaign_start_date,
+          campaign_end_date:   paymentData.campaign_end_date,
+        })
+      }
+      setUpdatingStatus(false)
+      setStatusMsg('Payment submitted for admin approval. Quote will be marked Won once approved.')
+      fetchPayments()
+      fetchQuoteById(id)
+      setTimeout(() => setStatusMsg(''), 4500)
+      return
+    }
+
+    // Admin path (or sales who skipped the payment): flip to Won now.
     const updates = {
       status: 'won',
       campaign_start_date: paymentData.campaign_start_date,
@@ -142,9 +168,27 @@ export default function QuoteDetail() {
     finally { setPdfLoading(false) }
   }
 
-  function handleWhatsApp() {
+  async function handleWhatsApp() {
     if (!quote) return
-    openWhatsApp(quote.client_phone, buildWhatsAppMessage(quote, cities))
+    // Upload PDF first so the WhatsApp message carries a public URL
+    // the client can tap to download. wa.me can't attach files, so
+    // this shortlink is the only way to get the PDF to them.
+    // On failure (bucket not set up, RLS block, network), fall back
+    // to sending the message without a link + trigger a local
+    // download so the sales user can attach it manually.
+    let pdfUrl = null
+    try {
+      setPdfLoading(true)
+      pdfUrl = await uploadQuotePDF(quote, cities)
+    } catch (e) {
+      console.warn('PDF upload failed, falling back:', e.message)
+      try { await downloadQuotePDF(quote, cities) } catch {}
+      setStatusMsg('PDF uploaded failed — downloaded locally. Please attach it in WhatsApp.')
+      setTimeout(() => setStatusMsg(''), 4000)
+    } finally {
+      setPdfLoading(false)
+    }
+    openWhatsApp(quote.client_phone, buildWhatsAppMessage(quote, cities, { pdfUrl }))
   }
 
   async function handleEditPayment(updated) {

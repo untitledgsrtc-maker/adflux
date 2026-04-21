@@ -253,6 +253,9 @@ button { cursor: pointer; font-family: inherit; }
   gap: 12px;
 }
 
+.topbar-avatar-wrap {
+  position: relative;
+}
 .topbar-avatar {
   width: 36px;
   height: 36px;
@@ -264,6 +267,62 @@ button { cursor: pointer; font-family: inherit; }
   align-items: center;
   justify-content: center;
   font-size: 14px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.topbar-avatar:hover,
+.topbar-avatar:focus-visible {
+  transform: scale(1.04);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
+}
+.topbar-avatar-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  z-index: 60;
+}
+.topbar-avatar-menu-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.topbar-avatar-menu-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.topbar-avatar-menu-role {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.topbar-avatar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition);
+}
+.topbar-avatar-menu-item:hover {
+  background: var(--surface-2);
 }
 
 .topbar-hamburger {
@@ -436,7 +495,7 @@ button { cursor: pointer; font-family: inherit; }
   letter-spacing: 0.06em;
 }
 
-.form-input, .input {
+.form-input, .input, .form-textarea {
   width: 100%;
   background: var(--surface);
   border: 1.5px solid var(--border-strong);
@@ -449,12 +508,20 @@ button { cursor: pointer; font-family: inherit; }
   outline: none;
 }
 
-.form-input:focus, .input:focus {
+/* Textarea-specific: allow vertical growth but prevent horizontal
+   resize which breaks the parent form grid on mobile. */
+.form-textarea {
+  min-height: 80px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.form-input:focus, .input:focus, .form-textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.form-input::placeholder, .input::placeholder {
+.form-input::placeholder, .input::placeholder, .form-textarea::placeholder {
   color: var(--text-subtle);
 }
 

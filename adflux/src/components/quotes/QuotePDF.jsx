@@ -5,6 +5,7 @@ import {
   Document, Page, Text, View, StyleSheet, Font, pdf,
 } from '@react-pdf/renderer'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+import { supabase } from '../../lib/supabase'
 
 // ─── Font registration ──────────────────────────────────────────────
 // Why: @react-pdf/renderer's bundled Helvetica has no glyph for the
@@ -582,6 +583,58 @@ export async function downloadQuotePDF(quote, cities = []) {
   a.download = `${quote.quote_number}.pdf`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+/**
+ * Generate + upload the PDF to Supabase Storage and return a public URL.
+ *
+ * Bucket: 'quote-pdfs' (must exist and be public — see
+ * supabase_storage_quotes.sql in the repo root).
+ *
+ * Path convention:  {quote_number}/{timestamp}.pdf
+ *   - Folder per quote keeps revisions grouped and makes manual cleanup
+ *     easy (drop the folder to forget a quote).
+ *   - Timestamp suffix means every regeneration produces a new file
+ *     so WhatsApp recipients always download the latest version
+ *     (no CDN cache confusion from overwriting the same key).
+ *
+ * Why this exists:
+ *   WhatsApp click-to-chat URLs (wa.me?text=…) only support plaintext
+ *   — they cannot attach files. So we upload the PDF to a public
+ *   bucket and paste the URL into the message body.
+ *
+ * @returns {Promise<string>} public URL to the uploaded PDF
+ */
+export async function uploadQuotePDF(quote, cities = []) {
+  const blob = await pdf(<QuoteDocument quote={quote} cities={cities} />).toBlob()
+  const ts   = Date.now()
+  const safeNumber = (quote.quote_number || 'quote').replace(/[^A-Za-z0-9_-]/g, '_')
+  const path = `${safeNumber}/${ts}.pdf`
+
+  const { error: uploadErr } = await supabase
+    .storage
+    .from('quote-pdfs')
+    .upload(path, blob, {
+      contentType: 'application/pdf',
+      upsert: false,
+    })
+
+  if (uploadErr) {
+    // Surface a readable error — the caller decides whether to fall
+    // back to the manual-attach flow or bubble it up to the user.
+    throw new Error(`PDF upload failed: ${uploadErr.message}`)
+  }
+
+  const { data } = supabase
+    .storage
+    .from('quote-pdfs')
+    .getPublicUrl(path)
+
+  if (!data?.publicUrl) {
+    throw new Error('PDF uploaded but no public URL was returned — check bucket is public.')
+  }
+
+  return data.publicUrl
 }
 
 export { QuoteDocument }

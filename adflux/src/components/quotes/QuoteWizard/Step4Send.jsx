@@ -1,28 +1,44 @@
 import { useState } from 'react'
 import { CheckCircle, MessageCircle, FileText, ArrowRight } from 'lucide-react'
 import { buildWhatsAppMessage, openWhatsApp } from '../../../utils/whatsapp'
-import { downloadQuotePDF } from '../QuotePDF'
+import { downloadQuotePDF, uploadQuotePDF } from '../QuotePDF'
 import { formatCurrency } from '../../../utils/formatters'
 
 export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, onDone, onViewQuote }) {
   const [sent, setSent] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
+  const [sending, setSending] = useState(false)
 
   async function handleWhatsApp() {
+    setSending(true)
+    // Try uploading the PDF so the WhatsApp message carries a real
+    // downloadable URL. If upload fails (bucket not configured, RLS
+    // blocks, network), fall back to the old "download locally and
+    // attach manually" flow so the sales user is never stuck.
+    let pdfUrl = null
     try {
-      // First download PDF
-      await downloadQuotePDF(quote, cities)
-      setToastMsg('PDF downloaded — please attach it in WhatsApp.')
-      setTimeout(() => setToastMsg(''), 3000)
-
-      // Then open WhatsApp
-      const message = buildWhatsAppMessage(quote, cities)
-      openWhatsApp(quote.client_phone, message)
-      setSent(true)
+      pdfUrl = await uploadQuotePDF(quote, cities)
     } catch (e) {
-      setToastMsg('Failed to download PDF')
-      setTimeout(() => setToastMsg(''), 3000)
+      console.warn('PDF upload failed, falling back to local download:', e.message)
+      try {
+        await downloadQuotePDF(quote, cities)
+        setToastMsg('Upload unavailable — PDF downloaded locally, please attach manually in WhatsApp.')
+      } catch (dlErr) {
+        setToastMsg('Failed to generate PDF')
+        setTimeout(() => setToastMsg(''), 3000)
+        setSending(false)
+        return
+      }
     }
+
+    const message = buildWhatsAppMessage(quote, cities, { pdfUrl })
+    openWhatsApp(quote.client_phone, message)
+    setSent(true)
+    setSending(false)
+    if (pdfUrl) {
+      setToastMsg('PDF link included in WhatsApp message.')
+    }
+    setTimeout(() => setToastMsg(''), 3500)
   }
 
   return (
@@ -54,9 +70,10 @@ export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, o
           <button
             className={`btn btn-primary send-whatsapp-btn${sent ? ' send-whatsapp-btn--done' : ''}`}
             onClick={handleWhatsApp}
+            disabled={sending}
           >
             <MessageCircle size={17} />
-            {sent ? 'Open WhatsApp Again' : 'Send via WhatsApp'}
+            {sending ? 'Preparing PDF…' : sent ? 'Open WhatsApp Again' : 'Send via WhatsApp'}
           </button>
         ) : (
           <div className="send-no-phone">

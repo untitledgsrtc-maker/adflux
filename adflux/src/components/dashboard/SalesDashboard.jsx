@@ -263,24 +263,19 @@ export function SalesDashboard() {
             </div>
           </div>
 
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 1.6fr) repeat(auto-fit, minmax(130px,1fr))',
-            gap: 20,
-            alignItems: 'center',
-            marginBottom: 12,
-          }}>
+          <div className="sd-hero-grid">
             {/* Hero number */}
-            <div style={{ borderRight: '1px solid rgba(179,157,219,.2)', paddingRight: 16 }}>
+            <div className="sd-hero-main">
               <div style={{ fontSize: '.7rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
                 Projected Incentive
               </div>
               <div style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: '2.4rem',
+                fontSize: 'clamp(1.8rem, 7vw, 2.4rem)',
                 lineHeight: 1.05,
                 color: '#b39ddb',
                 textShadow: '0 0 24px rgba(179,157,219,.25)',
+                wordBreak: 'break-word',
               }}>
                 +{formatCurrency(proposed.deltaIncentive)}
               </div>
@@ -295,9 +290,9 @@ export function SalesDashboard() {
               { label: 'Open Renewal',    val: formatCurrency(proposed.openRenewal) },
               { label: 'Open Pipeline', val: formatCurrency(proposed.deltaRevenue), color: 'var(--y)' },
             ].map((f, i) => (
-              <div key={i}>
+              <div key={i} style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>{f.label}</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: f.color || 'var(--wh)' }}>{f.val}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: f.color || 'var(--wh)', wordBreak: 'break-word' }}>{f.val}</div>
               </div>
             ))}
           </div>

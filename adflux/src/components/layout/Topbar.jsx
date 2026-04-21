@@ -7,8 +7,9 @@
 //
 // The route-to-title map lives here so we don't need per-page boilerplate.
 
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, LogOut } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 const TITLES = {
@@ -22,7 +23,7 @@ const TITLES = {
 }
 
 export function Topbar() {
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth()
   const { pathname } = useLocation()
   const navigate = useNavigate()
 
@@ -31,6 +32,31 @@ export function Topbar() {
     (pathname.startsWith('/quotes/') ? 'Quote Detail' : 'Untitled Adflux')
 
   const initial = profile?.name?.[0]?.toUpperCase() || 'U'
+
+  // Avatar menu (contains Sign Out). Needed because on mobile the
+  // sidebar is hidden — sales + admin users had no way to log out
+  // from a phone. Desktop users can still use the sidebar button;
+  // this just duplicates access from the top-right.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onDocClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false)
+      }
+    }
+    function onEsc(e) {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [menuOpen])
 
   return (
     <header className="topbar">
@@ -48,8 +74,34 @@ export function Topbar() {
           </button>
         )}
 
-        <div className="topbar-avatar" title={profile?.name || ''}>
-          {initial}
+        <div className="topbar-avatar-wrap" ref={menuRef}>
+          <button
+            type="button"
+            className="topbar-avatar"
+            title={profile?.name || ''}
+            aria-label="Account menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(o => !o)}
+          >
+            {initial}
+          </button>
+          {menuOpen && (
+            <div className="topbar-avatar-menu" role="menu">
+              <div className="topbar-avatar-menu-header">
+                <div className="topbar-avatar-menu-name">{profile?.name || '—'}</div>
+                <div className="topbar-avatar-menu-role">{profile?.role || 'user'}</div>
+              </div>
+              <button
+                type="button"
+                className="topbar-avatar-menu-item"
+                onClick={() => { setMenuOpen(false); signOut() }}
+                role="menuitem"
+              >
+                <LogOut size={14} />
+                <span>Sign out</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
