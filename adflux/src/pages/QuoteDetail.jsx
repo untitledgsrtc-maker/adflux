@@ -586,29 +586,25 @@ export default function QuoteDetail() {
         />
       )}
 
-      {/* ── Won Modal — collect payment when marking Won ── */}
+      {/* ── Won Modal — collect payment when marking Won ──
+          Only way to mark Won is by recording a payment. The previous
+          "Skip Payment for Now" button flipped status to Won with no
+          payment, which caused the Won Revenue KPI and Active Campaigns
+          to show quotes that had nothing received. Removed so the
+          business rule "no payment = no Won" is enforced at the UI. */}
       {showWonModal && (
         <WonPaymentModal
           quote={quote}
           onConfirm={handleWonWithPayment}
-          onSkip={() => { setShowWonModal(false); handleStatusChange_direct('won') }}
           onClose={() => setShowWonModal(false)}
         />
       )}
     </div>
   )
-
-  async function handleStatusChange_direct(newStatus) {
-    setUpdatingStatus(true)
-    const { error: err } = await updateQuoteStatus(quote.id, newStatus)
-    setUpdatingStatus(false)
-    if (err) setError(err.message)
-    else { setStatusMsg(`Status updated to ${STATUS_LABELS[newStatus]}`); setTimeout(() => setStatusMsg(''), 3000) }
-  }
 }
 
 // ── Won Payment Modal ────────────────────────────────────────────────────────
-function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
+function WonPaymentModal({ quote, onConfirm, onClose }) {
   const today = todayISO()
   const [form, setForm] = useState({
     amount_received: '',
@@ -729,8 +725,15 @@ function WonPaymentModal({ quote, onConfirm, onSkip, onClose }) {
           </div>
         </div>
         <div className="md-f">
-          <button className="btn btn-ghost" onClick={onSkip}>Skip Payment for Now</button>
-          <button className="btn btn-y" onClick={() => onConfirm(form)} disabled={!campaignDatesValid}>✓ Confirm & Mark Won</button>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button
+            className="btn btn-y"
+            onClick={() => onConfirm(form)}
+            disabled={!campaignDatesValid || !(Number(form.amount_received) > 0)}
+            title={!(Number(form.amount_received) > 0) ? 'Record a payment amount to mark this quote Won' : ''}
+          >
+            ✓ Confirm & Mark Won
+          </button>
         </div>
       </div>
     </div>
