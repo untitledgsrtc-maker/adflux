@@ -12,6 +12,9 @@ import Incentives from './pages/Incentives'
 import MyPerformance from './pages/MyPerformance'
 import RenewalTools from './pages/RenewalTools'
 import PendingApprovals from './pages/PendingApprovals'
+import HR from './pages/HR'
+import MyOffer from './pages/MyOffer'
+import OfferForm from './pages/OfferForm'
 
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
@@ -46,6 +49,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Public candidate-facing offer form — NO AppShell, NO auth. */}
+        <Route path="/offer/:token" element={<OfferForm />} />
         <Route path="/" element={<RootRedirect />} />
         <Route element={<RequireAuth><AppShell /></RequireAuth>}>
           <Route path="/dashboard"      element={<Dashboard />} />
@@ -54,10 +59,12 @@ export default function App() {
           <Route path="/incentives"     element={<RequireAdmin><Incentives /></RequireAdmin>} />
           <Route path="/renewal-tools"  element={<RenewalTools />} />
           <Route path="/pending-approvals" element={<RequireAdmin><PendingApprovals /></RequireAdmin>} />
+          <Route path="/hr"             element={<RequireAdmin><HR /></RequireAdmin>} />
           <Route path="/quotes"         element={<Quotes />} />
           <Route path="/quotes/new"     element={<CreateQuote />} />
           <Route path="/quotes/:id"     element={<QuoteDetail />} />
           <Route path="/my-performance" element={<MyPerformance />} />
+          <Route path="/my-offer"       element={<MyOffer />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

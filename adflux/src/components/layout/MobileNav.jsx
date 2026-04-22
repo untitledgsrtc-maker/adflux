@@ -11,6 +11,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2,
   Users, TrendingUp, BarChart3, Inbox, RotateCcw,
+  Briefcase, FileSignature,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
@@ -29,6 +30,7 @@ const ADMIN_NAV = [
   { to: '/renewal-tools',     icon: RotateCcw,       label: 'Renewals' },
   { to: '/cities',            icon: Building2,       label: 'Cities' },
   { to: '/team',              icon: Users,           label: 'Team' },
+  { to: '/hr',                icon: Briefcase,       label: 'HR' },
   { to: '/incentives',        icon: TrendingUp,      label: 'Incentives' },
 ]
 
@@ -37,6 +39,7 @@ const SALES_NAV = [
   { to: '/quotes',         icon: FileText,        label: 'Quotes' },
   { to: '/renewal-tools',  icon: RotateCcw,       label: 'Renewals' },
   { to: '/my-performance', icon: BarChart3,       label: 'Perf' },
+  { to: '/my-offer',       icon: FileSignature,   label: 'Offer' },
 ]
 
 export function MobileNav() {
