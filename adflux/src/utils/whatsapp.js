@@ -6,19 +6,31 @@ import { formatCurrency } from './formatters'
  * Our Supabase PDF URLs look like
  *   https://xxxxx.supabase.co/storage/v1/object/public/quote-pdfs/UA-2026-0012/1745300000000.pdf
  * Pasting that raw into WhatsApp looks spammy and some clients wrap
- * the tail onto a second line. A 20-char tinyurl.com/... link reads
- * cleaner and previews as a clickable card.
+ * the tail onto a second line. A short link previews as a clean
+ * clickable card.
  *
- * Strategy:
- *   1. Try TinyURL's simple GET API — well-known domain, recipients
- *      trust the preview.
- *   2. Fall back to is.gd if TinyURL is unreachable (rare, but CORS
- *      policies do change).
- *   3. Fall back to the original long URL so the message ALWAYS
- *      carries a working link — a shortener outage must never block
- *      the WhatsApp send.
+ * CORS NOTE — the ordering below is deliberate.
  *
- * Both services are free, no-auth, public-link-only. No secrets.
+ *   TinyURL (api-create.php) and is.gd (create.php) are legacy
+ *   endpoints that do NOT send Access-Control-Allow-Origin. Called
+ *   from a browser they fail with a CORS error, the try/catch
+ *   swallows it, and the user ends up with the long URL.
+ *
+ *   cleanuri.com IS designed for browser use — it advertises
+ *   `Access-Control-Allow-Origin: *` and accepts POST
+ *   application/x-www-form-urlencoded with a `url` field, returning
+ *   `{"result_url": "https://cleanuri.com/xxx"}`. That's why it's
+ *   the primary now.
+ *
+ *   TinyURL and is.gd remain as fallbacks — they still work in
+ *   server contexts and some browsers (older CORS policies, or a
+ *   user-installed extension that strips CORS), so keeping them
+ *   costs nothing and covers the long tail.
+ *
+ * If all three fail we fall back to the original long URL so the
+ * message ALWAYS carries a working link — a shortener outage must
+ * never block the WhatsApp send.
+ *
  * Each call is capped at 3.5s so a slow DNS lookup doesn't stall
  * the whole "Send via WhatsApp" button.
  *
@@ -30,26 +42,56 @@ export async function shortenUrl(longUrl) {
   // Already short enough — skip the round-trip.
   if (longUrl.length < 40) return longUrl
 
-  const endpoints = [
-    `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`,
-    `https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`,
+  // Each shortener is an async fn that returns the short URL or null.
+  // Structured as an array so the request shapes (POST+JSON vs
+  // GET+text) can coexist cleanly.
+  const shorteners = [
+    // cleanuri — CORS-friendly, browser-safe. Primary path.
+    async (url, signal) => {
+      const res = await fetch('https://cleanuri.com/api/v1/shorten', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    `url=${encodeURIComponent(url)}`,
+        signal,
+      })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => null)
+      return data?.result_url || null
+    },
+    // TinyURL — no CORS headers; included for non-browser callers
+    // and browsers where an extension permits it.
+    async (url, signal) => {
+      const res = await fetch(
+        `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
+        { signal }
+      )
+      if (!res.ok) return null
+      return (await res.text()).trim() || null
+    },
+    // is.gd — same story as TinyURL; last-resort fallback.
+    async (url, signal) => {
+      const res = await fetch(
+        `https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`,
+        { signal }
+      )
+      if (!res.ok) return null
+      return (await res.text()).trim() || null
+    },
   ]
 
-  for (const url of endpoints) {
+  for (const shortener of shorteners) {
     try {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 3500)
-      const res = await fetch(url, { signal: controller.signal })
+      const short = await shortener(longUrl, controller.signal)
       clearTimeout(timer)
-      if (!res.ok) continue
-      const text = (await res.text()).trim()
-      // Defensive — both APIs return the bare short URL on success,
-      // but reject anything that doesn't parse as a reasonable URL.
-      if (/^https?:\/\/\S+$/i.test(text) && text.length < longUrl.length) {
-        return text
+      // Reject anything that doesn't parse as a reasonable URL or
+      // isn't actually shorter than what we started with.
+      if (short && /^https?:\/\/\S+$/i.test(short) && short.length < longUrl.length) {
+        return short
       }
     } catch {
-      // Network error, CORS block, timeout — try the next endpoint.
+      // Network error, CORS block, timeout — try the next shortener.
     }
   }
   return longUrl
