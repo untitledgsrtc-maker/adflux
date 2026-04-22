@@ -172,14 +172,17 @@ const S = StyleSheet.create({
   tdText: { fontSize: 8.5, color: DARK },
   tdBold: { fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
   tdMuted:{ fontSize: 7.5, color: GRAY },
-  colSr:       { width: 22 },
-  colCity:     { flex: 2.2 },
-  colGrade:    { width: 36, alignItems: 'center' },
-  colScreens:  { width: 44, alignItems: 'center' },
-  colSize:     { width: 36, alignItems: 'center' },
+  // 9-column layout at A4 with 32pt side margins → 531pt usable.
+  // Fixed widths total ~335pt; City flex absorbs the rest (~196pt).
+  // Increments must stay within budget or SPOTS/MO gets clipped.
+  colSr:       { width: 20 },
+  colCity:     { flex: 1 },
+  colGrade:    { width: 34, alignItems: 'center' },
+  colScreens:  { width: 40, alignItems: 'center' },
+  colSize:     { width: 30, alignItems: 'center' },
   colSpots:    { width: 50, alignItems: 'center' },
-  colDuration: { width: 44, alignItems: 'center' },
-  colRate:     { width: 60, alignItems: 'flex-end' },
+  colDuration: { width: 48, alignItems: 'center' },
+  colRate:     { width: 55, alignItems: 'flex-end' },
   colTotal:    { width: 60, alignItems: 'flex-end' },
 
   tableFootRow: {
@@ -216,6 +219,30 @@ const S = StyleSheet.create({
   },
   investGrandLabel: { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
   investGrandValue: { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+
+  // ── GRAND TOTAL HERO (standalone dark bar, reference page 3 top) ─
+  grandHero: {
+    backgroundColor: DARK,
+    borderRadius: 6,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  grandHeroLabel: {
+    fontSize: 13,
+    fontFamily: 'Roboto', fontWeight: 'bold',
+    color: YELLOW,
+    letterSpacing: 1,
+  },
+  grandHeroValue: {
+    fontSize: 18,
+    fontFamily: 'Roboto', fontWeight: 'bold',
+    color: YELLOW,
+  },
 
   // ── WHY BOX ─────────────────────────────────
   whyBox: {
@@ -275,18 +302,49 @@ const S = StyleSheet.create({
   footerBottomHighlight: { fontSize: 7, color: YELLOW },
 })
 
-// ── helpers ─────────────────────────────────────────────────────────────────
+// ── Network marketing constants ─────────────────────────────────────
+// Shown in the top yellow stats banner AND the dark footer strip.
+// Network-wide pitch, not per-quote. Update here if the fleet changes.
+const NETWORK = {
+  totalScreens: '264',
+  cities:       '20',
+  monthlyImpressions: '29L+',
+  uniquePerDay: '30K+',
+}
+
+// ── Per-row and glance helpers ──────────────────────────────────────
 function totalScreens(cities) {
   return cities.reduce((s, c) => s + (Number(c.screens) || 0), 0)
 }
+// Spots per month for a city = screens × 3000 (100 spots/day × 30 days).
+function spotsPerMonth(screens) {
+  return (Number(screens) || 0) * 3000
+}
+function totalSpotsPerMonth(cities) {
+  return cities.reduce((s, c) => s + spotsPerMonth(c.screens), 0)
+}
+// Quote-wide total monthly impressions. Reference data implies ~5200
+// impressions/screen/month (13.7L / 264 ≈ 5200). Keeps the "glance"
+// Total Impressions card in the same ballpark as the reference PDF.
 function totalImpressions(cities) {
-  // approximate: screens * 3000 spots/month average
-  return cities.reduce((s, c) => s + (Number(c.screens) || 0) * 3000, 0)
+  return cities.reduce((s, c) => s + (Number(c.screens) || 0) * 5200, 0)
 }
 function formatLakh(n) {
   if (n >= 100000) return (n / 100000).toFixed(1) + 'L'
   if (n >= 1000)   return (n / 1000).toFixed(0) + 'K'
   return String(n)
+}
+// Station subtitle under each city name ("Anand ST Bus Depot").
+// Prefer the stored station_name when present (not currently saved by
+// the wizard, see task #30); fall back to computing it from city_name.
+function stationLabel(c) {
+  if (c.station_name) return c.station_name
+  if (!c.city_name)   return ''
+  // Title-case city name so "ANAND" → "Anand" for the subtitle only.
+  const nice = c.city_name
+    .toLowerCase()
+    .replace(/\b\w/g, ch => ch.toUpperCase())
+  return `${nice} ST Bus Depot`
 }
 
 // ── Document ─────────────────────────────────────────────────────────────────
@@ -295,14 +353,24 @@ function QuoteDocument({ quote, cities }) {
   const gstAmount   = Number(quote.gst_amount)   || 0
   const totalAmount = Number(quote.total_amount) || 0
   const screens     = totalScreens(cities)
-  const spots       = totalImpressions(cities)
-  const uniqueDay   = Math.round(screens * 150)
+  const spotsMonth  = totalSpotsPerMonth(cities)
+  const impressions = totalImpressions(cities)
+
+  // Dynamic GST text — pull from the quote so "No GST" (rate=0) quotes
+  // don't ship a PDF claiming GST was charged. Null/missing rate falls
+  // back to 18% for legacy rows created before the gst_rate migration.
+  const rate   = quote.gst_rate !== null && quote.gst_rate !== undefined ? Number(quote.gst_rate) : 0.18
+  const gstPct = Math.round(rate * 100)
+  const gstApplies = rate > 0
+  const gstLabel = gstApplies ? `GST @${gstPct}%` : 'No GST'
 
   const TERMS = [
     'Quotation valid for 30 days from date of issue. Rates subject to change post-expiry.',
     '50% advance payment required to confirm booking. Balance payable before campaign go-live.',
     'Creative in MP4 format (1920×1080, H.264, max 10MB) to be submitted 5 working days before go-live.',
-    'GST @18% is levied on campaign value and is included in the Grand Total above.',
+    gstApplies
+      ? `GST @${gstPct}% is levied on campaign value and is included in the Grand Total above.`
+      : 'No GST is applied to this quotation. The Grand Total is the final payable amount.',
     'Campaign slot confirmation subject to availability at time of booking.',
     'Cancellation post-confirmation: 25% cancellation fee applicable on total invoice.',
     'Content violating law, GSRTC regulations, or community standards may be rejected without refund.',
@@ -331,22 +399,24 @@ function QuoteDocument({ quote, cities }) {
           </View>
         </View>
 
-        {/* ── STATS BAR ── */}
+        {/* ── STATS BAR ── Network-wide marketing stats, not quote-specific.
+            These are the pitch for the whole GSRTC fleet; the quote's own
+            totals live in the "At a Glance" block further down. */}
         <View style={S.statsBar}>
           <View style={S.statItem}>
-            <Text style={S.statNum}>{screens || 264}</Text>
+            <Text style={S.statNum}>{NETWORK.totalScreens}</Text>
             <Text style={S.statLabel}>Total Screens</Text>
           </View>
           <View style={S.statItem}>
-            <Text style={S.statNum}>{cities.length || 20}</Text>
+            <Text style={S.statNum}>{NETWORK.cities}</Text>
             <Text style={S.statLabel}>Cities</Text>
           </View>
           <View style={S.statItem}>
-            <Text style={S.statNum}>{formatLakh(spots || 2900000)}+</Text>
+            <Text style={S.statNum}>{NETWORK.monthlyImpressions}</Text>
             <Text style={S.statLabel}>Monthly Impressions</Text>
           </View>
           <View style={S.statItem}>
-            <Text style={S.statNum}>{formatLakh(uniqueDay || 30000)}+</Text>
+            <Text style={S.statNum}>{NETWORK.uniquePerDay}</Text>
             <Text style={S.statLabel}>Unique/Day</Text>
           </View>
         </View>
@@ -387,13 +457,15 @@ function QuoteDocument({ quote, cities }) {
           <View style={S.sectionBar}>
             <Text style={S.sectionTitle}>This Campaign at a Glance</Text>
           </View>
+          {/* Quote-specific headline numbers. Mirrors the reference's
+              4-card strip. Total Impressions ≈ screens × 5200/mo. */}
           <View style={S.glanceRow}>
             <View style={S.glanceItem}>
               <Text style={S.glanceNum}>{screens}</Text>
               <Text style={S.glanceLabel}>Screens Booked</Text>
             </View>
             <View style={S.glanceItem}>
-              <Text style={S.glanceNum}>{formatLakh(spots)}+</Text>
+              <Text style={S.glanceNum}>{formatLakh(spotsMonth)}</Text>
               <Text style={S.glanceLabel}>Spots / Month</Text>
             </View>
             <View style={S.glanceItem}>
@@ -401,8 +473,8 @@ function QuoteDocument({ quote, cities }) {
               <Text style={S.glanceLabel}>Spot Duration</Text>
             </View>
             <View style={[S.glanceItem, { borderRight: 'none' }]}>
-              <Text style={S.glanceNum}>{quote.duration_months}M</Text>
-              <Text style={S.glanceLabel}>Campaign Duration</Text>
+              <Text style={S.glanceNum}>{formatLakh(impressions)}</Text>
+              <Text style={S.glanceLabel}>Total Impressions</Text>
             </View>
           </View>
 
@@ -420,65 +492,82 @@ function QuoteDocument({ quote, cities }) {
             <Text style={S.sectionTitle}>Location Breakdown</Text>
           </View>
           <View style={S.tableSection}>
-            {/* Header */}
+            {/* Header — mirrors reference: SR | LOCATION | GRADE | SCREENS
+                | SIZE | SPOTS/MO | DURATION | LISTED RATE | CAMPAIGN TOTAL */}
             <View style={S.tableHead}>
               <View style={S.colSr}><Text style={S.thText}>SR</Text></View>
               <View style={S.colCity}><Text style={S.thText}>Location</Text></View>
               <View style={S.colGrade}><Text style={S.thText}>Grade</Text></View>
               <View style={S.colScreens}><Text style={[S.thText, { textAlign: 'center' }]}>Screens</Text></View>
               <View style={S.colSize}><Text style={[S.thText, { textAlign: 'center' }]}>Size</Text></View>
+              <View style={S.colSpots}><Text style={[S.thText, { textAlign: 'center' }]}>Spots/Mo</Text></View>
               <View style={S.colDuration}><Text style={[S.thText, { textAlign: 'center' }]}>Duration</Text></View>
               <View style={S.colRate}><Text style={[S.thText, { textAlign: 'right' }]}>Listed Rate</Text></View>
               <View style={S.colTotal}><Text style={[S.thText, { textAlign: 'right' }]}>Campaign Total</Text></View>
             </View>
 
-            {/* Rows */}
-            {cities.map((c, i) => (
-              <View key={c.id || i} style={[S.tableRow, i % 2 === 1 && S.tableRowAlt]}>
-                <View style={S.colSr}>
-                  <Text style={S.tdMuted}>{i + 1}</Text>
-                </View>
-                <View style={S.colCity}>
-                  <Text style={S.tdBold}>{c.city_name}</Text>
-                  {c.station_name && <Text style={S.tdMuted}>{c.station_name}</Text>}
-                </View>
-                <View style={S.colGrade}>
-                  <View style={{
-                    backgroundColor: c.grade === 'A' ? '#dcfce7' : c.grade === 'B' ? '#fef9c3' : '#f1f5f9',
-                    borderRadius: 3, padding: '1 5', alignSelf: 'center',
-                  }}>
-                    <Text style={[S.tdMuted, {
-                      color: c.grade === 'A' ? '#166534' : c.grade === 'B' ? '#854d0e' : '#475569',
-                      fontFamily: 'Roboto', fontWeight: 'bold',
-                    }]}>{c.grade}</Text>
+            {/* Rows. Grade chip colors match reference: A=green, B=orange,
+                C=gray. Size falls back to em dash when no per-city data
+                (screen_size_inch isn't captured by the wizard yet). */}
+            {cities.map((c, i) => {
+              const gradeBg = c.grade === 'A' ? '#DCFCE7' : c.grade === 'B' ? '#FFEDD5' : '#F1F5F9'
+              const gradeFg = c.grade === 'A' ? '#166534' : c.grade === 'B' ? '#B45309' : '#475569'
+              const sizeText = c.screen_size_inch ? `${c.screen_size_inch}"` : '—'
+              const spots = spotsPerMonth(c.screens)
+              return (
+                <View key={c.id || i} style={[S.tableRow, i % 2 === 1 && S.tableRowAlt]} wrap={false}>
+                  <View style={S.colSr}>
+                    <Text style={S.tdMuted}>{i + 1}</Text>
+                  </View>
+                  <View style={S.colCity}>
+                    <Text style={S.tdBold}>{c.city_name}</Text>
+                    <Text style={S.tdMuted}>{stationLabel(c)}</Text>
+                  </View>
+                  <View style={S.colGrade}>
+                    <View style={{
+                      backgroundColor: gradeBg,
+                      borderRadius: 8,
+                      paddingVertical: 2,
+                      paddingHorizontal: 6,
+                      alignSelf: 'center',
+                    }}>
+                      <Text style={{
+                        fontSize: 8,
+                        fontFamily: 'Roboto', fontWeight: 'bold',
+                        color: gradeFg,
+                      }}>{c.grade}</Text>
+                    </View>
+                  </View>
+                  <View style={S.colScreens}>
+                    <Text style={[S.tdText, { textAlign: 'center' }]}>{c.screens}</Text>
+                  </View>
+                  <View style={S.colSize}>
+                    <Text style={[S.tdMuted, { textAlign: 'center' }]}>{sizeText}</Text>
+                  </View>
+                  <View style={S.colSpots}>
+                    <Text style={[S.tdText, { textAlign: 'center' }]}>
+                      {spots.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={S.colDuration}>
+                    <Text style={[S.tdText, { textAlign: 'center' }]}>
+                      {c.duration_months} Month{c.duration_months !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  <View style={S.colRate}>
+                    <Text style={[S.tdText, { textAlign: 'right' }]}>{formatCurrency(c.offered_rate)}</Text>
+                    {c.listed_rate && c.listed_rate !== c.offered_rate && (
+                      <Text style={[S.tdMuted, { textAlign: 'right', textDecoration: 'line-through' }]}>
+                        {formatCurrency(c.listed_rate)}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={S.colTotal}>
+                    <Text style={[S.tdBold, { textAlign: 'right' }]}>{formatCurrency(c.campaign_total)}</Text>
                   </View>
                 </View>
-                <View style={S.colScreens}>
-                  <Text style={[S.tdText, { textAlign: 'center' }]}>{c.screens}</Text>
-                </View>
-                <View style={S.colSize}>
-                  <Text style={[S.tdMuted, { textAlign: 'center' }]}>
-                    {c.screen_size_inch ? `${c.screen_size_inch}"` : '55"'}
-                  </Text>
-                </View>
-                <View style={S.colDuration}>
-                  <Text style={[S.tdText, { textAlign: 'center' }]}>
-                    {c.duration_months} Month{c.duration_months !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-                <View style={S.colRate}>
-                  <Text style={[S.tdText, { textAlign: 'right' }]}>{formatCurrency(c.offered_rate)}</Text>
-                  {c.listed_rate && c.listed_rate !== c.offered_rate && (
-                    <Text style={[S.tdMuted, { textAlign: 'right', textDecoration: 'line-through' }]}>
-                      {formatCurrency(c.listed_rate)}
-                    </Text>
-                  )}
-                </View>
-                <View style={S.colTotal}>
-                  <Text style={[S.tdBold, { textAlign: 'right' }]}>{formatCurrency(c.campaign_total)}</Text>
-                </View>
-              </View>
-            ))}
+              )
+            })}
 
             {/* Table footer */}
             <View style={S.tableFootRow}>
@@ -487,34 +576,40 @@ function QuoteDocument({ quote, cities }) {
             </View>
           </View>
 
-          {/* Investment Summary */}
+          {/* Investment Summary — full-width in the reference (not
+              right-aligned). Shows Subtotal + GST line only; Grand Total
+              promotes to its own dark hero bar below. */}
           <View style={S.sectionBar}>
             <Text style={S.sectionTitle}>Investment Summary</Text>
           </View>
           <View style={S.investSection}>
-            <View style={S.investBox}>
+            <View style={[S.investBox, { alignSelf: 'stretch', width: '100%' }]}>
               <View style={S.investRow}>
                 <Text style={S.investLabel}>Campaign Subtotal</Text>
                 <Text style={S.investValue}>{formatCurrency(subtotal)}</Text>
               </View>
-              <View style={S.investRow}>
-                <Text style={S.investLabel}>GST @18%</Text>
-                <Text style={S.investValue}>{formatCurrency(gstAmount)}</Text>
-              </View>
-              <View style={S.investGrandRow}>
-                <Text style={S.investGrandLabel}>GRAND TOTAL (INR)</Text>
-                <Text style={S.investGrandValue}>{formatCurrency(totalAmount)}</Text>
+              <View style={[S.investRow, { borderBottom: 'none' }]}>
+                <Text style={S.investLabel}>{gstLabel}</Text>
+                <Text style={S.investValue}>
+                  {gstApplies ? formatCurrency(gstAmount) : '—'}
+                </Text>
               </View>
             </View>
+          </View>
+
+          {/* Grand Total hero — standalone dark bar, reference p3 top */}
+          <View style={S.grandHero}>
+            <Text style={S.grandHeroLabel}>GRAND TOTAL (INR)</Text>
+            <Text style={S.grandHeroValue}>{formatCurrency(totalAmount)}</Text>
           </View>
 
           {/* Why GSRTC */}
           <View style={S.whyBox}>
             <Text style={S.whyTitle}>Why GSRTC LED Screens?</Text>
             {[
-              ["Gujarat's Largest OOH Network:", `${screens || 264} premium LED screens at GSRTC bus depots across ${cities.length || 20} cities — the highest-traffic public transit hubs in the state.`],
-              ["Zero Skip. Zero Scroll. Pure Attention:", "Bus terminal audiences dwell for 10–30 minutes. Your brand plays in a 5-minute loop with no ad-blocker, no skip button."],
-              ["Hyper-Local + State-Wide Reach:", "Reach hyperlocal audiences in each city simultaneously. Our pricing model gives you more reach per rupee than any other OOH format in Gujarat."],
+              ["Gujarat's Largest OOH Network:", `${NETWORK.totalScreens} premium LED screens at GSRTC bus depots across ${NETWORK.cities} cities — the highest-traffic public transit hubs in the state, delivering ${NETWORK.monthlyImpressions} verified monthly impressions.`],
+              ["Zero Skip. Zero Scroll. Pure Attention:", "Bus terminal audiences dwell for 10–30 minutes. Your brand plays in a 5-minute loop with no ad-blocker, no skip button, and no competing screen."],
+              ["Hyper-Local + State-Wide Reach:", "Reach hyperlocal audiences in each city simultaneously. Grade A locations deliver premium footfall; our pricing model gives you more reach per rupee than any other OOH format in Gujarat."],
             ].map(([title, body], i) => (
               <View key={i} style={S.whyItem}>
                 <Text style={S.whyBullet}>•</Text>
@@ -565,7 +660,7 @@ function QuoteDocument({ quote, cities }) {
           <Text style={S.footerBottomText}>untitlead.in | hello@untitlead.in</Text>
           <Text style={S.footerBottomText}>GSRTC LED Screen Network — Gujarat</Text>
           <Text style={S.footerBottomHighlight}>
-            {screens || 264} Screens · {cities.length || 20} Cities · {formatLakh(spots || 2900000)}+ Monthly Impressions
+            {NETWORK.totalScreens} Screens · {NETWORK.cities} Cities · {NETWORK.monthlyImpressions} Monthly · {NETWORK.uniquePerDay} Unique/Day
           </Text>
         </View>
 
