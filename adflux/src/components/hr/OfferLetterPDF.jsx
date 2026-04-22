@@ -69,10 +69,15 @@ const S = StyleSheet.create({
     paddingRight:  PAGE_PAD_SIDE,
   },
 
+  // A4 is 595 × 842 pt. Pin the letterhead to the absolute page
+  // edges (not the padded content box) so the logo hits the top
+  // and the address block hits the bottom of every physical page.
   bgImage: {
     position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    width: '100%', height: '100%',
+    top: 0,
+    left: 0,
+    width: 595,
+    height: 842,
   },
 
   refBar: {
