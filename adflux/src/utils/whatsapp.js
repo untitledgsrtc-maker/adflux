@@ -43,10 +43,27 @@ export async function shortenUrl(longUrl) {
   if (longUrl.length < 40) return longUrl
 
   // Each shortener is an async fn that returns the short URL or null.
-  // Structured as an array so the request shapes (POST+JSON vs
-  // GET+text) can coexist cleanly.
+  // Order matters — first success wins.
+  //
+  //   1. /api/shorten — our Vercel serverless function. Same-origin
+  //      request, so CSP `connect-src 'self'` allows it and no CORS
+  //      round-trip is involved. The function calls TinyURL from the
+  //      server where neither CSP nor CORS applies.
+  //   2. cleanuri.com — direct browser call. CSP now explicitly
+  //      allowlists it in vercel.json. Useful as a fallback if the
+  //      serverless function cold-starts slowly or errors.
+  //   3. TinyURL / is.gd — direct calls, allowlisted in CSP, but
+  //      these endpoints historically don't send CORS headers, so
+  //      they usually fail from a browser. Kept for completeness.
   const shorteners = [
-    // cleanuri — CORS-friendly, browser-safe. Primary path.
+    // Serverless function — primary.
+    async (url, signal) => {
+      const res = await fetch(`/api/shorten?url=${encodeURIComponent(url)}`, { signal })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => null)
+      return data?.short || null
+    },
+    // cleanuri — CORS-friendly, browser-safe.
     async (url, signal) => {
       const res = await fetch('https://cleanuri.com/api/v1/shorten', {
         method:  'POST',
@@ -58,8 +75,7 @@ export async function shortenUrl(longUrl) {
       const data = await res.json().catch(() => null)
       return data?.result_url || null
     },
-    // TinyURL — no CORS headers; included for non-browser callers
-    // and browsers where an extension permits it.
+    // TinyURL direct.
     async (url, signal) => {
       const res = await fetch(
         `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
@@ -68,7 +84,7 @@ export async function shortenUrl(longUrl) {
       if (!res.ok) return null
       return (await res.text()).trim() || null
     },
-    // is.gd — same story as TinyURL; last-resort fallback.
+    // is.gd direct.
     async (url, signal) => {
       const res = await fetch(
         `https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`,
