@@ -11,7 +11,7 @@ import { useQuotes } from '../hooks/useQuotes'
 import { usePayments } from '../hooks/usePayments'
 import { QuoteStatusBadge } from '../components/quotes/QuoteStatusBadge'
 import { downloadQuotePDF, uploadQuotePDF } from '../components/quotes/QuotePDF'
-import { buildWhatsAppMessage, openWhatsApp } from '../utils/whatsapp'
+import { buildWhatsAppMessage, openWhatsApp, shortenUrl } from '../utils/whatsapp'
 import { PaymentModal } from '../components/payments/PaymentModal'
 import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
@@ -215,6 +215,13 @@ export default function QuoteDetail() {
       setTimeout(() => setStatusMsg(''), 4000)
     } finally {
       setPdfLoading(false)
+    }
+    // Shorten the Supabase storage URL (~130 chars) to a tinyurl.com
+    // link so WhatsApp shows a clean preview card instead of a wrapped
+    // spammy-looking blob. Shortener failures fall back to the original
+    // URL inside shortenUrl — never blocks the send.
+    if (pdfUrl) {
+      try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
     }
     openWhatsApp(quote.client_phone, buildWhatsAppMessage(quote, cities, { pdfUrl }))
   }

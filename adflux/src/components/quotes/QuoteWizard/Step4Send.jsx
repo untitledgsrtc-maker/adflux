@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle, MessageCircle, FileText, ArrowRight } from 'lucide-react'
-import { buildWhatsAppMessage, openWhatsApp } from '../../../utils/whatsapp'
+import { buildWhatsAppMessage, openWhatsApp, shortenUrl } from '../../../utils/whatsapp'
 import { downloadQuotePDF, uploadQuotePDF } from '../QuotePDF'
 import { formatCurrency } from '../../../utils/formatters'
 
@@ -29,6 +29,13 @@ export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, o
         setSending(false)
         return
       }
+    }
+
+    // Shorten the (long) Supabase storage URL to a tinyurl.com link so
+    // the WhatsApp preview reads cleanly. Falls back to the original
+    // URL inside shortenUrl on any failure — never blocks the send.
+    if (pdfUrl) {
+      try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
     }
 
     const message = buildWhatsAppMessage(quote, cities, { pdfUrl })

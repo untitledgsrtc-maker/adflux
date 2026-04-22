@@ -1,6 +1,61 @@
 import { formatCurrency } from './formatters'
 
 /**
+ * Shorten a URL for WhatsApp.
+ *
+ * Our Supabase PDF URLs look like
+ *   https://xxxxx.supabase.co/storage/v1/object/public/quote-pdfs/UA-2026-0012/1745300000000.pdf
+ * Pasting that raw into WhatsApp looks spammy and some clients wrap
+ * the tail onto a second line. A 20-char tinyurl.com/... link reads
+ * cleaner and previews as a clickable card.
+ *
+ * Strategy:
+ *   1. Try TinyURL's simple GET API — well-known domain, recipients
+ *      trust the preview.
+ *   2. Fall back to is.gd if TinyURL is unreachable (rare, but CORS
+ *      policies do change).
+ *   3. Fall back to the original long URL so the message ALWAYS
+ *      carries a working link — a shortener outage must never block
+ *      the WhatsApp send.
+ *
+ * Both services are free, no-auth, public-link-only. No secrets.
+ * Each call is capped at 3.5s so a slow DNS lookup doesn't stall
+ * the whole "Send via WhatsApp" button.
+ *
+ * @param {string} longUrl
+ * @returns {Promise<string>} short URL or the original URL on failure
+ */
+export async function shortenUrl(longUrl) {
+  if (!longUrl || typeof longUrl !== 'string') return longUrl
+  // Already short enough — skip the round-trip.
+  if (longUrl.length < 40) return longUrl
+
+  const endpoints = [
+    `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`,
+    `https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`,
+  ]
+
+  for (const url of endpoints) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 3500)
+      const res = await fetch(url, { signal: controller.signal })
+      clearTimeout(timer)
+      if (!res.ok) continue
+      const text = (await res.text()).trim()
+      // Defensive — both APIs return the bare short URL on success,
+      // but reject anything that doesn't parse as a reasonable URL.
+      if (/^https?:\/\/\S+$/i.test(text) && text.length < longUrl.length) {
+        return text
+      }
+    } catch {
+      // Network error, CORS block, timeout — try the next endpoint.
+    }
+  }
+  return longUrl
+}
+
+/**
  * Build WhatsApp message text for a quote.
  *
  * Called from two paths with slightly different city shapes:
@@ -75,7 +130,15 @@ export function buildWhatsAppMessage(quote, cities = [], opts = {}) {
   }
 
   if (quote.total_amount != null) {
-    lines.push(`*Total (incl. 18% GST): ${formatCurrency(quote.total_amount)}*`)
+    // GST label tracks the stored rate — a "No GST" quote mustn't ship
+    // a WhatsApp line claiming 18% was included.
+    const rate = quote.gst_rate !== null && quote.gst_rate !== undefined
+      ? Number(quote.gst_rate)
+      : 0.18
+    const gstSuffix = rate > 0
+      ? `incl. ${Math.round(rate * 100)}% GST`
+      : 'No GST'
+    lines.push(`*Total (${gstSuffix}): ${formatCurrency(quote.total_amount)}*`)
     lines.push('')
   }
 
