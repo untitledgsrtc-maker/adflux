@@ -842,7 +842,7 @@ function OfferDocument({ offer, template }) {
                 </View>
               </>
             ) : (
-              <Text style={[S.signMeta, { fontStyle: 'italic', marginTop: 6 }]}>
+              <Text style={[S.signMeta, { marginTop: 6 }]}>
                 Pending candidate acceptance
               </Text>
             )}
@@ -959,7 +959,7 @@ function OfferDocument({ offer, template }) {
         <Text style={[S.annexSub, { marginTop: 12 }]}>City Ceilings</Text>
         <TADATable />
 
-        <Text style={[S.para, { marginTop: 14, fontStyle: 'italic', fontSize: 9, color: GRAY }]}>
+        <Text style={[S.para, { marginTop: 14, fontSize: 9, color: GRAY, textAlign: 'center' }]}>
           — End of Document —
         </Text>
 
