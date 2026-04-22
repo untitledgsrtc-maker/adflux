@@ -300,7 +300,42 @@ function OfferDocument({ offer, template }) {
             {offer.territory && <Row label="Territory" value={offer.territory} />}
             <Row label="Date of Joining"     value={formatLongDate(offer.joining_date)} />
             <Row label="Fixed Remuneration"  value={salaryLine(offer.fixed_salary_monthly)} />
-            {offer.incentive_text && <Row label="Performance Incentive" value={offer.incentive_text} />}
+            {/* Structured incentive — shown when admin captured the
+                new fields. Falls back to legacy free-text row if only
+                incentive_text is present (old offers). */}
+            {Number(offer.incentive_sales_multiplier) > 0 ? (
+              <>
+                <Row
+                  label="Incentive Threshold"
+                  value={`${formatCurrency(
+                    (offer.fixed_salary_monthly || 0) * 2
+                  )} per month (2× fixed salary)`}
+                />
+                <Row
+                  label="Monthly Target"
+                  value={`${formatCurrency(
+                    (offer.fixed_salary_monthly || 0)
+                    * Number(offer.incentive_sales_multiplier)
+                  )} per month (${Number(offer.incentive_sales_multiplier)}× fixed salary)`}
+                />
+                <Row
+                  label="Commission"
+                  value={
+                    `${(Number(offer.incentive_new_client_rate) * 100).toFixed(2)}% on new-client billings`
+                    + ` · ${(Number(offer.incentive_renewal_rate) * 100).toFixed(2)}% on renewal billings`
+                    + ` (payable only after monthly billings cross the threshold)`
+                  }
+                />
+                {Number(offer.incentive_flat_bonus) > 0 && (
+                  <Row
+                    label="Flat Bonus"
+                    value={`${formatCurrency(Number(offer.incentive_flat_bonus))} per month when monthly billings exceed the target`}
+                  />
+                )}
+              </>
+            ) : offer.incentive_text ? (
+              <Row label="Performance Incentive" value={offer.incentive_text} />
+            ) : null}
             <Row label="Probation Period"    value={`${tpl.probation_months} month${tpl.probation_months !== 1 ? 's' : ''}`} />
             <Row label="Working Days"        value={`${tpl.working_days} · Travel ${tpl.travel_percent}`} />
             <Row label="Leave Entitlement"   value={`${tpl.paid_leave_days} paid leave + ${tpl.sick_leave_days} sick leave per annum`} />

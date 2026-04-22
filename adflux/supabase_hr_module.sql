@@ -129,10 +129,19 @@ CREATE TABLE IF NOT EXISTS hr_offers (
   territory                 text,
   joining_date              date,
   fixed_salary_monthly      numeric NOT NULL,
-  -- Free-form string because the sample letter uses a range ("1% of
-  -- billing up to ₹15L / 2% thereafter") that isn't easily modeled
-  -- as a single number. Admin types what they want printed.
+  -- Free-form string kept for legacy/Phase 1 offers. New offers use
+  -- the structured incentive columns below; the PDF renders the
+  -- structured block and ignores this when any of the structured
+  -- columns are non-null.
   incentive_text            text,
+  -- Structured incentive config — mirrors staff_incentive_profiles
+  -- exactly so Convert-to-User can copy these straight into the new
+  -- user's profile without mapping. Defaults match the existing Team
+  -- modal defaults (5× multiplier, 5% / 2% rates, ₹10k bonus).
+  incentive_sales_multiplier numeric DEFAULT 5,
+  incentive_new_client_rate  numeric DEFAULT 0.05,
+  incentive_renewal_rate     numeric DEFAULT 0.02,
+  incentive_flat_bonus       numeric DEFAULT 10000,
   place                     text DEFAULT 'Vadodara',
   template_id               uuid REFERENCES hr_offer_templates(id),
 
@@ -176,6 +185,13 @@ CREATE TABLE IF NOT EXISTS hr_offers (
 CREATE INDEX IF NOT EXISTS hr_offers_status_idx       ON hr_offers(status);
 CREATE INDEX IF NOT EXISTS hr_offers_created_by_idx   ON hr_offers(created_by);
 CREATE INDEX IF NOT EXISTS hr_offers_converted_idx    ON hr_offers(converted_user_id);
+
+-- Idempotent ALTERs for already-deployed DBs. Safe no-ops on fresh
+-- installs because the columns are already in the CREATE above.
+ALTER TABLE hr_offers ADD COLUMN IF NOT EXISTS incentive_sales_multiplier numeric DEFAULT 5;
+ALTER TABLE hr_offers ADD COLUMN IF NOT EXISTS incentive_new_client_rate  numeric DEFAULT 0.05;
+ALTER TABLE hr_offers ADD COLUMN IF NOT EXISTS incentive_renewal_rate     numeric DEFAULT 0.02;
+ALTER TABLE hr_offers ADD COLUMN IF NOT EXISTS incentive_flat_bonus       numeric DEFAULT 10000;
 
 -- updated_at bookkeeping
 DROP TRIGGER IF EXISTS hr_offers_updated_at ON hr_offers;
@@ -236,17 +252,27 @@ CREATE POLICY "hr_offers_sales_own" ON hr_offers FOR SELECT
 -- =====================================================================
 
 -- Read-only summary for the public form page.
+--
+-- DROP before CREATE because Postgres refuses to re-create a function
+-- with a different RETURNS TABLE signature via CREATE OR REPLACE
+-- (error 42P13). We're adding the 4 structured-incentive columns to
+-- the return shape in this migration, so the drop is required once.
+DROP FUNCTION IF EXISTS fetch_offer_by_token(uuid);
 CREATE OR REPLACE FUNCTION fetch_offer_by_token(p_token uuid)
 RETURNS TABLE (
   id                    uuid,
   status                text,
   candidate_name        text,
   candidate_email       text,
-  position              text,
+  "position"            text,
   territory             text,
   joining_date          date,
   fixed_salary_monthly  numeric,
   incentive_text        text,
+  incentive_sales_multiplier numeric,
+  incentive_new_client_rate  numeric,
+  incentive_renewal_rate     numeric,
+  incentive_flat_bonus       numeric,
   place                 text,
   template_id           uuid,
   offer_pdf_url         text,
@@ -280,9 +306,11 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT
-    id, status, candidate_name, candidate_email, position, territory,
-    joining_date, fixed_salary_monthly, incentive_text, place,
-    template_id, offer_pdf_url, accepted_terms_at,
+    id, status, candidate_name, candidate_email, "position", territory,
+    joining_date, fixed_salary_monthly, incentive_text,
+    incentive_sales_multiplier, incentive_new_client_rate,
+    incentive_renewal_rate, incentive_flat_bonus,
+    place, template_id, offer_pdf_url, accepted_terms_at,
     full_legal_name, fathers_name, dob, mobile, personal_email,
     address_line1, address_line2, city, district, state, pincode,
     pan_number, aadhaar_number, qualification,

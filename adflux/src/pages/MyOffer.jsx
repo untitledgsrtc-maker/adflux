@@ -129,11 +129,51 @@ export default function MyOffer() {
           <Item label="Place" value={offer.place} />
         </div>
 
-        {offer.incentive_text && (
+        {/* Structured incentive — the numbers the company actually
+            signs the offer for. Falls back to legacy free-text for
+            offers issued before the structured block existed. */}
+        {Number(offer.incentive_sales_multiplier) > 0 ? (
+          <div style={{ marginTop: 18 }}>
+            <div style={{
+              fontSize: '.72rem', color: 'var(--gray)',
+              textTransform: 'uppercase', letterSpacing: '.08em',
+              fontWeight: 700, marginBottom: 10,
+            }}>
+              Performance Incentive
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <Item
+                label="Threshold"
+                value={`${formatCurrency((offer.fixed_salary_monthly || 0) * 2)} / month`}
+              />
+              <Item
+                label="Monthly Target"
+                value={`${formatCurrency(
+                  (offer.fixed_salary_monthly || 0)
+                  * Number(offer.incentive_sales_multiplier)
+                )} / month`}
+              />
+              <Item
+                label="New Client Rate"
+                value={`${(Number(offer.incentive_new_client_rate) * 100).toFixed(2)}%`}
+              />
+              <Item
+                label="Renewal Rate"
+                value={`${(Number(offer.incentive_renewal_rate) * 100).toFixed(2)}%`}
+              />
+              <Item
+                label="Flat Bonus Above Target"
+                value={Number(offer.incentive_flat_bonus) > 0
+                  ? formatCurrency(Number(offer.incentive_flat_bonus))
+                  : '—'}
+              />
+            </div>
+          </div>
+        ) : offer.incentive_text ? (
           <div style={{ marginTop: 14 }}>
             <Item label="Performance Incentive" value={offer.incentive_text} />
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   )

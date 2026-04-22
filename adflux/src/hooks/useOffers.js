@@ -12,7 +12,10 @@ import { supabase } from '../lib/supabase'
 const OFFER_COLS = `
   id, invite_token, status,
   candidate_name, candidate_email, position, territory,
-  joining_date, fixed_salary_monthly, incentive_text, place,
+  joining_date, fixed_salary_monthly, incentive_text,
+  incentive_sales_multiplier, incentive_new_client_rate,
+  incentive_renewal_rate, incentive_flat_bonus,
+  place,
   template_id,
   full_legal_name, fathers_name, dob, mobile, personal_email,
   address_line1, address_line2, city, district, state, pincode,

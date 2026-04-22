@@ -15,6 +15,7 @@ import { useState } from 'react'
 import { X, Copy, Check, MessageSquare } from 'lucide-react'
 import { useOffers, buildOfferUrl } from '../../hooks/useOffers'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
+import { formatCurrency } from '../../utils/formatters'
 
 function Field({ label, required, error, hint, children }) {
   return (
@@ -37,15 +38,21 @@ function Field({ label, required, error, hint, children }) {
 export function SendOfferModal({ onClose, onCreated }) {
   const { createOffer, markSent } = useOffers()
 
+  // Structured incentive defaults mirror the existing Team profile
+  // defaults so a "just send it" admin gets sensible values without
+  // touching them.
   const [form, setForm] = useState({
-    candidate_name:        '',
-    candidate_email:       '',
-    position:              'Sales Person',
-    territory:             '',
-    joining_date:          '',
-    fixed_salary_monthly:  '',
-    incentive_text:        '1% of billing up to ₹15,00,000 · 2% on amount over ₹15,00,000',
-    place:                 'Vadodara',
+    candidate_name:              '',
+    candidate_email:             '',
+    position:                    'Sales Person',
+    territory:                   '',
+    joining_date:                '',
+    fixed_salary_monthly:        '',
+    incentive_sales_multiplier:  '5',
+    incentive_new_client_rate:   '0.05',
+    incentive_renewal_rate:      '0.02',
+    incentive_flat_bonus:        '10000',
+    place:                       'Vadodara',
   })
   const [errors, setErrors]       = useState({})
   const [saving, setSaving]       = useState(false)
@@ -72,6 +79,12 @@ export function SendOfferModal({ onClose, onCreated }) {
     if (!form.fixed_salary_monthly || Number(form.fixed_salary_monthly) <= 0)
       errs.fixed_salary_monthly = 'Enter a monthly salary'
     if (!form.joining_date) errs.joining_date = 'Pick a joining date'
+    if (!form.incentive_sales_multiplier || Number(form.incentive_sales_multiplier) <= 0)
+      errs.incentive_sales_multiplier = 'Required'
+    if (form.incentive_new_client_rate === '' || Number(form.incentive_new_client_rate) < 0)
+      errs.incentive_new_client_rate = 'Required'
+    if (form.incentive_renewal_rate === '' || Number(form.incentive_renewal_rate) < 0)
+      errs.incentive_renewal_rate = 'Required'
     return errs
   }
 
@@ -82,14 +95,20 @@ export function SendOfferModal({ onClose, onCreated }) {
     setSaving(true)
     setServerError('')
     const { data, error } = await createOffer({
-      candidate_name:       form.candidate_name.trim(),
-      candidate_email:      form.candidate_email.trim().toLowerCase(),
-      position:             form.position.trim() || 'Sales Person',
-      territory:            form.territory.trim() || null,
-      joining_date:         form.joining_date,
-      fixed_salary_monthly: Number(form.fixed_salary_monthly),
-      incentive_text:       form.incentive_text.trim() || null,
-      place:                form.place.trim() || 'Vadodara',
+      candidate_name:              form.candidate_name.trim(),
+      candidate_email:             form.candidate_email.trim().toLowerCase(),
+      position:                    form.position.trim() || 'Sales Person',
+      territory:                   form.territory.trim() || null,
+      joining_date:                form.joining_date,
+      fixed_salary_monthly:        Number(form.fixed_salary_monthly),
+      incentive_sales_multiplier:  Number(form.incentive_sales_multiplier),
+      incentive_new_client_rate:   Number(form.incentive_new_client_rate),
+      incentive_renewal_rate:      Number(form.incentive_renewal_rate),
+      incentive_flat_bonus:        Number(form.incentive_flat_bonus || 0),
+      // Legacy free-text is no longer collected — left null so the
+      // PDF generator falls through to the structured block.
+      incentive_text:              null,
+      place:                       form.place.trim() || 'Vadodara',
     })
     setSaving(false)
 
@@ -289,19 +308,89 @@ export function SendOfferModal({ onClose, onCreated }) {
             </Field>
           </div>
 
-          <Field label="Performance Incentive"
-            hint="Printed verbatim on the offer letter. Edit to match the deal you agreed.">
-            <textarea
-              rows={2}
-              value={form.incentive_text}
-              onChange={e => set('incentive_text', e.target.value)}
-              style={{
-                width: '100%', padding: 10, borderRadius: 8,
-                border: '1px solid var(--brd)', fontSize: '.88rem',
-                fontFamily: 'inherit', resize: 'vertical',
-              }}
-            />
-          </Field>
+          {/* ── Structured incentive block ─────────────────
+              Numbers go straight onto the offer PDF AND into
+              staff_incentive_profiles when the candidate is
+              later converted to a user. Same shape as the Team
+              profile editor so nothing has to be re-entered. */}
+          <div style={{
+            padding: 14, borderRadius: 10,
+            border: '1px dashed var(--brd)',
+            marginBottom: 14,
+          }}>
+            <div style={{
+              fontSize: '.72rem', color: 'var(--gray)',
+              textTransform: 'uppercase', letterSpacing: '.08em',
+              fontWeight: 700, marginBottom: 10,
+            }}>
+              Performance Incentive
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Sales Multiplier" required
+                error={errors.incentive_sales_multiplier}
+                hint="Target = salary × multiplier">
+                <input
+                  type="number" step="0.1" min="0"
+                  value={form.incentive_sales_multiplier}
+                  onChange={e => set('incentive_sales_multiplier', e.target.value)}
+                />
+              </Field>
+              <Field label="Flat Bonus Above Target (₹)">
+                <input
+                  type="number" min="0"
+                  value={form.incentive_flat_bonus}
+                  onChange={e => set('incentive_flat_bonus', e.target.value)}
+                />
+              </Field>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="New Client Rate" required
+                error={errors.incentive_new_client_rate}
+                hint="e.g. 0.05 = 5%">
+                <input
+                  type="number" step="0.01" min="0" max="1"
+                  value={form.incentive_new_client_rate}
+                  onChange={e => set('incentive_new_client_rate', e.target.value)}
+                />
+              </Field>
+              <Field label="Renewal Rate" required
+                error={errors.incentive_renewal_rate}
+                hint="e.g. 0.02 = 2%">
+                <input
+                  type="number" step="0.01" min="0" max="1"
+                  value={form.incentive_renewal_rate}
+                  onChange={e => set('incentive_renewal_rate', e.target.value)}
+                />
+              </Field>
+            </div>
+
+            {/* Derived preview — shown only once salary is entered
+                so the admin can sanity-check the numbers before
+                hitting Create. Matches the threshold/target math
+                in utils/incentiveCalc.js exactly. */}
+            {Number(form.fixed_salary_monthly) > 0
+              && Number(form.incentive_sales_multiplier) > 0 && (
+              <div style={{
+                marginTop: 8, padding: '8px 12px', borderRadius: 6,
+                background: 'var(--subtle)', fontSize: '.82rem',
+              }}>
+                Threshold:{' '}
+                <strong>
+                  {formatCurrency(Number(form.fixed_salary_monthly) * 2)}
+                </strong>
+                {'  ·  '}
+                Target:{' '}
+                <strong>
+                  {formatCurrency(
+                    Number(form.fixed_salary_monthly)
+                    * Number(form.incentive_sales_multiplier)
+                  )}
+                </strong>
+              </div>
+            )}
+          </div>
 
           <Field label="Place (for acceptance)">
             <input

@@ -125,9 +125,11 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
 
     try { await supabaseSignup.auth.signOut() } catch (_) { /* ignore */ }
 
-    // Insert into users (the trigger auto_create_incentive_profile
-    // will populate staff_incentive_profiles with default rates; the
-    // admin can edit salary on the Team page afterwards).
+    // Insert into users. The trigger auto_create_incentive_profile
+    // synchronously inserts a staff_incentive_profiles row with the
+    // incentive_settings defaults — we overwrite it immediately
+    // below so the promised numbers from the offer letter are what
+    // actually go into production.
     const { error: insErr } = await supabase.from('users').insert([{
       id:        userId,
       name,
@@ -140,6 +142,39 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
       setConvertErr(insErr.message || 'Failed to insert user row')
       setConverting(false)
       return
+    }
+
+    // Auto-seed the incentive profile with the exact numbers from the
+    // offer letter. Upsert on user_id so this works whether the
+    // trigger row already exists (normal case) or hasn't fired yet
+    // (defensive). Drift between the signed letter and the live
+    // profile is the bug this is preventing.
+    const { error: profErr } = await supabase
+      .from('staff_incentive_profiles')
+      .upsert(
+        {
+          user_id:          userId,
+          monthly_salary:   Number(offer.fixed_salary_monthly) || 0,
+          sales_multiplier: Number(offer.incentive_sales_multiplier) || 5,
+          new_client_rate:  Number(offer.incentive_new_client_rate)  || 0.05,
+          renewal_rate:     Number(offer.incentive_renewal_rate)     || 0.02,
+          flat_bonus:       Number(offer.incentive_flat_bonus)       || 0,
+          join_date:        offer.joining_date
+                              || new Date().toISOString().split('T')[0],
+          is_active:        true,
+        },
+        { onConflict: 'user_id' }
+      )
+
+    if (profErr) {
+      // User row is in — don't block the convert, but surface the
+      // issue so admin knows to open Team page and set rates by hand.
+      setConvertErr(
+        'User created, but seeding the incentive profile failed: '
+        + (profErr.message || 'unknown error')
+        + ' — please set rates manually on the Team page.'
+      )
+      // Continue: still link the offer so status is accurate.
     }
 
     // Link the offer back to the user.
@@ -201,7 +236,38 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
             <Row label="Place"           value={offer.place} />
           </Section>
 
-          {offer.incentive_text && (
+          {/* Structured incentive block — shows the exact numbers that
+              get auto-seeded into staff_incentive_profiles at convert
+              time. Falls back to legacy free-text for old offers. */}
+          {Number(offer.incentive_sales_multiplier) > 0 ? (
+            <Section title="Performance Incentive">
+              <Row
+                label="Threshold (slab start)"
+                value={`${formatCurrency((offer.fixed_salary_monthly || 0) * 2)} / month (2× fixed salary)`}
+              />
+              <Row
+                label="Monthly Target"
+                value={`${formatCurrency(
+                  (offer.fixed_salary_monthly || 0)
+                  * Number(offer.incentive_sales_multiplier)
+                )} / month (${Number(offer.incentive_sales_multiplier)}× fixed salary)`}
+              />
+              <Row
+                label="New Client Rate"
+                value={`${(Number(offer.incentive_new_client_rate) * 100).toFixed(2)}%`}
+              />
+              <Row
+                label="Renewal Rate"
+                value={`${(Number(offer.incentive_renewal_rate) * 100).toFixed(2)}%`}
+              />
+              <Row
+                label="Flat Bonus Above Target"
+                value={Number(offer.incentive_flat_bonus) > 0
+                  ? formatCurrency(Number(offer.incentive_flat_bonus))
+                  : '—'}
+              />
+            </Section>
+          ) : offer.incentive_text ? (
             <div style={{ marginBottom: 18 }}>
               <div style={{
                 fontSize: '.7rem', color: 'var(--gray)',
@@ -214,7 +280,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
                 {offer.incentive_text}
               </div>
             </div>
-          )}
+          ) : null}
 
           {(offer.full_legal_name || offer.pan_number) ? (
             <>
