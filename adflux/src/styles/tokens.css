@@ -1,33 +1,35 @@
 /* =====================================================
-   UNTITLED ADFLUX — DESIGN TOKENS (DARK THEME)
-   Deep navy background with yellow accent for sales energy.
+   ADFLUX — DESIGN TOKENS · BATCH 1 · SALES CORE (ARENA)
+   Dark theme only. Near-black surfaces, yellow accent,
+   pink→purple→blue gradient for incentive moments.
    ===================================================== */
 
 :root {
   /* ---- Backgrounds ---- */
-  --bg:           #0f172a;   /* page background - deep navy */
-  --surface:      #1e293b;   /* cards, surface elements */
-  --surface-2:    #334155;   /* hover / nested surface */
-  --surface-3:    #475569;   /* inputs, disabled */
+  --bg:           #0A0A0B;   /* page background */
+  --surface:      #141416;   /* card surface */
+  --surface-2:    #1C1C20;   /* nested surface, hover */
+  --surface-3:    #26262C;   /* inputs, pill chrome */
 
   /* ---- Borders ---- */
-  --border:       #334155;   /* standard border */
-  --border-strong:#475569;   /* emphasis border */
+  --border:       #26262C;
+  --border-strong:#3A3A42;
 
   /* ---- Text ---- */
-  --text:         #f1f5f9;   /* primary text - light */
-  --text-muted:   #94a3b8;   /* secondary text, labels */
-  --text-subtle:  #64748b;   /* tertiary, placeholder */
+  --text:         #F5F5F7;
+  --text-muted:   #8B8B94;
+  --text-subtle:  #5C5C65;
 
   /* ---- Brand ---- */
-  --accent:       #FFE600;   /* brand yellow */
-  --accent-hover: #F0D800;
-  --accent-fg:    #0f172a;   /* dark text on yellow */
-  --accent-soft:  rgba(255, 230, 0, 0.14);
+  --accent:       #F7D21C;   /* brand yellow */
+  --accent-hover: #FFDD33;
+  --accent-fg:    #1A1A1E;   /* dark text on yellow */
+  --accent-soft:  rgba(247, 210, 28, 0.14);
+  --accent-glow:  0 0 24px rgba(247, 210, 28, 0.38);
 
   /* ---- Status ---- */
-  --success:       #10B981;
-  --success-soft:  rgba(16, 185, 129, 0.12);
+  --success:       #22C55E;
+  --success-soft:  rgba(34, 197, 94, 0.12);
   --warning:       #F59E0B;
   --warning-soft:  rgba(245, 158, 11, 0.12);
   --danger:        #EF4444;
@@ -35,56 +37,53 @@
   --blue:          #3B82F6;
   --blue-soft:     rgba(59, 130, 246, 0.12);
 
-  /* ---- Sidebar (same as main bg for cohesion) ---- */
-  --sidebar-bg:     #0F172A;
-  --sidebar-text:   #CBD5E1;
-  --sidebar-muted:  #64748B;
-  --sidebar-hover:  #1E293B;
-  --sidebar-active-bg: rgba(255, 230, 0, 0.12);
-  --sidebar-active-text: #FFE600;
-  --sidebar-border: #334155;
+  /* ---- Gradient (incentive / hero moments) ---- */
+  --gradient-incentive: linear-gradient(135deg, #EC4899 0%, #A855F7 50%, #3B82F6 100%);
+  --gradient-incentive-soft: linear-gradient(135deg, rgba(236,72,153,0.18) 0%, rgba(168,85,247,0.18) 50%, rgba(59,130,246,0.18) 100%);
+
+  /* ---- Sidebar ---- */
+  --sidebar-bg:     #0A0A0B;
+  --sidebar-text:   #C7C7CC;
+  --sidebar-muted:  #5C5C65;
+  --sidebar-hover:  #1C1C20;
+  --sidebar-active-bg: rgba(247, 210, 28, 0.10);
+  --sidebar-active-text: #F7D21C;
+  --sidebar-border: #26262C;
 
   /* ---- Layout ---- */
   --sidebar-width: 240px;
   --topbar-height: 60px;
-  --mobile-nav-height: 62px;
+  --mobile-nav-height: 72px;
 
   /* ---- Radius ---- */
-  --radius-sm: 6px;
-  --radius:    10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-sm: 8px;
+  --radius:    14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 
-  /* ---- Shadows (dark theme) ---- */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow:    0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4);
+  /* ---- Shadows ---- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
 
   /* ---- Transitions ---- */
   --transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ---- Fonts ----
-     Only Space Grotesk + DM Sans are actually imported in index.html.
-     Leading --font-sans with Inter meant the page rendered as DM Sans
-     for most visitors but as Inter for anyone who happened to have it
-     installed — a silent cross-machine inconsistency. Moved DM Sans
-     to the front so the fallback chain is deterministic.
-     --font-display uses Space Grotesk (600/700) for headings + big
-     numbers. --font-mono is new; it replaces 5 hardcoded
-     'JetBrains Mono' occurrences scattered across quotes.css /
-     followups.css that weren't importing the font anyway, so they
-     rendered as whichever system mono the user had. */
-  --font-sans: 'DM Sans', 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --font-display: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Consolas, monospace;
+     Inter is the body/UI font; Space Grotesk drives display + big
+     numbers; JetBrains Mono is used for quote IDs (UA-2026-0041)
+     and timestamps. All three are loaded in index.html. */
+  --font-sans:    'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 
-  /* ---- Legacy aliases ---- */
-  --y: #FFE600;
-  --bk: #0f172a;
-  --wh: #f1f5f9;
-  --gray: #94a3b8;
-  --brd: #334155;
-  --dk: #0f172a;
-  --mid: #1e293b;
+  /* ---- Legacy aliases — don't remove, existing CSS references these ---- */
+  --y: #F7D21C;
+  --bk: #0A0A0B;
+  --wh: #F5F5F7;
+  --gray: #8B8B94;
+  --brd: #26262C;
+  --dk: #0A0A0B;
+  --mid: #141416;
 }

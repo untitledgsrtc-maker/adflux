@@ -385,12 +385,52 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 .mobile-nav-item--active {
-  color: var(--accent-fg);
+  color: var(--accent);
 }
 
 .mobile-nav-item--active svg {
   color: var(--accent);
-  filter: drop-shadow(0 0 6px rgba(255, 230, 0, 0.4));
+  filter: drop-shadow(0 0 8px rgba(247, 210, 28, 0.5));
+}
+
+/* ── Center FAB in mobile bottom nav ─────────────────
+   Renders as a large yellow circle lifted above the bar
+   (Arena design — primary "New Quote" action). The wrap
+   takes an equal flex slot like siblings so the left/right
+   items stay evenly distributed; the circle itself is
+   absolutely positioned up. */
+.mobile-nav-fab-wrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  padding-top: 4px;
+  text-decoration: none;
+}
+.mobile-nav-fab {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-18px);
+  box-shadow:
+    0 10px 28px rgba(247, 210, 28, 0.45),
+    0 0 0 6px var(--bg);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.mobile-nav-fab-wrap:active .mobile-nav-fab {
+  transform: translateY(-18px) scale(0.96);
+}
+.mobile-nav-fab-wrap:hover .mobile-nav-fab {
+  box-shadow:
+    0 10px 32px rgba(247, 210, 28, 0.6),
+    0 0 0 6px var(--bg);
 }
 
 /* =====================================================

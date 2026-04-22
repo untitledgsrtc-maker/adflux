@@ -11,7 +11,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2,
   Users, TrendingUp, BarChart3, Inbox, RotateCcw,
-  Briefcase, FileSignature,
+  Briefcase, FileSignature, Plus,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
@@ -34,12 +34,15 @@ const ADMIN_NAV = [
   { to: '/incentives',        icon: TrendingUp,      label: 'Incentives' },
 ]
 
+// Sales layout uses a center FAB for "New Quote" (the primary action
+// from the Arena design). FAB items render as a large yellow circle
+// lifted above the bar; regular items stay as icon+label.
 const SALES_NAV = [
   { to: '/dashboard',      icon: LayoutDashboard, label: 'Home' },
   { to: '/quotes',         icon: FileText,        label: 'Quotes' },
-  { to: '/renewal-tools',  icon: RotateCcw,       label: 'Renewals' },
+  { to: '/quotes/new',     icon: Plus,            label: 'New', type: 'fab' },
   { to: '/my-performance', icon: BarChart3,       label: 'Perf' },
-  { to: '/my-offer',       icon: FileSignature,   label: 'Offer' },
+  { to: '/my-offer',       icon: FileSignature,   label: 'More' },
 ]
 
 export function MobileNav() {
@@ -65,40 +68,51 @@ export function MobileNav() {
 
   return (
     <nav className="mobile-nav">
-      {nav.map(({ to, icon: Icon, label, showPill }) => (
-        <NavLink
-          key={to}
-          to={to}
-          className={({ isActive }) =>
-            'mobile-nav-item' + (isActive ? ' mobile-nav-item--active' : '')
-          }
-        >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon size={20} />
-            {showPill && pendingCount > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -4,
-                  right: -8,
-                  background: 'var(--danger)',
-                  color: '#fff',
-                  fontSize: 9,
-                  fontWeight: 700,
-                  padding: '1px 5px',
-                  borderRadius: 8,
-                  minWidth: 16,
-                  textAlign: 'center',
-                  lineHeight: 1.3,
-                }}
-              >
-                {pendingCount > 9 ? '9+' : pendingCount}
+      {nav.map(({ to, icon: Icon, label, showPill, type }) => {
+        if (type === 'fab') {
+          return (
+            <NavLink key={to} to={to} className="mobile-nav-fab-wrap" aria-label={label}>
+              <span className="mobile-nav-fab">
+                <Icon size={22} strokeWidth={2.5} />
               </span>
-            )}
-          </div>
-          <span>{label}</span>
-        </NavLink>
-      ))}
+            </NavLink>
+          )
+        }
+        return (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              'mobile-nav-item' + (isActive ? ' mobile-nav-item--active' : '')
+            }
+          >
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon size={20} />
+              {showPill && pendingCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -8,
+                    background: 'var(--danger)',
+                    color: '#fff',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: 8,
+                    minWidth: 16,
+                    textAlign: 'center',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </span>
+              )}
+            </div>
+            <span>{label}</span>
+          </NavLink>
+        )
+      })}
     </nav>
   )
 }

@@ -27,6 +27,34 @@ export function formatCompact(amount) {
   return `₹${amount}`
 }
 
+/**
+ * Display-mode money (per the Arena design token spec):
+ *   ₹0, ₹1,250, ₹1.25L, ₹18.64L, ₹1.2Cr, -₹500
+ * Flips to L / Cr at ₹1,00,000 (1L). Negative values keep their sign
+ * on the outside of the ₹ so parsing doesn't break (e.g. "-₹500").
+ */
+export function formatMoneyDisplay(amount) {
+  if (amount === null || amount === undefined || isNaN(amount)) return '₹0'
+  const n = Number(amount)
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+
+  if (abs >= 1_00_00_000) {
+    const cr = abs / 1_00_00_000
+    const str = cr >= 100 ? cr.toFixed(0) : cr.toFixed(cr < 10 ? 2 : 1).replace(/\.?0+$/, '')
+    return `${sign}₹${str}Cr`
+  }
+  if (abs >= 1_00_000) {
+    const l = abs / 1_00_000
+    const str = l.toFixed(2).replace(/\.?0+$/, '')
+    return `${sign}₹${str}L`
+  }
+  return `${sign}₹${new Intl.NumberFormat('en-IN').format(abs)}`
+}
+
+/** Inline-mode money — always full form. Tables, history, PDF. */
+export const formatMoneyInline = formatCurrency
+
 // ─── Dates ───────────────────────────────────────────────────────
 
 /**

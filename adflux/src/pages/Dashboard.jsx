@@ -16,24 +16,23 @@ export default function Dashboard() {
   const { isAdmin, profile } = useAuth()
 
   if (!isAdmin) {
+    // Arena sales dashboard owns its own greeting row; no .db-header here.
     return (
       <div className="page">
-        <div className="db-header">
-          <div>
-            <h1 className="db-title">Welcome back, {profile?.name?.split(' ')[0] || 'there'} 👋</h1>
-            <p className="db-subtitle">Here's your sales snapshot</p>
-          </div>
-        </div>
         <SalesDashboard />
       </div>
     )
   }
 
+  const firstName = profile?.name?.split(' ')[0] || 'there'
   return (
     <div className="page">
       <div className="db-header">
         <div>
-          <h1 className="db-title">Dashboard</h1>
+          <h1 className="db-title">
+            Welcome back, {firstName}
+            <span className="db-title-wave" aria-hidden>👋</span>
+          </h1>
           <p className="db-subtitle">Company-wide overview</p>
         </div>
       </div>

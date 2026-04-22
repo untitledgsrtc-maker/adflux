@@ -10,11 +10,15 @@ export default {
       colors: {
         bg: 'var(--bg)',
         surface: 'var(--surface)',
-        surface2: 'var(--surface2)',
+        surface2: 'var(--surface-2)',
+        surface3: 'var(--surface-3)',
         border: 'var(--border)',
+        'border-strong': 'var(--border-strong)',
         text: 'var(--text)',
         muted: 'var(--text-muted)',
+        subtle: 'var(--text-subtle)',
         accent: 'var(--accent)',
+        'accent-fg': 'var(--accent-fg)',
         success: 'var(--success)',
         warning: 'var(--warning)',
         danger: 'var(--danger)',
@@ -25,6 +29,15 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'monospace'],
+      },
+      backgroundImage: {
+        'incentive': 'var(--gradient-incentive)',
+        'incentive-soft': 'var(--gradient-incentive-soft)',
+      },
+      boxShadow: {
+        'accent-glow': 'var(--accent-glow)',
       },
     },
   },
