@@ -11,21 +11,23 @@ import { formatCurrency } from './formatters'
  *
  * CORS NOTE — the ordering below is deliberate.
  *
- *   TinyURL (api-create.php) and is.gd (create.php) are legacy
- *   endpoints that do NOT send Access-Control-Allow-Origin. Called
- *   from a browser they fail with a CORS error, the try/catch
- *   swallows it, and the user ends up with the long URL.
+ *   is.gd (create.php) is a legacy endpoint that does NOT send
+ *   Access-Control-Allow-Origin. Called from a browser it fails with
+ *   a CORS error, the try/catch swallows it, and the next fallback
+ *   runs. That's why it's NOT the browser-direct primary — the
+ *   /api/shorten serverless function is (same-origin, no CORS).
  *
  *   cleanuri.com IS designed for browser use — it advertises
  *   `Access-Control-Allow-Origin: *` and accepts POST
  *   application/x-www-form-urlencoded with a `url` field, returning
- *   `{"result_url": "https://cleanuri.com/xxx"}`. That's why it's
- *   the primary now.
+ *   `{"result_url": "https://cleanuri.com/xxx"}`. Used as the
+ *   browser-direct fallback if our serverless function errors.
  *
- *   TinyURL and is.gd remain as fallbacks — they still work in
- *   server contexts and some browsers (older CORS policies, or a
- *   user-installed extension that strips CORS), so keeping them
- *   costs nothing and covers the long tail.
+ *   TinyURL has been removed entirely. Its legacy api-create.php
+ *   endpoint now emits shortlinks that show a "deprecated API
+ *   endpoint" interstitial to the END USER on click-through — the
+ *   new v2 API at api.tinyurl.com would work but requires an auth
+ *   token we don't have. is.gd is used server-side instead.
  *
  * If all three fail we fall back to the original long URL so the
  * message ALWAYS carries a working link — a shortener outage must
@@ -47,14 +49,16 @@ export async function shortenUrl(longUrl) {
   //
   //   1. /api/shorten — our Vercel serverless function. Same-origin
   //      request, so CSP `connect-src 'self'` allows it and no CORS
-  //      round-trip is involved. The function calls TinyURL from the
-  //      server where neither CSP nor CORS applies.
-  //   2. cleanuri.com — direct browser call. CSP now explicitly
-  //      allowlists it in vercel.json. Useful as a fallback if the
+  //      round-trip is involved. The function calls is.gd from the
+  //      server where neither CSP nor CORS applies. (Previously called
+  //      TinyURL; changed because TinyURL's legacy api-create.php now
+  //      serves a "deprecated API" interstitial on click-through.)
+  //   2. cleanuri.com — direct browser call. CORS-friendly, advertises
+  //      `Access-Control-Allow-Origin: *`. Useful as a fallback if the
   //      serverless function cold-starts slowly or errors.
-  //   3. TinyURL / is.gd — direct calls, allowlisted in CSP, but
-  //      these endpoints historically don't send CORS headers, so
-  //      they usually fail from a browser. Kept for completeness.
+  //   3. is.gd direct — kept even though it usually fails from a browser
+  //      (no CORS headers). Costs nothing to keep and will succeed on a
+  //      user-agent that strips CORS (browser extension, dev tooling).
   const shorteners = [
     // Serverless function — primary.
     async (url, signal) => {
@@ -75,23 +79,16 @@ export async function shortenUrl(longUrl) {
       const data = await res.json().catch(() => null)
       return data?.result_url || null
     },
-    // TinyURL direct.
-    async (url, signal) => {
-      const res = await fetch(
-        `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
-        { signal }
-      )
-      if (!res.ok) return null
-      return (await res.text()).trim() || null
-    },
-    // is.gd direct.
+    // is.gd direct — usually blocked by CORS but harmless to try last.
     async (url, signal) => {
       const res = await fetch(
         `https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`,
         { signal }
       )
       if (!res.ok) return null
-      return (await res.text()).trim() || null
+      const body = (await res.text()).trim()
+      if (/^error:/i.test(body)) return null
+      return body || null
     },
   ]
 

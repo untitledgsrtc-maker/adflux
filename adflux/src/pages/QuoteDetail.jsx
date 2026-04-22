@@ -671,9 +671,19 @@ function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
     // full quote. Sales users kept leaving it unchecked and their
     // approved payments wouldn't flip the quote to Won, leaving the
     // app in a "Fully Paid but Sent" stuck state.
+    //
+    // CRITICAL guard: require total > 0. Without it, `amt + 0 >= 0`
+    // was always true for any positive amt when `quote.total_amount`
+    // was 0/null/undefined — which was the bug report from a new
+    // HR-provisioned sales user: their very first quote's total_amount
+    // apparently read as falsy at the moment they typed the amount
+    // (stale store / hydration race), and a ₹64,400 partial on a
+    // ₹18.6L quote got auto-ticked as FINAL. Second quote worked
+    // because by then the quote store was fully populated.
     if (k === 'amount_received') {
       const amt = Number(v) || 0
-      if (amt + Number(totalPaid || 0) >= Number(quote.total_amount || 0)) {
+      const total = Number(quote.total_amount) || 0
+      if (total > 0 && amt + Number(totalPaid || 0) >= total) {
         updated.is_final = true
       }
     }

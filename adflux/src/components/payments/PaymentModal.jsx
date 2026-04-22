@@ -61,13 +61,21 @@ export function PaymentModal({
   const [dupConfirmed, setDupConfirmed] = useState(false) // has user acked the soft-warn?
   const [submittedPending, setSubmittedPending] = useState(false) // sales success state
 
-  // Auto-check final if amount fills the balance
+  // Auto-check final if amount fills the balance.
+  // Guard on `total > 0` — if `quote.total_amount` is ever 0, null, or
+  // undefined (hydration race on a freshly-created quote for a new
+  // user, stale store, bad read), `balance` collapses to `-totalPaid`
+  // and the `Math.abs < 1` check can misfire for small entered values.
+  // Pair of paranoia guards with the matching WonPaymentModal handler
+  // where a `>=` comparison against `Number(... || 0)` was DEFINITELY
+  // the spurious auto-tick vector.
   useEffect(() => {
     const entered = parseFloat(form.amount_received) || 0
-    if (entered > 0 && Math.abs(entered - balance) < 1) {
+    const total = Number(quote?.total_amount) || 0
+    if (total > 0 && entered > 0 && Math.abs(entered - balance) < 1) {
       setForm(f => ({ ...f, is_final_payment: true }))
     }
-  }, [form.amount_received, balance])
+  }, [form.amount_received, balance, quote?.total_amount])
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
