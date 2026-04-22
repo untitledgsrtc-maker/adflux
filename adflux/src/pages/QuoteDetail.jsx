@@ -595,6 +595,7 @@ export default function QuoteDetail() {
       {showWonModal && (
         <WonPaymentModal
           quote={quote}
+          totalPaid={totalPaid}
           onConfirm={handleWonWithPayment}
           onClose={() => setShowWonModal(false)}
         />
@@ -604,16 +605,35 @@ export default function QuoteDetail() {
 }
 
 // ── Won Payment Modal ────────────────────────────────────────────────────────
-function WonPaymentModal({ quote, onConfirm, onClose }) {
+// `totalPaid` is the sum of all APPROVED payments already on this quote —
+// when a quote has partial payment history, the modal pre-fills the
+// remaining balance and lets the user confirm Won without recording a
+// new payment (Won + Payment Pending is now a valid state). Incentive
+// crediting still gates on `is_final_payment=true` at the DB trigger, so
+// flipping a quote to Won with an outstanding balance won't pay out
+// incentive until that final tick happens.
+function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
   const today = todayISO()
+  const remainingBalance = Math.max(0, Number(quote.total_amount || 0) - Number(totalPaid || 0))
+  const hasExistingPayment = Number(totalPaid) > 0
+  const fullyPaid = hasExistingPayment && remainingBalance <= 0
+
   const [form, setForm] = useState({
-    amount_received: '',
+    // Pre-fill with balance when there's already a partial payment — this
+    // is the bug the user hit: modal showed empty field so they'd enter
+    // the FULL amount again, creating a double payment.
+    amount_received: hasExistingPayment && remainingBalance > 0 ? String(remainingBalance) : '',
     payment_mode: 'NEFT',
     payment_date: today,
     payment_notes: '',
-    is_final: false,
-    campaign_start_date: today,
-    campaign_end_date: '',
+    // If this IS the balancing payment (fully paid after recording it),
+    // pre-tick Final so incentive credits automatically on approval.
+    is_final: hasExistingPayment && remainingBalance > 0,
+    // If campaign dates were already set on a prior partial payment, carry
+    // them over instead of resetting to today — no point making the user
+    // re-enter dates they already confirmed.
+    campaign_start_date: quote.campaign_start_date || today,
+    campaign_end_date: quote.campaign_end_date || '',
   })
 
   function set(k, v) {
@@ -625,21 +645,26 @@ function WonPaymentModal({ quote, onConfirm, onClose }) {
       end.setMonth(end.getMonth() + quote.duration_months)
       updated.campaign_end_date = end.toISOString().split('T')[0]
     }
-    // Auto-tick "final payment" when the entered amount covers the
+    // Auto-tick "final payment" when the cumulative received covers the
     // full quote. Sales users kept leaving it unchecked and their
     // approved payments wouldn't flip the quote to Won, leaving the
     // app in a "Fully Paid but Sent" stuck state.
     if (k === 'amount_received') {
       const amt = Number(v) || 0
-      if (amt >= Number(quote.total_amount || 0)) {
+      if (amt + Number(totalPaid || 0) >= Number(quote.total_amount || 0)) {
         updated.is_final = true
       }
     }
     setForm(updated)
   }
 
-  const balance = quote.total_amount - (Number(form.amount_received) || 0)
+  // Balance = total - (already paid) - (new payment being entered now)
+  const balance = Number(quote.total_amount || 0) - Number(totalPaid || 0) - (Number(form.amount_received) || 0)
   const campaignDatesValid = form.campaign_start_date && form.campaign_end_date
+  const newAmount = Number(form.amount_received) || 0
+  // Allow confirm if EITHER a new payment is being recorded, OR an
+  // existing payment already exists (Won + Pending Balance is valid).
+  const canConfirm = campaignDatesValid && (newAmount > 0 || hasExistingPayment)
 
   return (
     <div className="mo">
@@ -668,10 +693,39 @@ function WonPaymentModal({ quote, onConfirm, onClose }) {
             </div>
           </div>
 
+          {/* Existing payment banner — shown only when approved payments
+              are already on this quote. Makes it obvious the modal is
+              about RECORDING THE REMAINDER, not re-entering the whole
+              total. */}
+          {hasExistingPayment && (
+            <div style={{ background: 'rgba(129,199,132,.1)', border: '1px solid rgba(129,199,132,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: '.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ color: '#81c784', fontWeight: 600 }}>Already Received</span>
+                <span style={{ color: '#81c784', fontWeight: 700 }}>{formatCurrency(totalPaid)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--gray)' }}>Remaining Balance</span>
+                <span style={{ color: remainingBalance > 0 ? '#ef9a9a' : '#81c784', fontWeight: 700 }}>{formatCurrency(remainingBalance)}</span>
+              </div>
+              {remainingBalance > 0 && (
+                <div style={{ fontSize: '.72rem', color: 'var(--gray)', marginTop: 8, lineHeight: 1.4 }}>
+                  Leave the amount blank to mark <strong>Won with Payment Pending</strong>, or enter the balance to record the final payment now. Incentive only credits once 100% is received.
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid2">
             <div className="fg">
-              <label>Amount Received (₹)</label>
-              <input type="number" value={form.amount_received} onChange={e => set('amount_received', e.target.value)} placeholder="Enter amount" />
+              <label>
+                {hasExistingPayment ? 'Additional Payment (₹) — optional' : 'Amount Received (₹)'}
+              </label>
+              <input
+                type="number"
+                value={form.amount_received}
+                onChange={e => set('amount_received', e.target.value)}
+                placeholder={hasExistingPayment ? 'Leave blank to mark Won only' : 'Enter amount'}
+              />
             </div>
             <div className="fg">
               <label>Payment Mode</label>
@@ -708,29 +762,37 @@ function WonPaymentModal({ quote, onConfirm, onClose }) {
             )}
           </div>
 
-          {form.amount_received > 0 && balance > 0 && (
+          {newAmount > 0 && balance > 0 && (
             <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: '.82rem', marginTop: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#ef9a9a', fontWeight: 700 }}>Balance Due</span>
+                <span style={{ color: '#ef9a9a', fontWeight: 700 }}>Balance Due After This Payment</span>
                 <span style={{ color: '#ef9a9a', fontWeight: 800 }}>{formatCurrency(balance)}</span>
               </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-            <input type="checkbox" id="isFinal" checked={form.is_final} onChange={e => set('is_final', e.target.checked)} />
-            <label htmlFor="isFinal" style={{ fontSize: '.82rem', cursor: 'pointer' }}>
-              This is the final / full payment
-            </label>
-          </div>
+          {newAmount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+              <input type="checkbox" id="isFinal" checked={form.is_final} onChange={e => set('is_final', e.target.checked)} />
+              <label htmlFor="isFinal" style={{ fontSize: '.82rem', cursor: 'pointer' }}>
+                This is the final / full payment {fullyPaid ? '(quote will be fully paid)' : ''}
+              </label>
+            </div>
+          )}
         </div>
         <div className="md-f">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-y"
             onClick={() => onConfirm(form)}
-            disabled={!campaignDatesValid || !(Number(form.amount_received) > 0)}
-            title={!(Number(form.amount_received) > 0) ? 'Record a payment amount to mark this quote Won' : ''}
+            disabled={!canConfirm}
+            title={
+              !campaignDatesValid
+                ? 'Campaign dates are required to mark Won'
+                : !canConfirm
+                ? 'Record a payment amount to mark this quote Won'
+                : ''
+            }
           >
             ✓ Confirm & Mark Won
           </button>
