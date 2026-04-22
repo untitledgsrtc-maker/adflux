@@ -77,7 +77,9 @@ export function RevenueSummary() {
     const [quotesRes, paymentsRes, profilesRes, msdRes, settingsRes] = await Promise.all([
       supabase.from('quotes').select('id, status, total_amount, subtotal, revenue_type, created_by, updated_at, created_at, campaign_end_date'),
       // Only approved payments count toward Revenue / Outstanding.
-      supabase.from('payments').select('amount_received, payment_date, is_final_payment').eq('approval_status', 'approved'),
+      // `quote_id` is required so Outstanding can pair payments to quotes per-row
+      // instead of subtracting one global pot from another.
+      supabase.from('payments').select('quote_id, amount_received, payment_date, is_final_payment').eq('approval_status', 'approved'),
       supabase.from('staff_incentive_profiles').select('*').eq('is_active', true),
       supabase.from('monthly_sales_data').select('staff_id, month_year, new_client_revenue, renewal_revenue'),
       supabase.from('incentive_settings').select('*').limit(1).maybeSingle(),
@@ -143,11 +145,21 @@ export function RevenueSummary() {
       .filter(q => ['sent', 'negotiating'].includes(q.status))
       .reduce((s, q) => s + (q.total_amount || 0), 0)
 
-    const totalCollected = payments.reduce((s, p) => s + (p.amount_received || 0), 0)
-    const wonTotal = quotes
-      .filter(q => q.status === 'won')
-      .reduce((s, q) => s + (q.total_amount || 0), 0)
-    const outstanding = Math.max(0, wonTotal - totalCollected)
+    // Outstanding: pair payments to their quote and clamp per-quote, then sum.
+    // The old formula (wonTotal − totalCollected) let a partial payment on a
+    // non-won quote cancel out balance on a won quote, so the KPI could show
+    // ₹0 even when there were real unpaid balances. Any quote with a real
+    // commitment (status='won', OR any payment recorded) is counted; 'lost' is
+    // excluded because those are dead.
+    const outstanding = quotes.reduce((sum, q) => {
+      if (q.status === 'lost') return sum
+      const paid = payments
+        .filter(p => p.quote_id === q.id)
+        .reduce((s, p) => s + Number(p.amount_received || 0), 0)
+      const committed = q.status === 'won' || paid > 0
+      if (!committed) return sum
+      return sum + Math.max(0, Number(q.total_amount || 0) - paid)
+    }, 0)
 
     // Total Possible Incentive (company-wide projection).
     // For each active sales profile, compute incentive assuming current
