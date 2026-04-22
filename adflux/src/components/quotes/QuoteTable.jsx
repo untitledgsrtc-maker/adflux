@@ -10,6 +10,23 @@ function SortIcon({ field, sortField, sortDir }) {
   return sortDir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />
 }
 
+// Derive a per-quote payment snapshot from the `payments` relation loaded
+// with the quote. Only approved payments count toward the balance — pending
+// approvals shouldn't shrink what the client still owes. Lost quotes and
+// untouched open quotes return { kind: 'none' } so the column renders a
+// neutral em dash instead of a misleading "full amount due".
+function computeBalance(q) {
+  if (q.status === 'lost') return { kind: 'none' }
+  const paid = (q.payments || [])
+    .filter(p => p.approval_status === 'approved')
+    .reduce((s, p) => s + Number(p.amount_received || 0), 0)
+  if (paid === 0 && q.status !== 'won') return { kind: 'none' }
+  const total = Number(q.total_amount || 0)
+  const balance = Math.max(0, total - paid)
+  if (balance === 0 && paid > 0) return { kind: 'paid' }
+  return { kind: 'due', amount: balance }
+}
+
 export function QuoteTable({ quotes, isAdmin }) {
   const navigate = useNavigate()
   const [sortField, setSortField] = useState('created_at')
@@ -74,6 +91,7 @@ export function QuoteTable({ quotes, isAdmin }) {
             {isAdmin && <Th field="sales_person_name">Sales Rep</Th>}
             <Th field="total_amount">Amount</Th>
             <Th field="status">Status</Th>
+            <th>Outstanding</th>
             <Th field="created_at">Date</Th>
             <th>Follow Up</th>
           </tr>
@@ -107,6 +125,26 @@ export function QuoteTable({ quotes, isAdmin }) {
               </td>
               <td>
                 <QuoteStatusBadge status={q.status} />
+              </td>
+              <td>
+                {(() => {
+                  const b = computeBalance(q)
+                  if (b.kind === 'none') {
+                    return <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+                  }
+                  if (b.kind === 'paid') {
+                    return (
+                      <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: 13 }}>
+                        Paid
+                      </span>
+                    )
+                  }
+                  return (
+                    <span style={{ color: 'var(--warning)', fontWeight: 600 }}>
+                      {formatCurrency(b.amount)}
+                    </span>
+                  )
+                })()}
               </td>
               <td>
                 <span style={{ color: 'var(--text-muted)' }}>{formatDate(q.created_at)}</span>

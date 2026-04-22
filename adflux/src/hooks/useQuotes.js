@@ -24,9 +24,13 @@ export function useQuotes() {
   const profile = useAuthStore(s => s.profile)
 
   const fetchQuotes = useCallback(async () => {
+    // `payments(...)` pulls approved payments alongside each quote so the
+    // Quotes list can render an Outstanding column without a second round-trip.
+    // The filter on approval_status lives in the caller (QuoteTable), not here,
+    // because PostgREST nested filters would drop quotes with zero payments.
     let query = supabase
       .from('quotes')
-      .select('*, quote_cities(*)')
+      .select('*, quote_cities(*), payments(amount_received, approval_status)')
       .order('created_at', { ascending: false })
 
     if (profile?.role === 'sales') {
