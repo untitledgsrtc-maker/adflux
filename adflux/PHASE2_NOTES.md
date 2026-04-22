@@ -128,7 +128,7 @@
   - Yellow tinted glow on hover
   
 - **J3. Typography tightened** ✅
-  - Removed Bebas Neue from card-title
+  - Removed legacy condensed display face from card-title
   - Updated to Inter 600 14px with letter-spacing 0.02em
   
 - **J4. Login page simplified** ⏳ NOT IMPLEMENTED

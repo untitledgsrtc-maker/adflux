@@ -246,11 +246,13 @@
   margin: 0;
 }
 .db-kpi-value {
-  /* Use display font (Bebas) at sales-size so the big metric lines up
-     with the sales dashboard typographically, not just spatially. */
-  font-family: var(--font-display, 'Bebas Neue'), sans-serif;
+  /* Use display font (Space Grotesk) at sales-size so the big metric
+     lines up with the sales dashboard typographically, not just
+     spatially. Weight 600 — Space Grotesk at 400 looks anemic at
+     this size. */
+  font-family: var(--font-display, 'Space Grotesk'), sans-serif;
   font-size: 1.6rem;
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1;
   color: var(--text);
   margin: 0;

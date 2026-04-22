@@ -65,17 +65,18 @@
   --transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ---- Fonts ----
-     Only Bebas Neue + DM Sans are actually imported in index.html.
+     Only Space Grotesk + DM Sans are actually imported in index.html.
      Leading --font-sans with Inter meant the page rendered as DM Sans
      for most visitors but as Inter for anyone who happened to have it
      installed — a silent cross-machine inconsistency. Moved DM Sans
      to the front so the fallback chain is deterministic.
-     --font-mono is new; it replaces 5 hardcoded 'JetBrains Mono'
-     occurrences scattered across quotes.css / followups.css that
-     weren't importing the font anyway, so they rendered as whichever
-     system mono the user had. */
+     --font-display uses Space Grotesk (600/700) for headings + big
+     numbers. --font-mono is new; it replaces 5 hardcoded
+     'JetBrains Mono' occurrences scattered across quotes.css /
+     followups.css that weren't importing the font anyway, so they
+     rendered as whichever system mono the user had. */
   --font-sans: 'DM Sans', 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --font-display: 'Bebas Neue', 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Consolas, monospace;
 
   /* ---- Legacy aliases ---- */

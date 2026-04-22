@@ -42,7 +42,7 @@
   font-weight: 600;
 }
 .sc-val {
-  font-family: var(--font-display, 'Bebas Neue'), sans-serif;
+  font-family: var(--font-display, 'Space Grotesk'), sans-serif;
   font-size: 1.6rem;
   line-height: 1;
   color: var(--text);
@@ -57,7 +57,7 @@
   gap: 10px;
 }
 .card-t {
-  font-family: var(--font-display, 'Bebas Neue'), sans-serif;
+  font-family: var(--font-display, 'Space Grotesk'), sans-serif;
   font-size: 1rem;
   letter-spacing: 0.04em;
   color: var(--text);
@@ -170,7 +170,7 @@ input.fg:focus, select.fg:focus, textarea.fg:focus {
   width: 42px; height: 42px; border-radius: 50%;
   background: var(--accent); color: var(--accent-fg);
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-family: var(--font-display, 'Bebas Neue'), sans-serif;
+  font-weight: 800; font-family: var(--font-display, 'Space Grotesk'), sans-serif;
   letter-spacing: 0.05em;
 }
 .logo-t {
