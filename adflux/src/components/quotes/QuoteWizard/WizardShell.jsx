@@ -35,6 +35,11 @@ export function WizardShell({ renewalOf = null, editOf = null }) {
   const [step, setStep] = useState(1)
   const [quoteData, setQuoteData] = useState(EMPTY_QUOTE)
   const [selectedCities, setSelectedCities] = useState([]) // [{city, screens, duration_months, listed_rate, offered_rate}]
+  // GST rate on this quote. 0.18 = 18%, 0 = No GST. Persists on the
+  // quotes row so the same quote always taxes the same way no matter
+  // who views it or when — changing the default later won't rewrite
+  // history.
+  const [gstRate, setGstRate] = useState(GST_RATE)
   const [saving, setSaving] = useState(false)
   const [savedQuote, setSavedQuote] = useState(null)
   const [error, setError] = useState('')
@@ -92,6 +97,13 @@ export function WizardShell({ renewalOf = null, editOf = null }) {
           }))
         }
 
+        // Carry the original quote's GST choice into both edit and
+        // renewal flows. Fall back to the 18% default if the column
+        // is null (pre-migration rows).
+        if (baseQuote.gst_rate !== null && baseQuote.gst_rate !== undefined) {
+          setGstRate(Number(baseQuote.gst_rate))
+        }
+
         // Pre-fill cities (both flows)
         const cities = baseQuote.quote_cities?.map(qc => ({
           city: {
@@ -117,9 +129,10 @@ export function WizardShell({ renewalOf = null, editOf = null }) {
     loadBaseQuote()
   }, [renewalOf, editOf])
 
-  // Computed totals
+  // Computed totals — GST driven by per-quote gstRate, not the global
+  // constant, so "No GST" (rate=0) actually produces gst_amount=0.
   const subtotal = selectedCities.reduce((sum, c) => sum + (c.campaign_total || 0), 0)
-  const gst_amount = Math.round(subtotal * GST_RATE)
+  const gst_amount = Math.round(subtotal * gstRate)
   const total_amount = subtotal + gst_amount
   const duration_months = selectedCities[0]?.duration_months || 1
 
@@ -153,6 +166,7 @@ export function WizardShell({ renewalOf = null, editOf = null }) {
       status,
       duration_months,
       subtotal,
+      gst_rate: gstRate,
       gst_amount,
       total_amount,
     }
@@ -321,6 +335,8 @@ export function WizardShell({ renewalOf = null, editOf = null }) {
             quoteData={quoteData}
             selectedCities={selectedCities}
             subtotal={subtotal}
+            gst_rate={gstRate}
+            onGstRateChange={setGstRate}
             gst_amount={gst_amount}
             total_amount={total_amount}
             onBack={goBack}

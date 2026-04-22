@@ -1,10 +1,13 @@
 import { ChevronLeft, Send, Save, Monitor } from 'lucide-react'
 import { formatCurrency } from '../../../utils/formatters'
+import { GST_RATE } from '../../../utils/constants'
 
 export function Step3Review({
   quoteData,
   selectedCities,
   subtotal,
+  gst_rate = GST_RATE,
+  onGstRateChange,
   gst_amount,
   total_amount,
   onBack,
@@ -14,6 +17,8 @@ export function Step3Review({
   isEdit = false,
   originalStatus = null,
 }) {
+  const gstApplicable = Number(gst_rate) > 0
+  const gstPct = Math.round(Number(gst_rate) * 100)
   // In edit mode, "Save Draft" really means "Save Changes (preserve
   // current status)" and "Send to Client" means "Save & re-send" —
   // relabel so sales doesn't accidentally demote a won quote.
@@ -85,10 +90,31 @@ export function Step3Review({
             <span>Subtotal</span>
             <span>{formatCurrency(subtotal)}</span>
           </div>
-          <div className="totals-row">
-            <span>GST (18%)</span>
-            <span>{formatCurrency(gst_amount)}</span>
+
+          {/* GST toggle — checking/unchecking re-runs totals live.
+              Changing the rate after the quote is saved (via edit flow)
+              rewrites gst_amount + total_amount on next save. */}
+          <div className="totals-row" style={{ alignItems: 'center' }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: onGstRateChange ? 'pointer' : 'default',
+                userSelect: 'none',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={gstApplicable}
+                onChange={e => onGstRateChange?.(e.target.checked ? GST_RATE : 0)}
+                style={{ cursor: onGstRateChange ? 'pointer' : 'default' }}
+              />
+              <span>{gstApplicable ? `GST (${gstPct}%)` : 'No GST'}</span>
+            </label>
+            <span>{gstApplicable ? formatCurrency(gst_amount) : '—'}</span>
           </div>
+
           <div className="totals-row totals-row--grand">
             <span>Total</span>
             <span>{formatCurrency(total_amount)}</span>

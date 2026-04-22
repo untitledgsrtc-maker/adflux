@@ -484,14 +484,29 @@ export default function QuoteDetail() {
             )}
 
             {/* Totals */}
-            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div className="sum-row"><span>Subtotal</span><span>{formatCurrency(quote.subtotal)}</span></div>
-              <div className="sum-row"><span>GST (18%)</span><span>{formatCurrency(quote.gst_amount)}</span></div>
-              <div className="sum-tot">
-                <span>Total</span>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem' }}>{formatCurrency(quote.total_amount)}</span>
-              </div>
-            </div>
+            {/* GST row reads the per-quote gst_rate so "No GST" quotes
+                don't display a phantom 18% line. Fallback to 0.18 for
+                rows that predate the gst_rate migration. */}
+            {(() => {
+              const rate = quote.gst_rate !== null && quote.gst_rate !== undefined
+                ? Number(quote.gst_rate)
+                : 0.18
+              const pct = Math.round(rate * 100)
+              return (
+                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="sum-row"><span>Subtotal</span><span>{formatCurrency(quote.subtotal)}</span></div>
+                  {rate > 0 ? (
+                    <div className="sum-row"><span>GST ({pct}%)</span><span>{formatCurrency(quote.gst_amount)}</span></div>
+                  ) : (
+                    <div className="sum-row" style={{ color: 'var(--text-muted)' }}><span>No GST</span><span>—</span></div>
+                  )}
+                  <div className="sum-tot">
+                    <span>Total</span>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem' }}>{formatCurrency(quote.total_amount)}</span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Payment Summary */}
