@@ -2,7 +2,7 @@
 // Matches Untitled Adflux brand PDF exactly:
 // Yellow header block, UA logo, stats bar, location table with SR#, investment summary, T&C, footer
 import {
-  Document, Page, Text, View, StyleSheet, Font, pdf,
+  Document, Page, Text, View, Image, StyleSheet, Font, pdf,
 } from '@react-pdf/renderer'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
@@ -154,6 +154,54 @@ const S = StyleSheet.create({
   },
   glanceNum:   { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
   glanceLabel: { fontSize: 7, color: GRAY, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
+
+  // ── LOCATION PHOTO GALLERY ──────────────────
+  // 5-column grid, body width 531pt. With 6pt gaps (4 gaps × 6 = 24pt)
+  // each tile is (531 - 24) / 5 = 101.4pt wide. Height 76pt keeps a
+  // ~4:3 ratio so most phone-shot photos crop cleanly. The yellow
+  // label bar sits underneath and carries the city name.
+  galleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 20,
+  },
+  galleryItem: {
+    width: 101,
+    border: '0.5pt solid ' + BORDER,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  galleryImg: {
+    width: 101,
+    height: 76,
+    objectFit: 'cover',
+  },
+  galleryPlaceholder: {
+    width: 101,
+    height: 76,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryPlaceholderText: {
+    fontSize: 20,
+    fontFamily: 'Roboto', fontWeight: 'bold',
+    color: LGRAY,
+  },
+  galleryLabel: {
+    backgroundColor: YELLOW,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+  },
+  galleryLabelText: {
+    fontSize: 7,
+    fontFamily: 'Roboto', fontWeight: 'bold',
+    color: DARK,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
 
   // ── LOCATION TABLE ──────────────────────────
   tableSection: { marginBottom: 20 },
@@ -487,6 +535,39 @@ function QuoteDocument({ quote, cities }) {
             </View>
           )}
 
+          {/* Location Photo Gallery
+              Only rendered if at least one city has a photo_url. A gallery
+              made entirely of placeholders would be noise — skipping the
+              section is cleaner than padding the PDF with gray boxes.
+              photo_url is enriched from the master `cities` table in the
+              download/upload helpers below, because quote_cities rows
+              don't carry it directly. */}
+          {cities.some(c => c.photo_url) && (
+            <>
+              <View style={S.sectionBar}>
+                <Text style={S.sectionTitle}>Location Photo Gallery</Text>
+              </View>
+              <View style={S.galleryGrid}>
+                {cities.map((c, i) => (
+                  <View key={c.id || `gal-${i}`} style={S.galleryItem} wrap={false}>
+                    {c.photo_url ? (
+                      <Image src={c.photo_url} style={S.galleryImg} />
+                    ) : (
+                      <View style={S.galleryPlaceholder}>
+                        <Text style={S.galleryPlaceholderText}>
+                          {(c.city_name || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={S.galleryLabel}>
+                      <Text style={S.galleryLabelText}>{c.city_name}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
           {/* Location Table */}
           <View style={S.sectionBar}>
             <Text style={S.sectionTitle}>Location Breakdown</Text>
@@ -670,8 +751,50 @@ function QuoteDocument({ quote, cities }) {
 }
 
 // ── Export helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Merge master-city photo_urls into a quote_cities array.
+ *
+ * The PDF needs photo_url for the gallery, but quote_cities rows don't
+ * store it — photo_url lives on the master `cities` table (populated
+ * from CityModal). We resolve it here in a single query keyed by
+ * city_id so the PDF component stays data-driven and doesn't fire
+ * its own Supabase calls mid-render.
+ *
+ * - Safe when called with wizard-state cities (preserves the nested
+ *   `city.name` / `city.id` shape untouched, and still hits the cities
+ *   table via c.city?.id when c.city_id is missing).
+ * - No-ops when there are no city_ids to look up.
+ * - Best-effort: if the query errors we return the original array so
+ *   the PDF still renders (gallery just won't appear — photo_url stays
+ *   undefined, the `.some(c => c.photo_url)` guard suppresses the
+ *   section).
+ */
+async function enrichCitiesWithPhotos(cities) {
+  if (!cities?.length) return cities
+
+  const ids = [...new Set(
+    cities.map(c => c.city_id || c.city?.id).filter(Boolean)
+  )]
+  if (!ids.length) return cities
+
+  const { data, error } = await supabase
+    .from('cities')
+    .select('id, photo_url')
+    .in('id', ids)
+
+  if (error || !data) return cities
+
+  const photoMap = Object.fromEntries(data.map(m => [m.id, m.photo_url]))
+  return cities.map(c => ({
+    ...c,
+    photo_url: photoMap[c.city_id || c.city?.id] || null,
+  }))
+}
+
 export async function downloadQuotePDF(quote, cities = []) {
-  const blob = await pdf(<QuoteDocument quote={quote} cities={cities} />).toBlob()
+  const enriched = await enrichCitiesWithPhotos(cities)
+  const blob = await pdf(<QuoteDocument quote={quote} cities={enriched} />).toBlob()
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
@@ -701,7 +824,8 @@ export async function downloadQuotePDF(quote, cities = []) {
  * @returns {Promise<string>} public URL to the uploaded PDF
  */
 export async function uploadQuotePDF(quote, cities = []) {
-  const blob = await pdf(<QuoteDocument quote={quote} cities={cities} />).toBlob()
+  const enriched = await enrichCitiesWithPhotos(cities)
+  const blob = await pdf(<QuoteDocument quote={quote} cities={enriched} />).toBlob()
   const ts   = Date.now()
   const safeNumber = (quote.quote_number || 'quote').replace(/[^A-Za-z0-9_-]/g, '_')
   const path = `${safeNumber}/${ts}.pdf`
