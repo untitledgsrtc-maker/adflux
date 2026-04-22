@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Search, Plus, Trash2, ChevronLeft, ChevronRight, Monitor, X } from 'lucide-react'
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight, Monitor, X, Lock } from 'lucide-react'
 import { useCities } from '../../../hooks/useCities'
+import { useAuth } from '../../../hooks/useAuth'
 import { formatCurrency } from '../../../utils/formatters'
 
 const DURATION_OPTIONS = [
@@ -17,6 +18,7 @@ function calcTotal(offeredRate, screens, durationMonths) {
 
 export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   const { cities, fetchCities } = useCities()
+  const { isAdmin } = useAuth()
   const [search, setSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [error, setError] = useState('')
@@ -149,13 +151,26 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                 </div>
 
                 <div className="ccr-field">
-                  <label className="ccr-label">Listed (₹)</label>
+                  <label className="ccr-label">
+                    Listed (₹)
+                    {!isAdmin && (
+                      <Lock
+                        size={10}
+                        style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.6 }}
+                        aria-label="Admin-only"
+                      />
+                    )}
+                  </label>
                   <input
                     type="number"
                     min="0"
                     className="ccr-input"
                     value={sc.listed_rate}
+                    readOnly={!isAdmin}
+                    disabled={!isAdmin}
                     onChange={e => updateEntry(sc.city.id, 'listed_rate', Number(e.target.value))}
+                    title={!isAdmin ? 'Listed rate can only be changed by admin' : ''}
+                    style={!isAdmin ? { opacity: 0.7, cursor: 'not-allowed' } : undefined}
                   />
                 </div>
 
