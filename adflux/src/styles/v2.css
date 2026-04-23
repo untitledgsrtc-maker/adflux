@@ -1618,11 +1618,15 @@
   overflow: hidden;
 }
 
-/* Legacy button variants mapped to v2 palette */
+/* Legacy button variants mapped to v2 palette.
+   .btn-sec is a legacy shorthand alias used by QuoteDetail — treat it as
+   .btn-secondary so the Edit / WhatsApp / Download PDF buttons aren't
+   rendered as unstyled base buttons. */
 .v2d .btn,
 .v2d .btn-primary,
 .v2d .btn-y,
 .v2d .btn-secondary,
+.v2d .btn-sec,
 .v2d .btn-ghost,
 .v2d .btn-danger,
 .v2d .btn-sm {
@@ -1640,11 +1644,13 @@
 }
 .v2d .btn-primary:hover,
 .v2d .btn-y:hover { background: var(--v2-yellow-hover, #f2c742); }
-.v2d .btn-secondary {
+.v2d .btn-secondary,
+.v2d .btn-sec {
   background: var(--v2-surface-2); color: var(--v2-ink-0);
   border-color: var(--v2-line);
 }
-.v2d .btn-secondary:hover { background: var(--v2-surface-3, #232734); }
+.v2d .btn-secondary:hover,
+.v2d .btn-sec:hover { background: var(--v2-surface-3, #232734); }
 .v2d .btn-ghost {
   background: transparent; color: var(--v2-ink-1);
   border-color: var(--v2-line);
@@ -1660,6 +1666,7 @@
 .v2d .btn:disabled,
 .v2d .btn-primary:disabled,
 .v2d .btn-secondary:disabled,
+.v2d .btn-sec:disabled,
 .v2d .btn-ghost:disabled,
 .v2d .btn-danger:disabled,
 .v2d .btn-y:disabled { opacity: .55; cursor: not-allowed; }
