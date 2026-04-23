@@ -2,7 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { AppShell } from './components/layout/AppShell'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
+// Legacy Dashboard kept for rollback. If the v2 cutover needs to be reverted:
+//   1. Delete the /dashboard element = <DashboardV2 /> route
+//   2. Put `<Route path="/dashboard" element={<Dashboard />} />` back inside
+//      the AppShell block
+// import Dashboard from './pages/Dashboard'
 import Quotes from './pages/Quotes'
 import QuoteDetail from './pages/QuoteDetail'
 import CreateQuote from './pages/CreateQuote'
@@ -15,6 +19,7 @@ import PendingApprovals from './pages/PendingApprovals'
 import HR from './pages/HR'
 import MyOffer from './pages/MyOffer'
 import OfferForm from './pages/OfferForm'
+import DashboardV2 from './pages/v2/DashboardV2'
 
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
@@ -51,9 +56,13 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         {/* Public candidate-facing offer form — NO AppShell, NO auth. */}
         <Route path="/offer/:token" element={<OfferForm />} />
+        {/* v2 dashboard — owns its own shell (sidebar + topbar), so it sits
+            OUTSIDE AppShell. Both /dashboard and /v2/dashboard resolve to
+            the same switcher so legacy bookmarks of either path still work. */}
+        <Route path="/dashboard"    element={<RequireAuth><DashboardV2 /></RequireAuth>} />
+        <Route path="/v2/dashboard" element={<RequireAuth><DashboardV2 /></RequireAuth>} />
         <Route path="/" element={<RootRedirect />} />
         <Route element={<RequireAuth><AppShell /></RequireAuth>}>
-          <Route path="/dashboard"      element={<Dashboard />} />
           <Route path="/cities"         element={<RequireAdmin><Cities /></RequireAdmin>} />
           <Route path="/team"           element={<RequireAdmin><Team /></RequireAdmin>} />
           <Route path="/incentives"     element={<RequireAdmin><Incentives /></RequireAdmin>} />
