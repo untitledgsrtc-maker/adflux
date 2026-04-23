@@ -907,3 +907,366 @@
 .v2d-side-streak { display: block; }
 .v2d-side-streak .v2d-side-streak-k svg { vertical-align: -2px; }
 
+/* ═══════════════════════════════════════════════════════════════
+   v2d — Batch B additions
+   Shared shell (V2AppShell) + inner pages (QuotesV2, MyOfferV2,
+   MyPerformanceV2, Login). Dashboard pages don't use these.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shell: hamburger + mobile drawer ── */
+.v2d-hamburger {
+  display: none;
+  width: 38px; height: 38px;
+  background: var(--v2-bg-1); border: 1px solid var(--v2-line);
+  border-radius: 10px; color: var(--v2-ink-0);
+  align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+@media (max-width: 860px) {
+  .v2d-hamburger { display: inline-flex; }
+}
+
+.v2d-crumb { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+.v2d-mdrawer {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+}
+.v2d-mdrawer-inner {
+  width: min(280px, 85vw);
+  background: var(--v2-bg-1);
+  border-right: 1px solid var(--v2-line);
+  padding: 18px 12px 16px;
+  display: flex; flex-direction: column;
+  animation: v2d-slidein 200ms ease;
+  overflow-y: auto;
+}
+@keyframes v2d-slidein {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+.v2d-mdrawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; margin-bottom: 6px;
+}
+.v2d-mdrawer-close {
+  width: 36px; height: 36px;
+  background: transparent; border: 1px solid var(--v2-line);
+  border-radius: 8px; color: var(--v2-ink-1);
+  display: grid; place-items: center; cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Make sure sidebar's nav spacer + foot work at mobile */
+.v2d-mdrawer-inner .v2d-nav { flex: 1; }
+
+/* ── Mobile-nav needs a row wrapper ── */
+.v2d-mnav-items { display: grid; width: 100%; grid-template-columns: repeat(var(--cols, 4), 1fr); }
+.v2d-mnav-item { text-decoration: none; }
+
+/* ── Page head row (inner pages) ── */
+.v2d-page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 20px;
+}
+.v2d-page-kicker {
+  font-size: 10px; letter-spacing: 0.14em;
+  color: var(--v2-ink-2); font-weight: 700;
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.v2d-page-title {
+  font-family: var(--v2-display);
+  font-weight: 700; font-size: 26px;
+  letter-spacing: -0.01em; color: var(--v2-ink-0);
+  margin: 0 0 4px; line-height: 1.15;
+}
+.v2d-page-sub {
+  font-size: 13px; color: var(--v2-ink-2);
+}
+
+/* ── Tabs & filter row (Quotes list) ── */
+.v2d-tab-row {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px; background: var(--v2-bg-1);
+  border: 1px solid var(--v2-line); border-radius: var(--v2-r-pill);
+  width: fit-content; max-width: 100%;
+}
+.v2d-tab-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: 0; border: 0; color: var(--v2-ink-1);
+  font-family: var(--v2-sans); font-size: 12px;
+  font-weight: 600; letter-spacing: 0.02em;
+  padding: 7px 14px; border-radius: var(--v2-r-pill);
+  cursor: pointer; white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.v2d-tab-pill:hover { color: var(--v2-ink-0); }
+.v2d-tab-pill.is-active { background: var(--v2-yellow); color: var(--v2-yellow-ink); }
+.v2d-tab-pill.is-active .v2d-tab-count { background: rgba(0,0,0,.18); color: var(--v2-yellow-ink); }
+.v2d-tab-count {
+  font-size: 10px; font-family: var(--v2-display); font-weight: 700;
+  padding: 1px 7px; border-radius: var(--v2-r-pill);
+  background: var(--v2-bg-2); color: var(--v2-ink-1);
+  letter-spacing: 0;
+}
+
+.v2d-filter-row {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; margin-bottom: 16px;
+}
+.v2d-search--inline {
+  min-width: 220px; flex: 1; max-width: 360px; display: flex;
+}
+.v2d-search--inline input { font-size: 13px; }
+.v2d-search-clear {
+  background: 0; border: 0; color: var(--v2-ink-2); cursor: pointer;
+  padding: 0; display: grid; place-items: center;
+}
+.v2d-date-group { display: flex; align-items: center; gap: 8px; }
+.v2d-date {
+  background: var(--v2-bg-1); border: 1px solid var(--v2-line);
+  color: var(--v2-ink-0); font-family: var(--v2-sans); font-size: 12px;
+  border-radius: 10px; padding: 8px 10px; color-scheme: dark;
+}
+.v2d-date-sep { color: var(--v2-ink-2); font-size: 11px; }
+.v2d-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: 0; border: 1px solid var(--v2-line);
+  color: var(--v2-ink-1); font-family: var(--v2-sans); font-size: 12px;
+  font-weight: 600; padding: 8px 12px; border-radius: var(--v2-r-pill);
+  cursor: pointer;
+}
+.v2d-ghost:hover { background: var(--v2-bg-2); color: var(--v2-ink-0); }
+
+/* ── Table wrapper + clickable rows ── */
+.v2d-table-wrap { padding: 6px 10px; overflow-x: auto; }
+.v2d-qt--click tbody tr:hover { background: var(--v2-bg-2); }
+.v2d-qt--click tbody tr { cursor: pointer; }
+
+/* Status chip — works both inside .v2d-qt and on its own (mobile cards). */
+.v2d .st {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  padding: 3px 9px; border-radius: var(--v2-r-pill);
+  display: inline-block; white-space: nowrap;
+}
+.v2d .st--draft       { background: var(--v2-bg-3, var(--v2-bg-2)); color: var(--v2-ink-1); }
+.v2d .st--sent        { background: var(--v2-blue-soft, rgba(96,165,250,.14)); color: var(--v2-blue); }
+.v2d .st--negotiating { background: rgba(255,230,0,.14); color: var(--v2-yellow); }
+.v2d .st--won         { background: var(--v2-green-soft); color: var(--v2-green); }
+.v2d .st--lost        { background: var(--v2-rose-soft); color: var(--v2-rose); }
+.v2d-muted { color: var(--v2-ink-2); font-size: 12px; }
+.v2d-ok    { color: var(--v2-green); font-weight: 700; font-size: 13px; }
+.v2d-warn  { color: var(--v2-amber, #f59e0b); font-weight: 700; }
+.v2d-fu {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: var(--v2-r-pill);
+  background: var(--v2-bg-2); color: var(--v2-ink-1);
+  letter-spacing: 0.02em; white-space: nowrap;
+}
+.v2d-fu--done    { background: var(--v2-green-soft); color: var(--v2-green); }
+.v2d-fu--overdue { background: var(--v2-rose-soft);  color: var(--v2-rose); }
+
+/* ── Mobile card list (Quotes) ── */
+.v2d-qlist { display: none; flex-direction: column; gap: 10px; }
+.v2d-qcard {
+  display: flex; flex-direction: column; gap: 10px;
+  text-align: left; padding: 14px 14px 12px;
+  background: var(--v2-bg-1); border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r); color: var(--v2-ink-0);
+  cursor: pointer; font-family: var(--v2-sans);
+}
+.v2d-qcard:hover { background: var(--v2-bg-2); }
+.v2d-qcard-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.v2d-qcard-num {
+  font-family: var(--v2-display); font-weight: 700; font-size: 13px;
+  color: var(--v2-yellow); letter-spacing: 0.04em;
+}
+.v2d-qcard-client {
+  font-size: 15px; font-weight: 700; color: var(--v2-ink-0);
+  margin-bottom: 2px;
+}
+.v2d-qcard-company { font-size: 12px; color: var(--v2-ink-2); }
+.v2d-qcard-foot {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+  padding-top: 10px; border-top: 1px solid var(--v2-line);
+}
+.v2d-qcard-k {
+  font-size: 9px; letter-spacing: 0.12em; color: var(--v2-ink-2);
+  font-weight: 700; text-transform: uppercase; margin-bottom: 2px;
+}
+.v2d-qcard-v {
+  font-family: var(--v2-display); font-weight: 700;
+  font-size: 13px; color: var(--v2-ink-0);
+}
+
+/* ── Empty state ── */
+.v2d-empty-card {
+  padding: 38px 22px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.v2d-empty-ic {
+  width: 54px; height: 54px; border-radius: 16px;
+  background: var(--v2-bg-2); color: var(--v2-ink-1);
+  display: grid; place-items: center;
+  font-size: 24px; margin-bottom: 6px;
+}
+.v2d-empty-t { font-family: var(--v2-display); font-weight: 700; font-size: 16px; color: var(--v2-ink-0); }
+.v2d-empty-s { font-size: 13px; color: var(--v2-ink-2); max-width: 320px; line-height: 1.5; margin-bottom: 4px; }
+
+/* ── MyOffer v2 ── */
+.v2d-offer-hero {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap; padding: 18px 22px;
+  border-left: 4px solid var(--v2-yellow);
+}
+.v2d-offer-hero-l { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.v2d-offer-hero-ic {
+  width: 46px; height: 46px; border-radius: 12px;
+  background: rgba(255,230,0,.1); color: var(--v2-yellow);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.v2d-offer-hero-role {
+  font-family: var(--v2-display); font-weight: 700; font-size: 18px;
+  color: var(--v2-ink-0); margin-bottom: 2px;
+}
+.v2d-offer-hero-sub { font-size: 13px; color: var(--v2-ink-2); }
+.v2d-offer-hero-r { text-align: right; }
+.v2d-offer-hero-k {
+  font-size: 10px; letter-spacing: 0.14em; font-weight: 700;
+  color: var(--v2-ink-2); text-transform: uppercase; margin-bottom: 4px;
+}
+.v2d-offer-hero-v {
+  font-family: var(--v2-display); font-weight: 700; font-size: 22px;
+  color: var(--v2-yellow); line-height: 1;
+}
+.v2d-offer-hero-v sub {
+  font-size: 0.55em; color: var(--v2-ink-2);
+  vertical-align: baseline; margin-left: 4px; font-weight: 600;
+}
+.v2d-offer {
+  /* top-level offer page — nothing extra, the hero does the work */
+}
+
+.v2d-panel--highlight {
+  border-color: rgba(255,230,0,.24);
+  box-shadow: 0 0 0 1px rgba(255,230,0,.12) inset;
+}
+.v2d-kvgrid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px;
+}
+.v2d-kv-l {
+  font-size: 9px; letter-spacing: 0.14em; font-weight: 700;
+  color: var(--v2-ink-2); text-transform: uppercase; margin-bottom: 3px;
+}
+.v2d-kv-v { font-size: 13px; color: var(--v2-ink-0); line-height: 1.5; }
+
+/* ── MyPerformance v2 wrapper ── */
+/* The embedded MyPerformance component brings its own chrome via
+   incentives.css. We deliberately add no background/border/padding
+   here so the legacy component renders untouched — changing those
+   would double-wrap it inside a v2 card. */
+.v2d-perf-body { /* intentionally empty */ }
+
+/* ── Responsive for inner pages ── */
+@media (max-width: 860px) {
+  .v2d-page-title { font-size: 22px; }
+  .v2d-page-head { gap: 10px; }
+  .v2d-table-wrap { display: none; }
+  .v2d-qlist { display: flex; }
+  .v2d-tab-row { width: 100%; overflow-x: auto; flex-wrap: nowrap; padding: 3px; }
+  .v2d-tab-pill { padding: 6px 11px; font-size: 11px; }
+  .v2d-tab-count { font-size: 9px; padding: 1px 6px; }
+  .v2d-filter-row { gap: 8px; }
+  .v2d-date-group { width: 100%; }
+  .v2d-search--inline { min-width: 0; max-width: none; flex: 1; }
+  .v2d-kvgrid { grid-template-columns: 1fr; }
+  .v2d-offer-hero { padding: 14px 16px; }
+  .v2d-offer-hero-role { font-size: 16px; }
+  .v2d-offer-hero-v { font-size: 19px; }
+  .v2d-offer-hero-r { text-align: left; }
+  .v2d-qcard-foot { grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   v2d — Login page
+   ═══════════════════════════════════════════════════════════════ */
+.v2d-login {
+  min-height: 100vh;
+  background:
+    radial-gradient(90% 60% at 20% 0%, rgba(255,230,0,.08), transparent 60%),
+    radial-gradient(80% 60% at 90% 100%, rgba(196,59,168,.12), transparent 60%),
+    var(--v2-bg-0);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px;
+  font-family: var(--v2-sans); color: var(--v2-ink-0);
+}
+.v2d-login-card {
+  width: 100%; max-width: 400px;
+  background: var(--v2-bg-1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+  padding: 32px 28px 28px;
+  box-shadow: var(--v2-shadow-pop);
+}
+.v2d-login-brand {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 22px;
+}
+.v2d-login-mark {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--v2-yellow); color: var(--v2-yellow-ink);
+  display: grid; place-items: center;
+  font-family: var(--v2-display); font-weight: 700; font-size: 18px;
+}
+.v2d-login-b-t {
+  font-family: var(--v2-display); font-weight: 700;
+  font-size: 17px; letter-spacing: -0.01em;
+}
+.v2d-login-b-s {
+  font-size: 10px; letter-spacing: 0.14em; color: var(--v2-ink-2);
+  font-weight: 700; text-transform: uppercase; margin-top: 2px;
+}
+.v2d-login-h {
+  font-family: var(--v2-display); font-weight: 700;
+  font-size: 22px; letter-spacing: -0.01em;
+  color: var(--v2-ink-0); margin: 18px 0 6px;
+}
+.v2d-login-s { font-size: 13px; color: var(--v2-ink-2); margin-bottom: 22px; }
+.v2d-login-fg { margin-bottom: 14px; }
+.v2d-login-l {
+  display: block; font-size: 11px; letter-spacing: 0.08em;
+  color: var(--v2-ink-2); font-weight: 700; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.v2d-login-in {
+  width: 100%; background: var(--v2-bg-2);
+  border: 1px solid var(--v2-line); color: var(--v2-ink-0);
+  font-family: var(--v2-sans); font-size: 14px;
+  padding: 12px 14px; border-radius: 10px; outline: 0;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.v2d-login-in:focus {
+  border-color: var(--v2-yellow);
+  background: color-mix(in srgb, var(--v2-bg-2) 88%, var(--v2-yellow) 6%);
+}
+.v2d-login-err {
+  background: var(--v2-rose-soft); color: var(--v2-rose);
+  border: 1px solid rgba(244,63,94,.3);
+  border-radius: 10px; padding: 10px 12px;
+  font-size: 12px; margin-bottom: 14px;
+}
+.v2d-login-sub {
+  width: 100%; background: var(--v2-yellow); color: var(--v2-yellow-ink);
+  border: 0; font-family: var(--v2-display); font-weight: 700;
+  font-size: 14px; padding: 13px; border-radius: 10px;
+  cursor: pointer; letter-spacing: 0.02em; box-shadow: var(--v2-shadow-fab);
+}
+.v2d-login-sub:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
+.v2d-login-foot {
+  margin-top: 20px; text-align: center;
+  font-size: 11px; letter-spacing: 0.08em; color: var(--v2-ink-2);
+  font-weight: 600; text-transform: uppercase;
+}
