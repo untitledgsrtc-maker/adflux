@@ -33,6 +33,7 @@ import {
   TrendingUp, UserCircle2,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { useQuoteStore } from '../../store/quoteStore'
 import { initials } from '../../utils/formatters'
 import '../../styles/v2.css'
 
@@ -75,9 +76,22 @@ export function V2AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [searchDraft, setSearchDraft] = useState('')
 
   const nav       = isAdmin ? ADMIN_NAV        : SALES_NAV
   const mobileNav = isAdmin ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
+
+  // Topbar search — commits to the shared quote-filter store and
+  // jumps to /quotes. Keeps the field as a global quick-search so
+  // users can lookup a client from anywhere in the app.
+  function runTopbarSearch(e) {
+    if (e && e.preventDefault) e.preventDefault()
+    const q = searchDraft.trim()
+    if (!q) return
+    useQuoteStore.getState().setFilters({ search: q, status: '' })
+    setSearchDraft('')
+    navigate('/quotes')
+  }
 
   function isActive(to) {
     // Quote detail paths (/quotes/123) should also mark /quotes active.
@@ -151,17 +165,30 @@ export function V2AppShell() {
 
           <div className="v2d-topbar-spacer" />
 
-          <div className="v2d-search">
+          <form className="v2d-search" onSubmit={runTopbarSearch}>
             <Search size={15} />
-            <input placeholder="Search quotes, clients…" />
-          </div>
+            <input
+              placeholder="Search quotes, clients…"
+              value={searchDraft}
+              onChange={e => setSearchDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') runTopbarSearch(e)
+                if (e.key === 'Escape') setSearchDraft('')
+              }}
+            />
+          </form>
 
           <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
             <Plus size={15} />
             <span>New Quote</span>
           </button>
 
-          <button className="v2d-bell" aria-label="Notifications">
+          <button
+            className="v2d-bell"
+            aria-label="Notifications"
+            title="Notifications — coming soon"
+            onClick={() => alert('Notifications are coming in the next release.')}
+          >
             <Bell size={17} />
           </button>
 

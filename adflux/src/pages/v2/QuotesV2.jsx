@@ -47,6 +47,13 @@ export default function QuotesV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters])
 
+  // Keep the in-page search draft in sync with the store — the topbar
+  // quick-search in V2AppShell also writes to filters.search, and
+  // without this the in-page input would drift out of step.
+  useEffect(() => {
+    setSearchDraft(filters.search || '')
+  }, [filters.search])
+
   function handleSearchKeyDown(e) {
     if (e.key === 'Enter') setFilters({ search: searchDraft })
     if (e.key === 'Escape') { setSearchDraft(''); setFilters({ search: '' }) }
