@@ -1270,3 +1270,629 @@
   font-size: 11px; letter-spacing: 0.08em; color: var(--v2-ink-2);
   font-weight: 600; text-transform: uppercase;
 }
+
+/* ============================================================
+   v2d — Batch C additions
+   Shared button system, stat cards, pending-approvals list,
+   renewal tools bucket KPIs, HR/team toolbar, cities toolbar,
+   generic v2 modal, toast. Legacy-component bridge rules at
+   the bottom adapt existing CityGrid/TeamList/IncentiveDashboard
+   etc. to the dark v2 theme without rewriting those components.
+   ============================================================ */
+
+/* ----- Shared button system ----- */
+.v2d .v2d-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 8px;
+  font-family: var(--v2-sans); font-weight: 600; font-size: 13px;
+  letter-spacing: .01em; border: 1px solid transparent;
+  cursor: pointer; transition: background .15s ease, border-color .15s ease, opacity .15s ease;
+  white-space: nowrap;
+}
+.v2d .v2d-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.v2d .v2d-btn--sm { padding: 5px 10px; font-size: 12px; border-radius: 7px; }
+.v2d .v2d-btn--primary {
+  background: var(--v2-yellow); color: var(--v2-yellow-ink);
+}
+.v2d .v2d-btn--primary:hover:not(:disabled) { background: var(--v2-yellow-hover, #f2c742); }
+.v2d .v2d-btn--secondary {
+  background: var(--v2-surface-2); color: var(--v2-ink-0);
+  border-color: var(--v2-line);
+}
+.v2d .v2d-btn--secondary:hover:not(:disabled) { background: var(--v2-surface-3, #232734); }
+.v2d .v2d-btn--danger {
+  background: transparent; color: var(--v2-rose);
+  border-color: rgba(248,113,113,.35);
+}
+.v2d .v2d-btn--danger:hover:not(:disabled) { background: rgba(248,113,113,.08); }
+
+.v2d .v2d-ghost--btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 8px;
+  background: transparent; color: var(--v2-ink-1);
+  border: 1px solid var(--v2-line);
+  font-family: var(--v2-sans); font-weight: 600; font-size: 12.5px;
+  cursor: pointer; transition: background .15s ease, border-color .15s ease;
+}
+.v2d .v2d-ghost--btn:hover:not(:disabled) {
+  background: var(--v2-surface-2); border-color: var(--v2-line-2, rgba(255,255,255,.14));
+  color: var(--v2-ink-0);
+}
+.v2d .v2d-ghost--btn:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ----- Shared stat cards (HR/Team/Cities KPIs) ----- */
+.v2d-hr-stats,
+.v2d-cities-kpis {
+  display: grid; gap: 10px; margin-bottom: 18px;
+  grid-template-columns: repeat(4, 1fr);
+}
+.v2d-cities-kpis { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 860px) {
+  .v2d-hr-stats      { grid-template-columns: repeat(2, 1fr); }
+  .v2d-cities-kpis   { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 480px) {
+  .v2d-cities-kpis   { grid-template-columns: 1fr; }
+}
+.v2d .v2d-stat {
+  padding: 14px 16px;
+}
+.v2d .v2d-stat-l {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--v2-ink-2); font-weight: 600;
+}
+.v2d .v2d-stat-v {
+  margin-top: 6px;
+  font-family: var(--v2-display); font-weight: 700;
+  font-size: 26px; line-height: 1.1; color: var(--v2-ink-0);
+  letter-spacing: -0.01em;
+}
+.v2d .v2d-stat-v--accent { color: var(--v2-yellow); }
+.v2d .v2d-stat-v--ok     { color: var(--v2-teal, #4ade80); }
+.v2d .v2d-stat-v--muted  { color: var(--v2-ink-2); }
+
+/* ----- Pending Approvals ----- */
+.v2d-pa-list {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.v2d-pa-card {
+  display: grid; grid-template-columns: 1fr auto; gap: 16px;
+  align-items: center; padding: 16px 18px;
+}
+@media (max-width: 640px) {
+  .v2d-pa-card { grid-template-columns: 1fr; gap: 12px; }
+}
+.v2d-pa-card-top { min-width: 0; }
+.v2d-pa-amt-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.v2d-pa-amt {
+  font-family: var(--v2-display); font-weight: 700; font-size: 18px;
+  color: var(--v2-ink-0); letter-spacing: -0.01em;
+}
+.v2d-pa-final {
+  background: rgba(251,191,36,.14); color: var(--v2-yellow);
+  padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.v2d .v2d-pa-qlink {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: transparent; border: 1px solid var(--v2-line);
+  color: var(--v2-ink-1); padding: 3px 8px; border-radius: 6px;
+  font-family: var(--v2-sans); font-weight: 600; font-size: 11.5px;
+  cursor: pointer;
+}
+.v2d .v2d-pa-qlink:hover { background: var(--v2-surface-2); color: var(--v2-ink-0); }
+.v2d-pa-meta {
+  margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 6px;
+  font-size: 12.5px; color: var(--v2-ink-1);
+}
+.v2d-pa-sub {
+  margin-top: 4px; font-size: 11.5px; color: var(--v2-ink-2);
+}
+.v2d-pa-sub strong { color: var(--v2-ink-1); font-weight: 600; }
+.v2d-pa-note {
+  margin-top: 8px; padding: 8px 12px;
+  background: var(--v2-surface-2); border-radius: 7px;
+  font-size: 12px; color: var(--v2-ink-1); font-style: italic;
+}
+.v2d-pa-actions {
+  display: flex; gap: 8px; justify-self: end; flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+  .v2d-pa-actions { justify-self: stretch; }
+  .v2d .v2d-pa-actions .v2d-btn { flex: 1; justify-content: center; }
+}
+
+/* ----- Renewal Tools ----- */
+.v2d-rt-kpis {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px; margin-bottom: 18px;
+}
+@media (max-width: 640px) { .v2d-rt-kpis { grid-template-columns: 1fr; } }
+.v2d-rt-kpi { padding: 14px 16px; position: relative; overflow: hidden; }
+.v2d-rt-kpi::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.v2d-rt-kpi--hot::before  { background: #ef9a9a; }
+.v2d-rt-kpi--warm::before { background: #ffb74d; }
+.v2d-rt-kpi--cool::before { background: #81c784; }
+.v2d .v2d-rt-kpi-l {
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--v2-ink-2); font-weight: 600;
+}
+.v2d .v2d-rt-kpi-v {
+  margin: 6px 0 2px;
+  font-family: var(--v2-display); font-weight: 700;
+  font-size: 28px; line-height: 1; color: var(--v2-ink-0);
+}
+.v2d .v2d-rt-kpi-s { font-size: 11.5px; color: var(--v2-ink-2); }
+
+.v2d .v2d-rt-days {
+  display: inline-block; padding: 3px 8px; border-radius: 10px;
+  font-weight: 700; font-size: 11.5px; letter-spacing: .02em;
+}
+.v2d .v2d-rt-days--hot  { background: rgba(239,154,154,.14); color: #ef9a9a; }
+.v2d .v2d-rt-days--warm { background: rgba(255,183,77,.14);  color: #ffb74d; }
+.v2d .v2d-rt-days--cool { background: rgba(129,199,132,.14); color: #81c784; }
+
+/* Mobile cards + desktop table toggle */
+.v2d-rt-list { display: none; flex-direction: column; gap: 10px; }
+@media (max-width: 860px) {
+  .v2d-rt .v2d-table-wrap { display: none; }
+  .v2d-rt-list            { display: flex; }
+}
+.v2d-rt-card { padding: 14px 16px; }
+.v2d-rt-card-top {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.v2d-rt-card-client { font-weight: 700; color: var(--v2-ink-0); font-size: 14.5px; }
+.v2d-rt-card-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 6px;
+  font-size: 12.5px; color: var(--v2-ink-1);
+}
+.v2d-rt-card-sub { margin-top: 4px; font-size: 11.5px; color: var(--v2-ink-2); }
+.v2d .v2d-rt-card-cta {
+  margin-top: 10px; width: 100%; justify-content: center;
+}
+
+/* ----- HR / Team toolbar (filters + search on one line) ----- */
+.v2d-hr-toolbar {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.v2d-hr-toolbar .v2d-search--inline {
+  flex: 1; min-width: 220px; max-width: 360px; margin-left: auto;
+}
+
+/* HR status chip inside table */
+.v2d .st.st--hr {
+  color: #fff; padding: 3px 9px; border-radius: 10px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; display: inline-block;
+}
+
+/* HR desktop table vs mobile cards */
+.v2d-hr-cards { display: none; flex-direction: column; gap: 10px; }
+@media (max-width: 860px) {
+  .v2d-hr .v2d-table-wrap { display: none; }
+  .v2d-hr-cards           { display: flex; }
+}
+.v2d-hr-card { padding: 14px 16px; cursor: pointer; }
+.v2d-hr-card-top {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; margin-bottom: 4px;
+}
+.v2d-hr-card-name { font-weight: 700; color: var(--v2-ink-0); }
+.v2d-hr-card-meta { font-size: 12px; color: var(--v2-ink-1); }
+.v2d-hr-card-sub  { font-size: 11.5px; color: var(--v2-ink-2); margin-top: 4px; }
+
+/* ----- Cities toolbar ----- */
+.v2d-cities-toolbar {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.v2d-cities-toolbar-r {
+  display: flex; align-items: center; gap: 8px; margin-left: auto;
+  flex-wrap: wrap;
+}
+.v2d-cities-toolbar .v2d-search--inline {
+  flex: 1; min-width: 180px; max-width: 280px;
+}
+.v2d .v2d-search-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: transparent; border: 0; color: var(--v2-ink-2);
+  cursor: pointer; display: inline-flex;
+}
+.v2d .v2d-search-clear:hover { color: var(--v2-ink-0); }
+.v2d .v2d-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--v2-ink-1); cursor: pointer;
+  user-select: none;
+}
+.v2d .v2d-toggle input { accent-color: var(--v2-yellow); }
+
+/* ----- Toast ----- */
+.v2d-toast {
+  position: fixed; top: 24px; right: 24px; z-index: 9999;
+  padding: 10px 16px; border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+  background: var(--v2-surface-1);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-ink-0);
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  animation: v2d-toast-in .18s ease;
+}
+.v2d-toast--success { border-color: rgba(74,222,128,.35); color: var(--v2-teal, #4ade80); }
+.v2d-toast--error   { border-color: rgba(248,113,113,.45); color: var(--v2-rose); }
+@keyframes v2d-toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ----- v2 modal (used by Cities delete-confirm) ----- */
+.v2d-modal-ov {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(10, 12, 18, .7);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: v2d-toast-in .12s ease;
+}
+.v2d-modal {
+  background: var(--v2-surface-1);
+  border: 1px solid var(--v2-line);
+  border-radius: 14px;
+  width: 100%; max-width: 480px;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0,0,0,.5);
+}
+.v2d-modal-h {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--v2-line);
+}
+.v2d-modal-t { font-family: var(--v2-display); font-weight: 700; color: var(--v2-ink-0); }
+.v2d-modal-x {
+  background: transparent; border: 0; color: var(--v2-ink-2);
+  cursor: pointer; display: inline-flex; padding: 4px;
+}
+.v2d-modal-x:hover { color: var(--v2-ink-0); }
+.v2d-modal-b {
+  padding: 18px; font-size: 13.5px; color: var(--v2-ink-1); line-height: 1.55;
+}
+.v2d-modal-b strong { color: var(--v2-ink-0); }
+.v2d-modal-f {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 18px; border-top: 1px solid var(--v2-line);
+  background: var(--v2-surface-0);
+}
+
+/* ----- Page wrappers that need default padding ----- */
+.v2d-pa,
+.v2d-rt,
+.v2d-inc,
+.v2d-hr,
+.v2d-team,
+.v2d-cities,
+.v2d-wiz {
+  padding: 4px 0 40px;
+}
+.v2d-inc-body,
+.v2d-team-body,
+.v2d-cities-body {
+  /* legacy inner components have their own chrome — just scope them */
+  position: relative;
+}
+
+/* ==================================================================
+   Legacy-component bridge
+   Adapts legacy class names (.page, .card, .btn*, .form-input,
+   .modal-overlay, .team-*, .city-*, .inc-*, .loading-screen, etc.)
+   to the dark v2 theme when they appear inside a .v2d parent.
+   These rules are targeted — they do NOT override v2-native classes.
+   ================================================================== */
+
+.v2d .page { padding: 0; }            /* we already have V2 layout padding */
+.v2d .page-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.v2d .page-title {
+  font-family: var(--v2-display); font-weight: 700;
+  font-size: 26px; color: var(--v2-ink-0); letter-spacing: -0.01em;
+  margin: 0;
+}
+.v2d .page-sub, .v2d .page-subtitle {
+  font-size: 13px; color: var(--v2-ink-1); margin: 4px 0 0;
+}
+
+/* Cards / panels — match v2-panel */
+.v2d .card {
+  background: var(--v2-surface-1);
+  border: 1px solid var(--v2-line);
+  border-radius: 12px;
+  color: var(--v2-ink-0);
+  overflow: hidden;
+}
+
+/* Legacy button variants mapped to v2 palette */
+.v2d .btn,
+.v2d .btn-primary,
+.v2d .btn-y,
+.v2d .btn-secondary,
+.v2d .btn-ghost,
+.v2d .btn-danger,
+.v2d .btn-sm {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 8px;
+  font-family: var(--v2-sans); font-weight: 600; font-size: 13px;
+  border: 1px solid transparent; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+  white-space: nowrap;
+}
+.v2d .btn-sm { padding: 5px 10px; font-size: 12px; }
+.v2d .btn-primary,
+.v2d .btn-y {
+  background: var(--v2-yellow); color: var(--v2-yellow-ink);
+}
+.v2d .btn-primary:hover,
+.v2d .btn-y:hover { background: var(--v2-yellow-hover, #f2c742); }
+.v2d .btn-secondary {
+  background: var(--v2-surface-2); color: var(--v2-ink-0);
+  border-color: var(--v2-line);
+}
+.v2d .btn-secondary:hover { background: var(--v2-surface-3, #232734); }
+.v2d .btn-ghost {
+  background: transparent; color: var(--v2-ink-1);
+  border-color: var(--v2-line);
+}
+.v2d .btn-ghost:hover {
+  background: var(--v2-surface-2); color: var(--v2-ink-0);
+}
+.v2d .btn-danger {
+  background: transparent; color: var(--v2-rose);
+  border-color: rgba(248,113,113,.35);
+}
+.v2d .btn-danger:hover { background: rgba(248,113,113,.08); }
+.v2d .btn:disabled,
+.v2d .btn-primary:disabled,
+.v2d .btn-secondary:disabled,
+.v2d .btn-ghost:disabled,
+.v2d .btn-danger:disabled,
+.v2d .btn-y:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Legacy form controls */
+.v2d .form-input,
+.v2d .team-input,
+.v2d input[type="text"],
+.v2d input[type="email"],
+.v2d input[type="number"],
+.v2d input[type="tel"],
+.v2d input[type="date"],
+.v2d input[type="search"],
+.v2d select,
+.v2d textarea {
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-ink-0);
+  border-radius: 8px; padding: 9px 12px;
+  font-family: var(--v2-sans); font-size: 13px;
+  transition: border-color .15s ease;
+}
+.v2d input:focus,
+.v2d select:focus,
+.v2d textarea:focus,
+.v2d .form-input:focus {
+  outline: none;
+  border-color: var(--v2-yellow);
+}
+
+/* Legacy modals (CityModal/BulkRateModal/TeamMemberModal/SendOfferModal) */
+.v2d .modal-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(10, 12, 18, .7);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.v2d .modal {
+  background: var(--v2-surface-1);
+  border: 1px solid var(--v2-line);
+  border-radius: 14px;
+  color: var(--v2-ink-0);
+  box-shadow: 0 16px 40px rgba(0,0,0,.5);
+  max-height: 92vh; overflow: auto;
+}
+.v2d .modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--v2-line);
+}
+.v2d .modal-title {
+  font-family: var(--v2-display); font-weight: 700; font-size: 16px;
+  color: var(--v2-ink-0); margin: 0;
+}
+.v2d .modal-close {
+  background: transparent; border: 0; color: var(--v2-ink-2);
+  cursor: pointer; display: inline-flex; padding: 4px;
+}
+.v2d .modal-close:hover { color: var(--v2-ink-0); }
+.v2d .modal-body  { padding: 18px; font-size: 13.5px; color: var(--v2-ink-1); }
+.v2d .modal-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 18px; border-top: 1px solid var(--v2-line);
+  background: var(--v2-surface-0);
+}
+
+/* Legacy table wrap (RenewalTools, Incentives, etc.) */
+.v2d .tw { overflow-x: auto; }
+.v2d .tw table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.v2d .tw thead th {
+  text-align: left; padding: 10px 14px;
+  background: var(--v2-surface-2);
+  color: var(--v2-ink-2); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; font-size: 11px;
+  border-bottom: 1px solid var(--v2-line);
+}
+.v2d .tw tbody td {
+  padding: 12px 14px; color: var(--v2-ink-0);
+  border-bottom: 1px solid var(--v2-line);
+}
+.v2d .tw tbody tr:last-child td { border-bottom: 0; }
+.v2d .tw tbody tr:hover { background: var(--v2-surface-2); }
+
+/* Empty state */
+.v2d .empty-state {
+  padding: 60px 20px; text-align: center;
+  color: var(--v2-ink-2);
+  background: var(--v2-surface-1);
+  border: 1px solid var(--v2-line); border-radius: 12px;
+}
+.v2d .empty-state svg { color: var(--v2-ink-2); margin-bottom: 8px; }
+
+/* Loading screen + spinner (legacy) */
+.v2d .loading-screen {
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px 0; color: var(--v2-ink-2);
+}
+.v2d .spinner,
+.v2d .db-loading .spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid var(--v2-line);
+  border-top-color: var(--v2-yellow);
+  animation: v2d-spin 0.8s linear infinite;
+}
+@keyframes v2d-spin { to { transform: rotate(360deg); } }
+
+/* Cities — legacy classes used by CityGrid */
+.v2d .city-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+@media (max-width: 480px) { .v2d .city-kpi-row { grid-template-columns: 1fr; } }
+.v2d .city-kpi-card {
+  background: var(--v2-surface-1);
+  border: 1px solid var(--v2-line);
+  border-radius: 12px; padding: 14px 16px;
+}
+.v2d .city-kpi-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--v2-ink-2); font-weight: 600; margin: 0;
+}
+.v2d .city-kpi-value {
+  font-family: var(--v2-display); font-weight: 700;
+  font-size: 26px; color: var(--v2-ink-0); margin: 6px 0 0;
+}
+.v2d .city-filters {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.v2d .search-box { position: relative; min-width: 180px; max-width: 280px; flex: 1; }
+.v2d .search-box .search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--v2-ink-2);
+}
+.v2d .search-input, .v2d .search-box .form-input { padding-left: 30px; }
+.v2d .search-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: transparent; border: 0; color: var(--v2-ink-2);
+  cursor: pointer; display: inline-flex;
+}
+.v2d .filter-pills { display: inline-flex; gap: 6px; }
+.v2d .filter-pill {
+  padding: 6px 12px; border-radius: 16px;
+  border: 1px solid var(--v2-line); background: transparent;
+  color: var(--v2-ink-1); font-weight: 600; font-size: 12px;
+  cursor: pointer; transition: background .15s ease, color .15s ease;
+}
+.v2d .filter-pill:hover { background: var(--v2-surface-2); color: var(--v2-ink-0); }
+.v2d .filter-pill--active {
+  background: var(--v2-yellow); color: var(--v2-yellow-ink);
+  border-color: var(--v2-yellow);
+}
+.v2d .toggle-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--v2-ink-1); cursor: pointer;
+  user-select: none;
+}
+.v2d .toggle-label input { accent-color: var(--v2-yellow); }
+
+/* CityGrid cards */
+.v2d .city-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.v2d .city-card {
+  background: var(--v2-surface-1);
+  border: 1px solid var(--v2-line);
+  border-radius: 12px; padding: 14px 16px;
+  color: var(--v2-ink-0);
+  transition: border-color .15s ease;
+}
+.v2d .city-card:hover { border-color: var(--v2-line-2, rgba(255,255,255,.16)); }
+.v2d .city-card--selected { border-color: var(--v2-yellow); }
+
+/* Team / HR legacy */
+.v2d .team-header,
+.v2d .inc-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.v2d .team-header-left h1,
+.v2d .inc-header-left h1 {
+  font-family: var(--v2-display); font-weight: 700; font-size: 26px;
+  color: var(--v2-ink-0); margin: 0; letter-spacing: -0.01em;
+}
+.v2d .team-header-left p,
+.v2d .inc-header-left p {
+  font-size: 13px; color: var(--v2-ink-1); margin: 4px 0 0;
+}
+.v2d .team-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 640px) { .v2d .team-stats { grid-template-columns: repeat(2, 1fr); } }
+.v2d .team-stat-card {
+  background: var(--v2-surface-1); border: 1px solid var(--v2-line);
+  border-radius: 12px; padding: 14px 16px;
+}
+.v2d .team-stat-label {
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--v2-ink-2); font-weight: 600;
+}
+.v2d .team-stat-value {
+  font-family: var(--v2-display); font-weight: 700; font-size: 26px;
+  color: var(--v2-ink-0); margin-top: 6px; letter-spacing: -0.01em;
+}
+.v2d .team-stat-value.accent { color: var(--v2-yellow); }
+.v2d .team-stat-value.success { color: var(--v2-teal, #4ade80); }
+.v2d .team-stat-value.muted   { color: var(--v2-ink-2); }
+
+.v2d .team-filters { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.v2d .team-filter-btn {
+  padding: 6px 12px; border-radius: 16px;
+  background: transparent; border: 1px solid var(--v2-line);
+  color: var(--v2-ink-1); font-size: 12px; font-weight: 600;
+  cursor: pointer;
+}
+.v2d .team-filter-btn:hover { background: var(--v2-surface-2); color: var(--v2-ink-0); }
+.v2d .team-filter-btn.active {
+  background: var(--v2-yellow); color: var(--v2-yellow-ink);
+  border-color: var(--v2-yellow);
+}
+
+/* Inc dashboard — legacy class scoping */
+.v2d .inc-panel,
+.v2d .inc-card {
+  background: var(--v2-surface-1); border: 1px solid var(--v2-line);
+  border-radius: 12px; color: var(--v2-ink-0);
+}
+
+/* Wizard scoping — just reset the outer page padding the wizard expected */
+.v2d-wiz .page--wizard { padding: 0; }
+
+/* Incentives / MyPerformance inner content */
+.v2d-inc-body .incentive-dashboard,
+.v2d-inc-body .my-performance { color: var(--v2-ink-0); }
+
+/* Subtle fallback for var(--subtle) used in HR legacy */
+.v2d [style*="--subtle"] { background: var(--v2-surface-2) !important; }
+
