@@ -25,16 +25,13 @@ import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { thisMonthISO, initials } from '../../utils/formatters'
 import '../../styles/v2.css'
 
-/* ─── Money display: Indian format with L/Cr subscript ─── */
-function Money({ value, big = false }) {
+/* ─── Money display: full Indian-format number with lakh/crore grouping.
+   No more ₹29.7K / ₹1.2Cr truncation — reps want the exact ₹ figure.
+   The `big` prop is retained for API compatibility but no longer
+   needed for scaling (CSS controls sizing on mobile). ─── */
+function Money({ value, big = false }) { /* eslint-disable-line no-unused-vars */
   const n = Number(value) || 0
-  let num, suffix
-  if (n >= 1_00_00_000) { num = (n / 1_00_00_000).toFixed(2).replace(/\.?0+$/, ''); suffix = 'Cr' }
-  else if (n >= 1_00_000) { num = (n / 1_00_000).toFixed(2).replace(/\.?0+$/, ''); suffix = 'L' }
-  else { num = new Intl.NumberFormat('en-IN').format(n); suffix = null }
-  return (
-    <>₹{num}{suffix && <sub>{suffix}</sub>}</>
-  )
+  return <>₹{new Intl.NumberFormat('en-IN').format(Math.round(n))}</>
 }
 
 /* ─── Greeting by time-of-day ─── */

@@ -22,15 +22,12 @@ import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { thisMonthISO, initials, formatCompact } from '../../utils/formatters'
 import '../../styles/v2.css'
 
-/* ─── Money display: Indian format with L/Cr subscript ─── */
+/* ─── Money display: full Indian-format number with lakh/crore grouping.
+   Full ₹ amount every time — ₹29,700 instead of ₹29.7K. Reps want to see
+   exactly what a quote is worth without doing the mental math. ─── */
 function Money({ value }) {
   const n = Number(value) || 0
-  let num, suffix
-  if (n >= 1_00_00_000) { num = (n / 1_00_00_000).toFixed(2).replace(/\.?0+$/, ''); suffix = 'Cr' }
-  else if (n >= 1_00_000) { num = (n / 1_00_000).toFixed(2).replace(/\.?0+$/, ''); suffix = 'L' }
-  else if (n >= 1000)     { num = (n / 1000).toFixed(1).replace(/\.?0+$/, ''); suffix = 'K' }
-  else { num = new Intl.NumberFormat('en-IN').format(n); suffix = null }
-  return (<>₹{num}{suffix && <sub>{suffix}</sub>}</>)
+  return <>₹{new Intl.NumberFormat('en-IN').format(Math.round(n))}</>
 }
 
 function greeting() {

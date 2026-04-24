@@ -28,15 +28,14 @@ import {
 } from '../../utils/formatters'
 import '../../styles/v2.css'
 
-/* ─── Money display: Indian format with L/Cr subscript ─── */
+/* ─── Money display: full Indian-format number with lakh/crore grouping.
+   Previously truncated to ₹3K / ₹29.7K / ₹1.2Cr etc., which hid the
+   real figure from admins reviewing numbers. Now always renders full
+   (e.g. ₹29,700 or ₹12,50,00,000) — if a cell ever becomes too narrow
+   the container CSS handles overflow, not this formatter. ─── */
 function Money({ value }) {
   const n = Number(value) || 0
-  let num, suffix
-  if (n >= 1_00_00_000) { num = (n / 1_00_00_000).toFixed(2).replace(/\.?0+$/, ''); suffix = 'Cr' }
-  else if (n >= 1_00_000) { num = (n / 1_00_000).toFixed(2).replace(/\.?0+$/, ''); suffix = 'L' }
-  else if (n >= 1000)     { num = (n / 1000).toFixed(1).replace(/\.?0+$/, ''); suffix = 'K' }
-  else { num = new Intl.NumberFormat('en-IN').format(n); suffix = null }
-  return (<>₹{num}{suffix && <sub>{suffix}</sub>}</>)
+  return <>₹{new Intl.NumberFormat('en-IN').format(Math.round(n))}</>
 }
 
 function greeting() {
@@ -454,11 +453,15 @@ export default function AdminDashboardDesktop() {
               </div>
             </section>
 
-            {/* KPI row */}
-            <section className="v2d-kpi-row">
-              <Kpi label="Revenue MTD"     value={state.kpi.revenue}       tone="green" />
+            {/* KPI row — Revenue and Pipeline value are now in the hero
+                above, so this row is trimmed to the two metrics that
+                *aren't* already covered up there: Active quotes (count)
+                and Outstanding (unpaid won-quote balance). The inline
+                grid override forces 2-up on desktop since the base
+                .v2d-kpi-row rule is repeat(4, 1fr) which would leave
+                two empty gutters with only two children. */}
+            <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
               <Kpi label="Active quotes"   count={state.kpi.activeQuotes}  tone="blue" />
-              <Kpi label="Pipeline value"  value={state.kpi.pipelineValue} tone="amber" />
               <Kpi label="Outstanding"     value={state.kpi.outstanding}   tone="rose" dot={state.kpi.outstanding > 0} />
             </section>
 
