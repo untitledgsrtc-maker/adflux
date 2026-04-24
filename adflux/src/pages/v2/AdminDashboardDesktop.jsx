@@ -18,14 +18,16 @@ import {
   LayoutDashboard, FileText, CheckSquare, BarChart3, Users, Building2,
   Repeat, Gift, Settings, LogOut, Search, Bell, Plus, AlertTriangle,
   CheckCircle2, CreditCard, Send, PenLine, ArrowUpRight,
-  ChevronLeft, ChevronRight, Contact2,
+  Contact2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import {
-  thisMonthISO, todayISO, initials, formatRelative,
+  todayISO, initials, formatRelative,
 } from '../../utils/formatters'
+import { thisMonth } from '../../utils/period'
+import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import '../../styles/v2.css'
 
 /* ─── Money display: full Indian-format number with lakh/crore grouping.
@@ -50,32 +52,17 @@ function daysBetween(a, b) {
   return Math.max(0, Math.round((new Date(a) - new Date(b)) / MS))
 }
 
-/* Period helpers — centralized so admin and sales dashboards can share the
-   same "YYYY-MM" convention and move in sync. We never advance past the
-   current month because there's no data in the future. */
-function shiftPeriod(periodKey, delta) {
-  const [y, m] = periodKey.split('-').map(Number)
-  const d = new Date(y, m - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-function formatPeriod(periodKey) {
-  const [y, m] = periodKey.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
-}
-function isFuturePeriod(periodKey) {
-  return periodKey >= thisMonthISO() // string compare is safe for YYYY-MM
-}
-
 export default function AdminDashboardDesktop() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   const [state, setState] = useState({ loading: true })
-  // Period (YYYY-MM) drives every month-bucketed query below. Defaults to
-  // the current month; the header arrow buttons shift it back/forward so
-  // Admin can audit historical months without touching the DB.
-  const [period, setPeriod] = useState(() => thisMonthISO())
+  // Period drives every window-bucketed query below. Defaults to the
+  // current month; PeriodPicker lets Admin jump to any past month, a
+  // preset range (Last 7, This quarter, …), or a fully custom start/end.
+  // The picker returns a normalized period object — see utils/period.js.
+  const [period, setPeriod] = useState(() => thisMonth())
 
   useEffect(() => {
     load(period)
@@ -89,16 +76,15 @@ export default function AdminDashboardDesktop() {
     return () => { supabase.removeChannel(ch) }
   /* eslint-disable-next-line */ }, [period])
 
-  async function load(periodKey) {
+  async function load(activePeriod) {
     const today = todayISO()
-    const monthKey = periodKey || thisMonthISO()
-    // Derive month window from the selected period, not "now".
-    const [yy, mm] = monthKey.split('-').map(Number)
-    const monthStart = new Date(yy, mm - 1, 1)
-    monthStart.setHours(0, 0, 0, 0)
-    const monthStartIso = monthStart.toISOString().slice(0, 10)
-    const monthEndExclusive = new Date(yy, mm, 1) // first of the NEXT month
-    const monthEndIso = monthEndExclusive.toISOString().slice(0, 10)
+    const p = activePeriod || thisMonth()
+    // All three are consumed below: startIso/endIso for row-level time
+    // filters (payments, quote timestamps), monthKeys for anything that
+    // looks up pre-aggregated monthly tables (monthly_sales_data).
+    const monthStartIso = p.startIso
+    const monthEndIso   = p.endIso
+    const monthKeys     = p.monthKeys
 
     const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes] = await Promise.all([
       supabase.from('quotes')
@@ -201,22 +187,32 @@ export default function AdminDashboardDesktop() {
       .sort((a, b) => b.won - a.won)
     const lbMax = Math.max(1, ...leaderboard.map(p => p.won))
 
-    // Incentive liability
+    // Incentive liability — monthly_sales_data is keyed by YYYY-MM, so
+    // for a custom range we iterate every month the period touches and
+    // sum each rep's incentive across those months. A "above target"
+    // rep is counted once if they hit target in ANY month in range
+    // (matches how admins think about it: "who's earning bonuses now?").
     let liability = 0
     let aboveTarget = 0
     for (const p of profiles) {
-      const md = msd.find(s => s.staff_id === p.user_id && s.month_year === monthKey) || {}
-      const r = calculateIncentive({
-        monthlySalary:    p.monthly_salary,
-        salesMultiplier:  p.sales_multiplier ?? settings.default_multiplier ?? 5,
-        newClientRate:    p.new_client_rate  ?? settings.new_client_rate    ?? 0.05,
-        renewalRate:      p.renewal_rate     ?? settings.renewal_rate       ?? 0.02,
-        flatBonus:        p.flat_bonus       ?? settings.default_flat_bonus ?? settings.flat_bonus ?? 10000,
-        newClientRevenue: md.new_client_revenue || 0,
-        renewalRevenue:   md.renewal_revenue    || 0,
-      })
-      liability += r.incentive
-      if (r.targetExceeded) aboveTarget++
+      let repIncentive = 0
+      let everAboveTarget = false
+      for (const mk of monthKeys) {
+        const md = msd.find(s => s.staff_id === p.user_id && s.month_year === mk) || {}
+        const r = calculateIncentive({
+          monthlySalary:    p.monthly_salary,
+          salesMultiplier:  p.sales_multiplier ?? settings.default_multiplier ?? 5,
+          newClientRate:    p.new_client_rate  ?? settings.new_client_rate    ?? 0.05,
+          renewalRate:      p.renewal_rate     ?? settings.renewal_rate       ?? 0.02,
+          flatBonus:        p.flat_bonus       ?? settings.default_flat_bonus ?? settings.flat_bonus ?? 10000,
+          newClientRevenue: md.new_client_revenue || 0,
+          renewalRevenue:   md.renewal_revenue    || 0,
+        })
+        repIncentive += r.incentive
+        if (r.targetExceeded) everAboveTarget = true
+      }
+      liability += repIncentive
+      if (everAboveTarget) aboveTarget++
     }
 
     // Outstanding list (top 8)
@@ -373,29 +369,11 @@ export default function AdminDashboardDesktop() {
               <Search size={14} />
               <input placeholder="Search quotes, clients…" onFocus={() => navigate('/quotes')} readOnly />
             </div>
-            {/* Period switcher — prev / label / next. Arrows shift the
-                `period` state, which re-fires load() via the useEffect dep.
-                Next arrow is disabled at the current month. */}
-            <div className="v2d-period" role="group" aria-label="Month">
-              <button
-                onClick={() => setPeriod(p => shiftPeriod(p, -1))}
-                aria-label="Previous month"
-                title="Previous month"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <button className="is-active" title="Selected month">
-                {formatPeriod(period)}
-              </button>
-              <button
-                onClick={() => setPeriod(p => shiftPeriod(p, +1))}
-                disabled={isFuturePeriod(shiftPeriod(period, +1))}
-                aria-label="Next month"
-                title={isFuturePeriod(shiftPeriod(period, +1)) ? 'Already at current month' : 'Next month'}
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
+            {/* Period picker — month nav + presets + custom range.
+                PeriodPicker returns a normalized period object
+                (see utils/period.js). Every calc in load() reads
+                startIso/endIso and monthKeys off that object. */}
+            <PeriodPicker period={period} onChange={setPeriod} />
             <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
               <Plus size={14} strokeWidth={2.6} /> Create Quote
             </button>
@@ -456,7 +434,7 @@ export default function AdminDashboardDesktop() {
                 owe the sales team. */}
             <section className="v2d-hero v2d-hero--action">
               <div className="v2d-hero-head">
-                <div className="v2d-hero-kicker">₹ Revenue · {formatPeriod(period)}</div>
+                <div className="v2d-hero-kicker">₹ Revenue · {period.label}</div>
                 <button className="v2d-banner-cta" onClick={() => navigate('/quotes')}>
                   View quotes
                 </button>
@@ -739,9 +717,10 @@ function OutstandingPanel({ rows, onOpen }) {
 function LeaderboardPanel({ rows, max, period }) {
   const medals = ['🥇', '🥈', '🥉']
   const top = rows.slice(0, 8)
-  const label = period
-    ? new Date(`${period}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
-    : new Date().toLocaleDateString('en-IN', { month: 'short' })
+  // period is the normalized object from utils/period.js; label is
+  // already formatted for display ("Apr 2026" or "Apr 10 – 20, 2026").
+  const label = period?.label
+    || new Date().toLocaleDateString('en-IN', { month: 'short' })
   return (
     <div className="v2d-panel">
       <div className="v2d-panel-h">

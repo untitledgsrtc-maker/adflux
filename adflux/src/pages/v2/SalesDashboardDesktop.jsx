@@ -14,12 +14,14 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, BarChart3, Gift, Repeat, LogOut,
   Search, Bell, Plus, Flame, ArrowUpRight, Phone, AlertTriangle,
-  ChevronLeft, ChevronRight, Contact2,
+  Contact2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
-import { thisMonthISO, initials, formatCompact } from '../../utils/formatters'
+import { initials, formatCompact } from '../../utils/formatters'
+import { thisMonth } from '../../utils/period'
+import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import '../../styles/v2.css'
 
 /* ─── Money display: full Indian-format number with lakh/crore grouping.
@@ -37,21 +39,6 @@ function greeting() {
   return 'Good evening'
 }
 
-/* Period helpers — mirror the admin dashboard so both feel identical.
-   "YYYY-MM" strings sort and compare correctly with lexicographic ops. */
-function shiftPeriod(periodKey, delta) {
-  const [y, m] = periodKey.split('-').map(Number)
-  const d = new Date(y, m - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-function formatPeriod(periodKey) {
-  const [y, m] = periodKey.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
-}
-function isFuturePeriod(periodKey) {
-  return periodKey >= thisMonthISO()
-}
-
 export default function SalesDashboardDesktop() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
@@ -61,15 +48,19 @@ export default function SalesDashboardDesktop() {
   // Default to Forecast — the forward-looking "if everything closes" number
   // is the one reps act on every morning. Mirrors the mobile dashboard.
   const [tab, setTab] = useState('forecast')
-  // Period drives every month-bucketed query. Arrows in the topbar shift
-  // it; the effect below re-fires load() on change.
-  const [period, setPeriod] = useState(() => thisMonthISO())
+  // Period drives every window-bucketed query. PeriodPicker returns a
+  // normalized object (startIso/endIso/monthKeys/label) — see
+  // utils/period.js. Defaults to the current month.
+  const [period, setPeriod] = useState(() => thisMonth())
 
   useEffect(() => { if (profile?.id) load(period) /* eslint-disable-next-line */ }, [profile?.id, period])
 
-  async function load(periodKey) {
+  async function load(activePeriod) {
     const uid = profile.id
-    const monthKey = periodKey || thisMonthISO()
+    const p = activePeriod || thisMonth()
+    const monthStartIso = p.startIso
+    const monthEndIso   = p.endIso
+    const monthKeys     = p.monthKeys
 
     const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes, usersRes] = await Promise.all([
       supabase.from('quotes')
@@ -86,8 +77,12 @@ export default function SalesDashboardDesktop() {
         .lte('follow_up_date', new Date().toISOString().slice(0, 10))
         .order('follow_up_date', { ascending: true })
         .limit(6),
+      // Fetch ALL monthly_sales_data rows the period touches (not just
+      // one). A custom range spanning March+April returns both rows;
+      // earned/forecast math sums new_client_revenue and renewal_revenue
+      // across them so the incentive calc reflects the whole window.
       supabase.from('monthly_sales_data')
-        .select('*').eq('staff_id', uid).eq('month_year', monthKey).maybeSingle(),
+        .select('*').eq('staff_id', uid).in('month_year', monthKeys),
       supabase.from('monthly_sales_data')
         .select('*').eq('staff_id', uid).order('month_year', { ascending: false }).limit(12),
       supabase.from('staff_incentive_profiles')
@@ -99,18 +94,25 @@ export default function SalesDashboardDesktop() {
     const quotes = qRes.data || []
     const payments = pRes.data || []
     const followups = fRes.data || []
-    const monthRow = msRes.data
+    const monthRows = msRes.data || []
     const history = histRes.data || []
     const prof = profRes.data
     const settings = settingsRes.data || {}
     const salesUsers = usersRes.data || []
 
-    // Leaderboard — won quote total_amount per user this month
-    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+    // Sum pre-aggregated monthly revenue across every month the period
+    // covers. If it's a single month this is just one row; for a range
+    // like "Mar 20 → Apr 10" it's two.
+    const monthNewClient = monthRows.reduce((s, r) => s + (r.new_client_revenue || 0), 0)
+    const monthRenewal   = monthRows.reduce((s, r) => s + (r.renewal_revenue    || 0), 0)
+
+    // Leaderboard — won quote total_amount per user, bucketed by the
+    // selected period. Uses updated_at (timestamp quote moved to won).
     const { data: lbQuotes } = await supabase.from('quotes')
       .select('created_by, total_amount, status, updated_at, created_at')
       .eq('status', 'won')
-      .gte('updated_at', monthStart.toISOString())
+      .gte('updated_at', monthStartIso)
+      .lt('updated_at', monthEndIso)
     const wonByUser = {}
     ;(lbQuotes || []).forEach(q => {
       wonByUser[q.created_by] = (wonByUser[q.created_by] || 0) + (q.total_amount || 0)
@@ -125,14 +127,17 @@ export default function SalesDashboardDesktop() {
     const renewalRate = prof?.renewal_rate     ?? settings.renewal_rate       ?? 0.02
     const flatBonus   = prof?.flat_bonus       ?? settings.default_flat_bonus ?? settings.flat_bonus ?? 10000
 
+    // Earned: pure "what have I booked in the selected window" — driven
+    // by the summed monthly_sales_data rows (monthNewClient/monthRenewal
+    // above, one-row-per-month aggregate the incentive subsystem owns).
     const earned = calculateIncentive({
       monthlySalary: prof?.monthly_salary || 0,
       salesMultiplier: multiplier,
       newClientRate: newRate,
       renewalRate: renewalRate,
       flatBonus,
-      newClientRevenue: monthRow?.new_client_revenue || 0,
-      renewalRevenue:   monthRow?.renewal_revenue    || 0,
+      newClientRevenue: monthNewClient,
+      renewalRevenue:   monthRenewal,
     })
 
     const openNew     = quotes.filter(q => !['lost','won'].includes(q.status) && q.revenue_type === 'new')
@@ -146,8 +151,8 @@ export default function SalesDashboardDesktop() {
       newClientRate: newRate,
       renewalRate: renewalRate,
       flatBonus,
-      newClientRevenue: (monthRow?.new_client_revenue || 0) + openNew,
-      renewalRevenue:   (monthRow?.renewal_revenue    || 0) + openRenewal,
+      newClientRevenue: monthNewClient + openNew,
+      renewalRevenue:   monthRenewal   + openRenewal,
     })
     const forecastDelta = Math.max(0, (forecast.incentive || 0) - (earned.incentive || 0))
     const openPipeline  = openNew + openRenewal
@@ -161,7 +166,10 @@ export default function SalesDashboardDesktop() {
     const streak = calculateStreak(history, earned.target)
 
     const wonValue = quotes.filter(q => q.status === 'won')
-                           .filter(q => (q.updated_at || q.created_at || '').slice(0, 7) === monthKey)
+                           .filter(q => {
+                             const ts = q.updated_at || q.created_at || ''
+                             return ts >= monthStartIso && ts < monthEndIso
+                           })
                            .reduce((s, q) => s + (q.total_amount || 0), 0)
     // Quotes Sent: surface the total ₹ value as the headline with the raw
     // count as a sub-line. Mirrors the mobile dashboard so reps see the
@@ -268,28 +276,9 @@ export default function SalesDashboardDesktop() {
               <Search size={14} />
               <input placeholder="Search quotes, clients…" onFocus={() => navigate('/quotes')} readOnly />
             </div>
-            {/* Period switcher — prev / label / next. Arrow shifts the
-                `period` state which re-runs load() via the useEffect dep. */}
-            <div className="v2d-period" role="group" aria-label="Month">
-              <button
-                onClick={() => setPeriod(p => shiftPeriod(p, -1))}
-                aria-label="Previous month"
-                title="Previous month"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <button className="is-active" title="Selected month">
-                {formatPeriod(period)}
-              </button>
-              <button
-                onClick={() => setPeriod(p => shiftPeriod(p, +1))}
-                disabled={isFuturePeriod(shiftPeriod(period, +1))}
-                aria-label="Next month"
-                title={isFuturePeriod(shiftPeriod(period, +1)) ? 'Already at current month' : 'Next month'}
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
+            {/* Period picker — month nav + presets + custom range.
+                Same component as admin dashboard. */}
+            <PeriodPicker period={period} onChange={setPeriod} />
             <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
               <Plus size={14} strokeWidth={2.6} /> Create Quote
             </button>
