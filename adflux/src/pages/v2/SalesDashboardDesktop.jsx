@@ -45,7 +45,9 @@ export default function SalesDashboardDesktop() {
   const location = useLocation()
 
   const [state, setState] = useState({ loading: true })
-  const [tab, setTab] = useState('earned')
+  // Default to Forecast — the forward-looking "if everything closes" number
+  // is the one reps act on every morning. Mirrors the mobile dashboard.
+  const [tab, setTab] = useState('forecast')
 
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
 
@@ -145,8 +147,13 @@ export default function SalesDashboardDesktop() {
     const wonValue = quotes.filter(q => q.status === 'won')
                            .filter(q => (q.updated_at || q.created_at || '').slice(0, 7) === monthKey)
                            .reduce((s, q) => s + (q.total_amount || 0), 0)
-    const quotesSent = quotes.filter(q => q.status === 'sent').length
-    const todoCount  = followups.length
+    // Quotes Sent: surface the total ₹ value as the headline with the raw
+    // count as a sub-line. Mirrors the mobile dashboard so reps see the
+    // revenue figure first, not just "how many did I send".
+    const sentQuotes       = quotes.filter(q => q.status === 'sent')
+    const quotesSent       = sentQuotes.length
+    const quotesSentValue  = sentQuotes.reduce((s, q) => s + (Number(q.total_amount) || 0), 0)
+    const todoCount        = followups.length
 
     const recent = [...quotes]
       .sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''))
@@ -161,6 +168,7 @@ export default function SalesDashboardDesktop() {
       rejected,
       wonValue,
       quotesSent,
+      quotesSentValue,
       todoCount,
       leaderboard,
       recent,
@@ -326,7 +334,12 @@ export default function SalesDashboardDesktop() {
             {/* KPI row */}
             <section className="v2d-kpi-row">
               <Kpi label="Won revenue" value={state.wonValue} tone="green" />
-              <Kpi label="Quotes sent" count={state.quotesSent} tone="blue" />
+              <Kpi
+                label="Quotes sent"
+                value={state.quotesSentValue}
+                sub={`${state.quotesSent ?? 0} quote${(state.quotesSent ?? 0) === 1 ? '' : 's'}`}
+                tone="blue"
+              />
               <Kpi label="Pending approval" count={state.pendingPending.count} tone="amber" dot={state.pendingPending.count > 0} />
               <Kpi label="Follow-ups due" count={state.todoCount} tone="rose" dot={state.todoCount > 0} />
             </section>
@@ -368,7 +381,7 @@ function HeroStat({ label, value, plus }) {
   )
 }
 
-function Kpi({ label, value, count, tone, dot }) {
+function Kpi({ label, value, count, sub, tone, dot }) {
   const icon = {
     green: '₹', blue: '◎', amber: '⏱', rose: '📞',
   }[tone] || '•'
@@ -384,6 +397,7 @@ function Kpi({ label, value, count, tone, dot }) {
       <div className="v2d-kpi-v">
         {value !== undefined ? <Money value={value} /> : (count ?? 0)}
       </div>
+      {sub && <div className="v2d-kpi-sub" style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.55))', marginTop: 2 }}>{sub}</div>}
       {dot && <div className="v2d-kpi-delta"><span className="up">●</span> needs attention</div>}
     </div>
   )
