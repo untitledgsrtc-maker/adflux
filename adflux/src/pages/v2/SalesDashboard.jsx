@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Flame, Home, FileText, Plus, BarChart3, MoreHorizontal, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Bell, Flame, Home, FileText, Plus, BarChart3, AlertTriangle, RefreshCw, LogOut } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
@@ -154,7 +154,11 @@ export default function SalesDashboardV2() {
     const wonValue = quotes.filter(q => q.status === 'won')
                            .filter(q => (q.updated_at || q.created_at || '').slice(0,7) === monthKey)
                            .reduce((s,q) => s + (q.total_amount || 0), 0)
-    const quotesSent = quotes.filter(q => q.status === 'sent').length
+    // Quotes Sent: count + total ₹ value so the dashboard surfaces the
+    // headline "how much have I sent" figure alongside the raw count.
+    const sentQuotes = quotes.filter(q => q.status === 'sent')
+    const quotesSent = sentQuotes.length
+    const quotesSentValue = sentQuotes.reduce((s, q) => s + (Number(q.total_amount) || 0), 0)
     const todoCount  = followups.length
 
     setState({
@@ -167,6 +171,7 @@ export default function SalesDashboardV2() {
       rejected,
       wonValue,
       quotesSent,
+      quotesSentValue,
       todoCount,
       leaderboard,
     })
@@ -187,6 +192,7 @@ export default function SalesDashboardV2() {
           name={profile?.name || 'there'}
           streak={state.streak}
           hasAlert={!!state.rejected || state.pendingPending.count > 0}
+          onLogout={() => { if (window.confirm('Log out of Adflux?')) signOut?.() }}
         />
 
         {state.rejected && (
@@ -221,7 +227,12 @@ export default function SalesDashboardV2() {
         <div className="v2-glance-head">This month at a glance</div>
         <div className="v2-kpi-grid">
           <Kpi label="Won Revenue" value={state.wonValue} tone="green" />
-          <Kpi label="Quotes Sent" count={state.quotesSent} tone="blue" />
+          <Kpi
+            label="Quotes Sent"
+            value={state.quotesSentValue}
+            sub={`${state.quotesSent} quote${state.quotesSent === 1 ? '' : 's'}`}
+            tone="blue"
+          />
           <Kpi label="Pending Approval" count={state.pendingPending.count} tone="yellow" dot={state.pendingPending.count > 0} />
           <Kpi label="Follow-ups Due" count={state.todoCount} tone="rose" dot={state.todoCount > 0} />
         </div>
@@ -238,7 +249,7 @@ export default function SalesDashboardV2() {
       <BottomNav active="home" onNew={() => navigate('/quotes/new')} onNav={(k) => {
         if (k === 'quotes') navigate('/quotes')
         if (k === 'perf')   navigate('/my-performance')
-        if (k === 'more')   signOut?.()
+        if (k === 'offer')  navigate('/my-offer')
       }} />
     </div>
   )
@@ -249,7 +260,7 @@ export default function SalesDashboardV2() {
    they're shared by more pages)
    ══════════════════════════════════════════════════════════ */
 
-function Header({ name, streak, hasAlert }) {
+function Header({ name, streak, hasAlert, onLogout }) {
   const firstName = name.split(' ')[0]
   return (
     <div className="v2-head">
@@ -269,17 +280,30 @@ function Header({ name, streak, hasAlert }) {
           No streak
         </div>
       )}
-      <div className="v2-bell">
+      <div className="v2-bell" title="Notifications — coming soon">
         <Bell size={16} strokeWidth={2.2} />
         {hasAlert && <span className="v2-bell-dot" />}
       </div>
+      {onLogout && (
+        <button
+          className="v2-bell"
+          style={{ marginLeft: 6, background: 'transparent', border: '1px solid var(--v2-line, rgba(255,255,255,.12))', cursor: 'pointer' }}
+          onClick={onLogout}
+          aria-label="Log out"
+          title="Log out"
+        >
+          <LogOut size={16} strokeWidth={2.2} />
+        </button>
+      )}
     </div>
   )
 }
 
 function ProposedIncentive({ earned, forecast, pending }) {
-  // Default to Earned — matches the mobile screenshot layout.
-  const [tab, setTab] = useState('earned')
+  // Default to Forecast — the forward-looking "if everything closes"
+  // number is the one the sales rep acts on every morning. Earned is
+  // backward-looking and less motivating as a landing state.
+  const [tab, setTab] = useState('forecast')
 
   const panes = {
     earned: {
@@ -323,7 +347,7 @@ function ProposedIncentive({ earned, forecast, pending }) {
   )
 }
 
-function Kpi({ label, value, count, tone, dot }) {
+function Kpi({ label, value, count, sub, tone, dot }) {
   const toneClass = tone === 'green' ? 'v2-kpi--green'
                   : tone === 'blue'  ? 'v2-kpi--blue'
                   : tone === 'rose'  ? 'v2-kpi--rose' : ''
@@ -334,6 +358,11 @@ function Kpi({ label, value, count, tone, dot }) {
       <div className="v2-kpi-value">
         {value !== undefined ? <Money value={value} /> : <>{count ?? 0}</>}
       </div>
+      {sub && (
+        <div style={{ marginTop: 2, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500 }}>
+          {sub}
+        </div>
+      )}
     </div>
   )
 }
@@ -436,8 +465,8 @@ function BottomNav({ active, onNew, onNav }) {
         <button className="v2-nav-item" onClick={() => onNav('perf')}>
           <BarChart3 size={18} /> Perf
         </button>
-        <button className="v2-nav-item" onClick={() => onNav('more')}>
-          <MoreHorizontal size={18} /> More
+        <button className="v2-nav-item" onClick={() => onNav('offer')}>
+          <FileText size={18} /> Offer
         </button>
       </div>
     </nav>

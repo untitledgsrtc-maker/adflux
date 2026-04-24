@@ -1609,13 +1609,18 @@
   font-size: 13px; color: var(--v2-ink-1); margin: 4px 0 0;
 }
 
-/* Cards / panels — match v2-panel */
+/* Cards / panels — match v2-panel.
+   NOTE: do NOT set overflow:hidden here. QuoteDetail's status dropdown
+   (Sent → Won/Lost) is a position:absolute popup anchored inside the
+   quote hero card; clipping it to the card bounds made the menu render
+   behind the tab strip below. If you need rounded-corner clipping for
+   a specific image/media element inside a card, do it locally on that
+   element, not on .card itself. */
 .v2d .card {
   background: var(--v2-surface-1);
   border: 1px solid var(--v2-line);
   border-radius: 12px;
   color: var(--v2-ink-0);
-  overflow: hidden;
 }
 
 /* Legacy button variants mapped to v2 palette.

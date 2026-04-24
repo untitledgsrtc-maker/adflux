@@ -351,9 +351,9 @@ export default function QuoteDetail() {
 
               {statusOpen && allowed.length > 0 && (
                 <>
-                  <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setStatusOpen(false)} />
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={() => setStatusOpen(false)} />
                   <div style={{
-                    position: 'absolute', right: 0, top: '110%', zIndex: 10,
+                    position: 'absolute', right: 0, top: '110%', zIndex: 1000,
                     background: 'var(--dk)', border: '1.5px solid var(--brd)', borderRadius: 10,
                     minWidth: 160, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,.5)',
                   }}>
