@@ -268,8 +268,13 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                     />
                   </div>
 
+                  {/* Offered (₹) — primary editable field per row.
+                      Styled with accent border + tinted fill + bold
+                      value so it pops against the locked LISTED
+                      input sitting next to it. Field discovery was
+                      the #1 sales-team complaint on mobile. */}
                   <div className="ccr-field">
-                    <label className="ccr-label">Offered (₹)</label>
+                    <label className="ccr-label ccr-label--accent">Offered (₹)</label>
                     <input
                       type="number"
                       min="0"

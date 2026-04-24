@@ -231,13 +231,30 @@
   border-color: var(--accent);
 }
 
+/* OFFERED price input — this is the field reps interact with most on
+   every quote, so it has to read as the primary target at a glance.
+   LISTED sits next to it and is locked for sales users; without
+   visual contrast the team was missing the OFFERED column entirely
+   (reported from the field). Stronger border + tinted fill + bold
+   value + accent-coloured label turn the whole column into a clear
+   "enter here". */
 .ccr-input--accent {
-  border-color: rgba(255, 230, 0, 0.3);
+  border: 1.5px solid rgba(255, 230, 0, 0.55);
+  background: rgba(255, 230, 0, 0.06);
   color: var(--accent);
+  font-weight: 700;
 }
 
 .ccr-input--accent:focus {
   border-color: var(--accent);
+  background: rgba(255, 230, 0, 0.1);
+  box-shadow: 0 0 0 3px rgba(255, 230, 0, 0.12);
+}
+
+/* Partner label — applied on the Offered (₹) label so the eye is
+   guided to the accent column, not just the input. */
+.ccr-label--accent {
+  color: var(--accent);
 }
 
 .ccr-select {
