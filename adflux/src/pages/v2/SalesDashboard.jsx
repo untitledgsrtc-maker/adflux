@@ -158,36 +158,40 @@ export default function SalesDashboardV2() {
     const quotesSentValue = sentQuotes.reduce((s, q) => s + (Number(q.total_amount) || 0), 0)
     const todoCount  = followups.length
 
-    // Outstanding — uncollected balance across MY won quotes. Query by
-    // quote_id (not recorded_by) so admin-recorded payments still
-    // reduce the outstanding number. See desktop sibling for the same
-    // pattern. is_final_payment excludes quotes the rep/admin has
-    // explicitly closed out.
-    const myWonIds = quotes.filter(q => q.status === 'won').map(q => q.id)
-    let wonPayments = []
-    if (myWonIds.length) {
-      const { data: wp } = await supabase
+    // Outstanding — mirror admin dashboard + QuotesV2 computeBalance so
+    // the rep KPI matches the Outstanding column on the Quotes list.
+    //
+    // A quote is "committed" (counts toward outstanding) if status === 'won'
+    // OR it has any approved payment recorded. Sent/negotiating quotes with
+    // a part-payment still count. Lost quotes never count. Balance clamped
+    // at 0. Query by quote_id (not recorded_by) so admin-recorded payments
+    // still reduce the balance.
+    const myQuoteIds = quotes.filter(q => q.status !== 'lost').map(q => q.id)
+    let approvedPayments = []
+    if (myQuoteIds.length) {
+      const { data: ap } = await supabase
         .from('payments')
         .select('quote_id, amount_received, is_final_payment')
         .eq('approval_status', 'approved')
-        .in('quote_id', myWonIds)
-      wonPayments = wp || []
+        .in('quote_id', myQuoteIds)
+      approvedPayments = ap || []
     }
     const paidMap = {}
-    for (const p of wonPayments) {
+    for (const p of approvedPayments) {
       if (!paidMap[p.quote_id]) paidMap[p.quote_id] = { paid: 0, final: false }
       paidMap[p.quote_id].paid += Number(p.amount_received) || 0
       if (p.is_final_payment) paidMap[p.quote_id].final = true
     }
     const outstandingRows = quotes
-      .filter(q => q.status === 'won')
+      .filter(q => q.status !== 'lost')
       .map(q => {
         const paid    = paidMap[q.id]?.paid  || 0
         const isFinal = paidMap[q.id]?.final || false
-        const balance = (Number(q.total_amount) || 0) - paid
-        return { balance, isFinal }
+        const committed = q.status === 'won' || paid > 0
+        const balance = Math.max(0, (Number(q.total_amount) || 0) - paid)
+        return { balance, isFinal, committed }
       })
-      .filter(r => !r.isFinal && r.balance > 0)
+      .filter(r => r.committed && !r.isFinal && r.balance > 0)
     const outstandingTotal = outstandingRows.reduce((s, r) => s + r.balance, 0)
     const outstandingCount = outstandingRows.length
 

@@ -160,40 +160,44 @@ export default function SalesDashboardDesktop() {
     const pendingPayments = payments.filter(p => p.approval_status === 'pending')
     const pendingTotal    = pendingPayments.reduce((s, p) => s + (Number(p.amount_received) || 0), 0)
 
-    // Outstanding = won quotes' total_amount minus approved payments against
-    // them, excluding quotes flagged is_final_payment (rep/admin marked
-    // "balance settled / no more expected").
+    // Outstanding — mirror the admin dashboard + QuotesV2 computeBalance
+    // exactly so the rep's KPI matches what they see in the Quotes list.
+    //
+    // Rule: a quote is "committed" (and therefore counts toward outstanding)
+    // if status === 'won' OR it has any approved payment recorded. Sent or
+    // negotiating quotes with a part-payment taken count. Lost quotes never
+    // count. Balance is clamped at 0 so over-payments don't go negative.
     //
     // IMPORTANT: we query payments BY QUOTE_ID here, not by recorded_by —
-    // admin can record payments against a rep's won quote too, and those
-    // still reduce the balance. Using the `payments` slice from load()
-    // above would undercount paid (it's .eq('recorded_by', uid)) and
-    // inflate outstanding. Extra round-trip worth the accuracy.
-    const myWonIds = quotes.filter(q => q.status === 'won').map(q => q.id)
-    let wonPayments = []
-    if (myWonIds.length) {
-      const { data: wp } = await supabase
+    // admin can record payments against a rep's quote too, and those still
+    // reduce the balance. Using the `payments` slice from load() above
+    // would undercount (it's .eq('recorded_by', uid)) and inflate outstanding.
+    const myQuoteIds = quotes.filter(q => q.status !== 'lost').map(q => q.id)
+    let approvedPayments = []
+    if (myQuoteIds.length) {
+      const { data: ap } = await supabase
         .from('payments')
         .select('quote_id, amount_received, is_final_payment')
         .eq('approval_status', 'approved')
-        .in('quote_id', myWonIds)
-      wonPayments = wp || []
+        .in('quote_id', myQuoteIds)
+      approvedPayments = ap || []
     }
     const paidMap = {}
-    for (const p of wonPayments) {
+    for (const p of approvedPayments) {
       if (!paidMap[p.quote_id]) paidMap[p.quote_id] = { paid: 0, final: false }
       paidMap[p.quote_id].paid += Number(p.amount_received) || 0
       if (p.is_final_payment) paidMap[p.quote_id].final = true
     }
     const outstandingRows = quotes
-      .filter(q => q.status === 'won')
+      .filter(q => q.status !== 'lost')
       .map(q => {
         const paid    = paidMap[q.id]?.paid  || 0
         const isFinal = paidMap[q.id]?.final || false
-        const balance = (Number(q.total_amount) || 0) - paid
-        return { balance, isFinal }
+        const committed = q.status === 'won' || paid > 0
+        const balance = Math.max(0, (Number(q.total_amount) || 0) - paid)
+        return { balance, isFinal, committed }
       })
-      .filter(r => !r.isFinal && r.balance > 0)
+      .filter(r => r.committed && !r.isFinal && r.balance > 0)
     const outstandingTotal = outstandingRows.reduce((s, r) => s + r.balance, 0)
     const outstandingCount = outstandingRows.length
 
