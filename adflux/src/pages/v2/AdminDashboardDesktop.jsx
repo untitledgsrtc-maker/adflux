@@ -18,6 +18,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, BarChart3, Users, Building2,
   Repeat, Gift, Settings, LogOut, Search, Bell, Plus, AlertTriangle,
   CheckCircle2, CreditCard, Send, PenLine, ArrowUpRight,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -50,29 +51,55 @@ function daysBetween(a, b) {
   return Math.max(0, Math.round((new Date(a) - new Date(b)) / MS))
 }
 
+/* Period helpers — centralized so admin and sales dashboards can share the
+   same "YYYY-MM" convention and move in sync. We never advance past the
+   current month because there's no data in the future. */
+function shiftPeriod(periodKey, delta) {
+  const [y, m] = periodKey.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+function formatPeriod(periodKey) {
+  const [y, m] = periodKey.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+}
+function isFuturePeriod(periodKey) {
+  return periodKey >= thisMonthISO() // string compare is safe for YYYY-MM
+}
+
 export default function AdminDashboardDesktop() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   const [state, setState] = useState({ loading: true })
+  // Period (YYYY-MM) drives every month-bucketed query below. Defaults to
+  // the current month; the header arrow buttons shift it back/forward so
+  // Admin can audit historical months without touching the DB.
+  const [period, setPeriod] = useState(() => thisMonthISO())
 
   useEffect(() => {
-    load()
+    load(period)
     // Realtime — one channel, covers everything that moves numbers.
+    // Re-use the current `period` from closure when a realtime event fires.
     const ch = supabase
       .channel('v2d-admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => load(period))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => load(period))
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  /* eslint-disable-next-line */ }, [])
+  /* eslint-disable-next-line */ }, [period])
 
-  async function load() {
+  async function load(periodKey) {
     const today = todayISO()
-    const monthKey = thisMonthISO()
-    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+    const monthKey = periodKey || thisMonthISO()
+    // Derive month window from the selected period, not "now".
+    const [yy, mm] = monthKey.split('-').map(Number)
+    const monthStart = new Date(yy, mm - 1, 1)
+    monthStart.setHours(0, 0, 0, 0)
     const monthStartIso = monthStart.toISOString().slice(0, 10)
+    const monthEndExclusive = new Date(yy, mm, 1) // first of the NEXT month
+    const monthEndIso = monthEndExclusive.toISOString().slice(0, 10)
 
     const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, msdThisRes, settingsRes] = await Promise.all([
       supabase.from('quotes')
@@ -103,9 +130,13 @@ export default function AdminDashboardDesktop() {
     const msdThis      = msdThisRes.data      || []
     const settings     = settingsRes.data     || {}
 
-    // Revenue (this month) = approved payments with payment_date in month
+    // Revenue for the selected month = approved payments whose payment_date
+    // falls inside [monthStart, monthEnd). The upper bound matters when
+    // viewing a past month — without it, later months' payments would leak
+    // into the total.
     const revenue = paymentsApr
-      .filter(p => (p.payment_date || '') >= monthStartIso)
+      .filter(p => (p.payment_date || '') >= monthStartIso
+                && (p.payment_date || '') <  monthEndIso)
       .reduce((s, p) => s + (p.amount_received || 0), 0)
 
     // Active quotes = not lost
@@ -317,8 +348,28 @@ export default function AdminDashboardDesktop() {
               <Search size={14} />
               <input placeholder="Search quotes, clients…" onFocus={() => navigate('/quotes')} readOnly />
             </div>
-            <div className="v2d-period">
-              <button className="is-active">{new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</button>
+            {/* Period switcher — prev / label / next. Arrows shift the
+                `period` state, which re-fires load() via the useEffect dep.
+                Next arrow is disabled at the current month. */}
+            <div className="v2d-period" role="group" aria-label="Month">
+              <button
+                onClick={() => setPeriod(p => shiftPeriod(p, -1))}
+                aria-label="Previous month"
+                title="Previous month"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button className="is-active" title="Selected month">
+                {formatPeriod(period)}
+              </button>
+              <button
+                onClick={() => setPeriod(p => shiftPeriod(p, +1))}
+                disabled={isFuturePeriod(shiftPeriod(period, +1))}
+                aria-label="Next month"
+                title={isFuturePeriod(shiftPeriod(period, +1)) ? 'Already at current month' : 'Next month'}
+              >
+                <ChevronRight size={14} />
+              </button>
             </div>
             <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
               <Plus size={14} strokeWidth={2.6} /> Create Quote
@@ -337,26 +388,64 @@ export default function AdminDashboardDesktop() {
           </header>
 
           <div className="v2d-content">
-            {/* Action queue hero */}
+            {/* Action Queue — demoted from hero to an inline notification.
+                Only renders when there's actually something pending. When
+                the queue is empty the banner disappears entirely; admins
+                don't need a "well done, inbox zero" pat on the back on
+                every page load. */}
+            {state.pending.length > 0 && (
+              <section
+                className="v2d-banner"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px',
+                  background: 'rgba(249, 115, 22, 0.08)',
+                  border: '1px solid rgba(249, 115, 22, 0.25)',
+                  borderRadius: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <AlertTriangle size={18} style={{ color: '#f97316', flex: '0 0 auto' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>
+                    ⚡ {state.pending.length} payment{state.pending.length > 1 ? 's' : ''} waiting on approval
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.6))' }}>
+                    Approve to credit the sales team.
+                  </div>
+                </div>
+                <button
+                  className="v2d-banner-cta"
+                  onClick={() => navigate('/pending-approvals')}
+                  style={{ flex: '0 0 auto' }}
+                >
+                  Open queue
+                </button>
+              </section>
+            )}
+
+            {/* Revenue hero — this is the number that actually matters
+                every morning, so it gets the gradient slot. Incentive
+                liability sits alongside because it's the natural
+                counter-weight: every rupee of revenue increases what we
+                owe the sales team. */}
             <section className="v2d-hero v2d-hero--action">
               <div className="v2d-hero-head">
-                <div className="v2d-hero-kicker">⚡ Action Queue</div>
-                <button className="v2d-banner-cta" onClick={() => navigate('/pending-approvals')}>
-                  Open queue
+                <div className="v2d-hero-kicker">₹ Revenue · {formatPeriod(period)}</div>
+                <button className="v2d-banner-cta" onClick={() => navigate('/quotes')}>
+                  View quotes
                 </button>
               </div>
               <div className="v2d-hero-grid">
                 <div>
-                  <div className="v2d-hero-big">{state.pending.length}</div>
+                  <div className="v2d-hero-big"><Money value={state.kpi.revenue} /></div>
                   <div className="v2d-hero-sub">
-                    {state.pending.length === 0
-                      ? 'All payments cleared. Inbox zero — nice work.'
-                      : `${state.pending.length} payment${state.pending.length > 1 ? 's' : ''} waiting on you. Approve to credit sales.`}
+                    Approved payments collected this period.
                   </div>
                 </div>
                 <div className="v2d-hero-stat">
-                  <div className="v2d-hero-stat-l">Revenue · MTD</div>
-                  <div className="v2d-hero-stat-v"><Money value={state.kpi.revenue} /></div>
+                  <div className="v2d-hero-stat-l">Pipeline value</div>
+                  <div className="v2d-hero-stat-v"><Money value={state.kpi.pipelineValue} /></div>
                 </div>
                 <div className="v2d-hero-stat">
                   <div className="v2d-hero-stat-l">Incentive liability</div>

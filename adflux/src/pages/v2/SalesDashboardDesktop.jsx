@@ -14,6 +14,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, BarChart3, Gift, Repeat, LogOut,
   Search, Bell, Plus, Flame, ArrowUpRight, Phone, AlertTriangle,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -39,6 +40,21 @@ function greeting() {
   return 'Good evening'
 }
 
+/* Period helpers — mirror the admin dashboard so both feel identical.
+   "YYYY-MM" strings sort and compare correctly with lexicographic ops. */
+function shiftPeriod(periodKey, delta) {
+  const [y, m] = periodKey.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+function formatPeriod(periodKey) {
+  const [y, m] = periodKey.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+}
+function isFuturePeriod(periodKey) {
+  return periodKey >= thisMonthISO()
+}
+
 export default function SalesDashboardDesktop() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
@@ -48,12 +64,15 @@ export default function SalesDashboardDesktop() {
   // Default to Forecast — the forward-looking "if everything closes" number
   // is the one reps act on every morning. Mirrors the mobile dashboard.
   const [tab, setTab] = useState('forecast')
+  // Period drives every month-bucketed query. Arrows in the topbar shift
+  // it; the effect below re-fires load() on change.
+  const [period, setPeriod] = useState(() => thisMonthISO())
 
-  useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
+  useEffect(() => { if (profile?.id) load(period) /* eslint-disable-next-line */ }, [profile?.id, period])
 
-  async function load() {
+  async function load(periodKey) {
     const uid = profile.id
-    const monthKey = thisMonthISO()
+    const monthKey = periodKey || thisMonthISO()
 
     const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes, usersRes] = await Promise.all([
       supabase.from('quotes')
@@ -249,8 +268,27 @@ export default function SalesDashboardDesktop() {
               <Search size={14} />
               <input placeholder="Search quotes, clients…" onFocus={() => navigate('/quotes')} readOnly />
             </div>
-            <div className="v2d-period">
-              <button className="is-active">{new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</button>
+            {/* Period switcher — prev / label / next. Arrow shifts the
+                `period` state which re-runs load() via the useEffect dep. */}
+            <div className="v2d-period" role="group" aria-label="Month">
+              <button
+                onClick={() => setPeriod(p => shiftPeriod(p, -1))}
+                aria-label="Previous month"
+                title="Previous month"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button className="is-active" title="Selected month">
+                {formatPeriod(period)}
+              </button>
+              <button
+                onClick={() => setPeriod(p => shiftPeriod(p, +1))}
+                disabled={isFuturePeriod(shiftPeriod(period, +1))}
+                aria-label="Next month"
+                title={isFuturePeriod(shiftPeriod(period, +1)) ? 'Already at current month' : 'Next month'}
+              >
+                <ChevronRight size={14} />
+              </button>
             </div>
             <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
               <Plus size={14} strokeWidth={2.6} /> Create Quote
