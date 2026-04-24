@@ -14,7 +14,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, BarChart3, Gift, Repeat, LogOut,
   Search, Bell, Plus, Flame, ArrowUpRight, Phone, AlertTriangle,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Contact2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -222,6 +222,9 @@ export default function SalesDashboardDesktop() {
             </button>
             <button onClick={() => navigate('/quotes')}>
               <FileText size={16} /><span>Quotes</span>
+            </button>
+            <button onClick={() => navigate('/clients')}>
+              <Contact2 size={16} /><span>Clients</span>
             </button>
             <button onClick={() => navigate('/my-performance')}>
               <BarChart3 size={16} /><span>My Performance</span>

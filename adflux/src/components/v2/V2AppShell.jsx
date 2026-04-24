@@ -30,7 +30,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
-  TrendingUp, UserCircle2,
+  TrendingUp, UserCircle2, Contact2,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -41,6 +41,7 @@ import '../../styles/v2.css'
 const ADMIN_NAV = [
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/pending-approvals', label: 'Approvals',      icon: CheckSquare },
   { to: '/cities',            label: 'Cities',         icon: Building2 },
   { to: '/team',              label: 'Team',           icon: Users },
@@ -52,6 +53,7 @@ const ADMIN_NAV = [
 const SALES_NAV = [
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },

@@ -28,12 +28,19 @@ const EMPTY_QUOTE = {
   status: 'draft',
 }
 
-export function WizardShell({ renewalOf = null, editOf = null }) {
+export function WizardShell({ renewalOf = null, editOf = null, prefill = null }) {
   const navigate = useNavigate()
   const { createQuote, updateQuote } = useQuotes()
 
   const [step, setStep] = useState(1)
-  const [quoteData, setQuoteData] = useState(EMPTY_QUOTE)
+  // Seed quoteData with the optional `prefill` payload. This lets the
+  // Clients page open the wizard with Step1 already populated. We keep
+  // it separate from renewalOf/editOf because those trigger an async
+  // fetch — prefill is synchronous so the form renders populated on
+  // first paint, no flicker.
+  const [quoteData, setQuoteData] = useState(() => (
+    prefill ? { ...EMPTY_QUOTE, ...prefill } : EMPTY_QUOTE
+  ))
   const [selectedCities, setSelectedCities] = useState([]) // [{city, screens, duration_months, listed_rate, offered_rate}]
   // GST rate on this quote. 0.18 = 18%, 0 = No GST. Persists on the
   // quotes row so the same quote always taxes the same way no matter

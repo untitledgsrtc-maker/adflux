@@ -20,6 +20,7 @@ import IncentivesV2       from './pages/v2/IncentivesV2'
 import RenewalToolsV2     from './pages/v2/RenewalToolsV2'
 import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
 import HRV2               from './pages/v2/HRV2'
+import ClientsV2          from './pages/v2/ClientsV2'
 
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
@@ -70,6 +71,9 @@ export default function App() {
           <Route path="/quotes/:id"        element={<QuoteDetail />} />
           <Route path="/quotes/new"        element={<CreateQuoteV2 />} />
           <Route path="/renewal-tools"     element={<RenewalToolsV2 />} />
+          {/* Clients is visible to both roles; RLS on the clients table
+              scopes rows so sales sees own, admin sees all. */}
+          <Route path="/clients"           element={<ClientsV2 />} />
 
           {/* Sales-only */}
           <Route path="/my-performance"    element={<MyPerformanceV2 />} />

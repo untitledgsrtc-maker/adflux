@@ -18,7 +18,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, BarChart3, Users, Building2,
   Repeat, Gift, Settings, LogOut, Search, Bell, Plus, AlertTriangle,
   CheckCircle2, CreditCard, Send, PenLine, ArrowUpRight,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Contact2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -100,7 +100,7 @@ export default function AdminDashboardDesktop() {
     const monthEndExclusive = new Date(yy, mm, 1) // first of the NEXT month
     const monthEndIso = monthEndExclusive.toISOString().slice(0, 10)
 
-    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, msdThisRes, settingsRes] = await Promise.all([
+    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes] = await Promise.all([
       supabase.from('quotes')
         .select('id, quote_number, client_name, client_company, status, total_amount, subtotal, revenue_type, created_by, sales_person_name, created_at, updated_at, campaign_start_date, campaign_end_date'),
       supabase.from('payments')
@@ -116,7 +116,10 @@ export default function AdminDashboardDesktop() {
         .order('created_at', { ascending: false }),
       supabase.from('staff_incentive_profiles').select('*, users(name)').eq('is_active', true),
       supabase.from('monthly_sales_data').select('staff_id, month_year, new_client_revenue, renewal_revenue'),
-      supabase.from('monthly_sales_data').select('staff_id, new_client_revenue, renewal_revenue, users(name)').eq('month_year', monthKey),
+      // Everyone with role='sales' — used for the leaderboard so reps with
+      // zero wins still show up (and to resolve names without relying on
+      // the denormalized sales_person_name column).
+      supabase.from('users').select('id, name, role').eq('role', 'sales'),
       supabase.from('incentive_settings').select('*').maybeSingle(),
     ])
 
@@ -126,7 +129,7 @@ export default function AdminDashboardDesktop() {
     const pending      = pendingPayRes.data   || []
     const profiles     = profilesRes.data     || []
     const msd          = msdRes.data          || []
-    const msdThis      = msdThisRes.data      || []
+    const salesUsers   = usersRes.data        || []
     const settings     = settingsRes.data     || {}
 
     // Revenue for the selected month = approved payments whose payment_date
@@ -167,16 +170,25 @@ export default function AdminDashboardDesktop() {
     })
     const funnelMax = Math.max(1, ...stages.map(r => r.count))
 
-    // Top performers this month
-    const performers = msdThis
-      .map(r => ({
-        id: r.staff_id,
-        name: r.users?.name || 'Unknown',
-        revenue: (r.new_client_revenue || 0) + (r.renewal_revenue || 0),
-      }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5)
-    const perfMax = Math.max(1, ...performers.map(p => p.revenue))
+    // Team leaderboard — won-quote total_amount per sales user for the
+    // selected period. Pulled directly from quotes (source of truth)
+    // instead of monthly_sales_data, so it's never blank just because
+    // the incentive aggregate hasn't been populated for a month.
+    //
+    // "Won this month" = status='won' AND updated_at inside the window.
+    // updated_at is set when a quote transitions to won (updateQuoteStatus
+    // writes the whole row). created_at would miss renewals closed later.
+    const wonByUser = {}
+    quotes.forEach(q => {
+      if (q.status !== 'won') return
+      const ts = q.updated_at || q.created_at || ''
+      if (ts < monthStartIso || ts >= monthEndIso) return
+      wonByUser[q.created_by] = (wonByUser[q.created_by] || 0) + (q.total_amount || 0)
+    })
+    const leaderboard = salesUsers
+      .map(u => ({ id: u.id, name: u.name, won: wonByUser[u.id] || 0 }))
+      .sort((a, b) => b.won - a.won)
+    const lbMax = Math.max(1, ...leaderboard.map(p => p.won))
 
     // Incentive liability
     let liability = 0
@@ -263,7 +275,7 @@ export default function AdminDashboardDesktop() {
       loading: false,
       kpi: { revenue, activeQuotes, pipelineValue, outstanding, pending: pending.length, liability },
       funnel: { stages, max: funnelMax },
-      performers, perfMax,
+      leaderboard, lbMax,
       liability: { total: liability, above: aboveTarget, staff: profiles.length },
       outstandingList, activeCampaigns, activity, trendMonths, trendMax,
       pending,
@@ -300,6 +312,9 @@ export default function AdminDashboardDesktop() {
             </button>
             <button onClick={() => navigate('/quotes')}>
               <FileText size={16} /><span>Quotes</span>
+            </button>
+            <button onClick={() => navigate('/clients')}>
+              <Contact2 size={16} /><span>Clients</span>
             </button>
             <button onClick={() => navigate('/pending-approvals')}>
               <CheckSquare size={16} /><span>Approvals</span>
@@ -484,9 +499,12 @@ export default function AdminDashboardDesktop() {
               />
             </section>
 
-            {/* Row 4: Top performers + Incentive liability breakdown */}
+            {/* Row 4: Team leaderboard + Incentive liability breakdown.
+                Leaderboard is quote-based (source of truth); liability is
+                incentive-profile-based. Two different questions, two
+                different data sources. */}
             <section className="v2d-grid-2">
-              <TopPerformersPanel rows={state.performers} max={state.perfMax} />
+              <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
               <LiabilityPanel data={state.liability} />
             </section>
 
@@ -676,29 +694,39 @@ function OutstandingPanel({ rows, onOpen }) {
   )
 }
 
-function TopPerformersPanel({ rows, max }) {
+/* Team leaderboard — admin flavour.
+   Shows all sales reps ranked by won-quote revenue for the selected
+   period. Unlike the sales-side leaderboard there's no "me" highlighting
+   because admin isn't a rep. Reps with zero wins still render so admin
+   can see who hasn't closed anything this month. Shows top 8 — long
+   tail gets collapsed. */
+function LeaderboardPanel({ rows, max, period }) {
   const medals = ['🥇', '🥈', '🥉']
+  const top = rows.slice(0, 8)
+  const label = period
+    ? new Date(`${period}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+    : new Date().toLocaleDateString('en-IN', { month: 'short' })
   return (
     <div className="v2d-panel">
       <div className="v2d-panel-h">
         <div>
-          <div className="v2d-panel-t">Top performers · {new Date().toLocaleDateString('en-IN', { month: 'short' })}</div>
-          <div className="v2d-panel-s">Combined new + renewal revenue this month</div>
+          <div className="v2d-panel-t">Team leaderboard · {label}</div>
+          <div className="v2d-panel-s">Won-quote revenue per rep this period</div>
         </div>
       </div>
-      {rows.length === 0 ? (
-        <div className="v2d-q-empty">No data for this month yet.</div>
+      {top.length === 0 ? (
+        <div className="v2d-q-empty">No sales reps on the team yet.</div>
       ) : (
         <div className="v2d-lb">
-          {rows.map((r, i) => {
-            const pct = Math.round((r.revenue / max) * 100)
+          {top.map((r, i) => {
+            const pct = max > 0 ? Math.round((r.won / max) * 100) : 0
             const rankCls = i === 0 ? 'v2d-lb-rank-1' : i === 1 ? 'v2d-lb-rank-2' : i === 2 ? 'v2d-lb-rank-3' : 'v2d-lb-rank-n'
             return (
               <div key={r.id} className="v2d-lb-row">
                 <div className={`v2d-lb-rank ${rankCls}`}>{medals[i] || i + 1}</div>
                 <div className="v2d-lb-avatar">{initials(r.name)}</div>
                 <div className="v2d-lb-name">{r.name}</div>
-                <div className="v2d-lb-val"><Money value={r.revenue} /></div>
+                <div className="v2d-lb-val"><Money value={r.won} /></div>
                 <div className="v2d-lb-pct">{pct}%</div>
               </div>
             )
