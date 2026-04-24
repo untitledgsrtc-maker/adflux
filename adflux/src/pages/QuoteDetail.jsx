@@ -458,6 +458,8 @@ export default function QuoteDetail() {
                       <th>Grade</th>
                       <th style={{ textAlign: 'center' }}>Screens</th>
                       <th style={{ textAlign: 'center' }}>Duration</th>
+                      <th style={{ textAlign: 'center' }}>Slot</th>
+                      <th style={{ textAlign: 'center' }}>Slots/day</th>
                       <th style={{ textAlign: 'right' }}>Listed</th>
                       <th style={{ textAlign: 'right' }}>Offered</th>
                       <th style={{ textAlign: 'right' }}>Total</th>
@@ -474,6 +476,21 @@ export default function QuoteDetail() {
                         </td>
                         <td style={{ textAlign: 'center' }}>{c.screens}</td>
                         <td style={{ textAlign: 'center' }}>{c.duration_months}mo</td>
+                        {/* Slot metadata — pre-migration rows lack these
+                            columns, so we fall back to the historical
+                            defaults (10s, 100/day) rather than showing —. */}
+                        <td style={{ textAlign: 'center' }}>{c.slot_seconds ?? 10}s</td>
+                        <td style={{ textAlign: 'center' }}>
+                          {c.slots_per_day ?? 100}
+                          {c.slots_override_reason && (
+                            <span
+                              title={c.slots_override_reason}
+                              style={{ marginLeft: 4, color: '#ffb74d', fontSize: '.7rem' }}
+                            >
+                              *
+                            </span>
+                          )}
+                        </td>
                         <td style={{ textAlign: 'right', color: 'var(--gray)', textDecoration: 'line-through', fontSize: '.78rem' }}>
                           {formatCurrency(c.listed_rate)}
                         </td>

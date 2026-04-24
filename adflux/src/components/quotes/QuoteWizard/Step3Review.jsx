@@ -59,28 +59,35 @@ export function Step3Review({
         <div className="review-section">
           <p className="review-section-title">Campaign Locations</p>
           <div className="review-cities">
-            {selectedCities.map(sc => (
-              <div key={sc.city.id} className="review-city-row">
-                <div className="review-city-info">
-                  <Monitor size={13} />
-                  <div>
-                    <p className="review-city-name">{sc.city.name}</p>
-                    <p className="review-city-meta">
-                      {sc.screens} screen{sc.screens !== 1 ? 's' : ''} · {sc.duration_months} month{sc.duration_months !== 1 ? 's' : ''}
+            {selectedCities.map(sc => {
+              // Slot fields are metadata — shown here so the rep and
+              // admin can both see what was promised, but they never
+              // affect campaign_total (see Step2Campaign.calcTotal).
+              const slotSec = sc.slot_seconds ?? 10
+              const slotsDay = sc.slots_per_day ?? 100
+              return (
+                <div key={sc.city.id} className="review-city-row">
+                  <div className="review-city-info">
+                    <Monitor size={13} />
+                    <div>
+                      <p className="review-city-name">{sc.city.name}</p>
+                      <p className="review-city-meta">
+                        {sc.screens} screen{sc.screens !== 1 ? 's' : ''} · {sc.duration_months} month{sc.duration_months !== 1 ? 's' : ''} · {slotSec}s · {slotsDay} slots/day
+                      </p>
+                    </div>
+                  </div>
+                  <div className="review-city-rates">
+                    <p className="review-listed">
+                      Listed: {formatCurrency(sc.listed_rate)}/mo
                     </p>
+                    <p className="review-offered">
+                      Offered: {formatCurrency(sc.offered_rate)}/mo
+                    </p>
+                    <p className="review-total">{formatCurrency(sc.campaign_total)}</p>
                   </div>
                 </div>
-                <div className="review-city-rates">
-                  <p className="review-listed">
-                    Listed: {formatCurrency(sc.listed_rate)}/mo
-                  </p>
-                  <p className="review-offered">
-                    Offered: {formatCurrency(sc.offered_rate)}/mo
-                  </p>
-                  <p className="review-total">{formatCurrency(sc.campaign_total)}</p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 

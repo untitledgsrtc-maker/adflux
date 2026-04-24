@@ -111,7 +111,11 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
           setGstRate(Number(baseQuote.gst_rate))
         }
 
-        // Pre-fill cities (both flows)
+        // Pre-fill cities (both flows).
+        // Fallbacks on slot_seconds / slots_per_day handle pre-migration
+        // rows where the columns are NULL — we treat those as the old
+        // implicit defaults (10s, 100 slots/day) rather than 0, so an
+        // old quote loads with the same meaning it was written with.
         const cities = baseQuote.quote_cities?.map(qc => ({
           city: {
             id: qc.city_id,
@@ -126,6 +130,9 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
           listed_rate: qc.listed_rate,
           offered_rate: qc.offered_rate,
           override_reason: qc.override_reason || '',
+          slot_seconds: qc.slot_seconds ?? 10,
+          slots_per_day: qc.slots_per_day ?? 100,
+          slots_override_reason: qc.slots_override_reason || '',
           campaign_total: qc.campaign_total,
         })) || []
         setSelectedCities(cities)
@@ -188,6 +195,12 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
       override_reason: c.override_reason || null,
       campaign_total: c.campaign_total,
       duration_months: c.duration_months,
+      // Slot metadata. Never null — falling back to the pre-migration
+      // defaults (10s, 100/day) keeps rows self-describing even if a
+      // caller forgets to set them.
+      slot_seconds: Number(c.slot_seconds) || 10,
+      slots_per_day: Number(c.slots_per_day) || 100,
+      slots_override_reason: c.slots_override_reason || null,
     }))
 
     if (isEdit) {

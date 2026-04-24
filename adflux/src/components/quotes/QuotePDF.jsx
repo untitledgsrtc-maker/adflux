@@ -364,12 +364,37 @@ const NETWORK = {
 function totalScreens(cities) {
   return cities.reduce((s, c) => s + (Number(c.screens) || 0), 0)
 }
-// Spots per month for a city = screens × 3000 (100 spots/day × 30 days).
-function spotsPerMonth(screens) {
-  return (Number(screens) || 0) * 3000
+// Spots per month for a city = screens × slots_per_day × 30.
+// Pre-migration rows (and the hardcoded reference assumption) treated
+// slots_per_day as a fixed 100, which is why the old formula baked in
+// × 3000. Now we respect the saved slots_per_day per row and fall back
+// to 100 only when the column is NULL/absent.
+function spotsPerMonth(city) {
+  const screens = Number(city?.screens) || 0
+  const slotsPerDay = Number(city?.slots_per_day) || 100
+  return screens * slotsPerDay * 30
 }
 function totalSpotsPerMonth(cities) {
-  return cities.reduce((s, c) => s + spotsPerMonth(c.screens), 0)
+  return cities.reduce((s, c) => s + spotsPerMonth(c), 0)
+}
+
+// Pick a single representative slot length for the quote-level glance
+// card. If every city in the quote uses the same slot length, show
+// that. If they mix (rare), show the most-screen-weighted length so
+// the headline number reflects the campaign's dominant format.
+function quoteSlotSeconds(cities) {
+  if (!cities?.length) return 10
+  const byScreens = new Map()
+  for (const c of cities) {
+    const sec = Number(c.slot_seconds) || 10
+    const weight = Number(c.screens) || 1
+    byScreens.set(sec, (byScreens.get(sec) || 0) + weight)
+  }
+  let bestSec = 10, bestWeight = -1
+  for (const [sec, weight] of byScreens) {
+    if (weight > bestWeight) { bestSec = sec; bestWeight = weight }
+  }
+  return bestSec
 }
 // Quote-wide total monthly impressions. Reference data implies ~5200
 // impressions/screen/month (13.7L / 264 ≈ 5200). Keeps the "glance"
@@ -403,6 +428,7 @@ function QuoteDocument({ quote, cities }) {
   const screens     = totalScreens(cities)
   const spotsMonth  = totalSpotsPerMonth(cities)
   const impressions = totalImpressions(cities)
+  const slotSec     = quoteSlotSeconds(cities)
 
   // Dynamic GST text — pull from the quote so "No GST" (rate=0) quotes
   // don't ship a PDF claiming GST was charged. Null/missing rate falls
@@ -517,7 +543,10 @@ function QuoteDocument({ quote, cities }) {
               <Text style={S.glanceLabel}>Spots / Month</Text>
             </View>
             <View style={S.glanceItem}>
-              <Text style={S.glanceNum}>10 SEC</Text>
+              {/* Spot Duration now reflects what the rep actually
+                  negotiated (slot_seconds on the cities). Falls back
+                  to 10s for pre-migration quotes with no slot data. */}
+              <Text style={S.glanceNum}>{slotSec} SEC</Text>
               <Text style={S.glanceLabel}>Spot Duration</Text>
             </View>
             <View style={[S.glanceItem, { borderRight: 'none' }]}>
