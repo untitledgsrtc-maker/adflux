@@ -149,6 +149,17 @@ export default function AdminDashboardDesktop() {
       .filter(q => ['sent', 'negotiating'].includes(q.status))
       .reduce((s, q) => s + (q.total_amount || 0), 0)
 
+    // Lost revenue — quote value we *failed* to close in the selected
+    // period. Uses updated_at to bucket by the month the quote moved to
+    // 'lost', falling back to created_at. This mirrors the leaderboard's
+    // period logic so a quote lost in Mar doesn't bleed into Apr's number.
+    const lostRevenue = quotes.reduce((sum, q) => {
+      if (q.status !== 'lost') return sum
+      const ts = q.updated_at || q.created_at || ''
+      if (ts < monthStartIso || ts >= monthEndIso) return sum
+      return sum + (q.total_amount || 0)
+    }, 0)
+
     // Outstanding — same per-quote clamp logic as legacy RevenueSummary
     const outstanding = quotes.reduce((sum, q) => {
       if (q.status === 'lost') return sum
@@ -273,7 +284,7 @@ export default function AdminDashboardDesktop() {
 
     setState({
       loading: false,
-      kpi: { revenue, activeQuotes, pipelineValue, outstanding, pending: pending.length, liability },
+      kpi: { revenue, activeQuotes, pipelineValue, outstanding, pending: pending.length, liability, lostRevenue },
       funnel: { stages, max: funnelMax },
       leaderboard, lbMax,
       liability: { total: liability, above: aboveTarget, staff: profiles.length },
@@ -450,20 +461,45 @@ export default function AdminDashboardDesktop() {
                   View quotes
                 </button>
               </div>
-              <div className="v2d-hero-grid">
+              {/* All four stats use the same number font-size (32px) so the
+                  card reads as a uniform stat strip rather than a headline +
+                  supporting numbers. The revenue cell keeps its description
+                  below to mark it as the primary metric. Inline styles used
+                  intentionally — v2d-hero-big / v2d-hero-stat-v are shared
+                  across other heroes (Sales dashboard) and shouldn't shift. */}
+              <div
+                className="v2d-hero-grid"
+                style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+              >
                 <div>
-                  <div className="v2d-hero-big"><Money value={state.kpi.revenue} /></div>
-                  <div className="v2d-hero-sub">
+                  <div className="v2d-hero-stat-l">Revenue</div>
+                  <div
+                    className="v2d-hero-big"
+                    style={{ fontSize: 32, marginBottom: 6 }}
+                  >
+                    <Money value={state.kpi.revenue} />
+                  </div>
+                  <div className="v2d-hero-sub" style={{ maxWidth: 'none' }}>
                     Approved payments collected this period.
                   </div>
                 </div>
                 <div className="v2d-hero-stat">
                   <div className="v2d-hero-stat-l">Pipeline value</div>
-                  <div className="v2d-hero-stat-v"><Money value={state.kpi.pipelineValue} /></div>
+                  <div className="v2d-hero-stat-v" style={{ fontSize: 32 }}>
+                    <Money value={state.kpi.pipelineValue} />
+                  </div>
                 </div>
                 <div className="v2d-hero-stat">
                   <div className="v2d-hero-stat-l">Incentive liability</div>
-                  <div className="v2d-hero-stat-v"><Money value={state.kpi.liability} /></div>
+                  <div className="v2d-hero-stat-v" style={{ fontSize: 32 }}>
+                    <Money value={state.kpi.liability} />
+                  </div>
+                </div>
+                <div className="v2d-hero-stat">
+                  <div className="v2d-hero-stat-l">Lost revenue</div>
+                  <div className="v2d-hero-stat-v" style={{ fontSize: 32 }}>
+                    <Money value={state.kpi.lostRevenue} />
+                  </div>
                 </div>
               </div>
             </section>
