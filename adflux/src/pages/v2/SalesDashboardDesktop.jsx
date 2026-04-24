@@ -160,6 +160,43 @@ export default function SalesDashboardDesktop() {
     const pendingPayments = payments.filter(p => p.approval_status === 'pending')
     const pendingTotal    = pendingPayments.reduce((s, p) => s + (Number(p.amount_received) || 0), 0)
 
+    // Outstanding = won quotes' total_amount minus approved payments against
+    // them, excluding quotes flagged is_final_payment (rep/admin marked
+    // "balance settled / no more expected").
+    //
+    // IMPORTANT: we query payments BY QUOTE_ID here, not by recorded_by —
+    // admin can record payments against a rep's won quote too, and those
+    // still reduce the balance. Using the `payments` slice from load()
+    // above would undercount paid (it's .eq('recorded_by', uid)) and
+    // inflate outstanding. Extra round-trip worth the accuracy.
+    const myWonIds = quotes.filter(q => q.status === 'won').map(q => q.id)
+    let wonPayments = []
+    if (myWonIds.length) {
+      const { data: wp } = await supabase
+        .from('payments')
+        .select('quote_id, amount_received, is_final_payment')
+        .eq('approval_status', 'approved')
+        .in('quote_id', myWonIds)
+      wonPayments = wp || []
+    }
+    const paidMap = {}
+    for (const p of wonPayments) {
+      if (!paidMap[p.quote_id]) paidMap[p.quote_id] = { paid: 0, final: false }
+      paidMap[p.quote_id].paid += Number(p.amount_received) || 0
+      if (p.is_final_payment) paidMap[p.quote_id].final = true
+    }
+    const outstandingRows = quotes
+      .filter(q => q.status === 'won')
+      .map(q => {
+        const paid    = paidMap[q.id]?.paid  || 0
+        const isFinal = paidMap[q.id]?.final || false
+        const balance = (Number(q.total_amount) || 0) - paid
+        return { balance, isFinal }
+      })
+      .filter(r => !r.isFinal && r.balance > 0)
+    const outstandingTotal = outstandingRows.reduce((s, r) => s + r.balance, 0)
+    const outstandingCount = outstandingRows.length
+
     const rejected = payments.filter(p => p.approval_status === 'rejected')
                              .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0]
 
@@ -194,6 +231,7 @@ export default function SalesDashboardDesktop() {
       quotesSent,
       quotesSentValue,
       todoCount,
+      outstanding: { total: outstandingTotal, count: outstandingCount },
       leaderboard,
       recent,
       followups,
@@ -358,7 +396,10 @@ export default function SalesDashboardDesktop() {
               </div>
             </section>
 
-            {/* KPI row */}
+            {/* KPI row. 5 tiles — Outstanding added so reps track
+                uncollected cash from their won quotes without drilling
+                into each one. Computed against approved payments for
+                their own won quotes (see outstandingTotal in load()). */}
             <section className="v2d-kpi-row">
               <Kpi label="Won revenue" value={state.wonValue} tone="green" />
               <Kpi
@@ -366,6 +407,13 @@ export default function SalesDashboardDesktop() {
                 value={state.quotesSentValue}
                 sub={`${state.quotesSent ?? 0} quote${(state.quotesSent ?? 0) === 1 ? '' : 's'}`}
                 tone="blue"
+              />
+              <Kpi
+                label="Outstanding"
+                value={state.outstanding?.total || 0}
+                sub={`${state.outstanding?.count || 0} quote${(state.outstanding?.count || 0) === 1 ? '' : 's'}`}
+                tone="amber"
+                dot={(state.outstanding?.count || 0) > 0}
               />
               <Kpi label="Pending approval" count={state.pendingPending.count} tone="amber" dot={state.pendingPending.count > 0} />
               <Kpi label="Follow-ups due" count={state.todoCount} tone="rose" dot={state.todoCount > 0} />

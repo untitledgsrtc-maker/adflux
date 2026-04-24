@@ -669,8 +669,11 @@
 .v2d-hero-stat-s { font-size: 11px; color: rgba(255,255,255,.7); margin-top: 4px; line-height: 1.4; }
 .v2d-hero-cta { background: var(--v2-yellow); color: var(--v2-yellow-ink); border: 0; font-family: var(--v2-display); font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: var(--v2-r-pill); cursor: pointer; }
 
-/* KPIs */
-.v2d-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+/* KPIs. 5-column row (was 4): added Outstanding so reps track
+   uncollected cash without leaving the dashboard. Narrow screens
+   still collapse to 2 cols via the @media rule below — a 5th card
+   simply wraps onto a third row (2+2+1), which is fine for mobile. */
+.v2d-kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 22px; }
 .v2d-kpi { background: var(--v2-bg-1); border: 1px solid var(--v2-line); border-radius: var(--v2-r); padding: 15px 17px 16px; position: relative; }
 .v2d-kpi-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .v2d-kpi-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }

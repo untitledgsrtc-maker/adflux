@@ -158,6 +158,39 @@ export default function SalesDashboardV2() {
     const quotesSentValue = sentQuotes.reduce((s, q) => s + (Number(q.total_amount) || 0), 0)
     const todoCount  = followups.length
 
+    // Outstanding — uncollected balance across MY won quotes. Query by
+    // quote_id (not recorded_by) so admin-recorded payments still
+    // reduce the outstanding number. See desktop sibling for the same
+    // pattern. is_final_payment excludes quotes the rep/admin has
+    // explicitly closed out.
+    const myWonIds = quotes.filter(q => q.status === 'won').map(q => q.id)
+    let wonPayments = []
+    if (myWonIds.length) {
+      const { data: wp } = await supabase
+        .from('payments')
+        .select('quote_id, amount_received, is_final_payment')
+        .eq('approval_status', 'approved')
+        .in('quote_id', myWonIds)
+      wonPayments = wp || []
+    }
+    const paidMap = {}
+    for (const p of wonPayments) {
+      if (!paidMap[p.quote_id]) paidMap[p.quote_id] = { paid: 0, final: false }
+      paidMap[p.quote_id].paid += Number(p.amount_received) || 0
+      if (p.is_final_payment) paidMap[p.quote_id].final = true
+    }
+    const outstandingRows = quotes
+      .filter(q => q.status === 'won')
+      .map(q => {
+        const paid    = paidMap[q.id]?.paid  || 0
+        const isFinal = paidMap[q.id]?.final || false
+        const balance = (Number(q.total_amount) || 0) - paid
+        return { balance, isFinal }
+      })
+      .filter(r => !r.isFinal && r.balance > 0)
+    const outstandingTotal = outstandingRows.reduce((s, r) => s + r.balance, 0)
+    const outstandingCount = outstandingRows.length
+
     setState({
       loading: false,
       isZero,
@@ -170,6 +203,7 @@ export default function SalesDashboardV2() {
       quotesSent,
       quotesSentValue,
       todoCount,
+      outstanding: { total: outstandingTotal, count: outstandingCount },
       leaderboard,
     })
   }
@@ -222,6 +256,9 @@ export default function SalesDashboardV2() {
         />
 
         <div className="v2-glance-head">This month at a glance</div>
+        {/* 5 tiles in a 2-col grid = 2+2+1 layout on mobile. Outstanding
+            gets the full-width bottom slot which is actually a plus —
+            cash-owed is the number reps act on most urgently. */}
         <div className="v2-kpi-grid">
           <Kpi label="Won Revenue" value={state.wonValue} tone="green" />
           <Kpi
@@ -232,6 +269,13 @@ export default function SalesDashboardV2() {
           />
           <Kpi label="Pending Approval" count={state.pendingPending.count} tone="yellow" dot={state.pendingPending.count > 0} />
           <Kpi label="Follow-ups Due" count={state.todoCount} tone="rose" dot={state.todoCount > 0} />
+          <Kpi
+            label="Outstanding"
+            value={state.outstanding?.total || 0}
+            sub={`${state.outstanding?.count || 0} quote${(state.outstanding?.count || 0) === 1 ? '' : 's'}`}
+            tone="yellow"
+            dot={(state.outstanding?.count || 0) > 0}
+          />
         </div>
 
         <EarnedCard earned={state.earned} />
