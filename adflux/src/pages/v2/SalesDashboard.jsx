@@ -22,6 +22,7 @@ import { Bell, Flame, Home, FileText, Plus, BarChart3, AlertTriangle, RefreshCw,
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
+import { buildSettlementMap } from '../../utils/settlement'
 import { thisMonthISO, initials } from '../../utils/formatters'
 import '../../styles/v2.css'
 
@@ -86,19 +87,41 @@ export default function SalesDashboardV2() {
     const settings = settingsRes.data || {}
     const salesUsers = usersRes.data || []
 
-    // ─── Leaderboard: sum won-quote total_amount per sales user this month ───
+    // ─── Leaderboard: sum settled-quote total_amount per sales user this month ───
+    // Settled = fully paid (sum of approved payments ≥ total OR is_final_payment).
+    // Bucketed by the month the clearing payment landed — so a deal closed in
+    // April but paid in June lands on June's leaderboard. Matches admin desktop.
     const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
-    const { data: lbQuotes } = await supabase.from('quotes')
-      .select('created_by, total_amount, status, updated_at, created_at')
-      .eq('status', 'won')
-      .gte('updated_at', monthStart.toISOString())
+    const monthEnd   = new Date(monthStart); monthEnd.setMonth(monthEnd.getMonth() + 1)
+    const monthStartIso = monthStart.toISOString()
+    const monthEndIso   = monthEnd.toISOString()
+    const [{ data: lbQuotes }, { data: lbPayments }] = await Promise.all([
+      supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
+      supabase.from('payments')
+        .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
+        .eq('approval_status', 'approved'),
+    ])
+    const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
     const wonByUser = {}
     ;(lbQuotes || []).forEach(q => {
+      const s = lbSettleMap.get(q.id)
+      if (!s) return
+      if (s.settledAt < monthStartIso || s.settledAt >= monthEndIso) return
       wonByUser[q.created_by] = (wonByUser[q.created_by] || 0) + (q.total_amount || 0)
     })
     const leaderboard = salesUsers
       .map(u => ({ id: u.id, name: u.name, won: wonByUser[u.id] || 0 }))
       .sort((a, b) => b.won - a.won)
+
+    // My settled-this-month total (drives the "Settled" KPI)
+    const mySettledValue = (lbQuotes || [])
+      .filter(q => q.created_by === uid)
+      .reduce((s, q) => {
+        const settle = lbSettleMap.get(q.id)
+        if (!settle) return s
+        if (settle.settledAt < monthStartIso || settle.settledAt >= monthEndIso) return s
+        return s + (Number(q.total_amount) || 0)
+      }, 0)
 
     // ─── Incentive math ───
     const multiplier  = prof?.sales_multiplier ?? settings.default_multiplier ?? 5
@@ -203,7 +226,8 @@ export default function SalesDashboardV2() {
       forecast: { incentive: forecastDelta, openNew, openRenewal, openPipeline },
       pendingPending: { count: pendingPayments.length, total: pendingTotal },
       rejected,
-      wonValue,
+      wonValue,                  // Closed (status→won) this month — informational
+      settledValue: mySettledValue, // Fully paid this month — drives incentive
       quotesSent,
       quotesSentValue,
       todoCount,
@@ -260,11 +284,14 @@ export default function SalesDashboardV2() {
         />
 
         <div className="v2-glance-head">This month at a glance</div>
-        {/* 5 tiles in a 2-col grid = 2+2+1 layout on mobile. Outstanding
-            gets the full-width bottom slot which is actually a plus —
-            cash-owed is the number reps act on most urgently. */}
+        {/* Tiles in a 2-col grid. Settled = fully paid this month
+            (drives incentive). Closed = quotes won this month
+            (informational — gap = revenue still to collect).
+            Outstanding gets the full-width bottom slot — cash owed
+            is the number reps act on most urgently. */}
         <div className="v2-kpi-grid">
-          <Kpi label="Won Revenue" value={state.wonValue} tone="green" />
+          <Kpi label="Settled" value={state.settledValue} sub="Fully paid · this month" tone="green" />
+          <Kpi label="Closed" value={state.wonValue} sub="Won · this month" tone="blue" />
           <Kpi
             label="Quotes Sent"
             value={state.quotesSentValue}

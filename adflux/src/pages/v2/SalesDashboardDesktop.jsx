@@ -19,6 +19,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
+import { buildSettlementMap } from '../../utils/settlement'
 import { initials, formatCompact } from '../../utils/formatters'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
@@ -106,20 +107,41 @@ export default function SalesDashboardDesktop() {
     const monthNewClient = monthRows.reduce((s, r) => s + (r.new_client_revenue || 0), 0)
     const monthRenewal   = monthRows.reduce((s, r) => s + (r.renewal_revenue    || 0), 0)
 
-    // Leaderboard — won quote total_amount per user, bucketed by the
-    // selected period. Uses updated_at (timestamp quote moved to won).
-    const { data: lbQuotes } = await supabase.from('quotes')
-      .select('created_by, total_amount, status, updated_at, created_at')
-      .eq('status', 'won')
-      .gte('updated_at', monthStartIso)
-      .lt('updated_at', monthEndIso)
+    // Leaderboard — bucketed by SETTLED month (rep is paid only when
+    // a quote is fully cleared — see utils/settlement.js). Pulls every
+    // quote + every approved payment, computes settle date locally,
+    // sums total_amount for quotes whose settle date falls in window.
+    // Same rule the admin dashboard uses, so numbers reconcile.
+    const [{ data: lbQuotes }, { data: lbPayments }] = await Promise.all([
+      supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
+      supabase.from('payments')
+        .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
+        .eq('approval_status', 'approved'),
+    ])
+    const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
     const wonByUser = {}
     ;(lbQuotes || []).forEach(q => {
+      const s = lbSettleMap.get(q.id)
+      if (!s) return
+      if (s.settledAt < monthStartIso || s.settledAt >= monthEndIso) return
       wonByUser[q.created_by] = (wonByUser[q.created_by] || 0) + (q.total_amount || 0)
     })
     const leaderboard = salesUsers
       .map(u => ({ id: u.id, name: u.name, won: wonByUser[u.id] || 0 }))
       .sort((a, b) => b.won - a.won)
+
+    // My settled-this-period revenue — the actually-paid number.
+    // Read from the same settle map the leaderboard uses so the rep's
+    // own KPI exactly matches their leaderboard row. Bucketed by settle
+    // date (date the final-clearing payment was received).
+    const mySettledValue = (lbQuotes || [])
+      .filter(q => q.created_by === uid)
+      .reduce((s, q) => {
+        const settle = lbSettleMap.get(q.id)
+        if (!settle) return s
+        if (settle.settledAt < monthStartIso || settle.settledAt >= monthEndIso) return s
+        return s + (Number(q.total_amount) || 0)
+      }, 0)
 
     // Incentive math
     const multiplier  = prof?.sales_multiplier ?? settings.default_multiplier ?? 5
@@ -231,7 +253,8 @@ export default function SalesDashboardDesktop() {
       forecast: { incentive: forecastDelta, openPipeline },
       pendingPending: { count: pendingPayments.length, total: pendingTotal },
       rejected,
-      wonValue,
+      wonValue,                  // closed (status→won) this period — informational
+      settledValue: mySettledValue, // fully-paid this period — drives incentive
       quotesSent,
       quotesSentValue,
       todoCount,
@@ -396,16 +419,21 @@ export default function SalesDashboardDesktop() {
 
                 {state.earned.flatBonus > 0
                   ? <HeroStat label="Flat bonus" value={state.earned.flatBonus} plus />
-                  : <HeroStat label="Won revenue" value={state.wonValue} />}
+                  : <HeroStat label="Settled" value={state.settledValue} />}
               </div>
             </section>
 
-            {/* KPI row. 5 tiles — Outstanding added so reps track
-                uncollected cash from their won quotes without drilling
-                into each one. Computed against approved payments for
-                their own won quotes (see outstandingTotal in load()). */}
+            {/* KPI row. 5 tiles. "Closed" = total_amount of quotes
+                moved to won this period (informational). "Settled" is
+                in the hero — that's the number the rep gets paid on.
+                Closed - Settled = the gap they're waiting to collect. */}
             <section className="v2d-kpi-row">
-              <Kpi label="Won revenue" value={state.wonValue} tone="green" />
+              <Kpi
+                label="Closed"
+                sub="Won this period"
+                value={state.wonValue}
+                tone="green"
+              />
               <Kpi
                 label="Quotes sent"
                 value={state.quotesSentValue}

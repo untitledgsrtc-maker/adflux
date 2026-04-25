@@ -23,6 +23,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive } from '../../utils/incentiveCalc'
+import { buildSettlementMap } from '../../utils/settlement'
 import {
   todayISO, initials, formatRelative,
 } from '../../utils/formatters'
@@ -167,23 +168,42 @@ export default function AdminDashboardDesktop() {
     })
     const funnelMax = Math.max(1, ...stages.map(r => r.count))
 
-    // Team leaderboard — won-quote total_amount per sales user for the
-    // selected period. Pulled directly from quotes (source of truth)
-    // instead of monthly_sales_data, so it's never blank just because
-    // the incentive aggregate hasn't been populated for a month.
+    // Team leaderboard — bucketed by SETTLED MONTH, not won month.
     //
-    // "Won this month" = status='won' AND updated_at inside the window.
-    // updated_at is set when a quote transitions to won (updateQuoteStatus
-    // writes the whole row). created_at would miss renewals closed later.
+    // Business rule: a rep is owed incentive only when the quote is
+    // fully paid (sum of approved payments ≥ total OR a payment is
+    // flagged is_final_payment). Settle month = date of the payment
+    // that crossed the threshold. So a campaign closed in April but
+    // fully paid in June lands on June's leaderboard, which is what
+    // the rep actually gets paid for.
+    //
+    // We also compute won-month totals so the UI can show
+    // "Closed vs Settled" if/when desired (currently not surfaced —
+    // leaderboard renders settled only).
+    const settlementMap = buildSettlementMap(quotes, paymentsApr)
+    const settledByUser = {}
     const wonByUser = {}
     quotes.forEach(q => {
-      if (q.status !== 'won') return
-      const ts = q.updated_at || q.created_at || ''
-      if (ts < monthStartIso || ts >= monthEndIso) return
-      wonByUser[q.created_by] = (wonByUser[q.created_by] || 0) + (q.total_amount || 0)
+      // Settled bucket: clearing payment date inside the window
+      const s = settlementMap.get(q.id)
+      if (s && s.settledAt >= monthStartIso && s.settledAt < monthEndIso) {
+        settledByUser[q.created_by] = (settledByUser[q.created_by] || 0) + (q.total_amount || 0)
+      }
+      // Won bucket (kept for reference / future split)
+      if (q.status === 'won') {
+        const ts = q.updated_at || q.created_at || ''
+        if (ts >= monthStartIso && ts < monthEndIso) {
+          wonByUser[q.created_by] = (wonByUser[q.created_by] || 0) + (q.total_amount || 0)
+        }
+      }
     })
     const leaderboard = salesUsers
-      .map(u => ({ id: u.id, name: u.name, won: wonByUser[u.id] || 0 }))
+      .map(u => ({
+        id: u.id,
+        name: u.name,
+        won:    settledByUser[u.id] || 0, // primary number — settled revenue
+        closed: wonByUser[u.id]    || 0, // secondary — quotes won this period
+      }))
       .sort((a, b) => b.won - a.won)
     const lbMax = Math.max(1, ...leaderboard.map(p => p.won))
 

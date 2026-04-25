@@ -18,38 +18,76 @@ import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 
-// ─── Helper: flip a quote to "won" when warranted ─────────────────
+// ─── Helper: settle a quote when warranted ────────────────────────
 // Call this after ANY approved payment lands (admin insert or admin
-// approval). Rule:
-//   • If is_final_payment is true → flip.
-//   • Else, check cumulative approved payments vs quote total —
-//     if the quote is paid off, flip anyway. Prevents the
-//     "Fully Paid but Sent" stuck state when is_final isn't ticked.
-// Safe to call multiple times: short-circuits when status is
-// already 'won'.
+// approval). Two responsibilities, one pass:
+//
+//   1. Flip the quote to 'won' when:
+//      • is_final_payment was just set true on this payment, OR
+//      • cumulative approved payments now cover the quote total.
+//
+//   2. Auto-flag is_final_payment = true on the LATEST approved
+//      payment (the one that crossed the threshold) when sum has
+//      reached total but no payment is currently flagged final.
+//      This is what triggers monthly_sales_data via the existing
+//      DB triggers (handle_payment_update / rebuild_monthly_sales),
+//      so the rep's incentive bucket lands in the month the FINAL
+//      payment cleared — not when the quote was won.
+//
+// Without (2) a partial-payment-only flow never settles for incentive
+// purposes — the quote silently flips to won but the rep's earned
+// number stays at zero.
+//
+// Safe to call multiple times: short-circuits when nothing to do.
 async function maybeFlipQuoteWon(quoteId, isFinalPayment) {
   if (!quoteId) return
-  if (isFinalPayment) {
-    await supabase.from('quotes').update({ status: 'won' }).eq('id', quoteId)
-    return
-  }
+  // Always pull the latest state so we can make the right call.
   const [{ data: approvedRows }, { data: quoteRow }] = await Promise.all([
     supabase
       .from('payments')
-      .select('amount_received')
+      .select('id, amount_received, payment_date, created_at, is_final_payment')
       .eq('quote_id', quoteId)
-      .eq('approval_status', 'approved'),
+      .eq('approval_status', 'approved')
+      .order('payment_date', { ascending: true }),
     supabase
       .from('quotes')
       .select('total_amount, status')
       .eq('id', quoteId)
       .single(),
   ])
-  if (!quoteRow || quoteRow.status === 'won') return
-  const totalApproved = (approvedRows || [])
-    .reduce((s, r) => s + Number(r.amount_received || 0), 0)
-  if (totalApproved >= Number(quoteRow.total_amount || 0)) {
-    await supabase.from('quotes').update({ status: 'won' }).eq('id', quoteId)
+  if (!quoteRow) return
+  const total = Number(quoteRow.total_amount) || 0
+  const rows  = approvedRows || []
+  const sumApproved = rows.reduce((s, r) => s + Number(r.amount_received || 0), 0)
+  const hasFinalFlag = rows.some(r => r.is_final_payment === true)
+
+  // Status flip — independent of the final-flag pass below.
+  if (quoteRow.status !== 'won') {
+    if (isFinalPayment || (total > 0 && sumApproved >= total)) {
+      await supabase.from('quotes').update({ status: 'won' }).eq('id', quoteId)
+    }
+  }
+
+  // Auto-settle the latest payment as final if the math checks out
+  // and nobody has flagged one explicitly. We pick the latest by
+  // payment_date (created_at as tiebreaker) — that's the payment
+  // that *actually* cleared the balance, so its month is the right
+  // bucket for incentive.
+  if (!hasFinalFlag && total > 0 && sumApproved >= total && rows.length) {
+    const sortedDesc = [...rows].sort((a, b) => {
+      const da = a.payment_date || a.created_at || ''
+      const db = b.payment_date || b.created_at || ''
+      return db.localeCompare(da)
+    })
+    const last = sortedDesc[0]
+    if (last && last.id) {
+      await supabase
+        .from('payments')
+        .update({ is_final_payment: true })
+        .eq('id', last.id)
+      // The DB trigger handle_payment_update will fire next and run
+      // rebuild_monthly_sales(staff, month) — no app-level recalc needed.
+    }
   }
 }
 
