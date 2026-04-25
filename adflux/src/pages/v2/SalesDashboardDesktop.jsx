@@ -20,7 +20,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
-import { initials, formatCompact } from '../../utils/formatters'
+import { initials, formatCompact, todayISO } from '../../utils/formatters'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import '../../styles/v2.css'
@@ -65,7 +65,7 @@ export default function SalesDashboardDesktop() {
 
     const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes, usersRes] = await Promise.all([
       supabase.from('quotes')
-        .select('id, quote_number, client_name, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_end_date')
+        .select('id, quote_number, client_name, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_start_date, campaign_end_date')
         .eq('created_by', uid)
         .order('created_at', { ascending: false }),
       supabase.from('payments')
@@ -246,6 +246,16 @@ export default function SalesDashboardDesktop() {
       .sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''))
       .slice(0, 6)
 
+    // Active campaigns — rep's own won quotes whose campaign window is
+    // still live (campaign_end_date today or later). Same shape the
+    // admin dashboard uses, scoped to created_by = uid via the quotes
+    // query above. Sorted by soonest-to-end so the urgent ones surface.
+    const today = todayISO()
+    const activeCampaigns = quotes
+      .filter(q => q.status === 'won' && q.campaign_end_date && q.campaign_end_date >= today)
+      .sort((a, b) => (a.campaign_end_date || '').localeCompare(b.campaign_end_date || ''))
+      .slice(0, 6)
+
     setState({
       loading: false,
       streak,
@@ -262,6 +272,7 @@ export default function SalesDashboardDesktop() {
       leaderboard,
       recent,
       followups,
+      activeCampaigns,
     })
   }
 
@@ -457,7 +468,11 @@ export default function SalesDashboardDesktop() {
               <RecentQuotesPanel quotes={state.recent} onOpen={(id) => navigate(`/quotes/${id}`)} onAll={() => navigate('/quotes')} />
             </section>
 
-            {/* Row 3: Leaderboard + Today's actions */}
+            {/* Row 3: Active campaigns — rep's own won quotes still on air.
+                Same panel as admin dashboard, scoped to this rep's clients. */}
+            <ActiveCampaignsPanel rows={state.activeCampaigns || []} onOpen={(id) => navigate(`/quotes/${id}`)} />
+
+            {/* Row 4: Leaderboard + Today's actions */}
             <section className="v2d-grid-2">
               <LeaderboardPanel rows={state.leaderboard} meId={profile?.id} />
               <TodayActionsPanel followups={state.followups} onOpen={(id) => navigate(`/quotes/${id}`)} onAll={() => navigate('/quotes')} />
@@ -629,6 +644,59 @@ function LbRow({ rank, row, isYou, leader }) {
       <div className="v2d-lb-val"><Money value={row.won} /></div>
       <div className="v2d-lb-pct">{pct}%</div>
     </div>
+  )
+}
+
+// Inline so the sales dashboard doesn't need to import from admin.
+// Mirrors AdminDashboardDesktop's ActiveCampaignsPanel but drops the
+// sales_person_name column — on the rep's own dashboard every row is
+// theirs by definition, so showing the name is redundant noise.
+function daysBetween(a, b) {
+  const MS = 1000 * 60 * 60 * 24
+  return Math.max(0, Math.round((new Date(a) - new Date(b)) / MS))
+}
+
+function ActiveCampaignsPanel({ rows, onOpen }) {
+  const today = todayISO()
+  return (
+    <section className="v2d-panel" style={{ marginBottom: 22 }}>
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">My active campaigns</div>
+          <div className="v2d-panel-s">Your won quotes with a live campaign window</div>
+        </div>
+        {rows.length > 0 && <div className="v2d-badge v2d-badge--green">{rows.length} running</div>}
+      </div>
+      {rows.length === 0 ? (
+        <div className="v2d-q-empty">No active campaigns. Once a won quote's campaign window opens, it'll appear here.</div>
+      ) : (
+        <div className="v2d-camp-grid">
+          {rows.map(r => {
+            const daysLeft = daysBetween(r.campaign_end_date, today)
+            const pillCls = daysLeft <= 3 ? 'v2d-camp-pill--end'
+                          : daysLeft <= 7 ? 'v2d-camp-pill--soon'
+                          : 'v2d-camp-pill--live'
+            const pillLabel = daysLeft <= 3 ? 'Ending' : daysLeft <= 7 ? 'Soon' : 'Live'
+            const totalDays = r.campaign_start_date ? daysBetween(r.campaign_end_date, r.campaign_start_date) : 30
+            const elapsed = r.campaign_start_date ? Math.max(0, daysBetween(today, r.campaign_start_date)) : 0
+            const pct = totalDays > 0 ? Math.min(100, Math.round((elapsed / totalDays) * 100)) : 0
+            return (
+              <div key={r.id} className="v2d-camp" onClick={() => onOpen(r.id)} style={{ cursor: 'pointer' }}>
+                <div className="v2d-camp-h">
+                  <div className="v2d-camp-n" title={r.client_name}>{r.client_name}</div>
+                  <span className={`v2d-camp-pill ${pillCls}`}>{pillLabel}</span>
+                </div>
+                <div className="v2d-camp-s">{r.quote_number}</div>
+                <div className="v2d-camp-s" style={{ marginTop: 4, color: 'var(--v2-ink-0)', fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13 }}>
+                  {daysLeft} day{daysLeft === 1 ? '' : 's'} left · <Money value={r.total_amount || 0} />
+                </div>
+                <div className="v2d-camp-prog"><div className="v2d-camp-prog-fill" style={{ width: `${pct}%` }} /></div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 

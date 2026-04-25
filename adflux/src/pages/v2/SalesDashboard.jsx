@@ -23,7 +23,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
-import { thisMonthISO, initials } from '../../utils/formatters'
+import { thisMonthISO, initials, todayISO } from '../../utils/formatters'
 import '../../styles/v2.css'
 
 /* ─── Money display: full Indian-format number with lakh/crore grouping.
@@ -57,7 +57,7 @@ export default function SalesDashboardV2() {
 
     const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes, usersRes] = await Promise.all([
       supabase.from('quotes')
-        .select('id, quote_number, client_name, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by')
+        .select('id, quote_number, client_name, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_start_date, campaign_end_date')
         .eq('created_by', uid)
         .order('created_at', { ascending: false }),
       supabase.from('payments')
@@ -218,6 +218,15 @@ export default function SalesDashboardV2() {
     const outstandingTotal = outstandingRows.reduce((s, r) => s + r.balance, 0)
     const outstandingCount = outstandingRows.length
 
+    // Active campaigns — rep's own won quotes still on air. Same rule
+    // the admin dashboard uses, just scoped to the rep's quotes (which
+    // the query above already filters via .eq('created_by', uid)).
+    const today = todayISO()
+    const activeCampaigns = quotes
+      .filter(q => q.status === 'won' && q.campaign_end_date && q.campaign_end_date >= today)
+      .sort((a, b) => (a.campaign_end_date || '').localeCompare(b.campaign_end_date || ''))
+      .slice(0, 6)
+
     setState({
       loading: false,
       isZero,
@@ -233,6 +242,7 @@ export default function SalesDashboardV2() {
       todoCount,
       outstanding: { total: outstandingTotal, count: outstandingCount },
       leaderboard,
+      activeCampaigns,
     })
   }
 
@@ -308,6 +318,8 @@ export default function SalesDashboardV2() {
             dot={(state.outstanding?.count || 0) > 0}
           />
         </div>
+
+        <ActiveCampaignsCard rows={state.activeCampaigns || []} onOpen={(id) => navigate(`/quotes/${id}`)} />
 
         <EarnedCard earned={state.earned} />
 
@@ -471,6 +483,63 @@ function EarnedCard({ earned }) {
             <span className="v2-bonus-amt">+<Money value={earned.flatBonus} /></span>
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// Mobile-friendly active-campaign card. Uses the v2d-camp-* CSS the
+// desktop dashboard already ships, but lays out as a vertical stack
+// so phone widths don't squeeze the labels. Kept in this file because
+// the mobile dashboard owns its own card primitives (v2-card-*).
+function daysBetween(a, b) {
+  const MS = 1000 * 60 * 60 * 24
+  return Math.max(0, Math.round((new Date(a) - new Date(b)) / MS))
+}
+
+function ActiveCampaignsCard({ rows, onOpen }) {
+  const today = todayISO()
+  return (
+    <div className="v2-card" style={{ padding: '14px 15px 12px' }}>
+      <div className="v2-card-h">
+        <div className="v2-card-t">My active campaigns</div>
+        {rows.length > 0 && <div className="v2-badge v2-badge--green">{rows.length} running</div>}
+      </div>
+      {rows.length === 0 ? (
+        <div className="v2-empty-hint" style={{ padding: '12px 0' }}>
+          No active campaigns. Won quotes with a live window will appear here.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+          {rows.map(r => {
+            const daysLeft = daysBetween(r.campaign_end_date, today)
+            const pillCls = daysLeft <= 3 ? 'v2d-camp-pill--end'
+                          : daysLeft <= 7 ? 'v2d-camp-pill--soon'
+                          : 'v2d-camp-pill--live'
+            const pillLabel = daysLeft <= 3 ? 'Ending' : daysLeft <= 7 ? 'Soon' : 'Live'
+            const totalDays = r.campaign_start_date ? daysBetween(r.campaign_end_date, r.campaign_start_date) : 30
+            const elapsed   = r.campaign_start_date ? Math.max(0, daysBetween(today, r.campaign_start_date)) : 0
+            const pct = totalDays > 0 ? Math.min(100, Math.round((elapsed / totalDays) * 100)) : 0
+            return (
+              <div
+                key={r.id}
+                className="v2d-camp"
+                onClick={() => onOpen(r.id)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="v2d-camp-h">
+                  <div className="v2d-camp-n" title={r.client_name}>{r.client_name}</div>
+                  <span className={`v2d-camp-pill ${pillCls}`}>{pillLabel}</span>
+                </div>
+                <div className="v2d-camp-s">{r.quote_number}</div>
+                <div className="v2d-camp-s" style={{ marginTop: 4, color: 'var(--v2-ink-0)', fontWeight: 700, fontSize: 13 }}>
+                  {daysLeft} day{daysLeft === 1 ? '' : 's'} left · <Money value={r.total_amount || 0} />
+                </div>
+                <div className="v2d-camp-prog"><div className="v2d-camp-prog-fill" style={{ width: `${pct}%` }} /></div>
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
