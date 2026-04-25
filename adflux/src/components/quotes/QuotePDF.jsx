@@ -799,6 +799,50 @@ function QuoteDocument({ quote, cities }) {
  *   undefined, the `.some(c => c.photo_url)` guard suppresses the
  *   section).
  */
+// ── Image preloader ───────────────────────────────────────────────
+//
+// Why this exists:
+//   @react-pdf/renderer's <Image src="https://..."> does its own
+//   headless fetch when the PDF is being rendered. That fetch fails
+//   silently for several common cases:
+//     • Cross-origin host without CORS headers (most free image hosts)
+//     • Google Drive / Dropbox share URLs that return HTML, not bytes
+//     • Mixed-content (http:// image on https:// page)
+//     • Unsupported formats (WebP, AVIF, HEIC) — supports JPG/PNG/GIF
+//   Result: gallery tile renders, but the image area is blank (white).
+//
+// Fix:
+//   Pre-fetch the image in the browser, validate it's actually an image
+//   by MIME type, convert to a base64 data URL, and pass THAT to
+//   <Image>. @react-pdf parses data URLs from memory — no fetch, no
+//   CORS. If fetch fails for any reason, we return null and the PDF
+//   falls back to the city-initial placeholder (still informative).
+//
+// This is a deliberate trade: download size grows by ~base64 overhead
+// per image, but PDF generation goes from "sometimes blank" to
+// "always shows something — real photo or first letter".
+async function urlToDataUrl(url) {
+  if (!url) return null
+  try {
+    const res = await fetch(url, { mode: 'cors' })
+    if (!res.ok) return null
+    const ct = res.headers.get('content-type') || ''
+    // Reject HTML responses (Google Drive share links etc.) and any
+    // format @react-pdf can't handle.
+    if (!/^image\/(jpeg|jpg|png|gif)$/i.test(ct)) return null
+    const blob = await res.blob()
+    return await new Promise((resolve) => {
+      const fr = new FileReader()
+      fr.onload  = () => resolve(typeof fr.result === 'string' ? fr.result : null)
+      fr.onerror = () => resolve(null)
+      fr.readAsDataURL(blob)
+    })
+  } catch {
+    // Network error, CORS block, etc. — fall through to placeholder.
+    return null
+  }
+}
+
 async function enrichCitiesWithPhotos(cities) {
   if (!cities?.length) return cities
 
@@ -815,10 +859,21 @@ async function enrichCitiesWithPhotos(cities) {
   if (error || !data) return cities
 
   const photoMap = Object.fromEntries(data.map(m => [m.id, m.photo_url]))
-  return cities.map(c => ({
-    ...c,
-    photo_url: photoMap[c.city_id || c.city?.id] || null,
-  }))
+
+  // Resolve each photo_url → data URL in parallel. Failures (CORS,
+  // 404, wrong MIME) come back as null and the PDF falls back to the
+  // letter placeholder for that city.
+  const resolved = await Promise.all(
+    cities.map(async c => {
+      const raw = photoMap[c.city_id || c.city?.id] || null
+      const dataUrl = raw ? await urlToDataUrl(raw) : null
+      return {
+        ...c,
+        photo_url: dataUrl, // PDF reads only this; original raw URL is intentionally dropped.
+      }
+    })
+  )
+  return resolved
 }
 
 export async function downloadQuotePDF(quote, cities = []) {
