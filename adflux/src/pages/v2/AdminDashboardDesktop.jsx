@@ -147,6 +147,18 @@ export default function AdminDashboardDesktop() {
       return sum + (q.total_amount || 0)
     }, 0)
 
+    // Won value — total_amount of quotes that flipped to 'won' in the
+    // selected period. Same period-bucketing logic as Lost revenue
+    // (updated_at falls inside the window). This is the "closed deals"
+    // companion to Revenue (cash in): Revenue is what cleared, Won is
+    // what was committed. Gap = collections still owed.
+    const wonValue = quotes.reduce((sum, q) => {
+      if (q.status !== 'won') return sum
+      const ts = q.updated_at || q.created_at || ''
+      if (ts < monthStartIso || ts >= monthEndIso) return sum
+      return sum + (q.total_amount || 0)
+    }, 0)
+
     // Outstanding — same per-quote clamp logic as legacy RevenueSummary
     const outstanding = quotes.reduce((sum, q) => {
       if (q.status === 'lost') return sum
@@ -322,7 +334,7 @@ export default function AdminDashboardDesktop() {
 
     setState({
       loading: false,
-      kpi: { revenue, activeQuotes, pipelineValue, outstanding, pending: pending.length, liability, lostRevenue },
+      kpi: { revenue, activeQuotes, pipelineValue, outstanding, pending: pending.length, liability, lostRevenue, wonValue },
       funnel: { stages, max: funnelMax },
       leaderboard, lbMax,
       liability: { total: liability, above: aboveTarget, staff: profiles.length },
@@ -489,13 +501,13 @@ export default function AdminDashboardDesktop() {
                   across other heroes (Sales dashboard) and shouldn't shift. */}
               <div
                 className="v2d-hero-grid"
-                style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+                style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}
               >
                 <div>
                   <div className="v2d-hero-stat-l">Revenue</div>
                   <div
                     className="v2d-hero-big"
-                    style={{ fontSize: 32, marginBottom: 6 }}
+                    style={{ fontSize: 28, marginBottom: 6 }}
                   >
                     <Money value={state.kpi.revenue} />
                   </div>
@@ -504,20 +516,26 @@ export default function AdminDashboardDesktop() {
                   </div>
                 </div>
                 <div className="v2d-hero-stat">
+                  <div className="v2d-hero-stat-l">Won value</div>
+                  <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
+                    <Money value={state.kpi.wonValue} />
+                  </div>
+                </div>
+                <div className="v2d-hero-stat">
                   <div className="v2d-hero-stat-l">Pipeline value</div>
-                  <div className="v2d-hero-stat-v" style={{ fontSize: 32 }}>
+                  <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
                     <Money value={state.kpi.pipelineValue} />
                   </div>
                 </div>
                 <div className="v2d-hero-stat">
                   <div className="v2d-hero-stat-l">Incentive liability</div>
-                  <div className="v2d-hero-stat-v" style={{ fontSize: 32 }}>
+                  <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
                     <Money value={state.kpi.liability} />
                   </div>
                 </div>
                 <div className="v2d-hero-stat">
                   <div className="v2d-hero-stat-l">Lost revenue</div>
-                  <div className="v2d-hero-stat-v" style={{ fontSize: 32 }}>
+                  <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
                     <Money value={state.kpi.lostRevenue} />
                   </div>
                 </div>
