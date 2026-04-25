@@ -139,10 +139,58 @@ export default function SalesDashboardV2() {
       renewalRevenue:   monthRow?.renewal_revenue    || 0,
     })
 
+    // Pull approved payments BY QUOTE_ID up front — both the forecast
+    // calc (won-unsettled inclusion) and the outstanding KPI need to
+    // know which quotes have a final payment cleared. We query by
+    // quote_id (not recorded_by) because admin can record payments
+    // against a rep's quote too — using the payments slice from above
+    // (.eq('recorded_by', uid)) would miss those and double-count
+    // forecast / inflate outstanding.
+    const myQuoteIds = quotes.filter(q => q.status !== 'lost').map(q => q.id)
+    let approvedPayments = []
+    if (myQuoteIds.length) {
+      const { data: ap } = await supabase
+        .from('payments')
+        .select('quote_id, amount_received, is_final_payment')
+        .eq('approval_status', 'approved')
+        .in('quote_id', myQuoteIds)
+      approvedPayments = ap || []
+    }
+    const paidMap = {}
+    for (const p of approvedPayments) {
+      if (!paidMap[p.quote_id]) paidMap[p.quote_id] = { paid: 0, final: false }
+      paidMap[p.quote_id].paid += Number(p.amount_received) || 0
+      if (p.is_final_payment) paidMap[p.quote_id].final = true
+    }
+
     const openNew     = quotes.filter(q => !['lost','won'].includes(q.status) && q.revenue_type === 'new')
                               .reduce((s,q) => s + (q.subtotal || 0), 0)
     const openRenewal = quotes.filter(q => !['lost','won'].includes(q.status) && q.revenue_type === 'renewal')
                               .reduce((s,q) => s + (q.subtotal || 0), 0)
+
+    // Won-but-not-yet-settled — quote is closed (status='won') but the
+    // final approved payment hasn't cleared, so monthly_sales_data
+    // hasn't credited it yet. These belong in forecast: the rep has
+    // earned the deal, the money is just stuck in collections. Carries
+    // forward month-over-month until the final payment lands (settles
+    // the quote, moves it into earned) OR the rep flips it to lost.
+    const today = todayISO()
+    const wonUnsettled = quotes.filter(q => q.status === 'won' && !(paidMap[q.id]?.final))
+    const wonUnsettledNew     = wonUnsettled.filter(q => q.revenue_type === 'new')
+                                            .reduce((s, q) => s + (q.subtotal || 0), 0)
+    const wonUnsettledRenewal = wonUnsettled.filter(q => q.revenue_type === 'renewal')
+                                            .reduce((s, q) => s + (q.subtotal || 0), 0)
+
+    // Age buckets for won-unsettled — Fresh <30d, Aging 30-60d,
+    // Stale 60+d, computed off updated_at (the won timestamp).
+    const wonAge = { fresh: 0, aging: 0, stale: 0, freshValue: 0, agingValue: 0, staleValue: 0 }
+    wonUnsettled.forEach(q => {
+      const days = daysBetween(today, q.updated_at || q.created_at)
+      const v = Number(q.subtotal) || 0
+      if (days < 30)        { wonAge.fresh++; wonAge.freshValue += v }
+      else if (days < 60)   { wonAge.aging++; wonAge.agingValue += v }
+      else                  { wonAge.stale++; wonAge.staleValue += v }
+    })
 
     const forecast = calculateIncentive({
       monthlySalary: prof?.monthly_salary || 0,
@@ -150,11 +198,12 @@ export default function SalesDashboardV2() {
       newClientRate: newRate,
       renewalRate: renewalRate,
       flatBonus,
-      newClientRevenue: (monthRow?.new_client_revenue || 0) + openNew,
-      renewalRevenue:   (monthRow?.renewal_revenue    || 0) + openRenewal,
+      newClientRevenue: (monthRow?.new_client_revenue || 0) + openNew + wonUnsettledNew,
+      renewalRevenue:   (monthRow?.renewal_revenue    || 0) + openRenewal + wonUnsettledRenewal,
     })
     const forecastDelta = Math.max(0, (forecast.incentive || 0) - (earned.incentive || 0))
     const openPipeline  = openNew + openRenewal
+    const wonUnsettledTotal = wonUnsettledNew + wonUnsettledRenewal
 
     // Pending: payments this user submitted that admin hasn't decided yet
     const pendingPayments = payments.filter(p => p.approval_status === 'pending')
@@ -183,28 +232,7 @@ export default function SalesDashboardV2() {
 
     // Outstanding — mirror admin dashboard + QuotesV2 computeBalance so
     // the rep KPI matches the Outstanding column on the Quotes list.
-    //
-    // A quote is "committed" (counts toward outstanding) if status === 'won'
-    // OR it has any approved payment recorded. Sent/negotiating quotes with
-    // a part-payment still count. Lost quotes never count. Balance clamped
-    // at 0. Query by quote_id (not recorded_by) so admin-recorded payments
-    // still reduce the balance.
-    const myQuoteIds = quotes.filter(q => q.status !== 'lost').map(q => q.id)
-    let approvedPayments = []
-    if (myQuoteIds.length) {
-      const { data: ap } = await supabase
-        .from('payments')
-        .select('quote_id, amount_received, is_final_payment')
-        .eq('approval_status', 'approved')
-        .in('quote_id', myQuoteIds)
-      approvedPayments = ap || []
-    }
-    const paidMap = {}
-    for (const p of approvedPayments) {
-      if (!paidMap[p.quote_id]) paidMap[p.quote_id] = { paid: 0, final: false }
-      paidMap[p.quote_id].paid += Number(p.amount_received) || 0
-      if (p.is_final_payment) paidMap[p.quote_id].final = true
-    }
+    // Reuses the paidMap built above (one fetch, two consumers).
     const outstandingRows = quotes
       .filter(q => q.status !== 'lost')
       .map(q => {
@@ -221,18 +249,31 @@ export default function SalesDashboardV2() {
     // Active campaigns — rep's own won quotes still on air. Same rule
     // the admin dashboard uses, just scoped to the rep's quotes (which
     // the query above already filters via .eq('created_by', uid)).
-    const today = todayISO()
+    // Tag each row with its age bucket and an is_settled flag so the
+    // panel can show which ones still owe money.
     const activeCampaigns = quotes
       .filter(q => q.status === 'won' && q.campaign_end_date && q.campaign_end_date >= today)
       .sort((a, b) => (a.campaign_end_date || '').localeCompare(b.campaign_end_date || ''))
       .slice(0, 6)
+      .map(q => {
+        const days = daysBetween(today, q.updated_at || q.created_at)
+        const ageKey = days < 30 ? 'fresh' : days < 60 ? 'aging' : 'stale'
+        return { ...q, _ageDays: days, _ageKey: ageKey, _isSettled: !!paidMap[q.id]?.final }
+      })
 
     setState({
       loading: false,
       isZero,
       streak,
       earned,
-      forecast: { incentive: forecastDelta, openNew, openRenewal, openPipeline },
+      forecast: {
+        incentive: forecastDelta,
+        openNew,
+        openRenewal,
+        openPipeline,
+        wonUnsettledTotal,
+        wonAge,
+      },
       pendingPending: { count: pendingPayments.length, total: pendingTotal },
       rejected,
       wonValue,                  // Closed (status→won) this month — informational
@@ -404,9 +445,23 @@ function ProposedIncentive({ earned, forecast, pending }) {
     },
     forecast: {
       value: forecast.incentive,
-      sub: forecast.openPipeline === 0
-        ? 'Forecast is flat — send quotes to build your open pipeline.'
-        : `Incremental on ₹${new Intl.NumberFormat('en-IN').format(forecast.openPipeline)} open pipeline if every non-lost quote closes this month.`,
+      sub: (() => {
+        const fmt = (n) => new Intl.NumberFormat('en-IN').format(n)
+        const open = forecast.openPipeline || 0
+        const won  = forecast.wonUnsettledTotal || 0
+        const age  = forecast.wonAge || {}
+        const stalePart = age.stale > 0 ? ` · ₹${fmt(age.staleValue)} stale` : ''
+        if (open === 0 && won === 0) {
+          return 'Forecast is flat — send quotes to build your open pipeline.'
+        }
+        if (won === 0) {
+          return `Incremental on ₹${fmt(open)} open pipeline if every non-lost quote closes this month.`
+        }
+        if (open === 0) {
+          return `₹${fmt(won)} from won quotes still collecting${stalePart}.`
+        }
+        return `₹${fmt(open)} open + ₹${fmt(won)} won-not-settled${stalePart}.`
+      })(),
     },
   }
   const p = panes[tab]
@@ -520,6 +575,16 @@ function ActiveCampaignsCard({ rows, onOpen }) {
             const totalDays = r.campaign_start_date ? daysBetween(r.campaign_end_date, r.campaign_start_date) : 30
             const elapsed   = r.campaign_start_date ? Math.max(0, daysBetween(today, r.campaign_start_date)) : 0
             const pct = totalDays > 0 ? Math.min(100, Math.round((elapsed / totalDays) * 100)) : 0
+            // Age tag — Fresh/Aging/Stale based on days since the
+            // won flip (updated_at). Settled tag wins if a final
+            // payment has cleared.
+            const ageKey = r._ageKey || 'fresh'
+            const isSettled = !!r._isSettled
+            const ageBadge = isSettled
+              ? { cls: 'v2d-camp-age--paid', label: 'Settled' }
+              : ageKey === 'stale' ? { cls: 'v2d-camp-age--stale', label: `Stale ${r._ageDays}d` }
+              : ageKey === 'aging' ? { cls: 'v2d-camp-age--aging', label: `Aging ${r._ageDays}d` }
+              :                      { cls: 'v2d-camp-age--fresh', label: `Fresh ${r._ageDays}d` }
             return (
               <div
                 key={r.id}
@@ -536,6 +601,7 @@ function ActiveCampaignsCard({ rows, onOpen }) {
                   {daysLeft} day{daysLeft === 1 ? '' : 's'} left · <Money value={r.total_amount || 0} />
                 </div>
                 <div className="v2d-camp-prog"><div className="v2d-camp-prog-fill" style={{ width: `${pct}%` }} /></div>
+                <div className={`v2d-camp-age ${ageBadge.cls}`}>{ageBadge.label}</div>
               </div>
             )
           })}

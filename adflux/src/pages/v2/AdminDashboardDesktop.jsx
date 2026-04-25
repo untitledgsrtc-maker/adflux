@@ -255,6 +255,28 @@ export default function AdminDashboardDesktop() {
       .sort((a, b) => (a.campaign_end_date || '').localeCompare(b.campaign_end_date || ''))
       .slice(0, 6)
 
+    // Stale won quotes — won 60+ days ago (per updated_at) AND no final
+    // approved payment on file. These are the deals reps closed but
+    // haven't collected on, so they sit in everyone's forecast forever.
+    // Surfacing them gives admin a punch list to either collect or
+    // ask the rep to flip to lost. Sorted by oldest first (worst on top).
+    const MS_PER_DAY = 1000 * 60 * 60 * 24
+    const todayMs = new Date(today).getTime()
+    const staleQuotes = quotes
+      .filter(q => q.status === 'won')
+      .map(q => {
+        const qPayments = paymentsApr.filter(p => p.quote_id === q.id)
+        const paid    = qPayments.reduce((s, p) => s + (p.amount_received || 0), 0)
+        const final   = qPayments.some(p => p.is_final_payment)
+        const balance = Math.max(0, (q.total_amount || 0) - paid)
+        const wonAt   = q.updated_at || q.created_at
+        const ageDays = wonAt ? Math.max(0, Math.round((todayMs - new Date(wonAt).getTime()) / MS_PER_DAY)) : 0
+        return { ...q, paid, balance, final, ageDays }
+      })
+      .filter(q => !q.final && q.ageDays >= 60)
+      .sort((a, b) => b.ageDays - a.ageDays)
+      .slice(0, 8)
+
     // Recent activity (merged quotes + payments, last 12)
     const quoteEvents = quotes
       .slice()
@@ -304,7 +326,7 @@ export default function AdminDashboardDesktop() {
       funnel: { stages, max: funnelMax },
       leaderboard, lbMax,
       liability: { total: liability, above: aboveTarget, staff: profiles.length },
-      outstandingList, activeCampaigns, activity, trendMonths, trendMax,
+      outstandingList, activeCampaigns, staleQuotes, activity, trendMonths, trendMax,
       pending,
     })
   }
@@ -544,6 +566,13 @@ export default function AdminDashboardDesktop() {
 
             {/* Row 5: Active campaigns */}
             <ActiveCampaignsPanel rows={state.activeCampaigns} onOpen={(id) => navigate(`/quotes/${id}`)} />
+
+            {/* Row 5b: Stale won quotes — won 60+ days ago, no final
+                payment on file. Punch list for cash collection or
+                cleanup (rep flips to lost). Only renders if there are any. */}
+            {state.staleQuotes && state.staleQuotes.length > 0 && (
+              <StalePanel rows={state.staleQuotes} onOpen={(id) => navigate(`/quotes/${id}`)} />
+            )}
 
             {/* Row 6: Recent activity */}
             <ActivityPanel items={state.activity} onOpen={(id) => navigate(`/quotes/${id}`)} />
@@ -835,6 +864,48 @@ function ActiveCampaignsPanel({ rows, onOpen }) {
           })}
         </div>
       )}
+    </section>
+  )
+}
+
+// Stale won-quote panel — won 60+ days ago, never settled. Each row
+// shows the rep responsible, age in days, balance owed. Sorted oldest
+// first (60+ d → ∞). Used by admin to either chase the cash or have
+// the rep flip the quote to lost so it stops inflating forecasts.
+function StalePanel({ rows, onOpen }) {
+  return (
+    <section className="v2d-panel" style={{ marginBottom: 22 }}>
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Stale won quotes · 60+ days unsettled</div>
+          <div className="v2d-panel-s">Won, never paid in full — chase the cash or flip to lost</div>
+        </div>
+        <div className="v2d-badge v2d-badge--rose">{rows.length} stale</div>
+      </div>
+      <table className="v2d-qt">
+        <thead>
+          <tr>
+            <th>Quote</th>
+            <th>Client</th>
+            <th>Rep</th>
+            <th className="num">Age</th>
+            <th className="num">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.id} onClick={() => onOpen(r.id)} style={{ cursor: 'pointer' }}>
+              <td>{r.quote_number || '—'}</td>
+              <td>{r.client_name || r.client_company || '—'}</td>
+              <td>{r.sales_person_name || '—'}</td>
+              <td className="num">
+                <span className="v2d-camp-age v2d-camp-age--stale">{r.ageDays}d</span>
+              </td>
+              <td className="num"><Money value={r.balance || 0} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </section>
   )
 }

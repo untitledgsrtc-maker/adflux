@@ -20,8 +20,15 @@ import { formatCurrency, formatDate, formatDateTime, formatPhone, todayISO } fro
 import { STATUS_LABELS } from '../utils/constants'
 
 function getAllowedTransitions(quote, hasFinalPayment) {
+  // Won-with-no-final-payment is the "client said yes, never paid"
+  // case. Allow rep to back it out to negotiating/sent (still chasing)
+  // OR mark it lost (gave up). Adding 'lost' here is what stops stale
+  // won quotes from sitting in the forecast forever — once a rep
+  // accepts the deal isn't going to settle, they can close the loop.
+  // Won-WITH-final-payment stays locked: the money cleared, the rep
+  // earned the incentive, no take-backs.
   if (quote.status === 'won' && !hasFinalPayment) {
-    return ['negotiating', 'sent']
+    return ['negotiating', 'sent', 'lost']
   }
   const BASE = {
     draft:       ['sent', 'lost'],

@@ -753,6 +753,15 @@
 .v2d-camp-prog { height: 4px; background: var(--v2-line); border-radius: 4px; overflow: hidden; margin-top: 8px; }
 .v2d-camp-prog-fill { height: 100%; background: var(--v2-yellow); }
 
+/* Age badge — surfaces how long a won quote has been sitting unsettled.
+   Fresh = <30d, Aging = 30-60d, Stale = 60+d. Settled = final payment
+   on file (collected, no chasing needed). */
+.v2d-camp-age { display: inline-block; margin-top: 8px; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; border-radius: var(--v2-r-pill); }
+.v2d-camp-age--fresh { background: var(--v2-blue-soft, rgba(100, 181, 246, 0.16)); color: var(--v2-blue, #64b5f6); }
+.v2d-camp-age--aging { background: var(--v2-amber-soft); color: var(--v2-amber); }
+.v2d-camp-age--stale { background: var(--v2-rose-soft); color: var(--v2-rose); }
+.v2d-camp-age--paid  { background: var(--v2-green-soft); color: var(--v2-green); }
+
 /* Activity feed */
 .v2d-act-row { display: grid; grid-template-columns: 8px 1fr auto; gap: 12px; align-items: start; padding: 10px 8px; border-radius: 10px; margin: 0 -8px; }
 .v2d-act-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--v2-yellow); margin-top: 6px; flex-shrink: 0; }
