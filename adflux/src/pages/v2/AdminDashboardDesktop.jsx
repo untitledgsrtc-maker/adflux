@@ -499,10 +499,7 @@ export default function AdminDashboardDesktop() {
                   below to mark it as the primary metric. Inline styles used
                   intentionally — v2d-hero-big / v2d-hero-stat-v are shared
                   across other heroes (Sales dashboard) and shouldn't shift. */}
-              <div
-                className="v2d-hero-grid"
-                style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}
-              >
+              <div className="v2d-hero-grid v2d-hero-grid--5col">
                 <div>
                   <div className="v2d-hero-stat-l">Revenue</div>
                   <div

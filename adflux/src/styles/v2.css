@@ -908,6 +908,22 @@
   .v2d-kpi-row { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* Admin hero variants — 4 or 5 stat columns on wide screens, collapse
+   inherited from .v2d-hero-grid base @media rule above. Class-based
+   instead of inline style so the responsive collapse actually wins
+   (inline style would override @media rules). */
+.v2d-hero-grid--4col { grid-template-columns: repeat(4, 1fr); }
+.v2d-hero-grid--5col { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1280px) {
+  /* On smaller-than-XL desktops, 5 cols squeeze numbers — drop to 3 cols
+     before fully collapsing at 1100px. The fifth tile wraps to row 2. */
+  .v2d-hero-grid--5col { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 1100px) {
+  .v2d-hero-grid--4col,
+  .v2d-hero-grid--5col { grid-template-columns: 1fr; }
+}
+
 /* Extra-narrow: topbar wraps and sidebar vanishes */
 @media (max-width: 860px) {
   .v2d-topbar { flex-wrap: wrap; padding: 12px 14px; gap: 10px; }
