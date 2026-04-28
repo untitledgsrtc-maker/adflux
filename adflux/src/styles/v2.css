@@ -724,7 +724,7 @@
 
 /* Leaderboard */
 .v2d-lb { display: flex; flex-direction: column; gap: 2px; }
-.v2d-lb-row { display: grid; grid-template-columns: 24px 30px 1fr 90px 80px; gap: 10px; align-items: center; padding: 9px 8px; border-radius: 10px; margin: 0 -4px; }
+.v2d-lb-row { display: grid; grid-template-columns: 24px 30px 1fr 90px 90px 50px; gap: 10px; align-items: center; padding: 9px 8px; border-radius: 10px; margin: 0 -4px; }
 .v2d-lb-row--you { background: rgba(255,230,0,.08); border: 1px solid rgba(255,230,0,.22); }
 .v2d-lb-row:hover:not(.v2d-lb-row--you) { background: var(--v2-bg-2); }
 .v2d-lb-rank { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-family: var(--v2-display); font-weight: 700; font-size: 11px; }

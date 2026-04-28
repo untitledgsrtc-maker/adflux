@@ -55,7 +55,7 @@ export default function SalesDashboardV2() {
     const uid = profile.id
     const monthKey = thisMonthISO()
 
-    const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes, usersRes] = await Promise.all([
+    const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes] = await Promise.all([
       supabase.from('quotes')
         .select('id, quote_number, client_name, client_company, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_start_date, campaign_end_date')
         .eq('created_by', uid)
@@ -75,7 +75,6 @@ export default function SalesDashboardV2() {
       supabase.from('staff_incentive_profiles')
         .select('*').eq('user_id', uid).maybeSingle(),
       supabase.from('incentive_settings').select('*').maybeSingle(),
-      supabase.from('users').select('id, name').eq('role', 'sales'),
     ])
 
     const quotes = qRes.data || []
@@ -85,87 +84,56 @@ export default function SalesDashboardV2() {
     const history = histRes.data || []
     const prof = profRes.data
     const settings = settingsRes.data || {}
-    const salesUsers = usersRes.data || []
 
-    // ─── Leaderboard: sum settled-quote total_amount per sales user this month ───
-    // Settled = fully paid (sum of approved payments ≥ total OR is_final_payment).
-    // Bucketed by the month the clearing payment landed — so a deal closed in
-    // April but paid in June lands on June's leaderboard. Matches admin desktop.
     const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
     const monthEnd   = new Date(monthStart); monthEnd.setMonth(monthEnd.getMonth() + 1)
     const monthStartIso = monthStart.toISOString()
     const monthEndIso   = monthEnd.toISOString()
-    // Leaderboard now races on PROPOSED INCENTIVE (forecast) per rep,
-    // not won-revenue. Need full data to run calculateIncentive per rep.
-    const [{ data: lbQuotes }, { data: lbPayments }, { data: lbProfiles }, { data: lbMsd }] = await Promise.all([
-      supabase.from('quotes').select('id, created_by, total_amount, subtotal, status, revenue_type, updated_at, created_at'),
+
+    // Leaderboard now races on PROPOSED INCENTIVE (forecast) per rep
+    // and shows EARNED alongside. Per-rep math has to run against ALL
+    // reps' data, which means bypassing the user-scoped RLS on
+    // staff_incentive_profiles + monthly_sales_data. The
+    // get_team_leaderboard SECURITY DEFINER RPC returns aggregated
+    // inputs only — no raw row leakage. See supabase_phase3d.sql.
+    //
+    // We still fetch lbQuotes + lbPayments separately because the
+    // rep's own settled-this-month KPI needs the settle map (built
+    // from payment_date).
+    const [{ data: lbQuotes }, { data: lbPayments }, { data: lbRpc }] = await Promise.all([
+      supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
       supabase.from('payments')
         .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
         .eq('approval_status', 'approved'),
-      supabase.from('staff_incentive_profiles').select('user_id, monthly_salary, sales_multiplier, new_client_rate, renewal_rate, flat_bonus'),
-      supabase.from('monthly_sales_data').select('staff_id, month_year, new_client_revenue, renewal_revenue').eq('month_year', monthKey),
+      supabase.rpc('get_team_leaderboard', { p_month_keys: [monthKey] }),
     ])
     const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
 
-    // Per-quote final-payment lookup (drives won-unsettled forecast)
-    const lbFinalByQuote = {}
-    ;(lbPayments || []).forEach(p => { if (p.is_final_payment) lbFinalByQuote[p.quote_id] = true })
-
-    // Per-rep aggregates: open pipeline + won-unsettled subtotals,
-    // settled monthly revenue, won counts.
-    const repAgg = {}
-    const ensureAgg = (uid) => {
-      if (!repAgg[uid]) {
-        repAgg[uid] = {
-          openNew: 0, openRenewal: 0,
-          wonUnsettledNew: 0, wonUnsettledRenewal: 0,
-          msdNew: 0, msdRenewal: 0,
-          wonCount: 0,
+    const leaderboard = (lbRpc || [])
+      .map(r => {
+        const cfg = {
+          monthlySalary:   Number(r.monthly_salary)   || 0,
+          salesMultiplier: Number(r.sales_multiplier) || 5,
+          newClientRate:   Number(r.new_client_rate)  || 0.05,
+          renewalRate:     Number(r.renewal_rate)     || 0.02,
+          flatBonus:       Number(r.flat_bonus)       || 10000,
         }
-      }
-      return repAgg[uid]
-    }
-    ;(lbQuotes || []).forEach(q => {
-      const a = ensureAgg(q.created_by)
-      const sub = Number(q.subtotal) || 0
-      if (!['lost','won'].includes(q.status)) {
-        if (q.revenue_type === 'renewal') a.openRenewal += sub
-        else                              a.openNew     += sub
-      } else if (q.status === 'won') {
-        a.wonCount++
-        if (!lbFinalByQuote[q.id]) {
-          if (q.revenue_type === 'renewal') a.wonUnsettledRenewal += sub
-          else                              a.wonUnsettledNew     += sub
-        }
-      }
-    })
-    ;(lbMsd || []).forEach(r => {
-      const a = ensureAgg(r.staff_id)
-      a.msdNew     += r.new_client_revenue || 0
-      a.msdRenewal += r.renewal_revenue    || 0
-    })
-
-    const profileByUser = {}
-    ;(lbProfiles || []).forEach(p => { profileByUser[p.user_id] = p })
-
-    const leaderboard = salesUsers
-      .map(u => {
-        const a = ensureAgg(u.id)
-        const p = profileByUser[u.id] || {}
-        const mult   = p.sales_multiplier ?? settings.default_multiplier ?? 5
-        const nRate  = p.new_client_rate  ?? settings.new_client_rate    ?? 0.05
-        const rRate  = p.renewal_rate     ?? settings.renewal_rate       ?? 0.02
-        const fBonus = p.flat_bonus       ?? settings.default_flat_bonus ?? settings.flat_bonus ?? 10000
+        const repEarned = calculateIncentive({
+          ...cfg,
+          newClientRevenue: Number(r.msd_new)     || 0,
+          renewalRevenue:   Number(r.msd_renewal) || 0,
+        })
         const repForecast = calculateIncentive({
-          monthlySalary: p.monthly_salary || 0,
-          salesMultiplier: mult, newClientRate: nRate, renewalRate: rRate, flatBonus: fBonus,
-          newClientRevenue: a.msdNew     + a.openNew     + a.wonUnsettledNew,
-          renewalRevenue:   a.msdRenewal + a.openRenewal + a.wonUnsettledRenewal,
+          ...cfg,
+          newClientRevenue: (Number(r.msd_new)     || 0) + (Number(r.open_new)     || 0) + (Number(r.wu_new)     || 0),
+          renewalRevenue:   (Number(r.msd_renewal) || 0) + (Number(r.open_renewal) || 0) + (Number(r.wu_renewal) || 0),
         })
         return {
-          id: u.id, name: u.name,
+          id: r.user_id,
+          name: r.name,
+          earned:   repEarned.incentive   || 0,
           proposed: repForecast.incentive || 0,
-          wonCount: a.wonCount,
+          wonCount: Number(r.won_count) || 0,
         }
       })
       .sort((a, b) => b.proposed - a.proposed)
@@ -711,7 +679,18 @@ function Row({ rank, row, isYou }) {
           {row.wonCount} won quote{row.wonCount === 1 ? '' : 's'}
         </div>
       </div>
-      <div className="v2-lb-val"><Money value={row.proposed} /></div>
+      {/* Earned ↑ Proposed stacked — phone widths can't fit two
+          horizontal columns of money so we double them up. */}
+      <div className="v2-lb-val" style={{ textAlign: 'right', lineHeight: 1.3 }}>
+        <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-green)' }}>
+          <Money value={row.earned} />
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>earned</div>
+        <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-ink-0)', marginTop: 2 }}>
+          <Money value={row.proposed} />
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>proposed</div>
+      </div>
     </div>
   )
 }
