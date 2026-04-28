@@ -57,7 +57,7 @@ export default function SalesDashboardV2() {
 
     const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes, usersRes] = await Promise.all([
       supabase.from('quotes')
-        .select('id, quote_number, client_name, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_start_date, campaign_end_date')
+        .select('id, quote_number, client_name, client_company, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_start_date, campaign_end_date')
         .eq('created_by', uid)
         .order('created_at', { ascending: false }),
       supabase.from('payments')
@@ -95,23 +95,80 @@ export default function SalesDashboardV2() {
     const monthEnd   = new Date(monthStart); monthEnd.setMonth(monthEnd.getMonth() + 1)
     const monthStartIso = monthStart.toISOString()
     const monthEndIso   = monthEnd.toISOString()
-    const [{ data: lbQuotes }, { data: lbPayments }] = await Promise.all([
-      supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
+    // Leaderboard now races on PROPOSED INCENTIVE (forecast) per rep,
+    // not won-revenue. Need full data to run calculateIncentive per rep.
+    const [{ data: lbQuotes }, { data: lbPayments }, { data: lbProfiles }, { data: lbMsd }] = await Promise.all([
+      supabase.from('quotes').select('id, created_by, total_amount, subtotal, status, revenue_type, updated_at, created_at'),
       supabase.from('payments')
         .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
         .eq('approval_status', 'approved'),
+      supabase.from('staff_incentive_profiles').select('user_id, monthly_salary, sales_multiplier, new_client_rate, renewal_rate, flat_bonus'),
+      supabase.from('monthly_sales_data').select('staff_id, month_year, new_client_revenue, renewal_revenue').eq('month_year', monthKey),
     ])
     const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
-    const wonByUser = {}
+
+    // Per-quote final-payment lookup (drives won-unsettled forecast)
+    const lbFinalByQuote = {}
+    ;(lbPayments || []).forEach(p => { if (p.is_final_payment) lbFinalByQuote[p.quote_id] = true })
+
+    // Per-rep aggregates: open pipeline + won-unsettled subtotals,
+    // settled monthly revenue, won counts.
+    const repAgg = {}
+    const ensureAgg = (uid) => {
+      if (!repAgg[uid]) {
+        repAgg[uid] = {
+          openNew: 0, openRenewal: 0,
+          wonUnsettledNew: 0, wonUnsettledRenewal: 0,
+          msdNew: 0, msdRenewal: 0,
+          wonCount: 0,
+        }
+      }
+      return repAgg[uid]
+    }
     ;(lbQuotes || []).forEach(q => {
-      const s = lbSettleMap.get(q.id)
-      if (!s) return
-      if (s.settledAt < monthStartIso || s.settledAt >= monthEndIso) return
-      wonByUser[q.created_by] = (wonByUser[q.created_by] || 0) + (q.total_amount || 0)
+      const a = ensureAgg(q.created_by)
+      const sub = Number(q.subtotal) || 0
+      if (!['lost','won'].includes(q.status)) {
+        if (q.revenue_type === 'renewal') a.openRenewal += sub
+        else                              a.openNew     += sub
+      } else if (q.status === 'won') {
+        a.wonCount++
+        if (!lbFinalByQuote[q.id]) {
+          if (q.revenue_type === 'renewal') a.wonUnsettledRenewal += sub
+          else                              a.wonUnsettledNew     += sub
+        }
+      }
     })
+    ;(lbMsd || []).forEach(r => {
+      const a = ensureAgg(r.staff_id)
+      a.msdNew     += r.new_client_revenue || 0
+      a.msdRenewal += r.renewal_revenue    || 0
+    })
+
+    const profileByUser = {}
+    ;(lbProfiles || []).forEach(p => { profileByUser[p.user_id] = p })
+
     const leaderboard = salesUsers
-      .map(u => ({ id: u.id, name: u.name, won: wonByUser[u.id] || 0 }))
-      .sort((a, b) => b.won - a.won)
+      .map(u => {
+        const a = ensureAgg(u.id)
+        const p = profileByUser[u.id] || {}
+        const mult   = p.sales_multiplier ?? settings.default_multiplier ?? 5
+        const nRate  = p.new_client_rate  ?? settings.new_client_rate    ?? 0.05
+        const rRate  = p.renewal_rate     ?? settings.renewal_rate       ?? 0.02
+        const fBonus = p.flat_bonus       ?? settings.default_flat_bonus ?? settings.flat_bonus ?? 10000
+        const repForecast = calculateIncentive({
+          monthlySalary: p.monthly_salary || 0,
+          salesMultiplier: mult, newClientRate: nRate, renewalRate: rRate, flatBonus: fBonus,
+          newClientRevenue: a.msdNew     + a.openNew     + a.wonUnsettledNew,
+          renewalRevenue:   a.msdRenewal + a.openRenewal + a.wonUnsettledRenewal,
+        })
+        return {
+          id: u.id, name: u.name,
+          proposed: repForecast.incentive || 0,
+          wonCount: a.wonCount,
+        }
+      })
+      .sort((a, b) => b.proposed - a.proposed)
 
     // My settled-this-month total (drives the "Settled" KPI)
     const mySettledValue = (lbQuotes || [])
@@ -593,7 +650,7 @@ function ActiveCampaignsCard({ rows, onOpen }) {
                 style={{ cursor: 'pointer' }}
               >
                 <div className="v2d-camp-h">
-                  <div className="v2d-camp-n" title={r.client_name}>{r.client_name}</div>
+                  <div className="v2d-camp-n" title={r.client_company || r.client_name}>{r.client_company || r.client_name}</div>
                   <span className={`v2d-camp-pill ${pillCls}`}>{pillLabel}</span>
                 </div>
                 <div className="v2d-camp-s">{r.quote_number}</div>
@@ -620,7 +677,10 @@ function Leaderboard({ rows, meId }) {
   return (
     <div className="v2-card" style={{ padding: '14px 15px 12px' }}>
       <div className="v2-card-h">
-        <div className="v2-card-t">Team leaderboard · {new Date().toLocaleDateString('en-IN', { month: 'short' })}</div>
+        <div>
+          <div className="v2-card-t">Team leaderboard · {new Date().toLocaleDateString('en-IN', { month: 'short' })}</div>
+          <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>Proposed incentive + total won quotes</div>
+        </div>
         {myRank && <div className="v2-badge v2-badge--neutral">Rank #{myRank}</div>}
       </div>
       {rows.length === 0 ? (
@@ -647,8 +707,11 @@ function Row({ rank, row, isYou }) {
       <div className="v2-lb-avatar">{initials(row.name)}</div>
       <div className="v2-lb-name">
         {row.name}{isYou && <span className="v2-lb-you">· you</span>}
+        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 1 }}>
+          {row.wonCount} won quote{row.wonCount === 1 ? '' : 's'}
+        </div>
       </div>
-      <div className="v2-lb-val"><Money value={row.won} /></div>
+      <div className="v2-lb-val"><Money value={row.proposed} /></div>
     </div>
   )
 }

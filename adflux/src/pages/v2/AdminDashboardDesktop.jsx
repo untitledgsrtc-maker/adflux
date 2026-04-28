@@ -758,8 +758,8 @@ function OutstandingPanel({ rows, onOpen }) {
             <div className="v2d-q-ic v2d-q-ic--rose"><AlertTriangle size={14} /></div>
             <div className="v2d-q-body">
               <div className="v2d-q-t">
-                {r.client_name}
-                {r.client_company && <span style={{ color: 'var(--v2-ink-2)', fontWeight: 500 }}> · {r.client_company}</span>}
+                {r.client_company || r.client_name}
+                {r.client_company && r.client_name && <span style={{ color: 'var(--v2-ink-2)', fontWeight: 500 }}> · {r.client_name}</span>}
               </div>
               <div className="v2d-q-s">{r.quote_number} · {pct}% paid</div>
             </div>
@@ -863,7 +863,7 @@ function ActiveCampaignsPanel({ rows, onOpen }) {
             return (
               <div key={r.id} className="v2d-camp" onClick={() => onOpen(r.id)} style={{ cursor: 'pointer' }}>
                 <div className="v2d-camp-h">
-                  <div className="v2d-camp-n" title={r.client_name}>{r.client_name}</div>
+                  <div className="v2d-camp-n" title={r.client_company || r.client_name}>{r.client_company || r.client_name}</div>
                   <span className={`v2d-camp-pill ${pillCls}`}>{pillLabel}</span>
                 </div>
                 <div className="v2d-camp-s">
@@ -911,7 +911,7 @@ function StalePanel({ rows, onOpen }) {
           {rows.map(r => (
             <tr key={r.id} onClick={() => onOpen(r.id)} style={{ cursor: 'pointer' }}>
               <td>{r.quote_number || '—'}</td>
-              <td>{r.client_name || r.client_company || '—'}</td>
+              <td>{r.client_company || r.client_name || '—'}</td>
               <td>{r.sales_person_name || '—'}</td>
               <td className="num">
                 <span className="v2d-camp-age v2d-camp-age--stale">{r.ageDays}d</span>

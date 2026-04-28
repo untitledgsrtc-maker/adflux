@@ -216,8 +216,8 @@ export default function QuotesV2() {
               <thead>
                 <tr>
                   <Th field="quote_number" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Quote #</Th>
-                  <Th field="client_name"  sortField={sortField} sortDir={sortDir} onSort={handleSort}>Client</Th>
                   <Th field="client_company" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Company</Th>
+                  <Th field="client_name"  sortField={sortField} sortDir={sortDir} onSort={handleSort}>Contact</Th>
                   {isAdmin && (
                     <Th field="sales_person_name" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Sales Rep</Th>
                   )}
@@ -232,8 +232,12 @@ export default function QuotesV2() {
                 {sorted.map(q => (
                   <tr key={q.id} onClick={() => navigate(`/quotes/${q.id}`)}>
                     <td>{q.quote_number}</td>
+                    {/* Company is the primary identifier (B2B context —
+                        a contact is just a person at the company).
+                        Falls back to '—' when company missing. Contact
+                        column shows the named individual. */}
+                    <td style={{ fontWeight: 600 }}>{truncate(q.client_company || '—', 24)}</td>
                     <td>{q.client_name}</td>
-                    <td>{truncate(q.client_company || '—', 24)}</td>
                     {isAdmin && <td>{q.sales_person_name || '—'}</td>}
                     <td className="num">{formatCurrency(q.total_amount)}</td>
                     <td><StatusChip status={q.status} /></td>
@@ -274,9 +278,14 @@ export default function QuotesV2() {
                     <StatusChip status={q.status} />
                   </div>
                   <div className="v2d-qcard-mid">
-                    <div className="v2d-qcard-client">{q.client_name}</div>
+                    {/* Company first (primary), contact name as subtitle.
+                        If no company, fall back to showing the contact
+                        name as the primary so the card never reads "—". */}
+                    <div className="v2d-qcard-client">
+                      {truncate(q.client_company || q.client_name || '—', 30)}
+                    </div>
                     <div className="v2d-qcard-company">
-                      {truncate(q.client_company || '—', 30)}
+                      {q.client_company ? q.client_name : ''}
                     </div>
                   </div>
                   <div className="v2d-qcard-foot">

@@ -149,14 +149,17 @@ export default function QuoteDetail() {
       }
     }
 
-    // Sales-side gate: a payment punched by sales lands as
-    // approval_status='pending'. Flipping the quote to 'won' here
-    // would create the exact bug the user flagged — quote shows Won
-    // while its payment still sits in admin's Pending Approval list.
-    // When sales submits a pending payment, leave the quote in its
-    // current status; admin's approval (approvePayment) flips it to
-    // 'won' atomically. Campaign dates are still saved so admin
-    // doesn't have to re-enter them on approval.
+    // Sales-with-payment gate: payment lands as approval_status='pending'.
+    // We DON'T flip the quote to 'won' here — admin's approval flow
+    // (approvePayment) does that atomically when the payment is
+    // approved. Otherwise the quote would show Won while its payment
+    // still sits in admin's pending queue. Campaign dates are still
+    // saved so admin doesn't have to re-enter them on approval.
+    //
+    // Sales-WITHOUT-payment falls through to the win-now path below —
+    // there's no payment to approve, so the quote just flips to Won.
+    // Incentive still doesn't credit until a final approved payment
+    // lands (DB trigger gates monthly_sales_data on that).
     if (!isAdmin && hasPayment) {
       if (paymentData.campaign_start_date || paymentData.campaign_end_date) {
         const { error: dateErr } = await updateQuoteStatus(quote.id, quote.status, {
@@ -718,9 +721,13 @@ function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
   const balance = Number(quote.total_amount || 0) - Number(totalPaid || 0) - (Number(form.amount_received) || 0)
   const campaignDatesValid = form.campaign_start_date && form.campaign_end_date
   const newAmount = Number(form.amount_received) || 0
-  // Allow confirm if EITHER a new payment is being recorded, OR an
-  // existing payment already exists (Won + Pending Balance is valid).
-  const canConfirm = campaignDatesValid && (newAmount > 0 || hasExistingPayment)
+  // Won is allowed with no payment at all — a "client said yes,
+  // money still pending" state. Campaign dates remain mandatory
+  // because they're what schedules the spot. Incentive doesn't
+  // credit until a final approved payment lands (DB trigger gates
+  // monthly_sales_data on is_final_payment + approval_status), so
+  // a payment-less Won won't pay out anything until the cash clears.
+  const canConfirm = campaignDatesValid
 
   return (
     <div className="mo">
@@ -728,7 +735,7 @@ function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
         <div className="md-h">
           <div>
             <div className="md-t">💰 Mark as Won</div>
-            <div style={{ fontSize: '.75rem', color: 'var(--gray)', marginTop: 3 }}>Enter payment details to confirm</div>
+            <div style={{ fontSize: '.75rem', color: 'var(--gray)', marginTop: 3 }}>Record payment if collected — or leave blank to mark Won with payment pending</div>
           </div>
           <button className="md-x" onClick={onClose}>✕</button>
         </div>
@@ -774,13 +781,13 @@ function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
           <div className="grid2">
             <div className="fg">
               <label>
-                {hasExistingPayment ? 'Additional Payment (₹) — optional' : 'Amount Received (₹)'}
+                {hasExistingPayment ? 'Additional Payment (₹) — optional' : 'Amount Received (₹) — optional'}
               </label>
               <input
                 type="number"
                 value={form.amount_received}
                 onChange={e => set('amount_received', e.target.value)}
-                placeholder={hasExistingPayment ? 'Leave blank to mark Won only' : 'Enter amount'}
+                placeholder="Leave blank to mark Won only"
               />
             </div>
             <div className="fg">
@@ -842,13 +849,7 @@ function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
             className="btn btn-y"
             onClick={() => onConfirm(form)}
             disabled={!canConfirm}
-            title={
-              !campaignDatesValid
-                ? 'Campaign dates are required to mark Won'
-                : !canConfirm
-                ? 'Record a payment amount to mark this quote Won'
-                : ''
-            }
+            title={!campaignDatesValid ? 'Campaign dates are required to mark Won' : ''}
           >
             ✓ Confirm & Mark Won
           </button>

@@ -219,9 +219,15 @@ export default function ClientsV2() {
                 {filtered.map(c => (
                   <tr key={c.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
                     <td style={tdStyle}>
-                      <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{c.name || 'Unknown'}</div>
-                      {c.company && (
-                        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{c.company}</div>
+                      {/* Company is the primary identifier (B2B —
+                          contact name is just the person at the company).
+                          Falls back to contact name when company is
+                          missing so the row never reads "Unknown". */}
+                      <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
+                        {c.company || c.name || 'Unknown'}
+                      </div>
+                      {c.company && c.name && (
+                        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{c.name}</div>
                       )}
                     </td>
                     <td style={tdStyle}>{c.phone || '—'}</td>
