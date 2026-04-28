@@ -1,6 +1,7 @@
 // src/components/incentives/IncentiveDashboard.jsx
 import { useEffect, useState } from 'react'
 import { Trophy, TrendingUp, Users, IndianRupee, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { useIncentive } from '../../hooks/useIncentive'
 import { useTeam } from '../../hooks/useTeam'
 import { calculateIncentive, calculateStreak, isIncrementEligible } from '../../utils/incentiveCalc'
@@ -35,6 +36,11 @@ export function IncentiveDashboard() {
   const [editProfile, setEditProfile] = useState(null)
   const [payoutFor, setPayoutFor]   = useState(null) // { staff, computed }
   const [loading, setLoading]       = useState(true)
+  // Per-staff aggregates from the get_team_leaderboard RPC for the
+  // selected month — feeds the Proposed (forecast) column. RLS would
+  // otherwise block admin from reading every rep's open pipeline +
+  // won-unsettled at once; the SECURITY DEFINER RPC bypasses that.
+  const [proposedInputs, setProposedInputs] = useState({})
 
   const monthOptions = buildMonthOptions()
 
@@ -48,6 +54,28 @@ export function IncentiveDashboard() {
     load()
   }, [])
 
+  // Refetch per-rep proposed inputs whenever the month changes.
+  useEffect(() => {
+    let cancelled = false
+    async function loadProposed() {
+      const { data, error } = await supabase.rpc('get_team_leaderboard', { p_month_keys: [selectedMonth] })
+      if (cancelled) return
+      if (error) { setProposedInputs({}); return }
+      const map = {}
+      ;(data || []).forEach(r => {
+        map[r.user_id] = {
+          openNew:   Number(r.open_new)     || 0,
+          openRen:   Number(r.open_renewal) || 0,
+          wuNew:     Number(r.wu_new)       || 0,
+          wuRen:     Number(r.wu_renewal)   || 0,
+        }
+      })
+      setProposedInputs(map)
+    }
+    loadProposed()
+    return () => { cancelled = true }
+  }, [selectedMonth])
+
   // Merge profiles with member info (profiles join users already from fetchProfiles)
   // Flatten: each profile has users embedded
   const salesProfiles = profiles.filter(p => p.users?.is_active)
@@ -56,24 +84,35 @@ export function IncentiveDashboard() {
   const monthData = monthlySales.filter(m => m.month_year === selectedMonth)
 
   let totalIncentive   = 0
+  let totalProposed    = 0
   let staffAboveTarget = 0
   let incrementEligible = []
 
   salesProfiles.forEach(p => {
     const md = monthData.find(m => m.staff_id === p.user_id)
+    const prop = proposedInputs[p.user_id] || { openNew: 0, openRen: 0, wuNew: 0, wuRen: 0 }
     const salary = p.monthly_salary || 0
     const multiplier = p.sales_multiplier || settings?.default_multiplier || 5
     const target = salary * multiplier
-    const result = calculateIncentive({
+    const cfg = {
       monthlySalary:    salary,
       salesMultiplier:  multiplier,
       newClientRate:    p.new_client_rate ?? settings?.new_client_rate ?? 0.05,
       renewalRate:      p.renewal_rate    ?? settings?.renewal_rate    ?? 0.02,
       flatBonus:        p.flat_bonus      ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
+    }
+    const result = calculateIncentive({
+      ...cfg,
       newClientRevenue: md?.new_client_revenue || 0,
       renewalRevenue:   md?.renewal_revenue    || 0,
     })
+    const proposed = calculateIncentive({
+      ...cfg,
+      newClientRevenue: (md?.new_client_revenue || 0) + prop.openNew + prop.wuNew,
+      renewalRevenue:   (md?.renewal_revenue    || 0) + prop.openRen + prop.wuRen,
+    })
     totalIncentive += result.incentive
+    totalProposed  += proposed.incentive
     if (result.targetExceeded) staffAboveTarget++
 
     const allMd = monthlySales.filter(m => m.staff_id === p.user_id)
@@ -126,7 +165,12 @@ export function IncentiveDashboard() {
         <div className="inc-summary-card">
           <p className="inc-summary-label">Total Incentive</p>
           <div className="inc-summary-value accent">{formatCurrency(totalIncentive)}</div>
-          <div className="inc-summary-sub">Liability this month</div>
+          <div className="inc-summary-sub">
+            Liability this month
+            {totalProposed > totalIncentive && (
+              <> · <span style={{ color: 'var(--accent)' }}>{formatCurrency(totalProposed)}</span> proposed</>
+            )}
+          </div>
         </div>
         <div className="inc-summary-card">
           <p className="inc-summary-label">Above Target</p>
@@ -165,6 +209,7 @@ export function IncentiveDashboard() {
           settings={settings}
           monthlySales={monthlySales}
           selectedMonth={selectedMonth}
+          proposedInputs={proposedInputs}
           onEdit={p => {
             // Find the full member to pass to StaffModal
             const m = members.find(mem => mem.id === p.user_id) || p.users || {}

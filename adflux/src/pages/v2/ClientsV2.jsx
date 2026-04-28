@@ -47,8 +47,10 @@ export default function ClientsV2() {
 
   const [clients, setClients] = useState([])
   const [userMap, setUserMap] = useState({}) // id → name (admin only)
+  const [salesUsers, setSalesUsers] = useState([]) // [{ id, name }] (admin filter)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [repFilter, setRepFilter] = useState('all') // admin-only: 'all' or user_id
   const [editing, setEditing] = useState(null) // client row currently in edit modal
   const [saveErr, setSaveErr] = useState('')
   const [saving, setSaving] = useState(false)
@@ -77,26 +79,34 @@ export default function ClientsV2() {
 
     // Admin needs to see the owner name. One extra query is fine vs
     // embedding a users(name) join, because the join would require an
-    // FK index and we want this list to stay fast.
+    // FK index and we want this list to stay fast. We also keep the
+    // sales-only subset around for the rep filter dropdown.
     if (isAdmin) {
-      const { data: users } = await supabase.from('users').select('id, name')
+      const { data: users } = await supabase.from('users').select('id, name, role')
       const map = {}
       ;(users || []).forEach(u => { map[u.id] = u.name })
       setUserMap(map)
+      setSalesUsers((users || []).filter(u => u.role === 'sales').map(u => ({ id: u.id, name: u.name })))
     }
     setLoading(false)
   }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return clients
-    return clients.filter(c =>
+    let list = clients
+    // Admin-only rep filter — clients are owned per (phone, created_by)
+    // so filtering by created_by gives admin a single rep's book.
+    if (isAdmin && repFilter !== 'all') {
+      list = list.filter(c => c.created_by === repFilter)
+    }
+    if (!q) return list
+    return list.filter(c =>
       (c.name    || '').toLowerCase().includes(q) ||
       (c.company || '').toLowerCase().includes(q) ||
       (c.phone   || '').toLowerCase().includes(q) ||
       (c.email   || '').toLowerCase().includes(q)
     )
-  }, [clients, search])
+  }, [clients, search, isAdmin, repFilter])
 
   function startNewQuoteForClient(c) {
     // Prefill Step1Client via router state. CreateQuoteV2 must read
@@ -177,20 +187,56 @@ export default function ClientsV2() {
           />
         </div>
 
+        {/* Admin-only sales-rep filter — scope the list to one rep's
+            book. Hidden for sales role (RLS already limits them to
+            their own clients, so the dropdown would be a single option). */}
+        {isAdmin && salesUsers.length > 0 && (
+          <select
+            value={repFilter}
+            onChange={e => setRepFilter(e.target.value)}
+            style={{
+              background: 'var(--v2-bg-1, rgba(255,255,255,.04))',
+              border: '1px solid var(--v2-line, rgba(255,255,255,.08))',
+              color: 'var(--v2-ink-0)',
+              fontFamily: 'var(--v2-sans)',
+              fontSize: 13,
+              fontWeight: 500,
+              padding: '8px 14px',
+              borderRadius: 999,
+              cursor: 'pointer',
+            }}
+          >
+            <option value="all">All sales reps</option>
+            {salesUsers.map(u => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+        )}
+
         <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
           <Plus size={15} /> New quote
         </button>
       </div>
 
       {/* ─── Stats strip ──────────────────────────────── */}
-      <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <StatCard label="Total clients" value={clients.length} />
-        <StatCard label="Quotes on record" value={clients.reduce((s, c) => s + (c.quote_count || 0), 0)} />
-        <StatCard
-          label="Total won"
-          money={clients.reduce((s, c) => s + (Number(c.total_won_amount) || 0), 0)}
-        />
-      </section>
+      {/* Stats reflect the rep filter when active so admin can see
+          a single rep's book at a glance. Falls back to all clients
+          when the filter is "All sales reps" or for non-admin views. */}
+      {(() => {
+        const scoped = (isAdmin && repFilter !== 'all')
+          ? clients.filter(c => c.created_by === repFilter)
+          : clients
+        return (
+          <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <StatCard label="Total clients" value={scoped.length} />
+            <StatCard label="Quotes on record" value={scoped.reduce((s, c) => s + (c.quote_count || 0), 0)} />
+            <StatCard
+              label="Total won"
+              money={scoped.reduce((s, c) => s + (Number(c.total_won_amount) || 0), 0)}
+            />
+          </section>
+        )
+      })()}
 
       {/* ─── Table ────────────────────────────────────── */}
       <div className="v2d-panel" style={{ overflow: 'hidden', padding: 0 }}>

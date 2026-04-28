@@ -31,6 +31,12 @@ export function MyPerformance() {
   const [myProfile,  setMyProfile]  = useState(null)
   const [loading,    setLoading]    = useState(true)
   const [activeCampaigns, setActiveCampaigns] = useState([])
+  // Aggregates feeding the Proposed (forecast) calc — open pipeline
+  // subtotals (sent/negotiating quotes the rep hasn't won yet) plus
+  // won-unsettled subtotals (won quotes still waiting on the final
+  // approved payment). These add to monthly_sales_data revenue to
+  // produce the forward-looking number alongside Earned.
+  const [pipeline, setPipeline] = useState({ openNew: 0, openRenewal: 0, wuNew: 0, wuRenewal: 0 })
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -56,6 +62,37 @@ export function MyPerformance() {
           .gte('campaign_end_date', today)
           .order('campaign_end_date', { ascending: true })
         setActiveCampaigns(camps || [])
+
+        // Pull rep's quotes + their approved final payments to derive
+        // open pipeline + won-unsettled subtotals. RLS already scopes
+        // these to the rep's own rows so no special privileges needed.
+        const { data: myQuotes } = await supabase
+          .from('quotes')
+          .select('id, status, revenue_type, subtotal')
+          .eq('created_by', profile.id)
+        const qIds = (myQuotes || []).map(q => q.id)
+        let finalSet = new Set()
+        if (qIds.length) {
+          const { data: finalPays } = await supabase
+            .from('payments')
+            .select('quote_id')
+            .eq('approval_status', 'approved')
+            .eq('is_final_payment', true)
+            .in('quote_id', qIds)
+          finalSet = new Set((finalPays || []).map(p => p.quote_id))
+        }
+        const agg = { openNew: 0, openRenewal: 0, wuNew: 0, wuRenewal: 0 }
+        ;(myQuotes || []).forEach(q => {
+          const sub = Number(q.subtotal) || 0
+          if (!['lost','won'].includes(q.status)) {
+            if (q.revenue_type === 'renewal') agg.openRenewal += sub
+            else                              agg.openNew     += sub
+          } else if (q.status === 'won' && !finalSet.has(q.id)) {
+            if (q.revenue_type === 'renewal') agg.wuRenewal += sub
+            else                              agg.wuNew     += sub
+          }
+        })
+        setPipeline(agg)
       }
       setLoading(false)
     }
@@ -96,15 +133,30 @@ export function MyPerformance() {
   // Selected month data
   const md = monthlySales.find(m => m.month_year === selectedMonth)
 
-  const result = calculateIncentive({
+  const cfg = {
     monthlySalary:    salary,
     salesMultiplier:  multiplier,
     newClientRate:    myProfile.new_client_rate ?? settings?.new_client_rate ?? 0.05,
     renewalRate:      myProfile.renewal_rate    ?? settings?.renewal_rate    ?? 0.02,
     flatBonus:        myProfile.flat_bonus      ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
+  }
+  const result = calculateIncentive({
+    ...cfg,
     newClientRevenue: md?.new_client_revenue || 0,
     renewalRevenue:   md?.renewal_revenue    || 0,
   })
+
+  // Proposed = Earned + open pipeline + won-unsettled. Surfaces the
+  // forward-looking number when no final payments have cleared
+  // yet (otherwise this card just reads ₹0 and reps think their
+  // won quotes don't count).
+  const proposed = calculateIncentive({
+    ...cfg,
+    newClientRevenue: (md?.new_client_revenue || 0) + pipeline.openNew     + pipeline.wuNew,
+    renewalRevenue:   (md?.renewal_revenue    || 0) + pipeline.openRenewal + pipeline.wuRenewal,
+  })
+  const proposedDelta = Math.max(0, (proposed.incentive || 0) - (result.incentive || 0))
+  const proposedExtraRevenue = pipeline.openNew + pipeline.openRenewal + pipeline.wuNew + pipeline.wuRenewal
 
   const streak   = calculateStreak(monthlySales, target)
   const eligible = isIncrementEligible(streak)
@@ -202,6 +254,19 @@ export function MyPerformance() {
             <div className={`perf-breakdown-value${result.incentive > 0 ? ' accent' : ''}`}>
               {result.incentive > 0 ? formatCurrency(result.incentive) : '—'}
             </div>
+            {/* Proposed line — what they're projected to earn once
+                open pipeline closes and won-unsettled clears. Only
+                shown when there's actually a forecast lift, otherwise
+                it's noise. */}
+            {proposedExtraRevenue > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
+                <span style={{ color: 'var(--text)' }}>Proposed: </span>
+                <strong style={{ color: 'var(--accent)' }}>{formatCurrency(proposed.incentive)}</strong>
+                {proposedDelta > 0 && (
+                  <span> (+{formatCurrency(proposedDelta)} once collected)</span>
+                )}
+              </div>
+            )}
             {!result.slabReached && (
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                 Need {formatCurrency(threshold - result.total)} more to unlock

@@ -33,7 +33,7 @@ function StreakBadge({ streak, target }) {
   )
 }
 
-export function StaffTable({ profiles, settings, monthlySales, selectedMonth, onEdit, onPayout }) {
+export function StaffTable({ profiles, settings, monthlySales, selectedMonth, proposedInputs = {}, onEdit, onPayout }) {
   const [expandedId, setExpandedId] = useState(null)
 
   function getMonthData(staffId) {
@@ -87,14 +87,27 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, on
               const multiplier = p.sales_multiplier || settings?.default_multiplier || 5
               const target   = salary * multiplier
 
-              const result = calculateIncentive({
+              const cfg = {
                 monthlySalary:    salary,
                 salesMultiplier:  multiplier,
                 newClientRate:    p.new_client_rate  ?? settings?.new_client_rate  ?? 0.05,
                 renewalRate:      p.renewal_rate     ?? settings?.renewal_rate     ?? 0.02,
                 flatBonus:        p.flat_bonus       ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
+              }
+              const result = calculateIncentive({
+                ...cfg,
                 newClientRevenue: md?.new_client_revenue || 0,
                 renewalRevenue:   md?.renewal_revenue    || 0,
+              })
+              // Proposed = Earned + open pipeline + won-unsettled.
+              // Lets admin see what each rep is "in for" before
+              // payments clear. Shown next to the earned number when
+              // there's a forecast lift; suppressed otherwise.
+              const prop = proposedInputs[p.user_id] || { openNew: 0, openRen: 0, wuNew: 0, wuRen: 0 }
+              const proposed = calculateIncentive({
+                ...cfg,
+                newClientRevenue: (md?.new_client_revenue || 0) + prop.openNew + prop.wuNew,
+                renewalRevenue:   (md?.renewal_revenue    || 0) + prop.openRen + prop.wuRen,
               })
 
               const streak = calculateStreak(allMd, target)
@@ -142,6 +155,14 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, on
                     }}>
                       {result.incentive > 0 ? formatCurrency(result.incentive) : '—'}
                     </span>
+                    {/* Proposed line — only when there's a forecast
+                        lift (rep has open pipeline or won-unsettled).
+                        Otherwise it'd just echo the earned number. */}
+                    {proposed.incentive > result.incentive && (
+                      <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
+                        Proposed: {formatCurrency(proposed.incentive)}
+                      </div>
+                    )}
                     {result.targetExceeded && (
                       <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
                         +{formatCurrency(result.flatBonus)} bonus
