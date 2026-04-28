@@ -628,37 +628,40 @@ export default function AdminDashboardDesktop() {
               <FunnelPanel stages={state.funnel.stages} max={state.funnel.max} />
             </section>
 
-            {/* Row 3: Outstanding payments. Approval queue panel was
-                pulled out of the dashboard — admin opens /pending-approvals
-                directly from the sidebar nav when they need it, no need
-                to surface it here. */}
-            <section>
+            {/* Row 3: Outstanding (LEFT) + Team leaderboard (RIGHT).
+                Both are 6-row scannable lists — pairing them fits the
+                "where's the money stuck / who's earning" glance an
+                admin runs every morning. Outstanding used to take a
+                whole row alone which wasted half the width. */}
+            <section className="v2d-grid-2">
               <OutstandingPanel
                 rows={state.outstandingList}
                 onOpen={(id) => navigate(`/quotes/${id}`)}
               />
-            </section>
-
-            {/* Row 4: Team leaderboard + Incentive liability breakdown.
-                Leaderboard is quote-based (source of truth); liability is
-                incentive-profile-based. Two different questions, two
-                different data sources. */}
-            <section className="v2d-grid-2">
               <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
-              <LiabilityPanel data={state.liability} />
             </section>
 
-            {/* Row 5: Active campaigns */}
-            <ActiveCampaignsPanel rows={state.activeCampaigns} onOpen={(id) => navigate(`/quotes/${id}`)} />
-
-            {/* Row 5b: Stale won quotes — won 60+ days ago, no final
-                payment on file. Punch list for cash collection or
-                cleanup (rep flips to lost). Only renders if there are any. */}
-            {state.staleQuotes && state.staleQuotes.length > 0 && (
-              <StalePanel rows={state.staleQuotes} onOpen={(id) => navigate(`/quotes/${id}`)} />
+            {/* Row 4: Incentive liability + Stale won quotes paired.
+                Both are forward-looking risk views — "what we owe" and
+                "what won't collect". Stale renders conditionally; when
+                missing, liability stretches full-width on its own. */}
+            {state.staleQuotes && state.staleQuotes.length > 0 ? (
+              <section className="v2d-grid-2">
+                <LiabilityPanel data={state.liability} />
+                <StalePanel rows={state.staleQuotes} onOpen={(id) => navigate(`/quotes/${id}`)} />
+              </section>
+            ) : (
+              <section>
+                <LiabilityPanel data={state.liability} />
+              </section>
             )}
 
-            {/* Row 6: Recent activity */}
+            {/* Row 5: Active campaigns — horizontal grid of cards needs
+                the full row width to lay out without wrapping awkwardly. */}
+            <ActiveCampaignsPanel rows={state.activeCampaigns} onOpen={(id) => navigate(`/quotes/${id}`)} />
+
+            {/* Row 6: Recent activity — vertical event feed, full width
+                so timestamps + descriptions don't truncate. */}
             <ActivityPanel items={state.activity} onOpen={(id) => navigate(`/quotes/${id}`)} />
 
             <div className="v2d-foot">
