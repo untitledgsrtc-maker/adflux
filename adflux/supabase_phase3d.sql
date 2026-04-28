@@ -70,7 +70,7 @@ AS $$
       default_multiplier,
       new_client_rate    AS s_new_rate,
       renewal_rate       AS s_ren_rate,
-      COALESCE(default_flat_bonus, flat_bonus) AS s_flat
+      default_flat_bonus AS s_flat
     FROM public.incentive_settings
     LIMIT 1
   )
