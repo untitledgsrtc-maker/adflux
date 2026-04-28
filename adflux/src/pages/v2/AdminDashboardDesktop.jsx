@@ -209,15 +209,86 @@ export default function AdminDashboardDesktop() {
         }
       }
     })
+    // Per-rep open pipeline + won-unsettled subtotals — drives the
+    // Proposed (forecast) column on the team leaderboard. Same logic
+    // the sales-side leaderboard uses; admin reads quotes + payments
+    // directly via admin RLS so we don't need the get_team_leaderboard
+    // RPC here.
+    const finalByQuote = new Set()
+    paymentsApr.forEach(p => { if (p.is_final_payment) finalByQuote.add(p.quote_id) })
+    const repPipeline = {}
+    const ensurePipe = (uid) => {
+      if (!repPipeline[uid]) {
+        repPipeline[uid] = { openNew: 0, openRen: 0, wuNew: 0, wuRen: 0, wonCount: 0 }
+      }
+      return repPipeline[uid]
+    }
+    quotes.forEach(q => {
+      const a = ensurePipe(q.created_by)
+      const sub = Number(q.subtotal) || 0
+      if (!['lost','won'].includes(q.status)) {
+        if (q.revenue_type === 'renewal') a.openRen += sub
+        else                              a.openNew += sub
+      } else if (q.status === 'won') {
+        a.wonCount++
+        if (!finalByQuote.has(q.id)) {
+          if (q.revenue_type === 'renewal') a.wuRen += sub
+          else                              a.wuNew += sub
+        }
+      }
+    })
+
+    // Profile lookup so we can run calculateIncentive per rep.
+    const profileByUser = {}
+    profiles.forEach(p => { profileByUser[p.user_id] = p })
+
+    // Sum monthly_sales_data across the requested period (custom ranges
+    // can span multiple months) so earned reflects the whole window.
+    const msdByUser = {}
+    const ensureMsd = (uid) => {
+      if (!msdByUser[uid]) msdByUser[uid] = { newRev: 0, renRev: 0 }
+      return msdByUser[uid]
+    }
+    msd.forEach(m => {
+      if (!monthKeys.includes(m.month_year)) return
+      const a = ensureMsd(m.staff_id)
+      a.newRev += m.new_client_revenue || 0
+      a.renRev += m.renewal_revenue    || 0
+    })
+
     const leaderboard = salesUsers
-      .map(u => ({
-        id: u.id,
-        name: u.name,
-        won:    settledByUser[u.id] || 0, // primary number — settled revenue
-        closed: wonByUser[u.id]    || 0, // secondary — quotes won this period
-      }))
-      .sort((a, b) => b.won - a.won)
-    const lbMax = Math.max(1, ...leaderboard.map(p => p.won))
+      .map(u => {
+        const pipe = ensurePipe(u.id)
+        const monthRev = msdByUser[u.id] || { newRev: 0, renRev: 0 }
+        const p = profileByUser[u.id] || {}
+        const cfg = {
+          monthlySalary:   p.monthly_salary || 0,
+          salesMultiplier: p.sales_multiplier ?? settings.default_multiplier ?? 5,
+          newClientRate:   p.new_client_rate  ?? settings.new_client_rate    ?? 0.05,
+          renewalRate:     p.renewal_rate     ?? settings.renewal_rate       ?? 0.02,
+          flatBonus:       p.flat_bonus       ?? settings.default_flat_bonus ?? 10000,
+        }
+        const earned = calculateIncentive({
+          ...cfg,
+          newClientRevenue: monthRev.newRev,
+          renewalRevenue:   monthRev.renRev,
+        })
+        const proposed = calculateIncentive({
+          ...cfg,
+          newClientRevenue: monthRev.newRev + pipe.openNew + pipe.wuNew,
+          renewalRevenue:   monthRev.renRev + pipe.openRen + pipe.wuRen,
+        })
+        return {
+          id:       u.id,
+          name:     u.name,
+          earned:   earned.incentive   || 0,
+          proposed: proposed.incentive || 0,
+          wonCount: pipe.wonCount,
+          settled:  settledByUser[u.id] || 0, // legacy — kept for reference
+        }
+      })
+      .sort((a, b) => b.proposed - a.proposed)
+    const lbMax = Math.max(1, ...leaderboard.map(p => p.proposed))
 
     // Incentive liability — monthly_sales_data is keyed by YYYY-MM, so
     // for a custom range we iterate every month the period touches and
@@ -557,13 +628,11 @@ export default function AdminDashboardDesktop() {
               <FunnelPanel stages={state.funnel.stages} max={state.funnel.max} />
             </section>
 
-            {/* Row 3: Approval queue + Outstanding payments */}
-            <section className="v2d-grid-2">
-              <ApprovalQueuePanel
-                pending={state.pending}
-                onOpen={(id) => navigate(`/quotes/${id}`)}
-                onAll={() => navigate('/pending-approvals')}
-              />
+            {/* Row 3: Outstanding payments. Approval queue panel was
+                pulled out of the dashboard — admin opens /pending-approvals
+                directly from the sidebar nav when they need it, no need
+                to surface it here. */}
+            <section>
               <OutstandingPanel
                 rows={state.outstandingList}
                 onOpen={(id) => navigate(`/quotes/${id}`)}
@@ -790,7 +859,7 @@ function LeaderboardPanel({ rows, max, period }) {
       <div className="v2d-panel-h">
         <div>
           <div className="v2d-panel-t">Team leaderboard · {label}</div>
-          <div className="v2d-panel-s">Won-quote revenue per rep this period</div>
+          <div className="v2d-panel-s">Proposed incentive + total won quotes</div>
         </div>
       </div>
       {top.length === 0 ? (
@@ -798,14 +867,28 @@ function LeaderboardPanel({ rows, max, period }) {
       ) : (
         <div className="v2d-lb">
           {top.map((r, i) => {
-            const pct = max > 0 ? Math.round((r.won / max) * 100) : 0
+            const pct = max > 0 ? Math.round((r.proposed / max) * 100) : 0
             const rankCls = i === 0 ? 'v2d-lb-rank-1' : i === 1 ? 'v2d-lb-rank-2' : i === 2 ? 'v2d-lb-rank-3' : 'v2d-lb-rank-n'
             return (
-              <div key={r.id} className="v2d-lb-row">
+              <div key={r.id} className="v2d-lb-row" style={{ alignItems: 'center' }}>
                 <div className={`v2d-lb-rank ${rankCls}`}>{medals[i] || i + 1}</div>
                 <div className="v2d-lb-avatar">{initials(r.name)}</div>
-                <div className="v2d-lb-name">{r.name}</div>
-                <div className="v2d-lb-val"><Money value={r.won} /></div>
+                <div className="v2d-lb-name">
+                  {r.name}
+                  <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>
+                    {r.wonCount} won quote{r.wonCount === 1 ? '' : 's'}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', minWidth: 90 }}>
+                  <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Earned</div>
+                  <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-green)' }}>
+                    <Money value={r.earned} />
+                  </div>
+                </div>
+                <div className="v2d-lb-val" style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Proposed</div>
+                  <Money value={r.proposed} />
+                </div>
                 <div className="v2d-lb-pct">{pct}%</div>
               </div>
             )
