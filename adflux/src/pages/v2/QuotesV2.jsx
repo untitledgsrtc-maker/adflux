@@ -40,6 +40,9 @@ export default function QuotesV2() {
   const [searchDraft, setSearchDraft] = useState(filters.search || '')
   const [sortField, setSortField] = useState('created_at')
   const [sortDir, setSortDir] = useState('desc')
+  // Admin-only sales-rep filter — derived from the quotes already
+  // loaded so no extra fetch is needed. 'all' shows everyone.
+  const [repFilter, setRepFilter] = useState('all')
 
   useEffect(() => {
     setLoading(true)
@@ -72,12 +75,20 @@ export default function QuotesV2() {
   const hasActiveFilters =
     filters.status || filters.search || filters.dateFrom || filters.dateTo
 
+  // Rep-scoped quote pool — used by tab counts so when admin scopes
+  // to one rep, the tabs show that rep's status breakdown (otherwise
+  // "Won 7" lies when the table only renders 3 of theirs).
+  const repScoped = useMemo(() => {
+    if (!isAdmin || repFilter === 'all') return quotes
+    return quotes.filter(q => q.created_by === repFilter)
+  }, [quotes, isAdmin, repFilter])
+
   const counts = useMemo(() => (
     QUOTE_STATUSES.reduce((acc, s) => {
-      acc[s] = quotes.filter(q => q.status === s).length
+      acc[s] = repScoped.filter(q => q.status === s).length
       return acc
     }, {})
-  ), [quotes])
+  ), [repScoped])
 
   const sorted = useMemo(() => {
     return [...quotes].sort((a, b) => {
@@ -96,6 +107,41 @@ export default function QuotesV2() {
     })
   }, [quotes, sortField, sortDir])
 
+  // Build the rep dropdown options from quotes already on screen —
+  // saves an extra users fetch and keeps the list in sync with what
+  // admin can actually see (RLS scoped). Sorted by name for stable UI.
+  const repOptions = useMemo(() => {
+    const seen = new Map()
+    quotes.forEach(q => {
+      if (q.created_by && !seen.has(q.created_by)) {
+        seen.set(q.created_by, q.sales_person_name || '—')
+      }
+    })
+    return Array.from(seen, ([id, name]) => ({ id, name }))
+                .sort((a, b) => a.name.localeCompare(b.name))
+  }, [quotes])
+
+  // Apply the rep filter on top of the sort (sales role doesn't need
+  // this — RLS limits them to their own rows already, so the filter
+  // is admin-only).
+  const displayed = useMemo(() => {
+    if (!isAdmin || repFilter === 'all') return sorted
+    return sorted.filter(q => q.created_by === repFilter)
+  }, [sorted, isAdmin, repFilter])
+
+  // Totals strip — recomputed against the displayed (filtered) set so
+  // when admin scopes to one rep they see that rep's totals only.
+  const totals = useMemo(() => {
+    let amount = 0
+    let outstanding = 0
+    displayed.forEach(q => {
+      amount += Number(q.total_amount) || 0
+      const b = computeBalance(q)
+      if (b.kind === 'due') outstanding += b.amount || 0
+    })
+    return { count: displayed.length, amount, outstanding }
+  }, [displayed])
+
   return (
     <div className="v2d-quotes">
       {/* ─── Page header ──────────────────────────────── */}
@@ -108,8 +154,8 @@ export default function QuotesV2() {
             {isAdmin ? 'Quotes' : 'My Quotes'}
           </h1>
           <div className="v2d-page-sub">
-            {quotes.length} quote{quotes.length !== 1 ? 's' : ''}
-            {hasActiveFilters ? ' · filtered' : ''}
+            {repScoped.length} quote{repScoped.length !== 1 ? 's' : ''}
+            {(hasActiveFilters || (isAdmin && repFilter !== 'all')) ? ' · filtered' : ''}
           </div>
         </div>
         <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
@@ -125,7 +171,7 @@ export default function QuotesV2() {
           onClick={() => setFilters({ status: '' })}
         >
           All
-          <span className="v2d-tab-count">{quotes.length}</span>
+          <span className="v2d-tab-count">{repScoped.length}</span>
         </button>
         {QUOTE_STATUSES.map(s => (
           <button
@@ -178,12 +224,47 @@ export default function QuotesV2() {
           />
         </div>
 
-        {hasActiveFilters && (
-          <button className="v2d-ghost" onClick={handleReset}>
+        {/* Admin-only sales-rep filter — scope the table + totals
+            strip to one rep. Hidden for sales role since RLS already
+            limits them to their own quotes. */}
+        {isAdmin && repOptions.length > 0 && (
+          <select
+            value={repFilter}
+            onChange={e => setRepFilter(e.target.value)}
+            className="v2d-date"
+            style={{ minWidth: 160, cursor: 'pointer' }}
+          >
+            <option value="all">All sales reps</option>
+            {repOptions.map(r => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+        )}
+
+        {(hasActiveFilters || (isAdmin && repFilter !== 'all')) && (
+          <button className="v2d-ghost" onClick={() => { handleReset(); setRepFilter('all') }}>
             <X size={13} />
             <span>Clear</span>
           </button>
         )}
+      </div>
+
+      {/* Totals strip — count, total amount, total outstanding for the
+          currently displayed (filtered) set. Reflects status tab,
+          search, date range, AND rep filter so admin can scope to one
+          rep and read their book at a glance. */}
+      <div
+        className="v2d-totals-strip"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 12,
+          margin: '0 0 14px',
+        }}
+      >
+        <TotalCard label="Total quotes" value={totals.count} kind="count" />
+        <TotalCard label="Total amount" value={totals.amount} kind="money" />
+        <TotalCard label="Outstanding" value={totals.outstanding} kind="money" warn />
       </div>
 
       {/* ─── Body ─────────────────────────────────────── */}
@@ -192,7 +273,7 @@ export default function QuotesV2() {
           <div className="v2d-spinner" />
           Loading quotes…
         </div>
-      ) : sorted.length === 0 ? (
+      ) : displayed.length === 0 ? (
         <div className="v2d-panel v2d-empty-card">
           <div className="v2d-empty-ic">📄</div>
           <div className="v2d-empty-t">No quotes found</div>
@@ -229,7 +310,7 @@ export default function QuotesV2() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(q => (
+                {displayed.map(q => (
                   <tr key={q.id} onClick={() => navigate(`/quotes/${q.id}`)}>
                     <td>{q.quote_number}</td>
                     {/* Company is the primary identifier (B2B context —
@@ -265,7 +346,7 @@ export default function QuotesV2() {
 
           {/* Mobile: card list (visible <860px via CSS) */}
           <div className="v2d-qlist">
-            {sorted.map(q => {
+            {displayed.map(q => {
               const b = computeBalance(q)
               return (
                 <button
@@ -358,5 +439,48 @@ function FollowUpChip({ q }) {
     <span className={cls}>
       {q.follow_up_done ? '✓ Done' : formatDate(q.follow_up_date)}
     </span>
+  )
+}
+
+/* ─── Totals strip card — count or money. `warn` flips the value
+       color to the rose accent (used for Outstanding so it reads as
+       attention-needed instead of neutral). ─── */
+function TotalCard({ label, value, kind, warn }) {
+  const display = kind === 'money'
+    ? `₹${new Intl.NumberFormat('en-IN').format(Math.round(Number(value) || 0))}`
+    : (Number(value) || 0).toLocaleString('en-IN')
+  return (
+    <div
+      className="v2d-panel"
+      style={{
+        padding: '14px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: '.14em',
+          textTransform: 'uppercase',
+          fontWeight: 700,
+          color: 'var(--v2-ink-2)',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--v2-display)',
+          fontSize: 22,
+          fontWeight: 700,
+          color: warn ? 'var(--v2-amber)' : 'var(--v2-ink-0)',
+          lineHeight: 1.1,
+        }}
+      >
+        {display}
+      </div>
+    </div>
   )
 }
