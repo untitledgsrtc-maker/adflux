@@ -120,43 +120,67 @@ export default function SalesDashboardDesktop() {
     // We still fetch lbQuotes + lbPayments separately because the
     // settlement map (used for the rep's own settled-this-period KPI)
     // needs payment_date data the RPC doesn't expose.
-    const [{ data: lbQuotes }, { data: lbPayments }, { data: lbRpc }] = await Promise.all([
+    const [{ data: lbQuotes }, { data: lbPayments }, lbRpcRes, lbUsersRes] = await Promise.all([
       supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
       supabase.from('payments')
         .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
         .eq('approval_status', 'approved'),
       supabase.rpc('get_team_leaderboard', { p_month_keys: monthKeys }),
+      // Names-only fallback for when the RPC isn't deployed yet —
+      // RLS on users normally lets sales read the team list, so we
+      // can at least populate the leaderboard with names + ₹0 until
+      // supabase_phase3d.sql is applied.
+      supabase.from('users').select('id, name').eq('role', 'sales'),
     ])
     const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
 
-    const leaderboard = (lbRpc || [])
-      .map(r => {
-        const cfg = {
-          monthlySalary:   Number(r.monthly_salary)   || 0,
-          salesMultiplier: Number(r.sales_multiplier) || 5,
-          newClientRate:   Number(r.new_client_rate)  || 0.05,
-          renewalRate:     Number(r.renewal_rate)     || 0.02,
-          flatBonus:       Number(r.flat_bonus)       || 10000,
-        }
-        const repEarned = calculateIncentive({
-          ...cfg,
-          newClientRevenue: Number(r.msd_new)     || 0,
-          renewalRevenue:   Number(r.msd_renewal) || 0,
+    let leaderboard
+    if (lbRpcRes?.data && lbRpcRes.data.length > 0) {
+      leaderboard = lbRpcRes.data
+        .map(r => {
+          const cfg = {
+            monthlySalary:   Number(r.monthly_salary)   || 0,
+            salesMultiplier: Number(r.sales_multiplier) || 5,
+            newClientRate:   Number(r.new_client_rate)  || 0.05,
+            renewalRate:     Number(r.renewal_rate)     || 0.02,
+            flatBonus:       Number(r.flat_bonus)       || 10000,
+          }
+          const repEarned = calculateIncentive({
+            ...cfg,
+            newClientRevenue: Number(r.msd_new)     || 0,
+            renewalRevenue:   Number(r.msd_renewal) || 0,
+          })
+          const repForecast = calculateIncentive({
+            ...cfg,
+            newClientRevenue: (Number(r.msd_new)     || 0) + (Number(r.open_new)     || 0) + (Number(r.wu_new)     || 0),
+            renewalRevenue:   (Number(r.msd_renewal) || 0) + (Number(r.open_renewal) || 0) + (Number(r.wu_renewal) || 0),
+          })
+          return {
+            id: r.user_id,
+            name: r.name,
+            earned:   repEarned.incentive   || 0,
+            proposed: repForecast.incentive || 0,
+            wonCount: Number(r.won_count) || 0,
+          }
         })
-        const repForecast = calculateIncentive({
-          ...cfg,
-          newClientRevenue: (Number(r.msd_new)     || 0) + (Number(r.open_new)     || 0) + (Number(r.wu_new)     || 0),
-          renewalRevenue:   (Number(r.msd_renewal) || 0) + (Number(r.open_renewal) || 0) + (Number(r.wu_renewal) || 0),
-        })
-        return {
-          id: r.user_id,
-          name: r.name,
-          earned:   repEarned.incentive   || 0,
-          proposed: repForecast.incentive || 0,
-          wonCount: Number(r.won_count) || 0,
-        }
-      })
-      .sort((a, b) => b.proposed - a.proposed)
+        .sort((a, b) => b.proposed - a.proposed)
+    } else {
+      // RPC failed (function not deployed) or returned empty — fall
+      // back to the user list so names still render with zeros. The
+      // current rep is patched with their own forecast incentive
+      // computed from already-fetched data so they see SOMETHING.
+      if (lbRpcRes?.error) {
+        console.warn('[leaderboard] RPC unavailable, using fallback. Apply supabase_phase3d.sql.', lbRpcRes.error)
+      }
+      leaderboard = (lbUsersRes?.data || []).map(u => ({
+        id: u.id,
+        name: u.name,
+        earned: 0,
+        proposed: 0,
+        wonCount: 0,
+        _fallback: true,
+      }))
+    }
 
     // My settled-this-period revenue — the actually-paid number.
     // Read from the same settle map the leaderboard uses so the rep's
@@ -691,15 +715,20 @@ function LeaderboardPanel({ rows, meId }) {
   const myRank = me ? rows.findIndex(r => r.id === meId) + 1 : null
   const leader = rows[0]
   const myPct = me && leader?.proposed ? Math.min(100, Math.round((me.proposed / leader.proposed) * 100)) : 0
+  const usingFallback = rows.length > 0 && rows.every(r => r._fallback)
 
   return (
     <div className="v2d-panel">
       <div className="v2d-panel-h">
         <div>
           <div className="v2d-panel-t">Team leaderboard · {new Date().toLocaleDateString('en-IN', { month: 'short' })}</div>
-          <div className="v2d-panel-s">Proposed incentive + total won quotes</div>
+          <div className="v2d-panel-s">
+            {usingFallback
+              ? 'Names only — apply supabase_phase3d.sql to populate numbers'
+              : 'Proposed incentive + total won quotes'}
+          </div>
         </div>
-        {myRank && <div className="v2d-badge v2d-badge--neutral">Rank #{myRank} · {myPct}% of leader</div>}
+        {myRank && !usingFallback && <div className="v2d-badge v2d-badge--neutral">Rank #{myRank} · {myPct}% of leader</div>}
       </div>
 
       {rows.length === 0 ? (
