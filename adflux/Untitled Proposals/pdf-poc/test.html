@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="utf-8">
+<title>Gujarati PDF Render Test — Untitled Proposals</title>
+
+<!--
+  Font strategy:
+  - Noto Sans Gujarati for Gujarati text (covers all conjuncts; OpenType GSUB tables
+    are honoured by Chromium's HarfBuzz shaper).
+  - DM Sans for English body, Space Grotesk for English display headings (matches
+    Adflux design tokens).
+  - Loaded from Google Fonts. In production we self-host (woff2) so the
+    serverless cold start doesn't depend on Google's CDN.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gujarati:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ---------------------------------------------------------------
+     Page setup — A4 portrait, generous margins so India Post envelopes
+     don't clip the office copy. @page rules are honoured by Puppeteer.
+     --------------------------------------------------------------- */
+  @page {
+    size: A4 portrait;
+    margin: 18mm 16mm 22mm 16mm;
+  }
+
+  :root {
+    --up-ink:        #1a1a1a;
+    --up-ink-muted:  #4a4a4a;
+    --up-line:       #d8d8d8;
+    --up-line-soft:  #ececec;
+    --up-accent:     #8b1f2a;   /* Untitled brand red — used sparingly */
+    --up-bg-tint:    #faf7f4;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    color: var(--up-ink);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    /*
+      `lang="gu"` on <html> + this stack means:
+      - Gujarati glyphs go to Noto Sans Gujarati
+      - Latin/digits go to DM Sans
+      - Chromium picks per-codepoint, which is exactly what we want for
+        bilingual receipts ("ગ્રાહક / Client: Acme Pvt Ltd")
+    */
+    font-family: 'DM Sans', 'Noto Sans Gujarati', system-ui, sans-serif;
+    font-size: 11pt;
+    line-height: 1.55;
+  }
+
+  .gu {
+    font-family: 'Noto Sans Gujarati', 'DM Sans', system-ui, sans-serif;
+    font-feature-settings: "akhn", "blwf", "half", "haln", "vatu", "pres", "abvs", "blws", "psts", "haln";
+    /*
+      The OpenType features above are the Indic shaping features for
+      Gujarati. HarfBuzz applies them automatically when language is set,
+      but explicitly listing them is defensive — some font subsetters drop
+      tables otherwise.
+    */
+  }
+
+  h1, h2, h3 {
+    font-family: 'Space Grotesk', 'Noto Sans Gujarati', sans-serif;
+    margin: 0 0 0.4em;
+    font-weight: 600;
+  }
+  h1 { font-size: 18pt; letter-spacing: -0.01em; }
+  h2 { font-size: 13pt; color: var(--up-accent); margin-top: 1.4em; }
+  h3 { font-size: 11pt; color: var(--up-ink-muted); }
+
+  .meta {
+    color: var(--up-ink-muted);
+    font-size: 9pt;
+    margin-top: 4mm;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--up-line);
+    margin: 6mm 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 3mm 0;
+    font-size: 10pt;
+  }
+  th, td {
+    border: 1px solid var(--up-line-soft);
+    padding: 6pt 8pt;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--up-bg-tint);
+    font-weight: 600;
+    font-size: 9.5pt;
+    color: var(--up-ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .torture-row {
+    background: #fff8f0;
+  }
+
+  .footnote {
+    font-size: 8.5pt;
+    color: var(--up-ink-muted);
+    margin-top: 8mm;
+    padding-top: 4mm;
+    border-top: 1px dashed var(--up-line);
+  }
+
+  .stamp {
+    display: inline-block;
+    padding: 2pt 8pt;
+    border: 1.5px solid var(--up-accent);
+    color: var(--up-accent);
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    border-radius: 2pt;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div>
+  <h1 class="gu">અનટાઈટલ્ડ એડવર્ટાઈઝિંગ — પ્રપોઝલ રેન્ડર પરીક્ષણ</h1>
+  <h3>Untitled Advertising — Proposal Render Test</h3>
+  <div class="meta">
+    Document: PoC · Date: 2026-04-25 · Renderer: Chromium + HarfBuzz<br>
+    Reference: <span class="gu">UA/AUTO/૨૦૨૬-૨૭/૦૦૦૧</span> (UA/AUTO/2026-27/0001)
+    &nbsp;<span class="stamp">Office Copy</span>
+  </div>
+</div>
+
+<hr>
+
+<h2 class="gu">૧. કઠિન જોડાક્ષરો — Conjunct Stress Test</h2>
+<p>
+  This page deliberately exercises the conjuncts that broke the docx-based
+  pipeline. If any glyph below renders as a dotted-circle placeholder, a square
+  box, or a visible halant (વિરામ), the font fallback is wrong and the proposal
+  output cannot ship.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:30%">Word (Gujarati)</th>
+      <th style="width:30%">Phonetic</th>
+      <th>What it tests</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="torture-row">
+      <td class="gu">ક્ષેત્રે</td>
+      <td>kṣetre</td>
+      <td>The classic ક + ષ ligature. Most weak fonts collapse this to "ક્ ષ".</td>
+    </tr>
+    <tr class="torture-row">
+      <td class="gu">સ્વચ્છ</td>
+      <td>swacch</td>
+      <td>Double consonant cluster + reph-like joiner; common in govt copy ("Swachh Bharat").</td>
+    </tr>
+    <tr class="torture-row">
+      <td class="gu">વ્યાજબી</td>
+      <td>vyājabī</td>
+      <td>વ + ય half-form. Failure mode: standalone halant visible.</td>
+    </tr>
+    <tr class="torture-row">
+      <td class="gu">ર્ડા</td>
+      <td>rḍā</td>
+      <td>Reph-above + matra below — three-stack vertical.</td>
+    </tr>
+    <tr class="torture-row">
+      <td class="gu">ડાઇરેક્ટર</td>
+      <td>director</td>
+      <td>Loanword with ઇ matra + ક + ટ conjunct + ર.</td>
+    </tr>
+    <tr>
+      <td class="gu">જાહેરાત</td>
+      <td>jāherāt</td>
+      <td>"Advertisement" — appears on every proposal.</td>
+    </tr>
+    <tr>
+      <td class="gu">પ્રપોઝલ</td>
+      <td>proposal</td>
+      <td>પ + ર half-form (પ્ર is the most common conjunct in govt prose).</td>
+    </tr>
+    <tr>
+      <td class="gu">સ્ક્રીન</td>
+      <td>screen</td>
+      <td>Triple-stack at start — સ્ક્ + ર + ી.</td>
+    </tr>
+    <tr>
+      <td class="gu">ગુજરાત રાજ્ય માર્ગ વાહન વ્યવહાર નિગમ</td>
+      <td>GSRTC full name</td>
+      <td>Long phrase with mixed reph, half-forms, and matras. Tests line-breaking.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 class="gu">૨. દ્વિભાષી ટેબલ — Bilingual Numbers</h2>
+<p>Bilingual table mirrors the actual proposal financial summary layout.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th class="gu">વિગત / Description</th>
+      <th class="gu">જથ્થો / Qty</th>
+      <th class="gu">દર (₹) / Rate</th>
+      <th class="gu">રકમ (₹) / Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <span class="gu">સુરત (સિટી) — GSRTC LED સ્ક્રીન</span><br>
+        <small>Surat (City) — GSRTC LED Screen, 30 days, 1500 spots/mo @ ₹3.00/slot</small>
+      </td>
+      <td>1500</td>
+      <td>3.00</td>
+      <td>4,500.00</td>
+    </tr>
+    <tr>
+      <td>
+        <span class="gu">અમદાવાદ — ઓટો રિક્ષા હૂડ જાહેરાત</span><br>
+        <small>Ahmedabad — Auto Hood Advertising, 100 rickshaws × 30 days @ ₹825</small>
+      </td>
+      <td>100</td>
+      <td>825.00</td>
+      <td>82,500.00</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="text-align:right"><strong>Subtotal</strong></td>
+      <td><strong>87,000.00</strong></td>
+    </tr>
+    <tr>
+      <td colspan="3" style="text-align:right">GST @ 18%</td>
+      <td>15,660.00</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="text-align:right"><strong class="gu">કુલ રકમ / Total Amount</strong></td>
+      <td><strong>1,02,660.00</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 class="gu">૩. હસ્તાક્ષર બ્લોક — Signature Block</h2>
+<table>
+  <tr>
+    <td style="width:50%; border:none">
+      <strong class="gu">આપનો વિશ્વાસુ,</strong><br>
+      <small>Yours faithfully,</small><br>
+      <br><br><br>
+      <strong class="gu">બ્રિજેશ પટેલ</strong><br>
+      <small>Brijesh Patel</small><br>
+      <span class="gu">ડાઇરેક્ટર</span> / Director<br>
+      <span class="gu">અનટાઈટલ્ડ એડવર્ટાઈઝિંગ</span><br>
+      <small>Untitled Advertising</small>
+    </td>
+    <td style="width:50%; border:none; text-align:right">
+      <small>HSN/SAC: 998361</small><br>
+      <small>GSTIN: 24AAAAA0000A1Z5</small><br>
+      <small>PAN: AAAAA0000A</small>
+    </td>
+  </tr>
+</table>
+
+<div class="footnote gu">
+  નોંધ: આ દસ્તાવેજ ૯૦ દિવસ માટે માન્ય છે. ચુકવણી DD / NEFT / RTGS / UPI દ્વારા
+  સ્વીકારવામાં આવશે. કરના નિયમો અનુસાર TDS @ ૨% (આવકવેરા) અને ૨% (GST) કાપવાનો છે.
+</div>
+<div class="footnote">
+  Note: This document is valid for 90 days. Payments accepted via DD / NEFT / RTGS / UPI.
+  TDS @ 2% (Income Tax, sec 194C) and 2% (GST, sec 51) is applicable as per law.
+</div>
+
+</body>
+</html>

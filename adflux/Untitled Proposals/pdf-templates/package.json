@@ -1,0 +1,15 @@
+{
+  "name": "untitled-proposals-pdf-templates",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HTML/CSS templates for proposal PDFs and receipt vouchers (consumed by the API at render time).",
+  "type": "module",
+  "exports": {
+    ".": "./render.js",
+    "./shared/styles.js": "./shared/styles.js",
+    "./shared/helpers.js": "./shared/helpers.js"
+  },
+  "scripts": {
+    "smoke": "node smoke-test.mjs"
+  }
+}
