@@ -108,4 +108,3 @@ export function validateStep4Gsrtc(data) {
   if (m > 36) return 'Campaign over 36 months — double-check.'
   return null
 }
-—
