@@ -36,16 +36,26 @@ export function Step5ReviewGsrtc({ data }) {
     [stations, data.selected_station_ids],
   )
 
+  const overrides = data.station_overrides || {}
   const lineItems = selectedStations.map(s => {
-    const monthly = (Number(s.screens_count) || 0) * 100 * 30 * Number(s.davp_per_slot_rate || 0)
+    const ov = overrides[s.id] || {}
+    const daily    = ov.daily_spots_override ?? 100
+    const days     = ov.days_override ?? 30
+    const duration = ov.spot_duration_sec_override ?? 10
+    const screens  = Number(s.screens_count) || 0
+    const rate     = Number(s.davp_per_slot_rate || 0)
+    const monthly  = screens * daily * days * rate
     return {
       id: s.id,
       description: s.station_name_en,
       description_gu: s.station_name_gu,
       category: s.category,
-      screens: s.screens_count,
-      monthly_spots: (Number(s.screens_count) || 0) * 100 * 30,
-      unit_rate: Number(s.davp_per_slot_rate || 0),
+      screens,
+      daily_spots: daily,
+      days,
+      spot_duration_sec: duration,
+      monthly_spots: screens * daily * days,   // shown in rate sheet
+      unit_rate: rate,
       monthly_total: monthly,
     }
   })
