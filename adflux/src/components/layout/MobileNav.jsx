@@ -11,7 +11,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2,
   Users, TrendingUp, BarChart3, Inbox, RotateCcw,
-  Briefcase, FileSignature,
+  Briefcase, FileSignature, MapPin, Tv,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
@@ -23,12 +23,14 @@ import { fetchPendingCount } from '../../hooks/usePayments'
 // Sidebar so every route is reachable from mobile too. Labels are
 // shortened because the bar is flex-equal-width and long labels
 // wrap awkwardly.
-const ADMIN_NAV = [
+const PRIVILEGED_NAV = [
   { to: '/dashboard',         icon: LayoutDashboard, label: 'Home' },
   { to: '/quotes',            icon: FileText,        label: 'Quotes' },
   { to: '/pending-approvals', icon: Inbox,           label: 'Pending', showPill: true },
   { to: '/renewal-tools',     icon: RotateCcw,       label: 'Renewals' },
   { to: '/cities',            icon: Building2,       label: 'Cities' },
+  { to: '/auto-districts',    icon: MapPin,          label: 'Districts' },
+  { to: '/gsrtc-stations',    icon: Tv,              label: 'GSRTC' },
   { to: '/team',              icon: Users,           label: 'Team' },
   { to: '/hr',                icon: Briefcase,       label: 'HR' },
   { to: '/incentives',        icon: TrendingUp,      label: 'Incentives' },
@@ -43,13 +45,13 @@ const SALES_NAV = [
 ]
 
 export function MobileNav() {
-  const { isAdmin } = useAuth()
-  const nav = isAdmin ? ADMIN_NAV : SALES_NAV
+  const { isPrivileged } = useAuth()
+  const nav = isPrivileged ? PRIVILEGED_NAV : SALES_NAV
 
   const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!isPrivileged) return
     let cancelled = false
     const load = async () => {
       const { count } = await fetchPendingCount()
@@ -61,7 +63,7 @@ export function MobileNav() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, load)
       .subscribe()
     return () => { cancelled = true; supabase.removeChannel(ch) }
-  }, [isAdmin])
+  }, [isPrivileged])
 
   return (
     <nav className="mobile-nav">

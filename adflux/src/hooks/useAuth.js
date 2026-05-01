@@ -71,8 +71,26 @@ export function useAuth() {
     user,
     profile,
     loading,
-    isAdmin: profile?.role === 'admin',
-    isSales: profile?.role === 'sales',
+
+    // Backwards-compatible role flags
+    isAdmin:      profile?.role === 'admin',
+    isSales:      profile?.role === 'sales',
+
+    // New role flags (Phase 5 added owner / co_owner to the enum)
+    isOwner:      profile?.role === 'owner',
+    isCoOwner:    profile?.role === 'co_owner',
+
+    // Full-access set used by sidebar gating + master-data pages
+    isPrivileged: ['admin','owner','co_owner'].includes(profile?.role),
+
+    // Segment scope (PRIVATE / GOVERNMENT / ALL) — defaults ALL if
+    // somehow null, mirrors the DB default.
+    segmentAccess: profile?.segment_access || 'ALL',
+
+    // Signing authority flag — drives govt wizard signer dropdown
+    // (Brijesh + Vishal both have this true after phase5 + Vishal seed).
+    isSigner: !!profile?.signing_authority,
+
     signIn,
     signOut,
   }

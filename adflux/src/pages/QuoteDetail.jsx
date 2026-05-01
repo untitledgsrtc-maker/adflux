@@ -90,6 +90,16 @@ export default function QuoteDetail() {
     if (id) fetchPayments()
   }, [id, fetchPayments])
 
+  // Phase 6: Government quotes have their own renderer page. If we
+  // landed here for a govt-segment quote (legacy bookmark or list
+  // click before the QuotesV2 list learned to discriminate), bounce
+  // over to /proposal/:id without losing the user's place.
+  useEffect(() => {
+    if (currentQuote?.segment === 'GOVERNMENT') {
+      navigate(`/proposal/${id}`, { replace: true })
+    }
+  }, [currentQuote?.segment, id, navigate])
+
   const quote  = currentQuote
   const cities = quote?.quote_cities || []
   const balance = quote ? (quote.total_amount - totalPaid) : 0

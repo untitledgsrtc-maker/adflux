@@ -18,7 +18,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, BarChart3, Users, Building2,
   Repeat, Gift, Settings, LogOut, Search, Bell, Plus, AlertTriangle,
   CheckCircle2, CreditCard, Send, PenLine, ArrowUpRight,
-  Contact2,
+  Contact2, MapPin, Tv,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -456,6 +456,12 @@ export default function AdminDashboardDesktop() {
             <div className="v2d-nav-group">Manage</div>
             <button onClick={() => navigate('/cities')}>
               <Building2 size={16} /><span>Cities</span>
+            </button>
+            <button onClick={() => navigate('/auto-districts')}>
+              <MapPin size={16} /><span>Auto Districts</span>
+            </button>
+            <button onClick={() => navigate('/gsrtc-stations')}>
+              <Tv size={16} /><span>GSRTC Stations</span>
             </button>
             <button onClick={() => navigate('/team')}>
               <Users size={16} /><span>Team</span>

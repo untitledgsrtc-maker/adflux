@@ -25,7 +25,9 @@ import SalesDashboardDesktop from './SalesDashboardDesktop'
 import AdminDashboardDesktop from './AdminDashboardDesktop'
 
 export default function DashboardV2() {
-  const { isAdmin, loading } = useAuth()
+  // Privileged set (admin / owner / co_owner) all get the admin
+  // dashboard. Sales reps get the sales dashboard.
+  const { isPrivileged, loading } = useAuth()
   const isDesktop = useIsDesktop()
 
   if (loading) {
@@ -36,6 +38,6 @@ export default function DashboardV2() {
     )
   }
 
-  if (isAdmin) return <AdminDashboardDesktop />
+  if (isPrivileged) return <AdminDashboardDesktop />
   return isDesktop ? <SalesDashboardDesktop /> : <SalesDashboardV2 />
 }

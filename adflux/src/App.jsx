@@ -22,6 +22,14 @@ import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
 import HRV2               from './pages/v2/HRV2'
 import ClientsV2          from './pages/v2/ClientsV2'
 
+// ── Government module (Phase 6) ─────────────────────────────────────
+import CreateQuoteChooserV2  from './pages/v2/CreateQuoteChooserV2'
+import CreateGovtAutoHoodV2  from './pages/v2/CreateGovtAutoHoodV2'
+import CreateGovtGsrtcLedV2  from './pages/v2/CreateGovtGsrtcLedV2'
+import AutoDistrictsV2       from './pages/v2/AutoDistrictsV2'
+import GsrtcStationsV2       from './pages/v2/GsrtcStationsV2'
+import GovtProposalDetailV2  from './pages/v2/GovtProposalDetailV2'
+
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
 }
@@ -37,6 +45,26 @@ function RequireAdmin({ children }) {
   const { isAdmin, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!isAdmin) return <Navigate to="/quotes" replace />
+  return children
+}
+
+/* Privileged set = admin / owner / co_owner. Used to gate master
+   pages and admin-only pieces of the new govt module. */
+function RequirePrivileged({ children }) {
+  const { isPrivileged, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!isPrivileged) return <Navigate to="/quotes" replace />
+  return children
+}
+
+/* Govt-segment guard. Used by the Government wizard so a Private-only
+   sales rep can't reach it via direct URL. ALL or GOVERNMENT is OK. */
+function RequireGovtAccess({ children }) {
+  const { segmentAccess, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (segmentAccess !== 'ALL' && segmentAccess !== 'GOVERNMENT') {
+    return <Navigate to="/quotes" replace />
+  }
   return children
 }
 
@@ -67,24 +95,38 @@ export default function App() {
         {/* ─── v2 inner pages (share V2AppShell chrome) ─── */}
         <Route element={<RequireAuth><V2AppShell /></RequireAuth>}>
           {/* Shared — admin + sales */}
-          <Route path="/quotes"            element={<QuotesV2 />} />
-          <Route path="/quotes/:id"        element={<QuoteDetail />} />
-          <Route path="/quotes/new"        element={<CreateQuoteV2 />} />
-          <Route path="/renewal-tools"     element={<RenewalToolsV2 />} />
+          <Route path="/quotes"                    element={<QuotesV2 />} />
+          <Route path="/quotes/:id"                element={<QuoteDetail />} />
+          {/* Quote chooser — Step 0 of new-quote flow. Sales reps
+              with a single segment scope skip directly to the right
+              wizard, but the chooser handles that case too. */}
+          <Route path="/quotes/new"                element={<CreateQuoteChooserV2 />} />
+          {/* Private LED quote (existing wizard) */}
+          <Route path="/quotes/new/private"        element={<CreateQuoteV2 />} />
+          {/* Government module — Auto Hood + GSRTC LED */}
+          <Route path="/quotes/new/government"     element={<RequireGovtAccess><CreateQuoteChooserV2 /></RequireGovtAccess>} />
+          <Route path="/quotes/new/government/auto-hood" element={<RequireGovtAccess><CreateGovtAutoHoodV2 /></RequireGovtAccess>} />
+          <Route path="/quotes/new/government/gsrtc-led" element={<RequireGovtAccess><CreateGovtGsrtcLedV2 /></RequireGovtAccess>} />
+          {/* Govt proposal renderer (HTML preview, browser-printable) */}
+          <Route path="/proposal/:id"              element={<GovtProposalDetailV2 />} />
+
+          <Route path="/renewal-tools"             element={<RenewalToolsV2 />} />
           {/* Clients is visible to both roles; RLS on the clients table
               scopes rows so sales sees own, admin sees all. */}
-          <Route path="/clients"           element={<ClientsV2 />} />
+          <Route path="/clients"                   element={<ClientsV2 />} />
 
           {/* Sales-only */}
-          <Route path="/my-performance"    element={<MyPerformanceV2 />} />
-          <Route path="/my-offer"          element={<MyOfferV2 />} />
+          <Route path="/my-performance"            element={<MyPerformanceV2 />} />
+          <Route path="/my-offer"                  element={<MyOfferV2 />} />
 
-          {/* Admin-only */}
-          <Route path="/cities"            element={<RequireAdmin><CitiesV2 /></RequireAdmin>} />
-          <Route path="/team"              element={<RequireAdmin><TeamV2 /></RequireAdmin>} />
-          <Route path="/incentives"        element={<RequireAdmin><IncentivesV2 /></RequireAdmin>} />
-          <Route path="/pending-approvals" element={<RequireAdmin><PendingApprovalsV2 /></RequireAdmin>} />
-          <Route path="/hr"                element={<RequireAdmin><HRV2 /></RequireAdmin>} />
+          {/* Admin / owner / co_owner master pages */}
+          <Route path="/cities"                    element={<RequirePrivileged><CitiesV2 /></RequirePrivileged>} />
+          <Route path="/auto-districts"            element={<RequirePrivileged><AutoDistrictsV2 /></RequirePrivileged>} />
+          <Route path="/gsrtc-stations"            element={<RequirePrivileged><GsrtcStationsV2 /></RequirePrivileged>} />
+          <Route path="/team"                      element={<RequirePrivileged><TeamV2 /></RequirePrivileged>} />
+          <Route path="/incentives"                element={<RequirePrivileged><IncentivesV2 /></RequirePrivileged>} />
+          <Route path="/pending-approvals"         element={<RequirePrivileged><PendingApprovalsV2 /></RequirePrivileged>} />
+          <Route path="/hr"                        element={<RequirePrivileged><HRV2 /></RequirePrivileged>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
