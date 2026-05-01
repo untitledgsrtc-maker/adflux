@@ -19,6 +19,7 @@ import { Step5ReviewGsrtc }                 from '../../components/govt/GsrtcLed
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { useGsrtcStations } from '../../hooks/useGovtMasters'
+import { syncClientFromQuote } from '../../utils/syncClient'
 
 const STEPS = [
   { id: 1, label: 'Recipient' },
@@ -172,6 +173,10 @@ export default function CreateGovtGsrtcLedV2() {
         return
       }
     }
+
+    // Auto-save the client into the CRM clients table. Non-fatal — quote
+    // is already saved, so failures here just mean no clients-list row.
+    syncClientFromQuote(quote, 'create')
 
     setSaving(false)
     navigate(`/proposal/${quote.id}`)
