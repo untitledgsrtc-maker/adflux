@@ -86,8 +86,8 @@ export function V2AppShell() {
 
   // PRIVILEGED set (admin / owner / co_owner) gets the full admin
   // sidebar incl. the new Auto Districts + GSRTC Stations.
-  const nav       =  ? ADMIN_NAV        : SALES_NAV
-  const mobileNav =  ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
+  const nav       =  isPrivileged ? ADMIN_NAV        : SALES_NAV
+  const mobileNav =  isPrivileged ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
 
   // Topbar search — commits to the shared quote-filter store and
   // jumps to /quotes. Keeps the field as a global quick-search so
@@ -122,7 +122,7 @@ export function V2AppShell() {
           <span className="v2d-brand-mark">UA</span>
           <div>
             <div className="v2d-brand-t">Adflux</div>
-            <div className="v2d-brand-s">{isAdmin ? 'Admin' : 'Sales'}</div>
+            <div className="v2d-brand-s">{isPrivileged ? 'Admin' : 'Sales'}</div>
           </div>
         </div>
 
@@ -164,7 +164,7 @@ export function V2AppShell() {
 
           <div className="v2d-crumb">
             <div className="v2d-crumb-kicker">
-              {isAdmin ? 'Admin Console' : 'Sales Console'}
+              {isPrivileged ? 'Admin Console' : 'Sales Console'}
             </div>
             <div className="v2d-crumb-t">
               {greetingFor(profile)}
@@ -204,7 +204,7 @@ export function V2AppShell() {
             <div className="v2d-me-av">{initials(profile?.name || 'U')}</div>
             <div>
               <div className="v2d-me-name">{profile?.name || 'User'}</div>
-              <div className="v2d-me-role">{isAdmin ? 'Admin' : 'Sales'}</div>
+              <div className="v2d-me-role">{isPrivileged ? 'Admin' : 'Sales'}</div>
             </div>
           </div>
         </header>
@@ -226,7 +226,7 @@ export function V2AppShell() {
                 <span className="v2d-brand-mark">UA</span>
                 <div>
                   <div className="v2d-brand-t">Adflux</div>
-                  <div className="v2d-brand-s">{isAdmin ? 'Admin' : 'Sales'}</div>
+                  <div className="v2d-brand-s">{isPrivileged ? 'Admin' : 'Sales'}</div>
                 </div>
               </div>
               <button
