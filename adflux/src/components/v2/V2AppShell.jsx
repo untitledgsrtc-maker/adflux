@@ -78,7 +78,7 @@ const MOBILE_NAV_SALES = [
 ]
 
 export function V2AppShell() {
-  const { profile, isPrivileged, signOut } = useAuth()
+  const { profile, , signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -86,8 +86,8 @@ export function V2AppShell() {
 
   // PRIVILEGED set (admin / owner / co_owner) gets the full admin
   // sidebar incl. the new Auto Districts + GSRTC Stations.
-  const nav       = isPrivileged ? ADMIN_NAV        : SALES_NAV
-  const mobileNav = isPrivileged ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
+  const nav       =  ? ADMIN_NAV        : SALES_NAV
+  const mobileNav =  ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
 
   // Topbar search — commits to the shared quote-filter store and
   // jumps to /quotes. Keeps the field as a global quick-search so
