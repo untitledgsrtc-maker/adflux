@@ -8,9 +8,12 @@
 // If the URL points at a non-government quote, we redirect to the
 // existing QuoteDetail page (which already handles private LED).
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Printer, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2, CreditCard } from 'lucide-react'
+import {
+  ArrowLeft, Printer, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2,
+  CreditCard, Upload, Download, FileText, Lock, Loader2,
+} from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { GovtProposalRenderer } from '../../components/govt/GovtProposalRenderer'
 import { useAuth } from '../../hooks/useAuth'
@@ -22,6 +25,10 @@ import { PaymentSummary } from '../../components/payments/PaymentSummary'
 import { WonPaymentModal } from '../../components/payments/WonPaymentModal'
 import { formatINREnglish } from '../../utils/gujaratiNumber'
 import { syncClientFromQuote } from '../../utils/syncClient'
+import {
+  uploadAttachment, getSignedUrl, fetchAsMergeInput,
+  buildCombinedPdf, downloadPdfBlob, generateLockedProposalPdf,
+} from '../../utils/proposalPdf'
 
 const STATUS_COLORS = {
   draft:        'var(--text-muted)',
@@ -60,6 +67,20 @@ export default function GovtProposalDetailV2() {
   const [showWonModal,     setShowWonModal]     = useState(false)
   const [showEditPayment,  setShowEditPayment]  = useState(false)
   const [editingPayment,   setEditingPayment]   = useState(null)
+
+  // Phase 8 — file storage + locked proposal PDF + combined PDF
+  // rendererRef is captured by html2canvas when generating the locked
+  // proposal PDF on Mark Sent. We attach it to a wrapper around
+  // GovtProposalRenderer so the rasterizer sees the exact rendered DOM.
+  const rendererRef = useRef(null)
+  // signedUrls maps storage path → short-lived signed URL for display.
+  // We refresh on demand (clicking download) since signed URLs expire.
+  const [signedUrls, setSignedUrls] = useState({})
+  // Per-row upload busy state, keyed by checklist index.
+  const [uploadingIdx, setUploadingIdx] = useState(null)
+  // Top-level busy flags for the two heavy ops.
+  const [generatingPdf,    setGeneratingPdf]    = useState(false)
+  const [combinedPdfBusy,  setCombinedPdfBusy]  = useState(false)
 
   // Pull payments on mount so the summary shows real numbers before the
   // user clicks anything — same pattern as private QuoteDetail.
@@ -161,24 +182,82 @@ export default function GovtProposalDetailV2() {
     }
   }, [quote, items])
 
+  // Helper used by both changeStatus and handleWonWithPayment to
+  // confirm a specific labelled attachment has actually been uploaded
+  // before the user can advance the lifecycle. Phase 8 spec:
+  //   • Mark Sent → require OC copy uploaded
+  //   • Mark Won  → require PO copy / Work Order uploaded
+  //
+  // We match by case-insensitive label substring so a small wording
+  // change in attachment_templates doesn't silently bypass the gate.
+  function findUploadedByLabel(substr) {
+    const needle = String(substr || '').toLowerCase()
+    return checklist.find(c =>
+      String(c.label || '').toLowerCase().includes(needle) &&
+      c.file_url && String(c.file_url).trim().length > 0
+    )
+  }
+
   async function changeStatus(next) {
     if (!quote || savingStatus) return
 
     // Mirror private QuoteDetail: marking Won opens the payment modal
     // first so the user can record cash + campaign dates in one shot.
-    // The actual flip happens inside handleWonWithPayment so all the
-    // approve/sales-pending paths land identically across segments.
+    // Validation for the Won-specific PO copy gate happens INSIDE
+    // handleWonWithPayment after the modal is dismissed — that way the
+    // owner sees the modal flow they expect and we still block the
+    // actual DB flip.
     if (next === 'won') {
       setShowWonModal(true)
       return
     }
 
+    // Mark Sent gate: OC copy MUST be uploaded. This is the stamped
+    // acknowledgment slip the delivery person brings back from the
+    // government body. Without it, no proof of receipt — block.
+    if (next === 'sent') {
+      const oc = findUploadedByLabel('oc copy')
+      if (!oc) {
+        setStatusError(
+          'Cannot mark Sent — please upload the OC copy (acknowledgment receipt from the government body) in the Attachments section first.'
+        )
+        return
+      }
+    }
+
     setSavingStatus(next)
     setStatusError('')
+    setStatusMsg('')
     const prior = quote.status
+
+    // Mark Sent → also generate + lock the proposal letter PDF as a
+    // snapshot. After this point, future edits to the quote do NOT
+    // change what was sent. If the snapshot fails we abort the status
+    // change so we don't end up with a Sent-but-unlocked proposal.
+    let lockedFields = {}
+    if (next === 'sent' && !quote.locked_proposal_pdf_url) {
+      try {
+        setGeneratingPdf(true)
+        const { path } = await generateLockedProposalPdf({
+          domNode: rendererRef.current,
+          quoteId: quote.id,
+        })
+        lockedFields = {
+          locked_proposal_pdf_url: path,
+          locked_proposal_pdf_at:  new Date().toISOString(),
+        }
+      } catch (e) {
+        setSavingStatus(null)
+        setGeneratingPdf(false)
+        setStatusError(`Failed to lock proposal PDF: ${e?.message || e}`)
+        return
+      }
+      setGeneratingPdf(false)
+    }
+
     const { data, error } = await supabase
       .from('quotes')
-      .update({ status: next })
+      .update({ status: next, ...lockedFields })
       .eq('id', quote.id)
       .select()
       .single()
@@ -188,6 +267,10 @@ export default function GovtProposalDetailV2() {
       return
     }
     setQuote(data)
+    if (next === 'sent' && lockedFields.locked_proposal_pdf_url) {
+      setStatusMsg('Proposal marked Sent. Letter PDF locked — future quote edits will not change what was sent.')
+      setTimeout(() => setStatusMsg(''), 4500)
+    }
     if (next === 'won' && prior !== 'won') {
       syncClientFromQuote(data, 'won')
     }
@@ -199,6 +282,18 @@ export default function GovtProposalDetailV2() {
   //   • Sales no payment  → quote flips to Won (no incentive until cash)
   //   • Admin             → flip + payment all in one
   async function handleWonWithPayment(paymentData) {
+    // Mark Won gate (Phase 8): PO copy / Work Order MUST be uploaded.
+    // The owner's spec — once Won, the agency-issued work order is the
+    // proof of award. Without it, the deal isn't properly closed.
+    const po = findUploadedByLabel('po copy')
+    if (!po) {
+      setShowWonModal(false)
+      setStatusError(
+        'Cannot mark Won — please upload the PO copy / Work Order from the government body in the Attachments section first.'
+      )
+      return
+    }
+
     setShowWonModal(false)
     setSavingStatus('won')
     setStatusError('')
@@ -345,6 +440,134 @@ export default function GovtProposalDetailV2() {
     persistChecklist(next)
   }
 
+  // ─── Phase 8 — file upload + signed URLs + combined PDF ───────────
+
+  // User picks a file for a checklist row → upload to Supabase Storage,
+  // store the resulting path in attachments_checklist[idx].file_url.
+  // We intentionally OVERWRITE any prior URL paste — switching from
+  // "URL paste" to "real upload" is the whole point of Phase 8.
+  async function handleFilePick(idx, file) {
+    if (!file) return
+    setUploadingIdx(idx)
+    setStatusError('')
+    try {
+      const row = checklist[idx]
+      const tpl = attachmentTpl.find(t => t.id === row?.template_id)
+      const { path } = await uploadAttachment({
+        file,
+        quoteId: quote.id,
+        displayOrder: tpl?.display_order,
+        label: row?.label,
+      })
+      // Mark this row as having a real file: file_url = storage path,
+      // and auto-tick checked since uploading IS confirming presence.
+      const next = checklist.map((c, i) =>
+        i === idx ? { ...c, file_url: path, checked: true } : c
+      )
+      await persistChecklist(next)
+    } catch (e) {
+      setStatusError(`Upload failed: ${e?.message || e}`)
+    } finally {
+      setUploadingIdx(null)
+    }
+  }
+
+  // Resolve a stored file path to a downloadable URL on demand. Cached
+  // per-path inside signedUrls — but signed URLs expire so a refresh
+  // is fine; we cache only to avoid re-fetching during a single click.
+  async function openAttachment(path) {
+    if (!path) return
+    if (path.startsWith('http')) {
+      // Old data: a pasted URL, not a storage path. Open as-is.
+      window.open(path, '_blank', 'noopener')
+      return
+    }
+    try {
+      const url = await getSignedUrl(path, 600)
+      setSignedUrls(prev => ({ ...prev, [path]: url }))
+      window.open(url, '_blank', 'noopener')
+    } catch (e) {
+      setStatusError(`Could not open file: ${e?.message || e}`)
+    }
+  }
+
+  // Build one consolidated PDF: locked proposal letter (if sent) +
+  // every uploaded checklist item, in checklist display order. Skips
+  // rows that only have a pasted URL (we can't reach external URLs
+  // from the browser due to CORS) and rows with unsupported file types.
+  async function handleDownloadCombinedPdf() {
+    if (!quote || combinedPdfBusy) return
+    setCombinedPdfBusy(true)
+    setStatusError('')
+    setStatusMsg('')
+    try {
+      const inputs = []
+
+      // 1) Locked proposal letter PDF first (if it exists). If we're
+      //    still in draft we don't have one — generate on the fly so
+      //    the user can preview the combined output without committing
+      //    to Mark Sent. We do NOT upload this draft preview to
+      //    Storage; it's a one-shot for download.
+      if (quote.locked_proposal_pdf_url) {
+        const part = await fetchAsMergeInput(quote.locked_proposal_pdf_url)
+        if (part) inputs.push(part)
+      } else if (rendererRef.current) {
+        // Draft preview: rasterize current state, embed as PDF in-memory
+        // (no Storage upload). Same code path as the locked generator
+        // but we keep the bytes locally instead of saving.
+        // Simpler: re-use generateLockedProposalPdf and immediately
+        // download — but we want to merge, not download. Use pdf-lib
+        // directly for in-memory generation:
+        try {
+          const html2canvas = (await import('html2canvas')).default
+          const { jsPDF } = await import('jspdf')
+          const canvas = await html2canvas(rendererRef.current, {
+            scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+          })
+          const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+          const imgData = canvas.toDataURL('image/jpeg', 0.92)
+          const pageWidthMm = 210
+          const ratio = canvas.height / canvas.width
+          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidthMm, pageWidthMm * ratio, undefined, 'FAST')
+          const buf = pdf.output('arraybuffer')
+          inputs.push({ kind: 'pdf', data: buf })
+        } catch (e) {
+          console.warn('[combined-pdf] could not embed draft preview:', e?.message)
+        }
+      }
+
+      // 2) Each uploaded attachment in checklist order.
+      for (const c of checklist) {
+        if (!c.file_url) continue
+        // Skip pasted URLs — CORS won't let us pull them. The user can
+        // upload the real file instead to include it in the merge.
+        if (String(c.file_url).startsWith('http')) continue
+        try {
+          const part = await fetchAsMergeInput(c.file_url)
+          if (part) inputs.push(part)
+        } catch (e) {
+          console.warn('[combined-pdf] skipped attachment:', c.label, e?.message)
+        }
+      }
+
+      if (inputs.length === 0) {
+        setStatusError('Nothing to merge — upload at least one attachment first.')
+        return
+      }
+
+      const merged = await buildCombinedPdf(inputs)
+      const filename = `${quote.quote_number || quote.ref_number || 'proposal'}-combined.pdf`
+        .replace(/[^a-z0-9-_.]/gi, '-')
+      downloadPdfBlob(merged, filename)
+      setStatusMsg(`Combined PDF generated (${inputs.length} document${inputs.length === 1 ? '' : 's'}).`)
+      setTimeout(() => setStatusMsg(''), 4000)
+    } catch (e) {
+      setStatusError(`Failed to build combined PDF: ${e?.message || e}`)
+    } finally {
+      setCombinedPdfBusy(false)
+    }
+  }
+
   if (loading) {
     return <div className="govt-master"><em>Loading proposal…</em></div>
   }
@@ -391,14 +614,27 @@ export default function GovtProposalDetailV2() {
           >
             <Printer size={14} /> Print / Save PDF
           </button>
+          <button
+            type="button"
+            className="govt-wiz__btn"
+            disabled={combinedPdfBusy}
+            onClick={handleDownloadCombinedPdf}
+            title="Merge proposal letter + all uploaded attachments into a single PDF"
+          >
+            {combinedPdfBusy
+              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Building…</>
+              : <><Download size={14} /> Combined PDF</>}
+          </button>
           {isPrivileged && quote.status === 'draft' && (
             <button
               type="button"
               className="govt-wiz__btn"
-              disabled={savingStatus === 'sent'}
+              disabled={savingStatus === 'sent' || generatingPdf}
               onClick={() => changeStatus('sent')}
             >
-              <Send size={14} /> Mark Sent
+              {generatingPdf
+                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Locking…</>
+                : <><Send size={14} /> Mark Sent</>}
             </button>
           )}
           {isPrivileged && (quote.status === 'sent' || quote.status === 'negotiating') && (
@@ -453,12 +689,49 @@ export default function GovtProposalDetailV2() {
         </div>
       )}
 
-      <GovtProposalRenderer
-        template={template}
-        data={renderedData}
-        signer={signer}
-        mediaType={quote.media_type}
-      />
+      {/* Wrap the renderer in a ref'd container — html2canvas captures
+          this exact node when generating the locked PDF on Mark Sent. */}
+      <div ref={rendererRef}>
+        <GovtProposalRenderer
+          template={template}
+          data={renderedData}
+          signer={signer}
+          mediaType={quote.media_type}
+        />
+      </div>
+
+      {/* Locked PDF status — shows once a snapshot exists so the user
+          knows the sent version is frozen. */}
+      {quote.locked_proposal_pdf_url && (
+        <div style={{
+          background: 'rgba(100,181,246,.08)',
+          border: '1px solid rgba(100,181,246,.25)',
+          borderRadius: 8, padding: '10px 14px', margin: '12px 0',
+          fontSize: '.82rem', color: '#cdd9e6',
+          display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
+        }}>
+          <Lock size={14} style={{ color: '#64b5f6' }} />
+          <div style={{ flex: 1 }}>
+            <strong>Letter PDF locked</strong>
+            {quote.locked_proposal_pdf_at && (
+              <> on {new Date(quote.locked_proposal_pdf_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</>
+            )}
+            . Future quote edits won't change what was sent.
+          </div>
+          <button
+            type="button"
+            onClick={() => openAttachment(quote.locked_proposal_pdf_url)}
+            style={{
+              background: 'transparent', border: '1px solid rgba(100,181,246,.4)',
+              color: '#64b5f6', borderRadius: 6, padding: '4px 10px',
+              cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              display: 'inline-flex', gap: 6, alignItems: 'center',
+            }}
+          >
+            <Download size={12} /> View
+          </button>
+        </div>
+      )}
 
       {/* ─── Attachments checklist (Phase 7) ─────────────────────── */}
       <h2 style={{
@@ -472,61 +745,158 @@ export default function GovtProposalDetailV2() {
       </h2>
       <div className="govt-master__sub" style={{ marginBottom: 12 }}>
         Standard list for {quote.media_type === 'AUTO_HOOD' ? 'Auto Hood' : 'GSRTC LED'}.
-        Tick what's attached, paste a Google Drive link if you have one,
-        and add any extra docs at the bottom.
+        Upload each file, or paste a URL if it's already hosted somewhere.
+        OC copy is required to mark Sent. PO copy / Work Order is required to mark Won.
       </div>
       <div className="govt-list" style={{ marginBottom: 16 }}>
-        {checklist.map((c, idx) => (
-          <div
-            key={`${c.template_id || 'custom'}-${idx}`}
-            className="govt-list__row"
-            style={{ gridTemplateColumns: '28px 1fr 1.4fr 28px' }}
-          >
-            <span className="govt-list__check">
-              <input
-                type="checkbox"
-                checked={!!c.checked}
-                onChange={e => toggleAttachment(idx, 'checked', e.target.checked)}
-              />
-            </span>
-            <span style={{ color: c.checked ? 'var(--text)' : 'var(--text-muted)' }}>
-              {c.label}
-              {c.is_required && (
-                <span style={{ marginLeft: 6, color: 'var(--danger)', fontSize: 11 }}>required</span>
-              )}
-              {c.custom && (
-                <span style={{ marginLeft: 6, color: 'var(--blue)', fontSize: 11 }}>custom</span>
-              )}
-            </span>
-            <input
-              type="text"
-              placeholder="Paste file URL (Google Drive, etc.)"
-              value={c.file_url || ''}
-              onChange={e => toggleAttachment(idx, 'file_url', e.target.value)}
-              className="govt-input-cell"
-              style={{ maxWidth: 'unset', width: '100%' }}
-            />
-            <span>
-              {c.custom && (
-                <button
-                  type="button"
-                  onClick={() => removeCustomAttachment(idx)}
-                  title="Remove custom attachment"
-                  style={{
-                    background: 'transparent', border: 'none',
-                    color: 'var(--danger)', cursor: 'pointer',
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </span>
-          </div>
-        ))}
-        {/* Add-custom row */}
+        {checklist.map((c, idx) => {
+          // The proposal-letter slot is auto-generated on Mark Sent —
+          // the user can't manually upload here. Special read-only row.
+          const isAutoProposal =
+            String(c.label || '').toLowerCase().includes('auto-generated') ||
+            (c.template_id && (c.label || '').toLowerCase().startsWith('proposal letter'))
+          const hasUploadedFile = c.file_url && !String(c.file_url).startsWith('http')
+          const hasUrlOnly      = c.file_url && String(c.file_url).startsWith('http')
+
+          return (
+            <div
+              key={`${c.template_id || 'custom'}-${idx}`}
+              className="govt-list__row"
+              style={{ gridTemplateColumns: '28px 1.2fr 1.6fr 80px 28px', alignItems: 'center' }}
+            >
+              <span className="govt-list__check">
+                <input
+                  type="checkbox"
+                  checked={!!c.checked}
+                  disabled={isAutoProposal}
+                  onChange={e => toggleAttachment(idx, 'checked', e.target.checked)}
+                />
+              </span>
+              <span style={{ color: c.checked ? 'var(--text)' : 'var(--text-muted)' }}>
+                {c.label}
+                {c.is_required && !isAutoProposal && (
+                  <span style={{ marginLeft: 6, color: 'var(--danger)', fontSize: 11 }}>required</span>
+                )}
+                {isAutoProposal && (
+                  <span style={{ marginLeft: 6, color: '#64b5f6', fontSize: 11 }}>auto on Sent</span>
+                )}
+                {c.custom && (
+                  <span style={{ marginLeft: 6, color: 'var(--blue)', fontSize: 11 }}>custom</span>
+                )}
+              </span>
+
+              {/* File picker + URL paste cell. The auto-proposal slot
+                  shows a status string instead. */}
+              <span>
+                {isAutoProposal ? (
+                  <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>
+                    {quote.locked_proposal_pdf_url
+                      ? <>Locked snapshot — <em>see banner above</em></>
+                      : <>Will be auto-generated when proposal is marked Sent.</>}
+                  </span>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {/* Hidden native input + visible label = nicer UX */}
+                    <label
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '5px 10px', borderRadius: 6,
+                        border: '1px solid var(--surface-3)',
+                        background: 'var(--surface-2)',
+                        color: 'var(--text)', fontSize: 12, fontWeight: 600,
+                        cursor: uploadingIdx === idx ? 'wait' : 'pointer',
+                        opacity: uploadingIdx === idx ? 0.6 : 1,
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={hasUploadedFile ? 'Replace uploaded file' : 'Upload a file'}
+                    >
+                      {uploadingIdx === idx ? (
+                        <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Uploading…</>
+                      ) : (
+                        <><Upload size={12} /> {hasUploadedFile ? 'Replace' : 'Upload'}</>
+                      )}
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        style={{ display: 'none' }}
+                        disabled={uploadingIdx === idx}
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (f) handleFilePick(idx, f)
+                          e.target.value = '' // allow re-picking same file
+                        }}
+                      />
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="…or paste URL"
+                      value={hasUrlOnly ? c.file_url : ''}
+                      onChange={e => toggleAttachment(idx, 'file_url', e.target.value)}
+                      disabled={hasUploadedFile}
+                      title={hasUploadedFile ? 'Clear the uploaded file (Replace) to paste a URL instead' : ''}
+                      className="govt-input-cell"
+                      style={{ maxWidth: 'unset', width: '100%', opacity: hasUploadedFile ? 0.5 : 1 }}
+                    />
+                  </div>
+                )}
+              </span>
+
+              {/* View / status cell */}
+              <span style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                {hasUploadedFile && (
+                  <button
+                    type="button"
+                    onClick={() => openAttachment(c.file_url)}
+                    title="View uploaded file"
+                    style={{
+                      background: 'transparent', border: 'none',
+                      color: '#64b5f6', cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      fontSize: 11, fontWeight: 600,
+                    }}
+                  >
+                    <FileText size={12} /> View
+                  </button>
+                )}
+                {hasUrlOnly && (
+                  <button
+                    type="button"
+                    onClick={() => openAttachment(c.file_url)}
+                    title="Open URL"
+                    style={{
+                      background: 'transparent', border: 'none',
+                      color: '#81c784', cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      fontSize: 11, fontWeight: 600,
+                    }}
+                  >
+                    <Download size={12} /> Open
+                  </button>
+                )}
+              </span>
+
+              <span>
+                {c.custom && (
+                  <button
+                    type="button"
+                    onClick={() => removeCustomAttachment(idx)}
+                    title="Remove custom attachment"
+                    style={{
+                      background: 'transparent', border: 'none',
+                      color: 'var(--danger)', cursor: 'pointer',
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </span>
+            </div>
+          )
+        })}
+        {/* Add-custom row — matches the 5-column grid above */}
         <div
           className="govt-list__row"
-          style={{ gridTemplateColumns: '28px 1fr 1.4fr 28px' }}
+          style={{ gridTemplateColumns: '28px 1.2fr 1.6fr 80px 28px', alignItems: 'center' }}
         >
           <span></span>
           <input
@@ -541,6 +911,7 @@ export default function GovtProposalDetailV2() {
           <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>
             Press Enter or click +
           </span>
+          <span></span>
           <span>
             <button
               type="button"
@@ -558,6 +929,11 @@ export default function GovtProposalDetailV2() {
           </span>
         </div>
       </div>
+
+      {/* Lightweight global keyframe so the inline Loader2 spinners
+          actually rotate. Defined once at the page level so we don't
+          touch govt.css on the staging branch. */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
 
       {/* Auto Hood: per-district allocation list (always shown) */}
       {quote.media_type === 'AUTO_HOOD' && items.length > 0 && (
