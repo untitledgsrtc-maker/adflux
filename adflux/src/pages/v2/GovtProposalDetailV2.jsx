@@ -15,6 +15,7 @@ import { supabase } from '../../lib/supabase'
 import { GovtProposalRenderer } from '../../components/govt/GovtProposalRenderer'
 import { useAuth } from '../../hooks/useAuth'
 import { formatINREnglish } from '../../utils/gujaratiNumber'
+import { syncClientFromQuote } from '../../utils/syncClient'
 
 const STATUS_COLORS = {
   draft:        'var(--text-muted)',
@@ -137,13 +138,21 @@ export default function GovtProposalDetailV2() {
   async function changeStatus(next) {
     if (!quote || savingStatus) return
     setSavingStatus(next)
+    // Mirror the private flow: snapshot prior status so we only bump
+    // total_won_amount on the actual non-won → won transition.
+    const prior = quote.status
     const { data, error } = await supabase
       .from('quotes')
       .update({ status: next })
       .eq('id', quote.id)
       .select()
       .single()
-    if (!error) setQuote(data)
+    if (!error) {
+      setQuote(data)
+      if (next === 'won' && prior !== 'won') {
+        syncClientFromQuote(data, 'won')
+      }
+    }
     setSavingStatus(null)
   }
 
