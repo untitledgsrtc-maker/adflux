@@ -103,7 +103,7 @@ function renderSignerBlock(signer) {
     '<div class="govt-letter__signer">',
       'આપનો વિશ્વાસુ,<br/>',
       `${name}${title ? ` (${title})` : ''}<br/>`,
-      'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ',
+      'અનટાઇટ ટ્યુઑ',
       mobile ? `<br/>${mobile}` : '',
     '</div>',
   ].join('')
@@ -147,19 +147,34 @@ function renderGsrtcTable(data) {
   const months = Number(data.gsrtc_campaign_months || 1)
   const items  = data.line_items || []
   let subtotal = 0
+  let totalScreens = 0
+  let totalDaily   = 0
+  let totalMonthly = 0
 
   const rowsHtml = items.map((it, i) => {
-    const monthly = Number(it.monthly_total || 0)
+    // Use per-row values if set; fall back to defaults
+    const daily   = Number(it.daily_spots ?? 100)
+    const days    = Number(it.days ?? 30)
+    const dur     = Number(it.spot_duration_sec ?? 10)
+    const screens = Number(it.screens || 0)
+    const rate    = Number(it.unit_rate || 0)
+    const monthly = screens * daily * days * rate
     const lineTotal = monthly * months
-    subtotal += lineTotal
+    subtotal     += lineTotal
+    totalScreens += screens
+    totalDaily   += daily * screens
+    totalMonthly += daily * days * screens
     return `
       <tr>
         <td class="num">${toGujaratiDigits(String(i + 1))}</td>
         <td>${it.description || ''}</td>
         <td>${it.category || ''}</td>
-        <td class="num">${toGujaratiDigits(String(it.screens || 0))}</td>
-        <td class="num">${toGujaratiDigits(String(it.monthly_spots || 0))}</td>
-        <td class="num">${toGujaratiDigits(formatINREnglish(it.unit_rate || 0))}</td>
+        <td class="num">${toGujaratiDigits(String(screens))}</td>
+        <td class="num">${toGujaratiDigits(String(daily))}</td>
+        <td class="num">${toGujaratiDigits(String(dur))} સે.</td>
+        <td class="num">${toGujaratiDigits(String(daily * days))}</td>
+        <td class="num">${toGujaratiDigits(String(days))}</td>
+        <td class="num">${toGujaratiDigits(formatINREnglish(rate))}</td>
         <td class="num">${toGujaratiDigits(formatINREnglish(monthly))}</td>
         <td class="num">${toGujaratiDigits(formatINREnglish(lineTotal))}</td>
       </tr>`
@@ -169,7 +184,7 @@ function renderGsrtcTable(data) {
   const total = subtotal + gst
 
   return `
-  <p style="margin-top:8px;">
+  <p style="margin-top:8px;color:#111;">
     <em>GSRTC માન્ય રેટ ટેબલ — ${toGujaratiDigits(String(months))} માસ માટે કેમ્પેઇન</em>
   </p>
   <table class="govt-letter__table">
@@ -179,7 +194,10 @@ function renderGsrtcTable(data) {
         <th>બસ સ્ટેશન</th>
         <th>કેટેગરી</th>
         <th class="num">સ્ક્રીન્સ</th>
+        <th class="num">દૈનિક</th>
+        <th class="num">ડ્યુ.</th>
         <th class="num">માસિક સ્પોટ્સ</th>
+        <th class="num">દિવસો</th>
         <th class="num">દર/સ્લોટ</th>
         <th class="num">માસિક કુલ</th>
         <th class="num">${toGujaratiDigits(String(months))} માસ કુલ</th>
@@ -187,9 +205,9 @@ function renderGsrtcTable(data) {
     </thead>
     <tbody>
       ${rowsHtml}
-      <tr><td colspan="7"><strong>કુલ</strong></td><td class="num"><strong>${toGujaratiDigits(formatINREnglish(subtotal))}</strong></td></tr>
-      <tr><td colspan="7">GST 18%</td><td class="num">${toGujaratiDigits(formatINREnglish(gst))}</td></tr>
-      <tr><td colspan="7"><strong>ગ્રાન્ડ ટોટલ</strong></td><td class="num"><strong>${toGujaratiDigits(formatINREnglish(total))}</strong></td></tr>
+      <tr><td colspan="3"><strong>કુલ</strong></td><td class="num"><strong>${toGujaratiDigits(String(totalScreens))}</strong></td><td class="num">${toGujaratiDigits(String(totalDaily))}</td><td></td><td class="num">${toGujaratiDigits(String(totalMonthly))}</td><td colspan="3"></td><td class="num"><strong>${toGujaratiDigits(formatINREnglish(subtotal))}</strong></td></tr>
+      <tr><td colspan="10">GST 18%</td><td class="num">${toGujaratiDigits(formatINREnglish(gst))}</td></tr>
+      <tr><td colspan="10"><strong>ગ્રાન્ડ ટોટલ</strong></td><td class="num"><strong>${toGujaratiDigits(formatINREnglish(total))}</strong></td></tr>
     </tbody>
   </table>`
 }
