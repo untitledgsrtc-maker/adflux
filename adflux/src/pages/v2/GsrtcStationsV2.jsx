@@ -1,22 +1,37 @@
 // src/pages/v2/GsrtcStationsV2.jsx
 //
 // Admin master page — GSRTC station editor.
-// 20 rows. Inline edit on screens_count, category, davp_per_slot_rate,
-// agency_monthly_rate, agency_rack_rate. Live computed monthly cost
-// per row (= 100 × screens × 30 × DAVP rate).
+// Inline edit on name (EN), name (GU), category, screens_count, all rates,
+// is_active toggle. "Add station" button creates a new row with rate
+// defaults from the chosen category. Remove = soft-delete via Active
+// toggle (preserves old quote_cities references).
+//
+// Wizard hook (useGsrtcStations) filters is_active=true, so a deactivated
+// station vanishes from the next proposal but old saved proposals keep
+// their snapshot via stored ref_id + city_name.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Save, RotateCcw } from 'lucide-react'
+import { Save, RotateCcw, Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatINREnglish } from '../../utils/gujaratiNumber'
 
 const CATEGORIES = ['A', 'B', 'C']
+
+// Default rates per category — keep in sync with the GSRTC rate sheet
+// (last reviewed 30 Apr 2026). Cat A = top 6 city stations,
+// Cat B = mid stations, Cat C = small stations.
+const RATE_DEFAULTS = {
+  A: { davp_per_slot_rate: 3.00, agency_monthly_rate: 850, agency_rack_rate: 2250 },
+  B: { davp_per_slot_rate: 2.75, agency_monthly_rate: 650, agency_rack_rate: 1800 },
+  C: { davp_per_slot_rate: 2.50, agency_monthly_rate: 650, agency_rack_rate: 1800 },
+}
 
 export default function GsrtcStationsV2() {
   const [rows,    setRows]    = useState([])
   const [edits,   setEdits]   = useState({})           // id → patch obj
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
+  const [adding,  setAdding]  = useState(false)
   const [toast,   setToast]   = useState(null)
 
   async function load() {
@@ -35,7 +50,25 @@ export default function GsrtcStationsV2() {
   function setEdit(id, field, val) {
     setEdits(e => ({
       ...e,
-      [id]: { ...(e[id] || {}), [field]: val === '' ? null : (typeof val === 'string' && /^\d+(\.\d+)?$/.test(val) ? Number(val) : val) },
+      [id]: { ...(e[id] || {}), [field]: val },
+    }))
+  }
+
+  // Toggling category in the master also resets the three rates to the
+  // category default — admin can still tweak them after.
+  function setCategory(id, newCat) {
+    const def = RATE_DEFAULTS[newCat]
+    setEdits(e => ({
+      ...e,
+      [id]: {
+        ...(e[id] || {}),
+        category: newCat,
+        ...(def && {
+          davp_per_slot_rate:  def.davp_per_slot_rate,
+          agency_monthly_rate: def.agency_monthly_rate,
+          agency_rack_rate:    def.agency_rack_rate,
+        }),
+      },
     }))
   }
 
@@ -45,18 +78,24 @@ export default function GsrtcStationsV2() {
   })), [rows, edits])
 
   const dirty = Object.keys(edits).length > 0
-  const totalMonthly = liveRows.reduce((s, r) => {
-    const screens = Number(r.screens_count) || 0
-    const rate    = Number(r.davp_per_slot_rate) || 0
-    return s + (screens * 100 * 30 * rate)
-  }, 0)
+  const totalMonthly = liveRows
+    .filter(r => r.is_active)
+    .reduce((s, r) => {
+      const screens = Number(r.screens_count) || 0
+      const rate    = Number(r.davp_per_slot_rate) || 0
+      return s + (screens * 100 * 30 * rate)
+    }, 0)
 
   async function save() {
     setSaving(true)
     const updates = Object.entries(edits).map(([id, patch]) => {
       const cleanPatch = { ...patch }
-      // monthly_spots is auto-computed (= 3000 × screens) per phase5
-      // logic; keep it in sync if screens_count changed.
+      ;['screens_count', 'davp_per_slot_rate', 'agency_monthly_rate', 'agency_rack_rate'].forEach(f => {
+        if (cleanPatch[f] !== undefined && cleanPatch[f] !== null && cleanPatch[f] !== '') {
+          cleanPatch[f] = Number(cleanPatch[f])
+        }
+      })
+      // monthly_spots is auto-derived (= 3000 × screens) per phase 5.
       if (cleanPatch.screens_count != null) {
         cleanPatch.monthly_spots = 3000 * Number(cleanPatch.screens_count)
       }
@@ -79,6 +118,36 @@ export default function GsrtcStationsV2() {
     setToast(null)
   }
 
+  // Insert a new station seeded with category-B defaults. Admin then
+  // edits the name (EN + GU), picks the right category, and saves.
+  async function addStation() {
+    const nextSerial = (rows[rows.length - 1]?.serial_no || 0) + 1
+    setAdding(true)
+    const def = RATE_DEFAULTS.B
+    const { error } = await supabase
+      .from('gsrtc_stations')
+      .insert([{
+        serial_no:           nextSerial,
+        station_name_en:     `New Station ${nextSerial}`,
+        station_name_gu:     'નવું સ્ટેશન',
+        category:            'B',
+        screens_count:       10,
+        monthly_spots:       30000,
+        davp_per_slot_rate:  def.davp_per_slot_rate,
+        agency_monthly_rate: def.agency_monthly_rate,
+        agency_rack_rate:    def.agency_rack_rate,
+        is_active:           true,
+      }])
+    setAdding(false)
+    if (error) {
+      setToast({ type: 'error', msg: error.message })
+    } else {
+      setToast({ type: 'ok', msg: `Added station #${nextSerial}. Edit name and save.` })
+      await load()
+    }
+    setTimeout(() => setToast(null), 3500)
+  }
+
   return (
     <div className="govt-master">
       <div className="govt-master__head">
@@ -86,10 +155,22 @@ export default function GsrtcStationsV2() {
           <div className="govt-master__kicker">Government masters</div>
           <h1 className="govt-master__title">GSRTC Stations</h1>
           <div className="govt-master__sub">
-            20 GSRTC bus stations. Edit screens / category / rates to keep
-            in sync with the latest GSRTC rate sheet. Monthly cost per row =
-            screens × 100 daily spots × 30 days × DAVP rate.
+            GSRTC bus stations. Edit names, category, screens, or rates.
+            Toggle Active off to remove a station from new proposals (old
+            proposals keep their snapshot). Add a new station as GSRTC
+            expands. Monthly cost per row = screens × 100 daily spots × 30
+            days × DAVP rate.
           </div>
+        </div>
+        <div>
+          <button
+            type="button"
+            className="govt-wiz__btn govt-wiz__btn--primary"
+            onClick={addStation}
+            disabled={adding || saving}
+          >
+            <Plus size={14} /> {adding ? 'Adding…' : 'Add station'}
+          </button>
         </div>
       </div>
 
@@ -100,7 +181,7 @@ export default function GsrtcStationsV2() {
       )}
 
       <div className="govt-master__ok">
-        <strong>Combined monthly DAVP total: ₹{formatINREnglish(totalMonthly)}</strong>
+        <strong>Active monthly DAVP total: ₹{formatINREnglish(totalMonthly)}</strong>
       </div>
 
       <table className="govt-table">
@@ -108,33 +189,50 @@ export default function GsrtcStationsV2() {
           <tr>
             <th style={{ width: 40 }}>#</th>
             <th>Station (EN)</th>
-            <th>બસ સ્ટેશન (GU)</th>
+            <th>Station (GU)</th>
             <th style={{ width: 80 }}>Cat</th>
             <th className="num">Screens</th>
             <th className="num">DAVP/slot</th>
             <th className="num">Agency ₹/mo</th>
             <th className="num">Agency rack</th>
             <th className="num">Monthly DAVP</th>
+            <th style={{ width: 90 }}>Active</th>
           </tr>
         </thead>
         <tbody>
           {loading && (
-            <tr><td colSpan={9}><em>Loading…</em></td></tr>
+            <tr><td colSpan={10}><em>Loading…</em></td></tr>
           )}
           {liveRows.map(r => {
             const screens = Number(r.screens_count) || 0
             const rate    = Number(r.davp_per_slot_rate) || 0
             const monthly = screens * 100 * 30 * rate
             return (
-              <tr key={r.id}>
+              <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.55 }}>
                 <td className="num">{r.serial_no}</td>
-                <td>{r.station_name_en}</td>
-                <td>{r.station_name_gu}</td>
+                <td>
+                  <input
+                    type="text"
+                    className="govt-input-cell"
+                    style={{ maxWidth: 180, textAlign: 'left' }}
+                    value={r.station_name_en ?? ''}
+                    onChange={e => setEdit(r.id, 'station_name_en', e.target.value)}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    className="govt-input-cell"
+                    style={{ maxWidth: 180, textAlign: 'left' }}
+                    value={r.station_name_gu ?? ''}
+                    onChange={e => setEdit(r.id, 'station_name_gu', e.target.value)}
+                  />
+                </td>
                 <td>
                   <select
                     className="govt-input-cell"
                     value={r.category || 'B'}
-                    onChange={e => setEdit(r.id, 'category', e.target.value)}
+                    onChange={e => setCategory(r.id, e.target.value)}
                   >
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -179,6 +277,22 @@ export default function GsrtcStationsV2() {
                   />
                 </td>
                 <td className="num"><strong>₹{formatINREnglish(monthly)}</strong></td>
+                <td>
+                  <button
+                    type="button"
+                    onClick={() => setEdit(r.id, 'is_active', !r.is_active)}
+                    className={r.is_active ? 'govt-pill govt-pill--A' : 'govt-pill govt-pill--C'}
+                    style={{
+                      cursor: 'pointer',
+                      border: 'none',
+                      fontFamily: 'inherit',
+                      padding: '4px 12px',
+                    }}
+                    title={r.is_active ? 'Click to deactivate' : 'Click to reactivate'}
+                  >
+                    {r.is_active ? 'Active' : 'Off'}
+                  </button>
+                </td>
               </tr>
             )
           })}
