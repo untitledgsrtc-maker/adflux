@@ -80,8 +80,12 @@ export default function CreateGovtGsrtcLedV2() {
 
     const months = Number(data.gsrtc_campaign_months) || 1
     const selectedStations = stations.filter(s => (data.selected_station_ids || []).includes(s.id))
+    const overrides = data.station_overrides || {}
     const monthlySum = selectedStations.reduce((sum, s) => {
-      const monthly = (Number(s.screens_count) || 0) * 100 * 30 * Number(s.davp_per_slot_rate || 0)
+      const ov = overrides[s.id] || {}
+      const daily = ov.daily_spots_override ?? 100
+      const days  = ov.days_override        ?? 30
+      const monthly = (Number(s.screens_count) || 0) * daily * days * Number(s.davp_per_slot_rate || 0)
       return sum + monthly
     }, 0)
     const subtotal = monthlySum * months
@@ -124,9 +128,13 @@ export default function CreateGovtGsrtcLedV2() {
       return
     }
 
-    // Per-station line items
+    // Per-station line items — including per-row overrides (Phase 7).
     const lineItems = selectedStations.map(s => {
-      const monthly = (Number(s.screens_count) || 0) * 100 * 30 * Number(s.davp_per_slot_rate || 0)
+      const ov       = overrides[s.id] || {}
+      const daily    = ov.daily_spots_override ?? 100
+      const days     = ov.days_override ?? 30
+      const duration = ov.spot_duration_sec_override ?? 10
+      const monthly  = (Number(s.screens_count) || 0) * daily * days * Number(s.davp_per_slot_rate || 0)
       const lineTotal = monthly * months
       return {
         quote_id:     quote.id,
@@ -144,8 +152,13 @@ export default function CreateGovtGsrtcLedV2() {
         offered_rate: Number(s.davp_per_slot_rate || 0),
         campaign_total: lineTotal,
         duration_months: months,
-        slot_seconds: 10,
-        slots_per_day: 100,
+        // Phase 7 — per-row overrides (NULL means "use default")
+        daily_spots_override:       ov.daily_spots_override ?? null,
+        days_override:              ov.days_override ?? null,
+        spot_duration_sec_override: ov.spot_duration_sec_override ?? null,
+        // Legacy slot fields kept for the existing AdFlux columns
+        slot_seconds: duration,
+        slots_per_day: daily,
       }
     })
 
