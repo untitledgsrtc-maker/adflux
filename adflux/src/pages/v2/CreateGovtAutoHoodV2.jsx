@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { useAutoMasters } from '../../hooks/useGovtMasters'
 import { distributeAutoHoodQuantity } from '../../utils/distributeQuantity'
+import { syncClientFromQuote } from '../../utils/syncClient'
 
 const STEPS = [
   { id: 1, label: 'Recipient' },
@@ -174,6 +175,10 @@ export default function CreateGovtAutoHoodV2() {
         return
       }
     }
+
+    // Auto-save the client into the CRM clients table. Non-fatal — quote
+    // is already saved, so failures here just mean no clients-list row.
+    syncClientFromQuote(quote, 'create')
 
     setSaving(false)
     navigate(`/proposal/${quote.id}`)
