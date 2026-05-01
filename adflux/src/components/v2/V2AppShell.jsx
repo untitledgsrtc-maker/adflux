@@ -78,7 +78,7 @@ const MOBILE_NAV_SALES = [
 ]
 
 export function V2AppShell() {
-  const { profile, , signOut } = useAuth()
+  const { profile, isPrivileged, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
