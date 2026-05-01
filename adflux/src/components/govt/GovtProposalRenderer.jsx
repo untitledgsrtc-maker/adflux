@@ -104,7 +104,7 @@ function renderSignerBlock(signer) {
       'આપનો વિશ્વાસુ,<br/>',
       `${name}${title ? ` (${title})` : ''}<br/>`,
       'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ',
-      mobile ? `<br/>${mobile}` : '',
+    mobile ? `<br/>${mobile}` : '',
     '</div>',
   ].join('')
 }
