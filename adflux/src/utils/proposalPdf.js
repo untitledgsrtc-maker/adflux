@@ -152,6 +152,14 @@ export async function downloadAsArrayBuffer(path) {
 // each slice as its own page. Keeps the rendered look identical to the
 // preview while keeping the output a real PDF (not a single tall image
 // that prints awkwardly).
+//
+// CRITICAL: we force the captured DOM to A4 width (794px @ 96dpi)
+// BEFORE rasterizing, otherwise html2canvas captures whatever width
+// the dark-themed app is at (often 1100-1400px depending on viewport),
+// and the resulting PDF looks landscape-stretched and "wrong-sided"
+// when scaled to A4 portrait pages. Approach: clone the node into a
+// hidden positioned-off-screen container with width = 794px, render
+// from THERE, then discard the clone.
 export async function generateLockedProposalPdf({ domNode, quoteId }) {
   if (!domNode) throw new Error('No DOM node provided')
   if (!quoteId) throw new Error('No quoteId provided')
@@ -159,18 +167,36 @@ export async function generateLockedProposalPdf({ domNode, quoteId }) {
   const html2canvas = await loadHtml2Canvas()
   const JsPDF       = await loadJsPdf()
 
-  // Capture at 2x scale so the PDF stays sharp on print. backgroundColor
-  // forced to white because the app is dark-themed but the printed
-  // letter must look like a paper letter.
-  const canvas = await html2canvas(domNode, {
-    scale: 2,
-    backgroundColor: '#ffffff',
-    useCORS: true,
-    // Render at the node's actual width/height — the renderer is
-    // already styled to letter-paper proportions, we just capture
-    // what's there.
-    logging: false,
-  })
+  // ── Force A4 portrait proportions before rasterizing. ──
+  // 794px = A4 width @ 96dpi. We clone the renderer DOM into an
+  // off-screen wrapper sized to that width, let the layout engine
+  // re-flow the content, then capture. Off-screen positioning means
+  // the user never sees the clone flash onto their screen.
+  const A4_WIDTH_PX = 794
+  const wrapper = document.createElement('div')
+  wrapper.style.position = 'fixed'
+  wrapper.style.left     = '-100000px'
+  wrapper.style.top      = '0'
+  wrapper.style.width    = `${A4_WIDTH_PX}px`
+  wrapper.style.background = '#ffffff'
+  wrapper.style.padding  = '0'
+  wrapper.style.zIndex   = '-1'
+  wrapper.appendChild(domNode.cloneNode(true))
+  document.body.appendChild(wrapper)
+
+  let canvas
+  try {
+    canvas = await html2canvas(wrapper, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      width:       A4_WIDTH_PX,
+      windowWidth: A4_WIDTH_PX,
+      logging: false,
+    })
+  } finally {
+    document.body.removeChild(wrapper)
+  }
 
   const imgData = canvas.toDataURL('image/jpeg', 0.92)
 

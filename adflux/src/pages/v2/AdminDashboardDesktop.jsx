@@ -95,11 +95,13 @@ export default function AdminDashboardDesktop() {
     const monthKeys     = p.monthKeys
 
     const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes] = await Promise.all([
-      // segment + media_type pulled so the panels can route opens to
-      // /proposal/:id (govt) vs /quotes/:id (private) and so the
-      // segmentFilter post-fetch slice works.
-      supabase.from('quotes')
-        .select('id, quote_number, ref_number, client_name, client_company, status, total_amount, subtotal, revenue_type, created_by, sales_person_name, created_at, updated_at, campaign_start_date, campaign_end_date, segment, media_type'),
+      // Use `*` to be tolerant of schema drift — earlier we enumerated
+      // columns including `ref_number`, and a single missing column
+      // would silently return an empty array (not throw), which made
+      // the dashboard show all zeros even though quotes exist. The
+      // dashboard touches lots of fields; safer to pull the whole row
+      // and let JS pick what's needed.
+      supabase.from('quotes').select('*'),
       supabase.from('payments')
         .select('id, quote_id, amount_received, is_final_payment, approval_status, rejection_reason, payment_date, created_at, recorded_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
         .order('created_at', { ascending: false })

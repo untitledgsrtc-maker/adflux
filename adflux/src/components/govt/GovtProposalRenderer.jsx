@@ -99,8 +99,12 @@ function renderSignerBlock(signer) {
   const name   = signer.name || ''
   const title  = signer.signature_title || ''
   const mobile = signer.signature_mobile ? `મો. ${signer.signature_mobile}` : ''
+  // Right-aligned per standard Indian government letter format
+  // (owner spec, 1 May 2026). Inline style ensures the alignment
+  // also applies in the rasterized PDF where the .govt-letter__signer
+  // class might not be loaded with the same overrides.
   return [
-    '<div class="govt-letter__signer">',
+    '<div class="govt-letter__signer" style="text-align:right;">',
       'આપનો વિશ્વાસુ,<br/>',
       `${name}${title ? ` (${title})` : ''}<br/>`,
       'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ',

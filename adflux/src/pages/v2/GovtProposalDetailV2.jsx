@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Printer, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2,
-  CreditCard, Upload, Download, FileText, Lock, Loader2,
+  CreditCard, Upload, Download, FileText, Lock, Loader2, MessageCircle, Calendar,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { GovtProposalRenderer } from '../../components/govt/GovtProposalRenderer'
@@ -23,6 +23,8 @@ import { PaymentModal } from '../../components/payments/PaymentModal'
 import { PaymentHistory } from '../../components/payments/PaymentHistory'
 import { PaymentSummary } from '../../components/payments/PaymentSummary'
 import { WonPaymentModal } from '../../components/payments/WonPaymentModal'
+import { FollowUpList } from '../../components/followups/FollowUpList'
+import { openWhatsApp, shortenUrl } from '../../utils/whatsapp'
 import { formatINREnglish } from '../../utils/gujaratiNumber'
 import { syncClientFromQuote } from '../../utils/syncClient'
 import {
@@ -144,6 +146,16 @@ export default function GovtProposalDetailV2() {
     load()
     return () => { cancel = true }
   }, [id, navigate])
+
+  // Effective signer = the user record with the per-quote mobile
+  // override (if set). Phase 8B: lets the team change the desk-specific
+  // mobile per proposal without rewriting the signer's user record.
+  const effectiveSigner = useMemo(() => {
+    if (!signer) return null
+    const override = (quote?.signer_mobile_override || '').trim()
+    if (!override) return signer
+    return { ...signer, signature_mobile: override }
+  }, [signer, quote?.signer_mobile_override])
 
   const renderedData = useMemo(() => {
     if (!quote) return null
@@ -373,6 +385,36 @@ export default function GovtProposalDetailV2() {
     setStatusMsg('Proposal marked as Won.')
     fetchPayments()
     setTimeout(() => setStatusMsg(''), 3000)
+  }
+
+  // WhatsApp share — govt-flavored. Builds a short message in
+  // English/Gujarati referencing the proposal number and amount, plus
+  // a tinyurl-shortened link to the locked PDF when one exists. If no
+  // locked PDF yet (still draft), the message just references the
+  // proposal number; the team can re-share after Mark Sent generates
+  // the snapshot.
+  async function handleWhatsApp() {
+    if (!quote) return
+    const phone = (
+      quote.client_phone ||
+      // Govt proposals often don't capture a phone in the recipient
+      // block — try parsing the recipient_block for a 10-digit number
+      // as a fallback. Best-effort only.
+      (quote.recipient_block || '').match(/\b\d{10}\b/)?.[0] ||
+      ''
+    )
+    let msg = `નમસ્કાર,\n\nઅનટાઇટલ્ડ એડવર્ટાઇઝિંગ તરફથી ${quote.media_type === 'AUTO_HOOD' ? 'ઓટો રિક્ષા હૂડ' : 'GSRTC LED'} પ્રપોઝલ —\n${quote.quote_number || quote.ref_number || ''}\nરકમ: ₹${formatINREnglish(quote.total_amount || 0)}/-\n`
+    if (quote.locked_proposal_pdf_url) {
+      try {
+        const url = await getSignedUrl(quote.locked_proposal_pdf_url, 24 * 3600) // 24h link
+        const short = await shortenUrl(url).catch(() => url)
+        msg += `\nપ્રપોઝલ PDF: ${short}\n`
+      } catch (e) {
+        // signed URL failed — send without link, user can retry
+      }
+    }
+    msg += `\nઆભાર.`
+    openWhatsApp(phone, msg)
   }
 
   async function handleDeletePayment(paymentId) {
@@ -609,6 +651,14 @@ export default function GovtProposalDetailV2() {
           </button>
           <button
             type="button"
+            className="govt-wiz__btn"
+            onClick={handleWhatsApp}
+            title="Share via WhatsApp with the locked proposal PDF link"
+          >
+            <MessageCircle size={14} /> WhatsApp
+          </button>
+          <button
+            type="button"
             className="govt-wiz__btn govt-wiz__btn--primary"
             onClick={() => window.print()}
           >
@@ -689,13 +739,53 @@ export default function GovtProposalDetailV2() {
         </div>
       )}
 
+      {/* Editable signer mobile (Phase 8B) — the value flows through
+          to GovtProposalRenderer via effectiveSigner. Users can type a
+          desk-specific mobile per proposal without touching their user
+          record. Empty → falls back to signer's default. Saved on
+          blur to avoid a save-per-keystroke. */}
+      {signer && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          margin: '12px 0', fontSize: 12,
+          color: 'var(--text-muted)',
+        }}>
+          <span style={{ whiteSpace: 'nowrap' }}>
+            Signer mobile (overrides default):
+          </span>
+          <input
+            type="text"
+            placeholder={signer.signature_mobile || '—'}
+            defaultValue={quote.signer_mobile_override || ''}
+            onBlur={async (e) => {
+              const next = (e.target.value || '').trim() || null
+              if (next === (quote.signer_mobile_override || null)) return
+              const { data, error } = await supabase
+                .from('quotes')
+                .update({ signer_mobile_override: next })
+                .eq('id', quote.id)
+                .select()
+                .single()
+              if (!error) setQuote(data)
+            }}
+            className="govt-input-cell"
+            style={{ maxWidth: 220 }}
+          />
+          {quote.locked_proposal_pdf_url && (
+            <span style={{ color: 'var(--warning)', fontSize: 11 }}>
+              ⚠ Letter PDF already locked — changes affect future renders only, not the snapshot.
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Wrap the renderer in a ref'd container — html2canvas captures
           this exact node when generating the locked PDF on Mark Sent. */}
       <div ref={rendererRef}>
         <GovtProposalRenderer
           template={template}
           data={renderedData}
-          signer={signer}
+          signer={effectiveSigner}
           mediaType={quote.media_type}
         />
       </div>
@@ -1063,6 +1153,27 @@ export default function GovtProposalDetailV2() {
           onClose={() => setShowWonModal(false)}
         />
       )}
+
+      {/* ─── Follow-ups (Phase 8B parity with adflux private flow) ───
+           Same component the private QuoteDetail uses, just mounted
+           inline at the bottom of the govt page (no tab strip).
+           assignedTo defaults to the quote creator so admins creating
+           follow-ups still attach them to the rep who owns the quote. */}
+      <h2 style={{
+        fontFamily: 'var(--font-display)',
+        color: 'var(--text)',
+        margin: '24px 0 8px',
+        fontSize: 16,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <Calendar size={16} /> Follow-ups
+      </h2>
+      <div style={{ marginBottom: 24 }}>
+        <FollowUpList
+          quoteId={quote.id}
+          assignedTo={quote.created_by}
+        />
+      </div>
     </div>
   )
 }
