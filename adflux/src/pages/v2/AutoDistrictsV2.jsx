@@ -1,8 +1,11 @@
 // src/pages/v2/AutoDistrictsV2.jsx
 //
 // Admin master page — Auto Hood district editor.
-// 33 rows. Inline edit on share_pct. Live "must total 100%" check.
-// Save sends a batch UPDATE to Supabase.
+// 33 rows. Inline edit on name (EN), name (GU), share_pct, is_active.
+// No add/remove — Gujarat has a fixed 33-district list.
+// Use the Active toggle to remove a district from new proposals
+// (old proposals keep their snapshot via stored ref_id + city_name).
+// Live "active rows must total 100%" check before save.
 
 import { useEffect, useMemo, useState } from 'react'
 import { Save, RotateCcw } from 'lucide-react'
@@ -10,7 +13,7 @@ import { supabase } from '../../lib/supabase'
 
 export default function AutoDistrictsV2() {
   const [rows,    setRows]    = useState([])
-  const [edits,   setEdits]   = useState({})            // id → new share_pct
+  const [edits,   setEdits]   = useState({})            // id → patch obj
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [toast,   setToast]   = useState(null)
@@ -28,29 +31,39 @@ export default function AutoDistrictsV2() {
   }
   useEffect(() => { load() }, [])
 
-  function setEdit(id, val) {
-    const num = val === '' ? '' : Number(val)
-    setEdits(e => ({ ...e, [id]: num }))
+  function setEdit(id, field, val) {
+    setEdits(e => ({
+      ...e,
+      [id]: { ...(e[id] || {}), [field]: val },
+    }))
   }
 
   const liveRows = useMemo(() => rows.map(r => ({
     ...r,
-    share_pct: edits[r.id] !== undefined ? edits[r.id] : r.share_pct,
+    ...(edits[r.id] || {}),
   })), [rows, edits])
 
-  const total = liveRows.reduce((s, r) => s + (Number(r.share_pct) || 0), 0)
+  // Total share is across ACTIVE rows only — deactivated districts
+  // are zero-weighted in the distribution.
+  const total = liveRows
+    .filter(r => r.is_active)
+    .reduce((s, r) => s + (Number(r.share_pct) || 0), 0)
   const totalOk = Math.abs(total - 100) < 0.01
   const dirty = Object.keys(edits).length > 0
 
   async function save() {
     if (!totalOk) {
-      setToast({ type: 'error', msg: `Total is ${total.toFixed(2)}% — must be exactly 100% to save.` })
+      setToast({ type: 'error', msg: `Active total is ${total.toFixed(2)}% — must equal 100% to save.` })
       return
     }
     setSaving(true)
-    const updates = Object.entries(edits).map(([id, share_pct]) =>
-      supabase.from('auto_districts').update({ share_pct }).eq('id', id),
-    )
+    const updates = Object.entries(edits).map(([id, patch]) => {
+      const cleanPatch = { ...patch }
+      if (cleanPatch.share_pct !== undefined) {
+        cleanPatch.share_pct = Number(cleanPatch.share_pct) || 0
+      }
+      return supabase.from('auto_districts').update(cleanPatch).eq('id', id)
+    })
     const results = await Promise.all(updates)
     const firstErr = results.find(r => r.error)
     if (firstErr) {
@@ -75,9 +88,9 @@ export default function AutoDistrictsV2() {
           <div className="govt-master__kicker">Government masters</div>
           <h1 className="govt-master__title">Auto Districts</h1>
           <div className="govt-master__sub">
-            33 districts of Gujarat. Edit each district's % share — these
-            drive how Auto Hood total quantity is distributed in proposals.
-            Total must equal exactly <strong>100%</strong> to save.
+            33 districts of Gujarat (fixed list — no add/remove). Edit names,
+            share %, or toggle a district off. Active districts must total
+            exactly <strong>100%</strong> to save.
           </div>
         </div>
       </div>
@@ -88,10 +101,9 @@ export default function AutoDistrictsV2() {
         </div>
       )}
 
-      {/* Live total banner */}
       <div className={totalOk ? 'govt-master__ok' : 'govt-master__warn'}>
-        <strong>Total share: {total.toFixed(2)}%</strong>
-        {' '}— {totalOk ? '✓ ready to save' : `must equal 100% (${(100 - total).toFixed(2)}% off)`}
+        <strong>Active total: {total.toFixed(2)}%</strong>
+        {' '}— {totalOk ? 'ready to save' : `must equal 100% (${(100 - total).toFixed(2)}% off)`}
       </div>
 
       <table className="govt-table">
@@ -99,9 +111,9 @@ export default function AutoDistrictsV2() {
           <tr>
             <th style={{ width: 56 }}>#</th>
             <th>District (EN)</th>
-            <th>જિલ્લો (GU)</th>
+            <th>District (GU)</th>
             <th className="num">Share %</th>
-            <th style={{ width: 90 }}>Active</th>
+            <th style={{ width: 100 }}>Active</th>
           </tr>
         </thead>
         <tbody>
@@ -109,10 +121,26 @@ export default function AutoDistrictsV2() {
             <tr><td colSpan={5}><em>Loading…</em></td></tr>
           )}
           {liveRows.map(r => (
-            <tr key={r.id}>
+            <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.55 }}>
               <td className="num">{r.serial_no}</td>
-              <td>{r.district_name_en}</td>
-              <td>{r.district_name_gu}</td>
+              <td>
+                <input
+                  type="text"
+                  className="govt-input-cell"
+                  style={{ maxWidth: 200, textAlign: 'left' }}
+                  value={r.district_name_en ?? ''}
+                  onChange={e => setEdit(r.id, 'district_name_en', e.target.value)}
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  className="govt-input-cell"
+                  style={{ maxWidth: 200, textAlign: 'left' }}
+                  value={r.district_name_gu ?? ''}
+                  onChange={e => setEdit(r.id, 'district_name_gu', e.target.value)}
+                />
+              </td>
               <td className="num">
                 <input
                   type="number"
@@ -121,14 +149,25 @@ export default function AutoDistrictsV2() {
                   max="100"
                   className="govt-input-cell"
                   value={r.share_pct ?? ''}
-                  onChange={e => setEdit(r.id, e.target.value)}
+                  onChange={e => setEdit(r.id, 'share_pct', e.target.value)}
                 />
                 <span style={{ marginLeft: 4, color: 'var(--text-subtle)' }}>%</span>
               </td>
               <td>
-                <span className={r.is_active ? 'govt-pill govt-pill--A' : 'govt-pill govt-pill--C'}>
+                <button
+                  type="button"
+                  onClick={() => setEdit(r.id, 'is_active', !r.is_active)}
+                  className={r.is_active ? 'govt-pill govt-pill--A' : 'govt-pill govt-pill--C'}
+                  style={{
+                    cursor: 'pointer',
+                    border: 'none',
+                    fontFamily: 'inherit',
+                    padding: '4px 12px',
+                  }}
+                  title={r.is_active ? 'Click to deactivate' : 'Click to reactivate'}
+                >
                   {r.is_active ? 'Active' : 'Off'}
-                </span>
+                </button>
               </td>
             </tr>
           ))}
