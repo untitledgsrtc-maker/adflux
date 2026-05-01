@@ -33,7 +33,10 @@ function computeBalance(q) {
 export default function QuotesV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isAdmin = profile?.role === 'admin'
+  // Privileged set (admin / owner / co_owner) gets the full admin UI
+  // (sales-rep filter column, all-rows view). Phase 5 added the new
+  // owner / co_owner roles.
+  const isAdmin = ['admin', 'owner', 'co_owner'].includes(profile?.role)
 
   const { quotes, filters, setFilters, resetFilters, fetchQuotes } = useQuotes()
   const [loading, setLoading] = useState(true)
@@ -311,7 +314,12 @@ export default function QuotesV2() {
               </thead>
               <tbody>
                 {displayed.map(q => (
-                  <tr key={q.id} onClick={() => navigate(`/quotes/${q.id}`)}>
+                  <tr
+                    key={q.id}
+                    onClick={() => navigate(
+                      q.segment === 'GOVERNMENT' ? `/proposal/${q.id}` : `/quotes/${q.id}`
+                    )}
+                  >
                     <td>{q.quote_number}</td>
                     {/* Company is the primary identifier (B2B context —
                         a contact is just a person at the company).
@@ -352,7 +360,9 @@ export default function QuotesV2() {
                 <button
                   key={q.id}
                   className="v2d-qcard"
-                  onClick={() => navigate(`/quotes/${q.id}`)}
+                  onClick={() => navigate(
+                    q.segment === 'GOVERNMENT' ? `/proposal/${q.id}` : `/quotes/${q.id}`
+                  )}
                 >
                   <div className="v2d-qcard-top">
                     <div className="v2d-qcard-num">{q.quote_number}</div>

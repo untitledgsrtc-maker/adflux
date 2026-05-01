@@ -9,18 +9,22 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Building2,
   Users, TrendingUp, BarChart3, LogOut, RotateCcw, Inbox,
-  Briefcase, FileSignature,
+  Briefcase, FileSignature, MapPin, Tv,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { fetchPendingCount } from '../../hooks/usePayments'
 
-const ADMIN_NAV = [
+// Privileged nav (admin / owner / co_owner) — full access including
+// the new Government master tables (Auto Districts + GSRTC Stations).
+const PRIVILEGED_NAV = [
   { to: '/dashboard',         icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/quotes',            icon: FileText,        label: 'Quotes' },
   { to: '/pending-approvals', icon: Inbox,           label: 'Pending Approvals', showPill: true },
   { to: '/renewal-tools',     icon: RotateCcw,       label: 'Renewal Tools' },
   { to: '/cities',            icon: Building2,       label: 'Cities' },
+  { to: '/auto-districts',    icon: MapPin,          label: 'Auto Districts' },
+  { to: '/gsrtc-stations',    icon: Tv,              label: 'GSRTC Stations' },
   { to: '/team',              icon: Users,           label: 'Team' },
   { to: '/hr',                icon: Briefcase,       label: 'HR' },
   { to: '/incentives',        icon: TrendingUp,      label: 'Incentives' },
@@ -35,14 +39,14 @@ const SALES_NAV = [
 ]
 
 export function Sidebar() {
-  const { profile, signOut, isAdmin } = useAuth()
-  const nav = isAdmin ? ADMIN_NAV : SALES_NAV
+  const { profile, signOut, isPrivileged } = useAuth()
+  const nav = isPrivileged ? PRIVILEGED_NAV : SALES_NAV
   const initial = profile?.name?.[0]?.toUpperCase() || 'U'
 
   const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!isPrivileged) return
     let cancelled = false
     const load = async () => {
       const { count } = await fetchPendingCount()
@@ -57,7 +61,7 @@ export function Sidebar() {
       .subscribe()
 
     return () => { cancelled = true; supabase.removeChannel(ch) }
-  }, [isAdmin])
+  }, [isPrivileged])
 
   return (
     <aside className="sidebar">

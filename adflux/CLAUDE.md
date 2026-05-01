@@ -116,13 +116,18 @@ adflux/                                      ← merged repo, single deployment
 - ✅ Sprint 1 (schema + masters) — DONE 30 Apr 2026
   - 6 migration files applied to staging Supabase (`supabase_phase4a` through `supabase_phase4f`)
   - Adds segment + media_type + rate_type to quotes, segment_access to users, master tables (33 districts, 20 stations, rate master, 16-row validity matrix), media-aware ref-number generator, 3-layer RLS
-- ⏭ Sprint 2 (Government wizard port) — NEXT
-  - Port `proposal-wizard/Step1ClientMedia` → `Step6Review` from Untitled Proposals into AdFlux's quote flow
-  - Drop `.up-*` styles, rebuild with AdFlux tokens
-  - Add chooser screen at "+ Create Quote" (Government / Private)
-  - Wire the wizard to AdFlux's quotes table (NOT the standalone proposals table)
-  - Add `getSegmentAccess()` to authStore
-  - Lock Government dropdown to AUTO_HOOD + GSRTC_LED only (already DB-enforced; UI must enforce too)
+- ✅ Phase 5 prep — DONE 30 Apr 2026
+  - `supabase_phase5_signers_shares_templates.sql` — adds owner/co_owner roles, signing_authority, share_pct on districts, fixed gsrtc_stations seeds, proposal_templates table with locked Gujarati Auto Hood + GSRTC LED templates
+  - `supabase_seed_test_users.sql` — seeded 3 test users (admin Brijesh, Private rep, Govt rep)
+  - `supabase_seed_vishal.sql` — seeded Vishal Chauhan as co_owner with signing_authority
+- ✅ Sprint 2 (Government module front-end) — DONE 1 May 2026
+  - `supabase_phase6_govt_quote_extensions.sql` — extends quotes with signer_user_id / auto_total_quantity / gsrtc_campaign_months / recipient_block / proposal_date; extends quote_cities with ref_kind/ref_id/qty/unit_rate/amount; adds users.signature_mobile + signature_title (Brijesh: 9428273686 / "Founder & CEO"; Vishal: 9924350285 / "CEO")
+  - Sprint 2A — foundations: authStore + useAuth expose isOwner/isCoOwner/isPrivileged/segmentAccess/isSigner; Sidebar + MobileNav now use isPrivileged + add Auto Districts + GSRTC Stations nav; chooser screen at `/quotes/new` (3 tiles: Govt × Auto Hood, Govt × GSRTC LED, Private × LED Cities); routing in App.jsx
+  - Sprint 2B — Auto Hood wizard at `/quotes/new/government/auto-hood` (5 steps: recipient → date+signer → quantity → districts with live % distribution → review)
+  - Sprint 2C — GSRTC LED wizard at `/quotes/new/government/gsrtc-led` (5 steps: recipient → date+signer → stations → months → review)
+  - Sprint 2D — admin master pages at `/auto-districts` (33 districts, edit share_pct, live 100% check) and `/gsrtc-stations` (20 stations, edit screens/category/rates)
+  - Sprint 2E — proposal renderer at `/proposal/:id` (HTML preview, browser-print → PDF, status transition buttons)
+  - QuotesV2 list now routes govt rows to `/proposal/:id`, private rows to `/quotes/:id`. QuoteDetail auto-redirects govt quotes that landed on its old URL.
 - ⏭ Sprint 3 (P&L module port, simplified) — TBD
 - ⏭ Sprint 4 (receipts/TDS upgrade) — TBD
 - ⏭ Sprint 5 (cleanup, delete `Untitled Proposals/` folder) — TBD
@@ -131,13 +136,13 @@ adflux/                                      ← merged repo, single deployment
 
 ## Known gaps / things future-Claude must check
 
-1. **Frontend doesn't read `segment_access` yet.** `authStore.fetchProfile` selects `*` so the field is in memory, but no `getSegmentAccess()` getter exists. Wire this in Sprint 2 before any segment-aware UI lands.
-2. **Wizard hardcodes Private × LED_OTHER.** `WizardShell` / `Step1Client` create quotes with default segment/media. Government quotes can't be created from UI yet, even though DB supports it.
-3. **PDF API points at the wrong Supabase.** `pdf-api/` Vercel functions read `SUPABASE_URL` env var that points to Untitled Proposals' standalone project. Repoint at AdFlux staging before testing PDF rendering of Government quotes.
-4. **No seed users on staging Supabase yet.** Need 1 admin (segment_access='ALL') + at least 1 sales rep with PRIVATE + 1 with GOVERNMENT before Sprint 2 wizard can be tested. Owner needs to seed manually OR ask Claude to write a seed SQL.
-5. **Quote vs proposal data model — single decision pending.** Sprint 1 chose to extend `quotes` table (not create separate `proposals` table). Confirmed in architecture v2 doc but not yet in any migration comment. Future Claude: if you see references to a separate `proposals` table being needed, push back — single-table is the locked decision.
-6. **Quote status enum is AdFlux's small one** (`draft, sent, negotiating, won, lost`). Untitled Proposals had a richer one (`DRAFT, SENT, APPROVED, WON, PARTIAL_PAID, PAID, LOST, EXPIRED, CLOSED`). Decision: keep AdFlux's small enum for now. PARTIAL_PAID/PAID are *derived* from payments table, not stored. EXPIRED is added later via cron job (deferred).
-7. **TDS (Tax Deducted at Source) handling** — Government deals have TDS deducted from payment. AdFlux's `payments` table has no TDS columns. Untitled Proposals' `proposal_receipts` does. Sprint 4 adds TDS columns to AdFlux `payments` (NOT a separate receipts table) — single source of truth.
+1. **PDF rendering is browser-print only for now.** GovtProposalDetailV2's "Print / Save PDF" button just calls `window.print()` and relies on print-friendly CSS in `govt.css` (`@media print` block hides chrome, prints the letter). Real server-rendered PDFs via Puppeteer + Gujarati fonts is a Sprint 3+ item. The `Untitled Proposals/pdf-api/` code is in the repo but its `lib/fetchProposal.mjs` queries `proposals` / `proposal_line_items` tables that don't exist in AdFlux — would need rewriting to query `quotes` + `quote_cities` first.
+2. **TDS handling deferred.** Govt deals have Tax Deducted at Source (2% income + 2% GST). AdFlux `payments` table has no TDS columns. When the first Govt deal moves to PARTIAL_PAID, this matters. Sprint 4 adds TDS columns to `payments` (NOT a separate receipts table).
+3. **Govt invoice template not built.** Once a Govt quote moves to WON, the next step is invoice generation with PO + work-completion certificate + photos as attachments. Sprint 4-ish. Currently WON is a manual status flip with no auto invoice.
+4. **Quote status enum is AdFlux's small one** (`draft, sent, negotiating, won, lost`). Untitled Proposals had a richer one. Decision: keep AdFlux's small enum. PARTIAL_PAID/PAID are *derived* from payments table. EXPIRED via cron job later.
+5. **Sales Lead role + manager_id deferred.** When Brijesh actually promotes someone to Sales Lead, add the role enum value and wire `manager_id` into the RLS team-scope query. Until then, `admin` is the de-facto Sales Lead.
+6. **Telecaller role deferred to Phase 1 / M7.** Add when telecallers come online with the lead-handoff flow.
+7. **`available_rickshaw_count` was dropped from auto_districts in phase 5.** Replaced with `share_pct`. The original Untitled Proposals counts (Kutch 2500 etc.) are gone — if they're needed for ops capacity tracking later, add a separate column then; don't bring back the old one.
 
 ## Where memory writes don't work
 
