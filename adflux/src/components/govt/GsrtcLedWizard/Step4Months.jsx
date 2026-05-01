@@ -2,28 +2,38 @@
 //
 // Wizard Step 4 — campaign duration in months.
 // Quick chips (1 / 2 / 3) plus a "Custom" numeric input.
+// Uses station_overrides from Step 3 when computing the monthly cost
+// (so a station with overridden Daily/Days reflects in the totals).
 
 import { useGsrtcStations } from '../../../hooks/useGovtMasters'
 import { formatINREnglish } from '../../../utils/gujaratiNumber'
 
 const PRESET_MONTHS = [1, 2, 3]
 const GST_PCT = 18
+const DEFAULT_DAILY = 100
+const DEFAULT_DAYS = 30
+
+function effectiveMonthly(s, override) {
+  const daily   = (override?.daily_spots_override ?? null) || DEFAULT_DAILY
+  const days    = (override?.days_override        ?? null) || DEFAULT_DAYS
+  const screens = Number(s.screens_count) || 0
+  const rate    = Number(s.davp_per_slot_rate) || 0
+  return screens * daily * days * rate
+}
 
 export function Step4Months({ data, onChange }) {
   const { stations } = useGsrtcStations()
   const selectedIds = data.selected_station_ids || []
-  const months = Number(data.gsrtc_campaign_months) || 1
+  const overrides   = data.station_overrides || {}
+  const months      = Number(data.gsrtc_campaign_months) || 1
 
   const monthlySum = stations
     .filter(s => selectedIds.includes(s.id))
-    .reduce((sum, s) => {
-      const monthly = (Number(s.screens_count) || 0) * 100 * 30 * Number(s.davp_per_slot_rate || 0)
-      return sum + monthly
-    }, 0)
+    .reduce((sum, s) => sum + effectiveMonthly(s, overrides[s.id]), 0)
 
   const subtotal = monthlySum * months
-  const gst = Math.round(subtotal * GST_PCT / 100)
-  const total = subtotal + gst
+  const gst      = Math.round(subtotal * GST_PCT / 100)
+  const total    = subtotal + gst
 
   function set(value) {
     onChange({ gsrtc_campaign_months: Number(value) || 1 })
@@ -33,8 +43,8 @@ export function Step4Months({ data, onChange }) {
     <div>
       <h2 className="govt-step__title">Campaign Duration</h2>
       <p className="govt-step__sub">
-        Pick how many months the campaign runs. Standard GSRTC contract is 30 days
-        per "month". Total cost = monthly cost × months.
+        Pick how many months the campaign runs. Total cost = monthly cost × months.
+        Per-station overrides from Step 3 are already factored in.
       </p>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -68,7 +78,7 @@ export function Step4Months({ data, onChange }) {
 
       <div className="govt-summary">
         <div className="govt-summary__row">
-          <span>Monthly cost (selected stations)</span>
+          <span>Monthly cost (selected stations + overrides)</span>
           <strong>₹{formatINREnglish(monthlySum)}</strong>
         </div>
         <div className="govt-summary__row">
@@ -98,3 +108,4 @@ export function validateStep4Gsrtc(data) {
   if (m > 36) return 'Campaign over 36 months — double-check.'
   return null
 }
+—
