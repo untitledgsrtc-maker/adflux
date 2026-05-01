@@ -30,7 +30,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
-  TrendingUp, UserCircle2, Contact2,
+  TrendingUp, UserCircle2, Contact2, MapPin, Tv,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -38,12 +38,16 @@ import { initials } from '../../utils/formatters'
 import '../../styles/v2.css'
 
 /* ─── Nav definitions ─── */
+// PRIVILEGED = admin / owner / co_owner — full access including the
+// new Government master pages (Auto Districts + GSRTC Stations).
 const ADMIN_NAV = [
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/pending-approvals', label: 'Approvals',      icon: CheckSquare },
   { to: '/cities',            label: 'Cities',         icon: Building2 },
+  { to: '/auto-districts',    label: 'Auto Districts', icon: MapPin },
+  { to: '/gsrtc-stations',    label: 'GSRTC Stations', icon: Tv },
   { to: '/team',              label: 'Team',           icon: Users },
   { to: '/hr',                label: 'HR',             icon: UserCircle2 },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
@@ -74,14 +78,16 @@ const MOBILE_NAV_SALES = [
 ]
 
 export function V2AppShell() {
-  const { profile, isAdmin, signOut } = useAuth()
+  const { profile, isPrivileged, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
 
-  const nav       = isAdmin ? ADMIN_NAV        : SALES_NAV
-  const mobileNav = isAdmin ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
+  // PRIVILEGED set (admin / owner / co_owner) gets the full admin
+  // sidebar incl. the new Auto Districts + GSRTC Stations.
+  const nav       = isPrivileged ? ADMIN_NAV        : SALES_NAV
+  const mobileNav = isPrivileged ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
 
   // Topbar search — commits to the shared quote-filter store and
   // jumps to /quotes. Keeps the field as a global quick-search so
