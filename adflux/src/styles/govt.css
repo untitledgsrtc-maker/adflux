@@ -519,6 +519,11 @@
   border-collapse: collapse;
   margin: 16px 0;
   font-size: 13px;
+  /* Force solid black on white — when this letter renders inside the
+     dark v2d shell, color inheritance was painting cells in the dark
+     theme's --text (light grey on white = unreadable). */
+  color: #111 !important;
+  background: #fff;
 }
 .govt-letter__table th,
 .govt-letter__table td {
@@ -526,14 +531,21 @@
   padding: 6px 10px;
   text-align: left;
   vertical-align: top;
+  color: #111 !important;       /* same defensive override */
+  background: #fff;
 }
 .govt-letter__table th {
   background: #f5f5f5;
   font-weight: 700;
+  color: #111 !important;
 }
 .govt-letter__table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  color: #111 !important;
+}
+.govt-letter__table strong {
+  color: #111 !important;
 }
 
 .govt-letter__signer {
