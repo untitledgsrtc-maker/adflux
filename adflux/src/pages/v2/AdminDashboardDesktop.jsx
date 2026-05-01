@@ -18,7 +18,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, BarChart3, Users, Building2,
   Repeat, Gift, Settings, LogOut, Search, Bell, Plus, AlertTriangle,
   CheckCircle2, CreditCard, Send, PenLine, ArrowUpRight,
-  Contact2, MapPin, Tv,
+  Contact2, MapPin, Tv, FileBox,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -532,6 +532,9 @@ export default function AdminDashboardDesktop() {
             </button>
             <button onClick={() => navigate('/gsrtc-stations')}>
               <Tv size={16} /><span>GSRTC Stations</span>
+            </button>
+            <button onClick={() => navigate('/master')}>
+              <FileBox size={16} /><span>Master</span>
             </button>
             <button onClick={() => navigate('/team')}>
               <Users size={16} /><span>Team</span>

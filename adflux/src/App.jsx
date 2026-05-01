@@ -29,6 +29,7 @@ import CreateGovtGsrtcLedV2  from './pages/v2/CreateGovtGsrtcLedV2'
 import AutoDistrictsV2       from './pages/v2/AutoDistrictsV2'
 import GsrtcStationsV2       from './pages/v2/GsrtcStationsV2'
 import GovtProposalDetailV2  from './pages/v2/GovtProposalDetailV2'
+import MasterV2              from './pages/v2/MasterV2'
 
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
@@ -127,6 +128,8 @@ export default function App() {
           <Route path="/incentives"                element={<RequirePrivileged><IncentivesV2 /></RequirePrivileged>} />
           <Route path="/pending-approvals"         element={<RequirePrivileged><PendingApprovalsV2 /></RequirePrivileged>} />
           <Route path="/hr"                        element={<RequirePrivileged><HRV2 /></RequirePrivileged>} />
+          {/* Phase 8C — unified Master page (Attachments / Signers / Media / Documents) */}
+          <Route path="/master"                    element={<RequirePrivileged><MasterV2 /></RequirePrivileged>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -30,7 +30,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
-  TrendingUp, UserCircle2, Contact2, MapPin, Tv,
+  TrendingUp, UserCircle2, Contact2, MapPin, Tv, FileBox,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -48,6 +48,7 @@ const ADMIN_NAV = [
   { to: '/cities',            label: 'Cities',         icon: Building2 },
   { to: '/auto-districts',    label: 'Auto Districts', icon: MapPin },
   { to: '/gsrtc-stations',    label: 'GSRTC Stations', icon: Tv },
+  { to: '/master',            label: 'Master',         icon: FileBox },
   { to: '/team',              label: 'Team',           icon: Users },
   { to: '/hr',                label: 'HR',             icon: UserCircle2 },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },

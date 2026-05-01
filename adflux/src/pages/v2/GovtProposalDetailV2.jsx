@@ -130,7 +130,7 @@ export default function GovtProposalDetailV2() {
               .maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.from('attachment_templates')
-          .select('id, display_order, label, is_required')
+          .select('id, display_order, label, is_required, default_file_url, default_file_uploaded_at')
           .eq('segment', 'GOVERNMENT')
           .eq('media_type', q.media_type)
           .eq('is_active', true)
@@ -433,16 +433,27 @@ export default function GovtProposalDetailV2() {
   // with whatever's saved on the quote. Custom items live alongside.
   const checklist = useMemo(() => {
     const saved = Array.isArray(quote?.attachments_checklist) ? quote.attachments_checklist : []
-    // Merge: ensure every standard template item appears (saved-state if any)
+    // Merge order:
+    //   1. existing per-quote upload (saved.file_url) — wins, owner edited it
+    //   2. template default file (Phase 8C — uploaded once on Master page,
+    //      auto-attaches here) — fallback so new proposals don't have to
+    //      re-upload reusable docs (DAVP letter, Advisory, etc.)
+    //   3. empty — slot waits for user upload (OC copy / PO copy)
     const fromTpl = attachmentTpl.map(t => {
-      const existing = saved.find(s => s.template_id === t.id)
+      const existing  = saved.find(s => s.template_id === t.id)
+      const effective = existing?.file_url || t.default_file_url || ''
       return {
-        template_id: t.id,
-        label:       t.label,
-        is_required: t.is_required,
-        checked:     existing?.checked ?? false,
-        file_url:    existing?.file_url ?? '',
-        custom:      false,
+        template_id:        t.id,
+        label:              t.label,
+        is_required:        t.is_required,
+        // Auto-tick when EITHER a per-quote upload OR a master default
+        // file is present — both mean "this attachment is real".
+        checked:            existing?.checked ?? Boolean(effective),
+        file_url:           effective,
+        // Distinguish where the file came from in the UI so users know
+        // not to assume an uploaded file is per-quote.
+        from_master_default: !existing?.file_url && Boolean(t.default_file_url),
+        custom:             false,
       }
     })
     const customs = saved.filter(s => s.custom === true).map(s => ({ ...s }))
