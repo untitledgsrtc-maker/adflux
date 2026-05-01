@@ -309,14 +309,17 @@ export function usePayments(quoteId) {
 // Admin-wide helpers — not tied to a specific quote
 // =====================================================
 
-// Admin inbox: every pending payment with quote + submitter context
+// Admin inbox: every pending payment with quote + submitter context.
+// `segment` and `media_type` are needed so PendingApprovalsV2 can route
+// the "open quote" link to /proposal/:id (govt) vs /quotes/:id (private)
+// — without them, govt approvals 404 when admin clicks through.
 export async function fetchPendingApprovals() {
   return supabase
     .from('payments')
     .select(`
       *,
       users:received_by(name),
-      quotes(id, quote_number, client_name, client_company, total_amount, created_by, sales_person_name)
+      quotes(id, quote_number, ref_number, client_name, client_company, total_amount, created_by, sales_person_name, segment, media_type)
     `)
     .eq('approval_status', 'pending')
     .order('created_at', { ascending: false })

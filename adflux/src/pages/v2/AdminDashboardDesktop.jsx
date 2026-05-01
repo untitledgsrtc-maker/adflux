@@ -64,20 +64,27 @@ export default function AdminDashboardDesktop() {
   // preset range (Last 7, This quarter, …), or a fully custom start/end.
   // The picker returns a normalized period object — see utils/period.js.
   const [period, setPeriod] = useState(() => thisMonth())
+  // Phase B — segment filter. 'all' (default) keeps the historical
+  // behaviour of mixing private + govt; 'private' / 'government' slice
+  // the quote-derived KPIs (Pipeline, Won value, Outstanding, Lost,
+  // Active campaigns, Stale, Activity). The leaderboard / incentive
+  // liability still reads monthly_sales_data which is segment-blind —
+  // see the comment by the leaderboard build below.
+  const [segmentFilter, setSegmentFilter] = useState('all')
 
   useEffect(() => {
-    load(period)
+    load(period, segmentFilter)
     // Realtime — one channel, covers everything that moves numbers.
-    // Re-use the current `period` from closure when a realtime event fires.
+    // Re-use the current `period` + filter from closure on realtime.
     const ch = supabase
       .channel('v2d-admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => load(period))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => load(period))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => load(period, segmentFilter))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => load(period, segmentFilter))
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  /* eslint-disable-next-line */ }, [period])
+  /* eslint-disable-next-line */ }, [period, segmentFilter])
 
-  async function load(activePeriod) {
+  async function load(activePeriod, activeSegment = 'all') {
     const today = todayISO()
     const p = activePeriod || thisMonth()
     // All three are consumed below: startIso/endIso for row-level time
@@ -88,17 +95,20 @@ export default function AdminDashboardDesktop() {
     const monthKeys     = p.monthKeys
 
     const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes] = await Promise.all([
+      // segment + media_type pulled so the panels can route opens to
+      // /proposal/:id (govt) vs /quotes/:id (private) and so the
+      // segmentFilter post-fetch slice works.
       supabase.from('quotes')
-        .select('id, quote_number, client_name, client_company, status, total_amount, subtotal, revenue_type, created_by, sales_person_name, created_at, updated_at, campaign_start_date, campaign_end_date'),
+        .select('id, quote_number, ref_number, client_name, client_company, status, total_amount, subtotal, revenue_type, created_by, sales_person_name, created_at, updated_at, campaign_start_date, campaign_end_date, segment, media_type'),
       supabase.from('payments')
-        .select('id, quote_id, amount_received, is_final_payment, approval_status, rejection_reason, payment_date, created_at, recorded_by, quotes(quote_number, client_name, sales_person_name)')
+        .select('id, quote_id, amount_received, is_final_payment, approval_status, rejection_reason, payment_date, created_at, recorded_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
         .order('created_at', { ascending: false })
         .limit(40),
       supabase.from('payments')
         .select('quote_id, amount_received, payment_date, is_final_payment')
         .eq('approval_status', 'approved'),
       supabase.from('payments')
-        .select('id, quote_id, amount_received, created_at, recorded_by, quotes(quote_number, client_name, sales_person_name)')
+        .select('id, quote_id, amount_received, created_at, recorded_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false }),
       supabase.from('staff_incentive_profiles').select('*, users(name)').eq('is_active', true),
@@ -110,7 +120,7 @@ export default function AdminDashboardDesktop() {
       supabase.from('incentive_settings').select('*').maybeSingle(),
     ])
 
-    const quotes       = quotesRes.data       || []
+    const allQuotes    = quotesRes.data       || []
     const paymentsAll  = paymentsAllRes.data  || []
     const paymentsApr  = paymentsApprRes.data || []
     const pending      = pendingPayRes.data   || []
@@ -119,11 +129,28 @@ export default function AdminDashboardDesktop() {
     const salesUsers   = usersRes.data        || []
     const settings     = settingsRes.data     || {}
 
+    // Apply segment filter to the quote-derived calcs. Private rows
+    // historically have segment=null (pre-Phase 4) so 'private' must
+    // match both 'PRIVATE' and null/undefined.
+    const quotes = activeSegment === 'all'
+      ? allQuotes
+      : activeSegment === 'government'
+        ? allQuotes.filter(q => q.segment === 'GOVERNMENT')
+        : allQuotes.filter(q => q.segment !== 'GOVERNMENT')
+
+    // Filter approved payments by their parent quote's segment when a
+    // filter is active. Without this, switching to "Government" would
+    // still count private payments in Revenue.
+    const filteredQuoteIds = new Set(quotes.map(q => q.id))
+    const paymentsAprFiltered = activeSegment === 'all'
+      ? paymentsApr
+      : paymentsApr.filter(p => filteredQuoteIds.has(p.quote_id))
+
     // Revenue for the selected month = approved payments whose payment_date
     // falls inside [monthStart, monthEnd). The upper bound matters when
     // viewing a past month — without it, later months' payments would leak
-    // into the total.
-    const revenue = paymentsApr
+    // into the total. paymentsAprFiltered respects the segment toggle.
+    const revenue = paymentsAprFiltered
       .filter(p => (p.payment_date || '') >= monthStartIso
                 && (p.payment_date || '') <  monthEndIso)
       .reduce((s, p) => s + (p.amount_received || 0), 0)
@@ -159,7 +186,10 @@ export default function AdminDashboardDesktop() {
       return sum + (q.total_amount || 0)
     }, 0)
 
-    // Outstanding — same per-quote clamp logic as legacy RevenueSummary
+    // Outstanding — same per-quote clamp logic as legacy RevenueSummary.
+    // Uses paymentsApr (NOT paymentsAprFiltered) because we're already
+    // iterating only the segment-filtered `quotes` array; matching by
+    // quote_id is implicitly segment-correct.
     const outstanding = quotes.reduce((sum, q) => {
       if (q.status === 'lost') return sum
       const paid = paymentsApr.filter(p => p.quote_id === q.id)
@@ -244,6 +274,15 @@ export default function AdminDashboardDesktop() {
 
     // Sum monthly_sales_data across the requested period (custom ranges
     // can span multiple months) so earned reflects the whole window.
+    //
+    // SEGMENT NOTE: monthly_sales_data is populated by the
+    // rebuild_monthly_sales DB trigger (supabase_phase3c.sql) which
+    // joins payments → quotes but does NOT filter by segment, so the
+    // leaderboard reflects BOTH segments regardless of segmentFilter.
+    // To split by segment we'd need either (a) an extra column on
+    // monthly_sales_data + a trigger update, or (b) compute the
+    // leaderboard from quotes+payments directly here. Out of scope
+    // for this pass — flagged for follow-up.
     const msdByUser = {}
     const ensureMsd = (uid) => {
       if (!msdByUser[uid]) msdByUser[uid] = { newRev: 0, renRev: 0 }
@@ -360,27 +399,41 @@ export default function AdminDashboardDesktop() {
       .sort((a, b) => b.ageDays - a.ageDays)
       .slice(0, 8)
 
-    // Recent activity (merged quotes + payments, last 12)
+    // Recent activity (merged quotes + payments, last 12).
+    // Filter quote events by the segment toggle (uses already-filtered
+    // `quotes`). Payment events filter by the joined quote's segment
+    // when active so e.g. switching to Government doesn't show private
+    // payment activity. `segment` travels with each event so the panel
+    // routes /proposal/:id vs /quotes/:id correctly.
     const quoteEvents = quotes
       .slice()
       .sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''))
       .slice(0, 10)
       .map(q => ({
         type: 'quote', id: q.id, ts: q.updated_at || q.created_at,
-        label: q.client_name, sub: q.quote_number, status: q.status,
+        label: q.client_name,
+        sub: q.quote_number || q.ref_number,
+        status: q.status,
         actor: q.sales_person_name,
+        segment: q.segment,
       }))
 
-    const payEvents = paymentsAll
+    const payEventsAll = paymentsAll
       .slice(0, 10)
       .map(p => ({
         type: 'payment', id: p.quote_id, ts: p.created_at,
         label: p.quotes?.client_name || '—',
-        sub:   p.quotes?.quote_number || '',
+        sub:   p.quotes?.quote_number || p.quotes?.ref_number || '',
         amount: p.amount_received, final: p.is_final_payment,
         status: p.approval_status,
         actor: p.quotes?.sales_person_name,
+        segment: p.quotes?.segment,
       }))
+    const payEvents = activeSegment === 'all'
+      ? payEventsAll
+      : activeSegment === 'government'
+        ? payEventsAll.filter(e => e.segment === 'GOVERNMENT')
+        : payEventsAll.filter(e => e.segment !== 'GOVERNMENT')
 
     const activity = [...quoteEvents, ...payEvents]
       .sort((a, b) => new Date(b.ts) - new Date(a.ts))
@@ -396,7 +449,7 @@ export default function AdminDashboardDesktop() {
         value: 0,
       })
     }
-    paymentsApr.forEach(p => {
+    paymentsAprFiltered.forEach(p => {
       const k = (p.payment_date || '').slice(0, 7)
       const m = trendMonths.find(x => x.key === k)
       if (m) m.value += p.amount_received || 0
@@ -424,6 +477,21 @@ export default function AdminDashboardDesktop() {
 
   const firstName = (profile?.name || 'Admin').split(' ')[0]
   const isHome = location.pathname === '/dashboard'
+
+  // Segment-aware quote opener — the panels below pass either an id
+  // (legacy) or { id, segment } (new) to onOpen. Govt rows go to
+  // /proposal/:id, everything else to /quotes/:id. Without this branch
+  // govt rows 404 when admin clicks them anywhere on the dashboard.
+  function openQuote(arg) {
+    if (!arg) return
+    if (typeof arg === 'string') {
+      // Legacy callsite — assume private. New callsites pass an object.
+      navigate(`/quotes/${arg}`)
+      return
+    }
+    const { id, segment } = arg
+    navigate(segment === 'GOVERNMENT' ? `/proposal/${id}` : `/quotes/${id}`)
+  }
 
   return (
     <div className="v2d">
@@ -505,6 +573,35 @@ export default function AdminDashboardDesktop() {
                 (see utils/period.js). Every calc in load() reads
                 startIso/endIso and monthKeys off that object. */}
             <PeriodPicker period={period} onChange={setPeriod} />
+
+            {/* Segment filter — slices quote-derived KPIs (Pipeline,
+                Won value, Outstanding, Lost, Active campaigns, Stale,
+                Activity) by segment. Leaderboard / Incentive liability
+                stay segment-blind because monthly_sales_data is. */}
+            <div style={{ display: 'inline-flex', gap: 4, padding: 3, background: 'var(--v2-bg-2)', borderRadius: 999, border: '1px solid var(--v2-border)' }}>
+              {[
+                { key: 'all',        label: 'All' },
+                { key: 'private',    label: 'Private' },
+                { key: 'government', label: 'Govt' },
+              ].map(o => (
+                <button
+                  key={o.key}
+                  onClick={() => setSegmentFilter(o.key)}
+                  style={{
+                    padding: '5px 11px',
+                    borderRadius: 999,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    background: segmentFilter === o.key ? 'var(--v2-ink-0)' : 'transparent',
+                    color:      segmentFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
+                  }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
             <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
               <Plus size={14} strokeWidth={2.6} /> Create Quote
             </button>
@@ -642,7 +739,7 @@ export default function AdminDashboardDesktop() {
             <section className="v2d-grid-2">
               <OutstandingPanel
                 rows={state.outstandingList}
-                onOpen={(id) => navigate(`/quotes/${id}`)}
+                onOpen={(row) => openQuote(row)}
               />
               <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
             </section>
@@ -654,7 +751,7 @@ export default function AdminDashboardDesktop() {
             {state.staleQuotes && state.staleQuotes.length > 0 ? (
               <section className="v2d-grid-2">
                 <LiabilityPanel data={state.liability} />
-                <StalePanel rows={state.staleQuotes} onOpen={(id) => navigate(`/quotes/${id}`)} />
+                <StalePanel rows={state.staleQuotes} onOpen={(row) => openQuote(row)} />
               </section>
             ) : (
               <section>
@@ -664,11 +761,11 @@ export default function AdminDashboardDesktop() {
 
             {/* Row 5: Active campaigns — horizontal grid of cards needs
                 the full row width to lay out without wrapping awkwardly. */}
-            <ActiveCampaignsPanel rows={state.activeCampaigns} onOpen={(id) => navigate(`/quotes/${id}`)} />
+            <ActiveCampaignsPanel rows={state.activeCampaigns} onOpen={(row) => openQuote(row)} />
 
             {/* Row 6: Recent activity — vertical event feed, full width
                 so timestamps + descriptions don't truncate. */}
-            <ActivityPanel items={state.activity} onOpen={(id) => navigate(`/quotes/${id}`)} />
+            <ActivityPanel items={state.activity} onOpen={(item) => openQuote(item)} />
 
             <div className="v2d-foot">
               v2 · admin · {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -817,6 +914,26 @@ function ApprovalQueuePanel({ pending, onOpen, onAll }) {
   )
 }
 
+// Segment badge — small inline pill that distinguishes govt from
+// private rows in the dashboard lists. Returns null for private so
+// the chrome stays clean for the historically-only-private case.
+function SegmentBadge({ segment }) {
+  if (segment !== 'GOVERNMENT') return null
+  return (
+    <span style={{
+      marginLeft: 6,
+      padding: '1px 7px',
+      borderRadius: 999,
+      background: 'rgba(100,181,246,.15)',
+      color: '#64b5f6',
+      fontSize: 9,
+      fontWeight: 700,
+      letterSpacing: '.06em',
+      textTransform: 'uppercase',
+    }}>Govt</span>
+  )
+}
+
 function OutstandingPanel({ rows, onOpen }) {
   return (
     <div className="v2d-panel">
@@ -832,14 +949,15 @@ function OutstandingPanel({ rows, onOpen }) {
       ) : rows.map(r => {
         const pct = r.total_amount ? Math.round((r.paid / r.total_amount) * 100) : 0
         return (
-          <div key={r.id} className="v2d-q-row" onClick={() => onOpen(r.id)}>
+          <div key={r.id} className="v2d-q-row" onClick={() => onOpen(r)}>
             <div className="v2d-q-ic v2d-q-ic--rose"><AlertTriangle size={14} /></div>
             <div className="v2d-q-body">
               <div className="v2d-q-t">
                 {r.client_company || r.client_name}
                 {r.client_company && r.client_name && <span style={{ color: 'var(--v2-ink-2)', fontWeight: 500 }}> · {r.client_name}</span>}
+                <SegmentBadge segment={r.segment} />
               </div>
-              <div className="v2d-q-s">{r.quote_number} · {pct}% paid</div>
+              <div className="v2d-q-s">{r.quote_number || r.ref_number} · {pct}% paid</div>
             </div>
             <div className="v2d-q-amt"><Money value={r.balance} /></div>
             <ArrowUpRight size={14} style={{ color: 'var(--v2-ink-2)' }} />
@@ -953,13 +1071,16 @@ function ActiveCampaignsPanel({ rows, onOpen }) {
             const elapsed = r.campaign_start_date ? Math.max(0, daysBetween(today, r.campaign_start_date)) : 0
             const pct = totalDays > 0 ? Math.min(100, Math.round((elapsed / totalDays) * 100)) : 0
             return (
-              <div key={r.id} className="v2d-camp" onClick={() => onOpen(r.id)} style={{ cursor: 'pointer' }}>
+              <div key={r.id} className="v2d-camp" onClick={() => onOpen(r)} style={{ cursor: 'pointer' }}>
                 <div className="v2d-camp-h">
-                  <div className="v2d-camp-n" title={r.client_company || r.client_name}>{r.client_company || r.client_name}</div>
+                  <div className="v2d-camp-n" title={r.client_company || r.client_name}>
+                    {r.client_company || r.client_name}
+                    <SegmentBadge segment={r.segment} />
+                  </div>
                   <span className={`v2d-camp-pill ${pillCls}`}>{pillLabel}</span>
                 </div>
                 <div className="v2d-camp-s">
-                  {r.quote_number}
+                  {r.quote_number || r.ref_number}
                   {r.sales_person_name && ` · ${r.sales_person_name}`}
                 </div>
                 <div className="v2d-camp-s" style={{ marginTop: 4, color: 'var(--v2-ink-0)', fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13 }}>
@@ -1001,9 +1122,12 @@ function StalePanel({ rows, onOpen }) {
         </thead>
         <tbody>
           {rows.map(r => (
-            <tr key={r.id} onClick={() => onOpen(r.id)} style={{ cursor: 'pointer' }}>
-              <td>{r.quote_number || '—'}</td>
-              <td>{r.client_company || r.client_name || '—'}</td>
+            <tr key={r.id} onClick={() => onOpen(r)} style={{ cursor: 'pointer' }}>
+              <td>{r.quote_number || r.ref_number || '—'}</td>
+              <td>
+                {r.client_company || r.client_name || '—'}
+                <SegmentBadge segment={r.segment} />
+              </td>
               <td>{r.sales_person_name || '—'}</td>
               <td className="num">
                 <span className="v2d-camp-age v2d-camp-age--stale">{r.ageDays}d</span>
@@ -1057,7 +1181,7 @@ function ActivityPanel({ items, onOpen }) {
       {items.length === 0 ? (
         <div className="v2d-q-empty">No activity yet.</div>
       ) : items.map((it, i) => (
-        <div key={`${it.type}-${it.id}-${i}`} className="v2d-act-row" onClick={() => onOpen(it.id)} style={{ cursor: 'pointer' }}>
+        <div key={`${it.type}-${it.id}-${i}`} className="v2d-act-row" onClick={() => onOpen(it)} style={{ cursor: 'pointer' }}>
           <div className={`v2d-act-dot ${it.type === 'payment' ? (it.final ? 'green' : 'blue') : it.status === 'won' ? 'green' : it.status === 'lost' ? 'rose' : ''}`} />
           <div>
             <div className="v2d-act-t">{getDesc(it)}</div>
@@ -1065,6 +1189,7 @@ function ActivityPanel({ items, onOpen }) {
               {it.label}
               {it.sub && ` · ${it.sub}`}
               {it.actor && ` · ${it.actor}`}
+              <SegmentBadge segment={it.segment} />
             </div>
           </div>
           <div className="v2d-act-time">{formatRelative(it.ts)}</div>

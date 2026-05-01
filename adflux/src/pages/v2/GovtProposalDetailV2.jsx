@@ -10,10 +10,16 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Printer, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Printer, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2, CreditCard } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { GovtProposalRenderer } from '../../components/govt/GovtProposalRenderer'
 import { useAuth } from '../../hooks/useAuth'
+import { useAuthStore } from '../../store/authStore'
+import { usePayments } from '../../hooks/usePayments'
+import { PaymentModal } from '../../components/payments/PaymentModal'
+import { PaymentHistory } from '../../components/payments/PaymentHistory'
+import { PaymentSummary } from '../../components/payments/PaymentSummary'
+import { WonPaymentModal } from '../../components/payments/WonPaymentModal'
 import { formatINREnglish } from '../../utils/gujaratiNumber'
 import { syncClientFromQuote } from '../../utils/syncClient'
 
@@ -29,6 +35,8 @@ export default function GovtProposalDetailV2() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { isPrivileged } = useAuth()
+  const profile = useAuthStore(s => s.profile)
+  const isAdmin = profile?.role === 'admin'
 
   const [quote,    setQuote]    = useState(null)
   const [items,    setItems]    = useState([])
@@ -36,10 +44,28 @@ export default function GovtProposalDetailV2() {
   const [signer,   setSigner]   = useState(null)
   const [loading,  setLoading]  = useState(true)
   const [savingStatus, setSavingStatus] = useState(null)
+  const [statusMsg,    setStatusMsg]    = useState('')
+  const [statusError,  setStatusError]  = useState('')
   // Phase 7 — attachments checklist
   const [attachmentTpl, setAttachmentTpl] = useState([])  // standard items from attachment_templates
   const [savingAttachments, setSavingAttachments] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
+
+  // Payments (Phase B parity with private flow)
+  const {
+    payments, loading: paymentsLoading, totalPaid, hasFinalPayment,
+    fetchPayments, addPayment, updatePayment, deletePayment,
+  } = usePayments(id)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showWonModal,     setShowWonModal]     = useState(false)
+  const [showEditPayment,  setShowEditPayment]  = useState(false)
+  const [editingPayment,   setEditingPayment]   = useState(null)
+
+  // Pull payments on mount so the summary shows real numbers before the
+  // user clicks anything — same pattern as private QuoteDetail.
+  useEffect(() => {
+    if (id) fetchPayments()
+  }, [id, fetchPayments])
 
   useEffect(() => {
     let cancel = false
@@ -137,9 +163,18 @@ export default function GovtProposalDetailV2() {
 
   async function changeStatus(next) {
     if (!quote || savingStatus) return
+
+    // Mirror private QuoteDetail: marking Won opens the payment modal
+    // first so the user can record cash + campaign dates in one shot.
+    // The actual flip happens inside handleWonWithPayment so all the
+    // approve/sales-pending paths land identically across segments.
+    if (next === 'won') {
+      setShowWonModal(true)
+      return
+    }
+
     setSavingStatus(next)
-    // Mirror the private flow: snapshot prior status so we only bump
-    // total_won_amount on the actual non-won → won transition.
+    setStatusError('')
     const prior = quote.status
     const { data, error } = await supabase
       .from('quotes')
@@ -147,13 +182,111 @@ export default function GovtProposalDetailV2() {
       .eq('id', quote.id)
       .select()
       .single()
-    if (!error) {
-      setQuote(data)
-      if (next === 'won' && prior !== 'won') {
-        syncClientFromQuote(data, 'won')
+    setSavingStatus(null)
+    if (error) {
+      setStatusError(error.message || 'Failed to update status.')
+      return
+    }
+    setQuote(data)
+    if (next === 'won' && prior !== 'won') {
+      syncClientFromQuote(data, 'won')
+    }
+  }
+
+  // Mirrors handleWonWithPayment from src/pages/QuoteDetail.jsx so the
+  // govt and private flows behave identically:
+  //   • Sales + payment   → payment lands pending, quote stays as-is
+  //   • Sales no payment  → quote flips to Won (no incentive until cash)
+  //   • Admin             → flip + payment all in one
+  async function handleWonWithPayment(paymentData) {
+    setShowWonModal(false)
+    setSavingStatus('won')
+    setStatusError('')
+    setStatusMsg('')
+
+    const hasPayment = paymentData && Number(paymentData.amount_received) > 0
+    if (hasPayment) {
+      // Strip the WonPaymentModal-only fields before insert; payments
+      // doesn't have campaign_*_date columns.
+      const {
+        campaign_start_date: _csd,
+        campaign_end_date:   _ced,
+        is_final:            _isFinal,
+        ...paymentFields
+      } = paymentData
+      const result = await addPayment({
+        ...paymentFields,
+        is_final_payment: paymentData.is_final,
+      })
+      if (result?.error) {
+        setSavingStatus(null)
+        setStatusError(`Payment could not be saved: ${result.error.message}`)
+        return
       }
     }
+
+    const prior = quote.status
+
+    // Sales-with-payment: payment lands pending, admin's approval flow
+    // flips the quote to Won. Persist campaign dates now so admin
+    // doesn't have to retype them on approval.
+    if (!isAdmin && hasPayment) {
+      if (paymentData.campaign_start_date || paymentData.campaign_end_date) {
+        const { data, error } = await supabase
+          .from('quotes')
+          .update({
+            campaign_start_date: paymentData.campaign_start_date,
+            campaign_end_date:   paymentData.campaign_end_date,
+          })
+          .eq('id', quote.id)
+          .select()
+          .single()
+        if (error) {
+          setSavingStatus(null)
+          setStatusError(`Campaign dates could not be saved: ${error.message}`)
+          return
+        }
+        setQuote(data)
+      }
+      setSavingStatus(null)
+      setStatusMsg('Payment submitted for admin approval. Proposal will be marked Won once approved.')
+      fetchPayments()
+      setTimeout(() => setStatusMsg(''), 4500)
+      return
+    }
+
+    // Admin path (or sales who skipped the payment): flip to Won now.
+    const { data, error } = await supabase
+      .from('quotes')
+      .update({
+        status: 'won',
+        campaign_start_date: paymentData.campaign_start_date,
+        campaign_end_date:   paymentData.campaign_end_date,
+      })
+      .eq('id', quote.id)
+      .select()
+      .single()
     setSavingStatus(null)
+    if (error) {
+      setStatusError(error.message || 'Failed to mark Won.')
+      return
+    }
+    setQuote(data)
+    if (prior !== 'won') {
+      syncClientFromQuote(data, 'won')
+    }
+    setStatusMsg('Proposal marked as Won.')
+    fetchPayments()
+    setTimeout(() => setStatusMsg(''), 3000)
+  }
+
+  async function handleDeletePayment(paymentId) {
+    const { error } = await deletePayment(paymentId)
+    if (error) {
+      setStatusError(error.message)
+    } else {
+      fetchPayments()
+    }
   }
 
   // ─── Phase 7 — attachments checklist ──────────────────────────────
@@ -293,6 +426,33 @@ export default function GovtProposalDetailV2() {
         </div>
       </div>
 
+      {statusError && (
+        <div style={{
+          background: 'rgba(229,57,53,.1)',
+          border: '1px solid rgba(229,57,53,.3)',
+          borderRadius: 8, padding: '10px 14px', margin: '12px 0',
+          fontSize: '.82rem', color: '#ef9a9a',
+          display: 'flex', gap: 8, alignItems: 'center',
+        }}>
+          <XCircle size={14} /> {statusError}
+          <button
+            style={{ background: 'none', border: 'none', color: '#ef9a9a', marginLeft: 'auto', cursor: 'pointer' }}
+            onClick={() => setStatusError('')}
+          >✕</button>
+        </div>
+      )}
+
+      {statusMsg && (
+        <div style={{
+          background: 'rgba(76,175,80,.1)',
+          border: '1px solid rgba(76,175,80,.3)',
+          borderRadius: 8, padding: '10px 14px', margin: '12px 0',
+          fontSize: '.82rem', color: '#81c784',
+        }}>
+          ✓ {statusMsg}
+        </div>
+      )}
+
       <GovtProposalRenderer
         template={template}
         data={renderedData}
@@ -431,6 +591,101 @@ export default function GovtProposalDetailV2() {
             </tbody>
           </table>
         </>
+      )}
+
+      {/* ─── Payments (Phase B parity with private LED) ─────────────
+           Same components, same hook, same approval flow as
+           src/pages/QuoteDetail.jsx — only the surrounding chrome
+           differs. The `payments` table is segment-agnostic, and the
+           DB trigger rebuild_monthly_sales fires on is_final_payment +
+           approval_status='approved' regardless of segment, so once
+           govt deals start logging payments they roll into incentives
+           the same way private deals do. */}
+      <h2 style={{
+        fontFamily: 'var(--font-display)',
+        color: 'var(--text)',
+        margin: '24px 0 8px',
+        fontSize: 16,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <CreditCard size={16} /> Payments
+      </h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
+        <PaymentSummary
+          totalAmount={quote.total_amount}
+          totalPaid={totalPaid}
+          hasFinalPayment={hasFinalPayment}
+        />
+        <PaymentHistory
+          payments={payments}
+          loading={paymentsLoading}
+          onEdit={p => { setEditingPayment(p); setShowEditPayment(true) }}
+          onDelete={handleDeletePayment}
+        />
+        {quote.status !== 'lost' && !hasFinalPayment && (
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="button"
+              className="govt-wiz__btn govt-wiz__btn--primary"
+              onClick={() => { fetchPayments(); setShowPaymentModal(true) }}
+            >
+              <CreditCard size={14} /> Add Payment
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Add Payment modal */}
+      {showPaymentModal && (
+        <PaymentModal
+          quote={quote}
+          totalPaid={totalPaid}
+          existingPayments={payments}
+          onClose={() => setShowPaymentModal(false)}
+          onSave={async (paymentData) => {
+            const result = await addPayment(paymentData)
+            if (!result.error) {
+              fetchPayments()
+              // Refresh the quote so a status auto-flip from
+              // maybeFlipQuoteWon (admin path) is reflected here.
+              const { data: q } = await supabase
+                .from('quotes').select('*').eq('id', id).single()
+              if (q) setQuote(q)
+            }
+            return result
+          }}
+        />
+      )}
+
+      {/* Edit Payment modal */}
+      {showEditPayment && editingPayment && (
+        <PaymentModal
+          quote={quote}
+          totalPaid={totalPaid - (editingPayment.amount_received || 0)}
+          existingPayments={payments.filter(p => p.id !== editingPayment.id)}
+          initialPayment={editingPayment}
+          onClose={() => { setShowEditPayment(false); setEditingPayment(null) }}
+          onSave={async (paymentData) => {
+            const result = await updatePayment(editingPayment.id, paymentData)
+            if (!result.error) {
+              fetchPayments()
+              const { data: q } = await supabase
+                .from('quotes').select('*').eq('id', id).single()
+              if (q) setQuote(q)
+            }
+            return result
+          }}
+        />
+      )}
+
+      {/* Mark Won modal — collects payment + campaign dates in one pass */}
+      {showWonModal && (
+        <WonPaymentModal
+          quote={quote}
+          totalPaid={totalPaid}
+          onConfirm={handleWonWithPayment}
+          onClose={() => setShowWonModal(false)}
+        />
       )}
     </div>
   )

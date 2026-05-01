@@ -129,10 +129,16 @@ export default function PendingApprovalsV2() {
                     {row.is_final_payment && <span className="v2d-pa-final">Final</span>}
                     <button
                       className="v2d-pa-qlink"
-                      onClick={() => navigate(`/quotes/${row.quote_id}`)}
+                      onClick={() => {
+                        // Route based on segment — government quotes
+                        // live at /proposal/:id, private at /quotes/:id.
+                        // Without this branch, govt approvals 404.
+                        const isGovt = row.quotes?.segment === 'GOVERNMENT'
+                        navigate(isGovt ? `/proposal/${row.quote_id}` : `/quotes/${row.quote_id}`)
+                      }}
                       title="Open quote"
                     >
-                      {row.quotes?.quote_number || 'Quote'}
+                      {row.quotes?.quote_number || row.quotes?.ref_number || 'Quote'}
                       <ExternalLink size={11} />
                     </button>
                   </div>

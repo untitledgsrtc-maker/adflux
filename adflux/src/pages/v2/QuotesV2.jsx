@@ -46,6 +46,10 @@ export default function QuotesV2() {
   // Admin-only sales-rep filter — derived from the quotes already
   // loaded so no extra fetch is needed. 'all' shows everyone.
   const [repFilter, setRepFilter] = useState('all')
+  // Phase B segment filter — slices the list by Private vs Government.
+  // 'all' (default) keeps the historical mixed view. Pre-Phase 4 rows
+  // have segment=null, so 'private' must match both 'PRIVATE' and null.
+  const [segmentFilter, setSegmentFilter] = useState('all')
 
   useEffect(() => {
     setLoading(true)
@@ -78,13 +82,23 @@ export default function QuotesV2() {
   const hasActiveFilters =
     filters.status || filters.search || filters.dateFrom || filters.dateTo
 
+  // Apply segment filter to the underlying quote pool — every downstream
+  // memo (repScoped → counts, sorted → displayed → totals) reads from
+  // segmentScoped, so the pill correctly slices status tab counts and
+  // totals together.
+  const segmentScoped = useMemo(() => {
+    if (segmentFilter === 'all') return quotes
+    if (segmentFilter === 'government') return quotes.filter(q => q.segment === 'GOVERNMENT')
+    return quotes.filter(q => q.segment !== 'GOVERNMENT')
+  }, [quotes, segmentFilter])
+
   // Rep-scoped quote pool — used by tab counts so when admin scopes
   // to one rep, the tabs show that rep's status breakdown (otherwise
   // "Won 7" lies when the table only renders 3 of theirs).
   const repScoped = useMemo(() => {
-    if (!isAdmin || repFilter === 'all') return quotes
-    return quotes.filter(q => q.created_by === repFilter)
-  }, [quotes, isAdmin, repFilter])
+    if (!isAdmin || repFilter === 'all') return segmentScoped
+    return segmentScoped.filter(q => q.created_by === repFilter)
+  }, [segmentScoped, isAdmin, repFilter])
 
   const counts = useMemo(() => (
     QUOTE_STATUSES.reduce((acc, s) => {
@@ -94,7 +108,7 @@ export default function QuotesV2() {
   ), [repScoped])
 
   const sorted = useMemo(() => {
-    return [...quotes].sort((a, b) => {
+    return [...segmentScoped].sort((a, b) => {
       let va = a[sortField]
       let vb = b[sortField]
       if (sortField === 'total_amount' || sortField === 'subtotal') {
@@ -108,7 +122,7 @@ export default function QuotesV2() {
       if (va > vb) return sortDir === 'asc' ? 1 : -1
       return 0
     })
-  }, [quotes, sortField, sortDir])
+  }, [segmentScoped, sortField, sortDir])
 
   // Build the rep dropdown options from quotes already on screen —
   // saves an extra users fetch and keeps the list in sync with what
@@ -244,8 +258,38 @@ export default function QuotesV2() {
           </select>
         )}
 
-        {(hasActiveFilters || (isAdmin && repFilter !== 'all')) && (
-          <button className="v2d-ghost" onClick={() => { handleReset(); setRepFilter('all') }}>
+        {/* Segment filter — slices the list by Private vs Government.
+            'all' keeps the historical mixed view. Tab counts + totals
+            recompute against this slice. */}
+        <div style={{
+          display: 'inline-flex', gap: 4, padding: 3,
+          background: 'var(--v2-bg-2)', borderRadius: 999,
+          border: '1px solid var(--v2-border)',
+        }}>
+          {[
+            { key: 'all',        label: 'All' },
+            { key: 'private',    label: 'Private' },
+            { key: 'government', label: 'Govt' },
+          ].map(o => (
+            <button
+              key={o.key}
+              onClick={() => setSegmentFilter(o.key)}
+              style={{
+                padding: '5px 11px', borderRadius: 999, border: 'none',
+                cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                background: segmentFilter === o.key ? 'var(--v2-ink-0)' : 'transparent',
+                color:      segmentFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+
+        {(hasActiveFilters || (isAdmin && repFilter !== 'all') || segmentFilter !== 'all') && (
+          <button className="v2d-ghost" onClick={() => {
+            handleReset(); setRepFilter('all'); setSegmentFilter('all')
+          }}>
             <X size={13} />
             <span>Clear</span>
           </button>
@@ -320,7 +364,17 @@ export default function QuotesV2() {
                       q.segment === 'GOVERNMENT' ? `/proposal/${q.id}` : `/quotes/${q.id}`
                     )}
                   >
-                    <td>{q.quote_number}</td>
+                    <td>
+                      {q.quote_number || q.ref_number}
+                      {q.segment === 'GOVERNMENT' && (
+                        <span style={{
+                          marginLeft: 6, padding: '1px 7px', borderRadius: 999,
+                          background: 'rgba(100,181,246,.15)', color: '#64b5f6',
+                          fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
+                          textTransform: 'uppercase',
+                        }}>Govt</span>
+                      )}
+                    </td>
                     {/* Company is the primary identifier (B2B context —
                         a contact is just a person at the company).
                         Falls back to '—' when company missing. Contact
@@ -365,7 +419,17 @@ export default function QuotesV2() {
                   )}
                 >
                   <div className="v2d-qcard-top">
-                    <div className="v2d-qcard-num">{q.quote_number}</div>
+                    <div className="v2d-qcard-num">
+                      {q.quote_number || q.ref_number}
+                      {q.segment === 'GOVERNMENT' && (
+                        <span style={{
+                          marginLeft: 6, padding: '1px 7px', borderRadius: 999,
+                          background: 'rgba(100,181,246,.15)', color: '#64b5f6',
+                          fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
+                          textTransform: 'uppercase',
+                        }}>Govt</span>
+                      )}
+                    </div>
                     <StatusChip status={q.status} />
                   </div>
                   <div className="v2d-qcard-mid">
