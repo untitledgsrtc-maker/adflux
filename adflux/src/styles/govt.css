@@ -671,3 +671,11 @@
   gap: 10px;
   margin-top: 14px;
 }
+/* Phase 7 fix — ensure rate table has visible outer border in print/preview */
+.govt-letter__table {
+     border: 2px solid #444 !important;
+}
+.govt-letter__table tr:last-child td {
+     border-bottom: 2px solid #444 !important;
+}
+
