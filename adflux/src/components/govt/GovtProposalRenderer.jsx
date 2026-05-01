@@ -103,7 +103,7 @@ function renderSignerBlock(signer) {
     '<div class="govt-letter__signer">',
       'આપનો વિશ્વાસુ,<br/>',
       `${name}${title ? ` (${title})` : ''}<br/>`,
-      'અનટાઇટ ટ્યુઑ',
+      'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ',
       mobile ? `<br/>${mobile}` : '',
     '</div>',
   ].join('')
