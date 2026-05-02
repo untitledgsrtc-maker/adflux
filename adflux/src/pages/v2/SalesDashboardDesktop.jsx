@@ -63,7 +63,13 @@ export default function SalesDashboardDesktop() {
     const monthEndIso   = p.endIso
     const monthKeys     = p.monthKeys
 
-    const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes] = await Promise.all([
+    // M1 — pull the rep's active daily target so the counter widget
+    // has a denominator. Single row per active user (one_active_per_user
+    // unique index in supabase_phase9 SQL); maybeSingle() so a missing
+    // row falls back to defaults instead of erroring the whole load.
+    const todayDate = new Date().toISOString().slice(0, 10)
+
+    const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes, dtRes, fDoneRes] = await Promise.all([
       supabase.from('quotes')
         .select('id, quote_number, client_name, client_company, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_start_date, campaign_end_date')
         .eq('created_by', uid)
@@ -89,6 +95,21 @@ export default function SalesDashboardDesktop() {
       supabase.from('staff_incentive_profiles')
         .select('*').eq('user_id', uid).maybeSingle(),
       supabase.from('incentive_settings').select('*').maybeSingle(),
+      // M1 — active daily target for this rep
+      supabase.from('daily_targets')
+        .select('min_quotes, min_followups, min_calls')
+        .eq('user_id', uid)
+        .is('effective_to', null)
+        .maybeSingle(),
+      // M1 — follow-ups COMPLETED today (for the daily counter). The
+      // open-followups query above pulls is_done=false; this one pulls
+      // done=true to count today's completions.
+      supabase.from('follow_ups')
+        .select('id, completed_at')
+        .eq('assigned_to', uid)
+        .eq('is_done', true)
+        .gte('completed_at', `${todayDate}T00:00:00`)
+        .lte('completed_at', `${todayDate}T23:59:59`),
     ])
 
     const quotes = qRes.data || []
@@ -98,6 +119,8 @@ export default function SalesDashboardDesktop() {
     const history = histRes.data || []
     const prof = profRes.data
     const settings = settingsRes.data || {}
+    const dailyTarget = dtRes.data || { min_quotes: 2, min_followups: 5, min_calls: 0 }
+    const followupsDoneToday = (fDoneRes.data || []).length
 
     // Sum pre-aggregated monthly revenue across every month the period
     // covers. If it's a single month this is just one row; for a range
@@ -348,10 +371,79 @@ export default function SalesDashboardDesktop() {
         return { ...q, _ageDays: days, _ageKey: ageKey, _isSettled: !!paidMap[q.id]?.final }
       })
 
+    // M1 — TODAY counts + urgency-sorted action list ───────────────
+    // 1) Quotes SENT today by this rep (created_at = today).
+    const quotesSentToday = quotes.filter(q => {
+      const ts = (q.created_at || '').slice(0, 10)
+      return ts === todayDate
+    }).length
+
+    // 2) Payments LOGGED today by this rep (already filtered to recorded_by=uid).
+    const paymentsToday = payments.filter(p => {
+      const ts = (p.created_at || '').slice(0, 10)
+      return ts === todayDate
+    }).length
+
+    // 3) Stale sent quotes — sent >7 days ago, no follow-up logged.
+    //    "No follow-up logged" = no row in followups (open) for that quote.
+    //    These are the deals quietly slipping. Show top 6.
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+    const followupQuoteIds = new Set((followups || []).map(f => f.quote_id))
+    const staleSent = quotes
+      .filter(q => q.status === 'sent')
+      .filter(q => {
+        const updated = new Date(q.updated_at || q.created_at)
+        return Date.now() - updated.getTime() > SEVEN_DAYS_MS
+      })
+      .filter(q => !followupQuoteIds.has(q.id))
+      .slice(0, 6)
+      .map(q => ({
+        kind:    'stale',
+        id:      q.id,
+        title:   q.client_name || q.client_company || 'Quote',
+        sub:     `${q.quote_number || ''} · sent ${daysBetween(today, q.updated_at || q.created_at)}d ago`,
+        urgency: 2,
+      }))
+
+    // 4) Won quotes with no payment recorded — money still uncollected.
+    const wonNoPayment = quotes
+      .filter(q => q.status === 'won')
+      .filter(q => !(paidMap[q.id]?.paid > 0))
+      .slice(0, 6)
+      .map(q => ({
+        kind:    'won_no_payment',
+        id:      q.id,
+        title:   q.client_name || q.client_company || 'Quote',
+        sub:     `${q.quote_number || ''} · ₹${new Intl.NumberFormat('en-IN').format(Math.round(q.total_amount || 0))} unpaid`,
+        urgency: 1,
+      }))
+
+    // 5) Follow-ups due — convert existing followups array to the same shape.
+    const followupActions = (followups || []).map(f => ({
+      kind:    'followup',
+      id:      f.quote_id,
+      title:   f.notes || 'Follow up',
+      sub:     `Due ${new Date(f.follow_up_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`,
+      urgency: 0, // most urgent — overdue follow-ups
+    }))
+
+    // Merge + sort by urgency (lower = more urgent), cap at 10.
+    const todayActions = [...followupActions, ...wonNoPayment, ...staleSent]
+      .sort((a, b) => a.urgency - b.urgency)
+      .slice(0, 10)
+
     setState({
       loading: false,
       streak,
       earned,
+      // M1 daily counter inputs
+      dailyTarget,
+      todayActivity: {
+        quotes:    quotesSentToday,
+        followups: followupsDoneToday,
+        payments:  paymentsToday,
+      },
+      todayActions,
       forecast: {
         incentive: forecastDelta,
         openPipeline,
@@ -581,10 +673,20 @@ export default function SalesDashboardDesktop() {
                 Same panel as admin dashboard, scoped to this rep's clients. */}
             <ActiveCampaignsPanel rows={state.activeCampaigns || []} onOpen={(id) => navigate(`/quotes/${id}`)} />
 
-            {/* Row 4: Leaderboard + Today's actions */}
+            {/* M1 Row: Daily counter + What I owe today.
+                Daily counter = today's quote/follow-up/payment counts
+                vs daily_targets. Today panel = urgency-sorted list of
+                what needs the rep's attention right now (follow-ups due
+                + won-no-payment + stale sent quotes). */}
             <section className="v2d-grid-2">
+              <DailyCounterPanel activity={state.todayActivity} target={state.dailyTarget} />
+              <TodayActionsPanel actions={state.todayActions || []} onOpen={(id) => navigate(`/quotes/${id}`)} onAll={() => navigate('/quotes')} />
+            </section>
+
+            {/* Row 4: Leaderboard (full width, replaces the side-by-side
+                with TodayActions which moved up to the M1 row above) */}
+            <section>
               <LeaderboardPanel rows={state.leaderboard} meId={profile?.id} />
-              <TodayActionsPanel followups={state.followups} onOpen={(id) => navigate(`/quotes/${id}`)} onAll={() => navigate('/quotes')} />
             </section>
 
             <div className="v2d-foot">
@@ -840,28 +942,108 @@ function ActiveCampaignsPanel({ rows, onOpen }) {
   )
 }
 
-function TodayActionsPanel({ followups, onOpen, onAll }) {
+// M1 — Today panel. Was follow-ups only; now merges THREE urgency
+// streams the rep needs to act on right now:
+//   • follow-ups due on/before today (urgency 0 — most urgent)
+//   • won quotes with no payment recorded yet (urgency 1)
+//   • sent quotes idle >7d with no follow-up logged (urgency 2)
+// Caller passes pre-sorted `actions` array — see load() todayActions
+// computation. Each row carries a `kind` so the icon/colour routes.
+function TodayActionsPanel({ actions, onOpen, onAll }) {
+  const KIND_META = {
+    followup:        { icon: <Phone size={14} />,         iconCls: 'v2d-q-ic--rose',  label: 'Follow-up' },
+    won_no_payment:  { icon: <AlertTriangle size={14} />, iconCls: 'v2d-q-ic--amber', label: 'Collect' },
+    stale:           { icon: <ArrowUpRight size={14} />,  iconCls: 'v2d-q-ic--blue',  label: 'Chase' },
+  }
   return (
     <div className="v2d-panel">
       <div className="v2d-panel-h">
         <div>
-          <div className="v2d-panel-t">Today's actions</div>
-          <div className="v2d-panel-s">Follow-ups due on or before today</div>
+          <div className="v2d-panel-t">What I owe today</div>
+          <div className="v2d-panel-s">Follow-ups due, won quotes unpaid, sent quotes idle &gt;7d</div>
         </div>
-        {followups.length > 0 && <div className="v2d-badge v2d-badge--amber">{followups.length} open</div>}
+        {actions.length > 0 && <div className="v2d-badge v2d-badge--amber">{actions.length} item{actions.length === 1 ? '' : 's'}</div>}
       </div>
-      {followups.length === 0 ? (
-        <div className="v2d-q-empty">Inbox zero. Nothing due today.</div>
-      ) : followups.map(f => (
-        <div key={f.id} className="v2d-q-row" onClick={() => f.quote_id && onOpen(f.quote_id)}>
-          <div className="v2d-q-ic v2d-q-ic--rose"><Phone size={14} /></div>
-          <div className="v2d-q-body">
-            <div className="v2d-q-t">{f.notes || 'Follow up'}</div>
-            <div className="v2d-q-s">Due {new Date(f.follow_up_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
+      {actions.length === 0 ? (
+        <div className="v2d-q-empty">Inbox zero. Nothing needs your attention today.</div>
+      ) : actions.map((a, i) => {
+        const meta = KIND_META[a.kind] || KIND_META.followup
+        return (
+          <div key={`${a.kind}-${a.id}-${i}`} className="v2d-q-row" onClick={() => a.id && onOpen(a.id)}>
+            <div className={`v2d-q-ic ${meta.iconCls}`}>{meta.icon}</div>
+            <div className="v2d-q-body">
+              <div className="v2d-q-t">
+                {a.title}
+                <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                  {meta.label}
+                </span>
+              </div>
+              <div className="v2d-q-s">{a.sub}</div>
+            </div>
+            <ArrowUpRight size={14} style={{ color: 'var(--v2-ink-2)' }} />
           </div>
-          <ArrowUpRight size={14} style={{ color: 'var(--v2-ink-2)' }} />
+        )
+      })}
+    </div>
+  )
+}
+
+// M1 — Daily Counter widget. Three progress bars: quotes sent, follow-
+// ups completed, payments logged today. Each bar fills against the
+// daily_targets row for this rep. Counters > target render at 100%
+// with a "✓" so the rep sees green when they've hit it. Calls section
+// hidden when target = 0 (no calls module yet).
+function DailyCounterPanel({ activity, target }) {
+  const rows = [
+    { key: 'quotes',    label: 'Quotes sent',        value: activity?.quotes    || 0, target: target?.min_quotes    || 0 },
+    { key: 'followups', label: 'Follow-ups done',    value: activity?.followups || 0, target: target?.min_followups || 0 },
+    { key: 'payments',  label: 'Payments logged',    value: activity?.payments  || 0, target: 0 },
+  ]
+  if ((target?.min_calls || 0) > 0) {
+    rows.push({ key: 'calls', label: 'Calls logged', value: 0, target: target.min_calls, soon: true })
+  }
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Today's targets</div>
+          <div className="v2d-panel-s">Reset at midnight. Hit them every day.</div>
         </div>
-      ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {rows.map(r => {
+          const pct = r.target > 0 ? Math.min(100, Math.round((r.value / r.target) * 100)) : (r.value > 0 ? 100 : 0)
+          const hit = r.target > 0 && r.value >= r.target
+          const noTarget = r.target === 0
+          return (
+            <div key={r.key}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                fontSize: 12, marginBottom: 6,
+              }}>
+                <span style={{ color: 'var(--v2-ink-0)', fontWeight: 600 }}>
+                  {r.label}{r.soon && <span style={{ color: 'var(--v2-ink-2)', fontWeight: 500 }}> · soon</span>}
+                </span>
+                <span style={{
+                  fontFamily: 'var(--v2-display)', fontWeight: 700,
+                  color: hit ? 'var(--v2-green)' : noTarget ? 'var(--v2-ink-2)' : 'var(--v2-ink-0)',
+                }}>
+                  {r.value}{r.target > 0 ? ` / ${r.target}` : ''}
+                  {hit && ' ✓'}
+                </span>
+              </div>
+              <div style={{ height: 6, background: 'var(--v2-bg-2)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{
+                  width: `${pct}%`, height: '100%',
+                  background: hit ? 'var(--v2-green)' : 'var(--v2-blue)',
+                  borderRadius: 'inherit',
+                  transition: 'width .25s ease',
+                }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

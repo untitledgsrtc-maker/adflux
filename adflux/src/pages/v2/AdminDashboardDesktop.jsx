@@ -94,7 +94,13 @@ export default function AdminDashboardDesktop() {
     const monthEndIso   = p.endIso
     const monthKeys     = p.monthKeys
 
-    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes] = await Promise.all([
+    // M1 — daily targets + today's follow-ups completed across the
+    // team. We pull these alongside the existing 8 queries so the
+    // per-rep activity strip + missed-targets banner can render
+    // without an extra round-trip.
+    const todayDate = todayISO()
+
+    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes] = await Promise.all([
       // Use `*` to be tolerant of schema drift — earlier we enumerated
       // columns including `ref_number`, and a single missing column
       // would silently return an empty array (not throw), which made
@@ -120,6 +126,20 @@ export default function AdminDashboardDesktop() {
       // the denormalized sales_person_name column).
       supabase.from('users').select('id, name, role').eq('role', 'sales'),
       supabase.from('incentive_settings').select('*').maybeSingle(),
+      // M1 — every rep's active daily target. Filtered by effective_to
+      // is null (the unique partial index in supabase_phase9 ensures one
+      // active row per user, so a single fetch is sufficient).
+      supabase.from('daily_targets')
+        .select('user_id, min_quotes, min_followups, min_calls')
+        .is('effective_to', null),
+      // M1 — follow-ups completed today across the whole team.
+      // recorded_by isn't on follow_ups; we use assigned_to + is_done
+      // + completed_at-on-today to count completions per user.
+      supabase.from('follow_ups')
+        .select('id, assigned_to, completed_at')
+        .eq('is_done', true)
+        .gte('completed_at', `${todayDate}T00:00:00`)
+        .lte('completed_at', `${todayDate}T23:59:59`),
     ])
 
     const allQuotes    = quotesRes.data       || []
@@ -128,7 +148,9 @@ export default function AdminDashboardDesktop() {
     const pending      = pendingPayRes.data   || []
     const profiles     = profilesRes.data     || []
     const msd          = msdRes.data          || []
-    const salesUsers   = usersRes.data        || []
+    const salesUsers      = usersRes.data        || []
+    const dailyTargets    = dailyTargetsRes.data || []
+    const followupsToday  = followupsDoneTodayRes.data || []
     const settings     = settingsRes.data     || {}
 
     // Apply segment filter to the quote-derived calcs. Private rows
@@ -458,6 +480,59 @@ export default function AdminDashboardDesktop() {
     })
     const trendMax = Math.max(1, ...trendMonths.map(m => m.value))
 
+    // M1 — per-rep TODAY activity strip + missed-targets banner ──────
+    // For each sales user: count today's quotes sent, follow-ups
+    // completed, payments logged. Compare against their daily target
+    // (defaults applied when no target row exists). Flag misses for
+    // the banner. Stale quote count per rep (sent >7d, no follow-up)
+    // sits next to the activity counts so admin can see who's letting
+    // deals rot.
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+    const targetByUser = {}
+    dailyTargets.forEach(t => { targetByUser[t.user_id] = t })
+    const followupCountByUser = {}
+    followupsToday.forEach(f => {
+      followupCountByUser[f.assigned_to] = (followupCountByUser[f.assigned_to] || 0) + 1
+    })
+
+    // We use allQuotes (un-filtered by segment) for the daily activity
+    // strip on purpose — admin wants to see TOTAL rep activity today,
+    // not per-segment slice. The segment toggle still affects funnel /
+    // outstanding / etc. above.
+    const repActivity = salesUsers.map(u => {
+      const tgt = targetByUser[u.id] || { min_quotes: 2, min_followups: 5, min_calls: 0 }
+      const sentToday = allQuotes.filter(q =>
+        q.created_by === u.id && (q.created_at || '').slice(0, 10) === todayDate
+      ).length
+      const paymentsTodayCount = paymentsAll.filter(p =>
+        p.recorded_by === u.id && (p.created_at || '').slice(0, 10) === todayDate
+      ).length
+      const followupsDone = followupCountByUser[u.id] || 0
+      const stale = allQuotes.filter(q =>
+        q.created_by === u.id &&
+        q.status === 'sent' &&
+        (Date.now() - new Date(q.updated_at || q.created_at).getTime()) > SEVEN_DAYS_MS
+      ).length
+      const missedQuotes    = sentToday    < (tgt.min_quotes    || 0)
+      const missedFollowups = followupsDone < (tgt.min_followups || 0)
+      return {
+        id:   u.id,
+        name: u.name,
+        target: tgt,
+        sentToday,
+        followupsDone,
+        paymentsTodayCount,
+        stale,
+        missed: missedQuotes || missedFollowups,
+      }
+    }).sort((a, b) => {
+      // Reps who missed today bubble to top so admin can see them first.
+      if (a.missed !== b.missed) return a.missed ? -1 : 1
+      return (b.sentToday + b.followupsDone) - (a.sentToday + a.followupsDone)
+    })
+
+    const missedReps = repActivity.filter(r => r.missed)
+
     setState({
       loading: false,
       kpi: { revenue, activeQuotes, pipelineValue, outstanding, pending: pending.length, liability, lostRevenue, wonValue },
@@ -466,6 +541,8 @@ export default function AdminDashboardDesktop() {
       liability: { total: liability, above: aboveTarget, staff: profiles.length },
       outstandingList, activeCampaigns, staleQuotes, activity, trendMonths, trendMax,
       pending,
+      // M1 daily activity
+      repActivity, missedReps,
     })
   }
 
@@ -624,6 +701,34 @@ export default function AdminDashboardDesktop() {
           </header>
 
           <div className="v2d-content">
+            {/* M1 — Missed-targets banner. Shown only when at least one
+                rep is currently below their daily quota. Lists names so
+                admin can see who to ping (or who to walk over to).
+                When all reps are on track, banner disappears entirely. */}
+            {state.missedReps && state.missedReps.length > 0 && (
+              <section
+                className="v2d-banner"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px',
+                  background: 'rgba(229, 57, 53, 0.08)',
+                  border: '1px solid rgba(229, 57, 53, 0.25)',
+                  borderRadius: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <AlertTriangle size={18} style={{ color: '#ef9a9a', flex: '0 0 auto' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>
+                    {state.missedReps.length} rep{state.missedReps.length === 1 ? '' : 's'} below today's target
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.6))' }}>
+                    {state.missedReps.map(r => r.name).join(' · ')}
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* Action Queue — demoted from hero to an inline notification.
                 Only renders when there's actually something pending. When
                 the queue is empty the banner disappears entirely; admins
@@ -762,6 +867,15 @@ export default function AdminDashboardDesktop() {
               <section>
                 <LiabilityPanel data={state.liability} />
               </section>
+            )}
+
+            {/* M1 — Per-rep daily activity strip. One row per sales
+                user with today's quote count + follow-ups + payments
+                + stale-quote count, each with a "missed" indicator
+                when below target. Reps who missed today bubble to the
+                top via the load() sort. */}
+            {state.repActivity && state.repActivity.length > 0 && (
+              <RepActivityPanel rows={state.repActivity} />
             )}
 
             {/* Row 5: Active campaigns — horizontal grid of cards needs
@@ -1140,6 +1254,76 @@ function StalePanel({ rows, onOpen }) {
               <td className="num"><Money value={r.balance || 0} /></td>
             </tr>
           ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+// M1 — Per-rep daily activity strip. Renders one row per sales user
+// with today's quote count + follow-ups + payments + stale quote
+// count. Each cell shows X/Y format with an amber chip when below
+// target. Stale = sent quotes idle >7d with no follow-up; this is
+// the "rotting deal" warning for the rep.
+function RepActivityPanel({ rows }) {
+  return (
+    <section className="v2d-panel" style={{ marginBottom: 22 }}>
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Team — today's activity</div>
+          <div className="v2d-panel-s">Quotes sent / follow-ups done / payments logged · vs daily target</div>
+        </div>
+        {rows.some(r => r.missed) && (
+          <div className="v2d-badge v2d-badge--rose">
+            {rows.filter(r => r.missed).length} below target
+          </div>
+        )}
+      </div>
+      <table className="v2d-qt">
+        <thead>
+          <tr>
+            <th>Rep</th>
+            <th className="num">Quotes</th>
+            <th className="num">Follow-ups</th>
+            <th className="num">Payments</th>
+            <th className="num">Stale</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => {
+            const cell = (value, target) => {
+              if (target === 0) return <span style={{ color: 'var(--v2-ink-2)' }}>{value}</span>
+              const hit = value >= target
+              return (
+                <span style={{
+                  fontWeight: 600,
+                  color: hit ? 'var(--v2-green)' : 'var(--v2-amber)',
+                }}>
+                  {value} / {target}{hit && ' ✓'}
+                </span>
+              )
+            }
+            return (
+              <tr key={r.id}>
+                <td style={{ fontWeight: 600 }}>{r.name || '—'}</td>
+                <td className="num">{cell(r.sentToday,     r.target.min_quotes    || 0)}</td>
+                <td className="num">{cell(r.followupsDone, r.target.min_followups || 0)}</td>
+                <td className="num">
+                  <span style={{ color: r.paymentsTodayCount > 0 ? 'var(--v2-green)' : 'var(--v2-ink-2)', fontWeight: 600 }}>
+                    {r.paymentsTodayCount}
+                  </span>
+                </td>
+                <td className="num">
+                  <span style={{
+                    color: r.stale > 0 ? 'var(--v2-rose)' : 'var(--v2-ink-2)',
+                    fontWeight: r.stale > 0 ? 700 : 400,
+                  }}>
+                    {r.stale}{r.stale > 0 ? ' ⚠' : ''}
+                  </span>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </section>
