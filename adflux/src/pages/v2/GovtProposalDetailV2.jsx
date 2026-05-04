@@ -785,16 +785,36 @@ export default function GovtProposalDetailV2() {
       }
 
       // 2) Each uploaded attachment in checklist order.
+      // Phase 11d (rev) — track included vs skipped attachments by
+      // reason so the user gets actionable feedback instead of silent
+      // misses. "Combined PDF showing only the letter" was confusing
+      // when the rep didn't realize their pasted URLs / failed fetches
+      // were being dropped.
+      const merged_in    = []
+      const skipped_url  = []   // pasted http URLs (CORS-blocked)
+      const skipped_no   = []   // checklist row exists but no file
+      const skipped_err  = []   // fetch threw — file missing or RLS denied
       for (const c of checklist) {
-        if (!c.file_url) continue
-        // Skip pasted URLs — CORS won't let us pull them. The user can
-        // upload the real file instead to include it in the merge.
-        if (String(c.file_url).startsWith('http')) continue
+        const label = c.label || 'unnamed'
+        if (!c.file_url) {
+          skipped_no.push(label)
+          continue
+        }
+        if (String(c.file_url).startsWith('http')) {
+          skipped_url.push(label)
+          continue
+        }
         try {
           const part = await fetchAsMergeInput(c.file_url)
-          if (part) inputs.push(part)
+          if (part) {
+            inputs.push(part)
+            merged_in.push(label)
+          } else {
+            skipped_err.push(label)
+          }
         } catch (e) {
-          console.warn('[combined-pdf] skipped attachment:', c.label, e?.message)
+          console.warn('[combined-pdf] skipped attachment:', label, e?.message)
+          skipped_err.push(label)
         }
       }
 
@@ -807,8 +827,27 @@ export default function GovtProposalDetailV2() {
       const filename = `${quote.quote_number || quote.ref_number || 'proposal'}-combined.pdf`
         .replace(/[^a-z0-9-_.]/gi, '-')
       downloadPdfBlob(merged, filename)
-      setStatusMsg(`Combined PDF generated (${inputs.length} document${inputs.length === 1 ? '' : 's'}).`)
-      setTimeout(() => setStatusMsg(''), 4000)
+
+      // Build a feedback message that calls out skipped attachments
+      // by name so the rep knows exactly what's missing from the PDF.
+      const totalAttachments = checklist.length
+      const parts = [`Combined PDF generated (${inputs.length} document${inputs.length === 1 ? '' : 's'}).`]
+      if (merged_in.length) {
+        parts.push(`Included: ${merged_in.join(', ')}.`)
+      }
+      if (skipped_url.length) {
+        parts.push(`Skipped pasted-URL attachments (re-upload as files): ${skipped_url.join(', ')}.`)
+      }
+      if (skipped_err.length) {
+        parts.push(`Failed to fetch: ${skipped_err.join(', ')} — check the file still exists in storage.`)
+      }
+      if (totalAttachments === 0) {
+        parts.push('No attachment rows in checklist yet — upload OC copy / PO copy / supporting docs to include them.')
+      }
+      setStatusMsg(parts.join(' '))
+      // Longer timeout when there are skipped items so the rep has time
+      // to read the failure list.
+      setTimeout(() => setStatusMsg(''), (skipped_url.length + skipped_err.length) ? 9000 : 4500)
     } catch (e) {
       setStatusError(`Failed to build combined PDF: ${e?.message || e}`)
     } finally {

@@ -161,15 +161,14 @@ export function GovtProposalRenderer({
 
       {/* Page 2+ — district allotment list (Auto Hood only).
           Owner spec (4 May 2026): "list of auto should be in next page,
-          different from cover letter." Rendered as its own .govt-letter
-          div so the base CSS gives it its own A4 page; the rasterizer's
-          1123px slicing in proposalPdf.js puts each div on its own
-          PDF page automatically. Letterhead background applies here
-          too so page 2 also carries the company branding. */}
+          different from cover letter."
+          Rendered with NO letterhead background — standard govt-letter
+          convention is letterhead on page 1 only, plain on subsequent
+          pages. This also frees up the full 1011px content area
+          (vs ~860px under letterhead) so 33 districts fit on one page. */}
       {districtListHtml && (
         <div
-          className="govt-letter govt-letter--themed"
-          style={letterStyle}
+          className="govt-letter"
           dangerouslySetInnerHTML={{ __html: districtListHtml }}
         />
       )}
@@ -280,13 +279,19 @@ function renderBidanBlock(mediaType) {
      • raw wizard preview              (district_name_gu/en, allocated_qty)
 */
 function renderDistrictListPage(data) {
-  // Phase 11d (rev 2) — owner's reference format (4 May 2026):
-  // 3 columns only — Sr | District | Auto count. No percentage.
-  // Heading is centered and starred to match the reference doc.
+  // Phase 11d (rev 3) — compact table sized to fit 33 districts on a
+  // single A4 page.
+  //   Math: page height 1123px @ 96dpi, with 56px top+bottom padding
+  //   on the host .govt-letter, content area = 1011px.
+  //   Heading + thead + tfoot ~ 110px, leaves 901px for 33 rows = 27px
+  //   each. We use 19px rows (4px vertical padding × 11.5px font ×
+  //   1.3 line-height) so the table comfortably fits with margin to
+  //   spare. Centered, max-width 540 for printed look.
   const items = Array.isArray(data.line_items) ? data.line_items : []
   if (items.length === 0) return ''
 
   const totalQty = Number(data.auto_total_quantity || 0)
+  const cellStyle = 'padding:4px 10px;font-size:11.5px;line-height:1.35;border:1px solid #444;'
 
   const rowsHtml = items.map((it, i) => {
     const name =
@@ -299,29 +304,29 @@ function renderDistrictListPage(data) {
     const qty = Number(it.allocated_qty ?? it.qty ?? it.quantity ?? 0)
     return `
       <tr>
-        <td class="num">${toGujaratiDigits(String(i + 1))}</td>
-        <td>${name}</td>
-        <td class="num">${toGujaratiDigits(formatINREnglish(qty))}</td>
+        <td class="num" style="${cellStyle}text-align:center;">${toGujaratiDigits(String(i + 1))}</td>
+        <td style="${cellStyle}">${name}</td>
+        <td class="num" style="${cellStyle}text-align:right;">${toGujaratiDigits(formatINREnglish(qty))}</td>
       </tr>`
   }).join('')
 
   return `
-  <h2 style="margin:0 0 18px;font-size:16px;font-weight:700;text-align:center;">
+  <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;text-align:center;">
     *ગુજરાત – ઓટો રિક્ષા જિલ્લા પ્રમાણેનું લિસ્ટ*
   </h2>
-  <table class="govt-letter__table" style="max-width:520px;margin:0 auto;">
+  <table style="border-collapse:collapse;width:100%;max-width:540px;margin:0 auto;background:#fff;color:#111;">
     <thead>
       <tr>
-        <th style="width:60px;">ક્રમ</th>
-        <th>જિલ્લો</th>
-        <th class="num" style="width:140px;">ઓટો રિક્ષાની સંખ્યા</th>
+        <th style="${cellStyle}background:#f5f5f5;font-weight:700;width:50px;text-align:center;">ક્રમ</th>
+        <th style="${cellStyle}background:#f5f5f5;font-weight:700;text-align:left;">જિલ્લો</th>
+        <th style="${cellStyle}background:#f5f5f5;font-weight:700;width:140px;text-align:right;">ઓટો રિક્ષાની સંખ્યા</th>
       </tr>
     </thead>
     <tbody>
       ${rowsHtml}
       <tr>
-        <td colspan="2"><strong>કુલ</strong></td>
-        <td class="num"><strong>${toGujaratiDigits(formatINREnglish(totalQty))}</strong></td>
+        <td colspan="2" style="${cellStyle}font-weight:700;"><strong>કુલ</strong></td>
+        <td class="num" style="${cellStyle}font-weight:700;text-align:right;"><strong>${toGujaratiDigits(formatINREnglish(totalQty))}</strong></td>
       </tr>
     </tbody>
   </table>`
