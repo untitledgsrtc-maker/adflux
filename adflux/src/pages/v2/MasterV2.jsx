@@ -629,8 +629,7 @@ function CompaniesTab() {
           onChange={e => setField(row.id, field, e.target.value)}
           onBlur={() => persist(row.id)}
           placeholder={placeholder || ''}
-          className="govt-input-cell"
-          style={{ width: '100%' }}
+          className="govt-input-cell govt-input-cell--wide"
         />
       </div>
     )
@@ -1437,7 +1436,7 @@ function DocumentsTab() {
             New template
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
-            <select value={newSegment} onChange={e => setNewSegment(e.target.value)} className="govt-input-cell">
+            <select value={newSegment} onChange={e => setNewSegment(e.target.value)} className="govt-input-cell govt-input-cell--wide">
               <option value="GOVERNMENT">Government</option>
               <option value="PRIVATE">Private</option>
             </select>
@@ -1446,9 +1445,9 @@ function DocumentsTab() {
               value={newMedia}
               onChange={e => setNewMedia(e.target.value.toUpperCase())}
               placeholder="Media type (e.g. AUTO_HOOD)"
-              className="govt-input-cell"
+              className="govt-input-cell govt-input-cell--wide"
             />
-            <select value={newLanguage} onChange={e => setNewLanguage(e.target.value)} className="govt-input-cell">
+            <select value={newLanguage} onChange={e => setNewLanguage(e.target.value)} className="govt-input-cell govt-input-cell--wide">
               <option value="gu">Gujarati (gu)</option>
               <option value="en">English (en)</option>
             </select>
@@ -1458,29 +1457,29 @@ function DocumentsTab() {
             value={newSubject}
             onChange={e => setNewSubject(e.target.value)}
             placeholder="Subject line (required)"
-            className="govt-input-cell"
-            style={{ width: '100%', marginBottom: 10 }}
+            className="govt-input-cell govt-input-cell--wide"
+            style={{ marginBottom: 10 }}
           />
           <textarea
             value={newHeader}
             onChange={e => setNewHeader(e.target.value)}
             placeholder="Header HTML (optional)"
-            className="govt-input-cell"
-            style={{ width: '100%', minHeight: 50, fontFamily: 'monospace', fontSize: 12, marginBottom: 10 }}
+            className="govt-input-cell govt-input-cell--wide"
+            style={{ minHeight: 50, marginBottom: 10 }}
           />
           <textarea
             value={newBody}
             onChange={e => setNewBody(e.target.value)}
             placeholder="Body HTML (required)"
-            className="govt-input-cell"
-            style={{ width: '100%', minHeight: 180, fontFamily: 'monospace', fontSize: 12, marginBottom: 10 }}
+            className="govt-input-cell govt-input-cell--wide"
+            style={{ minHeight: 240, marginBottom: 10 }}
           />
           <textarea
             value={newFooter}
             onChange={e => setNewFooter(e.target.value)}
             placeholder="Footer HTML (optional)"
-            className="govt-input-cell"
-            style={{ width: '100%', minHeight: 50, fontFamily: 'monospace', fontSize: 12, marginBottom: 10 }}
+            className="govt-input-cell govt-input-cell--wide"
+            style={{ minHeight: 50, marginBottom: 10 }}
           />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button
@@ -1634,8 +1633,7 @@ function DocumentsTab() {
                   type="text"
                   value={editBuf.subject_line}
                   onChange={e => setEditBuf({ ...editBuf, subject_line: e.target.value })}
-                  className="govt-input-cell"
-                  style={{ width: '100%' }}
+                  className="govt-input-cell govt-input-cell--wide"
                 />
               </div>
               <div>
@@ -1643,8 +1641,8 @@ function DocumentsTab() {
                 <textarea
                   value={editBuf.header_html}
                   onChange={e => setEditBuf({ ...editBuf, header_html: e.target.value })}
-                  className="govt-input-cell"
-                  style={{ width: '100%', minHeight: 60, fontFamily: 'monospace', fontSize: 12 }}
+                  className="govt-input-cell govt-input-cell--wide"
+                  style={{ minHeight: 80 }}
                 />
               </div>
               <div>
@@ -1652,8 +1650,8 @@ function DocumentsTab() {
                 <textarea
                   value={editBuf.body_html}
                   onChange={e => setEditBuf({ ...editBuf, body_html: e.target.value })}
-                  className="govt-input-cell"
-                  style={{ width: '100%', minHeight: 240, fontFamily: 'monospace', fontSize: 12 }}
+                  className="govt-input-cell govt-input-cell--wide"
+                  style={{ minHeight: 320 }}
                 />
               </div>
               <div>
@@ -1661,8 +1659,8 @@ function DocumentsTab() {
                 <textarea
                   value={editBuf.footer_html}
                   onChange={e => setEditBuf({ ...editBuf, footer_html: e.target.value })}
-                  className="govt-input-cell"
-                  style={{ width: '100%', minHeight: 60, fontFamily: 'monospace', fontSize: 12 }}
+                  className="govt-input-cell govt-input-cell--wide"
+                  style={{ minHeight: 80 }}
                 />
               </div>
             </div>

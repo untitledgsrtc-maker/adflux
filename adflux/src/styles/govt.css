@@ -691,6 +691,9 @@
 .govt-pill--B { background: var(--blue-soft); color: var(--blue); }
 .govt-pill--C { background: var(--warning-soft); color: var(--warning); }
 
+/* Compact numeric cell (default) — auto-districts share%, gsrtc
+   station numeric columns, etc. Capped at 90px wide and right-aligned
+   so multi-digit numbers stack like a column. */
 .govt-input-cell {
   background: var(--surface-3);
   border: 1px solid var(--border);
@@ -702,8 +705,26 @@
   width: 100%;
   max-width: 90px;
   text-align: right;
+  box-sizing: border-box;
 }
 .govt-input-cell:focus { outline: none; border-color: var(--accent); }
+
+/* Wide form variant — Companies / Signers / Documents tabs in Master
+   plus the Edit-template modal. Removes the 90px cap and left-aligns.
+   Owner spec (4 May 2026): "UI not good" — the narrow-cell width was
+   clipping legal name, address, GSTIN, and template body HTML. */
+.govt-input-cell--wide {
+  max-width: none;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 13.5px;
+}
+textarea.govt-input-cell--wide {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  resize: vertical;
+}
 
 .govt-action-bar {
   display: flex;
