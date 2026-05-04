@@ -69,6 +69,12 @@ export default function GovtProposalDetailV2() {
   const [showWonModal,     setShowWonModal]     = useState(false)
   const [showEditPayment,  setShowEditPayment]  = useState(false)
   const [editingPayment,   setEditingPayment]   = useState(null)
+  // "Mark Sent" pre-flight modal — opens when user clicks Mark Sent.
+  // Shows the OC-copy requirement, lets them upload it inline, then
+  // Confirm & Send executes the original flip-to-sent flow.
+  const [showSentModal,    setShowSentModal]    = useState(false)
+  const [sentModalBusy,    setSentModalBusy]    = useState(false)
+  const [sentModalUploadingOc, setSentModalUploadingOc] = useState(false)
 
   // Phase 8 — file storage + locked proposal PDF + combined PDF
   // rendererRef is captured by html2canvas when generating the locked
@@ -213,41 +219,57 @@ export default function GovtProposalDetailV2() {
   async function changeStatus(next) {
     if (!quote || savingStatus) return
 
-    // Mirror private QuoteDetail: marking Won opens the payment modal
-    // first so the user can record cash + campaign dates in one shot.
-    // Validation for the Won-specific PO copy gate happens INSIDE
-    // handleWonWithPayment after the modal is dismissed — that way the
-    // owner sees the modal flow they expect and we still block the
-    // actual DB flip.
+    // Mark Won → existing flow: opens the payment+campaign modal.
     if (next === 'won') {
       setShowWonModal(true)
       return
     }
 
-    // Mark Sent gate: OC copy MUST be uploaded. This is the stamped
-    // acknowledgment slip the delivery person brings back from the
-    // government body. Without it, no proof of receipt — block.
+    // Mark Sent → open the pre-flight modal. The modal shows the
+    // OC-copy requirement and lets the user upload it inline before
+    // confirming. Replaces the old inline error banner.
     if (next === 'sent') {
-      const oc = findUploadedByLabel('oc copy')
-      if (!oc) {
-        setStatusError(
-          'Cannot mark Sent — please upload the OC copy (acknowledgment receipt from the government body) in the Attachments section first.'
-        )
-        return
-      }
+      setStatusError('')
+      setShowSentModal(true)
+      return
     }
 
+    // Other transitions (lost, draft, negotiating) — direct flip.
     setSavingStatus(next)
     setStatusError('')
     setStatusMsg('')
-    const prior = quote.status
+    const { data, error } = await supabase
+      .from('quotes')
+      .update({ status: next })
+      .eq('id', quote.id)
+      .select()
+      .single()
+    setSavingStatus(null)
+    if (error) {
+      setStatusError(error.message || 'Failed to update status.')
+      return
+    }
+    setQuote(data)
+  }
 
-    // Mark Sent → also generate + lock the proposal letter PDF as a
-    // snapshot. After this point, future edits to the quote do NOT
-    // change what was sent. If the snapshot fails we abort the status
-    // change so we don't end up with a Sent-but-unlocked proposal.
+  // Confirms the Sent transition from inside the modal. Generates
+  // the locked proposal PDF, flips status to sent, closes modal.
+  async function confirmMarkSent() {
+    if (!quote || sentModalBusy) return
+    // Belt-and-suspenders: re-check OC upload right before confirming.
+    // The modal's Confirm button is already disabled when OC is missing,
+    // but data could shift between disable and click in a multi-tab race.
+    const oc = findUploadedByLabel('oc copy')
+    if (!oc) {
+      setStatusError('Upload the OC copy first — you cannot mark Sent without it.')
+      return
+    }
+    setSentModalBusy(true)
+    setStatusError('')
+    setStatusMsg('')
+
     let lockedFields = {}
-    if (next === 'sent' && !quote.locked_proposal_pdf_url) {
+    if (!quote.locked_proposal_pdf_url) {
       try {
         setGeneratingPdf(true)
         const { path } = await generateLockedProposalPdf({
@@ -259,7 +281,7 @@ export default function GovtProposalDetailV2() {
           locked_proposal_pdf_at:  new Date().toISOString(),
         }
       } catch (e) {
-        setSavingStatus(null)
+        setSentModalBusy(false)
         setGeneratingPdf(false)
         setStatusError(`Failed to lock proposal PDF: ${e?.message || e}`)
         return
@@ -269,22 +291,37 @@ export default function GovtProposalDetailV2() {
 
     const { data, error } = await supabase
       .from('quotes')
-      .update({ status: next, ...lockedFields })
+      .update({ status: 'sent', ...lockedFields })
       .eq('id', quote.id)
       .select()
       .single()
-    setSavingStatus(null)
+    setSentModalBusy(false)
     if (error) {
       setStatusError(error.message || 'Failed to update status.')
       return
     }
     setQuote(data)
-    if (next === 'sent' && lockedFields.locked_proposal_pdf_url) {
+    setShowSentModal(false)
+    if (lockedFields.locked_proposal_pdf_url) {
       setStatusMsg('Proposal marked Sent. Letter PDF locked — future quote edits will not change what was sent.')
       setTimeout(() => setStatusMsg(''), 4500)
     }
-    if (next === 'won' && prior !== 'won') {
-      syncClientFromQuote(data, 'won')
+  }
+
+  // Modal-side OC upload helper. Finds the OC copy template row in the
+  // checklist and runs the same upload flow the inline UI uses.
+  async function handleSentModalOcUpload(file) {
+    if (!file || !quote) return
+    const idx = checklist.findIndex(c => /oc copy/i.test(c.label || ''))
+    if (idx < 0) {
+      setStatusError('OC copy template row not found — refresh the page and retry.')
+      return
+    }
+    setSentModalUploadingOc(true)
+    try {
+      await handleFilePick(idx, file)
+    } finally {
+      setSentModalUploadingOc(false)
     }
   }
 
@@ -1164,6 +1201,161 @@ export default function GovtProposalDetailV2() {
           onClose={() => setShowWonModal(false)}
         />
       )}
+
+      {/* Mark Sent pre-flight modal. Same shell as WonPaymentModal /
+          PaymentModal so the experience is consistent. Shows the OC-
+          copy requirement, lets the user upload it inline, then
+          Confirm & Send executes the lock-PDF + status-flip flow. */}
+      {showSentModal && (() => {
+        const ocItem = checklist.find(c => /oc copy/i.test(c.label || ''))
+        const ocUploaded = ocItem && ocItem.file_url && String(ocItem.file_url).trim() !== ''
+        const canConfirm = Boolean(ocUploaded) && !sentModalBusy && !generatingPdf
+        return (
+          <div className="mo" onClick={e => { if (e.target === e.currentTarget && !sentModalBusy && !generatingPdf) setShowSentModal(false) }}>
+            <div className="md" style={{ maxWidth: 520 }}>
+              <div className="md-h">
+                <div className="md-t">
+                  <Send size={16} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                  Mark proposal as Sent
+                </div>
+                <button
+                  className="md-x"
+                  onClick={() => setShowSentModal(false)}
+                  disabled={sentModalBusy || generatingPdf}
+                >✕</button>
+              </div>
+              <div className="md-b">
+                {/* Quick recap card */}
+                <div style={{
+                  background: 'rgba(100,181,246,.08)',
+                  border: '1.5px solid rgba(100,181,246,.2)',
+                  borderRadius: 9, padding: '13px 16px', marginBottom: 16,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '.72rem', color: 'var(--gray)' }}>Proposal</div>
+                      <div style={{ fontWeight: 700, color: '#64b5f6' }}>{quote.quote_number || quote.ref_number}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '.72rem', color: 'var(--gray)' }}>Total</div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#64b5f6' }}>
+                        ₹{formatINREnglish(quote.total_amount || 0)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* OC copy requirement row — green when uploaded, amber when missing */}
+                <div style={{
+                  background: ocUploaded ? 'rgba(76,175,80,.08)' : 'rgba(245,158,11,.08)',
+                  border: `1.5px solid ${ocUploaded ? 'rgba(76,175,80,.3)' : 'rgba(245,158,11,.3)'}`,
+                  borderRadius: 9, padding: '14px 16px', marginBottom: 12,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: ocUploaded ? 0 : 12 }}>
+                    {ocUploaded
+                      ? <CheckCircle2 size={18} style={{ color: '#81c784' }} />
+                      : <Paperclip size={18} style={{ color: '#fbbf24' }} />}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>
+                        OC copy {ocUploaded ? '✓ uploaded' : '— required'}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                        Stamped acknowledgment slip from the government body, brought back by the delivery person.
+                      </div>
+                    </div>
+                  </div>
+
+                  {!ocUploaded && (
+                    <label
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        padding: '10px 14px', borderRadius: 8,
+                        border: '1px dashed rgba(245,158,11,.4)',
+                        background: 'rgba(245,158,11,.04)',
+                        color: '#fbbf24', fontSize: 13, fontWeight: 600,
+                        cursor: sentModalUploadingOc ? 'wait' : 'pointer',
+                      }}
+                    >
+                      {sentModalUploadingOc ? (
+                        <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Uploading…</>
+                      ) : (
+                        <><Upload size={14} /> Upload OC copy</>
+                      )}
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        style={{ display: 'none' }}
+                        disabled={sentModalUploadingOc}
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (f) handleSentModalOcUpload(f)
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                  )}
+
+                  {ocUploaded && (
+                    <button
+                      type="button"
+                      onClick={() => openAttachment(ocItem.file_url)}
+                      style={{
+                        marginTop: 10,
+                        background: 'transparent', border: '1px solid rgba(76,175,80,.4)',
+                        color: '#81c784', borderRadius: 6, padding: '4px 10px',
+                        cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        display: 'inline-flex', gap: 6, alignItems: 'center',
+                      }}
+                    >
+                      <Download size={12} /> View uploaded file
+                    </button>
+                  )}
+                </div>
+
+                {/* What happens next — sets expectations */}
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  <strong style={{ color: 'var(--text)' }}>On confirm:</strong> the Gujarati letter is rasterized
+                  to PDF and locked as a snapshot. Future quote edits won't change the locked PDF. Status flips to
+                  <strong style={{ color: 'var(--text)' }}> Sent</strong>.
+                </div>
+
+                {generatingPdf && (
+                  <div style={{
+                    marginTop: 12,
+                    background: 'rgba(100,181,246,.08)',
+                    border: '1px solid rgba(100,181,246,.3)',
+                    borderRadius: 8, padding: '10px 12px',
+                    fontSize: 12, color: '#64b5f6',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                    Locking proposal letter as PDF…
+                  </div>
+                )}
+              </div>
+              <div className="md-f">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setShowSentModal(false)}
+                  disabled={sentModalBusy || generatingPdf}
+                >Cancel</button>
+                <button
+                  type="button"
+                  className="btn btn-y"
+                  onClick={confirmMarkSent}
+                  disabled={!canConfirm}
+                  title={!ocUploaded ? 'Upload OC copy first to enable' : ''}
+                >
+                  {sentModalBusy
+                    ? 'Sending…'
+                    : <><Send size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} /> Confirm & Mark Sent</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ─── Follow-ups (Phase 8B parity with adflux private flow) ───
            Same component the private QuoteDetail uses, just mounted
