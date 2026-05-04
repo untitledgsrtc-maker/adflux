@@ -184,6 +184,11 @@ export default function GsrtcStationsV2() {
         <strong>Active monthly DAVP total: ₹{formatINREnglish(totalMonthly)}</strong>
       </div>
 
+      {/* Phase 11d (rev8) — owner spec "Agency ₹/mo / Agency rack
+          no need in city". Removed those two columns from the master
+          view to declutter. The DB columns are still there (useful
+          for future agency-rate features), just not surfaced here.
+          colSpan dropped 10 → 8 to match. */}
       <table className="govt-table">
         <thead>
           <tr>
@@ -193,15 +198,13 @@ export default function GsrtcStationsV2() {
             <th style={{ width: 80 }}>Cat</th>
             <th className="num">Screens</th>
             <th className="num">DAVP/slot</th>
-            <th className="num">Agency ₹/mo</th>
-            <th className="num">Agency rack</th>
             <th className="num">Monthly DAVP</th>
             <th style={{ width: 90 }}>Active</th>
           </tr>
         </thead>
         <tbody>
           {loading && (
-            <tr><td colSpan={10}><em>Loading…</em></td></tr>
+            <tr><td colSpan={8}><em>Loading…</em></td></tr>
           )}
           {liveRows.map(r => {
             const screens = Number(r.screens_count) || 0
@@ -254,26 +257,6 @@ export default function GsrtcStationsV2() {
                     className="govt-input-cell"
                     value={r.davp_per_slot_rate ?? ''}
                     onChange={e => setEdit(r.id, 'davp_per_slot_rate', e.target.value)}
-                  />
-                </td>
-                <td className="num">
-                  <input
-                    type="number"
-                    step="1"
-                    min="0"
-                    className="govt-input-cell"
-                    value={r.agency_monthly_rate ?? ''}
-                    onChange={e => setEdit(r.id, 'agency_monthly_rate', e.target.value)}
-                  />
-                </td>
-                <td className="num">
-                  <input
-                    type="number"
-                    step="1"
-                    min="0"
-                    className="govt-input-cell"
-                    value={r.agency_rack_rate ?? ''}
-                    onChange={e => setEdit(r.id, 'agency_rack_rate', e.target.value)}
                   />
                 </td>
                 <td className="num"><strong>₹{formatINREnglish(monthly)}</strong></td>

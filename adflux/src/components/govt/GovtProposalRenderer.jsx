@@ -397,6 +397,20 @@ function renderDistrictListPage(data) {
   </table>`
 }
 
+// Phase 11d (rev8) — decimal-preserving formatter for the rate
+// column. The previous code used formatINREnglish which calls
+// .toFixed(0) → 2.75 became "3" for every row, making all stations
+// look identical. This formatter keeps up to 2 decimals when the
+// number isn't a whole rupee, drops them when it is.
+function formatRateGu(n) {
+  const num = Number(n)
+  if (!Number.isFinite(num)) return '૦'
+  // Whole numbers print without decimals (3 not 3.00).
+  // Fractional rates print with 2 decimals (2.75, 2.50).
+  const out = (num % 1 === 0) ? String(Math.round(num)) : num.toFixed(2)
+  return toGujaratiDigits(out)
+}
+
 function renderGsrtcTable(data) {
   const months = Number(data.gsrtc_campaign_months || 1)
   const items  = data.line_items || []
@@ -404,6 +418,14 @@ function renderGsrtcTable(data) {
   let totalScreens = 0
   let totalDaily   = 0
   let totalMonthly = 0
+
+  // Phase 11d (rev8) — explicit cell styling so the table renders
+  // cleanly in the rasterized PDF (the .govt-letter__table CSS
+  // sometimes loses through the cascade in the off-screen capture
+  // wrapper). Compact font + tight padding so 11 columns fit A4 width.
+  const cellStyle = 'padding:5px 6px;font-size:10.5px;line-height:1.35;border:1px solid #444;color:#111;background:#fff;vertical-align:middle;'
+  const headStyle = cellStyle + 'background:#f5f5f5;font-weight:700;text-align:center;'
+  const numCell   = cellStyle + 'text-align:right;font-variant-numeric:tabular-nums;'
 
   const rowsHtml = items.map((it, i) => {
     // Use per-row values if set; fall back to defaults
@@ -420,17 +442,17 @@ function renderGsrtcTable(data) {
     totalMonthly += daily * days * screens
     return `
       <tr>
-        <td class="num">${toGujaratiDigits(String(i + 1))}</td>
-        <td>${it.description || ''}</td>
-        <td>${it.category || ''}</td>
-        <td class="num">${toGujaratiDigits(String(screens))}</td>
-        <td class="num">${toGujaratiDigits(String(daily))}</td>
-        <td class="num">${toGujaratiDigits(String(dur))} સે.</td>
-        <td class="num">${toGujaratiDigits(String(daily * days))}</td>
-        <td class="num">${toGujaratiDigits(String(days))}</td>
-        <td class="num">${toGujaratiDigits(formatINREnglish(rate))}</td>
-        <td class="num">${toGujaratiDigits(formatINREnglish(monthly))}</td>
-        <td class="num">${toGujaratiDigits(formatINREnglish(lineTotal))}</td>
+        <td style="${cellStyle}text-align:center;">${toGujaratiDigits(String(i + 1))}</td>
+        <td style="${cellStyle}">${it.description || ''}</td>
+        <td style="${cellStyle}text-align:center;">${it.category || ''}</td>
+        <td style="${numCell}">${toGujaratiDigits(String(screens))}</td>
+        <td style="${numCell}">${toGujaratiDigits(String(daily))}</td>
+        <td style="${numCell}">${toGujaratiDigits(String(dur))} સે.</td>
+        <td style="${numCell}">${toGujaratiDigits(String(daily * days))}</td>
+        <td style="${numCell}">${toGujaratiDigits(String(days))}</td>
+        <td style="${numCell}">${formatRateGu(rate)}</td>
+        <td style="${numCell}">${toGujaratiDigits(formatINREnglish(monthly))}</td>
+        <td style="${numCell}">${toGujaratiDigits(formatINREnglish(lineTotal))}</td>
       </tr>`
   }).join('')
 
@@ -438,30 +460,44 @@ function renderGsrtcTable(data) {
   const total = subtotal + gst
 
   return `
-  <p style="margin-top:8px;color:#111;">
+  <p style="margin:8px 0 4px;color:#111;font-size:12px;">
     <em>GSRTC માન્ય રેટ ટેબલ — ${toGujaratiDigits(String(months))} માસ માટે કેમ્પેઇન</em>
   </p>
-  <table class="govt-letter__table">
+  <table style="border-collapse:collapse;width:100%;background:#fff;color:#111;table-layout:fixed;">
     <thead>
       <tr>
-        <th>ક્રમ</th>
-        <th>બસ સ્ટેશન</th>
-        <th>કેટેગરી</th>
-        <th class="num">સ્ક્રીન્સ</th>
-        <th class="num">દૈનિક</th>
-        <th class="num">ડ્યુ.</th>
-        <th class="num">માસિક સ્પોટ્સ</th>
-        <th class="num">દિવસો</th>
-        <th class="num">દર/સ્લોટ</th>
-        <th class="num">માસિક કુલ</th>
-        <th class="num">${toGujaratiDigits(String(months))} માસ કુલ</th>
+        <th style="${headStyle}width:32px;">ક્રમ</th>
+        <th style="${headStyle}text-align:left;">બસ સ્ટેશન</th>
+        <th style="${headStyle}width:42px;">કેટ.</th>
+        <th style="${headStyle}width:46px;">સ્ક્રીન</th>
+        <th style="${headStyle}width:42px;">દૈનિક</th>
+        <th style="${headStyle}width:54px;">સ્પોટ ડ્યુ.</th>
+        <th style="${headStyle}width:60px;">માસિક સ્પોટ</th>
+        <th style="${headStyle}width:42px;">દિવસો</th>
+        <th style="${headStyle}width:60px;">દર/સ્લોટ</th>
+        <th style="${headStyle}width:74px;">માસિક કુલ</th>
+        <th style="${headStyle}width:80px;">${toGujaratiDigits(String(months))} માસ કુલ</th>
       </tr>
     </thead>
     <tbody>
       ${rowsHtml}
-      <tr><td colspan="3"><strong>કુલ</strong></td><td class="num"><strong>${toGujaratiDigits(String(totalScreens))}</strong></td><td class="num">${toGujaratiDigits(String(totalDaily))}</td><td></td><td class="num">${toGujaratiDigits(String(totalMonthly))}</td><td colspan="3"></td><td class="num"><strong>${toGujaratiDigits(formatINREnglish(subtotal))}</strong></td></tr>
-      <tr><td colspan="10">GST 18%</td><td class="num">${toGujaratiDigits(formatINREnglish(gst))}</td></tr>
-      <tr><td colspan="10"><strong>ગ્રાન્ડ ટોટલ</strong></td><td class="num"><strong>${toGujaratiDigits(formatINREnglish(total))}</strong></td></tr>
+      <tr>
+        <td colspan="3" style="${cellStyle}font-weight:700;text-align:right;">કુલ</td>
+        <td style="${numCell}font-weight:700;">${toGujaratiDigits(String(totalScreens))}</td>
+        <td style="${numCell}">${toGujaratiDigits(String(totalDaily))}</td>
+        <td style="${cellStyle}"></td>
+        <td style="${numCell}">${toGujaratiDigits(String(totalMonthly))}</td>
+        <td colspan="3" style="${cellStyle}"></td>
+        <td style="${numCell}font-weight:700;">${toGujaratiDigits(formatINREnglish(subtotal))}</td>
+      </tr>
+      <tr>
+        <td colspan="10" style="${cellStyle}text-align:right;">GST 18%</td>
+        <td style="${numCell}">${toGujaratiDigits(formatINREnglish(gst))}</td>
+      </tr>
+      <tr>
+        <td colspan="10" style="${cellStyle}font-weight:700;text-align:right;">ગ્રાન્ડ ટોટલ</td>
+        <td style="${numCell}font-weight:700;">${toGujaratiDigits(formatINREnglish(total))}</td>
+      </tr>
     </tbody>
   </table>`
 }

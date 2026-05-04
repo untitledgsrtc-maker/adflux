@@ -98,7 +98,7 @@ export function Step3Stations({ data, onChange }) {
           <span style={{ textAlign: 'center' }}>Cat</span>
           <span style={{ textAlign: 'right' }}>Screens</span>
           <span style={{ textAlign: 'right' }}>Daily</span>
-          <span style={{ textAlign: 'right' }}>Dur s</span>
+          <span style={{ textAlign: 'right' }}>Spot (s)</span>
           <span style={{ textAlign: 'right' }}>Days</span>
           <span style={{ textAlign: 'right' }}>Monthly</span>
         </div>
