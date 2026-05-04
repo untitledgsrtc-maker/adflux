@@ -136,10 +136,20 @@ export function GovtProposalRenderer({
       }
     : undefined
 
+  // Phase 11d (rev5) — zero out trailing margin and border on the
+  // rasterized output. Default .govt-letter has margin: 0 auto 18px
+  // and border: 1px solid — those add 36-40px past 2×1123 = 2246px,
+  // which the rasterizer's A4 slicer turns into a near-blank page 3.
+  // We override both inline so the captured canvas is EXACTLY a clean
+  // multiple of the A4 page height. Border still shows on the live
+  // preview because v2.css's container styling provides visual frame.
+  const pageBaseStyle = { margin: 0, border: 'none', borderRadius: 0 }
+  const coverStyle = { ...pageBaseStyle, ...(letterStyle || {}) }
+
   return (
     <>
       {/* Page 1 — cover letter */}
-      <div className="govt-letter govt-letter--themed" style={letterStyle}>
+      <div className="govt-letter govt-letter--themed" style={coverStyle}>
         <div className="govt-letter__head">
           <div
             className="govt-letter__recipient"
@@ -160,15 +170,14 @@ export function GovtProposalRenderer({
       </div>
 
       {/* Page 2+ — district allotment list (Auto Hood only).
-          Owner spec (4 May 2026): "list of auto should be in next page,
-          different from cover letter."
           Rendered with NO letterhead background — standard govt-letter
           convention is letterhead on page 1 only, plain on subsequent
-          pages. This also frees up the full 1011px content area
-          (vs ~860px under letterhead) so 33 districts fit on one page. */}
+          pages. Same zero-margin/border override so it doesn't create
+          a phantom page 3 in the rasterized output. */}
       {districtListHtml && (
         <div
           className="govt-letter"
+          style={pageBaseStyle}
           dangerouslySetInnerHTML={{ __html: districtListHtml }}
         />
       )}
@@ -301,12 +310,18 @@ function renderDistrictListPage(data) {
   const headStyle = cellStyle + 'background:#f5f5f5;font-weight:700;'
 
   const rowsHtml = items.map((it, i) => {
+    // Phase 11d (rev6) — Gujarati FIRST. The wizard saves English
+    // names into description/city_name, but the parent loader (govt
+    // detail page useEffect) joins auto_districts and surfaces
+    // district_name_gu. Owner spec: "AUTO LIST IN GUJRATI NOT
+    // ENGLISH". Fall back to English forms only if no Gujarati is
+    // available (e.g., a custom district that's not in the master).
     const name =
+      it.district_name_gu ||
+      it.district_name ||
       it.description ||
       it.city_name ||
-      it.district_name_gu ||
       it.district_name_en ||
-      it.district_name ||
       '—'
     const qty = Number(it.allocated_qty ?? it.qty ?? it.quantity ?? 0)
     return `

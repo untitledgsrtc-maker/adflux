@@ -126,8 +126,10 @@ export default function GovtProposalDetailV2() {
       }
       setQuote(q)
 
-      // Line items, template, signer, attachment template, company in parallel
-      const [li, tpl, sg, atpl, co] = await Promise.all([
+      // Line items, template, signer, attachment template, company,
+      // and (for AUTO_HOOD) the auto_districts master so we can
+      // surface Gujarati district names in the rendered letter.
+      const [li, tpl, sg, atpl, co, dist] = await Promise.all([
         supabase.from('quote_cities')
           .select('*').eq('quote_id', id),
         supabase.from('proposal_templates')
@@ -159,9 +161,31 @@ export default function GovtProposalDetailV2() {
           .eq('segment', 'GOVERNMENT')
           .eq('is_active', true)
           .maybeSingle(),
+        // Phase 11d (rev6) — auto_districts master, only when the
+        // quote is AUTO_HOOD. The wizard saves quote_cities.description
+        // = district_name_en (English) so the rendered letter was
+        // showing English district names. Owner spec: list must be
+        // in Gujarati. We fetch the master here, build a Map of
+        // id → district_name_gu, and merge it into line_items below.
+        q.media_type === 'AUTO_HOOD'
+          ? supabase.from('auto_districts')
+              .select('id, district_name_en, district_name_gu')
+          : Promise.resolve({ data: [] }),
       ])
       if (cancel) return
-      setItems(li.data || [])
+      // Augment line_items with Gujarati district names for AUTO_HOOD.
+      // Match on ref_id (set by the wizard to auto_districts.id) so we
+      // can pull district_name_gu through to the renderer. Items for
+      // GSRTC_LED don't go through this lookup (their station names
+      // already come from gsrtc_stations master with Gujarati baked in).
+      const distMap = new Map((dist.data || []).map(d => [d.id, d]))
+      const itemsWithGu = (li.data || []).map(it => {
+        const d = it.ref_id ? distMap.get(it.ref_id) : null
+        return d
+          ? { ...it, district_name_gu: d.district_name_gu, district_name_en: d.district_name_en }
+          : it
+      })
+      setItems(itemsWithGu)
       setTemplate(tpl.data || null)
       setSigner(sg.data || null)
       setAttachmentTpl(atpl.data || [])
@@ -195,7 +219,14 @@ export default function GovtProposalDetailV2() {
       return {
         id:           it.id,
         ref_kind:     it.ref_kind,
+        // Phase 11d (rev6) — pass Gujarati name through when available
+        // (set by the load() useEffect's auto_districts JOIN). The
+        // renderer's district list prefers district_name_gu over
+        // description, so AUTO_HOOD letters show Gujarati names instead
+        // of English ones the wizard saved into description.
         description:  it.description || it.city_name,
+        district_name_gu: it.district_name_gu,
+        district_name_en: it.district_name_en,
         category:     it.grade,
         screens,
         daily_spots:       daily,
