@@ -80,6 +80,10 @@ export default function GovtProposalDetailV2() {
   // OC gate, but for the Work Order / PO copy. Banner lives inside
   // WonPaymentModal and disables Confirm until poUploaded === true.
   const [wonModalUploadingPo, setWonModalUploadingPo] = useState(false)
+  // Phase 11c — admin-only "regenerate locked PDF". Locked PDFs from
+  // before the A4 + letterhead fix have wrong-aspect pages; admin
+  // needs to re-rasterize without losing the Sent state.
+  const [regeneratingLocked, setRegeneratingLocked] = useState(false)
 
   // Phase 8 — file storage + locked proposal PDF + combined PDF
   // rendererRef is captured by html2canvas when generating the locked
@@ -337,6 +341,66 @@ export default function GovtProposalDetailV2() {
       await handleFilePick(idx, file)
     } finally {
       setSentModalUploadingOc(false)
+    }
+  }
+
+  // Phase 11c — admin: regenerate the locked proposal PDF in place.
+  //   Why this exists: Sent quotes from before the A4-lock + letterhead
+  //   fixes have a stored locked PDF with 6+ oversized empty pages.
+  //   Re-running Mark Sent isn't possible because the status one-way
+  //   trigger blocks sent → draft. So we provide a direct regenerate
+  //   path that re-rasterizes the CURRENT renderer DOM and overwrites
+  //   the same storage path. Same render code, same path = same legal
+  //   evidence chain, just with proper A4 dimensions.
+  //
+  //   Admin-only on purpose — sales reps shouldn't be able to silently
+  //   change what was "sent" to the client even if the new render is
+  //   visually equivalent. The locked_proposal_pdf_at timestamp gets
+  //   updated so the audit trail shows the regen happened.
+  async function handleRegenerateLockedPdf() {
+    if (!quote || regeneratingLocked) return
+    if (!isAdmin) {
+      setStatusError('Only admin can regenerate the locked PDF.')
+      return
+    }
+    if (!rendererRef.current) {
+      setStatusError('Renderer not ready — wait a moment and retry.')
+      return
+    }
+    if (!confirm(
+      'Regenerate the locked PDF for this proposal?\n\n' +
+      'This re-rasterizes the current letter render and overwrites the ' +
+      'stored snapshot. Use this only after fixing layout bugs (e.g. A4 ' +
+      'sizing, missing district list). The PDF content will reflect the ' +
+      "current quote data — if any line items have changed since the " +
+      "original send, those changes will appear in the regenerated PDF."
+    )) return
+
+    setRegeneratingLocked(true)
+    setStatusError('')
+    setStatusMsg('')
+    try {
+      const { path } = await generateLockedProposalPdf({
+        domNode: rendererRef.current,
+        quoteId: quote.id,
+      })
+      const { data, error } = await supabase
+        .from('quotes')
+        .update({
+          locked_proposal_pdf_url: path,
+          locked_proposal_pdf_at:  new Date().toISOString(),
+        })
+        .eq('id', quote.id)
+        .select()
+        .single()
+      if (error) throw error
+      setQuote(data)
+      setStatusMsg('Locked PDF regenerated. Old combined-PDF previews are now stale — re-download to see the new version.')
+      setTimeout(() => setStatusMsg(''), 5000)
+    } catch (e) {
+      setStatusError(`Could not regenerate locked PDF: ${e?.message || e}`)
+    } finally {
+      setRegeneratingLocked(false)
     }
   }
 
@@ -995,6 +1059,26 @@ export default function GovtProposalDetailV2() {
           >
             <Download size={12} /> View
           </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleRegenerateLockedPdf}
+              disabled={regeneratingLocked}
+              title="Regenerate the locked PDF — use after layout/template fixes"
+              style={{
+                background: 'transparent', border: '1px solid rgba(255,193,7,.4)',
+                color: '#ffc107', borderRadius: 6, padding: '4px 10px',
+                cursor: regeneratingLocked ? 'wait' : 'pointer',
+                fontSize: 12, fontWeight: 600,
+                display: 'inline-flex', gap: 6, alignItems: 'center',
+                opacity: regeneratingLocked ? 0.6 : 1,
+              }}
+            >
+              {regeneratingLocked
+                ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Regenerating…</>
+                : <>↻ Regenerate</>}
+            </button>
+          )}
         </div>
       )}
 

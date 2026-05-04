@@ -188,6 +188,53 @@ function renderAutoTable(data) {
   const rowGst   = toGujaratiDigits(formatINREnglish(gst)) + '/-'
   const rowTotal = toGujaratiDigits(formatINREnglish(total)) + '/-'
 
+  // Phase 11c — per-district allotment list.
+  //   The body template references "જિલ્લાવાર વિભાજન સાથે જોડેલ
+  //   યાદીમાં દર્શાવેલ છે" (district-wise breakdown shown in attached
+  //   list) but the renderer was never producing the list. Owner
+  //   confirmed (4 May 2026) the list belongs in the letter itself,
+  //   not as a separate attachment. Append it directly under the
+  //   rate table so the proposal is self-contained.
+  const items = Array.isArray(data.line_items) ? data.line_items : []
+  let districtTableHtml = ''
+  if (items.length > 0) {
+    const districtRows = items.map((it, i) => {
+      const districtName = it.description || it.city_name || it.district_name || `—`
+      const districtQty  = Number(it.quantity ?? it.auto_count ?? 0)
+      const pct = qty > 0 ? ((districtQty / qty) * 100) : 0
+      return `
+        <tr>
+          <td class="num">${toGujaratiDigits(String(i + 1))}</td>
+          <td>${districtName}</td>
+          <td class="num">${toGujaratiDigits(formatINREnglish(districtQty))}</td>
+          <td class="num">${toGujaratiDigits(pct.toFixed(1))}%</td>
+        </tr>`
+    }).join('')
+
+    districtTableHtml = `
+    <p style="margin-top:14px;color:#111;">
+      <strong>જિલ્લાવાર ઓટો રિક્ષા વિભાજન યાદી — ${toGujaratiDigits(String(items.length))} જિલ્લા:</strong>
+    </p>
+    <table class="govt-letter__table">
+      <thead>
+        <tr>
+          <th>ક્રમ</th>
+          <th>જિલ્લો</th>
+          <th class="num">ઓટો રિક્ષાની સંખ્યા</th>
+          <th class="num">હિસ્સો</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${districtRows}
+        <tr>
+          <td colspan="2"><strong>કુલ</strong></td>
+          <td class="num"><strong>${rowQty}</strong></td>
+          <td class="num"><strong>૧૦૦.૦%</strong></td>
+        </tr>
+      </tbody>
+    </table>`
+  }
+
   return `
   <table class="govt-letter__table">
     <thead>
@@ -206,7 +253,7 @@ function renderAutoTable(data) {
       <tr><td colspan="4">GST 18%</td><td class="num">${rowGst}</td></tr>
       <tr><td colspan="4"><strong>કુલ રકમ</strong></td><td class="num"><strong>${rowTotal}</strong></td></tr>
     </tbody>
-  </table>`
+  </table>${districtTableHtml}`
 }
 
 function renderGsrtcTable(data) {

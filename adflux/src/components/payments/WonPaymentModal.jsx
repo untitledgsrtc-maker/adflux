@@ -51,6 +51,21 @@ export function WonPaymentModal({
   const hasExistingPayment = Number(totalPaid) > 0
   const fullyPaid = hasExistingPayment && remainingBalance <= 0
 
+  // Compute an initial end date when start is known but end is blank.
+  // Uses the same duration-source priority as the on-change handler
+  // below: duration_months → gsrtc_campaign_months → 1 month default.
+  const initialStart = quote.campaign_start_date || today
+  function computeEndFromStart(startISO) {
+    const months =
+      Number(quote.duration_months) ||
+      Number(quote.gsrtc_campaign_months) ||
+      1
+    const d = new Date(startISO)
+    d.setMonth(d.getMonth() + months)
+    return d.toISOString().split('T')[0]
+  }
+  const initialEnd = quote.campaign_end_date || computeEndFromStart(initialStart)
+
   const [form, setForm] = useState({
     // Pre-fill with balance when there's already a partial payment — this
     // is the bug the user hit: modal showed empty field so they'd enter
@@ -65,17 +80,29 @@ export function WonPaymentModal({
     // If campaign dates were already set on a prior partial payment, carry
     // them over instead of resetting to today — no point making the user
     // re-enter dates they already confirmed.
-    campaign_start_date: quote.campaign_start_date || today,
-    campaign_end_date: quote.campaign_end_date || '',
+    campaign_start_date: initialStart,
+    campaign_end_date:   initialEnd,
   })
 
   function set(k, v) {
     const updated = { ...form, [k]: v }
-    // Auto-calculate end date if start changes and duration exists
-    if (k === 'campaign_start_date' && quote.duration_months) {
+    // Auto-calculate end date when start changes. Picks the duration
+    // hint from whichever field this quote actually has:
+    //   • duration_months         — private LED quotes
+    //   • gsrtc_campaign_months   — govt GSRTC LED quotes
+    //   • else                    — govt Auto Hood (default 1 month;
+    //                               owner can edit before submit)
+    // Without this, the rep had to type the end date manually for
+    // every govt quote — which was Owner's blocker on Mark Won
+    // (4 May 2026: "End date not auto-filling, can't mark Won").
+    if (k === 'campaign_start_date' && v) {
+      const months =
+        Number(quote.duration_months) ||
+        Number(quote.gsrtc_campaign_months) ||
+        1
       const start = new Date(v)
       const end = new Date(start)
-      end.setMonth(end.getMonth() + quote.duration_months)
+      end.setMonth(end.getMonth() + months)
       updated.campaign_end_date = end.toISOString().split('T')[0]
     }
     // Auto-tick "final payment" when the cumulative received covers the
