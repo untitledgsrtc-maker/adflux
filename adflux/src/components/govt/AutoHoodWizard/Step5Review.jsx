@@ -13,22 +13,36 @@ import { distributeAutoHoodQuantity } from '../../../utils/distributeQuantity'
 
 export function Step5Review({ data }) {
   const [template, setTemplate] = useState(null)
+  // Phase 11d (rev9) — also fetch the GOVERNMENT companies row so the
+  // wizard preview shows the same legal entity (Untitled Advertising)
+  // that the saved/printed PDF will use. Without this, the preview
+  // fell back to the renderer's hardcoded "અનટાઇટલ્ડ એડવર્ટાઇઝિંગ"
+  // even when the row had different data — confusing two-state UX.
+  const [company,  setCompany]  = useState(null)
   const { districts, rate } = useAutoMasters()
   const { signers } = useSigners()
 
   useEffect(() => {
     let cancel = false
-    supabase.from('proposal_templates')
-      .select('*')
-      .eq('segment',    'GOVERNMENT')
-      .eq('media_type', 'AUTO_HOOD')
-      .eq('language',   'gu')
-      .eq('is_active',  true)
-      .is('effective_to', null)
-      .maybeSingle()
-      .then(({ data: t }) => {
-        if (!cancel) setTemplate(t)
-      })
+    Promise.all([
+      supabase.from('proposal_templates')
+        .select('*')
+        .eq('segment',    'GOVERNMENT')
+        .eq('media_type', 'AUTO_HOOD')
+        .eq('language',   'gu')
+        .eq('is_active',  true)
+        .is('effective_to', null)
+        .maybeSingle(),
+      supabase.from('companies')
+        .select('*')
+        .eq('segment', 'GOVERNMENT')
+        .eq('is_active', true)
+        .maybeSingle(),
+    ]).then(([{ data: t }, { data: c }]) => {
+      if (cancel) return
+      setTemplate(t)
+      setCompany(c)
+    })
     return () => { cancel = true }
   }, [])
 
@@ -74,6 +88,7 @@ export function Step5Review({ data }) {
         data={rendered}
         signer={signer}
         mediaType="AUTO_HOOD"
+        company={company}
       />
 
       <div className="govt-summary">

@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Printer, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2,
+  ArrowLeft, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2,
   CreditCard, Upload, Download, FileText, Lock, Loader2, MessageCircle, Calendar,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'

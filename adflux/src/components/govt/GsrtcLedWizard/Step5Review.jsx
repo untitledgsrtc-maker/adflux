@@ -9,20 +9,34 @@ import { useGsrtcStations, useSigners } from '../../../hooks/useGovtMasters'
 
 export function Step5ReviewGsrtc({ data }) {
   const [template, setTemplate] = useState(null)
+  // Phase 11d (rev9) — fetch GOVERNMENT companies row so the wizard
+  // preview matches the saved/printed PDF (Untitled Advertising
+  // letterhead, GSTIN, bank, etc.).
+  const [company,  setCompany]  = useState(null)
   const { stations } = useGsrtcStations()
   const { signers } = useSigners()
 
   useEffect(() => {
     let cancel = false
-    supabase.from('proposal_templates')
-      .select('*')
-      .eq('segment',    'GOVERNMENT')
-      .eq('media_type', 'GSRTC_LED')
-      .eq('language',   'gu')
-      .eq('is_active',  true)
-      .is('effective_to', null)
-      .maybeSingle()
-      .then(({ data: t }) => { if (!cancel) setTemplate(t) })
+    Promise.all([
+      supabase.from('proposal_templates')
+        .select('*')
+        .eq('segment',    'GOVERNMENT')
+        .eq('media_type', 'GSRTC_LED')
+        .eq('language',   'gu')
+        .eq('is_active',  true)
+        .is('effective_to', null)
+        .maybeSingle(),
+      supabase.from('companies')
+        .select('*')
+        .eq('segment', 'GOVERNMENT')
+        .eq('is_active', true)
+        .maybeSingle(),
+    ]).then(([{ data: t }, { data: c }]) => {
+      if (cancel) return
+      setTemplate(t)
+      setCompany(c)
+    })
     return () => { cancel = true }
   }, [])
 
@@ -85,6 +99,7 @@ export function Step5ReviewGsrtc({ data }) {
         data={rendered}
         signer={signer}
         mediaType="GSRTC_LED"
+        company={company}
       />
 
       <div className="govt-summary">

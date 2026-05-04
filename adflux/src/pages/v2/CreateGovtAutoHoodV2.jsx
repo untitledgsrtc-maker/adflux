@@ -8,7 +8,7 @@
 // per-district line items into `quote_cities` with ref_kind='DISTRICT'.
 
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { GovtWizardShell } from '../../components/govt/GovtWizardShell'
 import { Step1Client, validateStep1 } from '../../components/govt/steps/Step1Client'
 import { Step2DateSigner, validateStep2 } from '../../components/govt/steps/Step2DateSigner'
@@ -33,17 +33,24 @@ const GST_PCT = 18
 
 export default function CreateGovtAutoHoodV2() {
   const navigate = useNavigate()
+  const location = useLocation()
   const profile  = useAuthStore(s => s.profile)
   const { districts, rate } = useAutoMasters()
+
+  // Phase 11d (rev9) — read prefill from location.state. Set by
+  // ClientsV2's "+" button → forwarded by CreateQuoteChooserV2. Owner
+  // reported "create quote via client not working": chooser was passing
+  // state but wizards were ignoring it, so Step 1 always loaded blank.
+  const prefill = location.state?.prefill || {}
 
   const [step,    setStep]    = useState(1)
   const [data,    setData]    = useState({
     // recipient
-    client_name: '',
-    client_company: '',
-    client_address: '',
-    client_phone: '',
-    client_email: '',
+    client_name:    prefill.client_name    || '',
+    client_company: prefill.client_company || '',
+    client_address: prefill.client_address || '',
+    client_phone:   prefill.client_phone   || '',
+    client_email:   prefill.client_email   || '',
     // date + signer
     proposal_date: new Date().toISOString().slice(0, 10),
     signer_user_id: null,
