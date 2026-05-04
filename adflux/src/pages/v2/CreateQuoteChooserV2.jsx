@@ -14,16 +14,28 @@
 // Space Grotesk display font) so the chooser looks native — no new
 // patterns introduced.
 
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Landmark, Tv, Building2, Lock, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function CreateQuoteChooserV2() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { segmentAccess } = useAuth()
 
   const govtAllowed    = segmentAccess === 'ALL' || segmentAccess === 'GOVERNMENT'
   const privateAllowed = segmentAccess === 'ALL' || segmentAccess === 'PRIVATE'
+
+  // Phase 11d (rev9) — forward prefill from ClientsV2 "+" button.
+  // Owner reported "create quote via client not working": the chooser
+  // was dropping location.state.prefill on every navigate, so clicking
+  // "+" on a Client and then picking a segment landed in an empty
+  // wizard. Now we pass the prefill through to whichever wizard the
+  // user picks, so client info auto-fills Step 1.
+  const incomingState = location.state || null
+  function go(path) {
+    navigate(path, incomingState ? { state: incomingState } : undefined)
+  }
 
   return (
     <div className="govt-chooser">
@@ -40,7 +52,7 @@ export default function CreateQuoteChooserV2() {
         {/* GOVERNMENT × AUTO HOOD */}
         <Tile
           allowed={govtAllowed}
-          onClick={() => navigate('/quotes/new/government/auto-hood')}
+          onClick={() => go('/quotes/new/government/auto-hood')}
           variant="govt"
           icon={<Landmark size={28} strokeWidth={1.6} />}
           label="Government — Auto Hood"
@@ -55,7 +67,7 @@ export default function CreateQuoteChooserV2() {
         {/* GOVERNMENT × GSRTC LED */}
         <Tile
           allowed={govtAllowed}
-          onClick={() => navigate('/quotes/new/government/gsrtc-led')}
+          onClick={() => go('/quotes/new/government/gsrtc-led')}
           variant="govt"
           icon={<Tv size={28} strokeWidth={1.6} />}
           label="Government — GSRTC LED"
@@ -70,7 +82,7 @@ export default function CreateQuoteChooserV2() {
         {/* PRIVATE × LED CITIES */}
         <Tile
           allowed={privateAllowed}
-          onClick={() => navigate('/quotes/new/private')}
+          onClick={() => go('/quotes/new/private')}
           variant="private"
           icon={<Building2 size={28} strokeWidth={1.6} />}
           label="Private — LED Cities"

@@ -999,16 +999,13 @@ export default function GovtProposalDetailV2() {
           >
             <MessageCircle size={14} /> WhatsApp
           </button>
+          {/* Phase 11d (rev9) — Print / Save PDF button removed.
+              Owner asked twice. Combined PDF (next button) is the
+              canonical download path; the browser-native window.print()
+              produced inconsistent output and confused the workflow. */}
           <button
             type="button"
             className="govt-wiz__btn govt-wiz__btn--primary"
-            onClick={() => window.print()}
-          >
-            <Printer size={14} /> Print / Save PDF
-          </button>
-          <button
-            type="button"
-            className="govt-wiz__btn"
             disabled={combinedPdfBusy}
             onClick={handleDownloadCombinedPdf}
             title="Merge proposal letter + all uploaded attachments into a single PDF"

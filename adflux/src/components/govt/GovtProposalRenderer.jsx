@@ -74,12 +74,20 @@ export function GovtProposalRenderer({
 
   const dateGu = formatDateGujarati(data.proposal_date || new Date())
 
-  /* Build the per-media rate table HTML inline (the seeded body_html
-     contains {{rate_table}} as a single-line placeholder so we can
-     swap it cleanly). */
-  const rateTableHtml = mediaType === 'AUTO_HOOD'
-    ? renderAutoTable(data)
-    : renderGsrtcTable(data)
+  /* Build the per-media rate table HTML.
+     Phase 11d (rev9) — GSRTC table moved to its own page (page 2),
+     mirroring the Auto Hood district list pattern. The rate table for
+     20 stations + GST + grand total is too tall to fit alongside the
+     cover letter body, and inline rendering caused mid-row page splits
+     (Bhachau showed half on page 1 / half on page 2). On page 1 we
+     keep just a one-line summary referencing the table on page 2.
+     For AUTO_HOOD the rate table stays inline (the 5-row package
+     summary fits comfortably with the body copy). */
+  const isGsrtc = mediaType === 'GSRTC_LED'
+  const rateTableHtml = isGsrtc
+    ? `<p style="margin:8px 0;color:#111;"><em>GSRTC માન્ય રેટ ટેબલ — વિગતવાર યાદી પાછળના પાને દર્શાવેલ છે.</em></p>`
+    : renderAutoTable(data)
+  const gsrtcStationPageHtml = isGsrtc ? renderGsrtcTable(data) : ''
 
   const signerHtml = renderSignerBlock(signer, company)
   // Phase 11d (rev7) — bidan list now driven by data.bidan_items if
@@ -181,12 +189,14 @@ export function GovtProposalRenderer({
             </span>
           </div>
         )}
+        {/* Phase 11d (rev9) — date removed from this header. The
+            સંદર્ભ ક્રમાંક block above already shows date on the right.
+            Owner reported "2 time date" — duplicate render. */}
         <div className="govt-letter__head">
           <div
             className="govt-letter__recipient"
             dangerouslySetInnerHTML={{ __html: recipientHtml }}
           />
-          <div className="govt-letter__date">{dateGu}</div>
         </div>
 
         <div
@@ -200,16 +210,27 @@ export function GovtProposalRenderer({
         />
       </div>
 
-      {/* Page 2+ — district allotment list (Auto Hood only).
+      {/* Page 2+ — extra detail page.
+          • AUTO_HOOD → district allotment list
+          • GSRTC_LED → station rate table
           Rendered with NO letterhead background — standard govt-letter
           convention is letterhead on page 1 only, plain on subsequent
           pages. Same zero-margin/border override so it doesn't create
-          a phantom page 3 in the rasterized output. */}
+          a phantom page 3 in the rasterized output. Phase 11d (rev9)
+          extends the page-2 pattern to GSRTC so the 20-station rate
+          table no longer splits mid-row across A4 boundaries. */}
       {districtListHtml && (
         <div
           className="govt-letter"
           style={pageBaseStyle}
           dangerouslySetInnerHTML={{ __html: districtListHtml }}
+        />
+      )}
+      {gsrtcStationPageHtml && (
+        <div
+          className="govt-letter"
+          style={pageBaseStyle}
+          dangerouslySetInnerHTML={{ __html: gsrtcStationPageHtml }}
         />
       )}
     </>
