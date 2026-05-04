@@ -27,18 +27,22 @@
 -- DESIGN:
 --   • Keep the existing "PO copy" and "Sample Work Order" rows (don't
 --     break old proposals).
---   • Add a new row "Awarded Work Order" with display_order 8 (after
---     OC copy at 7) for both AUTO_HOOD and GSRTC_LED.
+--   • Add a new row "Awarded Work Order (from this department)" with
+--     display_order = MAX(display_order) + 1 per media_type so we
+--     don't collide with whatever's already at the next slot.
 --   • Frontend gate change (handleWonModalPoUpload, findUploadedByLabel)
 --     ships in the same commit and matches "awarded work order" only.
 --
--- IDEMPOTENT.
+--   First version of this file hardcoded display_order = 8 and hit the
+--   unique constraint (segment, media_type, display_order). This rev
+--   computes the next free slot dynamically.
+--
+-- IDEMPOTENT — re-running has no effect once the row exists.
 -- =====================================================================
 
 
--- 1) Rename existing generic "Work Order" / "PO copy" rows to make
---    their proposal-phase role explicit. Only renames if the label is
---    still the default — a customised label is left alone.
+-- 1) Rename generic Work Order rows to make their proposal-phase
+--    role explicit. Only renames default labels; custom labels untouched.
 UPDATE public.attachment_templates
    SET label = 'Sample Work Order (reference)'
  WHERE segment = 'GOVERNMENT'
@@ -46,34 +50,59 @@ UPDATE public.attachment_templates
    AND is_active = true;
 
 
--- 2) Insert the "Awarded Work Order" row for both media types.
---    Required = true, so the checklist UI marks it red until uploaded.
---    Phase-11d frontend gate keys off the label substring "awarded
---    work order" (case-insensitive), which only matches this row.
+-- 2) Insert "Awarded Work Order" for AUTO_HOOD at the next free
+--    display_order. The HAVING clause guards against re-inserting on
+--    a second run; the SELECT inside the INSERT picks MAX+1 so we
+--    don't collide with whatever's already at the original target slot.
 INSERT INTO public.attachment_templates (
   segment, media_type, display_order, label, is_required, is_active
 )
-SELECT 'GOVERNMENT', mt, 8,
+SELECT 'GOVERNMENT',
+       'AUTO_HOOD',
+       COALESCE(MAX(display_order), 0) + 1,
        'Awarded Work Order (from this department)',
-       true, true
-  FROM (VALUES ('AUTO_HOOD'), ('GSRTC_LED')) AS m(mt)
- WHERE NOT EXISTS (
-   SELECT 1 FROM public.attachment_templates a
-    WHERE a.segment = 'GOVERNMENT'
-      AND a.media_type = m.mt
-      AND lower(a.label) LIKE '%awarded work order%'
-      AND a.is_active = true
- );
+       true,
+       true
+  FROM public.attachment_templates
+ WHERE segment = 'GOVERNMENT' AND media_type = 'AUTO_HOOD'
+HAVING NOT EXISTS (
+  SELECT 1 FROM public.attachment_templates a
+   WHERE a.segment = 'GOVERNMENT'
+     AND a.media_type = 'AUTO_HOOD'
+     AND lower(a.label) LIKE '%awarded work order%'
+     AND a.is_active = true
+);
+
+
+-- 3) Same for GSRTC_LED.
+INSERT INTO public.attachment_templates (
+  segment, media_type, display_order, label, is_required, is_active
+)
+SELECT 'GOVERNMENT',
+       'GSRTC_LED',
+       COALESCE(MAX(display_order), 0) + 1,
+       'Awarded Work Order (from this department)',
+       true,
+       true
+  FROM public.attachment_templates
+ WHERE segment = 'GOVERNMENT' AND media_type = 'GSRTC_LED'
+HAVING NOT EXISTS (
+  SELECT 1 FROM public.attachment_templates a
+   WHERE a.segment = 'GOVERNMENT'
+     AND a.media_type = 'GSRTC_LED'
+     AND lower(a.label) LIKE '%awarded work order%'
+     AND a.is_active = true
+);
 
 
 -- =====================================================================
 -- VERIFY:
+--
 --   SELECT segment, media_type, display_order, label, is_required
 --     FROM public.attachment_templates
 --    WHERE segment = 'GOVERNMENT' AND is_active = true
 --    ORDER BY media_type, display_order;
 --
---   Expected: each media_type has both
---     - "PO copy" / "Sample Work Order (reference)"     (existing)
---     - "Awarded Work Order (from this department)"     (new, required)
+--   Each media_type should now show an "Awarded Work Order (from this
+--   department)" row at the highest display_order, with is_required = true.
 -- =====================================================================
