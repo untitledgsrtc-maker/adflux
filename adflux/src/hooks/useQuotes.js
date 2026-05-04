@@ -160,6 +160,22 @@ export function useQuotes() {
   }
 
   const deleteQuote = async (id) => {
+    // Phase 11 — client-side guard mirrors the DB trigger
+    // (quotes_block_delete in supabase_phase11b_immutability.sql).
+    // The DB will reject any delete on non-draft quotes, but checking
+    // here gives us a clean error message without a round-trip and
+    // protects against showing a Delete button for a sent/won row.
+    const target = store.quotes?.find(q => q.id === id)
+    if (target && target.status !== 'draft') {
+      return {
+        error: {
+          message:
+            `Quote ${target.quote_number || id} is in status "${target.status}". ` +
+            'Only DRAFT quotes can be deleted. To remove from active pipeline, ' +
+            'mark it Lost instead.',
+        },
+      }
+    }
     const { error } = await supabase.from('quotes').delete().eq('id', id)
     if (!error) store.removeQuote(id)
     return { error }

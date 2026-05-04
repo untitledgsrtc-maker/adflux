@@ -422,27 +422,53 @@ function stationLabel(c) {
 
 // ── Document ─────────────────────────────────────────────────────────────────
 function QuoteDocument({ quote, cities, company }) {
-  // Phase 10 — company is the row from public.companies for this quote's
-  // segment. Falls back to the legacy hardcoded "Untitled Adflux" data
-  // when null so existing callers that haven't been updated still render
-  // identically. Once Phase 10 is fully rolled out, the fallback path
-  // becomes dead code we can remove.
-  const co = company || {
-    name:            'Untitled Adflux Private Limited',
-    short_name:      'Untitled Adflux Pvt. Ltd.',
-    email:           'hello@untitlead.in',
-    website:         'untitlead.in',
-    phone:           '9428273686',
-    bank_name:       null,
-    bank_branch:     null,
-    bank_acc_name:   'Untitled Adflux Private Limited',
-    bank_acc_number: null,
-    bank_ifsc:       null,
-    gstin:           null,
+  // Phase 11 — company is REQUIRED.
+  //   Previous code had a hardcoded "Untitled Adflux Pvt. Ltd." fallback
+  //   when company was null. That fallback was a money/legal bug: a
+  //   GOVERNMENT-segment quote rendered with the PRIVATE company's
+  //   name and a null GSTIN/bank, producing a PDF that is the wrong
+  //   legal entity for the contract and not a valid GST invoice.
+  //   Fail loudly instead — the caller (downloadQuotePDF / uploadQuotePDF)
+  //   must fetch the right companies row before calling render.
+  if (!company) {
+    throw new Error(
+      'QuotePDF: companies row is required. ' +
+      'fetchCompanyForQuote() must run before render. ' +
+      `Quote segment=${String(quote?.segment)}, no row found.`
+    )
   }
-  const subtotal    = Number(quote.subtotal)     || 0
-  const gstAmount   = Number(quote.gst_amount)   || 0
-  const totalAmount = Number(quote.total_amount) || 0
+  // Belt-and-suspenders: if the segments don't match, the caller passed
+  // the wrong company row (e.g. govt quote with private's row).
+  if (company.segment && quote?.segment && company.segment !== quote.segment) {
+    throw new Error(
+      `QuotePDF: segment mismatch — quote.segment=${quote.segment} but ` +
+      `company.segment=${company.segment}. Refusing to render a PDF that ` +
+      `would print the wrong legal entity.`
+    )
+  }
+  const co = company
+
+  // Phase 11 — refuse to render a zero/missing-amount invoice.
+  //   Previously these used `Number(...) || 0`, which silently rendered
+  //   ₹0 on the PDF when the quote had no subtotal computed yet. A rep
+  //   could send that PDF to a client and the client would think the
+  //   campaign is free. Treat zero subtotal as a render-blocking error.
+  const subtotal    = Number(quote.subtotal)
+  const gstAmount   = Number(quote.gst_amount)   || 0  // GST may legitimately be 0 (exempt)
+  const totalAmount = Number(quote.total_amount)
+  if (!Number.isFinite(subtotal) || subtotal <= 0) {
+    throw new Error(
+      'QuotePDF: subtotal must be > 0. ' +
+      `Got subtotal=${quote?.subtotal}. Refusing to render a ₹0 invoice — ` +
+      'fix the line items or rates before generating the PDF.'
+    )
+  }
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    throw new Error(
+      'QuotePDF: total_amount must be > 0. ' +
+      `Got total_amount=${quote?.total_amount}.`
+    )
+  }
   const screens     = totalScreens(cities)
   const spotsMonth  = totalSpotsPerMonth(cities)
   const impressions = totalImpressions(cities)

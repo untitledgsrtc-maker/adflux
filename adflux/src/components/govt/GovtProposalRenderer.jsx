@@ -45,6 +45,30 @@ export function GovtProposalRenderer({
     )
   }
 
+  // Phase 11 — guard against company / quote segment mismatch.
+  // A quote with segment=GOVERNMENT must render with the GOVERNMENT
+  // company row (Untitled Advertising). If somehow the wrong row is
+  // passed (e.g. cache bug, code refactor mistake), fail visibly here
+  // rather than producing a printed letter with the wrong legal
+  // entity's name and GSTIN. The renderer doesn't know the quote's
+  // segment directly, but the template carries it on its record so
+  // we can compare.
+  if (company && template.segment && company.segment && company.segment !== template.segment) {
+    return (
+      <div className="govt-letter" style={{ minHeight: 'auto' }}>
+        <strong style={{ color: '#b00020' }}>
+          Render blocked — segment mismatch.
+        </strong>
+        <p style={{ marginTop: 8 }}>
+          Template segment is <code>{template.segment}</code> but the company
+          row passed in is <code>{company.segment}</code>. Refusing to render
+          a proposal letter with the wrong legal entity. Reload the page; if
+          this persists, the companies table seed is corrupt.
+        </p>
+      </div>
+    )
+  }
+
   const recipientHtml = (data.recipient_block || '')
     .split('\n').map(l => l.trim()).filter(Boolean).join('<br/>')
 
