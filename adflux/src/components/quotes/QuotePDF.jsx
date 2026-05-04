@@ -421,7 +421,25 @@ function stationLabel(c) {
 }
 
 // ── Document ─────────────────────────────────────────────────────────────────
-function QuoteDocument({ quote, cities }) {
+function QuoteDocument({ quote, cities, company }) {
+  // Phase 10 — company is the row from public.companies for this quote's
+  // segment. Falls back to the legacy hardcoded "Untitled Adflux" data
+  // when null so existing callers that haven't been updated still render
+  // identically. Once Phase 10 is fully rolled out, the fallback path
+  // becomes dead code we can remove.
+  const co = company || {
+    name:            'Untitled Adflux Private Limited',
+    short_name:      'Untitled Adflux Pvt. Ltd.',
+    email:           'hello@untitlead.in',
+    website:         'untitlead.in',
+    phone:           '9428273686',
+    bank_name:       null,
+    bank_branch:     null,
+    bank_acc_name:   'Untitled Adflux Private Limited',
+    bank_acc_number: null,
+    bank_ifsc:       null,
+    gstin:           null,
+  }
   const subtotal    = Number(quote.subtotal)     || 0
   const gstAmount   = Number(quote.gst_amount)   || 0
   const totalAmount = Number(quote.total_amount) || 0
@@ -448,7 +466,7 @@ function QuoteDocument({ quote, cities }) {
     'Campaign slot confirmation subject to availability at time of booking.',
     'Cancellation post-confirmation: 25% cancellation fee applicable on total invoice.',
     'Content violating law, GSRTC regulations, or community standards may be rejected without refund.',
-    'Payments via NEFT/RTGS/Cheque in favour of Untitled Adflux Private Limited.',
+    `Payments via NEFT/RTGS/Cheque in favour of ${co.bank_acc_name || co.name}.${co.bank_name ? ` ${co.bank_name}` : ''}${co.bank_branch ? ` (${co.bank_branch} branch)` : ''}${co.bank_acc_number ? `. A/c No. ${co.bank_acc_number}` : ''}${co.bank_ifsc ? ` · IFSC ${co.bank_ifsc}` : ''}${co.gstin ? `. GSTIN: ${co.gstin}` : ''}.`,
   ]
 
   return (
@@ -468,8 +486,8 @@ function QuoteDocument({ quote, cities }) {
             </View>
           </View>
           <View style={S.headerRight}>
-            <Text style={S.headerWebsite}>untitlead.in</Text>
-            <Text style={S.headerEmail}>hello@untitlead.in</Text>
+            <Text style={S.headerWebsite}>{co.website || 'untitlead.in'}</Text>
+            <Text style={S.headerEmail}>{co.email || 'hello@untitlead.in'}</Text>
           </View>
         </View>
 
@@ -745,7 +763,7 @@ function QuoteDocument({ quote, cities }) {
           <View style={S.sigRow}>
             <View style={S.sigBlock}>
               <View style={S.sigLine} />
-              <Text style={S.sigLabel}>For Untitled Adflux Pvt. Ltd.</Text>
+              <Text style={S.sigLabel}>For {co.short_name || co.name}</Text>
               <Text style={[S.sigLabel, { marginTop: 1 }]}>Authorised Signatory &amp; Stamp</Text>
             </View>
             <View style={S.sigBlock}>
@@ -767,7 +785,7 @@ function QuoteDocument({ quote, cities }) {
           </Text>
         </View>
         <View style={S.footerBottomBand}>
-          <Text style={S.footerBottomText}>untitlead.in | hello@untitlead.in</Text>
+          <Text style={S.footerBottomText}>{co.website || 'untitlead.in'} | {co.email || 'hello@untitlead.in'}</Text>
           <Text style={S.footerBottomText}>GSRTC LED Screen Network — Gujarat</Text>
           <Text style={S.footerBottomHighlight}>
             {NETWORK.totalScreens} Screens · {NETWORK.cities} Cities · {NETWORK.monthlyImpressions} Monthly · {NETWORK.uniquePerDay} Unique/Day
@@ -876,9 +894,27 @@ async function enrichCitiesWithPhotos(cities) {
   return resolved
 }
 
+// Phase 10 — fetch the companies row for this quote's segment so the
+// PDF renders with the right legal entity (Govt → Untitled Advertising,
+// Private → Untitled Adflux Pvt Ltd). Single helper used by both
+// download and upload paths.
+async function fetchCompanyForQuote(quote) {
+  const seg = quote?.segment === 'GOVERNMENT' ? 'GOVERNMENT' : 'PRIVATE'
+  const { data } = await supabase
+    .from('companies')
+    .select('*')
+    .eq('segment', seg)
+    .eq('is_active', true)
+    .maybeSingle()
+  return data || null
+}
+
 export async function downloadQuotePDF(quote, cities = []) {
-  const enriched = await enrichCitiesWithPhotos(cities)
-  const blob = await pdf(<QuoteDocument quote={quote} cities={enriched} />).toBlob()
+  const [enriched, company] = await Promise.all([
+    enrichCitiesWithPhotos(cities),
+    fetchCompanyForQuote(quote),
+  ])
+  const blob = await pdf(<QuoteDocument quote={quote} cities={enriched} company={company} />).toBlob()
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
@@ -908,8 +944,11 @@ export async function downloadQuotePDF(quote, cities = []) {
  * @returns {Promise<string>} public URL to the uploaded PDF
  */
 export async function uploadQuotePDF(quote, cities = []) {
-  const enriched = await enrichCitiesWithPhotos(cities)
-  const blob = await pdf(<QuoteDocument quote={quote} cities={enriched} />).toBlob()
+  const [enriched, company] = await Promise.all([
+    enrichCitiesWithPhotos(cities),
+    fetchCompanyForQuote(quote),
+  ])
+  const blob = await pdf(<QuoteDocument quote={quote} cities={enriched} company={company} />).toBlob()
   const ts   = Date.now()
   const safeNumber = (quote.quote_number || 'quote').replace(/[^A-Za-z0-9_-]/g, '_')
   const path = `${safeNumber}/${ts}.pdf`

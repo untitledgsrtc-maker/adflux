@@ -51,6 +51,7 @@ export default function GovtProposalDetailV2() {
   const [items,    setItems]    = useState([])
   const [template, setTemplate] = useState(null)
   const [signer,   setSigner]   = useState(null)
+  const [company,  setCompany]  = useState(null)  // Phase 10 — companies row
   const [loading,  setLoading]  = useState(true)
   const [savingStatus, setSavingStatus] = useState(null)
   const [statusMsg,    setStatusMsg]    = useState('')
@@ -117,8 +118,8 @@ export default function GovtProposalDetailV2() {
       }
       setQuote(q)
 
-      // Line items, template, signer, attachment template in parallel
-      const [li, tpl, sg, atpl] = await Promise.all([
+      // Line items, template, signer, attachment template, company in parallel
+      const [li, tpl, sg, atpl, co] = await Promise.all([
         supabase.from('quote_cities')
           .select('*').eq('quote_id', id),
         supabase.from('proposal_templates')
@@ -141,12 +142,22 @@ export default function GovtProposalDetailV2() {
           .eq('media_type', q.media_type)
           .eq('is_active', true)
           .order('display_order'),
+        // Phase 10 — fetch the GOVERNMENT company row so the renderer
+        // can use its name_gu / GSTIN / etc. instead of the hardcoded
+        // string. maybeSingle() so a missing companies row falls back
+        // gracefully (renderer treats null company as legacy mode).
+        supabase.from('companies')
+          .select('*')
+          .eq('segment', 'GOVERNMENT')
+          .eq('is_active', true)
+          .maybeSingle(),
       ])
       if (cancel) return
       setItems(li.data || [])
       setTemplate(tpl.data || null)
       setSigner(sg.data || null)
       setAttachmentTpl(atpl.data || [])
+      setCompany(co.data || null)
       setLoading(false)
     }
     load()
@@ -835,6 +846,7 @@ export default function GovtProposalDetailV2() {
           data={renderedData}
           signer={effectiveSigner}
           mediaType={quote.media_type}
+          company={company}
         />
       </div>
 

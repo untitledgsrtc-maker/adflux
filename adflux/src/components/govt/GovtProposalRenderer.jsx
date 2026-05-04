@@ -32,6 +32,10 @@ export function GovtProposalRenderer({
   data,
   signer,
   mediaType,
+  company,    // Phase 10 — companies row for this segment. When null,
+              // falls back to the previously hardcoded "અનટાઇટલ્ડ
+              // એડવર્ટાઇઝિંગ" so existing rendered proposals still
+              // look correct if the table isn't seeded yet.
 }) {
   if (!template) {
     return (
@@ -53,7 +57,7 @@ export function GovtProposalRenderer({
     ? renderAutoTable(data)
     : renderGsrtcTable(data)
 
-  const signerHtml = renderSignerBlock(signer)
+  const signerHtml = renderSignerBlock(signer, company)
 
   const vars = {
     recipient:        recipientHtml,
@@ -94,11 +98,17 @@ export function GovtProposalRenderer({
 
 /* ── helpers ────────────────────────────────────────────────────── */
 
-function renderSignerBlock(signer) {
+function renderSignerBlock(signer, company) {
   if (!signer) return ''
   const name   = signer.name || ''
   const title  = signer.signature_title || ''
   const mobile = signer.signature_mobile ? `મો. ${signer.signature_mobile}` : ''
+  // Phase 10 — pull the company line from companies table when
+  // available; fall back to the legacy hardcoded Gujarati name so the
+  // rendered output is identical if the companies table isn't seeded
+  // yet (graceful degrade for environments where the migration hasn't
+  // landed).
+  const companyLine = (company?.name_gu || company?.short_name || company?.name || 'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ')
   // Right-aligned per standard Indian government letter format
   // (owner spec, 1 May 2026). Inline style ensures the alignment
   // also applies in the rasterized PDF where the .govt-letter__signer
@@ -107,7 +117,7 @@ function renderSignerBlock(signer) {
     '<div class="govt-letter__signer" style="text-align:right;">',
       'આપનો વિશ્વાસુ,<br/>',
       `${name}${title ? ` (${title})` : ''}<br/>`,
-      'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ',
+      companyLine,
     mobile ? `<br/>${mobile}` : '',
     '</div>',
   ].join('')
