@@ -238,13 +238,20 @@ export default function GovtProposalDetailV2() {
         allocated_qty: Number(it.qty) || 0,
       }
     })
-    // Bidan items — dynamic from the checklist. Phase 11d (rev7):
+    // Bidan items — dynamic from the checklist. Phase 11d (rev7+8):
     // owner spec "ticked document should listed in attachment". Replace
     // the hardcoded list with rows that have either checked=true OR a
     // file_url set, so the rendered બિડાણ section reflects what's
     // actually attached to THIS proposal.
-    const bidanItems = (checklist || [])
-      .filter(c => c.checked || (c.file_url && String(c.file_url).trim() !== ''))
+    //
+    // CRITICAL — read from quote.attachments_checklist DIRECTLY rather
+    // than the `checklist` useMemo above. Reason: that useMemo is
+    // declared AFTER this one (line 635), and reading it here triggers
+    // a ReferenceError (TDZ on `const`) — every proposal detail page
+    // crashed with a blank screen until this was fixed.
+    const rawChecklist = Array.isArray(quote.attachments_checklist) ? quote.attachments_checklist : []
+    const bidanItems = rawChecklist
+      .filter(c => c && (c.checked || (c.file_url && String(c.file_url).trim() !== '')))
       .map(c => c.label)
       .filter(Boolean)
 
@@ -264,7 +271,9 @@ export default function GovtProposalDetailV2() {
       line_items:             lineItems,
       bidan_items:            bidanItems,
     }
-  }, [quote, items, checklist])
+    // Reading quote.attachments_checklist directly (not the
+    // `checklist` useMemo defined further down — TDZ would crash).
+  }, [quote, items])
 
   // Helper used by both changeStatus and handleWonWithPayment to
   // confirm a specific labelled attachment has actually been uploaded
@@ -462,18 +471,21 @@ export default function GovtProposalDetailV2() {
     }
   }
 
-  // Phase 11 — modal-side Work Order / PO upload helper. Mirrors the
-  // OC version above so the two pre-flight gates have identical UX.
-  // Matches both "po copy" and "work order" labels case-insensitively
-  // since the seeded attachment_templates have used both wordings
-  // across versions.
+  // Phase 11e — modal-side AWARDED Work Order upload helper.
+  //   Targets the "Awarded Work Order" template row specifically (NOT
+  //   the proposal-phase "Sample Work Order" or generic "PO copy").
+  //   Owner spec: the awarded WO is the formal document issued by THIS
+  //   department for THIS proposal — it's what proves the deal closed.
   async function handleWonModalPoUpload(file) {
     if (!file || !quote) return
     const idx = checklist.findIndex(c =>
-      /(po copy|work order)/i.test(c.label || '')
+      /awarded work order/i.test(c.label || '')
     )
     if (idx < 0) {
-      setStatusError('Work Order / PO copy template row not found — refresh the page and retry.')
+      setStatusError(
+        'Awarded Work Order template row not found in checklist. ' +
+        'Run supabase_phase11e_awarded_wo_attachment.sql in Studio, then refresh.'
+      )
       return
     }
     setWonModalUploadingPo(true)
@@ -490,18 +502,19 @@ export default function GovtProposalDetailV2() {
   //   • Sales no payment  → quote flips to Won (no incentive until cash)
   //   • Admin             → flip + payment all in one
   async function handleWonWithPayment(paymentData) {
-    // Mark Won gate (Phase 8 + 11): PO copy / Work Order MUST be
-    // uploaded. The modal's banner blocks the Confirm click in the
-    // happy path, but we keep this server-adjacent check as belt-and-
-    // suspenders — covers a multi-tab race where the rep deletes the
-    // attachment between modal-open and Confirm. Match either label
-    // wording since attachment_templates seeds have used both.
+    // Mark Won gate (Phase 8 + 11 + 11e): the AWARDED Work Order must
+    // be uploaded — specifically the WO issued by THIS department for
+    // THIS proposal. A "Sample Work Order (reference)" attached during
+    // the proposal phase is NOT enough — that's just an example from
+    // another department. Match the label "awarded work order"
+    // exactly so we don't accept the sample by accident.
     if (quote?.segment === 'GOVERNMENT') {
-      const po = findUploadedByLabel('po copy') || findUploadedByLabel('work order')
-      if (!po) {
+      const awarded = findUploadedByLabel('awarded work order')
+      if (!awarded) {
         setShowWonModal(false)
         setStatusError(
-          'Cannot mark Won — please upload the PO copy / Work Order from the government body in the Attachments section first.'
+          'Cannot mark Won — upload the Awarded Work Order issued by this department for this proposal. ' +
+          '(A "Sample Work Order" attached at proposal phase does not count.)'
         )
         return
       }
@@ -1537,7 +1550,7 @@ export default function GovtProposalDetailV2() {
           onConfirm={handleWonWithPayment}
           onClose={() => setShowWonModal(false)}
           workOrderRequired={quote?.segment === 'GOVERNMENT'}
-          workOrderUploaded={!!findUploadedByLabel('po copy') || !!findUploadedByLabel('work order')}
+          workOrderUploaded={!!findUploadedByLabel('awarded work order')}
           onUploadWorkOrder={handleWonModalPoUpload}
           uploadingWorkOrder={wonModalUploadingPo}
         />
