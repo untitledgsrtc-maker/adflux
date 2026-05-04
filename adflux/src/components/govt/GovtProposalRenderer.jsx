@@ -89,13 +89,19 @@ export function GovtProposalRenderer({
     : renderAutoTable(data)
   const gsrtcStationPageHtml = isGsrtc ? renderGsrtcTable(data) : ''
 
-  // Phase 11d (rev12) — when letterhead is ON, the printed footer of
-  // the letterhead PNG already shows the company name + phone +
-  // address. Repeating those in the signer block creates duplicate
-  // ink and crowds the bottom of the page. Pass the flag through so
-  // renderSignerBlock can omit the company line + mobile when
-  // letterhead is on.
+  // Phase 11d (rev12) — compute letterhead URL FIRST so the signer
+  // block (and other downstream code) can branch on whether
+  // letterhead is on. Previously this was declared lower in the
+  // function and reading it from the signer block hit a TDZ
+  // ReferenceError → blank-screen crash on the proposal page.
+  const letterhead = (data.use_letterhead === false)
+    ? ''
+    : (company?.letterhead_url || '')
   const letterheadOn = !!letterhead
+
+  // When letterhead is ON, the printed footer of the letterhead PNG
+  // already shows company name + phone + address. Slim signer block
+  // mode skips the duplicate company line + mobile.
   const signerHtml = renderSignerBlock(signer, company, letterheadOn)
   // Phase 11d (rev7) — bidan list now driven by data.bidan_items if
   // provided (computed from the checklist by GovtProposalDetailV2).
@@ -142,16 +148,8 @@ export function GovtProposalRenderer({
   //     · private.png    — empty zone is 8.9% – 93.5%  (top ~100px, bottom ~73px @ 1123px)
   //   Using 130px top + 130px bottom gives a small visual safety margin
   //   so a slightly long letter doesn't kiss the printed footer.
-  // Phase 11d (rev10) — letterhead is optional per-print. The owner
-  // wanted a toggle so they can print:
-  //   • WITH letterhead   → for direct submission to the dept
-  //   • WITHOUT letterhead → for printing on company letterhead paper
-  // GovtProposalDetailV2 sets data.use_letterhead based on a checkbox
-  // in the header. Default true (preserves prior behavior). When false
-  // we skip the background image so the rendered letter is plain.
-  const letterhead = (data.use_letterhead === false)
-    ? ''
-    : (company?.letterhead_url || '')
+  // letterhead variable is declared higher up (right after the rate
+  // table block) so the signer renderer can read it without TDZ.
   const letterStyle = letterhead
     ? {
         backgroundImage:    `url(${letterhead})`,
