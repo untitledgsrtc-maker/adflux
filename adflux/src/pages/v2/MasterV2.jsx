@@ -933,12 +933,27 @@ function DocumentsTab() {
   const [saving, setSaving] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [statusError, setStatusError] = useState('')
+  // "+ New template" form state. When showNew is true we render
+  // the new-template editor at the top instead of the per-row Edit
+  // modal. Reuses the same editBuf shape so the editor JSX is shared.
+  const [showNew, setShowNew] = useState(false)
+  const [newSegment, setNewSegment] = useState('GOVERNMENT')
+  const [newMedia, setNewMedia] = useState('AUTO_HOOD')
+  const [newLanguage, setNewLanguage] = useState('gu')
+  const [newSubject, setNewSubject] = useState('')
+  const [newBody, setNewBody] = useState('')
+  const [newHeader, setNewHeader] = useState('')
+  const [newFooter, setNewFooter] = useState('')
 
   const load = async () => {
     setLoading(true)
+    // Schema-tolerant: select only columns that definitely exist on
+    // proposal_templates plus the Phase 8D additions (version,
+    // header_html, footer_html). subject_line is required NOT NULL,
+    // so it always exists.
     const { data, error } = await supabase
       .from('proposal_templates')
-      .select('id, segment, media_type, language, version, is_active, effective_from, effective_to, header_html, body_html, footer_html, created_at')
+      .select('id, segment, media_type, language, subject_line, version, is_active, effective_from, effective_to, header_html, body_html, footer_html, notes, created_at, updated_at')
       .order('segment').order('media_type').order('version', { ascending: false })
     if (error) setStatusError(error.message)
     else setTpls(data || [])
@@ -947,6 +962,7 @@ function DocumentsTab() {
   useEffect(() => { load() }, [])
 
   function startEdit(t) {
+    setShowNew(false)
     setEditingId(t.id)
     setEditBuf({
       id:           t.id,
@@ -954,15 +970,84 @@ function DocumentsTab() {
       media_type:   t.media_type,
       language:     t.language,
       version:      t.version,
-      header_html:  t.header_html || '',
-      body_html:    t.body_html   || '',
-      footer_html:  t.footer_html || '',
+      subject_line: t.subject_line || '',
+      header_html:  t.header_html  || '',
+      body_html:    t.body_html    || '',
+      footer_html:  t.footer_html  || '',
     })
   }
 
   function cancelEdit() {
     setEditingId(null)
     setEditBuf(null)
+    setShowNew(false)
+  }
+
+  function startNew() {
+    cancelEdit()
+    setShowNew(true)
+    setNewSegment('GOVERNMENT')
+    setNewMedia('AUTO_HOOD')
+    setNewLanguage('gu')
+    setNewSubject('')
+    setNewBody('')
+    setNewHeader('')
+    setNewFooter('')
+  }
+
+  async function createNewTemplate() {
+    if (!newSubject.trim() || !newBody.trim()) {
+      setStatusError('Subject + body are required.')
+      return
+    }
+    setSaving(true)
+    setStatusError('')
+    // New templates start as DRAFT (is_active=false). Admin clicks
+    // Activate to make them live. Same safety as edits.
+    const { error } = await supabase
+      .from('proposal_templates')
+      .insert([{
+        segment:      newSegment,
+        media_type:   newMedia,
+        language:     newLanguage,
+        subject_line: newSubject.trim(),
+        version:      1,
+        is_active:    false,
+        header_html:  newHeader || null,
+        body_html:    newBody,
+        footer_html:  newFooter || null,
+      }])
+    setSaving(false)
+    if (error) {
+      setStatusError(`Could not create: ${error.message}`)
+      return
+    }
+    setStatusMsg(`New template created as draft. Click Activate to make it live.`)
+    setTimeout(() => setStatusMsg(''), 4000)
+    setShowNew(false)
+    load()
+  }
+
+  async function deleteDraft(t) {
+    if (t.is_active) {
+      setStatusError('Cannot delete an active template. Activate a different version first.')
+      return
+    }
+    if (!window.confirm(`Delete v${t.version} of ${t.segment} — ${t.media_type} (${t.language})? This cannot be undone.`)) return
+    setSaving(true)
+    setStatusError('')
+    const { error } = await supabase
+      .from('proposal_templates')
+      .delete()
+      .eq('id', t.id)
+    setSaving(false)
+    if (error) {
+      setStatusError(`Could not delete: ${error.message}`)
+      return
+    }
+    setStatusMsg('Draft deleted.')
+    setTimeout(() => setStatusMsg(''), 2000)
+    load()
   }
 
   async function saveAsDraft() {
@@ -987,10 +1072,11 @@ function DocumentsTab() {
         segment:      editBuf.segment,
         media_type:   editBuf.media_type,
         language:     editBuf.language,
+        subject_line: editBuf.subject_line || 'Untitled subject',
         version:      nextVersion,
         is_active:    false,
         header_html:  editBuf.header_html || null,
-        body_html:    editBuf.body_html   || null,
+        body_html:    editBuf.body_html   || '',
         footer_html:  editBuf.footer_html || null,
       }])
     setSaving(false)
@@ -1061,6 +1147,106 @@ function DocumentsTab() {
         <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
       )}
 
+      {/* Add-new toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={startNew}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', borderRadius: 6,
+            border: '1px solid var(--surface-3)',
+            background: 'var(--surface-2)',
+            color: 'var(--text)', fontSize: 12, fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <Plus size={12} /> New template
+        </button>
+      </div>
+
+      {/* New template form — appears at top when active */}
+      {showNew && (
+        <div style={{
+          marginBottom: 22, padding: 16, borderRadius: 10,
+          border: '1px solid #facc15',
+          background: 'rgba(250,204,21,.04)',
+        }}>
+          <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14, marginBottom: 12 }}>
+            New template
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <select value={newSegment} onChange={e => setNewSegment(e.target.value)} className="govt-input-cell">
+              <option value="GOVERNMENT">Government</option>
+              <option value="PRIVATE">Private</option>
+            </select>
+            <input
+              type="text"
+              value={newMedia}
+              onChange={e => setNewMedia(e.target.value.toUpperCase())}
+              placeholder="Media type (e.g. AUTO_HOOD)"
+              className="govt-input-cell"
+            />
+            <select value={newLanguage} onChange={e => setNewLanguage(e.target.value)} className="govt-input-cell">
+              <option value="gu">Gujarati (gu)</option>
+              <option value="en">English (en)</option>
+            </select>
+          </div>
+          <input
+            type="text"
+            value={newSubject}
+            onChange={e => setNewSubject(e.target.value)}
+            placeholder="Subject line (required)"
+            className="govt-input-cell"
+            style={{ width: '100%', marginBottom: 10 }}
+          />
+          <textarea
+            value={newHeader}
+            onChange={e => setNewHeader(e.target.value)}
+            placeholder="Header HTML (optional)"
+            className="govt-input-cell"
+            style={{ width: '100%', minHeight: 50, fontFamily: 'monospace', fontSize: 12, marginBottom: 10 }}
+          />
+          <textarea
+            value={newBody}
+            onChange={e => setNewBody(e.target.value)}
+            placeholder="Body HTML (required)"
+            className="govt-input-cell"
+            style={{ width: '100%', minHeight: 180, fontFamily: 'monospace', fontSize: 12, marginBottom: 10 }}
+          />
+          <textarea
+            value={newFooter}
+            onChange={e => setNewFooter(e.target.value)}
+            placeholder="Footer HTML (optional)"
+            className="govt-input-cell"
+            style={{ width: '100%', minHeight: 50, fontFamily: 'monospace', fontSize: 12, marginBottom: 10 }}
+          />
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              style={{
+                padding: '8px 14px', borderRadius: 6,
+                border: '1px solid var(--surface-3)',
+                background: 'transparent', color: 'var(--text-muted)',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >Cancel</button>
+            <button
+              type="button"
+              onClick={createNewTemplate}
+              disabled={saving}
+              style={{
+                padding: '8px 14px', borderRadius: 6, border: 'none',
+                background: '#facc15', color: '#0a0e1a',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                opacity: saving ? 0.6 : 1,
+              }}
+            >{saving ? 'Creating…' : 'Create as draft'}</button>
+          </div>
+        </div>
+      )}
+
       {Object.entries(grouped).map(([key, versions]) => {
         const [segment, media_type, language] = key.split('|')
         return (
@@ -1128,6 +1314,22 @@ function DocumentsTab() {
                     >
                       View / Edit
                     </button>
+                    {!t.is_active && (
+                      <button
+                        type="button"
+                        onClick={() => deleteDraft(t)}
+                        disabled={saving}
+                        title="Delete this draft"
+                        style={{
+                          padding: '4px 8px', borderRadius: 6,
+                          border: '1px solid rgba(248,113,113,.4)',
+                          background: 'transparent', color: '#f87171',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </span>
                 </div>
               ))}
@@ -1165,6 +1367,16 @@ function DocumentsTab() {
               already exist are NEVER changed (snapshots).
             </div>
             <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Subject line</label>
+                <input
+                  type="text"
+                  value={editBuf.subject_line}
+                  onChange={e => setEditBuf({ ...editBuf, subject_line: e.target.value })}
+                  className="govt-input-cell"
+                  style={{ width: '100%' }}
+                />
+              </div>
               <div>
                 <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Header HTML (optional)</label>
                 <textarea
