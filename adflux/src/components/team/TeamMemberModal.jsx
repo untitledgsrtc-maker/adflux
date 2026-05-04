@@ -56,7 +56,15 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     if (mode === 'add') {
       if (!form.password) errs.password = 'Password is required'
       else if (form.password.length < 6) errs.password = 'Minimum 6 characters'
-      if (!form.monthly_salary) errs.monthly_salary = 'Salary is required'
+      // Phase 11g (rev) — owner spec: agency members can have 0
+      // salary (commission-only). Accept "0" as a valid salary; only
+      // empty / negative is invalid. For SALES role we still warn the
+      // admin on empty since 0-salary sales is unusual but allow it.
+      if (form.monthly_salary === '' || form.monthly_salary === null) {
+        errs.monthly_salary = 'Salary is required (enter 0 for commission-only)'
+      } else if (Number(form.monthly_salary) < 0 || Number.isNaN(Number(form.monthly_salary))) {
+        errs.monthly_salary = 'Enter 0 or a positive number'
+      }
     }
     return errs
   }

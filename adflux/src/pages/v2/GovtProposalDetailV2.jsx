@@ -1139,35 +1139,58 @@ export default function GovtProposalDetailV2() {
           OFF → plain white page (for printing on pre-printed letterhead
                 paper, or sharing where the recipient prefers no
                 letterhead). Choice persists per-quote in localStorage. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        margin: '12px 0', fontSize: 13,
-      }}>
-        <label style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          cursor: 'pointer', userSelect: 'none',
-          padding: '6px 12px',
-          borderRadius: 8,
-          border: '1px solid var(--surface-3)',
-          background: useLetterhead ? 'rgba(76,175,80,.08)' : 'var(--surface-2)',
-          color: useLetterhead ? '#81c784' : 'var(--text-muted)',
-        }}>
-          <input
-            type="checkbox"
-            checked={useLetterhead}
-            onChange={e => toggleLetterhead(e.target.checked)}
-            style={{ accentColor: '#facc15', cursor: 'pointer' }}
-          />
-          <span style={{ fontWeight: 600 }}>
-            {useLetterhead ? '✓ With letterhead' : 'Without letterhead'}
-          </span>
-        </label>
-        <span style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
-          {useLetterhead
-            ? 'Page 1 prints with the company letterhead background.'
-            : 'Plain page — print on pre-printed letterhead paper.'}
-        </span>
-      </div>
+      {/* Phase 11d (rev11) — show the toggle PLUS explain when it
+          can't do anything (company has no letterhead_url uploaded).
+          Without this guard the toggle looked broken to users — both
+          states rendered plain because there was no URL to apply. */}
+      {(() => {
+        const hasLetterhead = !!(company?.letterhead_url && String(company.letterhead_url).trim() !== '')
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            margin: '12px 0', fontSize: 13, flexWrap: 'wrap',
+          }}>
+            <label style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              cursor: hasLetterhead ? 'pointer' : 'not-allowed',
+              userSelect: 'none',
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: '1px solid var(--surface-3)',
+              background: !hasLetterhead
+                ? 'var(--surface-2)'
+                : useLetterhead ? 'rgba(76,175,80,.08)' : 'var(--surface-2)',
+              color: !hasLetterhead
+                ? 'var(--text-subtle)'
+                : useLetterhead ? '#81c784' : 'var(--text-muted)',
+              opacity: hasLetterhead ? 1 : 0.6,
+            }}>
+              <input
+                type="checkbox"
+                checked={hasLetterhead && useLetterhead}
+                disabled={!hasLetterhead}
+                onChange={e => toggleLetterhead(e.target.checked)}
+                style={{
+                  accentColor: '#facc15',
+                  cursor: hasLetterhead ? 'pointer' : 'not-allowed',
+                }}
+              />
+              <span style={{ fontWeight: 600 }}>
+                {!hasLetterhead
+                  ? 'Letterhead unavailable'
+                  : useLetterhead ? '✓ With letterhead' : 'Without letterhead'}
+              </span>
+            </label>
+            <span style={{ fontSize: 11, color: 'var(--text-subtle)', flex: '1 1 auto', minWidth: 200 }}>
+              {!hasLetterhead
+                ? <>No letterhead uploaded for this segment. Go to <strong>Master → Companies</strong> and upload one to enable this toggle.</>
+                : useLetterhead
+                  ? 'Page 1 prints with the company letterhead background.'
+                  : 'Plain page — print on pre-printed letterhead paper.'}
+            </span>
+          </div>
+        )
+      })()}
 
       {signer && (
         <div style={{

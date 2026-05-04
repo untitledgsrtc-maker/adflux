@@ -28,11 +28,23 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
   }
 
   function validate() {
+    // Phase 11g (rev) — owner spec (4 May 2026): "agency can be with
+    // 0 salary and 0 multiplier". Agency members are partner-channel
+    // and may not draw a fixed salary or hit a sales-multiplier
+    // target — they earn purely on per-deal commission. Relaxed the
+    // rules from "> 0" to ">= 0" so 0 is a valid entry. Negative
+    // numbers still rejected.
     const errs = {}
-    if (!form.monthly_salary || Number(form.monthly_salary) <= 0)
-      errs.monthly_salary = 'Enter a valid salary'
-    if (!form.sales_multiplier || Number(form.sales_multiplier) <= 0)
-      errs.sales_multiplier = 'Required'
+    const salary     = form.monthly_salary === '' || form.monthly_salary === null
+      ? null
+      : Number(form.monthly_salary)
+    const multiplier = form.sales_multiplier === '' || form.sales_multiplier === null
+      ? null
+      : Number(form.sales_multiplier)
+    if (salary === null || Number.isNaN(salary) || salary < 0)
+      errs.monthly_salary = 'Enter 0 or a positive number'
+    if (multiplier === null || Number.isNaN(multiplier) || multiplier < 0)
+      errs.sales_multiplier = 'Enter 0 or a positive number'
     if (form.new_client_rate === '' || form.new_client_rate === null)
       errs.new_client_rate = 'Required'
     if (form.renewal_rate === '' || form.renewal_rate === null)
