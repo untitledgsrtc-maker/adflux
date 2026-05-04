@@ -92,8 +92,8 @@ export default function MasterV2() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '7px 14px', borderRadius: 7, border: 'none',
-                background: activeTab === t.key ? 'var(--text)' : 'transparent',
-                color:      activeTab === t.key ? 'var(--surface-0)' : 'var(--text-muted)',
+                background: activeTab === t.key ? '#facc15' : 'transparent',
+                color:      activeTab === t.key ? '#0a0e1a' : 'var(--text-muted)',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
               }}
             >
@@ -315,8 +315,8 @@ function AttachmentsTab() {
               style={{
                 padding: '6px 14px', borderRadius: 999, border: 'none',
                 cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                background: active ? 'var(--text)' : 'transparent',
-                color:      active ? 'var(--surface-0)' : 'var(--text-muted)',
+                background: active ? '#facc15' : 'transparent',
+                color:      active ? '#0a0e1a' : 'var(--text-muted)',
               }}
             >
               {f.label}
@@ -542,21 +542,71 @@ function SignersTab() {
   const [savingId, setSavingId] = useState(null)
   const [statusMsg, setStatusMsg] = useState('')
   const [statusError, setStatusError] = useState('')
+  // Add-signer form: lists users currently with role='sales' and lets
+  // admin promote them to a signing role. We don't create brand-new
+  // users from here — that's the Team page's job (HR creates user with
+  // email + auth setup). Master.Signers is for promoting an existing
+  // user to a signing role + setting their signature info.
+  const [showAdd, setShowAdd] = useState(false)
+  const [candidates, setCandidates] = useState([])
+  const [pickedUserId, setPickedUserId] = useState('')
+  const [pickedRole, setPickedRole] = useState('co_owner')
+  const [pickedTitle, setPickedTitle] = useState('')
+  const [pickedMobile, setPickedMobile] = useState('')
+  const [adding, setAdding] = useState(false)
 
   const load = async () => {
     setLoading(true)
     // Pull users with privileged roles — they're the candidates to sign
     // proposals. Includes admin / owner / co_owner.
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, name, email, role, signature_title, signature_mobile')
-      .in('role', ['admin', 'owner', 'co_owner'])
-      .order('role').order('name')
-    if (error) setStatusError(error.message)
-    else setUsers(data || [])
+    const [signersRes, candidatesRes] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id, name, email, role, signature_title, signature_mobile')
+        .in('role', ['admin', 'owner', 'co_owner'])
+        .order('role').order('name'),
+      supabase
+        .from('users')
+        .select('id, name, email, role')
+        .eq('role', 'sales')
+        .order('name'),
+    ])
+    if (signersRes.error) setStatusError(signersRes.error.message)
+    else setUsers(signersRes.data || [])
+    setCandidates(candidatesRes.data || [])
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  async function handleAddSigner() {
+    if (!pickedUserId) {
+      setStatusError('Pick a user to promote.')
+      return
+    }
+    setAdding(true)
+    setStatusError('')
+    const { error } = await supabase
+      .from('users')
+      .update({
+        role:             pickedRole,
+        signature_title:  (pickedTitle || '').trim() || null,
+        signature_mobile: (pickedMobile || '').trim() || null,
+      })
+      .eq('id', pickedUserId)
+    setAdding(false)
+    if (error) {
+      setStatusError(`Could not promote: ${error.message}`)
+      return
+    }
+    setStatusMsg('Signer added.')
+    setTimeout(() => setStatusMsg(''), 2000)
+    setShowAdd(false)
+    setPickedUserId('')
+    setPickedTitle('')
+    setPickedMobile('')
+    setPickedRole('co_owner')
+    load()
+  }
 
   function setUserField(id, field, value) {
     setUsers(prev => prev.map(u => u.id === id ? { ...u, [field]: value } : u))
@@ -586,6 +636,99 @@ function SignersTab() {
       {statusError && (
         <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
       )}
+
+      {/* Add-signer toolbar — promote an existing user to signer.
+          We don't create new auth users from here; that's HR/Team's
+          job. This is the "make Vishnu a signer" workflow. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        {!showAdd ? (
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 6,
+              border: '1px solid var(--surface-3)',
+              background: 'var(--surface-2)',
+              color: 'var(--text)', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={12} /> Promote user to signer
+          </button>
+        ) : (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+            padding: 10, background: 'var(--surface-2)',
+            border: '1px solid var(--surface-3)', borderRadius: 8,
+            width: '100%',
+          }}>
+            <select
+              value={pickedUserId}
+              onChange={e => setPickedUserId(e.target.value)}
+              className="govt-input-cell"
+              style={{ minWidth: 200 }}
+            >
+              <option value="">Pick a user (sales role) —</option>
+              {candidates.map(c => (
+                <option key={c.id} value={c.id}>{c.name} · {c.email}</option>
+              ))}
+            </select>
+            <select
+              value={pickedRole}
+              onChange={e => setPickedRole(e.target.value)}
+              className="govt-input-cell"
+              style={{ minWidth: 130 }}
+            >
+              <option value="co_owner">Co-owner</option>
+              <option value="owner">Owner</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input
+              type="text"
+              value={pickedTitle}
+              onChange={e => setPickedTitle(e.target.value)}
+              placeholder="Signature title"
+              className="govt-input-cell"
+              style={{ minWidth: 140 }}
+            />
+            <input
+              type="text"
+              value={pickedMobile}
+              onChange={e => setPickedMobile(e.target.value)}
+              placeholder="Mobile (optional)"
+              className="govt-input-cell"
+              style={{ minWidth: 130 }}
+            />
+            <button
+              type="button"
+              onClick={handleAddSigner}
+              disabled={adding || !pickedUserId}
+              style={{
+                padding: '6px 14px', borderRadius: 6, border: 'none',
+                background: '#facc15', color: '#0a0e1a', fontSize: 12, fontWeight: 700,
+                cursor: pickedUserId ? 'pointer' : 'not-allowed',
+                opacity: adding ? 0.6 : 1,
+              }}
+            >
+              {adding ? 'Promoting…' : 'Promote'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowAdd(false); setPickedUserId(''); setPickedTitle(''); setPickedMobile('') }}
+              style={{
+                padding: '6px 12px', borderRadius: 6,
+                border: '1px solid var(--surface-3)',
+                background: 'transparent', color: 'var(--text-muted)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
       {loading ? (
         <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
           <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading signers…
@@ -664,19 +807,106 @@ function SignersTab() {
    MEDIA TAB — read-only
    ════════════════════════════════════════════════════════════════════ */
 
+// Media tab — shows the media catalog with shortcuts to where each
+// media's data is actually managed. NOT a full CRUD because adding a
+// new media type is more than a row insert — each media has its own
+// wizard (Auto Hood = 5 steps, GSRTC LED = different 5 steps), per-
+// row config (districts vs stations vs cities), per-media renderer
+// template, etc. Adding a new media type means writing code, not
+// just editing a database row. Master.Media surfaces what exists +
+// who to talk to.
 function MediaTab() {
+  const navigate = useNavigate()
+  const MEDIA = [
+    {
+      segment:    'GOVERNMENT',
+      media_type: 'AUTO_HOOD',
+      label:      'Government — Auto Hood',
+      description: 'DAVP-rated auto rickshaw hood advertising. 33 districts. Per-district allocation.',
+      manage_at:  '/auto-districts',
+      manage_label: 'Manage districts + DAVP rates',
+      wizard_at:  '/quotes/new/government/auto-hood',
+    },
+    {
+      segment:    'GOVERNMENT',
+      media_type: 'GSRTC_LED',
+      label:      'Government — GSRTC LED',
+      description: 'DAVP-rated LED screens at 20 GSRTC bus stations across Gujarat. Per-station daily-spots / days override.',
+      manage_at:  '/gsrtc-stations',
+      manage_label: 'Manage stations + DAVP rates',
+      wizard_at:  '/quotes/new/government/gsrtc-led',
+    },
+    {
+      segment:    'PRIVATE',
+      media_type: 'LED_OTHER',
+      label:      'Private — LED + other media',
+      description: 'Private clients across LED screens, hoardings, mall, cinema, auto, digital. Per-city pricing.',
+      manage_at:  '/cities',
+      manage_label: 'Manage cities + rates',
+      wizard_at:  '/quotes/new/private',
+    },
+  ]
   return (
-    <div style={{
-      padding: 30, textAlign: 'center', color: 'var(--text-muted)',
-      border: '1px dashed var(--surface-3)', borderRadius: 12,
-    }}>
-      <Tv size={28} style={{ marginBottom: 8, color: 'var(--text-subtle)' }} />
-      <div style={{ fontWeight: 600, color: 'var(--text)' }}>Media types</div>
-      <div style={{ fontSize: 13, marginTop: 6 }}>
-        Government — Auto Hood &amp; Government — GSRTC LED.<br />
-        Adding new media types is rare and ships via a database migration today.
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {MEDIA.map(m => (
+          <div
+            key={`${m.segment}-${m.media_type}`}
+            style={{
+              padding: 16, borderRadius: 10,
+              border: '1px solid var(--surface-3)',
+              background: 'var(--surface-1)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              gap: 16, flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{m.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
+                {m.segment} · {m.media_type}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
+                {m.description}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => navigate(m.manage_at)}
+                style={{
+                  padding: '6px 12px', borderRadius: 6,
+                  border: '1px solid var(--surface-3)',
+                  background: 'var(--surface-2)',
+                  color: 'var(--text)', fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {m.manage_label} →
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(m.wizard_at)}
+                style={{
+                  padding: '6px 12px', borderRadius: 6,
+                  border: 'none',
+                  background: '#facc15', color: '#0a0e1a',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                + New proposal
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
+      <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-subtle)', maxWidth: 720 }}>
+        <strong>Why I can't add new media types here:</strong> each media type has its own
+        wizard, its own renderer template, and a per-row config (districts / stations /
+        cities). Adding a new one is a code change, not a database row. If you want a new
+        media type — e.g. "Auto Body Wrap" or "Mall LED" — open a build request and we'll
+        add the wizard + master page + renderer in one sprint.
+      </p>
+    </>
   )
 }
 
@@ -684,22 +914,128 @@ function MediaTab() {
    DOCUMENTS TAB — read-only list of proposal_templates
    ════════════════════════════════════════════════════════════════════ */
 
+// Documents tab — view + edit + save-as-new-draft proposal templates.
+// Editing is RISKY (a typo in the Gujarati letter body becomes the
+// next proposal sent), so we never overwrite an active template in
+// place. Instead:
+//   1. Edit fields → "Save as new draft (v+1)" creates a new row
+//      with version+1 and is_active=false.
+//   2. "Activate this version" sets effective_to=now on all OTHER
+//      versions of the same (segment, media_type, language) and
+//      makes this the only active row.
+// This means editing is a 2-step explicit promotion, never a
+// silent in-place change.
 function DocumentsTab() {
   const [tpls, setTpls] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      const { data } = await supabase
-        .from('proposal_templates')
-        .select('id, segment, media_type, language, version, is_active, created_at')
-        .eq('is_active', true)
-        .is('effective_to', null)
-        .order('segment').order('media_type').order('version', { ascending: false })
-      setTpls(data || [])
-      setLoading(false)
-    })()
-  }, [])
+  const [editingId, setEditingId] = useState(null)
+  const [editBuf, setEditBuf] = useState(null) // { id, body_html, ... }
+  const [saving, setSaving] = useState(false)
+  const [statusMsg, setStatusMsg] = useState('')
+  const [statusError, setStatusError] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('proposal_templates')
+      .select('id, segment, media_type, language, version, is_active, effective_from, effective_to, header_html, body_html, footer_html, created_at')
+      .order('segment').order('media_type').order('version', { ascending: false })
+    if (error) setStatusError(error.message)
+    else setTpls(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  function startEdit(t) {
+    setEditingId(t.id)
+    setEditBuf({
+      id:           t.id,
+      segment:      t.segment,
+      media_type:   t.media_type,
+      language:     t.language,
+      version:      t.version,
+      header_html:  t.header_html || '',
+      body_html:    t.body_html   || '',
+      footer_html:  t.footer_html || '',
+    })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditBuf(null)
+  }
+
+  async function saveAsDraft() {
+    if (!editBuf) return
+    setSaving(true)
+    setStatusError('')
+    // Fetch the highest version for this (segment, media_type, language)
+    // so we can bump cleanly even if older drafts already exist.
+    const { data: hi } = await supabase
+      .from('proposal_templates')
+      .select('version')
+      .eq('segment',     editBuf.segment)
+      .eq('media_type',  editBuf.media_type)
+      .eq('language',    editBuf.language)
+      .order('version',  { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const nextVersion = (hi?.version || editBuf.version || 1) + 1
+    const { error } = await supabase
+      .from('proposal_templates')
+      .insert([{
+        segment:      editBuf.segment,
+        media_type:   editBuf.media_type,
+        language:     editBuf.language,
+        version:      nextVersion,
+        is_active:    false,
+        header_html:  editBuf.header_html || null,
+        body_html:    editBuf.body_html   || null,
+        footer_html:  editBuf.footer_html || null,
+      }])
+    setSaving(false)
+    if (error) {
+      setStatusError(`Could not save draft: ${error.message}`)
+      return
+    }
+    setStatusMsg(`Saved as draft v${nextVersion}. It won't be used until you Activate it.`)
+    setTimeout(() => setStatusMsg(''), 4000)
+    cancelEdit()
+    load()
+  }
+
+  async function activateVersion(t) {
+    if (!window.confirm(`Activate v${t.version} for ${t.segment} — ${t.media_type} (${t.language})?\n\nThis will retire all other versions of this template. Existing locked proposal PDFs are NOT changed (they're snapshots).`)) return
+    setSaving(true)
+    setStatusError('')
+    // 1. Retire every active row for the same (segment, media_type, language)
+    const nowIso = new Date().toISOString()
+    const { error: retireErr } = await supabase
+      .from('proposal_templates')
+      .update({ is_active: false, effective_to: nowIso })
+      .eq('segment',    t.segment)
+      .eq('media_type', t.media_type)
+      .eq('language',   t.language)
+      .eq('is_active',  true)
+    if (retireErr) {
+      setSaving(false)
+      setStatusError(`Could not retire current active: ${retireErr.message}`)
+      return
+    }
+    // 2. Activate the chosen version
+    const { error: actErr } = await supabase
+      .from('proposal_templates')
+      .update({ is_active: true, effective_from: nowIso, effective_to: null })
+      .eq('id', t.id)
+    setSaving(false)
+    if (actErr) {
+      setStatusError(`Could not activate: ${actErr.message}`)
+      return
+    }
+    setStatusMsg(`v${t.version} is now active for ${t.segment} — ${t.media_type}.`)
+    setTimeout(() => setStatusMsg(''), 4000)
+    load()
+  }
 
   if (loading) return (
     <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -707,45 +1043,191 @@ function DocumentsTab() {
     </div>
   )
 
+  // Group templates by (segment, media_type, language) so all versions
+  // of the same template are clustered together.
+  const grouped = {}
+  for (const t of tpls) {
+    const k = `${t.segment}|${t.media_type}|${t.language}`
+    if (!grouped[k]) grouped[k] = []
+    grouped[k].push(t)
+  }
+
   return (
     <>
-      <div className="govt-list">
-        <div
-          className="govt-list__row"
-          style={{
-            gridTemplateColumns: '1fr 1fr 80px 60px',
-            fontSize: 11, color: 'var(--text-subtle)',
-            textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600,
-          }}
-        >
-          <span>Segment + media</span>
-          <span>Language</span>
-          <span>Version</span>
-          <span></span>
-        </div>
-        {tpls.map(t => (
-          <div
-            key={t.id}
-            className="govt-list__row"
-            style={{ gridTemplateColumns: '1fr 1fr 80px 60px', alignItems: 'center' }}
-          >
-            <span style={{ color: 'var(--text)', fontWeight: 600 }}>
-              {t.segment} — {t.media_type}
-            </span>
-            <span style={{ color: 'var(--text-muted)' }}>{t.language}</span>
-            <span style={{ color: 'var(--text-muted)' }}>v{t.version}</span>
-            <span style={{
-              fontSize: 11, color: t.is_active ? '#81c784' : 'var(--text-subtle)',
-            }}>{t.is_active ? 'active' : 'inactive'}</span>
+      {statusMsg && (
+        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#81c784' }}>✓ {statusMsg}</div>
+      )}
+      {statusError && (
+        <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
+      )}
+
+      {Object.entries(grouped).map(([key, versions]) => {
+        const [segment, media_type, language] = key.split('|')
+        return (
+          <div key={key} style={{ marginBottom: 22, border: '1px solid var(--surface-3)', borderRadius: 10, padding: 14 }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              marginBottom: 10,
+            }}>
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14 }}>
+                  {segment} — {media_type}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
+                  Language: {language} · {versions.length} version{versions.length === 1 ? '' : 's'}
+                </div>
+              </div>
+            </div>
+            <div className="govt-list">
+              {versions.map(t => (
+                <div
+                  key={t.id}
+                  className="govt-list__row"
+                  style={{
+                    gridTemplateColumns: '60px 80px 1fr 240px',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>v{t.version}</span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+                    padding: '2px 8px', borderRadius: 999,
+                    background: t.is_active ? 'rgba(74,222,128,.15)' : 'var(--surface-2)',
+                    color:      t.is_active ? '#4ade80' : 'var(--text-subtle)',
+                    display: 'inline-block', textAlign: 'center',
+                  }}>
+                    {t.is_active ? 'active' : 'draft'}
+                  </span>
+                  <span style={{ color: 'var(--text-subtle)', fontSize: 11 }}>
+                    {t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                  </span>
+                  <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    {!t.is_active && (
+                      <button
+                        type="button"
+                        onClick={() => activateVersion(t)}
+                        disabled={saving}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, border: 'none',
+                          background: '#4ade80', color: '#0a0e1a', fontSize: 11, fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Activate
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => startEdit(t)}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6,
+                        border: '1px solid var(--surface-3)',
+                        background: 'transparent', color: 'var(--text)',
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      View / Edit
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-      </div>
+        )
+      })}
+
+      {/* Editor modal — appears below the list when a template is open */}
+      {editingId && editBuf && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }}>
+          <div style={{
+            background: 'var(--surface-1)', border: '1px solid var(--surface-3)',
+            borderRadius: 12, padding: 20, width: '100%', maxWidth: 920, maxHeight: '92vh',
+            display: 'flex', flexDirection: 'column', gap: 14, overflow: 'hidden',
+          }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>
+                {editBuf.segment} — {editBuf.media_type} · {editBuf.language} · editing v{editBuf.version}
+              </div>
+              <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 16 }}>
+                Edit template
+              </div>
+            </div>
+            <div style={{
+              padding: '10px 12px',
+              background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)',
+              borderRadius: 8, color: '#fbbf24', fontSize: 12,
+            }}>
+              ⚠ Your changes save as a NEW DRAFT version. They don't affect any proposals
+              until you click "Activate" on the new draft. Locked proposal PDFs that
+              already exist are NEVER changed (snapshots).
+            </div>
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Header HTML (optional)</label>
+                <textarea
+                  value={editBuf.header_html}
+                  onChange={e => setEditBuf({ ...editBuf, header_html: e.target.value })}
+                  className="govt-input-cell"
+                  style={{ width: '100%', minHeight: 60, fontFamily: 'monospace', fontSize: 12 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Body HTML</label>
+                <textarea
+                  value={editBuf.body_html}
+                  onChange={e => setEditBuf({ ...editBuf, body_html: e.target.value })}
+                  className="govt-input-cell"
+                  style={{ width: '100%', minHeight: 240, fontFamily: 'monospace', fontSize: 12 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Footer HTML (optional)</label>
+                <textarea
+                  value={editBuf.footer_html}
+                  onChange={e => setEditBuf({ ...editBuf, footer_html: e.target.value })}
+                  className="govt-input-cell"
+                  style={{ width: '100%', minHeight: 60, fontFamily: 'monospace', fontSize: 12 }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                style={{
+                  padding: '8px 14px', borderRadius: 6,
+                  border: '1px solid var(--surface-3)',
+                  background: 'transparent', color: 'var(--text-muted)',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveAsDraft}
+                disabled={saving}
+                style={{
+                  padding: '8px 14px', borderRadius: 6, border: 'none',
+                  background: '#facc15', color: '#0a0e1a', fontSize: 13, fontWeight: 700,
+                  cursor: 'pointer', opacity: saving ? 0.6 : 1,
+                }}
+              >
+                {saving ? 'Saving…' : 'Save as new draft (v+1)'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-subtle)', maxWidth: 720 }}>
-        <strong>How it works:</strong> proposal templates ship as database migrations
-        (the Gujarati letter body is checked into version control). Editing them in-app
-        is risky — a typo in the rendered output is hard to undo once proposals have
-        been sent. View-only here for now.
+        <strong>How it works:</strong> editing a template creates a NEW draft version,
+        leaving the active version untouched. Click <em>Activate</em> on a draft to
+        retire the old active version and promote the draft. Any proposal PDFs already
+        sent are locked snapshots — they don't change when you swap templates.
       </p>
     </>
   )
