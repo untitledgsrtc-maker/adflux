@@ -84,6 +84,22 @@ export default function GovtProposalDetailV2() {
   // before the A4 + letterhead fix have wrong-aspect pages; admin
   // needs to re-rasterize without losing the Sent state.
   const [regeneratingLocked, setRegeneratingLocked] = useState(false)
+  // Phase 11d (rev10) — letterhead toggle. Default ON. When OFF the
+  // renderer + Combined PDF skip the company.letterhead_url background
+  // so the proposal can be printed on the firm's pre-printed
+  // letterhead paper. Stored in localStorage per-quote so the choice
+  // sticks across reloads (typical workflow: rep flips it once for a
+  // particular client and re-uses for follow-ups).
+  const [useLetterhead, setUseLetterhead] = useState(() => {
+    try {
+      const v = localStorage.getItem(`use_letterhead:${id}`)
+      return v === null ? true : v === 'true'
+    } catch { return true }
+  })
+  function toggleLetterhead(next) {
+    setUseLetterhead(next)
+    try { localStorage.setItem(`use_letterhead:${id}`, String(next)) } catch {}
+  }
 
   // Phase 8 — file storage + locked proposal PDF + combined PDF
   // rendererRef is captured by html2canvas when generating the locked
@@ -261,6 +277,9 @@ export default function GovtProposalDetailV2() {
       // letter. Owner spec from the docx template.
       quote_number:           quote.quote_number,
       ref_number:             quote.ref_number,
+      // Phase 11d (rev10) — per-print letterhead toggle. False → skip
+      // the background PNG so the letter prints plain.
+      use_letterhead:         useLetterhead,
       recipient_block:        quote.recipient_block,
       proposal_date:          quote.proposal_date,
       auto_total_quantity:    quote.auto_total_quantity,
@@ -273,7 +292,7 @@ export default function GovtProposalDetailV2() {
     }
     // Reading quote.attachments_checklist directly (not the
     // `checklist` useMemo defined further down — TDZ would crash).
-  }, [quote, items])
+  }, [quote, items, useLetterhead])
 
   // Helper used by both changeStatus and handleWonWithPayment to
   // confirm a specific labelled attachment has actually been uploaded
@@ -1115,6 +1134,41 @@ export default function GovtProposalDetailV2() {
           desk-specific mobile per proposal without touching their user
           record. Empty → falls back to signer's default. Saved on
           blur to avoid a save-per-keystroke. */}
+      {/* Phase 11d (rev10) — letterhead toggle.
+          ON  → company.letterhead_url renders as the page-1 background
+          OFF → plain white page (for printing on pre-printed letterhead
+                paper, or sharing where the recipient prefers no
+                letterhead). Choice persists per-quote in localStorage. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        margin: '12px 0', fontSize: 13,
+      }}>
+        <label style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          cursor: 'pointer', userSelect: 'none',
+          padding: '6px 12px',
+          borderRadius: 8,
+          border: '1px solid var(--surface-3)',
+          background: useLetterhead ? 'rgba(76,175,80,.08)' : 'var(--surface-2)',
+          color: useLetterhead ? '#81c784' : 'var(--text-muted)',
+        }}>
+          <input
+            type="checkbox"
+            checked={useLetterhead}
+            onChange={e => toggleLetterhead(e.target.checked)}
+            style={{ accentColor: '#facc15', cursor: 'pointer' }}
+          />
+          <span style={{ fontWeight: 600 }}>
+            {useLetterhead ? '✓ With letterhead' : 'Without letterhead'}
+          </span>
+        </label>
+        <span style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
+          {useLetterhead
+            ? 'Page 1 prints with the company letterhead background.'
+            : 'Plain page — print on pre-printed letterhead paper.'}
+        </span>
+      </div>
+
       {signer && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,

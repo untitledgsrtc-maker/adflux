@@ -135,7 +135,16 @@ export function GovtProposalRenderer({
   //     · private.png    — empty zone is 8.9% – 93.5%  (top ~100px, bottom ~73px @ 1123px)
   //   Using 130px top + 130px bottom gives a small visual safety margin
   //   so a slightly long letter doesn't kiss the printed footer.
-  const letterhead = company?.letterhead_url || ''
+  // Phase 11d (rev10) — letterhead is optional per-print. The owner
+  // wanted a toggle so they can print:
+  //   • WITH letterhead   → for direct submission to the dept
+  //   • WITHOUT letterhead → for printing on company letterhead paper
+  // GovtProposalDetailV2 sets data.use_letterhead based on a checkbox
+  // in the header. Default true (preserves prior behavior). When false
+  // we skip the background image so the rendered letter is plain.
+  const letterhead = (data.use_letterhead === false)
+    ? ''
+    : (company?.letterhead_url || '')
   const letterStyle = letterhead
     ? {
         backgroundImage:    `url(${letterhead})`,
