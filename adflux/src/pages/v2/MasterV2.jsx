@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Paperclip, UserCheck, Tv, FileText, Upload, Loader2, Plus, Trash2,
-  Save, ArrowLeft, FileBox,
+  Save, ArrowLeft, FileBox, Building2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -30,6 +30,7 @@ import { uploadAttachment, getSignedUrl, slugifyLabel } from '../../utils/propos
 
 const TABS = [
   { key: 'attachments', label: 'Attachments', icon: Paperclip },
+  { key: 'companies',   label: 'Companies',   icon: Building2 },
   { key: 'signers',     label: 'Signers',     icon: UserCheck },
   { key: 'media',       label: 'Media',       icon: Tv },
   { key: 'documents',   label: 'Documents',   icon: FileText },
@@ -104,6 +105,7 @@ export default function MasterV2() {
       </div>
 
       {activeTab === 'attachments' && <AttachmentsTab />}
+      {activeTab === 'companies'   && <CompaniesTab />}
       {activeTab === 'signers'     && <SignersTab />}
       {activeTab === 'media'       && <MediaTab />}
       {activeTab === 'documents'   && <DocumentsTab />}
@@ -527,6 +529,219 @@ function AttachmentsTab() {
         only needs to upload the per-quote items (OC copy, PO copy / Work Order) on each
         individual proposal. Replacing a default file does NOT change proposals that have already
         been sent — those are locked snapshots.
+      </p>
+    </>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   COMPANIES TAB — admin edits both legal entities
+   ════════════════════════════════════════════════════════════════════
+   Renders the two companies (GOVERNMENT + PRIVATE) as side-by-side
+   editable cards. Same save-on-blur pattern as the Signers tab so the
+   admin can tweak GSTIN, bank details, address, etc. without touching
+   Supabase Studio. Both proposal letter (govt) and quote PDF
+   (private) read from this table on every render — edits take effect
+   immediately on next page load. */
+function CompaniesTab() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState(null)
+  const [statusMsg, setStatusMsg] = useState('')
+  const [statusError, setStatusError] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('segment')
+    if (error) setStatusError(error.message)
+    else setRows(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  function setField(id, field, value) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
+  }
+
+  async function persist(id) {
+    const r = rows.find(x => x.id === id)
+    if (!r) return
+    setSavingId(id)
+    // Strip null/empty strings to NULL so the DB stays clean (some
+    // columns are nullable and we don't want '' to render in the PDF
+    // as blank-but-not-null).
+    const payload = {
+      name:            (r.name || '').trim() || null,
+      name_gu:         (r.name_gu || '').trim() || null,
+      short_name:      (r.short_name || '').trim() || null,
+      address_line:    (r.address_line || '').trim() || null,
+      city:            (r.city || '').trim() || null,
+      state:           (r.state || '').trim() || null,
+      pincode:         (r.pincode || '').trim() || null,
+      phone:           (r.phone || '').trim() || null,
+      email:           (r.email || '').trim() || null,
+      website:         (r.website || '').trim() || null,
+      gstin:           (r.gstin || '').trim() || null,
+      pan:             (r.pan || '').trim() || null,
+      bank_name:       (r.bank_name || '').trim() || null,
+      bank_branch:     (r.bank_branch || '').trim() || null,
+      bank_acc_name:   (r.bank_acc_name || '').trim() || null,
+      bank_acc_number: (r.bank_acc_number || '').trim() || null,
+      bank_ifsc:       (r.bank_ifsc || '').trim() || null,
+      bank_micr:       (r.bank_micr || '').trim() || null,
+      upi_id:          (r.upi_id || '').trim() || null,
+    }
+    const { error } = await supabase
+      .from('companies')
+      .update(payload)
+      .eq('id', id)
+    setSavingId(null)
+    if (error) {
+      setStatusError(`Save failed: ${error.message}`)
+    } else {
+      setStatusMsg('Saved.')
+      setTimeout(() => setStatusMsg(''), 1500)
+    }
+  }
+
+  // Field renderer — shared label+input layout for every company field.
+  // Pulls value from rows[i][field], writes via setField, persists on blur.
+  // `wide` flag stretches across both columns of the card grid.
+  function Field({ row, field, label, placeholder, wide }) {
+    return (
+      <div style={{ gridColumn: wide ? '1 / span 2' : 'auto' }}>
+        <label style={{
+          display: 'block', fontSize: 10, fontWeight: 700,
+          color: 'var(--text-subtle)', textTransform: 'uppercase',
+          letterSpacing: '.06em', marginBottom: 4,
+        }}>{label}</label>
+        <input
+          type="text"
+          value={row[field] ?? ''}
+          onChange={e => setField(row.id, field, e.target.value)}
+          onBlur={() => persist(row.id)}
+          placeholder={placeholder || ''}
+          className="govt-input-cell"
+          style={{ width: '100%' }}
+        />
+      </div>
+    )
+  }
+
+  if (loading) return (
+    <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
+      <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading companies…
+    </div>
+  )
+
+  if (rows.length === 0) {
+    return (
+      <div style={{
+        padding: 30, textAlign: 'center', color: 'var(--text-muted)',
+        border: '1px dashed var(--surface-3)', borderRadius: 12,
+      }}>
+        <Building2 size={28} style={{ marginBottom: 8, color: 'var(--text-subtle)' }} />
+        <div style={{ fontWeight: 600, color: 'var(--text)' }}>No companies seeded</div>
+        <div style={{ fontSize: 13, marginTop: 6 }}>
+          Run the Phase 10 SQL migration to seed the two legal entities.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {statusMsg && (
+        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#81c784' }}>✓ {statusMsg}</div>
+      )}
+      {statusError && (
+        <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
+      )}
+
+      {/* Two cards side-by-side on wide screens, stacked on narrow. */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+        gap: 18,
+      }}>
+        {rows.map(r => (
+          <div
+            key={r.id}
+            style={{
+              padding: 18, borderRadius: 12,
+              border: '1px solid var(--surface-3)',
+              background: 'var(--surface-1)',
+            }}
+          >
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              marginBottom: 14,
+            }}>
+              <div>
+                <div style={{
+                  fontSize: 10, letterSpacing: '.12em',
+                  color: r.segment === 'GOVERNMENT' ? '#fbbf24' : '#64b5f6',
+                  fontWeight: 700, textTransform: 'uppercase',
+                  marginBottom: 2,
+                }}>
+                  {r.segment} segment
+                </div>
+                <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 16 }}>
+                  {r.name || 'Unnamed company'}
+                </div>
+              </div>
+              {savingId === r.id && (
+                <Loader2 size={14} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} />
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field row={r} field="name"          label="Legal name"      wide />
+              <Field row={r} field="name_gu"       label="Gujarati name (govt only)" />
+              <Field row={r} field="short_name"    label="Short name (signature line)" />
+              <Field row={r} field="address_line"  label="Address line"    wide />
+              <Field row={r} field="city"          label="City" />
+              <Field row={r} field="state"         label="State" />
+              <Field row={r} field="pincode"       label="Pincode" />
+              <Field row={r} field="phone"         label="Phone" />
+              <Field row={r} field="email"         label="Email"           wide />
+              <Field row={r} field="website"       label="Website"         wide />
+
+              {/* Tax fields */}
+              <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--surface-3)', paddingTop: 12, marginTop: 6 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Tax</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <Field row={r} field="gstin" label="GSTIN" />
+                  <Field row={r} field="pan"   label="PAN" />
+                </div>
+              </div>
+
+              {/* Bank fields */}
+              <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--surface-3)', paddingTop: 12, marginTop: 6 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Bank</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <Field row={r} field="bank_name"       label="Bank name" />
+                  <Field row={r} field="bank_branch"     label="Branch" />
+                  <Field row={r} field="bank_acc_name"   label="Account holder name" wide />
+                  <Field row={r} field="bank_acc_number" label="Account number" />
+                  <Field row={r} field="bank_ifsc"       label="IFSC" />
+                  <Field row={r} field="bank_micr"       label="MICR (optional)" />
+                  <Field row={r} field="upi_id"          label="UPI ID (optional)" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-subtle)', maxWidth: 720 }}>
+        <strong>How it works:</strong> these two rows drive the company line on every proposal letter
+        (govt) + quote PDF (private). Edit any field, click outside to save. Changes appear on the
+        very next render — no rebuild needed. Locked snapshots of already-sent proposals are NOT
+        affected (they keep the company info that was current at lock time).
       </p>
     </>
   )
