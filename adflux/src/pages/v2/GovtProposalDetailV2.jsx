@@ -76,6 +76,10 @@ export default function GovtProposalDetailV2() {
   const [showSentModal,    setShowSentModal]    = useState(false)
   const [sentModalBusy,    setSentModalBusy]    = useState(false)
   const [sentModalUploadingOc, setSentModalUploadingOc] = useState(false)
+  // Phase 11 — Mark Won pre-flight: same inline-upload pattern as Sent's
+  // OC gate, but for the Work Order / PO copy. Banner lives inside
+  // WonPaymentModal and disables Confirm until poUploaded === true.
+  const [wonModalUploadingPo, setWonModalUploadingPo] = useState(false)
 
   // Phase 8 — file storage + locked proposal PDF + combined PDF
   // rendererRef is captured by html2canvas when generating the locked
@@ -336,22 +340,49 @@ export default function GovtProposalDetailV2() {
     }
   }
 
+  // Phase 11 — modal-side Work Order / PO upload helper. Mirrors the
+  // OC version above so the two pre-flight gates have identical UX.
+  // Matches both "po copy" and "work order" labels case-insensitively
+  // since the seeded attachment_templates have used both wordings
+  // across versions.
+  async function handleWonModalPoUpload(file) {
+    if (!file || !quote) return
+    const idx = checklist.findIndex(c =>
+      /(po copy|work order)/i.test(c.label || '')
+    )
+    if (idx < 0) {
+      setStatusError('Work Order / PO copy template row not found — refresh the page and retry.')
+      return
+    }
+    setWonModalUploadingPo(true)
+    try {
+      await handleFilePick(idx, file)
+    } finally {
+      setWonModalUploadingPo(false)
+    }
+  }
+
   // Mirrors handleWonWithPayment from src/pages/QuoteDetail.jsx so the
   // govt and private flows behave identically:
   //   • Sales + payment   → payment lands pending, quote stays as-is
   //   • Sales no payment  → quote flips to Won (no incentive until cash)
   //   • Admin             → flip + payment all in one
   async function handleWonWithPayment(paymentData) {
-    // Mark Won gate (Phase 8): PO copy / Work Order MUST be uploaded.
-    // The owner's spec — once Won, the agency-issued work order is the
-    // proof of award. Without it, the deal isn't properly closed.
-    const po = findUploadedByLabel('po copy')
-    if (!po) {
-      setShowWonModal(false)
-      setStatusError(
-        'Cannot mark Won — please upload the PO copy / Work Order from the government body in the Attachments section first.'
-      )
-      return
+    // Mark Won gate (Phase 8 + 11): PO copy / Work Order MUST be
+    // uploaded. The modal's banner blocks the Confirm click in the
+    // happy path, but we keep this server-adjacent check as belt-and-
+    // suspenders — covers a multi-tab race where the rep deletes the
+    // attachment between modal-open and Confirm. Match either label
+    // wording since attachment_templates seeds have used both.
+    if (quote?.segment === 'GOVERNMENT') {
+      const po = findUploadedByLabel('po copy') || findUploadedByLabel('work order')
+      if (!po) {
+        setShowWonModal(false)
+        setStatusError(
+          'Cannot mark Won — please upload the PO copy / Work Order from the government body in the Attachments section first.'
+        )
+        return
+      }
     }
 
     setShowWonModal(false)
@@ -1288,13 +1319,20 @@ export default function GovtProposalDetailV2() {
         />
       )}
 
-      {/* Mark Won modal — collects payment + campaign dates in one pass */}
+      {/* Mark Won modal — collects payment + campaign dates in one pass.
+          Phase 11: also gates on Work Order / PO upload via the modal's
+          built-in banner. workOrderRequired=true on govt segment so the
+          gate fires; private quotes pass false (no WO requirement). */}
       {showWonModal && (
         <WonPaymentModal
           quote={quote}
           totalPaid={totalPaid}
           onConfirm={handleWonWithPayment}
           onClose={() => setShowWonModal(false)}
+          workOrderRequired={quote?.segment === 'GOVERNMENT'}
+          workOrderUploaded={!!findUploadedByLabel('po copy') || !!findUploadedByLabel('work order')}
+          onUploadWorkOrder={handleWonModalPoUpload}
+          uploadingWorkOrder={wonModalUploadingPo}
         />
       )}
 

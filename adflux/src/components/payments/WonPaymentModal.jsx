@@ -12,11 +12,41 @@
 // so flipping a quote to Won with an outstanding balance won't pay out
 // incentive until that final tick happens.
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { formatCurrency, todayISO } from '../../utils/formatters'
 
-export function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
+/**
+ * Mark-Won pre-flight + payment-capture modal.
+ *
+ * Phase 11 — adds Work Order / PO copy requirement gate:
+ *   • workOrderUploaded (bool)  : current state of the WO/PO attachment
+ *   • onUploadWorkOrder(file)   : async — invoked when the user picks
+ *                                 a file inline. Parent should run the
+ *                                 same file-pick path used by the
+ *                                 Attachments section so the upload
+ *                                 lands at the right storage path.
+ *   • uploadingWorkOrder (bool) : show a spinner while upload is in flight
+ *
+ * When the WO is missing, Confirm is disabled and a banner explains
+ * why with an inline file picker. Mirrors the Mark-Sent OC-copy
+ * flow so reps see one consistent pattern across both gates.
+ *
+ * Prop is OPTIONAL — if the parent doesn't pass it (private flow,
+ * which has no WO requirement), the gate is skipped.
+ */
+export function WonPaymentModal({
+  quote,
+  totalPaid = 0,
+  onConfirm,
+  onClose,
+  // Phase 11 props — all optional for callers that don't gate on WO.
+  workOrderRequired   = false,
+  workOrderUploaded   = false,
+  onUploadWorkOrder   = null,
+  uploadingWorkOrder  = false,
+}) {
   const today = todayISO()
+  const woFileInput = useRef(null)
   const remainingBalance = Math.max(0, Number(quote.total_amount || 0) - Number(totalPaid || 0))
   const hasExistingPayment = Number(totalPaid) > 0
   const fullyPaid = hasExistingPayment && remainingBalance <= 0
@@ -68,7 +98,21 @@ export function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
   // Won is allowed with no payment at all — a "client said yes,
   // money still pending" state. Campaign dates remain mandatory
   // because they're what schedules the spot.
-  const canConfirm = campaignDatesValid
+  //
+  // Phase 11 — also gate on Work Order / PO copy upload when the
+  // parent says it's required (govt segment). This catches reps who
+  // try to mark Won without the formal award document — the agency's
+  // proof of contract closure.
+  const woGatePassed = !workOrderRequired || workOrderUploaded
+  const canConfirm   = campaignDatesValid && woGatePassed && !uploadingWorkOrder
+
+  function handleWoFilePicked(e) {
+    const file = e.target.files?.[0]
+    if (!file || !onUploadWorkOrder) return
+    onUploadWorkOrder(file)
+    // Reset so picking the same file again still triggers onChange.
+    e.target.value = ''
+  }
 
   return (
     <div className="mo">
@@ -98,6 +142,70 @@ export function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
               </div>
             </div>
           </div>
+
+          {/* Phase 11 — Work Order / PO copy gate.
+              Shown only when the parent says workOrderRequired (govt
+              segment). Mirrors the Mark-Sent OC-copy banner: red when
+              missing (with inline upload), green when present. Confirm
+              button is disabled below until this clears. */}
+          {workOrderRequired && (
+            <div
+              style={{
+                background: workOrderUploaded
+                  ? 'rgba(76,175,80,.12)'
+                  : 'rgba(229,57,53,.12)',
+                border: workOrderUploaded
+                  ? '1px solid rgba(76,175,80,.4)'
+                  : '1px solid rgba(229,57,53,.4)',
+                borderRadius: 9,
+                padding: '12px 14px',
+                marginBottom: 14,
+                fontSize: '.84rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: workOrderUploaded ? 0 : 8 }}>
+                <span style={{ fontSize: 18 }}>{workOrderUploaded ? '✅' : '⚠️'}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontWeight: 700,
+                    color: workOrderUploaded ? '#81c784' : '#ef9a9a',
+                  }}>
+                    {workOrderUploaded
+                      ? 'Work Order / PO copy uploaded'
+                      : 'Work Order / PO copy required'}
+                  </div>
+                  {!workOrderUploaded && (
+                    <div style={{ color: 'var(--gray)', fontSize: '.78rem', marginTop: 3, lineHeight: 1.45 }}>
+                      The agency-issued Work Order or Purchase Order is the proof
+                      of award. Without it, this proposal can't be marked Won.
+                    </div>
+                  )}
+                </div>
+              </div>
+              {!workOrderUploaded && onUploadWorkOrder && (
+                <>
+                  <input
+                    ref={woFileInput}
+                    type="file"
+                    accept="application/pdf,image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleWoFilePicked}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-y"
+                    style={{ width: '100%', marginTop: 4 }}
+                    disabled={uploadingWorkOrder}
+                    onClick={() => woFileInput.current?.click()}
+                  >
+                    {uploadingWorkOrder
+                      ? 'Uploading…'
+                      : '📎 Upload Work Order / PO copy'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           {hasExistingPayment && (
             <div style={{ background: 'rgba(129,199,132,.1)', border: '1px solid rgba(129,199,132,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: '.82rem' }}>
@@ -188,7 +296,15 @@ export function WonPaymentModal({ quote, totalPaid = 0, onConfirm, onClose }) {
             className="btn btn-y"
             onClick={() => onConfirm(form)}
             disabled={!canConfirm}
-            title={!campaignDatesValid ? 'Campaign dates are required to mark Won' : ''}
+            title={
+              !campaignDatesValid
+                ? 'Campaign dates are required to mark Won'
+                : (workOrderRequired && !workOrderUploaded)
+                  ? 'Upload Work Order / PO copy first'
+                  : uploadingWorkOrder
+                    ? 'Wait for upload to finish'
+                    : ''
+            }
           >
             ✓ Confirm & Mark Won
           </button>
