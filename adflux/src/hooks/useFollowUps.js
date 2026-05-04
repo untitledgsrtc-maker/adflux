@@ -47,7 +47,8 @@ export function useFollowUps(quoteId = null) {
       .eq('is_done', false)
       .order('follow_up_date', { ascending: true })
 
-    if (profile?.role === 'sales') {
+    // Phase 11g — agency role behaves like sales here too.
+    if (profile?.role === 'sales' || profile?.role === 'agency') {
       query = query.eq('assigned_to', profile.id)
     }
 

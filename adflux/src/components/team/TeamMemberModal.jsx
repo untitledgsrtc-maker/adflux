@@ -5,9 +5,17 @@ import { X } from 'lucide-react'
 import { supabase, supabaseSignup } from '../../lib/supabase'
 import { useTeam } from '../../hooks/useTeam'
 
+// Phase 11g — owner spec (4 May 2026): "i want one more role / agency
+// / its same like sale person but just name agency". Agency members
+// behave like sales (incentive profile, commission tracking) but
+// segregated for reporting / partner-channel distinction. The 'agency'
+// value is already in the users_role_check constraint from Phase 8E,
+// and the incentive payout triggers operate on any role with a
+// staff_incentive_profile, so adding the dropdown option is enough.
 const ROLES = [
-  { value: 'sales', label: 'Sales' },
-  { value: 'admin', label: 'Admin' },
+  { value: 'sales',  label: 'Sales' },
+  { value: 'agency', label: 'Agency (sales-like)' },
+  { value: 'admin',  label: 'Admin' },
 ]
 
 function Field({ label, required, error, hint, children }) {

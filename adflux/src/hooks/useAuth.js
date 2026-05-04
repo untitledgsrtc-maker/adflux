@@ -79,6 +79,12 @@ export function useAuth() {
     // New role flags (Phase 5 added owner / co_owner to the enum)
     isOwner:      profile?.role === 'owner',
     isCoOwner:    profile?.role === 'co_owner',
+    // Phase 11g — agency is sales-equivalent (own quotes, incentives,
+    // commissions). Use isSalesLike when gating UI on "owner of the
+    // book" semantics; isSales-only checks should stay as-is when
+    // the distinction matters (e.g., agency-specific reporting).
+    isAgency:     profile?.role === 'agency',
+    isSalesLike:  profile?.role === 'sales' || profile?.role === 'agency',
 
     // Full-access set used by sidebar gating + master-data pages
     isPrivileged: ['admin','owner','co_owner'].includes(profile?.role),

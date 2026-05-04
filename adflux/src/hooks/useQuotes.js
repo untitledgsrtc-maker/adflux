@@ -40,7 +40,9 @@ export function useQuotes() {
       .select('*, quote_cities(*), payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
       .order('created_at', { ascending: false })
 
-    if (profile?.role === 'sales') {
+    // Phase 11g — agency role behaves like sales for ownership.
+    // Both see only their own quotes; admin/owner/co_owner see all.
+    if (profile?.role === 'sales' || profile?.role === 'agency') {
       query = query.eq('created_by', profile.id)
     }
 

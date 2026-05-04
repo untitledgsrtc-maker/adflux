@@ -18,7 +18,7 @@
 // filters at navigation time; we double-check here for direct URL
 // hits.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Paperclip, UserCheck, Tv, FileText, Upload, Loader2, Plus, Trash2,
@@ -534,6 +534,146 @@ function AttachmentsTab() {
   )
 }
 
+/* Phase 11f — file uploader for letterhead / logo. Uploads into the
+   public `company-assets` bucket, returns the public URL via onUpload.
+   Renders an inline preview when a value is set, an Upload/Replace
+   button + Clear button. Per-row local state for the file input + the
+   "uploading" spinner. */
+function AssetUploader({ row, field, label, kind, accept, onUpload, onClear }) {
+  const fileRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+  const [err, setErr] = useState('')
+  const url = row[field] || ''
+
+  async function handlePick(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setErr('')
+    try {
+      const ext  = (file.name.split('.').pop() || 'png').toLowerCase()
+      const ts   = Date.now()
+      const path = `${row.segment}/${kind}-${ts}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('company-assets')
+        .upload(path, file, { contentType: file.type, upsert: false })
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from('company-assets').getPublicUrl(path)
+      if (!data?.publicUrl) throw new Error('Upload succeeded but no public URL returned.')
+      await onUpload(data.publicUrl)
+    } catch (e2) {
+      setErr(e2?.message || String(e2))
+    } finally {
+      setUploading(false)
+      // Reset the input so picking the same file again still triggers onChange
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  return (
+    <div>
+      <label style={{
+        display: 'block', fontSize: 10, fontWeight: 700,
+        color: 'var(--text-subtle)', textTransform: 'uppercase',
+        letterSpacing: '.06em', marginBottom: 6,
+      }}>{label}</label>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept={accept}
+        onChange={handlePick}
+        style={{ display: 'none' }}
+      />
+
+      {url ? (
+        <div style={{
+          padding: 10,
+          borderRadius: 8,
+          background: 'var(--surface-2)',
+          border: '1px solid var(--surface-3)',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <img
+            src={url}
+            alt={`${kind} preview`}
+            style={{
+              width: 72, height: 96, flexShrink: 0,
+              objectFit: 'contain',
+              border: '1px solid var(--surface-3)',
+              background: '#fff',
+              borderRadius: 4,
+            }}
+            onError={e => {
+              e.currentTarget.style.background = 'var(--surface-3)'
+              e.currentTarget.removeAttribute('src')
+            }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 11.5, color: 'var(--text-muted)',
+              wordBreak: 'break-all', lineHeight: 1.4,
+            }}>
+              {url.length > 60 ? url.slice(0, 30) + '…' + url.slice(-25) : url}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                style={{
+                  padding: '5px 10px', fontSize: 11.5, fontWeight: 600,
+                  background: 'var(--surface-3)', border: 'none',
+                  borderRadius: 6, color: 'var(--text)',
+                  cursor: uploading ? 'wait' : 'pointer',
+                }}
+              >
+                {uploading ? 'Uploading…' : 'Replace'}
+              </button>
+              <button
+                type="button"
+                onClick={onClear}
+                disabled={uploading}
+                style={{
+                  padding: '5px 10px', fontSize: 11.5, fontWeight: 600,
+                  background: 'transparent', border: '1px solid var(--surface-3)',
+                  borderRadius: 6, color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          style={{
+            width: '100%',
+            padding: '14px 12px',
+            background: 'var(--surface-2)',
+            border: '1px dashed var(--surface-3)',
+            borderRadius: 8,
+            color: 'var(--text-muted)',
+            cursor: uploading ? 'wait' : 'pointer',
+            fontSize: 12.5,
+            fontWeight: 600,
+          }}
+        >
+          {uploading ? 'Uploading…' : '📎 Upload ' + kind}
+        </button>
+      )}
+
+      {err && (
+        <div style={{ color: '#ef9a9a', fontSize: 11, marginTop: 6 }}>{err}</div>
+      )}
+    </div>
+  )
+}
+
 /* ════════════════════════════════════════════════════════════════════
    COMPANIES TAB — admin edits both legal entities
    ════════════════════════════════════════════════════════════════════
@@ -610,6 +750,44 @@ function CompaniesTab() {
       setStatusMsg('Saved.')
       setTimeout(() => setStatusMsg(''), 1500)
     }
+  }
+
+  // Phase 11f — file upload handler for letterhead / logo. Persists
+  // immediately (no save-on-blur because there's no input to blur).
+  async function handleAssetUploaded(rowId, field, url) {
+    setField(rowId, field, url)
+    setSavingId(rowId)
+    const { data, error } = await supabase
+      .from('companies')
+      .update({ [field]: url })
+      .eq('id', rowId)
+      .select()
+      .single()
+    setSavingId(null)
+    if (error) {
+      setStatusError(`Could not save ${field}: ${error.message}`)
+      return
+    }
+    // Refresh the row from server so we don't drift
+    setRows(prev => prev.map(r => r.id === rowId ? { ...r, ...data } : r))
+    setStatusMsg('Uploaded.')
+    setTimeout(() => setStatusMsg(''), 1500)
+  }
+
+  async function handleAssetCleared(rowId, field) {
+    setField(rowId, field, null)
+    setSavingId(rowId)
+    const { error } = await supabase
+      .from('companies')
+      .update({ [field]: null })
+      .eq('id', rowId)
+    setSavingId(null)
+    if (error) {
+      setStatusError(`Could not clear ${field}: ${error.message}`)
+      return
+    }
+    setStatusMsg('Cleared.')
+    setTimeout(() => setStatusMsg(''), 1500)
   }
 
   // Field renderer — shared label+input layout for every company field.
@@ -737,44 +915,33 @@ function CompaniesTab() {
                 </div>
               </div>
 
-              {/* Branding fields — letterhead PNG is rasterized into the
-                  govt proposal PDF as background. Default points at the
-                  seeded /letterheads/*.png shipped in /public; admin can
-                  replace with a Supabase Storage URL after re-upload. */}
+              {/* Branding — Phase 11f. Replaced text URL inputs with
+                  real file upload. Files land in the public
+                  company-assets storage bucket; the resulting public
+                  URL is saved into companies.letterhead_url / logo_url
+                  and used directly by the proposal renderer. */}
               <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--surface-3)', paddingTop: 12, marginTop: 6 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Branding</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <Field row={r} field="letterhead_url" label="Letterhead URL (govt PDF bg)" wide />
-                  <Field row={r} field="logo_url"       label="Logo URL (optional)" wide />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <AssetUploader
+                    row={r}
+                    field="letterhead_url"
+                    label="Letterhead (govt PDF background)"
+                    kind="letterhead"
+                    accept="image/png,image/jpeg"
+                    onUpload={url => handleAssetUploaded(r.id, 'letterhead_url', url)}
+                    onClear={()  => handleAssetCleared(r.id, 'letterhead_url')}
+                  />
+                  <AssetUploader
+                    row={r}
+                    field="logo_url"
+                    label="Logo (optional)"
+                    kind="logo"
+                    accept="image/png,image/jpeg,image/svg+xml"
+                    onUpload={url => handleAssetUploaded(r.id, 'logo_url', url)}
+                    onClear={()  => handleAssetCleared(r.id, 'logo_url')}
+                  />
                 </div>
-                {r.letterhead_url && (
-                  <div style={{
-                    marginTop: 10,
-                    padding: 8,
-                    borderRadius: 8,
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--surface-3)',
-                    display: 'flex', alignItems: 'center', gap: 12,
-                  }}>
-                    <img
-                      src={r.letterhead_url}
-                      alt="letterhead preview"
-                      style={{
-                        width: 96, height: 'auto', flexShrink: 0,
-                        border: '1px solid var(--surface-3)',
-                        background: '#fff',
-                      }}
-                      onError={e => { e.currentTarget.style.display = 'none' }}
-                    />
-                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                      Letterhead is used as the page background on{' '}
-                      <strong>{r.segment === 'GOVERNMENT' ? 'Govt proposal' : 'Private quote'}</strong> PDFs.
-                      {r.segment === 'PRIVATE' && (
-                        <> Currently the private quote PDF uses its own custom design — letterhead is stored but not yet wired in.</>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
