@@ -214,10 +214,19 @@ export async function generateLockedProposalPdf({ domNode, quoteId }) {
   let isFirstPage = true
 
   while (remaining > 0) {
+    const sliceHpx = Math.min(pageHpx, remaining)
+    // Phase 11d (rev7) — skip a trailing slice that's < 10% of a page
+    // tall AND not the first page. Margin/border/line-height rounding
+    // routinely produces a 5-50px overflow past the last "real" page,
+    // which used to become a near-blank trailing page in the PDF. 10%
+    // threshold catches all rounding artifacts; legit content needs
+    // at least ~30% of a page, so this never drops real text.
+    if (!isFirstPage && sliceHpx < pageHpx * 0.10) {
+      break
+    }
     if (!isFirstPage) pdf.addPage()
     isFirstPage = false
 
-    const sliceHpx = Math.min(pageHpx, remaining)
     // For the slice, draw the source canvas onto a temp canvas then
     // dump just that slice as JPEG. Avoids putting the whole image in
     // memory N times.

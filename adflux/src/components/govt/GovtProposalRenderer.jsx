@@ -82,7 +82,12 @@ export function GovtProposalRenderer({
     : renderGsrtcTable(data)
 
   const signerHtml = renderSignerBlock(signer, company)
-  const bidanHtml  = renderBidanBlock(mediaType)
+  // Phase 11d (rev7) — bidan list now driven by data.bidan_items if
+  // provided (computed from the checklist by GovtProposalDetailV2).
+  // Falls back to the static media-type defaults so the wizard's
+  // Step5 live preview (no checklist context yet) still shows
+  // something sensible.
+  const bidanHtml  = renderBidanBlock(mediaType, data.bidan_items)
 
   const vars = {
     recipient:        recipientHtml,
@@ -150,6 +155,32 @@ export function GovtProposalRenderer({
     <>
       {/* Page 1 — cover letter */}
       <div className="govt-letter govt-letter--themed" style={coverStyle}>
+        {/* Phase 11d (rev7) — સંદર્ભ ક્રમાંક (reference number) line.
+            Owner spec docx includes "સંદર્ભ ક્રમાંક: UA/GOVT/2026/____
+            તારીખ: ____/____/૨૦૨૬" at the very top. Since the date
+            already lives on the right of the recipient block, we put
+            the quote number on the left of that same line so both
+            top-of-letter identifiers sit on one row. Falls back to
+            ref_number if quote_number is missing (legacy proposals). */}
+        {(data.quote_number || data.ref_number) && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            fontSize: 11.5,
+            color: '#444',
+            marginBottom: 14,
+            paddingBottom: 6,
+            borderBottom: '1px dashed #999',
+          }}>
+            <span>
+              <strong>સંદર્ભ ક્રમાંક:</strong> {data.quote_number || data.ref_number}
+            </span>
+            <span>
+              <strong>તારીખ:</strong> {dateGu}
+            </span>
+          </div>
+        )}
         <div className="govt-letter__head">
           <div
             className="govt-letter__recipient"
@@ -255,8 +286,14 @@ function renderAutoTable(data) {
    {{bidan_block}} placeholder; styling lives in govt.css if needed.
    Owner spec (4 May 2026 docx): bidan must appear at the END of every
    letter when generating PDF or printing. */
-function renderBidanBlock(mediaType) {
-  const items = mediaType === 'AUTO_HOOD'
+function renderBidanBlock(mediaType, dynamicItems) {
+  // Prefer the dynamic list (computed from this quote's checklist) so
+  // the bidan section reflects what's actually attached. When empty
+  // (e.g., wizard preview before checklist is populated), fall back to
+  // the standard media-type defaults so the letter still has a closing
+  // enclosure list. Owner spec (4 May 2026): "ticked document should
+  // listed in attachment".
+  const fallback = mediaType === 'AUTO_HOOD'
     ? [
         'CBC (પૂર્વે DAVP) મંજૂર દરપત્રકની નકલ',
         'જિલ્લાવાર ઓટો રિક્ષાઓની યાદી',
@@ -267,6 +304,11 @@ function renderBidanBlock(mediaType) {
         'અમારા તરફથી રજૂ કરેલ ભાવ-દરખાસ્તની નકલ',
         '૨૦ બસ ડેપો મથકોની યાદી',
       ]
+
+  const items = (Array.isArray(dynamicItems) && dynamicItems.length > 0)
+    ? dynamicItems
+    : fallback
+
   const lis = items.map(t => `<li>${t}</li>`).join('')
   return [
     '<div class="govt-letter__bidan" style="margin-top:18px;">',
@@ -300,13 +342,14 @@ function renderDistrictListPage(data) {
   if (items.length === 0) return ''
 
   const totalQty = Number(data.auto_total_quantity || 0)
-  // Phase 11d (rev4) — explicit color:#111 on EVERY cell, not just the
-  // table. Without this the dark-theme's --text variable inherits down
-  // through the table → cells render as light gray on white = invisible
-  // in the rasterized PDF. The base .govt-letter has color:#111 but the
-  // cascade was getting overridden by something between table and td;
-  // setting it on every cell is the bulletproof fix.
-  const cellStyle = 'padding:4px 10px;font-size:11.5px;line-height:1.35;border:1px solid #444;color:#111;background:#fff;'
+  // Phase 11d (rev7) — bumped from 4px/11.5px/1.35 to 5px/12px/1.4
+  // because Gujarati script has tall ascenders ("ફ", "ભ", "મ") and
+  // long descenders ("્") that were colliding between rows at 19px
+  // total height. New row height: 5+5+12*1.4 = ~27px × 33 rows = 891px,
+  // fits the 1011px content area with 80px to spare for heading/total.
+  // Explicit color:#111 on EVERY cell (cascade was getting overridden
+  // by dark-theme variables in the rasterized output).
+  const cellStyle = 'padding:5px 10px;font-size:12px;line-height:1.4;border:1px solid #444;color:#111;background:#fff;'
   const headStyle = cellStyle + 'background:#f5f5f5;font-weight:700;'
 
   const rowsHtml = items.map((it, i) => {

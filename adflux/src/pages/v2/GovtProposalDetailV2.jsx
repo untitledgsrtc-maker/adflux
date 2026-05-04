@@ -238,7 +238,22 @@ export default function GovtProposalDetailV2() {
         allocated_qty: Number(it.qty) || 0,
       }
     })
+    // Bidan items — dynamic from the checklist. Phase 11d (rev7):
+    // owner spec "ticked document should listed in attachment". Replace
+    // the hardcoded list with rows that have either checked=true OR a
+    // file_url set, so the rendered બિડાણ section reflects what's
+    // actually attached to THIS proposal.
+    const bidanItems = (checklist || [])
+      .filter(c => c.checked || (c.file_url && String(c.file_url).trim() !== ''))
+      .map(c => c.label)
+      .filter(Boolean)
+
     return {
+      // Phase 11d (rev7) — pass quote/ref number through so the
+      // renderer can stamp "સંદર્ભ ક્રમાંક: ..." at the top of the
+      // letter. Owner spec from the docx template.
+      quote_number:           quote.quote_number,
+      ref_number:             quote.ref_number,
       recipient_block:        quote.recipient_block,
       proposal_date:          quote.proposal_date,
       auto_total_quantity:    quote.auto_total_quantity,
@@ -247,8 +262,9 @@ export default function GovtProposalDetailV2() {
         ? Number(items[0]?.unit_rate ?? items[0]?.offered_rate ?? 825)
         : 0,
       line_items:             lineItems,
+      bidan_items:            bidanItems,
     }
-  }, [quote, items])
+  }, [quote, items, checklist])
 
   // Helper used by both changeStatus and handleWonWithPayment to
   // confirm a specific labelled attachment has actually been uploaded
@@ -333,7 +349,18 @@ export default function GovtProposalDetailV2() {
       } catch (e) {
         setSentModalBusy(false)
         setGeneratingPdf(false)
-        setStatusError(`Failed to lock proposal PDF: ${e?.message || e}`)
+        // Phase 11d (rev7) — friendlier error for the common stale-
+        // Vite-chunk failure ("Failed to fetch dynamically imported
+        // module"). User just needs to hard refresh.
+        const msg = String(e?.message || e)
+        if (msg.includes('dynamically imported module') || msg.includes('Failed to fetch')) {
+          setStatusError(
+            'Could not load PDF generator — stale page from before the last deploy. ' +
+            'Hard refresh (Cmd+Shift+R / Ctrl+Shift+R) and click Mark Sent again.'
+          )
+        } else {
+          setStatusError(`Failed to lock proposal PDF: ${msg}`)
+        }
         return
       }
       setGeneratingPdf(false)
@@ -793,10 +820,15 @@ export default function GovtProposalDetailV2() {
           let isFirstPage = true
 
           while (remaining > 0) {
+            const sliceHpx = Math.min(pageHpx, remaining)
+            // Phase 11d (rev7) — skip trailing tiny slice (kills the
+            // phantom blank page caused by margin/border rounding).
+            if (!isFirstPage && sliceHpx < pageHpx * 0.10) {
+              break
+            }
             if (!isFirstPage) pdf.addPage()
             isFirstPage = false
 
-            const sliceHpx = Math.min(pageHpx, remaining)
             const slice    = document.createElement('canvas')
             slice.width    = canvas.width
             slice.height   = sliceHpx
@@ -816,7 +848,23 @@ export default function GovtProposalDetailV2() {
           const buf = pdf.output('arraybuffer')
           inputs.push({ kind: 'pdf', data: buf })
         } catch (e) {
-          console.warn('[combined-pdf] could not embed draft preview:', e?.message)
+          // Phase 11d (rev7) — surface this. Previously logged to
+          // console.warn and swallowed, then the user got the
+          // misleading "Nothing to merge" message. Common cause is a
+          // stale Vite chunk hash after a deploy ("Failed to fetch
+          // dynamically imported module: jspdf.es.min-...js") — hard
+          // refresh fixes it.
+          const msg = String(e?.message || e)
+          if (msg.includes('dynamically imported module') || msg.includes('Failed to fetch')) {
+            setStatusError(
+              'Could not load PDF generator — your browser has a stale page from before the last deploy. ' +
+              'Hard refresh (Cmd+Shift+R / Ctrl+Shift+R) and try again.'
+            )
+          } else {
+            setStatusError(`Could not render proposal letter: ${msg}`)
+          }
+          setCombinedPdfBusy(false)
+          return
         }
       }
 
