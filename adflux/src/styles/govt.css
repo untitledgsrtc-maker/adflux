@@ -461,18 +461,35 @@
   font-weight: 700;
 }
 
-/* Letter preview frame */
+/* Letter preview frame
+   ---------------------------------------------------------------
+   Phase 10c — locked to A4 portrait dimensions (210×297mm = 794×1123px
+   at 96dpi). This mirrors what html2canvas + jsPDF will rasterize, so
+   what the user sees in preview is what gets printed. Without this
+   lock, the .govt-letter would stretch to full container width
+   (~1100px+ in the dark v2 shell), then the rasterizer's 794px wrapper
+   would re-flow it taller, and a short letter could end up filling
+   only the top half of an A4 page (white space below).
+
+   width is set via max-width + width:100% so narrow viewports can
+   shrink the preview, but on desktop the letter shows at exactly
+   A4 width. min-height ensures even short letters render full-page.
+   margin: auto centers the letter inside the wizard step body.
+*/
 .govt-letter {
   background: #fff;
   color: #111;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 36px 44px;
-  margin-bottom: 18px;
+  padding: 56px 64px;
+  margin: 0 auto 18px;
   font-family: 'Noto Sans Gujarati', 'DM Sans', system-ui, sans-serif;
   font-size: 13.5px;
   line-height: 1.7;
-  max-width: 100%;
+  width: 100%;
+  max-width: 794px;            /* A4 portrait width @ 96dpi */
+  min-height: 1123px;          /* A4 portrait height @ 96dpi */
+  box-sizing: border-box;      /* padding included in width/height */
   overflow-x: auto;
 }
 

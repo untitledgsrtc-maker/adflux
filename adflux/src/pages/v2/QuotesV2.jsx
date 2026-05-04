@@ -50,6 +50,9 @@ export default function QuotesV2() {
   // 'all' (default) keeps the historical mixed view. Pre-Phase 4 rows
   // have segment=null, so 'private' must match both 'PRIVATE' and null.
   const [segmentFilter, setSegmentFilter] = useState('all')
+  // Sub-filter for govt quotes — Auto Hood vs GSRTC LED. Only visible
+  // when segmentFilter === 'government'. Mirrors the segment pill UI.
+  const [mediaFilter, setMediaFilter] = useState('all')
 
   useEffect(() => {
     setLoading(true)
@@ -87,10 +90,18 @@ export default function QuotesV2() {
   // segmentScoped, so the pill correctly slices status tab counts and
   // totals together.
   const segmentScoped = useMemo(() => {
-    if (segmentFilter === 'all') return quotes
-    if (segmentFilter === 'government') return quotes.filter(q => q.segment === 'GOVERNMENT')
-    return quotes.filter(q => q.segment !== 'GOVERNMENT')
-  }, [quotes, segmentFilter])
+    let pool = quotes
+    if (segmentFilter === 'government') {
+      pool = quotes.filter(q => q.segment === 'GOVERNMENT')
+      // Govt-only sub-filter on media_type. 'all' keeps both AUTO + GSRTC.
+      if (mediaFilter !== 'all') {
+        pool = pool.filter(q => q.media_type === mediaFilter)
+      }
+    } else if (segmentFilter !== 'all') {
+      pool = quotes.filter(q => q.segment !== 'GOVERNMENT')
+    }
+    return pool
+  }, [quotes, segmentFilter, mediaFilter])
 
   // Rep-scoped quote pool — used by tab counts so when admin scopes
   // to one rep, the tabs show that rep's status breakdown (otherwise
@@ -273,7 +284,13 @@ export default function QuotesV2() {
           ].map(o => (
             <button
               key={o.key}
-              onClick={() => setSegmentFilter(o.key)}
+              onClick={() => {
+                setSegmentFilter(o.key)
+                // Auto-reset media sub-filter when leaving Govt — the
+                // pill disappears anyway, but a stale value would re-
+                // apply if the user toggled back to Govt later.
+                if (o.key !== 'government') setMediaFilter('all')
+              }}
               style={{
                 padding: '5px 11px', borderRadius: 999, border: 'none',
                 cursor: 'pointer', fontSize: 12, fontWeight: 600,
@@ -286,9 +303,40 @@ export default function QuotesV2() {
           ))}
         </div>
 
-        {(hasActiveFilters || (isAdmin && repFilter !== 'all') || segmentFilter !== 'all') && (
+        {/* Govt-only media-type sub-filter — Auto vs GSRTC. Hidden
+            unless segmentFilter is 'government', because for All /
+            Private the media types either don't exist or aren't useful
+            to slice on. Auto-resets when leaving Govt below. */}
+        {segmentFilter === 'government' && (
+          <div style={{
+            display: 'inline-flex', gap: 4, padding: 3,
+            background: 'var(--v2-bg-2)', borderRadius: 999,
+            border: '1px solid var(--v2-border)',
+          }}>
+            {[
+              { key: 'all',        label: 'All' },
+              { key: 'AUTO_HOOD',  label: 'Auto' },
+              { key: 'GSRTC_LED',  label: 'GSRTC' },
+            ].map(o => (
+              <button
+                key={o.key}
+                onClick={() => setMediaFilter(o.key)}
+                style={{
+                  padding: '5px 11px', borderRadius: 999, border: 'none',
+                  cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  background: mediaFilter === o.key ? 'var(--v2-accent, #facc15)' : 'transparent',
+                  color:      mediaFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {(hasActiveFilters || (isAdmin && repFilter !== 'all') || segmentFilter !== 'all' || mediaFilter !== 'all') && (
           <button className="v2d-ghost" onClick={() => {
-            handleReset(); setRepFilter('all'); setSegmentFilter('all')
+            handleReset(); setRepFilter('all'); setSegmentFilter('all'); setMediaFilter('all')
           }}>
             <X size={13} />
             <span>Clear</span>
@@ -394,11 +442,12 @@ export default function QuotesV2() {
                     </td>
                     <td>{formatDate(q.created_at)}</td>
                     <td>
-                      {q.follow_up_date ? (
-                        <FollowUpChip q={q} />
-                      ) : (
-                        <span className="v2d-muted">—</span>
-                      )}
+                      {(() => {
+                        const fu = nextFollowUp(q)
+                        return fu
+                          ? <FollowUpChip date={fu.date} done={fu.done} />
+                          : <span className="v2d-muted">—</span>
+                      })()}
                     </td>
                   </tr>
                 ))}
@@ -503,15 +552,43 @@ function StatusChip({ status }) {
   )
 }
 
+/* ─── Follow-up helpers ───────────────────────────────────────────
+   The denormalized quotes.follow_up_date column has no sync trigger
+   (auto_create_followup writes only to follow_ups), so it's null on
+   every row. We compute the next-pending date from the embedded
+   follow_ups array in useQuotes() instead. Returns null when the
+   quote has no follow-ups at all. */
+export function nextFollowUp(q) {
+  const list = Array.isArray(q?.follow_ups) ? q.follow_ups : []
+  if (!list.length) return null
+
+  const pending = list
+    .filter(f => f && !f.is_done && f.follow_up_date)
+    .sort((a, b) => String(a.follow_up_date).localeCompare(String(b.follow_up_date)))
+  if (pending.length) {
+    return { date: pending[0].follow_up_date, done: false }
+  }
+
+  // No pending — show the latest done one as "✓ Done" so the column
+  // doesn't read empty for quotes that have been worked through.
+  const done = list
+    .filter(f => f && f.is_done && f.follow_up_date)
+    .sort((a, b) => String(b.follow_up_date).localeCompare(String(a.follow_up_date)))
+  if (done.length) {
+    return { date: done[0].follow_up_date, done: true }
+  }
+  return null
+}
+
 /* ─── Follow-up chip ─── */
-function FollowUpChip({ q }) {
-  const overdue = !q.follow_up_done && new Date(q.follow_up_date) <= new Date()
+function FollowUpChip({ date, done }) {
+  const overdue = !done && new Date(date) <= new Date()
   let cls = 'v2d-fu'
-  if (q.follow_up_done) cls += ' v2d-fu--done'
-  else if (overdue)     cls += ' v2d-fu--overdue'
+  if (done)         cls += ' v2d-fu--done'
+  else if (overdue) cls += ' v2d-fu--overdue'
   return (
     <span className={cls}>
-      {q.follow_up_done ? '✓ Done' : formatDate(q.follow_up_date)}
+      {done ? '✓ Done' : formatDate(date)}
     </span>
   )
 }

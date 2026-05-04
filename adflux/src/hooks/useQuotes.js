@@ -29,9 +29,15 @@ export function useQuotes() {
     // Quotes list can render an Outstanding column without a second round-trip.
     // The filter on approval_status lives in the caller (QuoteTable), not here,
     // because PostgREST nested filters would drop quotes with zero payments.
+    // follow_ups(...) embeds every follow-up row for the quote so the
+    // list can compute the next-pending date inline. The denormalized
+    // quotes.follow_up_date column was never being populated (no sync
+    // trigger), so the Follow Up column always rendered "—". Reading
+    // from the source-of-truth follow_ups table instead is correct AND
+    // keeps the UI accurate when a follow-up is marked done / added.
     let query = supabase
       .from('quotes')
-      .select('*, quote_cities(*), payments(amount_received, approval_status)')
+      .select('*, quote_cities(*), payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
       .order('created_at', { ascending: false })
 
     if (profile?.role === 'sales') {

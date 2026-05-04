@@ -72,8 +72,36 @@ export function GovtProposalRenderer({
 
   const renderedBody = renderTemplate(template.body_html, vars)
 
+  // Phase 10b — letterhead background.
+  //   When companies.letterhead_url is set we render the letter on top
+  //   of the rasterized letterhead PNG (logo at top, footer text at
+  //   bottom) so the printed/uploaded PDF matches the physical
+  //   letterhead the business uses on paper. The base .govt-letter CSS
+  //   already locks the container to A4 portrait (794×1123 @ 96dpi)
+  //   via Phase 10c, so background-size:100% 100% always lines up.
+  //
+  //   Padding compensates for the empty zones in the PNGs so letter
+  //   content never overlaps the printed header/footer:
+  //     · government.png — empty zone is 7.3% – 91.1%  (top ~82px, bottom ~100px @ 1123px)
+  //     · private.png    — empty zone is 8.9% – 93.5%  (top ~100px, bottom ~73px @ 1123px)
+  //   Using 130px top + 130px bottom gives a small visual safety margin
+  //   so a slightly long letter doesn't kiss the printed footer.
+  const letterhead = company?.letterhead_url || ''
+  const letterStyle = letterhead
+    ? {
+        backgroundImage:    `url(${letterhead})`,
+        backgroundRepeat:   'no-repeat',
+        backgroundSize:     '100% 100%',
+        backgroundPosition: 'top center',
+        paddingTop:    '130px',
+        paddingRight:  '64px',
+        paddingBottom: '130px',
+        paddingLeft:   '64px',
+      }
+    : undefined
+
   return (
-    <div className="govt-letter">
+    <div className="govt-letter govt-letter--themed" style={letterStyle}>
       {/* Top header — recipient block (top-left) and date (top-right) */}
       <div className="govt-letter__head">
         <div

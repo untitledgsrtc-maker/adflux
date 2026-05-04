@@ -593,6 +593,11 @@ function CompaniesTab() {
       bank_ifsc:       (r.bank_ifsc || '').trim() || null,
       bank_micr:       (r.bank_micr || '').trim() || null,
       upi_id:          (r.upi_id || '').trim() || null,
+      // Phase 10b — admin can swap the seeded /letterheads/*.png path
+      // for a Supabase Storage URL after re-uploading a new letterhead.
+      // Empty value → NULL → renderer falls back to plain white page.
+      letterhead_url:  (r.letterhead_url || '').trim() || null,
+      logo_url:        (r.logo_url || '').trim() || null,
     }
     const { error } = await supabase
       .from('companies')
@@ -731,6 +736,46 @@ function CompaniesTab() {
                   <Field row={r} field="bank_micr"       label="MICR (optional)" />
                   <Field row={r} field="upi_id"          label="UPI ID (optional)" />
                 </div>
+              </div>
+
+              {/* Branding fields — letterhead PNG is rasterized into the
+                  govt proposal PDF as background. Default points at the
+                  seeded /letterheads/*.png shipped in /public; admin can
+                  replace with a Supabase Storage URL after re-upload. */}
+              <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--surface-3)', paddingTop: 12, marginTop: 6 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Branding</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <Field row={r} field="letterhead_url" label="Letterhead URL (govt PDF bg)" wide />
+                  <Field row={r} field="logo_url"       label="Logo URL (optional)" wide />
+                </div>
+                {r.letterhead_url && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: 8,
+                    borderRadius: 8,
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--surface-3)',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                  }}>
+                    <img
+                      src={r.letterhead_url}
+                      alt="letterhead preview"
+                      style={{
+                        width: 96, height: 'auto', flexShrink: 0,
+                        border: '1px solid var(--surface-3)',
+                        background: '#fff',
+                      }}
+                      onError={e => { e.currentTarget.style.display = 'none' }}
+                    />
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                      Letterhead is used as the page background on{' '}
+                      <strong>{r.segment === 'GOVERNMENT' ? 'Govt proposal' : 'Private quote'}</strong> PDFs.
+                      {r.segment === 'PRIVATE' && (
+                        <> Currently the private quote PDF uses its own custom design — letterhead is stored but not yet wired in.</>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

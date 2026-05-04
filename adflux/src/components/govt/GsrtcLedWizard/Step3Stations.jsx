@@ -91,7 +91,7 @@ export function Step3Stations({ data, onChange }) {
         {/* Header row */}
         <div
           className="govt-list__row govt-list__row--head"
-          style={{ gridTemplateColumns: '24px 1fr 50px 60px 64px 64px 64px 110px' }}
+          style={{ gridTemplateColumns: '24px 1fr 50px 60px 78px 78px 78px 110px' }}
         >
           <span></span>
           <span>Station</span>
@@ -157,7 +157,7 @@ export function Step3Stations({ data, onChange }) {
                 onChange={e => setOverride(s.id, 'daily_spots_override', e.target.value)}
                 disabled={!isChecked}
                 className="govt-input-cell"
-                style={{ maxWidth: 56 }}
+                style={{ maxWidth: 70, textAlign: 'right' }}
               />
               <input
                 type="number"
@@ -167,7 +167,7 @@ export function Step3Stations({ data, onChange }) {
                 onChange={e => setOverride(s.id, 'spot_duration_sec_override', e.target.value)}
                 disabled={!isChecked}
                 className="govt-input-cell"
-                style={{ maxWidth: 56 }}
+                style={{ maxWidth: 70, textAlign: 'right' }}
               />
               <input
                 type="number"
@@ -177,7 +177,7 @@ export function Step3Stations({ data, onChange }) {
                 onChange={e => setOverride(s.id, 'days_override', e.target.value)}
                 disabled={!isChecked}
                 className="govt-input-cell"
-                style={{ maxWidth: 56 }}
+                style={{ maxWidth: 70, textAlign: 'right' }}
               />
               <span className="govt-list__qty">
                 {isChecked ? `₹${formatINREnglish(v.monthly)}` : '—'}

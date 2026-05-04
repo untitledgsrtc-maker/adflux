@@ -614,22 +614,74 @@ export default function GovtProposalDetailV2() {
         if (part) inputs.push(part)
       } else if (rendererRef.current) {
         // Draft preview: rasterize current state, embed as PDF in-memory
-        // (no Storage upload). Same code path as the locked generator
-        // but we keep the bytes locally instead of saving.
-        // Simpler: re-use generateLockedProposalPdf and immediately
-        // download — but we want to merge, not download. Use pdf-lib
-        // directly for in-memory generation:
+        // (no Storage upload).
+        //
+        // CRITICAL — must mirror generateLockedProposalPdf's A4 logic:
+        //   1. Clone rendererRef into an off-screen 794px-wide wrapper
+        //      so the captured canvas matches A4 width (else the stretched
+        //      single-image addImage produces wrong-aspect pages).
+        //   2. Slice the canvas into A4-tall (≈297mm) pages and add each
+        //      to the PDF as its own page — same as the locked path.
+        // The previous version called pdf.addImage with full canvas height
+        // scaled to 210mm width, which gave PDFs where one giant image
+        // got stretched/squashed onto a single A4 page.
         try {
           const html2canvas = (await import('html2canvas')).default
           const { jsPDF } = await import('jspdf')
-          const canvas = await html2canvas(rendererRef.current, {
-            scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
-          })
+
+          const A4_WIDTH_PX = 794
+          const wrapper = document.createElement('div')
+          wrapper.style.position   = 'fixed'
+          wrapper.style.left       = '-100000px'
+          wrapper.style.top        = '0'
+          wrapper.style.width      = `${A4_WIDTH_PX}px`
+          wrapper.style.background = '#ffffff'
+          wrapper.style.padding    = '0'
+          wrapper.style.zIndex     = '-1'
+          wrapper.appendChild(rendererRef.current.cloneNode(true))
+          document.body.appendChild(wrapper)
+
+          let canvas
+          try {
+            canvas = await html2canvas(wrapper, {
+              scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+              width: A4_WIDTH_PX, windowWidth: A4_WIDTH_PX,
+            })
+          } finally {
+            document.body.removeChild(wrapper)
+          }
+
           const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-          const imgData = canvas.toDataURL('image/jpeg', 0.92)
-          const pageWidthMm = 210
-          const ratio = canvas.height / canvas.width
-          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidthMm, pageWidthMm * ratio, undefined, 'FAST')
+          const pageWidthMm  = 210
+          const pageHeightMm = 297
+          const pxPerMm      = canvas.width / pageWidthMm
+          const pageHpx      = Math.floor(pageHeightMm * pxPerMm)
+
+          let remaining   = canvas.height
+          let yOffsetPx   = 0
+          let isFirstPage = true
+
+          while (remaining > 0) {
+            if (!isFirstPage) pdf.addPage()
+            isFirstPage = false
+
+            const sliceHpx = Math.min(pageHpx, remaining)
+            const slice    = document.createElement('canvas')
+            slice.width    = canvas.width
+            slice.height   = sliceHpx
+            slice.getContext('2d').drawImage(
+              canvas,
+              0, yOffsetPx, canvas.width, sliceHpx,
+              0, 0,         canvas.width, sliceHpx,
+            )
+            const sliceData = slice.toDataURL('image/jpeg', 0.92)
+            const sliceMm   = sliceHpx / pxPerMm
+            pdf.addImage(sliceData, 'JPEG', 0, 0, pageWidthMm, sliceMm, undefined, 'FAST')
+
+            yOffsetPx += sliceHpx
+            remaining -= sliceHpx
+          }
+
           const buf = pdf.output('arraybuffer')
           inputs.push({ kind: 'pdf', data: buf })
         } catch (e) {
@@ -734,7 +786,19 @@ export default function GovtProposalDetailV2() {
               ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Building…</>
               : <><Download size={14} /> Combined PDF</>}
           </button>
-          {isPrivileged && quote.status === 'draft' && (
+          {/* Status transitions — Mark Sent / Won / Lost.
+              Phase 10d: previously gated behind isPrivileged so sales
+              reps couldn't advance their own govt proposals. Owner
+              spec is that sales runs the full send-to-client flow
+              themselves (small-business model, no manager review
+              hierarchy). The Mark Sent pre-flight modal still enforces
+              OC-copy upload, and Mark Won enforces PO upload + payment
+              capture, so removing the role gate doesn't bypass any
+              data-quality guard — those gates live on the modal flow.
+              RLS allows sales to UPDATE their own quotes
+              (quotes_sales_own) and INSERT their own payments
+              (payments_sales_insert_own), so the writes still succeed. */}
+          {quote.status === 'draft' && (
             <button
               type="button"
               className="govt-wiz__btn"
@@ -746,7 +810,7 @@ export default function GovtProposalDetailV2() {
                 : <><Send size={14} /> Mark Sent</>}
             </button>
           )}
-          {isPrivileged && (quote.status === 'sent' || quote.status === 'negotiating') && (
+          {(quote.status === 'sent' || quote.status === 'negotiating') && (
             <>
               <button
                 type="button"
@@ -767,6 +831,26 @@ export default function GovtProposalDetailV2() {
                 <XCircle size={14} /> Mark Lost
               </button>
             </>
+          )}
+          {/* Cancel draft → mark Lost. Visible only on drafts so reps
+              can clean up their own pipeline without admin help. Uses
+              the same status transition path as Mark Lost from sent;
+              the only difference is the entry status. */}
+          {quote.status === 'draft' && (
+            <button
+              type="button"
+              className="govt-wiz__btn"
+              disabled={savingStatus === 'lost'}
+              onClick={() => {
+                if (confirm('Cancel this draft proposal? It will be marked Lost and removed from active pipeline.')) {
+                  changeStatus('lost')
+                }
+              }}
+              style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+              title="Cancel and mark this draft as Lost"
+            >
+              <XCircle size={14} /> Cancel
+            </button>
           )}
         </div>
       </div>
