@@ -480,6 +480,86 @@ export default function AdminDashboardDesktop() {
     })
     const trendMax = Math.max(1, ...trendMonths.map(m => m.value))
 
+    // Dashboard spec — Action Queue counts ──────────────────────────
+    // The "what should I act on right now" widget. All counts derived
+    // from already-fetched data, no extra round-trips.
+    //
+    // Follow-ups due today across the whole team (admin sees all reps).
+    // We need a separate query because the existing follow-ups data we
+    // load is per-rep-completed-today (used by the per-rep activity
+    // strip). Inline this small fetch since it's cheap and only runs
+    // for admin.
+    const followupsDueRes = await supabase
+      .from('follow_ups')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_done', false)
+      .lte('follow_up_date', todayDate)
+    const followupsDueCount = followupsDueRes.count || 0
+
+    // Govt proposals waiting on OC copy upload — proposals in 'draft'
+    // status (haven't been Sent yet) that are MISSING the OC copy
+    // attachment. Surfaces "I need OC copy from delivery before I can
+    // mark this Sent" backlog. Reads attachments_checklist JSONB on
+    // each govt quote.
+    const govtAwaitingOcCount = allQuotes.reduce((n, q) => {
+      if (q.segment !== 'GOVERNMENT') return n
+      if (q.status !== 'draft') return n
+      const checklist = Array.isArray(q.attachments_checklist) ? q.attachments_checklist : []
+      const oc = checklist.find(c => /oc copy/i.test(c.label || ''))
+      // Missing entirely OR present-but-no-file → still awaiting.
+      if (!oc || !oc.file_url || String(oc.file_url).trim() === '') return n + 1
+      return n
+    }, 0)
+
+    // Renewal opportunities — won quotes whose campaign window ends
+    // in the next 30 days. Estimated renewal value = sum of those
+    // total_amounts (assumes 1:1 renewal which is generous; real
+    // renewal rate is rep+client specific).
+    const RENEWAL_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+    const nowMs = new Date(today).getTime()
+    const renewalsList = quotes
+      .filter(q => q.status === 'won' && q.campaign_end_date)
+      .filter(q => {
+        const end = new Date(q.campaign_end_date).getTime()
+        return end >= nowMs && (end - nowMs) <= RENEWAL_WINDOW_MS
+      })
+      .sort((a, b) => (a.campaign_end_date || '').localeCompare(b.campaign_end_date || ''))
+    const renewalEstValue = renewalsList.reduce((s, q) => s + (q.total_amount || 0), 0)
+
+    // Compose the Action Queue items in priority order. Each item =
+    // { id, kind, count, label, urgency, onClickRoute }.
+    // Items with count=0 are filtered out — empty rows aren't action.
+    const actionQueueAll = [
+      {
+        id:       'approvals',
+        kind:     'red',
+        count:    pending.length,
+        label:    pending.length === 1 ? 'payment approval waiting' : 'payment approvals waiting',
+        route:    '/pending-approvals',
+      },
+      {
+        id:       'stale_won',
+        kind:     'red',
+        count:    staleQuotes.length,
+        label:    staleQuotes.length === 1 ? 'won quote stale 60+ days' : 'won quotes stale 60+ days',
+        route:    '/quotes',
+      },
+      {
+        id:       'oc_pending',
+        kind:     'amber',
+        count:    govtAwaitingOcCount,
+        label:    govtAwaitingOcCount === 1 ? 'govt proposal awaiting OC copy' : 'govt proposals awaiting OC copy',
+        route:    '/quotes',
+      },
+      {
+        id:       'followups_due',
+        kind:     'amber',
+        count:    followupsDueCount,
+        label:    followupsDueCount === 1 ? 'follow-up due today' : 'follow-ups due today',
+        route:    '/quotes',
+      },
+    ].filter(i => i.count > 0)
+
     // M1 — per-rep TODAY activity strip + missed-targets banner ──────
     // For each sales user: count today's quotes sent, follow-ups
     // completed, payments logged. Compare against their daily target
@@ -543,6 +623,9 @@ export default function AdminDashboardDesktop() {
       pending,
       // M1 daily activity
       repActivity, missedReps,
+      // Dashboard spec — Action Queue + Renewal Opportunities
+      actionQueue: actionQueueAll,
+      renewals: { list: renewalsList, estValue: renewalEstValue },
     })
   }
 
@@ -701,6 +784,15 @@ export default function AdminDashboardDesktop() {
           </header>
 
           <div className="v2d-content">
+            {/* Dashboard spec — Action Queue card. Hero slot of the
+                page (above the revenue strip). Static rule-based for
+                now; AI agent integration will replace the body with a
+                generated morning briefing in a later batch. The slot
+                stays the same so the layout doesn't change when AI
+                lands. Only renders when there's actually something to
+                act on; an empty action queue shows "Inbox zero". */}
+            <ActionQueueCard items={state.actionQueue || []} onOpen={(route) => navigate(route)} />
+
             {/* M1 — Missed-targets banner. Shown only when at least one
                 rep is currently below their daily quota. Lists names so
                 admin can see who to ping (or who to walk over to).
@@ -854,18 +946,22 @@ export default function AdminDashboardDesktop() {
               <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
             </section>
 
-            {/* Row 4: Incentive liability + Stale won quotes paired.
-                Both are forward-looking risk views — "what we owe" and
-                "what won't collect". Stale renders conditionally; when
-                missing, liability stretches full-width on its own. */}
-            {state.staleQuotes && state.staleQuotes.length > 0 ? (
-              <section className="v2d-grid-2">
-                <LiabilityPanel data={state.liability} />
-                <StalePanel rows={state.staleQuotes} onOpen={(row) => openQuote(row)} />
-              </section>
-            ) : (
+            {/* Row 4: Incentive liability + Renewal opportunities.
+                Liability = "what we owe the team if month closed today".
+                Renewals = "money we could earn if we ask clients ending
+                in 30 days." Both forward-looking, naturally paired. */}
+            <section className="v2d-grid-2">
+              <LiabilityPanel data={state.liability} />
+              <RenewalsPanel data={state.renewals} onOpen={(row) => openQuote(row)} onAll={() => navigate('/renewal-tools')} />
+            </section>
+
+            {/* Row 4b: Stale won quotes — separate row, full-width when
+                present. Forward-looking risk: deals won that won't
+                actually collect unless someone chases. Hidden when
+                count = 0 to keep the page tight. */}
+            {state.staleQuotes && state.staleQuotes.length > 0 && (
               <section>
-                <LiabilityPanel data={state.liability} />
+                <StalePanel rows={state.staleQuotes} onOpen={(row) => openQuote(row)} />
               </section>
             )}
 
@@ -1257,6 +1353,141 @@ function StalePanel({ rows, onOpen }) {
         </tbody>
       </table>
     </section>
+  )
+}
+
+// Dashboard spec — Action Queue card. Hero slot. Static rule-based
+// version. AI agent integration replaces this with a generated
+// morning briefing later (same slot, swap the body content). When
+// the queue is empty, shows "Inbox zero" instead of hiding entirely
+// because the slot is supposed to be the hero of the page.
+function ActionQueueCard({ items, onOpen }) {
+  const allClear = items.length === 0
+  const KIND = {
+    red:   { color: '#f87171', bg: 'rgba(248,113,113,.1)',  border: 'rgba(248,113,113,.3)' },
+    amber: { color: '#fbbf24', bg: 'rgba(251,191,36,.08)',  border: 'rgba(251,191,36,.25)' },
+    green: { color: '#4ade80', bg: 'rgba(74,222,128,.08)',  border: 'rgba(74,222,128,.25)' },
+  }
+  return (
+    <section
+      className="v2d-banner"
+      style={{
+        padding: '14px 18px', marginBottom: 16,
+        background: allClear ? 'rgba(74,222,128,.06)' : 'rgba(15, 23, 42, .6)',
+        border: `1px solid ${allClear ? 'rgba(74,222,128,.2)' : 'var(--v2-border)'}`,
+        borderRadius: 14,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: allClear ? 0 : 12 }}>
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: '.12em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>
+            Action queue {!allClear && `· ${items.length} item${items.length === 1 ? '' : 's'}`}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--v2-ink-0)' }}>
+            {allClear ? '✓  Inbox zero — nothing needs your attention.' : 'What you should act on today'}
+          </div>
+        </div>
+      </div>
+      {!allClear && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {items.map(it => {
+            const meta = KIND[it.kind] || KIND.amber
+            return (
+              <button
+                key={it.id}
+                onClick={() => onOpen?.(it.route)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px',
+                  background: meta.bg,
+                  border: `1px solid ${meta.border}`,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background .15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = meta.bg.replace(/,\.\d+\)/, ',.18)') }}
+                onMouseLeave={e => { e.currentTarget.style.background = meta.bg }}
+              >
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  minWidth: 32, height: 28, padding: '0 8px', borderRadius: 8,
+                  background: meta.color, color: 'var(--v2-bg-0)',
+                  fontFamily: 'var(--v2-display)', fontWeight: 800, fontSize: 14,
+                }}>{it.count}</span>
+                <span style={{ fontSize: 13, color: 'var(--v2-ink-0)', fontWeight: 500, flex: 1 }}>
+                  {it.label}
+                </span>
+                <ArrowUpRight size={14} style={{ color: 'var(--v2-ink-2)' }} />
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// Dashboard spec — Renewal Opportunities widget. Paired with the
+// Liability panel (both forward-looking). Shows count of campaigns
+// ending in the next 30 days + estimated renewal value (sum of
+// total_amounts; assumes 1:1 renewal which is generous, real rate
+// varies by client). Click → opens specific quote or routes to
+// renewal-tools page.
+function RenewalsPanel({ data, onOpen, onAll }) {
+  const list = data?.list || []
+  const estValue = data?.estValue || 0
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Renewal opportunities</div>
+          <div className="v2d-panel-s">Campaigns ending in the next 30 days</div>
+        </div>
+        {list.length > 0 && <button className="v2d-link" onClick={onAll}>Open all →</button>}
+      </div>
+      {list.length === 0 ? (
+        <div className="v2d-q-empty">No campaigns ending in the next 30 days.</div>
+      ) : (
+        <>
+          {/* Big "estimated renewal value" stat at the top */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+            padding: '8px 0 14px', borderBottom: '1px solid var(--v2-border)',
+            marginBottom: 10,
+          }}>
+            <div>
+              <div className="v2d-prog-big"><Money value={estValue} /></div>
+              <div className="v2d-prog-meta">
+                <span>Est. renewal value · {list.length} campaign{list.length === 1 ? '' : 's'}</span>
+              </div>
+            </div>
+          </div>
+          {/* Top 5 ending soonest */}
+          {list.slice(0, 5).map(r => {
+            const daysLeft = Math.max(0, Math.round((new Date(r.campaign_end_date).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+            return (
+              <div key={r.id} className="v2d-q-row" onClick={() => onOpen?.(r)}>
+                <div className="v2d-q-ic v2d-q-ic--green"><Repeat size={14} /></div>
+                <div className="v2d-q-body">
+                  <div className="v2d-q-t">
+                    {r.client_company || r.client_name}
+                    {r.client_company && r.client_name && (
+                      <span style={{ color: 'var(--v2-ink-2)', fontWeight: 500 }}> · {r.client_name}</span>
+                    )}
+                  </div>
+                  <div className="v2d-q-s">
+                    {r.quote_number || r.ref_number} · ends in {daysLeft} day{daysLeft === 1 ? '' : 's'}
+                  </div>
+                </div>
+                <div className="v2d-q-amt"><Money value={r.total_amount || 0} /></div>
+                <ArrowUpRight size={14} style={{ color: 'var(--v2-ink-2)' }} />
+              </div>
+            )
+          })}
+        </>
+      )}
+    </div>
   )
 }
 
