@@ -699,15 +699,20 @@ export default function GovtProposalDetailV2() {
     try {
       const inputs = []
 
-      // 1) Locked proposal letter PDF first (if it exists). If we're
-      //    still in draft we don't have one — generate on the fly so
-      //    the user can preview the combined output without committing
-      //    to Mark Sent. We do NOT upload this draft preview to
-      //    Storage; it's a one-shot for download.
-      if (quote.locked_proposal_pdf_url) {
-        const part = await fetchAsMergeInput(quote.locked_proposal_pdf_url)
-        if (part) inputs.push(part)
-      } else if (rendererRef.current) {
+      // 1) Proposal letter PDF first.
+      //    Phase 11d (rev4) — ALWAYS rasterize fresh from the current
+      //    renderer instead of using the locked PDF. The locked PDF is
+      //    legal evidence of "what was originally sent" and stays on
+      //    Storage (still viewable via the Locked-PDF banner's "View"
+      //    button), but the Combined PDF is a working copy meant to
+      //    reflect current quote data + latest layout fixes. Without
+      //    this change, every layout improvement (A4 lock, district
+      //    list, font compaction) would only apply to NEW quotes —
+      //    existing Sent quotes would forever show stale 6-page
+      //    PDFs in their Combined download until admin manually
+      //    clicked Regenerate. That's a footgun. Better: View = legal
+      //    snapshot, Combined = current view.
+      if (rendererRef.current) {
         // Draft preview: rasterize current state, embed as PDF in-memory
         // (no Storage upload).
         //

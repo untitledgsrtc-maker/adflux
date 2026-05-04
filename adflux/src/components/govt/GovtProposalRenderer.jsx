@@ -291,7 +291,14 @@ function renderDistrictListPage(data) {
   if (items.length === 0) return ''
 
   const totalQty = Number(data.auto_total_quantity || 0)
-  const cellStyle = 'padding:4px 10px;font-size:11.5px;line-height:1.35;border:1px solid #444;'
+  // Phase 11d (rev4) — explicit color:#111 on EVERY cell, not just the
+  // table. Without this the dark-theme's --text variable inherits down
+  // through the table → cells render as light gray on white = invisible
+  // in the rasterized PDF. The base .govt-letter has color:#111 but the
+  // cascade was getting overridden by something between table and td;
+  // setting it on every cell is the bulletproof fix.
+  const cellStyle = 'padding:4px 10px;font-size:11.5px;line-height:1.35;border:1px solid #444;color:#111;background:#fff;'
+  const headStyle = cellStyle + 'background:#f5f5f5;font-weight:700;'
 
   const rowsHtml = items.map((it, i) => {
     const name =
@@ -304,29 +311,29 @@ function renderDistrictListPage(data) {
     const qty = Number(it.allocated_qty ?? it.qty ?? it.quantity ?? 0)
     return `
       <tr>
-        <td class="num" style="${cellStyle}text-align:center;">${toGujaratiDigits(String(i + 1))}</td>
+        <td style="${cellStyle}text-align:center;">${toGujaratiDigits(String(i + 1))}</td>
         <td style="${cellStyle}">${name}</td>
-        <td class="num" style="${cellStyle}text-align:right;">${toGujaratiDigits(formatINREnglish(qty))}</td>
+        <td style="${cellStyle}text-align:right;">${toGujaratiDigits(formatINREnglish(qty))}</td>
       </tr>`
   }).join('')
 
   return `
-  <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;text-align:center;">
+  <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;text-align:center;color:#111;">
     *ગુજરાત – ઓટો રિક્ષા જિલ્લા પ્રમાણેનું લિસ્ટ*
   </h2>
   <table style="border-collapse:collapse;width:100%;max-width:540px;margin:0 auto;background:#fff;color:#111;">
     <thead>
       <tr>
-        <th style="${cellStyle}background:#f5f5f5;font-weight:700;width:50px;text-align:center;">ક્રમ</th>
-        <th style="${cellStyle}background:#f5f5f5;font-weight:700;text-align:left;">જિલ્લો</th>
-        <th style="${cellStyle}background:#f5f5f5;font-weight:700;width:140px;text-align:right;">ઓટો રિક્ષાની સંખ્યા</th>
+        <th style="${headStyle}width:50px;text-align:center;">ક્રમ</th>
+        <th style="${headStyle}text-align:left;">જિલ્લો</th>
+        <th style="${headStyle}width:140px;text-align:right;">ઓટો રિક્ષાની સંખ્યા</th>
       </tr>
     </thead>
     <tbody>
       ${rowsHtml}
       <tr>
-        <td colspan="2" style="${cellStyle}font-weight:700;"><strong>કુલ</strong></td>
-        <td class="num" style="${cellStyle}font-weight:700;text-align:right;"><strong>${toGujaratiDigits(formatINREnglish(totalQty))}</strong></td>
+        <td colspan="2" style="${cellStyle}font-weight:700;">કુલ</td>
+        <td style="${cellStyle}font-weight:700;text-align:right;">${toGujaratiDigits(formatINREnglish(totalQty))}</td>
       </tr>
     </tbody>
   </table>`

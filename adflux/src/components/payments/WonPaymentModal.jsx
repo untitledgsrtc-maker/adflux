@@ -13,6 +13,7 @@
 // incentive until that final tick happens.
 
 import { useRef, useState } from 'react'
+import { CheckCircle2, Paperclip, Upload } from 'lucide-react'
 import { formatCurrency, todayISO } from '../../utils/formatters'
 
 /**
@@ -177,42 +178,42 @@ export function WonPaymentModal({
           </div>
 
           {/* Phase 11 — Work Order / PO copy gate.
-              Shown only when the parent says workOrderRequired (govt
-              segment). Mirrors the Mark-Sent OC-copy banner: red when
-              missing (with inline upload), green when present. Confirm
-              button is disabled below until this clears. */}
+              Phase 11d (rev4) — visually identical to Mark Sent's OC
+              banner: amber background + paperclip icon when missing,
+              green + check when uploaded. Same color tokens, same
+              icon family (lucide), same upload-button styling. Owner
+              spec (4 May 2026): "WO popup should look just like OC
+              popup". When uploaded, shows the filename so the rep
+              has visual confirmation it's THIS quote's WO, not a
+              stale state from another proposal. */}
           {workOrderRequired && (
             <div
               style={{
                 background: workOrderUploaded
-                  ? 'rgba(76,175,80,.12)'
-                  : 'rgba(229,57,53,.12)',
+                  ? 'rgba(76,175,80,.08)'
+                  : 'rgba(245,158,11,.08)',
                 border: workOrderUploaded
-                  ? '1px solid rgba(76,175,80,.4)'
-                  : '1px solid rgba(229,57,53,.4)',
+                  ? '1.5px solid rgba(76,175,80,.3)'
+                  : '1.5px solid rgba(245,158,11,.3)',
                 borderRadius: 9,
-                padding: '12px 14px',
-                marginBottom: 14,
+                padding: '14px 16px',
+                marginBottom: 12,
                 fontSize: '.84rem',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: workOrderUploaded ? 0 : 8 }}>
-                <span style={{ fontSize: 18 }}>{workOrderUploaded ? '✅' : '⚠️'}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    fontWeight: 700,
-                    color: workOrderUploaded ? '#81c784' : '#ef9a9a',
-                  }}>
-                    {workOrderUploaded
-                      ? 'Work Order / PO copy uploaded'
-                      : 'Work Order / PO copy required'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: workOrderUploaded ? 0 : 12 }}>
+                {workOrderUploaded
+                  ? <CheckCircle2 size={18} style={{ color: '#81c784', flexShrink: 0 }} />
+                  : <Paperclip   size={18} style={{ color: '#fbbf24', flexShrink: 0 }} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>
+                    Work Order / PO copy {workOrderUploaded ? '✓ uploaded' : '— required'}
                   </div>
-                  {!workOrderUploaded && (
-                    <div style={{ color: 'var(--gray)', fontSize: '.78rem', marginTop: 3, lineHeight: 1.45 }}>
-                      The agency-issued Work Order or Purchase Order is the proof
-                      of award. Without it, this proposal can't be marked Won.
-                    </div>
-                  )}
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {workOrderUploaded
+                      ? 'Agency-issued Work Order for this proposal — saved with this quote\'s attachments.'
+                      : 'The agency-issued Work Order or Purchase Order is the proof of award for THIS proposal. Each quote needs its own WO.'}
+                  </div>
                 </div>
               </div>
               {!workOrderUploaded && onUploadWorkOrder && (
@@ -224,17 +225,24 @@ export function WonPaymentModal({
                     style={{ display: 'none' }}
                     onChange={handleWoFilePicked}
                   />
-                  <button
-                    type="button"
-                    className="btn btn-y"
-                    style={{ width: '100%', marginTop: 4 }}
-                    disabled={uploadingWorkOrder}
-                    onClick={() => woFileInput.current?.click()}
+                  <label
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      padding: '8px 12px',
+                      background: 'rgba(245,158,11,.12)',
+                      border: '1px dashed rgba(245,158,11,.4)',
+                      borderRadius: 6,
+                      color: '#fbbf24',
+                      fontSize: 12, fontWeight: 600,
+                      cursor: uploadingWorkOrder ? 'wait' : 'pointer',
+                      marginTop: 4,
+                    }}
+                    onClick={() => !uploadingWorkOrder && woFileInput.current?.click()}
                   >
                     {uploadingWorkOrder
-                      ? 'Uploading…'
-                      : '📎 Upload Work Order / PO copy'}
-                  </button>
+                      ? <>Uploading…</>
+                      : <><Upload size={13} /> Upload WO copy</>}
+                  </label>
                 </>
               )}
             </div>
