@@ -280,6 +280,9 @@ function renderBidanBlock(mediaType) {
      • raw wizard preview              (district_name_gu/en, allocated_qty)
 */
 function renderDistrictListPage(data) {
+  // Phase 11d (rev 2) — owner's reference format (4 May 2026):
+  // 3 columns only — Sr | District | Auto count. No percentage.
+  // Heading is centered and starred to match the reference doc.
   const items = Array.isArray(data.line_items) ? data.line_items : []
   if (items.length === 0) return ''
 
@@ -294,27 +297,24 @@ function renderDistrictListPage(data) {
       it.district_name ||
       '—'
     const qty = Number(it.allocated_qty ?? it.qty ?? it.quantity ?? 0)
-    const pct = totalQty > 0 ? ((qty / totalQty) * 100) : 0
     return `
       <tr>
         <td class="num">${toGujaratiDigits(String(i + 1))}</td>
         <td>${name}</td>
         <td class="num">${toGujaratiDigits(formatINREnglish(qty))}</td>
-        <td class="num">${toGujaratiDigits(pct.toFixed(1))}%</td>
       </tr>`
   }).join('')
 
   return `
-  <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;">
-    જિલ્લાવાર ઓટો રિક્ષા વિભાજન યાદી — ${toGujaratiDigits(String(items.length))} જિલ્લા
+  <h2 style="margin:0 0 18px;font-size:16px;font-weight:700;text-align:center;">
+    *ગુજરાત – ઓટો રિક્ષા જિલ્લા પ્રમાણેનું લિસ્ટ*
   </h2>
-  <table class="govt-letter__table">
+  <table class="govt-letter__table" style="max-width:520px;margin:0 auto;">
     <thead>
       <tr>
-        <th>ક્રમ</th>
+        <th style="width:60px;">ક્રમ</th>
         <th>જિલ્લો</th>
-        <th class="num">ઓટો રિક્ષાની સંખ્યા</th>
-        <th class="num">હિસ્સો</th>
+        <th class="num" style="width:140px;">ઓટો રિક્ષાની સંખ્યા</th>
       </tr>
     </thead>
     <tbody>
@@ -322,7 +322,6 @@ function renderDistrictListPage(data) {
       <tr>
         <td colspan="2"><strong>કુલ</strong></td>
         <td class="num"><strong>${toGujaratiDigits(formatINREnglish(totalQty))}</strong></td>
-        <td class="num"><strong>૧૦૦.૦%</strong></td>
       </tr>
     </tbody>
   </table>`

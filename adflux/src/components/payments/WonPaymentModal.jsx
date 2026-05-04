@@ -50,6 +50,12 @@ export function WonPaymentModal({
   const remainingBalance = Math.max(0, Number(quote.total_amount || 0) - Number(totalPaid || 0))
   const hasExistingPayment = Number(totalPaid) > 0
   const fullyPaid = hasExistingPayment && remainingBalance <= 0
+  // Phase 11d (rev) — payment fields collapsed by default so the Mark
+  // Won modal matches the simplicity of Mark Sent's OC popup. If a
+  // partial payment already exists, expand by default since the rep is
+  // likely here to record the balance. Otherwise collapsed and hidden
+  // behind a "+ Record payment" toggle.
+  const [showPaymentFields, setShowPaymentFields] = useState(hasExistingPayment)
 
   // Compute an initial end date when start is known but end is blank.
   // Uses the same duration-source priority as the on-change handler
@@ -234,53 +240,81 @@ export function WonPaymentModal({
             </div>
           )}
 
-          {hasExistingPayment && (
-            <div style={{ background: 'rgba(129,199,132,.1)', border: '1px solid rgba(129,199,132,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: '.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ color: '#81c784', fontWeight: 600 }}>Already Received</span>
-                <span style={{ color: '#81c784', fontWeight: 700 }}>{formatCurrency(totalPaid)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--gray)' }}>Remaining Balance</span>
-                <span style={{ color: remainingBalance > 0 ? '#ef9a9a' : '#81c784', fontWeight: 700 }}>{formatCurrency(remainingBalance)}</span>
-              </div>
-              {remainingBalance > 0 && (
-                <div style={{ fontSize: '.72rem', color: 'var(--gray)', marginTop: 8, lineHeight: 1.4 }}>
-                  Leave the amount blank to mark <strong>Won with Payment Pending</strong>, or enter the balance to record the final payment now. Incentive only credits once 100% is received.
-                </div>
-              )}
-            </div>
+          {/* Payment section — collapsed by default to mirror OC popup
+              simplicity. Auto-expanded when a partial payment already
+              exists (rep is here to settle balance). Toggle "+ Record
+              payment" reveals the fields when needed. */}
+          {!showPaymentFields && !hasExistingPayment && (
+            <button
+              type="button"
+              onClick={() => setShowPaymentFields(true)}
+              style={{
+                width: '100%',
+                background: 'transparent',
+                border: '1px dashed rgba(255,255,255,.2)',
+                color: 'var(--gray)',
+                borderRadius: 8,
+                padding: '10px 14px',
+                marginBottom: 14,
+                fontSize: '.82rem',
+                cursor: 'pointer',
+              }}
+            >
+              + Record payment now (optional)
+            </button>
           )}
 
-          <div className="grid2">
-            <div className="fg">
-              <label>
-                {hasExistingPayment ? 'Additional Payment (₹) — optional' : 'Amount Received (₹) — optional'}
-              </label>
-              <input
-                type="number"
-                value={form.amount_received}
-                onChange={e => set('amount_received', e.target.value)}
-                placeholder="Leave blank to mark Won only"
-              />
-            </div>
-            <div className="fg">
-              <label>Payment Mode</label>
-              <select value={form.payment_mode} onChange={e => set('payment_mode', e.target.value)}>
-                {['NEFT','RTGS','UPI','Cheque','Cash'].map(m => <option key={m}>{m}</option>)}
-              </select>
-            </div>
-          </div>
+          {showPaymentFields && (
+            <>
+              {hasExistingPayment && (
+                <div style={{ background: 'rgba(129,199,132,.1)', border: '1px solid rgba(129,199,132,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: '.82rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: '#81c784', fontWeight: 600 }}>Already Received</span>
+                    <span style={{ color: '#81c784', fontWeight: 700 }}>{formatCurrency(totalPaid)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--gray)' }}>Remaining Balance</span>
+                    <span style={{ color: remainingBalance > 0 ? '#ef9a9a' : '#81c784', fontWeight: 700 }}>{formatCurrency(remainingBalance)}</span>
+                  </div>
+                  {remainingBalance > 0 && (
+                    <div style={{ fontSize: '.72rem', color: 'var(--gray)', marginTop: 8, lineHeight: 1.4 }}>
+                      Leave the amount blank to mark <strong>Won with Payment Pending</strong>, or enter the balance to record the final payment now. Incentive only credits once 100% is received.
+                    </div>
+                  )}
+                </div>
+              )}
 
-          <div className="fg">
-            <label>Payment Date</label>
-            <input type="date" value={form.payment_date} onChange={e => set('payment_date', e.target.value)} />
-          </div>
+              <div className="grid2">
+                <div className="fg">
+                  <label>
+                    {hasExistingPayment ? 'Additional Payment (₹) — optional' : 'Amount Received (₹) — optional'}
+                  </label>
+                  <input
+                    type="number"
+                    value={form.amount_received}
+                    onChange={e => set('amount_received', e.target.value)}
+                    placeholder="Leave blank to mark Won only"
+                  />
+                </div>
+                <div className="fg">
+                  <label>Payment Mode</label>
+                  <select value={form.payment_mode} onChange={e => set('payment_mode', e.target.value)}>
+                    {['NEFT','RTGS','UPI','Cheque','Cash'].map(m => <option key={m}>{m}</option>)}
+                  </select>
+                </div>
+              </div>
 
-          <div className="fg">
-            <label>Notes (cheque no., UTR, etc.)</label>
-            <textarea value={form.payment_notes} onChange={e => set('payment_notes', e.target.value)} placeholder="Optional" style={{ minHeight: 60 }} />
-          </div>
+              <div className="fg">
+                <label>Payment Date</label>
+                <input type="date" value={form.payment_date} onChange={e => set('payment_date', e.target.value)} />
+              </div>
+
+              <div className="fg">
+                <label>Notes (cheque no., UTR, etc.)</label>
+                <textarea value={form.payment_notes} onChange={e => set('payment_notes', e.target.value)} placeholder="Optional" style={{ minHeight: 60 }} />
+              </div>
+            </>
+          )}
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: 14, marginTop: 14 }}>
             <div style={{ fontSize: '.78rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, fontWeight: 600 }}>Campaign Dates *</div>
