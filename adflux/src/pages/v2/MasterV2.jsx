@@ -345,7 +345,7 @@ function AttachmentsTab() {
           <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading attachments…
         </div>
       ) : (
-        <div className="govt-list">
+        <div className="govt-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
           {/* Header row — labels for each column so the inline-edit
               grid feels like a table and not just stacked inputs. */}
           <div
@@ -563,7 +563,7 @@ function SignersTab() {
       supabase
         .from('users')
         .select('id, name, email, role, signature_title, signature_mobile')
-        .in('role', ['admin', 'owner', 'co_owner'])
+        .in('role', ['admin', 'owner', 'co_owner', 'agency'])
         .order('role').order('name'),
       supabase
         .from('users')
@@ -683,6 +683,7 @@ function SignersTab() {
               <option value="co_owner">Co-owner</option>
               <option value="owner">Owner</option>
               <option value="admin">Admin</option>
+              <option value="agency">Agency</option>
             </select>
             <input
               type="text"
@@ -734,7 +735,7 @@ function SignersTab() {
           <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading signers…
         </div>
       ) : (
-        <div className="govt-list">
+        <div className="govt-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
           <div
             className="govt-list__row"
             style={{
@@ -1264,7 +1265,7 @@ function DocumentsTab() {
                 </div>
               </div>
             </div>
-            <div className="govt-list">
+            <div className="govt-list" style={{ maxHeight: 'none', overflow: 'visible' }}>
               {versions.map(t => (
                 <div
                   key={t.id}
