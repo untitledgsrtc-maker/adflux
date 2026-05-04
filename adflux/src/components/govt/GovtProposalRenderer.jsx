@@ -82,6 +82,7 @@ export function GovtProposalRenderer({
     : renderGsrtcTable(data)
 
   const signerHtml = renderSignerBlock(signer, company)
+  const bidanHtml  = renderBidanBlock(mediaType)
 
   const vars = {
     recipient:        recipientHtml,
@@ -92,9 +93,20 @@ export function GovtProposalRenderer({
     selected_stations: toGujaratiDigits(String(data.line_items?.length || 0)),
     rate_table:       rateTableHtml,
     signer_block:     signerHtml,
+    bidan_block:      bidanHtml,
   }
 
   const renderedBody = renderTemplate(template.body_html, vars)
+
+  // Phase 11d — for AUTO_HOOD, render the per-district allotment list
+  // on a SEPARATE A4 page (owner spec, 4 May 2026: "list of auto should
+  // be in next page, different from cover letter"). The cover letter is
+  // the first .govt-letter div; the district list is a second sibling
+  // .govt-letter div. Each is min-height 1123px (one A4 page) via base
+  // CSS, so the rasterizer in proposalPdf.js naturally pages them.
+  const districtListHtml = mediaType === 'AUTO_HOOD'
+    ? renderDistrictListPage(data)
+    : ''
 
   // Phase 10b — letterhead background.
   //   When companies.letterhead_url is set we render the letter on top
@@ -125,26 +137,43 @@ export function GovtProposalRenderer({
     : undefined
 
   return (
-    <div className="govt-letter govt-letter--themed" style={letterStyle}>
-      {/* Top header — recipient block (top-left) and date (top-right) */}
-      <div className="govt-letter__head">
+    <>
+      {/* Page 1 — cover letter */}
+      <div className="govt-letter govt-letter--themed" style={letterStyle}>
+        <div className="govt-letter__head">
+          <div
+            className="govt-letter__recipient"
+            dangerouslySetInnerHTML={{ __html: recipientHtml }}
+          />
+          <div className="govt-letter__date">{dateGu}</div>
+        </div>
+
         <div
-          className="govt-letter__recipient"
-          dangerouslySetInnerHTML={{ __html: recipientHtml }}
+          className="govt-letter__subject"
+          dangerouslySetInnerHTML={{ __html: 'વિષય: ' + template.subject_line }}
         />
-        <div className="govt-letter__date">{dateGu}</div>
+
+        <div
+          className="govt-letter__body"
+          dangerouslySetInnerHTML={{ __html: renderedBody }}
+        />
       </div>
 
-      <div
-        className="govt-letter__subject"
-        dangerouslySetInnerHTML={{ __html: 'વિષય: ' + template.subject_line }}
-      />
-
-      <div
-        className="govt-letter__body"
-        dangerouslySetInnerHTML={{ __html: renderedBody }}
-      />
-    </div>
+      {/* Page 2+ — district allotment list (Auto Hood only).
+          Owner spec (4 May 2026): "list of auto should be in next page,
+          different from cover letter." Rendered as its own .govt-letter
+          div so the base CSS gives it its own A4 page; the rasterizer's
+          1123px slicing in proposalPdf.js puts each div on its own
+          PDF page automatically. Letterhead background applies here
+          too so page 2 also carries the company branding. */}
+      {districtListHtml && (
+        <div
+          className="govt-letter govt-letter--themed"
+          style={letterStyle}
+          dangerouslySetInnerHTML={{ __html: districtListHtml }}
+        />
+      )}
+    </>
   )
 }
 
@@ -176,6 +205,8 @@ function renderSignerBlock(signer, company) {
 }
 
 function renderAutoTable(data) {
+  // Renders ONLY the rate summary (5 rows). The per-district allotment
+  // list lives on a separate A4 page — see renderDistrictListPage.
   const qty = Number(data.auto_total_quantity || 0)
   const rate = Number(data.unit_rate ?? 825)
   const subtotal = qty * rate
@@ -188,53 +219,6 @@ function renderAutoTable(data) {
   const rowGst   = toGujaratiDigits(formatINREnglish(gst)) + '/-'
   const rowTotal = toGujaratiDigits(formatINREnglish(total)) + '/-'
 
-  // Phase 11c — per-district allotment list.
-  //   The body template references "જિલ્લાવાર વિભાજન સાથે જોડેલ
-  //   યાદીમાં દર્શાવેલ છે" (district-wise breakdown shown in attached
-  //   list) but the renderer was never producing the list. Owner
-  //   confirmed (4 May 2026) the list belongs in the letter itself,
-  //   not as a separate attachment. Append it directly under the
-  //   rate table so the proposal is self-contained.
-  const items = Array.isArray(data.line_items) ? data.line_items : []
-  let districtTableHtml = ''
-  if (items.length > 0) {
-    const districtRows = items.map((it, i) => {
-      const districtName = it.description || it.city_name || it.district_name || `—`
-      const districtQty  = Number(it.quantity ?? it.auto_count ?? 0)
-      const pct = qty > 0 ? ((districtQty / qty) * 100) : 0
-      return `
-        <tr>
-          <td class="num">${toGujaratiDigits(String(i + 1))}</td>
-          <td>${districtName}</td>
-          <td class="num">${toGujaratiDigits(formatINREnglish(districtQty))}</td>
-          <td class="num">${toGujaratiDigits(pct.toFixed(1))}%</td>
-        </tr>`
-    }).join('')
-
-    districtTableHtml = `
-    <p style="margin-top:14px;color:#111;">
-      <strong>જિલ્લાવાર ઓટો રિક્ષા વિભાજન યાદી — ${toGujaratiDigits(String(items.length))} જિલ્લા:</strong>
-    </p>
-    <table class="govt-letter__table">
-      <thead>
-        <tr>
-          <th>ક્રમ</th>
-          <th>જિલ્લો</th>
-          <th class="num">ઓટો રિક્ષાની સંખ્યા</th>
-          <th class="num">હિસ્સો</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${districtRows}
-        <tr>
-          <td colspan="2"><strong>કુલ</strong></td>
-          <td class="num"><strong>${rowQty}</strong></td>
-          <td class="num"><strong>૧૦૦.૦%</strong></td>
-        </tr>
-      </tbody>
-    </table>`
-  }
-
   return `
   <table class="govt-letter__table">
     <thead>
@@ -242,7 +226,7 @@ function renderAutoTable(data) {
         <th>વિગત</th>
         <th>સાઇઝ</th>
         <th class="num">ઓટો રિક્ષાની સંખ્યા</th>
-        <th class="num">DAVP ભાવ</th>
+        <th class="num">CBC ભાવ</th>
         <th class="num">કુલ રકમ</th>
       </tr>
     </thead>
@@ -253,7 +237,95 @@ function renderAutoTable(data) {
       <tr><td colspan="4">GST 18%</td><td class="num">${rowGst}</td></tr>
       <tr><td colspan="4"><strong>કુલ રકમ</strong></td><td class="num"><strong>${rowTotal}</strong></td></tr>
     </tbody>
-  </table>${districtTableHtml}`
+  </table>`
+}
+
+/* Phase 11d — Bidan (enclosure list) block.
+   Renders the standard "બિડાણ:" footer that closes a Gujarati govt
+   letter. Items are media-type-specific (different attachments are
+   relevant for AUTO_HOOD vs GSRTC_LED). Outputs raw HTML inserted via
+   {{bidan_block}} placeholder; styling lives in govt.css if needed.
+   Owner spec (4 May 2026 docx): bidan must appear at the END of every
+   letter when generating PDF or printing. */
+function renderBidanBlock(mediaType) {
+  const items = mediaType === 'AUTO_HOOD'
+    ? [
+        'CBC (પૂર્વે DAVP) મંજૂર દરપત્રકની નકલ',
+        'જિલ્લાવાર ઓટો રિક્ષાઓની યાદી',
+        'અમારી કંપની પ્રોફાઇલ તથા અગાઉના કામગીરીના નમૂના',
+      ]
+    : [
+        'GSRTC તરફથી નિર્ધારિત ભાવ-પત્રકની નકલ',
+        'અમારા તરફથી રજૂ કરેલ ભાવ-દરખાસ્તની નકલ',
+        '૨૦ બસ ડેપો મથકોની યાદી',
+      ]
+  const lis = items.map(t => `<li>${t}</li>`).join('')
+  return [
+    '<div class="govt-letter__bidan" style="margin-top:18px;">',
+      '<strong>બિડાણ:</strong>',
+      `<ol style="margin:6px 0 0 22px;padding:0;">${lis}</ol>`,
+    '</div>',
+  ].join('')
+}
+
+/* Phase 11d — district allotment list page (Auto Hood only).
+   Returns a complete `.govt-letter` div containing the per-district
+   table. Rendered as a SECOND A4 page after the cover letter.
+   Empty when line_items is empty (won't render the second page).
+
+   Data shape note — line_items has been through several rewrites; we
+   accept any of these field names so the renderer works for both:
+     • saved quotes from quote_cities  (description, qty)
+     • normalized live quotes          (description, allocated_qty)
+     • raw wizard preview              (district_name_gu/en, allocated_qty)
+*/
+function renderDistrictListPage(data) {
+  const items = Array.isArray(data.line_items) ? data.line_items : []
+  if (items.length === 0) return ''
+
+  const totalQty = Number(data.auto_total_quantity || 0)
+
+  const rowsHtml = items.map((it, i) => {
+    const name =
+      it.description ||
+      it.city_name ||
+      it.district_name_gu ||
+      it.district_name_en ||
+      it.district_name ||
+      '—'
+    const qty = Number(it.allocated_qty ?? it.qty ?? it.quantity ?? 0)
+    const pct = totalQty > 0 ? ((qty / totalQty) * 100) : 0
+    return `
+      <tr>
+        <td class="num">${toGujaratiDigits(String(i + 1))}</td>
+        <td>${name}</td>
+        <td class="num">${toGujaratiDigits(formatINREnglish(qty))}</td>
+        <td class="num">${toGujaratiDigits(pct.toFixed(1))}%</td>
+      </tr>`
+  }).join('')
+
+  return `
+  <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;">
+    જિલ્લાવાર ઓટો રિક્ષા વિભાજન યાદી — ${toGujaratiDigits(String(items.length))} જિલ્લા
+  </h2>
+  <table class="govt-letter__table">
+    <thead>
+      <tr>
+        <th>ક્રમ</th>
+        <th>જિલ્લો</th>
+        <th class="num">ઓટો રિક્ષાની સંખ્યા</th>
+        <th class="num">હિસ્સો</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+      <tr>
+        <td colspan="2"><strong>કુલ</strong></td>
+        <td class="num"><strong>${toGujaratiDigits(formatINREnglish(totalQty))}</strong></td>
+        <td class="num"><strong>૧૦૦.૦%</strong></td>
+      </tr>
+    </tbody>
+  </table>`
 }
 
 function renderGsrtcTable(data) {
