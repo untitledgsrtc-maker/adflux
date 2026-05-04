@@ -89,7 +89,14 @@ export function GovtProposalRenderer({
     : renderAutoTable(data)
   const gsrtcStationPageHtml = isGsrtc ? renderGsrtcTable(data) : ''
 
-  const signerHtml = renderSignerBlock(signer, company)
+  // Phase 11d (rev12) — when letterhead is ON, the printed footer of
+  // the letterhead PNG already shows the company name + phone +
+  // address. Repeating those in the signer block creates duplicate
+  // ink and crowds the bottom of the page. Pass the flag through so
+  // renderSignerBlock can omit the company line + mobile when
+  // letterhead is on.
+  const letterheadOn = !!letterhead
+  const signerHtml = renderSignerBlock(signer, company, letterheadOn)
   // Phase 11d (rev7) — bidan list now driven by data.bidan_items if
   // provided (computed from the checklist by GovtProposalDetailV2).
   // Falls back to the static media-type defaults so the wizard's
@@ -151,10 +158,15 @@ export function GovtProposalRenderer({
         backgroundRepeat:   'no-repeat',
         backgroundSize:     '100% 100%',
         backgroundPosition: 'top center',
-        paddingTop:    '130px',
-        paddingRight:  '64px',
-        paddingBottom: '130px',
-        paddingLeft:   '64px',
+        // Phase 11d (rev12) — bumped padding-top 130→170 and
+        // padding-bottom 130→180 because the prior values left only
+        // ~30px clearance from the letterhead's printed footer text,
+        // and content was crowding/overlapping it. Now content sits
+        // entirely inside the empty middle zone of the PNG.
+        paddingTop:    '170px',
+        paddingRight:  '70px',
+        paddingBottom: '180px',
+        paddingLeft:   '70px',
       }
     : undefined
 
@@ -248,21 +260,29 @@ export function GovtProposalRenderer({
 
 /* ── helpers ────────────────────────────────────────────────────── */
 
-function renderSignerBlock(signer, company) {
+function renderSignerBlock(signer, company, letterheadOn = false) {
   if (!signer) return ''
   const name   = signer.name || ''
   const title  = signer.signature_title || ''
   const mobile = signer.signature_mobile ? `મો. ${signer.signature_mobile}` : ''
-  // Phase 10 — pull the company line from companies table when
-  // available; fall back to the legacy hardcoded Gujarati name so the
-  // rendered output is identical if the companies table isn't seeded
-  // yet (graceful degrade for environments where the migration hasn't
-  // landed).
   const companyLine = (company?.name_gu || company?.short_name || company?.name || 'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ')
-  // Right-aligned per standard Indian government letter format
-  // (owner spec, 1 May 2026). Inline style ensures the alignment
-  // also applies in the rasterized PDF where the .govt-letter__signer
-  // class might not be loaded with the same overrides.
+
+  // Phase 11d (rev12) — when letterhead is ON, the printed footer of
+  // the letterhead PNG already shows company name + phone + address.
+  // Showing those again in the signer block creates duplicate ink and
+  // crowds the bottom of the page. Letterhead-mode signer block:
+  // just the courtesy + name + title. No company line, no mobile.
+  if (letterheadOn) {
+    return [
+      '<div class="govt-letter__signer" style="text-align:right;margin-top:18px;">',
+        'આપનો વિશ્વાસુ,<br/>',
+        `${name}${title ? ` (${title})` : ''}`,
+      '</div>',
+    ].join('')
+  }
+
+  // Plain mode (no letterhead): include the full block since there's
+  // no printed footer to provide the company info.
   return [
     '<div class="govt-letter__signer" style="text-align:right;">',
       'આપનો વિશ્વાસુ,<br/>',
