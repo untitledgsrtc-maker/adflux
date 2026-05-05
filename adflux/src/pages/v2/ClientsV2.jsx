@@ -86,7 +86,15 @@ export default function ClientsV2() {
       const map = {}
       ;(users || []).forEach(u => { map[u.id] = u.name })
       setUserMap(map)
-      setSalesUsers((users || []).filter(u => u.role === 'sales').map(u => ({ id: u.id, name: u.name })))
+      // Phase 11h — include agency users in the rep filter; both
+      // sales and agency own quote books that admin should be able
+      // to scope by. Without this, admin filtering by rep could only
+      // pick sales users, hiding any agency-created quotes.
+      setSalesUsers(
+        (users || [])
+          .filter(u => u.role === 'sales' || u.role === 'agency')
+          .map(u => ({ id: u.id, name: u.name, role: u.role }))
+      )
     }
     setLoading(false)
   }
