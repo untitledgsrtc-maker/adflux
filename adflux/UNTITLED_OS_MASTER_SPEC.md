@@ -148,7 +148,7 @@ ai_runs(id, run_type, input_json, output_json, model, tokens_in, tokens_out,
 - 6:30 PM: WhatsApp nudge → evening report → unlocks Check Out
 - 7:00 PM: Check Out → day's summary auto-WhatsApped to manager
 
-### Telecaller flow (DHARA + 2 New Telecallers)
+### Telecaller flow (Sales Manager + telecaller team)
 - Call queue ranked by heat + age
 - Lead can only become "Sales Ready" after 4 fields confirmed (budget / timeline / decision-maker / service interest)
 - Auto-assigned to a sales rep on city + load
@@ -333,7 +333,7 @@ You confirmed Meta is approved. Submit these on **Day 1 of each phase** (3–7 d
 | Daily targets — fixed or per-person? | ✅ Defaults `{meetings:5, calls:20, new_leads:10}`. Editable per user in HR / Team modal at create time and on edit. Override stored in `users.daily_targets jsonb`. |
 | Auto-assignment rule? | ✅ **Manual pick** by Sales Manager / telecaller — they pick the rep from a dropdown when marking SalesReady. No round-robin in v1. (But see §17 suggestion 1 — I propose hybrid for scale.) |
 | WhatsApp Business Account ID + Phone Number ID? | ⏳ Owner shares when needed — Phase 1 can be built without this; we wire WhatsApp send in week 3 of Phase 1. |
-| Government Partner scope (Vishal)? | ✅ **All GOVERNMENT segment** regardless of city. Implementation: in RLS, `team_role = 'government_partner'` users see all rows where `segment = 'GOVERNMENT'` — not filtered by city. |
+| Government Partner scope? | ✅ **All GOVERNMENT segment** regardless of city. Implementation: in RLS, `team_role = 'government_partner'` users see all rows where `segment = 'GOVERNMENT'` — not filtered by city. |
 | Off-day calendar? | ✅ Every Sunday + every Hindu festival (Vadodara/Gujarat). New `holidays` table; admin maintains. See §17 suggestion 2 — auto-seed via Calendarific API or hardcoded list. |
 | Creative Lead pick? | ✅ **PIYUSH** (Video Editor). He leads all designers + himself. `team_role = 'creative_lead'`. |
 | Team will scale to 35–40? | ✅ Confirmed. Architecture must scale. See §17 suggestion 3. |
