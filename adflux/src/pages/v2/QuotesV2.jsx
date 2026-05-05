@@ -36,7 +36,8 @@ export default function QuotesV2() {
   // Privileged set (admin / owner / co_owner) gets the full admin UI
   // (sales-rep filter column, all-rows view). Phase 5 added the new
   // owner / co_owner roles.
-  const isAdmin = ['admin', 'owner', 'co_owner'].includes(profile?.role)
+  // Phase 11i — owner role removed; admin + co_owner is the privileged set.
+  const isAdmin = ['admin', 'co_owner'].includes(profile?.role)
 
   const { quotes, filters, setFilters, resetFilters, fetchQuotes } = useQuotes()
   const [loading, setLoading] = useState(true)

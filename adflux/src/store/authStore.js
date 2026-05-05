@@ -62,15 +62,13 @@ export const useAuthStore = create((set, get) => ({
     set({ user: null, profile: null })
   },
 
-  // Role helpers — backwards-compatible. isAdmin keeps original meaning
-  // (only 'admin' role). isPrivileged is the new full-access set
-  // (admin + owner + co_owner) used for sidebar gating, RLS-equivalent
-  // checks on the client, and master-data page access.
+  // Role helpers — Phase 11i: owner role removed (was identical to
+  // admin in every check). isPrivileged is the full-access set used
+  // for sidebar gating, RLS-equivalent checks, and master-data pages.
   isAdmin:      () => get().profile?.role === 'admin',
   isSales:      () => get().profile?.role === 'sales',
-  isOwner:      () => get().profile?.role === 'owner',
   isCoOwner:    () => get().profile?.role === 'co_owner',
-  isPrivileged: () => ['admin', 'owner', 'co_owner'].includes(get().profile?.role),
+  isPrivileged: () => ['admin', 'co_owner'].includes(get().profile?.role),
 
   // Segment scope — drives wizard segment lock + quotes list filter.
   // Returns 'ALL' for non-sales/telecaller roles since the DB column

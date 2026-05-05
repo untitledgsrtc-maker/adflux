@@ -44,7 +44,8 @@ const MEDIA_FILTERS = [
 export default function MasterV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isAuthorized = ['admin', 'owner', 'co_owner'].includes(profile?.role)
+  // Phase 11i — owner role removed; admin + co_owner is the privileged set.
+  const isAuthorized = ['admin', 'co_owner'].includes(profile?.role)
 
   const [activeTab, setActiveTab] = useState('attachments')
 
@@ -984,12 +985,12 @@ function SignersTab() {
   const load = async () => {
     setLoading(true)
     // Pull users with privileged roles — they're the candidates to sign
-    // proposals. Includes admin / owner / co_owner.
+    // proposals. Phase 11i — owner role removed.
     const [signersRes, candidatesRes] = await Promise.all([
       supabase
         .from('users')
         .select('id, name, email, role, signature_title, signature_mobile')
-        .in('role', ['admin', 'owner', 'co_owner', 'agency'])
+        .in('role', ['admin', 'co_owner', 'agency'])
         .order('role').order('name'),
       supabase
         .from('users')
@@ -1106,8 +1107,9 @@ function SignersTab() {
               className="govt-input-cell"
               style={{ minWidth: 130 }}
             >
+              {/* Phase 11i — owner role removed. Existing owner users
+                   were migrated to admin via SQL migration. */}
               <option value="co_owner">Co-owner</option>
-              <option value="owner">Owner</option>
               <option value="admin">Admin</option>
               <option value="agency">Agency</option>
             </select>
