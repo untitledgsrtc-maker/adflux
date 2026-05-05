@@ -25,6 +25,9 @@ import ClientsV2          from './pages/v2/ClientsV2'
 import LeadsV2             from './pages/v2/LeadsV2'
 import LeadDetailV2        from './pages/v2/LeadDetailV2'
 import LeadUploadV2        from './pages/v2/LeadUploadV2'
+import WorkV2              from './pages/v2/WorkV2'
+import TelecallerV2        from './pages/v2/TelecallerV2'
+import CockpitV2           from './pages/v2/CockpitV2'
 
 // ── Government module (Phase 6) ─────────────────────────────────────
 import CreateQuoteChooserV2  from './pages/v2/CreateQuoteChooserV2'
@@ -125,6 +128,9 @@ export default function App() {
           <Route path="/leads"                     element={<LeadsV2 />} />
           <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
           <Route path="/leads/:id"                 element={<LeadDetailV2 />} />
+          <Route path="/work"                      element={<WorkV2 />} />
+          <Route path="/telecaller"                element={<TelecallerV2 />} />
+          <Route path="/cockpit"                   element={<RequirePrivileged><CockpitV2 /></RequirePrivileged>} />
 
           {/* Sales-only */}
           <Route path="/my-performance"            element={<MyPerformanceV2 />} />

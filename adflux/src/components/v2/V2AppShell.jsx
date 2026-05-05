@@ -25,13 +25,14 @@
 // (hamburger) + a fixed 4-item bottom nav. This mirrors the
 // Dashboard pages so the two halves of the app feel consistent.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
+import CopilotModal from '../copilot/CopilotModal'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, Contact2, MapPin, Tv, FileBox,
-  Inbox,
+  Inbox, Sparkles, Phone, Sun,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -43,8 +44,9 @@ import '../../styles/v2.css'
 // new Government master pages (Auto Districts + GSRTC Stations).
 const ADMIN_NAV = [
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
-  // Phase 12 — Leads sits above Quotes because the lead is the upstream
-  // record. Most of the rep's day starts here, then promotes to Quote.
+  // Phase 12 — Cockpit is the owner's daily landing strip; Leads above
+  // Quotes because the lead is the upstream record.
+  { to: '/cockpit',           label: 'Cockpit',        icon: Sparkles },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
@@ -61,12 +63,22 @@ const ADMIN_NAV = [
 
 const SALES_NAV = [
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
+  // Phase 12 — Today's work is the rep's daily landing.
+  { to: '/work',              label: 'Today',          icon: Sun },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
+]
+
+// Telecaller-specific nav: queue-first, no quotes/cities/clients clutter.
+const TELECALLER_NAV = [
+  { to: '/telecaller',        label: 'Call Queue',     icon: Phone },
+  { to: '/work',              label: 'Today',          icon: Sun },
+  { to: '/leads',             label: 'Leads',          icon: Inbox },
+  { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
 ]
 
 const MOBILE_NAV_ADMIN = [
@@ -89,10 +101,28 @@ export function V2AppShell() {
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
+  // Phase 1.5 — AI Co-Pilot. Cmd+K (Mac) / Ctrl+K (Win/Linux) opens.
+  const [copilotOpen, setCopilotOpen] = useState(false)
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCopilotOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
-  // PRIVILEGED set (admin / owner / co_owner) gets the full admin
-  // sidebar incl. the new Auto Districts + GSRTC Stations.
-  const nav       =  isPrivileged ? ADMIN_NAV        : SALES_NAV
+  // Phase 12 — three nav variants:
+  //   admin / co_owner → ADMIN_NAV (full chrome including govt masters)
+  //   telecaller       → TELECALLER_NAV (queue-first, minimal)
+  //   sales / agency   → SALES_NAV
+  const isTelecaller = profile?.team_role === 'telecaller'
+  const nav =
+    isPrivileged   ? ADMIN_NAV :
+    isTelecaller   ? TELECALLER_NAV :
+                     SALES_NAV
   const mobileNav =  isPrivileged ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
 
   // Topbar search — commits to the shared quote-filter store and
@@ -179,18 +209,28 @@ export function V2AppShell() {
 
           <div className="v2d-topbar-spacer" />
 
-          <form className="v2d-search" onSubmit={runTopbarSearch}>
-            <Search size={15} />
-            <input
-              placeholder="Search quotes, clients…"
-              value={searchDraft}
-              onChange={e => setSearchDraft(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') runTopbarSearch(e)
-                if (e.key === 'Escape') setSearchDraft('')
-              }}
-            />
-          </form>
+          {/* Phase 1.5 — Co-Pilot trigger replaces the legacy search bar.
+              Click or ⌘K opens the AI modal. Falls back to /leads search
+              if the Edge Function isn't deployed yet. */}
+          <button
+            className="v2d-search"
+            onClick={() => setCopilotOpen(true)}
+            style={{ cursor: 'pointer', textAlign: 'left', minWidth: 220, maxWidth: 300 }}
+            type="button"
+          >
+            <Sparkles size={14} style={{ color: '#c084fc' }} />
+            <span style={{ flex: 1, color: 'var(--v2-ink-2)', fontSize: 13 }}>
+              Ask anything…
+            </span>
+            <span style={{
+              fontFamily: 'monospace', fontSize: 10,
+              background: 'rgba(255,255,255,.06)',
+              padding: '2px 6px', borderRadius: 4,
+              color: 'var(--v2-ink-2)',
+            }}>
+              ⌘K
+            </span>
+          </button>
 
           <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
             <Plus size={15} />
