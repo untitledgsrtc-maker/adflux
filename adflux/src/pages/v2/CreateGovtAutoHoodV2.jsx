@@ -154,6 +154,12 @@ export default function CreateGovtAutoHoodV2() {
       // 'UA/AUTO/2026-27/NNNN'.
       created_by:     profile?.id,
       sales_person_name: profile?.name,
+      // Phase 14 — Lead → Quote linkage. If this quote was opened from
+      // /leads/:id "Convert to Quote", the lead_id was passed via
+      // location.state.prefill. Persist it on the quote so the lead
+      // detail page can show the quote and the cockpit can audit
+      // conversion rate.
+      lead_id:        prefill.lead_id || null,
     }
 
     const { data: quote, error: qErr } = await supabase
@@ -166,6 +172,15 @@ export default function CreateGovtAutoHoodV2() {
       setSaving(false)
       setError(qErr.message || 'Failed to save proposal.')
       return
+    }
+
+    // Phase 14 — advance the originating lead's stage to QuoteSent
+    // and pin its quote_id, so the lead funnel stays accurate.
+    if (prefill.lead_id) {
+      await supabase
+        .from('leads')
+        .update({ stage: 'QuoteSent', quote_id: quote.id })
+        .eq('id', prefill.lead_id)
     }
 
     // Save per-district line items

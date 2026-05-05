@@ -111,6 +111,18 @@ export function useQuotes() {
     // table failure must never cascade into "your quote didn't save".
     syncClientFromQuote(quote, 'create')
 
+    // Phase 14 — Lead → Quote linkage. If this quote was opened via
+    // /leads/:id "Convert to Quote", quoteData carries lead_id (saved
+    // on quotes.lead_id above). Advance the originating lead's stage
+    // to QuoteSent + pin its quote_id so the lead funnel stays accurate.
+    if (quote.lead_id) {
+      supabase
+        .from('leads')
+        .update({ stage: 'QuoteSent', quote_id: quote.id })
+        .eq('id', quote.lead_id)
+        .then(() => null, () => null)  // fire-and-forget
+    }
+
     store.upsertQuote(quote)
     return { data: quote }
   }

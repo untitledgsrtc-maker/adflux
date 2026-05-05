@@ -355,7 +355,20 @@ export default function LeadDetailV2() {
           <button className="v2d-ghost v2d-ghost--btn" onClick={() => openActivity('note')}>
             <Edit3 size={14} /> <span>Note</span>
           </button>
-          {(lead.stage !== 'Won' && lead.stage !== 'Lost') && (
+          {/* Phase 14 — show "View linked quote" once a quote has been
+              created from this lead, instead of "Convert" again. */}
+          {lead.quote_id ? (
+            <button
+              className="v2d-cta"
+              onClick={() => navigate(
+                lead.segment === 'GOVERNMENT'
+                  ? `/proposal/${lead.quote_id}`
+                  : `/quotes/${lead.quote_id}`
+              )}
+            >
+              <FileTextIcon size={14} /> <span>View linked quote</span>
+            </button>
+          ) : (lead.stage !== 'Won' && lead.stage !== 'Lost') && (
             <button className="v2d-cta" onClick={convertToQuote}>
               <FileTextIcon size={14} /> <span>Convert to Quote</span>
             </button>

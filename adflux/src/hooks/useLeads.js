@@ -99,6 +99,42 @@ export const LEAD_STAGES = [
   'QuoteSent', 'Negotiating', 'Won', 'Lost', 'Nurture',
 ]
 
+// Phase 12 (rev2) — owner feedback: 11 tabs is too many. Group stages
+// into 6 logical buckets for the UI tab row. Underlying schema keeps
+// all 10 stages — this is purely a display roll-up. The actual stage
+// transition modal still exposes every individual stage.
+export const STAGE_GROUPS = [
+  {
+    key:    'open',
+    label:  'Open',
+    stages: ['New', 'Contacted', 'Nurture'],
+  },
+  {
+    key:    'qualified',
+    label:  'Qualified',
+    stages: ['Qualified', 'SalesReady', 'MeetingScheduled'],
+  },
+  {
+    key:    'in_progress',
+    label:  'In Progress',
+    stages: ['QuoteSent', 'Negotiating'],
+  },
+  {
+    key:    'won',
+    label:  'Won',
+    stages: ['Won'],
+  },
+  {
+    key:    'lost',
+    label:  'Lost',
+    stages: ['Lost'],
+  },
+]
+
+export function groupForStage(stage) {
+  return STAGE_GROUPS.find(g => g.stages.includes(stage))?.key || 'open'
+}
+
 export const STAGE_LABELS = {
   New:              'New',
   Contacted:        'Contacted',

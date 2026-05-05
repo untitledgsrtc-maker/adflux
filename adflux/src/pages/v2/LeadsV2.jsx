@@ -24,7 +24,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import {
-  useLeads, LEAD_STAGES, STAGE_LABELS, STAGE_TINT,
+  useLeads, LEAD_STAGES, STAGE_LABELS, STAGE_TINT, STAGE_GROUPS, groupForStage,
 } from '../../hooks/useLeads'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 
@@ -74,7 +74,10 @@ export default function LeadsV2() {
 
   // Filter state — local to this page (no cross-page persistence).
   const [search, setSearch]         = useState('')
-  const [stageFilter, setStageFilter] = useState('all')   // 'all' | LEAD_STAGES
+  // Phase 12 (rev2) — stageFilter holds either 'all' or a group key
+  // ('open','qualified','in_progress','won','lost'). The group expands
+  // to multiple individual stages at filter time.
+  const [stageFilter, setStageFilter] = useState('all')   // 'all' | group.key
   const [segmentFilter, setSegmentFilter] = useState('all') // 'all' | 'PRIVATE' | 'GOVERNMENT'
   const [sourceFilter, setSourceFilter]   = useState('all')
   const [cityFilter, setCityFilter]       = useState('all')
@@ -132,10 +135,17 @@ export default function LeadsV2() {
 
   // Apply all filters in memory. RLS already filtered server-side; this
   // is just UI slicing. Search matches name / company / phone / email.
+  // stageFilter is now a group key — expand it to the underlying stages.
+  const stagesInGroup = useMemo(() => {
+    if (stageFilter === 'all') return null
+    const g = STAGE_GROUPS.find(x => x.key === stageFilter)
+    return g ? g.stages : null
+  }, [stageFilter])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return leads.filter(l => {
-      if (stageFilter   !== 'all' && l.stage   !== stageFilter)   return false
+      if (stagesInGroup && !stagesInGroup.includes(l.stage)) return false
       if (segmentFilter !== 'all' && l.segment !== segmentFilter) return false
       if (sourceFilter  !== 'all' && l.source  !== sourceFilter)  return false
       if (cityFilter    !== 'all' && l.city    !== cityFilter)    return false
@@ -149,18 +159,38 @@ export default function LeadsV2() {
         (l.email   || '').toLowerCase().includes(q)
       )
     })
-  }, [leads, search, stageFilter, segmentFilter, sourceFilter, cityFilter, repFilter, heatFilter])
+  }, [leads, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, repFilter, heatFilter])
 
   const totals = useMemo(() => {
+    // Per-stage counts (still needed for funnel + lead dashboard widget).
     const counts = {}
     LEAD_STAGES.forEach(s => { counts[s] = 0 })
     let value = 0
+    let activeValue = 0
+    let wonCount = 0
+    let lostCount = 0
     leads.forEach(l => {
       counts[l.stage] = (counts[l.stage] || 0) + 1
-      value += Number(l.expected_value) || 0
+      const v = Number(l.expected_value) || 0
+      value += v
+      if (l.stage === 'Won')  wonCount++
+      if (l.stage === 'Lost') lostCount++
+      if (!['Won', 'Lost'].includes(l.stage)) activeValue += v
     })
-    return { counts, total: leads.length, value }
+    // Group counts — sum over the stages each group contains.
+    const groupCounts = {}
+    STAGE_GROUPS.forEach(g => {
+      groupCounts[g.key] = g.stages.reduce((s, st) => s + (counts[st] || 0), 0)
+    })
+    return { counts, groupCounts, total: leads.length, value, activeValue, wonCount, lostCount }
   }, [leads])
+
+  // Win rate (over decided leads only — Won + Lost).
+  const winRate = useMemo(() => {
+    const decided = totals.wonCount + totals.lostCount
+    if (decided === 0) return null
+    return Math.round((totals.wonCount / decided) * 100)
+  }, [totals])
 
   function toggleSelected(id) {
     setSelected(prev => {
@@ -242,7 +272,26 @@ export default function LeadsV2() {
         </div>
       </div>
 
-      {/* ─── Stage tabs (pill row) — counts from total, not filtered ─── */}
+      {/* ─── Lead dashboard strip — owner feedback (5 May 2026):
+              "i need lead dashboard i dont know how will you do it want
+              simple as posssible". 4 stat cards + mini funnel preview. */}
+      {leads.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: 10, marginBottom: 12,
+        }}>
+          <DashStat label="Total leads" value={totals.total} />
+          <DashStat label="Open"        value={totals.groupCounts.open || 0}        accent="blue" />
+          <DashStat label="Qualified"   value={totals.groupCounts.qualified || 0}   accent="amber" />
+          <DashStat label="Won"         value={totals.wonCount} accent="green"
+                    sub={winRate != null ? `${winRate}% win rate` : null} />
+        </div>
+      )}
+
+      {/* ─── Stage tabs — Phase 12 rev2 — 6 logical groups instead of 11.
+              All / Open / Qualified / In Progress / Won / Lost. The
+              underlying stage transition modal still exposes all 10 stages. */}
       <div className="v2d-tab-row" style={{ flexWrap: 'wrap' }}>
         <button
           className={`v2d-tab-pill${stageFilter === 'all' ? ' is-active' : ''}`}
@@ -251,14 +300,14 @@ export default function LeadsV2() {
           All
           <span className="v2d-tab-count">{totals.total}</span>
         </button>
-        {LEAD_STAGES.map(s => (
+        {STAGE_GROUPS.map(g => (
           <button
-            key={s}
-            className={`v2d-tab-pill${stageFilter === s ? ' is-active' : ''}`}
-            onClick={() => setStageFilter(stageFilter === s ? 'all' : s)}
+            key={g.key}
+            className={`v2d-tab-pill${stageFilter === g.key ? ' is-active' : ''}`}
+            onClick={() => setStageFilter(stageFilter === g.key ? 'all' : g.key)}
           >
-            {STAGE_LABELS[s]}
-            <span className="v2d-tab-count">{totals.counts[s] || 0}</span>
+            {g.label}
+            <span className="v2d-tab-count">{totals.groupCounts[g.key] || 0}</span>
           </button>
         ))}
       </div>
@@ -578,6 +627,38 @@ export default function LeadsV2() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── Dashboard stat card ─── */
+function DashStat({ label, value, accent, sub }) {
+  const colors = {
+    blue:  '#60a5fa',
+    amber: '#fbbf24',
+    green: '#4ade80',
+    red:   '#f87171',
+  }
+  const c = colors[accent] || 'var(--v2-ink-0)'
+  return (
+    <div className="v2d-panel" style={{ padding: '12px 14px' }}>
+      <div style={{
+        fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
+        color: 'var(--v2-ink-2)', marginBottom: 6,
+      }}>{label}</div>
+      <div style={{
+        fontFamily: 'var(--v2-display)',
+        fontWeight: 600, fontSize: 22,
+        color: c,
+        lineHeight: 1.1,
+      }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 4 }}>
+          {sub}
         </div>
       )}
     </div>

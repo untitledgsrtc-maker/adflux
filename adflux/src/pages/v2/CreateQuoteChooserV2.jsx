@@ -15,7 +15,7 @@
 // patterns introduced.
 
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Landmark, Tv, Building2, Lock, ArrowRight } from 'lucide-react'
+import { Landmark, Tv, Building2, Lock, ArrowRight, Newspaper } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function CreateQuoteChooserV2() {
@@ -86,11 +86,29 @@ export default function CreateQuoteChooserV2() {
           variant="private"
           icon={<Building2 size={28} strokeWidth={1.6} />}
           label="Private — LED Cities"
-          desc="Existing AdFlux quote for private LED clients across Gujarat cities. Agency rates, GST options, follow-up automation."
+          desc="Private LED clients across Gujarat cities. Agency rates, GST options, follow-up automation. Use when client wants LED screen advertising at GSRTC bus stops."
           chips={[
             { text: 'Agency rates', accent: true },
             { text: 'LED Cities' },
-            { text: 'Existing flow' },
+          ]}
+        />
+
+        {/* PRIVATE × OTHER MEDIA — Phase 12 rev2.
+            Owner spec: "private rep create quote he need to see 2 thing
+            gsrtc quote or other media, so other media quote will be
+            different". This tile covers newspaper / hoarding / cinema /
+            mall / digital — anything that isn't LED. Single-page form
+            with media-type picker + line items + total. */}
+        <Tile
+          allowed={privateAllowed}
+          onClick={() => go('/quotes/new/private/other-media')}
+          variant="private"
+          icon={<Newspaper size={28} strokeWidth={1.6} />}
+          label="Private — Other Media"
+          desc="Newspaper, hoarding, cinema, mall, digital, radio. Free-form line items with rates. For everything that isn't LED screens."
+          chips={[
+            { text: 'Free-form rates', accent: true },
+            { text: 'Newspaper · Hoarding · Cinema · Mall · Digital' },
           ]}
         />
       </div>

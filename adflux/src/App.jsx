@@ -14,6 +14,7 @@ import QuotesV2           from './pages/v2/QuotesV2'
 import MyPerformanceV2    from './pages/v2/MyPerformanceV2'
 import MyOfferV2          from './pages/v2/MyOfferV2'
 import CreateQuoteV2      from './pages/v2/CreateQuoteV2'
+import CreateQuoteOtherMediaV2 from './pages/v2/CreateQuoteOtherMediaV2'
 import CitiesV2           from './pages/v2/CitiesV2'
 import TeamV2             from './pages/v2/TeamV2'
 import IncentivesV2       from './pages/v2/IncentivesV2'
@@ -110,7 +111,9 @@ export default function App() {
               wizard, but the chooser handles that case too. */}
           <Route path="/quotes/new"                element={<CreateQuoteChooserV2 />} />
           {/* Private LED quote (existing wizard) */}
-          <Route path="/quotes/new/private"        element={<CreateQuoteV2 />} />
+          <Route path="/quotes/new/private"                  element={<CreateQuoteV2 />} />
+          {/* Phase 12 rev2 — owner spec: private rep needs LED OR Other Media */}
+          <Route path="/quotes/new/private/other-media"      element={<CreateQuoteOtherMediaV2 />} />
           {/* Government module — Auto Hood + GSRTC LED */}
           <Route path="/quotes/new/government"     element={<RequireGovtAccess><CreateQuoteChooserV2 /></RequireGovtAccess>} />
           <Route path="/quotes/new/government/auto-hood" element={<RequireGovtAccess><CreateGovtAutoHoodV2 /></RequireGovtAccess>} />

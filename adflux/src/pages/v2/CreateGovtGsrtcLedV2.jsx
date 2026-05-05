@@ -121,6 +121,8 @@ export default function CreateGovtGsrtcLedV2() {
       proposal_date:  data.proposal_date,
       created_by:     profile?.id,
       sales_person_name: profile?.name,
+      // Phase 14 — Lead → Quote linkage (see CreateGovtAutoHoodV2 §similar)
+      lead_id:        prefill.lead_id || null,
     }
 
     const { data: quote, error: qErr } = await supabase
@@ -133,6 +135,14 @@ export default function CreateGovtGsrtcLedV2() {
       setSaving(false)
       setError(qErr.message || 'Failed to save proposal.')
       return
+    }
+
+    // Phase 14 — advance the originating lead's stage to QuoteSent.
+    if (prefill.lead_id) {
+      await supabase
+        .from('leads')
+        .update({ stage: 'QuoteSent', quote_id: quote.id })
+        .eq('id', prefill.lead_id)
     }
 
     // Per-station line items — including per-row overrides (Phase 7).
