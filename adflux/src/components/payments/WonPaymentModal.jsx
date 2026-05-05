@@ -245,6 +245,41 @@ export function WonPaymentModal({
                   </label>
                 </>
               )}
+              {/* Phase 11i — team feedback (Adflux Mistake.pptx slide 5):
+                  once the WO was uploaded inside this modal, no way to
+                  replace it. Add a Replace control parallel to the
+                  initial Upload control so a wrong file can be swapped
+                  without reopening the modal. */}
+              {workOrderUploaded && onUploadWorkOrder && (
+                <>
+                  <input
+                    ref={woFileInput}
+                    type="file"
+                    accept="application/pdf,image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleWoFilePicked}
+                  />
+                  <label
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 10px', marginTop: 10,
+                      background: 'transparent',
+                      border: '1px solid rgba(245,158,11,.4)',
+                      borderRadius: 6,
+                      color: '#fbbf24',
+                      fontSize: 12, fontWeight: 600,
+                      cursor: uploadingWorkOrder ? 'wait' : 'pointer',
+                      opacity: uploadingWorkOrder ? 0.6 : 1,
+                    }}
+                    onClick={() => !uploadingWorkOrder && woFileInput.current?.click()}
+                    title="Replace the uploaded Work Order with a new file"
+                  >
+                    {uploadingWorkOrder
+                      ? <>Replacing…</>
+                      : <><Upload size={12} /> Replace</>}
+                  </label>
+                </>
+              )}
             </div>
           )}
 

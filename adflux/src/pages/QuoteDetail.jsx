@@ -247,6 +247,38 @@ export default function QuoteDetail() {
     openWhatsApp(quote.client_phone, buildWhatsAppMessage(quote, cities, { pdfUrl }))
   }
 
+  // Phase 11i — team feedback: add Email parallel to WhatsApp.
+  // Uses the same upload-PDF-then-share flow so the customer gets a
+  // 24h download link in their inbox.
+  async function handleEmail() {
+    if (!quote) return
+    let pdfUrl = null
+    try {
+      setPdfLoading(true)
+      pdfUrl = await uploadQuotePDF(quote, cities)
+    } catch (e) {
+      console.warn('[email] PDF upload failed:', e?.message)
+    } finally {
+      setPdfLoading(false)
+    }
+    if (pdfUrl) {
+      try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
+    }
+    const to      = (quote.client_email || '').trim()
+    const subject = `Proposal — ${quote.quote_number || quote.ref_number || ''}`
+    let body =
+      `Dear ${quote.client_name || 'Sir/Madam'},\n\n` +
+      `Please find our proposal — ${quote.quote_number || quote.ref_number || ''}.\n` +
+      `Total: Rs. ${formatCurrency(quote.total_amount).replace('₹','')}\n`
+    if (pdfUrl) body += `\nProposal PDF: ${pdfUrl}\n`
+    body += `\nThank you,\nUntitled Adflux Pvt Ltd`
+    const href =
+      `mailto:${encodeURIComponent(to)}` +
+      `?subject=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`
+    window.location.href = href
+  }
+
   async function handleEditPayment(updated) {
     if (!editingPayment) return
     const { error } = await updatePayment(editingPayment.id, updated)
@@ -315,6 +347,11 @@ export default function QuoteDetail() {
           )}
           <button className="btn btn-sec btn-sm" onClick={handleWhatsApp}>
             <MessageCircle size={14} /> WhatsApp
+          </button>
+          {/* Phase 11i — Email parallel to WhatsApp; uploads PDF and
+              opens default mail client with the link prefilled. */}
+          <button className="btn btn-sec btn-sm" onClick={handleEmail} disabled={pdfLoading}>
+            <Mail size={14} /> Email
           </button>
           <button className="btn btn-sec btn-sm" onClick={handleDownloadPDF} disabled={pdfLoading}>
             <Download size={14} /> {pdfLoading ? 'Generating…' : 'PDF'}

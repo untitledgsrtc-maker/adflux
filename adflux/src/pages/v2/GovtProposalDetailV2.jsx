@@ -13,6 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2,
   CreditCard, Upload, Download, FileText, Lock, Loader2, MessageCircle, Calendar,
+  Mail,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { GovtProposalRenderer } from '../../components/govt/GovtProposalRenderer'
@@ -143,9 +144,10 @@ export default function GovtProposalDetailV2() {
       setQuote(q)
 
       // Line items, template, signer, attachment template, company,
-      // and (for AUTO_HOOD) the auto_districts master so we can
-      // surface Gujarati district names in the rendered letter.
-      const [li, tpl, sg, atpl, co, dist] = await Promise.all([
+      // and the appropriate Gujarati-name master (auto_districts for
+      // AUTO_HOOD, gsrtc_stations for GSRTC_LED) so we can surface
+      // Gujarati names in the rendered letter.
+      const [li, tpl, sg, atpl, co, dist, gst] = await Promise.all([
         supabase.from('quote_cities')
           .select('*').eq('quote_id', id),
         supabase.from('proposal_templates')
@@ -187,19 +189,37 @@ export default function GovtProposalDetailV2() {
           ? supabase.from('auto_districts')
               .select('id, district_name_en, district_name_gu')
           : Promise.resolve({ data: [] }),
+        // Phase 11i — same fix for GSRTC_LED. The wizard ALSO saves
+        // only the English station name (CreateGovtGsrtcLedV2 line 152
+        // → description: s.station_name_en) so renderGsrtcTable was
+        // showing English names too. Join gsrtc_stations master here,
+        // map id → station_name_gu, and merge into line_items.
+        q.media_type === 'GSRTC_LED'
+          ? supabase.from('gsrtc_stations')
+              .select('id, station_name_en, station_name_gu')
+          : Promise.resolve({ data: [] }),
       ])
       if (cancel) return
-      // Augment line_items with Gujarati district names for AUTO_HOOD.
-      // Match on ref_id (set by the wizard to auto_districts.id) so we
-      // can pull district_name_gu through to the renderer. Items for
-      // GSRTC_LED don't go through this lookup (their station names
-      // already come from gsrtc_stations master with Gujarati baked in).
+      // Augment line_items with Gujarati names. Both AUTO_HOOD and
+      // GSRTC_LED save quote_cities.ref_id = master row id, so we use
+      // that to look up the appropriate Gujarati name from whichever
+      // master matches the media_type.
       const distMap = new Map((dist.data || []).map(d => [d.id, d]))
+      const stnMap  = new Map((gst.data  || []).map(s => [s.id, s]))
       const itemsWithGu = (li.data || []).map(it => {
-        const d = it.ref_id ? distMap.get(it.ref_id) : null
-        return d
-          ? { ...it, district_name_gu: d.district_name_gu, district_name_en: d.district_name_en }
-          : it
+        if (q.media_type === 'AUTO_HOOD') {
+          const d = it.ref_id ? distMap.get(it.ref_id) : null
+          return d
+            ? { ...it, district_name_gu: d.district_name_gu, district_name_en: d.district_name_en }
+            : it
+        }
+        if (q.media_type === 'GSRTC_LED') {
+          const s = it.ref_id ? stnMap.get(it.ref_id) : null
+          return s
+            ? { ...it, station_name_gu: s.station_name_gu, station_name_en: s.station_name_en }
+            : it
+        }
+        return it
       })
       setItems(itemsWithGu)
       setTemplate(tpl.data || null)
@@ -243,6 +263,9 @@ export default function GovtProposalDetailV2() {
         description:  it.description || it.city_name,
         district_name_gu: it.district_name_gu,
         district_name_en: it.district_name_en,
+        // Phase 11i — same plumbing for GSRTC stations.
+        station_name_gu: it.station_name_gu,
+        station_name_en: it.station_name_en,
         category:     it.grade,
         screens,
         daily_spots:       daily,
@@ -413,18 +436,59 @@ export default function GovtProposalDetailV2() {
     }
   }
 
-  // Modal-side OC upload helper. Finds the OC copy template row in the
-  // checklist and runs the same upload flow the inline UI uses.
+  // Modal-side OC upload helper. Finds the OC copy template row in
+  // attachmentTpl (the RAW master list, not the filtered checklist) and
+  // upserts the upload into quote.attachments_checklist directly.
+  //
+  // Phase 11i — DO NOT use checklist.findIndex here. The checklist
+  // useMemo filters out OC copy when status='draft' (owner spec: hide
+  // OC until Sent), but Mark Sent ONLY fires when status='draft' →
+  // findIndex always returns -1 → "OC copy template row not found"
+  // error blocks the entire flow. Working off attachmentTpl + raw
+  // attachments_checklist sidesteps the filter.
   async function handleSentModalOcUpload(file) {
     if (!file || !quote) return
-    const idx = checklist.findIndex(c => /oc copy/i.test(c.label || ''))
-    if (idx < 0) {
-      setStatusError('OC copy template row not found — refresh the page and retry.')
+    const ocTpl = attachmentTpl.find(t => /oc copy/i.test(t.label || ''))
+    if (!ocTpl) {
+      setStatusError(
+        'OC copy template row not found in attachment_templates. ' +
+        'Run the Phase 7 seed migration in Supabase Studio to add it.'
+      )
       return
     }
     setSentModalUploadingOc(true)
+    setStatusError('')
     try {
-      await handleFilePick(idx, file)
+      const { path } = await uploadAttachment({
+        file,
+        quoteId: quote.id,
+        displayOrder: ocTpl.display_order,
+        label: ocTpl.label,
+      })
+      const saved = Array.isArray(quote.attachments_checklist)
+        ? quote.attachments_checklist
+        : []
+      const existingIdx = saved.findIndex(s => s.template_id === ocTpl.id)
+      let next
+      if (existingIdx >= 0) {
+        next = saved.map((s, i) => i === existingIdx
+          ? { ...s, file_url: path, checked: true }
+          : s)
+      } else {
+        next = [
+          ...saved,
+          {
+            template_id: ocTpl.id,
+            label:       ocTpl.label,
+            is_required: ocTpl.is_required,
+            checked:     true,
+            file_url:    path,
+          },
+        ]
+      }
+      await persistChecklist(next)
+    } catch (e) {
+      setStatusError(`Upload failed: ${e?.message || e}`)
     } finally {
       setSentModalUploadingOc(false)
     }
@@ -495,21 +559,56 @@ export default function GovtProposalDetailV2() {
   //   the proposal-phase "Sample Work Order" or generic "PO copy").
   //   Owner spec: the awarded WO is the formal document issued by THIS
   //   department for THIS proposal — it's what proves the deal closed.
+  //
+  // Phase 11i — same fix as handleSentModalOcUpload: work off
+  // attachmentTpl + raw attachments_checklist, NOT the filtered
+  // checklist (which hides AWO until status='won' → findIndex returns
+  // -1 inside the Mark Won pre-flight modal).
   async function handleWonModalPoUpload(file) {
     if (!file || !quote) return
-    const idx = checklist.findIndex(c =>
-      /awarded work order/i.test(c.label || '')
+    const awoTpl = attachmentTpl.find(t =>
+      /awarded work order/i.test(t.label || '')
     )
-    if (idx < 0) {
+    if (!awoTpl) {
       setStatusError(
-        'Awarded Work Order template row not found in checklist. ' +
+        'Awarded Work Order template row not found in attachment_templates. ' +
         'Run supabase_phase11e_awarded_wo_attachment.sql in Studio, then refresh.'
       )
       return
     }
     setWonModalUploadingPo(true)
+    setStatusError('')
     try {
-      await handleFilePick(idx, file)
+      const { path } = await uploadAttachment({
+        file,
+        quoteId: quote.id,
+        displayOrder: awoTpl.display_order,
+        label: awoTpl.label,
+      })
+      const saved = Array.isArray(quote.attachments_checklist)
+        ? quote.attachments_checklist
+        : []
+      const existingIdx = saved.findIndex(s => s.template_id === awoTpl.id)
+      let next
+      if (existingIdx >= 0) {
+        next = saved.map((s, i) => i === existingIdx
+          ? { ...s, file_url: path, checked: true }
+          : s)
+      } else {
+        next = [
+          ...saved,
+          {
+            template_id: awoTpl.id,
+            label:       awoTpl.label,
+            is_required: awoTpl.is_required,
+            checked:     true,
+            file_url:    path,
+          },
+        ]
+      }
+      await persistChecklist(next)
+    } catch (e) {
+      setStatusError(`Upload failed: ${e?.message || e}`)
     } finally {
       setWonModalUploadingPo(false)
     }
@@ -648,6 +747,47 @@ export default function GovtProposalDetailV2() {
     }
     msg += `\nઆભાર.`
     openWhatsApp(phone, msg)
+  }
+
+  // Phase 11i — team feedback (Adflux Mistake.pptx slide 6):
+  // "Add mail also so provide on mail". Opens the user's default
+  // email client with subject/body prefilled and the locked PDF
+  // signed URL (if available) inline. Kept simple — `mailto:` works
+  // across Gmail/Outlook/Apple Mail without OAuth or API setup.
+  async function handleEmail() {
+    if (!quote) return
+    const to      = (quote.client_email || '').trim()
+    const mediaLabel = quote.media_type === 'AUTO_HOOD'
+      ? 'Auto Rickshaw Hood'
+      : 'GSRTC LED Screen'
+    const subject = `Proposal — ${mediaLabel} — ${quote.quote_number || quote.ref_number || ''}`
+    let body =
+      `Dear Sir/Madam,\n\n` +
+      `Please find attached our proposal for ${mediaLabel} campaign.\n\n` +
+      `Reference  : ${quote.quote_number || quote.ref_number || ''}\n` +
+      `Total      : Rs. ${formatINREnglish(quote.total_amount || 0)}/-\n`
+    if (quote.locked_proposal_pdf_url) {
+      try {
+        const url = await getSignedUrl(quote.locked_proposal_pdf_url, 24 * 3600)
+        const short = await shortenUrl(url).catch(() => url)
+        body += `\nProposal PDF (link valid 24 hours): ${short}\n`
+      } catch (e) {
+        // Signed URL failed — send without link; user can re-share later.
+      }
+    } else {
+      body += `\nNote: Proposal PDF will be sent in a follow-up — kindly mark it Sent first to lock the snapshot.\n`
+    }
+    body += `\nThank you,\nUntitled Advertising`
+
+    const href =
+      `mailto:${encodeURIComponent(to)}` +
+      `?subject=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`
+
+    // mailto: max URL length varies by client; long bodies can fail
+    // silently in some browsers. Open in a new window so the current
+    // page state isn't lost if the handler doesn't fire.
+    window.location.href = href
   }
 
   async function handleDeletePayment(paymentId) {
@@ -789,7 +929,10 @@ export default function GovtProposalDetailV2() {
   // per-path inside signedUrls — but signed URLs expire so a refresh
   // is fine; we cache only to avoid re-fetching during a single click.
   async function openAttachment(path) {
-    if (!path) return
+    if (!path) {
+      setStatusError('No file path on this row — upload the file first.')
+      return
+    }
     if (path.startsWith('http')) {
       // Old data: a pasted URL, not a storage path. Open as-is.
       window.open(path, '_blank', 'noopener')
@@ -797,8 +940,23 @@ export default function GovtProposalDetailV2() {
     }
     try {
       const url = await getSignedUrl(path, 600)
+      // Phase 11i — getSignedUrl may return null on a missing path
+      // without throwing. window.open(null) opens about:blank — that's
+      // exactly the "File not view" symptom the team reported (blank
+      // page after clicking View).
+      if (!url) {
+        setStatusError(
+          `Could not generate signed URL for ${path}. The file may have ` +
+          `been deleted from Storage. Click Replace to re-upload.`
+        )
+        return
+      }
       setSignedUrls(prev => ({ ...prev, [path]: url }))
-      window.open(url, '_blank', 'noopener')
+      const win = window.open(url, '_blank', 'noopener')
+      if (!win) {
+        // Pop-up blocker — fall back to direct navigation in current tab.
+        window.location.href = url
+      }
     } catch (e) {
       // Phase 11h — Supabase returns 400 "Bad Request" when the file
       // at that path doesn't exist (RLS denial would be 403). The
@@ -827,6 +985,15 @@ export default function GovtProposalDetailV2() {
     setCombinedPdfBusy(true)
     setStatusError('')
     setStatusMsg('')
+    // Phase 11i — verbose console diagnostics. Combined PDF failures
+    // are hard to diagnose from a toast alone; this lets the user
+    // share the console output and pinpoint where it died.
+    console.log('[combined-pdf] start', {
+      quote_id:        quote.id,
+      checklist_len:   checklist.length,
+      has_renderer:    !!rendererRef.current,
+      has_locked_pdf:  !!quote.locked_proposal_pdf_url,
+    })
     try {
       const inputs = []
 
@@ -880,6 +1047,21 @@ export default function GovtProposalDetailV2() {
             })
           } finally {
             document.body.removeChild(wrapper)
+          }
+
+          // Phase 11i — sanity-check the canvas before slicing.
+          // html2canvas occasionally returns a 0×0 canvas when the
+          // cloned node has no laid-out dimensions (race with React
+          // render, or display:none somewhere up the tree).
+          console.log('[combined-pdf] canvas:', {
+            w: canvas.width, h: canvas.height,
+          })
+          if (!canvas.width || !canvas.height) {
+            throw new Error(
+              `Renderer captured as 0×0 — the proposal letter DOM has no ` +
+              `dimensions. Reload the page and wait for the letter to render ` +
+              `before clicking Combined PDF.`
+            )
           }
 
           const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -975,12 +1157,24 @@ export default function GovtProposalDetailV2() {
         }
       }
 
+      console.log('[combined-pdf] merge inputs:', {
+        total:        inputs.length,
+        merged_in:    merged_in,
+        skipped_url:  skipped_url,
+        skipped_no:   skipped_no,
+        skipped_err:  skipped_err,
+      })
+
       if (inputs.length === 0) {
-        setStatusError('Nothing to merge — upload at least one attachment first.')
+        setStatusError(
+          'Nothing to merge — the renderer produced no output AND no ' +
+          'attachments are uploaded. Open DevTools console for details.'
+        )
         return
       }
 
       const merged = await buildCombinedPdf(inputs)
+      console.log('[combined-pdf] merged size:', merged?.byteLength)
       const filename = `${quote.quote_number || quote.ref_number || 'proposal'}-combined.pdf`
         .replace(/[^a-z0-9-_.]/gi, '-')
       downloadPdfBlob(merged, filename)
@@ -1006,6 +1200,7 @@ export default function GovtProposalDetailV2() {
       // to read the failure list.
       setTimeout(() => setStatusMsg(''), (skipped_url.length + skipped_err.length) ? 9000 : 4500)
     } catch (e) {
+      console.error('[combined-pdf] FATAL:', e)
       setStatusError(`Failed to build combined PDF: ${e?.message || e}`)
     } finally {
       setCombinedPdfBusy(false)
@@ -1058,6 +1253,16 @@ export default function GovtProposalDetailV2() {
             title="Share via WhatsApp with the locked proposal PDF link"
           >
             <MessageCircle size={14} /> WhatsApp
+          </button>
+          {/* Phase 11i — Email button. Opens default mail client with
+              proposal subject + body + signed PDF link prefilled. */}
+          <button
+            type="button"
+            className="govt-wiz__btn"
+            onClick={handleEmail}
+            title="Send via email with the locked proposal PDF link"
+          >
+            <Mail size={14} /> Email
           </button>
           {/* Phase 11d (rev9) — Print / Save PDF button removed.
               Owner asked twice. Combined PDF (next button) is the
@@ -1789,19 +1994,52 @@ export default function GovtProposalDetailV2() {
                   )}
 
                   {ocUploaded && (
-                    <button
-                      type="button"
-                      onClick={() => openAttachment(ocItem.file_url)}
-                      style={{
-                        marginTop: 10,
-                        background: 'transparent', border: '1px solid rgba(76,175,80,.4)',
-                        color: '#81c784', borderRadius: 6, padding: '4px 10px',
-                        cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                        display: 'inline-flex', gap: 6, alignItems: 'center',
-                      }}
-                    >
-                      <Download size={12} /> View uploaded file
-                    </button>
+                    <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => openAttachment(ocItem.file_url)}
+                        style={{
+                          background: 'transparent', border: '1px solid rgba(76,175,80,.4)',
+                          color: '#81c784', borderRadius: 6, padding: '4px 10px',
+                          cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                          display: 'inline-flex', gap: 6, alignItems: 'center',
+                        }}
+                      >
+                        <Download size={12} /> View uploaded file
+                      </button>
+                      {/* Phase 11i — team feedback: once OC was uploaded
+                          there was no way to replace it from inside the
+                          modal. Add a Replace button that re-runs the
+                          same upload helper, overwriting file_url. */}
+                      <label
+                        style={{
+                          background: 'transparent', border: '1px solid rgba(245,158,11,.4)',
+                          color: '#fbbf24', borderRadius: 6, padding: '4px 10px',
+                          cursor: sentModalUploadingOc ? 'wait' : 'pointer',
+                          fontSize: 12, fontWeight: 600,
+                          display: 'inline-flex', gap: 6, alignItems: 'center',
+                          opacity: sentModalUploadingOc ? 0.6 : 1,
+                        }}
+                        title="Replace the uploaded OC copy with a new file"
+                      >
+                        {sentModalUploadingOc ? (
+                          <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Replacing…</>
+                        ) : (
+                          <><Upload size={12} /> Replace</>
+                        )}
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          style={{ display: 'none' }}
+                          disabled={sentModalUploadingOc}
+                          onChange={e => {
+                            const f = e.target.files?.[0]
+                            if (f) handleSentModalOcUpload(f)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                    </div>
                   )}
                 </div>
 

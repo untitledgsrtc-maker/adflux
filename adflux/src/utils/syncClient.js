@@ -48,7 +48,7 @@ export async function syncClientFromQuote(quote, snapshotMode = 'create') {
     }
 
     if (!existing) {
-      await supabase.from('clients').insert([{
+      const { error: insErr } = await supabase.from('clients').insert([{
         ...clientSnapshot,
         created_by:       quote.created_by,
         first_quote_at:   now,
@@ -56,6 +56,20 @@ export async function syncClientFromQuote(quote, snapshotMode = 'create') {
         quote_count:      snapshotMode === 'update' ? 0 : 1,
         total_won_amount: snapshotMode === 'won' ? (quote.total_amount || 0) : 0,
       }])
+      // Phase 11i — RLS rejection is the most common failure mode here
+      // (agency or other non-sales role with no clients_*_own policy).
+      // Surface it to the console with full detail so the user/dev can
+      // see why the clients tab stays empty even after creating quotes.
+      if (insErr) {
+        console.error(
+          '[clients] insert failed — likely RLS. role/auth.uid mismatch?',
+          {
+            phone,
+            created_by: quote.created_by,
+            error:      insErr,
+          },
+        )
+      }
       return
     }
 
@@ -72,7 +86,16 @@ export async function syncClientFromQuote(quote, snapshotMode = 'create') {
     if (snapshotMode === 'won') {
       patch.total_won_amount = (existing.total_won_amount || 0) + (quote.total_amount || 0)
     }
-    await supabase.from('clients').update(patch).eq('id', existing.id)
+    const { error: updErr } = await supabase
+      .from('clients')
+      .update(patch)
+      .eq('id', existing.id)
+    if (updErr) {
+      console.error(
+        '[clients] update failed — likely RLS:',
+        { client_id: existing.id, error: updErr },
+      )
+    }
   } catch (err) {
     // Non-fatal. Log so it's debuggable, but don't bubble.
     console.warn('[clients] sync failed:', err?.message || err)

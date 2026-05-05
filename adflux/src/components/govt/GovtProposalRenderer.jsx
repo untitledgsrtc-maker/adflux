@@ -508,10 +508,19 @@ function renderGsrtcTable(data) {
     totalScreens += screens
     totalDaily   += daily * screens
     totalMonthly += daily * days * screens
+    // Phase 11i — prefer Gujarati station name when available
+    // (joined from gsrtc_stations master in GovtProposalDetailV2.load).
+    // Falls back to English description for legacy items / wizard preview.
+    const stationName =
+      it.station_name_gu ||
+      it.description_gu ||
+      it.station_name_en ||
+      it.description ||
+      ''
     return `
       <tr>
         <td style="${cellStyle}text-align:center;">${toGujaratiDigits(String(i + 1))}</td>
-        <td style="${cellStyle}">${it.description || ''}</td>
+        <td style="${cellStyle}">${stationName}</td>
         <td style="${cellStyle}text-align:center;">${it.category || ''}</td>
         <td style="${numCell}">${toGujaratiDigits(String(screens))}</td>
         <td style="${numCell}">${toGujaratiDigits(String(daily))}</td>
