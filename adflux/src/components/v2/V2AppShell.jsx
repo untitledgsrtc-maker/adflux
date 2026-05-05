@@ -332,6 +332,9 @@ export function V2AppShell() {
           })}
         </div>
       </nav>
+
+      {/* Phase 1.5 — Co-Pilot modal (Cmd+K) */}
+      <CopilotModal open={copilotOpen} onClose={() => setCopilotOpen(false)} />
     </div>
   )
 }
