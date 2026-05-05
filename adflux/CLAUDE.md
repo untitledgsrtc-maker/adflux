@@ -1,151 +1,436 @@
-# CLAUDE — Project Context
+# CLAUDE.md — Untitled OS / AdFlux Working Rules
 
-This file is loaded at the start of every Claude session in this workspace. Read it first; it captures everything you can't derive from `git log` or the code itself.
+This file is loaded at the start of every Claude session in this workspace. **Read it end-to-end before doing anything else.** It captures rules the owner has established across many sprints and that you cannot derive from `git log` or the code.
+
+Owner is **Brijesh Solanki** (Untitled Advertising, Vadodara). UI-oriented, direct, non-technical, runs ~₹9 Cr/yr OOH advertising business. He pushes commits via GitHub Desktop, runs SQL by pasting into Supabase Studio, and tests every change personally.
+
+Off-brand UI is a hard fail. Patch-chain "fix this one thing" work is a hard fail. Skipping the response format is a hard fail.
 
 ---
 
-## Who you're working with
+## 0 · Mandatory pre-work reading (in this exact order)
 
-**Brijesh Solanki** — owner of Untitled Advertising, Vadodara, Gujarat. Non-technical, runs a ~₹9 Cr/yr OOH advertising business with 14 staff. Writes in fast, broken English (Indian English + Gujarati phrasing). Don't correct his spelling. Read intent, not literal text.
+Before writing a single line of code or proposing a plan:
 
-He's the sole product decision-maker AND the sole tester. Every change ships through his approval, sprint by sprint.
+1. `UNTITLED_OS_MASTER_SPEC.md` — the 8-module OS vision + phase plan.
+2. `UI_DESIGN_SYSTEM.md` — tokens, components, type scale, build checklist.
+3. `src/styles/tokens.css` — **LIVE tokens. These win when they differ from the doc.**
+4. `src/styles/v2.css` — `.v2`-scoped tokens used inside V2AppShell pages.
+5. `AUDIT_2026_05_05.md` — current state of the codebase.
+6. `PHASE1_DESIGN.md` — module-level plan for the active phase.
+7. `_design_reference/dashboard_mockup.html` — owner-approved visual reference.
+8. The owner's auto-memory files at `~/Library/Application Support/Claude/local-agent-mode-sessions/.../memory/MEMORY.md`.
 
-## How he wants you to work
+If a token in `UI_DESIGN_SYSTEM.md` disagrees with `tokens.css` / `v2.css`, **the CSS file wins** — flag the doc drift but follow the live token. (Example: doc says brand yellow `#facc15`; live token is `#FFE600`. Use `#FFE600`.)
 
-- **Push back. Don't agree by default.** First instinct: stress-test what he just said. Find the weakest point before validating anything.
-- **No glazing.** Don't tell him something is "great" or "smart." If you agree, earn it with specifics.
-- **Lead with what's wrong or missing.** If the answer is "no" or "this won't work," say that in the first sentence.
-- **Be direct, no warm-up sentences.** No filler affirmations.
-- **Plain language, not developer jargon.** This is the rule he explicitly called out — "build like you are owner and user of all module — easy to understand for user as well as owners." Every doc, UI label, error message must pass the "could a sales rep understand this without training" test.
-- **Walk him click-by-click for any Mac / GitHub Desktop / Vercel / Supabase steps.** He commits via GitHub Desktop, not terminal.
-- **One sprint at a time. Each sprint approved before the next starts.** No batching multiple modules in one ask.
+---
 
-## What's being built
+## 1 · Mandatory response format (every non-trivial reply)
 
-**Untitled OS** — a consolidated app that absorbs two existing systems:
+Six sections, in this order, every time:
 
-1. **AdFlux** — live in production (`main` branch → adflux-iota.vercel.app + original Supabase). ~50 quotes, 1 month old. Does Private LED quotes, payments with admin approval, rep incentives, mini-HR (offer letters), follow-ups, leaderboard, renewal tools, city catalog. **This is the host.**
-2. **Untitled Proposals** — dev-only, no users, schema complete (separate Supabase project). Built originally for Government deals only. Has the 6-step proposal wizard, dual DAVP/Agency rate model, GSRTC stations + Auto districts masters, per-deal P&L, monthly admin expenses, TOTP-gated owner access. **Being stripped for parts and folded into AdFlux.**
+1. **Audit Summary** — what is broken / what does the request actually require, in plain English.
+2. **Dependency Map** — files / tables / RLS / external systems this touches.
+3. **Proposed Solution** — the smallest change that meets the spec.
+4. **Acceptance Criteria** — observable checks that prove it works.
+5. **Files to Change/Create** — explicit list with one-line purpose each.
+6. **Next Action for Owner** — what they need to do (run SQL, push, smoke test).
 
-End state: one app, one team experience, two segments (Government + Private).
+Trivial chatter (single-question replies, follow-ups inside an in-flight task) doesn't need all six sections — but anything that touches code or schema does.
 
-## Architecture (locked decisions)
+---
 
-Full doc at `docs/UNTITLED_OS_v2_ARCHITECTURE.md`. Key invariants:
+## 2 · Tone & behavior (owner's standing preferences)
 
+- **Never agree by default.** First instinct = stress-test the idea. Find the weakest point before validating anything.
+- **No glazing.** Don't tell him something is "great", "smart", or "brilliant". If you agree, earn it with specifics.
+- **Don't echo his framing back to him.** If he says "I think X is the move", don't open with "X is definitely the move". Open with what you'd push back on.
+- **Be direct. First sentence = the answer.** If the answer is "no" or "this won't work", lead with that.
+- **The more certain he sounds, the more pushback he expects.**
+- **Skip warm-ups.** No "Great point", no "You're absolutely right", no filler affirmations.
+- **Plain language, not developer jargon.** Owner test: "could a sales rep understand this without training?"
+- **One sprint at a time.** No batching multiple modules in one ask.
+- **Walk him click-by-click for any Mac / GitHub Desktop / Vercel / Supabase steps.**
+- **Read intent, not literal text.** He writes in fast Indian-English / Gujarati phrasing. Don't correct his spelling.
+
+---
+
+## 3 · Module-not-patch directive (5 May 2026)
+
+Owner's explicit rule: **build modules, don't patch.** Anti-pattern is the 75-task patch chain that produced inconsistent UX.
+
+For any new feature:
+1. Audit the current state of the affected module.
+2. Cross-role test: does this work for admin, co_owner, sales, agency, telecaller?
+3. Write acceptance criteria BEFORE writing code.
+4. Ship one cohesive module-level change, not a stream of fixes.
+
+---
+
+## 4 · Two-company architecture (hard requirement)
+
+| Segment | Company | GSTIN / Bank | Letterhead |
+|---|---|---|---|
+| GOVERNMENT | Untitled Advertising | from `companies` row where segment='GOVERNMENT' | Govt letterhead |
+| PRIVATE | Untitled Adflux Pvt Ltd | from `companies` row where segment='PRIVATE' | Private letterhead |
+
+Rules:
+- Every PDF / proposal / quote reads the company row by `segment`. **Never hardcode** company name, address, GSTIN, bank, or logo.
+- **Hard-fail** (don't silently fall back) if the company row is missing required fields.
+- `GovtProposalRenderer` asserts segment matches company row; do the same for any new renderer.
+- Source of truth for legal details: `project_company_details.md` in memory.
+
+Locked architecture decisions:
 - **Two segments only:** `GOVERNMENT` and `PRIVATE`. Stored as `quotes.segment`.
-- **Government locked to AUTO_HOOD + GSRTC_LED only.** No DAVP for hoardings, mall, cinema, digital, other media. Enforced at DB via CHECK constraint AND in `media_segment_validity` config table. **Owner decision 30 Apr 2026 — do not relax without his explicit re-approval.**
-- **Two-axis data model:** `segment` (Government/Private) + `media_type` (LED_OTHER/AUTO_HOOD/GSRTC_LED/HOARDING/MALL/CINEMA/DIGITAL/OTHER). Independent fields. Every quote = one combination.
-- **Three-layer access control:**
-  1. Segment scope on `users.segment_access` — applies only to roles `sales` and `telecaller`. Everyone else = `ALL`.
-  2. Operational data (creative jobs, attendance, leads) — segment-blind for non-sales roles.
-  3. Financial data — gated by role. Sales: own only. Admin/Accounts: all revenue, no P&L. Owner: all + P&L.
-- **Existing 5 sales reps** (Brahmbhatt, Sondarva, Dhara, Vishnu, Nikhil) → `segment_access = 'PRIVATE'`. New hires for Government = `'GOVERNMENT'`.
-- **Existing 50 quotes' `UA-2026-NNNN` ref format is locked.** New formats apply to new quotes only:
+- **Government locked to AUTO_HOOD + GSRTC_LED only.** No DAVP for hoardings, mall, cinema, digital, other media. Enforced at DB via CHECK + `media_segment_validity` config table. Owner decision 30 Apr 2026 — do not relax without explicit re-approval.
+- **Two-axis data model:** `segment` (Govt/Private) + `media_type` (LED_OTHER/AUTO_HOOD/GSRTC_LED/HOARDING/MALL/CINEMA/DIGITAL/OTHER/OTHER_MEDIA). Independent fields. Every quote = one combination.
+- **Indian Financial Year:** April 1 – March 31. `fy_for_date()` Postgres function returns "2026-27" format.
+- **Ref formats are locked for existing 50 quotes (`UA-2026-NNNN`).** New formats apply to new quotes only:
   - `UA/AUTO/2026-27/NNNN` for AUTO_HOOD
   - `UA/GSRTC/2026-27/NNNN` for GSRTC_LED
   - `UA-2026-NNNN` for Private LED + supplementary media
-- **Indian Financial Year:** April 1 – March 31. `fy_for_date()` Postgres function returns "2026-27" format.
-- **Sales Lead role + manager_id + telecaller role: deferred** until actually needed (Phase 2). Don't add yet.
-- **P&L from Untitled Proposals: ported but stripped of TOTP/audit/owner-only gating.** Admin role check only.
-- **UX choice: option (b)** — chooser screen routes to two parallel wizards (Government / Private). Existing AdFlux Private LED wizard stays untouched; ported Untitled Proposals wizard handles Government.
 
-## Design system — non-negotiable
+---
 
-All new UI inherits AdFlux's existing tokens. Owner explicitly said "make sure all UI must be in this theme/font/color only — don't build different of anything which look unprofessional."
+## 5 · Live design tokens (from `src/styles/tokens.css`)
 
-- **Fonts:** Space Grotesk (display), DM Sans (body). No new fonts.
-- **Theme:** Dark — near-black background, slightly lighter cards, rounded corners.
-- **Primary CTA:** Yellow/gold buttons.
-- **Hero/banner:** Teal-cyan gradient (e.g., dashboard revenue card).
-- **Status colors:** Blue (Sent), Orange (Negotiating), Green (Won), Red (Lost).
-- **Sidebar:** Dark with yellow highlight on active item.
-- **Avatars:** Colored letter circles per user.
+These are the **only** colors / fonts to use. Do not paste hex codes from old code.
 
-**When porting Untitled Proposals UI** (uses `.up-*` CSS prefix): drop those styles entirely, rebuild components with AdFlux's existing tokens/classes. Never invent a new accent color. If a new pattern is needed (e.g., file upload), match the look of the closest existing AdFlux component.
+```
+/* Backgrounds */
+--bg:           #0f172a
+--surface:      #1e293b
+--surface-2:    #334155
+--surface-3:    #475569
 
-## Tech stack
+/* Borders */
+--border:       #334155
+--border-strong:#475569
 
-React 18 + Vite + React Router v6, Zustand store, React Hook Form + Zod, Supabase (Postgres + Auth + Realtime + RLS), `@react-pdf/renderer` for in-app PDFs (existing AdFlux), Puppeteer + Chromium pdf-api for server-side PDFs (Untitled Proposals — handles Gujarati text via `document.fonts.ready`), date-fns, Lucide icons, Vercel deployment.
+/* Text */
+--text:         #f1f5f9
+--text-muted:   #94a3b8
+--text-subtle:  #64748b
 
-## Branch & environment strategy
+/* Brand */
+--accent:       #FFE600    ← brand yellow. NOT #facc15.
+--accent-hover: #F0D800
+--accent-fg:    #0f172a
+--accent-soft:  rgba(255,230,0,0.14)
+
+/* Status */
+--success:       #10B981   --success-soft: rgba(16,185,129,0.12)
+--warning:       #F59E0B   --warning-soft: rgba(245,158,11,0.12)
+--danger:        #EF4444   --danger-soft:  rgba(239,68,68,0.12)
+--blue:          #3B82F6   --blue-soft:    rgba(59,130,246,0.12)
+
+/* Sidebar */
+--sidebar-bg / --sidebar-text / --sidebar-active-bg / --sidebar-active-text
+
+/* Layout */
+--sidebar-width: 240px
+--topbar-height: 60px
+--mobile-nav-height: 62px
+
+/* Radius */
+--radius-sm: 6px   --radius: 10px   --radius-lg: 14px   --radius-xl: 20px
+
+/* Fonts */
+--font-sans:    DM Sans → Inter → system
+--font-display: Space Grotesk (headings, big numbers)
+--font-mono:    JetBrains Mono (IDs, currency figures, ages)
+```
+
+Inside `.v2`-scoped pages (`V2AppShell` children) use the `--v2-*` tokens from `src/styles/v2.css` (`--v2-yellow`, `--v2-ink-0/1/2`, `--v2-bg-0/1/2`, `--v2-line`, `--v2-display`).
+
+If a fallback is needed in inline style: `var(--v2-yellow, #FFE600)` — never `#facc15`.
+
+---
+
+## 6 · UI build checklist (every screen, before declaring done)
+
+From `UI_DESIGN_SYSTEM.md` §10:
+
+1. CSS variables only — no hardcoded colors.
+2. Renders in both Night and Day theme (where applicable).
+3. Status badges use the chip + tint pattern (`--tint-*-bg` + `--tint-*-bd`).
+4. Numbers Space Grotesk; IDs/ages JetBrains Mono; body DM Sans / Inter.
+5. Border-radius matches the scale (6 / 8 / 9 / 12 / 14 / 16 / 999).
+6. Hover states defined on every interactive element.
+7. Empty state designed (not a blank box).
+8. Loading state designed (skeleton or spinner).
+9. Error state designed (red banner with retry).
+10. Mobile breakpoint tested at 720px and 1100px.
+11. Focus rings visible on tab navigation.
+12. Lucide icons only, stroke 1.6, size 14 / 16 / 18 / 22.
+
+Skipping any of these is the kind of thing the owner will catch and call out.
+
+---
+
+## 7 · Iconography
+
+- `lucide-react` only. No emoji, no other icon libraries.
+- Stroke width 1.6.
+- Sizes: 14 (inline / chip prefix), 16 (sidebar nav, action row, topbar buttons), 18, 22 (display numbers).
+- Color inherits from parent. Don't hardcode color on `<Icon>`.
+
+---
+
+## 8 · Database / RLS / migration patterns
+
+- Every SQL file is **idempotent**: `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `INSERT ... ON CONFLICT DO NOTHING`, `DROP POLICY IF EXISTS` then `CREATE POLICY`.
+- Every migration ends with a `-- VERIFY:` block of expected counts / column lists.
+- Filename: `supabase_phase{N}_{purpose}.sql`. Owner pastes into Supabase Studio manually.
+- After schema changes: `NOTIFY pgrst, 'reload schema';` at end of file.
+- RLS uses `public.get_my_role()` and `manager_id` chains. Don't bypass.
+- Roles in use: `admin`, `co_owner`, `sales`, `agency`, `telecaller`. **No `owner` role** (DB constraint dropped it). Don't reintroduce.
+- **Three-layer access control:**
+  1. Segment scope on `users.segment_access` — applies only to roles `sales` and `telecaller`. Everyone else = `ALL`.
+  2. Operational data (creative jobs, attendance, leads) — segment-blind for non-sales roles.
+  3. Financial data — gated by role. Sales: own only. Admin/Accounts: all revenue, no P&L. Owner/Co-owner: all + P&L.
+- Existing 5 sales reps (Brahmbhatt, Sondarva, Dhara, Vishnu, Nikhil) → `segment_access='PRIVATE'`. New govt hires = `'GOVERNMENT'`.
+- Storage path convention: `_master/{segment}/{media_type}/{order}-{slug}.{ext}` for master attachments.
+- Storage RLS: user must own the parent quote. Phase 11 lockdown.
+
+---
+
+## 9 · PDF rendering pattern
+
+- 794 × 1123 px A4 viewport, render off-screen.
+- `html2canvas` snapshot at scale 2 → `jsPDF` slice into A4 pages.
+- PDFs are printed on white paper — use the **Day-theme palette** (`--text-1` ≈ `#0c1224`, `--text-2` ≈ `#4a5474`, `--border` ≈ `#e3e6ee`, `--surface-2` ≈ `#f8f9fc`) but keep brand yellow `#FFE600`.
+- Tables: use explicit `<colgroup>` widths; don't let descriptions get squeezed. The Phase 15 cramping bug was caused by 11 columns sharing 738px without explicit widths.
+- Always test slicer with 6+ line items to make sure rows aren't cut mid-row.
+- Locked PDFs are snapshots — they don't re-render when company / template changes. Surface "stale lock" warnings (Phase 11 pattern).
+- Govt PDFs use `GovtProposalRenderer` (HTML → browser-print → PDF). Private LED uses `QuotePDF` (`@react-pdf/renderer`). Other Media uses `OtherMediaQuotePDF` (html2canvas + jsPDF). `QuoteDetail.handleDownloadPDF` routes by `media_type`.
+
+---
+
+## 10 · Routing rules
+
+- React Router v6. **Specific routes BEFORE parameterized.** `/leads/new` MUST come before `/leads/:id`. Failing to do this produced the `invalid input syntax for type uuid: 'new'` bug — owner felt that one personally.
+- Don't add a route without verifying it doesn't shadow an existing one.
+- Govt quotes route to `/proposal/:id`. Private quotes (LED + Other Media) route to `/quotes/:id`. `QuoteDetail` auto-redirects govt rows that landed on the old URL.
+
+---
+
+## 11 · Lead → Quote linkage
+
+- `quotes.lead_id` column exists (Phase 14). All wizards (Auto Hood, GSRTC LED, Private LED, Other Media) must:
+  1. Accept `prefill.lead_id` from `location.state`.
+  2. Persist it on the inserted quote row.
+  3. After insert, update the lead: `stage='QuoteSent'`, `quote_id={new}`.
+- Don't break this contract when adding a new wizard.
+
+---
+
+## 12 · Forms / wizards / clients
+
+- Every quote save calls `syncClientFromQuote(quote, 'create' | 'update')` so the Clients table stays in sync.
+- Every quote save also fires the `lead_id` update if applicable.
+- Govt quotes need phone fallback for client sync (Phase 11i fix — don't regress).
+- Mobile-first: only `/work` page. Everything else is desktop-first but must scroll on mobile.
+- The Other Media wizard reads media options from the `media_types` master table (Phase 15). Free-text fallback for one-offs. Tax fields auto-populate from the chosen master row; reps don't see HSN / CGST / SGST inputs.
+
+---
+
+## 13 · Phase plan (do not commit work that doesn't fit)
+
+| Phase | Window | Content |
+|---|---|---|
+| Phase 0 | Apr–May 2026 | Consolidation: AdFlux + Untitled Proposals → one repo, one DB |
+| Phase 1 | May 6–30 | M1 Sales/Lead + M7 Telecaller + M8 Cockpit + AI-1 daily brief + Smart Task Engine |
+| Phase 1.5 | Jun 1–14 | AI Co-Pilot (NL Gujarati/English) + Individual Daily Scorecard |
+| Phase 2 | Jun 15 – Jul 12 | M3 invoice + M4 campaigns + M6 reporting/renewal + Voice + Cash Forecaster + OCR + Gujarati drafter |
+| Phase 3 | Jul 13 – Aug 9 | M2 Creative + M5 HR + Expense+GPS + Load Balancer |
+| Phase 4 | Aug+ | GoGSTBill + Tally + sunset Cronberry + sunset Trackdek |
+
+Total to "all 22 people on one screen": ~14 weeks. If a request doesn't fit one of the 8 modules or 8 productivity features, mark it Phase 4+ and don't build it inline.
+
+---
+
+## 14 · Push & deploy workflow
+
+The sandbox **cannot push to GitHub** — no credentials. The only thing the sandbox can do is commit locally.
+
+After every commit:
+1. Tell the owner the commit SHA.
+2. Tell the owner the exact command to run from his Mac terminal:
+   ```
+   cd ~/Documents/untitled-os2/Untitled/adflux
+   git push origin untitled-os
+   ```
+3. Vercel auto-deploys from `untitled-os`. SQL files must be run by hand in Supabase Studio.
+4. **Never claim a commit was pushed unless `git log origin/untitled-os` shows it.** Verify before reporting.
 
 | Branch | Vercel | Supabase | Purpose |
 |---|---|---|---|
 | `main` | adflux-iota.vercel.app | Original AdFlux Supabase | Live production. Real money. Touch only for production fixes. |
-| `untitled-os` | untitled-os-xxxx.vercel.app | New staging Supabase | All consolidation work. Has full AdFlux schema migrated, Sprint 1 phase4* migrations applied, no real data yet. Owner's sandbox. |
+| `untitled-os` | untitled-os-xxxx.vercel.app | New staging Supabase | All consolidation + new module work. |
 
-**Never merge `untitled-os` to `main` until a sprint is genuinely shippable.** Production stays running while consolidation happens in parallel.
+Never merge `untitled-os` to `main` until a sprint is genuinely shippable. Production stays running while consolidation happens in parallel.
 
-## File layout
+---
 
-```
-adflux/                                      ← merged repo, single deployment
-├── ARCHITECTURE.md                          (existing AdFlux structural doc)
-├── PHASE2_NOTES.md                          (existing)
-├── DEPLOY_GUIDE.md                          (existing — outdated; needs phase4 update)
-├── CLAUDE.md                                ← THIS FILE
-├── docs/
-│   ├── UNTITLED_OS_v2_ARCHITECTURE.md       (post-consolidation blueprint)
-│   ├── UNTITLED_OS_ARCHITECTURE.md          (v1 — retained for module specs M1-M8)
-│   └── SPRINT_1_AUDIT_2026_04_30.md         (audit findings, corrected)
-├── supabase_*.sql                           (10 original AdFlux migrations + 6 new phase4* from Sprint 1)
-├── src/                                     (AdFlux frontend — React + Vite)
-│   ├── pages/v2/                            (current v2 pages)
-│   ├── components/                          (existing component tree)
-│   ├── store/                               (Zustand stores)
-│   └── ...
-├── pdf-api/                                 (existing — quote PDF generation; @react-pdf/renderer)
-└── Untitled Proposals/                      ← stripped for parts; deletion is final cleanup of Phase 0
-    ├── 001-007*.sql                         (root-level — older reference copy of the migrations)
-    ├── db/
-    ├── app/src/pages/                       (the wizard + P&L pages we're porting)
-    │   ├── proposal-wizard/                 ← Step1ClientMedia.jsx ... Step6Review.jsx + Stepper, WizardNav
-    │   ├── pnl/                             ← PnLSummary, ProposalPnL, AdminExpenses, AccessLog, EnrollTotp, VerifyTotp
-    │   ├── ProposalNew.jsx, ProposalsList.jsx, ProposalDetail.jsx
-    │   └── Login, Dashboard, Clients, Masters, Payments, Admin, NotFound
-    ├── pdf-api/api/                         ← render-proposal.mjs, render-receipt.mjs, render-settlement.mjs, cron-expire-proposals.mjs
-    ├── pdf-poc/                             ← local Gujarati font test harness
-    └── pdf-templates/                       ← HTML/CSS templates consumed by pdf-api
-```
+## 15 · Pre-commit verification (mandatory)
 
-## Sprint progress
+Before `git commit`:
+1. Parse-check every modified `.jsx` file with esbuild:
+   ```
+   npx --yes esbuild --loader:.jsx=jsx --log-level=warning <file> >/dev/null
+   ```
+2. `git status` → confirm only intended files staged.
+3. Commit message follows pattern: `Phase {N}{rev?}: {one-line summary}` with bullet body.
 
-**Phase 0 — Consolidation (in progress):**
+For non-trivial work, include a final verification step in the TodoList — fact-check, screenshot test, parse-check.
 
-- ✅ Sprint 1 (schema + masters) — DONE 30 Apr 2026
-  - 6 migration files applied to staging Supabase (`supabase_phase4a` through `supabase_phase4f`)
-  - Adds segment + media_type + rate_type to quotes, segment_access to users, master tables (33 districts, 20 stations, rate master, 16-row validity matrix), media-aware ref-number generator, 3-layer RLS
-- ✅ Phase 5 prep — DONE 30 Apr 2026
-  - `supabase_phase5_signers_shares_templates.sql` — adds owner/co_owner roles, signing_authority, share_pct on districts, fixed gsrtc_stations seeds, proposal_templates table with locked Gujarati Auto Hood + GSRTC LED templates
-  - `supabase_seed_test_users.sql` — seeded 3 test users (admin Brijesh, Private rep, Govt rep)
-  - `supabase_seed_vishal.sql` — seeded Vishal Chauhan as co_owner with signing_authority
-- ✅ Sprint 2 (Government module front-end) — DONE 1 May 2026
-  - `supabase_phase6_govt_quote_extensions.sql` — extends quotes with signer_user_id / auto_total_quantity / gsrtc_campaign_months / recipient_block / proposal_date; extends quote_cities with ref_kind/ref_id/qty/unit_rate/amount; adds users.signature_mobile + signature_title (Brijesh: 9428273686 / "Founder & CEO"; Vishal: 9924350285 / "CEO")
-  - Sprint 2A — foundations: authStore + useAuth expose isOwner/isCoOwner/isPrivileged/segmentAccess/isSigner; Sidebar + MobileNav now use isPrivileged + add Auto Districts + GSRTC Stations nav; chooser screen at `/quotes/new` (3 tiles: Govt × Auto Hood, Govt × GSRTC LED, Private × LED Cities); routing in App.jsx
-  - Sprint 2B — Auto Hood wizard at `/quotes/new/government/auto-hood` (5 steps: recipient → date+signer → quantity → districts with live % distribution → review)
-  - Sprint 2C — GSRTC LED wizard at `/quotes/new/government/gsrtc-led` (5 steps: recipient → date+signer → stations → months → review)
-  - Sprint 2D — admin master pages at `/auto-districts` (33 districts, edit share_pct, live 100% check) and `/gsrtc-stations` (20 stations, edit screens/category/rates)
-  - Sprint 2E — proposal renderer at `/proposal/:id` (HTML preview, browser-print → PDF, status transition buttons)
-  - QuotesV2 list now routes govt rows to `/proposal/:id`, private rows to `/quotes/:id`. QuoteDetail auto-redirects govt quotes that landed on its old URL.
-- ⏭ Sprint 3 (P&L module port, simplified) — TBD
-- ⏭ Sprint 4 (receipts/TDS upgrade) — TBD
-- ⏭ Sprint 5 (cleanup, delete `Untitled Proposals/` folder) — TBD
+---
 
-**Phase 1+ (months 3-12):** Per `docs/UNTITLED_OS_ARCHITECTURE.md` v1 — M1 sales activity, M2 creative briefs, M3 invoice automation, M8 cockpit, etc. Do not start until Phase 0 ships.
+## 16 · Scope discipline
 
-## Known gaps / things future-Claude must check
+When fixing code, **don't auto-fix unrelated pre-existing violations** in the same file. Flag them, leave them for a separate commit. Example: if `MasterV2.jsx` has 14 hardcoded `#facc15` from old tabs and you're only touching MediaTypesTab, fix only your section. Tell the owner the rest is outside this batch's scope.
 
-1. **PDF rendering is browser-print only for now.** GovtProposalDetailV2's "Print / Save PDF" button just calls `window.print()` and relies on print-friendly CSS in `govt.css` (`@media print` block hides chrome, prints the letter). Real server-rendered PDFs via Puppeteer + Gujarati fonts is a Sprint 3+ item. The `Untitled Proposals/pdf-api/` code is in the repo but its `lib/fetchProposal.mjs` queries `proposals` / `proposal_line_items` tables that don't exist in AdFlux — would need rewriting to query `quotes` + `quote_cities` first.
-2. **TDS handling deferred.** Govt deals have Tax Deducted at Source (2% income + 2% GST). AdFlux `payments` table has no TDS columns. When the first Govt deal moves to PARTIAL_PAID, this matters. Sprint 4 adds TDS columns to `payments` (NOT a separate receipts table).
-3. **Govt invoice template not built.** Once a Govt quote moves to WON, the next step is invoice generation with PO + work-completion certificate + photos as attachments. Sprint 4-ish. Currently WON is a manual status flip with no auto invoice.
-4. **Quote status enum is AdFlux's small one** (`draft, sent, negotiating, won, lost`). Untitled Proposals had a richer one. Decision: keep AdFlux's small enum. PARTIAL_PAID/PAID are *derived* from payments table. EXPIRED via cron job later.
-5. **Sales Lead role + manager_id deferred.** When Brijesh actually promotes someone to Sales Lead, add the role enum value and wire `manager_id` into the RLS team-scope query. Until then, `admin` is the de-facto Sales Lead.
-6. **Telecaller role deferred to Phase 1 / M7.** Add when telecallers come online with the lead-handoff flow.
-7. **`available_rickshaw_count` was dropped from auto_districts in phase 5.** Replaced with `share_pct`. The original Untitled Proposals counts (Kutch 2500 etc.) are gone — if they're needed for ops capacity tracking later, add a separate column then; don't bring back the old one.
+---
 
-## Where memory writes don't work
+## 17 · Memory system rules
 
-The system memory directory at `~/Library/Application Support/Claude/.../memory/` is outside this session's connected folders. The Write tool can't reach it (won't help to retry). This file (`CLAUDE.md`) is the workaround — persists in the project, future sessions read it.
+Auto-memory lives at `~/Library/Application Support/Claude/local-agent-mode-sessions/.../memory/`.
 
-If you (future-Claude) learn something important about this project, append to this file. Don't try to write to `~/Library/...`.
+When to write:
+- **user** memory: anything you learn about Brijesh's role, preferences, knowledge.
+- **feedback** memory: corrections OR validated approaches. Always include `**Why:**` + `**How to apply:**` lines.
+- **project** memory: ongoing initiatives. Convert relative dates to absolute dates.
+- **reference** memory: pointers to external systems / files.
+
+When NOT to write:
+- Code conventions derivable from current files.
+- Git history / who changed what.
+- Anything already in this CLAUDE.md.
+- Ephemeral task state (use TodoList instead).
+
+Before recommending from memory, **verify the memory is still accurate** by reading the current file or running `git log`. Memory can go stale.
+
+---
+
+## 18 · GST / invoice formatting (India)
+
+- Indian numbering: **lakh / crore**, never million / billion.
+- 12,21,300 → "Twelve Lakh Twenty-One Thousand Three Hundred Rupees Only" (use `src/utils/numberToWords.js`).
+- GST 18% = CGST 9% + SGST 9% split (intrastate). Default HSN/SAC for media: `998397`.
+- "Total in Words" required on every invoice / quotation PDF.
+- Bank details panel: Name / Branch / Acc Name / Acc Number / IFSC / MICR — read from `companies` row.
+
+---
+
+## 19 · Master configuration tabs
+
+`MasterV2.jsx` is the central admin UI. Tabs: **Attachments, Companies, Signers, Media, Media Types** (Phase 15), **Documents**.
+
+- Admin / co_owner only. Sales / agency / telecaller bounce to dashboard.
+- Inline edit pattern: local state buffer → `onBlur` persist → status banner.
+- Add-new pattern: form row at top, button on right, optimistic update on success.
+- For new master tables: `name` + `display_order` + `is_active` flag + RLS (admin-all + read-all-authenticated).
+
+---
+
+## 20 · Common foot-guns (don't repeat)
+
+- ❌ `#facc15` anywhere. Brand yellow is `#FFE600`.
+- ❌ `var(--v2-yellow, #facc15)` — use `var(--v2-yellow, #FFE600)`.
+- ❌ Defining `/leads/:id` before `/leads/new`.
+- ❌ Building a new wizard without `lead_id` plumbing.
+- ❌ Hardcoding company name / GSTIN / bank in a renderer.
+- ❌ Calling `delete` on an active quote (Phase 11b blocks it).
+- ❌ Backdated `payment_date` (blocked).
+- ❌ Modifying a locked proposal PDF (regenerate, don't mutate).
+- ❌ "Owner" role in any new code (use `admin` or `co_owner`).
+- ❌ Reading `media_type` / `media_label` columns from `quote_cities` — the wizard saves the media name to `city_name`.
+- ❌ Claiming `git push` succeeded from the sandbox. It can't push.
+- ❌ Auto-fixing 50 unrelated style violations during a feature commit.
+- ❌ Starting a response with "Great point" or "You're absolutely right".
+- ❌ Wrapping company info in a fallback when the row is missing — hard-fail instead.
+- ❌ Using emoji in any file (UI, code, commit messages) unless the owner asks.
+- ❌ Mocking the database in tests (Phase 11 fix — use real Supabase).
+- ❌ Persuasive tone or salesy copy in PDFs / UI labels. The voice is precise / quiet / grown-up.
+
+---
+
+## 21 · Tech stack at a glance
+
+- **React 18 + Vite** + **React Router v6**
+- **Zustand** for global state (`authStore`, `quotesStore`, etc.)
+- **React Hook Form + Zod** for forms
+- **Supabase** (Postgres + Auth + Realtime + RLS)
+- **`@react-pdf/renderer`** for in-app PDFs (Private LED quotes)
+- **`html2canvas` + `jsPDF`** for HTML-to-PDF (Govt proposals + Other Media)
+- **Puppeteer + Chromium pdf-api** for server-side PDFs (Untitled Proposals legacy — handles Gujarati via `document.fonts.ready`). Being phased out.
+- **`lucide-react`** for icons (only)
+- **DM Sans + Space Grotesk + JetBrains Mono** fonts (Google Fonts, in `index.html`)
+- **date-fns** for dates
+- **Vercel** auto-deploy from `untitled-os` branch
+- **Cronberry CSV import** (90d cutoff, regex Remarks parser) — sunset Phase 4
+- **Supabase Edge Functions** for AI-1 brief, scorecard, copilot
+
+---
+
+## 22 · Status / what's already shipped
+
+### Phase 0 — Consolidation (DONE)
+- Sprint 1 (30 Apr): schema + masters (`supabase_phase4a-f`).
+- Sprint 2 (1 May): Govt module front-end (Auto Hood + GSRTC LED wizards, master pages, proposal renderer).
+
+### Phase 1 + 1.5 (DONE)
+- Phase 12: users hierarchy + holidays + leads + activities + work_sessions + call_logs + RLS.
+- /leads, /leads/:id, /work (mobile-first), /telecaller (24h SLA + auto-assignment), /cockpit (owner page + AI-1 daily WhatsApp brief).
+- Cronberry CSV import with Remarks regex parser + 90d cutoff.
+- Phase 1.5: AI Co-Pilot (Gujarati/English NL query) + Individual Daily Scorecard WhatsApp 7:30 PM.
+- Edge Functions: copilot, daily-brief, scorecard.
+
+### Phase 12 rev2 (DONE)
+- Lead UX simplification + Other Media wizard (initial version).
+
+### Phase 13 (DONE)
+- `ai_runs` table + `run_select(text)` SECURITY INVOKER RPC for Co-Pilot.
+
+### Phase 14 (DONE)
+- `quotes.lead_id` column. All 4 wizards updated to persist + advance lead stage.
+
+### Phase 15 (DONE — needs SQL run + push)
+- `media_types` master table (8 seeds, admin CRUD via Master → Media Types).
+- `quote_cities` gains `hsn_sac` / `cgst_pct` / `sgst_pct` / `cgst_amount` / `sgst_amount` columns.
+- Other Media wizard reads dropdown from master, free-text fallback. Tax fields auto-populate.
+- New `OtherMediaQuotePDF` renderer (ENIL Quotation #44 layout, A4, CGST+SGST split, Total in Words, bank details).
+- `QuoteDetail` Download PDF routes `OTHER_MEDIA` to the new renderer.
+- Phase 15 fix commit `890b96b`: brand `#FFE600`, colgroup widths fix description cramping, `city_name` plumbing fix.
+
+### Pending (do not start without owner approval)
+- Sprint 3: P&L module port, simplified.
+- Sprint 4: receipts/TDS upgrade. Govt deals have TDS (2% income + 2% GST) — current `payments` table has no TDS columns; add when first Govt deal moves to PARTIAL_PAID.
+- Sprint 5: cleanup, delete `Untitled Proposals/` folder.
+- Govt invoice template (post-WON automation with PO + work-completion certificate + photos).
+
+---
+
+## 23 · Known gaps / things future-Claude must check
+
+1. **TDS handling deferred.** AdFlux `payments` table has no TDS columns. Don't try to invoice Govt deals as if it does.
+2. **Govt invoice template not built.** WON status flip currently requires manual invoice generation outside the app.
+3. **Quote status enum is small** (`draft, sent, negotiating, won, lost`). PARTIAL_PAID / PAID are *derived* from payments. EXPIRED via cron later. Don't add to enum without owner sign-off.
+4. **`available_rickshaw_count` was dropped from `auto_districts`** in Phase 5; replaced with `share_pct`. Don't bring it back.
+5. **`Untitled Proposals/` folder is in the repo** but its `lib/fetchProposal.mjs` queries `proposals` / `proposal_line_items` tables that don't exist in AdFlux. Useless until Sprint 5 cleanup.
+6. **MasterV2.jsx has ~14 pre-existing hardcoded `#facc15` / `#0a0e1a`** across old tabs (Attachments, Companies, Documents, Signers). Brand violation. Will be cleaned up in a dedicated commit when owner asks — don't sneak it into a feature commit.
+
+---
+
+## 24 · When in doubt
+
+Stop. Re-read this file + `UNTITLED_OS_MASTER_SPEC.md` + `tokens.css`. Ask the owner one targeted question instead of guessing. He prefers a quick clarification over five rounds of rework.
+
+---
+
+## 25 · Updates
+
+When you (future-Claude) learn something important about this project, **append to this file**. The auto-memory directory at `~/Library/...` is outside the connected workspace folders, so the Write tool can't reach it from this session. CLAUDE.md is the single source of truth that survives across sessions.
+
+Format for additions: add a numbered section at the bottom, dated, with title `## {N} · {Title} ({YYYY-MM-DD})`. Don't rewrite history — append.
