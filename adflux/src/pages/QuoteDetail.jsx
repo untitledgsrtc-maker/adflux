@@ -11,6 +11,10 @@ import { useQuotes } from '../hooks/useQuotes'
 import { usePayments } from '../hooks/usePayments'
 import { QuoteStatusBadge } from '../components/quotes/QuoteStatusBadge'
 import { downloadQuotePDF, uploadQuotePDF } from '../components/quotes/QuotePDF'
+// Phase 15 — ENIL-style PDF for Other Media quotes (newspaper, hoarding,
+// cinema, …). Routed in handleDownloadPDF based on quote.media_type so
+// the existing private LED PDF stays untouched.
+import { downloadOtherMediaPdf } from '../components/quotes/OtherMediaQuotePDF'
 import { buildWhatsAppMessage, openWhatsApp, shortenUrl } from '../utils/whatsapp'
 import { PaymentModal } from '../components/payments/PaymentModal'
 import { PaymentHistory } from '../components/payments/PaymentHistory'
@@ -212,7 +216,15 @@ export default function QuoteDetail() {
   async function handleDownloadPDF() {
     if (!quote) return
     setPdfLoading(true)
-    try { await downloadQuotePDF(quote, cities) }
+    try {
+      // Phase 15 — Other Media quotes get the ENIL-style invoice PDF.
+      // Everything else (private LED, govt) keeps the existing PDF.
+      if (quote.media_type === 'OTHER_MEDIA') {
+        await downloadOtherMediaPdf({ quote, lines: cities })
+      } else {
+        await downloadQuotePDF(quote, cities)
+      }
+    }
     catch (e) { setError('PDF generation failed: ' + e.message) }
     finally { setPdfLoading(false) }
   }

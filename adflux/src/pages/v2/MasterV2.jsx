@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Paperclip, UserCheck, Tv, FileText, Upload, Loader2, Plus, Trash2,
-  Save, ArrowLeft, FileBox, Building2,
+  Save, ArrowLeft, FileBox, Building2, Newspaper,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -33,6 +33,10 @@ const TABS = [
   { key: 'companies',   label: 'Companies',   icon: Building2 },
   { key: 'signers',     label: 'Signers',     icon: UserCheck },
   { key: 'media',       label: 'Media',       icon: Tv },
+  // Phase 15 — admin-managed list of "Other Media" types (newspaper,
+  // hoarding, cinema, etc.). Feeds the dropdown on the Other Media
+  // wizard and supplies HSN/SAC + CGST/SGST defaults to the PDF.
+  { key: 'media_types', label: 'Media Types', icon: Newspaper },
   { key: 'documents',   label: 'Documents',   icon: FileText },
 ]
 
@@ -109,6 +113,7 @@ export default function MasterV2() {
       {activeTab === 'companies'   && <CompaniesTab />}
       {activeTab === 'signers'     && <SignersTab />}
       {activeTab === 'media'       && <MediaTab />}
+      {activeTab === 'media_types' && <MediaTypesTab />}
       {activeTab === 'documents'   && <DocumentsTab />}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
@@ -1949,5 +1954,357 @@ function DocumentsTab() {
         sent are locked snapshots — they don't change when you swap templates.
       </p>
     </>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MEDIA TYPES TAB — Phase 15. Admin-managed list of "Other Media"
+   labels (Newspaper, Hoarding, Cinema, …). Each row carries a default
+   HSN/SAC + CGST% + SGST% that the Other Media wizard pulls in
+   silently when a rep selects this media for a quote line. Reps can
+   still type a one-off media name (free-text fallback uses sensible
+   defaults), but adding rows here makes those choices reusable + keeps
+   the tax breakup correct on the ENIL-style PDF.
+   ════════════════════════════════════════════════════════════════════ */
+
+function MediaTypesTab() {
+  const [rows, setRows]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState(null)
+  const [statusMsg, setStatusMsg] = useState('')
+  const [statusError, setStatusError] = useState('')
+  // New-row buffer
+  const [newName, setNewName]       = useState('')
+  const [newHsn, setNewHsn]         = useState('998397')
+  const [newCgst, setNewCgst]       = useState(9)
+  const [newSgst, setNewSgst]       = useState(9)
+  const [adding, setAdding]         = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('media_types')
+      .select('*')
+      .order('display_order', { ascending: true })
+      .order('name',          { ascending: true })
+    if (error) setStatusError(error.message)
+    else setRows(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  function setField(id, field, value) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
+  }
+
+  async function persist(id) {
+    const r = rows.find(x => x.id === id)
+    if (!r) return
+    setSavingId(id)
+    const payload = {
+      name:             (r.name || '').trim() || 'Untitled',
+      default_hsn_sac:  (r.default_hsn_sac || '').trim() || null,
+      default_cgst_pct: r.default_cgst_pct === '' || r.default_cgst_pct == null ? null : Number(r.default_cgst_pct),
+      default_sgst_pct: r.default_sgst_pct === '' || r.default_sgst_pct == null ? null : Number(r.default_sgst_pct),
+      notes:            (r.notes || '').trim() || null,
+      is_active:        !!r.is_active,
+      display_order:    Number(r.display_order) || 0,
+    }
+    const { error } = await supabase
+      .from('media_types')
+      .update(payload)
+      .eq('id', id)
+    setSavingId(null)
+    if (error) {
+      setStatusError(`Save failed: ${error.message}`)
+    } else {
+      setStatusMsg('Saved.')
+      setTimeout(() => setStatusMsg(''), 1500)
+    }
+  }
+
+  async function handleAdd() {
+    const name = newName.trim()
+    if (!name) {
+      setStatusError('Name is required.')
+      return
+    }
+    setAdding(true)
+    setStatusError('')
+    const nextOrder = (rows.reduce((m, r) => Math.max(m, r.display_order || 0), 0)) + 10
+    const { data, error } = await supabase
+      .from('media_types')
+      .insert([{
+        name,
+        default_hsn_sac:  newHsn.trim() || null,
+        default_cgst_pct: Number(newCgst) || 0,
+        default_sgst_pct: Number(newSgst) || 0,
+        is_active:        true,
+        display_order:    nextOrder,
+      }])
+      .select()
+      .single()
+    setAdding(false)
+    if (error) {
+      setStatusError(`Could not add: ${error.message}`)
+      return
+    }
+    setRows(prev => [...prev, data])
+    setNewName('')
+    setNewHsn('998397')
+    setNewCgst(9)
+    setNewSgst(9)
+    setStatusMsg(`Added "${name}".`)
+    setTimeout(() => setStatusMsg(''), 2000)
+  }
+
+  async function handleDelete(r) {
+    if (!window.confirm(`Delete media type "${r.name}"? Existing quote lines that reference it by name are not affected.`)) return
+    setSavingId(r.id)
+    const { error } = await supabase
+      .from('media_types')
+      .delete()
+      .eq('id', r.id)
+    setSavingId(null)
+    if (error) {
+      setStatusError(`Delete failed: ${error.message}`)
+      return
+    }
+    setRows(prev => prev.filter(x => x.id !== r.id))
+    setStatusMsg('Deleted.')
+    setTimeout(() => setStatusMsg(''), 2000)
+  }
+
+  if (loading) return (
+    <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
+      <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading media types…
+    </div>
+  )
+
+  return (
+    <>
+      {statusMsg && (
+        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#81c784' }}>✓ {statusMsg}</div>
+      )}
+      {statusError && (
+        <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
+      )}
+
+      {/* Add row */}
+      <div style={{
+        padding: 14, borderRadius: 12,
+        border: '1px solid var(--surface-3)',
+        background: 'var(--surface-1)',
+        marginBottom: 16,
+        display: 'grid',
+        gridTemplateColumns: '1.4fr 0.9fr 0.6fr 0.6fr auto',
+        gap: 10, alignItems: 'end',
+      }}>
+        <FieldBlock label="Media name *">
+          <input
+            type="text"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder="e.g. Pamphlet Distribution"
+            className="govt-input-cell govt-input-cell--wide"
+          />
+        </FieldBlock>
+        <FieldBlock label="Default HSN/SAC">
+          <input
+            type="text"
+            value={newHsn}
+            onChange={e => setNewHsn(e.target.value)}
+            placeholder="998397"
+            className="govt-input-cell govt-input-cell--wide"
+          />
+        </FieldBlock>
+        <FieldBlock label="CGST %">
+          <input
+            type="number"
+            min="0"
+            value={newCgst}
+            onChange={e => setNewCgst(e.target.value)}
+            className="govt-input-cell govt-input-cell--wide"
+          />
+        </FieldBlock>
+        <FieldBlock label="SGST %">
+          <input
+            type="number"
+            min="0"
+            value={newSgst}
+            onChange={e => setNewSgst(e.target.value)}
+            className="govt-input-cell govt-input-cell--wide"
+          />
+        </FieldBlock>
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={adding}
+          style={{
+            padding: '8px 14px', borderRadius: 8, border: 'none',
+            background: '#facc15', color: '#0a0e1a',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            opacity: adding ? 0.6 : 1,
+          }}
+        >
+          {adding ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
+          Add
+        </button>
+      </div>
+
+      {/* Existing rows */}
+      {rows.length === 0 ? (
+        <div style={{
+          padding: 30, textAlign: 'center', color: 'var(--text-muted)',
+          border: '1px dashed var(--surface-3)', borderRadius: 12,
+        }}>
+          <Newspaper size={28} style={{ marginBottom: 8, color: 'var(--text-subtle)' }} />
+          <div style={{ fontWeight: 600, color: 'var(--text)' }}>No media types yet</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>
+            Add the first one above. Reps will see it in the Other Media wizard dropdown.
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          border: '1px solid var(--surface-3)', borderRadius: 12,
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1.4fr 0.9fr 0.5fr 0.5fr 0.5fr 0.5fr 60px',
+            gap: 0,
+            background: 'var(--surface-2)',
+            fontSize: 10, fontWeight: 700,
+            color: 'var(--text-subtle)',
+            textTransform: 'uppercase', letterSpacing: '.06em',
+            borderBottom: '1px solid var(--surface-3)',
+          }}>
+            <div style={{ padding: '10px 12px' }}>Name</div>
+            <div style={{ padding: '10px 12px' }}>HSN/SAC</div>
+            <div style={{ padding: '10px 12px', textAlign: 'right' }}>CGST %</div>
+            <div style={{ padding: '10px 12px', textAlign: 'right' }}>SGST %</div>
+            <div style={{ padding: '10px 12px', textAlign: 'right' }}>Order</div>
+            <div style={{ padding: '10px 12px', textAlign: 'center' }}>Active</div>
+            <div style={{ padding: '10px 12px' }}></div>
+          </div>
+          {rows.map(r => (
+            <div
+              key={r.id}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.4fr 0.9fr 0.5fr 0.5fr 0.5fr 0.5fr 60px',
+                gap: 0,
+                borderBottom: '1px solid var(--surface-3)',
+                background: 'var(--surface-1)',
+                alignItems: 'center',
+              }}
+            >
+              <div style={{ padding: '6px 8px' }}>
+                <input
+                  type="text"
+                  value={r.name ?? ''}
+                  onChange={e => setField(r.id, 'name', e.target.value)}
+                  onBlur={() => persist(r.id)}
+                  className="govt-input-cell govt-input-cell--wide"
+                />
+              </div>
+              <div style={{ padding: '6px 8px' }}>
+                <input
+                  type="text"
+                  value={r.default_hsn_sac ?? ''}
+                  onChange={e => setField(r.id, 'default_hsn_sac', e.target.value)}
+                  onBlur={() => persist(r.id)}
+                  className="govt-input-cell govt-input-cell--wide"
+                />
+              </div>
+              <div style={{ padding: '6px 8px' }}>
+                <input
+                  type="number"
+                  min="0"
+                  value={r.default_cgst_pct ?? ''}
+                  onChange={e => setField(r.id, 'default_cgst_pct', e.target.value)}
+                  onBlur={() => persist(r.id)}
+                  className="govt-input-cell govt-input-cell--wide"
+                  style={{ textAlign: 'right' }}
+                />
+              </div>
+              <div style={{ padding: '6px 8px' }}>
+                <input
+                  type="number"
+                  min="0"
+                  value={r.default_sgst_pct ?? ''}
+                  onChange={e => setField(r.id, 'default_sgst_pct', e.target.value)}
+                  onBlur={() => persist(r.id)}
+                  className="govt-input-cell govt-input-cell--wide"
+                  style={{ textAlign: 'right' }}
+                />
+              </div>
+              <div style={{ padding: '6px 8px' }}>
+                <input
+                  type="number"
+                  min="0"
+                  value={r.display_order ?? 0}
+                  onChange={e => setField(r.id, 'display_order', e.target.value)}
+                  onBlur={() => persist(r.id)}
+                  className="govt-input-cell govt-input-cell--wide"
+                  style={{ textAlign: 'right' }}
+                />
+              </div>
+              <div style={{ padding: '6px 8px', textAlign: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={!!r.is_active}
+                  onChange={e => {
+                    setField(r.id, 'is_active', e.target.checked)
+                    setTimeout(() => persist(r.id), 0)
+                  }}
+                />
+              </div>
+              <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                {savingId === r.id ? (
+                  <Loader2 size={14} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(r)}
+                    style={{
+                      background: 'transparent', border: 'none',
+                      color: '#ef9a9a', cursor: 'pointer',
+                      padding: 4, display: 'inline-flex', alignItems: 'center',
+                    }}
+                    title={`Delete "${r.name}"`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-subtle)', maxWidth: 720 }}>
+        <strong>How it works:</strong> these rows feed the dropdown on the
+        Other Media wizard. The HSN/SAC + CGST% + SGST% defaults flow into
+        the saved quote lines so the ENIL-style PDF prints the correct tax
+        breakup. Reps can still type a one-off media name in the wizard
+        (free-text fallback), but the dropdown is the canonical list.
+      </p>
+    </>
+  )
+}
+
+/* Small helper used only by MediaTypesTab's add-row form. */
+function FieldBlock({ label, children }) {
+  return (
+    <div>
+      <label style={{
+        display: 'block', fontSize: 10, fontWeight: 700,
+        color: 'var(--text-subtle)', textTransform: 'uppercase',
+        letterSpacing: '.06em', marginBottom: 4,
+      }}>{label}</label>
+      {children}
+    </div>
   )
 }
