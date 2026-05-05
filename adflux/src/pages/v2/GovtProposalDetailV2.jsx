@@ -773,7 +773,21 @@ export default function GovtProposalDetailV2() {
       setSignedUrls(prev => ({ ...prev, [path]: url }))
       window.open(url, '_blank', 'noopener')
     } catch (e) {
-      setStatusError(`Could not open file: ${e?.message || e}`)
+      // Phase 11h — Supabase returns 400 "Bad Request" when the file
+      // at that path doesn't exist (RLS denial would be 403). The
+      // most common cause is: the row's file_url points at a path
+      // that was never actually uploaded OR the file was manually
+      // deleted from Storage. Surface that explicitly so the user
+      // knows to re-upload instead of staring at a silent failure.
+      const msg = String(e?.message || e || '')
+      if (msg.includes('400') || msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('bad request')) {
+        setStatusError(
+          `File missing from Storage — the recorded path doesn't exist anymore. ` +
+          `Path: ${path}. Click Replace on the row to re-upload.`
+        )
+      } else {
+        setStatusError(`Could not open file: ${msg}`)
+      }
     }
   }
 

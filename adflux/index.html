@@ -7,7 +7,12 @@
     <title>Untitled Adflux</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Noto Sans Gujarati added so the govt proposal letter renders
+         IDENTICALLY across admin / sales / agency sessions. Without it,
+         govt.css's `font-family: 'Noto Sans Gujarati', ...` falls back
+         to whatever system Gujarati font each machine happens to have,
+         and the rendered Gujarati script looked different per user. -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+Gujarati:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
