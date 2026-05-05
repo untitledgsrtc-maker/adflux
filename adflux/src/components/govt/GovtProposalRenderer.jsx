@@ -103,12 +103,12 @@ export function GovtProposalRenderer({
   // already shows company name + phone + address. Slim signer block
   // mode skips the duplicate company line + mobile.
   const signerHtml = renderSignerBlock(signer, company, letterheadOn)
-  // Phase 11d (rev7) — bidan list now driven by data.bidan_items if
-  // provided (computed from the checklist by GovtProposalDetailV2).
-  // Falls back to the static media-type defaults so the wizard's
-  // Step5 live preview (no checklist context yet) still shows
-  // something sensible.
-  const bidanHtml  = renderBidanBlock(mediaType, data.bidan_items)
+
+  // Phase 11d (rev15) — bidan moved OFF page 1 to keep cover letter
+  // strictly within the letterhead's empty zone. It now lives at the
+  // bottom of page 2 (with the district/station list). Owner spec:
+  // "covering letter in 1 page A4 size, city or station in 2nd page".
+  const page2BidanHtml = renderBidanBlock(mediaType, data.bidan_items)
 
   const vars = {
     recipient:        recipientHtml,
@@ -119,7 +119,10 @@ export function GovtProposalRenderer({
     selected_stations: toGujaratiDigits(String(data.line_items?.length || 0)),
     rate_table:       rateTableHtml,
     signer_block:     signerHtml,
-    bidan_block:      bidanHtml,
+    // Phase 11d (rev15) — bidan removed from cover letter, lives on
+    // page 2 instead. Empty string keeps the placeholder substitution
+    // working without rendering anything.
+    bidan_block:      '',
   }
 
   const renderedBody = renderTemplate(template.body_html, vars)
@@ -252,18 +255,21 @@ export function GovtProposalRenderer({
           a phantom page 3 in the rasterized output. Phase 11d (rev9)
           extends the page-2 pattern to GSRTC so the 20-station rate
           table no longer splits mid-row across A4 boundaries. */}
+      {/* Phase 11d (rev15) — page 2 also carries the bidan footer
+          since it was removed from page 1 to keep the cover letter
+          inside the letterhead's empty zone. */}
       {districtListHtml && (
         <div
           className="govt-letter"
           style={pageBaseStyle}
-          dangerouslySetInnerHTML={{ __html: districtListHtml }}
+          dangerouslySetInnerHTML={{ __html: districtListHtml + page2BidanHtml }}
         />
       )}
       {gsrtcStationPageHtml && (
         <div
           className="govt-letter"
           style={pageBaseStyle}
-          dangerouslySetInnerHTML={{ __html: gsrtcStationPageHtml }}
+          dangerouslySetInnerHTML={{ __html: gsrtcStationPageHtml + page2BidanHtml }}
         />
       )}
     </>

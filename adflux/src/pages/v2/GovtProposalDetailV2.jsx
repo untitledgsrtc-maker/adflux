@@ -690,8 +690,35 @@ export default function GovtProposalDetailV2() {
       }
     })
     const customs = saved.filter(s => s.custom === true).map(s => ({ ...s }))
-    return [...fromTpl, ...customs]
-  }, [quote?.attachments_checklist, attachmentTpl])
+    const all = [...fromTpl, ...customs]
+
+    // Phase 11d (rev15) — owner spec: "OC copy and Awarded Work Order
+    // only show after marked as Sent and after Won respectively".
+    // Both are uploaded inline via the Mark Sent / Mark Won pre-flight
+    // modals, so they don't need to clutter the visible checklist
+    // before then. Visibility rules:
+    //   • OC copy            — visible when status is NOT 'draft'
+    //   • Awarded Work Order — visible only when status is 'won'
+    // Drafts are also visible in any state once a file IS uploaded
+    // (so the row doesn't disappear retroactively if status changes
+    // back). The gates upstream still enforce upload before transition.
+    const status = quote?.status
+    return all.filter(c => {
+      const lbl = String(c.label || '').toLowerCase()
+      const hasFile = c.file_url && String(c.file_url).trim() !== ''
+
+      if (lbl.includes('oc copy') || lbl.includes('acknowledgment')) {
+        // Always show if already uploaded; otherwise gate by status.
+        if (hasFile) return true
+        return status && status !== 'draft'
+      }
+      if (lbl.includes('awarded work order')) {
+        if (hasFile) return true
+        return status === 'won'
+      }
+      return true
+    })
+  }, [quote?.attachments_checklist, attachmentTpl, quote?.status])
 
   async function persistChecklist(next) {
     setSavingAttachments(true)
