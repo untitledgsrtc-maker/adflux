@@ -270,13 +270,17 @@ Same data feeds owner's brief but personalized + with rank.
 
 For **every** phase milestone, all four user-journeys in `PHASE1_DESIGN.md` §9 must pass. The list grows per phase:
 
-| Role | Phase 1 must work | Phase 1.5 adds | Phase 2 adds | Phase 3 adds |
+| Role (team_role) | Phase 1 must work | Phase 1.5 adds | Phase 2 adds | Phase 3 adds |
 |---|---|---|---|---|
-| **Admin** (Brijesh) | Lead upload + cockpit + 9 AM brief | Co-Pilot query + each-person scorecard | Cash forecast + voice playback + OCR review | Creative queue + capacity view |
-| **Co-owner** (Vishal) | Scoped to Gandhinagar team + brief | Co-Pilot + scorecard | Same as admin scoped | Same as admin scoped |
-| **Sales Lead** (DHARA) | Telecaller team + reassign | Per-person scorecard for her team | — | — |
-| **Sales rep** | Morning plan / GPS / activity log / evening report | Personal scorecard | Voice notes / OCR for WO | Expense submission |
-| **Telecaller** | Call queue + qualify-to-handoff | Personal scorecard | Voice notes | — |
+| **Owner / Admin** | Lead upload + cockpit + 9 AM brief | Co-Pilot query + each-person scorecard | Cash forecast + voice playback + OCR review | Creative queue + capacity view |
+| **Government Partner** (co_owner, scoped to all GOVERNMENT segment) | Cockpit + brief filtered to govt segment regardless of city | Co-Pilot + scorecard | Same as admin (govt-scoped) | Same as admin (govt-scoped) |
+| **Sales Manager** (manages sales reps + telecallers) | Team scorecard + reassign + SLA dashboard | Per-person scorecard for her team | — | — |
+| **Sales Rep** | Morning plan / GPS / activity log / evening report | Personal scorecard | Voice notes / OCR for WO | Expense submission |
+| **Telecaller** | Call queue + qualify-to-handoff (manual rep pick) | Personal scorecard | Voice notes | — |
+| **Creative Lead** | (read-only access in Phase 1) | — | — | Designer queue + brief review + revision tracking |
+| **Designer / Video Editor** | (read-only access in Phase 1) | — | — | Personal queue + timer + asset library |
+| **Accounts** | (read-only access in Phase 1) | — | Invoice draft + chase + cash forecast | — |
+| **HR** | (read-only access in Phase 1) | — | — | Attendance / leave / perf review |
 | **Designer** | (Phase 3) | — | — | Brief form / queue / asset library |
 | **Accounts** (DIYA) | (Phase 2) | — | Invoice draft + chase + cash forecast | — |
 | **HR** (Riya) | (Phase 3) | — | — | Attendance / leave / perf review |
@@ -317,27 +321,23 @@ You confirmed Meta is approved. Submit these on **Day 1 of each phase** (3–7 d
 
 ---
 
-## 14. Open questions answered (May 5)
+## 14. Open questions — ALL ANSWERED (May 5 evening)
 
 | Q | Answer |
 |---|---|
 | WhatsApp Business API approved? | ✅ YES |
 | Phones for GPS? | ✅ Personal phones |
-| Telecaller incentive structure? | ✅ Different per person — model needs per-user fields |
+| Telecaller incentive structure? | ✅ Different per person — `staff_incentive_profiles` already supports per-user; we extend with per-user `qualified_lead_payout` + `closure_bonus_pct` columns. |
 | AI agent ~₹3,000/month budget? | ✅ OK |
-| Sales Lead + Creative Lead candidates? | ✅ DHARA = Sales Lead. Creative Lead = TBD (pick from Renuka / Safika / Shreya / Dikshita) |
-| Cronberry / Trackdek sunset dates? | After we replace functionality — built-in to phase plan |
-| Priority? | M1 + M7 + M8 first; M2 Creative deferred to Phase 3 |
-
-### Still open
-
-1. **Cronberry CSV** — need export to test importer.
-2. **Daily targets** — defaults 5 meetings / 20 calls / 10 leads; confirm or override per person.
-3. **Auto-assignment rule** — Vadodara telecaller → round-robin among Vadodara reps? Confirm.
-4. **WhatsApp Business Account ID + Phone Number ID** — get from Meta Business Manager.
-5. **Vishal's exact scope** — Gandhinagar team only, or all govt regardless of city?
-6. **Off-day calendar** — Sundays off? Holidays?
-7. **Creative Lead pick** — Renuka / Safika / Shreya / Dikshita?
+| Cronberry CSV sample? | ✅ Provided. Saved to repo at `_test_fixtures/cronberry_export_sample.csv`. Format: `name,email,mobile,address,company,city,Remarks`. Mobile wrapped in single quotes (strip on import). Remarks contain timestamp + status + telecaller name in form `2026-05-01 12:18:09 :- only time pass (Swati Jha)` — parse this into stage + last_contact_at + telecaller_id. |
+| Daily targets — fixed or per-person? | ✅ Defaults `{meetings:5, calls:20, new_leads:10}`. Editable per user in HR / Team modal at create time and on edit. Override stored in `users.daily_targets jsonb`. |
+| Auto-assignment rule? | ✅ **Manual pick** by Sales Manager / telecaller — they pick the rep from a dropdown when marking SalesReady. No round-robin in v1. (But see §17 suggestion 1 — I propose hybrid for scale.) |
+| WhatsApp Business Account ID + Phone Number ID? | ⏳ Owner shares when needed — Phase 1 can be built without this; we wire WhatsApp send in week 3 of Phase 1. |
+| Government Partner scope (Vishal)? | ✅ **All GOVERNMENT segment** regardless of city. Implementation: in RLS, `team_role = 'government_partner'` users see all rows where `segment = 'GOVERNMENT'` — not filtered by city. |
+| Off-day calendar? | ✅ Every Sunday + every Hindu festival (Vadodara/Gujarat). New `holidays` table; admin maintains. See §17 suggestion 2 — auto-seed via Calendarific API or hardcoded list. |
+| Creative Lead pick? | ✅ **PIYUSH** (Video Editor). He leads all designers + himself. `team_role = 'creative_lead'`. |
+| Team will scale to 35–40? | ✅ Confirmed. Architecture must scale. See §17 suggestion 3. |
+| Don't use personal names in spec? | ✅ Acknowledged. Spec now uses team_role labels (Sales Manager, Government Partner, Creative Lead). Personal names stay only in DB rows. |
 
 ---
 
@@ -368,6 +368,90 @@ If you ask for any of these mid-build, the answer is: "Phase 4 or later — let 
 
 **For future Claude:**
 - Re-read at the start of every conversation that touches code.
+
+---
+
+## 17. My suggestions (asked for, written honestly)
+
+### 17.1 Hybrid lead assignment (not pure manual)
+
+You said the Sales Manager manually picks the rep when passing SalesReady leads. **At 35–40 people this becomes 30 minutes of routing per day for one person.** The Sales Manager will start picking favorites or just whoever they see online — both bad outcomes.
+
+**Suggestion:** keep manual pick, but add a **"Suggested rep"** chip next to the dropdown. The system computes suggestion = (rep in same city as lead) ∩ (lowest current open-lead count) ∩ (segment_access matches lead.segment). Manager confirms or overrides. Same speed as today + load-balanced + city-matched. Two clicks instead of one but saves the wrong-rep mistake.
+
+If you want it pure-manual for v1, fine. But add an "Assigned this week" count next to each rep name in the dropdown so the manager at least sees who's overloaded.
+
+### 17.2 Holiday calendar auto-seed
+
+Manually entering 30+ Hindu festivals per year is busywork that will get skipped. Two options:
+
+(a) **Hardcoded seed** — I include a `_test_fixtures/gujarat_holidays_2026.json` file with the 30+ festivals (Diwali, Holi, Janmashtami, Navratri, Ganesh Chaturthi, Uttarayan, Rakhi, Dussehra, etc.) covering 2026–2027. Admin can add/remove from the Master → Holidays page. Roll forward each year via a 30-second admin task.
+
+(b) **Calendarific API** — paid service (~$10/year), auto-pulls Gujarat holidays. More accurate for moveable feasts. Higher overhead.
+
+I recommend (a) for Phase 1, (b) only if maintenance becomes painful.
+
+```sql
+holidays (id, holiday_date, name, type CHECK ('weekly_off','national','gujarat_festival','company_off'),
+          is_recurring, is_active, created_by)
+```
+
+Sundays auto-generated by a function (no rows needed). Festivals stored as one row per occurrence per year.
+
+### 17.3 Scaling to 35–40 people
+
+Three things change when team grows past ~25:
+
+**(a) Daily WhatsApp brief becomes too long.** Listing every person who hit/missed targets at 35 people = a 600-word message no one reads. Pivot at scale: only **list exceptions** ("3 people no check-in by 11 AM, 4 missed targets, top performer this week: X"). Keep details on the cockpit web page.
+
+**(b) Cockpit team scorecard needs grouping.** Today the spec shows a flat list; at scale it must group by Sales Manager / by city / by team_role. Already in the design system (§4.7 compact table) — just need a "group by" selector.
+
+**(c) Auto-assignment becomes essential, not optional.** The hybrid in §17.1 above scales naturally; pure-manual breaks.
+
+I'm baking these into the cockpit design from day 1 so we don't need to re-architect at month 4.
+
+### 17.4 Cronberry import — handle the messy reality
+
+Looking at your sample CSV, ~70% of rows have only `name + mobile + Remarks`. The Remarks field is where the actual business context lives, e.g.:
+- `2026-05-01 12:18:09 :- only time pass (Swati Jha)` → stage=Lost, lost_reason=NoNeed, last_contact_at=2026-05-01 12:18, telecaller_name=Swati Jha
+- `2026-05-01 13:07:59 :- no enquiry (Swati Jha)` → stage=Lost, lost_reason=NoNeed
+- `need to bus time table (Swati Jha)` → stage=Nurture or Contacted, notes preserved
+
+**My importer will:**
+1. Strip single quotes from mobile (`'9924714064'` → `9924714064`)
+2. Parse Remarks regex: `(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*:-\s*(.*?)\s*\((.+?)\)` → timestamp + status_text + telecaller_name
+3. Map status_text to stage via a keyword table (configurable):
+   - "no enquiry", "only time pass", "wrong number", "not interested" → Lost
+   - "call later", "callback" → Nurture
+   - "need quote", "send proposal", "interested" → Qualified
+4. Lookup telecaller_name in users table (case-insensitive); if no match, store as raw `notes_legacy_telecaller` and admin can map later
+5. Auto-create the lead AND a single `lead_activities` row from the parsed timestamp/notes so the activity timeline is populated immediately
+
+Without this messy-data handling, a straight column map would lose 70% of the value.
+
+### 17.5 Don't try to migrate ALL Cronberry data
+
+Your sample shows 25 rows; your full export will be 800+. Most are probably stale (lost / dead leads). Suggest:
+
+- **Day 1: import only leads with last_contact_at within 90 days** (active).
+- **Day 8: bulk-archive everything older than 90 days** as `Lost` with `lost_reason=Stale`. Searchable but out of the active pipeline.
+
+Otherwise the new lead list opens with 800 dead rows and nobody trusts it.
+
+### 17.6 PIYUSH as Creative Lead — one risk
+
+The architecture doc explicitly flagged "designers/video editor doing slot-booking admin work" as a structural problem. Promoting Piyush from Video Editor to Creative Lead means **he stops doing video work.** If he's currently your only video editor, that creates a gap. Two options:
+
+(a) Hire a junior video editor (Phase 3) — Piyush manages + does the hardest jobs.
+(b) Promote one of the designers (Renuka or Safika) instead — Piyush stays on video.
+
+You picked Piyush; I'm flagging this so you've thought about who fills his current seat.
+
+### 17.7 35–40 person scaling — what's good news
+
+The current Adflux DB schema + Supabase RLS handle 100+ users without re-architecting. The codebase scales fine. The bottleneck won't be technical — it'll be process discipline (which the architecture doc already warned about). My suggestions above (hybrid assignment, exception-only briefs, grouped cockpit) are the only architectural changes needed. No DB redesign required.
+
+---
 - If a request doesn't fit a module/phase, propose where it goes — don't build it inline.
 - Always pair code work with `UI_DESIGN_SYSTEM.md` reference.
 - Cross-role test (admin / co-owner / sales lead / sales / telecaller / agency) before any commit.
