@@ -43,10 +43,9 @@ import '../../styles/v2.css'
 // PRIVILEGED = admin / owner / co_owner — full access including the
 // new Government master pages (Auto Districts + GSRTC Stations).
 const ADMIN_NAV = [
+  // Phase 12 rev3 — owner spec: ONE landing page, not two. Cockpit
+  // widgets folded into AdminDashboardDesktop.
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
-  // Phase 12 — Cockpit is the owner's daily landing strip; Leads above
-  // Quotes because the lead is the upstream record.
-  { to: '/cockpit',           label: 'Cockpit',        icon: Sparkles },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },

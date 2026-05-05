@@ -29,6 +29,10 @@ import {
 } from '../../utils/formatters'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
+// Phase 12 rev3 — widgets folded in from the retired CockpitV2 page.
+import {
+  AiBriefingCard, LeadPipelinePanel, TeamActivityPanel, SlaBreachBanner,
+} from '../../components/dashboard/CockpitWidgets'
 import '../../styles/v2.css'
 
 /* ─── Money display: full Indian-format number with lakh/crore grouping.
@@ -784,13 +788,20 @@ export default function AdminDashboardDesktop() {
           </header>
 
           <div className="v2d-content">
-            {/* Dashboard spec — Action Queue card. Hero slot of the
-                page (above the revenue strip). Static rule-based for
-                now; AI agent integration will replace the body with a
-                generated morning briefing in a later batch. The slot
-                stays the same so the layout doesn't change when AI
-                lands. Only renders when there's actually something to
-                act on; an empty action queue shows "Inbox zero". */}
+            {/* Phase 12 rev3 — AI Briefing card hoisted to the top so
+                it's the first thing Brijesh sees on /dashboard. Pulls
+                its own data; rule-based until daily-brief Edge Function
+                deploys. */}
+            <AiBriefingCard />
+
+            {/* Phase 12 rev3 — SLA breach alert. Only renders when
+                there's at least one Sales Ready lead past 24h. */}
+            <SlaBreachBanner />
+
+            {/* Dashboard spec — Action Queue card. Was the hero slot;
+                now sits below AI Briefing. Only renders when there's
+                actually something to act on; an empty action queue
+                shows "Inbox zero". */}
             <ActionQueueCard items={state.actionQueue || []} onOpen={(route) => navigate(route)} />
 
             {/* M1 — Missed-targets banner. Shown only when at least one
@@ -953,6 +964,15 @@ export default function AdminDashboardDesktop() {
             <section className="v2d-grid-2">
               <LiabilityPanel data={state.liability} />
               <RenewalsPanel data={state.renewals} onOpen={(row) => openQuote(row)} onAll={() => navigate('/renewal-tools')} />
+            </section>
+
+            {/* Row 4c — Phase 12 rev3 — Lead pipeline (left) + Today's
+                team activity (right). Lead funnel is for the M1 LEADS
+                table (separate from the QUOTES funnel above). Team
+                activity shows daily check-ins + counters per person. */}
+            <section className="v2d-grid-2" style={{ marginTop: 16 }}>
+              <LeadPipelinePanel />
+              <TeamActivityPanel />
             </section>
 
             {/* Row 4b: Stale won quotes — separate row, full-width when

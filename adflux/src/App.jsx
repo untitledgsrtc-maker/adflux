@@ -25,10 +25,11 @@ import ClientsV2          from './pages/v2/ClientsV2'
 // ── Phase 12 — M1 Sales/Lead module ─────────────────────────────────
 import LeadsV2             from './pages/v2/LeadsV2'
 import LeadDetailV2        from './pages/v2/LeadDetailV2'
+import LeadFormV2          from './pages/v2/LeadFormV2'
 import LeadUploadV2        from './pages/v2/LeadUploadV2'
 import WorkV2              from './pages/v2/WorkV2'
 import TelecallerV2        from './pages/v2/TelecallerV2'
-import CockpitV2           from './pages/v2/CockpitV2'
+// Phase 12 rev3 — CockpitV2 retired; widgets folded into AdminDashboardDesktop.
 
 // ── Government module (Phase 6) ─────────────────────────────────────
 import CreateQuoteChooserV2  from './pages/v2/CreateQuoteChooserV2'
@@ -127,13 +128,18 @@ export default function App() {
           <Route path="/clients"                   element={<ClientsV2 />} />
 
           {/* Phase 12 — M1 Sales/Lead module. RLS handles per-role
-              visibility; the page itself shows admin-vs-sales chrome. */}
+              visibility; the page itself shows admin-vs-sales chrome.
+              ROUTE ORDER MATTERS — /leads/new must register BEFORE
+              /leads/:id, otherwise React Router matches /:id with
+              id="new" and the lead-detail loader sends "new" to a
+              uuid column ("invalid input syntax for type uuid: new"). */}
           <Route path="/leads"                     element={<LeadsV2 />} />
           <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
+          <Route path="/leads/new"                 element={<LeadFormV2 />} />
           <Route path="/leads/:id"                 element={<LeadDetailV2 />} />
           <Route path="/work"                      element={<WorkV2 />} />
           <Route path="/telecaller"                element={<TelecallerV2 />} />
-          <Route path="/cockpit"                   element={<RequirePrivileged><CockpitV2 /></RequirePrivileged>} />
+          {/* Phase 12 rev3 — /cockpit retired. Folded into /dashboard. */}
 
           {/* Sales-only */}
           <Route path="/my-performance"            element={<MyPerformanceV2 />} />
