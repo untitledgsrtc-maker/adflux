@@ -166,7 +166,19 @@ export function GovtProposalRenderer({
         paddingBottom: '180px',
         paddingLeft:   '70px',
       }
-    : undefined
+    : {
+        // Phase 11d (rev13) — when letterhead is OFF, leave generous
+        // top + bottom whitespace (140px / 130px) so the rep can
+        // print on a pre-printed letterhead paper without the
+        // content overrunning the printed header/footer of that
+        // physical paper. Side margins also bumped for cleaner look
+        // on a printed sheet. Owner spec: "without letterhead need
+        // some space in header so we can print on letterhead paper."
+        paddingTop:    '140px',
+        paddingRight:  '70px',
+        paddingBottom: '130px',
+        paddingLeft:   '70px',
+      }
 
   // Phase 11d (rev5) — zero out trailing margin and border on the
   // rasterized output. Default .govt-letter has margin: 0 auto 18px

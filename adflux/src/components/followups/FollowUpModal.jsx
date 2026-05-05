@@ -39,82 +39,101 @@ export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onResche
   const clientName = followUp?.quotes?.client_name || '—'
   const quoteNum   = followUp?.quotes?.quote_number  || ''
 
+  // Phase 11d (rev13) — rewrote to use the working `mo`/`md` modal
+  // classes from v2.css. The previous version used `modal-overlay` /
+  // `field-label` / `field-input` classes that aren't styled in the
+  // dark v2 theme — labels and inputs lost their layout, icons floated
+  // free of text. Owner reported "followup UI not good".
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box modal-box--sm" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="modal-header">
+    <div className="mo" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="md" style={{ maxWidth: 460 }}>
+        <div className="md-h">
           <div>
-            <div className="modal-title">
-              {mode === 'reschedule' ? 'Reschedule Follow-up' : 'Mark Done'}
+            <div className="md-t">
+              {mode === 'reschedule' ? '📅 Reschedule Follow-up' : '✓ Mark Done'}
             </div>
-            <div className="modal-subtitle">
-              {quoteNum && <span className="fu-modal-qnum">{quoteNum}</span>}
-              {clientName}
+            <div style={{ fontSize: 12, color: 'var(--gray)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {quoteNum && (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11,
+                  color: 'var(--y, #facc15)', background: 'rgba(255,230,0,0.08)',
+                  borderRadius: 4, padding: '1px 6px',
+                }}>{quoteNum}</span>
+              )}
+              <span>{clientName}</span>
             </div>
           </div>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <button className="md-x" onClick={onClose}>✕</button>
         </div>
 
-        {/* Body */}
-        <div className="modal-body">
+        <div className="md-b">
           {mode === 'mark_done' ? (
-            <div className="fu-done-confirm">
-              <CheckCircle size={36} style={{ color: 'var(--success)' }} />
-              <p>Mark this follow-up as <strong>done</strong>?</p>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 12, padding: '16px 0', textAlign: 'center',
+            }}>
+              <CheckCircle size={36} style={{ color: '#81c784' }} />
+              <p style={{ margin: 0 }}>Mark this follow-up as <strong>done</strong>?</p>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--gray)' }}>
                 This will close the follow-up for {clientName}.
               </p>
             </div>
           ) : (
             <form onSubmit={handleReschedule} id="reschedule-form">
-              <div className="form-field">
-                <label className="field-label">
+              <div className="fg">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Calendar size={13} /> New Date
                 </label>
                 <input
                   type="date"
-                  className="field-input"
                   value={date}
                   min={todayISO()}
                   onChange={e => setDate(e.target.value)}
                   required
                 />
               </div>
-              <div className="form-field">
-                <label className="field-label">
+              <div className="fg">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <MessageSquare size={13} /> Note (optional)
                 </label>
                 <textarea
-                  className="field-input field-textarea"
                   value={note}
                   onChange={e => setNote(e.target.value)}
                   placeholder="Add a note about this follow-up…"
                   rows={3}
+                  style={{ minHeight: 64, resize: 'vertical' }}
                 />
               </div>
             </form>
           )}
 
-          {err && <p className="form-error" style={{ marginTop: 8 }}>{err}</p>}
+          {err && (
+            <p style={{
+              marginTop: 8, fontSize: 12,
+              color: '#ef9a9a',
+              background: 'rgba(229,57,53,.08)',
+              border: '1px solid rgba(229,57,53,.3)',
+              borderRadius: 6, padding: '6px 10px',
+            }}>{err}</p>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="modal-footer">
+        <div className="md-f">
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>
             Cancel
           </button>
           {mode === 'mark_done' ? (
             <button
-              className="btn btn-success"
+              className="btn btn-y"
               onClick={handleMarkDone}
               disabled={saving}
+              style={{ background: '#81c784', color: '#0a0e1a' }}
             >
               {saving ? 'Saving…' : '✓ Mark Done'}
             </button>
           ) : (
             <button
-              className="btn btn-primary"
+              className="btn btn-y"
               type="submit"
               form="reschedule-form"
               disabled={saving}

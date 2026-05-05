@@ -1354,14 +1354,14 @@ export default function GovtProposalDetailV2() {
                       : <>Will be auto-generated when proposal is marked Sent.</>}
                   </span>
                 ) : (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     {/* Hidden native input + visible label = nicer UX */}
                     <label
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '5px 10px', borderRadius: 6,
+                        padding: '6px 12px', borderRadius: 6,
                         border: '1px solid var(--surface-3)',
-                        background: 'var(--surface-2)',
+                        background: hasUploadedFile ? 'var(--surface-3)' : 'var(--surface-2)',
                         color: 'var(--text)', fontSize: 12, fontWeight: 600,
                         cursor: uploadingIdx === idx ? 'wait' : 'pointer',
                         opacity: uploadingIdx === idx ? 0.6 : 1,
@@ -1386,16 +1386,40 @@ export default function GovtProposalDetailV2() {
                         }}
                       />
                     </label>
-                    <input
-                      type="text"
-                      placeholder="…or paste URL"
-                      value={hasUrlOnly ? c.file_url : ''}
-                      onChange={e => toggleAttachment(idx, 'file_url', e.target.value)}
-                      disabled={hasUploadedFile}
-                      title={hasUploadedFile ? 'Clear the uploaded file (Replace) to paste a URL instead' : ''}
-                      className="govt-input-cell"
-                      style={{ maxWidth: 'unset', width: '100%', opacity: hasUploadedFile ? 0.5 : 1 }}
-                    />
+                    {/* Phase 11d (rev13) — owner asked to drop the
+                        "or paste URL" input ("just killing space").
+                        File upload is now the only path for adding
+                        attachments, which also matches Phase 11
+                        storage RLS expectations.
+                        When a file IS uploaded, show a Remove button
+                        so a wrong-file mistake can be cleared with
+                        one click instead of having to find another
+                        file to "Replace" it with. */}
+                    {hasUploadedFile && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!confirm('Remove this uploaded file? You can re-upload anytime.')) return
+                          toggleAttachment(idx, 'file_url', null)
+                        }}
+                        title="Remove uploaded file"
+                        style={{
+                          padding: '6px 10px', borderRadius: 6,
+                          border: '1px solid rgba(229,57,53,.4)',
+                          background: 'transparent',
+                          color: '#ef9a9a', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <Trash2 size={12} /> Remove
+                      </button>
+                    )}
+                    {hasUrlOnly && (
+                      <span style={{ fontSize: 11, color: 'var(--text-subtle)', fontStyle: 'italic' }}>
+                        legacy URL — re-upload as file
+                      </span>
+                    )}
                   </div>
                 )}
               </span>
