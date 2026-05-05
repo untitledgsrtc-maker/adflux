@@ -18,6 +18,16 @@ const ROLES = [
   { value: 'admin',  label: 'Admin' },
 ]
 
+// Phase 11j — segment scope. Owner spec: "how can we define its for
+// goverment work only or private work only". Wires the existing
+// users.segment_access column (Phase 4b) into the team UI.
+// Values match the DB CHECK constraint exactly.
+const SEGMENT_SCOPES = [
+  { value: 'ALL',        label: 'Both (Government + Private)' },
+  { value: 'GOVERNMENT', label: 'Government only (DAVP / GSRTC)' },
+  { value: 'PRIVATE',    label: 'Private only (LED clients)' },
+]
+
 function Field({ label, required, error, hint, children }) {
   return (
     <div className="fg">
@@ -37,6 +47,9 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     email:          member?.email || '',
     password:       '',
     role:           member?.role || 'sales',
+    // Phase 11j — segment scope. Reuses the existing users.segment_access
+    // column (Phase 4b). Defaults to 'ALL' for new members.
+    segment_access: member?.segment_access || 'ALL',
     monthly_salary: member?.staff_incentive_profiles?.[0]?.monthly_salary?.toString() || '',
   })
   const [errors, setErrors]           = useState({})
@@ -113,6 +126,10 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
           name:      form.name.trim(),
           email:     form.email.trim().toLowerCase(),
           role:      form.role,
+          // Phase 11j — admin always 'ALL' regardless of dropdown
+          // (admin must see/manage everything). Other roles get the
+          // selected scope.
+          segment_access: form.role === 'admin' ? 'ALL' : form.segment_access,
           is_active: true,
         }])
 
@@ -144,6 +161,8 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       const { error } = await updateMember(member.id, {
         name: form.name.trim(),
         role: form.role,
+        // Phase 11j — admin can change a rep's segment scope from edit.
+        segment_access: form.role === 'admin' ? 'ALL' : form.segment_access,
       })
       if (error) {
         setServerError(error.message || 'Failed to update member')
@@ -213,6 +232,24 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </Field>
+
+          {/* Phase 11j — segment scope. Hidden for admin (always ALL). */}
+          {form.role !== 'admin' && (
+            <Field
+              label="Segment access"
+              required
+              hint="What kind of quotes this person works on. Affects which New Quote options and quote-list rows they see."
+            >
+              <select
+                value={form.segment_access}
+                onChange={e => set('segment_access', e.target.value)}
+              >
+                {SEGMENT_SCOPES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </Field>
+          )}
 
           {mode === 'add' && (
             <>

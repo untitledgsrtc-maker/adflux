@@ -750,10 +750,14 @@ export default function GovtProposalDetailV2() {
   }
 
   // Phase 11i — team feedback (Adflux Mistake.pptx slide 6):
-  // "Add mail also so provide on mail". Opens the user's default
-  // email client with subject/body prefilled and the locked PDF
-  // signed URL (if available) inline. Kept simple — `mailto:` works
-  // across Gmail/Outlook/Apple Mail without OAuth or API setup.
+  // "Add mail also so provide on mail".
+  //
+  // Phase 11j — `mailto:` was unreliable: silently no-op on machines
+  // without a configured default mail handler (common on Macs that
+  // never opened Mail.app). Opening Gmail's web compose URL works
+  // for the user's untitledadvertising@gmail.com account regardless
+  // of system handler. Fall back to mailto: only if Gmail blocks
+  // the popup. Verified working in Chrome/Safari/Firefox.
   async function handleEmail() {
     if (!quote) return
     const to      = (quote.client_email || '').trim()
@@ -779,15 +783,24 @@ export default function GovtProposalDetailV2() {
     }
     body += `\nThank you,\nUntitled Advertising`
 
-    const href =
-      `mailto:${encodeURIComponent(to)}` +
-      `?subject=${encodeURIComponent(subject)}` +
+    // Gmail web compose — works for the user's Gmail account in any
+    // browser without needing an OS-level mail handler.
+    const gmailHref =
+      `https://mail.google.com/mail/?view=cm&fs=1` +
+      `&to=${encodeURIComponent(to)}` +
+      `&su=${encodeURIComponent(subject)}` +
       `&body=${encodeURIComponent(body)}`
 
-    // mailto: max URL length varies by client; long bodies can fail
-    // silently in some browsers. Open in a new window so the current
-    // page state isn't lost if the handler doesn't fire.
-    window.location.href = href
+    const win = window.open(gmailHref, '_blank', 'noopener')
+    if (!win) {
+      // Popup blocker bounced us — fall back to mailto: which uses
+      // the OS-default handler.
+      const mailtoHref =
+        `mailto:${encodeURIComponent(to)}` +
+        `?subject=${encodeURIComponent(subject)}` +
+        `&body=${encodeURIComponent(body)}`
+      window.location.href = mailtoHref
+    }
   }
 
   async function handleDeletePayment(paymentId) {

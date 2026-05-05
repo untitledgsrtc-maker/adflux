@@ -56,10 +56,22 @@ export function Step5Review({ data }) {
     [districts, data.selected_district_ids],
   )
 
-  const allocated = useMemo(
-    () => distributeAutoHoodQuantity(data.auto_total_quantity || 0, checkedDistricts),
-    [data.auto_total_quantity, checkedDistricts],
-  )
+  // Phase 11j — same override-aware allocation as Step4 + save flow.
+  // Without this, the review preview shows auto-distributed numbers
+  // even when the rep typed manual qty overrides in Step 4.
+  const allocated = useMemo(() => {
+    const auto = distributeAutoHoodQuantity(data.auto_total_quantity || 0, checkedDistricts)
+    const overrides = data.district_qty_overrides || {}
+    return auto.map(a => {
+      const ov = overrides[a.id]
+      if (ov !== undefined && ov !== null && ov !== '') {
+        return { ...a, allocated_qty: Math.max(0, Number(ov) || 0) }
+      }
+      return a
+    })
+  }, [data.auto_total_quantity, data.district_qty_overrides, checkedDistricts])
+
+  const actualQty = allocated.reduce((s, a) => s + (a.allocated_qty || 0), 0)
 
   const recipientBlock = [
     data.client_name,
@@ -70,7 +82,7 @@ export function Step5Review({ data }) {
   const rendered = {
     recipient_block: recipientBlock,
     proposal_date:   data.proposal_date,
-    auto_total_quantity: data.auto_total_quantity,
+    auto_total_quantity: actualQty,
     unit_rate:       rate ? Number(rate.davp_per_rickshaw_rate) : 825,
     line_items:      allocated,                         // for districts_count placeholder
   }
@@ -98,7 +110,7 @@ export function Step5Review({ data }) {
         </div>
         <div className="govt-summary__row">
           <span>Total rickshaws</span>
-          <strong>{allocated.reduce((s, a) => s + (a.allocated_qty || 0), 0)}</strong>
+          <strong>{actualQty}</strong>
         </div>
         <div className="govt-summary__row">
           <span>Signed by</span>

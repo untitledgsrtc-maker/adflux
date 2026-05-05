@@ -248,8 +248,9 @@ export default function QuoteDetail() {
   }
 
   // Phase 11i — team feedback: add Email parallel to WhatsApp.
-  // Uses the same upload-PDF-then-share flow so the customer gets a
-  // 24h download link in their inbox.
+  // Phase 11j — switched from mailto: to Gmail web compose.
+  // mailto: silently no-ops on macs without a configured mail handler;
+  // Gmail compose URL works in any browser for the user's Gmail account.
   async function handleEmail() {
     if (!quote) return
     let pdfUrl = null
@@ -272,11 +273,21 @@ export default function QuoteDetail() {
       `Total: Rs. ${formatCurrency(quote.total_amount).replace('₹','')}\n`
     if (pdfUrl) body += `\nProposal PDF: ${pdfUrl}\n`
     body += `\nThank you,\nUntitled Adflux Pvt Ltd`
-    const href =
-      `mailto:${encodeURIComponent(to)}` +
-      `?subject=${encodeURIComponent(subject)}` +
+
+    const gmailHref =
+      `https://mail.google.com/mail/?view=cm&fs=1` +
+      `&to=${encodeURIComponent(to)}` +
+      `&su=${encodeURIComponent(subject)}` +
       `&body=${encodeURIComponent(body)}`
-    window.location.href = href
+
+    const win = window.open(gmailHref, '_blank', 'noopener')
+    if (!win) {
+      const mailtoHref =
+        `mailto:${encodeURIComponent(to)}` +
+        `?subject=${encodeURIComponent(subject)}` +
+        `&body=${encodeURIComponent(body)}`
+      window.location.href = mailtoHref
+    }
   }
 
   async function handleEditPayment(updated) {

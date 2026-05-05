@@ -38,8 +38,34 @@ export function Step4Districts({ data, onChange }) {
     [qty, checkedDistricts],
   )
 
+  // Phase 11j — per-district manual qty override.
+  // The auto-distribution by share_pct is the default, but the rep
+  // sometimes needs to bump or trim a specific district (e.g. owner
+  // approves an exception for Ahmedabad). Stored as a map keyed by
+  // district id; only districts the rep actually touched have entries.
+  // `effectiveQty(id)` falls back to the share-pct allocation.
+  const overrides = data.district_qty_overrides || {}
+  function effectiveQty(id) {
+    if (overrides[id] !== undefined && overrides[id] !== null && overrides[id] !== '') {
+      return Number(overrides[id]) || 0
+    }
+    return allocated.find(a => a.id === id)?.allocated_qty || 0
+  }
+  function setOverride(id, raw) {
+    const next = { ...overrides }
+    if (raw === '' || raw === null) {
+      delete next[id]
+    } else {
+      next[id] = Math.max(0, Number(raw) || 0)
+    }
+    onChange({ district_qty_overrides: next })
+  }
+
   const sumPctSelected = checkedDistricts.reduce((s, d) => s + Number(d.share_pct), 0)
-  const sumQtyAllocated = allocated.reduce((s, a) => s + (a.allocated_qty || 0), 0)
+  const sumQtyAllocated = checkedDistricts.reduce(
+    (s, d) => s + effectiveQty(d.id),
+    0,
+  )
 
   function toggle(id) {
     const has = selected.includes(id)
@@ -81,25 +107,54 @@ export function Step4Districts({ data, onChange }) {
         </div>
         {districts.map(d => {
           const isChecked = selected.includes(d.id)
-          const alloc = allocated.find(a => a.id === d.id)
+          const isOver    = overrides[d.id] !== undefined && overrides[d.id] !== ''
+          // Phase 11j — wrap the row in a div instead of <label> so
+          // clicking the qty input doesn't toggle the row checkbox.
+          // The checkbox itself still works because we attach the
+          // toggle handler directly to it.
           return (
-            <label key={d.id} className="govt-list__row" style={{ cursor: 'pointer' }}>
+            <div key={d.id} className="govt-list__row" style={{ cursor: 'default' }}>
               <span className="govt-list__check">
                 <input
                   type="checkbox"
                   checked={isChecked}
                   onChange={() => toggle(d.id)}
+                  style={{ cursor: 'pointer' }}
                 />
               </span>
-              <span className="govt-list__name">
+              <span
+                className="govt-list__name"
+                onClick={() => toggle(d.id)}
+                style={{ cursor: 'pointer' }}
+              >
                 {d.district_name_en}
                 <span className="govt-list__name-gu">{d.district_name_gu}</span>
               </span>
               <span className="govt-list__pct">{Number(d.share_pct).toFixed(2)}%</span>
               <span className="govt-list__qty">
-                {isChecked ? formatINREnglish(alloc?.allocated_qty || 0) : '—'}
+                {isChecked ? (
+                  <input
+                    type="number"
+                    min="0"
+                    value={overrides[d.id] !== undefined ? overrides[d.id] : (allocated.find(a => a.id === d.id)?.allocated_qty || 0)}
+                    onChange={e => setOverride(d.id, e.target.value)}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      width: 80,
+                      textAlign: 'right',
+                      background: isOver ? 'rgba(255,193,7,.08)' : 'var(--surface-2)',
+                      border: `1px solid ${isOver ? 'rgba(255,193,7,.4)' : 'var(--surface-3)'}`,
+                      color: isOver ? '#ffc107' : 'var(--text)',
+                      borderRadius: 4,
+                      padding: '3px 6px',
+                      fontFamily: 'inherit',
+                      fontSize: 13,
+                    }}
+                    title={isOver ? 'Manual override (click qty cell to clear)' : 'Auto-allocated by share %'}
+                  />
+                ) : '—'}
               </span>
-            </label>
+            </div>
           )
         })}
       </div>

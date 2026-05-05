@@ -26,23 +26,44 @@ export default function PendingApprovalsV2() {
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(true)
   const [actingId, setActingId] = useState(null)
+  // Phase 11j — surface fetch errors to the UI instead of console-only.
+  // The "you're all caught up" empty state was indistinguishable from
+  // a silent RLS / network failure; this fixes that.
+  const [fetchErr, setFetchErr] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setFetchErr('')
     const { data, error } = await fetchPendingApprovals()
-    if (error) console.error('[PendingApprovalsV2] fetch failed:', error)
+    if (error) {
+      console.error('[PendingApprovalsV2] fetch failed:', error)
+      setFetchErr(`Could not load approvals: ${error.message}`)
+    }
+    // Phase 11j — verbose log so the user can see what came back.
+    console.log('[PendingApprovalsV2] fetched', {
+      role:  profile?.role,
+      uid:   profile?.id,
+      count: (data || []).length,
+      data,
+    })
     setRows(data || [])
     setLoading(false)
-  }, [])
+  }, [profile?.role, profile?.id])
 
   useEffect(() => {
+    // Phase 11j — wait for the profile to be hydrated before firing
+    // the query. Without this guard, the page mounts → fires SELECT
+    // anonymously → RLS denies → empty → "all caught up" shows even
+    // though there are pending payments. Reproduces especially after
+    // a hard reload while the session is being restored.
+    if (!profile?.id) return
     load()
     const ch = supabase
       .channel('pending-approvals-v2')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [load])
+  }, [load, profile?.id])
 
   async function approve(row) {
     if (!window.confirm(
@@ -107,6 +128,20 @@ export default function PendingApprovalsV2() {
           <span>Refresh</span>
         </button>
       </div>
+
+      {fetchErr && (
+        <div style={{
+          background: 'rgba(229,57,53,.1)',
+          border: '1px solid rgba(229,57,53,.3)',
+          borderRadius: 8,
+          padding: '10px 14px',
+          margin: '12px 0',
+          fontSize: '.82rem',
+          color: '#ef9a9a',
+        }}>
+          ⚠ {fetchErr}
+        </div>
+      )}
 
       {loading ? (
         <div className="v2d-loading"><div className="v2d-spinner" />Loading…</div>

@@ -1,0 +1,14 @@
+-- =====================================================================
+-- Phase 11j — segment scope per team member (NO-OP migration)
+-- =====================================================================
+--
+-- This file is intentionally a no-op. The actual column already exists
+-- as `users.segment_access` from Phase 4b (supabase_phase4b_user_segment_access.sql)
+-- with values: 'ALL' | 'PRIVATE' | 'GOVERNMENT', default 'ALL'.
+--
+-- The frontend (TeamMemberModal, CreateQuoteChooserV2, useAuth) reads
+-- and writes `segment_access`. No DB change is needed for Phase 11j.
+--
+-- Kept as a placeholder so the migration index stays continuous.
+-- =====================================================================
+SELECT 1;
