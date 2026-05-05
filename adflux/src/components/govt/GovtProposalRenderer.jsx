@@ -156,14 +156,16 @@ export function GovtProposalRenderer({
         backgroundRepeat:   'no-repeat',
         backgroundSize:     '100% 100%',
         backgroundPosition: 'top center',
-        // Phase 11d (rev12) — bumped padding-top 130→170 and
-        // padding-bottom 130→180 because the prior values left only
-        // ~30px clearance from the letterhead's printed footer text,
-        // and content was crowding/overlapping it. Now content sits
-        // entirely inside the empty middle zone of the PNG.
+        // Phase 11d (rev14) — sized to the actual letterhead empty
+        // zone. Header logo bottom at y=170 (7.3% of 1123), printed
+        // footer top at y=1023 (91.1%). Padding-top 170 hugs the
+        // header. Padding-bottom 130 leaves 30px clean gap above
+        // the printed footer. Content area = 1123 - 300 = 823px,
+        // which fits the Phase 11d writeup with the bidan now
+        // collapsed to a single line.
         paddingTop:    '170px',
         paddingRight:  '70px',
-        paddingBottom: '180px',
+        paddingBottom: '130px',
         paddingLeft:   '70px',
       }
     : {
@@ -347,34 +349,34 @@ function renderAutoTable(data) {
    Owner spec (4 May 2026 docx): bidan must appear at the END of every
    letter when generating PDF or printing. */
 function renderBidanBlock(mediaType, dynamicItems) {
-  // Prefer the dynamic list (computed from this quote's checklist) so
-  // the bidan section reflects what's actually attached. When empty
-  // (e.g., wizard preview before checklist is populated), fall back to
-  // the standard media-type defaults so the letter still has a closing
-  // enclosure list. Owner spec (4 May 2026): "ticked document should
-  // listed in attachment".
+  // Phase 11d (rev14) — collapsed to single comma-separated line.
+  // The previous 6-line numbered list pushed the cover letter past
+  // 860px (the available content height when letterhead background
+  // is on, which eats top + bottom space). The recipient's own copy
+  // shows the actual attachments anyway; this line is a quick
+  // index. Single-line format saves ~100px and prevents bidan from
+  // colliding with the letterhead's printed footer.
   const fallback = mediaType === 'AUTO_HOOD'
     ? [
         'CBC (પૂર્વે DAVP) મંજૂર દરપત્રકની નકલ',
         'જિલ્લાવાર ઓટો રિક્ષાઓની યાદી',
-        'અમારી કંપની પ્રોફાઇલ તથા અગાઉના કામગીરીના નમૂના',
+        'કંપની પ્રોફાઇલ',
       ]
     : [
-        'GSRTC તરફથી નિર્ધારિત ભાવ-પત્રકની નકલ',
-        'અમારા તરફથી રજૂ કરેલ ભાવ-દરખાસ્તની નકલ',
-        '૨૦ બસ ડેપો મથકોની યાદી',
+        'GSRTC ભાવ-પત્રકની નકલ',
+        'ભાવ-દરખાસ્તની નકલ',
+        '૨૦ બસ ડેપો યાદી',
       ]
 
   const items = (Array.isArray(dynamicItems) && dynamicItems.length > 0)
     ? dynamicItems
     : fallback
 
-  const lis = items.map(t => `<li>${t}</li>`).join('')
   return [
-    '<div class="govt-letter__bidan" style="margin-top:18px;">',
-      '<strong>બિડાણ:</strong>',
-      `<ol style="margin:6px 0 0 22px;padding:0;">${lis}</ol>`,
-    '</div>',
+    '<p style="margin:10px 0 0;font-size:11.5px;line-height:1.5;">',
+      '<strong>બિડાણ:</strong> ',
+      items.join(', '),
+    '</p>',
   ].join('')
 }
 

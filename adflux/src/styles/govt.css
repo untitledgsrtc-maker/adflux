@@ -484,14 +484,17 @@
   padding: 56px 64px;
   margin: 0 auto 18px;
   font-family: 'Noto Sans Gujarati', 'DM Sans', system-ui, sans-serif;
-  /* Phase 11d (rev) — tightened from 13.5px/1.7 to 12px/1.5 so the
-     longer Phase 11d writeup (8 body paragraphs + rate table + note +
-     closing + signer + bidan) fits inside one A4 page even with the
-     letterhead PNG eating ~22% of vertical space (130px top + 130px
-     bottom padding). Old sizing produced ~930px of content vs ~863px
-     of available content area, forcing a second page mid-letter. */
+  /* Phase 11d (rev14) — owner-spec font matching the original look:
+     weight 500 for Gujarati boldness. Before Noto Sans Gujarati was
+     loaded explicitly, browsers fell back to system fonts (Mukta /
+     Mukti / Lohit) which default to bolder strokes. After we loaded
+     Noto, the default 400 weight made text look thin. Bumping to
+     500 restores the heavier appearance the owner approved.
+     Font sized 12px / line-height 1.5 keeps the long Phase 11d
+     writeup inside one A4 page even with letterhead bg eating space. */
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.5;
+  font-weight: 500;
   width: 100%;
   max-width: 794px;            /* A4 portrait width @ 96dpi */
   min-height: 1123px;          /* A4 portrait height @ 96dpi */
