@@ -139,6 +139,22 @@ function AttachmentsTab() {
       .eq('media_type', filter.media_type)
       .eq('is_active',  true)
       .order('display_order')
+    // Phase 11l — diagnostic logging. Owner reported "Attachments
+    // already attached but not showing". Most often this is a
+    // segment/media_type tab confusion (uploaded for AUTO_HOOD but
+    // looking at GSRTC_LED, or vice versa). Log how many rows have
+    // default_file_url so the gap is obvious in DevTools.
+    const withDefault = (data || []).filter(r => r.default_file_url)
+    console.log('[master-attachments] load', {
+      filter,
+      total_rows: (data || []).length,
+      with_default_file: withDefault.length,
+      labels: (data || []).map(r => ({
+        label:    r.label,
+        has_file: !!r.default_file_url,
+        path:     r.default_file_url,
+      })),
+    })
     if (error) {
       setStatusError(error.message)
       setRows([])
@@ -964,6 +980,10 @@ function CompaniesTab() {
    ════════════════════════════════════════════════════════════════════ */
 
 function SignersTab() {
+  // Phase 11l — read the logged-in admin profile so we can hide the
+  // self-row's Remove button (admin can't accidentally remove
+  // themselves and lose signing access).
+  const profile = useAuthStore(s => s.profile)
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState(null)
@@ -1037,6 +1057,41 @@ function SignersTab() {
 
   function setUserField(id, field, value) {
     setUsers(prev => prev.map(u => u.id === id ? { ...u, [field]: value } : u))
+  }
+
+  // Phase 11l — owner request: be able to remove a signer entry
+  // (e.g. agency partner who shouldn't be a signing authority). We
+  // clear the signature fields and demote the role to 'sales' so the
+  // signers query (filtered by role IN admin/co_owner/agency) drops
+  // them. Original quotes that referenced this user as signer keep
+  // working — their signer_user_id snapshot is unchanged.
+  async function handleRemoveSigner(id) {
+    const u = users.find(x => x.id === id)
+    if (!u) return
+    if (!confirm(
+      `Remove ${u.name} as a signer?\n\n` +
+      `Their signature title and mobile will be cleared, and their role ` +
+      `will be set to 'sales' so they no longer appear in the signer ` +
+      `dropdown. Existing proposals already signed by them are NOT affected.`
+    )) return
+    setSavingId(id)
+    setStatusError('')
+    const { error } = await supabase
+      .from('users')
+      .update({
+        signature_title:  null,
+        signature_mobile: null,
+        role:             'sales',
+      })
+      .eq('id', id)
+    setSavingId(null)
+    if (error) {
+      setStatusError(`Could not remove signer: ${error.message}`)
+      return
+    }
+    setStatusMsg(`${u.name} removed as signer.`)
+    setTimeout(() => setStatusMsg(''), 2500)
+    load()
   }
 
   async function persistUser(id) {
@@ -1212,9 +1267,33 @@ function SignersTab() {
                 className="govt-input-cell"
                 style={{ maxWidth: 'unset', width: '100%' }}
               />
-              <span style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, alignItems: 'center' }}>
                 {savingId === u.id && (
                   <Loader2 size={14} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} />
+                )}
+                {/* Phase 11l — Remove signer button. Hidden for the
+                    self-row (admin can't unsign themselves from Master)
+                    and disabled while a save is in flight. */}
+                {profile?.id !== u.id && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSigner(u.id)}
+                    disabled={savingId === u.id}
+                    title="Remove this user as a signer"
+                    style={{
+                      padding: '4px 6px',
+                      borderRadius: 4,
+                      border: '1px solid rgba(229,57,53,.3)',
+                      background: 'transparent',
+                      color: '#ef9a9a',
+                      cursor: savingId === u.id ? 'wait' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      opacity: savingId === u.id ? 0.5 : 1,
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 )}
               </span>
             </div>

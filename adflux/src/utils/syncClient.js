@@ -21,26 +21,59 @@ import { supabase } from '../lib/supabase'
 
 export async function syncClientFromQuote(quote, snapshotMode = 'create') {
   try {
-    if (!quote?.client_phone || !quote.created_by) return
-    const phone = String(quote.client_phone).trim()
-    if (!phone) return
+    if (!quote?.created_by) return
+    const phone   = String(quote.client_phone || '').trim()
+    const company = String(quote.client_company || '').trim()
+    const name    = String(quote.client_name || '').trim()
 
-    // Look up existing client for (phone, created_by). We fetch first
-    // instead of using Postgres upsert because we need to MERGE counts
-    // (quote_count += 1, total_won_amount += total) which a plain upsert
-    // can't express from the client side.
-    const { data: existing } = await supabase
-      .from('clients')
-      .select('id, first_quote_at, quote_count, total_won_amount')
-      .eq('phone', phone)
-      .eq('created_by', quote.created_by)
-      .maybeSingle()
+    // Phase 11l — govt proposals frequently have no phone (the
+    // "client" is a government body, contacted by physical letter).
+    // Previous behaviour was to early-return when phone was missing,
+    // so a sales rep with 6 won govt quotes had 0 client rows. Now
+    // we accept phone-less clients and dedup on (phone, created_by)
+    // when phone exists, else (lower(name), created_by). The DB unique
+    // index on (phone, created_by) treats NULL ≠ NULL, so multiple
+    // phone-less rows for the same rep don't collide there.
+    if (!phone && !company && !name) return  // nothing to identify
+
+    // Look up existing client. Two paths:
+    //   • phone present → match (phone, created_by) — same as before.
+    //   • phone absent  → fall back to matching by (lower(company OR name), created_by).
+    let existing = null
+    if (phone) {
+      const r = await supabase
+        .from('clients')
+        .select('id, first_quote_at, quote_count, total_won_amount')
+        .eq('phone', phone)
+        .eq('created_by', quote.created_by)
+        .maybeSingle()
+      existing = r.data || null
+    } else {
+      const lookupName = (company || name || '').toLowerCase()
+      if (lookupName) {
+        const r = await supabase
+          .from('clients')
+          .select('id, first_quote_at, quote_count, total_won_amount, name, company')
+          .eq('created_by', quote.created_by)
+          .is('phone', null)
+        // Client-side fuzzy match on lowercased name/company. Avoids a
+        // SQL function index on lower(name) which would need a
+        // migration; the rep's phone-less client list is small enough.
+        existing = (r.data || []).find(c =>
+          (c.company || '').toLowerCase() === lookupName ||
+          (c.name    || '').toLowerCase() === lookupName
+        ) || null
+      }
+    }
 
     const now = new Date().toISOString()
     const clientSnapshot = {
-      name:    (quote.client_name || '').trim() || 'Unknown',
-      company: (quote.client_company || '').trim() || null,
-      phone,
+      name:    name || 'Unknown',
+      company: company || null,
+      // Phase 11l — null phone allowed (govt bodies). DB column is
+      // nullable already; only the unique index treats NULLs as
+      // distinct so multiple phone-less rows per rep is fine.
+      phone:   phone || null,
       email:   (quote.client_email || '').trim() || null,
       gstin:   (quote.client_gst || '').trim() || null,
       address: (quote.client_address || '').trim() || null,

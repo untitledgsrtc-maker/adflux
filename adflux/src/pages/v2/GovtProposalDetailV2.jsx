@@ -753,35 +753,66 @@ export default function GovtProposalDetailV2() {
   // "Add mail also so provide on mail".
   //
   // Phase 11j — `mailto:` was unreliable: silently no-op on machines
-  // without a configured default mail handler (common on Macs that
-  // never opened Mail.app). Opening Gmail's web compose URL works
-  // for the user's untitledadvertising@gmail.com account regardless
-  // of system handler. Fall back to mailto: only if Gmail blocks
-  // the popup. Verified working in Chrome/Safari/Firefox.
+  // without a configured default mail handler. Switched to Gmail
+  // web compose URL with mailto: fallback.
+  //
+  // Phase 11l — owner spec: "email proposal draft shuld be proper or
+  // same as covering letter". Govt body now reads as a Gujarati
+  // letter mirroring the GovtProposalRenderer cover. Private quotes
+  // keep the English version.
   async function handleEmail() {
     if (!quote) return
     const to      = (quote.client_email || '').trim()
-    const mediaLabel = quote.media_type === 'AUTO_HOOD'
+    const mediaLabelEn = quote.media_type === 'AUTO_HOOD'
       ? 'Auto Rickshaw Hood'
       : 'GSRTC LED Screen'
-    const subject = `Proposal — ${mediaLabel} — ${quote.quote_number || quote.ref_number || ''}`
+    const mediaLabelGu = quote.media_type === 'AUTO_HOOD'
+      ? 'ઓટો રિક્ષા હૂડ'
+      : 'GSRTC LED સ્ક્રીન'
+
+    // Gujarati subject so the recipient's mail client surfaces the
+    // proposal context immediately.
+    const subject =
+      `પ્રપોઝલ — ${mediaLabelGu} — ${quote.quote_number || quote.ref_number || ''}`
+
+    // Body is a Gujarati letter, lightly summarised from the cover.
+    // Drop the recipient block since the email client renders it
+    // separately above.
+    const ddmm = quote.proposal_date
+      ? new Date(quote.proposal_date).toLocaleDateString('en-IN', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+        })
+      : ''
     let body =
-      `Dear Sir/Madam,\n\n` +
-      `Please find attached our proposal for ${mediaLabel} campaign.\n\n` +
-      `Reference  : ${quote.quote_number || quote.ref_number || ''}\n` +
-      `Total      : Rs. ${formatINREnglish(quote.total_amount || 0)}/-\n`
+      `નમસ્કાર,\n\n` +
+      `અનટાઇટલ્ડ એડવર્ટાઇઝિંગ તરફથી ` +
+      `${mediaLabelGu} પ્રપોઝલ આપને મોકલવામાં આવી રહી છે.\n\n` +
+      `સંદર્ભ ક્રમાંક : ${quote.quote_number || quote.ref_number || ''}\n` +
+      (ddmm ? `તારીખ        : ${ddmm}\n` : '') +
+      `કુલ રકમ      : રૂ. ${formatINREnglish(quote.total_amount || 0)}/-\n`
+
     if (quote.locked_proposal_pdf_url) {
       try {
         const url = await getSignedUrl(quote.locked_proposal_pdf_url, 24 * 3600)
         const short = await shortenUrl(url).catch(() => url)
-        body += `\nProposal PDF (link valid 24 hours): ${short}\n`
+        body += `\nપ્રપોઝલ PDF (24 કલાક માટે માન્ય): ${short}\n`
       } catch (e) {
         // Signed URL failed — send without link; user can re-share later.
       }
     } else {
-      body += `\nNote: Proposal PDF will be sent in a follow-up — kindly mark it Sent first to lock the snapshot.\n`
+      body +=
+        `\nનોંધ: પ્રપોઝલ PDF ટૂંક સમયમાં મોકલવામાં આવશે ` +
+        `(પહેલા Mark Sent કરો જેથી સ્નેપશોટ લોક થાય).\n`
     }
-    body += `\nThank you,\nUntitled Advertising`
+
+    // Phase 11l — note about combined PDF attachment limitation.
+    // Gmail compose URL doesn't accept file attachments programmatically;
+    // best we can do is tell the user to drag-attach after opening.
+    body +=
+      `\n(નોંધ: જો બધાં દસ્તાવેજો સાથે Combined PDF મોકલવી હોય તો ` +
+      `Adflux માં Combined PDF બટન દબાવી ડાઉનલોડ કરી, અહીં attach કરો.)\n`
+
+    body += `\nઆભાર,\nઅનટાઇટલ્ડ એડવર્ટાઇઝિંગ`
 
     // Gmail web compose — works for the user's Gmail account in any
     // browser without needing an OS-level mail handler.
