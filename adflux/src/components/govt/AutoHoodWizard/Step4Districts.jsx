@@ -11,7 +11,8 @@
 // rows). On Save, the per-district allocations get persisted as
 // quote_cities rows with ref_kind='DISTRICT'.
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Search, X } from 'lucide-react'
 import { useAutoMasters } from '../../../hooks/useGovtMasters'
 import { distributeAutoHoodQuantity } from '../../../utils/distributeQuantity'
 import { formatINREnglish } from '../../../utils/gujaratiNumber'
@@ -20,6 +21,20 @@ export function Step4Districts({ data, onChange }) {
   const { districts, loading } = useAutoMasters()
   const selected = data.selected_district_ids || []
   const qty      = Number(data.auto_total_quantity) || 0
+  // Phase 11k — search across English + Gujarati district names.
+  // 33 districts is too many to scroll when the rep just needs
+  // Ahmedabad or Surat.
+  const [search, setSearch] = useState('')
+
+  const filteredDistricts = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return districts
+    return districts.filter(d => {
+      const en = (d.district_name_en || '').toLowerCase()
+      const gu = (d.district_name_gu || '').toLowerCase()
+      return en.includes(q) || gu.includes(q)
+    })
+  }, [districts, search])
 
   /* If selected_district_ids is unset (first time on this step) we
      default to "all districts checked". The parent owns this state
@@ -94,8 +109,51 @@ export function Step4Districts({ data, onChange }) {
       </p>
 
       <div className="govt-list">
-        <div className="govt-list__bulk">
-          <span style={{ marginRight: 'auto', color: 'var(--text-muted)' }}>Bulk:</span>
+        <div className="govt-list__bulk" style={{ gap: 10 }}>
+          <span style={{ color: 'var(--text-muted)' }}>Bulk:</span>
+          {/* Phase 11k — search input */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            flex: '1 1 auto', maxWidth: 360,
+            background: 'var(--surface-2)',
+            border: '1px solid var(--surface-3)',
+            borderRadius: 6,
+            padding: '4px 10px',
+          }}>
+            <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search district (English or Gujarati)"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: 'var(--text)',
+                fontSize: 13,
+                padding: 0,
+              }}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                title="Clear search"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  display: 'flex',
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <button type="button" onClick={selectAll}>Select all</button>
           <button type="button" onClick={selectNone}>Select none</button>
         </div>
@@ -105,7 +163,21 @@ export function Step4Districts({ data, onChange }) {
           <span style={{ textAlign: 'right' }}>Share %</span>
           <span style={{ textAlign: 'right' }}>Qty</span>
         </div>
-        {districts.map(d => {
+        {filteredDistricts.length === 0 && (
+          <div
+            className="govt-list__row"
+            style={{
+              gridTemplateColumns: '1fr',
+              padding: '20px',
+              textAlign: 'center',
+              color: 'var(--text-muted)',
+              fontStyle: 'italic',
+            }}
+          >
+            No districts match "{search}". Clear the search to see all.
+          </div>
+        )}
+        {filteredDistricts.map(d => {
           const isChecked = selected.includes(d.id)
           const isOver    = overrides[d.id] !== undefined && overrides[d.id] !== ''
           // Phase 11j — wrap the row in a div instead of <label> so

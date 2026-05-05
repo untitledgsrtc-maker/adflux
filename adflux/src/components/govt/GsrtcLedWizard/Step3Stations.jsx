@@ -10,7 +10,8 @@
 // Monthly cost per station = screens × daily_spots × days × DAVP rate.
 // Live recalc as overrides change.
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Search, X } from 'lucide-react'
 import { useGsrtcStations } from '../../../hooks/useGovtMasters'
 import { formatINREnglish } from '../../../utils/gujaratiNumber'
 
@@ -34,10 +35,27 @@ export function Step3Stations({ data, onChange }) {
   const { stations, loading } = useGsrtcStations()
   const selected  = data.selected_station_ids || []
   const overrides = data.station_overrides || {}   // { station_id: { daily_spots_override, days_override, spot_duration_sec_override } }
+  // Phase 11k — search filter. Owner request (5 May 2026): "need
+  // serch option" for the station list so reps can find Anand,
+  // Vadodara etc. without scrolling through all 20. Matches against
+  // both English and Gujarati names + category. Only filters the
+  // VISIBLE rows — selection state and totals stay across all stations.
+  const [search, setSearch] = useState('')
 
   if (!loading && data.selected_station_ids === undefined && stations.length) {
     onChange({ selected_station_ids: stations.map(s => s.id) })
   }
+
+  const filteredStations = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return stations
+    return stations.filter(s => {
+      const en = (s.station_name_en || '').toLowerCase()
+      const gu = (s.station_name_gu || '').toLowerCase()
+      const cat = (s.category || '').toLowerCase()
+      return en.includes(q) || gu.includes(q) || cat.includes(q)
+    })
+  }, [stations, search])
 
   const monthlySum = useMemo(() => {
     return stations
@@ -82,8 +100,51 @@ export function Step3Stations({ data, onChange }) {
       </p>
 
       <div className="govt-list">
-        <div className="govt-list__bulk">
-          <span style={{ marginRight: 'auto', color: 'var(--text-muted)' }}>Bulk:</span>
+        <div className="govt-list__bulk" style={{ gap: 10 }}>
+          <span style={{ color: 'var(--text-muted)' }}>Bulk:</span>
+          {/* Phase 11k — search input */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            flex: '1 1 auto', maxWidth: 360,
+            background: 'var(--surface-2)',
+            border: '1px solid var(--surface-3)',
+            borderRadius: 6,
+            padding: '4px 10px',
+          }}>
+            <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search station name (English or Gujarati) or category"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: 'var(--text)',
+                fontSize: 13,
+                padding: 0,
+              }}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                title="Clear search"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  display: 'flex',
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <button type="button" onClick={selectAll}>Select all</button>
           <button type="button" onClick={selectNone}>Select none</button>
         </div>
@@ -103,7 +164,21 @@ export function Step3Stations({ data, onChange }) {
           <span style={{ textAlign: 'right' }}>Monthly</span>
         </div>
 
-        {stations.map(s => {
+        {filteredStations.length === 0 && (
+          <div
+            className="govt-list__row"
+            style={{
+              gridTemplateColumns: '1fr',
+              padding: '20px',
+              textAlign: 'center',
+              color: 'var(--text-muted)',
+              fontStyle: 'italic',
+            }}
+          >
+            No stations match "{search}". Clear the search to see all.
+          </div>
+        )}
+        {filteredStations.map(s => {
           const isChecked = selected.includes(s.id)
           const ov = overrides[s.id] || {}
           const v = effectiveValues(s, ov)
