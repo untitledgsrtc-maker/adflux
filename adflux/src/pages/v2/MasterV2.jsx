@@ -2084,17 +2084,17 @@ function MediaTypesTab() {
   return (
     <>
       {statusMsg && (
-        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#81c784' }}>✓ {statusMsg}</div>
+        <div style={{ background: 'var(--success-soft)', border: '1px solid var(--success)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--success)' }}>✓ {statusMsg}</div>
       )}
       {statusError && (
-        <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
+        <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--danger)' }}>{statusError}</div>
       )}
 
       {/* Add row */}
       <div style={{
         padding: 14, borderRadius: 12,
-        border: '1px solid var(--surface-3)',
-        background: 'var(--surface-1)',
+        border: '1px solid var(--border)',
+        background: 'var(--surface)',
         marginBottom: 16,
         display: 'grid',
         gridTemplateColumns: '1.4fr 0.9fr 0.6fr 0.6fr auto',
@@ -2142,7 +2142,7 @@ function MediaTypesTab() {
           disabled={adding}
           style={{
             padding: '8px 14px', borderRadius: 8, border: 'none',
-            background: '#facc15', color: '#0a0e1a',
+            background: 'var(--accent)', color: 'var(--accent-fg)',
             fontSize: 13, fontWeight: 700, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', gap: 6,
             opacity: adding ? 0.6 : 1,
@@ -2270,7 +2270,7 @@ function MediaTypesTab() {
                     onClick={() => handleDelete(r)}
                     style={{
                       background: 'transparent', border: 'none',
-                      color: '#ef9a9a', cursor: 'pointer',
+                      color: 'var(--danger)', cursor: 'pointer',
                       padding: 4, display: 'inline-flex', alignItems: 'center',
                     }}
                     title={`Delete "${r.name}"`}

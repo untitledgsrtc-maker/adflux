@@ -15,6 +15,17 @@
 //
 // Companies row is read by segment='PRIVATE' (Untitled Adflux Pvt Ltd)
 // so address/GSTIN/bank all come from DB, not hardcoded.
+//
+// DESIGN TOKENS (per UI_DESIGN_SYSTEM.md + tokens.css):
+//   • Brand yellow:   #FFE600           (NOT #facc15 — that was a doc-vs-live bug)
+//   • Ink primary:    #0c1224           (matches --text-1 Day)
+//   • Ink muted:      #4a5474           (matches --text-2 Day)
+//   • Border:         #e3e6ee           (matches --border Day)
+//   • Surface-2:      #f8f9fc           (matches --surface-2 Day)
+//   • Display font:   Space Grotesk     (numbers, headings)
+//   • Body font:      Inter / DM Sans
+//   • Mono font:      JetBrains Mono    (IDs, currency figures)
+// PDFs print on white paper so we use the Day-theme palette deliberately.
 
 import { useEffect, useRef, useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
@@ -107,9 +118,12 @@ export function OtherMediaQuotePDF({ quote, lines, onPdfReady }) {
         </div>
         <div style={{
           fontFamily: '"Space Grotesk", sans-serif',
-          fontSize: 22, fontWeight: 700,
-          color: '#facc15',
+          fontSize: 24, fontWeight: 700,
+          color: '#0c1224',
           letterSpacing: '-0.02em',
+          padding: '2px 12px',
+          background: '#FFE600',                /* brand yellow per tokens.css */
+          borderRadius: 4,
         }}>
           Quotation
         </div>
@@ -158,19 +172,36 @@ export function OtherMediaQuotePDF({ quote, lines, onPdfReady }) {
         </div>
       </div>
 
-      {/* ─── Line items table ─── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
+      {/* ─── Line items table ───
+          Width budget: 794 - (2 × 28 padding) = 738 usable.
+          Column widths sum to ~528, leaving ~210 for the description
+          column — enough for "Newspaper" + 2 lines of description
+          without wrapping inside narrow cells. */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: 26 }} />   {/* Sr.No */}
+          <col />                          {/* Name (flex) */}
+          <col style={{ width: 52 }} />   {/* HSN/SAC */}
+          <col style={{ width: 36 }} />   {/* Qty */}
+          <col style={{ width: 64 }} />   {/* Rate */}
+          <col style={{ width: 74 }} />   {/* Taxable */}
+          <col style={{ width: 26 }} />   {/* CGST % */}
+          <col style={{ width: 60 }} />   {/* CGST Amount */}
+          <col style={{ width: 26 }} />   {/* SGST % */}
+          <col style={{ width: 60 }} />   {/* SGST Amount */}
+          <col style={{ width: 76 }} />   {/* Total */}
+        </colgroup>
         <thead>
           <tr style={{ background: '#f8f9fc' }}>
-            <th style={cellHead(28)}>Sr.<br/>No.</th>
+            <th style={cellHead()}>Sr.<br/>No.</th>
             <th style={{ ...cellHead(), textAlign: 'left' }}>Name of Product / Service</th>
-            <th style={cellHead(60)}>HSN / SAC</th>
-            <th style={cellHead(40)}>Qty</th>
-            <th style={cellHead(80)}>Rate</th>
-            <th style={cellHead(90)}>Taxable Value</th>
-            <th colSpan={2} style={cellHead(120)}>CGST</th>
-            <th colSpan={2} style={cellHead(120)}>SGST</th>
-            <th style={cellHead(90)}>Total</th>
+            <th style={cellHead()}>HSN/SAC</th>
+            <th style={cellHead()}>Qty</th>
+            <th style={cellHead()}>Rate</th>
+            <th style={cellHead()}>Taxable</th>
+            <th colSpan={2} style={cellHead()}>CGST</th>
+            <th colSpan={2} style={cellHead()}>SGST</th>
+            <th style={cellHead()}>Total</th>
           </tr>
           <tr style={{ background: '#f8f9fc' }}>
             <th style={cellHeadSub()}></th>
@@ -179,10 +210,10 @@ export function OtherMediaQuotePDF({ quote, lines, onPdfReady }) {
             <th style={cellHeadSub()}></th>
             <th style={cellHeadSub()}></th>
             <th style={cellHeadSub()}></th>
-            <th style={{ ...cellHeadSub(), width: 35 }}>%</th>
-            <th style={{ ...cellHeadSub(), width: 70 }}>Amount</th>
-            <th style={{ ...cellHeadSub(), width: 35 }}>%</th>
-            <th style={{ ...cellHeadSub(), width: 70 }}>Amount</th>
+            <th style={cellHeadSub()}>%</th>
+            <th style={cellHeadSub()}>Amount</th>
+            <th style={cellHeadSub()}>%</th>
+            <th style={cellHeadSub()}>Amount</th>
             <th style={cellHeadSub()}></th>
           </tr>
         </thead>
@@ -193,10 +224,17 @@ export function OtherMediaQuotePDF({ quote, lines, onPdfReady }) {
               <tr key={i}>
                 <td style={cellNum()}>{i + 1}</td>
                 <td style={cellName()}>
-                  <div style={{ fontWeight: 700 }}>{l.media_label || l.media_type || ''}</div>
+                  {/* The wizard denormalises the media name into city_name
+                      (existing schema). Description is the rep-typed body.
+                      Strip a "Media: " prefix if any older row carries it. */}
+                  <div style={{ fontWeight: 700, fontSize: 10.5 }}>
+                    {l.city_name || l.media_label || l.media_type || ''}
+                  </div>
                   {l.description && (
-                    <div style={{ whiteSpace: 'pre-line', color: '#4a5474', marginTop: 2, fontSize: 10 }}>
-                      {l.description}
+                    <div style={{ whiteSpace: 'pre-line', color: '#4a5474', marginTop: 2, fontSize: 9.5, lineHeight: 1.4 }}>
+                      {(l.city_name && l.description.startsWith(`${l.city_name}: `))
+                        ? l.description.slice(l.city_name.length + 2)
+                        : l.description}
                     </div>
                   )}
                 </td>
@@ -312,22 +350,22 @@ export function OtherMediaQuotePDF({ quote, lines, onPdfReady }) {
 }
 
 /* ─── Helpers ─── */
-function cellHead(width) {
+function cellHead() {
   return {
-    padding: '6px 6px',
+    padding: '5px 4px',
     border: '1px solid #d8dde8',
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: 700,
     color: '#0c1224',
     textAlign: 'center',
-    ...(width ? { width } : {}),
+    lineHeight: 1.25,
   }
 }
 function cellHeadSub() {
   return {
-    padding: '4px 6px',
+    padding: '3px 4px',
     border: '1px solid #d8dde8',
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: 600,
     color: '#4a5474',
     textAlign: 'center',
@@ -337,20 +375,21 @@ function cellName() {
   return {
     padding: '6px 8px', border: '1px solid #d8dde8',
     verticalAlign: 'top', textAlign: 'left',
+    wordBreak: 'break-word',
   }
 }
 function cellNum() {
   return {
-    padding: '6px 6px', border: '1px solid #d8dde8',
+    padding: '6px 4px', border: '1px solid #d8dde8',
     textAlign: 'center', fontFamily: '"JetBrains Mono", monospace',
-    verticalAlign: 'top',
+    verticalAlign: 'top', fontSize: 9.5,
   }
 }
 function cellNumR() {
   return {
     padding: '6px 6px', border: '1px solid #d8dde8',
     textAlign: 'right', fontFamily: '"JetBrains Mono", monospace',
-    verticalAlign: 'top',
+    verticalAlign: 'top', fontSize: 9.5,
   }
 }
 function BankRow({ label, value, mono, last }) {

@@ -207,8 +207,8 @@ export default function CreateQuoteOtherMediaV2() {
         quote_id:        quote.id,
         ref_kind:        'FREE_TEXT',
         city_id:         null,
-        city_name:       l.media_type_name,
-        description:     `${l.media_type_name}: ${l.description}`,
+        city_name:       l.media_type_name,        // PDF reads media name from here
+        description:     l.description,             // pure description; PDF prints it under the media name
         qty:             Number(l.qty) || 1,
         unit_rate:       Number(l.unit_rate) || 0,
         amount:          amt,
@@ -458,7 +458,7 @@ export default function CreateQuoteOtherMediaV2() {
           borderTop: '1px solid var(--v2-line, rgba(255,255,255,.06))',
         }}>
           <span style={{ fontSize: 16, fontWeight: 700 }}>Total</span>
-          <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 22, color: 'var(--v2-yellow, #facc15)' }}>
+          <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 22, color: 'var(--v2-yellow, #FFE600)' }}>
             ₹{totals.total.toLocaleString('en-IN')}
           </span>
         </div>
