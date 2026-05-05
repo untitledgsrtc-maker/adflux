@@ -21,6 +21,8 @@ import RenewalToolsV2     from './pages/v2/RenewalToolsV2'
 import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
 import HRV2               from './pages/v2/HRV2'
 import ClientsV2          from './pages/v2/ClientsV2'
+// ── Phase 12 — M1 Sales/Lead module ─────────────────────────────────
+import LeadsV2             from './pages/v2/LeadsV2'
 
 // ── Government module (Phase 6) ─────────────────────────────────────
 import CreateQuoteChooserV2  from './pages/v2/CreateQuoteChooserV2'
@@ -115,6 +117,10 @@ export default function App() {
           {/* Clients is visible to both roles; RLS on the clients table
               scopes rows so sales sees own, admin sees all. */}
           <Route path="/clients"                   element={<ClientsV2 />} />
+
+          {/* Phase 12 — M1 Sales/Lead module. RLS handles per-role
+              visibility; the page itself shows admin-vs-sales chrome. */}
+          <Route path="/leads"                     element={<LeadsV2 />} />
 
           {/* Sales-only */}
           <Route path="/my-performance"            element={<MyPerformanceV2 />} />

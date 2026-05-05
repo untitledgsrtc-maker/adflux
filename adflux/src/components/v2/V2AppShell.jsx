@@ -31,6 +31,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, Contact2, MapPin, Tv, FileBox,
+  Inbox,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -42,6 +43,9 @@ import '../../styles/v2.css'
 // new Government master pages (Auto Districts + GSRTC Stations).
 const ADMIN_NAV = [
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
+  // Phase 12 — Leads sits above Quotes because the lead is the upstream
+  // record. Most of the rep's day starts here, then promotes to Quote.
+  { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/pending-approvals', label: 'Approvals',      icon: CheckSquare },
@@ -57,6 +61,7 @@ const ADMIN_NAV = [
 
 const SALES_NAV = [
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
+  { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
