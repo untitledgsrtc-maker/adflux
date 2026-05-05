@@ -1,479 +1,549 @@
 // src/components/quotes/OtherMediaQuotePDF.jsx
 //
-// Phase 15 — Other Media (private) quotation PDF.
+// Phase 15 rev2 — Other Media (private) quotation PDF.
 //
-// Renders the same layout as the uploaded ENIL Quotation #44 sample:
-//   • Letterhead with company logo + name + address + GSTIN + phone + email
-//   • "Quotation" title + "ORIGINAL FOR RECIPIENT"
-//   • Customer detail block (M/S, Address, Phone, GSTIN, PAN, Place of Supply)
-//   • Quotation No / Date / Completion Date
-//   • Line table: Sr · Name (multi-line desc) · HSN/SAC · Qty · Rate · Taxable · CGST%+amt · SGST%+amt · Total
-//   • Totals row, totals strip (Taxable / CGST / SGST / Total After Tax)
-//   • Total in words
-//   • Bank details panel (4 rows: Name / Branch / Acc Name / Acc# / IFSC / MICR)
-//   • Standard footer terms + "Authorised Signatory"
+// Owner directive (6 May 2026): "use private LED quote PDF format,
+// only GST 18% — no HSN/SAC, no CGST/SGST split". So this file mirrors
+// the structure of `QuotePDF.jsx` (yellow header band, dark MEDIA
+// QUOTATION title, client box, line table, Investment Summary with
+// single GST line, Grand Total hero, T&C, signatures, dual footer)
+// and only differs in:
+//   • Line table columns: Sr / Media + Description / Qty / Rate / Amount
+//     (no Grade / Screens / Size / Spots / Duration — LED-specific.)
+//   • LED-specific blocks dropped: network stats bar, photo gallery,
+//     "Why GSRTC" box, footer's "264 screens" highlight.
+//   • Title strip says "Private — Other Media" under MEDIA QUOTATION
+//     so the rep / client can see at a glance which kind of quote it is.
 //
-// Companies row is read by segment='PRIVATE' (Untitled Adflux Pvt Ltd)
-// so address/GSTIN/bank all come from DB, not hardcoded.
-//
-// DESIGN TOKENS (per UI_DESIGN_SYSTEM.md + tokens.css):
-//   • Brand yellow:   #FFE600           (NOT #facc15 — that was a doc-vs-live bug)
-//   • Ink primary:    #0c1224           (matches --text-1 Day)
-//   • Ink muted:      #4a5474           (matches --text-2 Day)
-//   • Border:         #e3e6ee           (matches --border Day)
-//   • Surface-2:      #f8f9fc           (matches --surface-2 Day)
-//   • Display font:   Space Grotesk     (numbers, headings)
-//   • Body font:      Inter / DM Sans
-//   • Mono font:      JetBrains Mono    (IDs, currency figures)
-// PDFs print on white paper so we use the Day-theme palette deliberately.
+// Companies row is read by segment='PRIVATE' (Untitled Adflux Pvt Ltd).
+// Hard-fails on missing company or zero subtotal — same money-safety
+// guards as QuotePDF.
 
-import { useEffect, useRef, useState } from 'react'
-import { Download, Loader2 } from 'lucide-react'
+import {
+  Document, Page, Text, View, StyleSheet, Font, pdf,
+} from '@react-pdf/renderer'
+import { formatCurrency, formatDate } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
-import { rupeesToWords } from '../../utils/numberToWords'
 
-function fmtINR(n) {
-  return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+// Same Roboto registration as QuotePDF.jsx — Helvetica's missing ₹
+// glyph is the reason this exists.
+Font.register({
+  family: 'Roboto',
+  fonts: [
+    { src: '/fonts/Roboto-Regular.ttf', fontWeight: 'normal' },
+    { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 'bold' },
+  ],
+})
+Font.registerHyphenationCallback(word => [word])
 
-function fmtDate(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+const YELLOW = '#FFE600'    // brand yellow per tokens.css — NOT #facc15
+const DARK   = '#0f172a'
+const GRAY   = '#64748b'
+const LGRAY  = '#94a3b8'
+const BORDER = '#e2e8f0'
+const WHITE  = '#ffffff'
 
-export function OtherMediaQuotePDF({ quote, lines, onPdfReady }) {
-  const ref = useRef(null)
-  const [company, setCompany] = useState(null)
+const S = StyleSheet.create({
+  page: {
+    backgroundColor: WHITE,
+    fontFamily: 'Roboto',
+    fontSize: 9,
+    color: DARK,
+  },
 
-  useEffect(() => {
-    supabase
-      .from('companies')
-      .select('*')
-      .eq('segment', 'PRIVATE')
-      .eq('is_active', true)
-      .maybeSingle()
-      .then(({ data }) => setCompany(data))
-  }, [])
+  // ── Top header band ──
+  headerBand: {
+    backgroundColor: DARK,
+    paddingHorizontal: 32,
+    paddingVertical: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  uaBadge: {
+    backgroundColor: YELLOW,
+    width: 36, height: 36,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uaBadgeText: {
+    fontFamily: 'Roboto', fontWeight: 'bold',
+    fontSize: 14,
+    color: DARK,
+  },
+  brandBlock: { gap: 2 },
+  brandName: { fontSize: 14, fontFamily: 'Roboto', fontWeight: 'bold', color: WHITE },
+  brandSub:  { fontSize: 8,  color: LGRAY },
+  brandNetwork: { fontSize: 8, color: LGRAY, marginTop: 2 },
+  headerRight: { alignItems: 'flex-end', gap: 3 },
+  headerWebsite: { fontSize: 9, color: YELLOW },
+  headerEmail:   { fontSize: 9, color: LGRAY },
 
-  if (!quote) return null
+  // ── Media quotation title block ──
+  titleBlock: {
+    backgroundColor: DARK,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  mediaQuotationText: {
+    fontSize: 22,
+    fontFamily: 'Roboto', fontWeight: 'bold',
+    color: YELLOW,
+    letterSpacing: 1,
+  },
+  quoteMetaRight: { alignItems: 'flex-end', gap: 3 },
+  quoteNumText: { fontSize: 11, fontFamily: 'Roboto', fontWeight: 'bold', color: WHITE },
+  quoteDateSmall: { fontSize: 8, color: LGRAY },
+  quoteValid: { fontSize: 8, color: LGRAY },
 
-  const subtotal = (lines || []).reduce((s, l) => s + (Number(l.qty || 0) * Number(l.unit_rate || 0)), 0)
-  const cgst     = (lines || []).reduce((s, l) => s + Number(l.cgst_amount || 0), 0)
-  const sgst     = (lines || []).reduce((s, l) => s + Number(l.sgst_amount || 0), 0)
-  const total    = subtotal + cgst + sgst
+  // ── Body ──
+  body: { paddingHorizontal: 32, paddingTop: 20, paddingBottom: 20 },
+
+  // ── Section heading ──
+  sectionBar: {
+    borderLeft: '3pt solid ' + YELLOW,
+    paddingLeft: 8,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold',
+    color: DARK, textTransform: 'uppercase', letterSpacing: 0.8,
+  },
+
+  // ── Client box ──
+  clientBox: {
+    border: '0.5pt solid ' + BORDER,
+    borderRadius: 4,
+    padding: '12 16',
+    marginBottom: 20,
+    flexDirection: 'row',
+    gap: 30,
+  },
+  clientCol: { flex: 1 },
+  clientFieldLabel: { fontSize: 7, color: LGRAY, marginBottom: 1, textTransform: 'uppercase', letterSpacing: 0.5 },
+  clientFieldValue: { fontSize: 10, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK, marginBottom: 8 },
+
+  // ── Line items table ──
+  // Column budget at A4 with 32pt margins → 531pt usable.
+  // Sr 22 + Qty 50 + Rate 80 + Amount 90 = 242. Media flex absorbs ~289pt,
+  // which fits "Newspaper" + a 2-line description without wrapping awkwardly.
+  tableSection: { marginBottom: 20 },
+  tableHead: {
+    flexDirection: 'row',
+    backgroundColor: DARK,
+    padding: '6 8',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    padding: '7 8',
+    borderBottom: '0.5pt solid ' + BORDER,
+  },
+  tableRowAlt: { backgroundColor: '#f8fafc' },
+  thText: { fontSize: 7, fontFamily: 'Roboto', fontWeight: 'bold', color: WHITE, textTransform: 'uppercase', letterSpacing: 0.4 },
+  tdText: { fontSize: 8.5, color: DARK },
+  tdBold: { fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+  tdMuted:{ fontSize: 7.5, color: GRAY, marginTop: 1 },
+
+  colSr:     { width: 22 },
+  colMedia:  { flex: 1, paddingRight: 8 },
+  colQty:    { width: 50, alignItems: 'center' },
+  colRate:   { width: 80, alignItems: 'flex-end' },
+  colTotal:  { width: 90, alignItems: 'flex-end' },
+
+  tableFootRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#f1f5f9',
+    padding: '7 8',
+  },
+  tableFootLabel: { fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+  tableFootValue: { fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+
+  // ── Investment Summary ──
+  investSection: { marginBottom: 20 },
+  investBox: {
+    border: '0.5pt solid ' + BORDER,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  investRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: '8 14',
+    borderBottom: '0.5pt solid ' + BORDER,
+  },
+  investLabel: { fontSize: 9, color: GRAY },
+  investValue: { fontSize: 9, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+
+  grandHero: {
+    backgroundColor: DARK,
+    borderRadius: 6,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  grandHeroLabel: {
+    fontSize: 13, fontFamily: 'Roboto', fontWeight: 'bold',
+    color: YELLOW, letterSpacing: 1,
+  },
+  grandHeroValue: {
+    fontSize: 18, fontFamily: 'Roboto', fontWeight: 'bold',
+    color: YELLOW,
+  },
+
+  // ── Terms ──
+  termsBox: {
+    border: '0.5pt solid ' + BORDER,
+    borderRadius: 4,
+    padding: '12 14',
+    marginBottom: 16,
+  },
+  termsTitle: {
+    fontSize: 8, fontFamily: 'Roboto', fontWeight: 'bold',
+    color: DARK, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 7,
+  },
+  termItem: { flexDirection: 'row', gap: 5, marginBottom: 4 },
+  termNum:  { fontSize: 7.5, color: GRAY, width: 12 },
+  termText: { fontSize: 7.5, color: GRAY, flex: 1, lineHeight: 1.4 },
+
+  // ── Signature row ──
+  sigRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  sigBlock: { alignItems: 'center', width: 160 },
+  sigLine:  { width: 140, borderBottom: '0.5pt solid #cbd5e1', marginBottom: 4 },
+  sigLabel: { fontSize: 7.5, color: GRAY },
+
+  // ── Footer ──
+  footerBand: {
+    backgroundColor: YELLOW,
+    paddingHorizontal: 32,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  footerPrepared: { fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+  footerQuoteRef: { fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 'bold', color: DARK },
+  footerBottomBand: {
+    backgroundColor: DARK,
+    paddingHorizontal: 32,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  footerBottomText: { fontSize: 7, color: LGRAY },
+})
+
+// ── Document ─────────────────────────────────────────────────────────
+function OtherMediaQuoteDocument({ quote, lines, company }) {
+  // Same hard-fails as QuotePDF — refuse to render the wrong legal
+  // entity or a ₹0 invoice.
+  if (!company) {
+    throw new Error(
+      'OtherMediaQuotePDF: companies row is required. ' +
+      'fetchCompanyForQuote() must run before render. ' +
+      `Quote segment=${String(quote?.segment)}, no row found.`
+    )
+  }
+  if (company.segment && quote?.segment && company.segment !== quote.segment) {
+    throw new Error(
+      `OtherMediaQuotePDF: segment mismatch — quote.segment=${quote.segment} but ` +
+      `company.segment=${company.segment}. Refusing to render the wrong legal entity.`
+    )
+  }
+  const co = company
+
+  const subtotal    = Number(quote.subtotal)
+  const gstAmount   = Number(quote.gst_amount) || 0
+  const totalAmount = Number(quote.total_amount)
+  if (!Number.isFinite(subtotal) || subtotal <= 0) {
+    throw new Error(
+      'OtherMediaQuotePDF: subtotal must be > 0. ' +
+      `Got subtotal=${quote?.subtotal}.`
+    )
+  }
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    throw new Error(
+      'OtherMediaQuotePDF: total_amount must be > 0. ' +
+      `Got total_amount=${quote?.total_amount}.`
+    )
+  }
+
+  const rate   = quote.gst_rate !== null && quote.gst_rate !== undefined ? Number(quote.gst_rate) : 0.18
+  const gstPct = Math.round(rate * 100)
+  const gstApplies = rate > 0
+  const gstLabel = gstApplies ? `GST @${gstPct}%` : 'No GST'
+
+  const TERMS = [
+    'Quotation valid for 30 days from date of issue. Rates subject to change post-expiry.',
+    '50% advance payment required to confirm booking. Balance payable before campaign go-live.',
+    'Final creative / artwork to be submitted at least 3 working days before campaign go-live, in the format and dimensions specified by the media partner.',
+    gstApplies
+      ? `GST @${gstPct}% is levied on campaign value and is included in the Grand Total above.`
+      : 'No GST is applied to this quotation. The Grand Total is the final payable amount.',
+    'Booking confirmation subject to slot / inventory availability with the underlying media at time of payment.',
+    'Cancellation post-confirmation: 25% cancellation fee applicable on total invoice.',
+    'Content violating law, statutory codes, or community standards may be rejected by the media partner without refund.',
+    `Payments via NEFT/RTGS/Cheque in favour of ${co.bank_acc_name || co.name}.${co.bank_name ? ` ${co.bank_name}` : ''}${co.bank_branch ? ` (${co.bank_branch} branch)` : ''}${co.bank_acc_number ? `. A/c No. ${co.bank_acc_number}` : ''}${co.bank_ifsc ? ` · IFSC ${co.bank_ifsc}` : ''}${co.gstin ? `. GSTIN: ${co.gstin}` : ''}.`,
+  ]
 
   return (
-    <div ref={ref} style={{
-      width: 794, minHeight: 1123,
-      background: '#fff',
-      color: '#0c1224',
-      fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
-      fontSize: 11,
-      padding: 28,
-      boxSizing: 'border-box',
-      lineHeight: 1.4,
-    }}>
-      {/* ─── Header ─── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, paddingBottom: 14, borderBottom: '1px solid #e3e6ee' }}>
-        {company?.logo_url && (
-          <img
-            src={company.logo_url}
-            alt="logo"
-            crossOrigin="anonymous"
-            style={{ width: 64, height: 64, objectFit: 'contain' }}
-          />
-        )}
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontFamily: '"Space Grotesk", "Inter", sans-serif',
-            fontWeight: 700, fontSize: 22,
-            letterSpacing: '-0.01em',
-            color: '#0c1224',
-          }}>
-            {company?.name || 'Untitled Adflux Private Limited'}
-          </div>
-          <div style={{ fontSize: 11, color: '#4a5474', marginTop: 4, lineHeight: 1.45 }}>
-            {company?.address_line || '203, Sidcup Tower'}
-            {company?.city ? <><br/>{company.city}{company.state ? `, ${company.state}` : ''}{company.pincode ? ` - ${company.pincode}` : ''}</> : null}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right', fontSize: 11, color: '#4a5474', lineHeight: 1.6 }}>
-          <div><strong style={{ color: '#0c1224' }}>Name:</strong> {company?.name}</div>
-          {company?.phone && <div><strong style={{ color: '#0c1224' }}>Phone:</strong> {company.phone}</div>}
-          {company?.email && <div><strong style={{ color: '#0c1224' }}>Email:</strong> {company.email}</div>}
-        </div>
-      </div>
+    <Document>
+      <Page size="A4" style={S.page}>
 
-      {/* ─── GSTIN + "Quotation" + ORIGINAL FOR RECIPIENT ─── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 14px', marginTop: 14, marginBottom: 14,
-        background: '#f8f9fc',
-        border: '1px solid #e3e6ee',
-        borderRadius: 4,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 600 }}>
-          GSTIN : {company?.gstin || '—'}
-        </div>
-        <div style={{
-          fontFamily: '"Space Grotesk", sans-serif',
-          fontSize: 24, fontWeight: 700,
-          color: '#0c1224',
-          letterSpacing: '-0.02em',
-          padding: '2px 12px',
-          background: '#FFE600',                /* brand yellow per tokens.css */
-          borderRadius: 4,
-        }}>
-          Quotation
-        </div>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: '#4a5474' }}>
-          ORIGINAL FOR RECIPIENT
-        </div>
-      </div>
+        {/* ── Top header band ── */}
+        <View style={S.headerBand}>
+          <View style={S.headerLeft}>
+            <View style={S.uaBadge}>
+              <Text style={S.uaBadgeText}>UA</Text>
+            </View>
+            <View style={S.brandBlock}>
+              <Text style={S.brandName}>UNTITLED ADVERTISING</Text>
+              <Text style={S.brandSub}>{(co.name || 'UNTITLED ADFLUX PRIVATE LIMITED').toUpperCase()}</Text>
+              <Text style={S.brandNetwork}>Newspaper · Hoarding · Cinema · Mall · Digital · Radio</Text>
+            </View>
+          </View>
+          <View style={S.headerRight}>
+            <Text style={S.headerWebsite}>{co.website || 'untitlead.in'}</Text>
+            <Text style={S.headerEmail}>{co.email || 'hello@untitlead.in'}</Text>
+          </View>
+        </View>
 
-      {/* ─── Customer + Quote Meta ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 0, marginBottom: 14, border: '1px solid #e3e6ee' }}>
-        <div style={{ padding: '10px 14px', borderRight: '1px solid #e3e6ee' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: '#4a5474', marginBottom: 6 }}>
-            CUSTOMER DETAIL
-          </div>
-          <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4 }}>
-            M/S {quote.client_company || quote.client_name || '—'}
-          </div>
-          {quote.client_address && (
-            <div style={{ fontSize: 11, color: '#4a5474', marginBottom: 2 }}>
-              <strong style={{ color: '#0c1224' }}>Address</strong> {quote.client_address}
-            </div>
+        {/* ── Title block ── */}
+        <View style={S.titleBlock}>
+          <Text style={S.mediaQuotationText}>MEDIA QUOTATION</Text>
+          <View style={S.quoteMetaRight}>
+            <Text style={S.quoteNumText}>{quote.quote_number}</Text>
+            <Text style={S.quoteDateSmall}>{formatDate(quote.proposal_date || quote.created_at)}</Text>
+            <Text style={S.quoteValid}>Valid 30 Days</Text>
+          </View>
+        </View>
+
+        {/* ── Body ── */}
+        <View style={S.body}>
+
+          {/* Client */}
+          <View style={S.sectionBar}>
+            <Text style={S.sectionTitle}>Prepared Exclusively For</Text>
+          </View>
+          <View style={S.clientBox}>
+            <View style={S.clientCol}>
+              <Text style={S.clientFieldLabel}>Client Name</Text>
+              <Text style={S.clientFieldValue}>{quote.client_name || '—'}</Text>
+              <Text style={S.clientFieldLabel}>Company</Text>
+              <Text style={S.clientFieldValue}>{quote.client_company || '—'}</Text>
+            </View>
+            <View style={S.clientCol}>
+              <Text style={S.clientFieldLabel}>Phone</Text>
+              <Text style={S.clientFieldValue}>{quote.client_phone || '—'}</Text>
+              <Text style={S.clientFieldLabel}>Email</Text>
+              <Text style={S.clientFieldValue}>{quote.client_email || '—'}</Text>
+            </View>
+          </View>
+
+          {/* Campaign period if set */}
+          {quote.campaign_start_date && quote.campaign_end_date && (
+            <View style={{ marginBottom: 16, paddingLeft: 8 }}>
+              <Text style={{ fontSize: 9, color: GRAY }}>
+                Campaign Period: {formatDate(quote.campaign_start_date)} — {formatDate(quote.campaign_end_date)}
+              </Text>
+            </View>
           )}
-          {quote.client_phone && (
-            <div style={{ fontSize: 11, color: '#4a5474', marginBottom: 2 }}>
-              <strong style={{ color: '#0c1224' }}>Phone</strong> {quote.client_phone}
-            </div>
-          )}
-          {quote.client_gst && (
-            <div style={{ fontSize: 11, color: '#4a5474', marginBottom: 2 }}>
-              <strong style={{ color: '#0c1224' }}>GSTIN</strong> {quote.client_gst}
-            </div>
-          )}
-          <div style={{ fontSize: 11, color: '#4a5474' }}>
-            <strong style={{ color: '#0c1224' }}>Place of Supply</strong> Gujarat ( 24 )
-          </div>
-        </div>
-        <div style={{ padding: '10px 14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
-            <div style={{ color: '#4a5474' }}>Quotation No.</div>
-            <div style={{ fontWeight: 700, fontFamily: '"JetBrains Mono", monospace' }}>{quote.quote_number || quote.ref_number || '—'}</div>
-            <div style={{ color: '#4a5474' }}>Quotation Date</div>
-            <div style={{ fontFamily: '"JetBrains Mono", monospace' }}>{fmtDate(quote.proposal_date || quote.created_at)}</div>
-            <div style={{ color: '#4a5474' }}>Completion Date</div>
-            <div style={{ fontFamily: '"JetBrains Mono", monospace' }}>{fmtDate(quote.campaign_end_date || quote.proposal_date || quote.created_at)}</div>
-          </div>
-        </div>
-      </div>
 
-      {/* ─── Line items table ───
-          Width budget: 794 - (2 × 28 padding) = 738 usable.
-          Column widths sum to ~528, leaving ~210 for the description
-          column — enough for "Newspaper" + 2 lines of description
-          without wrapping inside narrow cells. */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, tableLayout: 'fixed' }}>
-        <colgroup>
-          <col style={{ width: 26 }} />   {/* Sr.No */}
-          <col />                          {/* Name (flex) */}
-          <col style={{ width: 52 }} />   {/* HSN/SAC */}
-          <col style={{ width: 36 }} />   {/* Qty */}
-          <col style={{ width: 64 }} />   {/* Rate */}
-          <col style={{ width: 74 }} />   {/* Taxable */}
-          <col style={{ width: 26 }} />   {/* CGST % */}
-          <col style={{ width: 60 }} />   {/* CGST Amount */}
-          <col style={{ width: 26 }} />   {/* SGST % */}
-          <col style={{ width: 60 }} />   {/* SGST Amount */}
-          <col style={{ width: 76 }} />   {/* Total */}
-        </colgroup>
-        <thead>
-          <tr style={{ background: '#f8f9fc' }}>
-            <th style={cellHead()}>Sr.<br/>No.</th>
-            <th style={{ ...cellHead(), textAlign: 'left' }}>Name of Product / Service</th>
-            <th style={cellHead()}>HSN/SAC</th>
-            <th style={cellHead()}>Qty</th>
-            <th style={cellHead()}>Rate</th>
-            <th style={cellHead()}>Taxable</th>
-            <th colSpan={2} style={cellHead()}>CGST</th>
-            <th colSpan={2} style={cellHead()}>SGST</th>
-            <th style={cellHead()}>Total</th>
-          </tr>
-          <tr style={{ background: '#f8f9fc' }}>
-            <th style={cellHeadSub()}></th>
-            <th style={cellHeadSub()}></th>
-            <th style={cellHeadSub()}></th>
-            <th style={cellHeadSub()}></th>
-            <th style={cellHeadSub()}></th>
-            <th style={cellHeadSub()}></th>
-            <th style={cellHeadSub()}>%</th>
-            <th style={cellHeadSub()}>Amount</th>
-            <th style={cellHeadSub()}>%</th>
-            <th style={cellHeadSub()}>Amount</th>
-            <th style={cellHeadSub()}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {(lines || []).map((l, i) => {
-            const taxable = Number(l.qty || 0) * Number(l.unit_rate || 0)
-            return (
-              <tr key={i}>
-                <td style={cellNum()}>{i + 1}</td>
-                <td style={cellName()}>
-                  {/* The wizard denormalises the media name into city_name
-                      (existing schema). Description is the rep-typed body.
-                      Strip a "Media: " prefix if any older row carries it. */}
-                  <div style={{ fontWeight: 700, fontSize: 10.5 }}>
-                    {l.city_name || l.media_label || l.media_type || ''}
-                  </div>
-                  {l.description && (
-                    <div style={{ whiteSpace: 'pre-line', color: '#4a5474', marginTop: 2, fontSize: 9.5, lineHeight: 1.4 }}>
-                      {(l.city_name && l.description.startsWith(`${l.city_name}: `))
-                        ? l.description.slice(l.city_name.length + 2)
-                        : l.description}
-                    </div>
-                  )}
-                </td>
-                <td style={cellNum()}>{l.hsn_sac || ''}</td>
-                <td style={cellNum()}>{Number(l.qty || 0).toFixed(2)}</td>
-                <td style={cellNumR()}>{fmtINR(l.unit_rate)}</td>
-                <td style={cellNumR()}>{fmtINR(taxable)}</td>
-                <td style={cellNum()}>{Number(l.cgst_pct || 0).toFixed(2)}</td>
-                <td style={cellNumR()}>{fmtINR(l.cgst_amount)}</td>
-                <td style={cellNum()}>{Number(l.sgst_pct || 0).toFixed(2)}</td>
-                <td style={cellNumR()}>{fmtINR(l.sgst_amount)}</td>
-                <td style={cellNumR()}>{fmtINR(taxable + Number(l.cgst_amount || 0) + Number(l.sgst_amount || 0))}</td>
-              </tr>
-            )
-          })}
-          {/* Totals row */}
-          <tr style={{ background: '#f8f9fc', fontWeight: 700 }}>
-            <td colSpan={3} style={{ ...cellNum(), textAlign: 'right' }}>Total</td>
-            <td style={cellNum()}>{(lines || []).reduce((s, l) => s + Number(l.qty || 0), 0).toFixed(2)}</td>
-            <td style={cellNum()}></td>
-            <td style={cellNumR()}>{fmtINR(subtotal)}</td>
-            <td style={cellNum()}></td>
-            <td style={cellNumR()}>{fmtINR(cgst)}</td>
-            <td style={cellNum()}></td>
-            <td style={cellNumR()}>{fmtINR(sgst)}</td>
-            <td style={cellNumR()}>{fmtINR(total)}</td>
-          </tr>
-        </tbody>
-      </table>
+          {/* Line items table */}
+          <View style={S.sectionBar}>
+            <Text style={S.sectionTitle}>Quotation Items</Text>
+          </View>
+          <View style={S.tableSection}>
+            <View style={S.tableHead}>
+              <View style={S.colSr}><Text style={S.thText}>SR</Text></View>
+              <View style={S.colMedia}><Text style={S.thText}>Media · Description</Text></View>
+              <View style={S.colQty}><Text style={[S.thText, { textAlign: 'center' }]}>Qty</Text></View>
+              <View style={S.colRate}><Text style={[S.thText, { textAlign: 'right' }]}>Rate</Text></View>
+              <View style={S.colTotal}><Text style={[S.thText, { textAlign: 'right' }]}>Amount</Text></View>
+            </View>
 
-      {/* ─── Totals strip + Amount in words + Bank details ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 0, marginTop: 0, border: '1px solid #e3e6ee', borderTop: 'none' }}>
-        <div style={{ borderRight: '1px solid #e3e6ee' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid #e3e6ee', textAlign: 'center', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: '#4a5474' }}>
-            TOTAL IN WORDS
-          </div>
-          <div style={{ padding: '12px 14px', textAlign: 'center', fontSize: 11, fontWeight: 600, fontStyle: 'italic', borderBottom: '1px solid #e3e6ee' }}>
-            {rupeesToWords(total).toUpperCase()}
-          </div>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid #e3e6ee', textAlign: 'center', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: '#4a5474' }}>
-            BANK DETAILS
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
-            <tbody>
-              <BankRow label="Name"        value={company?.bank_name} />
-              <BankRow label="Branch"      value={company?.bank_branch} />
-              <BankRow label="Acc. Name"   value={company?.bank_account_name || company?.name} />
-              <BankRow label="Acc. Number" value={company?.bank_account_number} mono />
-              <BankRow label="IFSC"        value={company?.bank_ifsc} mono />
-              <BankRow label="MICR Code"   value={company?.bank_micr} mono last />
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-            <tbody>
-              <TotalsRow label="Taxable Amount" value={fmtINR(subtotal)} />
-              <TotalsRow label="Add : CGST"     value={fmtINR(cgst)} />
-              <TotalsRow label="Add : SGST"     value={fmtINR(sgst)} />
-              <TotalsRow label="Total Tax"      value={fmtINR(cgst + sgst)} />
-              <tr>
-                <td style={{
-                  padding: '10px 14px', borderTop: '1px solid #e3e6ee',
-                  fontWeight: 700, color: '#0c1224',
-                }}>Total Amount After Tax</td>
-                <td style={{
-                  padding: '10px 14px', borderTop: '1px solid #e3e6ee', textAlign: 'right',
-                  fontWeight: 700,
-                  fontFamily: '"Space Grotesk", sans-serif',
-                  fontSize: 14, color: '#0c1224',
-                }}>
-                  ₹{fmtINR(total)}
-                </td>
-              </tr>
-              <tr>
-                <td colSpan={2} style={{ padding: '6px 14px', textAlign: 'right', fontSize: 9, color: '#4a5474', fontStyle: 'italic' }}>
-                  (E & O.E.)
-                </td>
-              </tr>
-              <tr>
-                <td colSpan={2} style={{ padding: '14px 14px 8px', borderTop: '1px solid #e3e6ee', textAlign: 'center', fontSize: 10, color: '#4a5474' }}>
-                  Certified that the particulars given above are true and correct.
-                </td>
-              </tr>
-              <tr>
-                <td colSpan={2} style={{ padding: '6px 14px 60px', textAlign: 'center', fontSize: 11, fontWeight: 700 }}>
-                  For {company?.name || 'Untitled Adflux Private Limited'}
-                </td>
-              </tr>
-              <tr>
-                <td colSpan={2} style={{ padding: '6px 14px 14px', textAlign: 'center', fontSize: 10, color: '#4a5474' }}>
-                  Authorised Signatory
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+            {(lines || []).map((l, i) => {
+              // The wizard saves the media name in city_name and the
+              // pure description in description. Older rows may have a
+              // "<media>: <desc>" prefix in description; strip it on
+              // display so the gallery doesn't read "Newspaper: Newspaper:".
+              const mediaName = l.city_name || ''
+              const rawDesc   = l.description || ''
+              const cleanDesc = (mediaName && rawDesc.startsWith(`${mediaName}: `))
+                ? rawDesc.slice(mediaName.length + 2)
+                : rawDesc
+              const amount = Number(l.amount || (Number(l.qty || 0) * Number(l.unit_rate || 0)))
+              return (
+                <View key={l.id || i} style={[S.tableRow, i % 2 === 1 && S.tableRowAlt]} wrap={false}>
+                  <View style={S.colSr}><Text style={S.tdMuted}>{i + 1}</Text></View>
+                  <View style={S.colMedia}>
+                    <Text style={S.tdBold}>{mediaName}</Text>
+                    {cleanDesc ? <Text style={S.tdMuted}>{cleanDesc}</Text> : null}
+                  </View>
+                  <View style={S.colQty}>
+                    <Text style={[S.tdText, { textAlign: 'center' }]}>
+                      {Number(l.qty || 0)}{l.unit ? ` ${l.unit}` : ''}
+                    </Text>
+                  </View>
+                  <View style={S.colRate}>
+                    <Text style={[S.tdText, { textAlign: 'right' }]}>
+                      {formatCurrency(l.unit_rate)}
+                    </Text>
+                  </View>
+                  <View style={S.colTotal}>
+                    <Text style={[S.tdBold, { textAlign: 'right' }]}>
+                      {formatCurrency(amount)}
+                    </Text>
+                  </View>
+                </View>
+              )
+            })}
 
-      {/* ─── Standard footer terms ─── */}
-      <div style={{
-        marginTop: 12, padding: '10px 14px',
-        border: '1px solid #e3e6ee',
-        fontSize: 10, color: '#4a5474', lineHeight: 1.5,
-      }}>
-        Subject to our home Jurisdiction.<br/>
-        Our Responsibility Ceases as soon as goods leaves our Premises.<br/>
-        Goods once sold will not taken back.<br/>
-        Delivery Ex-Premises.
-      </div>
-    </div>
+            <View style={S.tableFootRow}>
+              <Text style={S.tableFootLabel}>
+                {(lines || []).length} item{(lines || []).length !== 1 ? 's' : ''}
+              </Text>
+              <Text style={S.tableFootValue}>Subtotal   {formatCurrency(subtotal)}</Text>
+            </View>
+          </View>
+
+          {/* Investment Summary */}
+          <View style={S.sectionBar}>
+            <Text style={S.sectionTitle}>Investment Summary</Text>
+          </View>
+          <View style={S.investSection}>
+            <View style={S.investBox}>
+              <View style={S.investRow}>
+                <Text style={S.investLabel}>Subtotal</Text>
+                <Text style={S.investValue}>{formatCurrency(subtotal)}</Text>
+              </View>
+              <View style={[S.investRow, { borderBottom: 'none' }]}>
+                <Text style={S.investLabel}>{gstLabel}</Text>
+                <Text style={S.investValue}>
+                  {gstApplies ? formatCurrency(gstAmount) : '—'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Grand Total hero */}
+          <View style={S.grandHero}>
+            <Text style={S.grandHeroLabel}>GRAND TOTAL (INR)</Text>
+            <Text style={S.grandHeroValue}>{formatCurrency(totalAmount)}</Text>
+          </View>
+
+          {/* Terms */}
+          <View style={S.termsBox}>
+            <Text style={S.termsTitle}>Terms &amp; Conditions</Text>
+            {TERMS.map((t, i) => (
+              <View key={i} style={S.termItem}>
+                <Text style={S.termNum}>{i + 1}.</Text>
+                <Text style={S.termText}>{t}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Signatures */}
+          <View style={S.sigRow}>
+            <View style={S.sigBlock}>
+              <View style={S.sigLine} />
+              <Text style={S.sigLabel}>For {co.short_name || co.name}</Text>
+              <Text style={[S.sigLabel, { marginTop: 1 }]}>Authorised Signatory &amp; Stamp</Text>
+            </View>
+            <View style={S.sigBlock}>
+              <View style={S.sigLine} />
+              <Text style={S.sigLabel}>Client Acceptance</Text>
+              <Text style={[S.sigLabel, { marginTop: 1 }]}>Name, Designation &amp; Company Stamp</Text>
+            </View>
+          </View>
+
+        </View>
+
+        {/* ── Footer ── */}
+        <View style={S.footerBand}>
+          <Text style={S.footerPrepared}>
+            Prepared by: {quote.sales_person_name || 'Sales Executive'}
+          </Text>
+          <Text style={S.footerQuoteRef}>
+            Quote: {quote.quote_number} · {formatDate(quote.created_at)}
+          </Text>
+        </View>
+        <View style={S.footerBottomBand}>
+          <Text style={S.footerBottomText}>{co.website || 'untitlead.in'} | {co.email || 'hello@untitlead.in'}</Text>
+          <Text style={S.footerBottomText}>{co.gstin ? `GSTIN: ${co.gstin}` : ''}</Text>
+        </View>
+
+      </Page>
+    </Document>
   )
 }
 
-/* ─── Helpers ─── */
-function cellHead() {
-  return {
-    padding: '5px 4px',
-    border: '1px solid #d8dde8',
-    fontSize: 9.5,
-    fontWeight: 700,
-    color: '#0c1224',
-    textAlign: 'center',
-    lineHeight: 1.25,
-  }
-}
-function cellHeadSub() {
-  return {
-    padding: '3px 4px',
-    border: '1px solid #d8dde8',
-    fontSize: 8.5,
-    fontWeight: 600,
-    color: '#4a5474',
-    textAlign: 'center',
-  }
-}
-function cellName() {
-  return {
-    padding: '6px 8px', border: '1px solid #d8dde8',
-    verticalAlign: 'top', textAlign: 'left',
-    wordBreak: 'break-word',
-  }
-}
-function cellNum() {
-  return {
-    padding: '6px 4px', border: '1px solid #d8dde8',
-    textAlign: 'center', fontFamily: '"JetBrains Mono", monospace',
-    verticalAlign: 'top', fontSize: 9.5,
-  }
-}
-function cellNumR() {
-  return {
-    padding: '6px 6px', border: '1px solid #d8dde8',
-    textAlign: 'right', fontFamily: '"JetBrains Mono", monospace',
-    verticalAlign: 'top', fontSize: 9.5,
-  }
-}
-function BankRow({ label, value, mono, last }) {
-  return (
-    <tr>
-      <td style={{
-        padding: '6px 14px',
-        borderTop: '1px solid #e3e6ee',
-        borderBottom: last ? 'none' : 'none',
-        fontWeight: 600, color: '#0c1224', width: 110,
-      }}>{label}</td>
-      <td style={{
-        padding: '6px 14px',
-        borderTop: '1px solid #e3e6ee',
-        fontFamily: mono ? '"JetBrains Mono", monospace' : 'inherit',
-        color: '#0c1224',
-      }}>{value || '—'}</td>
-    </tr>
-  )
-}
-function TotalsRow({ label, value }) {
-  return (
-    <tr>
-      <td style={{ padding: '6px 14px', color: '#4a5474', borderBottom: '1px solid #e3e6ee' }}>{label}</td>
-      <td style={{
-        padding: '6px 14px', textAlign: 'right',
-        fontFamily: '"JetBrains Mono", monospace',
-        borderBottom: '1px solid #e3e6ee',
-      }}>{value}</td>
-    </tr>
-  )
+// ── Helpers ──────────────────────────────────────────────────────────
+async function fetchCompanyForQuote(quote) {
+  const seg = quote?.segment === 'GOVERNMENT' ? 'GOVERNMENT' : 'PRIVATE'
+  const { data } = await supabase
+    .from('companies')
+    .select('*')
+    .eq('segment', seg)
+    .eq('is_active', true)
+    .maybeSingle()
+  return data || null
 }
 
-/* ─── PDF download helper — call from any page that has the quote ─── */
+/**
+ * Download the Other Media quotation PDF for a given quote + line items.
+ * Mirrors `downloadQuotePDF` from QuotePDF.jsx: fetch the company row,
+ * render the @react-pdf document, save as `${quote_number}.pdf`.
+ *
+ * Param shape kept as `{ quote, lines }` so existing callers
+ * (`QuoteDetail.handleDownloadPDF`) don't change.
+ */
 export async function downloadOtherMediaPdf({ quote, lines }) {
-  // Render the component off-screen, snapshot via html2canvas → jsPDF.
-  const html2canvas = (await import('html2canvas')).default
-  const { jsPDF } = await import('jspdf')
+  const company = await fetchCompanyForQuote(quote)
+  const blob = await pdf(
+    <OtherMediaQuoteDocument quote={quote} lines={lines || []} company={company} />
+  ).toBlob()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `${(quote.quote_number || 'quotation').replace(/[^A-Za-z0-9_-]/g, '_')}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
-  // Wrap in a hidden container.
-  const wrapper = document.createElement('div')
-  wrapper.style.position = 'fixed'
-  wrapper.style.left = '-100000px'
-  wrapper.style.top = '0'
-  wrapper.style.background = '#fff'
-  wrapper.style.zIndex = '-1'
-  document.body.appendChild(wrapper)
-
-  const root = (await import('react-dom/client')).createRoot(wrapper)
-  await new Promise(resolve => {
-    root.render(<OtherMediaQuotePDF quote={quote} lines={lines} onPdfReady={resolve} />)
-    setTimeout(resolve, 600) // give image + supabase fetch time
-  })
-
-  const node = wrapper.querySelector('div')
-  const canvas = await html2canvas(node, {
-    scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
-    width: 794, windowWidth: 794,
-  })
-  document.body.removeChild(wrapper)
-
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const pageW = 210
-  const pageH = 297
-  const pxPerMm = canvas.width / pageW
-  const pageHpx = Math.floor(pageH * pxPerMm)
-
-  let yOff = 0
-  let remaining = canvas.height
-  let firstPage = true
-  while (remaining > 0) {
-    const slice = document.createElement('canvas')
-    const sliceH = Math.min(pageHpx, remaining)
-    slice.width = canvas.width
-    slice.height = sliceH
-    slice.getContext('2d').drawImage(canvas, 0, yOff, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
-    const data = slice.toDataURL('image/jpeg', 0.92)
-    if (!firstPage) pdf.addPage()
-    pdf.addImage(data, 'JPEG', 0, 0, pageW, sliceH / pxPerMm, undefined, 'FAST')
-    yOff += sliceH
-    remaining -= sliceH
-    firstPage = false
+/**
+ * Optional: upload the PDF to the public quote-pdfs bucket and return
+ * the public URL. Mirrors `uploadQuotePDF` from QuotePDF.jsx so a future
+ * "Send via WhatsApp" flow on Other Media quotes can reuse it.
+ */
+export async function uploadOtherMediaPdf({ quote, lines }) {
+  const company = await fetchCompanyForQuote(quote)
+  const blob = await pdf(
+    <OtherMediaQuoteDocument quote={quote} lines={lines || []} company={company} />
+  ).toBlob()
+  const ts   = Date.now()
+  const safeNumber = (quote.quote_number || 'quote').replace(/[^A-Za-z0-9_-]/g, '_')
+  const path = `${safeNumber}/${ts}.pdf`
+  const { error: uploadErr } = await supabase.storage
+    .from('quote-pdfs')
+    .upload(path, blob, { contentType: 'application/pdf', upsert: false })
+  if (uploadErr) {
+    throw new Error(`Other Media PDF upload failed: ${uploadErr.message}`)
   }
-
-  const filename = `${quote.quote_number || 'quotation'}.pdf`.replace(/[^a-z0-9-_.]/gi, '-')
-  pdf.save(filename)
+  const { data } = supabase.storage.from('quote-pdfs').getPublicUrl(path)
+  return data?.publicUrl || null
 }

@@ -1958,13 +1958,12 @@ function DocumentsTab() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   MEDIA TYPES TAB — Phase 15. Admin-managed list of "Other Media"
-   labels (Newspaper, Hoarding, Cinema, …). Each row carries a default
-   HSN/SAC + CGST% + SGST% that the Other Media wizard pulls in
-   silently when a rep selects this media for a quote line. Reps can
-   still type a one-off media name (free-text fallback uses sensible
-   defaults), but adding rows here makes those choices reusable + keeps
-   the tax breakup correct on the ENIL-style PDF.
+   MEDIA TYPES TAB — Phase 15 rev2. Admin-managed list of "Other Media"
+   labels (Newspaper, Hoarding, Cinema, …). Just a name + display order
+   + active flag — no per-row HSN/SAC or CGST/SGST. Tax on Other Media
+   quotes is a single GST 18% applied at quote level (matches the
+   existing Private LED quote PDF format). The HSN/CGST/SGST columns
+   on the table are kept (idempotent) but no longer surfaced or used.
    ════════════════════════════════════════════════════════════════════ */
 
 function MediaTypesTab() {
@@ -1973,12 +1972,9 @@ function MediaTypesTab() {
   const [savingId, setSavingId] = useState(null)
   const [statusMsg, setStatusMsg] = useState('')
   const [statusError, setStatusError] = useState('')
-  // New-row buffer
-  const [newName, setNewName]       = useState('')
-  const [newHsn, setNewHsn]         = useState('998397')
-  const [newCgst, setNewCgst]       = useState(9)
-  const [newSgst, setNewSgst]       = useState(9)
-  const [adding, setAdding]         = useState(false)
+  // New-row buffer — name only.
+  const [newName, setNewName] = useState('')
+  const [adding, setAdding]   = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -2002,13 +1998,10 @@ function MediaTypesTab() {
     if (!r) return
     setSavingId(id)
     const payload = {
-      name:             (r.name || '').trim() || 'Untitled',
-      default_hsn_sac:  (r.default_hsn_sac || '').trim() || null,
-      default_cgst_pct: r.default_cgst_pct === '' || r.default_cgst_pct == null ? null : Number(r.default_cgst_pct),
-      default_sgst_pct: r.default_sgst_pct === '' || r.default_sgst_pct == null ? null : Number(r.default_sgst_pct),
-      notes:            (r.notes || '').trim() || null,
-      is_active:        !!r.is_active,
-      display_order:    Number(r.display_order) || 0,
+      name:          (r.name || '').trim() || 'Untitled',
+      notes:         (r.notes || '').trim() || null,
+      is_active:     !!r.is_active,
+      display_order: Number(r.display_order) || 0,
     }
     const { error } = await supabase
       .from('media_types')
@@ -2036,11 +2029,8 @@ function MediaTypesTab() {
       .from('media_types')
       .insert([{
         name,
-        default_hsn_sac:  newHsn.trim() || null,
-        default_cgst_pct: Number(newCgst) || 0,
-        default_sgst_pct: Number(newSgst) || 0,
-        is_active:        true,
-        display_order:    nextOrder,
+        is_active:     true,
+        display_order: nextOrder,
       }])
       .select()
       .single()
@@ -2051,9 +2041,6 @@ function MediaTypesTab() {
     }
     setRows(prev => [...prev, data])
     setNewName('')
-    setNewHsn('998397')
-    setNewCgst(9)
-    setNewSgst(9)
     setStatusMsg(`Added "${name}".`)
     setTimeout(() => setStatusMsg(''), 2000)
   }
@@ -2090,14 +2077,14 @@ function MediaTypesTab() {
         <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--danger)' }}>{statusError}</div>
       )}
 
-      {/* Add row */}
+      {/* Add row — name only. */}
       <div style={{
         padding: 14, borderRadius: 12,
         border: '1px solid var(--border)',
         background: 'var(--surface)',
         marginBottom: 16,
         display: 'grid',
-        gridTemplateColumns: '1.4fr 0.9fr 0.6fr 0.6fr auto',
+        gridTemplateColumns: '1fr auto',
         gap: 10, alignItems: 'end',
       }}>
         <FieldBlock label="Media name *">
@@ -2105,34 +2092,8 @@ function MediaTypesTab() {
             type="text"
             value={newName}
             onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
             placeholder="e.g. Pamphlet Distribution"
-            className="govt-input-cell govt-input-cell--wide"
-          />
-        </FieldBlock>
-        <FieldBlock label="Default HSN/SAC">
-          <input
-            type="text"
-            value={newHsn}
-            onChange={e => setNewHsn(e.target.value)}
-            placeholder="998397"
-            className="govt-input-cell govt-input-cell--wide"
-          />
-        </FieldBlock>
-        <FieldBlock label="CGST %">
-          <input
-            type="number"
-            min="0"
-            value={newCgst}
-            onChange={e => setNewCgst(e.target.value)}
-            className="govt-input-cell govt-input-cell--wide"
-          />
-        </FieldBlock>
-        <FieldBlock label="SGST %">
-          <input
-            type="number"
-            min="0"
-            value={newSgst}
-            onChange={e => setNewSgst(e.target.value)}
             className="govt-input-cell govt-input-cell--wide"
           />
         </FieldBlock>
@@ -2172,7 +2133,7 @@ function MediaTypesTab() {
         }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1.4fr 0.9fr 0.5fr 0.5fr 0.5fr 0.5fr 60px',
+            gridTemplateColumns: '1fr 0.5fr 0.5fr 60px',
             gap: 0,
             background: 'var(--surface-2)',
             fontSize: 10, fontWeight: 700,
@@ -2181,9 +2142,6 @@ function MediaTypesTab() {
             borderBottom: '1px solid var(--surface-3)',
           }}>
             <div style={{ padding: '10px 12px' }}>Name</div>
-            <div style={{ padding: '10px 12px' }}>HSN/SAC</div>
-            <div style={{ padding: '10px 12px', textAlign: 'right' }}>CGST %</div>
-            <div style={{ padding: '10px 12px', textAlign: 'right' }}>SGST %</div>
             <div style={{ padding: '10px 12px', textAlign: 'right' }}>Order</div>
             <div style={{ padding: '10px 12px', textAlign: 'center' }}>Active</div>
             <div style={{ padding: '10px 12px' }}></div>
@@ -2193,7 +2151,7 @@ function MediaTypesTab() {
               key={r.id}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1.4fr 0.9fr 0.5fr 0.5fr 0.5fr 0.5fr 60px',
+                gridTemplateColumns: '1fr 0.5fr 0.5fr 60px',
                 gap: 0,
                 borderBottom: '1px solid var(--surface-3)',
                 background: 'var(--surface-1)',
@@ -2207,37 +2165,6 @@ function MediaTypesTab() {
                   onChange={e => setField(r.id, 'name', e.target.value)}
                   onBlur={() => persist(r.id)}
                   className="govt-input-cell govt-input-cell--wide"
-                />
-              </div>
-              <div style={{ padding: '6px 8px' }}>
-                <input
-                  type="text"
-                  value={r.default_hsn_sac ?? ''}
-                  onChange={e => setField(r.id, 'default_hsn_sac', e.target.value)}
-                  onBlur={() => persist(r.id)}
-                  className="govt-input-cell govt-input-cell--wide"
-                />
-              </div>
-              <div style={{ padding: '6px 8px' }}>
-                <input
-                  type="number"
-                  min="0"
-                  value={r.default_cgst_pct ?? ''}
-                  onChange={e => setField(r.id, 'default_cgst_pct', e.target.value)}
-                  onBlur={() => persist(r.id)}
-                  className="govt-input-cell govt-input-cell--wide"
-                  style={{ textAlign: 'right' }}
-                />
-              </div>
-              <div style={{ padding: '6px 8px' }}>
-                <input
-                  type="number"
-                  min="0"
-                  value={r.default_sgst_pct ?? ''}
-                  onChange={e => setField(r.id, 'default_sgst_pct', e.target.value)}
-                  onBlur={() => persist(r.id)}
-                  className="govt-input-cell govt-input-cell--wide"
-                  style={{ textAlign: 'right' }}
                 />
               </div>
               <div style={{ padding: '6px 8px' }}>
@@ -2285,11 +2212,11 @@ function MediaTypesTab() {
       )}
 
       <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-subtle)', maxWidth: 720 }}>
-        <strong>How it works:</strong> these rows feed the dropdown on the
-        Other Media wizard. The HSN/SAC + CGST% + SGST% defaults flow into
-        the saved quote lines so the ENIL-style PDF prints the correct tax
-        breakup. Reps can still type a one-off media name in the wizard
-        (free-text fallback), but the dropdown is the canonical list.
+        <strong>How it works:</strong> these rows feed the media dropdown on
+        the Other Media quote wizard. Reps can still type a one-off name
+        when creating a quote (free-text fallback), but the rows here are
+        the canonical list. GST is fixed at 18% across all Other Media
+        quotes — there are no per-media tax overrides.
       </p>
     </>
   )

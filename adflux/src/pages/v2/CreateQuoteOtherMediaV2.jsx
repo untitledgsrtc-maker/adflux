@@ -1,21 +1,22 @@
 // src/pages/v2/CreateQuoteOtherMediaV2.jsx
 //
-// Phase 15 — Other Media wizard, simplified per owner directive (6 May 2026):
-// "use private led screen flow only same flow but just media will be cretaed
-//  in master and from dropdon we will select media and description".
+// Phase 15 rev2 — Other Media wizard, simplified per owner directive
+// (6 May 2026): "use private LED quote PDF format, only GST 18% — no
+// HSN/SAC, no CGST/SGST split". So:
 //
-// Net change vs Phase 12 rev2:
-//   • The hardcoded MEDIA_TYPES list is replaced by a fetch from the
-//     `media_types` master table (admin-managed via Master → Media Types).
-//   • Each line still shows just: [Media dropdown] [Description] [Qty]
-//     [Unit] [Rate]. Reps don't see HSN / CGST / SGST inputs — those are
-//     auto-populated from the master row and persisted on quote_cities so
-//     the ENIL-style PDF can render the tax breakup.
-//   • Free-text fallback: if a rep types a media name not in the master,
-//     the line still saves with sensible defaults (HSN 998397, 9% / 9%).
+//   • The media dropdown reads from the `media_types` master (admin
+//     CRUD via Master → Media Types). Free-text fallback for one-offs.
+//   • Each line: [Media dropdown] [Description] [Qty] [Unit] [Rate].
+//     No HSN, no CGST%, no SGST%, no per-line tax inputs.
+//   • Quote-level tax: a single 18% GST toggle. gst_rate=0.18, gst_amount
+//     = round(subtotal × 0.18). PDF prints a single GST @18% line, no
+//     CGST/SGST split.
+//   • The `quote_cities.hsn_sac / cgst_pct / sgst_pct / cgst_amount /
+//     sgst_amount` columns added in the original Phase 15 SQL are left
+//     in place but no longer populated.
 //
-// PDF: see src/components/quotes/OtherMediaQuotePDF.jsx — downloaded via
-// the QuoteDetail "Download PDF" button after save.
+// PDF renderer: src/components/quotes/OtherMediaQuotePDF.jsx — uses
+// @react-pdf/renderer to mirror the Private LED quote PDF visually.
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -26,13 +27,10 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { syncClientFromQuote } from '../../utils/syncClient'
 
-/* Owner directive: tax stays simple — 9% CGST + 9% SGST split (= 18% GST).
-   Per-line override happens in master (admin can edit defaults), not in
-   the wizard. These constants are only used when a rep types a free-text
-   media that isn't in the master. */
-const FALLBACK_HSN  = '998397'
-const FALLBACK_CGST = 9
-const FALLBACK_SGST = 9
+/* Owner directive: keep the wizard simple — single 18% GST at quote
+   level. No per-line HSN/CGST/SGST (the columns exist on quote_cities
+   but we don't populate them in this rev). */
+const GST_PCT = 18
 
 const EMPTY_LINE = () => ({
   media_type_id:   null,    // FK into media_types when picked from master
@@ -41,10 +39,6 @@ const EMPTY_LINE = () => ({
   qty:             1,
   unit:            'unit',
   unit_rate:       0,
-  // Pulled from the chosen master row (or fallbacks for free-text):
-  hsn_sac:         FALLBACK_HSN,
-  cgst_pct:        FALLBACK_CGST,
-  sgst_pct:        FALLBACK_SGST,
 })
 
 export default function CreateQuoteOtherMediaV2() {
@@ -80,20 +74,18 @@ export default function CreateQuoteOtherMediaV2() {
     async function load() {
       const { data, error } = await supabase
         .from('media_types')
-        .select('id, name, default_hsn_sac, default_cgst_pct, default_sgst_pct')
+        .select('id, name')
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('name', { ascending: true })
       if (cancelled) return
       if (error) {
-        // Master fetch failed — fall back to a static seed so the wizard
-        // still works. Reps can still type free-text.
         console.warn('[OtherMedia] media_types fetch failed:', error.message)
         setMediaTypes([
-          { id: null, name: 'Newspaper',          default_hsn_sac: FALLBACK_HSN, default_cgst_pct: 9, default_sgst_pct: 9 },
-          { id: null, name: 'Hoarding (Outdoor)', default_hsn_sac: FALLBACK_HSN, default_cgst_pct: 9, default_sgst_pct: 9 },
-          { id: null, name: 'Cinema',             default_hsn_sac: FALLBACK_HSN, default_cgst_pct: 9, default_sgst_pct: 9 },
-          { id: null, name: 'Other',              default_hsn_sac: FALLBACK_HSN, default_cgst_pct: 9, default_sgst_pct: 9 },
+          { id: null, name: 'Newspaper' },
+          { id: null, name: 'Hoarding (Outdoor)' },
+          { id: null, name: 'Cinema' },
+          { id: null, name: 'Other' },
         ])
       } else {
         setMediaTypes(data || [])
@@ -104,23 +96,15 @@ export default function CreateQuoteOtherMediaV2() {
     return () => { cancelled = true }
   }, [])
 
-  /* ─── Totals — split into CGST + SGST per line, summed ─── */
+  /* ─── Totals — single 18% GST at quote level ─── */
   const totals = useMemo(() => {
-    let subtotal = 0
-    let cgst = 0
-    let sgst = 0
-    for (const l of lines) {
-      const amt = (Number(l.qty) || 0) * (Number(l.unit_rate) || 0)
-      subtotal += amt
-      if (includeGst) {
-        cgst += amt * (Number(l.cgst_pct) || 0) / 100
-        sgst += amt * (Number(l.sgst_pct) || 0) / 100
-      }
-    }
-    cgst = Math.round(cgst)
-    sgst = Math.round(sgst)
-    const total = subtotal + cgst + sgst
-    return { subtotal, cgst, sgst, gst: cgst + sgst, total }
+    const subtotal = lines.reduce(
+      (s, l) => s + (Number(l.qty) || 0) * (Number(l.unit_rate) || 0),
+      0,
+    )
+    const gst   = includeGst ? Math.round(subtotal * GST_PCT / 100) : 0
+    const total = subtotal + gst
+    return { subtotal, gst, total }
   }, [lines, includeGst])
 
   /* ─── Line item helpers ─── */
@@ -129,16 +113,13 @@ export default function CreateQuoteOtherMediaV2() {
   }
 
   /** When rep picks a media from the master dropdown OR types a free-text
-      name, sync the line's tax fields from the matching master row (if any).
-      Free-text → fallback defaults. */
+      name, just record the name + (if matched) the master id. No tax
+      fields anymore. */
   function setLineMedia(i, name) {
     const match = mediaTypes.find(m => m.name.toLowerCase() === name.toLowerCase())
     setLine(i, {
       media_type_id:   match?.id || null,
       media_type_name: name,
-      hsn_sac:         match?.default_hsn_sac  || FALLBACK_HSN,
-      cgst_pct:        match?.default_cgst_pct ?? FALLBACK_CGST,
-      sgst_pct:        match?.default_sgst_pct ?? FALLBACK_SGST,
     })
   }
 
@@ -173,7 +154,7 @@ export default function CreateQuoteOtherMediaV2() {
       revenue_type:   'new',
       status:         targetStatus,
       subtotal:       totals.subtotal,
-      gst_rate:       includeGst ? 0.18 : 0,
+      gst_rate:       includeGst ? GST_PCT / 100 : 0,
       gst_amount:     totals.gst,
       total_amount:   totals.total,
       duration_months: 1,
@@ -200,9 +181,7 @@ export default function CreateQuoteOtherMediaV2() {
     }
 
     const lineItems = validLines.map(l => {
-      const amt   = (Number(l.qty) || 0) * (Number(l.unit_rate) || 0)
-      const cAmt  = includeGst ? Math.round(amt * (Number(l.cgst_pct) || 0) / 100) : 0
-      const sAmt  = includeGst ? Math.round(amt * (Number(l.sgst_pct) || 0) / 100) : 0
+      const amt = (Number(l.qty) || 0) * (Number(l.unit_rate) || 0)
       return {
         quote_id:        quote.id,
         ref_kind:        'FREE_TEXT',
@@ -220,12 +199,10 @@ export default function CreateQuoteOtherMediaV2() {
         duration_months: 1,
         slot_seconds:    0,
         slots_per_day:   0,
-        // Phase 15 — tax breakup for ENIL-style PDF
-        hsn_sac:         l.hsn_sac || FALLBACK_HSN,
-        cgst_pct:        includeGst ? Number(l.cgst_pct) || 0 : 0,
-        sgst_pct:        includeGst ? Number(l.sgst_pct) || 0 : 0,
-        cgst_amount:     cAmt,
-        sgst_amount:     sAmt,
+        // Phase 15 rev2 — HSN / CGST / SGST left NULL on the row.
+        // Columns kept on the table for backward-compat with rev1 rows
+        // but no longer populated by this wizard. PDF renders single
+        // GST 18% from the quote-level gst_rate / gst_amount.
       }
     })
 
@@ -419,11 +396,11 @@ export default function CreateQuoteOtherMediaV2() {
 
         <div style={{ marginTop: 12, fontSize: 11, color: 'var(--v2-ink-2)' }}>
           <Newspaper size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />
-          Tax breakup (HSN/SAC + CGST + SGST) for each media is configured in <strong>Master → Media Types</strong> and applied automatically on the PDF.
+          Media options are managed in <strong>Master → Media Types</strong>. Pick from the list or type a one-off name.
         </div>
       </div>
 
-      {/* ─── Totals — CGST + SGST split ─── */}
+      {/* ─── Totals — single GST 18% line, matches Private LED PDF format ─── */}
       <div className="v2d-panel" style={{ padding: 20, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ fontSize: 13, color: 'var(--v2-ink-1)' }}>Subtotal</span>
@@ -434,24 +411,12 @@ export default function CreateQuoteOtherMediaV2() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--v2-ink-1)' }}>
             <input type="checkbox" checked={includeGst} onChange={e => setIncludeGst(e.target.checked)} />
-            Apply GST (CGST + SGST per line)
+            GST {GST_PCT}%
           </label>
           <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 600 }}>
             ₹{totals.gst.toLocaleString('en-IN')}
           </span>
         </div>
-        {includeGst && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 12, color: 'var(--v2-ink-2)', paddingLeft: 22 }}>
-            <span>↳ CGST</span>
-            <span>₹{totals.cgst.toLocaleString('en-IN')}</span>
-          </div>
-        )}
-        {includeGst && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 12, color: 'var(--v2-ink-2)', paddingLeft: 22 }}>
-            <span>↳ SGST</span>
-            <span>₹{totals.sgst.toLocaleString('en-IN')}</span>
-          </div>
-        )}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           paddingTop: 12, marginTop: 12,
