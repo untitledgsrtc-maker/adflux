@@ -23,6 +23,8 @@ import HRV2               from './pages/v2/HRV2'
 import ClientsV2          from './pages/v2/ClientsV2'
 // ── Phase 12 — M1 Sales/Lead module ─────────────────────────────────
 import LeadsV2             from './pages/v2/LeadsV2'
+import LeadDetailV2        from './pages/v2/LeadDetailV2'
+import LeadUploadV2        from './pages/v2/LeadUploadV2'
 
 // ── Government module (Phase 6) ─────────────────────────────────────
 import CreateQuoteChooserV2  from './pages/v2/CreateQuoteChooserV2'
@@ -121,6 +123,8 @@ export default function App() {
           {/* Phase 12 — M1 Sales/Lead module. RLS handles per-role
               visibility; the page itself shows admin-vs-sales chrome. */}
           <Route path="/leads"                     element={<LeadsV2 />} />
+          <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
+          <Route path="/leads/:id"                 element={<LeadDetailV2 />} />
 
           {/* Sales-only */}
           <Route path="/my-performance"            element={<MyPerformanceV2 />} />
