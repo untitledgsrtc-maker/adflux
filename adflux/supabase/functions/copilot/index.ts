@@ -30,28 +30,82 @@ const ANON_KEY      = Deno.env.get('SUPABASE_ANON_KEY')!
 
 const SCHEMA_HINT = `
 TABLES (Postgres):
-  users(id, name, email, role, team_role, city, manager_id, daily_targets jsonb, is_active)
+  users(id, name, email, role, team_role, city, manager_id, daily_targets jsonb,
+        is_active, segment_access)
+    role IN ('admin','co_owner','sales_manager','sales','agency','telecaller','govt_partner')
+    segment_access IN ('ALL','PRIVATE','GOVERNMENT')
+
   leads(id, source, name, company, phone, email, city, segment, stage, lost_reason,
         heat, expected_value, assigned_to, telecaller_id, sales_ready_at,
         handoff_sla_due_at, contact_attempts_count, last_contact_at,
-        notes, created_by, created_at)
+        notes, created_by, created_at, quote_id)
     stage IN ('New','Contacted','Qualified','SalesReady','MeetingScheduled',
               'QuoteSent','Negotiating','Won','Lost','Nurture')
+    heat IN ('hot','warm','cold')
+    segment IN ('PRIVATE','GOVERNMENT')
+
   lead_activities(id, lead_id, activity_type, outcome, notes,
                   next_action, next_action_date, gps_lat, gps_lng,
                   created_by, created_at)
+    activity_type IN ('call','whatsapp','email','meeting','site_visit','note','status_change')
+    outcome IN ('positive','neutral','negative')
+
   work_sessions(id, user_id, work_date, plan_submitted_at, check_in_at,
-                check_out_at, evening_report_submitted_at, daily_counters jsonb)
-  call_logs(id, user_id, lead_id, client_phone, call_at, outcome, notes)
-  quotes(id, quote_number, client_name, total_amount, status, created_by, created_at, segment)
-  payments(id, quote_id, amount_received, approval_status, payment_date)
+                check_out_at, evening_report_submitted_at, daily_counters jsonb,
+                planned_meetings jsonb, planned_calls, planned_leads)
+    daily_counters keys: meetings, calls, new_leads
+
+  call_logs(id, user_id, lead_id, client_phone, call_at, outcome, notes,
+            duration_seconds)
+    outcome IN ('connected','no_answer','busy','wrong_number',
+                'callback_requested','not_interested','sales_ready','already_client')
+
+  quotes(id, quote_number, ref_number, client_name, client_company,
+         client_phone, client_email, client_address, client_gst,
+         total_amount, subtotal, gst_amount, status, segment, media_type,
+         created_by, sales_person_name, created_at, proposal_date,
+         campaign_start_date, campaign_end_date, lead_id, follow_up_date)
+    status IN ('draft','sent','negotiating','won','lost')
+    segment IN ('PRIVATE','GOVERNMENT')
+    media_type IN ('LED_OTHER','AUTO_HOOD','GSRTC_LED','HOARDING','MALL',
+                   'CINEMA','DIGITAL','OTHER','OTHER_MEDIA')
+
+  quote_cities(id, quote_id, city_id, city_name, qty, unit_rate, amount,
+               campaign_total, screens, slot_seconds, slots_per_day,
+               duration_months, ref_kind)
+    -- city_name on quote line items is where the city lives for govt
+    -- proposals (auto-rickshaw districts, GSRTC station names) and for
+    -- Other Media line items (denormalized media type)
+
+  payments(id, quote_id, amount_received, approval_status, payment_date,
+           is_final_payment, recorded_by)
+    approval_status IN ('pending','approved','rejected')
+
+  clients(id, name, company, phone, email, address, segment, created_at)
 
 NOTES:
 - Today's date: ${new Date().toISOString().slice(0,10)}
-- daily_counters jsonb has keys: meetings, calls, new_leads
-- Status check: work_sessions where check_in_at IS NULL AND work_date = today AND user is active sales rep → "no check-in"
-- SLA breach: leads where stage='SalesReady' AND handoff_sla_due_at < now()
-- Outstanding payment: quotes status='won' minus sum of approved payments
+- "no check-in today" = work_sessions where work_date = current_date
+  AND check_in_at IS NULL, joined to users where is_active = true AND
+  team_role IN ('sales','agency','telecaller')
+- "SLA breach" = leads where stage = 'SalesReady'
+  AND handoff_sla_due_at < now()
+- "outstanding payment" = quotes where status = 'won' AND total_amount >
+  (SELECT coalesce(sum(amount_received),0) FROM payments p
+     WHERE p.quote_id = quotes.id AND p.approval_status = 'approved')
+- For city / location lookups, ALWAYS use ILIKE '%name%' on these columns
+  in this priority order:
+    leads.city, quotes.client_address, users.city, quote_cities.city_name,
+    clients.address, clients.company
+  Single-word city names (e.g. Gandhinagar, Surat, Vadodara, Ahmedabad)
+  may be stored partial inside an address field. Use ILIKE not =.
+- For "active quotes" = quotes WHERE status NOT IN ('won','lost')
+- For "won" / "lost" use status = 'won' / status = 'lost' on quotes,
+  OR stage = 'Won' / stage = 'Lost' on leads — pick by context.
+- Stage and Status are different. Leads have STAGE; Quotes have STATUS.
+- When user asks about a NAMED city / person / company, search across
+  multiple plausible columns with OR ... ILIKE '%name%' so you don't
+  miss matches because of where the data happens to live.
 `
 
 const SYSTEM_PROMPT = `You are the Untitled OS Co-Pilot. The owner is Brijesh,
