@@ -1,69 +1,48 @@
 // src/pages/v2/LeadsV2.jsx
 //
-// Phase 12 (M1 + M7) — Lead pipeline list. Replaces Cronberry.
+// Phase 16 commit 2 — Lead list, ported in-place from owner's
+// Claude Design output (_design_reference/Leads/lead-admin.jsx ·
+// AdminLeadList). Same /leads route, new UI.
 //
-// Per role visibility (RLS-enforced; UI just shows what comes back):
-//   admin               → all leads, can reassign anyone
-//   government_partner  → all GOVERNMENT segment leads regardless of city
-//   sales_manager       → leads where assigned_to / telecaller_id is in
-//                         (me + my direct reports via manager_id)
+// Per-role visibility (RLS does the work):
+//   admin / co_owner    → all leads, can reassign anyone, can upload CSV
+//   government_partner  → all GOVERNMENT segment leads
+//   sales_manager       → leads in their team chain
 //   sales / agency      → assigned_to = me
 //   telecaller          → telecaller_id = me OR assigned_to = me
 //
-// Stage transitions live in /leads/:id (built next). This page is
-// list + filter + bulk-reassign + Excel upload entry point.
+// Design rules (from _design_reference/Leads/lead-styles.css):
+//   • Wrap content in .lead-root for Space Grotesk + JetBrains Mono helpers.
+//   • Stage chips, heat dots, segment chips, avatars from LeadShared.
+//   • 5-tab pill row: All · Open · Qualified · Won · Lost.
+//     (QuoteSent + Negotiating stages reachable via "All" or the Stage
+//      modal; we don't expose an "In Progress" tab in the rep-facing UI
+//      per the approved design.)
+//   • AI briefing card content is computed from real lead data, not mocked.
+//   • Bulk action bar is a sticky bottom pill that appears when ≥1 row
+//     is checked (privileged users only).
 //
-// Design tokens from UI_DESIGN_SYSTEM.md. Reuses v2.css `.v2d-*`
-// classes for chrome consistency with QuotesV2 / ClientsV2.
+// Per CLAUDE.md: lucide-react only; no #facc15 anywhere; brand yellow
+// is #FFE600 from tokens.css.
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Plus, Search, X, Upload, Users as UsersIcon, Filter, ChevronDown,
+  Plus, Search, X, Upload, Users as UsersIcon, AlertTriangle,
+  Sparkles, ArrowRight,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { useLeads, STAGE_GROUPS as ALL_STAGE_GROUPS } from '../../hooks/useLeads'
+import { formatCurrency, formatRelative } from '../../utils/formatters'
 import {
-  useLeads, LEAD_STAGES, STAGE_LABELS, STAGE_TINT, STAGE_GROUPS, groupForStage,
-} from '../../hooks/useLeads'
-import { formatCurrency, formatDate } from '../../utils/formatters'
+  StageChip, HeatDot, SegChip, LeadAvatar,
+} from '../../components/leads/LeadShared'
 
-/* ─── Stage chip — uses UI Design System §4.4 ─── */
-function StageChip({ stage }) {
-  const tint = STAGE_TINT[stage] || 'blue'
-  const styleByTint = {
-    blue:   { bg: 'var(--tint-blue-bg, rgba(96,165,250,.12))',  bd: 'var(--tint-blue-bd, rgba(96,165,250,.30))',  fg: 'var(--blue, #60a5fa)' },
-    green:  { bg: 'var(--tint-green-bg, rgba(74,222,128,.10))', bd: 'var(--tint-green-bd, rgba(74,222,128,.28))', fg: 'var(--green, #4ade80)' },
-    amber:  { bg: 'var(--tint-amber-bg, rgba(251,191,36,.10))', bd: 'var(--tint-amber-bd, rgba(251,191,36,.28))', fg: 'var(--amber, #fbbf24)' },
-    red:    { bg: 'var(--tint-red-bg, rgba(248,113,113,.10))',  bd: 'var(--tint-red-bd, rgba(248,113,113,.28))',  fg: 'var(--red, #f87171)' },
-    purple: { bg: 'var(--tint-purple-bg, rgba(192,132,252,.12))', bd: 'rgba(192,132,252,.30)',                    fg: 'var(--purple, #c084fc)' },
-  }
-  const s = styleByTint[tint]
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '3px 9px', borderRadius: 999,
-      fontSize: 11, fontWeight: 600,
-      background: s.bg, border: `1px solid ${s.bd}`, color: s.fg,
-      whiteSpace: 'nowrap',
-    }}>
-      {STAGE_LABELS[stage] || stage}
-    </span>
-  )
-}
-
-/* ─── Heat dot ─── */
-function HeatDot({ heat }) {
-  const color = heat === 'hot' ? 'var(--red, #f87171)'
-              : heat === 'warm' ? 'var(--amber, #fbbf24)'
-              : 'var(--text-3, rgba(255,255,255,.40))'
-  return (
-    <span title={heat} style={{
-      display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-      background: color, flexShrink: 0,
-    }} />
-  )
-}
+/* The 5 tabs from the design — All + 4 groups. We re-use the
+   underlying STAGE_GROUPS from useLeads but drop "in_progress"
+   so QuoteSent/Negotiating only appear under "All". */
+const VISIBLE_GROUPS = ALL_STAGE_GROUPS.filter(g => g.key !== 'in_progress')
 
 export default function LeadsV2() {
   const navigate = useNavigate()
@@ -72,34 +51,28 @@ export default function LeadsV2() {
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
   const { leads, loading, error, fetchLeads, reassignBulk } = useLeads()
 
-  // Filter state — local to this page (no cross-page persistence).
-  const [search, setSearch]         = useState('')
-  // Phase 12 (rev2) — stageFilter holds either 'all' or a group key
-  // ('open','qualified','in_progress','won','lost'). The group expands
-  // to multiple individual stages at filter time.
-  const [stageFilter, setStageFilter] = useState('all')   // 'all' | group.key
-  const [segmentFilter, setSegmentFilter] = useState('all') // 'all' | 'PRIVATE' | 'GOVERNMENT'
+  /* ─── Filter state ─── */
+  const [search, setSearch]               = useState('')
+  const [stageFilter, setStageFilter]     = useState('all')
+  const [segmentFilter, setSegmentFilter] = useState('all')
   const [sourceFilter, setSourceFilter]   = useState('all')
   const [cityFilter, setCityFilter]       = useState('all')
   const [repFilter, setRepFilter]         = useState('all')
-  const [heatFilter, setHeatFilter]       = useState('all')
 
-  // Bulk-select state
+  /* ─── Bulk select state ─── */
   const [selected, setSelected] = useState(new Set())
 
-  // Reassign modal
+  /* ─── Reassign modal ─── */
   const [reassignOpen, setReassignOpen] = useState(false)
   const [reassignTarget, setReassignTarget] = useState('')
   const [reassignBusy, setReassignBusy] = useState(false)
   const [reassignErr, setReassignErr] = useState('')
-
-  // Sales reps for reassign dropdown — admin / sales_manager / govt_partner
   const [assignableUsers, setAssignableUsers] = useState([])
 
   useEffect(() => { fetchLeads() }, [fetchLeads])
 
-  // Load assignable users (sales + agency + telecaller) for reassign UI.
-  // RLS limits this to whoever the current user can see — admin sees all.
+  // Privileged-user reassign target list. Sales / agency can't reassign,
+  // so we skip the query entirely for them.
   useEffect(() => {
     if (!isPrivileged) return
     supabase
@@ -113,32 +86,29 @@ export default function LeadsV2() {
       })
   }, [isPrivileged])
 
-  // Distinct sources / cities for filter dropdowns. Built from the
-  // loaded leads so the lists are scoped to what the user can actually see.
+  /* ─── Derived: distinct dropdown values ─── */
   const distinctSources = useMemo(() => {
-    const set = new Set()
-    leads.forEach(l => l.source && set.add(l.source))
-    return Array.from(set).sort()
+    const s = new Set()
+    leads.forEach(l => l.source && s.add(l.source))
+    return Array.from(s).sort()
   }, [leads])
   const distinctCities = useMemo(() => {
-    const set = new Set()
-    leads.forEach(l => l.city && set.add(l.city))
-    return Array.from(set).sort()
+    const s = new Set()
+    leads.forEach(l => l.city && s.add(l.city))
+    return Array.from(s).sort()
   }, [leads])
   const distinctReps = useMemo(() => {
-    const map = new Map()
+    const m = new Map()
     leads.forEach(l => {
-      if (l.assigned?.id) map.set(l.assigned.id, l.assigned.name)
+      if (l.assigned?.id) m.set(l.assigned.id, l.assigned.name)
     })
-    return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+    return Array.from(m, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
   }, [leads])
 
-  // Apply all filters in memory. RLS already filtered server-side; this
-  // is just UI slicing. Search matches name / company / phone / email.
-  // stageFilter is now a group key — expand it to the underlying stages.
+  /* ─── Apply filters in memory ─── */
   const stagesInGroup = useMemo(() => {
     if (stageFilter === 'all') return null
-    const g = STAGE_GROUPS.find(x => x.key === stageFilter)
+    const g = ALL_STAGE_GROUPS.find(x => x.key === stageFilter)
     return g ? g.stages : null
   }, [stageFilter])
 
@@ -149,7 +119,6 @@ export default function LeadsV2() {
       if (segmentFilter !== 'all' && l.segment !== segmentFilter) return false
       if (sourceFilter  !== 'all' && l.source  !== sourceFilter)  return false
       if (cityFilter    !== 'all' && l.city    !== cityFilter)    return false
-      if (heatFilter    !== 'all' && l.heat    !== heatFilter)    return false
       if (repFilter     !== 'all' && l.assigned?.id !== repFilter) return false
       if (!q) return true
       return (
@@ -159,53 +128,69 @@ export default function LeadsV2() {
         (l.email   || '').toLowerCase().includes(q)
       )
     })
-  }, [leads, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, repFilter, heatFilter])
+  }, [leads, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, repFilter])
 
+  /* ─── Stat strip totals ─── */
   const totals = useMemo(() => {
-    // Per-stage counts (still needed for funnel + lead dashboard widget).
     const counts = {}
-    LEAD_STAGES.forEach(s => { counts[s] = 0 })
-    let value = 0
-    let activeValue = 0
-    let wonCount = 0
-    let lostCount = 0
+    let value = 0, wonCount = 0, lostCount = 0
     leads.forEach(l => {
       counts[l.stage] = (counts[l.stage] || 0) + 1
-      const v = Number(l.expected_value) || 0
-      value += v
+      value += Number(l.expected_value) || 0
       if (l.stage === 'Won')  wonCount++
       if (l.stage === 'Lost') lostCount++
-      if (!['Won', 'Lost'].includes(l.stage)) activeValue += v
     })
-    // Group counts — sum over the stages each group contains.
     const groupCounts = {}
-    STAGE_GROUPS.forEach(g => {
+    ALL_STAGE_GROUPS.forEach(g => {
       groupCounts[g.key] = g.stages.reduce((s, st) => s + (counts[st] || 0), 0)
     })
-    return { counts, groupCounts, total: leads.length, value, activeValue, wonCount, lostCount }
+    return { counts, groupCounts, total: leads.length, value, wonCount, lostCount }
   }, [leads])
-
-  // Win rate (over decided leads only — Won + Lost).
   const winRate = useMemo(() => {
     const decided = totals.wonCount + totals.lostCount
-    if (decided === 0) return null
-    return Math.round((totals.wonCount / decided) * 100)
+    return decided === 0 ? null : Math.round((totals.wonCount / decided) * 100)
   }, [totals])
+
+  /* ─── AI briefing computations (no mocks — real lead data) ─── */
+  const aiBriefing = useMemo(() => {
+    const now = Date.now()
+    const dayAgo = now - 24 * 3600 * 1000
+    const last18h = now - 18 * 3600 * 1000
+    const yesterdayEvening = (() => {
+      const d = new Date()
+      d.setDate(d.getDate() - 1)
+      d.setHours(18, 0, 0, 0)
+      return d.getTime()
+    })()
+
+    const hotIdle = leads.filter(l =>
+      l.heat === 'hot' &&
+      !['Won','Lost'].includes(l.stage) &&
+      (!l.last_contact_at || new Date(l.last_contact_at).getTime() < dayAgo)
+    )
+    const slaBreaches = leads.filter(l =>
+      l.stage === 'SalesReady' &&
+      l.handoff_sla_due_at &&
+      new Date(l.handoff_sla_due_at).getTime() < now
+    )
+    const cronberryOvernight = leads.filter(l =>
+      (l.source || '').toLowerCase().includes('cronberry') &&
+      l.created_at && new Date(l.created_at).getTime() > yesterdayEvening
+    )
+    const sampleHot = hotIdle[0] || null
+    return { hotIdle, slaBreaches, cronberryOvernight, sampleHot, last18h }
+  }, [leads])
 
   function toggleSelected(id) {
     setSelected(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
     })
   }
   function toggleSelectAll() {
-    if (selected.size === filtered.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(filtered.map(l => l.id)))
-    }
+    if (selected.size === filtered.length) setSelected(new Set())
+    else setSelected(new Set(filtered.map(l => l.id)))
   }
 
   async function handleReassign() {
@@ -215,7 +200,7 @@ export default function LeadsV2() {
     }
     setReassignBusy(true)
     setReassignErr('')
-    const { error: err, data } = await reassignBulk(Array.from(selected), reassignTarget)
+    const { error: err } = await reassignBulk(Array.from(selected), reassignTarget)
     setReassignBusy(false)
     if (err) {
       setReassignErr(err.message || 'Reassign failed.')
@@ -232,190 +217,161 @@ export default function LeadsV2() {
     segmentFilter !== 'all' ||
     sourceFilter !== 'all' ||
     cityFilter !== 'all' ||
-    repFilter !== 'all' ||
-    heatFilter !== 'all'
+    repFilter !== 'all'
 
   return (
-    <div className="v2d-leads">
+    <div className="lead-root">
       {/* ─── Page header ─── */}
-      <div className="v2d-page-head">
+      <div className="lead-page-head">
         <div>
-          <div className="v2d-page-kicker">
-            {isAdmin ? 'All team leads' : 'Your pipeline'}
+          <div className="lead-page-eyebrow">
+            {isAdmin ? 'Pipeline · across all sources' : 'Your pipeline'}
           </div>
-          <h1 className="v2d-page-title">
+          <div className="lead-page-title">
             {isAdmin ? 'Leads' : 'My Leads'}
-          </h1>
-          <div className="v2d-page-sub">
-            {leads.length} lead{leads.length !== 1 ? 's' : ''}
-            {hasActiveFilters ? ' · filtered' : ''}
-            {leads.length > 0 && (
-              <> · pipeline value <strong>{formatCurrency(totals.value)}</strong></>
-            )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {isPrivileged && (
             <button
-              className="v2d-ghost v2d-ghost--btn"
+              className="lead-btn"
               onClick={() => navigate('/leads/upload')}
-              title="Upload leads from Excel / Cronberry CSV"
+              title="Upload from Cronberry / Excel"
             >
               <Upload size={14} />
-              <span>Upload Excel</span>
+              <span>Upload CSV</span>
             </button>
           )}
-          <button className="v2d-cta" onClick={() => navigate('/leads/new')}>
+          <button className="lead-btn lead-btn-primary" onClick={() => navigate('/leads/new')}>
             <Plus size={15} />
             <span>New Lead</span>
           </button>
         </div>
       </div>
 
-      {/* ─── Lead dashboard strip — owner feedback (5 May 2026):
-              "i need lead dashboard i dont know how will you do it want
-              simple as posssible". 4 stat cards + mini funnel preview. */}
+      {/* ─── AI briefing card (real data, not mock) ─── */}
       {leads.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: 10, marginBottom: 12,
-        }}>
-          <DashStat label="Total leads" value={totals.total} />
-          <DashStat label="Open"        value={totals.groupCounts.open || 0}        accent="blue" />
-          <DashStat label="Qualified"   value={totals.groupCounts.qualified || 0}   accent="amber" />
-          <DashStat label="Won"         value={totals.wonCount} accent="green"
-                    sub={winRate != null ? `${winRate}% win rate` : null} />
+        <AIBriefingCard
+          briefing={aiBriefing}
+          onOpenQueue={() => {
+            // Owner action: open the SLA-breach + hot-idle queue.
+            setStageFilter('all')
+            setSegmentFilter('all')
+            setSourceFilter('all')
+            setCityFilter('all')
+            setRepFilter('all')
+            setSearch('')
+            // No dedicated "queue" view yet — once the lead-detail
+            // SLA card lands, this navigates to a filtered list.
+          }}
+        />
+      )}
+
+      {/* ─── Stat strip (Total / Open / Qualified / Won) ─── */}
+      {leads.length > 0 && (
+        <div className="lead-stat-strip">
+          <StatCard label="Total leads" num={totals.total} meta="all sources" />
+          <StatCard label="Open"        num={totals.groupCounts.open || 0}      meta="New + Contacted + Nurture" />
+          <StatCard label="Qualified"   num={totals.groupCounts.qualified || 0} meta="→ rep ready" />
+          <StatCard label="Won"         num={totals.wonCount}                   meta={winRate != null ? `${winRate}% win rate` : 'no decisions yet'} />
         </div>
       )}
 
-      {/* ─── Stage tabs — Phase 12 rev2 — 6 logical groups instead of 11.
-              All / Open / Qualified / In Progress / Won / Lost. The
-              underlying stage transition modal still exposes all 10 stages. */}
-      <div className="v2d-tab-row" style={{ flexWrap: 'wrap' }}>
-        <button
-          className={`v2d-tab-pill${stageFilter === 'all' ? ' is-active' : ''}`}
-          onClick={() => setStageFilter('all')}
-        >
-          All
-          <span className="v2d-tab-count">{totals.total}</span>
-        </button>
-        {STAGE_GROUPS.map(g => (
-          <button
-            key={g.key}
-            className={`v2d-tab-pill${stageFilter === g.key ? ' is-active' : ''}`}
-            onClick={() => setStageFilter(stageFilter === g.key ? 'all' : g.key)}
-          >
-            {g.label}
-            <span className="v2d-tab-count">{totals.groupCounts[g.key] || 0}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ─── Filters row ─── */}
-      <div className="v2d-filter-row">
-        <div className="v2d-search v2d-search--inline">
+      {/* ─── Filter row (search + 5 stage tabs + segment/source/city/rep) ─── */}
+      <div className="lead-filter-row">
+        <div className="lead-search lead-filter-search">
           <Search size={14} />
           <input
-            placeholder="Search name, company, phone, email…"
+            placeholder="Name, company, phone, email"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button className="v2d-search-clear" onClick={() => setSearch('')}>
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--text-muted)', display: 'inline-flex' }}
+            >
               <X size={12} />
             </button>
           )}
         </div>
 
-        {/* Segment */}
-        <div style={{
-          display: 'inline-flex', gap: 4, padding: 3,
-          background: 'var(--v2-bg-2)', borderRadius: 999,
-          border: '1px solid var(--v2-border, var(--v2-line))',
-        }}>
-          {[
-            { key: 'all',        label: 'All' },
-            { key: 'PRIVATE',    label: 'Private' },
-            { key: 'GOVERNMENT', label: 'Govt' },
-          ].map(o => (
-            <button
-              key={o.key}
-              onClick={() => setSegmentFilter(o.key)}
-              style={{
-                padding: '5px 11px', borderRadius: 999, border: 'none',
-                cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                background: segmentFilter === o.key ? 'var(--v2-ink-0)' : 'transparent',
-                color:      segmentFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
-              }}
+        <div className="lead-filter-tabs">
+          <span
+            className={`lead-filter-tab ${stageFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setStageFilter('all')}
+          >
+            All
+          </span>
+          {VISIBLE_GROUPS.map(g => (
+            <span
+              key={g.key}
+              className={`lead-filter-tab ${stageFilter === g.key ? 'active' : ''}`}
+              onClick={() => setStageFilter(stageFilter === g.key ? 'all' : g.key)}
             >
-              {o.label}
-            </button>
+              {g.label}
+            </span>
           ))}
         </div>
 
-        {/* Heat */}
         <select
-          value={heatFilter}
-          onChange={e => setHeatFilter(e.target.value)}
-          className="v2d-date"
-          style={{ minWidth: 120, cursor: 'pointer' }}
-          title="Lead heat"
+          value={segmentFilter}
+          onChange={e => setSegmentFilter(e.target.value)}
+          className="lead-filter-select"
+          style={{ minWidth: 130 }}
+          title="Segment"
         >
-          <option value="all">All heat</option>
-          <option value="hot">🔥 Hot</option>
-          <option value="warm">Warm</option>
-          <option value="cold">Cold</option>
+          <option value="all">Segment: All</option>
+          <option value="PRIVATE">Segment: Private</option>
+          <option value="GOVERNMENT">Segment: Govt</option>
         </select>
 
-        {/* Source */}
         {distinctSources.length > 0 && (
           <select
             value={sourceFilter}
             onChange={e => setSourceFilter(e.target.value)}
-            className="v2d-date"
-            style={{ minWidth: 140, cursor: 'pointer' }}
+            className="lead-filter-select"
+            style={{ minWidth: 140 }}
           >
-            <option value="all">All sources</option>
+            <option value="all">Source: Any</option>
             {distinctSources.map(s => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>{`Source: ${s}`}</option>
             ))}
           </select>
         )}
 
-        {/* City */}
         {distinctCities.length > 0 && (
           <select
             value={cityFilter}
             onChange={e => setCityFilter(e.target.value)}
-            className="v2d-date"
-            style={{ minWidth: 130, cursor: 'pointer' }}
+            className="lead-filter-select"
+            style={{ minWidth: 130 }}
           >
-            <option value="all">All cities</option>
+            <option value="all">City: All</option>
             {distinctCities.map(c => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c} value={c}>{`City: ${c}`}</option>
             ))}
           </select>
         )}
 
-        {/* Assigned rep — admin / privileged only */}
         {isPrivileged && distinctReps.length > 0 && (
           <select
             value={repFilter}
             onChange={e => setRepFilter(e.target.value)}
-            className="v2d-date"
-            style={{ minWidth: 160, cursor: 'pointer' }}
+            className="lead-filter-select"
+            style={{ minWidth: 160 }}
           >
-            <option value="all">All assignees</option>
+            <option value="all">Assigned: Anyone</option>
             {distinctReps.map(r => (
-              <option key={r.id} value={r.id}>{r.name}</option>
+              <option key={r.id} value={r.id}>{`Assigned: ${r.name}`}</option>
             ))}
           </select>
         )}
 
         {hasActiveFilters && (
           <button
-            className="v2d-ghost v2d-ghost--btn"
+            className="lead-btn lead-btn-sm"
             onClick={() => {
               setSearch('')
               setStageFilter('all')
@@ -423,98 +379,75 @@ export default function LeadsV2() {
               setSourceFilter('all')
               setCityFilter('all')
               setRepFilter('all')
-              setHeatFilter('all')
             }}
           >
-            <X size={12} />
+            <X size={11} />
             <span>Reset</span>
           </button>
         )}
       </div>
 
-      {/* ─── Bulk action bar (shown only when something selected) ─── */}
-      {selected.size > 0 && isPrivileged && (
-        <div style={{
-          background: 'rgba(255,230,0,.08)',
-          border: '1px solid rgba(255,230,0,.28)',
-          borderRadius: 12,
-          padding: '10px 14px',
-          marginBottom: 12,
-          display: 'flex', alignItems: 'center', gap: 12,
-          fontSize: 13,
-        }}>
-          <span style={{ fontWeight: 600 }}>
-            {selected.size} selected
-          </span>
-          <button
-            className="v2d-cta"
-            style={{ padding: '6px 14px', fontSize: 12 }}
-            onClick={() => setReassignOpen(true)}
-          >
-            <UsersIcon size={13} />
-            <span>Reassign</span>
-          </button>
-          <button
-            className="v2d-ghost v2d-ghost--btn"
-            onClick={() => setSelected(new Set())}
-          >
-            <span>Clear</span>
-          </button>
-        </div>
-      )}
-
-      {/* ─── Status banner: error / loading / empty / table ─── */}
+      {/* ─── Status / loading / empty / error / table ─── */}
       {error && (
-        <div style={{
-          background: 'var(--tint-red-bg, rgba(248,113,113,.10))',
-          border: '1px solid var(--tint-red-bd, rgba(248,113,113,.28))',
-          color: 'var(--red, #f87171)',
-          borderRadius: 12, padding: '12px 16px', marginBottom: 12, fontSize: 13,
-        }}>
-          ⚠ {error}
+        <div
+          className="lead-card"
+          style={{
+            background: 'var(--danger-soft)',
+            borderColor: 'var(--danger)',
+            color: 'var(--danger)',
+            padding: '12px 16px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            fontSize: 13, marginBottom: 12,
+          }}
+        >
+          <AlertTriangle size={16} />
+          <span>{error}</span>
         </div>
       )}
 
       {loading ? (
-        <div className="v2d-loading"><div className="v2d-spinner" />Loading leads…</div>
+        <div className="lead-card lead-card-pad" style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
+          Loading leads…
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="v2d-panel v2d-empty-card">
-          <div className="v2d-empty-ic"><UsersIcon size={32} /></div>
-          <div className="v2d-empty-t">
+        <div className="lead-card lead-card-pad" style={{ textAlign: 'center', padding: 40 }}>
+          <UsersIcon size={32} style={{ color: 'var(--text-subtle)', marginBottom: 10 }} />
+          <div style={{ fontSize: 15, fontWeight: 600 }}>
             {leads.length === 0 ? 'No leads yet' : 'No leads match these filters'}
           </div>
-          <div className="v2d-empty-s">
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
             {leads.length === 0
               ? (isPrivileged
-                  ? 'Click Upload Excel to import from Cronberry, or New Lead to start fresh.'
+                  ? 'Click Upload CSV to import from Cronberry, or New Lead to start fresh.'
                   : 'Leads will appear here as they are assigned to you.')
               : 'Try clearing filters or searching differently.'}
           </div>
         </div>
       ) : (
-        <div className="v2d-panel" style={{ overflow: 'hidden' }}>
-          <table className="v2d-q-table">
+        <div className="lead-card" style={{ overflow: 'auto' }}>
+          <table className="lead-table">
             <thead>
               <tr>
                 {isPrivileged && (
-                  <th style={{ width: 36 }}>
+                  <th style={{ width: 32 }}>
                     <input
                       type="checkbox"
                       checked={selected.size === filtered.length && filtered.length > 0}
                       onChange={toggleSelectAll}
                       style={{ cursor: 'pointer' }}
+                      aria-label="Select all"
                     />
                   </th>
                 )}
+                <th style={{ width: 18 }}></th>
                 <th>Lead</th>
-                <th>Company</th>
+                <th>Phone</th>
                 <th>Stage</th>
-                <th>Heat</th>
+                <th>Segment</th>
                 <th>Source</th>
-                <th>City</th>
                 {isPrivileged && <th>Assigned</th>}
+                <th>Last</th>
                 <th style={{ textAlign: 'right' }}>Value</th>
-                <th>Last contact</th>
               </tr>
             </thead>
             <tbody>
@@ -525,7 +458,6 @@ export default function LeadsV2() {
                     if (e.target.tagName === 'INPUT') return
                     navigate(`/leads/${l.id}`)
                   }}
-                  style={{ cursor: 'pointer' }}
                 >
                   {isPrivileged && (
                     <td onClick={(e) => e.stopPropagation()}>
@@ -534,34 +466,44 @@ export default function LeadsV2() {
                         checked={selected.has(l.id)}
                         onChange={() => toggleSelected(l.id)}
                         style={{ cursor: 'pointer' }}
+                        aria-label={`Select ${l.name}`}
                       />
                     </td>
                   )}
+                  <td><HeatDot heat={l.heat} /></td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{l.name}</div>
-                    {l.phone && (
-                      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontFamily: 'var(--v2-mono, monospace)', marginTop: 2 }}>
-                        {l.phone}
+                    <div className="name-cell">
+                      <div>
+                        <div className="name">{l.name}</div>
+                        <div className="company">{l.company || '—'}</div>
                       </div>
-                    )}
+                    </div>
                   </td>
-                  <td style={{ color: 'var(--v2-ink-1)' }}>
-                    {l.company || <span style={{ color: 'var(--v2-ink-2)' }}>—</span>}
+                  <td className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {l.phone || '—'}
                   </td>
                   <td><StageChip stage={l.stage} /></td>
-                  <td><HeatDot heat={l.heat} /></td>
-                  <td style={{ fontSize: 12, color: 'var(--v2-ink-1)' }}>{l.source || '—'}</td>
-                  <td style={{ fontSize: 12, color: 'var(--v2-ink-1)' }}>{l.city || '—'}</td>
+                  <td><SegChip segment={l.segment} /></td>
+                  <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {l.source || '—'}
+                  </td>
                   {isPrivileged && (
-                    <td style={{ fontSize: 12, color: 'var(--v2-ink-1)' }}>
-                      {l.assigned?.name || <span style={{ color: 'var(--v2-ink-2)' }}>Unassigned</span>}
+                    <td>
+                      {l.assigned?.name ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <LeadAvatar name={l.assigned.name} userId={l.assigned.id} />
+                          <span style={{ fontSize: 12 }}>{l.assigned.name}</span>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Unassigned</span>
+                      )}
                     </td>
                   )}
-                  <td style={{ textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 600 }}>
-                    {l.expected_value ? formatCurrency(l.expected_value) : '—'}
+                  <td className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {l.last_contact_at ? formatRelative(l.last_contact_at) : '—'}
                   </td>
-                  <td style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontFamily: 'var(--v2-mono, monospace)' }}>
-                    {l.last_contact_at ? formatDate(l.last_contact_at) : '—'}
+                  <td className="mono" style={{ fontWeight: 600, fontFamily: 'var(--font-display)', textAlign: 'right' }}>
+                    {l.expected_value ? formatCurrency(l.expected_value) : '—'}
                   </td>
                 </tr>
               ))}
@@ -570,27 +512,61 @@ export default function LeadsV2() {
         </div>
       )}
 
+      {/* ─── Sticky bulk action bar (privileged + selection > 0) ─── */}
+      {selected.size > 0 && isPrivileged && (
+        <div
+          style={{
+            position: 'sticky', bottom: 12, marginTop: 16,
+            background: 'var(--surface)',
+            border: '1px solid var(--accent)',
+            borderRadius: 999,
+            padding: '10px 16px',
+            display: 'flex', alignItems: 'center', gap: 12,
+            boxShadow: '0 8px 24px rgba(0,0,0,.30)',
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>{selected.size} selected</span>
+          <div style={{ flex: 1 }} />
+          <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={() => setReassignOpen(true)}>
+            <UsersIcon size={12} /> Reassign
+          </button>
+          <button className="lead-btn lead-btn-sm" onClick={() => setSelected(new Set())}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* ─── Reassign modal ─── */}
       {reassignOpen && (
-        <div className="mo" onClick={(e) => {
-          if (e.target === e.currentTarget && !reassignBusy) setReassignOpen(false)
-        }}>
-          <div className="md" style={{ maxWidth: 480 }}>
-            <div className="md-h">
-              <div className="md-t">
-                <UsersIcon size={16} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-                Reassign {selected.size} lead{selected.size !== 1 ? 's' : ''}
+        <div
+          className="lead-modal-back"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !reassignBusy) setReassignOpen(false)
+          }}
+        >
+          <div className="lead-modal">
+            <div className="lead-modal-head">
+              <div>
+                <div className="lead-modal-title">Reassign {selected.size} lead{selected.size !== 1 ? 's' : ''}</div>
+                <div className="lead-card-sub">Replaces the current owner. New owner sees them immediately.</div>
               </div>
-              <button className="md-x" onClick={() => setReassignOpen(false)} disabled={reassignBusy}>✕</button>
+              <button
+                className="lead-btn lead-btn-sm"
+                onClick={() => setReassignOpen(false)}
+                disabled={reassignBusy}
+                aria-label="Close"
+              >
+                <X size={14} />
+              </button>
             </div>
-            <div className="md-b">
-              <div className="fg">
-                <label>Assign to</label>
+            <div className="lead-modal-body">
+              <div>
+                <label className="lead-fld-label">Pick a person</label>
                 <select
+                  className="lead-inp"
                   value={reassignTarget}
                   onChange={e => setReassignTarget(e.target.value)}
                   disabled={reassignBusy}
-                  style={{ width: '100%' }}
                 >
                   <option value="">— pick a person —</option>
                   {assignableUsers.map(u => (
@@ -599,27 +575,26 @@ export default function LeadsV2() {
                     </option>
                   ))}
                 </select>
-                <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 6 }}>
-                  Reassigning replaces the current owner. The new owner will see these leads in their list immediately.
-                </p>
               </div>
               {reassignErr && (
-                <div style={{
-                  background: 'rgba(248,113,113,.10)',
-                  border: '1px solid rgba(248,113,113,.28)',
-                  color: 'var(--red, #f87171)',
-                  borderRadius: 8, padding: '10px 14px', fontSize: 13, marginTop: 8,
-                }}>
+                <div
+                  style={{
+                    background: 'var(--danger-soft)',
+                    border: '1px solid var(--danger)',
+                    color: 'var(--danger)',
+                    borderRadius: 8, padding: '10px 14px', fontSize: 13,
+                  }}
+                >
                   {reassignErr}
                 </div>
               )}
             </div>
-            <div className="md-f">
-              <button className="btn btn-ghost" onClick={() => setReassignOpen(false)} disabled={reassignBusy}>
+            <div className="lead-modal-foot">
+              <button className="lead-btn" onClick={() => setReassignOpen(false)} disabled={reassignBusy}>
                 Cancel
               </button>
               <button
-                className="btn btn-y"
+                className="lead-btn lead-btn-primary"
                 onClick={handleReassign}
                 disabled={reassignBusy || !reassignTarget}
               >
@@ -633,34 +608,82 @@ export default function LeadsV2() {
   )
 }
 
-/* ─── Dashboard stat card ─── */
-function DashStat({ label, value, accent, sub }) {
-  const colors = {
-    blue:  '#60a5fa',
-    amber: '#fbbf24',
-    green: '#4ade80',
-    red:   '#f87171',
-  }
-  const c = colors[accent] || 'var(--v2-ink-0)'
+/* ──────────────────────────────────────────────────────────────────
+   Sub-components
+   ────────────────────────────────────────────────────────────────── */
+
+function StatCard({ label, num, meta }) {
   return (
-    <div className="v2d-panel" style={{ padding: '12px 14px' }}>
-      <div style={{
-        fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
-        color: 'var(--v2-ink-2)', marginBottom: 6,
-      }}>{label}</div>
-      <div style={{
-        fontFamily: 'var(--v2-display)',
-        fontWeight: 600, fontSize: 22,
-        color: c,
-        lineHeight: 1.1,
-      }}>
-        {value}
+    <div className="lead-stat-card">
+      <div className="lead-stat-eyebrow">{label}</div>
+      <div className="lead-stat-num">{num}</div>
+      {meta ? <div className="lead-stat-meta">{meta}</div> : null}
+    </div>
+  )
+}
+
+/* AI briefing card — renders only when there's something to surface
+   (hot idle, SLA breaches, or overnight imports). Hidden if everything
+   is calm so the page isn't noisy. */
+function AIBriefingCard({ briefing, onOpenQueue }) {
+  const { hotIdle, slaBreaches, cronberryOvernight, sampleHot } = briefing
+  if (!hotIdle.length && !slaBreaches.length && !cronberryOvernight.length) {
+    return null
+  }
+  return (
+    <div className="lead-ai-card">
+      <div className="lead-ai-icon">
+        <Sparkles size={20} />
       </div>
-      {sub && (
-        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 4 }}>
-          {sub}
+      <div>
+        <div className="lead-ai-eyebrow">
+          <span className="pulse" />
+          AI briefing · leads
         </div>
-      )}
+        <p className="lead-ai-recap">
+          {hotIdle.length > 0 && (<><b>{hotIdle.length} hot lead{hotIdle.length !== 1 ? 's' : ''}</b> idle &gt; 24h</>)}
+          {hotIdle.length > 0 && slaBreaches.length > 0 && ' · '}
+          {slaBreaches.length > 0 && (<><b>{slaBreaches.length} SLA breach{slaBreaches.length !== 1 ? 'es' : ''}</b> on hand-offs</>)}
+          {(hotIdle.length > 0 || slaBreaches.length > 0) && cronberryOvernight.length > 0 && ' · '}
+          {cronberryOvernight.length > 0 && (<><b>{cronberryOvernight.length} imported</b> from Cronberry overnight</>)}
+        </p>
+        <div className="lead-ai-list">
+          {sampleHot && (
+            <div className="lead-ai-item">
+              <HeatDot heat={sampleHot.heat} />
+              <span>
+                <b>{sampleHot.name}</b>
+                {sampleHot.company ? ` · ${sampleHot.company}` : ''}
+                {' · awaiting follow-up'}
+              </span>
+              <span className="meta">{sampleHot.assigned?.name || 'unassigned'}</span>
+            </div>
+          )}
+          {slaBreaches.length > 0 && (
+            <div className="lead-ai-item">
+              <HeatDot heat="hot" />
+              <span>
+                <b>{slaBreaches.length} SalesReady</b> lead{slaBreaches.length !== 1 ? 's' : ''} past 24h SLA
+              </span>
+              <span className="meta">overdue</span>
+            </div>
+          )}
+          {cronberryOvernight.length > 0 && (
+            <div className="lead-ai-item">
+              <HeatDot heat="warm" />
+              <span>{cronberryOvernight.length} stale Cronberry imports tagged for review</span>
+              <span className="meta">cleanup</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-subtle)' }}>now</span>
+        <button className="lead-btn" onClick={onOpenQueue}>
+          <span>Open queue</span>
+          <ArrowRight size={12} />
+        </button>
+      </div>
     </div>
   )
 }
