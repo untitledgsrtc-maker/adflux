@@ -1,58 +1,40 @@
 // src/pages/v2/LeadDetailV2.jsx
 //
-// Phase 12 (M1) — single lead detail page.
+// Phase 16 commit 3 — Lead detail, ported in-place from owner's
+// Claude Design output (_design_reference/Leads/lead-admin.jsx ·
+// AdminLeadDetail). Same /leads/:id route, new UI.
 //
-// Header: name, company, stage chip, heat, assigned, last contact.
-// Body: activity timeline + log-call + log-meeting + stage transition
-// + convert-to-quote + reassign.
+// Uses the 3 Phase 16 modal components for actions:
+//   • LogActivityModal     — call / whatsapp / email / meeting / site_visit / note
+//   • ChangeStageModal     — 10-stage move with BANT gate on SalesReady
+//   • ReassignModal        — admin/manager rep change
 //
-// Stage transitions force decisions:
-//   • Lost     → mandatory lost_reason
-//   • Nurture  → mandatory nurture_revisit_date (max 90 days out)
-//   • SalesReady → 4 mandatory fields (budget, timeline, decision-maker,
-//                  service interest) + manual rep pick (per §17.1, rep
-//                  required, with city + load shown for the suggested rep)
+// Layout (matches design):
+//   Header card: name + stage chip + heat dot + segment chip + meta row
+//                + expected value (right) + 6 action buttons
+//   Two columns:
+//     LEFT (8) — Activity timeline
+//     RIGHT (4) — Lead details · Ownership (with SLA pill) · Stage history
 //
-// RLS lets in: admin, govt_partner (for govt leads), assigned sales rep,
-// telecaller, sales manager (direct reports).
+// RLS lets in: admin, govt_partner (Govt leads), assigned sales rep,
+// telecaller, sales_manager (direct reports).
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Phone, MessageCircle, Mail, FileText as FileTextIcon,
-  Calendar, MapPin, User, Loader2, Plus, Edit3, RefreshCw,
-  CheckCircle2, XCircle, Clock,
+  ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
+  RefreshCw, Sparkles, FileText as FileTextIcon, Users as UsersIcon,
+  AlertTriangle, Clock,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { formatCurrency, formatDate, formatRelative } from '../../utils/formatters'
 import {
-  LEAD_STAGES, STAGE_LABELS, STAGE_TINT, LOST_REASONS, HEAT_OPTIONS,
-} from '../../hooks/useLeads'
-import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters'
-
-/* ─── Stage chip ─── */
-function StageChip({ stage, large = false }) {
-  const tint = STAGE_TINT[stage] || 'blue'
-  const tintMap = {
-    blue:   { bg: 'rgba(96,165,250,.12)',  bd: 'rgba(96,165,250,.30)',  fg: '#60a5fa' },
-    green:  { bg: 'rgba(74,222,128,.10)',  bd: 'rgba(74,222,128,.28)',  fg: '#4ade80' },
-    amber:  { bg: 'rgba(251,191,36,.10)',  bd: 'rgba(251,191,36,.28)',  fg: '#fbbf24' },
-    red:    { bg: 'rgba(248,113,113,.10)', bd: 'rgba(248,113,113,.28)', fg: '#f87171' },
-    purple: { bg: 'rgba(192,132,252,.12)', bd: 'rgba(192,132,252,.30)', fg: '#c084fc' },
-  }
-  const s = tintMap[tint]
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: large ? '5px 14px' : '3px 9px', borderRadius: 999,
-      fontSize: large ? 13 : 11, fontWeight: 600,
-      background: s.bg, border: `1px solid ${s.bd}`, color: s.fg,
-      whiteSpace: 'nowrap',
-    }}>
-      {STAGE_LABELS[stage] || stage}
-    </span>
-  )
-}
+  StageChip, HeatDot, SegChip, LeadAvatar, OutcomeChip, Pill,
+} from '../../components/leads/LeadShared'
+import LogActivityModal from '../../components/leads/LogActivityModal'
+import ChangeStageModal from '../../components/leads/ChangeStageModal'
+import ReassignModal   from '../../components/leads/ReassignModal'
 
 const ACTIVITY_ICON = {
   call:          Phone,
@@ -62,6 +44,7 @@ const ACTIVITY_ICON = {
   site_visit:    MapPin,
   note:          Edit3,
   status_change: RefreshCw,
+  imported:      Sparkles,
 }
 const ACTIVITY_COLOR = {
   call:          'blue',
@@ -69,32 +52,51 @@ const ACTIVITY_COLOR = {
   email:         'amber',
   meeting:       'purple',
   site_visit:    'amber',
-  note:          'blue',
-  status_change: 'amber',
+  note:          'amber',
+  status_change: 'purple',
+  imported:      'purple',
+}
+const ACTIVITY_TITLE = {
+  call:          'Call',
+  whatsapp:      'WhatsApp',
+  email:         'Email',
+  meeting:       'Meeting',
+  site_visit:    'Site visit',
+  note:          'Note',
+  status_change: 'Stage change',
+  imported:      'Imported',
+}
+
+function formatDuration(secs) {
+  if (!secs) return null
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return `${m}m ${String(s).padStart(2, '0')}s`
+}
+
+function slaInfo(due) {
+  if (!due) return null
+  const ms = new Date(due).getTime() - Date.now()
+  const hours = ms / (3600 * 1000)
+  if (hours < 0)   return { tone: 'danger', label: `Overdue ${Math.abs(Math.round(hours))}h · was due ${formatDate(due)}` }
+  if (hours <= 6)  return { tone: 'warn',   label: `${Math.round(hours)}h left · due ${formatDate(due)}` }
+  return { tone: 'success', label: `${Math.round(hours)}h left · due ${formatDate(due)}` }
 }
 
 export default function LeadDetailV2() {
   const { id } = useParams()
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+  const isPrivileged = ['admin', 'co_owner', 'sales_manager'].includes(profile?.role)
 
-  const [lead, setLead]           = useState(null)
+  const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState('')
-  const [savingStage, setSavingStage] = useState(false)
-  const [activityOpen, setActivityOpen] = useState(false)
-  const [activityType, setActivityType] = useState('call')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Stage transition modal state
-  const [stageModal, setStageModal] = useState(null) // null | { newStage }
-
-  // Activity form draft
-  const [draft, setDraft] = useState({
-    outcome: '', notes: '', next_action: '', next_action_date: '',
-  })
-  const [savingActivity, setSavingActivity] = useState(false)
+  // Modal state
+  const [activeModal, setActiveModal] = useState(null)   // null | 'stage' | 'reassign'
+  const [activityType, setActivityType] = useState(null) // null | 'call' | 'whatsapp' | …
 
   async function load() {
     setLoading(true)
@@ -121,127 +123,7 @@ export default function LeadDetailV2() {
     setActivities(actRes.data || [])
     setLoading(false)
   }
-
   useEffect(() => { load() /* eslint-disable-next-line */ }, [id])
-
-  /* ─── Stage transition with mandatory fields ─── */
-  function requestStageChange(newStage) {
-    if (newStage === lead.stage) return
-    setStageModal({ newStage, lost_reason: '', nurture_revisit_date: '',
-                    budget_confirmed: false, timeline_confirmed: false,
-                    decision_maker_contact: '', service_interest: '',
-                    handoff_to: '' })
-  }
-
-  async function commitStageChange() {
-    const m = stageModal
-    if (!m) return
-
-    // Validate mandatory fields
-    if (m.newStage === 'Lost' && !m.lost_reason) {
-      alert('Lost reason is required.')
-      return
-    }
-    if (m.newStage === 'Nurture' && !m.nurture_revisit_date) {
-      alert('Nurture revisit date is required.')
-      return
-    }
-    if (m.newStage === 'SalesReady') {
-      if (!m.budget_confirmed || !m.timeline_confirmed
-          || !m.decision_maker_contact?.trim() || !m.service_interest?.trim()) {
-        alert('All four qualification fields are required for Sales Ready.')
-        return
-      }
-      if (!m.handoff_to) {
-        alert('Pick a sales rep to hand off to.')
-        return
-      }
-    }
-
-    setSavingStage(true)
-    const patch = { stage: m.newStage }
-    if (m.newStage === 'Lost')      patch.lost_reason = m.lost_reason
-    if (m.newStage === 'Nurture')   patch.nurture_revisit_date = m.nurture_revisit_date
-    if (m.newStage === 'Qualified') patch.qualified_at = new Date().toISOString()
-    if (m.newStage === 'SalesReady') {
-      patch.qualified_at   = lead.qualified_at || new Date().toISOString()
-      patch.sales_ready_at = new Date().toISOString()
-      patch.assigned_to    = m.handoff_to
-    }
-    const { data, error: err } = await supabase
-      .from('leads')
-      .update(patch)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (!err && (m.newStage === 'SalesReady' || m.newStage === 'Lost' || m.newStage === 'Nurture' || m.newStage === 'Qualified')) {
-      // Log a status_change activity for the timeline.
-      const noteParts = [`Stage → ${STAGE_LABELS[m.newStage] || m.newStage}`]
-      if (m.lost_reason)            noteParts.push(`Reason: ${m.lost_reason}`)
-      if (m.nurture_revisit_date)   noteParts.push(`Revisit: ${m.nurture_revisit_date}`)
-      if (m.newStage === 'SalesReady') {
-        noteParts.push(`Budget ✓ Timeline ✓ DM: ${m.decision_maker_contact} Interest: ${m.service_interest}`)
-      }
-      await supabase.from('lead_activities').insert([{
-        lead_id: id,
-        activity_type: 'status_change',
-        notes: noteParts.join(' · '),
-        created_by: profile.id,
-      }])
-    }
-
-    setSavingStage(false)
-    if (err) {
-      alert('Stage change failed: ' + err.message)
-      return
-    }
-    setStageModal(null)
-    load()
-  }
-
-  /* ─── Activity logging ─── */
-  function openActivity(type) {
-    setActivityType(type)
-    setDraft({ outcome: '', notes: '', next_action: '', next_action_date: '' })
-    setActivityOpen(true)
-  }
-
-  async function commitActivity() {
-    setSavingActivity(true)
-    const row = {
-      lead_id: id,
-      activity_type: activityType,
-      outcome: draft.outcome || null,
-      notes: draft.notes?.trim() || null,
-      next_action: draft.next_action?.trim() || null,
-      next_action_date: draft.next_action_date || null,
-      created_by: profile.id,
-    }
-    // Capture GPS when available (browser permission required).
-    if (navigator.geolocation) {
-      try {
-        const pos = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: false, timeout: 4000, maximumAge: 60000,
-          })
-        })
-        row.gps_lat = pos.coords.latitude
-        row.gps_lng = pos.coords.longitude
-        row.gps_accuracy_m = Math.round(pos.coords.accuracy)
-      } catch (e) {
-        // Permission denied / unavailable — log without GPS.
-      }
-    }
-    const { error: err } = await supabase.from('lead_activities').insert([row])
-    setSavingActivity(false)
-    if (err) {
-      alert('Could not log activity: ' + err.message)
-      return
-    }
-    setActivityOpen(false)
-    load()
-  }
 
   /* ─── Convert lead → quote (prefill wizard) ─── */
   function convertToQuote() {
@@ -261,512 +143,379 @@ export default function LeadDetailV2() {
     })
   }
 
-  /* ─── Render ─── */
-  if (loading) return <div className="v2d-loading"><div className="v2d-spinner" />Loading lead…</div>
-  if (error)   return (
-    <div className="v2d-leads">
-      <button className="v2d-ghost v2d-ghost--btn" onClick={() => navigate('/leads')}>
-        <ArrowLeft size={14} /> Back to Leads
-      </button>
-      <div style={{
-        marginTop: 16,
-        background: 'rgba(248,113,113,.10)',
-        border: '1px solid rgba(248,113,113,.28)',
-        color: '#f87171',
-        borderRadius: 12, padding: '14px 18px', fontSize: 13,
-      }}>⚠ {error}</div>
-    </div>
-  )
+  /* ─── Stage history (status_change activities, oldest first) ─── */
+  const stageHistory = useMemo(() => {
+    return activities
+      .filter(a => a.activity_type === 'status_change')
+      .slice()
+      .reverse()
+  }, [activities])
+
+  if (loading) {
+    return (
+      <div className="lead-root" style={{ padding: 24 }}>
+        <div className="lead-card lead-card-pad" style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
+          Loading lead…
+        </div>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="lead-root">
+        <button className="lead-btn" onClick={() => navigate('/leads')} style={{ marginBottom: 16 }}>
+          <ArrowLeft size={14} /> Back to Leads
+        </button>
+        <div
+          className="lead-card"
+          style={{
+            background: 'var(--danger-soft)',
+            borderColor: 'var(--danger)',
+            color: 'var(--danger)',
+            padding: '12px 16px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            fontSize: 13,
+          }}
+        >
+          <AlertTriangle size={16} />
+          <span>{error}</span>
+        </div>
+      </div>
+    )
+  }
   if (!lead) return null
 
+  const sla = slaInfo(lead.handoff_sla_due_at)
+  const heatLabel = lead.heat ? lead.heat[0].toUpperCase() + lead.heat.slice(1) : null
+
   return (
-    <div className="v2d-lead-detail">
+    <div className="lead-root">
       {/* Back link */}
-      <button
-        className="v2d-ghost v2d-ghost--btn"
-        onClick={() => navigate('/leads')}
-        style={{ marginBottom: 16 }}
-      >
-        <ArrowLeft size={14} /> All Leads
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 12, marginBottom: 12, cursor: 'pointer' }}
+           onClick={() => navigate('/leads')}>
+        <ArrowLeft size={12} />
+        <span>Back to leads</span>
+      </div>
 
       {/* ─── Header card ─── */}
-      <div className="v2d-panel" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div className="v2d-page-kicker">
-              {lead.segment === 'GOVERNMENT' ? 'Govt lead' : lead.segment === 'PRIVATE' ? 'Private lead' : 'Lead'}
-              {lead.source && <> · {lead.source}</>}
-            </div>
-            <h1 className="v2d-page-title" style={{ margin: '4px 0 8px' }}>{lead.name}</h1>
-            {lead.company && (
-              <div style={{ fontSize: 14, color: 'var(--v2-ink-1)' }}>{lead.company}</div>
-            )}
-            <div style={{ display: 'flex', gap: 12, marginTop: 10, flexWrap: 'wrap', fontSize: 12, color: 'var(--v2-ink-2)' }}>
-              {lead.phone && (
-                <span><Phone size={11} style={{ verticalAlign: 'middle' }} /> <span className="v2d-mono" style={{ fontFamily: 'monospace' }}>{lead.phone}</span></span>
-              )}
-              {lead.email && (
-                <span><Mail size={11} style={{ verticalAlign: 'middle' }} /> {lead.email}</span>
-              )}
-              {lead.city && (
-                <span><MapPin size={11} style={{ verticalAlign: 'middle' }} /> {lead.city}</span>
-              )}
-            </div>
+      <div
+        className="lead-card lead-card-pad"
+        style={{
+          marginBottom: 16,
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          gap: 16,
+          alignItems: 'flex-start',
+        }}
+      >
+        {/* Left — name + meta */}
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600 }}>
+            {lead.name}
           </div>
+          {lead.company && (
+            <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 2 }}>{lead.company}</div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <StageChip stage={lead.stage} />
+            {lead.heat && (
+              <>
+                <HeatDot heat={lead.heat} />
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                  {heatLabel}
+                </span>
+              </>
+            )}
+            {lead.segment && <SegChip segment={lead.segment} />}
+            <span style={{ height: 14, width: 1, background: 'var(--border)' }} />
+            {lead.source && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Source · {lead.source}</span>
+            )}
+            {lead.assigned?.name && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                · Assigned <b style={{ color: 'var(--text)' }}>{lead.assigned.name}</b>
+                {lead.assigned.city ? ` · ${lead.assigned.city}` : ''}
+              </span>
+            )}
+            {lead.telecaller?.name && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                · Telecaller <b style={{ color: 'var(--text)' }}>{lead.telecaller.name}</b>
+              </span>
+            )}
+            {lead.last_contact_at && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· last contact {formatRelative(lead.last_contact_at)}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Right — value + action row */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ textAlign: 'right' }}>
-            <StageChip stage={lead.stage} large />
-            <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 8 }}>
-              {lead.assigned ? <>Assigned to <strong style={{ color: 'var(--v2-ink-0)' }}>{lead.assigned.name}</strong></> : 'Unassigned'}
+            <div style={{ fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
+              Expected value
             </div>
-            {lead.expected_value && (
-              <div style={{ fontFamily: 'var(--v2-display)', fontSize: 18, fontWeight: 600, marginTop: 6 }}>
-                {formatCurrency(lead.expected_value)}
-              </div>
-            )}
+            <div
+              style={{
+                fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600,
+                color: lead.expected_value ? 'var(--accent)' : 'var(--text-subtle)',
+              }}
+            >
+              {lead.expected_value ? formatCurrency(lead.expected_value) : '—'}
+            </div>
           </div>
-        </div>
-
-        {/* Action bar */}
-        <div style={{
-          display: 'flex', gap: 8, marginTop: 16, paddingTop: 16,
-          borderTop: '1px solid var(--v2-line, rgba(255,255,255,.06))',
-          flexWrap: 'wrap',
-        }}>
-          {lead.phone && (
-            <a
-              href={`tel:${lead.phone}`}
-              className="v2d-ghost v2d-ghost--btn"
-              onClick={() => openActivity('call')}
-              style={{ textDecoration: 'none' }}
-            >
-              <Phone size={14} /> <span>Call</span>
-            </a>
-          )}
-          <button className="v2d-ghost v2d-ghost--btn" onClick={() => openActivity('call')}>
-            <Phone size={14} /> <span>Log Call</span>
-          </button>
-          <button className="v2d-ghost v2d-ghost--btn" onClick={() => openActivity('whatsapp')}>
-            <MessageCircle size={14} /> <span>Log WhatsApp</span>
-          </button>
-          <button className="v2d-ghost v2d-ghost--btn" onClick={() => openActivity('meeting')}>
-            <Calendar size={14} /> <span>Log Meeting</span>
-          </button>
-          <button className="v2d-ghost v2d-ghost--btn" onClick={() => openActivity('note')}>
-            <Edit3 size={14} /> <span>Note</span>
-          </button>
-          {/* Phase 14 — show "View linked quote" once a quote has been
-              created from this lead, instead of "Convert" again. */}
-          {lead.quote_id ? (
-            <button
-              className="v2d-cta"
-              onClick={() => navigate(
-                lead.segment === 'GOVERNMENT'
-                  ? `/proposal/${lead.quote_id}`
-                  : `/quotes/${lead.quote_id}`
-              )}
-            >
-              <FileTextIcon size={14} /> <span>View linked quote</span>
-            </button>
-          ) : (lead.stage !== 'Won' && lead.stage !== 'Lost') && (
-            <button className="v2d-cta" onClick={convertToQuote}>
-              <FileTextIcon size={14} /> <span>Convert to Quote</span>
-            </button>
-          )}
-        </div>
-
-        {/* Stage transition pill row */}
-        <div style={{ marginTop: 16 }}>
-          <div className="v2d-page-kicker" style={{ marginBottom: 8 }}>Move to stage</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {LEAD_STAGES.filter(s => s !== lead.stage).map(s => (
-              <button
-                key={s}
-                onClick={() => requestStageChange(s)}
-                disabled={savingStage}
-                style={{
-                  padding: '5px 12px', borderRadius: 999,
-                  border: '1px solid var(--v2-line, rgba(255,255,255,.1))',
-                  background: 'transparent',
-                  color: 'var(--v2-ink-1)',
-                  fontSize: 12, fontWeight: 500,
-                  cursor: savingStage ? 'wait' : 'pointer',
-                }}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {lead.phone ? (
+              <a
+                href={`tel:${lead.phone}`}
+                className="lead-btn lead-btn-sm"
+                onClick={() => setActivityType('call')}
+                style={{ textDecoration: 'none' }}
               >
-                {STAGE_LABELS[s]}
+                <Phone size={12} /> Call
+              </a>
+            ) : (
+              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('call')}>
+                <Phone size={12} /> Call
               </button>
-            ))}
+            )}
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
+              <Calendar size={12} /> Meeting
+            </button>
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
+              <Edit3 size={12} /> Note
+            </button>
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
+              <MessageCircle size={12} /> WA
+            </button>
+            <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={() => setActiveModal('stage')}>
+              <RefreshCw size={12} /> Stage
+            </button>
+            {lead.quote_id ? (
+              <button
+                className="lead-btn lead-btn-sm lead-btn-primary"
+                onClick={() => navigate(
+                  lead.segment === 'GOVERNMENT' ? `/proposal/${lead.quote_id}` : `/quotes/${lead.quote_id}`
+                )}
+              >
+                <FileTextIcon size={12} /> View quote
+              </button>
+            ) : (lead.stage !== 'Won' && lead.stage !== 'Lost') && (
+              <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={convertToQuote}>
+                <FileTextIcon size={12} /> Convert
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ─── Activity timeline ─── */}
-      <div className="v2d-panel">
-        <div className="card-head" style={{
-          padding: '14px 18px',
-          borderBottom: '1px solid var(--v2-line, rgba(255,255,255,.06))',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Activity</div>
-            <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
-              {activities.length} entr{activities.length === 1 ? 'y' : 'ies'}
-              {lead.contact_attempts_count > 0 && <> · {lead.contact_attempts_count} contact attempts</>}
-              {lead.last_contact_at && <> · last {formatDateTime(lead.last_contact_at)}</>}
+      {/* ─── Two-column: timeline + side panel ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 16 }}>
+        {/* LEFT — Activity timeline */}
+        <div className="lead-card">
+          <div className="lead-card-head">
+            <div>
+              <div className="lead-card-title">Activity timeline</div>
+              <div className="lead-card-sub">
+                {activities.length} {activities.length === 1 ? 'entry' : 'entries'} · last {Math.min(activities.length, 200)} shown
+              </div>
             </div>
           </div>
-        </div>
-
-        {activities.length === 0 ? (
-          <div className="v2d-empty-card" style={{ margin: '20px 18px' }}>
-            <div className="v2d-empty-ic"><Clock size={28} /></div>
-            <div className="v2d-empty-t">No activity yet</div>
-            <div className="v2d-empty-s">Log a call, WhatsApp, or meeting to start the timeline.</div>
-          </div>
-        ) : (
-          <div className="activity">
-            {activities.map(a => {
-              const Icon = ACTIVITY_ICON[a.activity_type] || Edit3
-              const color = ACTIVITY_COLOR[a.activity_type] || 'blue'
-              return (
-                <div key={a.id} className="act-row" style={{ display: 'grid', gridTemplateColumns: '32px 1fr auto', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--v2-line, rgba(255,255,255,.06))' }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 8,
-                    display: 'grid', placeItems: 'center',
-                    background:
-                      color === 'green'  ? 'rgba(74,222,128,.10)'  :
-                      color === 'red'    ? 'rgba(248,113,113,.10)' :
-                      color === 'amber'  ? 'rgba(251,191,36,.10)'  :
-                      color === 'purple' ? 'rgba(192,132,252,.12)' :
-                                           'rgba(96,165,250,.12)',
-                    color:
-                      color === 'green'  ? '#4ade80'  :
-                      color === 'red'    ? '#f87171'  :
-                      color === 'amber'  ? '#fbbf24'  :
-                      color === 'purple' ? '#c084fc'  :
-                                           '#60a5fa',
-                  }}>
-                    <Icon size={14} />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: 'var(--v2-ink-0)', fontWeight: 500 }}>
-                      {a.activity_type.replace('_', ' ')}
-                      {a.outcome && (
-                        <span style={{
-                          marginLeft: 8, fontSize: 11, fontWeight: 600,
-                          color:
-                            a.outcome === 'positive' ? '#4ade80' :
-                            a.outcome === 'negative' ? '#f87171' :
-                                                       '#fbbf24',
-                        }}>
-                          · {a.outcome}
+          {activities.length === 0 ? (
+            <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+              No activity yet — start with a call or note from the action buttons above.
+            </div>
+          ) : (
+            <div className="lead-timeline">
+              {activities.map(a => {
+                const Icon = ACTIVITY_ICON[a.activity_type] || Edit3
+                const color = ACTIVITY_COLOR[a.activity_type] || 'amber'
+                const dur = formatDuration(a.duration_seconds)
+                return (
+                  <div className="tl-row" key={a.id}>
+                    <div className={`tl-icon ${color}`}><Icon size={14} /></div>
+                    <div>
+                      <div className="tl-head">
+                        <span className="tl-title">
+                          {ACTIVITY_TITLE[a.activity_type] || a.activity_type}
+                          {dur ? ` · ${dur}` : ''}
                         </span>
+                        <OutcomeChip outcome={a.outcome} />
+                        <span className="tl-time">{formatRelative(a.created_at)}</span>
+                      </div>
+                      {a.notes && <div className="tl-body">{a.notes}</div>}
+                      {a.next_action && (
+                        <div className="tl-next">
+                          <Clock size={11} /> Next: {a.next_action}
+                          {a.next_action_date ? ` · ${formatDate(a.next_action_date)}` : ''}
+                        </div>
+                      )}
+                      {(a.gps_lat && a.gps_lng) && (
+                        <div className="tl-gps">
+                          <MapPin size={10} /> {Number(a.gps_lat).toFixed(4)}, {Number(a.gps_lng).toFixed(4)}
+                          {a.gps_accuracy_m ? ` · ±${a.gps_accuracy_m}m` : ''}
+                        </div>
+                      )}
+                      {a.user?.name && (
+                        <div style={{ fontSize: 10, color: 'var(--text-subtle)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                          by {a.user.name}
+                        </div>
                       )}
                     </div>
-                    {a.notes && <div style={{ fontSize: 12, color: 'var(--v2-ink-1)', marginTop: 2 }}>{a.notes}</div>}
-                    {a.next_action && (
-                      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 4 }}>
-                        Next: {a.next_action}{a.next_action_date && <> · {formatDate(a.next_action_date)}</>}
-                      </div>
-                    )}
-                    {a.user?.name && (
-                      <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', marginTop: 4, letterSpacing: '.04em' }}>
-                        by {a.user.name}
-                      </div>
-                    )}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontFamily: 'monospace' }}>
-                    {formatDateTime(a.created_at)}
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT — side panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Lead details */}
+          <div className="lead-card">
+            <div className="lead-card-head">
+              <div className="lead-card-title">Lead details</div>
+            </div>
+            <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
+              {[
+                ['Phone',    lead.phone || '—'],
+                ['Email',    lead.email || '—'],
+                ['City',     lead.city || '—'],
+                ['Industry', lead.industry || '—'],
+                ['Source',   lead.source || '—'],
+                ['Created',  lead.created_at ? formatDate(lead.created_at) : '—'],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
+                    {k}
                   </div>
+                  <div style={{ wordBreak: 'break-word' }}>{v}</div>
                 </div>
-              )
-            })}
+              ))}
+              {lead.notes && (
+                <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))', paddingTop: 10, marginTop: 4 }}>
+                  <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
+                    Notes
+                  </div>
+                  <div style={{ whiteSpace: 'pre-line' }}>{lead.notes}</div>
+                </div>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* Ownership */}
+          <div className="lead-card">
+            <div className="lead-card-head">
+              <div className="lead-card-title">Ownership</div>
+              {isPrivileged && (
+                <span className="lead-card-link" onClick={() => setActiveModal('reassign')}>
+                  <UsersIcon size={11} /> Reassign
+                </span>
+              )}
+            </div>
+            <div className="lead-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Assigned to</span>
+                {lead.assigned?.name ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <LeadAvatar name={lead.assigned.name} userId={lead.assigned.id} />
+                    {lead.assigned.name}
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--text-subtle)' }}>Unassigned</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Telecaller</span>
+                {lead.telecaller?.name ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <LeadAvatar name={lead.telecaller.name} userId={lead.telecaller.id} />
+                    {lead.telecaller.name}
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--text-subtle)' }}>—</span>
+                )}
+              </div>
+              {sla && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Hand-off SLA</span>
+                  <Pill tone={sla.tone}>{sla.label}</Pill>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Contact attempts</span>
+                <span className="mono">{lead.contact_attempts_count || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stage history */}
+          <div className="lead-card">
+            <div className="lead-card-head">
+              <div className="lead-card-title">Stage history</div>
+            </div>
+            <div className="lead-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+              <Row label="Created"   right={<span className="mono">{lead.created_at ? formatDate(lead.created_at) : '—'}</span>} />
+              {lead.qualified_at && (
+                <Row label="Qualified" right={<span className="mono">{formatDate(lead.qualified_at)}</span>} />
+              )}
+              {lead.sales_ready_at && (
+                <Row label="Sales Ready" right={<span className="mono">{formatDate(lead.sales_ready_at)}</span>} />
+              )}
+              {stageHistory.slice(0, 5).map(h => (
+                <Row
+                  key={h.id}
+                  label={h.notes?.split(' · ')[0] || 'Status change'}
+                  right={
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {h.user?.name ? `${h.user.name} · ` : ''}
+                      <span className="mono">{formatDate(h.created_at)}</span>
+                    </span>
+                  }
+                />
+              ))}
+              {lead.lost_reason && (
+                <Row label="Lost reason" right={<Pill tone="danger">{lead.lost_reason}</Pill>} />
+              )}
+              {lead.nurture_revisit_date && (
+                <Row label="Nurture revisit" right={<span className="mono">{formatDate(lead.nurture_revisit_date)}</span>} />
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* ─── Activity log modal ─── */}
-      {activityOpen && (
-        <ActivityModal
-          activityType={activityType}
-          draft={draft}
-          setDraft={setDraft}
-          saving={savingActivity}
-          onCancel={() => setActivityOpen(false)}
-          onCommit={commitActivity}
+      {/* ─── Modals ─── */}
+      {activityType && (
+        <LogActivityModal
+          lead={lead}
+          type={activityType}
+          onClose={() => setActivityType(null)}
+          onSaved={load}
         />
       )}
-
-      {/* ─── Stage transition modal ─── */}
-      {stageModal && (
-        <StageModal
-          modal={stageModal}
-          setModal={setStageModal}
-          saving={savingStage}
-          onCancel={() => setStageModal(null)}
-          onCommit={commitStageChange}
-          leadCity={lead.city}
-          leadSegment={lead.segment}
+      {activeModal === 'stage' && (
+        <ChangeStageModal
+          lead={lead}
+          onClose={() => setActiveModal(null)}
+          onSaved={load}
+        />
+      )}
+      {activeModal === 'reassign' && (
+        <ReassignModal
+          lead={lead}
+          onClose={() => setActiveModal(null)}
+          onSaved={load}
         />
       )}
     </div>
   )
 }
 
-/* ─── Activity log modal ─── */
-function ActivityModal({ activityType, draft, setDraft, saving, onCancel, onCommit }) {
-  const Icon = ACTIVITY_ICON[activityType] || Edit3
+function Row({ label, right }) {
   return (
-    <div className="mo" onClick={(e) => { if (e.target === e.currentTarget && !saving) onCancel() }}>
-      <div className="md" style={{ maxWidth: 480 }}>
-        <div className="md-h">
-          <div className="md-t">
-            <Icon size={16} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-            Log {activityType.replace('_', ' ')}
-          </div>
-          <button className="md-x" onClick={onCancel} disabled={saving}>✕</button>
-        </div>
-        <div className="md-b">
-          {activityType !== 'note' && activityType !== 'status_change' && (
-            <div className="fg">
-              <label>Outcome</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[
-                  { v: 'positive', label: '👍 Positive', color: '#4ade80' },
-                  { v: 'neutral',  label: '· Neutral',   color: '#fbbf24' },
-                  { v: 'negative', label: '👎 Negative', color: '#f87171' },
-                ].map(o => (
-                  <button
-                    key={o.v}
-                    type="button"
-                    onClick={() => setDraft(d => ({ ...d, outcome: o.v }))}
-                    style={{
-                      flex: 1,
-                      padding: '8px 10px', borderRadius: 8,
-                      border: `1px solid ${draft.outcome === o.v ? o.color : 'var(--v2-line, rgba(255,255,255,.1))'}`,
-                      background: draft.outcome === o.v ? `${o.color}22` : 'transparent',
-                      color: draft.outcome === o.v ? o.color : 'var(--v2-ink-1)',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="fg">
-            <label>Notes</label>
-            <textarea
-              value={draft.notes}
-              onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
-              placeholder="What happened? 1-line summary."
-              style={{ minHeight: 80, width: '100%' }}
-            />
-          </div>
-          <div className="grid2">
-            <div className="fg">
-              <label>Next action</label>
-              <input
-                value={draft.next_action}
-                onChange={e => setDraft(d => ({ ...d, next_action: e.target.value }))}
-                placeholder="e.g. Send revised quote"
-              />
-            </div>
-            <div className="fg">
-              <label>Next action date</label>
-              <input
-                type="date"
-                value={draft.next_action_date}
-                onChange={e => setDraft(d => ({ ...d, next_action_date: e.target.value }))}
-              />
-            </div>
-          </div>
-          <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 4 }}>
-            GPS captured automatically if you allow browser permission. Won't block save if denied.
-          </p>
-        </div>
-        <div className="md-f">
-          <button className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button>
-          <button className="btn btn-y" onClick={onCommit} disabled={saving}>
-            {saving ? 'Logging…' : 'Log activity'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ─── Stage transition modal ─── */
-function StageModal({ modal, setModal, saving, onCancel, onCommit, leadCity, leadSegment }) {
-  const [reps, setReps] = useState([])
-  const [loadingReps, setLoadingReps] = useState(false)
-  const newStage = modal.newStage
-
-  useEffect(() => {
-    if (newStage !== 'SalesReady') return
-    setLoadingReps(true)
-    // Pull active sales reps; sort by city-match first (suggested first).
-    supabase
-      .from('users')
-      .select('id, name, team_role, city, is_active')
-      .in('team_role', ['sales', 'agency'])
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => {
-        const list = data || []
-        if (leadCity) {
-          list.sort((a, b) => {
-            const aMatch = a.city === leadCity ? -1 : 0
-            const bMatch = b.city === leadCity ? -1 : 0
-            return aMatch - bMatch
-          })
-        }
-        setReps(list)
-        setLoadingReps(false)
-      })
-  }, [newStage, leadCity])
-
-  const tintMap = {
-    blue:   '#60a5fa', green: '#4ade80', amber: '#fbbf24',
-    red:    '#f87171', purple: '#c084fc',
-  }
-  const headerColor = tintMap[STAGE_TINT[newStage] || 'blue']
-
-  return (
-    <div className="mo" onClick={(e) => { if (e.target === e.currentTarget && !saving) onCancel() }}>
-      <div className="md" style={{ maxWidth: 560 }}>
-        <div className="md-h">
-          <div className="md-t" style={{ color: headerColor }}>
-            Move to: {STAGE_LABELS[newStage] || newStage}
-          </div>
-          <button className="md-x" onClick={onCancel} disabled={saving}>✕</button>
-        </div>
-        <div className="md-b">
-          {/* Lost — mandatory reason */}
-          {newStage === 'Lost' && (
-            <div className="fg">
-              <label>Lost reason <span style={{ color: '#f87171' }}>*</span></label>
-              <select
-                value={modal.lost_reason}
-                onChange={e => setModal(m => ({ ...m, lost_reason: e.target.value }))}
-                style={{ width: '100%' }}
-              >
-                <option value="">— pick a reason —</option>
-                {LOST_REASONS.map(r => (<option key={r} value={r}>{r}</option>))}
-              </select>
-              <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 6 }}>
-                Reason is mandatory so the team can later analyze loss patterns.
-              </p>
-            </div>
-          )}
-
-          {/* Nurture — mandatory revisit date */}
-          {newStage === 'Nurture' && (
-            <div className="fg">
-              <label>Revisit date <span style={{ color: '#f87171' }}>*</span></label>
-              <input
-                type="date"
-                value={modal.nurture_revisit_date}
-                onChange={e => setModal(m => ({ ...m, nurture_revisit_date: e.target.value }))}
-                max={new Date(Date.now() + 90*24*60*60*1000).toISOString().slice(0,10)}
-                min={new Date().toISOString().slice(0,10)}
-              />
-              <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 6 }}>
-                Maximum 90 days out — architecture forces a decision instead of letting the lead rot.
-              </p>
-            </div>
-          )}
-
-          {/* SalesReady — 4 mandatory fields + handoff target */}
-          {newStage === 'SalesReady' && (
-            <>
-              <p style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginBottom: 12 }}>
-                Confirm all four qualification fields before passing to sales.
-                Architecture §4.1 — only "Sales Ready" leads can move forward.
-              </p>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <label style={{
-                  flex: 1, padding: '10px 12px', borderRadius: 8,
-                  border: `1px solid ${modal.budget_confirmed ? '#4ade80' : 'var(--v2-line, rgba(255,255,255,.1))'}`,
-                  background: modal.budget_confirmed ? 'rgba(74,222,128,.10)' : 'transparent',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={modal.budget_confirmed}
-                    onChange={e => setModal(m => ({ ...m, budget_confirmed: e.target.checked }))}
-                  />
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>Budget confirmed</span>
-                </label>
-                <label style={{
-                  flex: 1, padding: '10px 12px', borderRadius: 8,
-                  border: `1px solid ${modal.timeline_confirmed ? '#4ade80' : 'var(--v2-line, rgba(255,255,255,.1))'}`,
-                  background: modal.timeline_confirmed ? 'rgba(74,222,128,.10)' : 'transparent',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={modal.timeline_confirmed}
-                    onChange={e => setModal(m => ({ ...m, timeline_confirmed: e.target.checked }))}
-                  />
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>Timeline confirmed</span>
-                </label>
-              </div>
-              <div className="fg">
-                <label>Decision-maker contact <span style={{ color: '#f87171' }}>*</span></label>
-                <input
-                  value={modal.decision_maker_contact}
-                  onChange={e => setModal(m => ({ ...m, decision_maker_contact: e.target.value }))}
-                  placeholder="Name + role of the actual decision-maker"
-                />
-              </div>
-              <div className="fg">
-                <label>Service interest <span style={{ color: '#f87171' }}>*</span></label>
-                <input
-                  value={modal.service_interest}
-                  onChange={e => setModal(m => ({ ...m, service_interest: e.target.value }))}
-                  placeholder="e.g. Auto Hood Vadodara 500 units / GSRTC 5 stations 3 months"
-                />
-              </div>
-              <div className="fg">
-                <label>Hand off to <span style={{ color: '#f87171' }}>*</span></label>
-                <select
-                  value={modal.handoff_to}
-                  onChange={e => setModal(m => ({ ...m, handoff_to: e.target.value }))}
-                  disabled={loadingReps}
-                  style={{ width: '100%' }}
-                >
-                  <option value="">— pick a sales rep —</option>
-                  {reps.map(r => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                      {r.city ? ` · ${r.city}` : ''}
-                      {leadCity && r.city === leadCity ? ' (suggested — same city)' : ''}
-                    </option>
-                  ))}
-                </select>
-                <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 6 }}>
-                  Suggested rep = same city as lead. 24h SLA starts when you confirm.
-                </p>
-              </div>
-            </>
-          )}
-
-          {/* Default — generic confirmation */}
-          {!['Lost','Nurture','SalesReady'].includes(newStage) && (
-            <p style={{ fontSize: 13, color: 'var(--v2-ink-1)' }}>
-              Move this lead to <strong style={{ color: headerColor }}>{STAGE_LABELS[newStage]}</strong>?
-            </p>
-          )}
-        </div>
-        <div className="md-f">
-          <button className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button>
-          <button className="btn btn-y" onClick={onCommit} disabled={saving}>
-            {saving ? 'Saving…' : 'Confirm'}
-          </button>
-        </div>
-      </div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span>{label}</span>
+      <span>{right}</span>
     </div>
   )
 }
