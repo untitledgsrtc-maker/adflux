@@ -477,90 +477,33 @@ export default function SalesDashboardDesktop() {
   const isHome = location.pathname === '/dashboard'
 
   return (
+    // Phase 18c — sales dashboard now lives INSIDE V2AppShell, sharing
+    // the same sidebar as every other page (this is the same fix
+    // applied to AdminDashboardDesktop in Phase 18). Owner saw two
+    // sidebars side-by-side: the V2AppShell one + this component's
+    // own .v2d-side. Strip the .v2d-app + .v2d-side + .v2d-topbar
+    // wrappers; keep .v2d-content as the only child. Greeting +
+    // period picker + Create Quote CTA fold into a page-head row.
     <div className="v2d">
-      <div className="v2d-app">
-        {/* ──── Sidebar ──── */}
-        <aside className="v2d-side">
-          <div className="v2d-brand">
-            <span className="v2d-brand-mark">A</span>
-            <div>
-              <div className="v2d-brand-t">Adflux</div>
-              <div className="v2d-brand-s">Sales</div>
-            </div>
+      <div className="v2d-content">
+        <header
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            flexWrap: 'wrap', marginBottom: 16,
+          }}
+        >
+          <div>
+            <div className="v2d-crumb-kicker">{greeting()}</div>
+            <div className="v2d-crumb-t">{firstName} 👋</div>
           </div>
+          <div style={{ flex: 1 }} />
+          <PeriodPicker period={period} onChange={setPeriod} />
+          <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
+            <Plus size={14} strokeWidth={2.6} /> Create Quote
+          </button>
+        </header>
 
-          <nav className="v2d-nav">
-            <button className={isHome ? 'is-active' : ''} onClick={() => navigate('/dashboard')}>
-              <LayoutDashboard size={16} /><span>Dashboard</span>
-            </button>
-            <button onClick={() => navigate('/quotes')}>
-              <FileText size={16} /><span>Quotes</span>
-            </button>
-            <button onClick={() => navigate('/clients')}>
-              <Contact2 size={16} /><span>Clients</span>
-            </button>
-            <button onClick={() => navigate('/my-performance')}>
-              <BarChart3 size={16} /><span>My Performance</span>
-            </button>
-            <button onClick={() => navigate('/my-offer')}>
-              <Gift size={16} /><span>My Offer</span>
-            </button>
-            <button onClick={() => navigate('/renewal-tools')}>
-              <Repeat size={16} /><span>Renewal Tools</span>
-            </button>
-
-            <div className="v2d-nav-spacer" />
-
-            <div className="v2d-nav-foot">
-              {state.streak > 0 && (
-                <div className="v2d-side-streak">
-                  <div className="v2d-side-streak-k">
-                    <Flame size={12} strokeWidth={2.6} /> Streak
-                  </div>
-                  <div className="v2d-side-streak-v">{state.streak} months</div>
-                  <div className="v2d-side-streak-s">Keep the fire going</div>
-                </div>
-              )}
-              <button onClick={() => signOut?.()}>
-                <LogOut size={16} /><span>Log out</span>
-              </button>
-            </div>
-          </nav>
-        </aside>
-
-        {/* ──── Main column ──── */}
-        <main className="v2d-main">
-          {/* Top bar */}
-          <header className="v2d-topbar">
-            <div>
-              <div className="v2d-crumb-kicker">{greeting()}</div>
-              <div className="v2d-crumb-t">{firstName} 👋</div>
-            </div>
-            <div className="v2d-topbar-spacer" />
-            <div className="v2d-search">
-              <Search size={14} />
-              <input placeholder="Search quotes, clients…" onFocus={() => navigate('/quotes')} readOnly />
-            </div>
-            {/* Period picker — month nav + presets + custom range.
-                Same component as admin dashboard. */}
-            <PeriodPicker period={period} onChange={setPeriod} />
-            <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
-              <Plus size={14} strokeWidth={2.6} /> Create Quote
-            </button>
-            <button className="v2d-bell" aria-label="Notifications">
-              <Bell size={14} />
-              {(state.rejected || state.pendingPending.count > 0) && <span className="v2d-bell-dot" />}
-            </button>
-            <div className="v2d-me">
-              <div className="v2d-me-av">{initials(profile?.name || 'You')}</div>
-              <div>
-                <div className="v2d-me-name">{profile?.name || 'You'}</div>
-                <div className="v2d-me-role">Sales</div>
-              </div>
-            </div>
-          </header>
-
-          <div className="v2d-content">
+        <div>
             {/* Rejected payment banner */}
             {state.rejected && (
               <div className="v2d-banner v2d-banner--warn">
@@ -693,11 +636,10 @@ export default function SalesDashboardDesktop() {
               v2 · sales · {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
             </div>
           </div>
-        </main>
+        </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
 /* ══════════════════════════════════════════════════════════
    Sub-components
