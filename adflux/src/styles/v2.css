@@ -1940,3 +1940,24 @@
 /* Subtle fallback for var(--subtle) used in HR legacy */
 .v2d [style*="--subtle"] { background: var(--v2-surface-2) !important; }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   Phase 19e — topbar polish on phone widths
+   ═══════════════════════════════════════════════════════════════
+   Two issues KAMINA flagged on her phone:
+   1. The yellow "+" CTA showed only the icon, no "New Quote" text.
+      The earlier .v2d-cta span { display: none; } at 860px killed
+      the label. Bring it back — "New Quote" is the primary action
+      on the page and reps shouldn't have to guess what + does.
+   2. The topbar wrapped to two rows on a 380-420px viewport because
+      hamburger + crumb + CTA + bell + avatar didn't fit one row.
+      Drop the bell on phone sizes (notifications are still reachable
+      via the drawer) so the row stays single-line.
+*/
+@media (max-width: 860px) {
+  .v2d-cta span { display: inline; }
+  .v2d-cta { padding: 8px 12px; font-size: 12px; }
+}
+@media (max-width: 500px) {
+  .v2d-bell { display: none; }
+}
