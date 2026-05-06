@@ -54,6 +54,13 @@ const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')!
 const ANON_KEY      = Deno.env.get('SUPABASE_ANON_KEY')!
 
+// Whisper API accepts only ISO-639-1 codes from a fixed list. Gujarati
+// ('gu') is NOT on the list even though Whisper can transcribe it — the
+// API rejects 'gu' with "Language 'gu' is not supported." We pass the
+// hint only for languages OpenAI explicitly accepts; for Gujarati we
+// send nothing and let Whisper auto-detect (works fine in practice).
+const WHISPER_HINT_OK = new Set(['en', 'hi'])
+
 const CLASSIFY_SYSTEM = `You classify a short voice note from a sales rep at an Indian outdoor advertising company. The rep speaks in Gujarati, Hindi, or English (often mixed). The transcript is what they said about a customer interaction.
 
 Return ONLY a JSON object. No prose, no markdown fence. Schema:
@@ -136,7 +143,13 @@ serve(async (req) => {
     const fd = new FormData()
     fd.append('file', audioBlob, fileNameForMime(mime_type))
     fd.append('model', 'whisper-1')
-    if (language_hint) fd.append('language', language_hint)
+    // Phase 20c — Whisper API's `language` param uses ISO-639-1 but
+    // doesn't accept 'gu' (Gujarati) even though the model can transcribe
+    // it. Only pass the hint for languages OpenAI accepts. For Gujarati
+    // we let Whisper auto-detect, which works in practice.
+    if (language_hint && WHISPER_HINT_OK.has(language_hint)) {
+      fd.append('language', language_hint)
+    }
     fd.append('response_format', 'verbose_json')
 
     const wr = await fetch('https://api.openai.com/v1/audio/transcriptions', {
