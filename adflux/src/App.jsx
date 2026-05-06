@@ -98,15 +98,16 @@ export default function App() {
         {/* Public candidate-facing offer form — NO AppShell, NO auth. */}
         <Route path="/offer/:token" element={<OfferForm />} />
 
-        {/* v2 dashboard — owns its own shell (sidebar + topbar) so it
-            sits OUTSIDE V2AppShell. Both /dashboard and /v2/dashboard
-            route to the same switcher so legacy bookmarks still work. */}
-        <Route path="/dashboard"    element={<RequireAuth><DashboardV2 /></RequireAuth>} />
-        <Route path="/v2/dashboard" element={<RequireAuth><DashboardV2 /></RequireAuth>} />
         <Route path="/" element={<RootRedirect />} />
 
-        {/* ─── v2 inner pages (share V2AppShell chrome) ─── */}
+        {/* ─── v2 inner pages (share V2AppShell chrome) ───
+            Phase 18 — /dashboard moved INSIDE V2AppShell so it shares
+            the same sidebar (Lead Pipeline, Team Live, Leads, etc) as
+            every other page. Previously it sat outside and rendered
+            its own chrome which dropped the new nav links. */}
         <Route element={<RequireAuth><V2AppShell /></RequireAuth>}>
+          <Route path="/dashboard"    element={<DashboardV2 />} />
+          <Route path="/v2/dashboard" element={<DashboardV2 />} />
           {/* Shared — admin + sales */}
           <Route path="/quotes"                    element={<QuotesV2 />} />
           <Route path="/quotes/:id"                element={<QuoteDetail />} />

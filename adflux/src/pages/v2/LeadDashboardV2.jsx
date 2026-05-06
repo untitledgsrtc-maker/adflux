@@ -30,13 +30,18 @@ import {
   StageChip, HeatDot, LeadAvatar,
 } from '../../components/leads/LeadShared'
 
+// Phase 18 — rail rolls up the 10 stages into 6 columns so every lead
+// is visible somewhere. Previously a lead in QuoteSent / Negotiating /
+// MeetingScheduled / Nurture was invisible (Total counted them but no
+// rail column showed them) — that's why owner saw Total = 1 with all
+// columns 0 on the test lead in Quote Sent stage.
 const STAGE_RAIL = [
-  { key: 'New',         k: 's-new',  short: 'New' },
-  { key: 'Contacted',   k: 's-cont', short: 'Contacted' },
-  { key: 'Qualified',   k: 's-qual', short: 'Qualified' },
-  { key: 'SalesReady',  k: 's-sr',   short: 'SalesReady' },
-  { key: 'Won',         k: 's-won',  short: 'Won' },
-  { key: 'Lost',        k: 's-lost', short: 'Lost' },
+  { key: 'New',         k: 's-new',  short: 'New',         match: ['New'] },
+  { key: 'Contacted',   k: 's-cont', short: 'Contacted',   match: ['Contacted', 'Nurture'] },
+  { key: 'Qualified',   k: 's-qual', short: 'Qualified',   match: ['Qualified'] },
+  { key: 'SalesReady',  k: 's-sr',   short: 'In Progress', match: ['SalesReady', 'MeetingScheduled', 'QuoteSent', 'Negotiating'] },
+  { key: 'Won',         k: 's-won',  short: 'Won',         match: ['Won'] },
+  { key: 'Lost',        k: 's-lost', short: 'Lost',        match: ['Lost'] },
 ]
 
 export default function LeadDashboardV2() {
@@ -195,10 +200,10 @@ export default function LeadDashboardV2() {
         </div>
       </div>
 
-      {/* ─── Stage rail ─── */}
+      {/* ─── Stage rail (rolls up 10 stages into 6 columns) ─── */}
       <div className="lead-stage-rail">
-        {STAGE_RAIL.map((s, i) => {
-          const n = stageCounts[s.key] || 0
+        {STAGE_RAIL.map((s) => {
+          const n = s.match.reduce((sum, st) => sum + (stageCounts[st] || 0), 0)
           const sub = subForStage(s.key, leads, kpis)
           return (
             <div className={`lead-stage-col ${s.k}`} key={s.key}>

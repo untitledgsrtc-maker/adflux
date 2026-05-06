@@ -63,8 +63,13 @@ export default function TeamDashboardV2() {
         supabase.from('leads')
           .select('id', { count: 'exact', head: true })
           .gte('created_at', startOfDay),
+        // Phase 18 — only count won quotes for "pipeline added today",
+        // not every quote created. Drafts/sent/lost shouldn't inflate the
+        // headline number. Owner saw ₹2.7Cr because every quote created
+        // today was being summed regardless of status.
         supabase.from('quotes')
-          .select('total_amount')
+          .select('total_amount, status')
+          .eq('status', 'won')
           .gte('created_at', startOfDay),
       ])
       if (repsRes.error || sesRes.error) {
@@ -172,7 +177,7 @@ export default function TeamDashboardV2() {
           <HeroStat label="Calls today"       value={totalCallsToday}             delta="from call_logs"                          up={totalCallsToday > 0} />
           <HeroStat label="Voice logs"        value={0}                            delta="Phase 2 — needs API"                     acc />
           <HeroStat label="New leads added"   value={newLeadsToday}                delta="today"                                   up={newLeadsToday > 0} />
-          <HeroStat label="Pipeline added"    value={formatLakh(pipelineToday)}    delta="today"                                   up={pipelineToday > 0} />
+          <HeroStat label="Won today"         value={formatLakh(pipelineToday)}    delta="status=won"                              up={pipelineToday > 0} />
         </div>
       </div>
 

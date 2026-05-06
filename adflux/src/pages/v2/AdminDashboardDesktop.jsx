@@ -660,134 +660,65 @@ export default function AdminDashboardDesktop() {
   }
 
   return (
+    // Phase 18 — dashboard now lives INSIDE V2AppShell, sharing the
+    // same sidebar + topbar as every other page. Previously the
+    // dashboard rendered its own chrome (.v2d-app + .v2d-side +
+    // .v2d-topbar + .v2d-mnav) which caused users to lose the
+    // Lead Pipeline / Team Live / Leads nav links the moment they
+    // clicked Dashboard. The .v2d-side / .v2d-topbar / .v2d-mnav
+    // blocks are deleted; greeting + period picker + segment filter
+    // + Create Quote CTA fold into the page-head row inside content.
     <div className="v2d">
-      <div className="v2d-app">
-        {/* ──── Sidebar ──── */}
-        <aside className="v2d-side">
-          <div className="v2d-brand">
-            <span className="v2d-brand-mark">A</span>
-            <div>
-              <div className="v2d-brand-t">Adflux</div>
-              <div className="v2d-brand-s">Admin</div>
-            </div>
+      <div className="v2d-content">
+        {/* Greeting + filters + CTA — replaces the old internal topbar */}
+        <header
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            flexWrap: 'wrap', marginBottom: 16,
+          }}
+        >
+          <div>
+            <div className="v2d-crumb-kicker">{greeting()}</div>
+            <div className="v2d-crumb-t">{firstName} 👋</div>
+          </div>
+          <div style={{ flex: 1 }} />
+
+          {/* Period picker — month nav + presets + custom range. */}
+          <PeriodPicker period={period} onChange={setPeriod} />
+
+          {/* Segment filter — slices quote-derived KPIs by segment. */}
+          <div style={{
+            display: 'inline-flex', gap: 4, padding: 3,
+            background: 'var(--v2-bg-2)', borderRadius: 999,
+            border: '1px solid var(--v2-border, var(--v2-line))',
+          }}>
+            {[
+              { key: 'all',        label: 'All' },
+              { key: 'private',    label: 'Private' },
+              { key: 'government', label: 'Govt' },
+            ].map(o => (
+              <button
+                key={o.key}
+                onClick={() => setSegmentFilter(o.key)}
+                style={{
+                  padding: '5px 11px', borderRadius: 999, border: 'none',
+                  cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  background: segmentFilter === o.key ? 'var(--v2-ink-0)' : 'transparent',
+                  color:      segmentFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
           </div>
 
-          <nav className="v2d-nav">
-            <button className={isHome ? 'is-active' : ''} onClick={() => navigate('/dashboard')}>
-              <LayoutDashboard size={16} /><span>Dashboard</span>
-            </button>
-            <button onClick={() => navigate('/quotes')}>
-              <FileText size={16} /><span>Quotes</span>
-            </button>
-            <button onClick={() => navigate('/clients')}>
-              <Contact2 size={16} /><span>Clients</span>
-            </button>
-            <button onClick={() => navigate('/pending-approvals')}>
-              <CheckSquare size={16} /><span>Approvals</span>
-              {state.pending.length > 0 && <span className="v2d-nav-badge">{state.pending.length}</span>}
-            </button>
+          <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
+            <Plus size={14} strokeWidth={2.6} /> Create Quote
+          </button>
+        </header>
 
-            <div className="v2d-nav-group">Manage</div>
-            <button onClick={() => navigate('/cities')}>
-              <Building2 size={16} /><span>Cities</span>
-            </button>
-            <button onClick={() => navigate('/auto-districts')}>
-              <MapPin size={16} /><span>Auto Districts</span>
-            </button>
-            <button onClick={() => navigate('/gsrtc-stations')}>
-              <Tv size={16} /><span>GSRTC Stations</span>
-            </button>
-            <button onClick={() => navigate('/master')}>
-              <FileBox size={16} /><span>Master</span>
-            </button>
-            <button onClick={() => navigate('/team')}>
-              <Users size={16} /><span>Team</span>
-            </button>
-            <button onClick={() => navigate('/hr')}>
-              <Gift size={16} /><span>HR</span>
-            </button>
-            <button onClick={() => navigate('/renewal-tools')}>
-              <Repeat size={16} /><span>Renewal Tools</span>
-            </button>
-            <button onClick={() => navigate('/incentives')}>
-              <BarChart3 size={16} /><span>Incentives</span>
-            </button>
-
-            <div className="v2d-nav-spacer" />
-            <div className="v2d-nav-foot">
-              <button onClick={() => navigate('/incentives')}>
-                <Settings size={16} /><span>Settings</span>
-              </button>
-              <button onClick={() => signOut?.()}>
-                <LogOut size={16} /><span>Log out</span>
-              </button>
-            </div>
-          </nav>
-        </aside>
-
-        {/* ──── Main column ──── */}
-        <main className="v2d-main">
-          <header className="v2d-topbar">
-            <div>
-              <div className="v2d-crumb-kicker">{greeting()}</div>
-              <div className="v2d-crumb-t">{firstName} 👋</div>
-            </div>
-            <div className="v2d-topbar-spacer" />
-            <div className="v2d-search">
-              <Search size={14} />
-              <input placeholder="Search quotes, clients…" onFocus={() => navigate('/quotes')} readOnly />
-            </div>
-            {/* Period picker — month nav + presets + custom range.
-                PeriodPicker returns a normalized period object
-                (see utils/period.js). Every calc in load() reads
-                startIso/endIso and monthKeys off that object. */}
-            <PeriodPicker period={period} onChange={setPeriod} />
-
-            {/* Segment filter — slices quote-derived KPIs (Pipeline,
-                Won value, Outstanding, Lost, Active campaigns, Stale,
-                Activity) by segment. Leaderboard / Incentive liability
-                stay segment-blind because monthly_sales_data is. */}
-            <div style={{ display: 'inline-flex', gap: 4, padding: 3, background: 'var(--v2-bg-2)', borderRadius: 999, border: '1px solid var(--v2-border)' }}>
-              {[
-                { key: 'all',        label: 'All' },
-                { key: 'private',    label: 'Private' },
-                { key: 'government', label: 'Govt' },
-              ].map(o => (
-                <button
-                  key={o.key}
-                  onClick={() => setSegmentFilter(o.key)}
-                  style={{
-                    padding: '5px 11px',
-                    borderRadius: 999,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    background: segmentFilter === o.key ? 'var(--v2-ink-0)' : 'transparent',
-                    color:      segmentFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
-                  }}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
-              <Plus size={14} strokeWidth={2.6} /> Create Quote
-            </button>
-            <button className="v2d-bell" aria-label="Notifications" onClick={() => navigate('/pending-approvals')}>
-              <Bell size={14} />
-              {state.pending.length > 0 && <span className="v2d-bell-dot" />}
-            </button>
-            <div className="v2d-me">
-              <div className="v2d-me-av">{initials(profile?.name || 'Admin')}</div>
-              <div>
-                <div className="v2d-me-name">{profile?.name || 'Admin'}</div>
-                <div className="v2d-me-role">Admin</div>
-              </div>
-            </div>
-          </header>
-
-          <div className="v2d-content">
+        {/* end page-head, body below */}
+        <div>
             {/* Phase 12 rev3 — AI Briefing card hoisted to the top so
                 it's the first thing Brijesh sees on /dashboard. Pulls
                 its own data; rule-based until daily-brief Edge Function
@@ -1006,30 +937,10 @@ export default function AdminDashboardDesktop() {
               v2 · admin · {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
             </div>
           </div>
-
-          {/* Mobile bottom nav — CSS hides it above 860px */}
-          <nav className="v2d-mnav" style={{ '--cols': 4 }}>
-            <div className="v2d-mnav-items">
-              <button className={`v2d-mnav-item ${isHome ? 'v2d-mnav-item--active' : ''}`} onClick={() => navigate('/dashboard')}>
-                <LayoutDashboard size={16} /> Home
-              </button>
-              <button className="v2d-mnav-item" onClick={() => navigate('/pending-approvals')}>
-                <CheckSquare size={16} /> Approve
-                {state.pending.length > 0 && <span className="v2d-mnav-badge">{state.pending.length}</span>}
-              </button>
-              <button className="v2d-mnav-item" onClick={() => navigate('/quotes')}>
-                <FileText size={16} /> Quotes
-              </button>
-              <button className="v2d-mnav-item" onClick={() => signOut?.()}>
-                <LogOut size={16} /> Log out
-              </button>
-            </div>
-          </nav>
-        </main>
+        </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
 /* ══════════════════════════════════════════════════════════
    Sub-components

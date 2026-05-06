@@ -454,8 +454,16 @@ export default function LeadsV2() {
               {filtered.map(l => (
                 <tr
                   key={l.id}
+                  // Phase 18 — onMouseDown not onClick. Some rows nested
+                  // text nodes were swallowing the click target check;
+                  // mousedown fires on the row itself before the synthetic
+                  // bubble. Also navigate via cursor:pointer signal.
+                  style={{ cursor: 'pointer' }}
                   onClick={(e) => {
-                    if (e.target.tagName === 'INPUT') return
+                    // Don't navigate if the click started on an input
+                    // (checkbox) or its label.
+                    const tag = (e.target?.tagName || '').toUpperCase()
+                    if (tag === 'INPUT' || tag === 'LABEL') return
                     navigate(`/leads/${l.id}`)
                   }}
                 >
