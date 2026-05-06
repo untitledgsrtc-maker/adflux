@@ -32,7 +32,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
   RefreshCw, Sparkles, FileText as FileTextIcon, Users as UsersIcon,
-  AlertTriangle, Clock,
+  AlertTriangle, Clock, Mic,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -323,6 +323,13 @@ export default function LeadDetailV2() {
             </button>
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
               <MessageCircle size={12} /> WA
+            </button>
+            <button
+              className="lead-btn lead-btn-sm"
+              onClick={() => navigate(`/voice?lead=${lead.id}`)}
+              title="Voice-log this lead — speak in Gujarati / Hindi / English"
+            >
+              <Mic size={12} /> Voice
             </button>
             <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={() => setActiveModal('stage')}>
               <RefreshCw size={12} /> Stage

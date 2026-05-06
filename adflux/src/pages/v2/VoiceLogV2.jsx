@@ -1,47 +1,212 @@
 // src/pages/v2/VoiceLogV2.jsx
 //
-// Phase 16 commit 8 — Voice-First mobile screens, ported visually from
-// _design_reference/Leads/lead-voice.jsx (MVoiceListening, MVoiceConfirm,
-// MEveningReport).
+// Phase 20 — Voice-First V1 (real, not placeholder).
 //
-// Status: UI shells only. Functional voice recording / Whisper / Claude
-// extraction is **NOT WIRED** yet — depends on task #97 (Anthropic API
-// key + Edge Function deploy + Whisper integration).
+// Flow:
+//   1. Pick a lead (preselect via location.state or query string)
+//   2. Tap mic → MediaRecorder starts
+//   3. Tap stop → audio captured, base64-encoded, posted to the
+//      voice-process Edge Function
+//   4. Function transcribes (Whisper) + classifies (Claude) +
+//      inserts lead_activities row
+//   5. Show transcript + classified result + link to lead
 //
-// Each "Tap to record" button shows a banner explaining this and offers
-// a deep link to the API integration guide. Once the API is live, this
-// page swaps to functional MediaRecorder + Whisper transcribe + Claude
-// extract.
+// Mobile-first. Browser audio support: Chrome desktop/Android works
+// out of the box; iOS Safari supports MediaRecorder since iOS 14.5.
+// Microphone permission must be granted by the user the first time.
 //
-// Route: /voice. Three tabs (Listening / Confirm / Evening) so the
-// designer can verify all three screens at once.
+// All work happens in a single sync request — typical 30s clip
+// round-trips in 5–10 seconds. No background queueing in V1.
 
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
-  ArrowLeft, Mic, MicOff, MapPin, CheckCircle2, Sparkles, Phone,
+  ArrowLeft, Mic, Square, Loader2, CheckCircle2,
+  AlertTriangle, ChevronRight, RefreshCw,
 } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/authStore'
 import { Pill } from '../../components/leads/LeadShared'
 
-const TABS = [
-  { key: 'listen',  label: '1 · Listening' },
-  { key: 'confirm', label: '2 · Confirm' },
-  { key: 'evening', label: '3 · Evening report' },
+const MAX_SECONDS = 60
+const FUNCTION_PATH = '/functions/v1/voice-process'
+
+const LANG_HINTS = [
+  { key: 'gu', label: 'Gujarati' },
+  { key: 'hi', label: 'Hindi' },
+  { key: 'en', label: 'English' },
 ]
 
 export default function VoiceLogV2() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('listen')
-  const [showApiBanner, setShowApiBanner] = useState(false)
+  const [params] = useSearchParams()
+  const profile = useAuthStore(s => s.profile)
 
+  const initialLeadId = params.get('lead') || null
+
+  const [leads, setLeads]     = useState([])
+  const [leadId, setLeadId]   = useState(initialLeadId)
+  const [langHint, setLangHint] = useState('gu')
+
+  // Recorder state
+  const [phase, setPhase] = useState('idle') // idle|recording|recorded|sending|done|error
+  const [seconds, setSeconds] = useState(0)
+  const [error, setError] = useState('')
+  const [audioBlob, setAudioBlob] = useState(null)
+  const [audioMime, setAudioMime] = useState('audio/webm')
+
+  // Result
+  const [result, setResult] = useState(null)
+
+  const mediaRecorderRef = useRef(null)
+  const streamRef = useRef(null)
+  const tickRef = useRef(null)
+  const chunksRef = useRef([])
+
+  // Load leads the rep can target. RLS limits the list automatically.
+  useEffect(() => {
+    supabase.from('leads')
+      .select('id, name, company, phone, stage, segment')
+      .order('created_at', { ascending: false })
+      .limit(80)
+      .then(({ data, error: err }) => {
+        if (err) {
+          setError('Could not load your leads: ' + err.message)
+          return
+        }
+        setLeads(data || [])
+      })
+  }, [])
+
+  const lead = useMemo(
+    () => leads.find(l => l.id === leadId) || null,
+    [leads, leadId]
+  )
+
+  /* ─── Recorder controls ─── */
+  async function startRecording() {
+    setError('')
+    setResult(null)
+    setAudioBlob(null)
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setError('Your browser does not support audio recording. Try Chrome on Android or Safari on iOS.')
+      return
+    }
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (e) {
+      setError(
+        e?.name === 'NotAllowedError'
+          ? 'Microphone permission denied. Allow it in your browser, then try again.'
+          : 'Could not open the microphone: ' + (e?.message || e),
+      )
+      return
+    }
+    streamRef.current = stream
+
+    let mr
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', '']
+    for (const t of candidates) {
+      if (!t || (window.MediaRecorder && MediaRecorder.isTypeSupported(t))) {
+        try { mr = new MediaRecorder(stream, t ? { mimeType: t } : undefined); break }
+        catch { /* try next */ }
+      }
+    }
+    if (!mr) {
+      setError('No supported audio format found in this browser.')
+      stream.getTracks().forEach(t => t.stop())
+      return
+    }
+    mediaRecorderRef.current = mr
+    chunksRef.current = []
+    setAudioMime(mr.mimeType || 'audio/webm')
+
+    mr.ondataavailable = e => { if (e.data?.size) chunksRef.current.push(e.data) }
+    mr.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
+      setAudioBlob(blob)
+      setPhase(prev => (prev === 'recording' ? 'recorded' : prev))
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+
+    mr.start()
+    setPhase('recording')
+    setSeconds(0)
+    tickRef.current = setInterval(() => {
+      setSeconds(s => {
+        if (s + 1 >= MAX_SECONDS) {
+          stopRecording()
+          return MAX_SECONDS
+        }
+        return s + 1
+      })
+    }, 1000)
+  }
+
+  function stopRecording() {
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
+    const mr = mediaRecorderRef.current
+    if (mr && mr.state !== 'inactive') mr.stop()
+  }
+
+  function resetAll() {
+    setPhase('idle')
+    setSeconds(0)
+    setAudioBlob(null)
+    setResult(null)
+    setError('')
+  }
+
+  /* ─── Send to edge function ─── */
+  async function sendToProcess() {
+    if (!audioBlob) { setError('Record something first.'); return }
+    setError('')
+    setPhase('sending')
+    try {
+      const base64 = await blobToBase64(audioBlob)
+      const { data: sess } = await supabase.auth.getSession()
+      const accessToken = sess?.session?.access_token
+      const fnUrl = (supabase.supabaseUrl || '') + FUNCTION_PATH
+      const res = await fetch(fnUrl, {
+        method: 'POST',
+        headers: {
+          'content-type':  'application/json',
+          'authorization': `Bearer ${accessToken}`,
+          'apikey':        supabase.supabaseKey || '',
+        },
+        body: JSON.stringify({
+          audio_base64:     base64,
+          mime_type:        audioMime,
+          lead_id:          leadId || null,
+          duration_seconds: seconds,
+          language_hint:    langHint || null,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPhase('error')
+        setError(json?.error || `Edge function failed (${res.status})`)
+        return
+      }
+      setResult(json)
+      setPhase('done')
+    } catch (e) {
+      setPhase('error')
+      setError('Send failed: ' + (e?.message || e))
+    }
+  }
+
+  /* ─── Render ─── */
   return (
     <div className="lead-root">
       <button
         className="lead-btn lead-btn-sm"
-        onClick={() => navigate('/leads')}
+        onClick={() => navigate(leadId ? `/leads/${leadId}` : '/leads')}
         style={{ marginBottom: 16 }}
       >
-        <ArrowLeft size={12} /> Leads
+        <ArrowLeft size={12} /> {leadId ? 'Back to lead' : 'Back to leads'}
       </button>
 
       <div className="lead-page-head">
@@ -49,221 +214,238 @@ export default function VoiceLogV2() {
           <div className="lead-page-eyebrow">Voice-First · Gujarati / Hindi / English</div>
           <div className="lead-page-title">Voice Log</div>
           <div className="lead-page-sub">
-            3× faster than typing. Speak naturally — system transcribes via Whisper, extracts via Claude.
+            Speak naturally. We transcribe (Whisper) and classify (Claude) — you review and save.
           </div>
         </div>
-        <Pill tone="warn">
-          <MicOff size={11} style={{ marginRight: 6 }} />
-          Phase 2 · API not wired
-        </Pill>
       </div>
 
-      {/* Tab strip — picks which mobile preview to render */}
-      <div className="lead-filter-tabs" style={{ marginBottom: 16 }}>
-        {TABS.map(t => (
-          <span
-            key={t.key}
-            className={`lead-filter-tab ${tab === t.key ? 'active' : ''}`}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-          </span>
-        ))}
+      {/* Lead picker */}
+      <div className="lead-card lead-card-pad" style={{ marginBottom: 12 }}>
+        <label className="lead-fld-label">Logging for which lead?</label>
+        <select
+          className="lead-inp"
+          value={leadId || ''}
+          onChange={e => setLeadId(e.target.value || null)}
+          disabled={phase === 'recording' || phase === 'sending'}
+        >
+          <option value="">— pick a lead (or leave empty for an orphan note) —</option>
+          {leads.map(l => (
+            <option key={l.id} value={l.id}>
+              {l.name}{l.company ? ` · ${l.company}` : ''}{l.stage ? ` · ${l.stage}` : ''}
+            </option>
+          ))}
+        </select>
+
+        <label className="lead-fld-label" style={{ marginTop: 12 }}>Language hint</label>
+        <div className="lead-radio-grp">
+          {LANG_HINTS.map(l => (
+            <span
+              key={l.key}
+              className={`opt ${langHint === l.key ? 'on' : ''}`}
+              onClick={() => phase === 'idle' && setLangHint(l.key)}
+              style={{ cursor: phase === 'idle' ? 'pointer' : 'not-allowed' }}
+            >
+              {l.label}
+            </span>
+          ))}
+        </div>
       </div>
 
-      {/* API gate banner */}
-      {showApiBanner && (
+      {/* Recorder card */}
+      <div className="voice-card" style={{ textAlign: 'center', padding: 24 }}>
+        {phase === 'idle' && (
+          <>
+            <span className="voice-pill"><span className="mic" /> Ready</span>
+            <button
+              type="button"
+              className="voice-mic"
+              style={{ width: 96, height: 96, margin: '20px auto 14px', cursor: 'pointer' }}
+              onClick={startRecording}
+              aria-label="Start recording"
+            >
+              <Mic size={36} />
+            </button>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Tap to start. Up to {MAX_SECONDS}s.
+            </div>
+          </>
+        )}
+
+        {phase === 'recording' && (
+          <>
+            <span className="voice-pill"><span className="mic" /> Listening · {LANG_HINTS.find(l => l.key === langHint)?.label}</span>
+            <button
+              type="button"
+              className="voice-mic live"
+              style={{ width: 96, height: 96, margin: '20px auto 14px', cursor: 'pointer' }}
+              onClick={stopRecording}
+              aria-label="Stop recording"
+            >
+              <Square size={32} />
+            </button>
+            <div className="wave-big">
+              {Array.from({ length: 20 }).map((_, i) => <span key={i} />)}
+            </div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600, color: 'var(--purple)' }}>
+              {fmt(seconds)}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 4, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+              Tap to stop
+            </div>
+          </>
+        )}
+
+        {phase === 'recorded' && (
+          <>
+            <span className="voice-pill"><CheckCircle2 size={11} style={{ marginRight: 4 }} /> Recorded · {fmt(seconds)}</span>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '14px 0' }}>
+              Ready to send. We'll transcribe and classify.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button className="lead-btn" onClick={resetAll}>Re-record</button>
+              <button className="lead-btn lead-btn-primary" onClick={sendToProcess}>
+                Send <ChevronRight size={12} />
+              </button>
+            </div>
+          </>
+        )}
+
+        {phase === 'sending' && (
+          <>
+            <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--purple)' }} />
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 12 }}>
+              Transcribing and classifying… typically 5–10 seconds.
+            </div>
+          </>
+        )}
+
+        {phase === 'done' && result && (
+          <ResultPanel
+            result={result}
+            leadId={leadId}
+            onRecordAnother={resetAll}
+            onView={() => leadId && navigate(`/leads/${leadId}`)}
+          />
+        )}
+
+        {phase === 'error' && (
+          <>
+            <AlertTriangle size={28} style={{ color: 'var(--danger)' }} />
+            <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 8, lineHeight: 1.5 }}>
+              {error}
+            </div>
+            <button className="lead-btn" onClick={resetAll} style={{ marginTop: 14 }}>
+              <RefreshCw size={12} /> Try again
+            </button>
+          </>
+        )}
+      </div>
+
+      {error && phase !== 'error' && (
         <div
-          className="lead-card lead-card-pad"
           style={{
-            marginBottom: 14,
-            background: 'var(--warning-soft)',
-            borderColor: 'var(--warning)',
+            marginTop: 12,
+            background: 'var(--danger-soft)',
+            border: '1px solid var(--danger)',
+            color: 'var(--danger)',
+            borderRadius: 10, padding: '10px 14px', fontSize: 13,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13, color: 'var(--warning)', marginBottom: 6 }}>
-            <Sparkles size={14} />
-            Voice integration not yet live
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            To enable voice logging, the Anthropic API key needs to be set on
-            the Supabase project and the copilot Edge Function needs to be
-            deployed. See the deployment guide pinned at the top of CLAUDE.md
-            (Step 1–7). Once that's done, a Whisper-based recorder will plug
-            into this screen and these mock transcripts go away.
-          </div>
+          {error}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── Result panel ─── */
+function ResultPanel({ result, leadId, onRecordAnother, onView }) {
+  const c = result.classified || {}
+  return (
+    <div style={{ textAlign: 'left' }}>
+      <div className="voice-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <CheckCircle2 size={11} /> Saved · language {result.language || 'unknown'}
+      </div>
+
+      <div className="m-card" style={{ marginTop: 14 }}>
+        <div className="m-card-title">Transcript</div>
+        <div className="guj-quote" style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>
+          {result.transcript}
+        </div>
+      </div>
+
+      <div className="m-card" style={{ marginTop: 12 }}>
+        <div className="m-card-title">AI extracted</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+          <Row label="Type"     value={c.activity_type || '—'} />
+          <Row label="Outcome"  value={
+            <Pill tone={
+              c.outcome === 'positive' ? 'success' :
+              c.outcome === 'negative' ? 'danger' : 'info'
+            }>{c.outcome || 'neutral'}</Pill>
+          } />
+          {c.notes && <Row label="Summary" value={c.notes} stack />}
+          {c.next_action && <Row label="Next" value={c.next_action + (c.next_action_date ? ` · ${c.next_action_date}` : '')} />}
+        </div>
+      </div>
+
+      {result.warning && (
+        <div
+          style={{
+            marginTop: 12, background: 'var(--warning-soft)',
+            border: '1px solid var(--warning)', color: 'var(--warning)',
+            borderRadius: 10, padding: '10px 14px', fontSize: 12,
+          }}
+        >
+          {result.warning}
         </div>
       )}
 
-      {/* Mobile preview frame — keep the same 360-440 phone width
-          so the screen looks like it would on a rep's device. */}
-      <div
-        style={{
-          maxWidth: 440, margin: '0 auto',
-          background: 'var(--bg)',
-          border: '1px solid var(--border)',
-          borderRadius: 24,
-          padding: 4,
-          boxShadow: 'var(--shadow)',
-        }}
-      >
-        <div className="m-screen" style={{ borderRadius: 20 }}>
-          {tab === 'listen'  && <Listening  onTap={() => setShowApiBanner(true)} />}
-          {tab === 'confirm' && <Confirm    onTap={() => setShowApiBanner(true)} />}
-          {tab === 'evening' && <Evening    onTap={() => setShowApiBanner(true)} />}
-        </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button className="lead-btn" onClick={onRecordAnother}>
+          <Mic size={12} /> Record another
+        </button>
+        {leadId && result.activity_id && (
+          <button className="lead-btn lead-btn-primary" onClick={onView}>
+            View lead <ChevronRight size={12} />
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
-/* ─── Screen 1: Listening ─── */
-function Listening({ onTap }) {
+function Row({ label, value, stack }) {
   return (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <ArrowLeft size={14} />
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Logging call · Dr. Mehta</span>
-      </div>
-
-      <div className="voice-card" style={{ textAlign: 'center', padding: 18 }}>
-        <span className="voice-pill">
-          <span className="mic" /> Listening · Gujarati
-        </span>
-        <div
-          className="voice-mic live"
-          style={{ width: 80, height: 80, margin: '20px auto 14px' }}
-          onClick={onTap}
-        >
-          <Phone size={32} />
-        </div>
-        <div className="wave-big">
-          {Array.from({ length: 20 }).map((_, i) => <span key={i} />)}
-        </div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--purple)' }}>
-          0:24
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 4, letterSpacing: '.12em', textTransform: 'uppercase' }}>
-          Tap to stop
-        </div>
-      </div>
-
-      <div className="m-card" style={{ marginTop: 12 }}>
-        <div className="m-card-title">Live transcript</div>
-        <div className="guj-quote" style={{ fontSize: 13 }}>
-          Mehta sahebne mali aavyo, demo set thai gayo…
-          <span className="en">Met Mehta. Demo set…</span>
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 8 }}>
-          Speak naturally — system understands Gujarati, Hindi, English
-        </div>
-      </div>
-    </>
+    <div style={{
+      display: stack ? 'block' : 'flex',
+      alignItems: 'center', gap: 8,
+    }}>
+      <span style={{ fontSize: 11, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.1em', minWidth: 70, display: 'inline-block' }}>
+        {label}
+      </span>
+      <span>{value}</span>
+    </div>
   )
 }
 
-/* ─── Screen 2: Confirm extracted data ─── */
-function Confirm({ onTap }) {
-  return (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <ArrowLeft size={14} />
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Confirm log · Dr. Mehta</span>
-      </div>
-
-      <div className="voice-card" style={{ marginBottom: 12 }}>
-        <span className="voice-pill" style={{ marginBottom: 8 }}>
-          <CheckCircle2 size={11} style={{ marginRight: 4 }} /> Transcribed · 0:24
-        </span>
-        <div className="guj-quote">
-          Mehta sahebne mali aavyo, demo set thai gayo. ₹3.8 lakh nu quote mokalvaanu chhe.
-          <span className="en">Met Mehta. Demo scheduled. Need to send ₹3.8L quote.</span>
-        </div>
-      </div>
-
-      <div className="m-card">
-        <div className="m-card-title">AI extracted · review</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div>
-            <label className="lead-fld-label">Outcome</label>
-            <div className="lead-radio-grp">
-              <span className="opt on pos">Positive</span>
-              <span className="opt">Neutral</span>
-              <span className="opt">Negative</span>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label className="lead-fld-label">Next action</label>
-              <input className="lead-inp" defaultValue="Send quote" disabled />
-            </div>
-            <div>
-              <label className="lead-fld-label">Amount</label>
-              <input className="lead-inp" defaultValue="₹3,80,000" disabled />
-            </div>
-          </div>
-          <div>
-            <label className="lead-fld-label">Move stage to</label>
-            <select className="lead-inp" disabled defaultValue="SalesReady">
-              <option>SalesReady</option>
-            </select>
-          </div>
-          <Pill style={{ alignSelf: 'flex-start' }}>
-            <MapPin size={11} style={{ marginRight: 4 }} /> GPS · Surat · Adajan · ±12m
-          </Pill>
-        </div>
-      </div>
-
-      <button className="m-cta" onClick={onTap}>Looks good · save log</button>
-      <button className="m-cta m-cta-ghost" onClick={onTap}>Re-record</button>
-    </>
-  )
+/* ─── helpers ─── */
+function fmt(secs) {
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/* ─── Screen 3: Evening report (spoken) ─── */
-function Evening({ onTap }) {
-  return (
-    <>
-      <div className="m-greet">
-        <div>
-          <div className="hello">Evening report</div>
-          <div className="date">Saturday · 19:42 · check-out</div>
-        </div>
-        <span className="voice-pill">
-          <Mic size={10} style={{ marginRight: 4 }} /> AI
-        </span>
-      </div>
-
-      <div className="voice-card" style={{ marginBottom: 12, textAlign: 'center' }}>
-        <span className="voice-pill" style={{ marginBottom: 10 }}>
-          <span className="mic" /> Speak summary · 30s
-        </span>
-        <div
-          className="voice-mic live"
-          style={{ width: 64, height: 64, margin: '10px auto' }}
-          onClick={onTap}
-        >
-          <Phone size={24} />
-        </div>
-        <div className="guj-quote" style={{ textAlign: 'left' }}>
-          Aaje 3 meetings karya, Sunrise close thavaani randami. Bisleri renewal ma site survey Monday e karvi.
-          <span className="en">3 meetings today, Sunrise close to closing. Bisleri site survey on Monday.</span>
-        </div>
-      </div>
-
-      <div className="m-card">
-        <div className="m-card-title">
-          AI summary
-          <Pill tone="success">approved</Pill>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          <b style={{ color: 'var(--text)' }}>Highlights:</b> 3 meetings completed · Sunrise Diagnostics → SalesReady · ₹6.2L pipeline added.<br />
-          <b style={{ color: 'var(--text)' }}>Blockers:</b> Bisleri renewal site survey pending — scheduled Monday.<br />
-          <b style={{ color: 'var(--text)' }}>Tomorrow:</b> Send Sunrise quote · close Patel Auto Hub.
-        </div>
-      </div>
-
-      <button className="m-cta" onClick={onTap}>Submit report</button>
-    </>
-  )
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onloadend = () => {
+      const s = String(r.result || '')
+      // strip the data: prefix the function tolerates either way
+      const idx = s.indexOf(',')
+      resolve(idx >= 0 ? s.slice(idx + 1) : s)
+    }
+    r.onerror = () => reject(r.error)
+    r.readAsDataURL(blob)
+  })
 }
