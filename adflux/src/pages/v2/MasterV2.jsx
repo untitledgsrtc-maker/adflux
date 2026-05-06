@@ -400,8 +400,14 @@ function AttachmentsTab() {
                   alignItems: 'center',
                 }}
               >
+                {/* Phase 21b — show the visible row position (1, 2, 3 …)
+                    not the raw display_order. Rows can have gaps in
+                    display_order after a delete (e.g. 1, 2, 3, 5, 6, 7,
+                    9), and rendering the raw value made it look like
+                    rows were missing. Index-based numbering is what
+                    reps expect. */}
                 <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>
-                  {r.display_order}
+                  {idx + 1}
                 </span>
                 <input
                   type="text"

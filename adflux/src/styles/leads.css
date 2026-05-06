@@ -423,25 +423,37 @@
 .m-count .num .target { color: var(--text-subtle); font-size: 14px; }
 .m-count .lbl { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-subtle); margin-top: 4px; }
 
-/* Quick action tiles (mobile) */
+/* Quick action tiles (mobile + responsive) */
 .m-quick {
   display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 8px; margin-bottom: 12px;
 }
 .m-quick .tile {
+  /* Phase 21b — aspect-ratio:1 made tiles huge on desktop (each ~350px
+     squared on a 1400px content area). Cap with max-height instead so
+     the tile is square-ish on phone but compact on desktop. */
   aspect-ratio: 1;
+  max-height: 120px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 6px;
-  font-size: 10px; color: var(--text-muted); cursor: pointer;
+  font-size: 11px; color: var(--text-muted); cursor: pointer;
   padding: 6px; text-align: center; line-height: 1.2;
 }
+.m-quick .tile:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
 .m-quick .tile .ti {
-  width: 36px; height: 36px; border-radius: 10px;
+  width: 32px; height: 32px; border-radius: 10px;
   background: var(--tint-yellow-bg); color: var(--accent);
   display: grid; place-items: center;
+}
+@media (max-width: 720px) {
+  .m-quick .tile { max-height: none; }
+  .m-quick .tile .ti { width: 36px; height: 36px; }
 }
 [data-theme="day"] .m-quick .tile .ti { color: var(--accent-fg); }
 

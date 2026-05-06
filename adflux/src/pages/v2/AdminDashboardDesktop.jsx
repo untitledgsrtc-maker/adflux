@@ -677,10 +677,10 @@ export default function AdminDashboardDesktop() {
             flexWrap: 'wrap', marginBottom: 16,
           }}
         >
-          <div>
-            <div className="v2d-crumb-kicker">{greeting()}</div>
-            <div className="v2d-crumb-t">{firstName} 👋</div>
-          </div>
+          {/* Phase 21b — V2AppShell topbar already shows the greeting
+              ("ADMIN CONSOLE / Good evening, Brijesh"). Rendering it
+              again here was a duplicate header. Keep the page head as
+              just the period picker + filters + CTA on the right. */}
           <div style={{ flex: 1 }} />
 
           {/* Period picker — month nav + presets + custom range. */}

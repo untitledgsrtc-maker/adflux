@@ -62,12 +62,20 @@ export function useQuotes() {
   }, [profile?.id, store.filters])
 
   const fetchQuoteById = async (id) => {
+    if (!id) return { data: null, error: { message: 'No quote id' } }
+    // Phase 21b — accept either a UUID or a quote_number ref. UUIDs
+    // are 36 chars with hyphens at fixed positions and only hex; ref
+    // numbers like "UA-2026-0042" or "UA/AUTO/2026-27/0029" don't
+    // match. Detect by shape and look up on the right column so a
+    // user pasting a ref-number URL doesn't 404.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const lookupCol = UUID_RE.test(id) ? 'id' : 'quote_number'
     const { data, error } = await supabase
       .from('quotes')
       .select('*, quote_cities(*)')
-      .eq('id', id)
-      .single()
-    if (!error) store.setCurrentQuote(data)
+      .eq(lookupCol, id)
+      .maybeSingle()
+    if (!error && data) store.setCurrentQuote(data)
     return { data, error }
   }
 

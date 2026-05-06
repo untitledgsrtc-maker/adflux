@@ -492,10 +492,9 @@ export default function SalesDashboardDesktop() {
             flexWrap: 'wrap', marginBottom: 16,
           }}
         >
-          <div>
-            <div className="v2d-crumb-kicker">{greeting()}</div>
-            <div className="v2d-crumb-t">{firstName} 👋</div>
-          </div>
+          {/* Phase 21b — V2AppShell topbar already shows the greeting
+              ("SALES CONSOLE / Good evening, KAMINA"). Drop the inline
+              hero — same fix applied to AdminDashboardDesktop. */}
           <div style={{ flex: 1 }} />
           <PeriodPicker period={period} onChange={setPeriod} />
           <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
