@@ -162,8 +162,15 @@ serve(async (req) => {
     })
 
     if (sqlErr) {
-      console.error('[copilot] SQL error:', sqlErr)
-      return json({ error: 'Query failed: ' + sqlErr.message }, 500)
+      console.error('[copilot] SQL error:', sqlErr, 'sql:', sql)
+      // Phase 17b — when run_select rejects, return the actual SQL Claude
+      // generated so we can debug regex / shape mismatches without grepping
+      // function logs. Safe to expose: it's the SAME string we're about to
+      // execute, and the user already sees the rejection message.
+      return json({
+        error: 'Query failed: ' + sqlErr.message,
+        debug_sql: sql.slice(0, 500),
+      }, 500)
     }
 
     const rows: any[] = queryResult || []
