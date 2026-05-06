@@ -343,12 +343,22 @@ export default function SalesDashboardV2() {
   return (
     <div className="v2">
       <div className="v2-canvas">
-        <Header
-          name={profile?.name || 'there'}
-          streak={state.streak}
-          hasAlert={!!state.rejected || state.pendingPending.count > 0}
-          onLogout={() => { if (window.confirm('Log out of Adflux?')) signOut?.() }}
-        />
+        {/* Phase 19d — V2AppShell topbar already shows greeting + bell +
+            profile + logout. Header used to render those again, causing
+            a stacked duplicate header on mobile. Just keep the streak
+            pill as a small inline element since the topbar doesn't
+            carry that signal. */}
+        {state.streak > 0 ? (
+          <div className="v2-streak" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>
+            <Flame size={13} strokeWidth={2.4} />
+            {state.streak}-mo streak
+          </div>
+        ) : (
+          <div className="v2-streak v2-streak--muted" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>
+            <Flame size={13} strokeWidth={2.4} />
+            No streak
+          </div>
+        )}
 
         {state.rejected && (
           <div className="v2-banner v2-banner--toast">
