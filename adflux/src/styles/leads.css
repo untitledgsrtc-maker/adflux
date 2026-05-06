@@ -791,14 +791,14 @@
   font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle);
 }
 
-/* Actions hug the body content via margin-left:auto when there's
-   spare width, but stay close to the body on mid-width screens. */
+/* Actions sit immediately after the body so they're scannable next to
+   the lead name, not floated 800px away on wide screens. The card's
+   own background fills the full width. */
 .lead-task-actions {
   display: inline-flex;
   gap: 6px;
   align-items: center;
   flex-shrink: 0;
-  margin-left: auto;
 }
 .lead-task-actions .lead-btn {
   height: 30px;

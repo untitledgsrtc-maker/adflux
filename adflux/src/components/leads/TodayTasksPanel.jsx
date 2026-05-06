@@ -33,16 +33,23 @@ function dueHint(due_at) {
   return { tone: 'info', label: `due ${new Date(due_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}` }
 }
 
-// Strip the redundant kind prefix from the SQL-generated reason
-// so the chip + reason don't say the same thing twice.
-function trimReason(kind, reason) {
+// Strip the redundant phrasing the SQL generator produces so the
+// chip + reason don't duplicate. The chip already says it's a Hot
+// lead / New lead / Follow-up etc.; the reason should just carry
+// the specific detail.
+const REASON_STRIP = [
+  /^Hot lead\s*[—–-]\s*/i,
+  /^New lead\s*[—–-]\s*/i,
+  /^Follow-up:\s*/i,
+  /^SalesReady past\s*/i,
+  /^Qualified\s*[—–-]?\s*/i,
+  /^Nurture\s*/i,
+]
+function trimReason(_kind, reason) {
   if (!reason) return ''
-  const label = TASK_KIND_LABEL[kind]
-  if (!label) return reason
-  // Drop a leading "<kind label>:" or "<kind label> — " prefix if present.
-  return reason
-    .replace(new RegExp(`^${label}\\s*[:—-]\\s*`, 'i'), '')
-    .trim()
+  let out = reason
+  for (const re of REASON_STRIP) out = out.replace(re, '')
+  return out.trim()
 }
 
 export default function TodayTasksPanel({ userId, limit = 10 }) {
