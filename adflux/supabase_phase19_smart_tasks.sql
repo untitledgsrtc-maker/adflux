@@ -98,24 +98,30 @@ BEGIN
   inserted := inserted + rowcount;
 
   -- Rule 2: follow_up_due — lead_activities.next_action_date <= today,
-  -- only the most recent activity per lead with an unresolved next-action
+  -- only the most recent activity per lead with an unresolved next-action.
+  -- DISTINCT ON + ORDER BY are wrapped in a subquery so the outer
+  -- INSERT's ON CONFLICT clause parses unambiguously.
   INSERT INTO public.lead_tasks
     (lead_id, assigned_to, kind, priority, due_at, reason, generated_for)
-  SELECT DISTINCT ON (la.lead_id)
-    la.lead_id,
-    l.assigned_to,
-    'follow_up_due',
-    20,
-    (la.next_action_date::timestamp AT TIME ZONE 'Asia/Kolkata'),
-    COALESCE('Follow-up: ' || NULLIF(la.next_action, ''), 'Scheduled follow-up'),
-    d
-  FROM public.lead_activities la
-  JOIN public.leads l ON l.id = la.lead_id
-  WHERE la.next_action_date IS NOT NULL
-    AND la.next_action_date <= d
-    AND l.assigned_to IS NOT NULL
-    AND l.stage NOT IN ('Won', 'Lost')
-  ORDER BY la.lead_id, la.created_at DESC
+  SELECT lead_id, assigned_to, kind, priority, due_at, reason, generated_for
+  FROM (
+    SELECT DISTINCT ON (la.lead_id)
+      la.lead_id                                                            AS lead_id,
+      l.assigned_to                                                         AS assigned_to,
+      'follow_up_due'::text                                                 AS kind,
+      20::smallint                                                          AS priority,
+      (la.next_action_date::timestamp AT TIME ZONE 'Asia/Kolkata')          AS due_at,
+      COALESCE('Follow-up: ' || NULLIF(la.next_action, ''),
+               'Scheduled follow-up')                                       AS reason,
+      d                                                                     AS generated_for
+    FROM public.lead_activities la
+    JOIN public.leads l ON l.id = la.lead_id
+    WHERE la.next_action_date IS NOT NULL
+      AND la.next_action_date <= d
+      AND l.assigned_to IS NOT NULL
+      AND l.stage NOT IN ('Won', 'Lost')
+    ORDER BY la.lead_id, la.created_at DESC
+  ) sub
   ON CONFLICT (lead_id, kind, generated_for) DO NOTHING;
   GET DIAGNOSTICS rowcount = ROW_COUNT;
   inserted := inserted + rowcount;
