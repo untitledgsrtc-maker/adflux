@@ -32,7 +32,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, Contact2, MapPin, Tv, FileBox,
-  Inbox, Sparkles, Phone, Sun,
+  Inbox, Sparkles, Phone, Sun, Mic,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -70,6 +70,9 @@ const SALES_NAV = [
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
+  // Phase 20 — Voice-First. Reachable from this drawer plus the
+  // "Voice" button on each lead detail page.
+  { to: '/voice',             label: 'Voice Log',      icon: Mic },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
@@ -80,6 +83,8 @@ const TELECALLER_NAV = [
   { to: '/telecaller',        label: 'Call Queue',     icon: Phone },
   { to: '/work',              label: 'Today',          icon: Sun },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
+  // Phase 20 — telecallers benefit even more from voice logging.
+  { to: '/voice',             label: 'Voice Log',      icon: Mic },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
 ]
 
