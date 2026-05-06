@@ -69,8 +69,28 @@ export function GovtProposalRenderer({
     )
   }
 
-  const recipientHtml = (data.recipient_block || '')
-    .split('\n').map(l => l.trim()).filter(Boolean).join('<br/>')
+  // Phase 18b — owner spec: "પ્રતિ," ALWAYS on its own line, followed by
+  // designation / department / building / address each on a separate line.
+  // Previously the wizard let reps type "પ્રતિ, મેનેજિંગ ડિરેક્ટર," all on one
+  // line and the renderer just preserved that — which doesn't match the
+  // formal Gujarati letter layout the owner showed as the reference.
+  // We now strip a leading "પ્રતિ," from the first stored line and prepend
+  // it as its own line so the output is always:
+  //   પ્રતિ,
+  //   મેનેજિંગ ડિરેક્ટર,
+  //   ગુજરાત લાઇવલિહૂડ પ્રોમોશન કંપની લિમિટેડ,
+  //   …
+  const _recipLines = (data.recipient_block || '')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+  if (_recipLines.length && /^પ્રતિ[,\s]?/.test(_recipLines[0])) {
+    _recipLines[0] = _recipLines[0].replace(/^પ્રતિ[,\s]+/, '').trim()
+    if (!_recipLines[0]) _recipLines.shift()
+  }
+  const recipientHtml =
+    '<div style="margin-bottom:2px;">પ્રતિ,</div>' +
+    _recipLines.map(l => `<div style="margin-bottom:2px;">${l}</div>`).join('')
 
   const dateGu = formatDateGujarati(data.proposal_date || new Date())
 
@@ -497,17 +517,22 @@ function renderGsrtcTable(data) {
 
   const rowsHtml = items.map((it, i) => {
     // Use per-row values if set; fall back to defaults
-    const daily   = Number(it.daily_spots ?? 100)
-    const days    = Number(it.days ?? 30)
-    const dur     = Number(it.spot_duration_sec ?? 10)
-    const screens = Number(it.screens || 0)
-    const rate    = Number(it.unit_rate || 0)
-    const monthly = screens * daily * days * rate
-    const lineTotal = monthly * months
-    subtotal     += lineTotal
-    totalScreens += screens
-    totalDaily   += daily * screens
-    totalMonthly += daily * days * screens
+    const daily      = Number(it.daily_spots ?? 100)
+    const baseDays   = Number(it.days ?? 30)
+    // Phase 18b — owner directive: when campaign is 2 months, the
+    // "દિવસો" column should show 60 and "માસિક સ્પોટ" should aggregate
+    // over the full campaign duration, not 1 month. Fix: multiply
+    // base-days by `months` for everything in the row + totals.
+    const days       = baseDays * months
+    const dur        = Number(it.spot_duration_sec ?? 10)
+    const screens    = Number(it.screens || 0)
+    const rate       = Number(it.unit_rate || 0)
+    const monthly    = screens * daily * days * rate
+    const lineTotal  = monthly
+    subtotal        += lineTotal
+    totalScreens    += screens
+    totalDaily      += daily * screens
+    totalMonthly    += daily * days * screens
     // Phase 11i — prefer Gujarati station name when available
     // (joined from gsrtc_stations master in GovtProposalDetailV2.load).
     // Falls back to English description for legacy items / wizard preview.

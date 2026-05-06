@@ -69,6 +69,11 @@ export default function GovtProposalDetailV2() {
   } = usePayments(id)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showWonModal,     setShowWonModal]     = useState(false)
+  // Phase 18b — hard-delete a draft proposal. Visible only when
+  // status='draft' (the DB trigger from Phase 11b blocks delete on
+  // non-draft rows anyway). Used by the new red "Delete" button next
+  // to "Cancel" on the proposal header.
+  const [deleting, setDeleting] = useState(false)
   const [showEditPayment,  setShowEditPayment]  = useState(false)
   const [editingPayment,   setEditingPayment]   = useState(null)
   // "Mark Sent" pre-flight modal — opens when user clicks Mark Sent.
@@ -1155,10 +1160,22 @@ export default function GovtProposalDetailV2() {
           // refresh fixes it.
           const msg = String(e?.message || e)
           if (msg.includes('dynamically imported module') || msg.includes('Failed to fetch')) {
+            // Phase 18b — owner reported sales reps keep hitting this on
+            // tabs left open across deploys. Don't ask the rep to know
+            // what Cmd+Shift+R is — auto-reload after a short toast.
             setStatusError(
-              'Could not load PDF generator — your browser has a stale page from before the last deploy. ' +
-              'Hard refresh (Cmd+Shift+R / Ctrl+Shift+R) and try again.'
+              'New version detected — reloading the page to pick up the latest PDF engine…'
             )
+            setCombinedPdfBusy(false)
+            setTimeout(() => {
+              // location.reload(true) is deprecated; modern browsers
+              // honor a query-string bust + reload instead. Append a
+              // cache-bust param so service-workers / CDNs revalidate.
+              const u = new URL(window.location.href)
+              u.searchParams.set('_v', String(Date.now()))
+              window.location.replace(u.toString())
+            }, 1500)
+            return
           } else {
             setStatusError(`Could not render proposal letter: ${msg}`)
           }
@@ -1387,6 +1404,35 @@ export default function GovtProposalDetailV2() {
               title="Cancel and mark this draft as Lost"
             >
               <XCircle size={14} /> Cancel
+            </button>
+          )}
+          {/* Phase 18b — Delete (hard remove from DB). Owner spec: drafts
+              should be fully deletable, not just marked Lost. The DB
+              trigger from Phase 11b only blocks delete on non-draft
+              quotes; drafts pass through cleanly. */}
+          {quote.status === 'draft' && (
+            <button
+              type="button"
+              className="govt-wiz__btn"
+              disabled={deleting}
+              onClick={async () => {
+                if (!confirm('DELETE this draft proposal permanently? This cannot be undone.')) return
+                setDeleting(true)
+                const { error: delErr } = await supabase
+                  .from('quotes')
+                  .delete()
+                  .eq('id', quote.id)
+                setDeleting(false)
+                if (delErr) {
+                  setStatusError('Delete failed: ' + delErr.message)
+                  return
+                }
+                navigate('/quotes')
+              }}
+              style={{ borderColor: 'var(--danger)', background: 'var(--danger)', color: 'white' }}
+              title="Permanently delete this draft"
+            >
+              <XCircle size={14} /> {deleting ? 'Deleting…' : 'Delete'}
             </button>
           )}
         </div>
