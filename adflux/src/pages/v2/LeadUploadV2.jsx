@@ -365,24 +365,48 @@ export default function LeadUploadV2() {
   }
 
   /* ─── Render ─── */
+  // Phase 16 — wrapped in lead-root so typography matches the rest of
+  // the lead module. Underlying v2d-panel + v2d-q-table classes still
+  // resolve from v2.css; visual style stays close to the lead-card
+  // aesthetic since both share the same tokens.css source.
+  const stepIdx = !rows.length && !result ? 0 : result ? 3 : 2
+
   return (
-    <div className="v2d-lead-upload">
+    <div className="lead-root">
       <button
-        className="v2d-ghost v2d-ghost--btn"
+        className="lead-btn lead-btn-sm"
         onClick={() => navigate('/leads')}
         style={{ marginBottom: 16 }}
       >
-        <ArrowLeft size={14} /> All Leads
+        <ArrowLeft size={12} /> All Leads
       </button>
 
-      <div className="v2d-page-head">
+      <div className="lead-page-head">
         <div>
-          <div className="v2d-page-kicker">Bulk import</div>
-          <h1 className="v2d-page-title">Upload Leads</h1>
-          <div className="v2d-page-sub">
-            Drop a Cronberry CSV or any Excel with name + phone. The parser auto-detects standard columns and extracts Cronberry-style Remarks.
+          <div className="lead-page-eyebrow">Bulk import · admin only</div>
+          <div className="lead-page-title">Upload CSV</div>
+          <div className="lead-page-sub">
+            Cronberry / Excel exports · auto-classifies stage from Remarks
           </div>
         </div>
+      </div>
+
+      {/* Step strip from design */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center' }}>
+        {['Pick file', 'Preview', 'Map columns', 'Import'].map((s, i) => (
+          <div key={s} style={{ display: 'flex', flex: i < 3 ? 1 : 'none', alignItems: 'center', gap: 8 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: i <= stepIdx ? 'var(--text)' : 'var(--text-subtle)' }}>
+              <span style={{
+                width: 22, height: 22, borderRadius: '50%',
+                background: i < stepIdx ? 'var(--success)' : i === stepIdx ? 'var(--accent)' : 'var(--surface-2)',
+                color: i === stepIdx ? 'var(--accent-fg)' : i < stepIdx ? 'white' : 'var(--text-muted)',
+                display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600,
+              }}>{i < stepIdx ? '✓' : i + 1}</span>
+              <span style={{ fontSize: 12, fontWeight: i === stepIdx ? 600 : 500, whiteSpace: 'nowrap' }}>{s}</span>
+            </span>
+            {i < 3 ? <div style={{ flex: 1, height: 1, background: 'var(--border)' }} /> : null}
+          </div>
+        ))}
       </div>
 
       {/* File pick */}
