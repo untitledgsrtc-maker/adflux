@@ -380,20 +380,25 @@ export default function LeadsV2() {
           </select>
         )}
 
-        {distinctIndustries.length > 0 && (
-          <select
-            value={industryFilter}
-            onChange={e => setIndustryFilter(e.target.value)}
-            className="lead-filter-select"
-            style={{ minWidth: 150 }}
-            title="Industry"
-          >
-            <option value="all">Industry: All</option>
-            {distinctIndustries.map(i => (
-              <option key={i} value={i}>{`Industry: ${i}`}</option>
-            ))}
-          </select>
-        )}
+        {/* Phase 19b — always render so the filter is visible even when
+            the current lead set has no industry tags yet. The first
+            option is the only one in that case, but reps can see the
+            control exists. */}
+        <select
+          value={industryFilter}
+          onChange={e => setIndustryFilter(e.target.value)}
+          className="lead-filter-select"
+          style={{ minWidth: 150 }}
+          title="Industry"
+          disabled={distinctIndustries.length === 0}
+        >
+          <option value="all">
+            {distinctIndustries.length === 0 ? 'Industry: —' : 'Industry: All'}
+          </option>
+          {distinctIndustries.map(i => (
+            <option key={i} value={i}>{`Industry: ${i}`}</option>
+          ))}
+        </select>
 
         {isPrivileged && distinctReps.length > 0 && (
           <select

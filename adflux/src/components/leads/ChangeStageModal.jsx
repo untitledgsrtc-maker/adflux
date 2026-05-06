@@ -137,6 +137,18 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
       created_by:    profile.id,
     }])
 
+    // Phase 19b — close any open Smart Tasks for this lead. A stage
+    // change usually invalidates whatever rule generated them
+    // (hot_idle is no longer hot_idle once the rep moved the lead;
+    // sla_breach is no longer relevant if it left SalesReady; etc.).
+    // Tomorrow's regenerate run will create new ones if rules still
+    // apply.
+    await supabase
+      .from('lead_tasks')
+      .update({ status: 'skipped' })
+      .eq('lead_id', lead.id)
+      .eq('status', 'open')
+
     setSaving(false)
     onSaved?.()
     onClose?.()
