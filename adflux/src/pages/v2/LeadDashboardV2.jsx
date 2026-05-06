@@ -237,23 +237,26 @@ export default function LeadDashboardV2() {
         </div>
       )}
 
-      {/* ─── Two-up: Voice activity (placeholder) + Hot leads ─── */}
+      {/* ─── Two-up: Voice activity + Hot leads ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)', gap: 16 }}>
-        {/* Voice activity — Phase 2 placeholder. Coming with task #97. */}
+        {/* Voice activity — Phase 21a: voice is shipped (Phase 20).
+            Card now points to the live page; recent transcripts surface
+            on each lead's activity timeline. A roll-up panel here is a
+            Sprint C item once we have meaningful volume. */}
         <div className="lead-card">
           <div className="lead-card-head">
             <div>
               <div className="lead-card-title">
                 <span className="voice-pill" style={{ marginRight: 8 }}>
-                  <Mic size={10} style={{ marginRight: 4 }} /> coming soon
+                  <Mic size={10} style={{ marginRight: 4 }} /> live
                 </span>
                 Voice activity
               </div>
-              <div className="lead-card-sub">Reps speaking Gujarati · auto-logged · Phase 2</div>
+              <div className="lead-card-sub">Reps speaking Gujarati / Hindi / English · auto-classified</div>
             </div>
           </div>
           <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6 }}>
-            Reps will be able to log activities by speaking — Gujarati / Hindi / English. The system transcribes via Whisper, structures via Claude, and auto-routes to the right lead. Goes live once the Anthropic API key is wired up.
+            Voice logging is live. Reps tap the <b style={{ color: 'var(--text)' }}>Voice</b> button on any lead detail page (or open <b style={{ color: 'var(--text)' }}>/voice</b>) to record a note. The audio is transcribed via Whisper, classified via Claude, and saved as a lead activity automatically. Transcripts and classifications appear on each lead's activity timeline.
           </div>
         </div>
 

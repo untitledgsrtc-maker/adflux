@@ -175,7 +175,7 @@ export default function TeamDashboardV2() {
         <div className="lead-hero-stats">
           <HeroStat label="Reps active now"   value={`${live} / ${reps.length}`}   delta={`${reps.length - live} not checked-in`} down={live < reps.length} />
           <HeroStat label="Calls today"       value={totalCallsToday}             delta="from call_logs"                          up={totalCallsToday > 0} />
-          <HeroStat label="Voice logs"        value={0}                            delta="Phase 2 — needs API"                     acc />
+          <HeroStat label="Voice logs"        value={0}                            delta="counts coming · live"                    acc />
           <HeroStat label="New leads added"   value={newLeadsToday}                delta="today"                                   up={newLeadsToday > 0} />
           <HeroStat label="Won today"         value={formatLakh(pipelineToday)}    delta="status=won"                              up={pipelineToday > 0} />
         </div>
@@ -248,23 +248,26 @@ export default function TeamDashboardV2() {
 
       <div style={{ height: 16 }} />
 
-      {/* Live voice feed — Phase 2 placeholder */}
+      {/* Live voice feed — Phase 21a: voice is live (Phase 20). The
+          live-streaming roll-up of voice_logs across the team is a
+          Sprint C item once we have meaningful volume. For now this
+          card just confirms the feature is deployed. */}
       <div className="lead-card">
         <div className="lead-card-head">
           <div>
             <div className="lead-card-title">
               <span className="voice-pill" style={{ marginRight: 8 }}>
-                <Mic size={10} style={{ marginRight: 4 }} /> coming soon
+                <Mic size={10} style={{ marginRight: 4 }} /> live
               </span>
               Live voice feed · all reps
             </div>
             <div className="lead-card-sub">
-              Auto-translated · auto-classified · Phase 2 (needs Anthropic API)
+              Auto-classified · transcripts on each lead's timeline
             </div>
           </div>
         </div>
         <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6 }}>
-          When the voice integration goes live, every rep speaking into their phone (Gujarati / Hindi / English) will appear here in near-real-time, transcribed and classified by Claude. Today this stream is empty because the API is not yet deployed.
+          Voice logging is deployed. Reps record from any lead detail page or <b style={{ color: 'var(--text)' }}>/voice</b>. Whisper transcribes, Claude classifies (call/whatsapp/meeting · positive/neutral/negative), and the result lands as a lead activity. A roll-up of recent voice logs across the whole team will surface here once usage builds up.
         </div>
       </div>
     </div>

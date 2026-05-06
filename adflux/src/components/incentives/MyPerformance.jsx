@@ -207,33 +207,47 @@ export function MyPerformance() {
           </select>
         </div>
 
-        {/* Progress to threshold */}
-        <div className="perf-progress-section">
-          <div className="perf-progress-label">
-            <span>Progress to threshold ({formatCurrency(threshold)})</span>
-            <span>{Math.round(result.progressToThreshold * 100)}%</span>
-          </div>
-          <div className="perf-progress-track">
-            <div
-              className={`perf-progress-fill ${fillClass}`}
-              style={{ width: `${result.progressToThreshold * 100}%` }}
-            />
-          </div>
-        </div>
+        {/* Progress to threshold — Phase 21a guard: when threshold is 0
+            (rep doesn't have an incentive plan configured) progressToThreshold
+            comes back NaN. Render "Not set" instead of "NaN%" / "100%". */}
+        {(() => {
+          const pctT = result.progressToThreshold
+          const ok = Number.isFinite(pctT) && threshold > 0
+          return (
+            <div className="perf-progress-section">
+              <div className="perf-progress-label">
+                <span>Progress to threshold ({formatCurrency(threshold)})</span>
+                <span>{ok ? `${Math.round(pctT * 100)}%` : 'Not set'}</span>
+              </div>
+              <div className="perf-progress-track">
+                <div
+                  className={`perf-progress-fill ${fillClass}`}
+                  style={{ width: `${ok ? Math.min(pctT * 100, 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Progress to target */}
-        <div className="perf-progress-section">
-          <div className="perf-progress-label">
-            <span>Progress to target ({formatCurrency(target)})</span>
-            <span>{Math.round(result.progressToTarget * 100)}%</span>
-          </div>
-          <div className="perf-progress-track">
-            <div
-              className={`perf-progress-fill ${fillClass}`}
-              style={{ width: `${result.progressToTarget * 100}%` }}
-            />
-          </div>
-        </div>
+        {(() => {
+          const pct = result.progressToTarget
+          const ok = Number.isFinite(pct) && target > 0
+          return (
+            <div className="perf-progress-section">
+              <div className="perf-progress-label">
+                <span>Progress to target ({formatCurrency(target)})</span>
+                <span>{ok ? `${Math.round(pct * 100)}%` : 'Not set'}</span>
+              </div>
+              <div className="perf-progress-track">
+                <div
+                  className={`perf-progress-fill ${fillClass}`}
+                  style={{ width: `${ok ? Math.min(pct * 100, 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Breakdown */}
         <div className="perf-breakdown-grid">
@@ -294,7 +308,7 @@ export function MyPerformance() {
             You need <strong style={{ color: 'var(--text)' }}>{formatCurrency(threshold - result.total)}</strong> more in revenue to reach the incentive threshold this month.
           </div>
         )}
-        {result.slabReached && !result.targetExceeded && (
+        {result.slabReached && !result.targetExceeded && target > 0 && (
           <div style={{
             marginTop: 14,
             padding: '10px 14px',
@@ -305,6 +319,22 @@ export function MyPerformance() {
             color: 'var(--text-muted)',
           }}>
             You're earning incentive! Add <strong style={{ color: 'var(--text)' }}>{formatCurrency(target - result.total)}</strong> more to hit your target and unlock the <strong style={{ color: 'var(--accent)' }}>{formatCurrency(myProfile.flat_bonus ?? settings?.flat_bonus ?? 10000)}</strong> flat bonus.
+          </div>
+        )}
+        {/* Phase 21a — when no incentive plan is configured, the
+            "earning" banner shows nonsense (Add ₹0 to hit ₹0…). Surface
+            a clear "no plan" hint instead so the rep knows to ask. */}
+        {(!target || target <= 0) && (
+          <div style={{
+            marginTop: 14,
+            padding: '10px 14px',
+            background: 'rgba(148, 163, 184, 0.08)',
+            border: '1px solid rgba(148, 163, 184, 0.20)',
+            borderRadius: 8,
+            fontSize: 12,
+            color: 'var(--text-muted)',
+          }}>
+            No incentive plan configured for you yet. Ask admin to set your salary &amp; multiplier.
           </div>
         )}
       </div>

@@ -319,7 +319,7 @@ export async function fetchPendingApprovals() {
     .select(`
       *,
       users:received_by(name),
-      quotes(id, quote_number, ref_number, client_name, client_company, total_amount, created_by, sales_person_name, segment, media_type)
+      quotes(id, quote_number, client_name, client_company, total_amount, created_by, sales_person_name, segment, media_type)
     `)
     .eq('approval_status', 'pending')
     .order('created_at', { ascending: false })

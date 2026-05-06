@@ -5,17 +5,24 @@ import { calculateIncentive, calculateStreak, isIncrementEligible } from '../../
 import { formatCurrency, initials, formatMonthYear } from '../../utils/formatters'
 
 function SlabBar({ pct, slabReached, targetExceeded }) {
+  // Phase 21a — pct is earned/target. When target is 0 (not configured)
+  // pct is NaN, which used to render as "NaN% of target". Guard so we
+  // show "Not set" instead and keep the bar empty.
+  const safePct = Number.isFinite(pct) ? pct : 0
+  const noTarget = !Number.isFinite(pct)
   const cls = targetExceeded ? 'target' : slabReached ? 'slab' : 'below'
   return (
     <div className="slab-bar-wrap">
       <div className="slab-bar-track">
         <div
           className={`slab-bar-fill ${cls}`}
-          style={{ width: `${Math.min(pct * 100, 100)}%` }}
+          style={{ width: `${Math.min(safePct * 100, 100)}%` }}
         />
       </div>
       <div className="slab-bar-labels">
-        <span>{Math.round(pct * 100)}% of target</span>
+        <span>
+          {noTarget ? 'Target not set' : `${Math.round(safePct * 100)}% of target`}
+        </span>
       </div>
     </div>
   )
