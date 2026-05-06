@@ -1,32 +1,33 @@
 // src/pages/v2/VoiceLogV2.jsx
 //
-// Phase 20 — Voice-First V1 (real, not placeholder).
+// Phase 22 — Voice-First V2.
 //
-// Flow:
-//   1. Pick a lead (preselect via location.state or query string)
-//   2. Tap mic → MediaRecorder starts
-//   3. Tap stop → audio captured, base64-encoded, posted to the
-//      voice-process Edge Function
-//   4. Function transcribes (Whisper) + classifies (Claude) +
-//      inserts lead_activities row
-//   5. Show transcript + classified result + link to lead
+// Rebuilt to match the design source at
+// _design_reference/Leads/lead-voice.jsx (MVoiceListening, MVoiceConfirm).
+// The flow is now THREE distinct screens, not one state machine:
 //
-// Mobile-first. Browser audio support: Chrome desktop/Android works
-// out of the box; iOS Safari supports MediaRecorder since iOS 14.5.
-// Microphone permission must be granted by the user the first time.
+//   pick       → choose a lead, pick language hint, tap to start
+//   listening  → big voice mic + animated wave + timer
+//   sending    → small spinner while Whisper + Claude do their work
+//   confirm    → bilingual transcript card (.guj-quote + .en) +
+//                AI-extracted review (Outcome chips, Next action +
+//                Amount inputs, Stage dropdown, GPS pill) +
+//                "Looks good · save log" / "Re-record" CTAs
+//   done       → quick success card with "View lead" / "Record another"
 //
-// All work happens in a single sync request — typical 30s clip
-// round-trips in 5–10 seconds. No background queueing in V1.
+// Edge function still inserts the lead_activity automatically so the
+// activity row exists by the time the rep gets to Confirm. Re-record
+// deletes that row; Looks-good UPDATEs it with the rep's edits and
+// optionally moves the lead stage if Claude suggested one.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Mic, Square, Loader2, CheckCircle2,
-  AlertTriangle, ChevronRight, RefreshCw,
+  AlertTriangle, ChevronRight, RefreshCw, MapPin,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { Pill } from '../../components/leads/LeadShared'
 
 const MAX_SECONDS = 60
 const FUNCTION_PATH = '/functions/v1/voice-process'
@@ -37,6 +38,11 @@ const LANG_HINTS = [
   { key: 'en', label: 'English' },
 ]
 
+const STAGE_OPTIONS = [
+  '', 'Qualified', 'SalesReady', 'MeetingScheduled',
+  'QuoteSent', 'Negotiating', 'Won', 'Lost', 'Nurture',
+]
+
 export default function VoiceLogV2() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -44,26 +50,36 @@ export default function VoiceLogV2() {
 
   const initialLeadId = params.get('lead') || null
 
-  const [leads, setLeads]     = useState([])
-  const [leadId, setLeadId]   = useState(initialLeadId)
-  const [langHint, setLangHint] = useState('gu')
-
-  // Recorder state
-  const [phase, setPhase] = useState('idle') // idle|recording|recorded|sending|done|error
+  /* ─── Phase state ─── */
+  const [phase, setPhase] = useState('pick') // pick | listening | sending | confirm | done | error
   const [seconds, setSeconds] = useState(0)
   const [error, setError] = useState('')
+
+  /* ─── Lead + language ─── */
+  const [leads, setLeads] = useState([])
+  const [leadId, setLeadId] = useState(initialLeadId)
+  const [langHint, setLangHint] = useState('gu')
+
+  /* ─── Recording ─── */
   const [audioBlob, setAudioBlob] = useState(null)
   const [audioMime, setAudioMime] = useState('audio/webm')
+  const [gps, setGps] = useState(null)
 
-  // Result
+  /* ─── Confirm screen edit state ─── */
   const [result, setResult] = useState(null)
+  const [editOutcome, setEditOutcome] = useState('neutral')
+  const [editNextAction, setEditNextAction] = useState('')
+  const [editAmount, setEditAmount] = useState('')
+  const [editStage, setEditStage] = useState('')
+  const [saving, setSaving] = useState(false)
 
+  /* ─── Recorder refs ─── */
   const mediaRecorderRef = useRef(null)
   const streamRef = useRef(null)
   const tickRef = useRef(null)
   const chunksRef = useRef([])
 
-  // Load leads the rep can target. RLS limits the list automatically.
+  /* ─── Load assignable leads ─── */
   useEffect(() => {
     supabase.from('leads')
       .select('id, name, company, phone, stage, segment')
@@ -83,13 +99,30 @@ export default function VoiceLogV2() {
     [leads, leadId]
   )
 
-  /* ─── Recorder controls ─── */
+  /* ─── GPS capture (silent, fail-open) ─── */
+  async function captureGps() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return null
+    try {
+      const pos = await new Promise((res, rej) => {
+        navigator.geolocation.getCurrentPosition(res, rej, {
+          enableHighAccuracy: false, timeout: 4000, maximumAge: 60000,
+        })
+      })
+      return {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: Math.round(pos.coords.accuracy),
+      }
+    } catch { return null }
+  }
+
+  /* ─── Recorder ─── */
   async function startRecording() {
     setError('')
     setResult(null)
     setAudioBlob(null)
     if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      setError('Your browser does not support audio recording. Try Chrome on Android or Safari on iOS.')
+      setError('Your browser does not support audio recording. Use Chrome on Android or Safari on iOS.')
       return
     }
     let stream
@@ -126,13 +159,15 @@ export default function VoiceLogV2() {
     mr.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
       setAudioBlob(blob)
-      setPhase(prev => (prev === 'recording' ? 'recorded' : prev))
       streamRef.current?.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
 
+    // Silent GPS — capture in parallel; doesn't block recording
+    captureGps().then(setGps)
+
     mr.start()
-    setPhase('recording')
+    setPhase('listening')
     setSeconds(0)
     tickRef.current = setInterval(() => {
       setSeconds(s => {
@@ -151,21 +186,20 @@ export default function VoiceLogV2() {
     if (mr && mr.state !== 'inactive') mr.stop()
   }
 
-  function resetAll() {
-    setPhase('idle')
-    setSeconds(0)
-    setAudioBlob(null)
-    setResult(null)
-    setError('')
-  }
+  // When the recorder finishes (audioBlob set after stopRecording), send.
+  useEffect(() => {
+    if (phase === 'listening' && audioBlob) {
+      sendToProcess(audioBlob)
+    }
+    /* eslint-disable-next-line */
+  }, [audioBlob])
 
-  /* ─── Send to edge function ─── */
-  async function sendToProcess() {
-    if (!audioBlob) { setError('Record something first.'); return }
+  async function sendToProcess(blob) {
+    if (!blob) return
     setError('')
     setPhase('sending')
     try {
-      const base64 = await blobToBase64(audioBlob)
+      const base64 = await blobToBase64(blob)
       const { data: sess } = await supabase.auth.getSession()
       const accessToken = sess?.session?.access_token
       const fnUrl = (supabase.supabaseUrl || '') + FUNCTION_PATH
@@ -182,6 +216,9 @@ export default function VoiceLogV2() {
           lead_id:          leadId || null,
           duration_seconds: seconds,
           language_hint:    langHint || null,
+          gps_lat:          gps?.lat ?? null,
+          gps_lng:          gps?.lng ?? null,
+          gps_accuracy_m:   gps?.accuracy ?? null,
         }),
       })
       const json = await res.json().catch(() => ({}))
@@ -190,43 +227,195 @@ export default function VoiceLogV2() {
         setError(json?.error || `Edge function failed (${res.status})`)
         return
       }
+      // Hydrate Confirm-screen edit fields from Claude's classification
+      const c = json.classified || {}
       setResult(json)
-      setPhase('done')
+      setEditOutcome(c.outcome || 'neutral')
+      setEditNextAction(c.next_action || '')
+      setEditAmount(c.amount ? String(c.amount) : '')
+      setEditStage(c.stage_to || '')
+      setPhase('confirm')
     } catch (e) {
       setPhase('error')
       setError('Send failed: ' + (e?.message || e))
     }
   }
 
+  /* ─── Save (Looks good) ─── */
+  async function saveLog() {
+    if (!result?.activity_id) {
+      setError('Activity row missing — cannot save edits.')
+      return
+    }
+    setSaving(true)
+    setError('')
+
+    // 1. Update the activity row with the rep's confirmed values.
+    const patch = {
+      outcome:     editOutcome || null,
+      next_action: editNextAction.trim() || null,
+    }
+    const { error: actErr } = await supabase
+      .from('lead_activities')
+      .update(patch)
+      .eq('id', result.activity_id)
+    if (actErr) {
+      setSaving(false)
+      setError('Could not save edits: ' + actErr.message)
+      return
+    }
+
+    // 2. If Claude suggested a stage and rep kept it, move the lead.
+    if (editStage && lead) {
+      const { error: stgErr } = await supabase
+        .from('leads')
+        .update({ stage: editStage })
+        .eq('id', lead.id)
+      if (stgErr) {
+        // Don't block save — surface a warning but continue
+        console.warn('[voice] stage move failed:', stgErr)
+      }
+    }
+
+    // 3. Update voice_logs with the user-confirmed amount (audit only)
+    if (result.voice_log_id) {
+      const finalAmount = Number(editAmount) || 0
+      const final = { ...(result.classified || {}),
+        outcome: editOutcome,
+        next_action: editNextAction || '',
+        amount: finalAmount,
+        stage_to: editStage || '',
+      }
+      await supabase
+        .from('voice_logs')
+        .update({ classified: final })
+        .eq('id', result.voice_log_id)
+    }
+
+    setSaving(false)
+    setPhase('done')
+  }
+
+  /* ─── Re-record: delete activity, return to listening ─── */
+  async function reRecord() {
+    if (result?.activity_id) {
+      await supabase.from('lead_activities').delete().eq('id', result.activity_id)
+    }
+    if (result?.voice_log_id) {
+      await supabase.from('voice_logs').delete().eq('id', result.voice_log_id)
+    }
+    setResult(null)
+    setAudioBlob(null)
+    setSeconds(0)
+    setPhase('pick')
+  }
+
+  function backToStart() {
+    setResult(null)
+    setAudioBlob(null)
+    setSeconds(0)
+    setError('')
+    setPhase('pick')
+  }
+
   /* ─── Render ─── */
   return (
     <div className="lead-root">
-      <button
-        className="lead-btn lead-btn-sm"
-        onClick={() => navigate(leadId ? `/leads/${leadId}` : '/leads')}
-        style={{ marginBottom: 16 }}
+      {/* Mobile preview frame keeps the page readable on desktop */}
+      <div
+        style={{
+          maxWidth: 460, margin: '0 auto',
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+          borderRadius: 24, padding: 4,
+          boxShadow: 'var(--shadow)',
+        }}
       >
-        <ArrowLeft size={12} /> {leadId ? 'Back to lead' : 'Back to leads'}
-      </button>
+        <div className="m-screen" style={{ borderRadius: 20, padding: 18 }}>
+          {phase === 'pick' && (
+            <PickScreen
+              leads={leads}
+              leadId={leadId} setLeadId={setLeadId}
+              langHint={langHint} setLangHint={setLangHint}
+              onBack={() => navigate(leadId ? `/leads/${leadId}` : '/leads')}
+              onStart={startRecording}
+              error={error}
+            />
+          )}
 
-      <div className="lead-page-head">
-        <div>
-          <div className="lead-page-eyebrow">Voice-First · Gujarati / Hindi / English</div>
-          <div className="lead-page-title">Voice Log</div>
-          <div className="lead-page-sub">
-            Speak naturally. We transcribe (Whisper) and classify (Claude) — you review and save.
-          </div>
+          {phase === 'listening' && (
+            <ListeningScreen
+              leadName={lead?.name || 'lead'}
+              langLabel={LANG_HINTS.find(l => l.key === langHint)?.label || 'Gujarati'}
+              seconds={seconds}
+              onStop={stopRecording}
+            />
+          )}
+
+          {phase === 'sending' && (
+            <SendingScreen />
+          )}
+
+          {phase === 'confirm' && result && (
+            <ConfirmScreen
+              leadName={lead?.name || 'lead'}
+              result={result}
+              gps={gps}
+              seconds={seconds}
+              editOutcome={editOutcome}     setEditOutcome={setEditOutcome}
+              editNextAction={editNextAction} setEditNextAction={setEditNextAction}
+              editAmount={editAmount}       setEditAmount={setEditAmount}
+              editStage={editStage}         setEditStage={setEditStage}
+              saving={saving}
+              onSave={saveLog}
+              onReRecord={reRecord}
+              error={error}
+            />
+          )}
+
+          {phase === 'done' && (
+            <DoneScreen
+              leadId={lead?.id}
+              onView={() => lead && navigate(`/leads/${lead.id}`)}
+              onAnother={backToStart}
+            />
+          )}
+
+          {phase === 'error' && (
+            <ErrorScreen
+              error={error}
+              onRetry={backToStart}
+            />
+          )}
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Lead picker */}
-      <div className="lead-card lead-card-pad" style={{ marginBottom: 12 }}>
-        <label className="lead-fld-label">Logging for which lead?</label>
+/* ─────────────────────────────────────────────────
+   Sub-screens
+   ───────────────────────────────────────────────── */
+
+function PickScreen({ leads, leadId, setLeadId, langHint, setLangHint, onBack, onStart, error }) {
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <button className="lead-btn lead-btn-sm" onClick={onBack} style={{ padding: '4px 8px' }}>
+          <ArrowLeft size={12} />
+        </button>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          Voice log · pick lead + language
+        </span>
+      </div>
+
+      <div className="m-card">
+        <div className="m-card-title">Logging for which lead?</div>
         <select
           className="lead-inp"
           value={leadId || ''}
           onChange={e => setLeadId(e.target.value || null)}
-          disabled={phase === 'recording' || phase === 'sending'}
+          style={{ marginTop: 8 }}
         >
           <option value="">— pick a lead (or leave empty for an orphan note) —</option>
           {leads.map(l => (
@@ -236,14 +425,14 @@ export default function VoiceLogV2() {
           ))}
         </select>
 
-        <label className="lead-fld-label" style={{ marginTop: 12 }}>Language hint</label>
+        <div className="lead-fld-label" style={{ marginTop: 14 }}>Language hint</div>
         <div className="lead-radio-grp">
           {LANG_HINTS.map(l => (
             <span
               key={l.key}
               className={`opt ${langHint === l.key ? 'on' : ''}`}
-              onClick={() => phase === 'idle' && setLangHint(l.key)}
-              style={{ cursor: phase === 'idle' ? 'pointer' : 'not-allowed' }}
+              onClick={() => setLangHint(l.key)}
+              style={{ cursor: 'pointer' }}
             >
               {l.label}
             </span>
@@ -251,180 +440,282 @@ export default function VoiceLogV2() {
         </div>
       </div>
 
-      {/* Recorder card */}
-      <div className="voice-card" style={{ textAlign: 'center', padding: 24 }}>
-        {phase === 'idle' && (
-          <>
-            <span className="voice-pill"><span className="mic" /> Ready</span>
-            <button
-              type="button"
-              className="voice-mic"
-              style={{ width: 96, height: 96, margin: '20px auto 14px', cursor: 'pointer' }}
-              onClick={startRecording}
-              aria-label="Start recording"
-            >
-              <Mic size={36} />
-            </button>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Tap to start. Up to {MAX_SECONDS}s.
-            </div>
-          </>
-        )}
-
-        {phase === 'recording' && (
-          <>
-            <span className="voice-pill"><span className="mic" /> Listening · {LANG_HINTS.find(l => l.key === langHint)?.label}</span>
-            <button
-              type="button"
-              className="voice-mic live"
-              style={{ width: 96, height: 96, margin: '20px auto 14px', cursor: 'pointer' }}
-              onClick={stopRecording}
-              aria-label="Stop recording"
-            >
-              <Square size={32} />
-            </button>
-            <div className="wave-big">
-              {Array.from({ length: 20 }).map((_, i) => <span key={i} />)}
-            </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600, color: 'var(--purple)' }}>
-              {fmt(seconds)}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 4, letterSpacing: '.12em', textTransform: 'uppercase' }}>
-              Tap to stop
-            </div>
-          </>
-        )}
-
-        {phase === 'recorded' && (
-          <>
-            <span className="voice-pill"><CheckCircle2 size={11} style={{ marginRight: 4 }} /> Recorded · {fmt(seconds)}</span>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '14px 0' }}>
-              Ready to send. We'll transcribe and classify.
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button className="lead-btn" onClick={resetAll}>Re-record</button>
-              <button className="lead-btn lead-btn-primary" onClick={sendToProcess}>
-                Send <ChevronRight size={12} />
-              </button>
-            </div>
-          </>
-        )}
-
-        {phase === 'sending' && (
-          <>
-            <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--purple)' }} />
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 12 }}>
-              Transcribing and classifying… typically 5–10 seconds.
-            </div>
-          </>
-        )}
-
-        {phase === 'done' && result && (
-          <ResultPanel
-            result={result}
-            leadId={leadId}
-            onRecordAnother={resetAll}
-            onView={() => leadId && navigate(`/leads/${leadId}`)}
-          />
-        )}
-
-        {phase === 'error' && (
-          <>
-            <AlertTriangle size={28} style={{ color: 'var(--danger)' }} />
-            <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 8, lineHeight: 1.5 }}>
-              {error}
-            </div>
-            <button className="lead-btn" onClick={resetAll} style={{ marginTop: 14 }}>
-              <RefreshCw size={12} /> Try again
-            </button>
-          </>
-        )}
+      <div className="voice-card" style={{ textAlign: 'center', padding: 24, marginTop: 12 }}>
+        <span className="voice-pill"><span className="mic" /> Ready</span>
+        <button
+          type="button"
+          className="voice-mic"
+          style={{ width: 96, height: 96, margin: '20px auto 14px', cursor: 'pointer', border: 0 }}
+          onClick={onStart}
+          aria-label="Start recording"
+        >
+          <Mic size={36} />
+        </button>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          Tap to start. Up to {MAX_SECONDS}s. Speak naturally.
+        </div>
       </div>
 
-      {error && phase !== 'error' && (
-        <div
-          style={{
-            marginTop: 12,
-            background: 'var(--danger-soft)',
-            border: '1px solid var(--danger)',
-            color: 'var(--danger)',
-            borderRadius: 10, padding: '10px 14px', fontSize: 13,
-          }}
-        >
-          {error}
-        </div>
-      )}
-    </div>
+      {error && <ErrBanner text={error} />}
+    </>
   )
 }
 
-/* ─── Result panel ─── */
-function ResultPanel({ result, leadId, onRecordAnother, onView }) {
-  const c = result.classified || {}
+function ListeningScreen({ leadName, langLabel, seconds, onStop }) {
   return (
-    <div style={{ textAlign: 'left' }}>
-      <div className="voice-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <CheckCircle2 size={11} /> Saved · language {result.language || 'unknown'}
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <ArrowLeft size={14} />
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          Logging call · {leadName}
+        </span>
       </div>
 
-      <div className="m-card" style={{ marginTop: 14 }}>
-        <div className="m-card-title">Transcript</div>
-        <div className="guj-quote" style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>
-          {result.transcript}
+      <div className="voice-card" style={{ textAlign: 'center', padding: 24 }}>
+        <span className="voice-pill"><span className="mic" /> Listening · {langLabel}</span>
+        <button
+          type="button"
+          className="voice-mic live"
+          style={{ width: 96, height: 96, margin: '20px auto 14px', cursor: 'pointer', border: 0 }}
+          onClick={onStop}
+          aria-label="Stop recording"
+        >
+          <Square size={32} />
+        </button>
+        <div className="wave-big">
+          {Array.from({ length: 20 }).map((_, i) => <span key={i} />)}
+        </div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, color: 'var(--purple)' }}>
+          {fmt(seconds)}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 4, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+          Tap to stop
         </div>
       </div>
 
       <div className="m-card" style={{ marginTop: 12 }}>
-        <div className="m-card-title">AI extracted</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-          <Row label="Type"     value={c.activity_type || '—'} />
-          <Row label="Outcome"  value={
-            <Pill tone={
-              c.outcome === 'positive' ? 'success' :
-              c.outcome === 'negative' ? 'danger' : 'info'
-            }>{c.outcome || 'neutral'}</Pill>
-          } />
-          {c.notes && <Row label="Summary" value={c.notes} stack />}
-          {c.next_action && <Row label="Next" value={c.next_action + (c.next_action_date ? ` · ${c.next_action_date}` : '')} />}
+        <div className="m-card-title">Live transcript</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          Recording… transcript will appear here once you stop.
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 8 }}>
+          Speak naturally — the system understands Gujarati, Hindi, and English.
         </div>
       </div>
+    </>
+  )
+}
 
-      {result.warning && (
-        <div
-          style={{
-            marginTop: 12, background: 'var(--warning-soft)',
-            border: '1px solid var(--warning)', color: 'var(--warning)',
-            borderRadius: 10, padding: '10px 14px', fontSize: 12,
-          }}
-        >
-          {result.warning}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-        <button className="lead-btn" onClick={onRecordAnother}>
-          <Mic size={12} /> Record another
-        </button>
-        {leadId && result.activity_id && (
-          <button className="lead-btn lead-btn-primary" onClick={onView}>
-            View lead <ChevronRight size={12} />
-          </button>
-        )}
+function SendingScreen() {
+  return (
+    <div className="voice-card" style={{ textAlign: 'center', padding: 36 }}>
+      <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--purple)' }} />
+      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 14 }}>
+        Transcribing and classifying…
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 6 }}>
+        Typically 5–10 seconds.
       </div>
     </div>
   )
 }
 
-function Row({ label, value, stack }) {
+function ConfirmScreen({
+  leadName, result, gps, seconds,
+  editOutcome, setEditOutcome,
+  editNextAction, setEditNextAction,
+  editAmount, setEditAmount,
+  editStage, setEditStage,
+  saving, onSave, onReRecord, error,
+}) {
+  const transcriptGu = result.transcript || ''
+  const transcriptEn = result.classified?.transcript_en || ''
   return (
-    <div style={{
-      display: stack ? 'block' : 'flex',
-      alignItems: 'center', gap: 8,
-    }}>
-      <span style={{ fontSize: 11, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.1em', minWidth: 70, display: 'inline-block' }}>
-        {label}
-      </span>
-      <span>{value}</span>
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <ArrowLeft size={14} />
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          Confirm log · {leadName}
+        </span>
+      </div>
+
+      {/* Bilingual transcript card */}
+      <div className="voice-card" style={{ marginBottom: 12 }}>
+        <span className="voice-pill" style={{ marginBottom: 8 }}>
+          <CheckCircle2 size={11} style={{ marginRight: 4 }} />
+          Transcribed · {fmt(seconds)}
+        </span>
+        <div className="guj-quote">
+          {transcriptGu}
+          {transcriptEn && (
+            <span className="en">EN · {transcriptEn}</span>
+          )}
+        </div>
+      </div>
+
+      {/* AI extracted · review */}
+      <div className="m-card">
+        <div className="m-card-title">AI extracted · review</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Outcome chips */}
+          <div>
+            <div className="lead-fld-label">Outcome</div>
+            <div className="lead-radio-grp">
+              <span
+                className={`opt ${editOutcome === 'positive' ? 'on pos' : ''}`}
+                onClick={() => setEditOutcome('positive')}
+                style={{ cursor: 'pointer' }}
+              >
+                Positive
+              </span>
+              <span
+                className={`opt ${editOutcome === 'neutral' ? 'on' : ''}`}
+                onClick={() => setEditOutcome('neutral')}
+                style={{ cursor: 'pointer' }}
+              >
+                Neutral
+              </span>
+              <span
+                className={`opt ${editOutcome === 'negative' ? 'on neg' : ''}`}
+                onClick={() => setEditOutcome('negative')}
+                style={{ cursor: 'pointer' }}
+              >
+                Negative
+              </span>
+            </div>
+          </div>
+
+          {/* Next action + Amount side-by-side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <div className="lead-fld-label">Next action</div>
+              <input
+                className="lead-inp"
+                value={editNextAction}
+                onChange={e => setEditNextAction(e.target.value)}
+                placeholder="Send quote"
+              />
+            </div>
+            <div>
+              <div className="lead-fld-label">Amount</div>
+              <input
+                className="lead-inp"
+                value={editAmount}
+                onChange={e => setEditAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="₹3,80,000"
+                inputMode="numeric"
+              />
+            </div>
+          </div>
+
+          {/* Move stage to */}
+          <div>
+            <div className="lead-fld-label">Move stage to</div>
+            <select
+              className="lead-inp"
+              value={editStage}
+              onChange={e => setEditStage(e.target.value)}
+            >
+              <option value="">— don't move —</option>
+              {STAGE_OPTIONS.filter(Boolean).map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* GPS pill */}
+          {gps && (
+            <span
+              className="lead-pill"
+              style={{
+                alignSelf: 'flex-start',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: 'var(--surface-3, rgba(255,255,255,.04))',
+                border: '1px solid var(--border)',
+                color: 'var(--text-muted)',
+                padding: '4px 10px', borderRadius: 999, fontSize: 11,
+              }}
+            >
+              <MapPin size={11} />
+              GPS · {gps.lat.toFixed(4)}, {gps.lng.toFixed(4)} · ±{gps.accuracy}m
+            </span>
+          )}
+        </div>
+      </div>
+
+      <button
+        className="m-cta"
+        onClick={onSave}
+        disabled={saving}
+        style={{ marginTop: 14 }}
+      >
+        {saving
+          ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite', marginRight: 6 }} /> Saving…</>
+          : <>Looks good · save log</>}
+      </button>
+      <button
+        className="m-cta m-cta-ghost"
+        onClick={onReRecord}
+        disabled={saving}
+        style={{ marginTop: 8 }}
+      >
+        Re-record
+      </button>
+
+      {error && <ErrBanner text={error} />}
+    </>
+  )
+}
+
+function DoneScreen({ leadId, onView, onAnother }) {
+  return (
+    <>
+      <div className="voice-card" style={{ textAlign: 'center', padding: 28 }}>
+        <CheckCircle2 size={36} style={{ color: 'var(--success)' }} />
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, marginTop: 10 }}>
+          Saved
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+          Activity logged on the lead's timeline.
+        </div>
+      </div>
+
+      <button className="m-cta" onClick={onView} style={{ marginTop: 14 }} disabled={!leadId}>
+        View lead <ChevronRight size={14} />
+      </button>
+      <button className="m-cta m-cta-ghost" onClick={onAnother} style={{ marginTop: 8 }}>
+        <Mic size={14} /> Record another
+      </button>
+    </>
+  )
+}
+
+function ErrorScreen({ error, onRetry }) {
+  return (
+    <div className="voice-card" style={{ textAlign: 'center', padding: 28 }}>
+      <AlertTriangle size={32} style={{ color: 'var(--danger)' }} />
+      <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 10, lineHeight: 1.5 }}>
+        {error}
+      </div>
+      <button className="lead-btn" onClick={onRetry} style={{ marginTop: 14 }}>
+        <RefreshCw size={12} /> Try again
+      </button>
+    </div>
+  )
+}
+
+function ErrBanner({ text }) {
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        background: 'var(--danger-soft)',
+        border: '1px solid var(--danger)',
+        color: 'var(--danger)',
+        borderRadius: 10, padding: '10px 14px', fontSize: 13,
+      }}
+    >
+      {text}
     </div>
   )
 }
@@ -441,7 +732,6 @@ function blobToBase64(blob) {
     const r = new FileReader()
     r.onloadend = () => {
       const s = String(r.result || '')
-      // strip the data: prefix the function tolerates either way
       const idx = s.indexOf(',')
       resolve(idx >= 0 ? s.slice(idx + 1) : s)
     }

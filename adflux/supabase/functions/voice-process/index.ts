@@ -67,9 +67,12 @@ Return ONLY a JSON object. No prose, no markdown fence. Schema:
 {
   "activity_type": "call" | "whatsapp" | "meeting" | "site_visit" | "note",
   "outcome":       "positive" | "neutral" | "negative",
-  "notes":         "Short English summary of what happened (1-3 sentences)",
+  "transcript_en": "Sentence-level natural English translation of what the rep said (NOT a summary). Preserve their exact meaning. If transcript is already mostly English, copy it through.",
+  "notes":         "Short English summary of what happened (1-3 sentences). This is for the activity timeline.",
   "next_action":   "Short phrase like 'Send quote' or 'Follow up Tuesday', or empty string",
-  "next_action_date": "YYYY-MM-DD or empty string"
+  "next_action_date": "YYYY-MM-DD or empty string",
+  "amount":        "Numeric rupee amount mentioned, or 0. Convert lakh/crore to plain rupees (e.g. '3.8 lakh' -> 380000, '2 crore' -> 20000000).",
+  "stage_to":      "If the rep clearly indicates a stage transition, one of: 'Qualified' | 'SalesReady' | 'MeetingScheduled' | 'QuoteSent' | 'Negotiating' | 'Won' | 'Lost' | 'Nurture'. Otherwise empty string."
 }
 
 Guidance:
@@ -79,6 +82,9 @@ Guidance:
 - "Neutral" = neither — a follow-up or info-gathering call.
 - next_action only if the rep explicitly mentioned what to do next.
 - next_action_date only if the rep mentioned a specific day. "tomorrow" or "Monday" → resolve to date based on today's date provided in user message.
+- transcript_en is the user-facing English version of the spoken note, distinct from notes (the cleaned-up summary).
+- amount: only if the rep stated a specific number. "₹3.8 lakh nu quote" → 380000. Don't guess.
+- stage_to: only when the rep's intent is clear. "BANT confirmed" / "ready for sales" → SalesReady. "lost interest" → Lost. "demo set" / "meeting fixed" → MeetingScheduled. "quote sent" → QuoteSent.
 `
 
 serve(async (req) => {
@@ -110,7 +116,10 @@ serve(async (req) => {
   try { body = await req.json() }
   catch { return jsonResp({ error: 'Invalid JSON body.' }, 400) }
 
-  const { audio_base64, mime_type, lead_id, duration_seconds, language_hint } = body || {}
+  const {
+    audio_base64, mime_type, lead_id, duration_seconds, language_hint,
+    gps_lat, gps_lng, gps_accuracy_m,
+  } = body || {}
   if (!audio_base64 || typeof audio_base64 !== 'string') {
     return jsonResp({ error: 'audio_base64 (string) is required.' }, 400)
   }
@@ -230,6 +239,10 @@ serve(async (req) => {
       notes:            (classified.notes || transcript).slice(0, 4000),
       next_action:      classified.next_action      || null,
       next_action_date: classified.next_action_date || null,
+      duration_seconds: Number(duration_seconds) || null,
+      gps_lat:          (typeof gps_lat === 'number') ? gps_lat : null,
+      gps_lng:          (typeof gps_lng === 'number') ? gps_lng : null,
+      gps_accuracy_m:   (typeof gps_accuracy_m === 'number') ? Math.round(gps_accuracy_m) : null,
       created_by:       user.id,
     }
     const { data: actData, error: actErr } = await supabase
