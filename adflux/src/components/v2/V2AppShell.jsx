@@ -46,6 +46,9 @@ const ADMIN_NAV = [
   // Phase 12 rev3 — owner spec: ONE landing page, not two. Cockpit
   // widgets folded into AdminDashboardDesktop.
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
+  // Phase 16 — lead pipeline overview + live team field view.
+  { to: '/lead-dashboard',    label: 'Lead Pipeline',  icon: TrendingUp },
+  { to: '/team-dashboard',    label: 'Team Live',      icon: Users },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },

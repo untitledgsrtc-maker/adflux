@@ -24,6 +24,8 @@ import HRV2               from './pages/v2/HRV2'
 import ClientsV2          from './pages/v2/ClientsV2'
 // ── Phase 12 — M1 Sales/Lead module ─────────────────────────────────
 import LeadsV2             from './pages/v2/LeadsV2'
+import LeadDashboardV2     from './pages/v2/LeadDashboardV2'
+import TeamDashboardV2     from './pages/v2/TeamDashboardV2'
 import LeadDetailV2        from './pages/v2/LeadDetailV2'
 import LeadFormV2          from './pages/v2/LeadFormV2'
 import LeadUploadV2        from './pages/v2/LeadUploadV2'
@@ -134,6 +136,8 @@ export default function App() {
               id="new" and the lead-detail loader sends "new" to a
               uuid column ("invalid input syntax for type uuid: new"). */}
           <Route path="/leads"                     element={<LeadsV2 />} />
+          <Route path="/lead-dashboard"            element={<LeadDashboardV2 />} />
+          <Route path="/team-dashboard"            element={<RequirePrivileged><TeamDashboardV2 /></RequirePrivileged>} />
           <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
           <Route path="/leads/new"                 element={<LeadFormV2 />} />
           <Route path="/leads/:id"                 element={<LeadDetailV2 />} />
