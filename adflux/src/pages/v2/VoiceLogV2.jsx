@@ -19,7 +19,7 @@
 // round-trips in 5–10 seconds. No background queueing in V1.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Mic, Square, Loader2, CheckCircle2,
   AlertTriangle, ChevronRight, RefreshCw,
