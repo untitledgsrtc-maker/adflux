@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Sun, MapPin, Phone, Calendar, UserPlus, Loader2, Trash2, Plus,
-  CheckCircle2, Users as UsersIcon, Edit3,
+  CheckCircle2, Users as UsersIcon, Edit3, Mic,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
