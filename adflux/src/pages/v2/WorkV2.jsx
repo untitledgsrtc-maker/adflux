@@ -130,6 +130,28 @@ export default function WorkV2() {
     load()
   }
 
+  async function toggleMeetingDone(idx) {
+    if (!session?.planned_meetings) return
+    setBusy(true); setError('')
+    const next = session.planned_meetings.map((m, i) =>
+      i === idx ? { ...m, done: !m.done } : m
+    )
+    const wasDone = !!session.planned_meetings[idx]?.done
+    const nowDone = !wasDone
+    const nextCounters = {
+      ...(session.daily_counters || {}),
+      meetings: Math.max(0, (session.daily_counters?.meetings || 0) + (nowDone ? 1 : -1)),
+    }
+    const { error: err } = await supabase
+      .from('work_sessions')
+      .update({ planned_meetings: next, daily_counters: nextCounters })
+      .eq('user_id', profile.id)
+      .eq('work_date', TODAY())
+    setBusy(false)
+    if (err) { setError(err.message); return }
+    load()
+  }
+
   async function doCheckIn() {
     setBusy(true); setError('')
     const gps = await captureGps()
@@ -208,7 +230,8 @@ export default function WorkV2() {
   return (
     <div className="lead-root">
       <div className="m-screen">
-        {/* Greet header */}
+        {/* Greet header — design: avatar on Plan, "● live" pill on Active,
+            Day done greeting on D_DONE. */}
         <div className="m-greet">
           <div>
             <div className="hello">
@@ -218,10 +241,17 @@ export default function WorkV2() {
             </div>
             <div className="date">{niceDate}{session?.check_in_at ? ` · checked in ${formatTime(session.check_in_at)}` : ''}</div>
           </div>
-          {profile?.name && (
-            <span className={`lead-avatar av-${repColor}`} style={{ width: 36, height: 36, fontSize: 13 }}>
-              {repInitials}
-            </span>
+          {stateName === 'B_ACTIVE' ? (
+            <Pill tone="success">
+              <span className="lead-live-dot" style={{ marginRight: 5, width: 6, height: 6 }} />
+              live
+            </Pill>
+          ) : (
+            profile?.name && (
+              <span className={`lead-avatar av-${repColor}`} style={{ width: 36, height: 36, fontSize: 13 }}>
+                {repInitials}
+              </span>
+            )
           )}
         </div>
 
@@ -287,7 +317,7 @@ export default function WorkV2() {
               style={{ marginTop: 8 }}
               onClick={() => setPlannedMeetings(prev => [...prev, { client: '', time: '', location: '' }])}
             >
-              <Plus size={12} /> Add meeting
+              <Plus size={12} /> Add another
             </button>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
@@ -384,9 +414,21 @@ export default function WorkV2() {
                       <div className="who">{m.client}</div>
                       {m.location && <div className="where">{m.location}</div>}
                     </div>
-                    {/* No "mark done" persistence yet — that's a future feature.
-                        Counter gets bumped automatically when a meeting activity
-                        is logged via the lead detail page. */}
+                    {/* Phase 22b — Mark done pattern from design.
+                        m.done is a flag on the planned_meetings JSONB
+                        array. Toggle persists to work_sessions row. */}
+                    {m.done ? (
+                      <Pill tone="success">✓ done</Pill>
+                    ) : (
+                      <button
+                        type="button"
+                        className="lead-btn lead-btn-sm lead-btn-primary"
+                        onClick={() => toggleMeetingDone(i)}
+                        disabled={busy}
+                      >
+                        Mark done
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
