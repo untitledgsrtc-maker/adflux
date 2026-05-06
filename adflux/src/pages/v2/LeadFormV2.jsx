@@ -1,7 +1,7 @@
 // src/pages/v2/LeadFormV2.jsx
 //
-// Phase 12 rev3 — manual New Lead form. Owner spec §3.1:
-// "/leads/new manual create form".
+// Phase 16 commit 4 — New Lead form, ported in-place from
+// _design_reference/Leads/lead-admin.jsx (AdminLeadCreate).
 //
 // Per-role behaviour:
 //   admin / co_owner / sales_manager → can pick assignee + telecaller
@@ -9,29 +9,29 @@
 //   telecaller                       → telecaller_id defaults to self,
 //                                      assignee can be picked or left blank
 //
-// Mandatory fields: name, source, segment.
-// Phone is allowed (not required) since some sources are email-only.
-// Stage defaults to 'New' so it lands in the Open bucket.
+// Mandatory: name, source, segment.
+// Stage defaults to 'New' so it lands in Open bucket.
+// Heat defaults to 'cold' (manual rep judgment per spec §6).
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import {
-  ArrowLeft, Save, Loader2, Inbox,
-} from 'lucide-react'
+import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 
-const SOURCES = ['IndiaMart', 'Justdial', 'Cronberry WABA', 'Excel Upload', 'Manual', 'Referral', 'Walk-in', 'Website', 'Other']
+const SOURCES = [
+  'IndiaMart', 'Justdial', 'Cronberry WABA', 'Excel Upload',
+  'Manual', 'Referral', 'Walk-in', 'Website', 'Other',
+]
 
 export default function LeadFormV2() {
   const navigate = useNavigate()
   const location = useLocation()
-  const profile  = useAuthStore(s => s.profile)
+  const profile = useAuthStore(s => s.profile)
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
   const isManager    = profile?.team_role === 'sales_manager' || isPrivileged
+  const isTelecaller = profile?.team_role === 'telecaller'
 
-  // Optional prefill from /leads page state — used when admin clicks
-  // "+ New Lead" with a hint (e.g. from search). Not used for editing.
   const prefill = location.state?.prefill || {}
 
   const [form, setForm] = useState({
@@ -47,232 +47,262 @@ export default function LeadFormV2() {
     heat:           prefill.heat        || 'cold',
     stage:          'New',
     notes:          prefill.notes       || '',
-    assigned_to:    isPrivileged ? '' : profile?.id || '',
-    telecaller_id:  profile?.team_role === 'telecaller' ? profile?.id : '',
+    assigned_to:    isPrivileged ? '' : (profile?.id || ''),
+    telecaller_id:  isTelecaller ? (profile?.id || '') : '',
   })
 
-  const [users, setUsers] = useState([])
+  const [reps, setReps] = useState([])
+  const [telecallers, setTelecallers] = useState([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]   = useState('')
 
-  // Pull assignable users for admin/manager dropdowns. RLS filters this
-  // for non-admin so they only see their own team.
+  function set(k, v) { setForm(prev => ({ ...prev, [k]: v })) }
+
   useEffect(() => {
     supabase
       .from('users')
       .select('id, name, team_role, city, is_active')
+      .in('team_role', ['sales', 'agency', 'sales_manager'])
       .eq('is_active', true)
-      .in('team_role', ['sales','agency','sales_manager','telecaller'])
       .order('name')
-      .then(({ data }) => setUsers(data || []))
+      .then(({ data }) => setReps(data || []))
+    supabase
+      .from('users')
+      .select('id, name, team_role, city, is_active')
+      .eq('team_role', 'telecaller')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => setTelecallers(data || []))
   }, [])
 
-  function set(field, value) {
-    setForm(f => ({ ...f, [field]: value }))
-  }
-
-  async function handleSave() {
+  async function handleSave(openAfter = false) {
     setError('')
-    if (!form.name.trim()) { setError('Lead name is required.'); return }
-    if (!form.source)      { setError('Source is required.'); return }
-    if (!form.segment)     { setError('Segment is required.'); return }
-
+    if (!form.name.trim()) {
+      setError('Name is required.')
+      return
+    }
+    if (!form.source) {
+      setError('Source is required.')
+      return
+    }
+    if (!form.segment) {
+      setError('Segment is required.')
+      return
+    }
     setSaving(true)
     const payload = {
-      name:           form.name.trim(),
-      company:        form.company.trim() || null,
-      phone:          form.phone.trim() || null,
-      email:          form.email.trim() || null,
-      city:           form.city.trim() || null,
-      segment:        form.segment,
-      source:         form.source,
-      industry:       form.industry.trim() || null,
-      expected_value: form.expected_value ? Number(form.expected_value) : null,
-      heat:           form.heat,
-      stage:          form.stage,
-      notes:          form.notes.trim() || null,
-      assigned_to:    form.assigned_to || null,
-      telecaller_id:  form.telecaller_id || null,
-      created_by:     profile?.id,
+      name:          form.name.trim(),
+      company:       form.company.trim() || null,
+      phone:         form.phone.trim() || null,
+      email:         form.email.trim() || null,
+      city:          form.city.trim() || null,
+      segment:       form.segment,
+      source:        form.source,
+      industry:      form.industry.trim() || null,
+      expected_value: form.expected_value === '' ? null : Number(form.expected_value),
+      heat:          form.heat,
+      stage:         form.stage,
+      notes:         form.notes.trim() || null,
+      assigned_to:   form.assigned_to || null,
+      telecaller_id: form.telecaller_id || null,
+      created_by:    profile.id,
     }
-
     const { data, error: err } = await supabase
       .from('leads')
       .insert([payload])
       .select()
       .single()
-
     setSaving(false)
     if (err) {
-      setError(err.message || 'Failed to create lead.')
+      setError('Save failed: ' + err.message)
       return
     }
-    navigate(`/leads/${data.id}`)
+    navigate(openAfter ? `/leads/${data.id}` : '/leads')
   }
 
-  // Filter dropdowns to roles that can OWN a lead
-  const salesUsers     = users.filter(u => ['sales','agency','sales_manager'].includes(u.team_role))
-  const telecallerUsers = users.filter(u => u.team_role === 'telecaller')
-
   return (
-    <div className="v2d-lead-form">
-      <button
-        className="v2d-ghost v2d-ghost--btn"
-        onClick={() => navigate('/leads')}
-        style={{ marginBottom: 16 }}
-      >
-        <ArrowLeft size={14} /> All Leads
+    <div className="lead-root" style={{ maxWidth: 760, margin: '0 auto' }}>
+      <button className="lead-btn lead-btn-sm" onClick={() => navigate('/leads')} style={{ marginBottom: 16 }}>
+        <ArrowLeft size={12} /> All leads
       </button>
 
-      <div className="v2d-page-head">
+      <div className="lead-page-head">
         <div>
-          <div className="v2d-page-kicker">New lead</div>
-          <h1 className="v2d-page-title">Create lead</h1>
-          <div className="v2d-page-sub">
-            Manually add a new lead. For bulk import, use Upload Excel.
-          </div>
+          <div className="lead-page-eyebrow">Add to pipeline</div>
+          <div className="lead-page-title">New Lead</div>
+          <div className="lead-page-sub">30 seconds · all fields can be edited later</div>
         </div>
       </div>
 
-      {error && (
-        <div style={{
-          background: 'rgba(248,113,113,.10)',
-          border: '1px solid rgba(248,113,113,.28)',
-          color: '#f87171',
-          borderRadius: 12, padding: '12px 16px', marginBottom: 12, fontSize: 13,
-        }}>⚠ {error}</div>
-      )}
-
-      <div className="v2d-panel" style={{ padding: 22, marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
-          <Inbox size={14} style={{ verticalAlign: '-2px', marginRight: 8 }} />
-          Contact
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Name <span style={{ color: '#f87171' }}>*</span></label>
-            <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Person name or department" />
-          </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Company</label>
-            <input value={form.company} onChange={e => set('company', e.target.value)} />
-          </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Phone</label>
-            <input value={form.phone} onChange={e => set('phone', e.target.value)} />
-          </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Email</label>
-            <input type="email" value={form.email} onChange={e => set('email', e.target.value)} />
-          </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>City</label>
-            <input value={form.city} onChange={e => set('city', e.target.value)} placeholder="e.g. Vadodara" />
-          </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Industry</label>
-            <input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Education, Retail" />
-          </div>
+      {/* ─── Identity ─── */}
+      <div className="lead-card" style={{ marginBottom: 14 }}>
+        <div className="lead-card-head"><div className="lead-card-title">Identity</div></div>
+        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <Field label="Name *" value={form.name} onChange={v => set('name', v)} placeholder="e.g. Dr. Mehta" />
+          <Field label="Company" value={form.company} onChange={v => set('company', v)} placeholder="e.g. Sunrise Diagnostics" />
+          <Field label="Phone"  value={form.phone}   onChange={v => set('phone', v)}   placeholder="+91 98XXXX XXXXX" />
+          <Field label="Email"  value={form.email}   onChange={v => set('email', v)}   placeholder="name@company.com" type="email" />
+          <Field label="City"   value={form.city}    onChange={v => set('city', v)}    placeholder="Surat" />
         </div>
       </div>
 
-      <div className="v2d-panel" style={{ padding: 22, marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Lead context</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Segment <span style={{ color: '#f87171' }}>*</span></label>
-            <select value={form.segment} onChange={e => set('segment', e.target.value)}>
-              <option value="PRIVATE">Private</option>
-              <option value="GOVERNMENT">Government</option>
-            </select>
-          </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Source <span style={{ color: '#f87171' }}>*</span></label>
-            <select value={form.source} onChange={e => set('source', e.target.value)}>
+      {/* ─── Classification ─── */}
+      <div className="lead-card" style={{ marginBottom: 14 }}>
+        <div className="lead-card-head"><div className="lead-card-title">Classification</div></div>
+        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div>
+            <label className="lead-fld-label">Source *</label>
+            <select className="lead-inp" value={form.source} onChange={e => set('source', e.target.value)}>
               {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Heat</label>
-            <select value={form.heat} onChange={e => set('heat', e.target.value)}>
-              <option value="hot">Hot</option>
-              <option value="warm">Warm</option>
-              <option value="cold">Cold</option>
-            </select>
+          <div>
+            <label className="lead-fld-label">Segment *</label>
+            <div className="lead-radio-grp">
+              <span
+                className={`opt ${form.segment === 'GOVERNMENT' ? 'on' : ''}`}
+                onClick={() => set('segment', 'GOVERNMENT')}
+              >
+                Government
+              </span>
+              <span
+                className={`opt ${form.segment === 'PRIVATE' ? 'on' : ''}`}
+                onClick={() => set('segment', 'PRIVATE')}
+              >
+                Private
+              </span>
+            </div>
           </div>
-          <div className="fg" style={{ marginBottom: 0 }}>
-            <label>Expected value (₹)</label>
-            <input type="number" min="0" value={form.expected_value} onChange={e => set('expected_value', e.target.value)} placeholder="optional" />
+          <Field label="Industry" value={form.industry} onChange={v => set('industry', v)} placeholder="Healthcare, Retail, …" />
+        </div>
+      </div>
+
+      {/* ─── Money + temperature ─── */}
+      <div className="lead-card" style={{ marginBottom: 14 }}>
+        <div className="lead-card-head"><div className="lead-card-title">Money &amp; temperature</div></div>
+        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <Field
+            label="Expected value (₹)"
+            value={form.expected_value}
+            onChange={v => set('expected_value', v)}
+            placeholder="3,80,000"
+            type="number"
+          />
+          <div>
+            <label className="lead-fld-label">Heat</label>
+            <div className="lead-radio-grp">
+              <span
+                className={`opt ${form.heat === 'hot' ? 'on neg' : ''}`}
+                onClick={() => set('heat', 'hot')}
+              >
+                <Flame size={11} style={{ marginRight: 4, verticalAlign: '-1px' }} /> Hot
+              </span>
+              <span
+                className={`opt ${form.heat === 'warm' ? 'on' : ''}`}
+                onClick={() => set('heat', 'warm')}
+              >
+                <Zap size={11} style={{ marginRight: 4, verticalAlign: '-1px' }} /> Warm
+              </span>
+              <span
+                className={`opt ${form.heat === 'cold' ? 'on' : ''}`}
+                onClick={() => set('heat', 'cold')}
+              >
+                <Snowflake size={11} style={{ marginRight: 4, verticalAlign: '-1px' }} /> Cold
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {(isPrivileged || isManager || profile?.team_role === 'telecaller') && (
-        <div className="v2d-panel" style={{ padding: 22, marginBottom: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Assignment</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-            <div className="fg" style={{ marginBottom: 0 }}>
-              <label>Sales rep</label>
-              <select value={form.assigned_to} onChange={e => set('assigned_to', e.target.value)}>
-                <option value="">— unassigned —</option>
-                {salesUsers.map(u => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}{u.city ? ` · ${u.city}` : ''}
-                  </option>
-                ))}
-              </select>
-              <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 6 }}>
-                Lead will appear in this rep's queue. Leave blank if uncertain.
-              </p>
-            </div>
-            <div className="fg" style={{ marginBottom: 0 }}>
-              <label>Telecaller</label>
-              <select value={form.telecaller_id} onChange={e => set('telecaller_id', e.target.value)}>
-                <option value="">— none —</option>
-                {telecallerUsers.map(u => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}{u.city ? ` · ${u.city}` : ''}
-                  </option>
-                ))}
-              </select>
-              <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 6 }}>
-                Sets ownership for the call queue.
-              </p>
-            </div>
+      {/* ─── Ownership ─── */}
+      <div className="lead-card" style={{ marginBottom: 14 }}>
+        <div className="lead-card-head"><div className="lead-card-title">Ownership</div></div>
+        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div>
+            <label className="lead-fld-label">Assigned to {!isManager ? '(you)' : ''}</label>
+            <select
+              className="lead-inp"
+              value={form.assigned_to}
+              onChange={e => set('assigned_to', e.target.value)}
+              disabled={!isManager}
+            >
+              <option value="">— unassigned —</option>
+              {reps.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.name}{r.city ? ` · ${r.city}` : ''}
+                </option>
+              ))}
+            </select>
           </div>
+          <div>
+            <label className="lead-fld-label">Telecaller {isTelecaller ? '(you)' : ''}</label>
+            <select
+              className="lead-inp"
+              value={form.telecaller_id}
+              onChange={e => set('telecaller_id', e.target.value)}
+              disabled={!isManager && !isTelecaller}
+            >
+              <option value="">— none —</option>
+              {telecallers.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Notes ─── */}
+      <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
+        <label className="lead-fld-label">Notes</label>
+        <textarea
+          className="lead-inp"
+          rows={3}
+          value={form.notes}
+          onChange={e => set('notes', e.target.value)}
+          placeholder="Visited last Diwali, owner met us at the trade fair…"
+        />
+      </div>
+
+      {error && (
+        <div
+          style={{
+            background: 'var(--danger-soft)',
+            border: '1px solid var(--danger)',
+            color: 'var(--danger)',
+            borderRadius: 8, padding: '10px 14px', fontSize: 13,
+            marginBottom: 14,
+          }}
+        >
+          {error}
         </div>
       )}
 
-      <div className="v2d-panel" style={{ padding: 22, marginBottom: 14 }}>
-        <div className="fg" style={{ marginBottom: 0 }}>
-          <label>Notes</label>
-          <textarea
-            value={form.notes}
-            onChange={e => set('notes', e.target.value)}
-            placeholder="Anything the next person calling this lead should know."
-            style={{ minHeight: 80 }}
-          />
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button
-          className="v2d-ghost v2d-ghost--btn"
-          onClick={() => navigate('/leads')}
-          disabled={saving}
-        >
-          Cancel
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <button className="lead-btn" onClick={() => navigate('/leads')} disabled={saving}>Cancel</button>
+        <button className="lead-btn" onClick={() => handleSave(true)} disabled={saving}>
+          Save &amp; open
         </button>
-        <button
-          className="v2d-cta"
-          onClick={handleSave}
-          disabled={saving}
-        >
+        <button className="lead-btn lead-btn-primary" onClick={() => handleSave(false)} disabled={saving}>
           {saving
-            ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
-            : <><Save size={14} /> Create lead</>}
+            ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+            : <><Save size={12} /> Save Lead</>}
         </button>
       </div>
+    </div>
+  )
+}
+
+function Field({ label, value, onChange, placeholder, type }) {
+  return (
+    <div>
+      <label className="lead-fld-label">{label}</label>
+      <input
+        className="lead-inp"
+        type={type || 'text'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder || ''}
+      />
     </div>
   )
 }
