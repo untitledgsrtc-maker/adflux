@@ -4,6 +4,14 @@
 // Claude Design output (_design_reference/Leads/lead-admin.jsx ·
 // AdminLeadDetail). Same /leads/:id route, new UI.
 //
+// Phase 19 — Lead module v2.1
+//   • Inline-edit on Lead details (Phone/Email/City/Industry/Source/Notes).
+//     Pattern: click-to-edit → onBlur → supabase update → optimistic merge.
+//     RLS rejects unauthorised edits and the field reverts with a "save
+//     failed" hint.
+//   • Realtime listener on this lead row — if another tab updates the
+//     row, this view reflects within 1–2s without refresh.
+//
 // Uses the 3 Phase 16 modal components for actions:
 //   • LogActivityModal     — call / whatsapp / email / meeting / site_visit / note
 //   • ChangeStageModal     — 10-stage move with BANT gate on SalesReady
@@ -124,6 +132,35 @@ export default function LeadDetailV2() {
     setLoading(false)
   }
   useEffect(() => { load() /* eslint-disable-next-line */ }, [id])
+
+  /* ─── Phase 19 — Realtime: keep this lead + activity list fresh ─── */
+  useEffect(() => {
+    if (!id) return
+    const ch = supabase
+      .channel(`lead-detail-${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'leads', filter: `id=eq.${id}` },
+        (payload) => {
+          // Merge incoming row into local state, but preserve already-joined
+          // assigned / telecaller objects (the realtime payload is unjoined).
+          setLead(prev => prev ? { ...prev, ...payload.new } : prev)
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'lead_activities', filter: `lead_id=eq.${id}` },
+        () => { load() }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+    /* eslint-disable-next-line */
+  }, [id])
+
+  /* ─── Phase 19 — Inline-edit save callback (optimistic local merge) ─── */
+  function onLeadFieldSaved(field, value) {
+    setLead(prev => prev ? { ...prev, [field]: value } : prev)
+  }
 
   /* ─── Convert lead → quote (prefill wizard) ─── */
   function convertToQuote() {
@@ -370,35 +407,46 @@ export default function LeadDetailV2() {
 
         {/* RIGHT — side panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Lead details */}
+          {/* Lead details — Phase 19 inline-edit */}
           <div className="lead-card">
             <div className="lead-card-head">
               <div className="lead-card-title">Lead details</div>
+              <span className="lead-card-sub" style={{ fontSize: 10, color: 'var(--text-subtle)' }}>
+                Click any field to edit
+              </span>
             </div>
             <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
-              {[
-                ['Phone',    lead.phone || '—'],
-                ['Email',    lead.email || '—'],
-                ['City',     lead.city || '—'],
-                ['Industry', lead.industry || '—'],
-                ['Source',   lead.source || '—'],
-                ['Created',  lead.created_at ? formatDate(lead.created_at) : '—'],
-              ].map(([k, v]) => (
-                <div key={k}>
-                  <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
-                    {k}
-                  </div>
-                  <div style={{ wordBreak: 'break-word' }}>{v}</div>
+              <FieldCell label="Phone">
+                <InlineField value={lead.phone}    field="phone"    leadId={lead.id} type="tel"   onSaved={onLeadFieldSaved} />
+              </FieldCell>
+              <FieldCell label="Email">
+                <InlineField value={lead.email}    field="email"    leadId={lead.id} type="email" onSaved={onLeadFieldSaved} />
+              </FieldCell>
+              <FieldCell label="City">
+                <InlineField value={lead.city}     field="city"     leadId={lead.id} onSaved={onLeadFieldSaved} />
+              </FieldCell>
+              <FieldCell label="Industry">
+                <InlineField value={lead.industry} field="industry" leadId={lead.id} onSaved={onLeadFieldSaved} />
+              </FieldCell>
+              <FieldCell label="Source">
+                <InlineField value={lead.source}   field="source"   leadId={lead.id} onSaved={onLeadFieldSaved} />
+              </FieldCell>
+              <FieldCell label="Created">
+                <span>{lead.created_at ? formatDate(lead.created_at) : '—'}</span>
+              </FieldCell>
+              <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))', paddingTop: 10, marginTop: 4 }}>
+                <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
+                  Notes
                 </div>
-              ))}
-              {lead.notes && (
-                <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))', paddingTop: 10, marginTop: 4 }}>
-                  <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
-                    Notes
-                  </div>
-                  <div style={{ whiteSpace: 'pre-line' }}>{lead.notes}</div>
-                </div>
-              )}
+                <InlineField
+                  value={lead.notes}
+                  field="notes"
+                  leadId={lead.id}
+                  multiline
+                  onSaved={onLeadFieldSaved}
+                  placeholder="Click to add notes…"
+                />
+              </div>
             </div>
           </div>
 
@@ -516,6 +564,157 @@ function Row({ label, right }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>{label}</span>
       <span>{right}</span>
+    </div>
+  )
+}
+
+/* ─── Phase 19 — inline-edit cells ─── */
+function FieldCell({ label, children }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: '.12em',
+          textTransform: 'uppercase',
+          color: 'var(--text-subtle)',
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ wordBreak: 'break-word' }}>{children}</div>
+    </div>
+  )
+}
+
+function InlineField({
+  value,
+  field,
+  leadId,
+  type = 'text',
+  multiline = false,
+  placeholder = 'Click to add…',
+  onSaved,
+}) {
+  const [val, setVal] = useState(value ?? '')
+  const [original, setOriginal] = useState(value ?? '')
+  const [editing, setEditing] = useState(false)
+  const [status, setStatus] = useState('idle') // idle | saving | saved | error
+  const [errMsg, setErrMsg] = useState('')
+
+  // External value can change (after re-fetch / realtime push) — re-sync.
+  useEffect(() => {
+    setVal(value ?? '')
+    setOriginal(value ?? '')
+  }, [value])
+
+  async function persist() {
+    setEditing(false)
+    const trimmed = (val || '').trim()
+    const before = (original || '').trim()
+    if (trimmed === before) {
+      setStatus('idle')
+      return
+    }
+    setStatus('saving')
+    setErrMsg('')
+    const { error } = await supabase
+      .from('leads')
+      .update({ [field]: trimmed || null })
+      .eq('id', leadId)
+    if (error) {
+      setStatus('error')
+      setErrMsg(error.message || 'save failed')
+      // Revert visual to last-known-good. RLS may have rejected — keep
+      // the user's typed value briefly so they can copy it before reset.
+      setTimeout(() => setVal(before), 1200)
+      return
+    }
+    setOriginal(trimmed)
+    setStatus('saved')
+    setTimeout(() => setStatus('idle'), 1100)
+    if (onSaved) onSaved(field, trimmed || null)
+  }
+
+  if (editing) {
+    const commonProps = {
+      autoFocus: true,
+      value: val,
+      onChange: e => setVal(e.target.value),
+      onBlur: persist,
+      onKeyDown: e => {
+        if (e.key === 'Escape') {
+          setVal(original)
+          setEditing(false)
+          setStatus('idle')
+        }
+        if (e.key === 'Enter' && !multiline) {
+          e.preventDefault()
+          e.target.blur()
+        }
+      },
+      style: {
+        width: '100%',
+        background: 'var(--surface-3, rgba(255,255,255,.04))',
+        border: '1px solid var(--border-strong)',
+        borderRadius: 6,
+        padding: '6px 8px',
+        fontSize: 12,
+        color: 'var(--text)',
+        fontFamily: 'inherit',
+        outline: 'none',
+        resize: multiline ? 'vertical' : 'none',
+      },
+    }
+    if (multiline) {
+      return <textarea rows={3} {...commonProps} />
+    }
+    return <input type={type} {...commonProps} />
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => setEditing(true)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setEditing(true)
+        }
+      }}
+      title="Click to edit (Esc to cancel)"
+      style={{
+        cursor: 'text',
+        wordBreak: 'break-word',
+        whiteSpace: multiline ? 'pre-line' : 'normal',
+        padding: '2px 4px',
+        margin: '-2px -4px',
+        borderRadius: 4,
+        color: val ? 'var(--text)' : 'var(--text-subtle)',
+        minHeight: multiline ? 36 : 'auto',
+      }}
+    >
+      {val || placeholder}
+      {status === 'saving' && (
+        <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-subtle)' }}>
+          saving…
+        </span>
+      )}
+      {status === 'saved' && (
+        <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--success)' }}>
+          saved
+        </span>
+      )}
+      {status === 'error' && (
+        <span
+          style={{ marginLeft: 6, fontSize: 10, color: 'var(--danger)' }}
+          title={errMsg}
+        >
+          save failed — {errMsg}
+        </span>
+      )}
     </div>
   )
 }

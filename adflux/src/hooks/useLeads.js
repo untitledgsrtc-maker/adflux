@@ -82,6 +82,33 @@ export function useLeads() {
     return { data: { count: ids.length } }
   }, [fetchLeads])
 
+  // Phase 19 — realtime change handler. Realtime payloads come without
+  // joined assigned/telecaller objects, so on INSERT/UPDATE we re-fetch
+  // the single row with joins. RLS still gates: a user who can't read
+  // the row gets nothing back and the list isn't polluted.
+  const applyRealtimeChange = useCallback(async (payload) => {
+    const ev = payload?.eventType
+    if (ev === 'DELETE') {
+      const id = payload.old?.id
+      if (id) setLeads(prev => prev.filter(l => l.id !== id))
+      return
+    }
+    const id = payload?.new?.id
+    if (!id) return
+    const { data, error: err } = await supabase
+      .from('leads')
+      .select(SELECT_COLUMNS)
+      .eq('id', id)
+      .maybeSingle()
+    if (err || !data) return
+    setLeads(prev => {
+      const exists = prev.some(l => l.id === id)
+      if (ev === 'INSERT' && !exists) return [data, ...prev]
+      if (!exists) return [data, ...prev]   // UPDATE on row we hadn't seen
+      return prev.map(l => l.id === id ? data : l)
+    })
+  }, [])
+
   return {
     leads,
     loading,
@@ -89,6 +116,7 @@ export function useLeads() {
     fetchLeads,
     updateLead,
     reassignBulk,
+    applyRealtimeChange,
   }
 }
 

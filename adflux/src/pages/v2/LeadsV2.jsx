@@ -49,7 +49,7 @@ export default function LeadsV2() {
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
-  const { leads, loading, error, fetchLeads, reassignBulk } = useLeads()
+  const { leads, loading, error, fetchLeads, reassignBulk, applyRealtimeChange } = useLeads()
 
   /* ─── Filter state ─── */
   const [search, setSearch]               = useState('')
@@ -57,6 +57,7 @@ export default function LeadsV2() {
   const [segmentFilter, setSegmentFilter] = useState('all')
   const [sourceFilter, setSourceFilter]   = useState('all')
   const [cityFilter, setCityFilter]       = useState('all')
+  const [industryFilter, setIndustryFilter] = useState('all')   // Phase 19
   const [repFilter, setRepFilter]         = useState('all')
 
   /* ─── Bulk select state ─── */
@@ -70,6 +71,21 @@ export default function LeadsV2() {
   const [assignableUsers, setAssignableUsers] = useState([])
 
   useEffect(() => { fetchLeads() }, [fetchLeads])
+
+  // Phase 19 — realtime sync across tabs. Listens for any insert/update/
+  // delete on leads; the hook re-fetches the single row with joins so
+  // assigned_to / telecaller_id names stay populated.
+  useEffect(() => {
+    const ch = supabase
+      .channel('leads-list-rt')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leads' },
+        applyRealtimeChange
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [applyRealtimeChange])
 
   // Privileged-user reassign target list. Sales / agency can't reassign,
   // so we skip the query entirely for them.
@@ -97,6 +113,11 @@ export default function LeadsV2() {
     leads.forEach(l => l.city && s.add(l.city))
     return Array.from(s).sort()
   }, [leads])
+  const distinctIndustries = useMemo(() => {
+    const s = new Set()
+    leads.forEach(l => l.industry && s.add(l.industry))
+    return Array.from(s).sort()
+  }, [leads])
   const distinctReps = useMemo(() => {
     const m = new Map()
     leads.forEach(l => {
@@ -116,19 +137,21 @@ export default function LeadsV2() {
     const q = search.trim().toLowerCase()
     return leads.filter(l => {
       if (stagesInGroup && !stagesInGroup.includes(l.stage)) return false
-      if (segmentFilter !== 'all' && l.segment !== segmentFilter) return false
-      if (sourceFilter  !== 'all' && l.source  !== sourceFilter)  return false
-      if (cityFilter    !== 'all' && l.city    !== cityFilter)    return false
-      if (repFilter     !== 'all' && l.assigned?.id !== repFilter) return false
+      if (segmentFilter  !== 'all' && l.segment  !== segmentFilter)  return false
+      if (sourceFilter   !== 'all' && l.source   !== sourceFilter)   return false
+      if (cityFilter     !== 'all' && l.city     !== cityFilter)     return false
+      if (industryFilter !== 'all' && l.industry !== industryFilter) return false
+      if (repFilter      !== 'all' && l.assigned?.id !== repFilter)  return false
       if (!q) return true
       return (
-        (l.name    || '').toLowerCase().includes(q) ||
-        (l.company || '').toLowerCase().includes(q) ||
-        (l.phone   || '').toLowerCase().includes(q) ||
-        (l.email   || '').toLowerCase().includes(q)
+        (l.name     || '').toLowerCase().includes(q) ||
+        (l.company  || '').toLowerCase().includes(q) ||
+        (l.phone    || '').toLowerCase().includes(q) ||
+        (l.email    || '').toLowerCase().includes(q) ||
+        (l.industry || '').toLowerCase().includes(q)
       )
     })
-  }, [leads, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, repFilter])
+  }, [leads, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter])
 
   /* ─── Stat strip totals ─── */
   const totals = useMemo(() => {
@@ -217,6 +240,7 @@ export default function LeadsV2() {
     segmentFilter !== 'all' ||
     sourceFilter !== 'all' ||
     cityFilter !== 'all' ||
+    industryFilter !== 'all' ||
     repFilter !== 'all'
 
   return (
@@ -259,6 +283,7 @@ export default function LeadsV2() {
             setSegmentFilter('all')
             setSourceFilter('all')
             setCityFilter('all')
+            setIndustryFilter('all')
             setRepFilter('all')
             setSearch('')
             // No dedicated "queue" view yet — once the lead-detail
@@ -355,6 +380,21 @@ export default function LeadsV2() {
           </select>
         )}
 
+        {distinctIndustries.length > 0 && (
+          <select
+            value={industryFilter}
+            onChange={e => setIndustryFilter(e.target.value)}
+            className="lead-filter-select"
+            style={{ minWidth: 150 }}
+            title="Industry"
+          >
+            <option value="all">Industry: All</option>
+            {distinctIndustries.map(i => (
+              <option key={i} value={i}>{`Industry: ${i}`}</option>
+            ))}
+          </select>
+        )}
+
         {isPrivileged && distinctReps.length > 0 && (
           <select
             value={repFilter}
@@ -378,6 +418,7 @@ export default function LeadsV2() {
               setSegmentFilter('all')
               setSourceFilter('all')
               setCityFilter('all')
+              setIndustryFilter('all')
               setRepFilter('all')
             }}
           >
