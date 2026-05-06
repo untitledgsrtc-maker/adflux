@@ -212,7 +212,12 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+    // Phase 17d — supabase-js v2 sends x-client-info on every request.
+    // If it's not in this list the browser's CORS preflight succeeds but
+    // the actual POST is silently blocked client-side. That's what
+    // caused the "OPTIONS 200 but no POST + modal falls back to /leads"
+    // symptom traced via Claude in Chrome on 6 May 2026.
+    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
   }
 }
 
