@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920,initial-scale=1" />
+<title>Adflux · Lead Module</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lead-styles.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  /* Each artboard is a fixed-size window into a page */
+  .lead-frame { background: var(--bg); height: 100%; overflow: auto; }
+</style>
+</head>
+<body data-screen-label="Adflux Lead Module">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="android-frame.jsx"></script>
+<script type="text/babel" src="lead-shared.jsx"></script>
+<script type="text/babel" src="lead-admin.jsx"></script>
+<script type="text/babel" src="lead-modals-mobile.jsx"></script>
+<script type="text/babel" src="lead-voice.jsx"></script>
+
+<script type="text/babel">
+const { useEffect } = React;
+
+// Wrapper to apply theme + lead-root class to artboard contents
+const Frame = ({ children, theme }) => (
+  <div className="lead-root lead-frame" data-theme={theme} style={{ position: "relative" }}>
+    {children}
+  </div>
+);
+
+// Android wraps content with the device shell
+const Mobile = ({ children, theme, dark }) => (
+  <div style={{ background: theme === "night" ? "#0f172a" : "#f4f5f8", height: "100%", display: "grid", placeItems: "center" }}>
+    <window.AndroidDevice width={360} height={760} dark={dark}>
+      <div className="lead-root" data-theme={theme} style={{ height: "100%", overflow: "auto" }}>
+        {children}
+      </div>
+    </window.AndroidDevice>
+  </div>
+);
+
+const App = () => {
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "theme": "night"
+  }/*EDITMODE-END*/;
+  const [t, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+  const theme = t.theme;
+  const dark = theme === "night";
+
+  return (
+    <window.DesignCanvas>
+      <window.DCSection id="admin" title="Admin · Desktop" subtitle="Web · 1440px columns · the brain of the lead module">
+        <window.DCArtboard id="lead-dash" label="Lead Dashboard · voice-first" width={1440} height={1280}>
+          <Frame theme={theme}><window.AdminLeadDash /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="team-dash" label="Team Dashboard · live field" width={1440} height={1180}>
+          <Frame theme={theme}><window.AdminTeamDash /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="lead-list" label="Lead List · table" width={1440} height={1100}>
+          <Frame theme={theme}><window.AdminLeadList /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="lead-detail" label="Lead Detail · 360° view" width={1440} height={1100}>
+          <Frame theme={theme}><window.AdminLeadDetail /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="lead-create" label="New Lead · 30 sec form" width={1440} height={1100}>
+          <Frame theme={theme}><window.AdminLeadCreate /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="csv-import" label="CSV Import · admin only" width={1440} height={1100}>
+          <Frame theme={theme}><window.AdminCSVImport /></Frame>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="modals" title="Admin · Modals" subtitle="The decisions every rep makes 50× a day">
+        <window.DCArtboard id="m-log" label="Log Activity" width={500} height={600}>
+          <Frame theme={theme}><window.LogActivityModal inline /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="m-stage" label="Change Stage · BANT gate" width={500} height={680}>
+          <Frame theme={theme}><window.ChangeStageModal /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="m-reassign" label="Reassign" width={500} height={460}>
+          <Frame theme={theme}><window.ReassignModal /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="m-bulk" label="Bulk Reassign" width={500} height={460}>
+          <Frame theme={theme}><window.BulkReassignModal /></Frame>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="telecaller" title="Telecaller · Inside-sales" subtitle="Pooja N. burns through 47 calls before lunch">
+        <window.DCArtboard id="tc-desk" label="Telecaller Dashboard" width={1440} height={1100}>
+          <Frame theme={theme}><window.TelecallerDash /></Frame>
+        </window.DCArtboard>
+        <window.DCArtboard id="tc-mob" label="Telecaller · Mobile" width={420} height={820}>
+          <Mobile theme={theme} dark={dark}><window.TCMobile /></Mobile>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="sales-mobile" title="Sales · Mobile /work flow" subtitle="Field reps' day, in their pocket">
+        <window.DCArtboard id="m-plan" label="1 · Plan day" width={420} height={820}>
+          <Mobile theme={theme} dark={dark}><window.MWorkPlan /></Mobile>
+        </window.DCArtboard>
+        <window.DCArtboard id="m-active" label="2 · Active · in field" width={420} height={820}>
+          <Mobile theme={theme} dark={dark}><window.MWorkActive /></Mobile>
+        </window.DCArtboard>
+        <window.DCArtboard id="m-detail" label="3 · Lead detail · mobile" width={420} height={820}>
+          <Mobile theme={theme} dark={dark}><window.MLeadDetail /></Mobile>
+        </window.DCArtboard>
+        <window.DCArtboard id="m-done" label="4 · Day complete" width={420} height={820}>
+          <Mobile theme={theme} dark={dark}><window.MWorkDone /></Mobile>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="voice" title="Voice-First · Gujarati" subtitle="Field team speaks → AI logs the rest. 3× more accurate.">
+        <window.DCArtboard id="v-listen" label="1 · Listening · live" width={420} height={820}>
+          <Mobile theme={theme} dark={dark}><window.MVoiceListening /></Mobile>
+        </window.DCArtboard>
+        <window.DCArtboard id="v-confirm" label="2 · AI extracted · confirm" width={420} height={820}>
+          <Mobile theme={theme} dark={dark}><window.MVoiceConfirm /></Mobile>
+        </window.DCArtboard>
+        <window.DCArtboard id="v-evening" label="3 · Evening report · spoken" width={420} height={820}>
+          <Mobile theme={theme} dark={dark}><window.MEveningReport /></Mobile>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.TweaksPanel title="Tweaks">
+        <window.TweakSection title="Theme">
+          <window.TweakRadio
+            label="Mode"
+            value={theme}
+            options={[{ value: "night", label: "Night" }, { value: "day", label: "Day" }]}
+            onChange={(v) => setTweak({ theme: v })}
+          />
+        </window.TweakSection>
+      </window.TweaksPanel>
+    </window.DesignCanvas>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
