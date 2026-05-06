@@ -23,6 +23,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
+import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -350,6 +351,9 @@ export default function WorkV2() {
               <Counter num={counters.calls || 0}    target={targets.calls}    label="Calls" />
               <Counter num={counters.new_leads || 0} target={targets.new_leads} label="New leads" />
             </div>
+
+            {/* Phase 19 — Smart Task Engine: today's ranked call list */}
+            <TodayTasksPanel userId={profile.id} />
 
             <div className="m-quick">
               <button className="tile" onClick={() => navigate('/leads')}>
