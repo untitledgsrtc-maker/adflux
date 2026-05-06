@@ -61,6 +61,27 @@ const ANON_KEY      = Deno.env.get('SUPABASE_ANON_KEY')!
 // send nothing and let Whisper auto-detect (works fine in practice).
 const WHISPER_HINT_OK = new Set(['en', 'hi'])
 
+// System prompt for evening summary mode. Rep speaks a 20-30s end-of-day
+// recap; we extract Highlights / Blockers / Tomorrow into a structured
+// JSON the /voice/evening UI renders as the design's AI summary card.
+const EVENING_SYSTEM = `You summarise an end-of-day voice note from a sales rep at an Indian outdoor advertising company. They speak in Gujarati, Hindi, or English (often mixed) about what happened during their workday.
+
+Return ONLY a JSON object. No prose, no markdown fence. Schema:
+{
+  "transcript_en":   "Sentence-level natural English translation of what the rep said. Preserve their exact meaning.",
+  "highlights":      "1-2 sentences of what went well (deals progressed, meetings completed, pipeline added). Use Indian numbering (lakh/crore). English.",
+  "blockers":        "1-2 sentences of what's stuck or pending. English. Empty string if nothing.",
+  "tomorrow_focus":  "1 sentence on what the rep plans to do tomorrow. English. Empty string if not mentioned.",
+  "quotes_sent":     "Numeric count of quotes sent today, or 0 if not mentioned.",
+  "pipeline_added":  "Total ₹ pipeline added today as a plain rupee number, or 0. Convert lakh/crore."
+}
+
+Guidance:
+- Keep highlights/blockers/tomorrow_focus terse and English so they read clean on the rep's dashboard summary card.
+- transcript_en is the natural English version of the spoken note (not a summary).
+- Don't invent numbers the rep didn't say.
+`
+
 const CLASSIFY_SYSTEM = `You classify a short voice note from a sales rep at an Indian outdoor advertising company. The rep speaks in Gujarati, Hindi, or English (often mixed). The transcript is what they said about a customer interaction.
 
 Return ONLY a JSON object. No prose, no markdown fence. Schema:
@@ -119,7 +140,9 @@ serve(async (req) => {
   const {
     audio_base64, mime_type, lead_id, duration_seconds, language_hint,
     gps_lat, gps_lng, gps_accuracy_m,
+    mode,                    // 'lead' (default) | 'evening'
   } = body || {}
+  const isEvening = mode === 'evening'
   if (!audio_base64 || typeof audio_base64 !== 'string') {
     return jsonResp({ error: 'audio_base64 (string) is required.' }, 400)
   }
@@ -205,10 +228,12 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 600,
-        system: CLASSIFY_SYSTEM,
+        system: isEvening ? EVENING_SYSTEM : CLASSIFY_SYSTEM,
         messages: [{
           role: 'user',
-          content: `Today is ${today}. Classify this transcript:\n\n"${transcript}"`,
+          content: isEvening
+            ? `Today is ${today}. Summarise this evening recap:\n\n"${transcript}"`
+            : `Today is ${today}. Classify this transcript:\n\n"${transcript}"`,
         }],
       }),
     })
@@ -229,9 +254,11 @@ serve(async (req) => {
     return jsonResp({ error: 'Claude call threw: ' + (e?.message || e) }, 502)
   }
 
-  // 5. Insert lead_activities row (only if lead_id was provided).
+  // 5. Insert lead_activities row (only if lead_id was provided AND
+  //    we're in lead mode; evening summaries don't create per-lead
+  //    activities — the UI saves them to work_sessions.evening_summary).
   let activity_id: string | null = null
-  if (lead_id) {
+  if (lead_id && !isEvening) {
     const activityInsert = {
       lead_id,
       activity_type:    sanitizeActivityType(classified.activity_type),

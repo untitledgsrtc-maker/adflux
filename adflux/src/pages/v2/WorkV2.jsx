@@ -435,7 +435,17 @@ export default function WorkV2() {
             )}
 
             <div className="m-card">
-              <div className="m-card-title">Evening report</div>
+              <div className="m-card-title">
+                <span>Evening report</span>
+                <button
+                  type="button"
+                  className="lead-btn lead-btn-sm"
+                  onClick={() => navigate('/voice/evening')}
+                  title="Speak your summary instead of typing"
+                >
+                  <Mic size={11} /> Speak summary
+                </button>
+              </div>
               <div style={{ display: 'grid', gap: 10 }}>
                 <div>
                   <label className="lead-fld-label">Quotes sent today</label>
