@@ -229,7 +229,13 @@ export default function LeadUploadV2() {
 
   /* ─── Import ─── */
   async function commitImport() {
-    if (!rows.length || !columnMap.name) {
+    // Phase 27 — falsy bug: columnMap.name stores the column INDEX as
+    // a Number. When Name is the FIRST column (index 0) — which is the
+    // common case for CSVs starting with `name,email,phone,…` —
+    // `!columnMap.name` evaluates to TRUE because `!0 === true`. That
+    // made the import silently return without doing anything. Use a
+    // typeof check so 0 is treated as a valid index.
+    if (!rows.length || typeof columnMap.name !== 'number') {
       alert('Pick the Name column at minimum.')
       return
     }
@@ -577,7 +583,7 @@ export default function LeadUploadV2() {
             <button
               className="v2d-cta"
               onClick={commitImport}
-              disabled={importing || !columnMap.name}
+              disabled={importing || typeof columnMap.name !== 'number'}
             >
               {importing ? (
                 <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Importing {progress.done}/{progress.total}…</>
