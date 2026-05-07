@@ -48,6 +48,10 @@ export default function CreateQuoteOtherMediaV2() {
   const prefill  = location.state?.prefill || {}
   const leadId   = prefill.lead_id || null
 
+  // Phase 29b — owner spec: every quote should be editable. Detail
+  // page Edit on an Other Media draft routes here with editingId set.
+  const editingId = location.state?.editingId || null
+
   const [client, setClient] = useState({
     name:    prefill.client_name    || '',
     company: prefill.client_company || '',
@@ -67,6 +71,54 @@ export default function CreateQuoteOtherMediaV2() {
   const [loadingMaster, setLoadingMaster] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
+  const [editLoading, setEditLoading] = useState(!!editingId)
+
+  // Phase 29b — load existing Other Media quote + line items for edit.
+  useEffect(() => {
+    if (!editingId) return
+    let cancelled = false
+    ;(async () => {
+      const { data: q, error: qErr } = await supabase
+        .from('quotes').select('*').eq('id', editingId).single()
+      if (cancelled) return
+      if (qErr || !q) {
+        setError('Could not load this draft for editing — ' + (qErr?.message || 'not found'))
+        setEditLoading(false)
+        return
+      }
+      if (q.status !== 'draft') {
+        setError(`This quote is "${q.status}" — only drafts can be edited.`)
+        setEditLoading(false)
+        return
+      }
+      const { data: cities } = await supabase
+        .from('quote_cities').select('*').eq('quote_id', editingId)
+      if (cancelled) return
+
+      setClient({
+        name:    q.client_name    || '',
+        company: q.client_company || '',
+        phone:   q.client_phone   || '',
+        email:   q.client_email   || '',
+        address: q.client_address || '',
+        gstin:   q.client_gst     || '',
+      })
+      setCampaignStartDate(q.campaign_start_date || '')
+      setCampaignEndDate(q.campaign_end_date || '')
+      setIncludeGst(Number(q.gst_rate) > 0)
+      const reloadedLines = (cities || []).map(c => ({
+        media_type_id:   null,           // will be re-resolved by name match below
+        media_type_name: c.city_name || '',
+        description:     c.description || '',
+        qty:             Number(c.qty) || 1,
+        unit:            'unit',
+        unit_rate:       Number(c.unit_rate) || 0,
+      }))
+      setLines(reloadedLines.length ? reloadedLines : [EMPTY_LINE()])
+      setEditLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [editingId])
 
   /* ─── Fetch media_types master on mount ─── */
   useEffect(() => {
@@ -163,21 +215,40 @@ export default function CreateQuoteOtherMediaV2() {
       proposal_date:  new Date().toISOString().slice(0, 10),
       campaign_start_date: campaignStartDate || null,
       campaign_end_date:   campaignEndDate || null,
-      created_by:     profile?.id,
-      sales_person_name: profile?.name,
-      lead_id:        leadId,
+      // Phase 29b — only stamp creator + lead_id on INSERT.
+      ...(editingId ? {} : {
+        created_by:        profile?.id,
+        sales_person_name: profile?.name,
+        lead_id:           leadId,
+      }),
     }
 
-    const { data: quote, error: qErr } = await supabase
-      .from('quotes')
-      .insert([quotePayload])
-      .select()
-      .single()
-
-    if (qErr) {
-      setSaving(false)
-      setError(qErr.message || 'Failed to save quote.')
-      return
+    let quote
+    if (editingId) {
+      const { data: updated, error: uErr } = await supabase
+        .from('quotes').update(quotePayload).eq('id', editingId).select().single()
+      if (uErr) {
+        setSaving(false)
+        setError(uErr.message || 'Failed to update quote.')
+        return
+      }
+      quote = updated
+      const { error: dErr } = await supabase
+        .from('quote_cities').delete().eq('quote_id', editingId)
+      if (dErr) {
+        setSaving(false)
+        setError('Updated quote but could not clear old line items: ' + dErr.message)
+        return
+      }
+    } else {
+      const { data: inserted, error: qErr } = await supabase
+        .from('quotes').insert([quotePayload]).select().single()
+      if (qErr) {
+        setSaving(false)
+        setError(qErr.message || 'Failed to save quote.')
+        return
+      }
+      quote = inserted
     }
 
     const lineItems = validLines.map(l => {
@@ -215,9 +286,10 @@ export default function CreateQuoteOtherMediaV2() {
       }
     }
 
-    syncClientFromQuote(quote, 'create')
+    syncClientFromQuote(quote, editingId ? 'update' : 'create')
 
-    if (leadId) {
+    // Phase 29b — only advance the lead funnel on initial INSERT.
+    if (!editingId && leadId) {
       await supabase
         .from('leads')
         .update({ stage: 'QuoteSent', quote_id: quote.id })
@@ -226,6 +298,14 @@ export default function CreateQuoteOtherMediaV2() {
 
     setSaving(false)
     navigate(`/quotes/${quote.id}`)
+  }
+
+  if (editLoading) {
+    return (
+      <div style={{ padding: 40, color: 'var(--text-muted)', textAlign: 'center' }}>
+        Loading draft for editing…
+      </div>
+    )
   }
 
   return (

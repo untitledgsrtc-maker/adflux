@@ -1462,15 +1462,17 @@ export default function GovtProposalDetailV2() {
               immutability blocks edits to sent/won/lost quotes anyway).
               Routes back to the wizard with editingId so the wizard
               prefills the existing values and saves via UPDATE rather
-              than creating a duplicate. Currently wired for GSRTC LED
-              only; Auto Hood + Private LED + Other Media follow in
-              Phase 29b/c. */}
-          {quote.status === 'draft' && quote.media_type === 'GSRTC_LED' && (
+              than creating a duplicate.
+              Phase 29b — extended to AUTO_HOOD; both govt media types
+              now route to their own wizard with editingId. */}
+          {quote.status === 'draft' && (quote.media_type === 'GSRTC_LED' || quote.media_type === 'AUTO_HOOD') && (
             <button
               type="button"
               className="govt-wiz__btn"
               onClick={() => navigate(
-                '/quotes/new/government/gsrtc-led',
+                quote.media_type === 'AUTO_HOOD'
+                  ? '/quotes/new/government/auto-hood'
+                  : '/quotes/new/government/gsrtc-led',
                 { state: { editingId: quote.id } }
               )}
               title="Edit this draft proposal"

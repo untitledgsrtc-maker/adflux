@@ -4,11 +4,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Download, MessageCircle, ChevronDown,
   Building2, Phone, Mail, MapPin, FileText, Calendar,
-  CheckCircle, CreditCard, X, Pencil
+  CheckCircle, CreditCard, X, Pencil, Trash2
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useQuotes } from '../hooks/useQuotes'
 import { usePayments } from '../hooks/usePayments'
+import { supabase } from '../lib/supabase'
 import { QuoteStatusBadge } from '../components/quotes/QuoteStatusBadge'
 import { downloadQuotePDF, uploadQuotePDF } from '../components/quotes/QuotePDF'
 // Phase 15 — ENIL-style PDF for Other Media quotes (newspaper, hoarding,
@@ -358,11 +359,20 @@ export default function QuoteDetail() {
               status except 'lost' — lost quotes are archival. This lets
               either role correct client details, swap cities, or
               adjust rates even after a quote has been sent or won.
-              See WizardShell.jsx for status-preservation semantics. */}
+              See WizardShell.jsx for status-preservation semantics.
+              Phase 29b — Other Media has its own wizard; the Private
+              LED WizardShell can't load OTHER_MEDIA quotes correctly,
+              so route by media_type. */}
           {quote?.status !== 'lost' && (
             <button
               className="btn btn-sec btn-sm"
-              onClick={() => navigate(`/quotes/new?editOf=${id}`)}
+              onClick={() => {
+                if (quote?.media_type === 'OTHER_MEDIA') {
+                  navigate('/quotes/new/private/other-media', { state: { editingId: id } })
+                } else {
+                  navigate(`/quotes/new?editOf=${id}`)
+                }
+              }}
               title="Edit this quote"
             >
               <Pencil size={14} /> Edit
@@ -379,6 +389,30 @@ export default function QuoteDetail() {
           <button className="btn btn-sec btn-sm" onClick={handleDownloadPDF} disabled={pdfLoading}>
             <Download size={14} /> {pdfLoading ? 'Generating…' : 'PDF'}
           </button>
+          {/* Phase 29b — Delete (hard remove from DB), drafts only.
+              Phase 11b's DB trigger blocks delete on non-draft quotes
+              so the button is hidden when status != 'draft' to avoid
+              an obvious dead click. Confirmation prompt prevents
+              accidents. */}
+          {quote?.status === 'draft' && (
+            <button
+              className="btn btn-sec btn-sm"
+              style={{ borderColor: 'var(--red)', color: 'var(--red)' }}
+              onClick={async () => {
+                if (!confirm('DELETE this draft quote permanently? This cannot be undone.')) return
+                const { error: delErr } = await supabase
+                  .from('quotes').delete().eq('id', id)
+                if (delErr) {
+                  setError(delErr.message || 'Failed to delete draft.')
+                  return
+                }
+                navigate('/quotes')
+              }}
+              title="Delete this draft permanently"
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          )}
         </div>
       </div>
 
