@@ -712,9 +712,10 @@ export default function AdminDashboardDesktop() {
             ))}
           </div>
 
-          <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
-            <Plus size={14} strokeWidth={2.6} /> Create Quote
-          </button>
+          {/* Phase 25b — "Create Quote" CTA dropped from the page head.
+              The V2AppShell topbar already has a global "+ New Quote"
+              button. Two yellow CTAs side-by-side doing the same thing
+              was visual noise. */}
         </header>
 
         {/* end page-head, body below */}
@@ -992,7 +993,10 @@ function FunnelPanel({ stages, max }) {
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {stages.map(s => (
+        {/* Phase 25b — hide zero-count stages. A row reading
+            "Negotiating 0 [empty bar] ₹0" was visual noise. If a
+            stage genuinely has no quotes there's nothing to render. */}
+        {stages.filter(s => s.count > 0).map(s => (
           <div key={s.status} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 80px', gap: 10, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: colors[s.status], fontWeight: 600, textTransform: 'capitalize' }}>
               {s.status} <span style={{ color: 'var(--v2-ink-2)', fontWeight: 500 }}>{s.count}</span>
@@ -1005,6 +1009,11 @@ function FunnelPanel({ stages, max }) {
             </div>
           </div>
         ))}
+        {stages.every(s => s.count === 0) && (
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', padding: '8px 0' }}>
+            No quotes yet.
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1284,8 +1293,12 @@ function ActionQueueCard({ items, onOpen }) {
   }
   return (
     <section
-      className="v2d-banner"
+      // Phase 25b — was className="v2d-banner" but that has
+      // display:flex globally, which made the title-block and the
+      // items-list lay out side-by-side, leaving a big empty void to
+      // the right of the chips. Use plain block so children stack.
       style={{
+        display: 'block',
         padding: '14px 18px', marginBottom: 16,
         background: allClear ? 'rgba(74,222,128,.06)' : 'rgba(15, 23, 42, .6)',
         border: `1px solid ${allClear ? 'rgba(74,222,128,.2)' : 'var(--v2-border)'}`,
