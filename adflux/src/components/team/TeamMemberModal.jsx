@@ -47,6 +47,9 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     email:          member?.email || '',
     password:       '',
     role:           member?.role || 'sales',
+    // Phase 26 — free-text job title. Distinct from role (system enum).
+    // Examples: "Senior Sales Manager", "BDM Surat", "Account Executive".
+    designation:    member?.designation || '',
     // Phase 11j — segment scope. Reuses the existing users.segment_access
     // column (Phase 4b). Defaults to 'ALL' for new members.
     segment_access: member?.segment_access || 'ALL',
@@ -126,6 +129,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
           name:      form.name.trim(),
           email:     form.email.trim().toLowerCase(),
           role:      form.role,
+          designation: form.designation.trim() || null,
           // Phase 11j — admin always 'ALL' regardless of dropdown
           // (admin must see/manage everything). Other roles get the
           // selected scope.
@@ -161,6 +165,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       const { error } = await updateMember(member.id, {
         name: form.name.trim(),
         role: form.role,
+        designation: form.designation.trim() || null,
         // Phase 11j — admin can change a rep's segment scope from edit.
         segment_access: form.role === 'admin' ? 'ALL' : form.segment_access,
       })
@@ -231,6 +236,22 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
             <select value={form.role} onChange={e => set('role', e.target.value)}>
               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
+          </Field>
+
+          {/* Phase 26 — designation (job title). Free text, optional.
+              Distinct from role: role is the system enum (admin/sales/
+              agency); designation is the human-readable title shown on
+              team list and lead-detail "assigned to" stamps. */}
+          <Field
+            label="Designation"
+            hint="Job title shown on team list, lead assignments, signer blocks. e.g. Senior Sales Manager, BDM Surat, Account Executive."
+          >
+            <input
+              type="text"
+              placeholder="e.g. Senior Sales Manager"
+              value={form.designation}
+              onChange={e => set('designation', e.target.value)}
+            />
           </Field>
 
           {/* Phase 11j — segment scope. Hidden for admin (always ALL). */}
