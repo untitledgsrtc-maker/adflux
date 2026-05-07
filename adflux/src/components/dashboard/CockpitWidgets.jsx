@@ -12,6 +12,8 @@ import { useNavigate } from 'react-router-dom'
 import {
   Sparkles, AlertTriangle, ArrowRight, Clock, MapPin, FileText,
 } from 'lucide-react'
+// Already had ArrowRight — Phase 25c uses it for the "View action queue →"
+// CTA + the per-item arrow.
 import { supabase } from '../../lib/supabase'
 import { LEAD_STAGES, STAGE_LABELS } from '../../hooks/useLeads'
 
@@ -29,51 +31,121 @@ const STAGE_BAR_COLOR = {
 }
 
 /* ─── AI Briefing card ─────────────────────────────────────────────
-   Rule-based body until the daily-brief Edge Function is deployed.
-   Layout matches UI Design System §4.2 — purple→blue gradient,
-   pulse-animated icon, eyebrow + recap + bullet list. */
+   Phase 25c — rebuilt to match _design_reference/Untitled_Os_(1)/
+   app.jsx structure. Has FOUR distinct content blocks:
+     1. eyebrow with pulse dot   — "AI briefing · today"
+     2. yesterday recap line     — "Yesterday: ₹X collected, N quotes, M wins"
+     3. items list (up to 4)     — each row: text + tinted chip + meta + ↗
+     4. RHS CTA column           — "Updated X min ago" + "View action queue →"
+
+   Each item carries: text, chip { tone, label }, meta, route (optional).
+   Tinted chips use design's red/amber/green/govt palette (rgba tints
+   + matching border + colored text). */
 export function AiBriefingCard() {
-  const [stats, setStats] = useState(null)
+  const navigate = useNavigate()
+  const [data, setData] = useState(null)
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = new Date()
+    const todayIso = today.toISOString().slice(0, 10)
+    const y = new Date(today); y.setDate(y.getDate() - 1)
+    const yIso = y.toISOString().slice(0, 10)
+    const yStart = `${yIso}T00:00:00`
+    const yEnd   = `${yIso}T23:59:59`
+
     Promise.all([
+      // SLA breaches — SalesReady past 24h
       supabase.from('leads').select('id').eq('stage', 'SalesReady').lt('handoff_sla_due_at', new Date().toISOString()),
+      // Active team for missed-checkin compute
       supabase.from('users').select('id, name, team_role').eq('is_active', true).in('team_role', ['sales','telecaller','sales_manager','agency']),
-      supabase.from('work_sessions').select('user_id, check_in_at').eq('work_date', today),
-      supabase.from('payments').select('id', { count: 'exact', head: true }).eq('approval_status', 'pending'),
-    ]).then(([sla, team, sess, app]) => {
+      // Today's check-ins
+      supabase.from('work_sessions').select('user_id, check_in_at').eq('work_date', todayIso),
+      // Pending approvals (count + sum)
+      supabase.from('payments').select('amount_received').eq('approval_status', 'pending'),
+      // Hot-idle leads (heat=hot, last_contact_at > 7 days OR null, not Won/Lost)
+      supabase.from('leads').select('id, name, last_contact_at, assigned_to, users:assigned_to(name)').eq('heat', 'hot').not('stage', 'in', '("Won","Lost")').or(`last_contact_at.is.null,last_contact_at.lt.${new Date(Date.now() - 7*86400000).toISOString()}`).limit(5),
+      // Yesterday recap — payments collected
+      supabase.from('payments').select('amount_received').eq('approval_status', 'approved').gte('payment_date', yIso).lte('payment_date', yIso),
+      // Yesterday recap — quotes sent (status moved to sent yesterday)
+      supabase.from('quotes').select('id, status, total_amount').gte('updated_at', yStart).lte('updated_at', yEnd),
+      // Govt OC copy attachments missing — quotes status=won, segment=GOVERNMENT, no oc_copy attachment
+      supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'won').eq('segment', 'GOVERNMENT'),
+    ]).then(([sla, team, sess, pend, stale, yPay, yQuotes, govt]) => {
       const checkedIn = new Set((sess.data || []).filter(s => s.check_in_at).map(s => s.user_id))
       const elevenAm = new Date(); elevenAm.setHours(11, 0, 0, 0)
       const isAfter11 = new Date() > elevenAm
       const noCheckIn = isAfter11
         ? (team.data || []).filter(u => !checkedIn.has(u.id))
         : []
-      setStats({
+      const pendCount  = (pend.data || []).length
+      const pendTotal  = (pend.data || []).reduce((s, p) => s + Number(p.amount_received || 0), 0)
+      const yQuotesArr = yQuotes.data || []
+      const sentY = yQuotesArr.filter(q => q.status === 'sent').length
+      const wonY  = yQuotesArr.filter(q => q.status === 'won')
+      const wonYValue = wonY.reduce((s, q) => s + Number(q.total_amount || 0), 0)
+      const collectedY = (yPay.data || []).reduce((s, p) => s + Number(p.amount_received || 0), 0)
+
+      setData({
         slaBreaches: (sla.data || []).length,
         noCheckIn,
-        pendingApprovals: app.count || 0,
+        pendCount,
+        pendTotal,
+        staleHot: stale.data || [],
+        yesterday: { sent: sentY, won: wonY.length, wonValue: wonYValue, collected: collectedY },
       })
     })
   }, [])
 
-  if (!stats) return null
+  if (!data) return null
 
+  // Compose recap line. If yesterday had no activity, fall back to a
+  // simpler line so the briefing still feels populated.
+  const recap = data.yesterday.sent + data.yesterday.won + data.yesterday.collected > 0
+    ? `Yesterday: ${data.yesterday.sent} quote${data.yesterday.sent === 1 ? '' : 's'} sent, ${data.yesterday.won} won${data.yesterday.wonValue > 0 ? ` (${formatLakh(data.yesterday.wonValue)})` : ''}${data.yesterday.collected > 0 ? `, ${formatLakh(data.yesterday.collected)} collected` : ''}.`
+    : 'Quiet day yesterday. Below is what needs your attention today.'
+
+  // Build items list — up to 4, design preserves chip + meta + cta shape.
   const items = []
-  if (stats.slaBreaches > 0)      items.push(`${stats.slaBreaches} Sales Ready leads past 24h SLA`)
-  if (stats.noCheckIn.length > 0) items.push(`${stats.noCheckIn.length} field staff missed 11 AM check-in: ${stats.noCheckIn.slice(0,4).map(u => u.name).join(', ')}${stats.noCheckIn.length > 4 ? '…' : ''}`)
-  if (stats.pendingApprovals > 0) items.push(`${stats.pendingApprovals} payments waiting approval`)
-
-  const summary = items.length === 0
-    ? 'No urgent issues. Pipeline looks healthy.'
-    : items[0]
+  if (data.slaBreaches > 0) {
+    items.push({
+      text:  `${data.slaBreaches} SalesReady lead${data.slaBreaches === 1 ? '' : 's'} past 24h SLA`,
+      chip:  { tone: 'red', label: 'Act now' },
+      meta:  'Hand-off overdue',
+      route: '/leads?stage=SalesReady',
+    })
+  }
+  if (data.staleHot.length > 0) {
+    const top = data.staleHot[0]
+    items.push({
+      text:  `${top.name} stale · last touch by ${top.users?.name || 'unassigned'}${data.staleHot.length > 1 ? ` (+${data.staleHot.length - 1} more)` : ''}`,
+      chip:  { tone: 'amber', label: 'Follow up' },
+      meta:  `${data.staleHot.length} hot idle`,
+      route: `/leads/${top.id}`,
+    })
+  }
+  if (data.noCheckIn.length > 0) {
+    items.push({
+      text:  `${data.noCheckIn.length} field staff missed 11 AM check-in: ${data.noCheckIn.slice(0, 3).map(u => u.name).join(', ')}${data.noCheckIn.length > 3 ? '…' : ''}`,
+      chip:  { tone: 'amber', label: 'Coach' },
+      meta:  'No check-in',
+      route: '/team-dashboard',
+    })
+  }
+  if (data.pendCount > 0) {
+    items.push({
+      text:  `${data.pendCount} payment approval${data.pendCount === 1 ? '' : 's'} waiting · ${formatLakh(data.pendTotal)}`,
+      chip:  { tone: 'green', label: 'Approve' },
+      meta:  '5 min',
+      route: '/pending-approvals',
+    })
+  }
 
   return (
-    <div style={{
+    <div className="ai-briefing-card" style={{
       position: 'relative',
       background: `
-        radial-gradient(900px 200px at 100% 0%, rgba(192,132,252,.18), transparent 60%),
-        radial-gradient(700px 200px at 0% 100%, rgba(96,165,250,.18), transparent 60%),
+        radial-gradient(900px 220px at 100% 0%, rgba(192,132,252,.20), transparent 60%),
+        radial-gradient(700px 220px at 0% 100%, rgba(96,165,250,.18), transparent 60%),
         linear-gradient(135deg, rgba(192,132,252,.10), rgba(96,165,250,.10))
       `,
       border: '1px solid var(--v2-line, rgba(255,255,255,.08))',
@@ -81,47 +153,115 @@ export function AiBriefingCard() {
       padding: '20px 22px',
       marginBottom: 16,
       display: 'grid',
-      gridTemplateColumns: '44px 1fr',
+      gridTemplateColumns: '44px 1fr auto',
       gap: 18,
       alignItems: 'start',
     }}>
+      {/* Icon */}
       <div style={{
         width: 44, height: 44, borderRadius: 12,
         background: 'linear-gradient(135deg, #c084fc, #60a5fa)',
         display: 'grid', placeItems: 'center',
         color: 'white',
+        boxShadow: '0 4px 16px rgba(192,132,252,.25)',
       }}>
         <Sparkles size={22} />
       </div>
+
+      {/* Content */}
       <div>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase',
-          color: 'var(--v2-ink-1, rgba(255,255,255,.62))', marginBottom: 8,
+          color: 'var(--v2-ink-1, rgba(255,255,255,.62))', marginBottom: 10,
+          fontWeight: 700,
         }}>
           <span style={{
             width: 6, height: 6, borderRadius: '50%',
             background: '#c084fc',
-            animation: 'pulse 2s infinite',
+            animation: 'aipulse 2s infinite',
           }} />
-          AI briefing · {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          AI briefing · today
         </div>
-        <div style={{ fontSize: 15, lineHeight: 1.55, marginBottom: 12, color: 'var(--v2-ink-0, #fff)' }}>
-          {summary}
+        <div style={{ fontSize: 14, lineHeight: 1.55, marginBottom: 14, color: 'var(--v2-ink-0, #fff)', fontWeight: 500 }}>
+          {recap}
         </div>
-        {items.length > 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {items.slice(1).map((t, i) => (
-              <div key={i} style={{ fontSize: 12, color: 'var(--v2-ink-1, rgba(255,255,255,.62))', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: i === 0 ? '#fbbf24' : '#60a5fa' }} />
-                {t}
-              </div>
+
+        {items.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {items.map((it, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => it.route && navigate(it.route)}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto auto auto',
+                  gap: 10, alignItems: 'center',
+                  background: 'rgba(15, 23, 42, .35)',
+                  border: '1px solid rgba(255,255,255,.05)',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                  cursor: it.route ? 'pointer' : 'default',
+                  textAlign: 'left',
+                  transition: 'border-color .15s, background .15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,.15)'
+                  e.currentTarget.style.background = 'rgba(15, 23, 42, .55)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,.05)'
+                  e.currentTarget.style.background = 'rgba(15, 23, 42, .35)'
+                }}
+              >
+                <span style={{ fontSize: 13, color: 'var(--v2-ink-0, #fff)', lineHeight: 1.4 }}>
+                  {it.text}
+                </span>
+                <Chip tone={it.chip.tone}>{it.chip.label}</Chip>
+                <span style={{ fontSize: 11, color: 'var(--v2-ink-2)', whiteSpace: 'nowrap' }}>
+                  {it.meta}
+                </span>
+                <ArrowRight size={13} style={{ color: 'var(--v2-ink-2)' }} />
+              </button>
             ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: 'var(--v2-ink-2)', fontStyle: 'italic' }}>
+            Inbox zero — nothing flagged today.
           </div>
         )}
       </div>
+
+      {/* RHS CTA column */}
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'flex-end', justifyContent: 'space-between',
+        height: '100%', minHeight: 80,
+      }}>
+        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', whiteSpace: 'nowrap' }}>
+          Updated {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => navigate('/leads')}
+            style={{
+              background: 'transparent', border: 0,
+              color: 'var(--v2-yellow, #FFE600)',
+              fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', display: 'inline-flex',
+              alignItems: 'center', gap: 4,
+              padding: 0,
+            }}
+          >
+            View action queue <ArrowRight size={12} />
+          </button>
+        )}
+      </div>
+
       <style>{`
-        @keyframes pulse {
+        @keyframes aipulse {
           0%   { box-shadow: 0 0 0 0 rgba(192,132,252,.5); }
           70%  { box-shadow: 0 0 0 6px rgba(192,132,252,0); }
           100% { box-shadow: 0 0 0 0 rgba(192,132,252,0); }
@@ -129,6 +269,44 @@ export function AiBriefingCard() {
       `}</style>
     </div>
   )
+}
+
+/* Tinted status chip — design uses red/amber/green/blue/govt tints
+   with matching borders and colored text. */
+function Chip({ tone, children }) {
+  const palette = {
+    red:    { bg: 'rgba(248,113,113,.12)',  bd: 'rgba(248,113,113,.35)',  fg: '#fca5a5' },
+    amber:  { bg: 'rgba(251,191,36,.12)',   bd: 'rgba(251,191,36,.35)',   fg: '#fcd34d' },
+    green:  { bg: 'rgba(74,222,128,.12)',   bd: 'rgba(74,222,128,.35)',   fg: '#86efac' },
+    blue:   { bg: 'rgba(96,165,250,.12)',   bd: 'rgba(96,165,250,.35)',   fg: '#93c5fd' },
+    govt:   { bg: 'rgba(192,132,252,.12)',  bd: 'rgba(192,132,252,.35)',  fg: '#d8b4fe' },
+  }
+  const c = palette[tone] || palette.blue
+  return (
+    <span style={{
+      background: c.bg,
+      border: `1px solid ${c.bd}`,
+      color: c.fg,
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: '.04em',
+      textTransform: 'uppercase',
+      padding: '3px 8px',
+      borderRadius: 999,
+      whiteSpace: 'nowrap',
+    }}>
+      {children}
+    </span>
+  )
+}
+
+/* Format ₹ as Lakh / Crore for the recap line */
+function formatLakh(n) {
+  const x = Number(n) || 0
+  if (x >= 10000000) return `₹${(x / 10000000).toFixed(1)}Cr`
+  if (x >= 100000)   return `₹${(x / 100000).toFixed(1)}L`
+  if (x >= 1000)     return `₹${(x / 1000).toFixed(0)}K`
+  return `₹${x}`
 }
 
 
