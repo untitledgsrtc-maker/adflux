@@ -8,7 +8,7 @@
 // gsrtc_campaign_months. Per-station line items go to quote_cities
 // with ref_kind='STATION'.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { GovtWizardShell } from '../../components/govt/GovtWizardShell'
 import { Step1Client, validateStep1 }       from '../../components/govt/steps/Step1Client'
@@ -42,6 +42,13 @@ export default function CreateGovtGsrtcLedV2() {
   // for govt wizards.
   const prefill = location.state?.prefill || {}
 
+  // Phase 29a — owner spec (7 May 2026): "i can not edit quote".
+  // The detail page's Edit button on a draft routes here with
+  // editingId set. We fetch the existing quote + line-items in
+  // useEffect below, populate `data`, and switch handleSave from
+  // INSERT to UPDATE-in-place.
+  const editingId = location.state?.editingId || null
+
   const [step, setStep] = useState(1)
   const [data, setData] = useState({
     client_name:    prefill.client_name    || '',
@@ -56,6 +63,69 @@ export default function CreateGovtGsrtcLedV2() {
   })
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
+  // Phase 29a — block render until edit-mode prefill finishes loading
+  // so the wizard doesn't briefly mount with the empty defaults then
+  // jump to the loaded values.
+  const [editLoading, setEditLoading] = useState(!!editingId)
+
+  // Phase 29a — load existing quote + line items when editingId is set.
+  useEffect(() => {
+    if (!editingId) return
+    let cancelled = false
+    ;(async () => {
+      const { data: q, error: qErr } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', editingId)
+        .single()
+      if (cancelled) return
+      if (qErr || !q) {
+        setError('Could not load this draft for editing — ' + (qErr?.message || 'not found'))
+        setEditLoading(false)
+        return
+      }
+      // Refuse to edit anything past draft (Phase 11b immutability).
+      if (q.status !== 'draft') {
+        setError(`This proposal is "${q.status}" — only drafts can be edited.`)
+        setEditLoading(false)
+        return
+      }
+      const { data: cities } = await supabase
+        .from('quote_cities')
+        .select('*')
+        .eq('quote_id', editingId)
+      if (cancelled) return
+
+      const stationIds = (cities || []).map(c => c.ref_id).filter(Boolean)
+      const overrides = {}
+      ;(cities || []).forEach(c => {
+        if (!c.ref_id) return
+        const ov = {}
+        if (c.daily_spots_override       != null) ov.daily_spots_override       = c.daily_spots_override
+        if (c.days_override              != null) ov.days_override              = c.days_override
+        if (c.spot_duration_sec_override != null) ov.spot_duration_sec_override = c.spot_duration_sec_override
+        if (Object.keys(ov).length) overrides[c.ref_id] = ov
+      })
+
+      setData(prev => ({
+        ...prev,
+        client_name:    q.client_name || '',
+        client_company: q.client_company || '',
+        client_address: q.client_address || '',
+        client_phone:   q.client_phone || '',
+        client_email:   q.client_email || '',
+        proposal_date:  q.proposal_date
+                          ? String(q.proposal_date).slice(0, 10)
+                          : prev.proposal_date,
+        signer_user_id: q.signer_user_id || null,
+        selected_station_ids: stationIds,
+        station_overrides:    overrides,
+        gsrtc_campaign_months: Number(q.gsrtc_campaign_months || q.duration_months || 1),
+      }))
+      setEditLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [editingId])
 
   function update(patch) {
     setData(prev => ({ ...prev, ...patch }))
@@ -119,30 +189,66 @@ export default function CreateGovtGsrtcLedV2() {
       gsrtc_campaign_months: months,
       recipient_block: recipientBlock,
       proposal_date:  data.proposal_date,
-      created_by:     profile?.id,
-      sales_person_name: profile?.name,
-      // Phase 14 — Lead → Quote linkage (see CreateGovtAutoHoodV2 §similar)
-      lead_id:        prefill.lead_id || null,
+      // Phase 29a — only stamp created_by on INSERT; on UPDATE we
+      // leave it alone so RLS continues to match (created_by =
+      // auth.uid()) and so the original creator stays attributed.
+      ...(editingId ? {} : {
+        created_by:        profile?.id,
+        sales_person_name: profile?.name,
+        lead_id:           prefill.lead_id || null,
+      }),
     }
 
-    const { data: quote, error: qErr } = await supabase
-      .from('quotes')
-      .insert([quotePayload])
-      .select()
-      .single()
+    let quote
+    if (editingId) {
+      // Phase 29a — UPDATE in-place. Quote number stays UA/GSRTC/...,
+      // lead_id linkage preserved, original created_by intact. Only
+      // recompute fields the user might have changed.
+      const { data: updated, error: uErr } = await supabase
+        .from('quotes')
+        .update(quotePayload)
+        .eq('id', editingId)
+        .select()
+        .single()
+      if (uErr) {
+        setSaving(false)
+        setError(uErr.message || 'Failed to update proposal.')
+        return
+      }
+      quote = updated
 
-    if (qErr) {
-      setSaving(false)
-      setError(qErr.message || 'Failed to save proposal.')
-      return
-    }
+      // Wipe old line items — we'll re-insert below from current state.
+      const { error: dErr } = await supabase
+        .from('quote_cities')
+        .delete()
+        .eq('quote_id', editingId)
+      if (dErr) {
+        setSaving(false)
+        setError('Updated quote but could not clear old stations: ' + dErr.message)
+        return
+      }
+    } else {
+      const { data: inserted, error: qErr } = await supabase
+        .from('quotes')
+        .insert([quotePayload])
+        .select()
+        .single()
+      if (qErr) {
+        setSaving(false)
+        setError(qErr.message || 'Failed to save proposal.')
+        return
+      }
+      quote = inserted
 
-    // Phase 14 — advance the originating lead's stage to QuoteSent.
-    if (prefill.lead_id) {
-      await supabase
-        .from('leads')
-        .update({ stage: 'QuoteSent', quote_id: quote.id })
-        .eq('id', prefill.lead_id)
+      // Phase 14 — advance the originating lead's stage to QuoteSent.
+      // Only on INSERT; edits don't re-advance the lead (it's already
+      // past Lead stage by virtue of having a quote in the first place).
+      if (prefill.lead_id) {
+        await supabase
+          .from('leads')
+          .update({ stage: 'QuoteSent', quote_id: quote.id })
+          .eq('id', prefill.lead_id)
+      }
     }
 
     // Per-station line items — including per-row overrides (Phase 7).
@@ -192,7 +298,9 @@ export default function CreateGovtGsrtcLedV2() {
 
     // Auto-save the client into the CRM clients table. Non-fatal — quote
     // is already saved, so failures here just mean no clients-list row.
-    syncClientFromQuote(quote, 'create')
+    // Phase 29a — pass 'update' on edit so client row gets re-synced
+    // with any phone/email/address changes the rep made.
+    syncClientFromQuote(quote, editingId ? 'update' : 'create')
 
     setSaving(false)
     navigate(`/proposal/${quote.id}`)
@@ -200,10 +308,21 @@ export default function CreateGovtGsrtcLedV2() {
 
   const stepLabels = useMemo(() => STEPS, [])
 
+  // Phase 29a — show a brief loading state while edit-mode prefill
+  // is fetching. Without this the wizard mounts on Step 1 with empty
+  // fields and the user sees "blank → suddenly populated" flash.
+  if (editLoading) {
+    return (
+      <div style={{ padding: 40, color: 'var(--text-muted)', textAlign: 'center' }}>
+        Loading draft for editing…
+      </div>
+    )
+  }
+
   return (
     <GovtWizardShell
       kicker="Government — GSRTC LED"
-      title="New DAVP GSRTC LED Proposal"
+      title={editingId ? 'Edit GSRTC LED Proposal' : 'New DAVP GSRTC LED Proposal'}
       steps={stepLabels}
       step={step}
       goBack={goBack}

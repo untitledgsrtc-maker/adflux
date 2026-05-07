@@ -1458,6 +1458,26 @@ export default function GovtProposalDetailV2() {
               ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Building…</>
               : <><Download size={14} /> Combined PDF</>}
           </button>
+          {/* Phase 29a — Edit button. Visible only on drafts (Phase 11b
+              immutability blocks edits to sent/won/lost quotes anyway).
+              Routes back to the wizard with editingId so the wizard
+              prefills the existing values and saves via UPDATE rather
+              than creating a duplicate. Currently wired for GSRTC LED
+              only; Auto Hood + Private LED + Other Media follow in
+              Phase 29b/c. */}
+          {quote.status === 'draft' && quote.media_type === 'GSRTC_LED' && (
+            <button
+              type="button"
+              className="govt-wiz__btn"
+              onClick={() => navigate(
+                '/quotes/new/government/gsrtc-led',
+                { state: { editingId: quote.id } }
+              )}
+              title="Edit this draft proposal"
+            >
+              <FileText size={14} /> Edit
+            </button>
+          )}
           {/* Status transitions — Mark Sent / Won / Lost.
               Phase 10d: previously gated behind isPrivileged so sales
               reps couldn't advance their own govt proposals. Owner
