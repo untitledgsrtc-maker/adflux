@@ -27,30 +27,24 @@
 import { initials as initialsHelper } from '../../utils/formatters'
 
 /* ─── Stage chip ────────────────────────────────────────────────────
-   10 stages (per Phase 12 schema). SalesReady gets a pulsing dot —
-   it's the SLA-critical waiting state, the 24h hand-off clock is
-   running. The pulse animation lives in leads.css under @keyframes
-   leadpulse. */
+   Phase 30A — collapsed to 5 stages. Working leads with a missed
+   handoff_sla_due_at get the pulse dot (used to be only SalesReady).
+   The pulse animation lives in leads.css under @keyframes leadpulse. */
 const STAGE_LABELS = {
-  New:               'New',
-  Contacted:         'Contacted',
-  Qualified:         'Qualified',
-  SalesReady:        'Sales Ready',
-  MeetingScheduled:  'Meeting',
-  QuoteSent:         'Quote Sent',
-  Negotiating:       'Negotiating',
-  Won:               'Won',
-  Lost:              'Lost',
-  Nurture:           'Nurture',
+  New:       'New',
+  Working:   'Working',
+  QuoteSent: 'Quote Sent',
+  Won:       'Won',
+  Lost:      'Lost',
 }
 
-export function StageChip({ stage, sm = false }) {
+export function StageChip({ stage, sm = false, slaBreached = false }) {
   if (!stage) return null
   const cls = `stage-chip stage-${String(stage).toLowerCase()}`
   const style = sm ? { fontSize: 10, padding: '2px 7px' } : undefined
   return (
     <span className={cls} style={style}>
-      {stage === 'SalesReady' && <span className="pulse-dot" />}
+      {stage === 'Working' && slaBreached && <span className="pulse-dot" />}
       {STAGE_LABELS[stage] || stage}
     </span>
   )
@@ -120,15 +114,16 @@ export function Pill({ tone, children, style }) {
 /* ─── Stage palette helper for dashboards ──────────────────────────
    Maps a stage to the kanban-rail accent class used on
    <div className="lead-stage-col s-{...}">. Centralised so future
-   tabs / charts can colour-code consistently. */
+   tabs / charts can colour-code consistently.
+   Phase 30A — 5 stages now. Old class names (s-cont, s-sr) kept
+   as aliases via CSS so leads.css doesn't need updating in lockstep. */
 export function stageRailClass(stage) {
   const s = String(stage).toLowerCase()
-  if (s === 'new')        return 's-new'
-  if (s === 'contacted')  return 's-cont'
-  if (s === 'qualified' || s === 'meetingscheduled' || s === 'quotesent' || s === 'negotiating') return 's-qual'
-  if (s === 'salesready') return 's-sr'
-  if (s === 'won')        return 's-won'
-  if (s === 'lost')       return 's-lost'
+  if (s === 'new')       return 's-new'
+  if (s === 'working')   return 's-qual'   // amber rail
+  if (s === 'quotesent') return 's-sr'     // purple rail
+  if (s === 'won')       return 's-won'
+  if (s === 'lost')      return 's-lost'
   return ''
 }
 
@@ -140,20 +135,20 @@ export function stageLabel(stage) {
 }
 
 /* ─── Convenience export: stage groups (matches /leads filter row).
-   Mirrors LEAD_STAGE_GROUPS in useLeads.js — kept here so list +
-   detail pages can share the same 6-tab arrangement. */
+   Phase 30A — collapsed to 5 single-stage groups + 'all'. Kept as a
+   STAGE_GROUPS array (rather than just LEAD_STAGES) so existing
+   consumers that iterate `g.stages.includes(stage)` keep working. */
 export const STAGE_GROUPS = [
-  { key: 'all',         label: 'All',         stages: null /* no filter */ },
-  { key: 'open',        label: 'Open',        stages: ['New', 'Contacted', 'Nurture'] },
-  { key: 'qualified',   label: 'Qualified',   stages: ['Qualified', 'SalesReady', 'MeetingScheduled'] },
-  { key: 'in_progress', label: 'In Progress', stages: ['QuoteSent', 'Negotiating'] },
-  { key: 'won',         label: 'Won',         stages: ['Won'] },
-  { key: 'lost',        label: 'Lost',        stages: ['Lost'] },
+  { key: 'all',        label: 'All',        stages: null /* no filter */ },
+  { key: 'new',        label: 'New',        stages: ['New'] },
+  { key: 'working',    label: 'Working',    stages: ['Working'] },
+  { key: 'quote_sent', label: 'Quote Sent', stages: ['QuoteSent'] },
+  { key: 'won',        label: 'Won',        stages: ['Won'] },
+  { key: 'lost',       label: 'Lost',       stages: ['Lost'] },
 ]
 
 export const LEAD_STAGES = [
-  'New', 'Contacted', 'Qualified', 'SalesReady', 'MeetingScheduled',
-  'QuoteSent', 'Negotiating', 'Won', 'Lost', 'Nurture',
+  'New', 'Working', 'QuoteSent', 'Won', 'Lost',
 ]
 
 /* All exports declared via `export function` / `export const` above. */

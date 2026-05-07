@@ -38,9 +38,9 @@ const LANG_HINTS = [
   { key: 'en', label: 'English' },
 ]
 
+// Phase 30A — collapsed to 5 stages.
 const STAGE_OPTIONS = [
-  '', 'Qualified', 'SalesReady', 'MeetingScheduled',
-  'QuoteSent', 'Negotiating', 'Won', 'Lost', 'Nurture',
+  '', 'Working', 'QuoteSent', 'Won', 'Lost',
 ]
 
 export default function VoiceLogV2() {

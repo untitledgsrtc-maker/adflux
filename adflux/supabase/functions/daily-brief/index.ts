@@ -51,7 +51,9 @@ serve(async (req) => {
       supa.from('leads').select('stage, expected_value'),
       supa.from('users').select('id, name, team_role').eq('is_active', true).in('team_role', ['sales','telecaller','sales_manager','agency']),
       supa.from('work_sessions').select('user_id, check_in_at, daily_counters').eq('work_date', today),
-      supa.from('leads').select('id').eq('stage', 'SalesReady').lt('handoff_sla_due_at', new Date().toISOString()),
+      // Phase 30A — SalesReady stage removed. SLA breach = any
+      // active lead with handoff_sla_due_at in the past.
+      supa.from('leads').select('id').not('stage', 'in', '(Won,Lost)').lt('handoff_sla_due_at', new Date().toISOString()),
       supa.from('users').select('id, name, team_role').eq('is_active', true).in('team_role', ['sales','telecaller','sales_manager','agency']),
     ])
 

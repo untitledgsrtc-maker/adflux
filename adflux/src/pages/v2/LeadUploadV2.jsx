@@ -53,26 +53,37 @@ function parseCsv(text) {
   return rows.filter(r => r.some(c => String(c).trim()))
 }
 
-/* ─── Cronberry status → architecture stage mapping ─── */
+/* ─── Cronberry status → architecture stage mapping ───
+   Phase 30A — collapsed to 5 stages. "Nurture" CSV remarks now map
+   to Lost (the import sets nurture_revisit_date so the lead surfaces
+   later via the "Lost with revisit" filter). "Qualified" and
+   "Contacted" both map to Working. */
 const STATUS_KEYWORD_MAP = [
-  { stage: 'Lost', reason: 'NoNeed',       keywords: ['no enquiry', 'only time pass', 'not interested', 'no need', 'not required'] },
-  { stage: 'Lost', reason: 'WrongContact', keywords: ['wrong number', 'wrong contact', 'wrong person', 'unknown'] },
-  { stage: 'Lost', reason: 'NoResponse',   keywords: ['no response', 'not picking', 'not connected'] },
-  { stage: 'Lost', reason: 'Price',        keywords: ['price issue', 'too costly', 'budget issue', 'expensive'] },
-  { stage: 'Nurture', reason: null,        keywords: ['call later', 'callback', 'future prospect', 'follow up later', 'next month'] },
-  { stage: 'Qualified', reason: null,      keywords: ['interested', 'send proposal', 'send quote', 'want quote', 'meeting fixed', 'demo'] },
-  { stage: 'Won', reason: null,            keywords: ['won', 'closed', 'order placed'] },
-  { stage: 'Contacted', reason: null,      keywords: ['contacted', 'call done', 'spoke', 'talked'] },
+  { stage: 'Lost',    reason: 'NoNeed',       keywords: ['no enquiry', 'only time pass', 'not interested', 'no need', 'not required'] },
+  { stage: 'Lost',    reason: 'WrongContact', keywords: ['wrong number', 'wrong contact', 'wrong person', 'unknown'] },
+  { stage: 'Lost',    reason: 'NoResponse',   keywords: ['no response', 'not picking', 'not connected'] },
+  { stage: 'Lost',    reason: 'Price',        keywords: ['price issue', 'too costly', 'budget issue', 'expensive'] },
+  { stage: 'Lost',    reason: null, isNurture: true,
+                                            keywords: ['call later', 'callback', 'future prospect', 'follow up later', 'next month'] },
+  { stage: 'Working', reason: null,         keywords: ['interested', 'send proposal', 'send quote', 'want quote', 'meeting fixed', 'demo'] },
+  { stage: 'Won',     reason: null,         keywords: ['won', 'closed', 'order placed'] },
+  { stage: 'Working', reason: null,         keywords: ['contacted', 'call done', 'spoke', 'talked'] },
 ]
 
 function classifyStatus(text) {
   const lower = (text || '').toLowerCase()
-  for (const { stage, reason, keywords } of STATUS_KEYWORD_MAP) {
-    if (keywords.some(k => lower.includes(k))) {
-      return { stage, lost_reason: reason }
+  for (const entry of STATUS_KEYWORD_MAP) {
+    if (entry.keywords.some(k => lower.includes(k))) {
+      // Phase 30A — flag the ex-Nurture branch so the importer can set
+      // nurture_revisit_date alongside stage='Lost'.
+      return {
+        stage: entry.stage,
+        lost_reason: entry.reason,
+        isNurture: !!entry.isNurture,
+      }
     }
   }
-  return { stage: 'New', lost_reason: null }
+  return { stage: 'New', lost_reason: null, isNurture: false }
 }
 
 const REMARKS_REGEX = /^(\d{4}-\d{2}-\d{2}[\s,T]\d{2}:\d{2}:\d{2})\s*:-\s*(.+?)\s*\(([^)]+)\)\s*$/
@@ -215,15 +226,17 @@ export default function LeadUploadV2() {
 
       let stage = classified.stage
       let lost_reason = classified.lost_reason
+      let isNurture = !!classified.isNurture
       if (cutoffMs && parsed?.timestamp) {
         const ts = new Date(parsed.timestamp).getTime()
         if (!isNaN(ts) && ts < cutoffMs && staleAsLost && stage !== 'Won') {
           stage = 'Lost'
           lost_reason = 'Stale'
+          isNurture = false
         }
       }
 
-      return { name, phone, email, company, city, source, remarks, parsed, stage, lost_reason, telecaller }
+      return { name, phone, email, company, city, source, remarks, parsed, stage, lost_reason, isNurture, telecaller }
     })
   }, [rows, columnMap, cutoffDays, staleAsLost, userByName])
 
@@ -291,6 +304,10 @@ export default function LeadUploadV2() {
         const classified = parsed?.statusText ? classifyStatus(parsed.statusText) : { stage: 'New' }
         let stage = classified.stage
         let lost_reason = classified.lost_reason
+        // Phase 30A — ex-Nurture branch sets nurture_revisit_date
+        // 90 days out so the lead surfaces in the "Lost with revisit"
+        // filter for the rep to follow up later.
+        let isNurture = !!classified.isNurture
         const telecaller = parsed?.telecallerName ? userByName.get(parsed.telecallerName.toLowerCase()) : null
 
         if (cutoffMs && parsed?.timestamp) {
@@ -298,8 +315,12 @@ export default function LeadUploadV2() {
           if (!isNaN(ts) && ts < cutoffMs && staleAsLost && stage !== 'Won') {
             stage = 'Lost'
             lost_reason = 'Stale'
+            isNurture = false
           }
         }
+
+        const ninetyDaysOut = new Date()
+        ninetyDaysOut.setDate(ninetyDaysOut.getDate() + 90)
 
         const leadRow = {
           source,
@@ -311,6 +332,7 @@ export default function LeadUploadV2() {
           segment: defaultSegment,
           stage,
           lost_reason,
+          nurture_revisit_date: isNurture ? ninetyDaysOut.toISOString().slice(0, 10) : null,
           assigned_to: defaultAssignee || null,
           telecaller_id: telecaller?.id || null,
           notes_legacy_telecaller: parsed?.telecallerName && !telecaller ? parsed.telecallerName : null,
@@ -541,19 +563,24 @@ export default function LeadUploadV2() {
                       <td><strong>{p.name}</strong>{p.company && <div style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{p.company}</div>}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.phone || '—'}</td>
                       <td>
+                        {/* Phase 30A — 5 stages. Lost-with-revisit
+                            (the ex-Nurture branch) gets the blue tint
+                            so the importer preview still flags
+                            "follow-up-later" rows differently from
+                            the dead-Lost rows. */}
                         <span style={{
                           display: 'inline-block', padding: '2px 8px', borderRadius: 999,
                           fontSize: 11, fontWeight: 600,
-                          background: p.stage === 'Lost' ? 'rgba(248,113,113,.10)' :
+                          background: p.isNurture ? 'rgba(96,165,250,.12)' :
+                                       p.stage === 'Lost' ? 'rgba(248,113,113,.10)' :
                                        p.stage === 'Won' ? 'rgba(74,222,128,.10)' :
-                                       p.stage === 'Nurture' ? 'rgba(96,165,250,.12)' :
                                        'rgba(251,191,36,.10)',
-                          color: p.stage === 'Lost' ? '#f87171' :
+                          color: p.isNurture ? '#60a5fa' :
+                                 p.stage === 'Lost' ? '#f87171' :
                                  p.stage === 'Won' ? '#4ade80' :
-                                 p.stage === 'Nurture' ? '#60a5fa' :
                                  '#fbbf24',
                         }}>
-                          {p.stage}{p.lost_reason ? ` · ${p.lost_reason}` : ''}
+                          {p.isNurture ? 'Lost · revisit 90d' : p.stage}{p.lost_reason ? ` · ${p.lost_reason}` : ''}
                         </span>
                       </td>
                       <td style={{ fontSize: 12 }}>

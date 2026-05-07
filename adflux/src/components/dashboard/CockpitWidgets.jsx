@@ -54,8 +54,9 @@ export function AiBriefingCard() {
     const yEnd   = `${yIso}T23:59:59`
 
     Promise.all([
-      // SLA breaches — SalesReady past 24h
-      supabase.from('leads').select('id').eq('stage', 'SalesReady').lt('handoff_sla_due_at', new Date().toISOString()),
+      // Phase 30A — SLA breaches: any active (non-closed) lead with
+      // a handoff_sla_due_at in the past. SalesReady stage removed.
+      supabase.from('leads').select('id').not('stage', 'in', '(Won,Lost)').lt('handoff_sla_due_at', new Date().toISOString()),
       // Active team for missed-checkin compute
       supabase.from('users').select('id, name, team_role').eq('is_active', true).in('team_role', ['sales','telecaller','sales_manager','agency']),
       // Today's check-ins
@@ -492,10 +493,12 @@ export function SlaBreachBanner() {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
+    // Phase 30A — SalesReady removed. Active SLA breach = any
+    // non-closed lead with handoff_sla_due_at in the past.
     supabase
       .from('leads')
       .select('id', { count: 'exact', head: true })
-      .eq('stage', 'SalesReady')
+      .not('stage', 'in', '(Won,Lost)')
       .lt('handoff_sla_due_at', new Date().toISOString())
       .then(({ count: n }) => setCount(n || 0))
   }, [])

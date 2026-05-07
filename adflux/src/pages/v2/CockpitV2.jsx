@@ -85,8 +85,10 @@ export default function CockpitV2() {
   }, [leads])
 
   const slaBreaches = useMemo(() => {
+    // Phase 30A — SalesReady stage removed. Active-lead SLA breach
+    // detection now uses handoff_sla_due_at on any non-closed stage.
     return leads.filter(l =>
-      l.stage === 'SalesReady' &&
+      !['Won','Lost'].includes(l.stage) &&
       l.handoff_sla_due_at &&
       new Date(l.handoff_sla_due_at) < new Date()
     )

@@ -122,73 +122,50 @@ export function useLeads() {
 
 // Stage-related metadata. Single source of truth so UI + future
 // reports stay in sync. Order matters — funnel renders in this order.
+//
+// Phase 30A (7 May 2026) — collapsed from 10 stages to 5. Owner spec:
+// "10 is too many, reps will misuse half". The dropped stages
+// (Contacted, Qualified, SalesReady, MeetingScheduled, Negotiating,
+// Nurture) all map into one of the 5 below by SQL migration. See
+// supabase_phase30a_lead_stages_collapse.sql. Long-tail revisits live
+// on the existing leads.nurture_revisit_date column on Lost rows.
 export const LEAD_STAGES = [
-  'New', 'Contacted', 'Qualified', 'SalesReady', 'MeetingScheduled',
-  'QuoteSent', 'Negotiating', 'Won', 'Lost', 'Nurture',
+  'New', 'Working', 'QuoteSent', 'Won', 'Lost',
 ]
 
-// Phase 12 (rev2) — owner feedback: 11 tabs is too many. Group stages
-// into 6 logical buckets for the UI tab row. Underlying schema keeps
-// all 10 stages — this is purely a display roll-up. The actual stage
-// transition modal still exposes every individual stage.
+// Phase 30A — STAGE_GROUPS used to roll 10 stages into 6 display
+// buckets. With only 5 underlying stages, the buckets ARE the stages.
+// Each group still maps to a single stage so existing
+// `STAGE_GROUPS.find(g => g.stages.includes(stage))` consumers keep
+// working without refactor.
 export const STAGE_GROUPS = [
-  {
-    key:    'open',
-    label:  'Open',
-    stages: ['New', 'Contacted', 'Nurture'],
-  },
-  {
-    key:    'qualified',
-    label:  'Qualified',
-    stages: ['Qualified', 'SalesReady', 'MeetingScheduled'],
-  },
-  {
-    key:    'in_progress',
-    label:  'In Progress',
-    stages: ['QuoteSent', 'Negotiating'],
-  },
-  {
-    key:    'won',
-    label:  'Won',
-    stages: ['Won'],
-  },
-  {
-    key:    'lost',
-    label:  'Lost',
-    stages: ['Lost'],
-  },
+  { key: 'new',         label: 'New',         stages: ['New'] },
+  { key: 'working',     label: 'Working',     stages: ['Working'] },
+  { key: 'quote_sent',  label: 'Quote Sent',  stages: ['QuoteSent'] },
+  { key: 'won',         label: 'Won',         stages: ['Won'] },
+  { key: 'lost',        label: 'Lost',        stages: ['Lost'] },
 ]
 
 export function groupForStage(stage) {
-  return STAGE_GROUPS.find(g => g.stages.includes(stage))?.key || 'open'
+  return STAGE_GROUPS.find(g => g.stages.includes(stage))?.key || 'new'
 }
 
 export const STAGE_LABELS = {
-  New:              'New',
-  Contacted:        'Contacted',
-  Qualified:        'Qualified',
-  SalesReady:       'Sales Ready',
-  MeetingScheduled: 'Meeting',
-  QuoteSent:        'Quote Sent',
-  Negotiating:      'Negotiating',
-  Won:              'Won',
-  Lost:             'Lost',
-  Nurture:          'Nurture',
+  New:       'New',
+  Working:   'Working',
+  QuoteSent: 'Quote Sent',
+  Won:       'Won',
+  Lost:      'Lost',
 }
 
 // Maps stage → tint key from UI design system. Keep in sync with
 // the chip variants in UI_DESIGN_SYSTEM.md §4.4.
 export const STAGE_TINT = {
-  New:              'blue',
-  Contacted:        'blue',
-  Qualified:        'amber',
-  SalesReady:       'purple',
-  MeetingScheduled: 'amber',
-  QuoteSent:        'amber',
-  Negotiating:      'amber',
-  Won:              'green',
-  Lost:             'red',
-  Nurture:          'blue',
+  New:       'blue',
+  Working:   'amber',
+  QuoteSent: 'purple',
+  Won:       'green',
+  Lost:      'red',
 }
 
 export const LOST_REASONS = [

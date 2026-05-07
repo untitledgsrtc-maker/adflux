@@ -32,46 +32,29 @@ import { StageChip } from './LeadShared'
 export default function ChangeStageModal({ lead, onClose, onSaved }) {
   const profile = useAuthStore(s => s.profile)
 
-  const [target, setTarget] = useState('SalesReady')
-  const [reps, setReps] = useState([])
+  // Phase 30A — initial target overridden by useEffect below based on
+  // current stage. 'Working' is the safest default before lead loads.
+  const [target, setTarget] = useState('Working')
 
   // Conditional fields
   const [lostReason, setLostReason] = useState('')
+  // Phase 30A — `revisitDate` now applies to Lost (was Nurture).
+  // BANT / handoff fields removed (SalesReady is no longer a stage).
   const [revisitDate, setRevisitDate] = useState('')
-  const [budgetOk, setBudgetOk] = useState(false)
-  const [timelineOk, setTimelineOk] = useState(false)
-  const [dmContact, setDmContact] = useState('')
-  const [serviceInterest, setServiceInterest] = useState('')
-  const [handoffTo, setHandoffTo] = useState('')
 
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Initial sensible target — if currently New/Contacted, suggest Qualified;
-  // if Qualified, suggest SalesReady; otherwise next forward stage.
+  // Phase 30A — 5 stages: New → Working → QuoteSent → Won / Lost.
+  // Suggest the next forward stage from current.
   useEffect(() => {
     const cur = lead?.stage
-    const idx = LEAD_STAGES.indexOf(cur)
-    if (cur === 'New' || cur === 'Contacted') setTarget('Qualified')
-    else if (cur === 'Qualified')             setTarget('SalesReady')
-    else if (cur === 'SalesReady')            setTarget('MeetingScheduled')
-    else if (cur === 'MeetingScheduled')      setTarget('QuoteSent')
-    else if (cur === 'QuoteSent')             setTarget('Negotiating')
-    else if (cur === 'Negotiating')           setTarget('Won')
-    else if (idx < LEAD_STAGES.length - 1)    setTarget(LEAD_STAGES[idx + 1])
+    if (cur === 'New')           setTarget('Working')
+    else if (cur === 'Working')  setTarget('QuoteSent')
+    else if (cur === 'QuoteSent') setTarget('Won')
+    else                          setTarget('Working')
   }, [lead?.stage])
-
-  // Load active sales reps for the SalesReady hand-off picker.
-  useEffect(() => {
-    supabase
-      .from('users')
-      .select('id, name, team_role, city, is_active')
-      .in('team_role', ['sales', 'agency', 'sales_manager'])
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => setReps(data || []))
-  }, [])
 
   // Validate + commit
   async function handleSave() {
@@ -85,29 +68,19 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
       setError('Lost reason is required.')
       return
     }
-    if (target === 'Nurture' && !revisitDate) {
-      setError('Nurture revisit date is required.')
-      return
-    }
-    if (target === 'SalesReady') {
-      if (!budgetOk || !timelineOk || !dmContact.trim() || !serviceInterest.trim()) {
-        setError('All four BANT fields are required for Sales Ready.')
-        return
-      }
-      if (!handoffTo) {
-        setError('Pick a sales rep to hand off to.')
-        return
-      }
-    }
     setSaving(true)
     const patch = { stage: target }
-    if (target === 'Lost')      patch.lost_reason         = lostReason
-    if (target === 'Nurture')   patch.nurture_revisit_date = revisitDate
-    if (target === 'Qualified') patch.qualified_at         = lead.qualified_at || new Date().toISOString()
-    if (target === 'SalesReady') {
-      patch.qualified_at   = lead.qualified_at || new Date().toISOString()
-      patch.sales_ready_at = new Date().toISOString()
-      patch.assigned_to    = handoffTo
+    if (target === 'Lost') {
+      patch.lost_reason = lostReason
+      // Phase 30A — Lost can carry an optional revisit date (was a
+      // separate Nurture stage). Reps filter "Lost with revisit in next
+      // 90 days" to surface the long-tail follow-ups.
+      if (revisitDate) patch.nurture_revisit_date = revisitDate
+    }
+    // Phase 30A — moving INTO Working stamps qualified_at the first
+    // time, mirroring the old Qualified→Working merge.
+    if (target === 'Working' && !lead.qualified_at) {
+      patch.qualified_at = new Date().toISOString()
     }
     const { error: err } = await supabase
       .from('leads')
@@ -122,13 +95,8 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
 
     // Status_change activity entry
     const noteParts = [`Stage → ${STAGE_LABELS[target] || target}`]
-    if (lostReason)       noteParts.push(`Reason: ${lostReason}`)
-    if (revisitDate)      noteParts.push(`Revisit: ${revisitDate}`)
-    if (target === 'SalesReady') {
-      noteParts.push(`BANT confirmed`)
-      noteParts.push(`DM: ${dmContact}`)
-      noteParts.push(`Interest: ${serviceInterest}`)
-    }
+    if (lostReason)  noteParts.push(`Reason: ${lostReason}`)
+    if (revisitDate) noteParts.push(`Revisit: ${revisitDate}`)
     if (note.trim()) noteParts.push(note.trim())
     await supabase.from('lead_activities').insert([{
       lead_id:       lead.id,
@@ -191,99 +159,40 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
           </div>
 
           {target === 'Lost' && (
-            <div>
-              <label className="lead-fld-label">Lost reason *</label>
-              <select
-                className="lead-inp"
-                value={lostReason}
-                onChange={e => setLostReason(e.target.value)}
-                disabled={saving}
-              >
-                <option value="">— pick —</option>
-                {LOST_REASONS.map(r => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {target === 'Nurture' && (
-            <div>
-              <label className="lead-fld-label">Revisit date * (within 90 days)</label>
-              <input
-                className="lead-inp"
-                type="date"
-                value={revisitDate}
-                onChange={e => setRevisitDate(e.target.value)}
-                disabled={saving}
-              />
-            </div>
-          )}
-
-          {target === 'SalesReady' && (
-            <div className="lead-card" style={{ background: 'var(--surface-2)' }}>
-              <div className="lead-card-pad">
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>
-                  Qualification checklist
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={budgetOk}
-                      onChange={e => setBudgetOk(e.target.checked)}
-                      disabled={saving}
-                    />
-                    Budget confirmed
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={timelineOk}
-                      onChange={e => setTimelineOk(e.target.checked)}
-                      disabled={saving}
-                    />
-                    Timeline confirmed
-                  </label>
-                  <div>
-                    <label className="lead-fld-label">Decision-maker contact</label>
-                    <input
-                      className="lead-inp"
-                      value={dmContact}
-                      onChange={e => setDmContact(e.target.value)}
-                      placeholder="Name + role (e.g. Dr. Mehta, owner)"
-                      disabled={saving}
-                    />
-                  </div>
-                  <div>
-                    <label className="lead-fld-label">Service interest</label>
-                    <input
-                      className="lead-inp"
-                      value={serviceInterest}
-                      onChange={e => setServiceInterest(e.target.value)}
-                      placeholder="Auto Hood, GSRTC LED, Newspaper, …"
-                      disabled={saving}
-                    />
-                  </div>
-                  <div>
-                    <label className="lead-fld-label">Hand off to</label>
-                    <select
-                      className="lead-inp"
-                      value={handoffTo}
-                      onChange={e => setHandoffTo(e.target.value)}
-                      disabled={saving}
-                    >
-                      <option value="">— pick a sales rep —</option>
-                      {reps.map(r => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}{r.city ? ` · ${r.city}` : ''}{r.team_role ? ` · ${r.team_role}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            <>
+              <div>
+                <label className="lead-fld-label">Lost reason *</label>
+                <select
+                  className="lead-inp"
+                  value={lostReason}
+                  onChange={e => setLostReason(e.target.value)}
+                  disabled={saving}
+                >
+                  <option value="">— pick —</option>
+                  {LOST_REASONS.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Phase 30A — optional revisit date. Replaces the old
+                  Nurture stage. Reps filter "Lost with revisit ≤ 90d"
+                  to surface the long-tail follow-ups. */}
+              <div>
+                <label className="lead-fld-label">Revisit later (optional)</label>
+                <input
+                  className="lead-inp"
+                  type="date"
+                  value={revisitDate}
+                  onChange={e => setRevisitDate(e.target.value)}
+                  disabled={saving}
+                  placeholder="Leave blank if dead permanently"
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Pick a date if you want to revisit this client later
+                  (replaces the old Nurture stage).
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           <div>

@@ -74,12 +74,16 @@ export default function TelecallerV2() {
         .select('id', { count: 'exact', head: true })
         .eq('telecaller_id', profile.id)
         .or(`sales_ready_at.gte.${startOfDay},qualified_at.gte.${startOfDay}`),
+      // Phase 30A — SalesReady stage removed. Telecaller hand-offs are
+      // now identified by `sales_ready_at` timestamp (the moment the
+      // telecaller flipped the lead to ready) on a still-active row.
       supabase
         .from('leads')
         .select('*, assigned:assigned_to(id, name, city)')
         .eq('telecaller_id', profile.id)
-        .eq('stage', 'SalesReady')
-        .order('handoff_sla_due_at', { ascending: true })
+        .not('sales_ready_at', 'is', null)
+        .not('stage', 'in', '(Won,Lost)')
+        .order('handoff_sla_due_at', { ascending: true, nullsFirst: false })
         .limit(20),
     ])
 

@@ -35,13 +35,14 @@ import {
 // MeetingScheduled / Nurture was invisible (Total counted them but no
 // rail column showed them) — that's why owner saw Total = 1 with all
 // columns 0 on the test lead in Quote Sent stage.
+// Phase 30A — collapsed to 5 stages. Each rail column maps to exactly
+// one stage now (was 1-to-many for the 10-stage funnel).
 const STAGE_RAIL = [
-  { key: 'New',         k: 's-new',  short: 'New',         match: ['New'] },
-  { key: 'Contacted',   k: 's-cont', short: 'Contacted',   match: ['Contacted', 'Nurture'] },
-  { key: 'Qualified',   k: 's-qual', short: 'Qualified',   match: ['Qualified'] },
-  { key: 'SalesReady',  k: 's-sr',   short: 'In Progress', match: ['SalesReady', 'MeetingScheduled', 'QuoteSent', 'Negotiating'] },
-  { key: 'Won',         k: 's-won',  short: 'Won',         match: ['Won'] },
-  { key: 'Lost',        k: 's-lost', short: 'Lost',        match: ['Lost'] },
+  { key: 'New',       k: 's-new',  short: 'New',        match: ['New'] },
+  { key: 'Working',   k: 's-qual', short: 'Working',    match: ['Working'] },
+  { key: 'QuoteSent', k: 's-sr',   short: 'Quote Sent', match: ['QuoteSent'] },
+  { key: 'Won',       k: 's-won',  short: 'Won',        match: ['Won'] },
+  { key: 'Lost',      k: 's-lost', short: 'Lost',       match: ['Lost'] },
 ]
 
 export default function LeadDashboardV2() {
@@ -86,8 +87,12 @@ export default function LeadDashboardV2() {
       (!l.last_contact_at || new Date(l.last_contact_at).getTime() < dayAgo)
     ).length
 
+    // Phase 30A — SalesReady is no longer a stage, but the
+    // handoff_sla_due_at column still records when a Working lead
+    // needed pickup. SLA breach = any active (non-closed) lead with a
+    // handoff deadline in the past.
     const slaBreaches = leads.filter(l =>
-      l.stage === 'SalesReady' &&
+      !['Won','Lost'].includes(l.stage) &&
       l.handoff_sla_due_at &&
       new Date(l.handoff_sla_due_at).getTime() < now
     ).length
@@ -95,7 +100,7 @@ export default function LeadDashboardV2() {
     const slaBreachByRep = (() => {
       const m = new Map()
       leads
-        .filter(l => l.stage === 'SalesReady' && l.handoff_sla_due_at && new Date(l.handoff_sla_due_at).getTime() < now)
+        .filter(l => !['Won','Lost'].includes(l.stage) && l.handoff_sla_due_at && new Date(l.handoff_sla_due_at).getTime() < now)
         .forEach(l => {
           const name = l.assigned?.name || 'unassigned'
           m.set(name, (m.get(name) || 0) + 1)
@@ -339,12 +344,15 @@ function HeroStat({ label, value, delta, up, down, acc }) {
 }
 
 function subForStage(stage, leads, kpis) {
-  if (stage === 'New') return `${leads.filter(l => l.stage === 'New' && l.heat === 'hot').length} hot`
-  if (stage === 'Contacted') return `${leads.filter(l => l.stage === 'Contacted' && l.heat === 'hot').length} hot`
-  if (stage === 'Qualified') return 'BANT done'
-  if (stage === 'SalesReady') return kpis.slaBreaches > 0 ? `${kpis.slaBreaches} SLA risk` : 'on track'
-  if (stage === 'Won') return formatLakh(kpis.wonValue)
-  if (stage === 'Lost') return 'auto-closed'
+  // Phase 30A — 5 stages. Working merges Contacted+Qualified+SalesReady+
+  // MeetingScheduled; QuoteSent merges QuoteSent+Negotiating.
+  if (stage === 'New')       return `${leads.filter(l => l.stage === 'New'     && l.heat === 'hot').length} hot`
+  if (stage === 'Working')   return kpis.slaBreaches > 0
+                                      ? `${kpis.slaBreaches} SLA risk`
+                                      : `${leads.filter(l => l.stage === 'Working' && l.heat === 'hot').length} hot`
+  if (stage === 'QuoteSent') return 'awaiting client'
+  if (stage === 'Won')       return formatLakh(kpis.wonValue)
+  if (stage === 'Lost')      return 'auto-closed'
   return ''
 }
 

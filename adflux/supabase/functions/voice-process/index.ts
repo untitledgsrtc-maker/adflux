@@ -93,7 +93,7 @@ Return ONLY a JSON object. No prose, no markdown fence. Schema:
   "next_action":   "Short phrase like 'Send quote' or 'Follow up Tuesday', or empty string",
   "next_action_date": "YYYY-MM-DD or empty string",
   "amount":        "Numeric rupee amount mentioned, or 0. Convert lakh/crore to plain rupees (e.g. '3.8 lakh' -> 380000, '2 crore' -> 20000000).",
-  "stage_to":      "If the rep clearly indicates a stage transition, one of: 'Qualified' | 'SalesReady' | 'MeetingScheduled' | 'QuoteSent' | 'Negotiating' | 'Won' | 'Lost' | 'Nurture'. Otherwise empty string."
+  "stage_to":      "If the rep clearly indicates a stage transition, one of: 'Working' | 'QuoteSent' | 'Won' | 'Lost'. Otherwise empty string. (Phase 30A — collapsed from 10 stages to 5.)"
 }
 
 Guidance:
@@ -105,7 +105,7 @@ Guidance:
 - next_action_date only if the rep mentioned a specific day. "tomorrow" or "Monday" → resolve to date based on today's date provided in user message.
 - transcript_en is the user-facing English version of the spoken note, distinct from notes (the cleaned-up summary).
 - amount: only if the rep stated a specific number. "₹3.8 lakh nu quote" → 380000. Don't guess.
-- stage_to: only when the rep's intent is clear. "BANT confirmed" / "ready for sales" → SalesReady. "lost interest" → Lost. "demo set" / "meeting fixed" → MeetingScheduled. "quote sent" → QuoteSent.
+- stage_to: only when the rep's intent is clear. "BANT confirmed" / "ready for sales" / "demo set" / "meeting fixed" → Working. "quote sent" / "negotiating" → QuoteSent. "lost interest" / "not interested" → Lost. "won" / "deal closed" → Won.
 `
 
 serve(async (req) => {

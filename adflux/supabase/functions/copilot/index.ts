@@ -39,8 +39,8 @@ TABLES (Postgres):
         heat, expected_value, assigned_to, telecaller_id, sales_ready_at,
         handoff_sla_due_at, contact_attempts_count, last_contact_at,
         notes, created_by, created_at, quote_id)
-    stage IN ('New','Contacted','Qualified','SalesReady','MeetingScheduled',
-              'QuoteSent','Negotiating','Won','Lost','Nurture')
+    stage IN ('New','Working','QuoteSent','Won','Lost')
+    nurture_revisit_date date  -- on Lost rows, optional follow-up date
     heat IN ('hot','warm','cold')
     segment IN ('PRIVATE','GOVERNMENT')
 
@@ -88,8 +88,10 @@ NOTES:
 - "no check-in today" = work_sessions where work_date = current_date
   AND check_in_at IS NULL, joined to users where is_active = true AND
   team_role IN ('sales','agency','telecaller')
-- "SLA breach" = leads where stage = 'SalesReady'
+- "SLA breach" = leads where stage NOT IN ('Won','Lost')
   AND handoff_sla_due_at < now()
+- "leads to revisit" = leads where stage = 'Lost' AND nurture_revisit_date IS NOT NULL
+  AND nurture_revisit_date <= current_date + 30 (replaces the old Nurture stage)
 - "outstanding payment" = quotes where status = 'won' AND total_amount >
   (SELECT coalesce(sum(amount_received),0) FROM payments p
      WHERE p.quote_id = quotes.id AND p.approval_status = 'approved')

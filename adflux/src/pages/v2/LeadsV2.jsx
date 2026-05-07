@@ -191,8 +191,10 @@ export default function LeadsV2() {
       !['Won','Lost'].includes(l.stage) &&
       (!l.last_contact_at || new Date(l.last_contact_at).getTime() < dayAgo)
     )
+    // Phase 30A — SalesReady stage removed; SLA still keys off the
+    // handoff_sla_due_at timestamp on any active (non-closed) lead.
     const slaBreaches = leads.filter(l =>
-      l.stage === 'SalesReady' &&
+      !['Won','Lost'].includes(l.stage) &&
       l.handoff_sla_due_at &&
       new Date(l.handoff_sla_due_at).getTime() < now
     )
