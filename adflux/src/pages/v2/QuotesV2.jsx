@@ -10,11 +10,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react'
+import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2 } from 'lucide-react'
 import { useQuotes } from '../../hooks/useQuotes'
 import { useAuthStore } from '../../store/authStore'
 import { QUOTE_STATUSES, STATUS_LABELS } from '../../utils/constants'
 import { formatCurrency, formatDate, truncate } from '../../utils/formatters'
+import { supabase } from '../../lib/supabase'
 
 /* ─── Local helpers ────────────────────────────────── */
 function computeBalance(q) {
@@ -41,6 +42,33 @@ export default function QuotesV2() {
 
   const { quotes, filters, setFilters, resetFilters, fetchQuotes } = useQuotes()
   const [loading, setLoading] = useState(true)
+
+  // Phase 29c — inline Edit / Delete from the list row. Saves a click
+  // for cleanup workflows. Each handler stops row-click propagation
+  // so the row's onClick (open detail) doesn't also fire.
+  function editQuote(e, q) {
+    e.stopPropagation()
+    if (q.segment === 'GOVERNMENT') {
+      const path = q.media_type === 'AUTO_HOOD'
+        ? '/quotes/new/government/auto-hood'
+        : '/quotes/new/government/gsrtc-led'
+      navigate(path, { state: { editingId: q.id } })
+    } else if (q.media_type === 'OTHER_MEDIA') {
+      navigate('/quotes/new/private/other-media', { state: { editingId: q.id } })
+    } else {
+      navigate(`/quotes/new?editOf=${q.id}`)
+    }
+  }
+  async function deleteQuote(e, q) {
+    e.stopPropagation()
+    if (!confirm(`DELETE draft ${q.quote_number || q.ref_number || ''} permanently? This cannot be undone.`)) return
+    const { error: delErr } = await supabase.from('quotes').delete().eq('id', q.id)
+    if (delErr) {
+      alert('Could not delete: ' + delErr.message)
+      return
+    }
+    fetchQuotes()
+  }
   const [searchDraft, setSearchDraft] = useState(filters.search || '')
   const [sortField, setSortField] = useState('created_at')
   const [sortDir, setSortDir] = useState('desc')
@@ -403,6 +431,8 @@ export default function QuotesV2() {
                   <th>Outstanding</th>
                   <Th field="created_at"   sortField={sortField} sortDir={sortDir} onSort={handleSort}>Date</Th>
                   <th>Follow up</th>
+                  {/* Phase 29c — inline Edit + Delete on draft rows. */}
+                  <th style={{ width: 90 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -450,23 +480,63 @@ export default function QuotesV2() {
                           : <span className="v2d-muted">—</span>
                       })()}
                     </td>
+                    {/* Phase 29c — Edit always available except on lost.
+                        Delete only on drafts (Phase 11b trigger blocks
+                        non-draft hard-deletes). Stop row-click propagation
+                        so these don't double-fire navigate. */}
+                    <td>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {q.status !== 'lost' && (
+                          <button
+                            type="button"
+                            className="v2d-ghost"
+                            title="Edit"
+                            onClick={e => editQuote(e, q)}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        )}
+                        {q.status === 'draft' && (
+                          <button
+                            type="button"
+                            className="v2d-ghost"
+                            style={{ color: 'var(--red)' }}
+                            title="Delete draft"
+                            onClick={e => deleteQuote(e, q)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Mobile: card list (visible <860px via CSS) */}
+          {/* Mobile: card list (visible <860px via CSS).
+              Phase 29c — wrapper changed from <button> to <div role="button">
+              so we can nest Edit/Delete <button>s inside without invalid
+              HTML. Tap target behaviour preserved via role + tabIndex. */}
           <div className="v2d-qlist">
             {displayed.map(q => {
               const b = computeBalance(q)
               return (
-                <button
+                <div
                   key={q.id}
+                  role="button"
+                  tabIndex={0}
                   className="v2d-qcard"
                   onClick={() => navigate(
                     q.segment === 'GOVERNMENT' ? `/proposal/${q.id}` : `/quotes/${q.id}`
                   )}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigate(q.segment === 'GOVERNMENT' ? `/proposal/${q.id}` : `/quotes/${q.id}`)
+                    }
+                  }}
                 >
                   <div className="v2d-qcard-top">
                     <div className="v2d-qcard-num">
@@ -511,7 +581,37 @@ export default function QuotesV2() {
                       <div className="v2d-qcard-v">{formatDate(q.created_at)}</div>
                     </div>
                   </div>
-                </button>
+                  {/* Phase 29c — mobile inline actions. Same gating as
+                      desktop. Edit hidden on lost; Delete only on draft. */}
+                  {(q.status !== 'lost' || q.status === 'draft') && (
+                    <div style={{
+                      display: 'flex', gap: 8, marginTop: 10,
+                      borderTop: '1px solid var(--v2-line, #1f2741)',
+                      paddingTop: 10,
+                    }}>
+                      {q.status !== 'lost' && (
+                        <button
+                          type="button"
+                          className="v2d-ghost"
+                          style={{ flex: 1, padding: '8px 12px' }}
+                          onClick={e => editQuote(e, q)}
+                        >
+                          <Pencil size={13} /> Edit
+                        </button>
+                      )}
+                      {q.status === 'draft' && (
+                        <button
+                          type="button"
+                          className="v2d-ghost"
+                          style={{ flex: 1, padding: '8px 12px', color: 'var(--red)' }}
+                          onClick={e => deleteQuote(e, q)}
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>
