@@ -484,7 +484,10 @@ export default function LeadUploadV2() {
                 <label>Default assignee</label>
                 <select value={defaultAssignee} onChange={e => setDefaultAssignee(e.target.value)} style={{ width: '100%' }}>
                   <option value="">— unassigned —</option>
-                  {users.filter(u => ['sales','agency','sales_manager'].includes(u.team_role)).map(u => (
+                  {/* Phase 27 — telecallers can also own raw imported leads
+                      (the inside-sales caller works the queue first). Office
+                      staff stays excluded — they don't work leads. */}
+                  {users.filter(u => ['sales','agency','sales_manager','telecaller'].includes(u.team_role)).map(u => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>

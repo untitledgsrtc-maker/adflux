@@ -134,6 +134,11 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
           name:      form.name.trim(),
           email:     form.email.trim().toLowerCase(),
           role:      form.role,
+          // Phase 27 — mirror role into team_role. The Reassign +
+          // Default Assignee dropdowns + AI briefing all filter on
+          // team_role; without this, telecallers and office_staff
+          // created via the modal are invisible to those queries.
+          team_role: form.role,
           designation: form.designation.trim() || null,
           // Phase 11j — admin always 'ALL' regardless of dropdown
           // (admin must see/manage everything). Other roles get the
@@ -170,6 +175,10 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       const { error } = await updateMember(member.id, {
         name: form.name.trim(),
         role: form.role,
+        // Phase 27 — mirror role into team_role on edit too. If admin
+        // changes Dhara from 'sales' → 'telecaller', team_role must
+        // follow or the dropdowns will keep showing her as sales.
+        team_role: form.role,
         designation: form.designation.trim() || null,
         // Phase 11j — admin can change a rep's segment scope from edit.
         segment_access: ROLES_WITHOUT_SEGMENT.has(form.role) ? 'ALL' : form.segment_access,
