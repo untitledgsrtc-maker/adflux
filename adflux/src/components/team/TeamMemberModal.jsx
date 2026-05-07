@@ -5,18 +5,23 @@ import { X } from 'lucide-react'
 import { supabase, supabaseSignup } from '../../lib/supabase'
 import { useTeam } from '../../hooks/useTeam'
 
-// Phase 11g — owner spec (4 May 2026): "i want one more role / agency
-// / its same like sale person but just name agency". Agency members
-// behave like sales (incentive profile, commission tracking) but
-// segregated for reporting / partner-channel distinction. The 'agency'
-// value is already in the users_role_check constraint from Phase 8E,
-// and the incentive payout triggers operate on any role with a
-// staff_incentive_profile, so adding the dropdown option is enough.
+// Phase 11g — owner spec (4 May 2026): agency role added.
+// Phase 26b — owner spec (7 May 2026): telecaller + office_staff
+// added so admin can register the inside-sales caller and back-office
+// people (accounts / HR / ops) without forcing them into a sales role.
+// users_role_check constraint extended in supabase_phase26b_extra_roles.sql.
 const ROLES = [
-  { value: 'sales',  label: 'Sales' },
-  { value: 'agency', label: 'Agency (sales-like)' },
-  { value: 'admin',  label: 'Admin' },
+  { value: 'sales',        label: 'Sales' },
+  { value: 'agency',       label: 'Agency (sales-like)' },
+  { value: 'telecaller',   label: 'Telecaller' },
+  { value: 'office_staff', label: 'Office staff (back office)' },
+  { value: 'admin',        label: 'Admin' },
 ]
+
+// Roles that don't work on quotes — segment access dropdown is
+// irrelevant for them. We hide it so the form is shorter and the
+// admin doesn't have to think about a meaningless field.
+const ROLES_WITHOUT_SEGMENT = new Set(['admin', 'office_staff'])
 
 // Phase 11j — segment scope. Owner spec: "how can we define its for
 // goverment work only or private work only". Wires the existing
@@ -133,7 +138,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
           // Phase 11j — admin always 'ALL' regardless of dropdown
           // (admin must see/manage everything). Other roles get the
           // selected scope.
-          segment_access: form.role === 'admin' ? 'ALL' : form.segment_access,
+          segment_access: ROLES_WITHOUT_SEGMENT.has(form.role) ? 'ALL' : form.segment_access,
           is_active: true,
         }])
 
@@ -167,7 +172,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         role: form.role,
         designation: form.designation.trim() || null,
         // Phase 11j — admin can change a rep's segment scope from edit.
-        segment_access: form.role === 'admin' ? 'ALL' : form.segment_access,
+        segment_access: ROLES_WITHOUT_SEGMENT.has(form.role) ? 'ALL' : form.segment_access,
       })
       if (error) {
         setServerError(error.message || 'Failed to update member')
@@ -254,8 +259,9 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
             />
           </Field>
 
-          {/* Phase 11j — segment scope. Hidden for admin (always ALL). */}
-          {form.role !== 'admin' && (
+          {/* Phase 11j — segment scope. Hidden for admin (always ALL).
+              Phase 26b — also hidden for office_staff (no quote access). */}
+          {!ROLES_WITHOUT_SEGMENT.has(form.role) && (
             <Field
               label="Segment access"
               required
