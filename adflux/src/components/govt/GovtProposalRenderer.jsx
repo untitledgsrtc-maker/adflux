@@ -305,16 +305,21 @@ function renderSignerBlock(signer, company, letterheadOn = false) {
   const mobile = signer.signature_mobile ? `મો. ${signer.signature_mobile}` : ''
   const companyLine = (company?.name_gu || company?.short_name || company?.name || 'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ')
 
-  // Phase 11d (rev12) — when letterhead is ON, the printed footer of
-  // the letterhead PNG already shows company name + phone + address.
-  // Showing those again in the signer block creates duplicate ink and
-  // crowds the bottom of the page. Letterhead-mode signer block:
-  // just the courtesy + name + title. No company line, no mobile.
+  // Phase 11d (rev12) — letterhead-mode signer block originally hid
+  // the mobile on the theory that the printed letterhead footer
+  // carries phone numbers anyway.
+  // Phase 28a — owner correction (7 May 2026): the letterhead phone
+  // is the company switchboard; the SIGNER's personal mobile is a
+  // different number and should appear under the designation so the
+  // recipient can call the signer directly. Company name + address
+  // stay suppressed (still duplicated by the letterhead PNG), but
+  // the signer's mobile is added back.
   if (letterheadOn) {
     return [
       '<div class="govt-letter__signer" style="text-align:right;margin-top:18px;">',
         'આપનો વિશ્વાસુ,<br/>',
         `${name}${title ? ` (${title})` : ''}`,
+        mobile ? `<br/>${mobile}` : '',
       '</div>',
     ].join('')
   }

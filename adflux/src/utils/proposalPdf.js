@@ -184,6 +184,23 @@ export async function generateLockedProposalPdf({ domNode, quoteId }) {
   wrapper.appendChild(domNode.cloneNode(true))
   document.body.appendChild(wrapper)
 
+  // Phase 28a — measure each `.govt-letter` div's top/bottom in canvas
+  // coordinates BEFORE removing the wrapper. Each .govt-letter is one
+  // intended A4 page (cover letter, district list, station table, etc.).
+  // We use these bounds to slice instead of fixed mathematical cuts so
+  // the slicer never cuts through a footer that landed at the boundary
+  // because content overshot the 1123px min-height by a few pixels.
+  const wrapRect = wrapper.getBoundingClientRect()
+  const pageEls  = Array.from(wrapper.querySelectorAll('.govt-letter'))
+  const pageBoundsPx = pageEls.map(el => {
+    const r = el.getBoundingClientRect()
+    // Multiply by 2 because html2canvas captures at scale: 2.
+    return {
+      top: Math.round((r.top    - wrapRect.top) * 2),
+      bot: Math.round((r.bottom - wrapRect.top) * 2),
+    }
+  })
+
   let canvas
   try {
     canvas = await html2canvas(wrapper, {
@@ -198,10 +215,7 @@ export async function generateLockedProposalPdf({ domNode, quoteId }) {
     document.body.removeChild(wrapper)
   }
 
-  const imgData = canvas.toDataURL('image/jpeg', 0.92)
-
-  // A4 portrait: 210 x 297 mm. We compute the image's aspect-correct
-  // height when scaled to fit page width, then slice if it overflows.
+  // A4 portrait: 210 x 297 mm.
   const pageWidthMm  = 210
   const pageHeightMm = 297
   const pdf = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -209,42 +223,50 @@ export async function generateLockedProposalPdf({ domNode, quoteId }) {
   const pxPerMm  = canvas.width / pageWidthMm
   const pageHpx  = Math.floor(pageHeightMm * pxPerMm)
 
-  let remaining = canvas.height
-  let yOffsetPx = 0
-  let isFirstPage = true
+  // Helper: render one slice from the captured canvas onto a PDF page,
+  // scaling vertically if the slice slightly overshoots A4 height.
+  function addSliceToPdf(yTopPx, yBotPx, isFirst) {
+    const sliceHpx = Math.max(1, Math.min(yBotPx, canvas.height) - Math.max(0, yTopPx))
+    if (sliceHpx <= 0) return
+    if (!isFirst) pdf.addPage()
 
-  while (remaining > 0) {
-    const sliceHpx = Math.min(pageHpx, remaining)
-    // Phase 11d (rev7) — skip a trailing slice that's < 10% of a page
-    // tall AND not the first page. Margin/border/line-height rounding
-    // routinely produces a 5-50px overflow past the last "real" page,
-    // which used to become a near-blank trailing page in the PDF. 10%
-    // threshold catches all rounding artifacts; legit content needs
-    // at least ~30% of a page, so this never drops real text.
-    if (!isFirstPage && sliceHpx < pageHpx * 0.10) {
-      break
-    }
-    if (!isFirstPage) pdf.addPage()
-    isFirstPage = false
-
-    // For the slice, draw the source canvas onto a temp canvas then
-    // dump just that slice as JPEG. Avoids putting the whole image in
-    // memory N times.
     const slice = document.createElement('canvas')
     slice.width  = canvas.width
     slice.height = sliceHpx
     slice.getContext('2d').drawImage(
       canvas,
-      0, yOffsetPx, canvas.width, sliceHpx,
-      0, 0,         canvas.width, sliceHpx,
+      0, yTopPx, canvas.width, sliceHpx,
+      0, 0,      canvas.width, sliceHpx,
     )
     const sliceData = slice.toDataURL('image/jpeg', 0.92)
 
-    const sliceMm = sliceHpx / pxPerMm
+    // If the slice corresponds to one .govt-letter page that overshoots
+    // 1123px slightly, scaling vertically to fit A4 keeps the footer
+    // visible without splitting it. <=5% overshoot is invisible to the
+    // eye; >5% (rare) still scales — better a slightly compressed page
+    // than a footer cut in half.
+    const sliceMm = Math.min(sliceHpx / pxPerMm, pageHeightMm)
     pdf.addImage(sliceData, 'JPEG', 0, 0, pageWidthMm, sliceMm, undefined, 'FAST')
+  }
 
-    yOffsetPx += sliceHpx
-    remaining -= sliceHpx
+  if (pageBoundsPx.length > 0) {
+    // Snap to .govt-letter element boundaries — one element = one page.
+    pageBoundsPx.forEach((b, i) => addSliceToPdf(b.top, b.bot, i === 0))
+  } else {
+    // Fallback: caller didn't use .govt-letter wrappers (e.g. ad-hoc
+    // DOM). Fall back to fixed mathematical slicing with the rev7
+    // trailing-sliver guard.
+    let remaining = canvas.height
+    let yOffsetPx = 0
+    let isFirstPage = true
+    while (remaining > 0) {
+      const sliceHpx = Math.min(pageHpx, remaining)
+      if (!isFirstPage && sliceHpx < pageHpx * 0.10) break
+      addSliceToPdf(yOffsetPx, yOffsetPx + sliceHpx, isFirstPage)
+      isFirstPage = false
+      yOffsetPx += sliceHpx
+      remaining -= sliceHpx
+    }
   }
 
   const blob = pdf.output('blob')

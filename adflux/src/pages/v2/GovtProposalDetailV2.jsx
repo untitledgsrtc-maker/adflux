@@ -765,6 +765,13 @@ export default function GovtProposalDetailV2() {
   // same as covering letter". Govt body now reads as a Gujarati
   // letter mirroring the GovtProposalRenderer cover. Private quotes
   // keep the English version.
+  // Phase 28a — owner feedback (7 May 2026): "email template completly
+  // useless, make draft like fully professional, you can take contain
+  // from covering letter also". Body rebuilt as a real cover letter:
+  // brief intro of the company + medium, the key proposal numbers, a
+  // medium-specific reach pitch (3-4 lines), the PDF link, and a
+  // signed-off signature block with the signer's name + designation
+  // + mobile so the recipient can call directly.
   async function handleEmail() {
     if (!quote) return
     const to      = (quote.client_email || '').trim()
@@ -780,44 +787,88 @@ export default function GovtProposalDetailV2() {
     const subject =
       `પ્રપોઝલ — ${mediaLabelGu} — ${quote.quote_number || quote.ref_number || ''}`
 
-    // Body is a Gujarati letter, lightly summarised from the cover.
-    // Drop the recipient block since the email client renders it
-    // separately above.
     const ddmm = quote.proposal_date
       ? new Date(quote.proposal_date).toLocaleDateString('en-IN', {
           day: '2-digit', month: '2-digit', year: 'numeric',
         })
       : ''
+
+    // Pitch block — short paragraph describing the medium's reach so
+    // the email reads as a proposal, not a "you have mail" notification.
+    // Auto Hood pitches the 33-district mobile reach; GSRTC pitches the
+    // bus-stand high-footfall LED slot model.
+    const pitchGu = quote.media_type === 'AUTO_HOOD'
+      ? `ઓટો રિક્ષા હૂડ ગુજરાતના ૩૩ જિલ્લાઓમાં શહેરી તેમજ ગ્રામ્ય બંને ` +
+        `વિસ્તારોમાં લાંબા સમય સુધી દૃશ્યતા આપતી, સતત ગતિશીલ આઉટડોર ` +
+        `મીડિયા છે. ત્રણ બાજુ પ્રિન્ટ થયેલ હૂડ સવારથી રાત સુધી ` +
+        `શહેરના વ્યસ્ત માર્ગો, બસ સ્ટેન્ડ, સ્ટેશન અને બજાર વિસ્તારોમાં ` +
+        `દરરોજ ૧૫,૦૦૦+ વ્યક્તિઓ સુધી પહોંચે છે.`
+      : `GSRTC LED સ્ક્રીન ગુજરાતના મુખ્ય બસ સ્ટેન્ડ પર સ્થાપિત છે — ` +
+        `જ્યાં દૈનિક હાજરી હજારોમાં હોય છે અને મુસાફરો સરેરાશ ` +
+        `૧૫–૩૦ મિનિટ રાહ જુએ છે. ૧૦ સેકન્ડના સ્લોટ દિવસમાં અનેક વાર ` +
+        `પુનરાવર્તિત થતા હોવાથી બ્રાન્ડ રિકોલ ઊંચું રહે છે.`
+
+    const refLine    = quote.quote_number || quote.ref_number || ''
+    const totalLine  = `રૂ. ${formatINREnglish(quote.total_amount || 0)}/-`
+    const monthsLine = quote.gsrtc_campaign_months
+      ? `${quote.gsrtc_campaign_months} મહિના`
+      : ''
+
     let body =
       `નમસ્કાર,\n\n` +
-      `અનટાઇટલ્ડ એડવર્ટાઇઝિંગ તરફથી ` +
-      `${mediaLabelGu} પ્રપોઝલ આપને મોકલવામાં આવી રહી છે.\n\n` +
-      `સંદર્ભ ક્રમાંક : ${quote.quote_number || quote.ref_number || ''}\n` +
-      (ddmm ? `તારીખ        : ${ddmm}\n` : '') +
-      `કુલ રકમ      : રૂ. ${formatINREnglish(quote.total_amount || 0)}/-\n`
+      `Untitled Advertising તરફથી નમસ્કાર. અમે ગુજરાતમાં સરકારી તેમજ ` +
+      `ખાનગી ગ્રાહકો માટે OOH (બાહ્ય) જાહેરાત માધ્યમો — ઓટો રિક્ષા હૂડ, ` +
+      `GSRTC LED, હોર્ડિંગ, મોલ તેમજ સિનેમા — નું આયોજન કરીએ છીએ.\n\n` +
+      `આપની માંગણી મુજબ ${mediaLabelGu} માટેની વિગતવાર પ્રપોઝલ રજૂ ` +
+      `કરીએ છીએ. મુખ્ય વિગતો નીચે મુજબ છે:\n\n` +
+      `   સંદર્ભ ક્રમાંક : ${refLine}\n` +
+      (ddmm ? `   તારીખ          : ${ddmm}\n` : '') +
+      (monthsLine ? `   પ્રચાર સમયગાળો : ${monthsLine}\n` : '') +
+      `   કુલ રકમ        : ${totalLine} (GST સહિત)\n\n` +
+      `${pitchGu}\n\n`
 
     if (quote.locked_proposal_pdf_url) {
       try {
         const url = await getSignedUrl(quote.locked_proposal_pdf_url, 24 * 3600)
         const short = await shortenUrl(url).catch(() => url)
-        body += `\nપ્રપોઝલ PDF (24 કલાક માટે માન્ય): ${short}\n`
+        body +=
+          `વિગતવાર પ્રપોઝલ — રેટ ટેબલ, જિલ્લા / સ્ટેશન વાર ફાળવણી, ` +
+          `અને બાંધણી — સંલગ્ન PDF માં ઉપલબ્ધ છે.\n` +
+          `પ્રપોઝલ PDF (24 કલાક માટે માન્ય): ${short}\n\n`
       } catch (e) {
-        // Signed URL failed — send without link; user can re-share later.
+        body += `વિગતવાર પ્રપોઝલ સંલગ્ન છે. (PDF લિંક પ્રાપ્ત કરવામાં સમસ્યા — અમે ટૂંક સમયમાં ફરી મોકલીશું.)\n\n`
       }
     } else {
       body +=
-        `\nનોંધ: પ્રપોઝલ PDF ટૂંક સમયમાં મોકલવામાં આવશે ` +
-        `(પહેલા Mark Sent કરો જેથી સ્નેપશોટ લોક થાય).\n`
+        `નોંધ: પ્રપોઝલ PDF ટૂંક સમયમાં મોકલવામાં આવશે ` +
+        `(પહેલા Mark Sent કરો જેથી સ્નેપશોટ લોક થાય).\n\n`
     }
 
-    // Phase 11l — note about combined PDF attachment limitation.
+    body +=
+      `કૃપા કરી પ્રપોઝલની વિગતો ચકાસી અને કોઈપણ પ્રશ્ન / ચર્ચા / ` +
+      `મીટિંગ માટે નીચે આપેલા નંબર પર સંપર્ક કરો. અમે આપની ` +
+      `બ્રાન્ડ માટે યોગ્ય મીડિયા-મિક્સ બનાવવા પ્રતિબદ્ધ છીએ.\n\n`
+
+    // Phase 28a — note about combined PDF attachment limitation.
     // Gmail compose URL doesn't accept file attachments programmatically;
     // best we can do is tell the user to drag-attach after opening.
     body +=
-      `\n(નોંધ: જો બધાં દસ્તાવેજો સાથે Combined PDF મોકલવી હોય તો ` +
-      `Adflux માં Combined PDF બટન દબાવી ડાઉનલોડ કરી, અહીં attach કરો.)\n`
+      `(નોંધ: બધાં દસ્તાવેજો સાથે Combined PDF મોકલવી હોય તો ` +
+      `Adflux માં "Combined PDF" બટન દબાવી ડાઉનલોડ કરી, અહીં attach કરો.)\n\n`
 
-    body += `\nઆભાર,\nઅનટાઇટલ્ડ એડવર્ટાઇઝિંગ`
+    // Signature block: signer name + designation + personal mobile.
+    // Phase 28a — pulls from `effectiveSigner` (signer row + per-quote
+    // mobile override) so the email signature matches the rendered
+    // cover letter exactly, including any per-quote mobile change.
+    const signerName   = effectiveSigner?.name || ''
+    const signerTitle  = effectiveSigner?.signature_title || ''
+    const signerMobile = effectiveSigner?.signature_mobile || ''
+    body += `આભાર,\n`
+    if (signerName) {
+      body += `${signerName}${signerTitle ? ` (${signerTitle})` : ''}\n`
+    }
+    if (signerMobile) body += `મો. ${signerMobile}\n`
+    body += `અનટાઇટલ્ડ એડવર્ટાઇઝિંગ`
 
     // Gmail web compose — works for the user's Gmail account in any
     // browser without needing an OS-level mail handler.
