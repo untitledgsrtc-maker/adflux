@@ -78,11 +78,18 @@ const SALES_NAV = [
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
 
-// Telecaller-specific nav: queue-first, no quotes/cities/clients clutter.
+// Telecaller-specific nav: queue-first, lighter than the full sales nav.
+// Phase 28c — owner correction (7 May 2026): telecallers DO escalate
+// leads to quotes and need to track their own clients (Rima reported
+// not seeing Quotes / Clients tabs after she upgraded a lead). Added
+// both with the same routes as sales — RLS scopes them to the
+// telecaller's own rows. Order matches sales for muscle memory.
 const TELECALLER_NAV = [
   { to: '/telecaller',        label: 'Call Queue',     icon: Phone },
   { to: '/work',              label: 'Today',          icon: Sun },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
+  { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/clients',           label: 'Clients',        icon: Contact2 },
   // Phase 20 — telecallers benefit even more from voice logging.
   { to: '/voice',             label: 'Voice Log',      icon: Mic },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
