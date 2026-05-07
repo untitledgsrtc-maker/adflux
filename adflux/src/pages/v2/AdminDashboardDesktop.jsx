@@ -227,6 +227,39 @@ export default function AdminDashboardDesktop() {
       return sum + Math.max(0, Number(q.total_amount || 0) - paid)
     }, 0)
 
+    /* ─── Phase 25d — design-aligned hero KPIs ───────────────────────
+       The owner-approved dashboard hero shows five columns:
+         Today · MTD · Won value · Pipeline · Outstanding
+       Each cell has a small subtitle (delta or count or % of target).
+       Compute the extra numbers needed alongside the legacy revenue
+       set above. */
+    const todayIso = new Date().toISOString().slice(0, 10)
+    const todayCollected = paymentsAprFiltered
+      .filter(p => (p.payment_date || '').slice(0, 10) === todayIso)
+      .reduce((s, p) => s + Number(p.amount_received || 0), 0)
+
+    // Won + pipeline quote counts (used as subtitle on the KPI cells)
+    const wonCount = quotes.filter(q => {
+      if (q.status !== 'won') return false
+      const ts = q.updated_at || q.created_at || ''
+      return ts >= monthStartIso && ts < monthEndIso
+    }).length
+    const pipelineCount = quotes.filter(q =>
+      ['sent', 'negotiating'].includes(q.status)
+    ).length
+
+    // Outstanding aged > 45 days (won_at older than 45d, balance > 0)
+    const fortyFiveDaysAgo = new Date(Date.now() - 45 * 86400000).toISOString()
+    const outstandingOver45d = quotes.reduce((c, q) => {
+      if (q.status !== 'won') return c
+      const wonAt = q.updated_at || q.created_at || ''
+      if (wonAt > fortyFiveDaysAgo) return c
+      const paid = paymentsApr
+        .filter(p => p.quote_id === q.id)
+        .reduce((s, p) => s + Number(p.amount_received || 0), 0)
+      return paid < Number(q.total_amount || 0) ? c + 1 : c
+    }, 0)
+
     // Pipeline funnel
     const stages = ['draft', 'sent', 'negotiating', 'won', 'lost'].map(s => {
       const qs = quotes.filter(q => q.status === s)
@@ -299,6 +332,17 @@ export default function AdminDashboardDesktop() {
     // Profile lookup so we can run calculateIncentive per rep.
     const profileByUser = {}
     profiles.forEach(p => { profileByUser[p.user_id] = p })
+
+    // Phase 25d — total monthly target across active sales staff,
+    // for the MTD KPI's "% of target" subtitle. Per the owner's rule
+    // (Phase 25), target = monthly_salary × sales_multiplier (default
+    // multiplier 5 from incentive_settings). If no profiles configured,
+    // target stays 0 and we render the subtitle as 'target not set'.
+    const mtdTarget = profiles.reduce((sum, p) => {
+      const salary = Number(p.monthly_salary) || 0
+      const mult   = Number(p.sales_multiplier ?? settings.default_multiplier ?? 5)
+      return sum + (salary * mult)
+    }, 0)
 
     // Sum monthly_sales_data across the requested period (custom ranges
     // can span multiple months) so earned reflects the whole window.
@@ -619,7 +663,13 @@ export default function AdminDashboardDesktop() {
 
     setState({
       loading: false,
-      kpi: { revenue, activeQuotes, pipelineValue, outstanding, pending: pending.length, liability, lostRevenue, wonValue },
+      kpi: {
+        revenue, activeQuotes, pipelineValue, outstanding,
+        pending: pending.length, liability, lostRevenue, wonValue,
+        // Phase 25d — design-aligned hero subtitle data
+        todayCollected, mtdTarget,
+        wonCount, pipelineCount, outstandingOver45d,
+      },
       funnel: { stages, max: funnelMax },
       leaderboard, lbMax,
       liability: { total: liability, above: aboveTarget, staff: profiles.length },
@@ -783,59 +833,83 @@ export default function AdminDashboardDesktop() {
               </section>
             )}
 
-            {/* Revenue hero — this is the number that actually matters
-                every morning, so it gets the gradient slot. Incentive
-                liability sits alongside because it's the natural
-                counter-weight: every rupee of revenue increases what we
-                owe the sales team. */}
+            {/* Phase 25d — Hero Revenue KPIs aligned to the
+                owner-approved design (_design_reference/Untitled_Os_(1)/
+                app.jsx). Five cells: Today / MTD / Won value / Pipeline /
+                Outstanding. Each carries a sub-label (delta / % of target /
+                count) that gives the number context.
+
+                Lost revenue + Incentive liability moved off the hero —
+                Liability already has its own dedicated mini-card in
+                Row 4 (LiabilityPanel). Lost revenue surfaces in the
+                Pipeline funnel (Lost row) below the hero. */}
             <section className="v2d-hero v2d-hero--action">
               <div className="v2d-hero-head">
-                <div className="v2d-hero-kicker">₹ Revenue · {period.label}</div>
+                <div className="v2d-hero-kicker">
+                  <span style={{ color: 'var(--v2-yellow, #FFE600)', marginRight: 6 }}>●</span>
+                  Revenue · {period.label}
+                </div>
                 <button className="v2d-banner-cta" onClick={() => navigate('/quotes')}>
                   View quotes
                 </button>
               </div>
-              {/* All four stats use the same number font-size (32px) so the
-                  card reads as a uniform stat strip rather than a headline +
-                  supporting numbers. The revenue cell keeps its description
-                  below to mark it as the primary metric. Inline styles used
-                  intentionally — v2d-hero-big / v2d-hero-stat-v are shared
-                  across other heroes (Sales dashboard) and shouldn't shift. */}
               <div className="v2d-hero-grid v2d-hero-grid--5col">
+                {/* 1. TODAY — today's approved collections */}
                 <div>
-                  <div className="v2d-hero-stat-l">Revenue</div>
-                  <div
-                    className="v2d-hero-big"
-                    style={{ fontSize: 28, marginBottom: 6 }}
-                  >
+                  <div className="v2d-hero-stat-l">Today</div>
+                  <div className="v2d-hero-big" style={{ fontSize: 28, marginBottom: 6 }}>
+                    <Money value={state.kpi.todayCollected} />
+                  </div>
+                  <div className="v2d-hero-sub" style={{ maxWidth: 'none' }}>
+                    Collected today.
+                  </div>
+                </div>
+
+                {/* 2. MTD — period collections + % of target */}
+                <div className="v2d-hero-stat">
+                  <div className="v2d-hero-stat-l">MTD</div>
+                  <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
                     <Money value={state.kpi.revenue} />
                   </div>
                   <div className="v2d-hero-sub" style={{ maxWidth: 'none' }}>
-                    Approved payments collected this period.
+                    {state.kpi.mtdTarget > 0
+                      ? `${Math.round((state.kpi.revenue / state.kpi.mtdTarget) * 100)}% of target`
+                      : 'target not set'}
                   </div>
                 </div>
+
+                {/* 3. WON VALUE — won quotes total + count */}
                 <div className="v2d-hero-stat">
                   <div className="v2d-hero-stat-l">Won value</div>
                   <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
                     <Money value={state.kpi.wonValue} />
                   </div>
+                  <div className="v2d-hero-sub" style={{ maxWidth: 'none' }}>
+                    {state.kpi.wonCount} {state.kpi.wonCount === 1 ? 'quote' : 'quotes'}
+                  </div>
                 </div>
+
+                {/* 4. PIPELINE — sent + negotiating value + count */}
                 <div className="v2d-hero-stat">
-                  <div className="v2d-hero-stat-l">Pipeline value</div>
+                  <div className="v2d-hero-stat-l">Pipeline</div>
                   <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
                     <Money value={state.kpi.pipelineValue} />
                   </div>
-                </div>
-                <div className="v2d-hero-stat">
-                  <div className="v2d-hero-stat-l">Incentive liability</div>
-                  <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
-                    <Money value={state.kpi.liability} />
+                  <div className="v2d-hero-sub" style={{ maxWidth: 'none' }}>
+                    {state.kpi.pipelineCount} open
                   </div>
                 </div>
+
+                {/* 5. OUTSTANDING — unpaid balances + aged count */}
                 <div className="v2d-hero-stat">
-                  <div className="v2d-hero-stat-l">Lost revenue</div>
+                  <div className="v2d-hero-stat-l">Outstanding</div>
                   <div className="v2d-hero-stat-v" style={{ fontSize: 28 }}>
-                    <Money value={state.kpi.lostRevenue} />
+                    <Money value={state.kpi.outstanding} />
+                  </div>
+                  <div className="v2d-hero-sub" style={{ maxWidth: 'none' }}>
+                    {state.kpi.outstandingOver45d > 0
+                      ? `${state.kpi.outstandingOver45d} over 45d`
+                      : 'all current'}
                   </div>
                 </div>
               </div>
