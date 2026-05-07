@@ -739,29 +739,12 @@ export default function AdminDashboardDesktop() {
                 rep is currently below their daily quota. Lists names so
                 admin can see who to ping (or who to walk over to).
                 When all reps are on track, banner disappears entirely. */}
-            {state.missedReps && state.missedReps.length > 0 && (
-              <section
-                className="v2d-banner"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 16px',
-                  background: 'rgba(229, 57, 53, 0.08)',
-                  border: '1px solid rgba(229, 57, 53, 0.25)',
-                  borderRadius: 12,
-                  marginBottom: 16,
-                }}
-              >
-                <AlertTriangle size={18} style={{ color: '#ef9a9a', flex: '0 0 auto' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>
-                    {state.missedReps.length} rep{state.missedReps.length === 1 ? '' : 's'} below today's target
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.6))' }}>
-                    {state.missedReps.map(r => r.name).join(' · ')}
-                  </div>
-                </div>
-              </section>
-            )}
+            {/* Phase 25a — red "X reps below today's target" banner
+                removed. Owner-approved design has this surfacing in the
+                Team Leaderboard panel further down (Row 3), where each
+                rep's % to target is shown with a visual bar and rank
+                medals. The banner here was duplicating that signal in
+                a less-actionable form. */}
 
             {/* Action Queue — demoted from hero to an inline notification.
                 Only renders when there's actually something pending. When
