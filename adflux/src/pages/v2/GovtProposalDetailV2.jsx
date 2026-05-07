@@ -816,9 +816,12 @@ export default function GovtProposalDetailV2() {
 
     let body =
       `નમસ્કાર,\n\n` +
+      // Phase 28b — owner correction (7 May 2026): drop "મોલ તેમજ
+      // સિનેમા" from the media list. We do those formats but they're
+      // not relevant for govt proposals.
       `Untitled Advertising તરફથી નમસ્કાર. અમે ગુજરાતમાં સરકારી તેમજ ` +
       `ખાનગી ગ્રાહકો માટે OOH (બાહ્ય) જાહેરાત માધ્યમો — ઓટો રિક્ષા હૂડ, ` +
-      `GSRTC LED, હોર્ડિંગ, મોલ તેમજ સિનેમા — નું આયોજન કરીએ છીએ.\n\n` +
+      `GSRTC LED તેમજ હોર્ડિંગ — નું આયોજન કરીએ છીએ.\n\n` +
       `આપની માંગણી મુજબ ${mediaLabelGu} માટેની વિગતવાર પ્રપોઝલ રજૂ ` +
       `કરીએ છીએ. મુખ્ય વિગતો નીચે મુજબ છે:\n\n` +
       `   સંદર્ભ ક્રમાંક : ${refLine}\n` +
@@ -827,7 +830,28 @@ export default function GovtProposalDetailV2() {
       `   કુલ રકમ        : ${totalLine} (GST સહિત)\n\n` +
       `${pitchGu}\n\n`
 
-    if (quote.locked_proposal_pdf_url) {
+    // Phase 28b — try the Combined PDF first. Owner spec: "combine
+    // pdf link shuld be there [in email]". The Combined PDF button
+    // uploads the merged file to <quote_id>/99-combined.pdf on
+    // success; we generate a 24h signed URL here. If the rep never
+    // clicked Combined PDF (or upload failed), fall back to the
+    // locked cover-letter PDF link.
+    let pdfLinkAdded = false
+    try {
+      const combinedPath = `${quote.id}/99-combined.pdf`
+      const combinedUrl  = await getSignedUrl(combinedPath, 24 * 3600)
+      if (combinedUrl) {
+        const short = await shortenUrl(combinedUrl).catch(() => combinedUrl)
+        body +=
+          `સંપૂર્ણ પ્રપોઝલ + દસ્તાવેજો (Combined PDF — 24 કલાક માટે ` +
+          `માન્ય): ${short}\n\n`
+        pdfLinkAdded = true
+      }
+    } catch (_) {
+      // No combined PDF in storage yet — fall through to locked cover.
+    }
+
+    if (!pdfLinkAdded && quote.locked_proposal_pdf_url) {
       try {
         const url = await getSignedUrl(quote.locked_proposal_pdf_url, 24 * 3600)
         const short = await shortenUrl(url).catch(() => url)
@@ -835,10 +859,11 @@ export default function GovtProposalDetailV2() {
           `વિગતવાર પ્રપોઝલ — રેટ ટેબલ, જિલ્લા / સ્ટેશન વાર ફાળવણી, ` +
           `અને બાંધણી — સંલગ્ન PDF માં ઉપલબ્ધ છે.\n` +
           `પ્રપોઝલ PDF (24 કલાક માટે માન્ય): ${short}\n\n`
+        pdfLinkAdded = true
       } catch (e) {
         body += `વિગતવાર પ્રપોઝલ સંલગ્ન છે. (PDF લિંક પ્રાપ્ત કરવામાં સમસ્યા — અમે ટૂંક સમયમાં ફરી મોકલીશું.)\n\n`
       }
-    } else {
+    } else if (!pdfLinkAdded) {
       body +=
         `નોંધ: પ્રપોઝલ PDF ટૂંક સમયમાં મોકલવામાં આવશે ` +
         `(પહેલા Mark Sent કરો જેથી સ્નેપશોટ લોક થાય).\n\n`
@@ -849,12 +874,9 @@ export default function GovtProposalDetailV2() {
       `મીટિંગ માટે નીચે આપેલા નંબર પર સંપર્ક કરો. અમે આપની ` +
       `બ્રાન્ડ માટે યોગ્ય મીડિયા-મિક્સ બનાવવા પ્રતિબદ્ધ છીએ.\n\n`
 
-    // Phase 28a — note about combined PDF attachment limitation.
-    // Gmail compose URL doesn't accept file attachments programmatically;
-    // best we can do is tell the user to drag-attach after opening.
-    body +=
-      `(નોંધ: બધાં દસ્તાવેજો સાથે Combined PDF મોકલવી હોય તો ` +
-      `Adflux માં "Combined PDF" બટન દબાવી ડાઉનલોડ કરી, અહીં attach કરો.)\n\n`
+    // Phase 28b — owner correction: drop the manual-attach note. The
+    // Combined PDF link above carries the merged file; the rep no
+    // longer needs to attach by hand.
 
     // Signature block: signer name + designation + personal mobile.
     // Phase 28a — pulls from `effectiveSigner` (signer row + per-quote
@@ -1139,6 +1161,20 @@ export default function GovtProposalDetailV2() {
           wrapper.appendChild(rendererRef.current.cloneNode(true))
           document.body.appendChild(wrapper)
 
+          // Phase 28b — measure each .govt-letter element BEFORE
+          // rasterizing so the slicer can snap to actual page bounds
+          // instead of fixed mathematical cuts. Without this, content
+          // overshoot of the 1123px min-height splits the letterhead
+          // footer across pages 1 and 2.
+          const wrapRect = wrapper.getBoundingClientRect()
+          const pageBoundsPx = Array.from(wrapper.querySelectorAll('.govt-letter')).map(el => {
+            const r = el.getBoundingClientRect()
+            return {
+              top: Math.round((r.top    - wrapRect.top) * 2),
+              bot: Math.round((r.bottom - wrapRect.top) * 2),
+            }
+          })
+
           let canvas
           try {
             canvas = await html2canvas(wrapper, {
@@ -1154,7 +1190,7 @@ export default function GovtProposalDetailV2() {
           // cloned node has no laid-out dimensions (race with React
           // render, or display:none somewhere up the tree).
           console.log('[combined-pdf] canvas:', {
-            w: canvas.width, h: canvas.height,
+            w: canvas.width, h: canvas.height, pages: pageBoundsPx.length,
           })
           if (!canvas.width || !canvas.height) {
             throw new Error(
@@ -1170,34 +1206,42 @@ export default function GovtProposalDetailV2() {
           const pxPerMm      = canvas.width / pageWidthMm
           const pageHpx      = Math.floor(pageHeightMm * pxPerMm)
 
-          let remaining   = canvas.height
-          let yOffsetPx   = 0
-          let isFirstPage = true
-
-          while (remaining > 0) {
-            const sliceHpx = Math.min(pageHpx, remaining)
-            // Phase 11d (rev7) — skip trailing tiny slice (kills the
-            // phantom blank page caused by margin/border rounding).
-            if (!isFirstPage && sliceHpx < pageHpx * 0.10) {
-              break
-            }
-            if (!isFirstPage) pdf.addPage()
-            isFirstPage = false
-
-            const slice    = document.createElement('canvas')
-            slice.width    = canvas.width
-            slice.height   = sliceHpx
+          // Phase 28b — addSliceToPdf scales the slice vertically to fit
+          // A4 height when content overshoots by a few pixels, so the
+          // letterhead footer never splits across pages.
+          const addSlice = (yTop, yBot, isFirst) => {
+            const sliceHpx = Math.max(1, Math.min(yBot, canvas.height) - Math.max(0, yTop))
+            if (sliceHpx <= 0) return
+            if (!isFirst) pdf.addPage()
+            const slice = document.createElement('canvas')
+            slice.width  = canvas.width
+            slice.height = sliceHpx
             slice.getContext('2d').drawImage(
               canvas,
-              0, yOffsetPx, canvas.width, sliceHpx,
-              0, 0,         canvas.width, sliceHpx,
+              0, yTop, canvas.width, sliceHpx,
+              0, 0,    canvas.width, sliceHpx,
             )
             const sliceData = slice.toDataURL('image/jpeg', 0.92)
-            const sliceMm   = sliceHpx / pxPerMm
+            const sliceMm = Math.min(sliceHpx / pxPerMm, pageHeightMm)
             pdf.addImage(sliceData, 'JPEG', 0, 0, pageWidthMm, sliceMm, undefined, 'FAST')
+          }
 
-            yOffsetPx += sliceHpx
-            remaining -= sliceHpx
+          if (pageBoundsPx.length > 0) {
+            // Snap to .govt-letter element boundaries — one element = one page.
+            pageBoundsPx.forEach((b, i) => addSlice(b.top, b.bot, i === 0))
+          } else {
+            // Fallback: math-slice if no .govt-letter elements found.
+            let remaining = canvas.height
+            let yOffsetPx = 0
+            let isFirstPage = true
+            while (remaining > 0) {
+              const sliceHpx = Math.min(pageHpx, remaining)
+              if (!isFirstPage && sliceHpx < pageHpx * 0.10) break
+              addSlice(yOffsetPx, yOffsetPx + sliceHpx, isFirstPage)
+              isFirstPage = false
+              yOffsetPx += sliceHpx
+              remaining -= sliceHpx
+            }
           }
 
           const buf = pdf.output('arraybuffer')
@@ -1290,6 +1334,29 @@ export default function GovtProposalDetailV2() {
       const filename = `${quote.quote_number || quote.ref_number || 'proposal'}-combined.pdf`
         .replace(/[^a-z0-9-_.]/gi, '-')
       downloadPdfBlob(merged, filename)
+
+      // Phase 28b — also persist to storage so the Email handler can
+      // include a single combined-PDF link in the body. Path is fixed
+      // per-quote so re-running Combined PDF overwrites the previous
+      // version (upsert: true). Owner spec: "combine pdf link shuld
+      // be there [in email]" — without this the email had only the
+      // locked cover-letter PDF, no merged attachments.
+      try {
+        const combinedPath = `${quote.id}/99-combined.pdf`
+        const combinedFile = new File([merged], filename, { type: 'application/pdf' })
+        await supabase.storage
+          .from('quote-attachments')
+          .upload(combinedPath, combinedFile, {
+            upsert: true,
+            contentType: 'application/pdf',
+            cacheControl: '60',
+          })
+      } catch (uploadErr) {
+        // Don't fail the whole flow on a persistence miss — the rep
+        // already has the downloaded file. Just log; email link will
+        // fall back to the locked PDF only.
+        console.warn('[combined-pdf] persist for email failed:', uploadErr?.message)
+      }
 
       // Build a feedback message that calls out skipped attachments
       // by name so the rep knows exactly what's missing from the PDF.

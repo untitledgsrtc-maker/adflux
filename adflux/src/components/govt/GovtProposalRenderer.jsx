@@ -180,15 +180,17 @@ export function GovtProposalRenderer({
         backgroundSize:     '100% 100%',
         backgroundPosition: 'top center',
         // Phase 11d (rev14) — sized to the actual letterhead empty
-        // zone. Header logo bottom at y=170 (7.3% of 1123), printed
-        // footer top at y=1023 (91.1%). Padding-top 170 hugs the
-        // header. Padding-bottom 130 leaves 30px clean gap above
-        // the printed footer. Content area = 1123 - 300 = 823px,
-        // which fits the Phase 11d writeup with the bidan now
-        // collapsed to a single line.
-        paddingTop:    '170px',
+        // zone. Header logo bottom at y=82 (7.3% of 1123), printed
+        // footer top at y=1023 (91.1%).
+        // Phase 28b — owner correction (7 May 2026): paddingTop:170
+        // left an obvious empty band below the U logo. Tightened to
+        // 110 (28px buffer below the empty-zone start at y=82).
+        // paddingBottom tightened to 105 → content area 1123 - 215
+        // = 908px, more breathing room for the cover body so the
+        // signer block is unlikely to crowd the printed footer.
+        paddingTop:    '110px',
         paddingRight:  '70px',
-        paddingBottom: '130px',
+        paddingBottom: '105px',
         paddingLeft:   '70px',
       }
     : {
@@ -435,14 +437,17 @@ function renderDistrictListPage(data) {
   if (items.length === 0) return ''
 
   const totalQty = Number(data.auto_total_quantity || 0)
-  // Phase 11d (rev7) — bumped from 4px/11.5px/1.35 to 5px/12px/1.4
-  // because Gujarati script has tall ascenders ("ફ", "ભ", "મ") and
-  // long descenders ("્") that were colliding between rows at 19px
-  // total height. New row height: 5+5+12*1.4 = ~27px × 33 rows = 891px,
-  // fits the 1011px content area with 80px to spare for heading/total.
-  // Explicit color:#111 on EVERY cell (cascade was getting overridden
-  // by dark-theme variables in the rasterized output).
-  const cellStyle = 'padding:5px 10px;font-size:12px;line-height:1.4;border:1px solid #444;color:#111;background:#fff;'
+  // Phase 28b — Phase 11d's 27px-per-row math left 80px headroom for
+  // heading + total, but the page-2 .govt-letter ALSO carries the
+  // bidan block (Phase 11d rev15) plus a ~56px base-CSS padding pair,
+  // pushing 33 rows + total + bidan past one A4 page. Owner correction
+  // (7 May 2026): "you can reduce font but it should be visible".
+  // Tightened: 4px padding / 11px font / 1.35 line-height → row
+  // height ≈ 4+4+11*1.35 = 22.85px × 33 = 754px. Plus heading 30 +
+  // thead 32 + total 23 + bidan 30 + base padding ~110 = 979px. Fits
+  // 1123px with ~140px safety margin. Still readable for printed
+  // Gujarati and large enough for the long district names.
+  const cellStyle = 'padding:4px 9px;font-size:11px;line-height:1.35;border:1px solid #444;color:#111;background:#fff;'
   const headStyle = cellStyle + 'background:#f5f5f5;font-weight:700;'
 
   const rowsHtml = items.map((it, i) => {
