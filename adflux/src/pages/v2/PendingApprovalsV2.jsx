@@ -188,8 +188,12 @@ export default function PendingApprovalsV2() {
                     Submitted by <strong>{submitter}</strong>
                     {' · '}{new Date(row.created_at).toLocaleString('en-IN')}
                   </div>
-                  {row.payment_notes && (
-                    <div className="v2d-pa-note">"{row.payment_notes}"</div>
+                  {/* Phase 24a — only render the note if it's a meaningful
+                      string (skip stray single-character typos like ">").
+                      The data wasn't validated on the sales-side payment
+                      modal, so we filter on display. */}
+                  {row.payment_notes && row.payment_notes.trim().length >= 2 && (
+                    <div className="v2d-pa-note">"{row.payment_notes.trim()}"</div>
                   )}
                 </div>
 

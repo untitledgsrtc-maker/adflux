@@ -1400,9 +1400,14 @@ export default function GovtProposalDetailV2() {
                   changeStatus('lost')
                 }
               }}
-              style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
               title="Cancel and mark this draft as Lost"
             >
+              {/* Phase 24a — Cancel was styled red (border + text), same
+                  as the Delete button beside it. Per UI_DESIGN_SYSTEM.md
+                  §4.15 only true-danger actions get danger styling.
+                  Cancel just flips status to Lost (data preserved), so
+                  it should be neutral. Delete (hard DB remove) keeps
+                  the solid red. */}
               <XCircle size={14} /> Cancel
             </button>
           )}
