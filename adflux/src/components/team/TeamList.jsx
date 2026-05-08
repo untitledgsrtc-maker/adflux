@@ -164,6 +164,19 @@ function MemberCard({ member, settings, onDeactivate, onReactivate, onEdit }) {
                     <Mail size={14} /> Send Email
                   </a>
 
+                  {/* Phase 30F — admin map view of this rep's day track. */}
+                  <a
+                    href={`/admin/gps/${member.id}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 14px',
+                      color: 'var(--text)', fontSize: 13, textDecoration: 'none',
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    📍 Track today
+                  </a>
+
                   <div style={{ borderTop: '1px solid var(--border)' }} />
 
                   {member.is_active ? (

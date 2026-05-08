@@ -123,6 +123,49 @@ export default function WorkV2() {
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
 
+  /* ─── Phase 30F — GPS interval polling ───
+     Owner spec: 'every 10 min keep fetch location'. Fires only while
+     the rep is checked in AND the evening report hasn't been submitted
+     (B_ACTIVE state). Browser geolocation is foreground-only on iOS
+     PWAs — once the tab is closed, polling pauses. Native wrapper
+     follows in a later phase if owner needs background coverage. */
+  useEffect(() => {
+    if (!profile?.id) return
+    if (!session?.check_in_at) return
+    if (session?.evening_report_submitted_at) return // day complete; stop pinging
+    if (!navigator.geolocation) return
+
+    let cancelled = false
+
+    async function pingOnce(source = 'interval') {
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: false, timeout: 10000, maximumAge: 60000,
+          })
+        })
+        if (cancelled) return
+        await supabase.from('gps_pings').insert([{
+          user_id:     profile.id,
+          lat:         pos.coords.latitude,
+          lng:         pos.coords.longitude,
+          accuracy_m:  Math.round(pos.coords.accuracy || 0) || null,
+          source,
+        }])
+      } catch (e) {
+        // Permission denied / timeout / offline — just skip this tick.
+        // Don't surface to the user; GPS is best-effort.
+      }
+    }
+
+    // Capture immediately on mount (fresh load after check-in), then
+    // every 10 min while the tab stays open.
+    pingOnce('interval')
+    const id = setInterval(() => pingOnce('interval'), 10 * 60 * 1000)
+    return () => { cancelled = true; clearInterval(id) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, session?.check_in_at, session?.evening_report_submitted_at])
+
   const targets = useMemo(() => {
     return profile?.daily_targets || { meetings: 5, calls: 20, new_leads: 10 }
   }, [profile])
@@ -256,6 +299,15 @@ export default function WorkV2() {
       .eq('work_date', TODAY())
     setBusy(false)
     if (err) { setError(err.message); return }
+    // Phase 30F — also drop a 'checkin' ping in gps_pings so the
+    // map view has the full track (start point + interval points +
+    // end point) in a single source.
+    if (gps?.lat && gps?.lng) {
+      supabase.from('gps_pings').insert([{
+        user_id: profile.id, lat: gps.lat, lng: gps.lng,
+        accuracy_m: gps.accuracy || null, source: 'checkin',
+      }]).then(() => {}, () => {})
+    }
     load()
   }
 
@@ -295,6 +347,13 @@ export default function WorkV2() {
       .eq('work_date', TODAY())
     setBusy(false)
     if (err) { setError(err.message); return }
+    // Phase 30F — drop a 'checkout' ping for the map endpoint.
+    if (gps?.lat && gps?.lng) {
+      supabase.from('gps_pings').insert([{
+        user_id: profile.id, lat: gps.lat, lng: gps.lng,
+        accuracy_m: gps.accuracy || null, source: 'checkout',
+      }]).then(() => {}, () => {})
+    }
     load()
   }
 

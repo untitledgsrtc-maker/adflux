@@ -42,6 +42,7 @@ import CreateGovtGsrtcLedV2  from './pages/v2/CreateGovtGsrtcLedV2'
 import AutoDistrictsV2       from './pages/v2/AutoDistrictsV2'
 import GsrtcStationsV2       from './pages/v2/GsrtcStationsV2'
 import GovtProposalDetailV2  from './pages/v2/GovtProposalDetailV2'
+import GpsTrackV2            from './pages/v2/GpsTrackV2'
 import MasterV2              from './pages/v2/MasterV2'
 
 function LoadingScreen() {
@@ -148,6 +149,11 @@ export default function App() {
           <Route path="/telecaller"                element={<TelecallerV2 />} />
           <Route path="/voice"                     element={<VoiceLogV2 />} />
           <Route path="/voice/evening"             element={<EveningVoiceV2 />} />
+          {/* Phase 30F — admin map view of a rep's day track. Date is
+              optional (defaults to today). Specific BEFORE the
+              two-segment fallback so it never gets shadowed. */}
+          <Route path="/admin/gps/:userId/:date"   element={<RequirePrivileged><GpsTrackV2 /></RequirePrivileged>} />
+          <Route path="/admin/gps/:userId"         element={<RequirePrivileged><GpsTrackV2 /></RequirePrivileged>} />
           {/* Phase 12 rev3 — /cockpit retired. Folded into /dashboard. */}
 
           {/* Sales-only */}
