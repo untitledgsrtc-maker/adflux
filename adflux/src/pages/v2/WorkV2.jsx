@@ -80,6 +80,20 @@ export default function WorkV2() {
     return now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30)
   })()
 
+  // Phase 30E — focus mode. Owner spec (7 May 2026): "he/she must
+  // need to see one by one task, followup, meeting until he reacts
+  // on that particular card it will keep showing". Default ON for
+  // mobile thumb-friendly flow; rep can toggle "Show all" to reveal
+  // the full list view. Persisted in localStorage so the choice
+  // sticks across reloads.
+  const [focusMode, setFocusMode] = useState(() => {
+    try { return localStorage.getItem('work_focus_mode') !== 'off' } catch (_) { return true }
+  })
+  function setFocusModeAndPersist(v) {
+    setFocusMode(v)
+    try { localStorage.setItem('work_focus_mode', v ? 'on' : 'off') } catch (_) {}
+  }
+
   async function load() {
     setLoading(true)
     setError('')
@@ -499,10 +513,135 @@ export default function WorkV2() {
               <Counter num={counters.new_leads || 0} target={targets.new_leads} label="New leads" />
             </div>
 
+            {/* Phase 30E — focus / show-all toggle. Drives whether the
+                rep sees one card at a time or the full list. */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '8px 4px', fontSize: 12, color: 'var(--text-muted)',
+            }}>
+              <span>{focusMode ? 'Focus mode — one card at a time' : 'All visible'}</span>
+              <button
+                type="button"
+                className="lead-btn lead-btn-sm"
+                onClick={() => setFocusModeAndPersist(!focusMode)}
+              >
+                {focusMode ? 'Show all' : 'Focus mode'}
+              </button>
+            </div>
+
+            {/* FOCUS MODE — render only the next-best undone card. */}
+            {focusMode && (() => {
+              // Pick highest-priority pending item from the union of:
+              //   1. Morning plan tasks not done (Phase 30D)
+              //   2. Planned meetings not done
+              // Smart Tasks panel is shown separately because each row
+              // is already self-contained — focus mode just hides the
+              // bulk list views, not the smart-task list.
+              const planTasks = (session?.morning_plan_tasks || []).filter(t => !t.done)
+              const meetings  = (session?.planned_meetings   || []).filter(m => !m.done)
+
+              if (planTasks.length === 0 && meetings.length === 0) {
+                return (
+                  <div className="m-card" style={{ textAlign: 'center', padding: 24 }}>
+                    <div style={{ fontSize: 28, marginBottom: 6 }}>🎯</div>
+                    <div style={{ fontWeight: 600 }}>All caught up</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                      No pending plan tasks or meetings. Use Smart Tasks below or log a new activity.
+                    </div>
+                  </div>
+                )
+              }
+
+              // Prefer a meeting that has a time today (most time-bound)
+              // else first undone plan task, else first undone meeting.
+              const nextMeeting = meetings.find(m => m.time)
+              const nextPlan    = planTasks[0]
+              const card = nextMeeting
+                ? { kind: 'meeting', data: nextMeeting }
+                : nextPlan
+                  ? { kind: 'plan', data: nextPlan }
+                  : { kind: 'meeting', data: meetings[0] }
+
+              return (
+                <div className="m-card" style={{
+                  borderColor: 'var(--accent, #FFE600)',
+                  background: 'rgba(255,230,0,0.04)',
+                }}>
+                  <div className="m-card-title">
+                    <span>Next up</span>
+                    <span className="pill">{planTasks.length + meetings.length} pending</span>
+                  </div>
+                  {card.kind === 'meeting' ? (
+                    <>
+                      <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>
+                        {card.data.client || 'Meeting'}
+                      </div>
+                      {card.data.time && (
+                        <div style={{ fontSize: 13, color: 'var(--accent)', marginTop: 4 }}>
+                          ⏰ {card.data.time}
+                        </div>
+                      )}
+                      {card.data.location && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                          📍 {card.data.location}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                        <button
+                          className="lead-btn lead-btn-primary"
+                          style={{ flex: 1, minWidth: 120 }}
+                          onClick={() => {
+                            const idx = (session?.planned_meetings || []).findIndex(m => m === card.data)
+                            if (idx >= 0) toggleMeetingDone(idx)
+                          }}
+                          disabled={busy}
+                        >
+                          <CheckCircle2 size={14} /> Done
+                        </button>
+                        <button
+                          className="lead-btn"
+                          onClick={() => navigate('/leads')}
+                        >
+                          Open leads
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 17, fontWeight: 600, marginTop: 4 }}>
+                        {card.data.title}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                        {card.data.type}{card.data.due_time ? ` · ${card.data.due_time}` : ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                        <button
+                          className="lead-btn lead-btn-primary"
+                          style={{ flex: 1, minWidth: 120 }}
+                          onClick={() => toggleTaskDone(card.data.id)}
+                          disabled={busy}
+                        >
+                          <CheckCircle2 size={14} /> Done
+                        </button>
+                        <button
+                          className="lead-btn"
+                          onClick={() => navigate('/leads')}
+                        >
+                          Open leads
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Phase 30D — morning plan checklist. Claude-parsed tasks
                 from the rep's own description. Tap to mark done; the
-                full original text is shown collapsed below. */}
-            {Array.isArray(session?.morning_plan_tasks) && session.morning_plan_tasks.length > 0 && (
+                full original text is shown collapsed below.
+                Phase 30E — hidden in focus mode (the Next-Up card
+                above already surfaces the top item). */}
+            {!focusMode && Array.isArray(session?.morning_plan_tasks) && session.morning_plan_tasks.length > 0 && (
               <div className="m-card">
                 <div className="m-card-title">
                   <span>My plan for today</span>
@@ -577,7 +716,7 @@ export default function WorkV2() {
               </button>
             </div>
 
-            {session?.planned_meetings?.length > 0 && (
+            {!focusMode && session?.planned_meetings?.length > 0 && (
               <div className="m-card">
                 <div className="m-card-title">Today's meetings</div>
                 {session.planned_meetings.map((m, i) => (
