@@ -840,3 +840,142 @@
   }
   .lead-task-name { max-width: 60vw; }
 }
+
+/* ─── Phase 30B — Lead Detail hero card ────────────────────────────
+   Owner correction (7 May 2026): the old header packed name, company,
+   stage, heat, segment, source, assignee, telecaller, last contact and
+   six action buttons into two crammed rows. Mobile wrapping was ugly,
+   "COLD" / "PRIVATE" floated as orphan badges, and there was no clear
+   primary action. Rebuild groups title block / chips / meta / value
+   into clean rows and replaces the 6-button row with a single primary
+   CTA + a compact icon row. */
+
+.lead-hero-card { /* uses .lead-card padding */ }
+
+.lead-hero-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.lead-hero-title-block {
+  min-width: 0; /* allow text truncation inside grid */
+}
+
+.lead-hero-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.15;
+  word-break: break-word;
+}
+.lead-hero-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.lead-hero-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.lead-hero-heat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 2px 4px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+}
+.lead-hero-heat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.lead-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.lead-hero-meta b { color: var(--text); font-weight: 600; }
+
+.lead-hero-value { text-align: right; }
+.lead-hero-value-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.lead-hero-value-num {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  line-height: 1.1;
+  margin-top: 2px;
+}
+.lead-hero-value-num.has-val { color: var(--accent, #FFE600); }
+
+.lead-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, rgba(255,255,255,0.06));
+}
+.lead-btn-lg {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+}
+
+.lead-hero-actions-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto; /* push tertiary icons to the right of primary */
+}
+.lead-hero-actions-icons .lead-btn-sm {
+  height: 32px;
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+@media (max-width: 720px) {
+  .lead-hero-top {
+    grid-template-columns: 1fr; /* stack title + value */
+    gap: 12px;
+  }
+  .lead-hero-value { text-align: left; }
+  .lead-hero-value-num { font-size: 22px; }
+
+  .lead-hero-title { font-size: 20px; }
+  .lead-hero-sub   { font-size: 12px; }
+
+  .lead-hero-actions {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  .lead-hero-actions-icons {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  /* Primary CTA stretches full-width on mobile so it's a clear thumb target */
+  .lead-hero-actions > .lead-btn-lg { flex: 1 1 100%; justify-content: center; }
+}

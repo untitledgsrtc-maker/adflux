@@ -234,120 +234,146 @@ export default function LeadDetailV2() {
         <span>Back to leads</span>
       </div>
 
-      {/* ─── Header card ─── */}
+      {/* ─── Header card (Phase 30B rebuild) ────────────────
+          Goals (owner spec, 7 May 2026):
+          - Title never repeats name + company when they're identical
+            ("Untitled Gsrtc / Untitled Gsrtc" was the bug).
+          - Status chips on ONE compact row, not scattered with stray
+            "COLD" / "PRIVATE" labels floating around.
+          - Meta (source / assigned / telecaller / last contact) on a
+            separate, smaller line — distinct visual hierarchy.
+          - Action bar: ONE primary action that changes by stage,
+            secondary actions as small icons. No more 6-button row. */}
       <div
-        className="lead-card lead-card-pad"
-        style={{
-          marginBottom: 16,
-          display: 'grid',
-          gridTemplateColumns: '1fr auto',
-          gap: 16,
-          alignItems: 'flex-start',
-        }}
+        className="lead-hero-card lead-card lead-card-pad"
+        style={{ marginBottom: 16 }}
       >
-        {/* Left — name + meta */}
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600 }}>
-            {lead.name}
-          </div>
-          {lead.company && (
-            <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 2 }}>{lead.company}</div>
-          )}
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <StageChip stage={lead.stage} />
-            {lead.heat && (
-              <>
-                <HeatDot heat={lead.heat} />
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
-                  {heatLabel}
-                </span>
-              </>
-            )}
-            {lead.segment && <SegChip segment={lead.segment} />}
-            <span style={{ height: 14, width: 1, background: 'var(--border)' }} />
-            {lead.source && (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Source · {lead.source}</span>
-            )}
-            {lead.assigned?.name && (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                · Assigned <b style={{ color: 'var(--text)' }}>{lead.assigned.name}</b>
-                {lead.assigned.city ? ` · ${lead.assigned.city}` : ''}
-              </span>
-            )}
-            {lead.telecaller?.name && (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                · Telecaller <b style={{ color: 'var(--text)' }}>{lead.telecaller.name}</b>
-              </span>
-            )}
-            {lead.last_contact_at && (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· last contact {formatRelative(lead.last_contact_at)}</span>
-            )}
-          </div>
-        </div>
+        {/* Top row: title block (left) + value (right on desktop) */}
+        <div className="lead-hero-top">
+          <div className="lead-hero-title-block">
+            {/* Title: prefer company (B2B context); contact name as
+                subtitle when distinct. If name == company, show only once. */}
+            {(() => {
+              const company = (lead.company || '').trim()
+              const name    = (lead.name    || '').trim()
+              const title   = company || name || '—'
+              const sub     = (company && name && company.toLowerCase() !== name.toLowerCase())
+                              ? name : null
+              return (
+                <>
+                  <div className="lead-hero-title">{title}</div>
+                  {sub && <div className="lead-hero-sub">{sub}</div>}
+                </>
+              )
+            })()}
 
-        {/* Right — value + action row */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
-              Expected value
+            {/* Status row: stage + heat + segment, in that order, no separators */}
+            <div className="lead-hero-chips">
+              <StageChip stage={lead.stage} slaBreached={!!sla && sla.tone === 'danger'} />
+              {lead.heat && (
+                <span className="lead-hero-heat">
+                  <HeatDot heat={lead.heat} />
+                  <span className="lead-hero-heat-label">{heatLabel}</span>
+                </span>
+              )}
+              {lead.segment && <SegChip segment={lead.segment} />}
             </div>
-            <div
-              style={{
-                fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600,
-                color: lead.expected_value ? 'var(--accent)' : 'var(--text-subtle)',
-              }}
-            >
+
+            {/* Meta row: source · assigned · telecaller · last contact */}
+            <div className="lead-hero-meta">
+              {lead.source && <span>Source · <b>{lead.source}</b></span>}
+              {lead.assigned?.name && (
+                <span>· Assigned <b>{lead.assigned.name}</b>{lead.assigned.city ? ` · ${lead.assigned.city}` : ''}</span>
+              )}
+              {lead.telecaller?.name && (
+                <span>· Telecaller <b>{lead.telecaller.name}</b></span>
+              )}
+              {lead.last_contact_at && (
+                <span>· last contact {formatRelative(lead.last_contact_at)}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Expected value — right on desktop, full-width on mobile (CSS) */}
+          <div className="lead-hero-value">
+            <div className="lead-hero-value-label">Expected value</div>
+            <div className={`lead-hero-value-num ${lead.expected_value ? 'has-val' : ''}`}>
               {lead.expected_value ? formatCurrency(lead.expected_value) : '—'}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        </div>
+
+        {/* Action bar — ONE primary CTA + compact secondary icons.
+            Primary = "next best action" by stage:
+              has quote        -> View quote
+              else not closed  -> Convert (or Call if no quote yet and we have a phone)
+              closed (Won/Lost) -> nothing primary */}
+        <div className="lead-hero-actions">
+          {/* PRIMARY */}
+          {lead.quote_id ? (
+            <button
+              className="lead-btn lead-btn-primary lead-btn-lg"
+              onClick={() => navigate(
+                lead.segment === 'GOVERNMENT' ? `/proposal/${lead.quote_id}` : `/quotes/${lead.quote_id}`
+              )}
+            >
+              <FileTextIcon size={14} /> View quote
+            </button>
+          ) : (lead.stage !== 'Won' && lead.stage !== 'Lost') ? (
+            <button className="lead-btn lead-btn-primary lead-btn-lg" onClick={convertToQuote}>
+              <FileTextIcon size={14} /> Convert to quote
+            </button>
+          ) : null}
+
+          {/* SECONDARY — call only as primary alternative when no quote
+              path makes sense (cold lead, hasn't been contacted yet) */}
+          {!lead.quote_id && lead.phone && (lead.stage === 'New') && (
+            <a
+              href={`tel:${lead.phone}`}
+              className="lead-btn lead-btn-lg"
+              onClick={() => setActivityType('call')}
+              style={{ textDecoration: 'none' }}
+            >
+              <Phone size={14} /> Call
+            </a>
+          )}
+
+          {/* TERTIARY — compact icon row. Always present unless closed. */}
+          <div className="lead-hero-actions-icons">
             {lead.phone ? (
               <a
                 href={`tel:${lead.phone}`}
                 className="lead-btn lead-btn-sm"
                 onClick={() => setActivityType('call')}
+                title="Call"
                 style={{ textDecoration: 'none' }}
               >
-                <Phone size={12} /> Call
+                <Phone size={13} />
               </a>
             ) : (
-              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('call')}>
-                <Phone size={12} /> Call
+              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('call')} title="Log call">
+                <Phone size={13} />
               </button>
             )}
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
-              <Calendar size={12} /> Meeting
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')} title="WhatsApp">
+              <MessageCircle size={13} />
             </button>
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
-              <Edit3 size={12} /> Note
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')} title="Meeting">
+              <Calendar size={13} />
             </button>
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
-              <MessageCircle size={12} /> WA
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')} title="Note">
+              <Edit3 size={13} />
             </button>
             <button
               className="lead-btn lead-btn-sm"
               onClick={() => navigate(`/voice?lead=${lead.id}`)}
-              title="Voice-log this lead — speak in Gujarati / Hindi / English"
+              title="Voice log (Gujarati / Hindi / English)"
             >
-              <Mic size={12} /> Voice
+              <Mic size={13} />
             </button>
-            <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={() => setActiveModal('stage')}>
-              <RefreshCw size={12} /> Stage
+            <button className="lead-btn lead-btn-sm" onClick={() => setActiveModal('stage')} title="Move stage">
+              <RefreshCw size={13} />
             </button>
-            {lead.quote_id ? (
-              <button
-                className="lead-btn lead-btn-sm lead-btn-primary"
-                onClick={() => navigate(
-                  lead.segment === 'GOVERNMENT' ? `/proposal/${lead.quote_id}` : `/quotes/${lead.quote_id}`
-                )}
-              >
-                <FileTextIcon size={12} /> View quote
-              </button>
-            ) : (lead.stage !== 'Won' && lead.stage !== 'Lost') && (
-              <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={convertToQuote}>
-                <FileTextIcon size={12} /> Convert
-              </button>
-            )}
           </div>
         </div>
       </div>
