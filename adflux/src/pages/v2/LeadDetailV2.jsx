@@ -294,13 +294,17 @@ export default function LeadDetailV2() {
             </div>
           </div>
 
-          {/* Expected value — right on desktop, full-width on mobile (CSS) */}
-          <div className="lead-hero-value">
-            <div className="lead-hero-value-label">Expected value</div>
-            <div className={`lead-hero-value-num ${lead.expected_value ? 'has-val' : ''}`}>
-              {lead.expected_value ? formatCurrency(lead.expected_value) : '—'}
+          {/* Expected value — only render when non-zero. An empty card
+              taking a full row of vertical space (with just '—') was
+              dead weight on mobile. */}
+          {lead.expected_value ? (
+            <div className="lead-hero-value">
+              <div className="lead-hero-value-label">Expected value</div>
+              <div className="lead-hero-value-num has-val">
+                {formatCurrency(lead.expected_value)}
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         {/* Action bar — ONE primary CTA + compact secondary icons.
@@ -338,48 +342,52 @@ export default function LeadDetailV2() {
             </a>
           )}
 
-          {/* TERTIARY — compact icon row. Always present unless closed. */}
-          <div className="lead-hero-actions-icons">
+          {/* TERTIARY — labelled pills (Phase 30B rev2 — owner: icons
+              alone don't tell reps what they do). 3-per-row grid on
+              mobile, inline on desktop. */}
+          <div className="lead-hero-actions-grid">
             {lead.phone ? (
               <a
                 href={`tel:${lead.phone}`}
                 className="lead-btn lead-btn-sm"
                 onClick={() => setActivityType('call')}
-                title="Call"
                 style={{ textDecoration: 'none' }}
               >
-                <Phone size={13} />
+                <Phone size={13} /> <span>Call</span>
               </a>
             ) : (
-              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('call')} title="Log call">
-                <Phone size={13} />
+              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('call')}>
+                <Phone size={13} /> <span>Call</span>
               </button>
             )}
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')} title="WhatsApp">
-              <MessageCircle size={13} />
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
+              <MessageCircle size={13} /> <span>WhatsApp</span>
             </button>
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')} title="Meeting">
-              <Calendar size={13} />
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
+              <Calendar size={13} /> <span>Meeting</span>
             </button>
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')} title="Note">
-              <Edit3 size={13} />
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
+              <Edit3 size={13} /> <span>Note</span>
             </button>
             <button
               className="lead-btn lead-btn-sm"
               onClick={() => navigate(`/voice?lead=${lead.id}`)}
               title="Voice log (Gujarati / Hindi / English)"
             >
-              <Mic size={13} />
+              <Mic size={13} /> <span>Voice</span>
             </button>
-            <button className="lead-btn lead-btn-sm" onClick={() => setActiveModal('stage')} title="Move stage">
-              <RefreshCw size={13} />
+            <button className="lead-btn lead-btn-sm" onClick={() => setActiveModal('stage')}>
+              <RefreshCw size={13} /> <span>Stage</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* ─── Two-column: timeline + side panel ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 16 }}>
+      {/* ─── Two-column on desktop, stacked on mobile (Phase 30B rev2).
+          Owner screenshot showed both cols crammed side-by-side at
+          mobile width, "untitledgsrtc@gmail.com" wrapping mid-word.
+          The grid now collapses to a single column at <960px. */}
+      <div className="lead-detail-body">
         {/* LEFT — Activity timeline */}
         <div className="lead-card">
           <div className="lead-card-head">

@@ -979,3 +979,52 @@
   /* Primary CTA stretches full-width on mobile so it's a clear thumb target */
   .lead-hero-actions > .lead-btn-lg { flex: 1 1 100%; justify-content: center; }
 }
+
+/* Phase 30B rev2 — owner pushback (7 May 2026): the icon-only
+   secondary actions ("the floating circles below Convert to quote")
+   gave reps zero affordance. Restored visible labels; pills now sit
+   in a 3-column grid on mobile so reps see Call / WhatsApp / Meeting
+   / Note / Voice / Stage with text. Body grid also stacks below 960px
+   so Activity timeline and Lead details stop fighting for width. */
+
+.lead-hero-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+.lead-hero-actions-grid .lead-btn-sm {
+  height: 38px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  justify-content: center;
+  gap: 6px;
+}
+.lead-hero-actions-grid .lead-btn-sm span {
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (min-width: 720px) {
+  .lead-hero-actions-grid {
+    grid-template-columns: repeat(6, auto);
+    width: auto;
+    margin-left: auto;
+  }
+  .lead-hero-actions-grid .lead-btn-sm {
+    height: 32px;
+    padding: 0 12px;
+  }
+}
+
+.lead-detail-body {
+  display: grid;
+  grid-template-columns: 1fr; /* mobile default — stacked */
+  gap: 16px;
+}
+@media (min-width: 960px) {
+  .lead-detail-body {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
