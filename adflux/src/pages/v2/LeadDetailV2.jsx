@@ -106,6 +106,32 @@ export default function LeadDetailV2() {
   const [activeModal, setActiveModal] = useState(null)   // null | 'stage' | 'reassign'
   const [activityType, setActivityType] = useState(null) // null | 'call' | 'whatsapp' | …
 
+  /* Phase 30C rev2 — fast-path action loggers. Owner spec
+     (8 May 2026): "call log, whatsapp log not able to fetched". The
+     hero-card Call / WhatsApp / Email buttons used to JUST open the
+     LogActivityModal — they didn't insert an activity until the rep
+     filled in notes. Net effect: clicks were lost if the rep didn't
+     come back to type. These helpers fire-and-forget an immediate
+     activity insert so the timeline reflects every touch, then
+     refresh the timeline. The slower paths (meeting / note) still
+     open the modal because those genuinely need notes. */
+  async function quickLog(activityType, notes) {
+    if (!lead?.id || !profile?.id) return
+    const { error: insErr } = await supabase.from('lead_activities').insert([{
+      lead_id:       lead.id,
+      activity_type: activityType,
+      outcome:       null,
+      notes,
+      created_by:    profile.id,
+    }])
+    if (insErr) {
+      // Surface the failure so the rep knows the click wasn't logged.
+      setError(`Could not log ${activityType}: ${insErr.message}`)
+      return
+    }
+    load()
+  }
+
   async function load() {
     setLoading(true)
     setError('')
@@ -344,13 +370,18 @@ export default function LeadDetailV2() {
 
           {/* TERTIARY — labelled pills (Phase 30B rev2 — owner: icons
               alone don't tell reps what they do). 3-per-row grid on
-              mobile, inline on desktop. */}
+              mobile, inline on desktop.
+              Phase 30C rev2 — Call / WhatsApp / Email are FAST-PATH:
+              they open the relevant app AND fire a quickLog insert
+              in one click. No more "click button → fill form → save".
+              Meeting / Note still open the modal because those need
+              free-text notes to be useful. */}
           <div className="lead-hero-actions-grid">
             {lead.phone ? (
               <a
                 href={`tel:${lead.phone}`}
                 className="lead-btn lead-btn-sm"
-                onClick={() => setActivityType('call')}
+                onClick={() => quickLog('call', `Call → ${lead.phone}`)}
                 style={{ textDecoration: 'none' }}
               >
                 <Phone size={13} /> <span>Call</span>
@@ -360,9 +391,36 @@ export default function LeadDetailV2() {
                 <Phone size={13} /> <span>Call</span>
               </button>
             )}
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
-              <MessageCircle size={13} /> <span>WhatsApp</span>
-            </button>
+            {lead.phone ? (
+              <a
+                href={`https://wa.me/${String(lead.phone).replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="lead-btn lead-btn-sm"
+                onClick={() => quickLog('whatsapp', `WhatsApp → ${lead.phone}`)}
+                style={{ textDecoration: 'none' }}
+              >
+                <MessageCircle size={13} /> <span>WhatsApp</span>
+              </a>
+            ) : (
+              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
+                <MessageCircle size={13} /> <span>WhatsApp</span>
+              </button>
+            )}
+            {lead.email ? (
+              <a
+                href={`mailto:${lead.email}`}
+                className="lead-btn lead-btn-sm"
+                onClick={() => quickLog('email', `Email → ${lead.email}`)}
+                style={{ textDecoration: 'none' }}
+              >
+                <Mail size={13} /> <span>Email</span>
+              </a>
+            ) : (
+              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('email')}>
+                <Mail size={13} /> <span>Email</span>
+              </button>
+            )}
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
               <Calendar size={13} /> <span>Meeting</span>
             </button>
