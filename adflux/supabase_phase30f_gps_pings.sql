@@ -39,12 +39,15 @@ CREATE TABLE IF NOT EXISTS public.gps_pings (
 );
 
 -- Most reads are by (user_id, captured_at) for the day-map view.
+-- A single composite index covers both the latest-N query and the
+-- day-range query (WHERE user_id = X AND captured_at BETWEEN
+-- '2026-05-08T00:00:00Z' AND '2026-05-08T23:59:59Z'). An earlier
+-- attempt added a second index on (user_id, captured_at::date) but
+-- timestamptz→date is not IMMUTABLE (depends on session timezone)
+-- and Postgres rejects non-IMMUTABLE functions in index expressions
+-- (ERROR 42P17). The single index is sufficient.
 CREATE INDEX IF NOT EXISTS gps_pings_user_time_idx
   ON public.gps_pings (user_id, captured_at DESC);
-
--- Admin map filters by date — partial index helps the time-range query.
-CREATE INDEX IF NOT EXISTS gps_pings_user_date_idx
-  ON public.gps_pings (user_id, (captured_at::date));
 
 -- Enable RLS
 ALTER TABLE public.gps_pings ENABLE ROW LEVEL SECURITY;
