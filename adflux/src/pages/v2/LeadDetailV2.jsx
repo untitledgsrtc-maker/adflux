@@ -462,12 +462,19 @@ export default function LeadDetailV2() {
             </div>
           ) : (
             <div className="lead-timeline">
-              {activities.map(a => {
+              {activities.map((a, i) => {
                 const Icon = ACTIVITY_ICON[a.activity_type] || Edit3
                 const color = ACTIVITY_COLOR[a.activity_type] || 'amber'
                 const dur = formatDuration(a.duration_seconds)
+                // Phase 30G — mark the most-recent (top) row as fresh
+                // for one render so it pops in via CSS keyframe. Only
+                // applies when the row is from the last 5s — keeps
+                // animation tied to "I just saved" and doesn't fire on
+                // every reload of an old timeline.
+                const ageMs = Date.now() - new Date(a.created_at).getTime()
+                const isFresh = i === 0 && ageMs < 5000
                 return (
-                  <div className="tl-row" key={a.id}>
+                  <div className={`tl-row${isFresh ? ' tl-row-fresh' : ''}`} key={a.id}>
                     <div className={`tl-icon ${color}`}><Icon size={14} /></div>
                     <div>
                       <div className="tl-head">

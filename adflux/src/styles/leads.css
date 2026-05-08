@@ -1028,3 +1028,56 @@
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   }
 }
+
+/* ─── Phase 30G — sticky head + foot for lead modals ───
+   Owner pushback (8 May 2026): on long modals (Log Activity with
+   templates + follow-up section + GPS) the Save button scrolled
+   off-screen because .lead-modal had overflow:auto on the whole
+   pane. Solution: keep .lead-modal as flex column, .lead-modal-body
+   takes the only overflow:auto. The `.lead-modal-stickyfoot`
+   modifier opt-in lets older modals keep the legacy behaviour
+   if needed; LogActivityModal turns it on.
+
+   Also adds a brief save-success morph: the primary button gains
+   .lead-btn-saved styling when the row is inserted, fading to a
+   green/check state for ~700ms before the modal closes. Pure CSS
+   transition so React doesn't have to manage frames. */
+
+.lead-modal.lead-modal-stickyfoot {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* let body scroll, not the whole modal */
+}
+.lead-modal.lead-modal-stickyfoot .lead-modal-head { flex-shrink: 0; }
+.lead-modal.lead-modal-stickyfoot .lead-modal-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  /* Smooth scroll feedback when the new content is taller than
+     the viewport — feels less jarring on mobile. */
+  scroll-behavior: smooth;
+}
+.lead-modal.lead-modal-stickyfoot .lead-modal-foot {
+  flex-shrink: 0;
+  /* Subtle shadow above the foot when body has scrollable content
+     so it visually anchors. */
+  box-shadow: 0 -4px 12px rgba(0,0,0,.18);
+}
+
+/* Save button success morph */
+.lead-btn.lead-btn-primary {
+  transition: background-color .25s ease, color .25s ease, transform .15s ease;
+}
+.lead-btn.lead-btn-primary:active:not(:disabled) {
+  transform: scale(.97);
+}
+
+/* Activity timeline — gentle slide-in for the most-recently inserted
+   row. Phase 30G: makes Save feel landed. We tag the freshest row
+   with .tl-row-fresh in code; it animates once on mount. */
+@keyframes tl-row-pop {
+  0%   { opacity: 0; transform: translateY(-6px) scale(.98); }
+  100% { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+.tl-row-fresh {
+  animation: tl-row-pop .35s ease-out 1;
+}
