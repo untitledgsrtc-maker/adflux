@@ -69,6 +69,17 @@ export default function WorkV2() {
     quotes_sent: '', blockers: '', tomorrow_focus: '',
   })
 
+  /* ─── Phase 30D — free-text morning plan + Claude tasks ─── */
+  const [planText, setPlanText] = useState('')
+  const [parsing, setParsing]   = useState(false)
+  const [lateReason, setLateReason] = useState('')
+  // Show late-reason field only when current time > 9:30 AM and we
+  // haven't checked in yet. Computed at render, not stored.
+  const isLate = (() => {
+    const now = new Date()
+    return now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30)
+  })()
+
   async function load() {
     setLoading(true)
     setError('')
@@ -92,6 +103,7 @@ export default function WorkV2() {
         blockers: data.evening_summary.blockers || '',
         tomorrow_focus: data.evening_summary.tomorrow_focus || '',
       })
+      if (data?.morning_plan_text) setPlanText(data.morning_plan_text)
     }
     setLoading(false)
   }
@@ -113,6 +125,44 @@ export default function WorkV2() {
   async function submitPlan() {
     setBusy(true); setError('')
     const filtered = plannedMeetings.filter(m => m.client.trim())
+
+    // Phase 30D — if rep wrote a free-text plan, send it to the
+    // parse-day-plan Edge Function. Claude returns a discrete task
+    // list which we persist on the row for display in B_ACTIVE.
+    let parsedTasks = null
+    const text = planText.trim()
+    if (text) {
+      setParsing(true)
+      try {
+        const { data: { session: authSession } } = await supabase.auth.getSession()
+        const fnRes = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-day-plan`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'Authorization': `Bearer ${authSession?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({ text }),
+          }
+        )
+        if (fnRes.ok) {
+          const json = await fnRes.json()
+          parsedTasks = Array.isArray(json?.tasks) ? json.tasks : null
+        } else {
+          // Non-fatal — save the plan text without tasks. Rep can still
+          // see their own raw plan; admin can read it. Better to let
+          // the day continue than block on a Claude hiccup.
+          console.warn('[parse-day-plan] non-OK', fnRes.status, await fnRes.text().catch(() => ''))
+        }
+      } catch (e) {
+        console.warn('[parse-day-plan] error', e?.message)
+      } finally {
+        setParsing(false)
+      }
+    }
+
     const payload = {
       user_id:           profile.id,
       work_date:         TODAY(),
@@ -121,10 +171,30 @@ export default function WorkV2() {
       planned_calls:     Number(plannedCalls) || 0,
       planned_leads:     Number(plannedLeads) || 0,
       evening_summary:   focusArea ? { focus: focusArea } : null,
+      morning_plan_text:         text || null,
+      morning_plan_tasks:        parsedTasks,
+      morning_plan_submitted_at: text ? new Date().toISOString() : null,
     }
     const { error: err } = await supabase
       .from('work_sessions')
       .upsert(payload, { onConflict: 'user_id,work_date' })
+    setBusy(false)
+    if (err) { setError(err.message); return }
+    load()
+  }
+
+  /* ─── Phase 30D — toggle a parsed task done/undone ─── */
+  async function toggleTaskDone(taskId) {
+    if (!session?.morning_plan_tasks) return
+    const next = session.morning_plan_tasks.map(t =>
+      t.id === taskId ? { ...t, done: !t.done } : t
+    )
+    setBusy(true)
+    const { error: err } = await supabase
+      .from('work_sessions')
+      .update({ morning_plan_tasks: next })
+      .eq('user_id', profile.id)
+      .eq('work_date', TODAY())
     setBusy(false)
     if (err) { setError(err.message); return }
     load()
@@ -153,14 +223,20 @@ export default function WorkV2() {
   }
 
   async function doCheckIn() {
+    // Phase 30D — soft 9:30 AM gate. Don't block; require a reason.
+    if (isLate && !lateReason.trim()) {
+      setError('Please add a reason — check-in is past 9:30 AM.')
+      return
+    }
     setBusy(true); setError('')
     const gps = await captureGps()
     const { error: err } = await supabase
       .from('work_sessions')
       .update({
-        check_in_at:      new Date().toISOString(),
-        check_in_gps_lat: gps?.lat || null,
-        check_in_gps_lng: gps?.lng || null,
+        check_in_at:          new Date().toISOString(),
+        check_in_gps_lat:     gps?.lat || null,
+        check_in_gps_lng:     gps?.lng || null,
+        check_in_late_reason: isLate ? lateReason.trim() : null,
       })
       .eq('user_id', profile.id)
       .eq('work_date', TODAY())
@@ -349,13 +425,35 @@ export default function WorkV2() {
                 placeholder="Close Sunrise · push 2 quotes"
               />
             </div>
+
+            {/* Phase 30D — free-text day plan in any language. Claude
+                turns this into a checklist on submit. Optional but
+                strongly encouraged: reps who type "આજે રાજેશ ને
+                મળવા જવું છે, 5 cold calls કરવી છે" get tickable
+                tasks waiting for them after check-in. */}
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border, rgba(255,255,255,.06))' }}>
+              <label className="lead-fld-label">
+                Today's plan in your words (Gujarati / Hindi / English)
+              </label>
+              <textarea
+                className="lead-inp"
+                rows={4}
+                value={planText}
+                onChange={e => setPlanText(e.target.value)}
+                placeholder="આજે રાજેશ ને મળવા જવું છે 11 વાગ્યે, પછી 5 cold calls કરવી છે, અને Patel ને quote send કરવી છે…"
+                style={{ resize: 'vertical', minHeight: 90 }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                Optional. We'll turn it into a checklist you can tick off through the day.
+              </div>
+            </div>
           </div>
         )}
 
         {stateName === 'A_PLAN' && (
-          <button className="m-cta" onClick={submitPlan} disabled={busy}>
-            {busy ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-            Submit plan
+          <button className="m-cta" onClick={submitPlan} disabled={busy || parsing}>
+            {(busy || parsing) ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+            {parsing ? 'Reading your plan…' : 'Submit plan'}
           </button>
         )}
 
@@ -366,7 +464,26 @@ export default function WorkV2() {
               <div className="m-card-title">Plan submitted ✓</div>
               <PlanSummary session={session} />
             </div>
-            <button className="m-cta" onClick={doCheckIn} disabled={busy}>
+            {/* Phase 30D — soft 9:30 AM gate. If past, require a
+                reason. Admin sees the reason in the daily report;
+                no punishment. */}
+            {isLate && (
+              <div className="m-card" style={{ borderColor: 'var(--warning)' }}>
+                <div className="m-card-title">
+                  <span>Late check-in — please add a reason</span>
+                </div>
+                <input
+                  className="lead-inp"
+                  placeholder="Doctor appointment / Site visit / Traffic…"
+                  value={lateReason}
+                  onChange={e => setLateReason(e.target.value)}
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Cut-off is 9:30 AM. Admin reviews late reasons in the daily summary.
+                </div>
+              </div>
+            )}
+            <button className="m-cta" onClick={doCheckIn} disabled={busy || (isLate && !lateReason.trim())}>
               <MapPin size={16} />
               {busy ? 'Capturing GPS…' : 'Check in'}
             </button>
@@ -381,6 +498,62 @@ export default function WorkV2() {
               <Counter num={counters.calls || 0}    target={targets.calls}    label="Calls" />
               <Counter num={counters.new_leads || 0} target={targets.new_leads} label="New leads" />
             </div>
+
+            {/* Phase 30D — morning plan checklist. Claude-parsed tasks
+                from the rep's own description. Tap to mark done; the
+                full original text is shown collapsed below. */}
+            {Array.isArray(session?.morning_plan_tasks) && session.morning_plan_tasks.length > 0 && (
+              <div className="m-card">
+                <div className="m-card-title">
+                  <span>My plan for today</span>
+                  <span className="pill">
+                    {session.morning_plan_tasks.filter(t => t.done).length}
+                    /{session.morning_plan_tasks.length}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {session.morning_plan_tasks.map(t => (
+                    <label
+                      key={t.id}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 10,
+                        padding: '10px 12px', borderRadius: 8,
+                        background: t.done ? 'rgba(16,185,129,.06)' : 'var(--surface-2)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!t.done}
+                        onChange={() => toggleTaskDone(t.id)}
+                        disabled={busy}
+                        style={{ marginTop: 2 }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 13, fontWeight: 500,
+                          textDecoration: t.done ? 'line-through' : 'none',
+                          color: t.done ? 'var(--text-muted)' : 'var(--text)',
+                        }}>
+                          {t.title}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-subtle)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                          {t.type}{t.due_time ? ` · ${t.due_time}` : ''}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {session.morning_plan_text && (
+                  <details style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)' }}>
+                    <summary style={{ cursor: 'pointer' }}>Original plan text</summary>
+                    <div style={{ whiteSpace: 'pre-wrap', marginTop: 6, padding: 8, background: 'var(--surface-2)', borderRadius: 6 }}>
+                      {session.morning_plan_text}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
 
             {/* Phase 19 — Smart Task Engine: today's ranked call list */}
             <TodayTasksPanel userId={profile.id} />
