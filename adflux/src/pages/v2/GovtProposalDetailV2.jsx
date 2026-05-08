@@ -752,6 +752,8 @@ export default function GovtProposalDetailV2() {
     }
     msg += `\nઆભાર.`
     openWhatsApp(phone, msg)
+    // Phase 30C — record the touch in the lead's activity timeline.
+    logQuoteTouch('whatsapp', `WhatsApp · proposal ${quote.quote_number || quote.ref_number || ''}${quote.locked_proposal_pdf_url ? ' · PDF link sent' : ''}`)
   }
 
   // Phase 11i — team feedback (Adflux Mistake.pptx slide 6):
@@ -909,6 +911,26 @@ export default function GovtProposalDetailV2() {
         `?subject=${encodeURIComponent(subject)}` +
         `&body=${encodeURIComponent(body)}`
       window.location.href = mailtoHref
+    }
+    // Phase 30C — record the touch in the lead's activity timeline.
+    logQuoteTouch('email', `Email · proposal ${refLine}${pdfLinkAdded ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
+  }
+
+  // Phase 30C — auto-log every WhatsApp / Email click on the govt
+  // proposal detail page as a lead_activity entry. Best-effort,
+  // skipped silently when the quote has no lead_id linkage.
+  async function logQuoteTouch(activityType, notes) {
+    if (!quote?.lead_id) return
+    try {
+      await supabase.from('lead_activities').insert([{
+        lead_id:       quote.lead_id,
+        activity_type: activityType,
+        outcome:       null,
+        notes,
+        created_by:    profile?.id || null,
+      }])
+    } catch (e) {
+      console.warn('[govt-quote-touch] activity log failed:', e?.message)
     }
   }
 

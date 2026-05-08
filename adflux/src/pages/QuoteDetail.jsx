@@ -64,8 +64,30 @@ export default function QuoteDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  const { isAdmin } = useAuth()
+  const { isAdmin, profile } = useAuth()
   const { fetchQuoteById, updateQuoteStatus, currentQuote } = useQuotes()
+
+  // Phase 30C — auto-log every WhatsApp / Email click on the quote
+  // detail page as a lead_activity entry, so admin sees a touch
+  // history per lead without each rep manually opening the activity
+  // modal first. Only inserts when the quote is linked to a lead
+  // (Phase 14 lead_id column) — older quotes without lead_id silently
+  // skip the log to avoid NOT NULL violations.
+  async function logQuoteTouch(activityType, notes) {
+    if (!currentQuote?.lead_id) return
+    try {
+      await supabase.from('lead_activities').insert([{
+        lead_id:       currentQuote.lead_id,
+        activity_type: activityType,
+        outcome:       null,
+        notes,
+        created_by:    profile?.id || null,
+      }])
+    } catch (e) {
+      // Logging is best-effort — never block the user-facing action.
+      console.warn('[quote-touch] activity log failed:', e?.message)
+    }
+  }
   const { payments, loading: paymentsLoading, totalPaid, hasFinalPayment, fetchPayments, addPayment, updatePayment, deletePayment } = usePayments(id)
 
   const [loading, setLoading]               = useState(true)
@@ -258,6 +280,8 @@ export default function QuoteDetail() {
       try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
     }
     openWhatsApp(quote.client_phone, buildWhatsAppMessage(quote, cities, { pdfUrl }))
+    // Phase 30C — record the touch in the lead's activity timeline.
+    logQuoteTouch('whatsapp', `WhatsApp · proposal ${quote.quote_number || quote.ref_number || ''}${pdfUrl ? ' · PDF link sent' : ''}`)
   }
 
   // Phase 11i — team feedback: add Email parallel to WhatsApp.
@@ -301,6 +325,8 @@ export default function QuoteDetail() {
         `&body=${encodeURIComponent(body)}`
       window.location.href = mailtoHref
     }
+    // Phase 30C — record the touch in the lead's activity timeline.
+    logQuoteTouch('email', `Email · proposal ${quote.quote_number || quote.ref_number || ''}${pdfUrl ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
   }
 
   async function handleEditPayment(updated) {

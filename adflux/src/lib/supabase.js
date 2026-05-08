@@ -8,11 +8,28 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Primary client — the one the whole app uses for data queries.
-// Keeps the admin's session in localStorage and auto-refreshes tokens.
+//
+// Phase 30C — owner spec (7 May 2026): "login should be saved until
+// manual logout". Three settings drive that:
+//   1. persistSession: true — the session lives in localStorage
+//      across tab reloads + browser restarts.
+//   2. autoRefreshToken: true — when the access token (default 1h)
+//      is about to expire, the SDK silently swaps it for a new one
+//      using the refresh token.
+//   3. flowType: 'pkce' — Proof Key for Code Exchange. Hardens the
+//      token exchange against interception when the user is on a
+//      shared / public Wi-Fi.
+//
+// The fourth knob lives in the Supabase dashboard, NOT here:
+// Auth → JWT settings → Refresh token expiry. Default is 604800
+// seconds (7 days). Set to 31536000 (1 year) so reps don't get
+// kicked out after a quiet weekend.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession:    true,
+    autoRefreshToken:  true,
+    detectSessionInUrl: true,
+    flowType:          'pkce',
   },
 })
 
