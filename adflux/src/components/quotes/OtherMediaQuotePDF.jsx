@@ -317,8 +317,8 @@ function OtherMediaQuoteDocument({ quote, lines, company }) {
             </View>
           </View>
           <View style={S.headerRight}>
-            <Text style={S.headerWebsite}>{co.website || 'untitlead.in'}</Text>
-            <Text style={S.headerEmail}>{co.email || 'hello@untitlead.in'}</Text>
+            <Text style={S.headerWebsite}>{co.website || 'untitledad.in'}</Text>
+            <Text style={S.headerEmail}>{co.email || 'hello@untitledad.in'}</Text>
           </View>
         </View>
 
@@ -483,7 +483,7 @@ function OtherMediaQuoteDocument({ quote, lines, company }) {
           </Text>
         </View>
         <View style={S.footerBottomBand}>
-          <Text style={S.footerBottomText}>{co.website || 'untitlead.in'} | {co.email || 'hello@untitlead.in'}</Text>
+          <Text style={S.footerBottomText}>{co.website || 'untitledad.in'} | {co.email || 'hello@untitledad.in'}</Text>
           <Text style={S.footerBottomText}>{co.gstin ? `GSTIN: ${co.gstin}` : ''}</Text>
         </View>
 

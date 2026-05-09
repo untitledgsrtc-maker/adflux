@@ -14,6 +14,15 @@
   --v2-bg-1: #111a2e;            /* card surface */
   --v2-bg-2: #1a2742;            /* nested surface, hover */
   --v2-line: #1f2b47;
+  /* Phase 32I (10 May 2026) — QA audit caught the form-input rule
+     (v2.css:~1745) referencing --v2-surface-2 / --v2-surface-3 which
+     were NEVER declared. Inputs rendered with transparent bg —
+     half-undid Phase 32B's input-visibility fix. Aliased to the
+     real tokens here so every legacy reference resolves correctly.
+     surface-2 = nested bg matches --v2-bg-2; surface-3 = stronger
+     border for input visibility (slate-500-ish). */
+  --v2-surface-2: var(--v2-bg-2);
+  --v2-surface-3: #475569;
   --v2-ink-0: #f5f7fb;
   --v2-ink-1: #a9b3c7;
   --v2-ink-2: #6a7590;
