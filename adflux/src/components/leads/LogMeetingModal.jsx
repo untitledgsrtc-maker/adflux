@@ -59,7 +59,13 @@ const OUTCOMES = [
     label:      'Not interested',
     sub:        'Politely refused — territory recorded',
     stage:      'Lost',
-    lostReason: 'Cold meeting — no fit',
+    // Phase 32M fix — leads_lost_reason_check is a CHECK constraint
+    // restricted to: Price, Timing, Competitor, NoNeed, NoResponse,
+    // WrongContact, Stale. Cold-walk-in rejection most accurately maps
+    // to NoNeed (prospect has no need for outdoor advertising right
+    // now). Free-text reason "Cold meeting — no fit" gets surfaced in
+    // the activity notes instead so the audit trail still shows it.
+    lostReason: 'NoNeed',
     tone:       'danger',
   },
 ]
