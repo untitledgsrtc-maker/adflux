@@ -310,6 +310,61 @@ export default function LeadsV2() {
         </div>
       )}
 
+      {/* Phase 32B — owner asked (10 May 2026) for a per-rep filter as
+          one-tap chips so admin can see who owns what and bulk-reassign
+          fast, without diving into the dropdown. Renders only for
+          privileged users (admin / co_owner) and only when there's
+          more than one rep with leads. Click a chip → filter the list
+          to that rep's leads. Click the active chip again to clear. */}
+      {isPrivileged && distinctReps.length > 1 && (
+        <div style={{
+          display: 'flex', gap: 8, flexWrap: 'wrap',
+          marginBottom: 10, alignItems: 'center',
+        }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: '.1em',
+            textTransform: 'uppercase', color: 'var(--text-muted)',
+            marginRight: 4,
+          }}>
+            Filter by rep
+          </span>
+          <button
+            type="button"
+            onClick={() => setRepFilter('all')}
+            className="lead-btn lead-btn-sm"
+            style={{
+              borderColor: repFilter === 'all' ? 'var(--accent)' : 'var(--border-strong, #475569)',
+              color:       repFilter === 'all' ? 'var(--accent)' : 'var(--text)',
+              background:  repFilter === 'all' ? 'var(--accent-soft)' : 'transparent',
+              fontWeight:  repFilter === 'all' ? 700 : 500,
+            }}
+          >
+            All ({leads.length})
+          </button>
+          {distinctReps.map(r => {
+            const count = leads.filter(l => l.assigned?.id === r.id).length
+            const active = repFilter === r.id
+            return (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => setRepFilter(active ? 'all' : r.id)}
+                className="lead-btn lead-btn-sm"
+                title={active ? 'Click to clear filter' : `Show only ${r.name}'s leads`}
+                style={{
+                  borderColor: active ? 'var(--accent)' : 'var(--border-strong, #475569)',
+                  color:       active ? 'var(--accent)' : 'var(--text)',
+                  background:  active ? 'var(--accent-soft)' : 'transparent',
+                  fontWeight:  active ? 700 : 500,
+                }}
+              >
+                {r.name} ({count})
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* ─── Filter row (search + 5 stage tabs + segment/source/city/rep) ─── */}
       <div className="lead-filter-row">
         <div className="lead-search lead-filter-search">

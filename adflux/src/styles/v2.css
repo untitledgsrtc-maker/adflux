@@ -1734,6 +1734,11 @@
 .v2d .btn-y:disabled { opacity: .55; cursor: not-allowed; }
 
 /* Legacy form controls */
+/* Phase 32B — owner reported (10 May 2026) inputs blended into the
+   dark surface ("can't see where to type"). Was 1px var(--v2-line)
+   border which is the same hex as var(--v2-surface-2) bg. Now 1.5px
+   with the stronger surface-3 token. Bumped font-size 13→14px and
+   weight to 500 to match the readability ask. */
 .v2d .form-input,
 .v2d .team-input,
 .v2d input[type="text"],
@@ -1741,15 +1746,21 @@
 .v2d input[type="number"],
 .v2d input[type="tel"],
 .v2d input[type="date"],
+.v2d input[type="time"],
 .v2d input[type="search"],
 .v2d select,
 .v2d textarea {
   background: var(--v2-surface-2);
-  border: 1px solid var(--v2-line);
+  border: 1.5px solid var(--v2-surface-3, #475569);
   color: var(--v2-ink-0);
-  border-radius: 8px; padding: 9px 12px;
-  font-family: var(--v2-sans); font-size: 13px;
+  border-radius: 8px; padding: 10px 12px;
+  font-family: var(--v2-sans); font-size: 14px; font-weight: 500;
   transition: border-color .15s ease;
+}
+.v2d input:hover:not(:focus),
+.v2d select:hover:not(:focus),
+.v2d textarea:hover:not(:focus) {
+  border-color: var(--v2-ink-2, #94a3b8);
 }
 .v2d input:focus,
 .v2d select:focus,
@@ -1757,6 +1768,11 @@
 .v2d .form-input:focus {
   outline: none;
   border-color: var(--v2-yellow);
+}
+.v2d input::placeholder,
+.v2d textarea::placeholder {
+  color: var(--v2-ink-2, #94a3b8);
+  opacity: 0.7;
 }
 
 /* Legacy modals (CityModal/BulkRateModal/TeamMemberModal/SendOfferModal) */

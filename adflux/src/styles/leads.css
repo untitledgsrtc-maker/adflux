@@ -65,6 +65,13 @@
 }
 .stage-new,
 .stage-contacted          { background: var(--blue-soft, rgba(59,130,246,.12)); color: var(--blue); border-color: rgba(59,130,246,.30); }
+/* Phase 32B — `.stage-working` was missing entirely (Phase 30A
+   collapse dropped it from this rule and it never came back). DB
+   value 'Working' → CSS class .stage-working, so every "Follow-up"
+   chip across the app rendered as plain text without a pill bg.
+   Owner spotted this. Added below alongside the other amber chips.
+   STAGE_TINT.Working = 'amber' per useLeads.js. */
+.stage-working,
 .stage-qualified,
 .stage-salesready,
 .stage-meetingscheduled,
@@ -180,22 +187,32 @@
 .lead-btn-sm { padding: 6px 10px; font-size: 11px; }
 
 /* ─── Inputs (lead-scoped) ─── */
+/* Phase 32B — owner reported (10 May 2026) inputs across the app
+   "merged with background — can't see where to type". Root cause:
+   --surface-2 (#334155) and --border (#334155) are the same hex.
+   Border never showed, so input boxes blended into the surrounding
+   panel. Switched to --border-strong (#475569) and bumped the
+   border weight to 1.5px so the box is unambiguous in dark theme.
+   Same fix applied below for select / textarea / global v2 inputs. */
 .lead-inp {
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border-strong, #475569);
   color: var(--text);
-  border-radius: 6px;
-  padding: 8px 10px;
-  font: inherit;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
   outline: none;
   width: 100%;
+  transition: border-color 120ms ease;
 }
-.lead-inp:focus { border-color: var(--accent); }
-.lead-inp::placeholder { color: var(--text-subtle); }
+.lead-inp:hover { border-color: var(--text-subtle, #64748b); }
+.lead-inp:focus { border-color: var(--accent); border-width: 1.5px; }
+.lead-inp::placeholder { color: var(--text-muted); opacity: 0.65; }
 .lead-fld-label {
-  font-size: 11px; color: var(--text-muted);
+  font-size: 12px; color: var(--text-muted);
   letter-spacing: .04em; text-transform: uppercase;
-  margin-bottom: 6px; display: block; font-weight: 500;
+  margin-bottom: 6px; display: block; font-weight: 600;
 }
 
 /* ─── Stat strip (4 cards) ─── */
