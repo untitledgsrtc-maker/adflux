@@ -35,20 +35,54 @@ function haversineKm(a, b) {
 
 // Inject Leaflet CSS + JS once. Returns a promise that resolves with
 // window.L when ready.
-function loadLeaflet() {
-  if (window._leafletPromise) return window._leafletPromise
-  window._leafletPromise = new Promise((resolve, reject) => {
+// Phase 32A — owner reported (10 May 2026) "Map library failed to
+// load: undefined" — unpkg.com flaky / blocked / slow. Switched to
+// cdnjs.cloudflare.com which is more reliably reachable from India.
+// Also: explicit window.L verify after onload (some flaky CDN paths
+// resolve onload but never populate window.L), 10s timeout, and a
+// fallback path that swaps to unpkg.com if cdnjs fails.
+function loadLeafletFrom(cssUrl, jsUrl) {
+  return new Promise((resolve, reject) => {
     if (window.L) return resolve(window.L)
+    let timer
     const css = document.createElement('link')
     css.rel = 'stylesheet'
-    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    css.href = cssUrl
     document.head.appendChild(css)
     const js = document.createElement('script')
-    js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    js.onload = () => resolve(window.L)
-    js.onerror = reject
+    js.src = jsUrl
+    js.async = true
+    js.onload = () => {
+      clearTimeout(timer)
+      if (window.L) resolve(window.L)
+      else reject(new Error('Leaflet script loaded but window.L undefined'))
+    }
+    js.onerror = (e) => { clearTimeout(timer); reject(e || new Error('Leaflet script failed')) }
     document.head.appendChild(js)
+    timer = setTimeout(() => reject(new Error('Leaflet load timed out after 10s')), 10000)
   })
+}
+
+function loadLeaflet() {
+  if (window._leafletPromise) return window._leafletPromise
+  window._leafletPromise = (async () => {
+    if (window.L) return window.L
+    try {
+      return await loadLeafletFrom(
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
+      )
+    } catch (_e1) {
+      // Fall back to unpkg if cdnjs is blocked. Don't reuse the cached
+      // failed promise — try again from scratch.
+      return await loadLeafletFrom(
+        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+      )
+    }
+  })()
+  // If the promise rejects, clear the cache so retries can try again.
+  window._leafletPromise.catch(() => { delete window._leafletPromise })
   return window._leafletPromise
 }
 
@@ -259,7 +293,7 @@ export default function GpsTrackV2() {
           }}>
             <span><span style={{ color: '#10B981' }}>●</span> Check-in {stats.first ? new Date(stats.first).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
             <span><span style={{ color: '#EF4444' }}>●</span> Check-out {stats.last ? new Date(stats.last).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-            <span><span style={{ color: '#F59E0B' }}>●</span> Interval pings (every ~10 min while /work was open)</span>
+            <span><span style={{ color: '#F59E0B' }}>●</span> Interval pings (every ~5 min while /work was open)</span>
           </div>
         </>
       )}

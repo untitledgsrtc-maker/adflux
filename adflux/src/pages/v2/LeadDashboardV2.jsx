@@ -55,21 +55,39 @@ export default function LeadDashboardV2() {
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Phase 32A — owner audit caught the Voice activity card showing a
+  // static "Voice logging is live..." blurb instead of actual recent
+  // activity. Loading recent voice_logs alongside leads now.
+  const [voiceLogs, setVoiceLogs] = useState([])
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       setError('')
-      const { data, error: err } = await supabase
-        .from('leads')
-        .select('*, assigned:assigned_to(id, name, city)')
-        .order('created_at', { ascending: false })
-      if (err) {
-        setError(err.message)
+      const [leadsRes, voiceRes] = await Promise.all([
+        supabase
+          .from('leads')
+          .select('*, assigned:assigned_to(id, name, city)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('voice_logs')
+          .select(`
+            id, created_at, transcript, language_detected, status,
+            classified, lead_id,
+            user:user_id(id, name),
+            lead:lead_id(id, name, company)
+          `)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(8),
+      ])
+      if (leadsRes.error) {
+        setError(leadsRes.error.message)
         setLeads([])
       } else {
-        setLeads(data || [])
+        setLeads(leadsRes.data || [])
       }
+      if (!voiceRes.error) setVoiceLogs(voiceRes.data || [])
       setLoading(false)
     }
     load()
@@ -247,10 +265,13 @@ export default function LeadDashboardV2() {
 
       {/* ─── Two-up: Voice activity + Hot leads ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)', gap: 16 }}>
-        {/* Voice activity — Phase 21a: voice is shipped (Phase 20).
-            Card now points to the live page; recent transcripts surface
-            on each lead's activity timeline. A roll-up panel here is a
-            Sprint C item once we have meaningful volume. */}
+        {/* Phase 32A — voice activity card now shows REAL recent
+            voice_logs. Owner audit (10 May 2026) caught the static
+            "Voice logging is live..." blurb pretending to be a live
+            feed. Replaced with the last 8 completed voice notes:
+            rep name, lead name, transcript snippet, time. Empty state
+            (no voice logs yet) keeps a short hint. Click row → go to
+            that lead's detail. */}
         <div className="lead-card">
           <div className="lead-card-head">
             <div>
@@ -260,12 +281,72 @@ export default function LeadDashboardV2() {
                 </span>
                 Voice activity
               </div>
-              <div className="lead-card-sub">Reps speaking Gujarati / Hindi / English · auto-classified</div>
+              <div className="lead-card-sub">Latest {voiceLogs.length || 'recent'} notes · Gujarati / Hindi / English</div>
             </div>
+            <span className="lead-card-link" onClick={() => navigate('/voice')}>
+              Open <ArrowRight size={11} />
+            </span>
           </div>
-          <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6 }}>
-            Voice logging is live. Reps tap the <b style={{ color: 'var(--text)' }}>Voice</b> button on any lead detail page (or open <b style={{ color: 'var(--text)' }}>/voice</b>) to record a note. The audio is transcribed via Whisper, classified via Claude, and saved as a lead activity automatically. Transcripts and classifications appear on each lead's activity timeline.
-          </div>
+          {voiceLogs.length === 0 ? (
+            <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6 }}>
+              No voice notes yet. Reps tap the Voice button on any lead detail page to record one — audio is transcribed and classified automatically.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {voiceLogs.map(v => {
+                const snippet = (v.transcript || '').trim().slice(0, 110)
+                const lang = v.language_detected ? String(v.language_detected).toUpperCase() : ''
+                const outcome = v.classified?.outcome || ''
+                return (
+                  <div
+                    key={v.id}
+                    onClick={() => v.lead_id && navigate(`/leads/${v.lead_id}`)}
+                    style={{
+                      cursor: v.lead_id ? 'pointer' : 'default',
+                      padding: '10px 14px',
+                      borderTop: '1px solid var(--border)',
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                        {v.user?.name || 'Rep'}
+                      </span>
+                      {v.lead?.name && (
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          → {v.lead.company || v.lead.name}
+                        </span>
+                      )}
+                      {lang && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                          color: 'var(--accent)',
+                          background: 'var(--accent-soft)',
+                          padding: '1px 6px', borderRadius: 999,
+                        }}>{lang}</span>
+                      )}
+                      {outcome && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                          color: outcome === 'positive' ? 'var(--success)'
+                                : outcome === 'negative' ? 'var(--danger)' : 'var(--text-muted)',
+                          textTransform: 'uppercase',
+                        }}>{outcome}</span>
+                      )}
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
+                        {formatRelative(v.created_at)}
+                      </span>
+                    </div>
+                    {snippet && (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        {snippet}{v.transcript && v.transcript.length > 110 ? '…' : ''}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Hot leads */}
