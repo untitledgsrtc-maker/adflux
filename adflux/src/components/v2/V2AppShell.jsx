@@ -29,6 +29,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import CopilotModal from '../copilot/CopilotModal'
 import GlobalSearchBar from './GlobalSearchBar'
+import NotificationPanel from './NotificationPanel'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -258,14 +259,10 @@ export function V2AppShell() {
             <span>New Quote</span>
           </button>
 
-          <button
-            className="v2d-bell"
-            aria-label="Notifications"
-            title="Notifications — coming soon"
-            onClick={() => alert('Notifications are coming in the next release.')}
-          >
-            <Bell size={17} />
-          </button>
+          {/* Phase 31A.4 — real notification panel. Aggregates pending
+              approvals + due follow-ups + SLA breaches + due actions
+              from existing tables; no new schema. */}
+          <NotificationPanel />
 
           <div className="v2d-me">
             <div className="v2d-me-av">{initials(profile?.name || 'U')}</div>
