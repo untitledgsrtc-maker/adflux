@@ -8,8 +8,31 @@ export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, o
   const [sent, setSent] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
   const [sending, setSending] = useState(false)
+  // Phase 32K — owner reported (10 May 2026) "Open WhatsApp Again"
+  // button did nothing. Root cause: the original handler did
+  // window.open() AFTER multiple awaits (PDF upload + URL shorten).
+  // Mobile Safari + several desktop browsers strip popup permission
+  // once the user-gesture context is broken by an await; window.open
+  // gets silently blocked. Fix: cache the built message + phone after
+  // the first successful send so re-clicks open WhatsApp synchronously
+  // with no async work — popup permission stays intact.
+  const [cachedMessage, setCachedMessage] = useState(null)
+
+  function reopenWhatsApp() {
+    // Synchronous open — no awaits between click and window.open.
+    if (cachedMessage) {
+      openWhatsApp(quote.client_phone, cachedMessage)
+    }
+  }
 
   async function handleWhatsApp() {
+    // If we've already sent once, skip all the async work and just
+    // re-open with the cached message. Keeps the user-gesture chain
+    // unbroken so popup permission survives.
+    if (sent && cachedMessage) {
+      reopenWhatsApp()
+      return
+    }
     setSending(true)
     // Try uploading the PDF so the WhatsApp message carries a real
     // downloadable URL. If upload fails (bucket not configured, RLS
@@ -40,6 +63,7 @@ export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, o
 
     const message = buildWhatsAppMessage(quote, cities, { pdfUrl })
     openWhatsApp(quote.client_phone, message)
+    setCachedMessage(message)   // Phase 32K — cache for re-click.
     setSent(true)
     setSending(false)
     if (pdfUrl) {

@@ -89,6 +89,15 @@ export default function LeadFormV2() {
       setError('Segment is required.')
       return
     }
+    // Phase 32K — owner spec (10 May 2026): phone is mandatory for
+    // every non-government lead. Govt leads come via tender / RFP and
+    // often only have a department contact email at lead-creation time;
+    // private leads MUST have a phone or the rep can't action them
+    // (Call / WhatsApp buttons fail without one). Keep govt nullable.
+    if (form.segment !== 'GOVERNMENT' && !form.phone.trim()) {
+      setError('Phone is required for private leads — call / WhatsApp won\'t work without it.')
+      return
+    }
     setSaving(true)
     const payload = {
       name:          form.name.trim(),
@@ -140,7 +149,9 @@ export default function LeadFormV2() {
         <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <Field label="Name *" value={form.name} onChange={v => set('name', v)} placeholder="e.g. Dr. Mehta" />
           <Field label="Company" value={form.company} onChange={v => set('company', v)} placeholder="e.g. Sunrise Diagnostics" />
-          <Field label="Phone"  value={form.phone}   onChange={v => set('phone', v)}   placeholder="+91 98XXXX XXXXX" />
+          {/* Phase 32K — phone label flips to required asterisk for
+              non-government leads. Govt leads keep optional phone. */}
+          <Field label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Phone *'}  value={form.phone}   onChange={v => set('phone', v)}   placeholder="+91 98XXXX XXXXX" />
           <Field label="Email"  value={form.email}   onChange={v => set('email', v)}   placeholder="name@company.com" type="email" />
           <Field label="City"   value={form.city}    onChange={v => set('city', v)}    placeholder="Surat" />
         </div>

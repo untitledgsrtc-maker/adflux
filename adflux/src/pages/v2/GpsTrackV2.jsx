@@ -18,6 +18,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, MapPin } from 'lucide-react'
+// Phase 32K (10 May 2026) — owner reported map STILL failed after
+// Phase 32A's CDN failover ("Map library failed to load: undefined").
+// Both unpkg and cdnjs were failing for him — likely network /
+// firewall / corporate-proxy interference. Leaflet now bundled via
+// npm so it ships in the Vite chunk; no CDN dependency at runtime.
+// Adds ~40KB gzip to the GpsTrack chunk only (lazy-loaded).
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { formatDate } from '../../utils/formatters'
@@ -33,58 +41,10 @@ function haversineKm(a, b) {
   return 2 * R * Math.asin(Math.sqrt(x))
 }
 
-// Inject Leaflet CSS + JS once. Returns a promise that resolves with
-// window.L when ready.
-// Phase 32A — owner reported (10 May 2026) "Map library failed to
-// load: undefined" — unpkg.com flaky / blocked / slow. Switched to
-// cdnjs.cloudflare.com which is more reliably reachable from India.
-// Also: explicit window.L verify after onload (some flaky CDN paths
-// resolve onload but never populate window.L), 10s timeout, and a
-// fallback path that swaps to unpkg.com if cdnjs fails.
-function loadLeafletFrom(cssUrl, jsUrl) {
-  return new Promise((resolve, reject) => {
-    if (window.L) return resolve(window.L)
-    let timer
-    const css = document.createElement('link')
-    css.rel = 'stylesheet'
-    css.href = cssUrl
-    document.head.appendChild(css)
-    const js = document.createElement('script')
-    js.src = jsUrl
-    js.async = true
-    js.onload = () => {
-      clearTimeout(timer)
-      if (window.L) resolve(window.L)
-      else reject(new Error('Leaflet script loaded but window.L undefined'))
-    }
-    js.onerror = (e) => { clearTimeout(timer); reject(e || new Error('Leaflet script failed')) }
-    document.head.appendChild(js)
-    timer = setTimeout(() => reject(new Error('Leaflet load timed out after 10s')), 10000)
-  })
-}
-
-function loadLeaflet() {
-  if (window._leafletPromise) return window._leafletPromise
-  window._leafletPromise = (async () => {
-    if (window.L) return window.L
-    try {
-      return await loadLeafletFrom(
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
-      )
-    } catch (_e1) {
-      // Fall back to unpkg if cdnjs is blocked. Don't reuse the cached
-      // failed promise — try again from scratch.
-      return await loadLeafletFrom(
-        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-      )
-    }
-  })()
-  // If the promise rejects, clear the cache so retries can try again.
-  window._leafletPromise.catch(() => { delete window._leafletPromise })
-  return window._leafletPromise
-}
+// Phase 32K — Leaflet imported directly from npm (`import L from 'leaflet'`).
+// No more CDN load gymnastics, no failover paths, no timeout guards.
+// Vite bundles Leaflet into the GpsTrack chunk so the map works
+// offline / on flaky networks / behind firewalls.
 
 export default function GpsTrackV2() {
   const navigate = useNavigate()
@@ -179,22 +139,20 @@ export default function GpsTrackV2() {
     }
   }, [pings])
 
-  // Render the Leaflet map once pings load.
+  // Render the Leaflet map once pings load. Phase 32K — direct L
+  // import; no CDN wrap, no failover, no error path needed.
   useEffect(() => {
     if (loading) return
     if (!containerRef.current) return
     if (pings.length === 0) return
-    let map
-    let cancelled = false
-    loadLeaflet().then(L => {
-      if (cancelled) return
-      // Clean up any earlier map on this node (StrictMode double-mounts).
-      if (mapRef.current) {
-        try { mapRef.current.remove() } catch (_) {}
-        mapRef.current = null
-      }
+    // Clean up any earlier map on this node (StrictMode double-mounts).
+    if (mapRef.current) {
+      try { mapRef.current.remove() } catch (_) {}
+      mapRef.current = null
+    }
+    try {
       const center = [Number(pings[0].lat), Number(pings[0].lng)]
-      map = L.map(containerRef.current).setView(center, 13)
+      const map = L.map(containerRef.current).setView(center, 13)
       mapRef.current = map
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap',
@@ -222,9 +180,10 @@ export default function GpsTrackV2() {
           (p.accuracy_m ? `<br/><small>±${p.accuracy_m}m accuracy</small>` : '')
         )
       })
-    }).catch(e => setError('Map library failed to load: ' + e?.message))
+    } catch (e) {
+      setError('Map render failed: ' + (e?.message || String(e)))
+    }
     return () => {
-      cancelled = true
       if (mapRef.current) {
         try { mapRef.current.remove() } catch (_) {}
         mapRef.current = null

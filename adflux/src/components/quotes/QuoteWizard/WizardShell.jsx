@@ -171,6 +171,18 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
     setSaving(true)
     setError('')
 
+    // Phase 32K — phone is required for every private LED quote.
+    // Owner reported (10 May 2026) the system let a quote save with
+    // empty phone, then WhatsApp / Call buttons on the quote detail
+    // had nothing to dial. WizardShell handles Private LED quotes
+    // only (govt quotes use their own wizards), so private rule
+    // applies unconditionally here.
+    if (!quoteData.client_phone || !String(quoteData.client_phone).trim()) {
+      setSaving(false)
+      setError('Client phone is required — WhatsApp and Call buttons need it to work.')
+      return
+    }
+
     const status = isEdit
       ? (statusOverride || originalStatus || 'draft')
       : (statusOverride || 'draft')
