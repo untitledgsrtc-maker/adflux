@@ -82,6 +82,43 @@ export function useLeads() {
     return { data: { count: ids.length } }
   }, [fetchLeads])
 
+  // Phase 31A.5 — bulk stage change. Owner sales-exec analysis (8 May 2026):
+  // 'No bulk actions. Cannot select multiple leads to update stage'.
+  // Same RLS path as single-row update. Skips Won/Lost guard rails
+  // because admin uses this for cleanup; reps can move forward only.
+  const stageBulk = useCallback(async (ids, stage, extra = {}) => {
+    if (!ids?.length) return { error: { message: 'No leads selected.' } }
+    const patch = { stage, ...extra }
+    const { error: err } = await supabase
+      .from('leads')
+      .update(patch)
+      .in('id', ids)
+    if (err) {
+      console.error('[useLeads] bulk stage change failed:', err)
+      return { error: err }
+    }
+    await fetchLeads()
+    return { data: { count: ids.length } }
+  }, [fetchLeads])
+
+  // Phase 31A.5 — bulk delete. Hard removes from DB. RLS will reject
+  // anyone who isn't admin/co_owner OR doesn't own each row, so safe
+  // to surface to all users — they just won't be able to nuke leads
+  // they don't own.
+  const deleteBulk = useCallback(async (ids) => {
+    if (!ids?.length) return { error: { message: 'No leads selected.' } }
+    const { error: err } = await supabase
+      .from('leads')
+      .delete()
+      .in('id', ids)
+    if (err) {
+      console.error('[useLeads] bulk delete failed:', err)
+      return { error: err }
+    }
+    await fetchLeads()
+    return { data: { count: ids.length } }
+  }, [fetchLeads])
+
   // Phase 19 — realtime change handler. Realtime payloads come without
   // joined assigned/telecaller objects, so on INSERT/UPDATE we re-fetch
   // the single row with joins. RLS still gates: a user who can't read
@@ -116,6 +153,8 @@ export function useLeads() {
     fetchLeads,
     updateLead,
     reassignBulk,
+    stageBulk,
+    deleteBulk,
     applyRealtimeChange,
   }
 }

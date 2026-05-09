@@ -49,7 +49,7 @@ export default function LeadsV2() {
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
-  const { leads, loading, error, fetchLeads, reassignBulk, applyRealtimeChange } = useLeads()
+  const { leads, loading, error, fetchLeads, reassignBulk, stageBulk, deleteBulk, applyRealtimeChange } = useLeads()
 
   /* ─── Filter state ─── */
   const [search, setSearch]               = useState('')
@@ -568,7 +568,12 @@ export default function LeadsV2() {
         </div>
       )}
 
-      {/* ─── Sticky bulk action bar (privileged + selection > 0) ─── */}
+      {/* ─── Sticky bulk action bar (privileged + selection > 0) ───
+          Phase 31A.5 — added bulk Stage + Delete next to existing
+          bulk Reassign. Stage uses inline native <select>; Delete
+          confirms before nuking. RLS gates server-side so
+          non-privileged users (sales / agency) can only nuke their
+          own rows even if they reach this bar via DOM tampering. */}
       {selected.size > 0 && isPrivileged && (
         <div
           style={{
@@ -577,7 +582,7 @@ export default function LeadsV2() {
             border: '1px solid var(--accent)',
             borderRadius: 999,
             padding: '10px 16px',
-            display: 'flex', alignItems: 'center', gap: 12,
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
             boxShadow: '0 8px 24px rgba(0,0,0,.30)',
           }}
         >
@@ -585,6 +590,39 @@ export default function LeadsV2() {
           <div style={{ flex: 1 }} />
           <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={() => setReassignOpen(true)}>
             <UsersIcon size={12} /> Reassign
+          </button>
+          <select
+            className="lead-inp"
+            style={{ height: 32, padding: '0 8px', fontSize: 12, width: 'auto' }}
+            defaultValue=""
+            onChange={async (e) => {
+              const stage = e.target.value
+              e.target.value = ''
+              if (!stage) return
+              if (!confirm(`Move ${selected.size} lead${selected.size === 1 ? '' : 's'} to ${stage}?`)) return
+              const { error: err } = await stageBulk(Array.from(selected), stage)
+              if (err) { alert('Bulk stage change failed: ' + err.message); return }
+              setSelected(new Set())
+            }}
+          >
+            <option value="" disabled>Move stage…</option>
+            <option value="New">New</option>
+            <option value="Working">Working</option>
+            <option value="QuoteSent">Quote Sent</option>
+            <option value="Won">Won</option>
+            <option value="Lost">Lost</option>
+          </select>
+          <button
+            className="lead-btn lead-btn-sm"
+            style={{ borderColor: 'var(--red, #EF4444)', color: 'var(--red, #EF4444)' }}
+            onClick={async () => {
+              if (!confirm(`DELETE ${selected.size} lead${selected.size === 1 ? '' : 's'} permanently? This cannot be undone.`)) return
+              const { error: err } = await deleteBulk(Array.from(selected))
+              if (err) { alert('Bulk delete failed: ' + err.message); return }
+              setSelected(new Set())
+            }}
+          >
+            <X size={12} /> Delete
           </button>
           <button className="lead-btn lead-btn-sm" onClick={() => setSelected(new Set())}>
             Cancel
