@@ -348,15 +348,16 @@ export default function SalesDashboardV2() {
             a stacked duplicate header on mobile. Just keep the streak
             pill as a small inline element since the topbar doesn't
             carry that signal. */}
-        {state.streak > 0 ? (
+        {/* Phase 31D — owner reported (9 May 2026) the muted "No streak"
+            pill was confusing: looks like a clickable badge but does
+            nothing, and reading "No streak" first thing on dashboard
+            kills morale. Render the streak pill only when the rep
+            actually has one. The Day-1 reset banner below already
+            handles the "you have nothing yet" case. */}
+        {state.streak > 0 && (
           <div className="v2-streak" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>
             <Flame size={13} strokeWidth={2.4} />
             {state.streak}-mo streak
-          </div>
-        ) : (
-          <div className="v2-streak v2-streak--muted" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>
-            <Flame size={13} strokeWidth={2.4} />
-            No streak
           </div>
         )}
 
@@ -449,15 +450,10 @@ function Header({ name, streak, hasAlert, onLogout }) {
         <div className="v2-hello-kicker">{greeting()}</div>
         <div className="v2-hello-name">{firstName} 👋</div>
       </div>
-      {streak > 0 ? (
+      {streak > 0 && (
         <div className="v2-streak">
           <Flame size={13} strokeWidth={2.4} />
           {streak}-mo streak
-        </div>
-      ) : (
-        <div className="v2-streak v2-streak--muted">
-          <Flame size={13} strokeWidth={2.4} />
-          No streak
         </div>
       )}
       <div className="v2-bell" title="Notifications — coming soon">

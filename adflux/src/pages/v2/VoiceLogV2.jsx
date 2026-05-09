@@ -398,6 +398,22 @@ export default function VoiceLogV2() {
    ───────────────────────────────────────────────── */
 
 function PickScreen({ leads, leadId, setLeadId, langHint, setLangHint, onBack, onStart, error }) {
+  // Phase 31D — owner reported (9 May 2026) the lead picker was an
+  // 80-row alphabetical-ish dropdown that was unusable on mobile. Now
+  // a typeahead: type to filter by name / company / phone, and the
+  // list below is recent-first (load order from useEffect already
+  // returns DESC by created_at). Picking a row sets leadId.
+  const [filter, setFilter] = useState('')
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return leads
+    return leads.filter(l => {
+      const hay = `${l.name || ''} ${l.company || ''} ${l.phone || ''}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [leads, filter])
+  const selectedLead = leads.find(l => l.id === leadId) || null
+
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -411,19 +427,97 @@ function PickScreen({ leads, leadId, setLeadId, langHint, setLangHint, onBack, o
 
       <div className="m-card">
         <div className="m-card-title">Logging for which lead?</div>
-        <select
-          className="lead-inp"
-          value={leadId || ''}
-          onChange={e => setLeadId(e.target.value || null)}
-          style={{ marginTop: 8 }}
-        >
-          <option value="">— pick a lead (or leave empty for an orphan note) —</option>
-          {leads.map(l => (
-            <option key={l.id} value={l.id}>
-              {l.name}{l.company ? ` · ${l.company}` : ''}{l.stage ? ` · ${l.stage}` : ''}
-            </option>
-          ))}
-        </select>
+
+        {selectedLead && (
+          <div
+            style={{
+              marginTop: 8, padding: '8px 12px',
+              background: 'var(--accent-soft)',
+              border: '1px solid var(--accent)',
+              borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedLead.name}
+                {selectedLead.company ? ` · ${selectedLead.company}` : ''}
+              </div>
+              {selectedLead.stage && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{selectedLead.stage}</div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setLeadId(null)}
+              style={{
+                background: 'transparent', border: 0, color: 'var(--text-muted)',
+                cursor: 'pointer', fontSize: 11, padding: '4px 8px',
+              }}
+            >
+              Change
+            </button>
+          </div>
+        )}
+
+        {!selectedLead && (
+          <>
+            <input
+              type="text"
+              className="lead-inp"
+              placeholder="Type to search by name, company, or phone…"
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              style={{ marginTop: 8 }}
+              autoFocus
+            />
+            <div
+              style={{
+                marginTop: 8,
+                maxHeight: 240,
+                overflowY: 'auto',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                background: 'var(--surface)',
+              }}
+            >
+              {filtered.length === 0 && (
+                <div style={{ padding: 12, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                  No leads match "{filter}". Leave empty for an orphan note.
+                </div>
+              )}
+              {filtered.slice(0, 30).map(l => (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => { setLeadId(l.id); setFilter('') }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '8px 12px', background: 'transparent',
+                    border: 0, borderBottom: '1px solid var(--border)',
+                    color: 'var(--text)', cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>
+                    {l.name}{l.company ? ` · ${l.company}` : ''}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {l.stage || '—'}{l.phone ? ` · ${l.phone}` : ''}
+                  </div>
+                </button>
+              ))}
+              {filtered.length > 30 && (
+                <div style={{ padding: 8, fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Showing 30 of {filtered.length}. Type to narrow.
+                </div>
+              )}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+              Or leave it empty — you can always file a quick voice note without a lead and link it later.
+            </div>
+          </>
+        )}
 
         <div className="lead-fld-label" style={{ marginTop: 14 }}>Language hint</div>
         <div className="lead-radio-grp">

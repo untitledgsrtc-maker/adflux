@@ -568,6 +568,13 @@
   display: grid;
   grid-template-columns: 232px 1fr;
   min-height: 100vh;
+  /* Phase 31D — owner reported (9 May 2026) content cut off the right
+     edge on narrow desktop widths and on /leads with very long client
+     names. .v2d-content already has overflow-x:hidden but the grid
+     parent itself didn't, so wide children could still escape on some
+     browsers. Belt-and-braces: clip at the shell. */
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* Sidebar */
@@ -602,7 +609,16 @@
 .v2d-nav-badge { margin-left: auto; background: var(--v2-rose); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: var(--v2-r-pill); font-family: var(--v2-display); }
 .v2d-nav-badge--amber { background: var(--v2-amber); color: #0b1220; }
 .v2d-nav-spacer { flex: 1; }
-.v2d-nav-foot { border-top: 1px solid var(--v2-line); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 2px; }
+.v2d-nav-foot { border-top: 1px solid var(--v2-line); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+/* Phase 31D — sidebar identity strip above Log out. Compact 2-line
+   block that shows who's signed in (name + email) so reps can answer
+   "which account am I in?" with one glance. */
+.v2d-side-me { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--v2-bg-2); border: 1px solid var(--v2-line); }
+.v2d-side-me-av { width: 28px; height: 28px; border-radius: 50%; background: var(--v2-yellow); color: var(--v2-yellow-ink); display: grid; place-items: center; font-family: var(--v2-display); font-weight: 700; font-size: 11px; flex-shrink: 0; }
+.v2d-side-me-text { min-width: 0; flex: 1; }
+.v2d-side-me-name { font-size: 12px; font-weight: 600; color: var(--v2-ink-0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+.v2d-side-me-mail { font-size: 10px; color: var(--v2-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; margin-top: 1px; }
 
 .v2d-side-streak { background: rgba(255,230,0,.08); border: 1px solid rgba(255,230,0,.22); border-radius: var(--v2-r); padding: 12px; margin-bottom: 10px; }
 .v2d-side-streak-k { font-size: 9px; letter-spacing: 0.14em; font-weight: 700; color: var(--v2-yellow); text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
@@ -610,7 +626,7 @@
 .v2d-side-streak-s { font-size: 11px; color: var(--v2-ink-2); margin-top: 2px; line-height: 1.4; }
 
 /* Main column */
-.v2d-main { min-width: 0; display: flex; flex-direction: column; }
+.v2d-main { min-width: 0; max-width: 100%; overflow-x: hidden; display: flex; flex-direction: column; }
 .v2d-topbar {
   display: flex; align-items: center; gap: 14px;
   padding: 16px 28px;

@@ -86,7 +86,11 @@ const SALES_NAV = [
 // not seeing Quotes / Clients tabs after she upgraded a lead). Added
 // both with the same routes as sales — RLS scopes them to the
 // telecaller's own rows. Order matches sales for muscle memory.
+// Phase 31D — owner reported (9 May 2026) telecaller sidebar had no
+// Dashboard entry. Added at the top so reps can see the same
+// pipeline / KPI / leaderboard widgets the sales role gets.
 const TELECALLER_NAV = [
+  { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/telecaller',        label: 'Call Queue',     icon: Phone },
   { to: '/work',              label: 'Today',          icon: Sun },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
@@ -112,7 +116,7 @@ const MOBILE_NAV_SALES = [
 ]
 
 export function V2AppShell() {
-  const { profile, isPrivileged, signOut } = useAuth()
+  const { user, profile, isPrivileged, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -194,6 +198,18 @@ export function V2AppShell() {
           })}
           <div className="v2d-nav-spacer" />
           <div className="v2d-nav-foot">
+            {/* Phase 31D — owner reported (9 May 2026) the sidebar foot
+                only had a "Log out" button. Reps couldn't tell which
+                account was active when supporting each other. Added a
+                compact identity strip showing name + email above
+                Log out so the answer is always one glance away. */}
+            <div className="v2d-side-me" title={user?.email || ''}>
+              <div className="v2d-side-me-av">{initials(profile?.name || 'U')}</div>
+              <div className="v2d-side-me-text">
+                <div className="v2d-side-me-name">{profile?.name || 'User'}</div>
+                <div className="v2d-side-me-mail">{user?.email || '—'}</div>
+              </div>
+            </div>
             <button onClick={handleLogout}>
               <LogOut size={16} />
               <span>Log out</span>
@@ -319,6 +335,14 @@ export function V2AppShell() {
               })}
               <div className="v2d-nav-spacer" />
               <div className="v2d-nav-foot">
+                {/* Phase 31D — same identity strip as desktop sidebar. */}
+                <div className="v2d-side-me" title={user?.email || ''}>
+                  <div className="v2d-side-me-av">{initials(profile?.name || 'U')}</div>
+                  <div className="v2d-side-me-text">
+                    <div className="v2d-side-me-name">{profile?.name || 'User'}</div>
+                    <div className="v2d-side-me-mail">{user?.email || '—'}</div>
+                  </div>
+                </div>
                 <button onClick={handleLogout}>
                   <LogOut size={16} />
                   <span>Log out</span>
