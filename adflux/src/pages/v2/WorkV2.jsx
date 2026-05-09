@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Sun, MapPin, Phone, Calendar, UserPlus, Loader2, Trash2, Plus,
-  CheckCircle2, Users as UsersIcon, Edit3, Mic,
+  CheckCircle2, Users as UsersIcon, Edit3, Mic, Square,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -73,6 +73,94 @@ export default function WorkV2() {
   const [planText, setPlanText] = useState('')
   const [parsing, setParsing]   = useState(false)
   const [lateReason, setLateReason] = useState('')
+
+  /* ─── Phase 31A.6 — voice dictation on the plan textarea ───
+     Owner spec (9 May 2026): typing the morning plan in Gujarati on
+     a phone is slow. Reuses the existing voice-process Edge Function
+     with mode='transcribe_only' (added this phase) — that returns the
+     raw Whisper transcript without doing the lead_activities classify
+     step. We append the result to whatever's already in the textarea. */
+  const [recState, setRecState]   = useState('idle') // 'idle'|'recording'|'sending'
+  const [mediaRecorder, setMediaRecorder] = useState(null)
+  const [audioChunks, setAudioChunks]     = useState([])
+
+  async function startRecording() {
+    if (recState !== 'idle') return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      const chunks = []
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setRecState('sending')
+        try {
+          const blob = new Blob(chunks, { type: 'audio/webm' })
+          const buf  = await blob.arrayBuffer()
+          // Convert to base64 (no streaming — clip is short, < 60s).
+          let bin = ''
+          const bytes = new Uint8Array(buf)
+          for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i])
+          const audio_base64 = btoa(bin)
+          const { data: { session: authSession } } = await supabase.auth.getSession()
+          const res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-process`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${authSession?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({
+                audio_base64,
+                mime_type:        'audio/webm',
+                lead_id:          null,
+                duration_seconds: null,
+                mode:             'transcribe_only',
+              }),
+            }
+          )
+          if (!res.ok) {
+            const msg = await res.text().catch(() => '')
+            setError('Voice failed: ' + msg.slice(0, 140))
+            setRecState('idle')
+            return
+          }
+          const json = await res.json()
+          const transcript = (json?.transcript || '').trim()
+          if (transcript) {
+            setPlanText(prev => prev?.trim()
+              ? `${prev}${prev.endsWith(' ') ? '' : ' '}${transcript}`
+              : transcript
+            )
+          }
+        } catch (e) {
+          setError('Voice failed: ' + (e?.message || e))
+        } finally {
+          setRecState('idle')
+          setMediaRecorder(null)
+          setAudioChunks([])
+        }
+      }
+      setMediaRecorder(mr)
+      setAudioChunks(chunks)
+      mr.start()
+      setRecState('recording')
+      // Auto-stop at 60s as a safety guard.
+      setTimeout(() => {
+        if (mr.state === 'recording') mr.stop()
+      }, 60_000)
+    } catch (e) {
+      setError('Microphone access denied or unavailable: ' + (e?.message || e))
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop()
+    }
+  }
   // Show late-reason field only when current time > 9:30 AM and we
   // haven't checked in yet. Computed at render, not stored.
   const isLate = (() => {
@@ -505,9 +593,38 @@ export default function WorkV2() {
                 મળવા જવું છે, 5 cold calls કરવી છે" get tickable
                 tasks waiting for them after check-in. */}
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border, rgba(255,255,255,.06))' }}>
-              <label className="lead-fld-label">
-                Today's plan in your words (Gujarati / Hindi / English)
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label className="lead-fld-label" style={{ marginBottom: 0 }}>
+                  Today's plan in your words (Gujarati / Hindi / English)
+                </label>
+                {/* Phase 31A.6 — voice dictation. Tap → record up to
+                    60s → Whisper transcribes → text appended to the
+                    textarea. Reps can edit before submit. */}
+                {recState === 'recording' ? (
+                  <button
+                    type="button"
+                    className="lead-btn lead-btn-sm"
+                    onClick={stopRecording}
+                    style={{ borderColor: 'var(--red, #EF4444)', color: 'var(--red, #EF4444)' }}
+                  >
+                    <Square size={11} /> Stop
+                    <span className="lead-live-dot" style={{ marginLeft: 4, width: 6, height: 6 }} />
+                  </button>
+                ) : recState === 'sending' ? (
+                  <button type="button" className="lead-btn lead-btn-sm" disabled>
+                    <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Transcribing…
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="lead-btn lead-btn-sm lead-btn-primary"
+                    onClick={startRecording}
+                    title="Speak your plan — Gujarati / Hindi / English"
+                  >
+                    <Mic size={11} /> Speak
+                  </button>
+                )}
+              </div>
               <textarea
                 className="lead-inp"
                 rows={4}
@@ -517,7 +634,7 @@ export default function WorkV2() {
                 style={{ resize: 'vertical', minHeight: 90 }}
               />
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                Optional. We'll turn it into a checklist you can tick off through the day.
+                Optional. Type or tap <b>Speak</b>. We'll turn it into a checklist you can tick off through the day.
               </div>
             </div>
           </div>

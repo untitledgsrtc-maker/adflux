@@ -207,6 +207,28 @@ serve(async (req) => {
     return jsonResp({ error: 'Whisper returned an empty transcript. Try recording again.' }, 422)
   }
 
+  // Phase 31A.6 — owner spec (8 May 2026): morning plan textarea
+  // wants voice dictation. Extends voice-process with a
+  // mode='transcribe_only' branch that returns after Whisper —
+  // skips Claude classify + lead_activities insert. Saves a
+  // round-trip and a token bill when all the caller wants is
+  // the raw transcript dropped into a textbox.
+  if (mode === 'transcribe_only') {
+    // Use 'completed' (in the existing CHECK enum) since transcribe-only
+    // skips the Claude classify step on purpose — there's nothing more
+    // to do. Avoids needing a schema migration to add a new status.
+    await supabase.from('voice_logs').update({
+      transcript,
+      language_detected: language,
+      status:            'completed',
+    }).eq('id', voice_log_id)
+    return jsonResp({
+      voice_log_id,
+      transcript,
+      language,
+    }, 200)
+  }
+
   // 3. Update voice_logs with the transcript and move to classifying.
   await supabase.from('voice_logs').update({
     transcript,
