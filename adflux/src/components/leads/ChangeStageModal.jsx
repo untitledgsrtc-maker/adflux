@@ -25,7 +25,7 @@ import { X, RefreshCw, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import {
-  LEAD_STAGES, STAGE_LABELS, LOST_REASONS,
+  LEAD_STAGES, STAGE_LABELS, LOST_REASONS, WON_REASONS,
 } from '../../hooks/useLeads'
 import { StageChip } from './LeadShared'
 
@@ -38,6 +38,10 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
 
   // Conditional fields
   const [lostReason, setLostReason] = useState('')
+  // Phase 31A — capture WHY a lead was won (mirrors lostReason).
+  // Source-of-truth coaching data for admin: "75% of wins from
+  // referral, 5% from cold". Drives effort allocation.
+  const [wonReason, setWonReason] = useState('')
   // Phase 30A — `revisitDate` now applies to Lost (was Nurture).
   // BANT / handoff fields removed (SalesReady is no longer a stage).
   const [revisitDate, setRevisitDate] = useState('')
@@ -68,6 +72,10 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
       setError('Lost reason is required.')
       return
     }
+    if (target === 'Won' && !wonReason) {
+      setError('Win source is required — picks one (Referral / Existing client / etc).')
+      return
+    }
     setSaving(true)
     const patch = { stage: target }
     if (target === 'Lost') {
@@ -76,6 +84,9 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
       // separate Nurture stage). Reps filter "Lost with revisit in next
       // 90 days" to surface the long-tail follow-ups.
       if (revisitDate) patch.nurture_revisit_date = revisitDate
+    }
+    if (target === 'Won') {
+      patch.won_reason = wonReason
     }
     // Phase 30A — moving INTO Working stamps qualified_at the first
     // time, mirroring the old Qualified→Working merge.
@@ -95,7 +106,8 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
 
     // Status_change activity entry
     const noteParts = [`Stage → ${STAGE_LABELS[target] || target}`]
-    if (lostReason)  noteParts.push(`Reason: ${lostReason}`)
+    if (lostReason)  noteParts.push(`Lost reason: ${lostReason}`)
+    if (wonReason)   noteParts.push(`Win source: ${wonReason}`)
     if (revisitDate) noteParts.push(`Revisit: ${revisitDate}`)
     if (note.trim()) noteParts.push(note.trim())
     await supabase.from('lead_activities').insert([{
@@ -158,6 +170,25 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
             </select>
           </div>
 
+          {target === 'Won' && (
+            <div>
+              <label className="lead-fld-label">Win source *</label>
+              <select
+                className="lead-inp"
+                value={wonReason}
+                onChange={e => setWonReason(e.target.value)}
+                disabled={saving}
+              >
+                <option value="">— pick —</option>
+                {WON_REASONS.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                Coaching data — admin uses this to see which channels actually close deals.
+              </div>
+            </div>
+          )}
           {target === 'Lost' && (
             <>
               <div>

@@ -173,4 +173,16 @@ export const LOST_REASONS = [
   'NoResponse', 'WrongContact', 'Stale',
 ]
 
+// Phase 31A — capture the source of every Won lead so admin can spot
+// which channel / referral path actually closes deals. CHECK constraint
+// in supabase_phase31a_won_reason.sql enforces these exact values.
+export const WON_REASONS = [
+  { value: 'Referral',       label: 'Referral' },
+  { value: 'ExistingClient', label: 'Existing client' },
+  { value: 'ColdOutreach',   label: 'Cold outreach' },
+  { value: 'Marketing',      label: 'Marketing / inbound' },
+  { value: 'WalkIn',         label: 'Walk-in' },
+  { value: 'Other',          label: 'Other' },
+]
+
 export const HEAT_OPTIONS = ['hot', 'warm', 'cold']
