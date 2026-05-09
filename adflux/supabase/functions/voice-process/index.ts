@@ -92,6 +92,7 @@ Return ONLY a JSON object. No prose, no markdown fence. Schema:
   "notes":         "Short English summary of what happened (1-3 sentences). This is for the activity timeline.",
   "next_action":   "Short phrase like 'Send quote' or 'Follow up Tuesday', or empty string",
   "next_action_date": "YYYY-MM-DD or empty string",
+  "next_action_time": "HH:MM (24-hour) if the rep mentioned a specific clock time. Empty string otherwise. (Phase 31J)",
   "amount":        "Numeric rupee amount mentioned, or 0. Convert lakh/crore to plain rupees (e.g. '3.8 lakh' -> 380000, '2 crore' -> 20000000).",
   "stage_to":      "If the rep clearly indicates a stage transition, one of: 'Working' | 'QuoteSent' | 'Won' | 'Lost'. Otherwise empty string. (Phase 30A — collapsed from 10 stages to 5.)"
 }
@@ -103,6 +104,7 @@ Guidance:
 - "Neutral" = neither — a follow-up or info-gathering call.
 - next_action only if the rep explicitly mentioned what to do next.
 - next_action_date only if the rep mentioned a specific day. "tomorrow" or "Monday" → resolve to date based on today's date provided in user message.
+- next_action_time only if the rep mentioned a clock time. "12 o'clock" / "barah baje" / "5 PM" / "savaare 10" → resolve to 24-hour HH:MM. "barah" without context defaults to noon (12:00) for meetings, evening (12:00 unchanged) for calls — keep noon. Don't infer from "morning" / "evening" alone unless they also said a number.
 - transcript_en is the user-facing English version of the spoken note, distinct from notes (the cleaned-up summary).
 - amount: only if the rep stated a specific number. "₹3.8 lakh nu quote" → 380000. Don't guess.
 - stage_to: only when the rep's intent is clear. "BANT confirmed" / "ready for sales" / "demo set" / "meeting fixed" → Working. "quote sent" / "negotiating" → QuoteSent. "lost interest" / "not interested" → Lost. "won" / "deal closed" → Won.
@@ -299,6 +301,10 @@ serve(async (req) => {
       notes:            (classified.notes || transcript).slice(0, 4000),
       next_action:      classified.next_action      || null,
       next_action_date: classified.next_action_date || null,
+      // Phase 31J — store HH:MM time if Claude extracted one. Postgres
+      // `time` column accepts HH:MM:SS or HH:MM. Coerce empty → null
+      // so the index / display logic isn't tripped by ''.
+      next_action_time: sanitizeTime(classified.next_action_time),
       duration_seconds: Number(duration_seconds) || null,
       gps_lat:          (typeof gps_lat === 'number') ? gps_lat : null,
       gps_lng:          (typeof gps_lng === 'number') ? gps_lng : null,
@@ -378,6 +384,19 @@ function sanitizeActivityType(v: any): string {
 function sanitizeOutcome(v: any): string | null {
   const allowed = ['positive','neutral','negative']
   return allowed.includes(v) ? v : null
+}
+// Phase 31J — coerce Claude's next_action_time (HH:MM or HH:MM:SS) to
+// a Postgres-friendly value. Empty / malformed → null. We don't try
+// to recover bad strings here; if Claude returned garbage, dropping
+// it is safer than storing wrong-time data.
+function sanitizeTime(v: any): string | null {
+  if (!v || typeof v !== 'string') return null
+  const m = v.trim().match(/^([0-1]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/)
+  if (!m) return null
+  const hh = m[1].padStart(2, '0')
+  const mm = m[2]
+  const ss = m[3] || '00'
+  return `${hh}:${mm}:${ss}`
 }
 
 async function markFailed(supabase: any, id: string, message: string) {

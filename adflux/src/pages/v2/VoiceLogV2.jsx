@@ -69,6 +69,12 @@ export default function VoiceLogV2() {
   const [result, setResult] = useState(null)
   const [editOutcome, setEditOutcome] = useState('neutral')
   const [editNextAction, setEditNextAction] = useState('')
+  // Phase 31J — owner reported (10 May 2026) "no time schedule
+  // assigned while saying meeting tomorrow 12 o'clock". Surfacing the
+  // AI-extracted date + time as editable inputs so the rep can see
+  // and correct what got captured before saving.
+  const [editNextActionDate, setEditNextActionDate] = useState('')
+  const [editNextActionTime, setEditNextActionTime] = useState('')
   const [editAmount, setEditAmount] = useState('')
   const [editStage, setEditStage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -232,6 +238,11 @@ export default function VoiceLogV2() {
       setResult(json)
       setEditOutcome(c.outcome || 'neutral')
       setEditNextAction(c.next_action || '')
+      // Phase 31J — hydrate date + time from Claude. Time comes back
+      // as HH:MM (24-hour) per the prompt; <input type="time"> wants
+      // the same format so it just works.
+      setEditNextActionDate(c.next_action_date || '')
+      setEditNextActionTime(c.next_action_time || '')
       setEditAmount(c.amount ? String(c.amount) : '')
       setEditStage(c.stage_to || '')
       setPhase('confirm')
@@ -251,9 +262,20 @@ export default function VoiceLogV2() {
     setError('')
 
     // 1. Update the activity row with the rep's confirmed values.
+    // Phase 31J — also persist the rep's confirmed date + time (or
+    // null them out if the rep cleared the inputs). Time is stored
+    // as HH:MM:SS for Postgres `time`; pad with :00 if the picker
+    // returned HH:MM only.
+    const cleanTime = editNextActionTime
+      ? (/^\d{2}:\d{2}$/.test(editNextActionTime)
+           ? `${editNextActionTime}:00`
+           : editNextActionTime)
+      : null
     const patch = {
-      outcome:     editOutcome || null,
-      next_action: editNextAction.trim() || null,
+      outcome:          editOutcome || null,
+      next_action:      editNextAction.trim() || null,
+      next_action_date: editNextActionDate || null,
+      next_action_time: cleanTime,
     }
     const { error: actErr } = await supabase
       .from('lead_activities')
@@ -364,6 +386,8 @@ export default function VoiceLogV2() {
               seconds={seconds}
               editOutcome={editOutcome}     setEditOutcome={setEditOutcome}
               editNextAction={editNextAction} setEditNextAction={setEditNextAction}
+              editNextActionDate={editNextActionDate} setEditNextActionDate={setEditNextActionDate}
+              editNextActionTime={editNextActionTime} setEditNextActionTime={setEditNextActionTime}
               editAmount={editAmount}       setEditAmount={setEditAmount}
               editStage={editStage}         setEditStage={setEditStage}
               saving={saving}
@@ -618,6 +642,8 @@ function ConfirmScreen({
   leadName, result, gps, seconds,
   editOutcome, setEditOutcome,
   editNextAction, setEditNextAction,
+  editNextActionDate, setEditNextActionDate,
+  editNextActionTime, setEditNextActionTime,
   editAmount, setEditAmount,
   editStage, setEditStage,
   saving, onSave, onReRecord, error,
@@ -698,6 +724,31 @@ function ConfirmScreen({
                 onChange={e => setEditAmount(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="₹3,80,000"
                 inputMode="numeric"
+              />
+            </div>
+          </div>
+
+          {/* Phase 31J — schedule date + time. AI extracts these from
+              phrases like "kaal barah baje meeting" → tomorrow 12:00.
+              Editable so the rep can correct if AI misheard. Empty
+              fields are valid — Postgres takes nulls. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <div className="lead-fld-label">Schedule date</div>
+              <input
+                type="date"
+                className="lead-inp"
+                value={editNextActionDate}
+                onChange={e => setEditNextActionDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <div className="lead-fld-label">Schedule time</div>
+              <input
+                type="time"
+                className="lead-inp"
+                value={editNextActionTime}
+                onChange={e => setEditNextActionTime(e.target.value)}
               />
             </div>
           </div>
