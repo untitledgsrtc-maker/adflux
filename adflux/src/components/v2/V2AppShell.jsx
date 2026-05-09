@@ -115,6 +115,20 @@ const MOBILE_NAV_SALES = [
   { to: '/my-offer',          label: 'Offer',          icon: FileText },
 ]
 
+// Phase 31G — owner reported (9 May 2026) Dhara (telecaller) was
+// getting MOBILE_NAV_SALES on her phone, which doesn't include Call
+// Queue or Today — her two most-used screens. Telecaller now has a
+// dedicated mobile bottom nav matching her sidebar's top entries
+// (Today / Queue / Leads / Voice). Drops Quotes / Perf / Offer from
+// the mobile thumb-zone — telecallers rarely create quotes from
+// mobile and can still reach those via the sidebar drawer.
+const MOBILE_NAV_TELECALLER = [
+  { to: '/work',              label: 'Today',          icon: Sun },
+  { to: '/telecaller',        label: 'Queue',          icon: Phone },
+  { to: '/leads',             label: 'Leads',          icon: Inbox },
+  { to: '/voice',             label: 'Voice',          icon: Mic },
+]
+
 export function V2AppShell() {
   const { user, profile, isPrivileged, signOut } = useAuth()
   const navigate = useNavigate()
@@ -143,7 +157,11 @@ export function V2AppShell() {
     isPrivileged   ? ADMIN_NAV :
     isTelecaller   ? TELECALLER_NAV :
                      SALES_NAV
-  const mobileNav =  isPrivileged ? MOBILE_NAV_ADMIN : MOBILE_NAV_SALES
+  // Phase 31G — telecaller now has its own mobile bottom nav.
+  const mobileNav =
+    isPrivileged   ? MOBILE_NAV_ADMIN :
+    isTelecaller   ? MOBILE_NAV_TELECALLER :
+                     MOBILE_NAV_SALES
 
   // Topbar search — commits to the shared quote-filter store and
   // jumps to /quotes. Keeps the field as a global quick-search so

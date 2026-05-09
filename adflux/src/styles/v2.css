@@ -843,9 +843,17 @@
   .v2d-topbar { padding: 14px 16px; gap: 10px; }
   .v2d-search { display: none; }
   .v2d-period { display: none; }
-  .v2d-me-name, .v2d-me-role { display: none; }
-  .v2d-me { padding: 4px; }
-  .v2d-content { padding: 18px 16px 90px; }
+  /* Phase 31G — owner reported (9 May 2026) the avatar pill was
+     wrapping to a new line and showing as an orphan yellow "D" bubble
+     under the search row. Phase 31D already moved the user identity
+     into the sidebar drawer foot, so this pill is now redundant on
+     mobile. Hide it entirely. */
+  .v2d-me { display: none; }
+  /* Phase 31G — bump bottom padding so cards don't slide under the
+     sticky bottom nav on phones. Previous 90px wasn't enough because
+     the focus card on /work has its own border that extended past
+     the safe gap. */
+  .v2d-content { padding: 18px 16px 110px; }
   .v2d-hero { padding: 18px 18px; }
   .v2d-hero-big { font-size: 36px; }
   .v2d-kpi-row { gap: 10px; }
@@ -945,10 +953,11 @@
   .v2d-topbar { flex-wrap: wrap; padding: 12px 14px; gap: 10px; }
   .v2d-topbar > div:first-child { order: -1; }
   .v2d-search, .v2d-period { display: none; }
-  .v2d-me-name, .v2d-me-role { display: none; }
-  .v2d-me { padding: 4px; }
+  /* Phase 31G — same orphan-avatar fix as the earlier 860px block. */
+  .v2d-me { display: none; }
   .v2d-hero-big { font-size: 36px; }
-  .v2d-content { padding: 16px 14px 80px; }
+  /* Phase 31G — bump bottom padding to clear the sticky bottom nav. */
+  .v2d-content { padding: 16px 14px 110px; }
 }
 
 /* Sidebar foot alignment */

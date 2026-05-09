@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Sun, MapPin, Phone, Calendar, UserPlus, Loader2, Trash2, Plus,
-  CheckCircle2, Users as UsersIcon, Edit3, Mic, Square,
+  CheckCircle2, Users as UsersIcon, Edit3, Mic, Square, Clock,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -752,14 +752,25 @@ export default function WorkV2() {
                       <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>
                         {card.data.client || 'Meeting'}
                       </div>
+                      {/* Phase 31G — replaced ⏰ + 📍 emoji per CLAUDE.md
+                          §20 (no emoji in UI files). Lucide Clock and
+                          MapPin match stroke / size used elsewhere. */}
                       {card.data.time && (
-                        <div style={{ fontSize: 13, color: 'var(--accent)', marginTop: 4 }}>
-                          ⏰ {card.data.time}
+                        <div style={{
+                          fontSize: 13, color: 'var(--accent)', marginTop: 6,
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                        }}>
+                          <Clock size={14} strokeWidth={1.6} />
+                          {card.data.time}
                         </div>
                       )}
                       {card.data.location && (
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                          📍 {card.data.location}
+                        <div style={{
+                          fontSize: 12, color: 'var(--text-muted)', marginTop: 4,
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                        }}>
+                          <MapPin size={14} strokeWidth={1.6} />
+                          {card.data.location}
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
