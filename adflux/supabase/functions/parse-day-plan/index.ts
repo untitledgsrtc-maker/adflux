@@ -27,34 +27,56 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SYSTEM = `You convert a sales rep's morning plan into a discrete actionable task list.
+// Phase 31Y (10 May 2026) — schema extended.
+// Owner reported (a) Gujarati audio still returned in Devanagari
+// despite Phase 31I/X bias prompts, and (b) the voice transcript
+// went into the textarea but never auto-filled the structured form
+// fields (Planned Meetings rows, Calls, New Leads, Focus area).
+// Both fixed in one pass:
+//   1. transcript_corrected — Claude re-renders the rep's words in
+//      the language they selected (gu/hi/en script). Reliable script
+//      transliteration since Claude handles Indic scripts natively;
+//      doesn't depend on Whisper's bias prompt working.
+//   2. meetings[], calls_planned, new_leads_target, focus — Claude
+//      extracts the structured fields the WorkV2 morning plan form
+//      already has manual inputs for. Voice fills them in one tap.
+const SYSTEM = `You parse a sales rep's morning plan into structured fields.
 
-The rep speaks/writes in Gujarati, Hindi, English, or any mix. Their description is informal — "આજે રાજેશભાઈ ને મળવા જવું છે, પછી 5 cold calls કરવી છે, અને Patel ne quote send કરવી છે" — translate intent into clean English task titles.
+The rep speaks/writes in Gujarati, Hindi, English, or any mix. Their description is informal — "આજે રાજેશભાઈ ને બાર વાગ્યે વડોદરામાં મળવા જવું છે, પછી 5 cold calls કરવી છે, અને Patel ne quote send કરવી છે, focus is close Sunrise deal" — extract everything you can.
 
 Return JSON only, no commentary, with this exact shape:
 {
+  "transcript_corrected": "...",   // The rep's exact words, but rewritten in the SCRIPT specified by the 'language' field in the user message. If language='gu', emit Gujarati script (ગુજરાતી લિપિ). If language='hi', Devanagari. If language='en', Roman. Preserve word choice — only the script changes. If the input is already in the right script, return it unchanged.
+  "meetings": [
+    {
+      "time": "12:00",     // 24-hour HH:MM if specified, else empty string
+      "client": "Rajesh",  // person/company name, else empty string
+      "where": "Vadodara"  // location if specified, else empty string
+    }
+  ],
+  "calls_planned": 5,                // integer count of planned calls (0 if not mentioned)
+  "new_leads_target": 0,             // integer count of new leads to add today (0 if not mentioned)
+  "focus": "Close Sunrise deal",     // 1-line focus area in English (empty string if not mentioned)
   "tasks": [
     {
-      "id": "t1",  // sequential t1..tN
-      "title": "Visit Rajeshbhai for meeting",  // English, action-oriented, <= 60 chars
-      "type": "meeting",  // one of: call | meeting | visit | quote | followup | other
-      "due_time": "11:00",  // 24-hour HH:MM if rep specified a time, else null
-      "done": false  // always false for newly-parsed tasks
+      "id": "t1",                     // sequential t1..tN
+      "title": "Visit Rajesh in Vadodara",  // English, action-oriented, <= 60 chars
+      "type": "meeting",              // one of: call | meeting | visit | quote | followup | other
+      "due_time": "12:00",            // 24-hour HH:MM if specified, else null
+      "done": false
     }
   ]
 }
 
 Rules:
-- Max 8 tasks. If rep listed more, take the most concrete first.
-- Skip vague items ("be productive", "stay positive") — only actionable.
-- "5 cold calls" or similar batches → ONE task with title "Make 5 cold calls", type 'call'.
-- "Send quote to X" → type 'quote'.
-- "Follow up with X" → type 'followup'.
-- "Site visit Y" → type 'visit'.
-- "Meeting with X" / "go meet X" → type 'meeting'.
-- Anything else → type 'other'.
+- transcript_corrected: just script transliteration. NEVER add or remove words. NEVER translate to English. If language is unknown or 'auto', echo input unchanged.
+- meetings: include every meeting the rep mentioned (max 5). If rep gave a time-only ("12 baje meeting"), client and where stay empty strings.
+- calls_planned: only set if the rep said a number ("5 cold calls", "10 calls") or implied one ("call all hot leads" → 0; only set when rep gave an explicit count).
+- new_leads_target: same — only when rep said a number.
+- focus: 1 short line capturing the rep's primary goal of the day. English is fine even if input was Gujarati.
+- tasks: max 8. Skip vague items. "5 cold calls" → ONE task with title "Make 5 cold calls", type 'call'. "Send quote to X" → 'quote'. "Follow up with X" → 'followup'. "Site visit Y" → 'visit'. "Meeting with X" → 'meeting'. Else 'other'.
 - Preserve client / person names from the rep's text.
-- If a time is given ("11 AM", "after lunch"), put it in due_time. "Morning"/"after lunch"/"evening" without specific hour → null.
+- If a time is given in input ("11 AM", "બાર વાગ્યે"), put it in HH:MM. "morning" / "after lunch" without specific hour → null/empty.
 
 Return only valid JSON. No preamble, no trailing text.`
 
@@ -71,6 +93,10 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json().catch(() => ({}))
     const text = String(body?.text || '').trim()
+    // Phase 31Y — caller passes language='gu' | 'hi' | 'en' so Claude
+    // knows what script transcript_corrected should land in. Defaults
+    // to 'auto' which means echo input unchanged.
+    const language = String(body?.language || 'auto')
     if (!text) {
       return new Response(JSON.stringify({ error: 'text required' }), {
         status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
@@ -96,7 +122,7 @@ Deno.serve(async (req: Request) => {
         max_tokens:  2000,
         system:      SYSTEM,
         messages: [
-          { role: 'user', content: `Today's date: ${new Date().toISOString().slice(0,10)}\n\nRep's morning plan:\n${text}` },
+          { role: 'user', content: `Today's date: ${new Date().toISOString().slice(0,10)}\nlanguage: ${language}\n\nRep's morning plan:\n${text}` },
         ],
       }),
     })
@@ -134,7 +160,36 @@ Deno.serve(async (req: Request) => {
       done:     false,
     })).filter((t: any) => t.title)
 
-    return new Response(JSON.stringify({ tasks: safeTasks }), {
+    // Phase 31Y — sanitise the new structured fields. We don't want a
+    // hallucinated 'calls_planned: 999' to break the form so each
+    // numeric is clamped, each string is bounded, and meetings get
+    // capped at 5 entries.
+    const safeMeetings = Array.isArray(parsed?.meetings)
+      ? parsed.meetings.slice(0, 5).map((m: any) => ({
+          time:   typeof m?.time   === 'string' && /^\d{1,2}:\d{2}$/.test(m.time) ? m.time : '',
+          client: String(m?.client || '').slice(0, 80),
+          where:  String(m?.where  || '').slice(0, 80),
+        })).filter((m: any) => m.time || m.client || m.where)
+      : []
+    const callsPlanned    = Number.isFinite(Number(parsed?.calls_planned))
+      ? Math.max(0, Math.min(200, Math.round(Number(parsed.calls_planned))))
+      : 0
+    const newLeadsTarget  = Number.isFinite(Number(parsed?.new_leads_target))
+      ? Math.max(0, Math.min(200, Math.round(Number(parsed.new_leads_target))))
+      : 0
+    const focus           = String(parsed?.focus || '').slice(0, 200)
+    const transcriptCorr  = typeof parsed?.transcript_corrected === 'string'
+      ? parsed.transcript_corrected.slice(0, 4000)
+      : text  // fall back to input unchanged if Claude didn't return one
+
+    return new Response(JSON.stringify({
+      tasks:                 safeTasks,
+      meetings:              safeMeetings,
+      calls_planned:         callsPlanned,
+      new_leads_target:      newLeadsTarget,
+      focus,
+      transcript_corrected:  transcriptCorr,
+    }), {
       status: 200, headers: { ...cors, 'Content-Type': 'application/json' },
     })
   } catch (e) {

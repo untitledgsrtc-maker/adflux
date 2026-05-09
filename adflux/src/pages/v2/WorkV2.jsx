@@ -133,10 +133,87 @@ export default function WorkV2() {
           const json = await res.json()
           const transcript = (json?.transcript || '').trim()
           if (transcript) {
-            setPlanText(prev => prev?.trim()
-              ? `${prev}${prev.endsWith(' ') ? '' : ' '}${transcript}`
-              : transcript
-            )
+            // Phase 31Y — pipe the Whisper transcript through
+            // parse-day-plan IMMEDIATELY (not just on Submit) so two
+            // owner asks land at once:
+            //   1. Claude returns transcript_corrected in the language
+            //      script the rep selected (gu/hi/en) — fixes the
+            //      "Hindi script even when I picked Gujarati" issue.
+            //   2. Claude extracts structured meetings + calls + leads
+            //      target + focus area, populating the form's manual
+            //      input fields automatically.
+            // If parse-day-plan fails for any reason, we still fall
+            // back to inserting the raw transcript so the rep isn't
+            // stuck — speech UX must never silently lose audio.
+            try {
+              const planRes = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-day-plan`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type':  'application/json',
+                    'Authorization': `Bearer ${authSession?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                    'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+                  },
+                  body: JSON.stringify({ text: transcript, language: 'gu' }),
+                }
+              )
+              if (planRes.ok) {
+                const plan = await planRes.json().catch(() => ({}))
+                const corrected = (plan.transcript_corrected || transcript).trim()
+                // Replace the textarea content with the corrected
+                // (Gujarati-script) transcript. If rep had typed
+                // anything before tapping Speak, append below.
+                setPlanText(prev => prev?.trim()
+                  ? `${prev}${prev.endsWith(' ') ? '' : ' '}${corrected}`
+                  : corrected
+                )
+                // Auto-fill structured fields — only fill empty rows
+                // / unset values so we don't trample manual edits.
+                if (Array.isArray(plan.meetings) && plan.meetings.length > 0) {
+                  setPlannedMeetings(prev => {
+                    const next = [...prev]
+                    plan.meetings.forEach(m => {
+                      // Find first empty slot
+                      const idx = next.findIndex(s => !s.client && !s.time)
+                      const meeting = {
+                        time:   m.time   || '',
+                        client: m.client || '',
+                        where:  m.where  || '',
+                      }
+                      if (idx >= 0) next[idx] = meeting
+                      else next.push(meeting)
+                    })
+                    return next
+                  })
+                }
+                // If the rep explicitly stated a number ("10 calls",
+                // "5 new leads"), trust that over our hardcoded
+                // defaults (plannedCalls=20, plannedLeads=10). Can't
+                // distinguish "rep typed 20" from "default 20" so we
+                // unconditionally overwrite when Claude found a count.
+                if (plan.calls_planned > 0) {
+                  setPlannedCalls(plan.calls_planned)
+                }
+                if (plan.new_leads_target > 0) {
+                  setPlannedLeads(plan.new_leads_target)
+                }
+                if (plan.focus && !focusArea) {
+                  setFocusArea(plan.focus)
+                }
+              } else {
+                // parse-day-plan errored — keep the raw transcript.
+                setPlanText(prev => prev?.trim()
+                  ? `${prev}${prev.endsWith(' ') ? '' : ' '}${transcript}`
+                  : transcript
+                )
+              }
+            } catch (_) {
+              setPlanText(prev => prev?.trim()
+                ? `${prev}${prev.endsWith(' ') ? '' : ' '}${transcript}`
+                : transcript
+              )
+            }
           }
         } catch (e) {
           setError('Voice failed: ' + (e?.message || e))
