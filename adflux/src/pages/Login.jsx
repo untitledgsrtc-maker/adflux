@@ -36,10 +36,16 @@ export default function Login() {
     <div className="v2d v2d-login">
       <div className="v2d-login-card">
         {/* Brand */}
+        {/* Phase 31U — owner directive (10 May 2026): user-facing brand
+            is "Untitled OS", not "Untitled Adflux". The legal entity
+            name (Untitled Adflux Pvt Ltd) still appears on PDFs / quotes
+            for the PRIVATE segment per CLAUDE.md §4 — that's correct
+            and untouched. The login mark "UA" stays (Untitled Advertising
+            company logo). */}
         <div className="v2d-login-brand">
           <div className="v2d-login-mark">UA</div>
           <div>
-            <div className="v2d-login-b-t">Untitled Adflux</div>
+            <div className="v2d-login-b-t">Untitled OS</div>
             <div className="v2d-login-b-s">Internal Sales Platform</div>
           </div>
         </div>
@@ -58,7 +64,7 @@ export default function Login() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="you@untitlead.in"
+              placeholder="you@untitledad.in"
               required
               autoFocus
             />

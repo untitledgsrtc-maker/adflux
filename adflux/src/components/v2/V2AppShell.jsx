@@ -210,8 +210,12 @@ export function V2AppShell() {
         <div className="v2d-brand">
           <span className="v2d-brand-mark">UA</span>
           <div>
-            <div className="v2d-brand-t">Adflux</div>
-            <div className="v2d-brand-s">{isPrivileged ? 'Admin' : 'Sales'}</div>
+            <div className="v2d-brand-t">Untitled OS</div>
+            <div className="v2d-brand-s">{
+              isPrivileged ? 'Admin'
+              : isTelecaller ? 'Telecaller'
+              : 'Sales'
+            }</div>
           </div>
         </div>
 
@@ -265,7 +269,14 @@ export function V2AppShell() {
 
           <div className="v2d-crumb">
             <div className="v2d-crumb-kicker">
-              {isPrivileged ? 'Admin Console' : 'Sales Console'}
+              {/* Phase 31U — was hardcoded 'Admin Console' / 'Sales Console';
+                  telecallers saw 'Sales Console' which doesn't match their
+                  actual workspace. Three values now. */}
+              {
+                isPrivileged ? 'Admin Console'
+                : isTelecaller ? 'Telecaller Console'
+                : 'Sales Console'
+              }
             </div>
             <div className="v2d-crumb-t">
               {greetingFor(profile)}
@@ -317,7 +328,11 @@ export function V2AppShell() {
             <div className="v2d-me-av">{initials(profile?.name || 'U')}</div>
             <div>
               <div className="v2d-me-name">{profile?.name || 'User'}</div>
-              <div className="v2d-me-role">{isPrivileged ? 'Admin' : 'Sales'}</div>
+              <div className="v2d-me-role">{
+                isPrivileged ? 'Admin'
+                : isTelecaller ? 'Telecaller'
+                : 'Sales'
+              }</div>
             </div>
           </div>
         </header>
@@ -351,8 +366,12 @@ export function V2AppShell() {
               <div className="v2d-brand">
                 <span className="v2d-brand-mark">UA</span>
                 <div>
-                  <div className="v2d-brand-t">Adflux</div>
-                  <div className="v2d-brand-s">{isPrivileged ? 'Admin' : 'Sales'}</div>
+                  <div className="v2d-brand-t">Untitled OS</div>
+                  <div className="v2d-brand-s">{
+              isPrivileged ? 'Admin'
+              : isTelecaller ? 'Telecaller'
+              : 'Sales'
+            }</div>
                 </div>
               </div>
               <button
