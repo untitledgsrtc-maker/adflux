@@ -32,6 +32,7 @@ import LeadUploadV2        from './pages/v2/LeadUploadV2'
 import WorkV2              from './pages/v2/WorkV2'
 import TelecallerV2        from './pages/v2/TelecallerV2'
 import VoiceLogV2          from './pages/v2/VoiceLogV2'
+import FollowUpsV2         from './pages/v2/FollowUpsV2'
 import EveningVoiceV2      from './pages/v2/EveningVoiceV2'
 // Phase 12 rev3 — CockpitV2 retired; widgets folded into AdminDashboardDesktop.
 
@@ -84,10 +85,21 @@ function RequireGovtAccess({ children }) {
 }
 
 function RootRedirect() {
-  const { user, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!user) return <Navigate to="/login" replace />
-  // Dashboard switcher decides admin vs sales render internally.
+  // Phase 31K — owner directive (10 May 2026): sales reps land on the
+  // Today (/work) screen, not /dashboard. The morning plan + check-in
+  // flow IS the start of the rep's day; landing them on the incentive
+  // dashboard skipped that step. Other roles unchanged.
+  //   admin / co_owner → /dashboard (full admin console)
+  //   telecaller       → /telecaller (their queue is their workspace)
+  //   sales            → /work (Plan-A flow)
+  //   agency           → /dashboard (govt-only role, no daily plan flow)
+  const role     = profile?.role
+  const teamRole = profile?.team_role
+  if (teamRole === 'telecaller') return <Navigate to="/telecaller" replace />
+  if (role === 'sales')          return <Navigate to="/work" replace />
   return <Navigate to="/dashboard" replace />
 }
 
@@ -149,6 +161,9 @@ export default function App() {
           <Route path="/telecaller"                element={<TelecallerV2 />} />
           <Route path="/voice"                     element={<VoiceLogV2 />} />
           <Route path="/voice/evening"             element={<EveningVoiceV2 />} />
+          {/* Phase 31K — dedicated follow-ups list. Sales sees their own;
+              admin/co_owner sees all (component handles the toggle). */}
+          <Route path="/follow-ups"                element={<FollowUpsV2 />} />
           {/* Phase 30F — admin map view of a rep's day track. Date is
               optional (defaults to today). Specific BEFORE the
               two-segment fallback so it never gets shadowed. */}

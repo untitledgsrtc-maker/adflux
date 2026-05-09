@@ -34,7 +34,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, Contact2, MapPin, Tv, FileBox,
-  Inbox, Sparkles, Phone, Sun, Mic,
+  Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -66,15 +66,19 @@ const ADMIN_NAV = [
 ]
 
 const SALES_NAV = [
-  { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
-  // Phase 12 — Today's work is the rep's daily landing.
+  // Phase 31K — Plan-A: /work is the sales home now. Order reflects
+  // daily flow: plan day → see follow-ups → work leads → send quotes.
+  // Dashboard moved further down (still reachable for incentive
+  // numbers but not the daily landing).
   { to: '/work',              label: 'Today',          icon: Sun },
+  { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   // Phase 20 — Voice-First. Reachable from this drawer plus the
   // "Voice" button on each lead detail page.
   { to: '/voice',             label: 'Voice Log',      icon: Mic },
+  { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
@@ -108,22 +112,21 @@ const MOBILE_NAV_ADMIN = [
   { to: '/team',              label: 'Team',           icon: Users },
 ]
 
-// Phase 31H — owner asked me to decide on the mobile-label rename
-// (9 May 2026). Reasoning:
-//   "Perf"  is an abbreviation reps don't say in conversation; "Score"
-//           captures the same idea (incentive ranking + target % to
-//           date) in a word reps actually use.
-//   "Offer" is ambiguous on mobile (the company's offer? a price
-//           offer to a client? a deal?). What lives at /my-offer is
-//           the rep's commission/incentive scheme — i.e. their reward
-//           for closing. "Reward" reads as personal and concrete.
-// Desktop sidebar keeps "My Performance" / "My Offer" because it has
-// the room and matches the in-DB phrasing the owner uses elsewhere.
+// Phase 31K — owner directive (10 May 2026): sales reps land on
+// /work now (Plan-A flow). Mobile bottom nav reorders accordingly:
+//   Today  → /work     (the new home — plan, check in, do the day)
+//   Quotes → /quotes
+//   Score  → /my-performance (was 'Perf' pre-31H; reps say "score")
+//   Follow → /follow-ups     (NEW — Phase 31K's dedicated screen)
+// "Reward" / /my-offer dropped from the thumb-zone — reps check that
+// weekly, not daily. Still reachable via the sidebar drawer.
+// Dashboard stays accessible via sidebar — it's the "view my numbers"
+// page, not the daily-action surface anymore.
 const MOBILE_NAV_SALES = [
-  { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
-  { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/work',              label: 'Today',          icon: Sun },
+  { to: '/follow-ups',        label: 'Follow',         icon: ClockIcon },
+  { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/my-performance',    label: 'Score',          icon: TrendingUp },
-  { to: '/my-offer',          label: 'Reward',         icon: FileText },
 ]
 
 // Phase 31G — owner reported (9 May 2026) Dhara (telecaller) was

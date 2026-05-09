@@ -24,6 +24,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import { thisMonthISO, initials, todayISO } from '../../utils/formatters'
+import ProposedIncentiveCard from '../../components/incentives/ProposedIncentiveCard'
 import '../../styles/v2.css'
 
 /* ─── Money display: full Indian-format number with lakh/crore grouping.
@@ -384,11 +385,11 @@ export default function SalesDashboardV2() {
           </div>
         )}
 
-        <ProposedIncentive
-          earned={state.earned}
-          forecast={state.forecast}
-          pending={state.pendingPending}
-        />
+        {/* Phase 31K — switched to shared self-fetching component so
+            /work renders the same card. The inline ProposedIncentive
+            function below is left intact as dead code in case we need
+            to roll back; ESLint will flag it as unused. */}
+        <ProposedIncentiveCard />
 
         <div className="v2-glance-head">This month at a glance</div>
         {/* Tiles in a 2-col grid. Settled = fully paid this month

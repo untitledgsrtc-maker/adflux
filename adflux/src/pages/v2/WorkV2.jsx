@@ -24,6 +24,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
+import ProposedIncentiveCard from '../../components/incentives/ProposedIncentiveCard'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -505,6 +506,18 @@ export default function WorkV2() {
           </div>
         )}
 
+        {/* Phase 31K — owner directive (10 May 2026): the Proposed
+            Incentive card was the rep's daily motivator on /dashboard.
+            Now that /work is the sales home page, the card lives here
+            too — first thing they see when they open the app. Renders
+            before the plan form so the rep sees the carrot before
+            they put in the work. Self-fetching component; no props. */}
+        {stateName === 'A_PLAN' && (
+          <div style={{ marginBottom: 14 }}>
+            <ProposedIncentiveCard />
+          </div>
+        )}
+
         {/* ─── A_PLAN: morning plan form ─── */}
         {stateName === 'A_PLAN' && (
           <div className="m-card">
@@ -683,6 +696,14 @@ export default function WorkV2() {
         {/* ─── B_ACTIVE: checked in, working day ─── */}
         {stateName === 'B_ACTIVE' && (
           <>
+            {/* Phase 31K — Proposed Incentive card during the active
+                day too. Forecast tab updates as quotes get sent / won
+                so the rep sees the day's progress reflect into their
+                projected payout. */}
+            <div style={{ marginBottom: 14 }}>
+              <ProposedIncentiveCard />
+            </div>
+
             <div className="m-counters">
               <Counter num={counters.meetings || 0} target={targets.meetings} label="Meetings" />
               <Counter num={counters.calls || 0}    target={targets.calls}    label="Calls" />
