@@ -294,13 +294,19 @@ export default function LeadsV2() {
         />
       )}
 
-      {/* ─── Stat strip (Total / Open / Qualified / Won) ─── */}
+      {/* Phase 31R — owner audit caught these StatCards were referring
+          to group keys ('open', 'qualified') that no longer exist after
+          Phase 30A's stage collapse. Both rendered 0 forever. Replaced
+          with the actual current groups: New count + Follow-up count.
+          'New + Contacted + Nurture' meta was misleading too — Contacted
+          hasn't existed since Phase 30A, and Nurture is its own column
+          now (Phase 31N). */}
       {leads.length > 0 && (
         <div className="lead-stat-strip">
           <StatCard label="Total leads" num={totals.total} meta="all sources" />
-          <StatCard label="Open"        num={totals.groupCounts.open || 0}      meta="New + Contacted + Nurture" />
-          <StatCard label="Qualified"   num={totals.groupCounts.qualified || 0} meta="→ rep ready" />
-          <StatCard label="Won"         num={totals.wonCount}                   meta={winRate != null ? `${winRate}% win rate` : 'no decisions yet'} />
+          <StatCard label="New"         num={totals.groupCounts.new || 0}        meta="not yet contacted" />
+          <StatCard label="Follow-up"   num={totals.groupCounts.working || 0}    meta="actively chasing" />
+          <StatCard label="Won"         num={totals.wonCount}                    meta={winRate != null ? `${winRate}% win rate` : 'no decisions yet'} />
         </div>
       )}
 

@@ -25,18 +25,24 @@
 // content in <div className="lead-root">.
 
 import { initials as initialsHelper } from '../../utils/formatters'
+// Phase 31R (10 May 2026) — owner audit caught a load-bearing bug:
+// this file had its own duplicate STAGE_LABELS / STAGE_GROUPS /
+// LEAD_STAGES that shadowed the canonical exports in useLeads.js.
+// Phase 31N (Nurture) and 31P (Working → Follow-up label) silently
+// did nothing on every page that imported StageChip / stageLabel /
+// STAGE_GROUPS / LEAD_STAGES from here, because those consumers got
+// the OLD 5-stage map. Re-export from useLeads so there is exactly
+// one source of truth across the codebase.
+import {
+  STAGE_LABELS,
+  STAGE_GROUPS as USE_LEADS_STAGE_GROUPS,
+  LEAD_STAGES as USE_LEADS_LEAD_STAGES,
+} from '../../hooks/useLeads'
 
 /* ─── Stage chip ────────────────────────────────────────────────────
-   Phase 30A — collapsed to 5 stages. Working leads with a missed
-   handoff_sla_due_at get the pulse dot (used to be only SalesReady).
-   The pulse animation lives in leads.css under @keyframes leadpulse. */
-const STAGE_LABELS = {
-  New:       'New',
-  Working:   'Working',
-  QuoteSent: 'Quote Sent',
-  Won:       'Won',
-  Lost:      'Lost',
-}
+   Phase 31R — pulls labels from the single source of truth in
+   useLeads.js. Working leads with a missed handoff_sla_due_at get
+   the pulse dot. Pulse animation in leads.css @keyframes leadpulse. */
 
 export function StageChip({ stage, sm = false, slaBreached = false }) {
   if (!stage) return null
@@ -115,13 +121,15 @@ export function Pill({ tone, children, style }) {
    Maps a stage to the kanban-rail accent class used on
    <div className="lead-stage-col s-{...}">. Centralised so future
    tabs / charts can colour-code consistently.
-   Phase 30A — 5 stages now. Old class names (s-cont, s-sr) kept
-   as aliases via CSS so leads.css doesn't need updating in lockstep. */
+   Phase 31R — Nurture rail uses 's-sr' (purple, same as old SalesReady)
+   so we don't need a new CSS class. QuoteSent moves to 's-qual' (amber)
+   to match its STAGE_TINT (Phase 31N). */
 export function stageRailClass(stage) {
   const s = String(stage).toLowerCase()
   if (s === 'new')       return 's-new'
   if (s === 'working')   return 's-qual'   // amber rail
-  if (s === 'quotesent') return 's-sr'     // purple rail
+  if (s === 'quotesent') return 's-qual'   // amber rail (Phase 31N)
+  if (s === 'nurture')   return 's-sr'     // purple rail (Phase 31N)
   if (s === 'won')       return 's-won'
   if (s === 'lost')      return 's-lost'
   return ''
@@ -134,21 +142,17 @@ export function stageLabel(stage) {
   return STAGE_LABELS[stage] || stage || ''
 }
 
-/* ─── Convenience export: stage groups (matches /leads filter row).
-   Phase 30A — collapsed to 5 single-stage groups + 'all'. Kept as a
-   STAGE_GROUPS array (rather than just LEAD_STAGES) so existing
-   consumers that iterate `g.stages.includes(stage)` keep working. */
+/* ─── Stage groups + LEAD_STAGES re-exports ─────────────────────────
+   Phase 31R — these used to be defined locally and silently disagreed
+   with useLeads.js. Now we re-export the canonical lists with one
+   addition: an 'all' filter group at the top (filter UIs need it; the
+   useLeads version omits it because LEAD_STAGES is also used as a DB
+   value list where 'all' would be invalid). */
 export const STAGE_GROUPS = [
-  { key: 'all',        label: 'All',        stages: null /* no filter */ },
-  { key: 'new',        label: 'New',        stages: ['New'] },
-  { key: 'working',    label: 'Working',    stages: ['Working'] },
-  { key: 'quote_sent', label: 'Quote Sent', stages: ['QuoteSent'] },
-  { key: 'won',        label: 'Won',        stages: ['Won'] },
-  { key: 'lost',       label: 'Lost',       stages: ['Lost'] },
+  { key: 'all', label: 'All', stages: null /* no filter */ },
+  ...USE_LEADS_STAGE_GROUPS,
 ]
 
-export const LEAD_STAGES = [
-  'New', 'Working', 'QuoteSent', 'Won', 'Lost',
-]
+export const LEAD_STAGES = USE_LEADS_LEAD_STAGES
 
 /* All exports declared via `export function` / `export const` above. */

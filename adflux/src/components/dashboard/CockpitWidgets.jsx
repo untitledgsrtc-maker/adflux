@@ -610,7 +610,11 @@ export function PipelineFunnelCard() {
     supabase.from('leads')
       .select('stage')
       .then(({ data }) => {
-        const c = { New: 0, Working: 0, QuoteSent: 0, Won: 0, Lost: 0 }
+        // Phase 31R — seed counts from LEAD_STAGES so adding a new stage
+        // (Nurture, etc) doesn't silently drop those leads from the
+        // funnel. Owner audit caught this hardcoded 5-stage object
+        // missing Nurture leads entirely.
+        const c = Object.fromEntries(LEAD_STAGES.map(s => [s, 0]))
         ;(data || []).forEach(r => { if (c[r.stage] !== undefined) c[r.stage]++ })
         setCounts(c)
       })
@@ -620,10 +624,14 @@ export function PipelineFunnelCard() {
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
   const max   = Math.max(1, ...Object.values(counts))
 
+  // Phase 31R — added Nurture (purple, matches STAGE_TINT). Working
+  // = amber. QuoteSent moved to a slightly redder amber so the two
+  // amber columns stay visually distinct in the funnel bar.
   const STAGE_TINT_HEX = {
     New:       '#60A5FA',
     Working:   '#FBBF24',
-    QuoteSent: '#C084FC',
+    QuoteSent: '#F59E0B',
+    Nurture:   '#C084FC',
     Won:       '#4ADE80',
     Lost:      '#F87171',
   }

@@ -35,14 +35,17 @@ import {
 // MeetingScheduled / Nurture was invisible (Total counted them but no
 // rail column showed them) — that's why owner saw Total = 1 with all
 // columns 0 on the test lead in Quote Sent stage.
-// Phase 30A — collapsed to 5 stages. Each rail column maps to exactly
-// one stage now (was 1-to-many for the 10-stage funnel).
+// Phase 31R — 6 stages (Nurture restored Phase 31N). Each rail column
+// maps to exactly one stage. Working renamed to "Follow-up" in the UI
+// per Phase 31P (DB value still 'Working'). Nurture rail uses purple
+// (s-sr) to match its STAGE_TINT; QuoteSent moves to amber (s-qual).
 const STAGE_RAIL = [
-  { key: 'New',       k: 's-new',  short: 'New',        match: ['New'] },
-  { key: 'Working',   k: 's-qual', short: 'Working',    match: ['Working'] },
-  { key: 'QuoteSent', k: 's-sr',   short: 'Quote Sent', match: ['QuoteSent'] },
-  { key: 'Won',       k: 's-won',  short: 'Won',        match: ['Won'] },
-  { key: 'Lost',      k: 's-lost', short: 'Lost',       match: ['Lost'] },
+  { key: 'New',       k: 's-new',   short: 'New',        match: ['New'] },
+  { key: 'Working',   k: 's-qual',  short: 'Follow-up',  match: ['Working'] },
+  { key: 'QuoteSent', k: 's-qual',  short: 'Quote Sent', match: ['QuoteSent'] },
+  { key: 'Nurture',   k: 's-sr',    short: 'Nurture',    match: ['Nurture'] },
+  { key: 'Won',       k: 's-won',   short: 'Won',        match: ['Won'] },
+  { key: 'Lost',      k: 's-lost',  short: 'Lost',       match: ['Lost'] },
 ]
 
 export default function LeadDashboardV2() {

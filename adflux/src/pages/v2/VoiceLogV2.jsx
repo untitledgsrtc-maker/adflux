@@ -38,9 +38,11 @@ const LANG_HINTS = [
   { key: 'en', label: 'English' },
 ]
 
-// Phase 30A — collapsed to 5 stages.
+// Phase 31R — Nurture restored Phase 31N. Voice log can move a lead
+// to Nurture (e.g. rep records "customer says revisit next quarter"
+// after a quote was sent). Empty string at top = "don't move stage".
 const STAGE_OPTIONS = [
-  '', 'Working', 'QuoteSent', 'Won', 'Lost',
+  '', 'Working', 'QuoteSent', 'Nurture', 'Won', 'Lost',
 ]
 
 export default function VoiceLogV2() {
