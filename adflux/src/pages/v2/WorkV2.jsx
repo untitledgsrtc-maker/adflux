@@ -327,9 +327,13 @@ export default function WorkV2() {
     }
 
     // Capture immediately on mount (fresh load after check-in), then
-    // every 10 min while the tab stays open.
+    // every 5 min while the tab stays open.
+    // Phase 31Z (10 May 2026) — owner asked for 5-minute pinging
+    // (was 10 min). Caveat: iOS Safari pauses geolocation when the
+    // tab is backgrounded; gaps show on the map when reps close the
+    // app. Background GPS needs a Capacitor wrapper, separate phase.
     pingOnce('interval')
-    const id = setInterval(() => pingOnce('interval'), 10 * 60 * 1000)
+    const id = setInterval(() => pingOnce('interval'), 5 * 60 * 1000)
     return () => { cancelled = true; clearInterval(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, session?.check_in_at, session?.evening_report_submitted_at])

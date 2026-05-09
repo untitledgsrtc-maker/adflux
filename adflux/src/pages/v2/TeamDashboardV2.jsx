@@ -261,8 +261,26 @@ export default function TeamDashboardV2() {
               <div className="lead-rep-foot">
                 <MapPin size={11} />
                 <span>{r.city || '—'}</span>
-                <span style={{ marginLeft: 'auto' }}>
-                  {counters.new_leads ? <>Leads today: <b>{counters.new_leads}</b></> : '—'}
+                <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {counters.new_leads ? <>Leads today: <b>{counters.new_leads}</b></> : null}
+                  {/* Phase 31Z — owner couldn't find the GPS map view
+                      because no UI surface linked to it. Each rep card
+                      now has a "View track" link to /admin/gps/:userId
+                      (defaults to today's date in GpsTrackV2). */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/admin/gps/${r.id}`) }}
+                    style={{
+                      background: 'transparent', border: 0,
+                      color: 'var(--accent, #FFE600)',
+                      fontSize: 11, fontWeight: 600,
+                      cursor: 'pointer', padding: 0,
+                      textDecoration: 'underline',
+                    }}
+                    title="View today's GPS track on a map"
+                  >
+                    View track →
+                  </button>
                 </span>
               </div>
             </div>
