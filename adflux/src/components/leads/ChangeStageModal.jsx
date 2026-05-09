@@ -50,15 +50,42 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Phase 30A — 5 stages: New → Working → QuoteSent → Won / Lost.
-  // Suggest the next forward stage from current.
+  // Phase 31N — 6 stages: New → Working → QuoteSent → Nurture/Won/Lost.
+  // Nurture only appears as a forward target FROM QuoteSent (matches
+  // owner's stage spec). Suggest the next forward stage from current.
   useEffect(() => {
     const cur = lead?.stage
     if (cur === 'New')           setTarget('Working')
     else if (cur === 'Working')  setTarget('QuoteSent')
     else if (cur === 'QuoteSent') setTarget('Won')
+    else if (cur === 'Nurture')   setTarget('Won')
     else                          setTarget('Working')
   }, [lead?.stage])
+
+  // Phase 31N — Nurture is reachable ONLY from QuoteSent or already-
+  // in-Nurture (rep can edit revisit_date). Hide it from the dropdown
+  // for other current stages so reps can't park leads that haven't
+  // had a quote sent yet — owner spec.
+  function isStageAvailable(s) {
+    if (s !== 'Nurture') return true
+    return lead?.stage === 'QuoteSent' || lead?.stage === 'Nurture'
+  }
+
+  // Phase 31N — when user picks Nurture, pre-fill revisit_date with
+  // today+30 so the field isn't empty (Nurture without a date is
+  // pointless). Reps can edit. Pre-fill the existing revisit_date if
+  // we're editing an already-Nurture lead.
+  useEffect(() => {
+    if (target !== 'Nurture') return
+    if (revisitDate) return
+    if (lead?.revisit_date) {
+      setRevisitDate(lead.revisit_date)
+    } else {
+      const d = new Date()
+      d.setDate(d.getDate() + 30)
+      setRevisitDate(d.toISOString().slice(0, 10))
+    }
+  }, [target, lead?.revisit_date, revisitDate])
 
   // Validate + commit
   async function handleSave() {
@@ -76,14 +103,26 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
       setError('Win source is required — picks one (Referral / Existing client / etc).')
       return
     }
+    // Phase 31N — Nurture requires a revisit_date (it's the whole
+    // point of Nurture vs Lost — "come back to me on this date").
+    if (target === 'Nurture' && !revisitDate) {
+      setError('Pick a revisit date — Nurture without a date becomes a forgotten lead.')
+      return
+    }
     setSaving(true)
     const patch = { stage: target }
     if (target === 'Lost') {
       patch.lost_reason = lostReason
-      // Phase 30A — Lost can carry an optional revisit date (was a
-      // separate Nurture stage). Reps filter "Lost with revisit in next
-      // 90 days" to surface the long-tail follow-ups.
+      // Lost can also carry an optional revisit date (kept from 30A).
+      // For Nurture, revisit_date goes into its own column below.
       if (revisitDate) patch.nurture_revisit_date = revisitDate
+    }
+    if (target === 'Nurture') {
+      // Phase 31N — Nurture lives on its own revisit_date column added
+      // by supabase_phase31n_stage_v3.sql. Distinct from Lost's
+      // nurture_revisit_date so reports can tell "parked post-quote"
+      // from "lost but might come back."
+      patch.revisit_date = revisitDate
     }
     if (target === 'Won') {
       patch.won_reason = wonReason
@@ -164,7 +203,7 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
               onChange={e => setTarget(e.target.value)}
               disabled={saving}
             >
-              {LEAD_STAGES.map(s => (
+              {LEAD_STAGES.filter(isStageAvailable).map(s => (
                 <option key={s} value={s}>{STAGE_LABELS[s] || s}</option>
               ))}
             </select>
@@ -186,6 +225,26 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
               </select>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                 Coaching data — admin uses this to see which channels actually close deals.
+              </div>
+            </div>
+          )}
+          {/* Phase 31N — Nurture requires a revisit date. The useEffect
+              above pre-fills it (today + 30 or the existing date if the
+              lead is already in Nurture). Rep can edit before saving. */}
+          {target === 'Nurture' && (
+            <div>
+              <label className="lead-fld-label">Revisit on *</label>
+              <input
+                className="lead-inp"
+                type="date"
+                value={revisitDate}
+                onChange={e => setRevisitDate(e.target.value)}
+                disabled={saving}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                When should this lead come back to your action list?
+                Default is 30 days from today — pick the date the
+                customer suggested.
               </div>
             </div>
           )}

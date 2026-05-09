@@ -162,25 +162,26 @@ export function useLeads() {
 // Stage-related metadata. Single source of truth so UI + future
 // reports stay in sync. Order matters — funnel renders in this order.
 //
-// Phase 30A (7 May 2026) — collapsed from 10 stages to 5. Owner spec:
-// "10 is too many, reps will misuse half". The dropped stages
-// (Contacted, Qualified, SalesReady, MeetingScheduled, Negotiating,
-// Nurture) all map into one of the 5 below by SQL migration. See
-// supabase_phase30a_lead_stages_collapse.sql. Long-tail revisits live
-// on the existing leads.nurture_revisit_date column on Lost rows.
+// Phase 30A (7 May 2026) — collapsed from 10 stages to 5.
+// Phase 31N (10 May 2026) — owner restored Nurture as a 6th stage.
+// Reasoning: a lead post-QuoteSent who says "revisit next quarter" is
+// a real long-tail signal that Phase 30A merged into Lost or Working,
+// both wrong. Nurture lives BETWEEN QuoteSent and Won/Lost — quote is
+// on the table, customer hasn't decided. Requires `revisit_date` so
+// it doesn't sit forever. Pipeline reports treat Nurture as
+// open-but-stalled (still counts toward forecast since the rep can
+// reactivate when the revisit_date passes).
 export const LEAD_STAGES = [
-  'New', 'Working', 'QuoteSent', 'Won', 'Lost',
+  'New', 'Working', 'QuoteSent', 'Nurture', 'Won', 'Lost',
 ]
 
-// Phase 30A — STAGE_GROUPS used to roll 10 stages into 6 display
-// buckets. With only 5 underlying stages, the buckets ARE the stages.
-// Each group still maps to a single stage so existing
-// `STAGE_GROUPS.find(g => g.stages.includes(stage))` consumers keep
-// working without refactor.
+// Phase 31N — Nurture rolled into its own group. Order matters here
+// (drives the funnel column order on /leads).
 export const STAGE_GROUPS = [
   { key: 'new',         label: 'New',         stages: ['New'] },
   { key: 'working',     label: 'Working',     stages: ['Working'] },
   { key: 'quote_sent',  label: 'Quote Sent',  stages: ['QuoteSent'] },
+  { key: 'nurture',     label: 'Nurture',     stages: ['Nurture'] },
   { key: 'won',         label: 'Won',         stages: ['Won'] },
   { key: 'lost',        label: 'Lost',        stages: ['Lost'] },
 ]
@@ -193,16 +194,22 @@ export const STAGE_LABELS = {
   New:       'New',
   Working:   'Working',
   QuoteSent: 'Quote Sent',
+  Nurture:   'Nurture',
   Won:       'Won',
   Lost:      'Lost',
 }
 
 // Maps stage → tint key from UI design system. Keep in sync with
 // the chip variants in UI_DESIGN_SYSTEM.md §4.4.
+// Phase 31N — QuoteSent is amber (warning tone — "in customer's court,
+// awaiting decision"), Nurture is purple (parked / long-tail). The
+// .stage-nurture CSS class survived the Phase 30A purge and already
+// has the right styling — no leads.css edit needed.
 export const STAGE_TINT = {
   New:       'blue',
   Working:   'amber',
-  QuoteSent: 'purple',
+  QuoteSent: 'amber',
+  Nurture:   'purple',
   Won:       'green',
   Lost:      'red',
 }
