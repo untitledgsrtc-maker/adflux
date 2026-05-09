@@ -24,7 +24,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
-import ProposedIncentiveCard from '../../components/incentives/ProposedIncentiveCard'
+// Phase 31O — ProposedIncentiveCard import removed; the V2AppShell
+// now mounts it once at the top of every sales page, so /work
+// doesn't render it directly anymore.
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -506,17 +508,10 @@ export default function WorkV2() {
           </div>
         )}
 
-        {/* Phase 31K — owner directive (10 May 2026): the Proposed
-            Incentive card was the rep's daily motivator on /dashboard.
-            Now that /work is the sales home page, the card lives here
-            too — first thing they see when they open the app. Renders
-            before the plan form so the rep sees the carrot before
-            they put in the work. Self-fetching component; no props. */}
-        {stateName === 'A_PLAN' && (
-          <div style={{ marginBottom: 14 }}>
-            <ProposedIncentiveCard />
-          </div>
-        )}
+        {/* Phase 31O — moved the ProposedIncentiveCard up into the
+            V2AppShell so it persists across every sales page (owner
+            directive 10 May 2026). The shell handles render + gating
+            now; this page no longer mounts it directly. */}
 
         {/* ─── A_PLAN: morning plan form ─── */}
         {stateName === 'A_PLAN' && (
@@ -696,13 +691,8 @@ export default function WorkV2() {
         {/* ─── B_ACTIVE: checked in, working day ─── */}
         {stateName === 'B_ACTIVE' && (
           <>
-            {/* Phase 31K — Proposed Incentive card during the active
-                day too. Forecast tab updates as quotes get sent / won
-                so the rep sees the day's progress reflect into their
-                projected payout. */}
-            <div style={{ marginBottom: 14 }}>
-              <ProposedIncentiveCard />
-            </div>
+            {/* Phase 31O — moved the ProposedIncentiveCard into
+                V2AppShell. Persists across all sales pages now. */}
 
             <div className="m-counters">
               <Counter num={counters.meetings || 0} target={targets.meetings} label="Meetings" />

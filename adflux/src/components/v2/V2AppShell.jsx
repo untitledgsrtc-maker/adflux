@@ -30,6 +30,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import CopilotModal from '../copilot/CopilotModal'
 import GlobalSearchBar from './GlobalSearchBar'
 import NotificationPanel from './NotificationPanel'
+import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -322,6 +323,19 @@ export function V2AppShell() {
         </header>
 
         <div className="v2d-content">
+          {/* Phase 31O — owner directive (10 May 2026): the Proposed
+              Incentive card must be visible on every sales screen so
+              reps stay motivated by what they're earning while they
+              work. Mounted in the shell so it persists across route
+              changes (one fetch on app load, no extra round-trips per
+              page nav). Gated to non-privileged + non-telecaller —
+              admin/co_owner have their own incentive views, telecaller
+              doesn't earn the same incentives. Sales + agency see it. */}
+          {!isPrivileged && !isTelecaller && (
+            <div style={{ marginBottom: 16 }}>
+              <ProposedIncentiveCard />
+            </div>
+          )}
           <Outlet />
         </div>
       </main>

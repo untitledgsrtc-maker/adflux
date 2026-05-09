@@ -24,7 +24,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import { thisMonthISO, initials, todayISO } from '../../utils/formatters'
-import ProposedIncentiveCard from '../../components/incentives/ProposedIncentiveCard'
+// Phase 31O — V2AppShell mounts ProposedIncentiveCard now; this file
+// no longer needs the import.
 import '../../styles/v2.css'
 
 /* ─── Money display: full Indian-format number with lakh/crore grouping.
@@ -385,11 +386,11 @@ export default function SalesDashboardV2() {
           </div>
         )}
 
-        {/* Phase 31K — switched to shared self-fetching component so
-            /work renders the same card. The inline ProposedIncentive
-            function below is left intact as dead code in case we need
-            to roll back; ESLint will flag it as unused. */}
-        <ProposedIncentiveCard />
+        {/* Phase 31O — V2AppShell now mounts ProposedIncentiveCard at
+            the top of every sales page. /dashboard no longer renders
+            it inline (it would be a duplicate of the shell's render).
+            The inline ProposedIncentive function further down stays as
+            dead code in case of rollback; ESLint will flag it. */}
 
         <div className="v2-glance-head">This month at a glance</div>
         {/* Tiles in a 2-col grid. Settled = fully paid this month
