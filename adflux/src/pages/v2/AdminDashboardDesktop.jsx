@@ -30,8 +30,12 @@ import {
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 // Phase 12 rev3 — widgets folded in from the retired CockpitV2 page.
+// Phase 31A.2 — added 4 sales-exec analysis widgets per owner spec
+// (8 May 2026): stale leads alert, pipeline funnel, win rate / avg
+// deal / projected, recent activity feed.
 import {
   AiBriefingCard, LeadPipelinePanel, TeamActivityPanel, SlaBreachBanner,
+  StaleLeadsAlertCard, PipelineFunnelCard, WinRateCard, RecentActivityFeedCard,
 } from '../../components/dashboard/CockpitWidgets'
 import '../../styles/v2.css'
 
@@ -779,6 +783,27 @@ export default function AdminDashboardDesktop() {
             {/* Phase 12 rev3 — SLA breach alert. Only renders when
                 there's at least one Sales Ready lead past 24h. */}
             <SlaBreachBanner />
+
+            {/* Phase 31A.2 — stale leads alert (only renders when count > 0). */}
+            <div style={{ marginTop: 12 }}>
+              <StaleLeadsAlertCard />
+            </div>
+
+            {/* Phase 31A.2 — pipeline funnel + win rate row. Two-column
+                on desktop, stacked on mobile via grid auto-fit. */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: 12, marginTop: 12,
+            }}>
+              <PipelineFunnelCard />
+              <WinRateCard />
+            </div>
+
+            {/* Phase 31A.2 — recent activity feed (admin sees all reps). */}
+            <div style={{ marginTop: 12 }}>
+              <RecentActivityFeedCard limit={10} />
+            </div>
 
             {/* Dashboard spec — Action Queue card. Was the hero slot;
                 now sits below AI Briefing. Only renders when there's

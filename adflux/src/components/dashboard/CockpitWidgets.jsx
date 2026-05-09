@@ -531,3 +531,318 @@ export function SlaBreachBanner() {
     </section>
   )
 }
+
+/* ─── Phase 31A.2 — sales-exec analysis widgets ────────────────────
+   Owner pasted a full sales-exec analysis (8 May 2026) calling out
+   four dashboard gaps. Each widget below addresses one. All are
+   self-contained: own queries, no host state. Drop into any v2
+   dashboard.
+
+   1. StaleLeadsAlertCard — "X leads not contacted in 7+ days".
+      Active leads (not Won/Lost) where last_contact_at is missing
+      OR > 7 days ago. Click → /leads with stale filter intent.
+
+   2. PipelineFunnelCard — visual breakdown by stage (5 buckets).
+      Bars sized to share-of-total. Reads role-scoped via RLS so a
+      sales rep sees own; admin sees all.
+
+   3. WinRateCard — wins / (wins + losses) for this calendar month
+      + avg deal size on Won quotes + projected month-end based on
+      current pace.
+
+   4. RecentActivityFeedCard — last 8 lead_activities the rep
+      personally created (own perspective). Chronological. */
+
+export function StaleLeadsAlertCard() {
+  const navigate = useNavigate()
+  const [stale, setStale] = useState({ count: 0, sample: null })
+
+  useEffect(() => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
+    supabase.from('leads')
+      .select('id, name, company, last_contact_at, stage', { count: 'exact' })
+      .not('stage', 'in', '(Won,Lost)')
+      .or(`last_contact_at.is.null,last_contact_at.lt.${sevenDaysAgo}`)
+      .order('last_contact_at', { ascending: true, nullsFirst: true })
+      .limit(1)
+      .then(({ data, count }) => {
+        setStale({ count: count || 0, sample: data?.[0] || null })
+      })
+  }, [])
+
+  if (stale.count === 0) return null
+  return (
+    <section
+      onClick={() => navigate('/leads')}
+      style={{
+        cursor: 'pointer',
+        background: 'rgba(248,113,113,.08)',
+        border: '1px solid rgba(248,113,113,.30)',
+        borderRadius: 12,
+        padding: '14px 16px',
+        display: 'flex', alignItems: 'center', gap: 12,
+      }}
+    >
+      <AlertTriangle size={18} style={{ color: '#f87171', flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>
+          {stale.count} stale lead{stale.count === 1 ? '' : 's'} — no contact 7+ days
+        </div>
+        {stale.sample && (
+          <div style={{
+            fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            Oldest: {stale.sample.company || stale.sample.name} · stage {stale.sample.stage}
+          </div>
+        )}
+      </div>
+      <ArrowRight size={14} style={{ color: '#f87171', flexShrink: 0 }} />
+    </section>
+  )
+}
+
+export function PipelineFunnelCard() {
+  const navigate = useNavigate()
+  const [counts, setCounts] = useState(null)
+
+  useEffect(() => {
+    supabase.from('leads')
+      .select('stage')
+      .then(({ data }) => {
+        const c = { New: 0, Working: 0, QuoteSent: 0, Won: 0, Lost: 0 }
+        ;(data || []).forEach(r => { if (c[r.stage] !== undefined) c[r.stage]++ })
+        setCounts(c)
+      })
+  }, [])
+
+  if (!counts) return null
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
+  const max   = Math.max(1, ...Object.values(counts))
+
+  const STAGE_TINT_HEX = {
+    New:       '#60A5FA',
+    Working:   '#FBBF24',
+    QuoteSent: '#C084FC',
+    Won:       '#4ADE80',
+    Lost:      '#F87171',
+  }
+
+  return (
+    <section style={{
+      background: 'var(--v2-bg-1, rgba(255,255,255,.03))',
+      border: '1px solid var(--v2-line, rgba(255,255,255,.08))',
+      borderRadius: 12,
+      padding: '14px 16px',
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        marginBottom: 12,
+      }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>Pipeline funnel</div>
+        <div style={{ fontSize: 11, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+          {total} leads
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {LEAD_STAGES.map(stage => {
+          const n = counts[stage] || 0
+          const pct = (n / max) * 100
+          return (
+            <div key={stage}
+              onClick={() => navigate('/leads')}
+              style={{ cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                <span>{STAGE_LABELS[stage] || stage}</span>
+                <span style={{ color: 'var(--v2-ink-2, rgba(255,255,255,.40))', fontFamily: 'var(--font-mono)' }}>
+                  {n}
+                </span>
+              </div>
+              <div style={{
+                height: 6, borderRadius: 3,
+                background: 'rgba(255,255,255,.04)', overflow: 'hidden',
+              }}>
+                <div style={{
+                  width: `${pct}%`, height: '100%',
+                  background: STAGE_TINT_HEX[stage] || '#60A5FA',
+                  transition: 'width .4s ease',
+                }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+export function WinRateCard() {
+  const [m, setM] = useState(null)
+
+  useEffect(() => {
+    const monthStart = new Date()
+    monthStart.setDate(1); monthStart.setHours(0,0,0,0)
+    const monthStartIso = monthStart.toISOString()
+
+    supabase.from('quotes')
+      .select('total_amount, status, created_at')
+      .gte('created_at', monthStartIso)
+      .then(({ data }) => {
+        const rows = data || []
+        const won  = rows.filter(r => r.status === 'won')
+        const lost = rows.filter(r => r.status === 'lost')
+        const wonValue = won.reduce((s, r) => s + Number(r.total_amount || 0), 0)
+        const wonCount = won.length
+        const winRate = (won.length + lost.length) > 0
+          ? Math.round((won.length / (won.length + lost.length)) * 100)
+          : null
+        const avgDeal = wonCount > 0 ? Math.round(wonValue / wonCount) : 0
+        // Days elapsed vs month length → projected end-of-month wins.
+        const today = new Date()
+        const daysIn = today.getDate()
+        const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+        const projected = daysIn > 0
+          ? Math.round((wonValue / daysIn) * daysInMonth)
+          : 0
+        setM({ winRate, avgDeal, wonValue, wonCount, projected })
+      })
+  }, [])
+
+  function fmtLakh(n) {
+    if (!n) return '—'
+    if (n >= 10_000_000) return `₹${(n/10_000_000).toFixed(2)} Cr`
+    if (n >= 100_000)    return `₹${(n/100_000).toFixed(2)} L`
+    return `₹${n.toLocaleString('en-IN')}`
+  }
+
+  if (!m) return null
+
+  return (
+    <section style={{
+      background: 'var(--v2-bg-1, rgba(255,255,255,.03))',
+      border: '1px solid var(--v2-line, rgba(255,255,255,.08))',
+      borderRadius: 12,
+      padding: '14px 16px',
+    }}>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+        Month at a glance
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+      }}>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+            Win rate
+          </div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, marginTop: 2 }}>
+            {m.winRate == null ? '—' : `${m.winRate}%`}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+            of {m.wonCount} won
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+            Avg deal
+          </div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, marginTop: 2 }}>
+            {fmtLakh(m.avgDeal)}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+            Projected
+          </div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, marginTop: 2, color: 'var(--accent, #FFE600)' }}>
+            {fmtLakh(m.projected)}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+            at current pace
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export function RecentActivityFeedCard({ userId, limit = 8 }) {
+  const navigate = useNavigate()
+  const [feed, setFeed] = useState(null)
+
+  useEffect(() => {
+    let q = supabase.from('lead_activities')
+      .select('id, lead_id, activity_type, notes, created_at, lead:lead_id(name, company)')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (userId) q = q.eq('created_by', userId)
+    q.then(({ data }) => setFeed(data || []))
+  }, [userId, limit])
+
+  if (!feed) return null
+  if (feed.length === 0) {
+    return (
+      <section style={{
+        background: 'var(--v2-bg-1, rgba(255,255,255,.03))',
+        border: '1px solid var(--v2-line, rgba(255,255,255,.08))',
+        borderRadius: 12,
+        padding: '14px 16px',
+        fontSize: 12,
+        color: 'var(--v2-ink-2, rgba(255,255,255,.40))',
+      }}>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, color: 'var(--text)' }}>
+          Recent activity
+        </div>
+        No activity logged yet today.
+      </section>
+    )
+  }
+
+  function fmtRelative(ts) {
+    const ms = Date.now() - new Date(ts).getTime()
+    if (ms < 60_000)        return 'just now'
+    if (ms < 3600_000)      return `${Math.floor(ms/60_000)} min ago`
+    if (ms < 86400_000)     return `${Math.floor(ms/3600_000)} hr ago`
+    return `${Math.floor(ms/86400_000)} d ago`
+  }
+
+  return (
+    <section style={{
+      background: 'var(--v2-bg-1, rgba(255,255,255,.03))',
+      border: '1px solid var(--v2-line, rgba(255,255,255,.08))',
+      borderRadius: 12,
+      padding: '14px 16px',
+    }}>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Recent activity</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {feed.map(a => (
+          <div key={a.id}
+            onClick={() => navigate(`/leads/${a.lead_id}`)}
+            style={{
+              cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '6px 8px', borderRadius: 8,
+              background: 'rgba(255,255,255,.02)',
+            }}
+          >
+            <Clock size={11} style={{ color: 'var(--v2-ink-2, rgba(255,255,255,.40))', marginTop: 3, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {a.activity_type}{a.lead ? ` · ${a.lead.company || a.lead.name}` : ''}
+              </div>
+              {a.notes && (
+                <div style={{
+                  fontSize: 11, color: 'var(--v2-ink-2, rgba(255,255,255,.50))',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {a.notes}
+                </div>
+              )}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', flexShrink: 0 }}>
+              {fmtRelative(a.created_at)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
