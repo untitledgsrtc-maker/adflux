@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useQuoteStore } from '../../store/quoteStore'
 import {
   LayoutDashboard, FileText, CheckSquare, BarChart3, Users, Building2,
   Repeat, Gift, Settings, LogOut, Search, Bell, Plus, AlertTriangle,
@@ -795,6 +796,38 @@ export default function AdminDashboardDesktop() {
 
         {/* end page-head, body below */}
         <div>
+            {/* Phase 31F — owner-facing target progress line. The hero
+                further down shows revenue / pipeline / outstanding but
+                NOT % to target, which is the single number an owner
+                steers by. Renders only when there's a target set so
+                fresh installs don't display "0% to ₹0 target". */}
+            {state.kpi.mtdTarget > 0 && (
+              <div
+                style={{
+                  fontSize: 13, color: 'var(--v2-ink-1)', marginBottom: 12,
+                  display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ color: 'var(--v2-ink-2)' }}>This month</span>
+                <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-ink-0)' }}>
+                  <Money value={state.kpi.revenue} />
+                </span>
+                <span style={{ color: 'var(--v2-ink-2)' }}>of</span>
+                <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-ink-0)' }}>
+                  <Money value={state.kpi.mtdTarget} />
+                </span>
+                <span style={{
+                  fontFamily: 'var(--v2-display)', fontWeight: 700,
+                  color: state.kpi.revenue >= state.kpi.mtdTarget ? 'var(--v2-green)' : 'var(--v2-amber)',
+                  fontSize: 12,
+                  background: state.kpi.revenue >= state.kpi.mtdTarget ? 'rgba(16,185,129,.12)' : 'rgba(245,158,11,.12)',
+                  padding: '2px 8px', borderRadius: 999,
+                }}>
+                  {Math.round((state.kpi.revenue / state.kpi.mtdTarget) * 100)}% to target
+                </span>
+              </div>
+            )}
+
             {/* Phase 12 rev3 — AI Briefing card hoisted to the top so
                 it's the first thing Brijesh sees on /dashboard. Pulls
                 its own data; rule-based until daily-brief Edge Function
@@ -970,8 +1003,11 @@ export default function AdminDashboardDesktop() {
                 two empty gutters with only two children. */}
             <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
               {/* Phase 31E — Active Quotes now shows total ₹ value and
-                  overdue count under the headline number. Was just a
-                  bare integer that felt empty next to Outstanding. */}
+                  overdue count under the headline number.
+                  Phase 31F — added "View all" CTA that resets quote
+                  filters and routes to /quotes (the global filter store
+                  was holding stale dashboard slices, so .resetFilters()
+                  before nav). */}
               <Kpi
                 label="Active quotes"
                 count={state.kpi.activeQuotes}
@@ -982,13 +1018,53 @@ export default function AdminDashboardDesktop() {
                     : 'No active quotes'
                 }
                 dot={state.kpi.activeOverdue > 0}
+                cta={{
+                  label: 'View all',
+                  onClick: () => {
+                    useQuoteStore.getState().resetFilters()
+                    navigate('/quotes')
+                  },
+                }}
               />
-              <Kpi label="Outstanding"     value={state.kpi.outstanding}   tone="rose" dot={state.kpi.outstanding > 0} />
+              {/* Phase 31F — Outstanding gets a "Chase" CTA that filters
+                  /quotes to status='won' (i.e. won-but-not-fully-paid
+                  is what Outstanding represents). */}
+              <Kpi
+                label="Outstanding"
+                value={state.kpi.outstanding}
+                tone="rose"
+                dot={state.kpi.outstanding > 0}
+                cta={state.kpi.outstanding > 0 ? {
+                  label: 'Chase',
+                  onClick: () => {
+                    useQuoteStore.getState().resetFilters()
+                    useQuoteStore.getState().setFilters({ status: 'won' })
+                    navigate('/quotes')
+                  },
+                } : undefined}
+              />
             </section>
 
             {/* Row 2: Revenue trend + Funnel */}
             <section className="v2d-grid-2">
-              <RevenueTrendPanel months={state.trendMonths} max={state.trendMax} />
+              {/* Phase 31F — clicking a bar drills into /quotes filtered
+                  to that month. monthKey is "YYYY-MM"; we widen it to
+                  the full month range and feed the global quote filter
+                  store before navigating. */}
+              <RevenueTrendPanel
+                months={state.trendMonths}
+                max={state.trendMax}
+                onMonthClick={(monthKey) => {
+                  const [yy, mm] = monthKey.split('-').map(Number)
+                  const dateFrom = `${yy}-${String(mm).padStart(2, '0')}-01`
+                  // Last day of month: day 0 of next month.
+                  const last = new Date(yy, mm, 0).getDate()
+                  const dateTo = `${yy}-${String(mm).padStart(2, '0')}-${String(last).padStart(2, '0')}`
+                  useQuoteStore.getState().resetFilters()
+                  useQuoteStore.getState().setFilters({ dateFrom, dateTo })
+                  navigate('/quotes')
+                }}
+              />
               <FunnelPanel stages={state.funnel.stages} max={state.funnel.max} />
             </section>
 
@@ -1063,7 +1139,7 @@ export default function AdminDashboardDesktop() {
    Sub-components
    ══════════════════════════════════════════════════════════ */
 
-function Kpi({ label, value, count, tone, dot, sub }) {
+function Kpi({ label, value, count, tone, dot, sub, cta }) {
   const icon = { green: '₹', blue: '◎', amber: '⏱', rose: '!' }[tone] || '•'
   const iconClass = tone === 'green' ? 'v2d-kpi-ic--green'
                   : tone === 'blue'  ? 'v2d-kpi-ic--blue'
@@ -1073,6 +1149,22 @@ function Kpi({ label, value, count, tone, dot, sub }) {
       <div className="v2d-kpi-head">
         <div className={`v2d-kpi-ic ${iconClass}`}>{icon}</div>
         <div className="v2d-kpi-l">{label}</div>
+        {/* Phase 31F — optional CTA link in the head row (top-right).
+            Passed as { label, onClick }. Keeps the KPI value clean
+            while giving the user a one-click drill-down. */}
+        {cta && (
+          <button
+            type="button"
+            onClick={cta.onClick}
+            style={{
+              marginLeft: 'auto', background: 'transparent', border: 0,
+              color: 'var(--v2-yellow)', fontSize: 11, fontWeight: 600,
+              cursor: 'pointer', padding: 0,
+            }}
+          >
+            {cta.label} →
+          </button>
+        )}
       </div>
       <div className="v2d-kpi-v">
         {value !== undefined ? <Money value={value} /> : (count ?? 0)}
@@ -1089,26 +1181,44 @@ function Kpi({ label, value, count, tone, dot, sub }) {
   )
 }
 
-function RevenueTrendPanel({ months, max }) {
+function RevenueTrendPanel({ months, max, onMonthClick }) {
   return (
     <div className="v2d-panel">
       <div className="v2d-panel-h">
         <div>
           <div className="v2d-panel-t">Revenue trend · last 6 months</div>
-          <div className="v2d-panel-s">Approved payments per month</div>
+          {/* Phase 31F — added "click any bar to drill in" hint so the
+              affordance is discoverable. */}
+          <div className="v2d-panel-s">Approved payments per month · click a bar to open the quotes</div>
         </div>
       </div>
       <div className="v2d-bars">
         {months.map((m, i) => {
           const h = Math.max(6, Math.round((m.value / max) * 170))
           const isCurrent = i === months.length - 1
+          // Phase 31F — render bar columns as buttons when an onMonthClick
+          // handler is provided. Disabled for empty months so dead clicks
+          // don't reach a /quotes view that has nothing to show.
+          const clickable = !!onMonthClick && m.value > 0
           return (
-            <div key={m.key} className="v2d-bar-col">
+            <button
+              key={m.key}
+              type="button"
+              className="v2d-bar-col"
+              onClick={clickable ? () => onMonthClick(m.key) : undefined}
+              disabled={!clickable}
+              title={clickable ? `Open ${m.label} quotes` : `${m.label}: no revenue`}
+              style={{
+                background: 'transparent', border: 0, padding: 0,
+                cursor: clickable ? 'pointer' : 'default',
+                color: 'inherit', font: 'inherit', textAlign: 'inherit',
+              }}
+            >
               <div className={`v2d-bar ${isCurrent ? 'is-current' : ''}`} style={{ height: h }}>
                 <div className="v2d-bar-v"><Money value={m.value} /></div>
               </div>
               <div className="v2d-bar-m">{m.label}</div>
-            </div>
+            </button>
           )
         })}
       </div>
