@@ -427,6 +427,19 @@ export default function LeadDetailV2() {
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
               <Edit3 size={13} /> <span>Note</span>
             </button>
+            {/* Phase 31B — owner pushback (9 May 2026): "how to change
+                status for follow up its not there anywhere". The
+                follow-up scheduling lives inside LogActivityModal but
+                wasn't discoverable. New top-level Follow-up button
+                opens the same modal pre-typed as a 'note' so the rep
+                lands on the schedule-follow-up section directly. */}
+            <button
+              className="lead-btn lead-btn-sm"
+              onClick={() => setActivityType('note')}
+              title="Schedule a follow-up date"
+            >
+              <Clock size={13} /> <span>Follow-up</span>
+            </button>
             <button
               className="lead-btn lead-btn-sm"
               onClick={() => navigate(`/voice?lead=${lead.id}`)}
