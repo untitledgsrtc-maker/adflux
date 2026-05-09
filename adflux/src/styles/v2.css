@@ -595,7 +595,10 @@
 .v2d-brand-s { font-size: 9px; color: var(--v2-ink-2); letter-spacing: 0.14em; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
 
 .v2d-nav { display: flex; flex-direction: column; gap: 2px; }
-.v2d-nav-group { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--v2-ink-2); font-weight: 700; padding: 10px 12px 6px; }
+/* Phase 32G — same readability bump as leads.css. Eyebrow / kicker
+   font-size 10 → 11px, color upgraded from ink-2 → ink-1 where the
+   contrast was thin. Body text classes unchanged. */
+.v2d-nav-group { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--v2-ink-1); font-weight: 700; padding: 10px 12px 6px; }
 .v2d-nav a, .v2d-nav button {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 11px; border-radius: 8px;
@@ -635,7 +638,7 @@
   position: sticky; top: 0; z-index: 10;
   flex-wrap: wrap;
 }
-.v2d-crumb-kicker { font-size: 10px; letter-spacing: 0.14em; color: var(--v2-ink-2); font-weight: 700; text-transform: uppercase; }
+.v2d-crumb-kicker { font-size: 11px; letter-spacing: 0.14em; color: var(--v2-ink-1); font-weight: 700; text-transform: uppercase; }
 .v2d-crumb-t { font-family: var(--v2-display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
 .v2d-topbar-spacer { flex: 1; }
 
@@ -659,8 +662,8 @@
 
 .v2d-me { display: flex; align-items: center; gap: 10px; padding: 4px 14px 4px 4px; border: 1px solid var(--v2-line); border-radius: var(--v2-r-pill); background: var(--v2-bg-1); cursor: pointer; flex-shrink: 0; }
 .v2d-me-av { width: 30px; height: 30px; border-radius: 50%; background: var(--v2-yellow); color: var(--v2-yellow-ink); display: grid; place-items: center; font-family: var(--v2-display); font-weight: 700; font-size: 12px; flex-shrink: 0; }
-.v2d-me-name { font-size: 12px; font-weight: 600; white-space: nowrap; }
-.v2d-me-role { font-size: 10px; color: var(--v2-ink-2); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
+.v2d-me-name { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.v2d-me-role { font-size: 11px; color: var(--v2-ink-1); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
 
 .v2d-content { padding: 24px 28px 36px; overflow-x: hidden; }
 
@@ -697,7 +700,7 @@
 .v2d-kpi-ic--blue { background: var(--v2-blue-soft); color: var(--v2-blue); }
 .v2d-kpi-ic--amber { background: var(--v2-amber-soft); color: var(--v2-amber); }
 .v2d-kpi-ic--rose { background: var(--v2-rose-soft); color: var(--v2-rose); }
-.v2d-kpi-l { font-size: 10px; letter-spacing: 0.14em; font-weight: 700; color: var(--v2-ink-2); text-transform: uppercase; }
+.v2d-kpi-l { font-size: 11px; letter-spacing: 0.14em; font-weight: 700; color: var(--v2-ink-1); text-transform: uppercase; }
 .v2d-kpi-v { font-family: var(--v2-display); font-weight: 700; font-size: 26px; line-height: 1; letter-spacing: -0.01em; }
 .v2d-kpi-v sub { font-size: 0.55em; vertical-align: baseline; font-weight: 600; color: var(--v2-ink-1); margin-left: 3px; }
 .v2d-kpi-delta { margin-top: 8px; font-size: 11px; color: var(--v2-ink-2); display: flex; gap: 4px; align-items: center; line-height: 1.4; }

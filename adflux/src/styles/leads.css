@@ -144,9 +144,14 @@
   display: flex; align-items: flex-end; justify-content: space-between;
   margin-bottom: 18px;
 }
-.lead-page-eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-subtle); }
+/* Phase 32G — owner ask: 'fonts very small of all small thing make
+   it bold and readable'. Bumped readability across the small-text
+   class hierarchy. Eyebrows / labels / meta lines: +1px font, +100
+   weight where they were thin. Numbers and big text untouched —
+   they were already legible. */
+.lead-page-eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
 .lead-page-title   { font-family: var(--font-display); font-size: 26px; font-weight: 600; margin-top: 4px; }
-.lead-page-sub     { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.lead-page-sub     { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 
 /* ─── Generic card (lead-scoped to avoid clobbering existing .card) ─── */
 .lead-card {
@@ -162,9 +167,9 @@
   display: flex; align-items: center; justify-content: space-between;
   border-bottom: 1px solid var(--border-soft, rgba(255,255,255,.06));
 }
-.lead-card-title { font-size: 13px; font-weight: 600; }
-.lead-card-sub   { font-size: 11px; color: var(--text-subtle); margin-top: 2px; }
-.lead-card-link  { font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.lead-card-title { font-size: 14px; font-weight: 700; }
+.lead-card-sub   { font-size: 12px; color: var(--text-muted); margin-top: 3px; font-weight: 500; }
+.lead-card-link  { font-size: 13px; font-weight: 600; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .lead-card-link:hover { color: var(--accent); }
 
 /* ─── Buttons (lead-scoped) ─── */
@@ -184,7 +189,7 @@
 }
 .lead-btn-primary:hover { background: var(--accent); filter: brightness(1.05); }
 .lead-btn-ghost { background: transparent; }
-.lead-btn-sm { padding: 6px 10px; font-size: 11px; }
+.lead-btn-sm { padding: 7px 12px; font-size: 12px; font-weight: 600; }
 
 /* ─── Inputs (lead-scoped) ─── */
 /* Phase 32B — owner reported (10 May 2026) inputs across the app
@@ -227,9 +232,9 @@
   padding: 14px 16px;
   box-shadow: var(--shadow);
 }
-.lead-stat-eyebrow { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-subtle); }
+.lead-stat-eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
 .lead-stat-num     { font-family: var(--font-display); font-weight: 600; font-size: 22px; margin-top: 4px; }
-.lead-stat-meta    { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.lead-stat-meta    { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
 
 /* ─── Filter row ─── */
 .lead-filter-row {
@@ -348,10 +353,10 @@
 .tl-icon.red    { background: var(--danger-soft,  rgba(239,68,68,.12));  color: var(--danger); }
 .tl-icon.purple { background: var(--tint-purple-bg);                     color: var(--purple); }
 .tl-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.tl-title { font-weight: 500; }
-.tl-time  { color: var(--text-subtle); font-size: 11px; font-family: var(--font-mono); margin-left: auto; }
-.tl-body  { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-.tl-next  { font-size: 11px; color: var(--warning); margin-top: 6px; display: inline-flex; gap: 6px; align-items: center; }
+.tl-title { font-weight: 600; font-size: 14px; }
+.tl-time  { color: var(--text-muted); font-size: 12px; font-weight: 600; font-family: var(--font-mono); margin-left: auto; }
+.tl-body  { font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+.tl-next  { font-size: 12px; color: var(--warning); margin-top: 6px; display: inline-flex; gap: 6px; align-items: center; font-weight: 600; }
 .tl-gps   { font-size: 10px; color: var(--text-subtle); font-family: var(--font-mono); margin-top: 4px; display: inline-flex; gap: 4px; align-items: center; }
 
 /* ─── Modal (lead-scoped to not collide with existing .modal) ─── */
