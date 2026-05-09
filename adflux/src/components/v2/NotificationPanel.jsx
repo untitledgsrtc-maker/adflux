@@ -41,7 +41,9 @@ export default function NotificationPanel() {
         .order('created_at', { ascending: false })
         .limit(15),
       supabase.from('follow_ups')
-        .select('id, quote_id, follow_up_date, note, quotes(quote_number, ref_number, client_company, client_name, segment)')
+        // Phase 31V — pulled follow_up_time too so notifications can
+        // show "Meeting at 12:00" instead of just "Meeting today".
+        .select('id, quote_id, follow_up_date, follow_up_time, note, quotes(quote_number, ref_number, client_company, client_name, segment)')
         .eq('is_done', false)
         .lte('follow_up_date', todayIso)
         .order('follow_up_date', { ascending: true })
@@ -53,7 +55,9 @@ export default function NotificationPanel() {
         .order('handoff_sla_due_at', { ascending: true })
         .limit(15),
       supabase.from('lead_activities')
-        .select('id, lead_id, next_action, next_action_date, lead:lead_id(name, company)')
+        // Phase 31V — pull next_action_time so the row reads
+        // "Send quote · 14:30" not just "Send quote".
+        .select('id, lead_id, next_action, next_action_date, next_action_time, lead:lead_id(name, company)')
         .eq('next_action_date', todayIso)
         .order('created_at', { ascending: false })
         .limit(15),
@@ -72,10 +76,13 @@ export default function NotificationPanel() {
     })
     ;(fuRes.data || []).forEach(r => {
       const q = r.quotes
+      // Phase 31V — bake follow_up_time into the title and sub when
+      // present, so the rep sees "Follow-up at 14:30" before tapping in.
+      const tStr = r.follow_up_time ? String(r.follow_up_time).slice(0, 5) : ''
       list.push({
         kind: 'followup', id: r.id,
-        title: `Follow-up due: ${q?.client_company || q?.client_name || '—'}`,
-        sub: r.note || `${q?.quote_number || q?.ref_number || ''} · ${r.follow_up_date}`,
+        title: `Follow-up${tStr ? ` at ${tStr}` : ''}: ${q?.client_company || q?.client_name || '—'}`,
+        sub: r.note || `${q?.quote_number || q?.ref_number || ''} · ${r.follow_up_date}${tStr ? ` ${tStr}` : ''}`,
         to: q ? (q.segment === 'GOVERNMENT' ? `/proposal/${r.quote_id}` : `/quotes/${r.quote_id}`) : '/quotes',
         ts: r.follow_up_date,
       })
@@ -90,9 +97,11 @@ export default function NotificationPanel() {
       })
     })
     ;(naRes.data || []).forEach(r => {
+      // Phase 31V — same time treatment for next-action-due rows.
+      const tStr = r.next_action_time ? String(r.next_action_time).slice(0, 5) : ''
       list.push({
         kind: 'dueAction', id: r.id,
-        title: `Today: ${r.next_action || 'next action due'}`,
+        title: `Today${tStr ? ` ${tStr}` : ''}: ${r.next_action || 'next action due'}`,
         sub: r.lead?.company || r.lead?.name || '—',
         to: `/leads/${r.lead_id}`,
         ts: r.next_action_date,

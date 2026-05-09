@@ -500,8 +500,12 @@ export default function LeadDetailV2() {
                       {a.notes && <div className="tl-body">{a.notes}</div>}
                       {a.next_action && (
                         <div className="tl-next">
+                          {/* Phase 31V — next_action_time was being saved
+                              by the voice flow (Phase 31J) but never
+                              displayed. Now: 'Send quote · 12 May · 14:30'. */}
                           <Clock size={11} /> Next: {a.next_action}
                           {a.next_action_date ? ` · ${formatDate(a.next_action_date)}` : ''}
+                          {a.next_action_time ? ` · ${String(a.next_action_time).slice(0, 5)}` : ''}
                         </div>
                       )}
                       {(a.gps_lat && a.gps_lng) && (
