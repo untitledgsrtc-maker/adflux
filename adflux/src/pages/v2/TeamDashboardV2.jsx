@@ -36,6 +36,11 @@ export default function TeamDashboardV2() {
   const [reps, setReps] = useState([])
   const [sessions, setSessions] = useState([])
   const [callsByUser, setCallsByUser] = useState({})
+  // Phase 31E — owner reported (9 May 2026) Voice Logs hero stat showed
+  // "0 · counts coming · live". The voice_logs table has been live
+  // since Phase 20 — placeholder copy was just stale. Wire actual
+  // counts the same way callsByUser is wired.
+  const [voiceByUser, setVoiceByUser] = useState({})
   const [newLeadsToday, setNewLeadsToday] = useState(0)
   const [pipelineToday, setPipelineToday] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -48,7 +53,7 @@ export default function TeamDashboardV2() {
       const today = new Date().toISOString().slice(0, 10)
       const startOfDay = `${today}T00:00:00`
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes] = await Promise.all([
         supabase.from('users')
           .select('id, name, team_role, city, daily_targets, is_active')
           .in('team_role', ['sales', 'agency', 'sales_manager'])
@@ -71,6 +76,10 @@ export default function TeamDashboardV2() {
           .select('total_amount, status')
           .eq('status', 'won')
           .gte('created_at', startOfDay),
+        // Phase 31E — voice_logs counted per rep for today.
+        supabase.from('voice_logs')
+          .select('user_id')
+          .gte('created_at', startOfDay),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
@@ -84,6 +93,13 @@ export default function TeamDashboardV2() {
         byUser[r.user_id] = (byUser[r.user_id] || 0) + 1
       })
       setCallsByUser(byUser)
+      // Phase 31E — same shape as callsByUser: row-per-log, count by user_id.
+      const voiceMap = {}
+      ;(voiceRes.data || []).forEach(r => {
+        if (!r.user_id) return
+        voiceMap[r.user_id] = (voiceMap[r.user_id] || 0) + 1
+      })
+      setVoiceByUser(voiceMap)
       setNewLeadsToday(newLeadsRes.count || 0)
       setPipelineToday((pipelineRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0))
       setLoading(false)
@@ -104,6 +120,11 @@ export default function TeamDashboardV2() {
   const totalCallsToday = useMemo(() => {
     return Object.values(callsByUser).reduce((s, n) => s + n, 0)
   }, [callsByUser])
+
+  // Phase 31E — total voice logs across the team, today.
+  const totalVoiceToday = useMemo(() => {
+    return Object.values(voiceByUser).reduce((s, n) => s + n, 0)
+  }, [voiceByUser])
 
   if (!isPrivileged) {
     return (
@@ -175,7 +196,7 @@ export default function TeamDashboardV2() {
         <div className="lead-hero-stats">
           <HeroStat label="Reps active now"   value={`${live} / ${reps.length}`}   delta={`${reps.length - live} not checked-in`} down={live < reps.length} />
           <HeroStat label="Calls today"       value={totalCallsToday}             delta="from call_logs"                          up={totalCallsToday > 0} />
-          <HeroStat label="Voice logs"        value={0}                            delta="counts coming · live"                    acc />
+          <HeroStat label="Voice logs"        value={totalVoiceToday}              delta={totalVoiceToday > 0 ? 'recorded today' : 'none yet today'}  acc />
           <HeroStat label="New leads added"   value={newLeadsToday}                delta="today"                                   up={newLeadsToday > 0} />
           <HeroStat label="Won today"         value={formatLakh(pipelineToday)}    delta="status=won"                              up={pipelineToday > 0} />
         </div>
@@ -227,7 +248,10 @@ export default function TeamDashboardV2() {
                   <div className="lbl">Calls</div>
                 </div>
                 <div className="lead-rep-kpi">
-                  <div className="num acc">0</div>
+                  {/* Phase 31E — wired to voiceByUser instead of literal 0. */}
+                  <div className={`num ${(voiceByUser[r.id] || 0) > 0 ? 'acc' : ''}`}>
+                    {voiceByUser[r.id] || 0}
+                  </div>
                   <div className="lbl">Voice</div>
                 </div>
               </div>

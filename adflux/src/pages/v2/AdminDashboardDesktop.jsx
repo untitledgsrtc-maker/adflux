@@ -25,7 +25,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import {
-  todayISO, initials, formatRelative,
+  todayISO, initials, formatRelative, formatCompact,
 } from '../../utils/formatters'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
@@ -188,7 +188,19 @@ export default function AdminDashboardDesktop() {
       .reduce((s, p) => s + (p.amount_received || 0), 0)
 
     // Active quotes = not lost
-    const activeQuotes = quotes.filter(q => q.status !== 'lost').length
+    const activeQuotesArr = quotes.filter(q => q.status !== 'lost')
+    const activeQuotes    = activeQuotesArr.length
+    // Phase 31E — owner reported (9 May 2026) Active Quotes card felt
+    // bare next to Outstanding. Enrich with total ₹ value + a count of
+    // "overdue" quotes (status sent/negotiating, created 30+ days ago,
+    // still not closed). Both displayed under the count via the new
+    // Kpi `sub` prop.
+    const activeValue   = activeQuotesArr.reduce((s, q) => s + (q.total_amount || 0), 0)
+    const overdueCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const activeOverdue = activeQuotesArr.filter(q =>
+      ['sent', 'negotiating'].includes(q.status)
+      && (q.created_at || '') < overdueCutoff
+    ).length
 
     // Pipeline (sent + negotiating value)
     const pipelineValue = quotes
@@ -668,7 +680,8 @@ export default function AdminDashboardDesktop() {
     setState({
       loading: false,
       kpi: {
-        revenue, activeQuotes, pipelineValue, outstanding,
+        revenue, activeQuotes, activeValue, activeOverdue,
+        pipelineValue, outstanding,
         pending: pending.length, liability, lostRevenue, wonValue,
         // Phase 25d — design-aligned hero subtitle data
         todayCollected, mtdTarget,
@@ -725,17 +738,25 @@ export default function AdminDashboardDesktop() {
     <div className="v2d">
       <div className="v2d-content">
         {/* Greeting + filters + CTA — replaces the old internal topbar */}
+        {/* Phase 31E — owner reported (9 May 2026) the entire LEFT half
+            of this row was empty whitespace because of the old `flex:1`
+            spacer that pushed period picker + segment tabs to the right.
+            On a wide desktop it looked broken — like a missing widget.
+            Removed the spacer and added a small "Filters" kicker on the
+            left so the row reads as labelled controls instead of two
+            floating chips. */}
         <header
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
             flexWrap: 'wrap', marginBottom: 16,
           }}
         >
-          {/* Phase 21b — V2AppShell topbar already shows the greeting
-              ("ADMIN CONSOLE / Good evening, Brijesh"). Rendering it
-              again here was a duplicate header. Keep the page head as
-              just the period picker + filters + CTA on the right. */}
-          <div style={{ flex: 1 }} />
+          <div style={{
+            fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase',
+            color: 'var(--v2-ink-2)', fontWeight: 700, marginRight: 4,
+          }}>
+            Filters
+          </div>
 
           {/* Period picker — month nav + presets + custom range. */}
           <PeriodPicker period={period} onChange={setPeriod} />
@@ -948,7 +969,20 @@ export default function AdminDashboardDesktop() {
                 .v2d-kpi-row rule is repeat(4, 1fr) which would leave
                 two empty gutters with only two children. */}
             <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-              <Kpi label="Active quotes"   count={state.kpi.activeQuotes}  tone="blue" />
+              {/* Phase 31E — Active Quotes now shows total ₹ value and
+                  overdue count under the headline number. Was just a
+                  bare integer that felt empty next to Outstanding. */}
+              <Kpi
+                label="Active quotes"
+                count={state.kpi.activeQuotes}
+                tone="blue"
+                sub={
+                  state.kpi.activeQuotes > 0
+                    ? `${formatCompact(state.kpi.activeValue)} value${state.kpi.activeOverdue > 0 ? ` · ${state.kpi.activeOverdue} overdue 30d+` : ''}`
+                    : 'No active quotes'
+                }
+                dot={state.kpi.activeOverdue > 0}
+              />
               <Kpi label="Outstanding"     value={state.kpi.outstanding}   tone="rose" dot={state.kpi.outstanding > 0} />
             </section>
 
@@ -1029,7 +1063,7 @@ export default function AdminDashboardDesktop() {
    Sub-components
    ══════════════════════════════════════════════════════════ */
 
-function Kpi({ label, value, count, tone, dot }) {
+function Kpi({ label, value, count, tone, dot, sub }) {
   const icon = { green: '₹', blue: '◎', amber: '⏱', rose: '!' }[tone] || '•'
   const iconClass = tone === 'green' ? 'v2d-kpi-ic--green'
                   : tone === 'blue'  ? 'v2d-kpi-ic--blue'
@@ -1043,6 +1077,13 @@ function Kpi({ label, value, count, tone, dot }) {
       <div className="v2d-kpi-v">
         {value !== undefined ? <Money value={value} /> : (count ?? 0)}
       </div>
+      {/* Phase 31E — optional sub line for richer context (e.g. value
+          + overdue count under Active Quotes count). */}
+      {sub && (
+        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 4, fontWeight: 500 }}>
+          {sub}
+        </div>
+      )}
       {dot && <div className="v2d-kpi-delta"><span className="up">●</span> needs attention</div>}
     </div>
   )
@@ -1237,7 +1278,15 @@ function LeaderboardPanel({ rows, max, period }) {
               <div key={r.id} className="v2d-lb-row" style={{ alignItems: 'center' }}>
                 <div className={`v2d-lb-rank ${rankCls}`}>{medals[i] || i + 1}</div>
                 <div className="v2d-lb-avatar">{initials(r.name)}</div>
-                <div className="v2d-lb-name">
+                {/* Phase 31E — owner reported (9 May 2026) leaderboard
+                    names truncating to "Test...", "Brijesh...". The
+                    1fr name column gets squeezed when Outstanding
+                    panel takes the other half. Added a hover tooltip
+                    so the full name is one mouse-over away even when
+                    truncation kicks in; tightened the right cols in
+                    .v2d-lb-row CSS to 80/80/40 to give names a bit
+                    more breathing room before truncation triggers. */}
+                <div className="v2d-lb-name" title={r.name}>
                   {r.name}
                   <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>
                     {r.wonCount} won quote{r.wonCount === 1 ? '' : 's'}
