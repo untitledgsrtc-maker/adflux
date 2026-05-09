@@ -393,10 +393,19 @@ export default function QuoteDetail() {
             <button
               className="btn btn-sec btn-sm"
               onClick={() => {
+                // Phase 32C — owner reported (10 May 2026) Edit button
+                // does nothing. Root cause: /quotes/new routes to
+                // CreateQuoteChooserV2 (the "Govt or Private?" picker),
+                // NOT the Private LED wizard, which lives at
+                // /quotes/new/private. The chooser dropped the editOf
+                // query string, so reps landed on the picker page with
+                // no edit context and assumed nothing happened.
+                // Fixed: navigate directly to the wizard route by
+                // media_type. Same pattern OTHER_MEDIA already uses.
                 if (quote?.media_type === 'OTHER_MEDIA') {
                   navigate('/quotes/new/private/other-media', { state: { editingId: id } })
                 } else {
-                  navigate(`/quotes/new?editOf=${id}`)
+                  navigate(`/quotes/new/private?editOf=${id}`)
                 }
               }}
               title="Edit this quote"

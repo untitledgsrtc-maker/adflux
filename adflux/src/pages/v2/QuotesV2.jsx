@@ -56,7 +56,10 @@ export default function QuotesV2() {
     } else if (q.media_type === 'OTHER_MEDIA') {
       navigate('/quotes/new/private/other-media', { state: { editingId: q.id } })
     } else {
-      navigate(`/quotes/new?editOf=${q.id}`)
+      // Phase 32C — was '/quotes/new?editOf=' but that's the segment
+      // chooser, which silently drops editOf. Use the actual Private
+      // LED wizard route. Same bug fix applied in QuoteDetail.jsx.
+      navigate(`/quotes/new/private?editOf=${q.id}`)
     }
   }
   async function deleteQuote(e, q) {
