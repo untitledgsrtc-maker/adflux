@@ -32,7 +32,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
   RefreshCw, Sparkles, FileText as FileTextIcon, Users as UsersIcon,
-  AlertTriangle, Clock, Mic,
+  AlertTriangle, Clock, Mic, ChevronDown,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -299,21 +299,32 @@ export default function LeadDetailV2() {
             })()}
 
             {/* Status row: stage + heat + segment, in that order, no separators
-                Phase 31T — stage chip is now clickable. Replaces the
-                'Stage' button that used to live in the action grid.
-                Tap chip → ChangeStageModal opens. Title shows the
-                affordance for new reps. */}
+                Phase 31T — stage chip is now clickable.
+                Phase 32L — owner reported (10 May 2026) "when we change
+                stage of lead it's not changing". Root cause was NOT the
+                save logic (works) but discoverability — the chip looked
+                like a static badge with zero visible affordance. The
+                only hint was a `title=` tooltip, invisible on touch. Fix
+                wraps chip + ChevronDown in a pill-styled button with a
+                subtle border + hover state so it reads as "tap me". The
+                Stage button is also restored to the action grid below
+                as a second path for reps with muscle memory from <31T. */}
             <div className="lead-hero-chips">
               <button
                 type="button"
                 onClick={() => setActiveModal('stage')}
                 title="Tap to change stage"
+                className="lead-stage-chip-btn"
                 style={{
-                  background: 'transparent', border: 0, padding: 0,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  background: 'var(--surface-2, rgba(255,255,255,.04))',
+                  border: '1px dashed var(--border-strong)',
+                  borderRadius: 999, padding: '2px 6px 2px 4px',
                   cursor: 'pointer', font: 'inherit',
                 }}
               >
                 <StageChip stage={lead.stage} slaBreached={!!sla && sla.tone === 'danger'} />
+                <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} />
               </button>
               {lead.heat && (
                 <span className="lead-hero-heat">
@@ -453,6 +464,20 @@ export default function LeadDetailV2() {
               title="Voice log (Gujarati / Hindi / English)"
             >
               <Mic size={13} /> <span>Voice</span>
+            </button>
+            {/* Phase 32L — owner reported the chip-only path was
+                undiscoverable. Bring back an explicit Stage button so
+                reps have an obvious labelled control. The chip in the
+                hero (with ChevronDown affordance) is still the fast
+                path; this is the muscle-memory path for anyone who
+                used the pre-31T 6-button grid. Same handler, same
+                modal, no duplication of save logic. */}
+            <button
+              className="lead-btn lead-btn-sm"
+              onClick={() => setActiveModal('stage')}
+              title="Change stage"
+            >
+              <RefreshCw size={13} /> <span>Stage</span>
             </button>
           </div>
         </div>
