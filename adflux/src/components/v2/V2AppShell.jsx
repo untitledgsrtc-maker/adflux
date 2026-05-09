@@ -28,6 +28,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import CopilotModal from '../copilot/CopilotModal'
+import GlobalSearchBar from './GlobalSearchBar'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -223,18 +224,24 @@ export function V2AppShell() {
 
           <div className="v2d-topbar-spacer" />
 
-          {/* Phase 1.5 — Co-Pilot trigger replaces the legacy search bar.
-              Click or ⌘K opens the AI modal. Falls back to /leads search
-              if the Edge Function isn't deployed yet. */}
+          {/* Phase 31A.3 — global cross-entity literal search. Fast
+              path for "find this lead/client/quote by name or number".
+              Co-Pilot below is for natural-language pipeline queries. */}
+          <GlobalSearchBar />
+
+          {/* Phase 1.5 — Co-Pilot trigger. Click or ⌘K opens the AI
+              modal for NL queries ('how much did Sondarva close last
+              month?'). The literal lookup lives in GlobalSearchBar
+              just above. */}
           <button
             className="v2d-search"
             onClick={() => setCopilotOpen(true)}
-            style={{ cursor: 'pointer', textAlign: 'left', minWidth: 220, maxWidth: 300 }}
+            style={{ cursor: 'pointer', textAlign: 'left', minWidth: 180, maxWidth: 240 }}
             type="button"
           >
             <Sparkles size={14} style={{ color: '#c084fc' }} />
             <span style={{ flex: 1, color: 'var(--v2-ink-2)', fontSize: 13 }}>
-              Ask anything…
+              Ask AI…
             </span>
             <span style={{
               fontFamily: 'monospace', fontSize: 10,
