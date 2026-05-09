@@ -34,7 +34,7 @@
 //   • leads.last_contact_at = now()
 //   • work_sessions.daily_counters bumped on call/meeting
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   X, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3, Loader2,
   RefreshCw, CheckCircle2, Sparkles,
@@ -108,9 +108,21 @@ function buildFollowUpPresets() {
   ]
 }
 
-export default function LogActivityModal({ lead, type = 'call', onClose, onSaved }) {
+export default function LogActivityModal({ lead, type = 'call', focusFollowup = false, onClose, onSaved }) {
   const profile = useAuthStore(s => s.profile)
   const meta = TYPE_META[type] || TYPE_META.note
+  // Phase 31T — when the rep tapped the 'Follow-up' button on lead
+  // detail, scroll the modal to the schedule-follow-up section on
+  // mount so they don't have to scroll past the outcome chips.
+  const followupRef = useRef(null)
+  useEffect(() => {
+    if (!focusFollowup) return
+    // RAF gives the modal one paint cycle to mount before we scroll.
+    const r = requestAnimationFrame(() => {
+      followupRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => cancelAnimationFrame(r)
+  }, [focusFollowup])
 
   const [outcome, setOutcome]   = useState('')
   const [duration, setDuration] = useState('')
@@ -356,11 +368,16 @@ export default function LogActivityModal({ lead, type = 'call', onClose, onSaved
 
           {/* Phase 30G — schedule follow-up section. Promoted from
               two unrelated inputs ("Next action" + "Date") to a single
-              clearly-labelled box with quick-pick chips. */}
-          <div style={{
-            border: '1px solid var(--border-soft, rgba(255,255,255,.08))',
-            borderRadius: 10, padding: 12, background: 'rgba(255,255,255,.02)',
-          }}>
+              clearly-labelled box with quick-pick chips.
+              Phase 31T — followupRef wired so the 'Follow-up' button
+              on lead detail scrolls the modal to this section on mount. */}
+          <div
+            ref={followupRef}
+            style={{
+              border: '1px solid var(--border-soft, rgba(255,255,255,.08))',
+              borderRadius: 10, padding: 12, background: 'rgba(255,255,255,.02)',
+              scrollMarginTop: 16,
+            }}>
             <label className="lead-fld-label" style={{ marginBottom: 8 }}>
               Schedule follow-up <span style={{ fontWeight: 400, color: 'var(--text-subtle)' }}>(optional)</span>
             </label>

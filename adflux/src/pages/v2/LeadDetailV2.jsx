@@ -293,9 +293,23 @@ export default function LeadDetailV2() {
               )
             })()}
 
-            {/* Status row: stage + heat + segment, in that order, no separators */}
+            {/* Status row: stage + heat + segment, in that order, no separators
+                Phase 31T — stage chip is now clickable. Replaces the
+                'Stage' button that used to live in the action grid.
+                Tap chip → ChangeStageModal opens. Title shows the
+                affordance for new reps. */}
             <div className="lead-hero-chips">
-              <StageChip stage={lead.stage} slaBreached={!!sla && sla.tone === 'danger'} />
+              <button
+                type="button"
+                onClick={() => setActiveModal('stage')}
+                title="Tap to change stage"
+                style={{
+                  background: 'transparent', border: 0, padding: 0,
+                  cursor: 'pointer', font: 'inherit',
+                }}
+              >
+                <StageChip stage={lead.stage} slaBreached={!!sla && sla.tone === 'danger'} />
+              </button>
               {lead.heat && (
                 <span className="lead-hero-heat">
                   <HeatDot heat={lead.heat} />
@@ -371,6 +385,22 @@ export default function LeadDetailV2() {
               in one click. No more "click button → fill form → save".
               Meeting / Note still open the modal because those need
               free-text notes to be useful. */}
+          {/* Phase 31T — owner audit caught this back at 8 buttons.
+              Cut to 5 (the Phase 31L+M target):
+                Call · WhatsApp · Note · Follow-up · Voice
+              Email moved out of the grid (the lead.email field in the
+              Lead Details panel below is clickable mailto:; reps who
+              actually email — mostly govt — go through there).
+              Meeting moved out — recording a past meeting goes via
+              Note (or Voice for non-typing reps); scheduling a future
+              meeting goes via Follow-up.
+              Stage moved out — the stage chip itself is now the
+              click target (rendered in the green hero card above).
+              Note opens LogActivityModal in 'note' mode (free-text),
+              Follow-up opens it in 'note' mode AND scrolls to the
+              schedule-follow-up section so the rep doesn't need to
+              hunt for it (Phase 31B nudge preserved, just no longer
+              a duplicate Note button). */}
           <div className="lead-hero-actions-grid">
             {lead.phone ? (
               <a
@@ -402,35 +432,12 @@ export default function LeadDetailV2() {
                 <MessageCircle size={13} /> <span>WhatsApp</span>
               </button>
             )}
-            {lead.email ? (
-              <a
-                href={`mailto:${lead.email}`}
-                className="lead-btn lead-btn-sm"
-                onClick={() => quickLog('email', `Email → ${lead.email}`)}
-                style={{ textDecoration: 'none' }}
-              >
-                <Mail size={13} /> <span>Email</span>
-              </a>
-            ) : (
-              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('email')}>
-                <Mail size={13} /> <span>Email</span>
-              </button>
-            )}
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
-              <Calendar size={13} /> <span>Meeting</span>
-            </button>
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
               <Edit3 size={13} /> <span>Note</span>
             </button>
-            {/* Phase 31B — owner pushback (9 May 2026): "how to change
-                status for follow up its not there anywhere". The
-                follow-up scheduling lives inside LogActivityModal but
-                wasn't discoverable. New top-level Follow-up button
-                opens the same modal pre-typed as a 'note' so the rep
-                lands on the schedule-follow-up section directly. */}
             <button
               className="lead-btn lead-btn-sm"
-              onClick={() => setActivityType('note')}
+              onClick={() => setActivityType('followup')}
               title="Schedule a follow-up date"
             >
               <Clock size={13} /> <span>Follow-up</span>
@@ -441,9 +448,6 @@ export default function LeadDetailV2() {
               title="Voice log (Gujarati / Hindi / English)"
             >
               <Mic size={13} /> <span>Voice</span>
-            </button>
-            <button className="lead-btn lead-btn-sm" onClick={() => setActiveModal('stage')}>
-              <RefreshCw size={13} /> <span>Stage</span>
             </button>
           </div>
         </div>
@@ -650,7 +654,13 @@ export default function LeadDetailV2() {
       {activityType && (
         <LogActivityModal
           lead={lead}
-          type={activityType}
+          // Phase 31T — 'followup' is a UI shorthand that opens the note
+          // modal pre-focused on the schedule-follow-up section. The
+          // saved activity_type is still 'note' (the only valid CHECK
+          // value for free-text rows). The focusFollowup prop just
+          // scrolls the modal to that section on mount.
+          type={activityType === 'followup' ? 'note' : activityType}
+          focusFollowup={activityType === 'followup'}
           onClose={() => setActivityType(null)}
           onSaved={load}
         />
