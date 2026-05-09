@@ -56,7 +56,7 @@ export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onResche
               {quoteNum && (
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontSize: 11,
-                  color: 'var(--y, #facc15)', background: 'rgba(255,230,0,0.08)',
+                  color: 'var(--accent, #FFE600)', background: 'rgba(255,230,0,0.08)',
                   borderRadius: 4, padding: '1px 6px',
                 }}>{quoteNum}</span>
               )}

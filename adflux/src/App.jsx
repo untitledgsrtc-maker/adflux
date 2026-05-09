@@ -144,7 +144,11 @@ export default function App() {
           <Route path="/quotes/new/government/auto-hood" element={<RequireGovtAccess><CreateGovtAutoHoodV2 /></RequireGovtAccess>} />
           <Route path="/quotes/new/government/gsrtc-led" element={<RequireGovtAccess><CreateGovtGsrtcLedV2 /></RequireGovtAccess>} />
           {/* Govt proposal renderer (HTML preview, browser-printable) */}
-          <Route path="/proposal/:id"              element={<GovtProposalDetailV2 />} />
+          {/* Phase 32J — wrap in RequireGovtAccess. Was unguarded;
+              private-only sales reps could open a govt proposal URL
+              directly. RLS would filter the row but the route guard
+              was missing per CLAUDE.md §10. */}
+          <Route path="/proposal/:id"              element={<RequireGovtAccess><GovtProposalDetailV2 /></RequireGovtAccess>} />
 
           <Route path="/renewal-tools"             element={<RenewalToolsV2 />} />
           {/* Clients is visible to both roles; RLS on the clients table

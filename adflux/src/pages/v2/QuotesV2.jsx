@@ -356,7 +356,7 @@ export default function QuotesV2() {
                 style={{
                   padding: '5px 11px', borderRadius: 999, border: 'none',
                   cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                  background: mediaFilter === o.key ? 'var(--v2-accent, #facc15)' : 'transparent',
+                  background: mediaFilter === o.key ? 'var(--v2-yellow, #FFE600)' : 'transparent',
                   color:      mediaFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
                 }}
               >

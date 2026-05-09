@@ -354,7 +354,7 @@ export function LeadPipelinePanel() {
           onClick={() => navigate('/leads')}
           style={{
             background: 'transparent', border: 'none',
-            color: 'var(--v2-yellow, #facc15)',
+            color: 'var(--v2-yellow, #FFE600)',
             fontSize: 12, fontWeight: 600, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', gap: 4,
           }}

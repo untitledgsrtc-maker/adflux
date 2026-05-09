@@ -304,6 +304,7 @@ export function V2AppShell() {
               {
                 isPrivileged ? 'Admin Console'
                 : isTelecaller ? 'Telecaller Console'
+                : isAgency ? 'Agency Console'
                 : 'Sales Console'
               }
             </div>
@@ -360,6 +361,7 @@ export function V2AppShell() {
               <div className="v2d-me-role">{
                 isPrivileged ? 'Admin'
                 : isTelecaller ? 'Telecaller'
+                : isAgency ? 'Agency'
                 : 'Sales'
               }</div>
             </div>

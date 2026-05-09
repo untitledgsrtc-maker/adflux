@@ -440,7 +440,7 @@ export default function LeadUploadV2() {
       {/* File pick */}
       {!rows.length && !result && (
         <div className="v2d-panel" style={{ padding: 28, textAlign: 'center' }}>
-          <FileSpreadsheet size={40} style={{ color: 'var(--v2-yellow, #facc15)', margin: '0 auto 12px' }} />
+          <FileSpreadsheet size={40} style={{ color: 'var(--v2-yellow, #FFE600)', margin: '0 auto 12px' }} />
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Drop file or click to browse</div>
           <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginBottom: 16 }}>
             Accepts .csv files. For .xlsx, save as CSV in Excel first.

@@ -815,7 +815,9 @@ export default function WorkV2() {
               if (planTasks.length === 0 && meetings.length === 0) {
                 return (
                   <div className="m-card" style={{ textAlign: 'center', padding: 24 }}>
-                    <div style={{ fontSize: 28, marginBottom: 6 }}>🎯</div>
+                    {/* Phase 32J — replaced 🎯 emoji with Lucide
+                        CheckCircle2 per CLAUDE.md §20. */}
+                    <CheckCircle2 size={28} strokeWidth={1.6} style={{ color: 'var(--success)', marginBottom: 6 }} />
                     <div style={{ fontWeight: 600 }}>All caught up</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                       No pending plan tasks or meetings. Use Smart Tasks below or log a new activity.
