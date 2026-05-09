@@ -214,7 +214,13 @@ export default function TeamDashboardV2() {
           const callPct = Math.round((callsHere / callsTarget) * 100)
           const cls = callPct >= 80 ? '' : callPct >= 50 ? 'warn' : 'dng'
           return (
-            <div className={`lead-rep-card ${isLive ? 'live' : ''}`} key={r.id}>
+            <div
+              className={`lead-rep-card ${isLive ? 'live' : ''}`}
+              key={r.id}
+              onClick={() => navigate(`/admin/gps/${r.id}`)}
+              style={{ cursor: 'pointer' }}
+              title={`Open ${r.name}'s full day`}
+            >
               <div className="lead-rep-head">
                 <LeadAvatar name={r.name} userId={r.id} />
                 <div>

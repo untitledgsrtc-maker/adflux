@@ -97,10 +97,16 @@ export default function GpsTrackV2() {
   const [user, setUser]     = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]   = useState('')
+  // Phase 32E — rep-day view from owner request: clicking a rep card
+  // on Team Live should show the FULL day (map + activities + counters
+  // + voice logs), not just GPS. Loading those alongside.
+  const [session, setSession] = useState(null)
+  const [activities, setActivities] = useState([])
+  const [voiceLogs, setVoiceLogs] = useState([])
   const mapRef     = useRef(null)
   const containerRef = useRef(null)
 
-  // Fetch the rep + their pings for the selected day.
+  // Fetch the rep + their pings + their day-activity for the date.
   useEffect(() => {
     if (!userId) return
     let cancelled = false
@@ -109,7 +115,7 @@ export default function GpsTrackV2() {
     ;(async () => {
       const start = `${targetDate}T00:00:00`
       const end   = `${targetDate}T23:59:59`
-      const [userRes, pingsRes] = await Promise.all([
+      const [userRes, pingsRes, sessionRes, actsRes, voiceRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
         supabase.from('gps_pings')
           .select('id, captured_at, lat, lng, accuracy_m, source')
@@ -117,12 +123,40 @@ export default function GpsTrackV2() {
           .gte('captured_at', start)
           .lte('captured_at', end)
           .order('captured_at', { ascending: true }),
+        // Phase 32E — work_sessions row gives check-in/out times,
+        // morning plan, counters. One row per (user_id, work_date).
+        supabase.from('work_sessions')
+          .select('check_in_at, check_out_at, daily_counters, planned_meetings, morning_plan_text, evening_summary')
+          .eq('user_id', userId)
+          .eq('work_date', targetDate)
+          .maybeSingle(),
+        // Phase 32E — every lead activity created by this rep on this
+        // date. created_at filtered to the IST day window so the
+        // timeline matches the chosen date.
+        supabase.from('lead_activities')
+          .select('id, created_at, activity_type, outcome, notes, next_action, lead:lead_id(id, name, company)')
+          .eq('created_by', userId)
+          .gte('created_at', start)
+          .lte('created_at', end)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        // Phase 32E — voice logs filed by this rep that day.
+        supabase.from('voice_logs')
+          .select('id, created_at, transcript, language_detected, status, classified, lead:lead_id(id, name, company)')
+          .eq('user_id', userId)
+          .gte('created_at', start)
+          .lte('created_at', end)
+          .order('created_at', { ascending: false })
+          .limit(20),
       ])
       if (cancelled) return
       if (userRes.error)  { setError(userRes.error.message);  setLoading(false); return }
       if (pingsRes.error) { setError(pingsRes.error.message); setLoading(false); return }
       setUser(userRes.data || null)
       setPings(pingsRes.data || [])
+      setSession(sessionRes.data || null)
+      setActivities(actsRes.data || [])
+      setVoiceLogs(voiceRes.data || [])
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -297,6 +331,194 @@ export default function GpsTrackV2() {
           </div>
         </>
       )}
+
+      {/* Phase 32E — rep-day view extras: counters + activity timeline +
+          voice logs. Owner directive: clicking a rep card on Team Live
+          should give the FULL day picture, not just the GPS map. */}
+      {!loading && (
+        <RepDaySections session={session} activities={activities} voiceLogs={voiceLogs} navigate={navigate} />
+      )}
+    </div>
+  )
+}
+
+/* Phase 32E — extracted into a sub-component so the main render
+   stays readable. Renders three stacked sections: today's counters
+   from work_sessions.daily_counters, the lead-activities timeline
+   (scoped to this rep + this day), and voice logs filed today. */
+function RepDaySections({ session, activities, voiceLogs, navigate }) {
+  const counters = session?.daily_counters || {}
+  const checkIn  = session?.check_in_at
+  const checkOut = session?.check_out_at
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
+      {/* Counters strip */}
+      {(checkIn || activities.length > 0) && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: 10,
+        }}>
+          <RepDayStat label="Check-in"  value={checkIn  ? new Date(checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'} />
+          <RepDayStat label="Check-out" value={checkOut ? new Date(checkOut).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Open'} tone={checkOut ? '' : 'warn'} />
+          <RepDayStat label="Meetings"  value={counters.meetings || 0} />
+          <RepDayStat label="Calls"     value={counters.calls || 0} />
+          <RepDayStat label="New leads" value={counters.new_leads || 0} />
+          <RepDayStat label="Voice notes" value={voiceLogs.length} />
+        </div>
+      )}
+
+      {/* Activity timeline */}
+      <div className="lead-card">
+        <div className="lead-card-head">
+          <div>
+            <div className="lead-card-title">Activity timeline · {activities.length}</div>
+            <div className="lead-card-sub">Every call / WhatsApp / meeting / note logged today</div>
+          </div>
+        </div>
+        {activities.length === 0 ? (
+          <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            No activities logged on this date.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {activities.map(a => {
+              const t = new Date(a.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+              return (
+                <div
+                  key={a.id}
+                  onClick={() => a.lead?.id && navigate(`/leads/${a.lead.id}`)}
+                  style={{
+                    cursor: a.lead?.id ? 'pointer' : 'default',
+                    padding: '10px 14px',
+                    borderTop: '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: 'var(--text-muted)', minWidth: 44,
+                    }}>{t}</span>
+                    <span style={{
+                      fontWeight: 700, color: 'var(--text)',
+                      textTransform: 'capitalize',
+                    }}>{a.activity_type}</span>
+                    {a.outcome && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                        textTransform: 'uppercase',
+                        color: a.outcome === 'positive' ? 'var(--success)'
+                              : a.outcome === 'negative' ? 'var(--danger)' : 'var(--text-muted)',
+                      }}>{a.outcome}</span>
+                    )}
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      → {a.lead?.company || a.lead?.name || '—'}
+                    </span>
+                  </div>
+                  {a.notes && (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, marginLeft: 52, lineHeight: 1.5 }}>
+                      {a.notes.slice(0, 200)}{a.notes.length > 200 ? '…' : ''}
+                    </div>
+                  )}
+                  {a.next_action && (
+                    <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, marginLeft: 52 }}>
+                      Next: {a.next_action}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Voice logs */}
+      {voiceLogs.length > 0 && (
+        <div className="lead-card">
+          <div className="lead-card-head">
+            <div>
+              <div className="lead-card-title">Voice notes · {voiceLogs.length}</div>
+              <div className="lead-card-sub">Recordings filed today</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {voiceLogs.map(v => {
+              const t = new Date(v.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+              const lang = v.language_detected ? String(v.language_detected).toUpperCase() : ''
+              const snippet = (v.transcript || '').trim().slice(0, 160)
+              return (
+                <div
+                  key={v.id}
+                  onClick={() => v.lead?.id && navigate(`/leads/${v.lead.id}`)}
+                  style={{
+                    cursor: v.lead?.id ? 'pointer' : 'default',
+                    padding: '10px 14px',
+                    borderTop: '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: 'var(--text-muted)', minWidth: 44,
+                    }}>{t}</span>
+                    {lang && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                        color: 'var(--accent)',
+                        background: 'var(--accent-soft)',
+                        padding: '1px 6px', borderRadius: 999,
+                      }}>{lang}</span>
+                    )}
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      → {v.lead?.company || v.lead?.name || '—'}
+                    </span>
+                  </div>
+                  {snippet && (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, marginLeft: 52, lineHeight: 1.5 }}>
+                      {snippet}{v.transcript && v.transcript.length > 160 ? '…' : ''}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Morning plan reference */}
+      {session?.morning_plan_text && (
+        <details className="lead-card" style={{ padding: '10px 14px' }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>
+            Morning plan
+          </summary>
+          <div style={{ marginTop: 8, whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            {session.morning_plan_text}
+          </div>
+        </details>
+      )}
+    </div>
+  )
+}
+
+function RepDayStat({ label, value, tone }) {
+  const color = tone === 'warn' ? 'var(--warning)' : 'var(--text)'
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border-strong, #475569)',
+      borderRadius: 10, padding: '10px 14px',
+    }}>
+      <div style={{
+        fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+        color: 'var(--text-muted)', fontWeight: 700, marginBottom: 4,
+      }}>
+        {label}
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-display)', fontWeight: 700,
+        fontSize: 18, color,
+      }}>
+        {value}
+      </div>
     </div>
   )
 }
