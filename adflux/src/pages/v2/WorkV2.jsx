@@ -27,6 +27,12 @@ import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
 // Phase 31O — ProposedIncentiveCard import removed; the V2AppShell
 // now mounts it once at the top of every sales page, so /work
 // doesn't render it directly anymore.
+// Phase 32M — LogMeetingModal: cold walk-in fast-path. One tap on the
+// "Log meet" tile creates a lead + meeting activity + bumps the
+// counter, all from inside the modal. The Postgres trigger
+// bump_meeting_counter (Phase 32M SQL) handles the counter; we just
+// need to reload the session row after save so the UI reflects it.
+import LogMeetingModal from '../../components/leads/LogMeetingModal'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -56,6 +62,10 @@ export default function WorkV2() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Phase 32M — modal toggle for the cold walk-in fast-path. The
+  // modal owns its own form state; we just open it and reload the
+  // session row on save so the meetings counter ticks up visibly.
+  const [meetingModalOpen, setMeetingModalOpen] = useState(false)
 
   /* ─── Morning plan draft ─── */
   const [plannedMeetings, setPlannedMeetings] = useState([
@@ -987,9 +997,27 @@ export default function WorkV2() {
                 <div className="ti"><Phone size={16} /></div>
                 Log call
               </button>
-              <button className="tile" onClick={() => navigate('/leads')}>
+              {/* Phase 32M — was navigate('/leads') which made the tile
+                  useless (rep had to find a lead, open it, then log).
+                  Now opens LogMeetingModal directly: company + outcome +
+                  notes, GPS auto-captured, INSERTs lead with
+                  source='Field Meeting' and a meeting activity in one
+                  shot. Counter bump comes from the bump_meeting_counter
+                  Postgres trigger; we reload the session row on close
+                  so the "Meetings X/5" counter at the top updates
+                  immediately. The accent border + brand background
+                  highlights the milestone path — this is the rep's
+                  primary daily action. */}
+              <button
+                className="tile"
+                onClick={() => setMeetingModalOpen(true)}
+                style={{
+                  borderColor: 'var(--accent, #FFE600)',
+                  background: 'rgba(255,230,0,0.08)',
+                }}
+              >
                 <div className="ti"><Calendar size={16} /></div>
-                Log meet
+                Log meeting
               </button>
               {/* Phase 32D — owner reported (10 May 2026) "voice while
                   checked in not working" — no inline voice button
@@ -1142,6 +1170,26 @@ export default function WorkV2() {
           </>
         )}
       </div>
+
+      {/* Phase 32M — Field Meeting fast-path. Opens from the "Log
+          meeting" tile in B_ACTIVE. Modal handles its own form +
+          INSERTs lead + activity. On save we reload the session row
+          so the meetings counter at the top reflects the increment
+          (Postgres trigger bump_meeting_counter does the actual bump
+          on lead_activities INSERT). */}
+      {meetingModalOpen && (
+        <LogMeetingModal
+          onClose={() => setMeetingModalOpen(false)}
+          onSaved={(_newLeadId) => {
+            // Don't navigate — keep rep on /work so they can log the
+            // next meeting immediately. The counter at the top will
+            // tick up. If the rep wants to open the new lead, the
+            // modal could pass the ID via toast → "View" link, but
+            // for now just refresh.
+            load()
+          }}
+        />
+      )}
     </div>
   )
 }

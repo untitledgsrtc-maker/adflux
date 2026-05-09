@@ -21,7 +21,12 @@ import { useAuthStore } from '../../store/authStore'
 
 const SOURCES = [
   'IndiaMart', 'Justdial', 'Cronberry WABA', 'Excel Upload',
-  'Manual', 'Referral', 'Walk-in', 'Website', 'Other',
+  'Manual', 'Referral', 'Walk-in', 'Website',
+  // Phase 32M — Field Meeting = cold walk-in logged from /work via
+  // LogMeetingModal. Listed here so reps creating leads manually can
+  // back-fill a field meeting they forgot to log via the fast-path.
+  'Field Meeting',
+  'Other',
 ]
 
 export default function LeadFormV2() {

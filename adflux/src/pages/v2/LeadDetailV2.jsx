@@ -448,6 +448,17 @@ export default function LeadDetailV2() {
                 <MessageCircle size={13} /> <span>WhatsApp</span>
               </button>
             )}
+            {/* Phase 32M — Meeting button restored. Phase 31T pruned
+                it on the rationale "log past meetings via Note", but
+                owner pushed back: meetings need their own activity
+                type so they tick the daily milestone counter (via
+                bump_meeting_counter trigger). Notes don't count.
+                Opens LogActivityModal in 'meeting' mode — rep gets the
+                outcome chips + GPS + duration fields the cold-walk-in
+                LogMeetingModal exposes, but bound to THIS lead. */}
+            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
+              <Calendar size={13} /> <span>Meeting</span>
+            </button>
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
               <Edit3 size={13} /> <span>Note</span>
             </button>
