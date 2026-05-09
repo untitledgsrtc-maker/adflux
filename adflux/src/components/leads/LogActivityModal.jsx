@@ -300,7 +300,8 @@ export default function LogActivityModal({ lead, type = 'call', onClose, onSaved
             }}>
               <Sparkles size={14} style={{ color: 'var(--accent, #FFE600)' }} />
               <span style={{ flex: 1 }}>
-                Positive on a New lead — also move stage to <b>Working</b>?
+                {/* Phase 31P — Working renamed to Follow-up in UI. */}
+                Positive on a New lead — also move stage to <b>Follow-up</b>?
               </span>
               <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                 You can pick on Save.
@@ -493,7 +494,8 @@ export default function LogActivityModal({ lead, type = 'call', onClose, onSaved
               >
                 {saved ? <><CheckCircle2 size={14} /> Saved</>
                        : saving ? 'Saving…'
-                       : 'Save + Move to Working'}
+                       /* Phase 31P — Working renamed to Follow-up. */
+                       : 'Save + Move to Follow-up'}
               </button>
             </>
           ) : (

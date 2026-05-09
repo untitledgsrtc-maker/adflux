@@ -607,8 +607,10 @@ export default function LeadsV2() {
           >
             <option value="" disabled>Move stage…</option>
             <option value="New">New</option>
-            <option value="Working">Working</option>
+            {/* Phase 31P — 'Working' DB value, 'Follow-up' rep label. */}
+            <option value="Working">Follow-up</option>
             <option value="QuoteSent">Quote Sent</option>
+            <option value="Nurture">Nurture</option>
             <option value="Won">Won</option>
             <option value="Lost">Lost</option>
           </select>

@@ -177,9 +177,13 @@ export const LEAD_STAGES = [
 
 // Phase 31N — Nurture rolled into its own group. Order matters here
 // (drives the funnel column order on /leads).
+// Phase 31P (10 May 2026) — owner directive: rename 'Working' label to
+// 'Follow-up' in the UI. DB value stays 'Working' (no migration, no
+// Edge Function changes, no breaking comparisons). The label is the
+// only thing reps see.
 export const STAGE_GROUPS = [
   { key: 'new',         label: 'New',         stages: ['New'] },
-  { key: 'working',     label: 'Working',     stages: ['Working'] },
+  { key: 'working',     label: 'Follow-up',   stages: ['Working'] },
   { key: 'quote_sent',  label: 'Quote Sent',  stages: ['QuoteSent'] },
   { key: 'nurture',     label: 'Nurture',     stages: ['Nurture'] },
   { key: 'won',         label: 'Won',         stages: ['Won'] },
@@ -190,9 +194,10 @@ export function groupForStage(stage) {
   return STAGE_GROUPS.find(g => g.stages.includes(stage))?.key || 'new'
 }
 
+// Phase 31P — 'Working' DB value displays as 'Follow-up' to reps.
 export const STAGE_LABELS = {
   New:       'New',
-  Working:   'Working',
+  Working:   'Follow-up',
   QuoteSent: 'Quote Sent',
   Nurture:   'Nurture',
   Won:       'Won',
