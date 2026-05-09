@@ -477,67 +477,10 @@ function Header({ name, streak, hasAlert, onLogout }) {
   )
 }
 
-function ProposedIncentive({ earned, forecast, pending }) {
-  // Default to Forecast — the forward-looking "if everything closes"
-  // number is the one the sales rep acts on every morning. Earned is
-  // backward-looking and less motivating as a landing state.
-  const [tab, setTab] = useState('forecast')
-
-  const panes = {
-    earned: {
-      value: earned.incentive,
-      sub: earned.slabReached
-        ? `Target hit${earned.targetExceeded ? ' · flat bonus unlocked' : ''}. Payouts credit on admin approval.`
-        : `Hit your threshold of ₹${earned.threshold.toLocaleString('en-IN')} to unlock incentive payouts.`,
-    },
-    pending: {
-      value: pending.total,
-      sub: pending.count === 0
-        ? 'Nothing waiting — admin has cleared every payment you punched.'
-        : `${pending.count} payment${pending.count > 1 ? 's' : ''} awaiting admin approval.`,
-    },
-    forecast: {
-      value: forecast.incentive,
-      sub: (() => {
-        const fmt = (n) => new Intl.NumberFormat('en-IN').format(n)
-        const open = forecast.openPipeline || 0
-        const won  = forecast.wonUnsettledTotal || 0
-        const age  = forecast.wonAge || {}
-        const stalePart = age.stale > 0 ? ` · ₹${fmt(age.staleValue)} stale` : ''
-        if (open === 0 && won === 0) {
-          return 'Forecast is flat — send quotes to build your open pipeline.'
-        }
-        if (won === 0) {
-          return `Incremental on ₹${fmt(open)} open pipeline if every non-lost quote closes this month.`
-        }
-        if (open === 0) {
-          return `₹${fmt(won)} from won quotes still collecting${stalePart}.`
-        }
-        return `₹${fmt(open)} open + ₹${fmt(won)} won-not-settled${stalePart}.`
-      })(),
-    },
-  }
-  const p = panes[tab]
-  const isForecast = tab === 'forecast'
-
-  return (
-    <div className="v2-incentive">
-      <div className="v2-incentive-kicker">
-        <span style={{ fontSize: 13, lineHeight: 1 }}>⚡</span> Proposed Incentive
-      </div>
-      <div className="v2-tabs">
-        <button className={`v2-tab ${tab === 'forecast' ? 'v2-tab--active' : ''}`} onClick={() => setTab('forecast')}>Forecast</button>
-        <button className={`v2-tab ${tab === 'pending' ? 'v2-tab--active' : ''}`} onClick={() => setTab('pending')}>Pending</button>
-        <button className={`v2-tab ${tab === 'earned' ? 'v2-tab--active' : ''}`} onClick={() => setTab('earned')}>Earned</button>
-      </div>
-      <div className="v2-incentive-big">
-        {isForecast && p.value > 0 && '+'}
-        <Money value={p.value} big />
-      </div>
-      <div className="v2-incentive-sub">{p.sub}</div>
-    </div>
-  )
-}
+// Phase 31W — the inline ProposedIncentive function that lived here
+// pre-31O has been deleted. Phase 31O moved to a self-fetching shared
+// component in src/components/incentives/ProposedIncentiveCard.jsx
+// mounted by V2AppShell. Rollback window has closed.
 
 function Kpi({ label, value, count, sub, tone, dot }) {
   const toneClass = tone === 'green' ? 'v2-kpi--green'

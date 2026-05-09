@@ -22,10 +22,15 @@ export function useFollowUps(quoteId = null) {
 
     if (quoteId) {
       query = query.eq('quote_id', quoteId)
-    } else if (profile?.role === 'sales') {
+    } else if (profile?.role === 'sales' || profile?.role === 'agency') {
+      // Phase 31W — was 'sales' only; agency is sales-equivalent per
+      // Phase 11g (CLAUDE.md §8). Without this, agency users hit the
+      // admin path and see all follow-ups, not just their own. Now
+      // matches fetchDue's rule below — single source of truth for
+      // the sales-like check.
       query = query.eq('assigned_to', profile.id)
     }
-    // admin with no quoteId = all follow-ups
+    // admin / co_owner / sales_manager with no quoteId = all follow-ups
 
     const { data, error: err } = await query
     if (err) setError(err.message)

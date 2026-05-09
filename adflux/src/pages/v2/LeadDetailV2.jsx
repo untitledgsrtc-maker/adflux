@@ -95,7 +95,12 @@ export default function LeadDetailV2() {
   const { id } = useParams()
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isPrivileged = ['admin', 'co_owner', 'sales_manager'].includes(profile?.role)
+  // Phase 31W — was a local list including 'sales_manager' which isn't
+  // even a canonical role per CLAUDE.md §8 (only admin/co_owner/sales/
+  // agency/telecaller exist). Standardise to the same definition the
+  // rest of the app uses (admin || co_owner). If sales_manager is
+  // ever added as a real role, do it once in useAuth.js, not here.
+  const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
 
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
