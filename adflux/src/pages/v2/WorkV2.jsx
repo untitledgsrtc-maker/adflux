@@ -985,6 +985,18 @@ export default function WorkV2() {
                 <div className="ti"><Calendar size={16} /></div>
                 Log meet
               </button>
+              {/* Phase 32D — owner reported (10 May 2026) "voice while
+                  checked in not working" — no inline voice button
+                  existed on B_ACTIVE state. Reps wanting to record a
+                  voice note mid-day had to navigate to a specific
+                  lead first, then find Voice. Now: a Voice tile in
+                  the quick-actions row → /voice (the lead-picker
+                  voice page from Phase 22). Same accent treatment as
+                  the lead detail Voice action so reps recognise it. */}
+              <button className="tile" onClick={() => navigate('/voice')}>
+                <div className="ti"><Mic size={16} /></div>
+                Voice note
+              </button>
               <button className="tile" onClick={() => navigate('/leads/new')}>
                 <div className="ti"><UserPlus size={16} /></div>
                 New lead
