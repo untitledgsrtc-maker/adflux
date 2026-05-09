@@ -88,18 +88,24 @@ function RootRedirect() {
   const { user, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!user) return <Navigate to="/login" replace />
-  // Phase 31K — owner directive (10 May 2026): sales reps land on the
-  // Today (/work) screen, not /dashboard. The morning plan + check-in
-  // flow IS the start of the rep's day; landing them on the incentive
-  // dashboard skipped that step. Other roles unchanged.
+  // Phase 32F (10 May 2026) — agency role landing changed.
+  // Owner spec: 'agency is not employee of our company so we don't
+  // need any track from them, they just create quotes for govt
+  // (and in future private), we share them % from their sales.'
+  // Agency users now land on /quotes (their workspace). They get NO
+  // /work flow, no GPS, no morning plan, no attendance counters.
+  //
+  // Routing:
   //   admin / co_owner → /dashboard (full admin console)
   //   telecaller       → /telecaller (their queue is their workspace)
-  //   sales            → /work (Plan-A flow)
-  //   agency           → /dashboard (govt-only role, no daily plan flow)
+  //   sales            → /work       (Plan-A morning plan flow)
+  //   agency           → /quotes     (govt quote creation only)
+  //   anything else    → /dashboard
   const role     = profile?.role
   const teamRole = profile?.team_role
   if (teamRole === 'telecaller') return <Navigate to="/telecaller" replace />
   if (role === 'sales')          return <Navigate to="/work" replace />
+  if (role === 'agency')         return <Navigate to="/quotes" replace />
   return <Navigate to="/dashboard" replace />
 }
 

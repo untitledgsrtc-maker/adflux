@@ -299,6 +299,10 @@ export default function WorkV2() {
      follows in a later phase if owner needs background coverage. */
   useEffect(() => {
     if (!profile?.id) return
+    // Phase 32F — agency users don't get GPS-tracked. Defense in depth
+    // since RootRedirect now lands them on /quotes, but a directly-
+    // typed /work URL would still mount this hook. Skip the polling.
+    if (profile?.role === 'agency') return
     if (!session?.check_in_at) return
     if (session?.evening_report_submitted_at) return // day complete; stop pinging
     if (!navigator.geolocation) return

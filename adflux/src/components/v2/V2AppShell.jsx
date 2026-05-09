@@ -85,6 +85,24 @@ const SALES_NAV = [
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
 
+// Phase 32F (10 May 2026) — agency role is an external commission
+// partner per owner spec, NOT an employee. They don't get the daily
+// plan flow, GPS, or attendance — they're here only to create govt
+// quotes (and private later). Sidebar is tight: just the quote-
+// creation + tracking + their own commission view.
+//   • No /work (no morning plan / GPS)
+//   • No /follow-ups, /leads, /clients (those are rep-owned workflows)
+//   • No /voice (voice is for in-field reps logging activities)
+//   • No /dashboard (their KPIs aren't ours)
+// Kept: Quotes (where they spend most of their time), My Performance
+// (so they can see their commission earnings), My Offer (their %
+// scheme).
+const AGENCY_NAV = [
+  { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/my-performance',    label: 'My Earnings',    icon: TrendingUp },
+  { to: '/my-offer',          label: 'My Offer',       icon: FileText },
+]
+
 // Telecaller-specific nav: queue-first, lighter than the full sales nav.
 // Phase 28c — owner correction (7 May 2026): telecallers DO escalate
 // leads to quotes and need to track their own clients (Rima reported
@@ -163,19 +181,29 @@ export function V2AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Phase 12 — three nav variants:
+  // Phase 12 — nav variants by role.
+  // Phase 32F — agency split out into its own variant (external
+  // commission partner, not an employee — minimal sidebar without
+  // /work, /follow-ups, GPS, or attendance flows).
   //   admin / co_owner → ADMIN_NAV (full chrome including govt masters)
   //   telecaller       → TELECALLER_NAV (queue-first, minimal)
-  //   sales / agency   → SALES_NAV
+  //   agency           → AGENCY_NAV (Quotes + Earnings + Offer only)
+  //   sales            → SALES_NAV (full daily flow)
   const isTelecaller = profile?.team_role === 'telecaller'
+  const isAgency     = profile?.role === 'agency'
   const nav =
     isPrivileged   ? ADMIN_NAV :
     isTelecaller   ? TELECALLER_NAV :
+    isAgency       ? AGENCY_NAV :
                      SALES_NAV
-  // Phase 31G — telecaller now has its own mobile bottom nav.
+  // Mobile bottom nav — telecaller + agency get tighter nav rows.
+  // Agency mobile mirrors the sidebar (3 items + a hidden 4th slot
+  // for visual balance — empty slot kept since agency is desktop-
+  // mostly anyway).
   const mobileNav =
     isPrivileged   ? MOBILE_NAV_ADMIN :
     isTelecaller   ? MOBILE_NAV_TELECALLER :
+    isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES
 
   // Topbar search — commits to the shared quote-filter store and
@@ -214,6 +242,7 @@ export function V2AppShell() {
             <div className="v2d-brand-s">{
               isPrivileged ? 'Admin'
               : isTelecaller ? 'Telecaller'
+              : isAgency ? 'Agency'
               : 'Sales'
             }</div>
           </div>
@@ -370,6 +399,7 @@ export function V2AppShell() {
                   <div className="v2d-brand-s">{
               isPrivileged ? 'Admin'
               : isTelecaller ? 'Telecaller'
+              : isAgency ? 'Agency'
               : 'Sales'
             }</div>
                 </div>

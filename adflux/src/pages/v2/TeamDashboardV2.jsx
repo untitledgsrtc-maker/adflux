@@ -54,9 +54,14 @@ export default function TeamDashboardV2() {
       const startOfDay = `${today}T00:00:00`
 
       const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes] = await Promise.all([
+        // Phase 32F — agency excluded from Team Live grid. Owner spec
+        // (10 May 2026): agency = external commission partner, not
+        // an employee. They don't have GPS / attendance / morning
+        // plan, so Team Live (a 'where are my reps right now' view)
+        // doesn't apply. Reps shown here are the in-house field team.
         supabase.from('users')
           .select('id, name, team_role, city, daily_targets, is_active')
-          .in('team_role', ['sales', 'agency', 'sales_manager'])
+          .in('team_role', ['sales', 'sales_manager'])
           .eq('is_active', true)
           .order('name'),
         supabase.from('work_sessions')
