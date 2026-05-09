@@ -27,7 +27,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Phone, MessageCircle, CheckCircle2, Loader2,
-  Inbox, AlertTriangle, Clock,
+  Inbox, AlertTriangle, Clock, RefreshCw,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -42,10 +42,16 @@ const ADD_DAYS  = (iso, n) => {
 export default function FollowUpsV2() {
   const { profile, isPrivileged } = useAuth()
   const navigate = useNavigate()
-  const [rows, setRows]       = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState('')
-  const [busyId, setBusyId]   = useState(null)
+  const [rows, setRows]             = useState([])
+  // Phase 31S — Nurture leads ready to revisit. Separate query off
+  // the leads table since they're a distinct concept from follow_ups
+  // (no scheduled note, no time, just "this lead's parked-revisit
+  // date has arrived"). Rendered as their own section below the
+  // follow-up sections.
+  const [nurtureRows, setNurtureRows] = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState('')
+  const [busyId, setBusyId]         = useState(null)
 
   const load = useCallback(async () => {
     if (!profile?.id) return
@@ -65,9 +71,30 @@ export default function FollowUpsV2() {
     if (!isPrivileged) {
       q = q.eq('assigned_to', profile.id)
     }
-    const { data, error: err } = await q
-    if (err) { setError(err.message); setLoading(false); return }
-    setRows(data || [])
+
+    // Phase 31S — Nurture leads where revisit_date is within the
+    // surfacing window (overdue + this week). Pull more than we'll
+    // show (50) so admin spot-checks see context. Use the new
+    // Phase 31N revisit_date column (NOT the legacy nurture_revisit_date
+    // which lives on Lost rows).
+    const today = TODAY_ISO()
+    const weekEnd = ADD_DAYS(today, 7)
+    let nq = supabase.from('leads')
+      .select('id, name, company, phone, email, stage, revisit_date, segment, assigned_to')
+      .eq('stage', 'Nurture')
+      .not('revisit_date', 'is', null)
+      .lte('revisit_date', weekEnd)
+      .order('revisit_date', { ascending: true })
+      .limit(50)
+    if (!isPrivileged) {
+      nq = nq.eq('assigned_to', profile.id)
+    }
+
+    const [fuRes, nuRes] = await Promise.all([q, nq])
+    if (fuRes.error) { setError(fuRes.error.message); setLoading(false); return }
+    if (nuRes.error) { setError(nuRes.error.message); setLoading(false); return }
+    setRows(fuRes.data || [])
+    setNurtureRows(nuRes.data || [])
     setLoading(false)
   }, [profile?.id, isPrivileged])
 
@@ -92,6 +119,23 @@ export default function FollowUpsV2() {
     })
     return out
   }, [rows])
+
+  // Phase 31S — same date bucketing for Nurture revisits.
+  const nurtureBuckets = useMemo(() => {
+    const today    = TODAY_ISO()
+    const tomorrow = ADD_DAYS(today, 1)
+    const weekEnd  = ADD_DAYS(today, 7)
+    const out = { overdue: [], today: [], tomorrow: [], week: [] }
+    nurtureRows.forEach(l => {
+      const d = l.revisit_date
+      if (!d) return
+      if (d < today)            out.overdue.push(l)
+      else if (d === today)     out.today.push(l)
+      else if (d === tomorrow)  out.tomorrow.push(l)
+      else if (d <= weekEnd)    out.week.push(l)
+    })
+    return out
+  }, [nurtureRows])
 
   async function markDone(row) {
     setBusyId(row.id)
@@ -129,6 +173,49 @@ export default function FollowUpsV2() {
     window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
   }
 
+  // Phase 31S — Nurture row handlers. Lead has phone directly on the
+  // row (no nested quote join), so the contact actions read lead.phone
+  // / lead.name. Reactivate flips the stage back to Working, clears
+  // revisit_date, and inserts a status_change activity for the timeline.
+  function nurtureCall(lead) {
+    if (!lead.phone) {
+      setError(`${lead.name || 'Lead'} has no phone on file.`)
+      return
+    }
+    window.location.href = `tel:${String(lead.phone).replace(/\s/g, '')}`
+  }
+  function nurtureWhatsApp(lead) {
+    if (!lead.phone) {
+      setError(`${lead.name || 'Lead'} has no phone on file.`)
+      return
+    }
+    const clean = String(lead.phone).replace(/\D/g, '')
+    const e164  = clean.length === 10 ? `91${clean}` : clean
+    const greet = `Hi ${lead.name || ''}, just checking back in as we discussed.`
+    const url   = `https://wa.me/${e164}?text=${encodeURIComponent(greet)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+  async function reactivate(lead) {
+    setBusyId(lead.id)
+    const { error: err } = await supabase
+      .from('leads')
+      .update({ stage: 'Working', revisit_date: null })
+      .eq('id', lead.id)
+    if (!err) {
+      // Status_change row for the timeline so the rep sees when this
+      // happened and what stage flip drove it.
+      await supabase.from('lead_activities').insert([{
+        lead_id:       lead.id,
+        activity_type: 'status_change',
+        notes:         'Stage → Follow-up (reactivated from Nurture)',
+        created_by:    profile.id,
+      }])
+    }
+    setBusyId(null)
+    if (err) { setError(err.message); return }
+    setNurtureRows(prev => prev.filter(r => r.id !== lead.id))
+  }
+
   if (loading) {
     return (
       <div className="lead-root">
@@ -141,6 +228,10 @@ export default function FollowUpsV2() {
   }
 
   const total = buckets.overdue.length + buckets.today.length + buckets.tomorrow.length + buckets.week.length
+  // Phase 31S — Nurture totals included in the "anything to do?" check
+  // so the empty state only shows when BOTH lists are clean.
+  const nurtureTotal = nurtureBuckets.overdue.length + nurtureBuckets.today.length + nurtureBuckets.tomorrow.length + nurtureBuckets.week.length
+  const grandTotal = total + nurtureTotal
 
   return (
     <div className="lead-root" style={{ paddingBottom: 24 }}>
@@ -150,9 +241,9 @@ export default function FollowUpsV2() {
             Follow-ups
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {total === 0
+            {grandTotal === 0
               ? 'Nothing on your plate today.'
-              : `${total} pending · ${buckets.overdue.length} overdue · ${buckets.today.length} due today`}
+              : `${total} follow-up${total === 1 ? '' : 's'}${nurtureTotal > 0 ? ` · ${nurtureTotal} nurture revisit${nurtureTotal === 1 ? '' : 's'}` : ''} · ${buckets.overdue.length + nurtureBuckets.overdue.length} overdue`}
           </div>
         </div>
       </div>
@@ -169,7 +260,7 @@ export default function FollowUpsV2() {
         </div>
       )}
 
-      {total === 0 && (
+      {grandTotal === 0 && (
         <div className="lead-card lead-card-pad" style={{ textAlign: 'center', padding: 32 }}>
           <Inbox size={28} strokeWidth={1.6} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
           <div style={{ fontWeight: 600, marginBottom: 4 }}>No follow-ups due</div>
@@ -209,6 +300,53 @@ export default function FollowUpsV2() {
         tone="neutral"
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} busyId={busyId}
         navigate={navigate}
+      />
+
+      {/* Phase 31S — Nurture revisit sections. Distinct from follow-ups
+          (Nurture = lead in parked stage, no scheduled note; revisit_date
+          is set by the rep when moving to Nurture). Visually grouped
+          UNDER the follow-up sections so reps see "what was scheduled"
+          first, then "what's parked but ready to revisit." */}
+      {nurtureTotal > 0 && (
+        <div style={{
+          marginTop: 24, marginBottom: 8, paddingTop: 16,
+          borderTop: '1px dashed var(--border)',
+          fontSize: 11, fontWeight: 700, letterSpacing: '.16em',
+          textTransform: 'uppercase', color: 'var(--text-muted)',
+        }}>
+          Nurture · Ready to revisit
+        </div>
+      )}
+
+      <NurtureSection
+        title="Overdue revisit"
+        rows={nurtureBuckets.overdue}
+        tone="danger"
+        icon={<AlertTriangle size={14} strokeWidth={2} />}
+        onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
+        busyId={busyId} navigate={navigate}
+      />
+      <NurtureSection
+        title="Revisit today"
+        rows={nurtureBuckets.today}
+        tone="warning"
+        icon={<Clock size={14} strokeWidth={2} />}
+        onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
+        busyId={busyId} navigate={navigate}
+      />
+      <NurtureSection
+        title="Revisit tomorrow"
+        rows={nurtureBuckets.tomorrow}
+        tone="neutral"
+        onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
+        busyId={busyId} navigate={navigate}
+      />
+      <NurtureSection
+        title="Revisit this week"
+        rows={nurtureBuckets.week}
+        tone="neutral"
+        onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
+        busyId={busyId} navigate={navigate}
       />
     </div>
   )
@@ -313,6 +451,109 @@ function Row({ row, onCall, onWhatsApp, onDone, busy, navigate }) {
           {busy
             ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving</>
             : <><CheckCircle2 size={13} /> Done</>}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Phase 31S — Nurture revisit section + row.
+   Distinct from <Section> / <Row> because the data shape is
+   different: lead row has phone/name directly, no nested quote join,
+   and the action set is different (Reactivate moves stage, not
+   "Mark done"). Visual style mirrors the follow-up rows so the page
+   reads as one continuous list, just with a header divider.
+   ───────────────────────────────────────────────────────────────── */
+function NurtureSection({ title, rows, tone, icon, onCall, onWhatsApp, onReactivate, busyId, navigate }) {
+  if (rows.length === 0) return null
+  const toneColor =
+    tone === 'danger'  ? 'var(--danger)'  :
+    tone === 'warning' ? 'var(--warning)' :
+                         'var(--text-muted)'
+  return (
+    <section style={{ marginBottom: 16 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        fontSize: 11, fontWeight: 700, letterSpacing: '.1em',
+        textTransform: 'uppercase', color: toneColor,
+        marginBottom: 8, padding: '0 4px',
+      }}>
+        {icon}
+        <span>{title}</span>
+        <span style={{
+          fontSize: 10, color: 'var(--text-muted)',
+          background: 'var(--surface-2)', padding: '1px 7px', borderRadius: 999,
+        }}>
+          {rows.length}
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rows.map(l => (
+          <NurtureRow
+            key={l.id} lead={l}
+            onCall={onCall} onWhatsApp={onWhatsApp} onReactivate={onReactivate}
+            busy={busyId === l.id}
+            navigate={navigate}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function NurtureRow({ lead, onCall, onWhatsApp, onReactivate, busy, navigate }) {
+  const dateLabel = formatDate(lead.revisit_date)
+  return (
+    <div
+      className="lead-card"
+      style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}
+    >
+      <div
+        onClick={() => navigate(`/leads/${lead.id}`)}
+        style={{ cursor: 'pointer' }}
+      >
+        <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
+          {lead.name || 'Unknown lead'}
+          {lead.company && (
+            <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 13 }}> · {lead.company}</span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+          Nurture · revisit {dateLabel}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="lead-btn lead-btn-sm"
+          onClick={() => onCall(lead)}
+          disabled={busy}
+          style={{ flex: 1, minWidth: 80 }}
+        >
+          <Phone size={13} /> Call
+        </button>
+        <button
+          type="button"
+          className="lead-btn lead-btn-sm"
+          onClick={() => onWhatsApp(lead)}
+          disabled={busy}
+          style={{ flex: 1, minWidth: 80 }}
+        >
+          <MessageCircle size={13} /> WhatsApp
+        </button>
+        <button
+          type="button"
+          className="lead-btn lead-btn-sm lead-btn-primary"
+          onClick={() => onReactivate(lead)}
+          disabled={busy}
+          style={{ flex: 1, minWidth: 100 }}
+          title="Move back to Follow-up stage"
+        >
+          {busy
+            ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving</>
+            : <><RefreshCw size={13} /> Reactivate</>}
         </button>
       </div>
     </div>
