@@ -184,16 +184,27 @@ serve(async (req) => {
     if (language_hint && WHISPER_HINT_OK.has(language_hint)) {
       fd.append('language', language_hint)
     }
-    // Phase 31I — owner reported (10 May 2026) Gujarati audio reliably
-    // transcribes as Hindi (Devanagari script) when auto-detection runs.
-    // The acoustic similarity + Whisper's Hindi-heavy training data
-    // means auto-detect picks Hindi every time. Fix: when the rep
-    // explicitly selected Gujarati, pass a short Gujarati-script
-    // `prompt`. Whisper's prompt parameter biases the output script —
-    // a Gujarati prompt makes the decoder emit Gujarati script. The
-    // prompt itself doesn't appear in the transcript.
+    // Phase 31X (10 May 2026) — owner reported Gujarati STILL coming
+    // back in Devanagari after Phase 31I. The single-sentence bias
+    // prompt wasn't strong enough; Whisper's Hindi-heavy training
+    // outweighed it. Replaced with a multi-sentence seed that:
+    //   1. Asserts the language explicitly
+    //   2. Provides domain vocabulary (sales: meeting, follow-up,
+    //      price, quotation, customer) IN Gujarati script
+    //   3. Provides clock-time phrasing (બાર વાગ્યે = 12 o'clock)
+    //      so meeting-time recordings land in script
+    //   4. Provides temporal phrases (today/yesterday/next month)
+    //   5. Repeats the "write in Gujarati" instruction
+    // Whisper's prompt budget is ~224 tokens; this fits well within.
+    // Prompt itself never appears in the transcript output.
     if (language_hint === 'gu') {
-      fd.append('prompt', 'આ ગુજરાતી ભાષામાં વાતચીત છે. કૃપા કરીને ગુજરાતી લિપિમાં લખો.')
+      fd.append('prompt',
+        'આ ગુજરાતી ભાષામાં સેલ્સ વાતચીત છે. '
+        + 'ગ્રાહક સાથે મીટિંગ, ફોલો-અપ, ભાવ, કોટેશન, ડિલ. '
+        + 'કાલે બાર વાગ્યે, ત્રણ વાગ્યે, પાંચ વાગ્યે મીટિંગ છે. '
+        + 'આજે, ગયા અઠવાડિયે, આવતા મહિને. '
+        + 'કૃપા કરીને ગુજરાતી લિપિમાં લખો, હિન્દી લિપિમાં નહીં.'
+      )
     }
     fd.append('response_format', 'verbose_json')
 
