@@ -108,11 +108,22 @@ const MOBILE_NAV_ADMIN = [
   { to: '/team',              label: 'Team',           icon: Users },
 ]
 
+// Phase 31H — owner asked me to decide on the mobile-label rename
+// (9 May 2026). Reasoning:
+//   "Perf"  is an abbreviation reps don't say in conversation; "Score"
+//           captures the same idea (incentive ranking + target % to
+//           date) in a word reps actually use.
+//   "Offer" is ambiguous on mobile (the company's offer? a price
+//           offer to a client? a deal?). What lives at /my-offer is
+//           the rep's commission/incentive scheme — i.e. their reward
+//           for closing. "Reward" reads as personal and concrete.
+// Desktop sidebar keeps "My Performance" / "My Offer" because it has
+// the room and matches the in-DB phrasing the owner uses elsewhere.
 const MOBILE_NAV_SALES = [
   { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
-  { to: '/my-performance',    label: 'Perf',           icon: TrendingUp },
-  { to: '/my-offer',          label: 'Offer',          icon: FileText },
+  { to: '/my-performance',    label: 'Score',          icon: TrendingUp },
+  { to: '/my-offer',          label: 'Reward',         icon: FileText },
 ]
 
 // Phase 31G — owner reported (9 May 2026) Dhara (telecaller) was
