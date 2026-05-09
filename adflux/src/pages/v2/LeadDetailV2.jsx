@@ -355,18 +355,13 @@ export default function LeadDetailV2() {
             </button>
           ) : null}
 
-          {/* SECONDARY — call only as primary alternative when no quote
-              path makes sense (cold lead, hasn't been contacted yet) */}
-          {!lead.quote_id && lead.phone && (lead.stage === 'New') && (
-            <a
-              href={`tel:${lead.phone}`}
-              className="lead-btn lead-btn-lg"
-              onClick={() => setActivityType('call')}
-              style={{ textDecoration: 'none' }}
-            >
-              <Phone size={14} /> Call
-            </a>
-          )}
+          {/* Phase 31L — owner reported (10 May 2026) the standalone
+              "Call" button was a duplicate. The 8-action grid below
+              already includes a Call button that does the same thing
+              (tel: + quickLog). Showing both, in two different sizes,
+              for a cold lead with a phone was visually confusing. The
+              "call cold leads first" nudge happens via the green hero
+              card's "Working" badge + the prominent grid placement. */}
 
           {/* TERTIARY — labelled pills (Phase 30B rev2 — owner: icons
               alone don't tell reps what they do). 3-per-row grid on
