@@ -178,9 +178,20 @@ serve(async (req) => {
     // Phase 20c — Whisper API's `language` param uses ISO-639-1 but
     // doesn't accept 'gu' (Gujarati) even though the model can transcribe
     // it. Only pass the hint for languages OpenAI accepts. For Gujarati
-    // we let Whisper auto-detect, which works in practice.
+    // we let Whisper auto-detect.
     if (language_hint && WHISPER_HINT_OK.has(language_hint)) {
       fd.append('language', language_hint)
+    }
+    // Phase 31I — owner reported (10 May 2026) Gujarati audio reliably
+    // transcribes as Hindi (Devanagari script) when auto-detection runs.
+    // The acoustic similarity + Whisper's Hindi-heavy training data
+    // means auto-detect picks Hindi every time. Fix: when the rep
+    // explicitly selected Gujarati, pass a short Gujarati-script
+    // `prompt`. Whisper's prompt parameter biases the output script —
+    // a Gujarati prompt makes the decoder emit Gujarati script. The
+    // prompt itself doesn't appear in the transcript.
+    if (language_hint === 'gu') {
+      fd.append('prompt', 'આ ગુજરાતી ભાષામાં વાતચીત છે. કૃપા કરીને ગુજરાતી લિપિમાં લખો.')
     }
     fd.append('response_format', 'verbose_json')
 
