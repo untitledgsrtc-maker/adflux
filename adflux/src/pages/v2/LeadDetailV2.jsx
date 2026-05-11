@@ -653,18 +653,28 @@ export default function LeadDetailV2() {
                   the LogActivityModal so the rep can still record
                   the touch manually (e.g. they called from another
                   device, or want to email from desktop client) */}
-          {/* Phase 33G.2 — action grid trimmed 9 → 5 primary + More.
-              Primary set is the daily-touch shortlist:
-                Call · WhatsApp · Meeting · Note · Voice
-              Overflow (rare or duplicated elsewhere) folds into More:
-                Email   — duplicated by the mailto on lead.email below
-                Follow-up — auto-cadence creates these; manual is rare
-                Stage   — the chip in the hero is the primary path
-                Photo   — used once per new lead (biz-card scan)
-              Rationale per Phase 31T target (Call/WhatsApp/Note/FU/Voice)
-              with Meeting swapped in over Follow-up because Meeting is
-              the daily-milestone counter and FU is auto-generated. */}
-          <div className="lead-hero-actions-grid">
+          {/* Phase 33P (owner directive) — final 4-button primary grid.
+              Owner's mockup:
+                ┌──────────────────────┐
+                │  Convert to quote    │   (top, already above)
+                ├──────────┬───────────┤
+                │  Call    │ WhatsApp  │   row 1
+                ├──────────┼───────────┤
+                │  Meeting │ Voice     │   row 2
+                ├──────────┴───────────┤
+                │       More ↓         │   row 3 (full-width toggle)
+                └──────────────────────┘
+              2-col grid, bigger tap targets. Note moves into More.
+              Stage stays in More (chip in hero is still primary path).
+              Photo/Email/Follow-up stay in More. */}
+          <div
+            className="lead-hero-actions-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 10,
+            }}
+          >
             {(() => {
               const phone = cleanPhone(lead.phone)
               return phone ? (
@@ -733,35 +743,40 @@ export default function LeadDetailV2() {
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
               <Calendar size={13} /> <span>Meeting</span>
             </button>
-            {/* Phase 33N — Voice button removed from primary grid.
-                Voice input is now only inside the Note activity modal
-                (LogActivityModal Note tab has a mic input). Owner
-                directive: 'only in notes'. */}
-            <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
-              <Edit3 size={13} /> <span>Note</span>
-            </button>
-            {/* Phase 33J — fixed label always reads "More" with chevron
-                rotation indicating state. Earlier the label flipped to
-                "Less" on open which confused fast tappers (they'd see
-                "Less" and tap to dismiss, but the muscle memory was
-                "tap More to see more"). */}
+            {/* Phase 33P (owner mockup) — Voice restored to primary 4.
+                Note moved into the More drawer below. */}
             <button
               className="lead-btn lead-btn-sm"
-              onClick={() => setMoreOpen(v => !v)}
-              title="More actions"
-              aria-expanded={moreOpen}
+              onClick={() => navigate(`/voice?lead=${lead.id}`)}
+              title="Voice log (Gujarati / Hindi / English)"
             >
-              <MoreHorizontal size={13} /> <span>More</span>
-              <ChevronDown
-                size={11}
-                style={{
-                  marginLeft: 2,
-                  transform: moreOpen ? 'rotate(180deg)' : 'rotate(0)',
-                  transition: 'transform .15s',
-                }}
-              />
+              <Mic size={13} /> <span>Voice</span>
             </button>
           </div>
+
+          {/* Phase 33P — More toggle as its own full-width row below
+              the 2x2 primary grid. Bigger tap target. */}
+          <button
+            className="lead-btn lead-btn-sm"
+            onClick={() => setMoreOpen(v => !v)}
+            title="More actions"
+            aria-expanded={moreOpen}
+            style={{
+              width: '100%', marginTop: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <MoreHorizontal size={13} /> <span>More</span>
+            <ChevronDown
+              size={11}
+              style={{
+                marginLeft: 2,
+                transform: moreOpen ? 'rotate(180deg)' : 'rotate(0)',
+                transition: 'transform .15s',
+              }}
+            />
+          </button>
 
           {/* Phase 33G.2 — More drawer. Hidden by default; opens to a
               second 4-button row when the rep taps More. Same
@@ -772,6 +787,10 @@ export default function LeadDetailV2() {
               className="lead-hero-actions-grid"
               style={{ marginTop: 8 }}
             >
+              {/* Phase 33P — Note moved here from primary grid. */}
+              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
+                <Edit3 size={13} /> <span>Note</span>
+              </button>
               {/* Email — falls back to LogActivityModal when lead has
                   no email on file (most govt leads). */}
               {lead.email ? (
