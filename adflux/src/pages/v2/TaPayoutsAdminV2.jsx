@@ -94,6 +94,11 @@ export default function TaPayoutsAdminV2() {
   // when reps report falling outside a city.
   const [ceilingsOpen, setCeilingsOpen] = useState(false)
   const [ceilings, setCeilings] = useState([])
+  // Phase 33M — desktop-only polish: status filter + bulk approve.
+  // 'all' shows everything, others scope the table down. Bulk approve
+  // hits every visible pending row in one supabase update.
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   // Load rep list once.
   useEffect(() => {
@@ -153,9 +158,45 @@ export default function TaPayoutsAdminV2() {
     loadCeilings()
   }
 
+  // Phase 33M — scope rows to status filter. Totals + bulk operations
+  // act on the FILTERED set so admin can "approve all visible
+  // pending" without affecting other statuses.
+  const visibleRows = useMemo(() => {
+    if (statusFilter === 'all') return rows
+    return rows.filter(r => r.status === statusFilter)
+  }, [rows, statusFilter])
+
+  // Status counts for the filter chips — show counts so admin sees
+  // at-a-glance how many rows are pending vs approved etc.
+  const statusCounts = useMemo(() => {
+    const out = { all: rows.length, pending: 0, approved: 0, paid: 0, rejected: 0 }
+    rows.forEach(r => { out[r.status] = (out[r.status] || 0) + 1 })
+    return out
+  }, [rows])
+
+  // Bulk approve every visible pending row. Confirmation required.
+  async function bulkApprovePending() {
+    const targets = visibleRows.filter(r => r.status === 'pending')
+    if (targets.length === 0) {
+      alert('No pending rows in the current filter.')
+      return
+    }
+    if (!confirm(`Approve all ${targets.length} pending TA rows for this rep + month?`)) return
+    setBulkBusy(true)
+    const ids = targets.map(r => r.id)
+    const { error } = await supabase.from('daily_ta').update({
+      status: 'approved',
+      approved_by: profile?.id,
+      approved_at: new Date().toISOString(),
+    }).in('id', ids)
+    setBulkBusy(false)
+    if (error) { alert('Bulk approve failed: ' + error.message); return }
+    loadRows()
+  }
+
   // Aggregate footer.
   const totals = useMemo(() => {
-    return rows.reduce((acc, r) => {
+    return visibleRows.reduce((acc, r) => {
       acc.km     += Number(r.km_traveled)  || 0
       acc.da     += Number(r.da_amount)    || 0
       acc.bike   += Number(r.bike_amount)  || 0
@@ -208,12 +249,12 @@ export default function TaPayoutsAdminV2() {
 
   // CSV export — what finance opens in Excel.
   function exportCsv() {
-    if (rows.length === 0) return
+    if (visibleRows.length === 0) return
     const repName = users.find(u => u.id === fUser)?.name || 'rep'
     const lines = [
       ['Date','Day','City','Category','KM','DA','Bike','Hotel','Total','Status','GPS pings','Notes'].join(','),
     ]
-    rows.forEach(r => {
+    visibleRows.forEach(r => {
       lines.push([
         r.ta_date,
         fmtDow(r.ta_date),
@@ -385,7 +426,7 @@ export default function TaPayoutsAdminV2() {
           <button
             type="button"
             onClick={exportCsv}
-            disabled={rows.length === 0}
+            disabled={visibleRows.length === 0}
             className="v2d-cta"
             style={{ alignSelf: 'end', height: 38 }}
           >
@@ -403,11 +444,62 @@ export default function TaPayoutsAdminV2() {
         )}
       </div>
 
+      {/* ─── Status filter + bulk approve (Phase 33M) ──── */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center',
+        gap: 10, justifyContent: 'space-between',
+      }}>
+        <div style={{
+          display: 'inline-flex', gap: 4, padding: 3,
+          background: 'var(--v2-bg-2)', borderRadius: 999,
+          border: '1px solid var(--v2-line)',
+        }}>
+          {[
+            { key: 'all',      label: 'All' },
+            { key: 'pending',  label: 'Pending' },
+            { key: 'approved', label: 'Approved' },
+            { key: 'paid',     label: 'Paid' },
+            { key: 'rejected', label: 'Rejected' },
+          ].map(o => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => setStatusFilter(o.key)}
+              style={{
+                padding: '5px 12px', borderRadius: 999, border: 'none',
+                cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                background: statusFilter === o.key ? 'var(--v2-ink-0)' : 'transparent',
+                color:      statusFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              {o.label}
+              <span style={{
+                padding: '1px 7px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                background: statusFilter === o.key ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.06)',
+                color: 'inherit',
+              }}>
+                {statusCounts[o.key] || 0}
+              </span>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={bulkApprovePending}
+          disabled={bulkBusy || statusCounts.pending === 0}
+          className="v2d-cta"
+          title="Approve every pending row in the current rep + month view"
+        >
+          <Check size={14} /> {bulkBusy ? 'Approving…' : `Approve all pending (${visibleRows.filter(r => r.status === 'pending').length})`}
+        </button>
+      </div>
+
       {/* ─── Totals strip ─────────────────────────────── */}
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12,
       }}>
-        <TotalCard label="Days with TA" value={rows.filter(r => Number(r.total_amount) > 0).length} kind="count" />
+        <TotalCard label="Days with TA" value={visibleRows.filter(r => Number(r.total_amount) > 0).length} kind="count" />
         <TotalCard label="Total km"     value={totals.km.toFixed(1)} kind="raw" suffix=" km" />
         <TotalCard label="Total DA"     value={totals.da} />
         <TotalCard label="Total bike"   value={totals.bike} />
@@ -421,7 +513,7 @@ export default function TaPayoutsAdminV2() {
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--v2-ink-2)' }}>
             Loading TA rows…
           </div>
-        ) : rows.length === 0 ? (
+        ) : visibleRows.length === 0 ? (
           <div className="v2d-empty-card" style={{ padding: 40, textAlign: 'center' }}>
             <div className="v2d-empty-ic" style={{ marginBottom: 12 }}>
               <Wallet size={28} strokeWidth={1.6} />
@@ -450,7 +542,7 @@ export default function TaPayoutsAdminV2() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
+                {visibleRows.map(r => (
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{fmtDateShort(r.ta_date)}</div>
