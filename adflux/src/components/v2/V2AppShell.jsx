@@ -293,19 +293,22 @@ export function V2AppShell() {
       {/* ─── Main ─────────────────────────────────────── */}
       <main className="v2d-main">
         <header className="v2d-topbar">
-          {/* Phase 33F (A5) — hamburger hidden for sales/agency. The
-              avatar More drawer (Phase 33B.4) is the only nav surface
-              for sales reps. Admin/co_owner/telecaller still get the
-              hamburger since they have more sidebar items to reach. */}
-          {(isPrivileged || isTelecaller) && (
-            <button
-              className="v2d-hamburger"
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open navigation"
-            >
-              <Menu size={20} />
-            </button>
-          )}
+          {/* Phase 33G.4 — hamburger restored for ALL roles on mobile.
+              Phase 33F (A5) hid it for sales/agency on the theory that
+              the bottom nav + avatar More drawer was enough. Owner
+              reported reps couldn't find the avatar (and the More
+              drawer behind it), so the long-tail screens (Quotes,
+              Clients, My Performance, Follow-ups) were effectively
+              orphaned. Bringing the hamburger back gives every role
+              one obvious nav surface. The bottom nav still covers the
+              hot paths (Today/Leads/Voice for sales). */}
+          <button
+            className="v2d-hamburger"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu size={20} />
+          </button>
 
           {/* Phase 33G (A1, A2) — "SALES CONSOLE" eyebrow killed for
               sales/agency. Greeting "Good evening, {name}" shown
