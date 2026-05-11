@@ -733,15 +733,12 @@ export default function LeadDetailV2() {
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
               <Calendar size={13} /> <span>Meeting</span>
             </button>
+            {/* Phase 33N — Voice button removed from primary grid.
+                Voice input is now only inside the Note activity modal
+                (LogActivityModal Note tab has a mic input). Owner
+                directive: 'only in notes'. */}
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
               <Edit3 size={13} /> <span>Note</span>
-            </button>
-            <button
-              className="lead-btn lead-btn-sm"
-              onClick={() => navigate(`/voice?lead=${lead.id}`)}
-              title="Voice log (Gujarati / Hindi / English)"
-            >
-              <Mic size={13} /> <span>Voice</span>
             </button>
             {/* Phase 33J — fixed label always reads "More" with chevron
                 rotation indicating state. Earlier the label flipped to

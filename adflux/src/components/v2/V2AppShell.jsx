@@ -81,9 +81,12 @@ const SALES_NAV = [
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
-  // Phase 20 — Voice-First. Reachable from this drawer plus the
-  // "Voice" button on each lead detail page.
-  { to: '/voice',             label: 'Voice Log',      icon: Mic },
+  // Phase 33N — owner directive: voice is no longer a standalone
+  // surface. Voice input lives inside the Note activity modal
+  // (LogActivityModal) where reps already record free-text notes.
+  // The dedicated /voice page and 'Voice' tab were causing confusion
+  // ('what do I do here?'). Note flow handles voice transcription
+  // as a single tap inside an action they already understand.
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },

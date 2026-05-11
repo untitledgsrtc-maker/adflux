@@ -320,7 +320,9 @@ BEGIN
   SELECT id INTO v_qid FROM quotes WHERE quote_number = 'SMOKE-001';
 
   -- Add an approved payment for ₹40,000. Outstanding = 60,000.
-  INSERT INTO payments (quote_id, amount_received, approval_status, recorded_by)
+  -- Note: schema column is received_by, NOT recorded_by (JSX uses
+  -- both names; only received_by actually exists on the table).
+  INSERT INTO payments (quote_id, amount_received, approval_status, received_by)
     VALUES (v_qid, 40000, 'approved', v_uid);
 
   v_updated := regen_payment_fu_notes(v_qid);
