@@ -227,6 +227,64 @@
   border-color: var(--accent, #FFE600);
   color: var(--accent-fg, #0f172a);
 }
+
+/* Phase 33B.4 — More drawer. Bottom sheet on mobile, side-panel on
+   wide. Opens from avatar tap in topbar. */
+.more-drawer-back {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 60;
+  animation: fade-in .15s ease;
+}
+.more-drawer {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: var(--surface, #1e293b);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  padding: 8px 12px 24px;
+  display: flex; flex-direction: column;
+  animation: slide-up .22s ease;
+}
+.more-drawer-handle {
+  width: 40px; height: 4px;
+  background: var(--border-strong, #475569);
+  border-radius: 999px;
+  margin: 4px auto 12px;
+}
+.more-drawer-head {
+  font-family: var(--font-display, 'Space Grotesk');
+  font-weight: 600;
+  font-size: 18px;
+  padding: 4px 8px 12px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border, #334155);
+  margin-bottom: 8px;
+}
+.more-drawer-link {
+  display: flex; align-items: center; gap: 14px;
+  background: transparent; border: 0;
+  padding: 14px 10px;
+  font-size: 16px; font-weight: 500;
+  color: var(--text, #f1f5f9);
+  cursor: pointer;
+  border-radius: 8px;
+  text-align: left;
+  font-family: inherit;
+}
+.more-drawer-link:hover { background: var(--surface-2, #334155); }
+.more-drawer-link svg { color: var(--text-muted, #94a3b8); flex-shrink: 0; }
+@keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slide-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
+
+/* Phase 33B.4 — big numbers pass. Owner directive: 24-28px on KPI
+   numbers so they read at outdoor distance / on weak phone screens. */
+.m-count .num { font-size: 26px !important; }
+.lead-stat-num { font-size: 26px !important; }
+.lead-tasks-eye span { font-size: 16px !important; font-weight: 600; }
+.v2-incentive-strip-num { font-size: 20px !important; }
+.v2d-kpi-l { font-size: 22px !important; }
+.tl-title { font-size: 14px !important; font-weight: 600; }
 .v2-incentive::after {
   content: '';
   position: absolute; inset: 0;

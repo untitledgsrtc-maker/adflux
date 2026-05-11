@@ -171,6 +171,8 @@ export function V2AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  // Phase 33B.4 — More drawer for sales reps. Avatar tap opens it.
+  const [moreOpen, setMoreOpen] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
   // Phase 1.5 — AI Co-Pilot. Cmd+K (Mac) / Ctrl+K (Win/Linux) opens.
   const [copilotOpen, setCopilotOpen] = useState(false)
@@ -358,7 +360,12 @@ export function V2AppShell() {
               from existing tables; no new schema. */}
           <NotificationPanel />
 
-          <div className="v2d-me">
+          <div
+            className="v2d-me"
+            onClick={() => setMoreOpen(true)}
+            style={{ cursor: 'pointer' }}
+            title="More options"
+          >
             <div className="v2d-me-av">{initials(profile?.name || 'U')}</div>
             <div>
               <div className="v2d-me-name">{profile?.name || 'User'}</div>
@@ -371,6 +378,35 @@ export function V2AppShell() {
             </div>
           </div>
         </header>
+
+        {/* Phase 33B.4 — More drawer. Owner audit (11 May 2026)
+            flagged: cutting nav to 3 items without giving the dropped
+            items a new home was a regression. This sheet opens on
+            avatar tap and surfaces Follow-ups, Quotes, Clients, Voice,
+            Score, Logout. Sales-only — admin keeps full sidebar. */}
+        {moreOpen && (
+          <div className="more-drawer-back" onClick={() => setMoreOpen(false)}>
+            <div className="more-drawer" onClick={(e) => e.stopPropagation()}>
+              <div className="more-drawer-handle" />
+              <div className="more-drawer-head">More</div>
+              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/follow-ups') }}>
+                <ClockIcon size={18} /> <span>Follow-ups</span>
+              </button>
+              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/quotes') }}>
+                <FileText size={18} /> <span>Quotes</span>
+              </button>
+              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/clients') }}>
+                <Users size={18} /> <span>Clients</span>
+              </button>
+              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-performance') }}>
+                <TrendingUp size={18} /> <span>Score</span>
+              </button>
+              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); signOut(); navigate('/login') }}>
+                <LogOut size={18} /> <span>Log out</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="v2d-content">
           {/* Phase 31O — owner directive (10 May 2026): the Proposed

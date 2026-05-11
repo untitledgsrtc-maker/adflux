@@ -37,6 +37,32 @@ import LogMeetingModal from '../../components/leads/LogMeetingModal'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
+// Phase 33B.4 — audio chime on save. Web Audio API beep, no asset.
+// Two short tones (E5 + A5) ~150ms total. Plays after meeting save.
+// Browsers require a user gesture before AudioContext can fire; the
+// click that triggers save IS that gesture, so it works on mobile.
+function playChime() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) return
+    const ctx = new AC()
+    const tones = [659.25, 880.0]  // E5, A5
+    tones.forEach((freq, i) => {
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.type = 'sine'
+      o.frequency.value = freq
+      o.connect(g); g.connect(ctx.destination)
+      const t0 = ctx.currentTime + i * 0.09
+      g.gain.setValueAtTime(0, t0)
+      g.gain.linearRampToValueAtTime(0.18, t0 + 0.02)
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.12)
+      o.start(t0); o.stop(t0 + 0.13)
+    })
+    setTimeout(() => { try { ctx.close() } catch {} }, 400)
+  } catch {}
+}
+
 async function captureGps() {
   if (!navigator.geolocation) return null
   try {
@@ -1255,6 +1281,7 @@ export default function WorkV2() {
             const tgt  = targets.meetings || 5
             setToast(`Saved · ${next}/${tgt} meetings today`)
             setTimeout(() => setToast(''), 2200)
+            playChime()
             load()
           }}
         />
