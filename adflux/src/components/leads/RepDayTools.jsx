@@ -17,11 +17,13 @@
 
 import { useEffect, useState } from 'react'
 import {
-  AlertTriangle, Hotel, CalendarPlus, X, Check, BellRing,
+  AlertTriangle, Hotel, CalendarPlus, X, Check, BellRing, BellOff,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { sendPushToRep } from '../../utils/pushNotifications'
+import {
+  sendPushToRep, registerServiceWorker, subscribeForPush,
+} from '../../utils/pushNotifications'
 
 const LEAVE_TYPES = [
   { key: 'sick',         label: 'Sick'        },
@@ -294,6 +296,138 @@ function RequestLeaveModal({ userId, onClose, onSaved }) {
   )
 }
 
+// ─── EnableNotificationsButton (Phase 33V) ──────────────────────
+// Owner-reported issue: auto-subscribe on /work mount silently fails
+// on iOS Safari and sometimes on Chrome. iOS often requires the
+// subscribe call to come from a direct user gesture, not from a
+// useEffect. This button does the whole flow on tap with verbose
+// error reporting so we can see exactly where it fails.
+function EnableNotificationsButton({ userId }) {
+  const [state, setState] = useState('idle')  // idle | working | enabled | failed
+  const [msg, setMsg] = useState('')
+  const [isSubscribed, setIsSubscribed] = useState(null)
+
+  // Check current state on mount.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setIsSubscribed(false)
+      return
+    }
+    ;(async () => {
+      const reg = await navigator.serviceWorker.getRegistration()
+      const sub = reg ? await reg.pushManager.getSubscription() : null
+      // Also check that a Supabase row exists for THIS endpoint.
+      if (sub) {
+        const { count } = await supabase.from('push_subscriptions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId).eq('endpoint', sub.endpoint)
+        setIsSubscribed((count || 0) > 0)
+      } else {
+        setIsSubscribed(false)
+      }
+    })()
+  }, [userId])
+
+  async function enable() {
+    setState('working'); setMsg('')
+    try {
+      // Step 1 — service worker.
+      const reg = await registerServiceWorker()
+      if (!reg) { setMsg('Service worker not supported in this browser'); setState('failed'); return }
+
+      // Step 2 — permission. iOS REQUIRES this to run on a user gesture.
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') {
+        setMsg(perm === 'denied'
+          ? 'Permission denied. Re-enable in Settings → ' + (navigator.userAgent.includes('iPhone') ? 'Untitled' : 'this site') + ' → Notifications.'
+          : 'Permission not granted. Tap Allow when prompted.')
+        setState('failed')
+        return
+      }
+
+      // Step 3 — subscribe (uses VITE_VAPID_PUBLIC_KEY).
+      const sub = await subscribeForPush(userId)
+      if (!sub) {
+        setMsg('Subscribe failed. Check VITE_VAPID_PUBLIC_KEY is set in Vercel.')
+        setState('failed')
+        return
+      }
+
+      // Step 4 — verify the row landed in Supabase.
+      const { count, error } = await supabase.from('push_subscriptions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).eq('endpoint', sub.endpoint)
+      if (error) {
+        setMsg('Row check failed: ' + error.message)
+        setState('failed')
+        return
+      }
+      if (!count) {
+        setMsg('Subscribed but row not saved. RLS issue.')
+        setState('failed')
+        return
+      }
+
+      setState('enabled')
+      setMsg('Notifications enabled. Tap "Send test push" below to verify.')
+      setIsSubscribed(true)
+    } catch (e) {
+      setState('failed')
+      setMsg('Error: ' + (e?.message || String(e)))
+    }
+  }
+
+  if (isSubscribed === null) return null
+
+  // Already subscribed — show calm green confirmation.
+  if (isSubscribed && state !== 'failed') {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '10px 14px', borderRadius: 10,
+        background: 'rgba(16,185,129,.08)',
+        border: '1px solid var(--success, #10B981)',
+        color: 'var(--success)', fontSize: 12, fontWeight: 600,
+      }}>
+        <Check size={14} />
+        Notifications enabled on this device
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <button
+        onClick={enable}
+        disabled={state === 'working'}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '12px 14px', borderRadius: 10,
+          background: state === 'failed' ? 'rgba(239,68,68,.10)' : 'var(--accent, #FFE600)',
+          border: state === 'failed' ? '1px solid var(--danger)' : 0,
+          color: state === 'failed' ? 'var(--danger)' : 'var(--accent-fg, #0f172a)',
+          cursor: 'pointer', fontSize: 14, fontWeight: 700,
+          width: '100%', textAlign: 'left',
+        }}
+      >
+        {state === 'failed' ? <BellOff size={16} /> : <BellRing size={16} />}
+        {state === 'working' ? 'Enabling…'
+          : state === 'failed' ? 'Try again'
+          : 'Enable notifications'}
+      </button>
+      {msg && (
+        <div style={{
+          fontSize: 11, lineHeight: 1.4,
+          color: state === 'failed' ? 'var(--danger)' : 'var(--text-muted)',
+          marginTop: 6, paddingLeft: 4,
+        }}>
+          {msg}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── TestPushButton (Phase 33S smoke test) ─────────────────────
 // Owner-only. Sends a self-targeted push so we can verify the
 // VAPID + Edge Function + service worker chain works without
@@ -372,6 +506,13 @@ export default function RepDayTools({ workDate, checkedIn }) {
           <CalendarPlus size={16} style={{ color: 'var(--text-muted)' }} />
           Request leave
         </button>
+
+        {/* Phase 33V — explicit Enable button. Auto-subscribe on /work
+            mount silently fails on iOS PWA + sometimes on Chrome. iOS
+            requires the subscribe call to come from a real user
+            gesture, not from a useEffect. This button runs the full
+            flow on tap and surfaces specific errors. */}
+        <EnableNotificationsButton userId={profile.id} />
 
         {/* Phase 33S — smoke test for the push notification chain.
             Tap → fires notify-rep with a 'test push' payload. Confirms
