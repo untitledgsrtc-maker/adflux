@@ -9,7 +9,7 @@
 // view any rep.
 
 import { useEffect, useState } from 'react'
-import { Loader2, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import { Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -57,7 +57,34 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
       </div>
     )
   }
-  if (!data) return null
+  // Phase 33G.2 (item 84) — proper empty state. monthly_score returns
+  // no row for first-day-of-month before any work is logged, for a
+  // rep with zero working_days, or for a brand-new hire. Silently
+  // returning null left the page reading like a broken card.
+  if (!data) {
+    return (
+      <div className="lead-card" style={{
+        padding: 20, marginBottom: 14, textAlign: 'center',
+        background: 'var(--surface)', border: '1px solid var(--border)',
+      }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 999, margin: '0 auto 10px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(255,230,0,.10)', color: 'var(--accent, #FFE600)',
+        }}>
+          <Sparkles size={22} strokeWidth={1.6} />
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+          No score yet this month
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          Log a meeting or move a lead through a stage and your score will
+          start building. Sundays, holidays and approved leaves don't count
+          against you.
+        </div>
+      </div>
+    )
+  }
 
   const pct = Number(data.avg_score_pct || 0)
   const isLow = pct < 50
