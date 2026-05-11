@@ -430,6 +430,85 @@
 }
 .m-cta-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 
+/* Phase 33A — Today screen simplification.
+   Meeting ring + 3 giant action buttons + thin quick links row. */
+.m-ring-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  margin-bottom: 18px;
+}
+.m-ring {
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+  border-radius: 50%;
+  filter: drop-shadow(0 6px 18px rgba(0,0,0,.18));
+}
+.m-ring-sheet {
+  margin-top: 12px; width: 100%;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  font-size: 13px;
+}
+.m-ring-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.m-ring-row span { color: var(--text-muted); }
+.m-ring-row b {
+  font-family: var(--font-display); font-weight: 600; font-size: 16px;
+  color: var(--text);
+}
+.m-ring-row b.good { color: var(--success); }
+
+.m-cta-stack {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-bottom: 16px;
+}
+.m-cta-big {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px;
+  width: 100%; min-height: 72px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  color: var(--text);
+  font-family: var(--font-display, 'Space Grotesk');
+  font-weight: 600; font-size: 18px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: transform .08s ease, border-color .15s ease, background .15s ease;
+}
+.m-cta-big:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+.m-cta-big:active { transform: scale(.98); }
+.m-cta-big.m-cta-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.m-cta-big.m-cta-primary:hover {
+  background: var(--accent-hover, var(--accent));
+}
+
+.m-quick-chips {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.chip-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chip-link:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
 /* Counter strip (mobile) */
 .m-counters {
   display: grid; grid-template-columns: repeat(3, 1fr);

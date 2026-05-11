@@ -18,7 +18,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Sun, MapPin, Phone, Calendar, UserPlus, Loader2, Trash2, Plus,
-  CheckCircle2, Users as UsersIcon, Edit3, Mic, Square, Clock,
+  CheckCircle2, Users as UsersIcon, Edit3, Mic, Square,
+  Clock, Clock as ClockIcon,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -465,6 +466,27 @@ export default function WorkV2() {
     load()
   }
 
+  // Phase 33A — owner directive: collapse A_PLAN + A_CHECKIN into one
+  // perceptual step. New "Start My Day" button does submitPlan
+  // (possibly with empty plan) then immediately checks in. The plan
+  // form is still reachable for power users via the collapsed
+  // "Add plan (optional)" expand. doCheckIn waits for the row to
+  // exist; we poll the session once after submitPlan.
+  async function startDay() {
+    if (busy || parsing) return
+    setError('')
+    // If we're already past A_PLAN (rare race), just check in directly.
+    if (stateName !== 'A_PLAN') {
+      return doCheckIn()
+    }
+    await submitPlan()
+    // submitPlan calls load() which moves us to A_CHECKIN. Wait one
+    // tick then advance to check-in. This is conservative — if the
+    // server reload is slow we still get to A_CHECKIN as a visible
+    // intermediate state, then the rep taps once more.
+    setTimeout(() => { doCheckIn() }, 100)
+  }
+
   async function doCheckIn() {
     // Phase 30D — soft 9:30 AM gate. Don't block; require a reason.
     if (isLate && !lateReason.trim()) {
@@ -608,9 +630,35 @@ export default function WorkV2() {
             directive 10 May 2026). The shell handles render + gating
             now; this page no longer mounts it directly. */}
 
-        {/* ─── A_PLAN: morning plan form ─── */}
+        {/* Phase 33A — owner directive: collapse A_PLAN form behind a
+            single "Start My Day" CTA. Reps who want to type/dictate a
+            plan first can expand the "Add plan (optional)" section.
+            Default flow: tap one button → plan submitted empty → GPS
+            captured → checked in → on Today screen in one tap. */}
         {stateName === 'A_PLAN' && (
-          <div className="m-card">
+          <button
+            className="m-cta"
+            onClick={startDay}
+            disabled={busy || parsing}
+            style={{ marginBottom: 16, minHeight: 64, fontSize: 18 }}
+          >
+            <Sun size={20} />
+            {(busy || parsing) ? 'Starting…' : 'Start My Day'}
+          </button>
+        )}
+
+        {/* ─── A_PLAN: morning plan form (now collapsed, optional) ─── */}
+        {stateName === 'A_PLAN' && (
+          <details className="m-card" style={{ padding: 0 }}>
+            <summary style={{
+              padding: '12px 16px', cursor: 'pointer',
+              fontSize: 13, color: 'var(--text-muted)',
+              fontWeight: 500,
+              borderRadius: 10,
+            }}>
+              Add plan (optional) — meetings, calls, focus
+            </summary>
+            <div style={{ padding: '0 16px 16px' }}>
             <div className="m-card-title">
               <span>Today's plan <span className="pill">Step 1 of 3</span></span>
               <Sun size={16} style={{ color: 'var(--warning)' }} />
@@ -740,14 +788,23 @@ export default function WorkV2() {
                 Optional. Type or tap <b>Speak</b>. We'll turn it into a checklist you can tick off through the day.
               </div>
             </div>
-          </div>
-        )}
-
-        {stateName === 'A_PLAN' && (
-          <button className="m-cta" onClick={submitPlan} disabled={busy || parsing}>
-            {(busy || parsing) ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-            {parsing ? 'Reading your plan…' : 'Submit plan'}
-          </button>
+            {/* Phase 33A — keep a "Save plan only" button inside the
+                details for reps who want to save without starting yet
+                (e.g. typing plan night before). Default Start My Day
+                flow does both in one tap above. */}
+            <button
+              type="button"
+              className="lead-btn lead-btn-sm"
+              onClick={submitPlan}
+              disabled={busy || parsing}
+              style={{ marginTop: 10 }}
+            >
+              {(busy || parsing)
+                ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+                : 'Save plan only'}
+            </button>
+            </div>
+          </details>
         )}
 
         {/* ─── A_CHECKIN: plan submitted, waiting for check-in ─── */}
@@ -789,10 +846,44 @@ export default function WorkV2() {
             {/* Phase 31O — moved the ProposedIncentiveCard into
                 V2AppShell. Persists across all sales pages now. */}
 
-            <div className="m-counters">
-              <Counter num={counters.meetings || 0} target={targets.meetings} label="Meetings" />
-              <Counter num={counters.calls || 0}    target={targets.calls}    label="Calls" />
-              <Counter num={counters.new_leads || 0} target={targets.new_leads} label="New leads" />
+            {/* Phase 33A — owner directive: one big meeting ring,
+                not 3 small counters. Meeting is THE daily milestone
+                (5/day, every meeting counts including rejections —
+                locked 10 May 2026). Tap the ring → sheet with all
+                targets (calls, new leads). Don't dilute attention. */}
+            <MeetingRing
+              done={counters.meetings || 0}
+              target={targets.meetings || 5}
+              extras={{ calls: counters.calls || 0, callTarget: targets.calls || 20, leads: counters.new_leads || 0, leadTarget: targets.new_leads || 10 }}
+            />
+
+            {/* Phase 33A — 3 giant action buttons. Replace the 5-tile
+                grid below. Vertical stack, 72px tall, icon on top +
+                English label. Meeting = primary (brand accent border);
+                Call + Voice are secondary. */}
+            <div className="m-cta-stack">
+              <button
+                className="m-cta-big m-cta-primary"
+                onClick={() => setMeetingModalOpen(true)}
+                disabled={busy}
+              >
+                <Calendar size={24} strokeWidth={1.8} />
+                <span>Meeting</span>
+              </button>
+              <button
+                className="m-cta-big"
+                onClick={() => navigate('/leads')}
+              >
+                <Phone size={24} strokeWidth={1.8} />
+                <span>Call</span>
+              </button>
+              <button
+                className="m-cta-big"
+                onClick={() => navigate('/voice')}
+              >
+                <Mic size={24} strokeWidth={1.8} />
+                <span>Voice</span>
+              </button>
             </div>
 
             {/* Phase 30E — focus / show-all toggle. Drives whether the
@@ -992,52 +1083,20 @@ export default function WorkV2() {
             {/* Phase 19 — Smart Task Engine: today's ranked call list */}
             <TodayTasksPanel userId={profile.id} />
 
-            <div className="m-quick">
-              <button className="tile" onClick={() => navigate('/leads')}>
-                <div className="ti"><Phone size={16} /></div>
-                Log call
+            {/* Phase 33A — the old 5-tile m-quick grid replaced by
+                the m-cta-stack of 3 giant buttons above. Surfaces
+                left here as a small chip row for secondary actions
+                (Follow-ups merged into Today's tasks card below
+                already; this is the escape hatch). */}
+            <div className="m-quick-chips">
+              <button className="chip-link" onClick={() => navigate('/follow-ups')}>
+                <ClockIcon size={13} /> Follow-ups
               </button>
-              {/* Phase 32M — was navigate('/leads') which made the tile
-                  useless (rep had to find a lead, open it, then log).
-                  Now opens LogMeetingModal directly: company + outcome +
-                  notes, GPS auto-captured, INSERTs lead with
-                  source='Field Meeting' and a meeting activity in one
-                  shot. Counter bump comes from the bump_meeting_counter
-                  Postgres trigger; we reload the session row on close
-                  so the "Meetings X/5" counter at the top updates
-                  immediately. The accent border + brand background
-                  highlights the milestone path — this is the rep's
-                  primary daily action. */}
-              <button
-                className="tile"
-                onClick={() => setMeetingModalOpen(true)}
-                style={{
-                  borderColor: 'var(--accent, #FFE600)',
-                  background: 'rgba(255,230,0,0.08)',
-                }}
-              >
-                <div className="ti"><Calendar size={16} /></div>
-                Log meeting
+              <button className="chip-link" onClick={() => navigate('/leads')}>
+                <UsersIcon size={13} /> My leads
               </button>
-              {/* Phase 32D — owner reported (10 May 2026) "voice while
-                  checked in not working" — no inline voice button
-                  existed on B_ACTIVE state. Reps wanting to record a
-                  voice note mid-day had to navigate to a specific
-                  lead first, then find Voice. Now: a Voice tile in
-                  the quick-actions row → /voice (the lead-picker
-                  voice page from Phase 22). Same accent treatment as
-                  the lead detail Voice action so reps recognise it. */}
-              <button className="tile" onClick={() => navigate('/voice')}>
-                <div className="ti"><Mic size={16} /></div>
-                Voice note
-              </button>
-              <button className="tile" onClick={() => navigate('/leads/new')}>
-                <div className="ti"><UserPlus size={16} /></div>
-                New lead
-              </button>
-              <button className="tile" onClick={() => navigate('/leads')}>
-                <div className="ti"><UsersIcon size={16} /></div>
-                My leads
+              <button className="chip-link" onClick={() => navigate('/leads/new')}>
+                <UserPlus size={13} /> New lead
               </button>
             </div>
 
@@ -1195,6 +1254,63 @@ export default function WorkV2() {
 }
 
 /* ─── Sub-components ─── */
+// Phase 33A — single big meeting ring on /work B_ACTIVE. Replaces
+// the 3-counter row. SVG progress ring, big center number, tap to
+// expand a sheet showing all 3 targets (meetings/calls/new leads).
+function MeetingRing({ done, target, extras }) {
+  const [open, setOpen] = useState(false)
+  const pct = Math.max(0, Math.min(1, target ? done / target : 0))
+  const R = 64
+  const C = 2 * Math.PI * R
+  const dash = C * pct
+  const hit = done >= target
+  return (
+    <div className="m-ring-wrap">
+      <button
+        type="button"
+        className="m-ring"
+        onClick={() => setOpen(o => !o)}
+        title="Tap to see all targets"
+      >
+        <svg viewBox="0 0 160 160" width="148" height="148">
+          <circle cx="80" cy="80" r={R} fill="none" stroke="var(--surface-2, #1e293b)" strokeWidth="12" />
+          <circle
+            cx="80" cy="80" r={R} fill="none"
+            stroke={hit ? 'var(--success, #10B981)' : 'var(--accent, #FFE600)'}
+            strokeWidth="12"
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${C - dash}`}
+            transform="rotate(-90 80 80)"
+            style={{ transition: 'stroke-dasharray .4s ease' }}
+          />
+          <text x="80" y="74" textAnchor="middle" fontSize="32" fontWeight="700" fontFamily="Space Grotesk, system-ui" fill="var(--text, #f1f5f9)">
+            {done}/{target}
+          </text>
+          <text x="80" y="100" textAnchor="middle" fontSize="11" fontWeight="600" letterSpacing="0.1em" fill="var(--text-muted, #94a3b8)">
+            MEETINGS
+          </text>
+        </svg>
+      </button>
+      {open && (
+        <div className="m-ring-sheet">
+          <div className="m-ring-row">
+            <span>Meetings</span>
+            <b className={done >= target ? 'good' : ''}>{done} / {target}</b>
+          </div>
+          <div className="m-ring-row">
+            <span>Calls</span>
+            <b className={extras.calls >= extras.callTarget ? 'good' : ''}>{extras.calls} / {extras.callTarget}</b>
+          </div>
+          <div className="m-ring-row">
+            <span>New leads</span>
+            <b className={extras.leads >= extras.leadTarget ? 'good' : ''}>{extras.leads} / {extras.leadTarget}</b>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Counter({ num, target, label, tone }) {
   const color = tone === 'good' ? 'var(--success)'
               : tone === 'warn' ? 'var(--warning)'
