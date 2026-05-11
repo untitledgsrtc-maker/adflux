@@ -231,6 +231,65 @@ serve(async (req) => {
     return jsonResp({ error: 'Whisper returned an empty transcript. Try recording again.' }, 422)
   }
 
+  // Phase 32N — owner reported (11 May 2026) voice notes still
+  // showing in Devanagari (Hindi) script even though Phase 31X
+  // shipped a stronger Gujarati Whisper prompt. Root cause: when
+  // the audio is ambiguous (mixed Gujarati/Hindi vocab, which is
+  // ~every Surat sales call), Whisper's training defaults to
+  // Devanagari and ignores the prompt's "write in Gujarati" line.
+  // Phase 31X kept the prompt but never added a correction step.
+  //
+  // Fix: if the rep hinted 'gu' but the transcript contains
+  // Devanagari and no Gujarati, route it through Claude Haiku for
+  // script conversion. Claude is good at this — Devanagari and
+  // Gujarati scripts have a near 1:1 char map for shared phonemes.
+  // Falls through silently on any error so a Claude outage doesn't
+  // block the voice flow.
+  const DEVANAGARI_RX = /[ऀ-ॿ]/
+  const GUJARATI_RX   = /[઀-૿]/
+  if (
+    language_hint === 'gu' &&
+    DEVANAGARI_RX.test(transcript) &&
+    !GUJARATI_RX.test(transcript)
+  ) {
+    try {
+      const cr = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key':         ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type':      'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          system:
+            'You convert Devanagari (Hindi script) text written by a Gujarati-speaking '
+            + 'salesperson into Gujarati script. The words are Gujarati or Gujarati-Hindi '
+            + 'mixed — Whisper mis-transcribed them in Devanagari because the model defaults '
+            + "to Hindi script for ambiguous South Asian audio. Don't translate the meaning — "
+            + 'only swap the script. Keep all English loanwords (meeting, quote, location, '
+            + 'PDF) as-is in Latin script. Return ONLY the corrected text. No commentary, '
+            + 'no quotation marks, no explanation.',
+          messages: [{ role: 'user', content: transcript }],
+        }),
+      })
+      if (cr.ok) {
+        const cj = await cr.json()
+        const corrected = (cj?.content?.[0]?.text || '').trim()
+        // Sanity: only accept if Claude actually produced Gujarati and
+        // didn't return Devanagari again or echo the prompt.
+        if (corrected && GUJARATI_RX.test(corrected) && corrected.length > 8) {
+          transcript = corrected
+          language   = 'gu'
+        }
+      }
+    } catch (_e) {
+      // Network blip / Claude down — keep the Devanagari transcript
+      // rather than failing the whole save. The rep can re-record.
+    }
+  }
+
   // Phase 31A.6 — owner spec (8 May 2026): morning plan textarea
   // wants voice dictation. Extends voice-process with a
   // mode='transcribe_only' branch that returns after Whisper —

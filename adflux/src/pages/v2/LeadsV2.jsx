@@ -133,9 +133,19 @@ export default function LeadsV2() {
     return g ? g.stages : null
   }, [stageFilter])
 
+  // Phase 32N — owner reported (11 May 2026) Open queue button on the
+  // AI Briefing card did nothing. The handler cleared filters but
+  // never narrowed the list to the hot-idle leads the card was
+  // pointing at. Fix: store the IDs of the hot-idle leads at click
+  // time, then apply that ID set as a filter until the user clears
+  // it. A small chip shows "Queue: N leads × clear" so the rep
+  // knows why the list is narrowed.
+  const [queueIds, setQueueIds] = useState(null)   // null = no queue filter
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return leads.filter(l => {
+      if (queueIds && !queueIds.has(l.id)) return false
       if (stagesInGroup && !stagesInGroup.includes(l.stage)) return false
       if (segmentFilter  !== 'all' && l.segment  !== segmentFilter)  return false
       if (sourceFilter   !== 'all' && l.source   !== sourceFilter)   return false
@@ -151,7 +161,7 @@ export default function LeadsV2() {
         (l.industry || '').toLowerCase().includes(q)
       )
     })
-  }, [leads, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter])
+  }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter])
 
   /* ─── Stat strip totals ─── */
   const totals = useMemo(() => {
@@ -280,7 +290,18 @@ export default function LeadsV2() {
         <AIBriefingCard
           briefing={aiBriefing}
           onOpenQueue={() => {
-            // Owner action: open the SLA-breach + hot-idle queue.
+            // Phase 32N — was a no-op (cleared filters but never
+            // narrowed to the hot-idle set the card was advertising).
+            // Now: collect hot-idle + SLA-breach IDs from the same
+            // briefing object the card is rendering, store them as
+            // a Set, and the filter useMemo above respects it. Other
+            // filters clear so the queue view isn't double-scoped.
+            const queueSet = new Set([
+              ...aiBriefing.hotIdle.map(l => l.id),
+              ...aiBriefing.slaBreaches.map(l => l.id),
+            ])
+            if (queueSet.size === 0) return
+            setQueueIds(queueSet)
             setStageFilter('all')
             setSegmentFilter('all')
             setSourceFilter('all')
@@ -288,8 +309,12 @@ export default function LeadsV2() {
             setIndustryFilter('all')
             setRepFilter('all')
             setSearch('')
-            // No dedicated "queue" view yet — once the lead-detail
-            // SLA card lands, this navigates to a filtered list.
+            // Scroll the lead table into view so the rep can see
+            // the narrowed list without hunting.
+            requestAnimationFrame(() => {
+              const tbl = document.querySelector('.lead-table-wrap')
+              if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            })
           }}
         />
       )}
@@ -384,6 +409,36 @@ export default function LeadsV2() {
             </button>
           )}
         </div>
+
+        {/* Phase 32N — Queue mode pill. Visible only when the Open
+            queue button has scoped the list to a subset of leads. Tap
+            X to clear and restore full list. */}
+        {queueIds && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 12px', marginBottom: 10,
+            background: 'rgba(255,230,0,0.08)',
+            border: '1px solid var(--accent, #FFE600)',
+            borderRadius: 999, fontSize: 12,
+            width: 'fit-content',
+          }}>
+            <span style={{ color: 'var(--text)', fontWeight: 600 }}>
+              Queue · {queueIds.size} lead{queueIds.size !== 1 ? 's' : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => setQueueIds(null)}
+              style={{
+                background: 'transparent', border: 0, padding: 0,
+                color: 'var(--text-muted)', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}
+              title="Show all leads"
+            >
+              <X size={11} /> clear
+            </button>
+          </div>
+        )}
 
         <div className="lead-filter-tabs">
           <span
