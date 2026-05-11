@@ -1163,18 +1163,27 @@ export default function WorkV2() {
               </div>
             )}
 
-            <div className="m-card">
-              <div className="m-card-title">
-                <span>Evening report</span>
-                <button
-                  type="button"
-                  className="lead-btn lead-btn-sm"
-                  onClick={() => navigate('/voice/evening')}
-                  title="Speak your summary instead of typing"
-                >
-                  <Mic size={11} /> Speak summary
-                </button>
-              </div>
+            {/* Phase 33B.4 — voice-first evening report. Owner directive:
+                speak the summary, don't type. The big mic button is the
+                primary path; the form below is an optional fallback for
+                reps who prefer typing. */}
+            <button
+              className="m-cta m-cta-big m-cta-primary"
+              onClick={() => navigate('/voice/evening')}
+              style={{ minHeight: 80, fontSize: 18, marginBottom: 14 }}
+            >
+              <Mic size={24} strokeWidth={1.8} />
+              <span>Speak Evening Summary</span>
+            </button>
+            <details className="m-card" style={{ padding: 0 }}>
+              <summary style={{
+                padding: '12px 16px', cursor: 'pointer',
+                fontSize: 13, color: 'var(--text-muted)',
+                fontWeight: 500,
+              }}>
+                Type instead
+              </summary>
+              <div style={{ padding: '0 16px 16px' }}>
               <div style={{ display: 'grid', gap: 10 }}>
                 <div>
                   <label className="lead-fld-label">Quotes sent today</label>
@@ -1206,12 +1215,12 @@ export default function WorkV2() {
                   />
                 </div>
               </div>
-            </div>
-
-            <button className="m-cta" onClick={submitEvening} disabled={busy}>
-              {busy ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-              Submit evening report
-            </button>
+              <button className="m-cta" onClick={submitEvening} disabled={busy} style={{ marginTop: 12 }}>
+                {busy ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+                Submit typed report
+              </button>
+              </div>
+            </details>
           </>
         )}
 

@@ -124,6 +124,70 @@ export default function LeadDetailV2() {
   const [activeModal, setActiveModal] = useState(null)   // null | 'stage' | 'reassign' | 'whatsapp_template'
   const [activityType, setActivityType] = useState(null) // null | 'call' | 'whatsapp' | …
 
+  // Phase 33B.4 — "I'm here" auto-checkin with 10-min dwell. Captures
+  // GPS on tap, starts a 10-min timer. If still on this lead page when
+  // the timer fires, auto-logs a meeting activity with the captured
+  // pin. Rep can tap "Save now" to log immediately.
+  const [hereGps, setHereGps] = useState(null)         // {lat, lng, acc, startedAt}
+  const [hereCountdown, setHereCountdown] = useState(0)
+  async function imHere() {
+    if (!navigator.geolocation) {
+      setError('GPS not available on this device.')
+      return
+    }
+    setError('')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const g = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          acc: Math.round(pos.coords.accuracy),
+          startedAt: Date.now(),
+        }
+        setHereGps(g)
+        setHereCountdown(600)  // 10 minutes in seconds
+      },
+      (e) => setError('Could not capture GPS: ' + (e.message || 'denied')),
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }
+  async function saveHereMeeting() {
+    if (!hereGps || !lead?.id || !profile?.id) return
+    const dwellMin = Math.round((Date.now() - hereGps.startedAt) / 60000)
+    const { error: insErr } = await supabase.from('lead_activities').insert([{
+      lead_id:        lead.id,
+      activity_type:  'meeting',
+      outcome:        null,
+      notes:          `I'm here · auto-check-in (${dwellMin}m at location)`,
+      created_by:     profile.id,
+      gps_lat:        hereGps.lat,
+      gps_lng:        hereGps.lng,
+      gps_accuracy_m: hereGps.acc,
+    }])
+    if (insErr) {
+      setError('Could not log: ' + insErr.message)
+      return
+    }
+    setHereGps(null)
+    setHereCountdown(0)
+    load()
+  }
+  // Countdown tick — auto-save when it hits 0.
+  useEffect(() => {
+    if (hereCountdown <= 0) return
+    const t = setInterval(() => {
+      setHereCountdown(c => {
+        if (c <= 1) {
+          saveHereMeeting()
+          return 0
+        }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hereCountdown])
+
   // Phase 33B — WhatsApp template send. Fetches the message_templates
   // row matching the current lead.stage, fills placeholders, opens
   // WhatsApp. Owner directive (11 May 2026): one-tap follow-up at
@@ -618,6 +682,45 @@ export default function LeadDetailV2() {
               <RefreshCw size={13} /> <span>Stage</span>
             </button>
           </div>
+          {/* Phase 33B.4 — "I'm here" auto-checkin row. Locked 10-min
+              dwell per owner decision. Shown only after the rep taps
+              I'm here; otherwise the button is in the grid above. */}
+          {hereGps && (
+            <div style={{
+              marginTop: 12,
+              padding: '10px 14px',
+              background: 'rgba(255,230,0,0.08)',
+              border: '1px solid var(--accent, #FFE600)',
+              borderRadius: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 10, flexWrap: 'wrap',
+            }}>
+              <span style={{ fontSize: 13, color: 'var(--text)' }}>
+                I'm here · auto-save in {Math.floor(hereCountdown / 60)}:{String(hereCountdown % 60).padStart(2,'0')}
+              </span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={saveHereMeeting}>
+                  Save now
+                </button>
+                <button className="lead-btn lead-btn-sm" onClick={() => { setHereGps(null); setHereCountdown(0) }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {!hereGps && lead.phone && (
+            <button
+              className="lead-btn lead-btn-sm"
+              onClick={imHere}
+              style={{
+                marginTop: 10,
+                borderColor: 'var(--accent, #FFE600)',
+                background: 'rgba(255,230,0,0.06)',
+              }}
+            >
+              <MapPin size={13} /> I'm here (auto-log in 10 min)
+            </button>
+          )}
         </div>
       </div>
 
