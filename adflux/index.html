@@ -4,7 +4,26 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Untitled Adflux</title>
+    <title>Untitled OS</title>
+
+    <!-- Phase 33U — PWA manifest + Apple-specific tags so iOS Safari
+         treats the site as installable. Apple still blocks Web Push
+         in regular Safari tabs (since iOS 16.4); the rep must Add to
+         Home Screen, then open from the home icon to get push. -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#FFE600" />
+
+    <!-- Apple PWA tags. apple-mobile-web-app-capable=yes is the key
+         flag that makes iOS treat the home-screen icon as a real app
+         (no Safari chrome) and enables Web Push API. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Untitled" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Noto Sans Gujarati added so the govt proposal letter renders
