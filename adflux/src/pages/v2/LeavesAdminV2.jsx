@@ -133,6 +133,12 @@ export default function LeavesAdminV2() {
         p_user_id: fUser, p_date: fDate,
       })
     } catch (_) { /* ignore */ }
+    // Phase 33J — reset every form field so admin can immediately
+    // add another leave without manually clearing. Keep fDate at
+    // today since "approve another day for the same rep" is rare.
+    setFUser('')
+    setFDate(todayISO())
+    setFType('personal')
     setFReason('')
     load()
   }

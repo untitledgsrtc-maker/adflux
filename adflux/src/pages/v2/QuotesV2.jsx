@@ -469,7 +469,7 @@ export default function QuotesV2() {
                     <td>{q.client_name}</td>
                     {isAdmin && <td>{q.sales_person_name || '—'}</td>}
                     <td className="num">{formatCurrency(q.total_amount)}</td>
-                    <td><StatusChip status={q.status} /></td>
+                    <td><StatusChip status={q.status} quote={q} /></td>
                     <td>
                       {(() => {
                         const b = computeBalance(q)
@@ -557,7 +557,7 @@ export default function QuotesV2() {
                         }}>Govt</span>
                       )}
                     </div>
-                    <StatusChip status={q.status} />
+                    <StatusChip status={q.status} quote={q} />
                   </div>
                   <div className="v2d-qcard-mid">
                     {/* Company first (primary), contact name as subtitle.
@@ -652,7 +652,36 @@ function Th({ field, sortField, sortDir, onSort, children, right }) {
 }
 
 /* ─── Status chip (matches v2d-qt pattern) ─── */
-function StatusChip({ status }) {
+/* Phase 33J (F8 fix) — derived PARTIAL_PAID / PAID surfaces on Won
+   quotes. PAID = any approved payment exists and total - paid <= 0.
+   PARTIAL_PAID = some approved payment but not fully cleared.
+   Pure status passthrough for non-Won rows. */
+function StatusChip({ status, quote }) {
+  if (status === 'won' && quote) {
+    const total = Number(quote.total_amount) || 0
+    const paid = (quote.payments || [])
+      .filter(p => p.approval_status === 'approved')
+      .reduce((s, p) => s + (Number(p.amount_received) || 0), 0)
+    if (paid > 0) {
+      const fullyPaid = total > 0 && paid >= total
+      return (
+        <span className={`st st--won`} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+        }}>
+          Won
+          <span style={{
+            padding: '1px 6px', borderRadius: 999,
+            fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
+            textTransform: 'uppercase',
+            background: fullyPaid ? 'rgba(16,185,129,.18)' : 'rgba(59,130,246,.18)',
+            color:      fullyPaid ? 'var(--success, #10B981)' : '#60A5FA',
+          }}>
+            {fullyPaid ? 'Paid' : 'Partial'}
+          </span>
+        </span>
+      )
+    }
+  }
   return (
     <span className={`st st--${status}`}>
       {STATUS_LABELS[status] || status}

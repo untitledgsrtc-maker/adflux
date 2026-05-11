@@ -526,6 +526,10 @@ export default function LeadDetailV2() {
                 Stage button is also restored to the action grid below
                 as a second path for reps with muscle memory from <31T. */}
             <div className="lead-hero-chips">
+              {/* Phase 33J (F6 fix) — added an explicit "Change" label
+                  next to the chevron. ChevronDown alone wasn't a clear
+                  enough tap-target for low-literacy reps; the word
+                  removes ambiguity. */}
               <button
                 type="button"
                 onClick={() => setActiveModal('stage')}
@@ -535,12 +539,17 @@ export default function LeadDetailV2() {
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   background: 'var(--surface-2, rgba(255,255,255,.04))',
                   border: '1px dashed var(--border-strong)',
-                  borderRadius: 999, padding: '2px 6px 2px 4px',
+                  borderRadius: 999, padding: '2px 8px 2px 4px',
                   cursor: 'pointer', font: 'inherit',
                 }}
               >
                 <StageChip stage={lead.stage} slaBreached={!!sla && sla.tone === 'danger'} />
-                <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} />
+                <span style={{
+                  fontSize: 10, fontWeight: 600, letterSpacing: '.08em',
+                  color: 'var(--text-muted)', textTransform: 'uppercase',
+                  marginLeft: 2,
+                }}>Change</span>
+                <ChevronDown size={11} style={{ color: 'var(--text-muted)' }} />
               </button>
               {lead.heat && (
                 <span className="lead-hero-heat">
@@ -705,13 +714,26 @@ export default function LeadDetailV2() {
             >
               <Mic size={13} /> <span>Voice</span>
             </button>
+            {/* Phase 33J — fixed label always reads "More" with chevron
+                rotation indicating state. Earlier the label flipped to
+                "Less" on open which confused fast tappers (they'd see
+                "Less" and tap to dismiss, but the muscle memory was
+                "tap More to see more"). */}
             <button
               className="lead-btn lead-btn-sm"
               onClick={() => setMoreOpen(v => !v)}
               title="More actions"
               aria-expanded={moreOpen}
             >
-              <MoreHorizontal size={13} /> <span>{moreOpen ? 'Less' : 'More'}</span>
+              <MoreHorizontal size={13} /> <span>More</span>
+              <ChevronDown
+                size={11}
+                style={{
+                  marginLeft: 2,
+                  transform: moreOpen ? 'rotate(180deg)' : 'rotate(0)',
+                  transition: 'transform .15s',
+                }}
+              />
             </button>
           </div>
 

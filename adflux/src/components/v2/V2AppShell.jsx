@@ -147,14 +147,18 @@ const MOBILE_NAV_ADMIN = [
 // Dashboard stays accessible via sidebar — it's the "view my numbers"
 // page, not the daily-action surface anymore.
 // Phase 33A — owner directive (11 May 2026): cut bottom nav to 3 items.
-// The persistent IncentiveCard strip (Phase 33A redesign) now carries
-// the motivational role that "Score" used to fill in the nav. Follow-ups
-// merge into the Today screen's task card. Mobile thumb-zone shows
-// only the three actions a rep touches every minute.
+// Phase 33J (owner directive, item F2) — sales bottom nav is now
+// 4 items: Today / Follow-ups / Leads / Quotes. Voice moves to the
+// sidebar drawer (still reachable via the Voice button on each lead).
+// Reasoning: Quotes is daily work for a closing rep — keeping it
+// behind the hamburger was friction. Follow-ups is the main work-
+// queue surface and deserves its own slot. Voice gets used per-lead,
+// not as a global tab.
 const MOBILE_NAV_SALES = [
   { to: '/work',              label: 'Today',          icon: Sun },
+  { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
-  { to: '/voice',             label: 'Voice',          icon: Mic },
+  { to: '/quotes',            label: 'Quotes',         icon: FileText },
 ]
 
 // Phase 31G — owner reported (9 May 2026) Dhara (telecaller) was

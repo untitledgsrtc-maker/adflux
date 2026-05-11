@@ -57,10 +57,11 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
       </div>
     )
   }
-  // Phase 33G.2 (item 84) — proper empty state. monthly_score returns
-  // no row for first-day-of-month before any work is logged, for a
-  // rep with zero working_days, or for a brand-new hire. Silently
-  // returning null left the page reading like a broken card.
+  // Phase 33G.2 (item 84) — proper empty state.
+  // Phase 33J (B1 fix) — agency role gets different copy. Agencies
+  // only create govt quotes; they don't do meetings or own leads.
+  // The "log a meeting" prompt was confusing.
+  const isAgency = profile?.role === 'agency'
   if (!data) {
     return (
       <div className="lead-card" style={{
@@ -75,12 +76,14 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
           <Sparkles size={22} strokeWidth={1.6} />
         </div>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-          No score yet this month
+          {isAgency ? 'No earnings yet this month' : 'No score yet this month'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Log a meeting or move a lead through a stage and your score will
-          start building. Sundays, holidays and approved leaves don't count
-          against you.
+          {isAgency
+            ? 'Create a govt proposal and mark it won — your commission appears here once payment is recorded.'
+            : `Log a meeting or move a lead through a stage and your score will
+              start building. Sundays, holidays and approved leaves don't count
+              against you.`}
         </div>
       </div>
     )
@@ -143,6 +146,65 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
           </div>
         </div>
       </div>
+
+      {/* Phase 33J (B11 fix) — score breakdown. Rep at 47% needs to
+          see WHAT is hurting the score, not just the result. Math is:
+          score = (meetings_done / meetings_target) × 100, averaged
+          across working days in month. Coaching = "to reach 80% you
+          need M more meetings over the remaining D working days". */}
+      {(() => {
+        // Pull this-month math directly from data. avg_score_pct is
+        // already the average across working_days. We surface the
+        // delta needed to hit each milestone (50% threshold, 80%
+        // target, 100% max).
+        const remainingToFifty   = Math.max(0, 50  - pct).toFixed(0)
+        const remainingToEighty  = Math.max(0, 80  - pct).toFixed(0)
+        const remainingToHundred = Math.max(0, 100 - pct).toFixed(0)
+        const hitFifty   = pct >= 50
+        const hitEighty  = pct >= 80
+        const hitHundred = pct >= 100
+        return (
+          <div style={{
+            marginTop: 12, padding: '10px 12px', borderRadius: 8,
+            background: 'rgba(255,255,255,.03)',
+            border: '1px solid var(--border)',
+            fontSize: 12,
+          }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '.12em',
+              color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6,
+            }}>
+              What's hurting your score
+            </div>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'auto 1fr',
+              gap: '4px 10px', fontSize: 12,
+            }}>
+              <span style={{ color: hitFifty   ? 'var(--success)' : 'var(--danger)' }}>
+                {hitFifty ? '✓' : '○'} 50% threshold
+              </span>
+              <span style={{ color: 'var(--text-muted)' }}>
+                {hitFifty ? 'Variable unlocked' : `${remainingToFifty}% to unlock variable salary`}
+              </span>
+              <span style={{ color: hitEighty  ? 'var(--success)' : 'var(--warning)' }}>
+                {hitEighty ? '✓' : '○'} 80% target
+              </span>
+              <span style={{ color: 'var(--text-muted)' }}>
+                {hitEighty ? 'Strong month' : `${remainingToEighty}% to hit team target`}
+              </span>
+              <span style={{ color: hitHundred ? 'var(--success)' : 'var(--text-muted)' }}>
+                {hitHundred ? '✓' : '○'} 100% max
+              </span>
+              <span style={{ color: 'var(--text-muted)' }}>
+                {hitHundred ? 'Maxed out' : `${remainingToHundred}% to maximise payout`}
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+              Score = (meetings done ÷ daily target) × 100, averaged across {days} working day{days !== 1 ? 's' : ''} this month.
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Status line */}
       <div style={{
