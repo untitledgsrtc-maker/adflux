@@ -280,7 +280,11 @@ BEGIN
     RAISE EXCEPTION 'T7 FAIL: payment FUs existed pre-Won (count=%)', v_fu_count;
   END IF;
 
-  -- Flip status to won. Trigger should fire.
+  -- Phase 11b trigger blocks direct draft → won transitions. Must
+  -- step through 'sent' first (draft → sent is allowed, sent → won
+  -- is allowed). Real-world reps follow this path naturally via
+  -- Mark Sent → Mark Won.
+  UPDATE quotes SET status = 'sent' WHERE id = v_qid;
   UPDATE quotes SET status = 'won' WHERE id = v_qid;
 
   SELECT COUNT(*) INTO v_fu_count FROM follow_ups
@@ -378,7 +382,8 @@ BEGIN
     RAISE EXCEPTION 'T11 FAIL: stale draft not flagged expired';
   END IF;
 
-  -- Move to won → un-flag.
+  -- Move to won → un-flag. Step through 'sent' (Phase 11b one-way trigger).
+  UPDATE quotes SET status = 'sent' WHERE id = v_qid;
   UPDATE quotes SET status = 'won' WHERE id = v_qid;
   PERFORM refresh_expired_quotes();
   SELECT is_expired INTO v_is_expired FROM quotes WHERE id = v_qid;
