@@ -509,6 +509,27 @@
   border-color: var(--border-strong);
 }
 
+/* Phase 33B — color-coded lead row tints + days-since-contact dot.
+   Tints are very light (4-8% alpha) so they don't overwhelm; the
+   eye picks them up at scan speed. */
+.lead-row-green   { background: rgba(16, 185, 129, .05); }
+.lead-row-yellow  { background: rgba(245, 158, 11, .05); }
+.lead-row-red     { background: rgba(239, 68, 68, .055); }
+.lead-row-default { background: transparent; }
+.lead-row-green:hover, .lead-row-yellow:hover, .lead-row-red:hover {
+  filter: brightness(1.18);
+}
+
+.days-dot {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.days-dot-green  { background: var(--success, #10B981); box-shadow: 0 0 0 2px rgba(16, 185, 129, .15); }
+.days-dot-yellow { background: var(--warning, #F59E0B); box-shadow: 0 0 0 2px rgba(245, 158, 11, .15); }
+.days-dot-red    { background: var(--danger,  #EF4444); box-shadow: 0 0 0 2px rgba(239,  68,  68, .15); }
+
 /* Phase 33A — global toast strip for /work. */
 .m-toast {
   position: fixed;

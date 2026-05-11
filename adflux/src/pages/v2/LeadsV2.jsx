@@ -615,17 +615,35 @@ export default function LeadsV2() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(l => (
+              {filtered.map(l => {
+                // Phase 33B — color-coded row tint + days-since-contact dot.
+                // Owner directive: reps scan the list by color, not text.
+                //   Green: won OR contacted within 3 days
+                //   Yellow: needs follow-up this week (active stage)
+                //   Red: active stage, last contact > 7 days
+                //   Gray (default): nurture / lost / no activity
+                const days = l.last_contact_at
+                  ? Math.floor((Date.now() - new Date(l.last_contact_at).getTime()) / 86400000)
+                  : null
+                let rowTone = 'default'
+                if (l.stage === 'Won') rowTone = 'green'
+                else if (['Nurture','Lost'].includes(l.stage)) rowTone = 'default'
+                else if (days === null) rowTone = 'yellow'
+                else if (days <= 3) rowTone = 'green'
+                else if (days <= 7) rowTone = 'yellow'
+                else rowTone = 'red'
+
+                const dotTone = days === null ? 'red'
+                  : days <= 3 ? 'green'
+                  : days <= 7 ? 'yellow'
+                  : 'red'
+
+                return (
                 <tr
                   key={l.id}
-                  // Phase 18 — onMouseDown not onClick. Some rows nested
-                  // text nodes were swallowing the click target check;
-                  // mousedown fires on the row itself before the synthetic
-                  // bubble. Also navigate via cursor:pointer signal.
+                  className={`lead-row lead-row-${rowTone}`}
                   style={{ cursor: 'pointer' }}
                   onClick={(e) => {
-                    // Don't navigate if the click started on an input
-                    // (checkbox) or its label.
                     const tag = (e.target?.tagName || '').toUpperCase()
                     if (tag === 'INPUT' || tag === 'LABEL') return
                     navigate(`/leads/${l.id}`)
@@ -644,7 +662,13 @@ export default function LeadsV2() {
                   )}
                   <td><HeatDot heat={l.heat} /></td>
                   <td>
-                    <div className="name-cell">
+                    <div className="name-cell" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {/* Phase 33B — days-since-contact dot. Color tracks
+                          dotTone. Tooltip shows the exact value. */}
+                      <span
+                        className={`days-dot days-dot-${dotTone}`}
+                        title={days === null ? 'No contact yet' : `Last contact: ${days}d ago`}
+                      />
                       <div>
                         <div className="name">{l.name}</div>
                         <div className="company">{l.company || '—'}</div>
@@ -678,7 +702,7 @@ export default function LeadsV2() {
                     {l.expected_value ? formatCurrency(l.expected_value) : '—'}
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
