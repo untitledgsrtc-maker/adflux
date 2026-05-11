@@ -59,11 +59,16 @@ export default function FollowUpsV2() {
     setError('')
     // Privileged users (admin / co_owner) see ALL pending follow-ups
     // so they can spot-check the team. Sales reps see their own.
+    // Phase 33D.4 — pull both quote-linked AND lead-linked follow-ups
+    // in one query. Lead-linked rows have lead_id set (and quote_id
+    // NULL); quote-linked rows are the reverse. The join keeps both
+    // join targets available; whichever is null is ignored in render.
     let q = supabase.from('follow_ups')
       .select(`
-        id, follow_up_date, follow_up_time, note, is_done,
-        quote_id,
-        quote:quotes ( id, client_name, client_company, client_phone, segment )
+        id, follow_up_date, follow_up_time, note, is_done, auto_generated,
+        quote_id, lead_id,
+        quote:quotes ( id, client_name, client_company, client_phone, segment ),
+        lead:leads   ( id, name, company, phone, segment )
       `)
       .eq('is_done', false)
       .order('follow_up_date', { ascending: true })
@@ -150,24 +155,32 @@ export default function FollowUpsV2() {
     setRows(prev => prev.filter(r => r.id !== row.id))
   }
 
+  // Phase 33D.4 — both quote-linked AND lead-linked follow-ups can
+  // appear here. Resolve phone + name from whichever join is present.
+  function rowPhone(row) {
+    return row.lead_id ? row.lead?.phone : row.quote?.client_phone
+  }
+  function rowName(row) {
+    return row.lead_id ? row.lead?.name : row.quote?.client_name
+  }
+
   function openWhatsApp(row) {
-    const phone = row.quote?.client_phone
+    const phone = rowPhone(row)
     if (!phone) {
-      setError(`${row.quote?.client_name || 'Client'} has no phone on file. Add it from the quote.`)
+      setError(`${rowName(row) || 'Contact'} has no phone on file.`)
       return
     }
-    // Strip non-digits, prepend country code 91 if local number.
     const clean = String(phone).replace(/\D/g, '')
     const e164  = clean.length === 10 ? `91${clean}` : clean
-    const greet = row.note ? `Hi ${row.quote?.client_name || ''}, following up on: ${row.note}` : `Hi ${row.quote?.client_name || ''}`
+    const greet = row.note ? `Hi ${rowName(row) || ''}, following up on: ${row.note}` : `Hi ${rowName(row) || ''}`
     const url   = `https://wa.me/${e164}?text=${encodeURIComponent(greet)}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   function openCall(row) {
-    const phone = row.quote?.client_phone
+    const phone = rowPhone(row)
     if (!phone) {
-      setError(`${row.quote?.client_name || 'Client'} has no phone on file.`)
+      setError(`${rowName(row) || 'Contact'} has no phone on file.`)
       return
     }
     window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
@@ -406,10 +419,18 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, busyId, 
 }
 
 function Row({ row, onCall, onWhatsApp, onDone, busy, navigate }) {
-  const client = row.quote?.client_name || 'Unknown client'
-  const company = row.quote?.client_company
+  // Phase 33D.4 — follow-up rows can be quote-linked OR lead-linked.
+  // Resolve client display + tap target from whichever join is present.
+  const isLeadFu = !!row.lead_id
+  const client = isLeadFu
+    ? (row.lead?.name || 'Unknown lead')
+    : (row.quote?.client_name || 'Unknown client')
+  const company = isLeadFu ? row.lead?.company : row.quote?.client_company
   const time = row.follow_up_time ? row.follow_up_time.slice(0, 5) : null
   const dateLabel = formatDate(row.follow_up_date)
+  const tapTo = isLeadFu
+    ? (row.lead_id ? `/leads/${row.lead_id}` : null)
+    : (row.quote_id ? `/quotes/${row.quote_id}` : null)
 
   return (
     <div
@@ -419,13 +440,22 @@ function Row({ row, onCall, onWhatsApp, onDone, busy, navigate }) {
       }}
     >
       <div
-        onClick={() => row.quote_id && navigate(`/quotes/${row.quote_id}`)}
-        style={{ cursor: row.quote_id ? 'pointer' : 'default' }}
+        onClick={() => tapTo && navigate(tapTo)}
+        style={{ cursor: tapTo ? 'pointer' : 'default' }}
       >
         <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
           {client}
           {company && (
             <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 13 }}> · {company}</span>
+          )}
+          {row.auto_generated && (
+            <span style={{
+              marginLeft: 8, fontSize: 10, fontWeight: 600,
+              color: 'var(--accent-fg)', background: 'var(--accent)',
+              padding: '2px 6px', borderRadius: 4,
+            }}>
+              AUTO
+            </span>
           )}
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
