@@ -17,10 +17,11 @@
 
 import { useEffect, useState } from 'react'
 import {
-  AlertTriangle, Hotel, CalendarPlus, X, Check,
+  AlertTriangle, Hotel, CalendarPlus, X, Check, BellRing,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { sendPushToRep } from '../../utils/pushNotifications'
 
 const LEAVE_TYPES = [
   { key: 'sick',         label: 'Sick'        },
@@ -293,6 +294,55 @@ function RequestLeaveModal({ userId, onClose, onSaved }) {
   )
 }
 
+// ─── TestPushButton (Phase 33S smoke test) ─────────────────────
+// Owner-only. Sends a self-targeted push so we can verify the
+// VAPID + Edge Function + service worker chain works without
+// waiting for a real trigger.
+function TestPushButton({ userId }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  async function go() {
+    setBusy(true); setMsg('')
+    const res = await sendPushToRep({
+      userId,
+      title: 'Test push from Untitled OS',
+      body: 'If you see this, push is working end-to-end.',
+      tag: 'test-push',
+      url: '/work',
+    })
+    setBusy(false)
+    if (!res) { setMsg('Call failed — see console'); return }
+    if (res.sent > 0) {
+      setMsg(`Sent to ${res.sent} device${res.sent > 1 ? 's' : ''}`)
+    } else {
+      setMsg(res.reason || 'No subscriptions (allow notifications first)')
+    }
+  }
+  return (
+    <div>
+      <button
+        onClick={go}
+        disabled={busy}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 14px', borderRadius: 10,
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+          color: 'var(--text-muted)', cursor: 'pointer',
+          fontSize: 12, fontWeight: 600, width: '100%', textAlign: 'left',
+        }}
+      >
+        <BellRing size={14} />
+        {busy ? 'Sending test push…' : 'Send test push to my device'}
+      </button>
+      {msg && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 4 }}>
+          {msg}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main export ────────────────────────────────────────────────
 export default function RepDayTools({ workDate, checkedIn }) {
   const profile = useAuthStore(s => s.profile)
@@ -322,6 +372,12 @@ export default function RepDayTools({ workDate, checkedIn }) {
           <CalendarPlus size={16} style={{ color: 'var(--text-muted)' }} />
           Request leave
         </button>
+
+        {/* Phase 33S — smoke test for the push notification chain.
+            Tap → fires notify-rep with a 'test push' payload. Confirms
+            VAPID keys, Edge Function, service worker, browser
+            permission all working. */}
+        <TestPushButton userId={profile.id} />
       </div>
 
       {leaveOpen && (

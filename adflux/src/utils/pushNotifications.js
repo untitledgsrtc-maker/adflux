@@ -111,6 +111,33 @@ export async function ensurePushOnLogin(userId) {
   await subscribeForPush(userId)
 }
 
+// Phase 33S — fire-and-forget helper to send a push to one rep.
+// Wraps the notify-rep Edge Function. Returns the function response
+// (or null on error). Safe to call from any client — RLS on the
+// edge function checks the caller's auth.
+export async function sendPushToRep({ userId, title, body, url, tag, requireInteraction }) {
+  try {
+    const { data, error } = await supabase.functions.invoke('notify-rep', {
+      body: {
+        user_id: userId,
+        title,
+        body,
+        url,
+        tag,
+        require_interaction: requireInteraction,
+      },
+    })
+    if (error) {
+      console.warn('notify-rep failed:', error)
+      return null
+    }
+    return data
+  } catch (e) {
+    console.warn('notify-rep threw:', e)
+    return null
+  }
+}
+
 export async function unsubscribeFromPush(userId) {
   if (!userId) return
   const reg = await navigator.serviceWorker?.ready
