@@ -307,21 +307,25 @@ export function V2AppShell() {
             </button>
           )}
 
+          {/* Phase 33G (A1, A2) — "SALES CONSOLE" eyebrow killed for
+              sales/agency. Greeting "Good evening, {name}" shown
+              only on /work for sales reps — repeating it on every
+              page navigation was wasteful chrome. Admin / telecaller
+              still see both since their workspace is more multi-
+              context and the label helps orientation. */}
           <div className="v2d-crumb">
-            <div className="v2d-crumb-kicker">
-              {/* Phase 31U — was hardcoded 'Admin Console' / 'Sales Console';
-                  telecallers saw 'Sales Console' which doesn't match their
-                  actual workspace. Three values now. */}
-              {
-                isPrivileged ? 'Admin Console'
-                : isTelecaller ? 'Telecaller Console'
-                : isAgency ? 'Agency Console'
-                : 'Sales Console'
-              }
-            </div>
-            <div className="v2d-crumb-t">
-              {greetingFor(profile)}
-            </div>
+            {(isPrivileged || isTelecaller) && (
+              <div className="v2d-crumb-kicker">
+                {isPrivileged ? 'Admin Console'
+                  : isTelecaller ? 'Telecaller Console'
+                  : 'Sales Console'}
+              </div>
+            )}
+            {(isPrivileged || isTelecaller || location.pathname === '/work') && (
+              <div className="v2d-crumb-t">
+                {greetingFor(profile)}
+              </div>
+            )}
           </div>
 
           <div className="v2d-topbar-spacer" />
@@ -355,10 +359,19 @@ export function V2AppShell() {
             </span>
           </button>
 
-          <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
-            <Plus size={15} />
-            <span>New Quote</span>
-          </button>
+          {/* Phase 33G (A4) — "New Quote" button hidden for sales/agency
+              except on /quotes routes. Reps create quotes from a
+              specific lead via "Convert to quote", not from a global
+              header button. Admin keeps the global shortcut. */}
+          {(isPrivileged
+            || isTelecaller
+            || location.pathname.startsWith('/quotes')
+          ) && (
+            <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
+              <Plus size={15} />
+              <span>New Quote</span>
+            </button>
+          )}
 
           {/* Phase 31A.4 — real notification panel. Aggregates pending
               approvals + due follow-ups + SLA breaches + due actions
@@ -422,16 +435,14 @@ export function V2AppShell() {
               page nav). Gated to non-privileged + non-telecaller —
               admin/co_owner have their own incentive views, telecaller
               doesn't earn the same incentives. Sales + agency see it. */}
-          {/* Phase 33B.3 — owner refined directive (11 May 2026):
-              compact strip on /work ONLY (it competes with the 3 giant
-              buttons there). Full hero gradient card on every OTHER
-              sales page — leads, lead detail, quotes, clients,
-              follow-ups. The hero card is what motivates daily; the
-              strip is the unobtrusive presence when the rep is in
-              their action loop on Today. */}
+          {/* Phase 33G (C1) — owner audit (11 May): the big purple
+              hero on /leads / /follow-ups / lead detail was pushing
+              the actual content below the fold. Compact strip is now
+              the default everywhere; only /my-performance gets the
+              full hero (rep's deep view of their numbers). */}
           {!isPrivileged && !isTelecaller && (
             <div style={{ marginBottom: 12 }}>
-              <ProposedIncentiveCard compact={location.pathname === '/work'} />
+              <ProposedIncentiveCard compact={location.pathname !== '/my-performance'} />
             </div>
           )}
           <Outlet />

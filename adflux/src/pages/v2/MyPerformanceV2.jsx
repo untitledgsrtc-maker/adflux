@@ -1,17 +1,15 @@
 // src/pages/v2/MyPerformanceV2.jsx
 //
-// v2 "My Performance" page. The actual data-fetch + chart component
-// lives in components/incentives/MyPerformance — we just give it a
-// v2-styled header and shell wrapper. The page is rendered inside
-// V2AppShell so the sidebar/topbar/mobile-nav are already on screen.
+// v2 "My Performance" page.
 //
-// Why this file is deliberately thin:
-// - The MyPerformance component already handles threshold/target/rate
-//   maths, month switcher, and history table.
-// - Rewriting that logic would risk diverging from what the incentive
-//   calc utility produces for the dashboard (single source of truth).
+// Phase 33G (I5) — old MyPerformanceView slab card removed. It was
+// the legacy revenue/incentive-slab block that duplicated the salary
+// signal now shown by PerformanceScoreCard (70/30 base + variable,
+// 50% threshold). Two cards talking about the same number confused
+// reps — the new score card is the single source of truth.
+//
+// Sidebar / topbar / mobile-nav come from V2AppShell.
 
-import { MyPerformance as MyPerformanceView } from '../../components/incentives/MyPerformance'
 import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCard'
 import '../../styles/incentives.css'
 
@@ -23,19 +21,15 @@ export default function MyPerformanceV2() {
           <div className="v2d-page-kicker">Your numbers</div>
           <h1 className="v2d-page-title">My Performance</h1>
           <div className="v2d-page-sub">
-            Track your monthly revenue, incentive slab progress and history.
+            Your monthly score, base + variable salary projection, and
+            the targets you need to hit.
           </div>
         </div>
       </div>
 
       {/* Phase 33E — task-completion score + variable salary projection.
-          Live for the current month. Sits above the existing revenue /
-          incentive table so the rep sees their salary signal first. */}
+          Phase 33G — now the only salary card on this page. */}
       <PerformanceScoreCard />
-
-      <div className="v2d-perf-body">
-        <MyPerformanceView />
-      </div>
     </div>
   )
 }

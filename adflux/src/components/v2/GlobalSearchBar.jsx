@@ -118,7 +118,7 @@ export default function GlobalSearchBar() {
           onChange={e => { setQ(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder="Find lead, client, quote…"
+          placeholder="Search"
           style={{
             flex: 1, background: 'transparent', border: 0, outline: 'none',
             color: 'var(--text)', fontSize: 13, padding: '8px 0', minWidth: 0,

@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText } from 'lucide-react'
 import { useQuotes } from '../../hooks/useQuotes'
 import { useAuthStore } from '../../store/authStore'
 import { QUOTE_STATUSES, STATUS_LABELS } from '../../utils/constants'
@@ -401,8 +401,12 @@ export default function QuotesV2() {
           Loading quotes…
         </div>
       ) : displayed.length === 0 ? (
+        // Phase 33G — replaced emoji icon with Lucide FileText (CLAUDE.md
+        // §7: lucide-react only). CTA still primary path out of empty.
         <div className="v2d-panel v2d-empty-card">
-          <div className="v2d-empty-ic">📄</div>
+          <div className="v2d-empty-ic">
+            <FileText size={28} strokeWidth={1.6} />
+          </div>
           <div className="v2d-empty-t">No quotes found</div>
           <div className="v2d-empty-s">
             {hasActiveFilters

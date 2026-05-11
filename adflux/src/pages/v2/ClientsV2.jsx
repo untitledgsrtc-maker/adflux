@@ -251,8 +251,27 @@ export default function ClientsV2() {
         {loading ? (
           <div className="v2d-q-empty" style={{ padding: 40 }}>Loading clients…</div>
         ) : filtered.length === 0 ? (
-          <div className="v2d-q-empty" style={{ padding: 40 }}>
-            {search ? `No clients match "${search}".` : 'No clients yet. Create a quote and the client will auto-save here.'}
+          // Phase 33G — proper empty state with icon + CTA, matching
+          // the QuotesV2 pattern. Reps need a visible path forward;
+          // a one-line hint isn't enough.
+          <div className="v2d-empty-card" style={{ padding: 40, textAlign: 'center' }}>
+            <div className="v2d-empty-ic" style={{ marginBottom: 12 }}>
+              <Users size={28} strokeWidth={1.6} />
+            </div>
+            <div className="v2d-empty-t">
+              {search ? 'No matching clients' : 'No clients yet'}
+            </div>
+            <div className="v2d-empty-s" style={{ marginBottom: 16 }}>
+              {search
+                ? `Nothing matched "${search}". Try a different name, phone, or company.`
+                : 'Clients are saved automatically the first time you create a quote for them.'}
+            </div>
+            {!search && (
+              <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
+                <Plus size={15} />
+                <span>Create your first quote</span>
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
