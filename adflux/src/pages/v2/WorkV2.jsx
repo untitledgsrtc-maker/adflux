@@ -1084,8 +1084,11 @@ export default function WorkV2() {
               </div>
             )}
 
-            {/* Phase 19 — Smart Task Engine: today's ranked call list */}
-            <TodayTasksPanel userId={profile.id} />
+            {/* Phase 19 — Smart Task Engine: today's ranked call list.
+                Phase 33B.4 — owner audit (11 May 2026) called out the
+                list wasn't truncated to 3. Pass limit=3; overflow shows
+                'View all' link inside the panel. */}
+            <TodayTasksPanel userId={profile.id} limit={3} />
 
             {/* Phase 33A — the old 5-tile m-quick grid replaced by
                 the m-cta-stack of 3 giant buttons above. Surfaces

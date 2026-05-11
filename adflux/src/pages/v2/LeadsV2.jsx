@@ -498,10 +498,10 @@ export default function LeadsV2() {
           </select>
         )}
 
-        {/* Phase 19b — always render so the filter is visible even when
-            the current lead set has no industry tags yet. The first
-            option is the only one in that case, but reps can see the
-            control exists. */}
+        {/* Phase 33B.3 — sales view doesn't see the industry filter
+            (owner audit 11 May: <5% use; clutter). Admin/co_owner
+            still get it for cross-rep slicing. */}
+        {isPrivileged && (
         <select
           value={industryFilter}
           onChange={e => setIndustryFilter(e.target.value)}
@@ -517,6 +517,7 @@ export default function LeadsV2() {
             <option key={i} value={i}>{`Industry: ${i}`}</option>
           ))}
         </select>
+        )}
 
         {isPrivileged && distinctReps.length > 0 && (
           <select
