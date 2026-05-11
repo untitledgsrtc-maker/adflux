@@ -32,7 +32,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
   RefreshCw, Sparkles, FileText as FileTextIcon, Users as UsersIcon,
-  AlertTriangle, Clock, Mic, ChevronDown,
+  AlertTriangle, Clock, Mic, ChevronDown, MoreHorizontal,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -137,6 +137,13 @@ export default function LeadDetailV2() {
   // pin. Rep can tap "Save now" to log immediately.
   const [hereGps, setHereGps] = useState(null)         // {lat, lng, acc, startedAt}
   const [hereCountdown, setHereCountdown] = useState(0)
+  // Phase 33G.2 — action-grid trim 9 → 5 + More.
+  // Primary 5: Call · WhatsApp · Meeting · Note · Voice (highest-
+  // frequency daily-use actions). Email / Follow-up / Stage / Photo
+  // fold into the More drawer; stage is also reachable via the chip
+  // in the hero, and email still works via the mailto link on the
+  // lead.email field below.
+  const [moreOpen, setMoreOpen] = useState(false)
   async function imHere() {
     if (!navigator.geolocation) {
       setError('GPS not available on this device.')
@@ -637,6 +644,17 @@ export default function LeadDetailV2() {
                   the LogActivityModal so the rep can still record
                   the touch manually (e.g. they called from another
                   device, or want to email from desktop client) */}
+          {/* Phase 33G.2 — action grid trimmed 9 → 5 primary + More.
+              Primary set is the daily-touch shortlist:
+                Call · WhatsApp · Meeting · Note · Voice
+              Overflow (rare or duplicated elsewhere) folds into More:
+                Email   — duplicated by the mailto on lead.email below
+                Follow-up — auto-cadence creates these; manual is rare
+                Stage   — the chip in the hero is the primary path
+                Photo   — used once per new lead (biz-card scan)
+              Rationale per Phase 31T target (Call/WhatsApp/Note/FU/Voice)
+              with Meeting swapped in over Follow-up because Meeting is
+              the daily-milestone counter and FU is auto-generated. */}
           <div className="lead-hero-actions-grid">
             {(() => {
               const phone = cleanPhone(lead.phone)
@@ -674,34 +692,6 @@ export default function LeadDetailV2() {
                 </button>
               )
             })()}
-            {/* Phase 32P — Email button restored. Real mailto: link.
-                Pre-fills subject with the company name so the
-                client's inbox shows "Outdoor advertising - <Company>"
-                instead of "no subject". Body left empty — rep writes
-                their own pitch. Falls back to LogActivityModal if
-                lead has no email on file (govt leads often don't). */}
-            {lead.email ? (
-              <a
-                href={`mailto:${lead.email}?subject=${encodeURIComponent('Outdoor advertising — ' + (lead.company || lead.name || ''))}`}
-                className="lead-btn lead-btn-sm"
-                onClick={() => fireAndForgetLog('email', `Email → ${lead.email}`)}
-                style={{ textDecoration: 'none' }}
-              >
-                <Mail size={13} /> <span>Email</span>
-              </a>
-            ) : (
-              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('email')}>
-                <Mail size={13} /> <span>Email</span>
-              </button>
-            )}
-            {/* Phase 32M — Meeting button restored. Phase 31T pruned
-                it on the rationale "log past meetings via Note", but
-                owner pushed back: meetings need their own activity
-                type so they tick the daily milestone counter (via
-                bump_meeting_counter trigger). Notes don't count.
-                Opens LogActivityModal in 'meeting' mode — rep gets the
-                outcome chips + GPS + duration fields the cold-walk-in
-                LogMeetingModal exposes, but bound to THIS lead. */}
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
               <Calendar size={13} /> <span>Meeting</span>
             </button>
@@ -710,58 +700,77 @@ export default function LeadDetailV2() {
             </button>
             <button
               className="lead-btn lead-btn-sm"
-              onClick={() => setActivityType('followup')}
-              title="Schedule a follow-up date"
-            >
-              <Clock size={13} /> <span>Follow-up</span>
-            </button>
-            <button
-              className="lead-btn lead-btn-sm"
               onClick={() => navigate(`/voice?lead=${lead.id}`)}
               title="Voice log (Gujarati / Hindi / English)"
             >
               <Mic size={13} /> <span>Voice</span>
             </button>
-            {/* Phase 33F (D7) — duplicate Template button removed.
-                WhatsApp button now opens the template prompt by
-                default (stage-aware). Reps who want a raw blank
-                chat can long-press WhatsApp (future). The Phase 33D.5
-                post-stage prompt also auto-fires when stage changes,
-                so reps don't lose the template path. */}
-            {/* Phase 32L — owner reported the chip-only path was
-                undiscoverable. Bring back an explicit Stage button so
-                reps have an obvious labelled control. The chip in the
-                hero (with ChevronDown affordance) is still the fast
-                path; this is the muscle-memory path for anyone who
-                used the pre-31T 6-button grid. Same handler, same
-                modal, no duplication of save logic. */}
             <button
               className="lead-btn lead-btn-sm"
-              onClick={() => setActiveModal('stage')}
-              title="Change stage"
+              onClick={() => setMoreOpen(v => !v)}
+              title="More actions"
+              aria-expanded={moreOpen}
             >
-              <RefreshCw size={13} /> <span>Stage</span>
+              <MoreHorizontal size={13} /> <span>{moreOpen ? 'Less' : 'More'}</span>
             </button>
-            {/* Phase 33D — photo capture + OCR. Camera button in
-                action grid. Tap → native camera → upload to lead-
-                photos bucket → OCR via Claude Vision. If business
-                card detected, offers to patch lead fields. */}
-            <PhotoCapture
-              leadId={lead.id}
-              profileId={profile?.id}
-              onSaved={() => load()}
-              onPatchLead={async (fields) => {
-                const patch = {}
-                if (fields.name    && !lead.name?.trim())    patch.name    = fields.name
-                if (fields.phone   && !lead.phone?.trim())   patch.phone   = fields.phone
-                if (fields.email   && !lead.email?.trim())   patch.email   = fields.email
-                if (fields.company && !lead.company?.trim()) patch.company = fields.company
-                if (Object.keys(patch).length === 0) { load(); return }
-                await supabase.from('leads').update(patch).eq('id', lead.id)
-                load()
-              }}
-            />
           </div>
+
+          {/* Phase 33G.2 — More drawer. Hidden by default; opens to a
+              second 4-button row when the rep taps More. Same
+              lead-hero-actions-grid styling so it reads as a natural
+              extension. Stays open until rep taps Less. */}
+          {moreOpen && (
+            <div
+              className="lead-hero-actions-grid"
+              style={{ marginTop: 8 }}
+            >
+              {/* Email — falls back to LogActivityModal when lead has
+                  no email on file (most govt leads). */}
+              {lead.email ? (
+                <a
+                  href={`mailto:${lead.email}?subject=${encodeURIComponent('Outdoor advertising — ' + (lead.company || lead.name || ''))}`}
+                  className="lead-btn lead-btn-sm"
+                  onClick={() => fireAndForgetLog('email', `Email → ${lead.email}`)}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Mail size={13} /> <span>Email</span>
+                </a>
+              ) : (
+                <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('email')}>
+                  <Mail size={13} /> <span>Email</span>
+                </button>
+              )}
+              <button
+                className="lead-btn lead-btn-sm"
+                onClick={() => setActivityType('followup')}
+                title="Schedule a follow-up date"
+              >
+                <Clock size={13} /> <span>Follow-up</span>
+              </button>
+              <button
+                className="lead-btn lead-btn-sm"
+                onClick={() => setActiveModal('stage')}
+                title="Change stage"
+              >
+                <RefreshCw size={13} /> <span>Stage</span>
+              </button>
+              <PhotoCapture
+                leadId={lead.id}
+                profileId={profile?.id}
+                onSaved={() => load()}
+                onPatchLead={async (fields) => {
+                  const patch = {}
+                  if (fields.name    && !lead.name?.trim())    patch.name    = fields.name
+                  if (fields.phone   && !lead.phone?.trim())   patch.phone   = fields.phone
+                  if (fields.email   && !lead.email?.trim())   patch.email   = fields.email
+                  if (fields.company && !lead.company?.trim()) patch.company = fields.company
+                  if (Object.keys(patch).length === 0) { load(); return }
+                  await supabase.from('leads').update(patch).eq('id', lead.id)
+                  load()
+                }}
+              />
+            </div>
+          )}
           {/* Phase 33B.4 — "I'm here" auto-checkin row. Locked 10-min
               dwell per owner decision. Shown only after the rep taps
               I'm here; otherwise the button is in the grid above. */}
