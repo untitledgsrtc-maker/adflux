@@ -65,6 +65,8 @@ const ADMIN_NAV = [
   // Phase 33G.8 — admin Leaves (item 82). Sits next to HR since it's
   // the same operational neighbourhood.
   { to: '/admin/leaves',      label: 'Leaves',         icon: ClockIcon },
+  // Phase 33H — TA (travel allowance) auto-computed from GPS pings.
+  { to: '/admin/ta-payouts',  label: 'TA Payouts',     icon: TrendingUp },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/incentives',        label: 'Incentives',     icon: Gift },
 ]
