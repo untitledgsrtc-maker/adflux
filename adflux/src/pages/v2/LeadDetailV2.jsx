@@ -121,8 +121,46 @@ export default function LeadDetailV2() {
   const [error, setError] = useState('')
 
   // Modal state
-  const [activeModal, setActiveModal] = useState(null)   // null | 'stage' | 'reassign'
+  const [activeModal, setActiveModal] = useState(null)   // null | 'stage' | 'reassign' | 'whatsapp_template'
   const [activityType, setActivityType] = useState(null) // null | 'call' | 'whatsapp' | …
+
+  // Phase 33B — WhatsApp template send. Fetches the message_templates
+  // row matching the current lead.stage, fills placeholders, opens
+  // WhatsApp. Owner directive (11 May 2026): one-tap follow-up at
+  // every stage; templates editable via Master → Message Templates.
+  const [waTemplate, setWaTemplate] = useState(null)
+  const [waLoading, setWaLoading] = useState(false)
+  async function sendStageTemplate() {
+    if (!lead) return
+    const phone = cleanPhone(lead.phone)
+    if (!phone) {
+      setError('No phone number on file — can\'t send WhatsApp follow-up.')
+      return
+    }
+    setWaLoading(true)
+    const { data, error: tErr } = await supabase
+      .from('message_templates')
+      .select('id, name, body')
+      .eq('stage', lead.stage)
+      .eq('is_active', true)
+      .order('display_order')
+      .limit(1)
+      .maybeSingle()
+    setWaLoading(false)
+    if (tErr || !data) {
+      setError(`No active template for stage "${lead.stage}". Ask admin to add one in Master → Message Templates.`)
+      return
+    }
+    // Fill placeholders. {name}, {company}, {rep}, {city}.
+    const filled = data.body
+      .replace(/\{name\}/g,    lead.name    || 'Sir/Madam')
+      .replace(/\{company\}/g, lead.company || lead.name || 'your business')
+      .replace(/\{rep\}/g,     profile?.name || 'Sales Team')
+      .replace(/\{city\}/g,    lead.city    || 'your city')
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(filled)}`
+    window.open(url, '_blank')
+    fireAndForgetLog('whatsapp', `Follow-up template sent (${data.name})`)
+  }
 
   /* Phase 30C rev2 + 32P — fast-path action loggers. Owner spec
      (8 May 2026): "call log, whatsapp log not able to fetched". The
@@ -550,6 +588,20 @@ export default function LeadDetailV2() {
               title="Voice log (Gujarati / Hindi / English)"
             >
               <Mic size={13} /> <span>Voice</span>
+            </button>
+            {/* Phase 33B — one-tap stage-aware WhatsApp template.
+                Fetches message_templates row matching lead.stage,
+                fills {name}/{company}/{rep}/{city}, opens WhatsApp.
+                Different from the raw WhatsApp button above — that one
+                opens an empty chat; this one ships a ready-to-send
+                follow-up message. */}
+            <button
+              className="lead-btn lead-btn-sm"
+              onClick={sendStageTemplate}
+              disabled={waLoading}
+              title="Send WhatsApp follow-up using stage template"
+            >
+              <MessageCircle size={13} /> <span>{waLoading ? '…' : 'Template'}</span>
             </button>
             {/* Phase 32L — owner reported the chip-only path was
                 undiscoverable. Bring back an explicit Stage button so
