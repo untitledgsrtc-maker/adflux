@@ -1346,8 +1346,18 @@ function TodayTasksBreakdown({ userId, navigate }) {
     return () => { cancelled = true }
   }, [userId])
 
-  const followUps = rows.filter(r => r.cadence_type === 'lead_intro' || r.cadence_type === 'quote_chase')
-  const nurtureCalls = rows.filter(r => r.cadence_type === 'nurture' || r.cadence_type === 'lost_nurture')
+  // Phase 33D.6 — owner directive (11 May): overdue items shown first
+  // so the rep sees what's already late before what's due today. The
+  // query already pulls follow_up_date <= today; here we split into
+  // overdue (< today) and today buckets, then sub-group by cadence.
+  const today = new Date().toISOString().slice(0, 10)
+  const isFollowUp = (r) => r.cadence_type === 'lead_intro' || r.cadence_type === 'quote_chase'
+  const isNurture  = (r) => r.cadence_type === 'nurture' || r.cadence_type === 'lost_nurture'
+  const overdueFollowUps = rows.filter(r => r.follow_up_date < today && isFollowUp(r))
+  const overdueNurture   = rows.filter(r => r.follow_up_date < today && isNurture(r))
+  const followUps        = rows.filter(r => r.follow_up_date >= today && isFollowUp(r))
+  const nurtureCalls     = rows.filter(r => r.follow_up_date >= today && isNurture(r))
+  const overdueCount = overdueFollowUps.length + overdueNurture.length
 
   if (rows.length === 0) {
     return (
@@ -1434,10 +1444,25 @@ function TodayTasksBreakdown({ userId, navigate }) {
           View all →
         </button>
       </div>
+      {/* Phase 33D.6 — OVERDUE first (red), then today (muted).
+          Within each, follow-ups before nurture. */}
+      {overdueCount > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700,
+            color: 'var(--danger)',
+            textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6,
+          }}>
+            ⚠ {overdueCount} overdue
+          </div>
+          {overdueFollowUps.slice(0, 3).map(r => <CallCard key={r.id} r={r} />)}
+          {overdueNurture.slice(0, 2).map(r => <CallCard key={r.id} r={r} />)}
+        </div>
+      )}
       {followUps.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
-            {followUps.length} follow-up{followUps.length > 1 ? 's' : ''}
+            {followUps.length} follow-up{followUps.length > 1 ? 's' : ''} today
           </div>
           {followUps.slice(0, 3).map(r => <CallCard key={r.id} r={r} />)}
         </div>
@@ -1445,7 +1470,7 @@ function TodayTasksBreakdown({ userId, navigate }) {
       {nurtureCalls.length > 0 && (
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
-            {nurtureCalls.length} nurture call{nurtureCalls.length > 1 ? 's' : ''}
+            {nurtureCalls.length} nurture call{nurtureCalls.length > 1 ? 's' : ''} today
           </div>
           {nurtureCalls.slice(0, 3).map(r => <CallCard key={r.id} r={r} />)}
         </div>
