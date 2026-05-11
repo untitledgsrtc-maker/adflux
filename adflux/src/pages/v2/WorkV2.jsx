@@ -26,6 +26,7 @@ import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
+import { ensurePushOnLogin } from '../../utils/pushNotifications'
 // Phase 31O — ProposedIncentiveCard import removed; the V2AppShell
 // now mounts it once at the top of every sales page, so /work
 // doesn't render it directly anymore.
@@ -332,6 +333,15 @@ export default function WorkV2() {
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
+
+  // Phase 33R — register service worker + request push permission
+  // + subscribe (silent if already done). Skips silently if
+  // VITE_VAPID_PUBLIC_KEY is unset.
+  useEffect(() => {
+    if (profile?.id) {
+      ensurePushOnLogin(profile.id).catch(() => { /* silent */ })
+    }
+  }, [profile?.id])
 
   /* ─── Phase 30F — GPS interval polling ───
      Owner spec: 'every 10 min keep fetch location'. Fires only while
@@ -1478,56 +1488,76 @@ function TodayTasksBreakdown({ userId, navigate }) {
   )
 }
 
-function MeetingRing({ done, target, extras }) {
-  const [open, setOpen] = useState(false)
+// Phase 33Q (item #1) — 3-round milestone rings. Owner asked for
+// "all milestones in 3 rounds". Layout chosen: three side-by-side
+// rings (Meetings · Calls · New leads), one for each daily target.
+// Each ring is independently coloured by hit status. The middle ring
+// is largest since Meetings is the variable-salary driver. Outer two
+// are slightly smaller — visual hierarchy.
+function MiniRing({ done, target, label, accent, isPrimary }) {
   const pct = Math.max(0, Math.min(1, target ? done / target : 0))
-  const R = 64
+  const R = isPrimary ? 56 : 42
   const C = 2 * Math.PI * R
   const dash = C * pct
   const hit = done >= target
+  const stroke = hit ? 'var(--success, #10B981)' : accent
+  const size = isPrimary ? 140 : 110
+  const view = isPrimary ? 160 : 130
+  const cx = view / 2
   return (
-    <div className="m-ring-wrap">
-      <button
-        type="button"
-        className="m-ring"
-        onClick={() => setOpen(o => !o)}
-        title="Tap to see all targets"
-      >
-        <svg viewBox="0 0 160 160" width="148" height="148">
-          <circle cx="80" cy="80" r={R} fill="none" stroke="var(--surface-2, #1e293b)" strokeWidth="12" />
-          <circle
-            cx="80" cy="80" r={R} fill="none"
-            stroke={hit ? 'var(--success, #10B981)' : 'var(--accent, #FFE600)'}
-            strokeWidth="12"
-            strokeLinecap="round"
-            strokeDasharray={`${dash} ${C - dash}`}
-            transform="rotate(-90 80 80)"
-            style={{ transition: 'stroke-dasharray .4s ease' }}
-          />
-          <text x="80" y="74" textAnchor="middle" fontSize="32" fontWeight="700" fontFamily="Space Grotesk, system-ui" fill="var(--text, #f1f5f9)">
-            {done}/{target}
-          </text>
-          <text x="80" y="100" textAnchor="middle" fontSize="11" fontWeight="600" letterSpacing="0.1em" fill="var(--text-muted, #94a3b8)">
-            MEETINGS
-          </text>
-        </svg>
-      </button>
-      {open && (
-        <div className="m-ring-sheet">
-          <div className="m-ring-row">
-            <span>Meetings</span>
-            <b className={done >= target ? 'good' : ''}>{done} / {target}</b>
-          </div>
-          <div className="m-ring-row">
-            <span>Calls</span>
-            <b className={extras.calls >= extras.callTarget ? 'good' : ''}>{extras.calls} / {extras.callTarget}</b>
-          </div>
-          <div className="m-ring-row">
-            <span>New leads</span>
-            <b className={extras.leads >= extras.leadTarget ? 'good' : ''}>{extras.leads} / {extras.leadTarget}</b>
-          </div>
-        </div>
-      )}
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', gap: 4, flex: 1, minWidth: 0,
+    }}>
+      <svg viewBox={`0 0 ${view} ${view}`} width={size} height={size}>
+        <circle cx={cx} cy={cx} r={R} fill="none"
+          stroke="var(--surface-2, #1e293b)" strokeWidth={isPrimary ? 12 : 9} />
+        <circle
+          cx={cx} cy={cx} r={R} fill="none"
+          stroke={stroke}
+          strokeWidth={isPrimary ? 12 : 9}
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${C - dash}`}
+          transform={`rotate(-90 ${cx} ${cx})`}
+          style={{ transition: 'stroke-dasharray .4s ease' }}
+        />
+        <text x={cx} y={cx - 2} textAnchor="middle"
+          fontSize={isPrimary ? 26 : 19} fontWeight="700"
+          fontFamily="Space Grotesk, system-ui"
+          fill="var(--text, #f1f5f9)">
+          {done}/{target}
+        </text>
+      </svg>
+      <div style={{
+        fontSize: isPrimary ? 11 : 10, fontWeight: 600,
+        letterSpacing: '.08em', textTransform: 'uppercase',
+        color: hit ? 'var(--success, #10B981)' : 'var(--text-muted, #94a3b8)',
+        marginTop: -4,
+      }}>
+        {label}
+      </div>
+    </div>
+  )
+}
+
+function MeetingRing({ done, target, extras }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      gap: 4, padding: '6px 4px', flexWrap: 'wrap',
+    }}>
+      <MiniRing
+        done={extras.calls} target={extras.callTarget}
+        label="Calls" accent="var(--blue, #3B82F6)"
+      />
+      <MiniRing
+        done={done} target={target}
+        label="Meetings" accent="var(--accent, #FFE600)" isPrimary
+      />
+      <MiniRing
+        done={extras.leads} target={extras.leadTarget}
+        label="Leads" accent="#A78BFA"
+      />
     </div>
   )
 }

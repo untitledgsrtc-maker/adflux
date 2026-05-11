@@ -18,12 +18,13 @@
 import { useNavigate } from 'react-router-dom'
 import {
   Sparkles, RefreshCw, Phone, CheckCircle2, Clock,
-  Forward, X as XIcon, Loader2,
+  Forward, X as XIcon, Loader2, ArrowRight,
 } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLeadTasks, TASK_KIND_LABEL, TASK_KIND_TONE } from '../../hooks/useLeadTasks'
 import { HeatDot, Pill } from './LeadShared'
 import { formatRelative } from '../../utils/formatters'
+import { supabase } from '../../lib/supabase'
 
 function dueHint(due_at) {
   if (!due_at) return null
@@ -100,9 +101,7 @@ export default function TodayTasksPanel({ userId, limit = 10 }) {
       )}
 
       {!loading && tasks.length === 0 && (
-        <div className="lead-tasks-empty">
-          Nothing flagged for today. Tap Refresh to re-check.
-        </div>
+        <SuggestedTasks userId={userId} />
       )}
 
       {top.length > 0 && (
@@ -201,3 +200,97 @@ export default function TodayTasksPanel({ userId, limit = 10 }) {
     </div>
   )
 }
+
+/* ─── SuggestedTasks ──────────────────────────────────────────────
+   Phase 33Q (owner directive #5) — when the rep has no smart-tasks
+   for today, fall back to the suggestion engine. Pulls from the
+   todays_suggested_tasks RPC: new leads untouched > 24h, quotes
+   sent > 5d, won quotes with outstanding > 14d.
+
+   Tap a row → opens the lead or quote in detail view. */
+function SuggestedTasks({ userId }) {
+  const navigate = useNavigate()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!userId) { setLoading(false); return }
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase.rpc('todays_suggested_tasks', {
+        p_user_id: userId,
+      })
+      if (cancelled) return
+      setItems(Array.isArray(data) ? data : [])
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [userId])
+
+  if (loading) {
+    return (
+      <div className="lead-tasks-empty">
+        Loading suggestions…
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="lead-tasks-empty">
+        All caught up — nothing flagged for today.
+      </div>
+    )
+  }
+
+  const toneFor = (kind) => kind === 'new_lead' ? 'info'
+    : kind === 'chase_quote' ? 'warning'
+    : 'danger'
+  const labelFor = (kind) => kind === 'new_lead' ? 'NEW LEAD'
+    : kind === 'chase_quote' ? 'CHASE'
+    : 'COLLECT'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{
+        fontSize: 11, color: 'var(--text-muted)',
+        padding: '8px 4px 4px',
+      }}>
+        Suggested for today — nothing else flagged
+      </div>
+      {items.map((it, i) => (
+        <div
+          key={`${it.kind}-${i}`}
+          onClick={() => {
+            if (it.lead_id) navigate(`/leads/${it.lead_id}`)
+            else if (it.quote_id) navigate(`/quotes/${it.quote_id}`)
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 12px', borderRadius: 10,
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+            }}>
+              <Pill tone={toneFor(it.kind)}>{labelFor(it.kind)}</Pill>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                {it.primary_text}
+              </span>
+            </div>
+            {it.secondary_text && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                {it.secondary_text}
+              </div>
+            )}
+          </div>
+          <ArrowRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
