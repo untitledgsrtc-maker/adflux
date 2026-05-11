@@ -129,6 +129,14 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
   const [notes, setNotes]       = useState('')
   const [nextAction, setNextAction] = useState('')
   const [nextDate, setNextDate]     = useState('')
+  // Phase 32O — owner reported (11 May 2026, screenshot) the Schedule
+  // follow-up section had date chips but no time picker. Voice flow
+  // (Phase 31J) saved next_action_time from a Claude parse; manual
+  // flow had no way to set it. Time picker is HH:MM, optional. Empty
+  // string = no time (lands at start-of-day on reports). Pre-fills to
+  // "10:00" when the rep picks a date chip so they don't have to type
+  // "10:00" by hand for the most common case.
+  const [nextTime, setNextTime]     = useState('')
   const [customOpen, setCustomOpen] = useState(false)
   const [gps, setGps]               = useState(null) // {lat, lng, acc}
   const [gpsBusy, setGpsBusy]       = useState(false)
@@ -180,6 +188,10 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
   function pickPreset(date) {
     setNextDate(date)
     setCustomOpen(false)
+    // Phase 32O — auto-fill 10:00 the first time a date chip is tapped,
+    // so the rep gets a sane default. They can edit. If they explicitly
+    // cleared the time earlier, don't refill.
+    if (!nextTime) setNextTime('10:00')
   }
 
   // Phase 30G — owner-thinking suggestion. If rep marks the call
@@ -202,6 +214,10 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
       notes:            notes.trim() || null,
       next_action:      nextAction.trim() || null,
       next_action_date: nextDate || null,
+      // Phase 32O — persist time alongside date. Column type is `time`
+      // in Postgres (HH:MM:SS), but HH:MM is accepted and Postgres
+      // pads :00. Null when rep didn't set a time.
+      next_action_time: nextTime || null,
       created_by:       profile.id,
     }
     if (meta.showDuration) {
@@ -414,7 +430,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                   type="button"
                   className="lead-btn lead-btn-sm"
                   style={{ fontSize: 11, padding: '6px 11px', color: 'var(--text-muted)' }}
-                  onClick={() => { setNextDate(''); setCustomOpen(false) }}
+                  onClick={() => { setNextDate(''); setNextTime(''); setCustomOpen(false) }}
                 >
                   Clear
                 </button>
@@ -431,9 +447,39 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                 />
               </div>
             )}
+            {/* Phase 32O — time picker appears once a date is set. Owner
+                screenshot (11 May 2026) showed the modal had no way to
+                set follow-up time, even though the column has existed
+                since Phase 31J. Default 10:00 pre-fills on first chip
+                tap (see pickPreset). Reps can clear or edit. */}
+            {nextDate && (
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <label className="lead-fld-label" style={{ marginBottom: 0 }}>Time</label>
+                <input
+                  className="lead-inp"
+                  type="time"
+                  value={nextTime}
+                  onChange={e => setNextTime(e.target.value)}
+                  style={{ width: 130 }}
+                />
+                {nextTime && (
+                  <button
+                    type="button"
+                    className="lead-btn lead-btn-sm"
+                    style={{ fontSize: 11, padding: '6px 11px', color: 'var(--text-muted)' }}
+                    onClick={() => setNextTime('')}
+                  >
+                    No time
+                  </button>
+                )}
+              </div>
+            )}
             {nextDate && !customOpen && (
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-                Follow-up scheduled for <b style={{ color: 'var(--text)' }}>{nextDate}</b>
+                Follow-up scheduled for{' '}
+                <b style={{ color: 'var(--text)' }}>
+                  {nextDate}{nextTime ? ` · ${nextTime}` : ''}
+                </b>
               </div>
             )}
           </div>
