@@ -319,6 +319,7 @@ export default function LogMeetingModal({ onClose, onSaved }) {
                 if (fields.company && !company.trim()) setCompany(fields.company)
                 if (fields.name    && !contact.trim()) setContact(fields.name)
                 if (fields.phone   && !phone.trim())   setPhone(fields.phone)
+                if (fields.city    && !city.trim())    setCity(fields.city)
               }}
             />
           </div>

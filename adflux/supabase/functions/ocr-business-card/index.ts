@@ -42,17 +42,21 @@ Return STRICT JSON only — no commentary, no markdown fences. Schema:
   "ocr_text": "full visible text, original layout",
   "is_business_card": true | false,
   "fields": {
-    "name":    "person's name or null",
-    "phone":   "primary phone digits (no formatting) or null",
-    "email":   "email address or null",
-    "company": "organization name or null",
-    "role":    "designation / title or null"
+    "name":        "person's name or null",
+    "designation": "job title / role / department (e.g. 'Director', 'CEO', 'Marketing Manager') or null",
+    "phone":       "primary phone digits (no formatting) or null",
+    "email":       "email address or null",
+    "company":     "organization name or null",
+    "city":        "city or town the card mentions in the address block or null",
+    "website":     "website URL (without https://) or null"
   }
 }
 
 Rules:
 - If the photo is NOT a business card (storefront, hoarding mockup, building, document), set is_business_card=false and leave fields null but still fill ocr_text with any visible text.
 - Indian phone numbers: strip spaces / hyphens / +91 prefix; return 10 digits only.
+- City: extract from the address block on the card. Indian cards typically have "Surat", "Vadodara", "Ahmedabad", "Mumbai" etc near the address. Look at the line preceding state / pincode.
+- Website: strip leading http(s):// and trailing slash. e.g. "www.untitledad.in" not "https://www.untitledad.in/".
 - Don't invent fields. Null when uncertain.
 - Latin script preferred for fields; ocr_text can be mixed Gujarati / Hindi / English.`
 

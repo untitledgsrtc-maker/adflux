@@ -43,9 +43,12 @@ export default function LeadFormV2() {
   const [form, setForm] = useState({
     name:           prefill.name        || '',
     company:        prefill.company     || '',
+    // Phase 33D.3 — new fields per owner spec (11 May 2026)
+    designation:    prefill.designation || '',
     phone:          prefill.phone       || '',
     email:          prefill.email       || '',
     city:           prefill.city        || profile?.city || '',
+    website:        prefill.website     || '',
     segment:        prefill.segment     || 'PRIVATE',
     source:         prefill.source      || 'Manual',
     industry:       prefill.industry    || '',
@@ -115,9 +118,11 @@ export default function LeadFormV2() {
     const payload = {
       name:          form.name.trim(),
       company:       form.company.trim() || null,
+      designation:   form.designation.trim() || null,
       phone:         form.phone.trim() || null,
       email:         form.email.trim() || null,
       city:          form.city.trim() || null,
+      website:       form.website.trim() || null,
       segment:       form.segment,
       source:        form.source,
       industry:      form.industry.trim() || null,
@@ -184,10 +189,13 @@ export default function LeadFormV2() {
             onFieldsExtracted={(fields) => {
               setForm(prev => ({
                 ...prev,
-                name:    prev.name    || fields.name    || '',
-                company: prev.company || fields.company || '',
-                phone:   prev.phone   || fields.phone   || '',
-                email:   prev.email   || fields.email   || '',
+                name:        prev.name        || fields.name        || '',
+                company:     prev.company     || fields.company     || '',
+                designation: prev.designation || fields.designation || fields.role || '',
+                phone:       prev.phone       || fields.phone       || '',
+                email:       prev.email       || fields.email       || '',
+                city:        prev.city        || fields.city        || '',
+                website:     prev.website     || fields.website     || '',
               }))
             }}
           />
@@ -198,14 +206,17 @@ export default function LeadFormV2() {
       <div className="lead-card" style={{ marginBottom: 14 }}>
         <div className="lead-card-head"><div className="lead-card-title">Identity</div></div>
         <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          {/* Phase 33B.3 — Company, Person, Phone, City all required.
-              Email + address optional. Govt segment still exempts
-              phone since tender leads often have only an email. */}
-          <Field label="Person name *" value={form.name} onChange={v => set('name', v)} placeholder="e.g. Dr. Mehta" />
-          <Field label="Company *" value={form.company} onChange={v => set('company', v)} placeholder="e.g. Sunrise Diagnostics" />
-          <Field label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Mobile *'}  value={form.phone}   onChange={v => set('phone', v)}   placeholder="+91 98XXXX XXXXX" />
-          <Field label="City *"   value={form.city}    onChange={v => set('city', v)}    placeholder="Surat" />
-          <Field label="Email"  value={form.email}   onChange={v => set('email', v)}   placeholder="name@company.com" type="email" />
+          {/* Phase 33D.3 — locked field set (11 May 2026):
+                Company* / Person* / Designation / Mobile* / Email /
+                City* / Website. Govt segment exempts phone (tender
+                leads have only a department email). */}
+          <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     placeholder="e.g. Sunrise Diagnostics" />
+          <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" />
+          <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
+          <Field label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Mobile *'} value={form.phone} onChange={v => set('phone', v)} placeholder="+91 98XXXX XXXXX" />
+          <Field label="Email"          value={form.email}       onChange={v => set('email', v)}       placeholder="name@company.com" type="email" />
+          <Field label="City *"         value={form.city}        onChange={v => set('city', v)}        placeholder="Surat" />
+          <Field label="Website"        value={form.website}     onChange={v => set('website', v)}     placeholder="www.example.com" />
         </div>
       </div>
 
