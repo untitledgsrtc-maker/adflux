@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Search, Edit3, Plus, Phone, Mail, Building2, MapPin,
-  FileText, X, Save,
+  FileText, X, Save, GitMerge, Trash2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -54,6 +54,11 @@ export default function ClientsV2() {
   const [editing, setEditing] = useState(null) // client row currently in edit modal
   const [saveErr, setSaveErr] = useState('')
   const [saving, setSaving] = useState(false)
+  // Phase 33L — duplicate-merge tool. Admin-only. Toggled open via
+  // the "Find duplicates" button below the header. Groups clients
+  // by normalized phone (or company when phone empty) and surfaces
+  // groups with 2+ rows. Admin picks a primary; the rest get deleted.
+  const [dupOpen, setDupOpen] = useState(false)
 
   useEffect(() => {
     load()
@@ -225,6 +230,21 @@ export default function ClientsV2() {
           <Plus size={15} /> New quote
         </button>
       </div>
+
+      {/* Phase 33L — duplicate finder. Admin-only. Surfaces clients
+          with the same normalized phone (or company when phone is
+          blank) so admin can merge by picking a primary and deleting
+          the others. Clients table is decoupled from quote history,
+          so deleting a dup doesn't affect past quote snapshots. */}
+      {isAdmin && (
+        <DuplicatesPanel
+          clients={clients}
+          userMap={userMap}
+          isOpen={dupOpen}
+          onToggle={() => setDupOpen(v => !v)}
+          onChanged={load}
+        />
+      )}
 
       {/* ─── Stats strip ──────────────────────────────── */}
       {/* Stats reflect the rep filter when active so admin can see
@@ -423,6 +443,132 @@ export default function ClientsV2() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* Phase 33L — DuplicatesPanel
+   Admin tool that groups clients by normalized phone (or company when
+   phone is blank). Surfaces groups with 2+ rows; admin picks a
+   primary and the rest get deleted. Clients table is decoupled from
+   quote history (every quote carries its own client_* snapshot), so
+   deletes don't affect past quotes. */
+function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
+  const groups = useMemo(() => {
+    const buckets = new Map()
+    clients.forEach(c => {
+      // Normalize phone to digits-only. Empty? Fall back to company name.
+      const phoneKey = (c.phone || '').replace(/\D/g, '')
+      const companyKey = (c.company || '').trim().toLowerCase()
+      const key = phoneKey || (companyKey ? 'co:' + companyKey : null)
+      if (!key) return
+      if (!buckets.has(key)) buckets.set(key, [])
+      buckets.get(key).push(c)
+    })
+    return Array.from(buckets.entries())
+      .filter(([, arr]) => arr.length >= 2)
+      .map(([key, arr]) => ({ key, rows: arr }))
+      .sort((a, b) => b.rows.length - a.rows.length)
+  }, [clients])
+
+  async function mergeGroup(group, primaryId) {
+    const others = group.rows.filter(r => r.id !== primaryId)
+    if (others.length === 0) return
+    const primaryName = group.rows.find(r => r.id === primaryId)?.company
+      || group.rows.find(r => r.id === primaryId)?.name || 'this client'
+    if (!confirm(
+      `Delete ${others.length} duplicate row${others.length > 1 ? 's' : ''} ` +
+      `and keep "${primaryName}" as the primary? ` +
+      `Past quotes are unaffected.`
+    )) return
+    const ids = others.map(r => r.id)
+    const { error } = await supabase.from('clients').delete().in('id', ids)
+    if (error) { alert('Merge failed: ' + error.message); return }
+    onChanged()
+  }
+
+  return (
+    <div className="v2d-panel" style={{ padding: 0, overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          width: '100%', padding: '10px 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'transparent', border: 0, cursor: 'pointer',
+          color: 'var(--v2-ink-0)',
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+          <GitMerge size={14} /> Find duplicate clients
+          {groups.length > 0 && (
+            <span style={{
+              padding: '1px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+              background: 'rgba(245,158,11,.15)', color: 'var(--v2-amber, #F59E0B)',
+              textTransform: 'uppercase', letterSpacing: '.06em',
+            }}>
+              {groups.length} group{groups.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>
+          {isOpen ? 'Hide' : 'Show'}
+        </span>
+      </button>
+      {isOpen && (
+        <div style={{ borderTop: '1px solid var(--v2-line)' }}>
+          {groups.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--v2-ink-2)', fontSize: 13 }}>
+              No duplicates found. Clients are unique by phone (or by company name where phone is blank).
+            </div>
+          ) : (
+            groups.map(g => (
+              <div key={g.key} style={{
+                padding: '12px 14px', borderBottom: '1px solid var(--v2-line)',
+              }}>
+                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginBottom: 8 }}>
+                  {g.rows.length} clients share {g.key.startsWith('co:') ? `company "${g.key.slice(3)}"` : `phone ${g.key}`}
+                  — pick the one to KEEP. Others will be deleted.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {g.rows.map(c => (
+                    <div
+                      key={c.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 10px', borderRadius: 8,
+                        background: 'var(--v2-bg-2)', border: '1px solid var(--v2-line)',
+                        gap: 10, flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v2-ink-0)' }}>
+                          {c.company || c.name || 'Unknown'}
+                          {c.company && c.name && (
+                            <span style={{ fontWeight: 400, color: 'var(--v2-ink-2)', fontSize: 12 }}> · {c.name}</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
+                          {c.phone || '—'} · {c.quote_count || 0} quotes · owner: {userMap[c.created_by] || '—'}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => mergeGroup(g, c.id)}
+                        className="v2d-cta"
+                        style={{ padding: '6px 12px', fontSize: 12 }}
+                        title="Keep this row, delete the others"
+                      >
+                        Keep this · merge {g.rows.length - 1}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

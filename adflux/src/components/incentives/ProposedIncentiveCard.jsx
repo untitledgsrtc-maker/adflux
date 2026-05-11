@@ -66,6 +66,29 @@ export default function ProposedIncentiveCard({ compact = false }) {
     return () => document.removeEventListener('mousedown', onClick)
   }, [pickerOpen])
 
+  // Phase 33L — bump this to force a re-fetch from the realtime
+  // subscription. Saves wiring data through a stale-cache prop.
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Realtime: subscribe to quotes + payments changes for this user.
+  // On any insert/update/delete, bump refreshKey to re-trigger the
+  // fetch. Cheap because the channel only fires for THIS user's rows
+  // via the inserted filter (RLS still enforced; realtime is just an
+  // efficient signal).
+  useEffect(() => {
+    if (!profile?.id) return
+    const ch = supabase
+      .channel(`incentive-${profile.id}`)
+      .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'quotes', filter: `created_by=eq.${profile.id}` },
+          () => setRefreshKey(k => k + 1))
+      .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'payments', filter: `recorded_by=eq.${profile.id}` },
+          () => setRefreshKey(k => k + 1))
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [profile?.id])
+
   useEffect(() => {
     if (!profile?.id) return
     let cancelled = false
@@ -166,7 +189,7 @@ export default function ProposedIncentiveCard({ compact = false }) {
       })
     })()
     return () => { cancelled = true }
-  }, [profile?.id])
+  }, [profile?.id, refreshKey])
 
   if (!data) {
     // Skeleton — same height as the real card so layout doesn't jump.
