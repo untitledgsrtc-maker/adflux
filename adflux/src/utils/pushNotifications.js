@@ -86,17 +86,47 @@ export async function subscribeForPush(userId) {
     }
   }
 
-  // Upsert subscription into Supabase. ON CONFLICT endpoint keeps
-  // one row per device.
+  // Upsert subscription into Supabase.
+  // Phase 33X — use raw fetch with the live access_token directly
+  // instead of supabase-js .upsert(). The supabase-js client
+  // sometimes doesn't have the user's session loaded at the moment
+  // this is called (race between auth bootstrap and useEffect on
+  // /work mount), causing silent RLS rejection with no error
+  // surfacing. Raw fetch with access_token guarantees the JWT is
+  // present at write time.
   const json = sub.toJSON()
-  await supabase.from('push_subscriptions').upsert({
-    user_id: userId,
-    endpoint: sub.endpoint,
-    p256dh: json.keys?.p256dh,
-    auth:   json.keys?.auth,
-    user_agent: navigator.userAgent,
-    last_seen_at: new Date().toISOString(),
-  }, { onConflict: 'endpoint' })
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const at = session?.access_token
+    if (!at) {
+      console.warn('subscribeForPush: no auth session yet')
+      return sub
+    }
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + at,
+        'Prefer': 'return=minimal,resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        endpoint: sub.endpoint,
+        p256dh: json.keys?.p256dh,
+        auth:   json.keys?.auth,
+        user_agent: navigator.userAgent,
+        last_seen_at: new Date().toISOString(),
+      }),
+    })
+    if (!resp.ok) {
+      console.warn('subscribeForPush insert failed:', resp.status, await resp.text())
+    }
+  } catch (e) {
+    console.warn('subscribeForPush insert threw:', e)
+  }
 
   return sub
 }
