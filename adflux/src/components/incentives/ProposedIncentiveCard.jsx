@@ -319,75 +319,18 @@ export default function ProposedIncentiveCard({ compact = false }) {
     )
   }
 
-  const tabLabel = tab === 'forecast' ? 'Forecast' : tab === 'pending' ? 'Pending' : 'Earned'
-
+  // Phase 33N (owner directive) — reverted to the original full-card
+  // design: kicker on top, 3-tab row, big amount, subtitle.
+  // The dropdown chip variant from Phase 33G.6 was rolled back per
+  // 'forcasted card must be as old one'. Compact strip variant
+  // (top of this file) keeps the dropdown for narrow-page contexts.
   return (
     <div className="v2-incentive">
-      {/* Phase 33G.6 — kicker + dropdown picker on the same row.
-          Saves vertical space vs. the old kicker-on-top + 3-tab-row
-          layout. Tap the chip to switch views. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div className="v2-incentive-kicker">Proposed Incentive</div>
-        <div ref={pickerRef} style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => setPickerOpen(v => !v)}
-            aria-expanded={pickerOpen}
-            aria-haspopup="listbox"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', borderRadius: 999,
-              background: 'rgba(255,255,255,.18)',
-              border: '1px solid rgba(255,255,255,.20)',
-              color: '#fff', fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', backdropFilter: 'blur(4px)',
-            }}
-          >
-            {tabLabel}
-            <ChevronDown
-              size={14}
-              style={{
-                transform: pickerOpen ? 'rotate(180deg)' : 'rotate(0)',
-                transition: 'transform .15s',
-              }}
-            />
-          </button>
-          {pickerOpen && (
-            <div
-              role="listbox"
-              style={{
-                position: 'absolute', top: 'calc(100% + 6px)', right: 0,
-                minWidth: 140, background: 'var(--surface, #1e293b)',
-                border: '1px solid var(--border, #334155)',
-                borderRadius: 10, boxShadow: '0 10px 30px rgba(0,0,0,.45)',
-                zIndex: 50, overflow: 'hidden',
-              }}
-            >
-              {[
-                { key: 'forecast', label: 'Forecast' },
-                { key: 'pending',  label: 'Pending'  },
-                { key: 'earned',   label: 'Earned'   },
-              ].map(o => (
-                <button
-                  key={o.key}
-                  type="button"
-                  role="option"
-                  aria-selected={tab === o.key}
-                  onClick={() => { setTab(o.key); setPickerOpen(false) }}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left',
-                    padding: '10px 14px',
-                    background: tab === o.key ? 'rgba(255,255,255,.06)' : 'transparent',
-                    border: 0, color: 'var(--text, #f1f5f9)',
-                    fontSize: 13, cursor: 'pointer',
-                  }}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="v2-incentive-kicker">Proposed Incentive</div>
+      <div className="v2-tabs">
+        <button className={`v2-tab ${tab === 'forecast' ? 'v2-tab--active' : ''}`} onClick={() => setTab('forecast')}>Forecast</button>
+        <button className={`v2-tab ${tab === 'pending'  ? 'v2-tab--active' : ''}`} onClick={() => setTab('pending')}>Pending</button>
+        <button className={`v2-tab ${tab === 'earned'   ? 'v2-tab--active' : ''}`} onClick={() => setTab('earned')}>Earned</button>
       </div>
       <div className="v2-incentive-big">
         {isForecast && p.value > 0 && '+'}
