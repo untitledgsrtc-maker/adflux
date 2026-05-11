@@ -29,10 +29,11 @@
 // to the lead if they want, or just close and refresh counters.
 
 import { useEffect, useState } from 'react'
-import { X, MapPin, Loader2, Building2 } from 'lucide-react'
+import { X, MapPin, Loader2, Building2, Camera } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
+import PhotoCapture from './PhotoCapture'
 
 // Outcome → (stage, lost_reason) mapping. Locked in this file because
 // the modal owns the cold-meeting flow end-to-end. If you change these
@@ -294,6 +295,32 @@ export default function LogMeetingModal({ onClose, onSaved }) {
             >
               {gpsBusy ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : 'Refresh'}
             </button>
+          </div>
+
+          {/* Phase 33D.2 — business-card scanner inside LogMeeting.
+              Owner directive (11 May 2026): OCR everywhere a new
+              lead gets created. Tap → camera → OCR → auto-fills
+              company/contact/phone in this modal's state. Email
+              isn't a field on this modal so it's dropped. */}
+          <div style={{
+            padding: '10px 12px',
+            background: 'rgba(255,230,0,0.06)',
+            border: '1px dashed var(--accent, #FFE600)',
+            borderRadius: 8,
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          }}>
+            <Camera size={16} style={{ color: 'var(--accent)' }} />
+            <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+              Got a business card? Scan it.
+            </div>
+            <PhotoCapture
+              buttonLabel="Scan card"
+              onFieldsExtracted={(fields) => {
+                if (fields.company && !company.trim()) setCompany(fields.company)
+                if (fields.name    && !contact.trim()) setContact(fields.name)
+                if (fields.phone   && !phone.trim())   setPhone(fields.phone)
+              }}
+            />
           </div>
 
           <div>
