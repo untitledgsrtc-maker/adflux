@@ -722,20 +722,12 @@ export default function LeadDetailV2() {
             >
               <Mic size={13} /> <span>Voice</span>
             </button>
-            {/* Phase 33B — one-tap stage-aware WhatsApp template.
-                Fetches message_templates row matching lead.stage,
-                fills {name}/{company}/{rep}/{city}, opens WhatsApp.
-                Different from the raw WhatsApp button above — that one
-                opens an empty chat; this one ships a ready-to-send
-                follow-up message. */}
-            <button
-              className="lead-btn lead-btn-sm"
-              onClick={sendStageTemplate}
-              disabled={waLoading}
-              title="Send WhatsApp follow-up using stage template"
-            >
-              <MessageCircle size={13} /> <span>{waLoading ? '…' : 'Template'}</span>
-            </button>
+            {/* Phase 33F (D7) — duplicate Template button removed.
+                WhatsApp button now opens the template prompt by
+                default (stage-aware). Reps who want a raw blank
+                chat can long-press WhatsApp (future). The Phase 33D.5
+                post-stage prompt also auto-fires when stage changes,
+                so reps don't lose the template path. */}
             {/* Phase 32L — owner reported the chip-only path was
                 undiscoverable. Bring back an explicit Stage button so
                 reps have an obvious labelled control. The chip in the

@@ -921,21 +921,11 @@ export default function WorkV2() {
               </button>
             </div>
 
-            {/* Phase 30E — focus / show-all toggle. Drives whether the
-                rep sees one card at a time or the full list. */}
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '8px 4px', fontSize: 12, color: 'var(--text-muted)',
-            }}>
-              <span>{focusMode ? 'Focus mode — one card at a time' : 'All visible'}</span>
-              <button
-                type="button"
-                className="lead-btn lead-btn-sm"
-                onClick={() => setFocusModeAndPersist(!focusMode)}
-              >
-                {focusMode ? 'Show all' : 'Focus mode'}
-              </button>
-            </div>
+            {/* Phase 33F (B8) — Focus mode toggle hidden. Low-literacy
+                reps got confused by the "focus mode / show all" choice;
+                most never used it. Defaulting to "show all" (focusMode
+                state stays initially false). Admin can still hit the
+                /work?focus=1 query param if they want it for testing. */}
 
             {/* FOCUS MODE — render only the next-best undone card. */}
             {focusMode && (() => {

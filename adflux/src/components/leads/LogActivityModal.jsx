@@ -41,6 +41,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import VoiceInput from '../voice/VoiceInput'
 
 const TYPE_META = {
   call:        { label: 'Call',        Icon: Phone,         showOutcome: true,  showDuration: true,
@@ -369,16 +370,19 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                 </button>
               ))}
             </div>
-            <textarea
-              className="lead-inp"
+            {/* Phase 33F (K4) — voice mic on Notes textarea. Rep can
+                speak Gujarati / Hindi / English; transcript auto-fills. */}
+            <VoiceInput
+              multiline
               rows={3}
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={setNotes}
               placeholder={
                 type === 'call'    ? 'What was discussed? Decision-maker? Budget? Next step?'
               : type === 'meeting' ? 'Who attended, what was agreed, next step.'
               : 'Short note…'
               }
+              languageHint="gu"
             />
           </div>
 

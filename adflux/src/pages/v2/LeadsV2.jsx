@@ -257,12 +257,11 @@ export default function LeadsV2() {
 
   return (
     <div className="lead-root">
-      {/* ─── Page header ─── */}
+      {/* Phase 33F (C2) — dropped the "Your pipeline" eyebrow above
+          the "My Leads" title. Redundant filler that pushed content
+          down. */}
       <div className="lead-page-head">
         <div>
-          <div className="lead-page-eyebrow">
-            {isAdmin ? 'Pipeline · across all sources' : 'Your pipeline'}
-          </div>
           <div className="lead-page-title">
             {isAdmin ? 'Leads' : 'My Leads'}
           </div>
@@ -326,12 +325,41 @@ export default function LeadsV2() {
           'New + Contacted + Nurture' meta was misleading too — Contacted
           hasn't existed since Phase 30A, and Nurture is its own column
           now (Phase 31N). */}
+      {/* Phase 33F (C3) — owner audit (11 May): 4 stat cards × 110px
+          = 440px wasted on /leads. Same data is on the filter chips
+          below. Compact horizontal chip row instead. Tap a chip to
+          filter the list. */}
       {leads.length > 0 && (
-        <div className="lead-stat-strip">
-          <StatCard label="Total leads" num={totals.total} meta="all sources" />
-          <StatCard label="New"         num={totals.groupCounts.new || 0}        meta="not yet contacted" />
-          <StatCard label="Follow-up"   num={totals.groupCounts.working || 0}    meta="actively chasing" />
-          <StatCard label="Won"         num={totals.wonCount}                    meta={winRate != null ? `${winRate}% win rate` : 'no decisions yet'} />
+        <div style={{
+          display: 'flex', gap: 8, flexWrap: 'wrap',
+          marginBottom: 12, fontSize: 12,
+        }}>
+          <span
+            onClick={() => setStageFilter('all')}
+            className="chip-link"
+            style={{ cursor: 'pointer', fontWeight: stageFilter === 'all' ? 700 : 500 }}
+          >
+            <b style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--text)' }}>{totals.total}</b>
+            <span style={{ marginLeft: 4 }}>total</span>
+          </span>
+          <span className="chip-link" style={{ cursor: 'pointer' }}
+            onClick={() => setStageFilter('new')}
+          >
+            <b style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--text)' }}>{totals.groupCounts.new || 0}</b>
+            <span style={{ marginLeft: 4 }}>new</span>
+          </span>
+          <span className="chip-link" style={{ cursor: 'pointer' }}
+            onClick={() => setStageFilter('working')}
+          >
+            <b style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--text)' }}>{totals.groupCounts.working || 0}</b>
+            <span style={{ marginLeft: 4 }}>follow-up</span>
+          </span>
+          <span className="chip-link" style={{ cursor: 'pointer' }}
+            onClick={() => setStageFilter('won')}
+          >
+            <b style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--success)' }}>{totals.wonCount}</b>
+            <span style={{ marginLeft: 4 }}>won{winRate != null ? ` · ${winRate}%` : ''}</span>
+          </span>
         </div>
       )}
 
@@ -626,7 +654,8 @@ export default function LeadsV2() {
                     />
                   </th>
                 )}
-                <th style={{ width: 18 }}></th>
+                {/* Phase 33F (C4) — heat dot column removed; heat now
+                    lives inside the Lead cell next to the days-dot. */}
                 <th>Lead</th>
                 <th>Phone</th>
                 <th>Stage</th>
@@ -683,11 +712,20 @@ export default function LeadsV2() {
                       />
                     </td>
                   )}
-                  <td><HeatDot heat={l.heat} /></td>
+                  {/* Phase 33F (C4) — heat dot moved INTO the name cell
+                      next to the days-dot, with a small separator, so
+                      the two coloured dots stop looking like one big
+                      red/yellow smear. Heat dot first (rep's lead
+                      "temperature"), then a thin divider, then the
+                      days-dot (how stale). */}
                   <td>
-                    <div className="name-cell" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {/* Phase 33B — days-since-contact dot. Color tracks
-                          dotTone. Tooltip shows the exact value. */}
+                    <div className="name-cell" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <HeatDot heat={l.heat} />
+                      <span style={{
+                        width: 1, height: 14,
+                        background: 'var(--border)',
+                        display: 'inline-block',
+                      }} />
                       <span
                         className={`days-dot days-dot-${dotTone}`}
                         title={days === null ? 'No contact yet' : `Last contact: ${days}d ago`}

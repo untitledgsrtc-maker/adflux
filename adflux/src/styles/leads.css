@@ -512,12 +512,15 @@
 /* Phase 33B — color-coded lead row tints + days-since-contact dot.
    Tints are very light (4-8% alpha) so they don't overwhelm; the
    eye picks them up at scan speed. */
-.lead-row-green   { background: rgba(16, 185, 129, .05); }
-.lead-row-yellow  { background: rgba(245, 158, 11, .05); }
-.lead-row-red     { background: rgba(239, 68, 68, .055); }
+/* Phase 33F (C5) — bumped alpha 5% → 12% so the tints are actually
+   scannable on a phone. Below ~10% they're invisible against the
+   dark surface. */
+.lead-row-green   { background: rgba(16, 185, 129, .12); }
+.lead-row-yellow  { background: rgba(245, 158, 11, .12); }
+.lead-row-red     { background: rgba(239, 68, 68, .12); }
 .lead-row-default { background: transparent; }
 .lead-row-green:hover, .lead-row-yellow:hover, .lead-row-red:hover {
-  filter: brightness(1.18);
+  filter: brightness(1.12);
 }
 
 .days-dot {

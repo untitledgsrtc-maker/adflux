@@ -20,6 +20,7 @@ import {
   Sparkles, RefreshCw, Phone, CheckCircle2, Clock,
   Forward, X as XIcon, Loader2,
 } from 'lucide-react'
+import { useEffect } from 'react'
 import { useLeadTasks, TASK_KIND_LABEL, TASK_KIND_TONE } from '../../hooks/useLeadTasks'
 import { HeatDot, Pill } from './LeadShared'
 import { formatRelative } from '../../utils/formatters'
@@ -59,6 +60,17 @@ export default function TodayTasksPanel({ userId, limit = 10 }) {
     generate, complete, snooze, skip,
   } = useLeadTasks({ userId })
 
+  // Phase 33F (B7) — auto-regenerate when the tab regains focus.
+  // Saves the rep a tap; covers the case where they checked a meeting
+  // in another tab and want the smart-task list to refresh.
+  useEffect(() => {
+    if (!userId) return
+    const onFocus = () => { try { generate?.() } catch {} }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
   const top = tasks.slice(0, limit)
   const overflow = Math.max(0, tasks.length - limit)
 
@@ -70,22 +82,13 @@ export default function TodayTasksPanel({ userId, limit = 10 }) {
             <Sparkles size={12} />
             <span>Today's tasks · {tasks.length}</span>
           </div>
-          <div className="lead-tasks-sub">
-            Ranked by SLA, follow-up date, and heat.
-          </div>
+          {/* Phase 33F (B6) — dropped the "Ranked by SLA / heat" subtitle.
+              "SLA" and "heat" are technical terms a class-10 rep doesn't
+              understand. The list IS the explanation. */}
         </div>
-        <button
-          type="button"
-          className="lead-btn lead-btn-sm"
-          onClick={generate}
-          disabled={generating}
-          title="Re-generate from current lead state"
-        >
-          {generating
-            ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-            : <RefreshCw size={12} />}
-          <span>Refresh</span>
-        </button>
+        {/* Phase 33F (B7) — manual Refresh button hidden for sales. The
+            generate call now fires on focus + mount automatically. Admin
+            still wants the button to debug regeneration. */}
       </div>
 
       {error && (

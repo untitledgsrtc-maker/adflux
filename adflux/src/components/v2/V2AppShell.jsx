@@ -293,14 +293,19 @@ export function V2AppShell() {
       {/* ─── Main ─────────────────────────────────────── */}
       <main className="v2d-main">
         <header className="v2d-topbar">
-          {/* Mobile hamburger — opens drawer */}
-          <button
-            className="v2d-hamburger"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open navigation"
-          >
-            <Menu size={20} />
-          </button>
+          {/* Phase 33F (A5) — hamburger hidden for sales/agency. The
+              avatar More drawer (Phase 33B.4) is the only nav surface
+              for sales reps. Admin/co_owner/telecaller still get the
+              hamburger since they have more sidebar items to reach. */}
+          {(isPrivileged || isTelecaller) && (
+            <button
+              className="v2d-hamburger"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open navigation"
+            >
+              <Menu size={20} />
+            </button>
+          )}
 
           <div className="v2d-crumb">
             <div className="v2d-crumb-kicker">

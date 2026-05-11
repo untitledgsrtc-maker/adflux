@@ -19,6 +19,7 @@ import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera } from 'lucide-
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import PhotoCapture from '../../components/leads/PhotoCapture'
+import VoiceInput   from '../../components/voice/VoiceInput'
 import { findLeadByPhone } from '../../utils/leadDedup'
 
 const SOURCES = [
@@ -246,8 +247,8 @@ export default function LeadFormV2() {
                 Company* / Person* / Designation / Mobile* / Email /
                 City* / Website. Govt segment exempts phone (tender
                 leads have only a department email). */}
-          <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     placeholder="e.g. Sunrise Diagnostics" />
-          <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" />
+          <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     placeholder="e.g. Sunrise Diagnostics" voice />
+          <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" voice />
           <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
           <Field
             label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Mobile *'}
@@ -368,14 +369,16 @@ export default function LeadFormV2() {
       </div>
 
       {/* ─── Notes ─── */}
+      {/* Phase 33F (K3) — voice mic on Notes textarea. */}
       <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
         <label className="lead-fld-label">Notes</label>
-        <textarea
-          className="lead-inp"
+        <VoiceInput
+          multiline
           rows={3}
           value={form.notes}
-          onChange={e => set('notes', e.target.value)}
+          onChange={(v) => set('notes', v)}
           placeholder="Visited last Diwali, owner met us at the trade fair…"
+          languageHint="gu"
         />
       </div>
 
@@ -408,7 +411,22 @@ export default function LeadFormV2() {
   )
 }
 
-function Field({ label, value, onChange, onBlur, placeholder, type }) {
+function Field({ label, value, onChange, onBlur, placeholder, type, voice }) {
+  // Phase 33F (K3) — optional voice mic on text fields. Pass voice=true
+  // to render VoiceInput instead of plain <input>. Default = no mic.
+  if (voice) {
+    return (
+      <div>
+        <label className="lead-fld-label">{label}</label>
+        <VoiceInput
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder || ''}
+          languageHint="gu"
+        />
+      </div>
+    )
+  }
   return (
     <div>
       <label className="lead-fld-label">{label}</label>
