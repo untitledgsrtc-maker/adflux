@@ -75,6 +75,19 @@ const ACTIVITY_TITLE = {
   imported:      'Imported',
 }
 
+// Phase 32P — single source of truth for phone-number cleaning. Strip
+// every non-digit, then prepend 91 if the result is a bare 10-digit
+// Indian number. Used by Call (tel:) and WhatsApp (wa.me:) so both
+// land on the same account. Returns null if the cleaned number is
+// shorter than 10 digits (invalid → don't generate a broken URL).
+function cleanPhone(raw) {
+  if (!raw) return null
+  const digits = String(raw).replace(/\D/g, '')
+  if (digits.length < 10) return null
+  if (digits.length === 10) return '91' + digits
+  return digits
+}
+
 function formatDuration(secs) {
   if (!secs) return null
   const m = Math.floor(secs / 60)
@@ -111,7 +124,7 @@ export default function LeadDetailV2() {
   const [activeModal, setActiveModal] = useState(null)   // null | 'stage' | 'reassign'
   const [activityType, setActivityType] = useState(null) // null | 'call' | 'whatsapp' | …
 
-  /* Phase 30C rev2 — fast-path action loggers. Owner spec
+  /* Phase 30C rev2 + 32P — fast-path action loggers. Owner spec
      (8 May 2026): "call log, whatsapp log not able to fetched". The
      hero-card Call / WhatsApp / Email buttons used to JUST open the
      LogActivityModal — they didn't insert an activity until the rep
@@ -119,7 +132,24 @@ export default function LeadDetailV2() {
      come back to type. These helpers fire-and-forget an immediate
      activity insert so the timeline reflects every touch, then
      refresh the timeline. The slower paths (meeting / note) still
-     open the modal because those genuinely need notes. */
+     open the modal because those genuinely need notes.
+
+     Phase 32P (11 May 2026) — owner reported: Call / WhatsApp / Email
+     buttons "not working". Root causes:
+       1. WhatsApp URL was `wa.me/${digits}` without the 91 country
+          code prefix, so a 10-digit Indian number landed on the wrong
+          WhatsApp account (or a dead URL).
+       2. Email button didn't exist at all — Phase 31T pruned it
+          claiming the email field in Lead Details was clickable
+          mailto, but that field is an inline-edit input. Clicking it
+          opens edit mode, not the mail app.
+       3. The async supabase.insert in onClick raced with the native
+          tel:/wa.me/mailto: handoff on iOS Safari — the browser would
+          sometimes refuse to launch the system app because the user
+          gesture was deemed "consumed" by the async work.
+     Fix: cleanPhone helper for consistent 91 prefix. fireAndForget
+     wraps the insert in setTimeout(0) so navigation always wins the
+     race. Email button restored to the grid with a real mailto: href. */
   async function quickLog(activityType, notes) {
     if (!lead?.id || !profile?.id) return
     const { error: insErr } = await supabase.from('lead_activities').insert([{
@@ -135,6 +165,14 @@ export default function LeadDetailV2() {
       return
     }
     load()
+  }
+
+  // Phase 32P — defer the activity insert so the tel:/wa.me/mailto:
+  // navigation gets the user gesture first. setTimeout(0) puts the
+  // insert on the next event-loop tick, after the browser has handed
+  // off to the system app.
+  function fireAndForgetLog(activityType, notes) {
+    setTimeout(() => { quickLog(activityType, notes) }, 0)
   }
 
   async function load() {
@@ -417,35 +455,72 @@ export default function LeadDetailV2() {
               schedule-follow-up section so the rep doesn't need to
               hunt for it (Phase 31B nudge preserved, just no longer
               a duplicate Note button). */}
+          {/* Phase 32P — Call / WhatsApp / Email rewritten end-to-end.
+              All three follow the same pattern:
+                - Phone/email cleaned + validated SYNCHRONOUSLY
+                - href set to the resolved tel:/wa.me/mailto: URL
+                - fireAndForgetLog defers the activity insert to the
+                  next event-loop tick so the OS app handoff wins
+                  the race
+                - If no phone / email available, fall back to opening
+                  the LogActivityModal so the rep can still record
+                  the touch manually (e.g. they called from another
+                  device, or want to email from desktop client) */}
           <div className="lead-hero-actions-grid">
-            {lead.phone ? (
+            {(() => {
+              const phone = cleanPhone(lead.phone)
+              return phone ? (
+                <a
+                  href={`tel:+${phone}`}
+                  className="lead-btn lead-btn-sm"
+                  onClick={() => fireAndForgetLog('call', `Call → ${lead.phone}`)}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Phone size={13} /> <span>Call</span>
+                </a>
+              ) : (
+                <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('call')}>
+                  <Phone size={13} /> <span>Call</span>
+                </button>
+              )
+            })()}
+            {(() => {
+              const phone = cleanPhone(lead.phone)
+              return phone ? (
+                <a
+                  href={`https://wa.me/${phone}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="lead-btn lead-btn-sm"
+                  onClick={() => fireAndForgetLog('whatsapp', `WhatsApp → ${lead.phone}`)}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <MessageCircle size={13} /> <span>WhatsApp</span>
+                </a>
+              ) : (
+                <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
+                  <MessageCircle size={13} /> <span>WhatsApp</span>
+                </button>
+              )
+            })()}
+            {/* Phase 32P — Email button restored. Real mailto: link.
+                Pre-fills subject with the company name so the
+                client's inbox shows "Outdoor advertising - <Company>"
+                instead of "no subject". Body left empty — rep writes
+                their own pitch. Falls back to LogActivityModal if
+                lead has no email on file (govt leads often don't). */}
+            {lead.email ? (
               <a
-                href={`tel:${lead.phone}`}
+                href={`mailto:${lead.email}?subject=${encodeURIComponent('Outdoor advertising — ' + (lead.company || lead.name || ''))}`}
                 className="lead-btn lead-btn-sm"
-                onClick={() => quickLog('call', `Call → ${lead.phone}`)}
+                onClick={() => fireAndForgetLog('email', `Email → ${lead.email}`)}
                 style={{ textDecoration: 'none' }}
               >
-                <Phone size={13} /> <span>Call</span>
+                <Mail size={13} /> <span>Email</span>
               </a>
             ) : (
-              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('call')}>
-                <Phone size={13} /> <span>Call</span>
-              </button>
-            )}
-            {lead.phone ? (
-              <a
-                href={`https://wa.me/${String(lead.phone).replace(/\D/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="lead-btn lead-btn-sm"
-                onClick={() => quickLog('whatsapp', `WhatsApp → ${lead.phone}`)}
-                style={{ textDecoration: 'none' }}
-              >
-                <MessageCircle size={13} /> <span>WhatsApp</span>
-              </a>
-            ) : (
-              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
-                <MessageCircle size={13} /> <span>WhatsApp</span>
+              <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('email')}>
+                <Mail size={13} /> <span>Email</span>
               </button>
             )}
             {/* Phase 32M — Meeting button restored. Phase 31T pruned
@@ -579,11 +654,50 @@ export default function LeadDetailV2() {
               </span>
             </div>
             <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
+              {/* Phase 32P — the inline-edit field opens edit mode on
+                  click, which blocks the obvious "tap to call" / "tap
+                  to email" affordance. Small action icon next to each
+                  value gives a clear separate path: tap icon = call /
+                  email, tap text = edit. */}
               <FieldCell label="Phone">
-                <InlineField value={lead.phone}    field="phone"    leadId={lead.id} type="tel"   onSaved={onLeadFieldSaved} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <InlineField value={lead.phone} field="phone" leadId={lead.id} type="tel" onSaved={onLeadFieldSaved} />
+                  </div>
+                  {cleanPhone(lead.phone) && (
+                    <a
+                      href={`tel:+${cleanPhone(lead.phone)}`}
+                      onClick={() => fireAndForgetLog('call', `Call → ${lead.phone}`)}
+                      title="Call now"
+                      style={{
+                        color: 'var(--accent)', textDecoration: 'none',
+                        display: 'inline-flex', padding: 4,
+                      }}
+                    >
+                      <Phone size={14} />
+                    </a>
+                  )}
+                </div>
               </FieldCell>
               <FieldCell label="Email">
-                <InlineField value={lead.email}    field="email"    leadId={lead.id} type="email" onSaved={onLeadFieldSaved} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <InlineField value={lead.email} field="email" leadId={lead.id} type="email" onSaved={onLeadFieldSaved} />
+                  </div>
+                  {lead.email && (
+                    <a
+                      href={`mailto:${lead.email}?subject=${encodeURIComponent('Outdoor advertising — ' + (lead.company || lead.name || ''))}`}
+                      onClick={() => fireAndForgetLog('email', `Email → ${lead.email}`)}
+                      title="Email now"
+                      style={{
+                        color: 'var(--accent)', textDecoration: 'none',
+                        display: 'inline-flex', padding: 4,
+                      }}
+                    >
+                      <Mail size={14} />
+                    </a>
+                  )}
+                </div>
               </FieldCell>
               <FieldCell label="City">
                 <InlineField value={lead.city}     field="city"     leadId={lead.id} onSaved={onLeadFieldSaved} />
