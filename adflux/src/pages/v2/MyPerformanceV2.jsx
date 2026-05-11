@@ -12,6 +12,7 @@
 //   calc utility produces for the dashboard (single source of truth).
 
 import { MyPerformance as MyPerformanceView } from '../../components/incentives/MyPerformance'
+import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCard'
 import '../../styles/incentives.css'
 
 export default function MyPerformanceV2() {
@@ -26,6 +27,11 @@ export default function MyPerformanceV2() {
           </div>
         </div>
       </div>
+
+      {/* Phase 33E — task-completion score + variable salary projection.
+          Live for the current month. Sits above the existing revenue /
+          incentive table so the rep sees their salary signal first. */}
+      <PerformanceScoreCard />
 
       <div className="v2d-perf-body">
         <MyPerformanceView />

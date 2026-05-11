@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Paperclip, UserCheck, Tv, FileText, Upload, Loader2, Plus, Trash2,
-  Save, ArrowLeft, FileBox, Building2, Newspaper, MessageCircle,
+  Save, ArrowLeft, FileBox, Building2, Newspaper, MessageCircle, TrendingUp,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -40,6 +40,8 @@ const TABS = [
   // Phase 33D.5 — WhatsApp message templates per stage + post-action
   // triggers. Edited inline so admin can tweak wording without code.
   { key: 'templates',   label: 'Messages',    icon: MessageCircle },
+  // Phase 33E — performance score + variable salary (70/30 split).
+  { key: 'performance', label: 'Performance', icon: TrendingUp },
   { key: 'documents',   label: 'Documents',   icon: FileText },
 ]
 
@@ -118,6 +120,7 @@ export default function MasterV2() {
       {activeTab === 'media'       && <MediaTab />}
       {activeTab === 'media_types' && <MediaTypesTab />}
       {activeTab === 'templates'   && <MessageTemplatesTab />}
+      {activeTab === 'performance' && <PerformanceTab />}
       {activeTab === 'documents'   && <DocumentsTab />}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
@@ -1995,6 +1998,121 @@ const TEMPLATE_STAGES = [
   { key: 'Won',          label: 'Thank-you (Won)', desc: 'Post-deal close' },
   { key: 'Lost',         label: 'Door open (Lost)', desc: 'Polite re-engagement' },
 ]
+
+/* ─────────────────────────────────────────────────────────────────
+   PERFORMANCE TAB (Phase 33E)
+   Per-rep monthly score + variable salary calculator. Admin can also
+   trigger a backfill of the last 30 days for any rep (useful first
+   time after running the SQL — daily_performance starts empty).
+   ───────────────────────────────────────────────────────────────── */
+function PerformanceTab() {
+  const [reps, setReps] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState(null)
+
+  async function load() {
+    setLoading(true)
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, team_role, is_active, segment_access')
+      .in('team_role', ['sales', 'agency'])
+      .eq('is_active', true)
+      .order('name')
+    // For each user, call monthly_score for this month.
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    const ms = monthStart.toISOString().slice(0, 10)
+    const rows = []
+    for (const u of (users || [])) {
+      const { data: s } = await supabase
+        .rpc('monthly_score', { p_user_id: u.id, p_month_start: ms })
+      rows.push({ user: u, score: Array.isArray(s) && s.length > 0 ? s[0] : null })
+    }
+    setReps(rows)
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  async function backfill(uid) {
+    setBusyId(uid)
+    await supabase.rpc('backfill_performance', { p_user_id: uid })
+    setBusyId(null)
+    load()
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+        <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading scores…
+      </div>
+    )
+  }
+
+  const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Number(n) || 0))
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      <div style={{
+        padding: '12px 14px', marginBottom: 14,
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 10, fontSize: 12, color: 'var(--text-muted)',
+      }}>
+        Monthly score = average % of daily meeting target hit. Sundays / holidays / leaves
+        excluded. Below <b>50%</b> → variable = ₹0. At/above 50% → variable scales linearly.
+        Base = 70% of total comp · Variable cap = 30%.
+      </div>
+      <div style={{ overflow: 'auto' }}>
+        <table className="lead-table" style={{ width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left' }}>Rep</th>
+              <th style={{ textAlign: 'right' }}>Score</th>
+              <th style={{ textAlign: 'right' }}>Days</th>
+              <th style={{ textAlign: 'right' }}>Base</th>
+              <th style={{ textAlign: 'right' }}>Variable</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {reps.map(r => {
+              const s = r.score
+              const pct = Number(s?.avg_score_pct || 0)
+              const isLow = pct < 50
+              return (
+                <tr key={r.user.id}>
+                  <td>{r.user.name}</td>
+                  <td style={{ textAlign: 'right', color: isLow ? 'var(--danger)' : 'var(--text)' }}>
+                    <b>{s ? `${pct.toFixed(0)}%` : '—'}</b>
+                  </td>
+                  <td style={{ textAlign: 'right', color: 'var(--text-muted)' }} className="mono">
+                    {s?.working_days || 0}
+                  </td>
+                  <td style={{ textAlign: 'right' }} className="mono">{fmt(s?.base_amount)}</td>
+                  <td style={{ textAlign: 'right', color: isLow ? 'var(--danger)' : 'var(--text)' }} className="mono">
+                    {fmt(s?.variable_earned)} / {fmt(s?.variable_cap)}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }} className="mono">{fmt(s?.total_payable)}</td>
+                  <td>
+                    <button
+                      className="lead-btn lead-btn-sm"
+                      onClick={() => backfill(r.user.id)}
+                      disabled={busyId === r.user.id}
+                    >
+                      {busyId === r.user.id
+                        ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                        : 'Backfill 30d'}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
 
 function MessageTemplatesTab() {
   const [rows, setRows] = useState([])
