@@ -103,8 +103,8 @@ export default function MasterV2() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '7px 14px', borderRadius: 7, border: 'none',
-                background: activeTab === t.key ? '#facc15' : 'transparent',
-                color:      activeTab === t.key ? '#0a0e1a' : 'var(--text-muted)',
+                background: activeTab === t.key ? 'var(--accent, #FFE600)' : 'transparent',
+                color:      activeTab === t.key ? 'var(--accent-fg, #0f172a)' : 'var(--text-muted)',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
               }}
             >
@@ -346,8 +346,8 @@ function AttachmentsTab() {
               style={{
                 padding: '6px 14px', borderRadius: 999, border: 'none',
                 cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                background: active ? '#facc15' : 'transparent',
-                color:      active ? '#0a0e1a' : 'var(--text-muted)',
+                background: active ? 'var(--accent, #FFE600)' : 'transparent',
+                color:      active ? 'var(--accent-fg, #0f172a)' : 'var(--text-muted)',
               }}
             >
               {f.label}
@@ -1208,7 +1208,7 @@ function SignersTab() {
               disabled={adding || !pickedUserId}
               style={{
                 padding: '6px 14px', borderRadius: 6, border: 'none',
-                background: '#facc15', color: '#0a0e1a', fontSize: 12, fontWeight: 700,
+                background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', fontSize: 12, fontWeight: 700,
                 cursor: pickedUserId ? 'pointer' : 'not-allowed',
                 opacity: adding ? 0.6 : 1,
               }}
@@ -1415,7 +1415,7 @@ function MediaTab() {
                 style={{
                   padding: '6px 12px', borderRadius: 6,
                   border: 'none',
-                  background: '#facc15', color: '#0a0e1a',
+                  background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
                   fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 }}
               >
@@ -1695,7 +1695,7 @@ function DocumentsTab() {
       {showNew && (
         <div style={{
           marginBottom: 22, padding: 16, borderRadius: 10,
-          border: '1px solid #facc15',
+          border: '1px solid var(--accent, #FFE600)',
           background: 'rgba(250,204,21,.04)',
         }}>
           <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14, marginBottom: 12 }}>
@@ -1764,7 +1764,7 @@ function DocumentsTab() {
               disabled={saving}
               style={{
                 padding: '8px 14px', borderRadius: 6, border: 'none',
-                background: '#facc15', color: '#0a0e1a',
+                background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
                 fontSize: 13, fontWeight: 700, cursor: 'pointer',
                 opacity: saving ? 0.6 : 1,
               }}
@@ -1821,7 +1821,7 @@ function DocumentsTab() {
                         disabled={saving}
                         style={{
                           padding: '4px 10px', borderRadius: 6, border: 'none',
-                          background: '#4ade80', color: '#0a0e1a', fontSize: 11, fontWeight: 700,
+                          background: '#4ade80', color: 'var(--accent-fg, #0f172a)', fontSize: 11, fontWeight: 700,
                           cursor: 'pointer',
                         }}
                       >
@@ -1949,7 +1949,7 @@ function DocumentsTab() {
                 disabled={saving}
                 style={{
                   padding: '8px 14px', borderRadius: 6, border: 'none',
-                  background: '#facc15', color: '#0a0e1a', fontSize: 13, fontWeight: 700,
+                  background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', fontSize: 13, fontWeight: 700,
                   cursor: 'pointer', opacity: saving ? 0.6 : 1,
                 }}
               >
