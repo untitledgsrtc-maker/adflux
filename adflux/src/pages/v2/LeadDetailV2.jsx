@@ -682,23 +682,52 @@ export default function LeadDetailV2() {
                 </button>
               )
             })()}
+            {/* Phase 33L — long-press WhatsApp = blank chat (no template).
+                Tap = stage-aware template (Phase 33D.5 default).
+                Hold for >500ms = wa.me link only, no template prompt. */}
             {(() => {
               const phone = cleanPhone(lead.phone)
-              return phone ? (
+              if (!phone) {
+                return (
+                  <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
+                    <MessageCircle size={13} /> <span>WhatsApp</span>
+                  </button>
+                )
+              }
+              let pressTimer = null
+              let longPressed = false
+              const start = () => {
+                longPressed = false
+                pressTimer = setTimeout(() => {
+                  longPressed = true
+                  fireAndForgetLog('whatsapp', `WhatsApp blank → ${lead.phone}`)
+                  window.open(`https://wa.me/${phone}`, '_blank', 'noopener,noreferrer')
+                }, 500)
+              }
+              const cancel = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null } }
+              const tap = (e) => {
+                cancel()
+                if (longPressed) { e.preventDefault(); return }
+                fireAndForgetLog('whatsapp', `WhatsApp → ${lead.phone}`)
+              }
+              return (
                 <a
                   href={`https://wa.me/${phone}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="lead-btn lead-btn-sm"
-                  onClick={() => fireAndForgetLog('whatsapp', `WhatsApp → ${lead.phone}`)}
-                  style={{ textDecoration: 'none' }}
+                  onClick={tap}
+                  onMouseDown={start}
+                  onTouchStart={start}
+                  onMouseUp={cancel}
+                  onTouchEnd={cancel}
+                  onMouseLeave={cancel}
+                  onContextMenu={(e) => e.preventDefault()}
+                  title="Tap for default template. Hold for blank chat."
+                  style={{ textDecoration: 'none', userSelect: 'none' }}
                 >
                   <MessageCircle size={13} /> <span>WhatsApp</span>
                 </a>
-              ) : (
-                <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
-                  <MessageCircle size={13} /> <span>WhatsApp</span>
-                </button>
               )
             })()}
             <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('meeting')}>
@@ -776,16 +805,40 @@ export default function LeadDetailV2() {
               >
                 <RefreshCw size={13} /> <span>Stage</span>
               </button>
+              {/* Phase 33L (F7 fix) — OCR field merge now asks the rep
+                  to confirm when OCR has a value AND the existing
+                  field is non-empty AND they differ. Empty fields get
+                  patched silently as before. */}
               <PhotoCapture
                 leadId={lead.id}
                 profileId={profile?.id}
                 onSaved={() => load()}
                 onPatchLead={async (fields) => {
                   const patch = {}
-                  if (fields.name    && !lead.name?.trim())    patch.name    = fields.name
-                  if (fields.phone   && !lead.phone?.trim())   patch.phone   = fields.phone
-                  if (fields.email   && !lead.email?.trim())   patch.email   = fields.email
-                  if (fields.company && !lead.company?.trim()) patch.company = fields.company
+                  const conflicts = []
+                  ;[
+                    ['name',    'Name'],
+                    ['phone',   'Phone'],
+                    ['email',   'Email'],
+                    ['company', 'Company'],
+                  ].forEach(([key, label]) => {
+                    const ocrVal = (fields[key] || '').trim()
+                    const curVal = (lead[key] || '').trim()
+                    if (!ocrVal) return
+                    if (!curVal) {
+                      patch[key] = ocrVal
+                    } else if (curVal.toLowerCase() !== ocrVal.toLowerCase()) {
+                      conflicts.push({ key, label, curVal, ocrVal })
+                    }
+                  })
+
+                  // Resolve conflicts via simple confirm prompts.
+                  // For each conflict, ask "Replace X with Y from card?"
+                  conflicts.forEach(c => {
+                    const msg = `${c.label}: replace "${c.curVal}" with "${c.ocrVal}" from the scanned card?`
+                    if (confirm(msg)) patch[c.key] = c.ocrVal
+                  })
+
                   if (Object.keys(patch).length === 0) { load(); return }
                   await supabase.from('leads').update(patch).eq('id', lead.id)
                   load()
@@ -796,27 +849,50 @@ export default function LeadDetailV2() {
           {/* Phase 33B.4 — "I'm here" auto-checkin row. Locked 10-min
               dwell per owner decision. Shown only after the rep taps
               I'm here; otherwise the button is in the grid above. */}
+          {/* Phase 33L (F10 fix) — Save now made bigger + first in tap
+              order. Quick visits (under 10 min) don't need the rep to
+              wait out the countdown — they tap Save now the moment the
+              meeting ends. Cancel demoted to a small secondary action. */}
           {hereGps && (
             <div style={{
               marginTop: 12,
-              padding: '10px 14px',
-              background: 'rgba(255,230,0,0.08)',
+              padding: '12px 14px',
+              background: 'rgba(255,230,0,0.10)',
               border: '1px solid var(--accent, #FFE600)',
               borderRadius: 10,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              gap: 10, flexWrap: 'wrap',
+              display: 'flex', flexDirection: 'column', gap: 10,
             }}>
-              <span style={{ fontSize: 13, color: 'var(--text)' }}>
-                I'm here · auto-save in {Math.floor(hereCountdown / 60)}:{String(hereCountdown % 60).padStart(2,'0')}
-              </span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={saveHereMeeting}>
-                  Save now
-                </button>
-                <button className="lead-btn lead-btn-sm" onClick={() => { setHereGps(null); setHereCountdown(0) }}>
+              <div style={{
+                fontSize: 13, color: 'var(--text)',
+                display: 'flex', justifyContent: 'space-between',
+                alignItems: 'center', gap: 10,
+              }}>
+                <span><strong>I'm here</strong> · auto-saving in {Math.floor(hereCountdown / 60)}:{String(hereCountdown % 60).padStart(2,'0')}</span>
+                <button
+                  onClick={() => { setHereGps(null); setHereCountdown(0) }}
+                  style={{
+                    background: 'none', border: 0,
+                    color: 'var(--text-muted)', fontSize: 11,
+                    cursor: 'pointer', padding: 4,
+                    textDecoration: 'underline',
+                  }}
+                >
                   Cancel
                 </button>
               </div>
+              <button
+                className="lead-btn lead-btn-primary"
+                onClick={saveHereMeeting}
+                style={{
+                  width: '100%', padding: '10px 14px',
+                  fontSize: 14, fontWeight: 700,
+                  background: 'var(--accent, #FFE600)',
+                  color: 'var(--accent-fg, #0f172a)',
+                  border: 0, borderRadius: 8, cursor: 'pointer',
+                }}
+              >
+                Save meeting now
+              </button>
             </div>
           )}
           {!hereGps && lead.phone && (

@@ -13,6 +13,81 @@ import { Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles } from 'luci
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
+// Phase 33L (F5 fix) — inline 6-month sparkline. Pulls from
+// score_history RPC. Renders bars instead of a chart library to
+// stay zero-dependency. Tap a bar → tooltip.
+function ScoreSparkline({ userId }) {
+  const [history, setHistory] = useState([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase.rpc('score_history', {
+        p_user_id: userId, p_months_back: 6,
+      })
+      if (!cancelled) {
+        setHistory(data || [])
+        setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [userId])
+
+  if (loading || history.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{
+        fontSize: 10, fontWeight: 700, letterSpacing: '.12em',
+        color: 'var(--text-muted)', textTransform: 'uppercase',
+        marginBottom: 8,
+      }}>
+        Last 6 months
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 56 }}>
+        {history.map((m, i) => {
+          const pct = Number(m.avg_score_pct) || 0
+          const barColor = pct < 50 ? 'var(--danger)'
+                         : pct >= 90 ? 'var(--success)'
+                         : 'var(--accent, #FFE600)'
+          const isCurrent = i === history.length - 1
+          return (
+            <div
+              key={m.month_start}
+              title={`${m.month_label}: ${pct.toFixed(0)}% · ₹${new Intl.NumberFormat('en-IN').format(Math.round(m.total_payable || 0))}`}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: 4,
+              }}
+            >
+              <div style={{
+                width: '100%',
+                height: `${Math.max(2, pct * 0.4)}px`,
+                background: barColor,
+                borderRadius: '3px 3px 0 0',
+                opacity: isCurrent ? 1 : 0.7,
+              }} />
+              <div style={{
+                fontSize: 10, color: isCurrent ? 'var(--text)' : 'var(--text-muted)',
+                fontWeight: isCurrent ? 700 : 500,
+              }}>
+                {m.month_label}
+              </div>
+              <div style={{
+                fontSize: 9, fontFamily: 'monospace',
+                color: 'var(--text-muted)',
+              }}>
+                {pct.toFixed(0)}%
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function fmtINR(n) {
   return '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Number(n) || 0))
 }
@@ -221,6 +296,10 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
             ? <><TrendingUp size={13} color="var(--success)" /> On track for full variable payout.</>
             : <><TrendingDown size={13} color="var(--warning)" /> Variable scales with your score — hit 100% to maximise.</>}
       </div>
+
+      {/* Phase 33L (F5 fix) — 6-month sparkline. Gives reps the trend
+          line that was lost when MyPerformanceView was removed. */}
+      {!isAgency && <ScoreSparkline userId={userId} />}
     </div>
   )
 }
