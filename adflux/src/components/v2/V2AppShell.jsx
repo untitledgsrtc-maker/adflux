@@ -381,12 +381,16 @@ export function V2AppShell() {
               page nav). Gated to non-privileged + non-telecaller —
               admin/co_owner have their own incentive views, telecaller
               doesn't earn the same incentives. Sales + agency see it. */}
-          {/* Phase 33A — compact strip variant. Owner directive (11
-              May): keep card on every sales page as motivation but
-              shrink from the big gradient hero to a 36-40px strip. */}
+          {/* Phase 33B.3 — owner refined directive (11 May 2026):
+              compact strip on /work ONLY (it competes with the 3 giant
+              buttons there). Full hero gradient card on every OTHER
+              sales page — leads, lead detail, quotes, clients,
+              follow-ups. The hero card is what motivates daily; the
+              strip is the unobtrusive presence when the rep is in
+              their action loop on Today. */}
           {!isPrivileged && !isTelecaller && (
             <div style={{ marginBottom: 12 }}>
-              <ProposedIncentiveCard compact />
+              <ProposedIncentiveCard compact={location.pathname === '/work'} />
             </div>
           )}
           <Outlet />

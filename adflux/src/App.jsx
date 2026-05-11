@@ -101,11 +101,20 @@ function RootRedirect() {
   //   sales            → /work       (Plan-A morning plan flow)
   //   agency           → /quotes     (govt quote creation only)
   //   anything else    → /dashboard
+  // Phase 33B.3 (11 May 2026) — owner reported login lands on
+  // /dashboard for sales reps not /work. Root cause: the previous
+  // logic only checked `profile.role`, but per the established
+  // pattern (LeadFormV2, LogActivityModal, ChangeStageModal), sales/
+  // agency/telecaller distinctions live on `team_role`, while
+  // `role` is reserved for admin/co_owner gating. A sales user
+  // commonly has `role='user'` or null with `team_role='sales'` —
+  // the old check fell through to /dashboard. Fix: check team_role
+  // first, then fall back to role for admin/co_owner.
   const role     = profile?.role
   const teamRole = profile?.team_role
-  if (teamRole === 'telecaller') return <Navigate to="/telecaller" replace />
-  if (role === 'sales')          return <Navigate to="/work" replace />
-  if (role === 'agency')         return <Navigate to="/quotes" replace />
+  if (teamRole === 'telecaller')               return <Navigate to="/telecaller" replace />
+  if (teamRole === 'sales' || role === 'sales')   return <Navigate to="/work" replace />
+  if (teamRole === 'agency' || role === 'agency') return <Navigate to="/quotes" replace />
   return <Navigate to="/dashboard" replace />
 }
 

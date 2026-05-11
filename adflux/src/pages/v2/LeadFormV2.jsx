@@ -83,7 +83,23 @@ export default function LeadFormV2() {
   async function handleSave(openAfter = false) {
     setError('')
     if (!form.name.trim()) {
-      setError('Name is required.')
+      setError('Person name is required.')
+      return
+    }
+    // Phase 33B.3 (11 May 2026) — owner locked the required-field set
+    // for lead create: Company, Person, Phone, City all required.
+    // Email + address optional. Govt segment still exempted from
+    // phone (tender/RFP leads often only have a department email).
+    if (!form.company.trim()) {
+      setError('Company name is required.')
+      return
+    }
+    if (form.segment !== 'GOVERNMENT' && !form.phone.trim()) {
+      setError('Mobile number is required — call / WhatsApp won\'t work without it.')
+      return
+    }
+    if (!form.city.trim()) {
+      setError('City is required.')
       return
     }
     if (!form.source) {
@@ -92,15 +108,6 @@ export default function LeadFormV2() {
     }
     if (!form.segment) {
       setError('Segment is required.')
-      return
-    }
-    // Phase 32K — owner spec (10 May 2026): phone is mandatory for
-    // every non-government lead. Govt leads come via tender / RFP and
-    // often only have a department contact email at lead-creation time;
-    // private leads MUST have a phone or the rep can't action them
-    // (Call / WhatsApp buttons fail without one). Keep govt nullable.
-    if (form.segment !== 'GOVERNMENT' && !form.phone.trim()) {
-      setError('Phone is required for private leads — call / WhatsApp won\'t work without it.')
       return
     }
     setSaving(true)
@@ -152,13 +159,14 @@ export default function LeadFormV2() {
       <div className="lead-card" style={{ marginBottom: 14 }}>
         <div className="lead-card-head"><div className="lead-card-title">Identity</div></div>
         <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <Field label="Name *" value={form.name} onChange={v => set('name', v)} placeholder="e.g. Dr. Mehta" />
-          <Field label="Company" value={form.company} onChange={v => set('company', v)} placeholder="e.g. Sunrise Diagnostics" />
-          {/* Phase 32K — phone label flips to required asterisk for
-              non-government leads. Govt leads keep optional phone. */}
-          <Field label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Phone *'}  value={form.phone}   onChange={v => set('phone', v)}   placeholder="+91 98XXXX XXXXX" />
+          {/* Phase 33B.3 — Company, Person, Phone, City all required.
+              Email + address optional. Govt segment still exempts
+              phone since tender leads often have only an email. */}
+          <Field label="Person name *" value={form.name} onChange={v => set('name', v)} placeholder="e.g. Dr. Mehta" />
+          <Field label="Company *" value={form.company} onChange={v => set('company', v)} placeholder="e.g. Sunrise Diagnostics" />
+          <Field label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Mobile *'}  value={form.phone}   onChange={v => set('phone', v)}   placeholder="+91 98XXXX XXXXX" />
+          <Field label="City *"   value={form.city}    onChange={v => set('city', v)}    placeholder="Surat" />
           <Field label="Email"  value={form.email}   onChange={v => set('email', v)}   placeholder="name@company.com" type="email" />
-          <Field label="City"   value={form.city}    onChange={v => set('city', v)}    placeholder="Surat" />
         </div>
       </div>
 

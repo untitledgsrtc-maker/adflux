@@ -129,12 +129,30 @@ export default function LogMeetingModal({ onClose, onSaved }) {
   async function handleSave() {
     if (saving) return
     setError('')
+    // Phase 33B.3 (11 May 2026) — owner locked the required-field set
+    // for both LogMeeting AND LeadForm: Company, Person, Phone, City
+    // are all mandatory. Email + address optional. Reason: a field
+    // meeting that's missing any of these can't be actioned later
+    // (no phone = can't call back, no city = can't route by territory,
+    // no person name = "Dr. X at Sunrise" is unidentifiable later).
     if (!company.trim()) {
       setError('Company / shop name is required.')
       return
     }
+    if (!contact.trim()) {
+      setError('Person name is required — who did you meet?')
+      return
+    }
+    if (!phone.trim()) {
+      setError('Mobile number is required — without it the lead can\'t be followed up.')
+      return
+    }
+    if (!city.trim()) {
+      setError('City is required.')
+      return
+    }
     if (!outcome) {
-      setError('Pick an outcome — Interested / Maybe / Not interested.')
+      setError('Pick an outcome — Good / Maybe / Lost.')
       return
     }
     const oc = OUTCOMES.find(o => o.value === outcome)
@@ -289,54 +307,43 @@ export default function LogMeetingModal({ onClose, onSaved }) {
             />
           </div>
 
-          {/* Phase 33A — owner directive (11 May 2026): collapse the
-              optional fields behind a single expander. 90% of cold
-              walk-ins don't have a contact name / phone at the moment
-              of logging. Reps can still add them via lead detail
-              later. Keeps the modal to 1 typed field + 1 chip choice
-              for the common case. */}
-          <details className="lead-card" style={{ background: 'transparent', border: 0, padding: 0 }}>
-            <summary style={{
-              cursor: 'pointer', padding: '8px 0',
-              fontSize: 12, color: 'var(--text-muted)',
-              fontWeight: 500,
-            }}>
-              More details (optional) — contact, phone, city
-            </summary>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
-              <div>
-                <label className="lead-fld-label">Contact name</label>
-                <input
-                  className="lead-inp"
-                  value={contact}
-                  onChange={e => setContact(e.target.value)}
-                  placeholder="e.g. Dr. Mehta"
-                  disabled={saving}
-                />
-              </div>
-              <div>
-                <label className="lead-fld-label">Phone</label>
-                <input
-                  className="lead-inp"
-                  type="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  placeholder="+91 98XXXX XXXXX"
-                  disabled={saving}
-                />
-              </div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <label className="lead-fld-label">City</label>
+          {/* Phase 33B.3 — owner revised (11 May 2026): Person, Phone,
+              City are now all REQUIRED (not collapsed). A field meeting
+              missing any of these can't be followed up. Email + address
+              still optional. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="lead-fld-label">Person name *</label>
               <input
                 className="lead-inp"
-                value={city}
-                onChange={e => setCity(e.target.value)}
-                placeholder="Surat"
+                value={contact}
+                onChange={e => setContact(e.target.value)}
+                placeholder="e.g. Dr. Mehta"
                 disabled={saving}
               />
             </div>
-          </details>
+            <div>
+              <label className="lead-fld-label">Mobile number *</label>
+              <input
+                className="lead-inp"
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="+91 98XXXX XXXXX"
+                disabled={saving}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="lead-fld-label">City *</label>
+            <input
+              className="lead-inp"
+              value={city}
+              onChange={e => setCity(e.target.value)}
+              placeholder="Surat"
+              disabled={saving}
+            />
+          </div>
 
           <div>
             <label className="lead-fld-label">Outcome *</label>
