@@ -44,6 +44,7 @@ import LogActivityModal from '../../components/leads/LogActivityModal'
 import ChangeStageModal from '../../components/leads/ChangeStageModal'
 import ReassignModal   from '../../components/leads/ReassignModal'
 import PhotoCapture     from '../../components/leads/PhotoCapture'
+import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 
 const ACTIVITY_ICON = {
   call:          Phone,
@@ -124,6 +125,11 @@ export default function LeadDetailV2() {
   // Modal state
   const [activeModal, setActiveModal] = useState(null)   // null | 'stage' | 'reassign' | 'whatsapp_template'
   const [activityType, setActivityType] = useState(null) // null | 'call' | 'whatsapp' | …
+
+  // Phase 33D.5 — post-action WhatsApp prompt. After quick-Call, stage
+  // change, or any other touch, open the prompt with the right
+  // template. State: { stage: 'post_call'|'New'|... } or null.
+  const [waPrompt, setWaPrompt] = useState(null)
 
   // Phase 33B.4 — "I'm here" auto-checkin with 10-min dwell. Captures
   // GPS on tap, starts a 10-min timer. If still on this lead page when
@@ -266,6 +272,13 @@ export default function LeadDetailV2() {
       // Surface the failure so the rep knows the click wasn't logged.
       setError(`Could not log ${activityType}: ${insErr.message}`)
       return
+    }
+    // Phase 33D.5 — after a call, prompt the rep to send a
+    // thank-you WhatsApp template. Delayed by 1.5s so the OS
+    // dialer's call screen takes priority first; when the rep
+    // returns to the app the prompt is waiting.
+    if (activityType === 'call') {
+      setTimeout(() => setWaPrompt({ stage: 'post_call' }), 1500)
     }
     load()
   }
@@ -1003,7 +1016,22 @@ export default function LeadDetailV2() {
         <ChangeStageModal
           lead={lead}
           onClose={() => setActiveModal(null)}
-          onSaved={load}
+          onSaved={(newStage) => {
+            load()
+            // Phase 33D.5 — open the post-stage-change WhatsApp prompt
+            // with the new stage's template. ChangeStageModal calls
+            // onSaved() with no args, so we re-fetch the lead first
+            // (load() above) then pick up the new stage from the
+            // refreshed lead state via a small delay. Simpler: just
+            // open the prompt with whatever the modal moved TO. The
+            // modal already validates the stage is valid.
+            // To avoid coupling, fetch the lead again ourselves here.
+            setTimeout(async () => {
+              const { data } = await supabase
+                .from('leads').select('stage').eq('id', lead.id).maybeSingle()
+              if (data?.stage) setWaPrompt({ stage: data.stage })
+            }, 200)
+          }}
         />
       )}
       {activeModal === 'reassign' && (
@@ -1013,6 +1041,16 @@ export default function LeadDetailV2() {
           onSaved={load}
         />
       )}
+      {/* Phase 33D.5 — post-action WhatsApp prompt. Opens after
+          quick-Call, after stage change, etc. Lead object stays
+          current via the load() refetch that precedes it. */}
+      <WhatsAppPromptModal
+        open={!!waPrompt}
+        stage={waPrompt?.stage}
+        lead={lead}
+        profile={profile}
+        onClose={() => setWaPrompt(null)}
+      />
     </div>
   )
 }

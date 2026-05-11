@@ -34,6 +34,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
 import PhotoCapture from './PhotoCapture'
+import WhatsAppPromptModal from './WhatsAppPromptModal'
 
 // Outcome → (stage, lost_reason) mapping. Locked in this file because
 // the modal owns the cold-meeting flow end-to-end. If you change these
@@ -89,6 +90,12 @@ export default function LogMeetingModal({ onClose, onSaved }) {
   const [gpsBusy, setGpsBusy] = useState(false)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
+  // Phase 33D.5 — post-save WhatsApp prompt. After successful save we
+  // stash the new lead row here and render WhatsAppPromptModal on top.
+  // The outer modal stays open behind it so the rep can review their
+  // entry while seeing the thank-you message. Closing the prompt
+  // closes everything via onClose.
+  const [savedLead, setSavedLead] = useState(null)
 
   // Auto-capture GPS silently on mount. This is the whole point of the
   // milestone — without GPS, fake-logging from home is trivial. We
@@ -236,7 +243,19 @@ export default function LogMeetingModal({ onClose, onSaved }) {
     }
 
     setSaving(false)
+    // Phase 33D.5 — fire onSaved (so counter ticks + parent reloads)
+    // but DEFER onClose. We open the WhatsApp prompt instead. The
+    // prompt's own Skip/Send buttons trigger the final close.
     onSaved?.(leadRow.id)
+    setSavedLead({
+      ...leadRow,
+      // leadRow comes from .select().single() on the insert, so it
+      // already has all fields including segment for media mapping.
+    })
+  }
+
+  function closeAll() {
+    setSavedLead(null)
     onClose?.()
   }
 
@@ -454,6 +473,15 @@ export default function LogMeetingModal({ onClose, onSaved }) {
           </button>
         </div>
       </div>
+      {/* Phase 33D.5 — post-meeting thank-you prompt. Auto-opens after
+          successful save. Rep can edit or skip. */}
+      <WhatsAppPromptModal
+        open={!!savedLead}
+        stage="post_meeting"
+        lead={savedLead}
+        profile={profile}
+        onClose={closeAll}
+      />
     </div>
   )
 }
