@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Wallet, RefreshCw, Download, Check, X, AlertTriangle, MapPin,
+  Settings2, ChevronDown,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -87,6 +88,12 @@ export default function TaPayoutsAdminV2() {
   const [loading, setLoading]   = useState(false)
   const [recomputing, setRecomputing] = useState(false)
   const [err, setErr]           = useState('')
+  // Phase 33I (B9 fix) — city ceilings inline editor. Collapsed by
+  // default; expands to show all 21 cities with editable daily_da,
+  // bike_per_km, hotel_rate, radius_km. Admin can widen a radius
+  // when reps report falling outside a city.
+  const [ceilingsOpen, setCeilingsOpen] = useState(false)
+  const [ceilings, setCeilings] = useState([])
 
   // Load rep list once.
   useEffect(() => {
@@ -124,6 +131,27 @@ export default function TaPayoutsAdminV2() {
     setRows(data || [])
   }
   useEffect(() => { loadRows() }, [fUser, fMonth]) // eslint-disable-line
+
+  // Load city ceilings the first time the admin expands the editor.
+  async function loadCeilings() {
+    const { data, error } = await supabase.from('city_da_ceilings')
+      .select('*')
+      .order('display_order', { ascending: true })
+    if (!error) setCeilings(data || [])
+  }
+  useEffect(() => { if (ceilingsOpen && ceilings.length === 0) loadCeilings() }, [ceilingsOpen]) // eslint-disable-line
+
+  // Inline-save a single ceiling field. Saves on blur. Recomputes
+  // nothing — admin can hit "Recompute month" after if they want the
+  // change to flow into existing daily_ta rows.
+  async function saveCeilingField(row, field, valueRaw) {
+    const num = Math.max(0, Number(valueRaw))
+    if (Number.isNaN(num) || num === Number(row[field])) return
+    const { error } = await supabase.from('city_da_ceilings')
+      .update({ [field]: num }).eq('id', row.id)
+    if (error) { alert(`Save failed: ${error.message}`); return }
+    loadCeilings()
+  }
 
   // Aggregate footer.
   const totals = useMemo(() => {
@@ -233,6 +261,93 @@ export default function TaPayoutsAdminV2() {
             day when the rep stayed overnight. Approve before finance pays out.
           </div>
         </div>
+      </div>
+
+      {/* ─── City ceilings editor (collapsible) ───────── */}
+      {/* Phase 33I (B9 fix) — admin can adjust DA, bike rate, hotel
+          and radius per city without going to Supabase Studio. Useful
+          when reps report falling outside a city's detection radius. */}
+      <div className="v2d-panel" style={{ padding: 0, overflow: 'hidden' }}>
+        <button
+          type="button"
+          onClick={() => setCeilingsOpen(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', padding: '12px 16px', background: 'transparent',
+            border: 0, cursor: 'pointer', color: 'var(--v2-ink-0)',
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+            <Settings2 size={14} /> City ceilings · {ceilings.length || '21'} cities
+          </span>
+          <ChevronDown
+            size={14}
+            style={{
+              transform: ceilingsOpen ? 'rotate(180deg)' : 'rotate(0)',
+              transition: 'transform .15s',
+              color: 'var(--v2-ink-2)',
+            }}
+          />
+        </button>
+        {ceilingsOpen && (
+          <div style={{ borderTop: '1px solid var(--v2-line)', overflowX: 'auto' }}>
+            <table className="v2d-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--v2-line)', color: 'var(--v2-ink-2)' }}>
+                  <th style={thStyle}>City</th>
+                  <th style={thStyle}>Cat</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Daily DA (₹)</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Bike (₹/km)</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Hotel (₹)</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Radius (km)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ceilings.map(c => (
+                  <tr key={c.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <MapPin size={12} style={{ color: 'var(--v2-ink-2)' }} />
+                        <span style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{c.city_name}</span>
+                        {c.is_home && (
+                          <span style={{
+                            padding: '1px 7px', borderRadius: 999, fontSize: 9, fontWeight: 700,
+                            background: 'rgba(255,230,0,.15)', color: 'var(--accent, #FFE600)',
+                            textTransform: 'uppercase', letterSpacing: '.06em',
+                          }}>HQ</span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={catChipStyle(c.category)}>{c.category}</span>
+                    </td>
+                    {['daily_da','bike_per_km','hotel_rate','radius_km'].map(field => (
+                      <td key={field} style={{ ...tdStyle, textAlign: 'right' }}>
+                        <input
+                          type="number"
+                          step={field === 'radius_km' || field === 'bike_per_km' ? '0.1' : '1'}
+                          defaultValue={c[field] || 0}
+                          onBlur={e => saveCeilingField(c, field, e.target.value)}
+                          style={{
+                            width: 90, textAlign: 'right',
+                            padding: '4px 8px', borderRadius: 6,
+                            background: 'var(--v2-bg-2)',
+                            border: '1px solid var(--v2-line)',
+                            color: 'var(--v2-ink-0)', fontSize: 12,
+                            fontFamily: 'monospace',
+                          }}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ padding: '8px 14px', fontSize: 11, color: 'var(--v2-ink-2)', borderTop: '1px solid var(--v2-line)' }}>
+              Changes save on blur. Hit <strong>Recompute month</strong> above for ceiling changes to flow into existing TA rows (only pending rows update — approved/paid are preserved).
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── Filters ──────────────────────────────────── */}

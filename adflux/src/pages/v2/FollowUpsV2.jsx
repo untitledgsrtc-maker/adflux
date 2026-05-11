@@ -63,11 +63,20 @@ export default function FollowUpsV2() {
     // in one query. Lead-linked rows have lead_id set (and quote_id
     // NULL); quote-linked rows are the reverse. The join keeps both
     // join targets available; whichever is null is ignored in render.
+    // Phase 33I (B3 fix) — pulled quotes.total_amount + payments so the
+    // payment-collection FU rows can show LIVE outstanding instead of
+    // the snapshot the trigger wrote at Won time. Payments that landed
+    // after the FU was created are subtracted from total_amount when
+    // the row renders.
     let q = supabase.from('follow_ups')
       .select(`
         id, follow_up_date, follow_up_time, note, is_done, auto_generated,
         quote_id, lead_id,
-        quote:quotes ( id, client_name, client_company, client_phone, segment ),
+        quote:quotes (
+          id, client_name, client_company, client_phone, segment,
+          total_amount, status,
+          payments ( amount_received, approval_status )
+        ),
         lead:leads   ( id, name, company, phone, segment )
       `)
       .eq('is_done', false)
@@ -494,11 +503,48 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, busy, navigate }) {
             → {row.action_hint}
           </div>
         )}
-        {row.note && !row.note.startsWith('Auto') && (
+        {row.note && !row.note.startsWith('Auto') && !row.note.startsWith('Payment collection') && (
           <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 6, lineHeight: 1.4 }}>
             {row.note}
           </div>
         )}
+        {/* Phase 33I (B3 fix) — payment-collection FU notes show LIVE
+            outstanding, not the snapshot the trigger wrote at Won time.
+            Recompute from total_amount + approved payments at render. */}
+        {row.note?.startsWith('Payment collection') && row.quote && (() => {
+          const total = Number(row.quote.total_amount) || 0
+          const paid = (row.quote.payments || [])
+            .filter(p => p.approval_status === 'approved')
+            .reduce((s, p) => s + (Number(p.amount_received) || 0), 0)
+          const outstanding = Math.max(0, total - paid)
+          const cleared = outstanding === 0 && paid > 0
+          // Pull the sequence hint (1st / 2nd reminder / final) from
+          // the snapshotted note text so reps know which chase this is.
+          const seq = row.note.includes('2nd reminder') ? '2nd reminder'
+                    : row.note.includes('final reminder') ? 'Final reminder'
+                    : '1st reminder'
+          const fmt = n => '₹' + new Intl.NumberFormat('en-IN').format(Math.round(n))
+          return (
+            <div style={{
+              fontSize: 13, marginTop: 6, lineHeight: 1.4,
+              color: cleared ? 'var(--success, #10B981)' : 'var(--text)',
+              padding: '8px 10px', borderRadius: 8,
+              background: cleared ? 'rgba(16,185,129,.08)' : 'rgba(245,158,11,.08)',
+              border: `1px solid ${cleared ? 'var(--success, #10B981)' : 'var(--warning, #F59E0B)'}`,
+            }}>
+              <div style={{ fontWeight: 600 }}>
+                Payment collection · {seq}
+              </div>
+              <div style={{ fontSize: 12, marginTop: 3 }}>
+                {cleared
+                  ? `Fully paid — mark this follow-up done.`
+                  : paid > 0
+                    ? `Outstanding ${fmt(outstanding)} of ${fmt(total)} · ${fmt(paid)} received`
+                    : `Outstanding ${fmt(total)} (no payments recorded yet)`}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

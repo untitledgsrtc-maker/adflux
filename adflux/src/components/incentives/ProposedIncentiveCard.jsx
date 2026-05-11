@@ -219,26 +219,79 @@ export default function ProposedIncentiveCard({ compact = false }) {
   const p = panes[tab]
   const isForecast = tab === 'forecast'
 
+  const compactTabLabel = tab === 'forecast' ? 'Forecast' : tab === 'pending' ? 'Pending' : 'Earned'
+
   // Phase 33A — compact strip variant for in-page motivation.
-  // 36-40px tall, bold ₹ on left, tabs on right, no gradient hero.
-  // Tap the ₹ number → routes to /scorecard for the deep view.
+  // Phase 33I (B2 fix) — replaced the F/P/E single-letter mini-tabs
+  // with the same dropdown chip pattern the full card uses (33G.6).
+  // F/P/E was confusing for new reps who didn't know F=Forecast etc.
   if (compact) {
     return (
-      <div className="v2-incentive-strip">
+      <div className="v2-incentive-strip" ref={pickerRef} style={{ position: 'relative' }}>
         <div className="v2-incentive-strip-left">
           <span className="v2-incentive-strip-num">
             {isForecast && p.value > 0 && '+'}
             <Money value={p.value} />
           </span>
-          <span className="v2-incentive-strip-label">
-            {tab === 'forecast' ? 'Forecast' : tab === 'pending' ? 'Pending' : 'Earned'}
-          </span>
         </div>
-        <div className="v2-incentive-strip-tabs">
-          <button className={`v2-mini-tab ${tab === 'forecast' ? 'on' : ''}`} onClick={() => setTab('forecast')}>F</button>
-          <button className={`v2-mini-tab ${tab === 'pending'  ? 'on' : ''}`} onClick={() => setTab('pending')}>P</button>
-          <button className={`v2-mini-tab ${tab === 'earned'   ? 'on' : ''}`} onClick={() => setTab('earned')}>E</button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setPickerOpen(v => !v)}
+          aria-expanded={pickerOpen}
+          aria-haspopup="listbox"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '4px 10px', borderRadius: 999,
+            background: 'rgba(255,255,255,.10)',
+            border: '1px solid rgba(255,255,255,.14)',
+            color: 'inherit', fontSize: 11, fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          {compactTabLabel}
+          <ChevronDown
+            size={11}
+            style={{
+              transform: pickerOpen ? 'rotate(180deg)' : 'rotate(0)',
+              transition: 'transform .15s',
+            }}
+          />
+        </button>
+        {pickerOpen && (
+          <div
+            role="listbox"
+            style={{
+              position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+              minWidth: 130, background: 'var(--surface, #1e293b)',
+              border: '1px solid var(--border, #334155)',
+              borderRadius: 10, boxShadow: '0 10px 30px rgba(0,0,0,.45)',
+              zIndex: 50, overflow: 'hidden',
+            }}
+          >
+            {[
+              { key: 'forecast', label: 'Forecast' },
+              { key: 'pending',  label: 'Pending'  },
+              { key: 'earned',   label: 'Earned'   },
+            ].map(o => (
+              <button
+                key={o.key}
+                type="button"
+                role="option"
+                aria-selected={tab === o.key}
+                onClick={() => { setTab(o.key); setPickerOpen(false) }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '9px 13px',
+                  background: tab === o.key ? 'rgba(255,255,255,.06)' : 'transparent',
+                  border: 0, color: 'var(--text, #f1f5f9)',
+                  fontSize: 12, cursor: 'pointer',
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
