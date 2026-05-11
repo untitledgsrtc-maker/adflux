@@ -25,6 +25,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
+import RepDayTools from '../../components/leads/RepDayTools'
 // Phase 31O — ProposedIncentiveCard import removed; the V2AppShell
 // now mounts it once at the top of every sales page, so /work
 // doesn't render it directly anymore.
@@ -1110,6 +1111,14 @@ export default function WorkV2() {
                 list wasn't truncated to 3. Pass limit=3; overflow shows
                 'View all' link inside the panel. */}
             <TodayTasksPanel userId={profile.id} limit={3} />
+
+            {/* Phase 33Q — rep-side day tools: 3-day-miss warning,
+                overnight stay toggle, request leave. One mountable
+                block keeps WorkV2 tidy. */}
+            <RepDayTools
+              workDate={new Date().toISOString().slice(0, 10)}
+              checkedIn={!!session?.check_in_at}
+            />
 
             {/* Phase 33A — the old 5-tile m-quick grid replaced by
                 the m-cta-stack of 3 giant buttons above. Surfaces

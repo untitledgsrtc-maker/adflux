@@ -1,0 +1,336 @@
+// src/components/leads/RepDayTools.jsx
+//
+// Phase 33Q — rep-side day-management tools for /work.
+//
+// Three pieces folded into one mountable component:
+//   1. MissedDaysBanner    — warning when 3+ consecutive missed days
+//      (variable salary at risk). Dismissible per-day via localStorage.
+//   2. OvernightToggle      — rep flags "I stayed overnight here"
+//      → work_sessions.overnight_stay = true → admin sees on /admin/ta-payouts.
+//   3. RequestLeaveModal    — rep submits a pending leave for a future
+//      date. Admin sees in /admin/leaves and approves.
+//
+// Owner directives covered:
+//   #12 — apply leave (rep side)
+//   #13 — TA hotel toggle (rep side; admin still types the amount)
+//   #16 — 3-day-miss popup with salary warning
+
+import { useEffect, useState } from 'react'
+import {
+  AlertTriangle, Hotel, CalendarPlus, X, Check,
+} from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/authStore'
+
+const LEAVE_TYPES = [
+  { key: 'sick',         label: 'Sick'        },
+  { key: 'personal',     label: 'Personal'    },
+  { key: 'vacation',     label: 'Vacation'    },
+  { key: 'bereavement',  label: 'Bereavement' },
+  { key: 'other',        label: 'Other'       },
+]
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+// ─── 1. MissedDaysBanner ────────────────────────────────────────
+function MissedDaysBanner({ userId }) {
+  const [missed, setMissed] = useState(0)
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    if (!userId) return
+    // Suppress for the rest of the day if dismissed.
+    const stamp = localStorage.getItem(`missed_dismissed_${userId}`)
+    if (stamp === todayISO()) { setDismissed(true); return }
+
+    ;(async () => {
+      const { data } = await supabase.rpc('consecutive_missed_days', {
+        p_user_id: userId,
+      })
+      setMissed(Number(data) || 0)
+    })()
+  }, [userId])
+
+  if (dismissed || missed < 3) return null
+
+  function dismiss() {
+    localStorage.setItem(`missed_dismissed_${userId}`, todayISO())
+    setDismissed(true)
+  }
+
+  return (
+    <div style={{
+      background: 'rgba(239,68,68,.10)',
+      border: '1px solid var(--danger, #EF4444)',
+      borderRadius: 12, padding: 14, marginBottom: 12,
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+    }}>
+      <AlertTriangle size={20} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 2 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 4 }}>
+          {missed} days below 50% — variable salary at risk
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.45 }}>
+          You've missed your daily target for {missed} working days in a row.
+          Hit your meeting target today to pull the average back. If the month
+          ends below 50% your variable salary drops to zero.
+        </div>
+      </div>
+      <button
+        onClick={dismiss}
+        title="Dismiss for today"
+        style={{
+          background: 'none', border: 0, color: 'var(--text-muted)',
+          cursor: 'pointer', padding: 2,
+        }}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  )
+}
+
+// ─── 2. OvernightToggle ─────────────────────────────────────────
+function OvernightToggle({ userId, workDate }) {
+  const [on, setOn] = useState(null)  // null = loading, true/false = real
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!userId) return
+    ;(async () => {
+      const { data } = await supabase.from('work_sessions')
+        .select('overnight_stay')
+        .eq('user_id', userId).eq('work_date', workDate)
+        .maybeSingle()
+      setOn(Boolean(data?.overnight_stay))
+    })()
+  }, [userId, workDate])
+
+  async function toggle() {
+    if (on === null) return
+    setBusy(true)
+    const next = !on
+    const { error } = await supabase.from('work_sessions')
+      .update({ overnight_stay: next })
+      .eq('user_id', userId).eq('work_date', workDate)
+    setBusy(false)
+    if (error) { alert('Save failed: ' + error.message); return }
+    setOn(next)
+  }
+
+  if (on === null) return null
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 10, width: '100%',
+        padding: '12px 14px', borderRadius: 10,
+        background: on ? 'rgba(255,230,0,.10)' : 'var(--surface-2)',
+        border: `1px solid ${on ? 'var(--accent, #FFE600)' : 'var(--border)'}`,
+        color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+        textAlign: 'left',
+      }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <Hotel size={16} style={{ color: on ? 'var(--accent)' : 'var(--text-muted)' }} />
+        {on ? 'Staying overnight here — flagged' : 'I am staying overnight here'}
+      </span>
+      {on && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: '.08em',
+          padding: '2px 8px', borderRadius: 999,
+          background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
+          textTransform: 'uppercase',
+        }}>
+          ON
+        </span>
+      )}
+    </button>
+  )
+}
+
+// ─── 3. RequestLeaveModal ───────────────────────────────────────
+function RequestLeaveModal({ userId, onClose, onSaved }) {
+  const [fDate, setFDate] = useState(todayISO())
+  const [fType, setFType] = useState('personal')
+  const [fReason, setFReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function submit() {
+    if (!fDate) { setErr('Pick a date.'); return }
+    setSaving(true); setErr('')
+    const { error } = await supabase.from('leaves').insert({
+      user_id: userId,
+      leave_date: fDate,
+      leave_type: fType,
+      reason: (fReason || '').trim() || null,
+      status: 'pending',
+      created_by: userId,
+    })
+    setSaving(false)
+    if (error) {
+      setErr(error.code === '23505'
+        ? 'You already have a leave on that date.'
+        : (error.message || 'Submit failed.'))
+      return
+    }
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <div
+      onClick={() => !saving && onClose()}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 60,
+        background: 'rgba(0,0,0,.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 420,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 14, padding: 18,
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+            Request leave
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 0, color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+          Goes to admin as a pending request. Once approved it's excluded
+          from your monthly performance score.
+        </div>
+
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+            Date
+          </label>
+          <input
+            type="date"
+            value={fDate}
+            onChange={e => setFDate(e.target.value)}
+            style={{
+              width: '100%', marginTop: 4,
+              padding: '10px 12px', borderRadius: 10,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              color: 'var(--text)', fontSize: 14,
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+            Type
+          </label>
+          <select
+            value={fType}
+            onChange={e => setFType(e.target.value)}
+            style={{
+              width: '100%', marginTop: 4,
+              padding: '10px 12px', borderRadius: 10,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              color: 'var(--text)', fontSize: 14,
+            }}
+          >
+            {LEAVE_TYPES.map(t => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+            Reason (optional)
+          </label>
+          <input
+            type="text"
+            value={fReason}
+            onChange={e => setFReason(e.target.value)}
+            placeholder="Family wedding · medical · etc."
+            style={{
+              width: '100%', marginTop: 4,
+              padding: '10px 12px', borderRadius: 10,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              color: 'var(--text)', fontSize: 14,
+            }}
+          />
+        </div>
+        {err && (
+          <div style={{ color: 'var(--danger)', fontSize: 12 }}>
+            <AlertTriangle size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            {err}
+          </div>
+        )}
+        <button
+          onClick={submit}
+          disabled={saving}
+          style={{
+            width: '100%', padding: '12px',
+            background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
+            border: 0, borderRadius: 10,
+            fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          <Check size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+          {saving ? 'Submitting…' : 'Submit request'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main export ────────────────────────────────────────────────
+export default function RepDayTools({ workDate, checkedIn }) {
+  const profile = useAuthStore(s => s.profile)
+  const [leaveOpen, setLeaveOpen] = useState(false)
+  if (!profile?.id) return null
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <MissedDaysBanner userId={profile.id} />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Overnight toggle — only when checked in (work_sessions row exists). */}
+        {checkedIn && (
+          <OvernightToggle userId={profile.id} workDate={workDate} />
+        )}
+
+        <button
+          onClick={() => setLeaveOpen(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '12px 14px', borderRadius: 10,
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            textAlign: 'left',
+          }}
+        >
+          <CalendarPlus size={16} style={{ color: 'var(--text-muted)' }} />
+          Request leave
+        </button>
+      </div>
+
+      {leaveOpen && (
+        <RequestLeaveModal
+          userId={profile.id}
+          onClose={() => setLeaveOpen(false)}
+          onSaved={() => { /* admin gets it via realtime / next load */ }}
+        />
+      )}
+    </div>
+  )
+}
