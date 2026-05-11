@@ -582,11 +582,33 @@ export default function LeadsV2() {
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
             {leads.length === 0
-              ? (isPrivileged
-                  ? 'Click Upload CSV to import from Cronberry, or New Lead to start fresh.'
-                  : 'Leads will appear here as they are assigned to you.')
+              ? 'Tap below to add your first lead.'
               : 'Try clearing filters or searching differently.'}
           </div>
+          {/* Phase 33D — empty-state CTA. Owner directive: never a
+              dead empty page; always show the next action. */}
+          {leads.length === 0 && (
+            <button
+              className="lead-btn lead-btn-primary"
+              onClick={() => navigate('/leads/new')}
+              style={{ marginTop: 16 }}
+            >
+              <Plus size={14} /> Add first lead
+            </button>
+          )}
+          {leads.length > 0 && (
+            <button
+              className="lead-btn"
+              onClick={() => {
+                setStageFilter('all'); setSegmentFilter('all'); setSourceFilter('all')
+                setCityFilter('all'); setIndustryFilter('all'); setRepFilter('all')
+                setSearch(''); setQueueIds(null)
+              }}
+              style={{ marginTop: 16 }}
+            >
+              Clear all filters
+            </button>
+          )}
         </div>
       ) : (
         <div className="lead-card" style={{ overflow: 'auto' }}>

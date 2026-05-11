@@ -32,6 +32,7 @@ import { useEffect, useState } from 'react'
 import { X, MapPin, Loader2, Building2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import VoiceInput from '../voice/VoiceInput'
 
 // Outcome → (stage, lost_reason) mapping. Locked in this file because
 // the modal owns the cold-meeting flow end-to-end. If you change these
@@ -297,13 +298,12 @@ export default function LogMeetingModal({ onClose, onSaved }) {
 
           <div>
             <label className="lead-fld-label">Company / shop name *</label>
-            <input
-              className="lead-inp"
+            <VoiceInput
               value={company}
-              onChange={e => setCompany(e.target.value)}
+              onChange={setCompany}
               placeholder="e.g. Sunrise Diagnostics"
               disabled={saving}
-              autoFocus
+              languageHint="gu"
             />
           </div>
 
@@ -387,13 +387,14 @@ export default function LogMeetingModal({ onClose, onSaved }) {
 
           <div>
             <label className="lead-fld-label">Notes (optional)</label>
-            <textarea
-              className="lead-inp"
+            <VoiceInput
+              multiline
               rows={3}
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={setNotes}
               placeholder="What did they say? Decision-maker name? Budget hint?"
               disabled={saving}
+              languageHint="gu"
             />
           </div>
 

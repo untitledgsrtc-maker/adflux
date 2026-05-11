@@ -248,6 +248,22 @@ export default function FollowUpsV2() {
         </div>
       </div>
 
+      {/* Phase 33D — empty-state CTA. Never a dead page; always show
+          the next action. When no follow-ups, suggest logging a meeting. */}
+      {grandTotal === 0 && !error && (
+        <div className="lead-card lead-card-pad" style={{ textAlign: 'center', padding: 32, marginBottom: 14 }}>
+          <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 10 }}>
+            All caught up. Time to find a new lead.
+          </div>
+          <button
+            className="lead-btn lead-btn-primary"
+            onClick={() => navigate('/work')}
+          >
+            Go to Today
+          </button>
+        </div>
+      )}
+
       {error && (
         <div
           style={{

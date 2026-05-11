@@ -43,6 +43,7 @@ import {
 import LogActivityModal from '../../components/leads/LogActivityModal'
 import ChangeStageModal from '../../components/leads/ChangeStageModal'
 import ReassignModal   from '../../components/leads/ReassignModal'
+import PhotoCapture     from '../../components/leads/PhotoCapture'
 
 const ACTIVITY_ICON = {
   call:          Phone,
@@ -681,6 +682,25 @@ export default function LeadDetailV2() {
             >
               <RefreshCw size={13} /> <span>Stage</span>
             </button>
+            {/* Phase 33D — photo capture + OCR. Camera button in
+                action grid. Tap → native camera → upload to lead-
+                photos bucket → OCR via Claude Vision. If business
+                card detected, offers to patch lead fields. */}
+            <PhotoCapture
+              leadId={lead.id}
+              profileId={profile?.id}
+              onSaved={() => load()}
+              onPatchLead={async (fields) => {
+                const patch = {}
+                if (fields.name    && !lead.name?.trim())    patch.name    = fields.name
+                if (fields.phone   && !lead.phone?.trim())   patch.phone   = fields.phone
+                if (fields.email   && !lead.email?.trim())   patch.email   = fields.email
+                if (fields.company && !lead.company?.trim()) patch.company = fields.company
+                if (Object.keys(patch).length === 0) { load(); return }
+                await supabase.from('leads').update(patch).eq('id', lead.id)
+                load()
+              }}
+            />
           </div>
           {/* Phase 33B.4 — "I'm here" auto-checkin row. Locked 10-min
               dwell per owner decision. Shown only after the rep taps
