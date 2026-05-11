@@ -38,7 +38,13 @@ function daysBetween(a, b) {
   return Math.abs(Math.round((new Date(a) - new Date(b)) / (1000 * 60 * 60 * 24)))
 }
 
-export default function ProposedIncentiveCard() {
+// Phase 33A — owner directive (11 May 2026): keep card on every sales
+// page as daily motivation, but shrink it. The big purple gradient
+// hero competed with the new "3 giant action buttons" on /work. Pass
+// `compact` to render a 36px strip with a bold ₹ number on the left,
+// tabs on the right, no gradient. Default (no prop) renders the
+// original full card — kept for /scorecard deep view.
+export default function ProposedIncentiveCard({ compact = false }) {
   const { profile } = useAuth()
   const [data, setData] = useState(null)
   const [tab, setTab] = useState('forecast')
@@ -147,6 +153,14 @@ export default function ProposedIncentiveCard() {
 
   if (!data) {
     // Skeleton — same height as the real card so layout doesn't jump.
+    if (compact) {
+      return (
+        <div className="v2-incentive-strip" style={{ opacity: 0.55 }}>
+          <span className="v2-incentive-strip-num">…</span>
+          <span className="v2-incentive-strip-sub">Loading</span>
+        </div>
+      )
+    }
     return (
       <div className="v2-incentive" style={{ opacity: 0.55 }}>
         <div className="v2-incentive-kicker">Proposed Incentive</div>
@@ -187,6 +201,30 @@ export default function ProposedIncentiveCard() {
   }
   const p = panes[tab]
   const isForecast = tab === 'forecast'
+
+  // Phase 33A — compact strip variant for in-page motivation.
+  // 36-40px tall, bold ₹ on left, tabs on right, no gradient hero.
+  // Tap the ₹ number → routes to /scorecard for the deep view.
+  if (compact) {
+    return (
+      <div className="v2-incentive-strip">
+        <div className="v2-incentive-strip-left">
+          <span className="v2-incentive-strip-num">
+            {isForecast && p.value > 0 && '+'}
+            <Money value={p.value} />
+          </span>
+          <span className="v2-incentive-strip-label">
+            {tab === 'forecast' ? 'Forecast' : tab === 'pending' ? 'Pending' : 'Earned'}
+          </span>
+        </div>
+        <div className="v2-incentive-strip-tabs">
+          <button className={`v2-mini-tab ${tab === 'forecast' ? 'on' : ''}`} onClick={() => setTab('forecast')}>F</button>
+          <button className={`v2-mini-tab ${tab === 'pending'  ? 'on' : ''}`} onClick={() => setTab('pending')}>P</button>
+          <button className={`v2-mini-tab ${tab === 'earned'   ? 'on' : ''}`} onClick={() => setTab('earned')}>E</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="v2-incentive">

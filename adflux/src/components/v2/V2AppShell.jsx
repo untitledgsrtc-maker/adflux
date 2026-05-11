@@ -141,11 +141,15 @@ const MOBILE_NAV_ADMIN = [
 // weekly, not daily. Still reachable via the sidebar drawer.
 // Dashboard stays accessible via sidebar — it's the "view my numbers"
 // page, not the daily-action surface anymore.
+// Phase 33A — owner directive (11 May 2026): cut bottom nav to 3 items.
+// The persistent IncentiveCard strip (Phase 33A redesign) now carries
+// the motivational role that "Score" used to fill in the nav. Follow-ups
+// merge into the Today screen's task card. Mobile thumb-zone shows
+// only the three actions a rep touches every minute.
 const MOBILE_NAV_SALES = [
   { to: '/work',              label: 'Today',          icon: Sun },
-  { to: '/follow-ups',        label: 'Follow',         icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
-  { to: '/my-performance',    label: 'Score',          icon: TrendingUp },
+  { to: '/voice',             label: 'Voice',          icon: Mic },
 ]
 
 // Phase 31G — owner reported (9 May 2026) Dhara (telecaller) was
@@ -377,9 +381,12 @@ export function V2AppShell() {
               page nav). Gated to non-privileged + non-telecaller —
               admin/co_owner have their own incentive views, telecaller
               doesn't earn the same incentives. Sales + agency see it. */}
+          {/* Phase 33A — compact strip variant. Owner directive (11
+              May): keep card on every sales page as motivation but
+              shrink from the big gradient hero to a 36-40px strip. */}
           {!isPrivileged && !isTelecaller && (
-            <div style={{ marginBottom: 16 }}>
-              <ProposedIncentiveCard />
+            <div style={{ marginBottom: 12 }}>
+              <ProposedIncentiveCard compact />
             </div>
           )}
           <Outlet />

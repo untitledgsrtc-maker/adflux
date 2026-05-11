@@ -162,6 +162,71 @@
   overflow: hidden;
   box-shadow: var(--v2-shadow-card);
 }
+
+/* Phase 33A — compact strip variant. Mounted on every sales page via
+   V2AppShell. 36-40px tall, bold ₹ on the left, 3 micro-tabs (F/P/E)
+   on the right. No gradient hero — keeps the motivational signal
+   without competing with the giant action buttons on /work. */
+.v2-incentive-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: linear-gradient(90deg, rgba(155, 89, 182, 0.22), rgba(155, 89, 182, 0.08));
+  border: 1px solid rgba(155, 89, 182, 0.35);
+  border-radius: var(--v2-r-pill, 999px);
+  padding: 6px 14px 6px 16px;
+  min-height: 38px;
+}
+.v2-incentive-strip-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.v2-incentive-strip-num {
+  font-family: var(--font-display, 'Space Grotesk'), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text, #f1f5f9);
+  letter-spacing: -0.02em;
+}
+.v2-incentive-strip-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #94a3b8);
+}
+.v2-incentive-strip-sub {
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+}
+.v2-incentive-strip-tabs {
+  display: flex;
+  gap: 4px;
+}
+.v2-mini-tab {
+  background: transparent;
+  border: 1px solid var(--border-strong, #475569);
+  color: var(--text-muted, #94a3b8);
+  font-family: var(--font-display, 'Space Grotesk'), system-ui;
+  font-weight: 600;
+  font-size: 11px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.v2-mini-tab.on {
+  background: var(--accent, #FFE600);
+  border-color: var(--accent, #FFE600);
+  color: var(--accent-fg, #0f172a);
+}
 .v2-incentive::after {
   content: '';
   position: absolute; inset: 0;
