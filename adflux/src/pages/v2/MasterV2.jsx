@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Paperclip, UserCheck, Tv, FileText, Upload, Loader2, Plus, Trash2,
-  Save, ArrowLeft, FileBox, Building2, Newspaper,
+  Save, ArrowLeft, FileBox, Building2, Newspaper, MessageCircle,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -37,6 +37,9 @@ const TABS = [
   // hoarding, cinema, etc.). Feeds the dropdown on the Other Media
   // wizard and supplies HSN/SAC + CGST/SGST defaults to the PDF.
   { key: 'media_types', label: 'Media Types', icon: Newspaper },
+  // Phase 33D.5 — WhatsApp message templates per stage + post-action
+  // triggers. Edited inline so admin can tweak wording without code.
+  { key: 'templates',   label: 'Messages',    icon: MessageCircle },
   { key: 'documents',   label: 'Documents',   icon: FileText },
 ]
 
@@ -114,6 +117,7 @@ export default function MasterV2() {
       {activeTab === 'signers'     && <SignersTab />}
       {activeTab === 'media'       && <MediaTab />}
       {activeTab === 'media_types' && <MediaTypesTab />}
+      {activeTab === 'templates'   && <MessageTemplatesTab />}
       {activeTab === 'documents'   && <DocumentsTab />}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
@@ -1971,6 +1975,176 @@ function DocumentsTab() {
    existing Private LED quote PDF format). The HSN/CGST/SGST columns
    on the table are kept (idempotent) but no longer surfaced or used.
    ════════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   MESSAGE TEMPLATES TAB (Phase 33D.5)
+
+   8 active templates — 6 stage-based (New / Working / QuoteSent /
+   Nurture / Won / Lost) and 2 action-based (post_meeting /
+   post_call). Admin can edit the body inline. Placeholders:
+     {name}, {company}, {rep}, {city}, {media}
+   ───────────────────────────────────────────────────────────────── */
+
+const TEMPLATE_STAGES = [
+  { key: 'post_meeting', label: 'After meeting',   desc: 'Sent when a meeting is saved' },
+  { key: 'post_call',    label: 'After call',      desc: 'Sent when a call is logged' },
+  { key: 'New',          label: 'New lead',        desc: 'First contact intro' },
+  { key: 'Working',      label: 'Follow-up',       desc: 'After first meeting, before quote' },
+  { key: 'QuoteSent',    label: 'Quote chase',     desc: 'Pushing the proposal' },
+  { key: 'Nurture',      label: 'Nurture revisit', desc: 'Reactivate parked lead' },
+  { key: 'Won',          label: 'Thank-you (Won)', desc: 'Post-deal close' },
+  { key: 'Lost',         label: 'Door open (Lost)', desc: 'Polite re-engagement' },
+]
+
+function MessageTemplatesTab() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState(null)
+  const [status, setStatus] = useState({})  // { [id]: 'saved' | 'err msg' }
+
+  async function load() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('message_templates')
+      .select('*')
+      .order('stage')
+      .order('display_order')
+    if (!error) setRows(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  async function saveBody(row, newBody) {
+    setSavingId(row.id)
+    setStatus(s => ({ ...s, [row.id]: '' }))
+    const { error } = await supabase
+      .from('message_templates')
+      .update({ body: newBody })
+      .eq('id', row.id)
+    setSavingId(null)
+    if (error) setStatus(s => ({ ...s, [row.id]: error.message }))
+    else {
+      setStatus(s => ({ ...s, [row.id]: 'saved' }))
+      setTimeout(() => setStatus(s => ({ ...s, [row.id]: '' })), 1800)
+    }
+  }
+
+  async function toggleActive(row) {
+    await supabase.from('message_templates').update({ is_active: !row.is_active }).eq('id', row.id)
+    load()
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+        <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Loading templates…
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      <div style={{
+        padding: '12px 14px', marginBottom: 14,
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 10, fontSize: 12, color: 'var(--text-muted)',
+      }}>
+        WhatsApp messages sent to clients. Edit the body and click <b>Save</b>. Placeholders
+        — <code>{'{name}'}</code>, <code>{'{company}'}</code>, <code>{'{rep}'}</code>,
+        <code>{'{city}'}</code>, <code>{'{media}'}</code> — fill in at send time.
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {TEMPLATE_STAGES.map(s => {
+          const row = rows.find(r => r.stage === s.key)
+          if (!row) {
+            return (
+              <div key={s.key} className="lead-card lead-card-pad" style={{ fontSize: 13, color: 'var(--danger)' }}>
+                Missing template for <b>{s.label}</b>. Run supabase_phase33d5_action_templates.sql.
+              </div>
+            )
+          }
+          return (
+            <TemplateEditor
+              key={row.id}
+              row={row}
+              stageMeta={s}
+              busy={savingId === row.id}
+              status={status[row.id]}
+              onSave={(body) => saveBody(row, body)}
+              onToggleActive={() => toggleActive(row)}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function TemplateEditor({ row, stageMeta, busy, status, onSave, onToggleActive }) {
+  const [body, setBody] = useState(row.body || '')
+  const dirty = body !== (row.body || '')
+  return (
+    <div className="lead-card" style={{ padding: 14 }}>
+      <div style={{
+        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+        gap: 10, marginBottom: 6,
+      }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+            {stageMeta.label}
+            {!row.is_active && (
+              <span style={{
+                marginLeft: 8, fontSize: 10, fontWeight: 600,
+                color: 'var(--text-muted)', border: '1px solid var(--border-strong)',
+                padding: '2px 6px', borderRadius: 4,
+              }}>OFF</span>
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            {stageMeta.desc} · <span className="mono">stage = {row.stage}</span>
+          </div>
+        </div>
+        <button className="lead-btn lead-btn-sm" onClick={onToggleActive}>
+          {row.is_active ? 'Disable' : 'Enable'}
+        </button>
+      </div>
+      <textarea
+        className="lead-inp"
+        rows={8}
+        value={body}
+        onChange={e => setBody(e.target.value)}
+        style={{ fontFamily: 'inherit', fontSize: 13, lineHeight: 1.5 }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+        <button
+          className="lead-btn lead-btn-primary lead-btn-sm"
+          onClick={() => onSave(body)}
+          disabled={busy || !dirty}
+        >
+          {busy
+            ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+            : <><Save size={11} /> Save</>}
+        </button>
+        {dirty && !busy && (
+          <button
+            className="lead-btn lead-btn-sm"
+            onClick={() => setBody(row.body || '')}
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Revert
+          </button>
+        )}
+        {status === 'saved' && (
+          <span style={{ fontSize: 11, color: 'var(--success)' }}>✓ Saved</span>
+        )}
+        {status && status !== 'saved' && (
+          <span style={{ fontSize: 11, color: 'var(--danger)' }}>{status}</span>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function MediaTypesTab() {
   const [rows, setRows]     = useState([])
