@@ -21,6 +21,8 @@ import IncentivesV2       from './pages/v2/IncentivesV2'
 import RenewalToolsV2     from './pages/v2/RenewalToolsV2'
 import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
 import HRV2               from './pages/v2/HRV2'
+// Phase 33G.8 — admin Leaves page (item 82 real leaves table).
+import LeavesAdminV2     from './pages/v2/LeavesAdminV2'
 import ClientsV2          from './pages/v2/ClientsV2'
 // ── Phase 12 — M1 Sales/Lead module ─────────────────────────────────
 import LeadsV2             from './pages/v2/LeadsV2'
@@ -202,6 +204,10 @@ export default function App() {
           <Route path="/incentives"                element={<RequirePrivileged><IncentivesV2 /></RequirePrivileged>} />
           <Route path="/pending-approvals"         element={<RequirePrivileged><PendingApprovalsV2 /></RequirePrivileged>} />
           <Route path="/hr"                        element={<RequirePrivileged><HRV2 /></RequirePrivileged>} />
+          {/* Phase 33G.8 — admin Leaves CRUD. Excluded days for the
+              monthly performance score now come from a real table
+              instead of the work_sessions.is_off_day proxy. */}
+          <Route path="/admin/leaves"              element={<RequirePrivileged><LeavesAdminV2 /></RequirePrivileged>} />
           {/* Phase 8C — unified Master page (Attachments / Signers / Media / Documents) */}
           <Route path="/master"                    element={<RequirePrivileged><MasterV2 /></RequirePrivileged>} />
         </Route>

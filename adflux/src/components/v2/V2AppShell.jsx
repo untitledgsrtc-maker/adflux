@@ -62,6 +62,9 @@ const ADMIN_NAV = [
   { to: '/master',            label: 'Master',         icon: FileBox },
   { to: '/team',              label: 'Team',           icon: Users },
   { to: '/hr',                label: 'HR',             icon: UserCircle2 },
+  // Phase 33G.8 — admin Leaves (item 82). Sits next to HR since it's
+  // the same operational neighbourhood.
+  { to: '/admin/leaves',      label: 'Leaves',         icon: ClockIcon },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/incentives',        label: 'Incentives',     icon: Gift },
 ]
