@@ -37,27 +37,30 @@ import { useAuthStore } from '../../store/authStore'
 // the modal owns the cold-meeting flow end-to-end. If you change these
 // values, also update bump_meeting_counter expectations and the
 // LeadsV2 'Field Meeting' filter chip (none today).
+// Phase 33A — owner locked the 3-outcome model (11 May 2026):
+// Good / Maybe / Lost. Single-word labels per the bilingual-label
+// stripped redesign. Sub-text kept short for low-literacy reps.
 const OUTCOMES = [
   {
     value:      'interested',
-    label:      'Interested',
-    sub:        'Wants to know more / asked for quote',
+    label:      'Good',
+    sub:        'Wants quote / more info',
     stage:      'Working',
     lostReason: null,
     tone:       'success',
   },
   {
     value:      'maybe',
-    label:      'Maybe later',
-    sub:        'Open but not now — revisit in 30 days',
+    label:      'Maybe',
+    sub:        'Come back in 30 days',
     stage:      'Nurture',
     lostReason: null,
     tone:       'warn',
   },
   {
     value:      'not_interested',
-    label:      'Not interested',
-    sub:        'Politely refused — territory recorded',
+    label:      'Lost',
+    sub:        'Politely refused',
     stage:      'Lost',
     // Phase 32M fix — leads_lost_reason_check is a CHECK constraint
     // restricted to: Price, Timing, Competitor, NoNeed, NoResponse,
@@ -286,40 +289,54 @@ export default function LogMeetingModal({ onClose, onSaved }) {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label className="lead-fld-label">Contact name (optional)</label>
+          {/* Phase 33A — owner directive (11 May 2026): collapse the
+              optional fields behind a single expander. 90% of cold
+              walk-ins don't have a contact name / phone at the moment
+              of logging. Reps can still add them via lead detail
+              later. Keeps the modal to 1 typed field + 1 chip choice
+              for the common case. */}
+          <details className="lead-card" style={{ background: 'transparent', border: 0, padding: 0 }}>
+            <summary style={{
+              cursor: 'pointer', padding: '8px 0',
+              fontSize: 12, color: 'var(--text-muted)',
+              fontWeight: 500,
+            }}>
+              More details (optional) — contact, phone, city
+            </summary>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
+              <div>
+                <label className="lead-fld-label">Contact name</label>
+                <input
+                  className="lead-inp"
+                  value={contact}
+                  onChange={e => setContact(e.target.value)}
+                  placeholder="e.g. Dr. Mehta"
+                  disabled={saving}
+                />
+              </div>
+              <div>
+                <label className="lead-fld-label">Phone</label>
+                <input
+                  className="lead-inp"
+                  type="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="+91 98XXXX XXXXX"
+                  disabled={saving}
+                />
+              </div>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <label className="lead-fld-label">City</label>
               <input
                 className="lead-inp"
-                value={contact}
-                onChange={e => setContact(e.target.value)}
-                placeholder="e.g. Dr. Mehta"
+                value={city}
+                onChange={e => setCity(e.target.value)}
+                placeholder="Surat"
                 disabled={saving}
               />
             </div>
-            <div>
-              <label className="lead-fld-label">Phone (optional)</label>
-              <input
-                className="lead-inp"
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="+91 98XXXX XXXXX"
-                disabled={saving}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="lead-fld-label">City</label>
-            <input
-              className="lead-inp"
-              value={city}
-              onChange={e => setCity(e.target.value)}
-              placeholder="Surat"
-              disabled={saving}
-            />
-          </div>
+          </details>
 
           <div>
             <label className="lead-fld-label">Outcome *</label>

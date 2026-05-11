@@ -67,6 +67,10 @@ export default function WorkV2() {
   // modal owns its own form state; we just open it and reload the
   // session row on save so the meetings counter ticks up visibly.
   const [meetingModalOpen, setMeetingModalOpen] = useState(false)
+  // Phase 33A — success toast after Log Meeting save. Owner audit
+  // (11 May) caught the modal closed silently; rep had no
+  // confirmation. 2-second brand-yellow strip with "✓ Saved · N/5".
+  const [toast, setToast] = useState('')
 
   /* ─── Morning plan draft ─── */
   const [plannedMeetings, setPlannedMeetings] = useState([
@@ -1240,14 +1244,26 @@ export default function WorkV2() {
         <LogMeetingModal
           onClose={() => setMeetingModalOpen(false)}
           onSaved={(_newLeadId) => {
-            // Don't navigate — keep rep on /work so they can log the
-            // next meeting immediately. The counter at the top will
-            // tick up. If the rep wants to open the new lead, the
-            // modal could pass the ID via toast → "View" link, but
-            // for now just refresh.
+            // Phase 33A — surface a success toast so the rep gets
+            // confirmation (audit P2 caught silent close on Phase 32M).
+            // Compute the new meeting count optimistically — Phase 12
+            // trigger has already fired by the time we get here.
+            const next = (session?.daily_counters?.meetings || 0) + 1
+            const tgt  = targets.meetings || 5
+            setToast(`Saved · ${next}/${tgt} meetings today`)
+            setTimeout(() => setToast(''), 2200)
             load()
           }}
         />
+      )}
+
+      {/* Phase 33A — global toast strip. Slides up from bottom. Brand
+          yellow with checkmark. Auto-clears after 2.2s. */}
+      {toast && (
+        <div className="m-toast">
+          <CheckCircle2 size={16} strokeWidth={2} />
+          <span>{toast}</span>
+        </div>
       )}
     </div>
   )

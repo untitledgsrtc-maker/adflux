@@ -509,6 +509,27 @@
   border-color: var(--border-strong);
 }
 
+/* Phase 33A — global toast strip for /work. */
+.m-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--mobile-nav-height, 62px) + 16px);
+  transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600; font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  z-index: 50;
+  animation: m-toast-pop .22s ease-out;
+}
+@keyframes m-toast-pop {
+  from { transform: translate(-50%, 12px); opacity: 0; }
+  to   { transform: translate(-50%, 0);    opacity: 1; }
+}
+
 /* Counter strip (mobile) */
 .m-counters {
   display: grid; grid-template-columns: repeat(3, 1fr);
