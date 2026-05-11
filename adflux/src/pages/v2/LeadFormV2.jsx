@@ -15,9 +15,10 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import PhotoCapture from '../../components/leads/PhotoCapture'
 
 const SOURCES = [
   'IndiaMart', 'Justdial', 'Cronberry WABA', 'Excel Upload',
@@ -152,6 +153,44 @@ export default function LeadFormV2() {
           <div className="lead-page-eyebrow">Add to pipeline</div>
           <div className="lead-page-title">New Lead</div>
           <div className="lead-page-sub">30 seconds · all fields can be edited later</div>
+        </div>
+      </div>
+
+      {/* Phase 33D.1 — business-card scanner. Owner directive (11 May
+          2026): at top of New Lead, allow capture/upload of a card
+          photo. OCR runs via the same ocr-business-card Edge Function
+          and pre-fills name / phone / email / company in the form
+          state below. Rep reviews + edits + saves. Photo itself is
+          NOT stored (no lead row exists yet); rep can take a follow-
+          up photo from the lead detail later to keep it on record. */}
+      <div className="lead-card" style={{
+        marginBottom: 14,
+        padding: '14px 16px',
+        background: 'rgba(255,230,0,0.06)',
+        border: '1px dashed var(--accent, #FFE600)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <Camera size={20} style={{ color: 'var(--accent)' }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+              Have a business card?
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              Snap or upload a photo — we'll fill the form for you.
+            </div>
+          </div>
+          <PhotoCapture
+            buttonLabel="Scan card"
+            onFieldsExtracted={(fields) => {
+              setForm(prev => ({
+                ...prev,
+                name:    prev.name    || fields.name    || '',
+                company: prev.company || fields.company || '',
+                phone:   prev.phone   || fields.phone   || '',
+                email:   prev.email   || fields.email   || '',
+              }))
+            }}
+          />
         </div>
       </div>
 

@@ -1,19 +1,37 @@
 // src/components/leads/PhotoCapture.jsx
 //
-// Phase 33D (11 May 2026) — photo capture + OCR for leads. Uses native
-// camera via <input type="file" capture="environment"> so mobile reps
-// get the rear camera. Uploads to lead-photos storage bucket. Optionally
-// runs OCR via the ocr-business-card Edge Function and offers to patch
-// the lead with extracted name/phone/email/company.
+// Phase 33D (11 May 2026) — photo capture + OCR for leads.
+// Phase 33D.1 (11 May 2026) — added scan-only mode for new-lead
+// creation. Owner asked for business-card → new lead autofill.
+//
+// Two modes:
+//   - ATTACH mode (leadId given): upload to lead-photos bucket,
+//     INSERT lead_photos row, run OCR, offer to patch the lead's
+//     empty fields with extracted values.
+//   - SCAN mode (no leadId): skip upload + insert, just run OCR
+//     and call onFieldsExtracted({name, phone, email, company, role}).
+//     Used by LeadFormV2 to prefill the New Lead form from a
+//     business card photo.
+//
+// Uses native camera via <input type="file" capture="environment">
+// so mobile reps get the rear camera.
 
 import { useState } from 'react'
 import { Camera, Loader2, Sparkles, Check } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
-export default function PhotoCapture({ leadId, profileId, onSaved, onPatchLead }) {
+export default function PhotoCapture({
+  leadId,
+  profileId,
+  onSaved,
+  onPatchLead,
+  onFieldsExtracted,
+  buttonLabel,
+}) {
+  const scanOnly = !leadId
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [ocrPreview, setOcrPreview] = useState(null)  // { photo_id, fields, is_business_card }
+  const [ocrPreview, setOcrPreview] = useState(null)  // { photo_id?, fields, is_business_card }
 
   async function handleFile(e) {
     const file = e.target.files?.[0]
@@ -21,26 +39,30 @@ export default function PhotoCapture({ leadId, profileId, onSaved, onPatchLead }
     setError('')
     setBusy(true)
     try {
-      // 1. Upload to storage.
-      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-      const key = `${leadId}/${Date.now()}.${ext}`
-      const { error: upErr } = await supabase.storage
-        .from('lead-photos').upload(key, file, { upsert: false, contentType: file.type })
-      if (upErr) throw new Error('Upload: ' + upErr.message)
+      let photoRow = null
+      if (!scanOnly) {
+        // 1. Upload to storage.
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+        const key = `${leadId}/${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('lead-photos').upload(key, file, { upsert: false, contentType: file.type })
+        if (upErr) throw new Error('Upload: ' + upErr.message)
 
-      // 2. INSERT lead_photos row.
-      const { data: photoRow, error: insErr } = await supabase
-        .from('lead_photos')
-        .insert([{
-          lead_id:      leadId,
-          storage_path: key,
-          created_by:   profileId,
-        }])
-        .select()
-        .single()
-      if (insErr) throw new Error('Save: ' + insErr.message)
+        // 2. INSERT lead_photos row.
+        const ins = await supabase
+          .from('lead_photos')
+          .insert([{
+            lead_id:      leadId,
+            storage_path: key,
+            created_by:   profileId,
+          }])
+          .select()
+          .single()
+        if (ins.error) throw new Error('Save: ' + ins.error.message)
+        photoRow = ins.data
+      }
 
-      // 3. Kick off OCR (best-effort; failure doesn't block the upload).
+      // 3. Run OCR (always — both modes need the fields).
       const b64 = await blobToBase64(file)
       const { data: { session } } = await supabase.auth.getSession()
       const url = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/ocr-business-card`
@@ -50,34 +72,45 @@ export default function PhotoCapture({ leadId, profileId, onSaved, onPatchLead }
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token || ''}`,
         },
-        body: JSON.stringify({ image_base64: b64, mime_type: file.type, lead_id: leadId }),
+        body: JSON.stringify({ image_base64: b64, mime_type: file.type, lead_id: leadId || null }),
       })
       let ocr = null
       if (res.ok) {
         ocr = await res.json()
-        await supabase.from('lead_photos').update({
-          ocr_text:         ocr.ocr_text || null,
-          ocr_fields:       ocr.fields || {},
-          is_business_card: !!ocr.is_business_card,
-        }).eq('id', photoRow.id)
+        if (photoRow) {
+          await supabase.from('lead_photos').update({
+            ocr_text:         ocr.ocr_text || null,
+            ocr_fields:       ocr.fields || {},
+            is_business_card: !!ocr.is_business_card,
+          }).eq('id', photoRow.id)
+        }
+      } else {
+        const txt = await res.text()
+        throw new Error('OCR failed: ' + txt.slice(0, 200))
       }
+
       // 4. Show preview if business card with usable fields.
       if (ocr?.is_business_card && ocr.fields && Object.values(ocr.fields).some(Boolean)) {
-        setOcrPreview({ photo_id: photoRow.id, fields: ocr.fields })
+        setOcrPreview({ photo_id: photoRow?.id, fields: ocr.fields })
+      } else if (scanOnly) {
+        setError('No business card detected. Try a clearer photo.')
       }
-      onSaved?.(photoRow)
+      if (photoRow) onSaved?.(photoRow)
     } catch (err) {
       setError(err.message || 'Photo failed')
     } finally {
       setBusy(false)
-      // reset input so the same file can be re-picked
       e.target.value = ''
     }
   }
 
   function applyOcrFields() {
     if (!ocrPreview?.fields) return
-    onPatchLead?.(ocrPreview.fields)
+    if (scanOnly) {
+      onFieldsExtracted?.(ocrPreview.fields)
+    } else {
+      onPatchLead?.(ocrPreview.fields)
+    }
     setOcrPreview(null)
   }
 
@@ -93,7 +126,7 @@ export default function PhotoCapture({ leadId, profileId, onSaved, onPatchLead }
         {busy
           ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
           : <Camera size={13} />}
-        <span>{busy ? 'Uploading…' : 'Take photo'}</span>
+        <span>{busy ? (scanOnly ? 'Reading card…' : 'Uploading…') : (buttonLabel || 'Take photo')}</span>
         <input
           type="file"
           accept="image/*"
