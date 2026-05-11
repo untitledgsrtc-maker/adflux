@@ -19,6 +19,7 @@ import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera } from 'lucide-
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import PhotoCapture from '../../components/leads/PhotoCapture'
+import { findLeadByPhone } from '../../utils/leadDedup'
 
 const SOURCES = [
   'IndiaMart', 'Justdial', 'Cronberry WABA', 'Excel Upload',
@@ -64,6 +65,14 @@ export default function LeadFormV2() {
   const [telecallers, setTelecallers] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
+  // Phase 33D.6 — duplicate phone warning
+  const [dupLead, setDupLead] = useState(null)
+
+  async function checkPhoneDup(p) {
+    setDupLead(null)
+    const hit = await findLeadByPhone(p)
+    if (hit) setDupLead(hit)
+  }
 
   function set(k, v) { setForm(prev => ({ ...prev, [k]: v })) }
 
@@ -104,6 +113,13 @@ export default function LeadFormV2() {
     }
     if (!form.city.trim()) {
       setError('City is required.')
+      return
+    }
+    // Phase 33D.6 — re-check dup at save time too (in case rep didn't blur).
+    const dup = await findLeadByPhone(form.phone)
+    if (dup) {
+      setDupLead(dup)
+      setError(`This phone is already in your pipeline as "${dup.name}". Open the existing lead instead of creating a duplicate.`)
       return
     }
     if (!form.source) {
@@ -202,6 +218,26 @@ export default function LeadFormV2() {
         </div>
       </div>
 
+      {/* Phase 33D.6 — duplicate-phone warning. Fired when rep blurs
+          the Mobile field. Blocks save until rep changes the number
+          or navigates to the existing lead. */}
+      {dupLead && (
+        <div style={{
+          marginBottom: 14, padding: '12px 14px',
+          background: 'var(--danger-soft)', border: '1px solid var(--danger)',
+          borderRadius: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+        }}>
+          <div style={{ fontSize: 13, color: 'var(--danger)' }}>
+            This number is already in your pipeline as <b>{dupLead.name}</b>
+            {dupLead.company ? ` (${dupLead.company})` : ''} · {dupLead.stage}
+          </div>
+          <button className="lead-btn lead-btn-sm" onClick={() => navigate(`/leads/${dupLead.id}`)}>
+            Open existing
+          </button>
+        </div>
+      )}
+
       {/* ─── Identity ─── */}
       <div className="lead-card" style={{ marginBottom: 14 }}>
         <div className="lead-card-head"><div className="lead-card-title">Identity</div></div>
@@ -213,7 +249,13 @@ export default function LeadFormV2() {
           <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     placeholder="e.g. Sunrise Diagnostics" />
           <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" />
           <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
-          <Field label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Mobile *'} value={form.phone} onChange={v => set('phone', v)} placeholder="+91 98XXXX XXXXX" />
+          <Field
+            label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Mobile *'}
+            value={form.phone}
+            onChange={v => { set('phone', v); if (dupLead) setDupLead(null) }}
+            onBlur={() => checkPhoneDup(form.phone)}
+            placeholder="+91 98XXXX XXXXX"
+          />
           <Field label="Email"          value={form.email}       onChange={v => set('email', v)}       placeholder="name@company.com" type="email" />
           <Field label="City *"         value={form.city}        onChange={v => set('city', v)}        placeholder="Surat" />
           <Field label="Website"        value={form.website}     onChange={v => set('website', v)}     placeholder="www.example.com" />
@@ -366,7 +408,7 @@ export default function LeadFormV2() {
   )
 }
 
-function Field({ label, value, onChange, placeholder, type }) {
+function Field({ label, value, onChange, onBlur, placeholder, type }) {
   return (
     <div>
       <label className="lead-fld-label">{label}</label>
@@ -375,6 +417,7 @@ function Field({ label, value, onChange, placeholder, type }) {
         type={type || 'text'}
         value={value}
         onChange={e => onChange(e.target.value)}
+        onBlur={onBlur}
         placeholder={placeholder || ''}
       />
     </div>

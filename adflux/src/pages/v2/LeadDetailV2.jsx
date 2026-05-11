@@ -408,6 +408,22 @@ export default function LeadDetailV2() {
   if (!lead) return null
 
   const sla = slaInfo(lead.handoff_sla_due_at)
+
+  // Phase 33D.6 — stale banner. If last_contact_at > 30 days, surface
+  // a yellow banner with last note. Reduces context-switching cost.
+  const daysSinceContact = lead.last_contact_at
+    ? Math.floor((Date.now() - new Date(lead.last_contact_at).getTime()) / 86400000)
+    : null
+  const lastNote = activities.find(a => a.notes)?.notes
+  const isStale = daysSinceContact !== null && daysSinceContact >= 30
+
+  async function toggleChasePaused() {
+    await supabase
+      .from('leads')
+      .update({ cadence_paused: !lead.cadence_paused })
+      .eq('id', lead.id)
+    load()
+  }
   const heatLabel = lead.heat ? lead.heat[0].toUpperCase() + lead.heat.slice(1) : null
 
   return (
@@ -418,6 +434,45 @@ export default function LeadDetailV2() {
         <ArrowLeft size={12} />
         <span>Back to leads</span>
       </div>
+
+      {/* Phase 33D.6 — stale-lead banner. Shown when no contact in 30+ days. */}
+      {isStale && (
+        <div style={{
+          background: 'rgba(245, 158, 11, .08)',
+          border: '1px solid var(--warning, #F59E0B)',
+          borderRadius: 10, padding: '10px 14px', marginBottom: 12,
+          fontSize: 13,
+        }}>
+          <div style={{ color: 'var(--warning)', fontWeight: 600 }}>
+            Last contact: {daysSinceContact} days ago
+          </div>
+          {lastNote && (
+            <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+              Last note: "{lastNote.slice(0, 160)}{lastNote.length > 160 ? '…' : ''}"
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Phase 33D.6 — Stop chasing toggle. Sets cadence_paused so
+          stage-change triggers + 30-day nurture cycles skip this lead. */}
+      {(lead.stage === 'Lost' || lead.stage === 'Nurture') && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 12px', marginBottom: 10,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, fontSize: 12,
+        }}>
+          <span style={{ color: 'var(--text-muted)' }}>
+            {lead.cadence_paused
+              ? 'Auto follow-ups paused for this lead'
+              : 'Auto follow-ups active (30-day cadence)'}
+          </span>
+          <button className="lead-btn lead-btn-sm" onClick={toggleChasePaused}>
+            {lead.cadence_paused ? 'Resume' : 'Stop chasing'}
+          </button>
+        </div>
+      )}
 
       {/* ─── Header card (Phase 30B rebuild) ────────────────
           Goals (owner spec, 7 May 2026):

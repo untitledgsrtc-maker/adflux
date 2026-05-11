@@ -19,6 +19,7 @@
 import { useState } from 'react'
 import { Camera, Loader2, Sparkles, Check } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { resizeImage } from '../../utils/leadDedup'
 
 export default function PhotoCapture({
   leadId,
@@ -34,18 +35,22 @@ export default function PhotoCapture({
   const [ocrPreview, setOcrPreview] = useState(null)  // { photo_id?, fields, is_business_card }
 
   async function handleFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const original = e.target.files?.[0]
+    if (!original) return
     setError('')
     setBusy(true)
     try {
+      // Phase 33D.6 — auto-resize to max 1280px + 0.85 JPEG before
+      // upload. Cuts a 4MB phone photo to ~200KB. Same image used
+      // for OCR — Claude Vision is fine with 1280px.
+      const file = await resizeImage(original, 1280, 0.85)
       let photoRow = null
       if (!scanOnly) {
         // 1. Upload to storage.
-        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+        const ext = 'jpg'
         const key = `${leadId}/${Date.now()}.${ext}`
         const { error: upErr } = await supabase.storage
-          .from('lead-photos').upload(key, file, { upsert: false, contentType: file.type })
+          .from('lead-photos').upload(key, file, { upsert: false, contentType: file.type || 'image/jpeg' })
         if (upErr) throw new Error('Upload: ' + upErr.message)
 
         // 2. INSERT lead_photos row.

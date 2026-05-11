@@ -155,6 +155,24 @@ export default function FollowUpsV2() {
     setRows(prev => prev.filter(r => r.id !== row.id))
   }
 
+  // Phase 33D.6 — Snooze pushes the FU date by 1 day. Stops the
+  // queue from accumulating overdue items when rep has a rough day.
+  async function snooze(row) {
+    setBusyId(row.id)
+    // Add 1 day, then push Sunday → Monday on the client too.
+    const d = new Date(row.follow_up_date + 'T00:00:00')
+    d.setDate(d.getDate() + 1)
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1)
+    const newDate = d.toISOString().slice(0, 10)
+    const { error: err } = await supabase
+      .from('follow_ups')
+      .update({ follow_up_date: newDate })
+      .eq('id', row.id)
+    setBusyId(null)
+    if (err) { setError(err.message); return }
+    setRows(prev => prev.map(r => r.id === row.id ? { ...r, follow_up_date: newDate } : r))
+  }
+
   // Phase 33D.4 — both quote-linked AND lead-linked follow-ups can
   // appear here. Resolve phone + name from whichever join is present.
   function rowPhone(row) {
@@ -305,7 +323,7 @@ export default function FollowUpsV2() {
         rows={buckets.overdue}
         tone="danger"
         icon={<AlertTriangle size={14} strokeWidth={2} />}
-        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} busyId={busyId}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
         navigate={navigate}
       />
       <Section
@@ -313,21 +331,21 @@ export default function FollowUpsV2() {
         rows={buckets.today}
         tone="warning"
         icon={<Clock size={14} strokeWidth={2} />}
-        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} busyId={busyId}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
         navigate={navigate}
       />
       <Section
         title="Tomorrow"
         rows={buckets.tomorrow}
         tone="neutral"
-        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} busyId={busyId}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
         navigate={navigate}
       />
       <Section
         title="This week"
         rows={buckets.week}
         tone="neutral"
-        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} busyId={busyId}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
         navigate={navigate}
       />
 
@@ -381,7 +399,7 @@ export default function FollowUpsV2() {
   )
 }
 
-function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, busyId, navigate }) {
+function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze, busyId, navigate }) {
   if (rows.length === 0) return null
   const toneColor =
     tone === 'danger'  ? 'var(--danger)'  :
@@ -408,7 +426,7 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, busyId, 
         {rows.map(r => (
           <Row
             key={r.id} row={r}
-            onCall={onCall} onWhatsApp={onWhatsApp} onDone={onDone}
+            onCall={onCall} onWhatsApp={onWhatsApp} onDone={onDone} onSnooze={onSnooze}
             busy={busyId === r.id}
             navigate={navigate}
           />
@@ -418,7 +436,7 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, busyId, 
   )
 }
 
-function Row({ row, onCall, onWhatsApp, onDone, busy, navigate }) {
+function Row({ row, onCall, onWhatsApp, onDone, onSnooze, busy, navigate }) {
   // Phase 33D.4 — follow-up rows can be quote-linked OR lead-linked.
   // Resolve client display + tap target from whichever join is present.
   const isLeadFu = !!row.lead_id
@@ -460,8 +478,23 @@ function Row({ row, onCall, onWhatsApp, onDone, busy, navigate }) {
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
           {dateLabel}{time ? ` · ${time}` : ''}
+          {/* Phase 33D.6 — show sequence + cadence type */}
+          {row.sequence && row.cadence_type && (
+            <span style={{ marginLeft: 8 }}>
+              · {row.cadence_type === 'lead_intro' ? `Follow-up ${row.sequence} of 6`
+                : row.cadence_type === 'quote_chase' ? `Quote chase ${row.sequence} of 3`
+                : row.cadence_type === 'nurture' ? 'Nurture check-in'
+                : row.cadence_type === 'lost_nurture' ? 'Lost · 30-day touch'
+                : ''}
+            </span>
+          )}
         </div>
-        {row.note && (
+        {row.action_hint && (
+          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 4, fontWeight: 500 }}>
+            → {row.action_hint}
+          </div>
+        )}
+        {row.note && !row.note.startsWith('Auto') && (
           <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 6, lineHeight: 1.4 }}>
             {row.note}
           </div>
@@ -486,6 +519,16 @@ function Row({ row, onCall, onWhatsApp, onDone, busy, navigate }) {
           style={{ flex: 1, minWidth: 80 }}
         >
           <MessageCircle size={13} /> WhatsApp
+        </button>
+        <button
+          type="button"
+          className="lead-btn lead-btn-sm"
+          onClick={() => onSnooze && onSnooze(row)}
+          disabled={busy || !onSnooze}
+          style={{ flex: 1, minWidth: 80, color: 'var(--text-muted)' }}
+          title="Push to tomorrow"
+        >
+          <Clock size={13} /> Snooze
         </button>
         <button
           type="button"

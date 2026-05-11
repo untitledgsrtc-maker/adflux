@@ -35,6 +35,7 @@ import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
 import PhotoCapture from './PhotoCapture'
 import WhatsAppPromptModal from './WhatsAppPromptModal'
+import { findLeadByPhone } from '../../utils/leadDedup'
 
 // Outcome → (stage, lost_reason) mapping. Locked in this file because
 // the modal owns the cold-meeting flow end-to-end. If you change these
@@ -166,6 +167,39 @@ export default function LogMeetingModal({ onClose, onSaved }) {
     }
     const oc = OUTCOMES.find(o => o.value === outcome)
     setSaving(true)
+
+    // Phase 33D.6 — duplicate check by phone. If the rep just walked
+    // into a shop whose number is already in our pipeline, this is a
+    // follow-up meeting on the EXISTING lead, not a new lead. Insert
+    // a lead_activities row tied to that lead and short-circuit out.
+    const dup = await findLeadByPhone(phone)
+    if (dup) {
+      const activityPayload = {
+        lead_id:        dup.id,
+        activity_type:  'meeting',
+        outcome:        outcome === 'interested' ? 'positive'
+                        : outcome === 'maybe' ? 'neutral'
+                        : 'negative',
+        notes:          `Follow-up meeting · ${oc.label}` + (notes.trim() ? ` — ${notes.trim()}` : ''),
+        created_by:     profile.id,
+        gps_lat:        gps?.lat || null,
+        gps_lng:        gps?.lng || null,
+        gps_accuracy_m: gps?.acc || null,
+      }
+      const { error: actErr } = await supabase
+        .from('lead_activities').insert([activityPayload])
+      if (actErr) {
+        setSaving(false)
+        setError('Could not log follow-up meeting: ' + actErr.message)
+        return
+      }
+      setSaving(false)
+      // Treat as a save — surface that it's a follow-up + open the
+      // existing lead for the prompt.
+      onSaved?.(dup.id)
+      setSavedLead({ id: dup.id, name: dup.name, company: dup.company, phone, segment: 'PRIVATE' })
+      return
+    }
 
     // 1) Create the lead. Field Meeting source, stage mapped from
     //    outcome. Sales rep owns the lead (assigned_to = themselves).

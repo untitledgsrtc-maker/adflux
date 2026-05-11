@@ -887,6 +887,11 @@ export default function WorkV2() {
               extras={{ calls: counters.calls || 0, callTarget: targets.calls || 20, leads: counters.new_leads || 0, leadTarget: targets.new_leads || 10 }}
             />
 
+            {/* Phase 33D.6 — Today's tasks breakdown: count of due
+                follow-ups + nurture calls. Shows alongside the meeting
+                ring so the rep sees the full daily picture at a glance. */}
+            <TodayTasksBreakdown userId={profile.id} navigate={navigate} />
+
             {/* Phase 33A — 3 giant action buttons. Replace the 5-tile
                 grid below. Vertical stack, 72px tall, icon on top +
                 English label. Meeting = primary (brand accent border);
@@ -1312,6 +1317,143 @@ export default function WorkV2() {
 // Phase 33A — single big meeting ring on /work B_ACTIVE. Replaces
 // the 3-counter row. SVG progress ring, big center number, tap to
 // expand a sheet showing all 3 targets (meetings/calls/new leads).
+// Phase 33D.6 — Today's task breakdown. Fetches today's open
+// follow-ups for the current rep, classifies into general FUs vs
+// nurture/lost calls, and offers tap-to-call-card actions. Tap any
+// row → opens lead detail. Tap CALL → tel: with auto-log.
+function TodayTasksBreakdown({ userId, navigate }) {
+  const [rows, setRows] = useState([])
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    ;(async () => {
+      const today = new Date().toISOString().slice(0, 10)
+      const { data } = await supabase
+        .from('follow_ups')
+        .select(`
+          id, lead_id, follow_up_date, follow_up_time, note,
+          sequence, cadence_type, action_hint, auto_generated,
+          lead:leads (id, name, company, phone, segment)
+        `)
+        .eq('is_done', false)
+        .eq('assigned_to', userId)
+        .lte('follow_up_date', today)
+        .not('lead_id', 'is', null)
+        .order('follow_up_date', { ascending: true })
+        .limit(10)
+      if (!cancelled) setRows(data || [])
+    })()
+    return () => { cancelled = true }
+  }, [userId])
+
+  const followUps = rows.filter(r => r.cadence_type === 'lead_intro' || r.cadence_type === 'quote_chase')
+  const nurtureCalls = rows.filter(r => r.cadence_type === 'nurture' || r.cadence_type === 'lost_nurture')
+
+  if (rows.length === 0) {
+    return (
+      <div className="m-card" style={{ marginBottom: 14, padding: '14px 16px' }}>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
+          ✓ All caught up — no follow-ups due
+        </div>
+      </div>
+    )
+  }
+
+  function cleanPhone(raw) {
+    if (!raw) return null
+    const d = String(raw).replace(/\D/g, '')
+    if (d.length < 10) return null
+    return d.length === 10 ? '91' + d : d
+  }
+
+  function CallCard({ r }) {
+    const phone = cleanPhone(r.lead?.phone)
+    return (
+      <div
+        style={{
+          padding: '10px 12px', background: 'var(--surface)',
+          border: '1px solid var(--border)', borderRadius: 10,
+          marginBottom: 8,
+        }}
+      >
+        <div
+          onClick={() => navigate(`/leads/${r.lead_id}`)}
+          style={{ cursor: 'pointer', marginBottom: 8 }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 600 }}>
+            {r.lead?.name || 'Lead'}
+            {r.lead?.company && (
+              <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> · {r.lead.company}</span>
+            )}
+          </div>
+          {r.action_hint && (
+            <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
+              → {r.action_hint}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {phone ? (
+            <a
+              href={`tel:+${phone}`}
+              className="lead-btn lead-btn-sm lead-btn-primary"
+              style={{ flex: 1, textDecoration: 'none', justifyContent: 'center' }}
+            >
+              <Phone size={13} /> Call
+            </a>
+          ) : (
+            <button className="lead-btn lead-btn-sm" disabled style={{ flex: 1 }}>No phone</button>
+          )}
+          {phone && (
+            <a
+              href={`https://wa.me/${phone}`}
+              target="_blank" rel="noopener noreferrer"
+              className="lead-btn lead-btn-sm"
+              style={{ flex: 1, textDecoration: 'none', justifyContent: 'center' }}
+            >
+              <Mic size={13} style={{ display: 'none' }} /> WhatsApp
+            </a>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="m-card" style={{ marginBottom: 14, padding: '14px 16px' }}>
+      <div style={{
+        fontSize: 13, fontWeight: 600, marginBottom: 10,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <span>Today's tasks</span>
+        <button
+          className="lead-btn lead-btn-sm"
+          onClick={() => navigate('/follow-ups')}
+          style={{ fontSize: 11 }}
+        >
+          View all →
+        </button>
+      </div>
+      {followUps.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
+            {followUps.length} follow-up{followUps.length > 1 ? 's' : ''}
+          </div>
+          {followUps.slice(0, 3).map(r => <CallCard key={r.id} r={r} />)}
+        </div>
+      )}
+      {nurtureCalls.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
+            {nurtureCalls.length} nurture call{nurtureCalls.length > 1 ? 's' : ''}
+          </div>
+          {nurtureCalls.slice(0, 3).map(r => <CallCard key={r.id} r={r} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MeetingRing({ done, target, extras }) {
   const [open, setOpen] = useState(false)
   const pct = Math.max(0, Math.min(1, target ? done / target : 0))
