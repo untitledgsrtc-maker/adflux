@@ -47,8 +47,9 @@ DECLARE
 BEGIN
   -- Skip if already in this transaction.
   IF NOT EXISTS (SELECT 1 FROM users WHERE id = v_uid) THEN
-    INSERT INTO users (id, name, role, segment_access, daily_targets, is_active)
-    VALUES (v_uid, 'TEST_REP_SMOKE', 'sales', 'PRIVATE', '{"meetings": 5}'::jsonb, true);
+    INSERT INTO users (id, name, email, role, segment_access, daily_targets, is_active)
+    VALUES (v_uid, 'TEST_REP_SMOKE', 'smoke-test@untitledadvertising.local',
+            'sales', 'PRIVATE', '{"meetings": 5}'::jsonb, true);
   END IF;
   -- Set up incentive profile so monthly_score has something to multiply.
   INSERT INTO staff_incentive_profiles (user_id, monthly_salary)
