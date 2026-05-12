@@ -11,6 +11,18 @@ import App from './App'
 import { initAuth } from './hooks/useAuth'
 import './styles/globals.css'
 
+// Phase 34G — register the PWA service worker (vite-plugin-pwa virtual
+// import). autoUpdate strategy means a new build reloads tabs once the
+// SW takes over. No prompt UI needed.
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  // Dynamically import so dev mode (where the plugin disables the
+  // virtual module) doesn't choke. The runtime check above + the
+  // try/catch belt-and-braces it.
+  import('virtual:pwa-register')
+    .then(({ registerSW }) => registerSW({ immediate: true }))
+    .catch(() => { /* dev mode / plugin disabled — ignore */ })
+}
+
 // Bootstrap auth listener a single time, before render.
 initAuth()
 
