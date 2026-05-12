@@ -46,6 +46,7 @@ import ReassignModal   from '../../components/leads/ReassignModal'
 import PhotoCapture     from '../../components/leads/PhotoCapture'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
+import { toastError } from '../../components/v2/Toast'
 
 const ACTIVITY_ICON = {
   call:          Phone,
@@ -449,6 +450,53 @@ export default function LeadDetailV2() {
         When you open Log Activity, the notes field has a mic button.
         Speak up to 60 seconds in Gujarati / Hindi / English — AI transcribes.
       </DidYouKnow>
+
+      {/* Phase 34B — soft auto-Lost suggestion. Trigger sets
+          auto_lost_suggested=true after 3 non-positive attempts but
+          no longer flips stage. Rep confirms or dismisses here. */}
+      {lead.auto_lost_suggested && lead.stage !== 'Lost' && lead.stage !== 'Won' && lead.stage !== 'Nurture' && (
+        <div style={{
+          background: 'rgba(244, 63, 94, .10)',
+          border: '1px solid var(--danger, #EF4444)',
+          borderRadius: 10, padding: '10px 14px', marginBottom: 12,
+          fontSize: 13,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          gap: 12, flexWrap: 'wrap',
+        }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ color: 'var(--danger, #EF4444)', fontWeight: 600 }}>
+              System suggests marking Lost
+            </div>
+            <div style={{ color: 'var(--text-muted)', marginTop: 2, fontSize: 12 }}>
+              3+ attempts with no positive response. Confirm if truly lost, or dismiss to keep working the lead.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setActiveModal('stage')}
+              style={{
+                padding: '6px 12px', borderRadius: 8,
+                background: 'var(--danger, #EF4444)', border: 'none',
+                color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}
+            >Mark Lost</button>
+            <button
+              type="button"
+              onClick={async () => {
+                const { error } = await supabase.rpc('dismiss_auto_lost_suggestion', { p_lead_id: lead.id })
+                if (error) { toastError(error, 'Could not dismiss suggestion.'); return }
+                setLead(prev => prev ? { ...prev, auto_lost_suggested: false, auto_lost_suggested_at: null } : prev)
+              }}
+              style={{
+                padding: '6px 12px', borderRadius: 8,
+                background: 'transparent', border: '1px solid var(--border)',
+                color: 'var(--text)', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              }}
+            >Dismiss</button>
+          </div>
+        </div>
+      )}
 
       {/* Phase 33D.6 — stale-lead banner. Shown when no contact in 30+ days. */}
       {isStale && (

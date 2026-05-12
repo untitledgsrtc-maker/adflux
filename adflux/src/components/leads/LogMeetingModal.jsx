@@ -87,6 +87,14 @@ export default function LogMeetingModal({ onClose, onSaved }) {
   const [outcome, setOutcome] = useState('')
   const [notes,   setNotes]   = useState('')
 
+  // Phase 34.10 — phone-first dedup. Was previously a check on Save
+  // which dropped the rep's typed company/contact when a match was
+  // found. Now we check as the rep types phone (debounced 600 ms)
+  // and show an inline preview so the rep can switch to follow-up-
+  // on-existing mode without losing typed work.
+  const [dupPreview, setDupPreview] = useState(null)   // {id, name, company, stage}
+  const [dupBusy,    setDupBusy]    = useState(false)
+
   const [gps, setGps]         = useState(null)   // {lat, lng, acc}
   const [gpsBusy, setGpsBusy] = useState(false)
   const [saving, setSaving]   = useState(false)
@@ -118,6 +126,33 @@ export default function LogMeetingModal({ onClose, onSaved }) {
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
     )
   }, [])
+
+  // Phase 34.10 — debounced phone-first dedup. As the rep types the
+  // phone number we poll findLeadByPhone (~600 ms after last keystroke)
+  // and surface a preview chip. Rep can tap "Use existing lead" to
+  // skip new-lead creation and log the activity onto the matched
+  // lead — without losing the company / contact fields they already
+  // typed (those get saved into the activity notes for context).
+  useEffect(() => {
+    const trimmed = (phone || '').trim()
+    if (trimmed.length < 6) {
+      setDupPreview(null)
+      return
+    }
+    let cancelled = false
+    setDupBusy(true)
+    const t = setTimeout(async () => {
+      try {
+        const dup = await findLeadByPhone(trimmed)
+        if (!cancelled) setDupPreview(dup || null)
+      } catch {
+        if (!cancelled) setDupPreview(null)
+      } finally {
+        if (!cancelled) setDupBusy(false)
+      }
+    }, 600)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [phone])
 
   function refreshGps() {
     if (!navigator.geolocation || gpsBusy) return
@@ -413,6 +448,36 @@ export default function LogMeetingModal({ onClose, onSaved }) {
                 placeholder="+91 98XXXX XXXXX"
                 disabled={saving}
               />
+              {/* Phase 34.10 — phone-first dedup preview. Shows the
+                  match as the rep types, before they fill the rest. */}
+              {dupBusy && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
+                  Checking for existing lead…
+                </div>
+              )}
+              {dupPreview && !dupBusy && (
+                <div
+                  style={{
+                    marginTop: 6,
+                    padding: '8px 10px',
+                    background: 'rgba(245, 158, 11, .10)',
+                    border: '1px solid var(--warning, #F59E0B)',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong>Already in pipeline:</strong>{' '}
+                    {dupPreview.name || '—'}
+                    {dupPreview.company ? ` · ${dupPreview.company}` : ''}
+                    {dupPreview.stage ? ` (${dupPreview.stage})` : ''}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div>

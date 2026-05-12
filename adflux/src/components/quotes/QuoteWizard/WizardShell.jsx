@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
-import { Check, X } from 'lucide-react'
+import { Check, X, Copy, Loader2 } from 'lucide-react'
 import { Step1Client } from './Step1Client'
 import { Step2Campaign } from './Step2Campaign'
 import { Step3Review } from './Step3Review'
 import { Step4Send } from './Step4Send'
 import { useQuotes } from '../../../hooks/useQuotes'
 import { GST_RATE } from '../../../utils/constants'
+import { useAuthStore } from '../../../store/authStore'
+import { toastError, toastSuccess } from '../../v2/Toast'
 
 const STEPS = [
   { id: 1, label: 'Client' },
@@ -32,7 +34,11 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
   const navigate = useNavigate()
   const { createQuote, updateQuote } = useQuotes()
 
+  const profile = useAuthStore((s) => s.profile)
   const [step, setStep] = useState(1)
+  // Phase 34E — Copy-from-last quote button state. Only used in
+  // create mode (not edit/renewal) on step 1.
+  const [copying, setCopying] = useState(false)
   // Seed quoteData with the optional `prefill` payload. This lets the
   // Clients page open the wizard with Step1 already populated. We keep
   // it separate from renewalOf/editOf because those trigger an async
@@ -348,11 +354,94 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
         )}
 
         {step === 1 && (
-          <Step1Client
-            data={quoteData}
-            onChange={updateQuoteData}
-            onNext={goNext}
-          />
+          <>
+            {/* Phase 34E — Copy from last quote. Pulls rep's most
+                recent non-Lost private LED quote and pre-fills client
+                fields + city list, so reps don't retype 80% of
+                identical content. Hidden in edit / renewal modes. */}
+            {!isEdit && !renewalOf && profile?.id && (
+              <div style={{ marginBottom: 12 }}>
+                <button
+                  type="button"
+                  disabled={copying}
+                  onClick={async () => {
+                    setCopying(true)
+                    try {
+                      // Most recent quote of mine, not Lost, not Other Media
+                      // (Other Media has its own wizard). Pull the quote +
+                      // its city rows in one fetch.
+                      const { data, error } = await supabase
+                        .from('quotes')
+                        .select('*, quote_cities(*)')
+                        .eq('created_by', profile.id)
+                        .neq('status', 'lost')
+                        .or('media_type.is.null,media_type.eq.LED_OTHER')
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle()
+                      if (error) { toastError(error, 'Could not load last quote.'); setCopying(false); return }
+                      if (!data) { toastError(null, 'No earlier quote to copy from.'); setCopying(false); return }
+                      setQuoteData(prev => ({
+                        ...prev,
+                        client_name:    data.client_name    || prev.client_name,
+                        client_company: data.client_company || prev.client_company,
+                        client_phone:   data.client_phone   || prev.client_phone,
+                        client_email:   data.client_email   || prev.client_email,
+                        client_gst:     data.client_gst     || prev.client_gst,
+                        client_address: data.client_address || prev.client_address,
+                        client_notes:   data.client_notes   || prev.client_notes,
+                      }))
+                      const rows = data.quote_cities || []
+                      if (rows.length) {
+                        // Best-effort hydrate. Rep can still tweak per city.
+                        setSelectedCities(rows.map(r => ({
+                          city: { id: r.city_id, name: r.city_name, grade: r.grade },
+                          screens:           r.screens,
+                          duration_months:   r.duration_months,
+                          listed_rate:       Number(r.listed_rate || 0),
+                          offered_rate:      Number(r.offered_rate || r.listed_rate || 0),
+                          override_reason:   r.override_reason || null,
+                          campaign_total:    Number(r.campaign_total || 0),
+                          slot_seconds:      Number(r.slot_seconds || 10),
+                          slots_per_day:     Number(r.slots_per_day || 100),
+                          slots_override_reason: r.slots_override_reason || null,
+                        })))
+                      }
+                      if (data.gst_rate !== null && data.gst_rate !== undefined) {
+                        setGstRate(Number(data.gst_rate))
+                      }
+                      toastSuccess('Copied client + ' + rows.length + ' cities from your last quote. Edit as needed.')
+                    } catch (e) {
+                      toastError(e, 'Could not copy last quote.')
+                    } finally {
+                      setCopying(false)
+                    }
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'transparent',
+                    border: '1px solid var(--border, #334155)',
+                    color: 'var(--text, #f1f5f9)',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: copying ? 'wait' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  {copying ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
+                  {copying ? 'Copying…' : 'Copy from your last quote'}
+                </button>
+              </div>
+            )}
+            <Step1Client
+              data={quoteData}
+              onChange={updateQuoteData}
+              onNext={goNext}
+            />
+          </>
         )}
         {step === 2 && (
           <Step2Campaign

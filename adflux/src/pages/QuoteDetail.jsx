@@ -20,6 +20,7 @@ import { buildWhatsAppMessage, openWhatsApp, shortenUrl } from '../utils/whatsap
 import { PaymentModal } from '../components/payments/PaymentModal'
 import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
+import IncentiveForecastCard from '../components/quotes/IncentiveForecastCard'
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
@@ -697,6 +698,11 @@ export default function QuoteDetail() {
 
           {/* Payment Summary */}
           <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} />
+
+          {/* Phase 34D — incentive forecast. Hidden for admin + for
+              already-won/lost quotes. Tells the rep how much closing
+              this quote this month bumps their incentive. */}
+          <IncentiveForecastCard quote={quote} />
 
           {/* Won quote actions — Create Renewal stays here so the
               renewal CTA is visible at the bottom of the quote.

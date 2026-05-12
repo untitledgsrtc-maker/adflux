@@ -25,6 +25,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
+import UpcomingTasksCard from '../../components/leads/UpcomingTasksCard'
 import RepDayTools from '../../components/leads/RepDayTools'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
@@ -1129,6 +1130,10 @@ export default function WorkV2() {
                 list wasn't truncated to 3. Pass limit=3; overflow shows
                 'View all' link inside the panel. */}
             <TodayTasksPanel userId={profile.id} limit={3} />
+
+            {/* Phase 34C — Tomorrow + Next 7 days preview so the rep
+                can prep at end-of-shift without leaving /work. */}
+            <UpcomingTasksCard userId={profile.id} />
 
             {/* Phase 33Q — rep-side day tools: 3-day-miss warning,
                 overnight stay toggle, request leave. One mountable
