@@ -434,3 +434,79 @@ Stop. Re-read this file + `UNTITLED_OS_MASTER_SPEC.md` + `tokens.css`. Ask the o
 When you (future-Claude) learn something important about this project, **append to this file**. The auto-memory directory at `~/Library/...` is outside the connected workspace folders, so the Write tool can't reach it from this session. CLAUDE.md is the single source of truth that survives across sessions.
 
 Format for additions: add a numbered section at the bottom, dated, with title `## {N} · {Title} ({YYYY-MM-DD})`. Don't rewrite history — append.
+
+---
+
+## 26 · Phase 34 — May 13 audit + Sprint A–D (2026-05-13)
+
+Full-codebase audit completed 13 May 2026 and shipped as four sprints (12 commits) on branch `untitled-os`. Key results captured here so future sessions don't re-discover what's already fixed.
+
+### Sprint A — bleed-stop (`3664169`, `5d82909`, `96c17b0`, `a638f84`, `2c73190`)
+
+- New `src/components/v2/Toast.jsx` — zustand-backed toast with imperative API (`pushToast`, `toastError`, `toastSuccess`, `dismissToast`). `<ToastViewport />` mounted at V2AppShell root. Use this instead of `alert()` or per-page inline banners for any new error surface.
+- New `src/components/v2/ConfirmDialog.jsx` — promise-based confirm dialog (`confirmDialog({ title, message, confirmLabel, cancelLabel, danger })` returns `Promise<boolean>`). `<ConfirmDialogViewport />` mounted alongside Toast. Use this instead of `confirm()` for destructive bulk operations.
+- `LeadUploadV2.jsx` — aborts import when `lead_imports.insert` fails. Previously a failed audit row left `importId` undefined and the loop inserted 500 leads with `import_id = null`. Now hard-fails with a toast + early return.
+- `useQuotes.js createQuote` — replaces silent fire-and-forget on `syncClientFromQuote` and the Phase 14 lead-stage advance with `toastError` on failure. Quote still saves; the rep just finds out when the dependent writes fail.
+- Five unguarded DB writes now check `error`: `ChangeStageModal:152`, `ReassignModal:44+56`, `SalesDashboard.markDone`, `IncentivePayoutModal.remove`, `PhotoCapture` OCR update.
+- `QuoteDetail.handleWhatsApp` — the empty inner catch on `downloadQuotePDF` was the worst silent failure in the app (WhatsApp opened claiming "PDF downloaded locally" when nothing was downloaded). Now tracks `downloadedLocally` flag and toasts on double-failure.
+- `LeadsV2` bulk stage change + bulk delete — `confirm()` and `alert()` → `confirmDialog()` and `toastError()`.
+- Brand fixes: `GovtProposalDetailV2.jsx:1677` `accentColor: '#facc15'` → `var(--v2-yellow, #FFE600)`; `FollowUpModal.jsx:130` `#81c784`/`#0a0e1a` → `var(--success)`/`var(--accent-fg)`.
+
+**False alarms caught and skipped:** audit explorer claimed (i) Private LED wizard missing `lead_id` contract — actually compliant via `WizardShell.jsx:42` + `useQuotes.js:90-132`; (ii) LogMeetingModal unguarded inserts — actually guards both at 189–194 + 262–275; (iii) 404 handlers missing on `/quotes/:id` and `/leads/:id` — both already exist; (iv) `imHere` interval cleanup missing in LeadDetailV2 — `clearInterval` already returned at line 201. Run a quick re-read before trusting any explorer-agent finding.
+
+### Sprint B — follow-up architecture (`feca0d4`, `89973eb`)
+
+`supabase_phase34_followup_consolidation.sql` (idempotent, ~290 LOC). Fixes four structural bugs:
+
+1. Dead `lead_set_handoff_sla()` trigger — was checking `'SalesReady'` (removed in Phase 30A). Re-pointed at the `New → Working` transition (the Phase 30A handoff semantics).
+2. SLA was wall-clock UTC. New `public.next_business_moment(timestamptz)` helper rolls a timestamp to the next IST business day using the existing `is_off_day()` function + `holidays` table. `handoff_sla_due_at` now computed as `next_business_moment(sales_ready_at + 24h)`.
+3. No auto-assignment. New `public.assign_lead_round_robin(p_segment text)` picks the active sales/telecaller/agency user (matching segment_access) with the fewest non-terminal leads. `trg_leads_auto_assign` BEFORE INSERT fills `assigned_to` when blank — wizard inserts that already set `assigned_to` are untouched.
+4. Orphan `lead_activities.next_action_date`. New `trg_lead_activity_sync_followup` AFTER INSERT upserts the lead's open `follow_ups` row when an activity carries `next_action_date`.
+
+Supersedes the SLA half of `supabase_phase33t_smart_task_fix.sql` (the smart-task RPC body in 33T stays — only the handoff-SLA function is overridden). Any future SLA / handoff work edits the Phase 34 file, **never** spawns a new sub-letter under 33.
+
+### Sprint C — idempotency lockdown (`a54cb43`, `0873cc1`)
+
+- `scripts/check-sql-schema.sh` extended with structure warnings (CLAUDE.md §8): CREATE TABLE / ADD COLUMN without IF NOT EXISTS, CREATE POLICY without DROP POLICY IF EXISTS, INSERT INTO without ON CONFLICT/NOT EXISTS (skipped when the file defines a PL/pgSQL function body), schema mutation without `NOTIFY pgrst`, missing `-- VERIFY` block. Soft warnings by default; `--strict` flag promotes to hard fail.
+- `PHASE_33_INVENTORY.md` — one-page map of all 23 phase33 SQL files. Marks the 9 explicit hotfix files (39 % churn rate) and the Phase 34 supersession. Phase 33 documented, not squashed; Phase 11 also document-only.
+- The audit-flagged "4 seed files missing ON CONFLICT" was a false grep finding — all four (`phase5`, `phase9`, `phase9b`, `phase11e`) use `WHERE NOT EXISTS` / `HAVING NOT EXISTS` patterns that are equally idempotent.
+
+### Sprint D — dead code + dedup + brand sweep (`5b5e99a`, `09b8c44`, `0c972b2`)
+
+- Deleted 12 dead V1 pages (1,468 LOC): `Cities`, `CreateQuote`, `Dashboard`, `FollowUps`, `HR`, `Incentives`, `MyOffer`, `MyPerformance`, `PendingApprovals`, `Quotes`, `RenewalTools`, `Team`. Routes all use V2 versions; no V1→V1 cross-imports existed.
+- Kept V1: `Login.jsx`, `OfferForm.jsx`, `QuoteDetail.jsx`. The latter handles both V1 and V2 routes (auto-redirects govt rows to `/proposal/:id`).
+- Single source of truth for status colors. Added `STATUS_COLOR_VARS` to `src/utils/constants.js`. `QuoteDetail`, `GovtProposalDetailV2`, `SalesDashboard` now import instead of redefining. `STATUS_COLORS` (CSS-class map) stays separate — different purpose.
+- `WonPaymentModal` — 10 inline Material/Tailwind hex codes (`#81c784`, `#fbbf24`, `#ef9a9a`) → `var(--success)` / `var(--warning)` / `var(--danger)`. Subtle visual shift; brand-token traceability gained.
+- **Not done this sprint:** CockpitWidgets has more hardcoded hexes following a chip-tint pattern that requires `--tint-*` tokens — `tokens.css` hasn't declared those yet, so that cleanup needs the token additions first. MasterV2's ~10 `#facc15` / `#0a0e1a` violations stay per §23 line 6 (owner wants them in their own dedicated commit when asked).
+- `_phase-b-backup-2026-05-01/` (180 KB) not deleted; will only delete with explicit owner approval.
+
+### Tooling additions you can now use
+
+```js
+// Toast — anywhere
+import { pushToast, toastError, toastSuccess } from '../components/v2/Toast'
+toastSuccess('Saved.')
+toastError(error, 'Could not save lead.')
+
+// Confirm — anywhere (returns Promise<boolean>)
+import { confirmDialog } from '../components/v2/ConfirmDialog'
+if (!(await confirmDialog({
+  title: 'Delete leads?',
+  message: `Delete ${n} leads permanently? This cannot be undone.`,
+  confirmLabel: 'Delete',
+  danger: true,
+}))) return
+
+// Single status color source
+import { STATUS_COLOR_VARS } from '../utils/constants'
+```
+
+### What's left after Phase 34
+
+1. `--tint-*` tokens in `tokens.css` + `v2.css`, then sweep CockpitWidgets and any other chip-tint sites.
+2. MasterV2 brand cleanup (owner-scheduled commit).
+3. `_phase-b-backup-2026-05-01/` removal (owner approval).
+4. Optional: squash Phase 4 (a–f) into one foundation file for fresh installs.
+5. Sprint 3 of the original plan: P&L module port.
+6. Sprint 4: receipts/TDS upgrade for govt deals.
+7. Govt invoice template (post-WON automation).
