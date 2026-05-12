@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
 
 /* ─── Hand-rolled CSV parser ───
    Handles RFC 4180 quoted fields with commas + escaped quotes inside,
@@ -184,7 +185,9 @@ export default function LeadUploadV2() {
       setColumnMap(buildColumnMap(hdrs))
       setRows(data)
     } catch (e) {
-      alert('Could not parse file: ' + e.message)
+      // Phase 34a — was browser alert(); now surfaces in the v2 toast
+      // viewport so the rep can keep working while reading the error.
+      toastError(e, 'Could not parse file.')
     } finally {
       setParsing(false)
     }
@@ -249,14 +252,19 @@ export default function LeadUploadV2() {
     // made the import silently return without doing anything. Use a
     // typeof check so 0 is treated as a valid index.
     if (!rows.length || typeof columnMap.name !== 'number') {
-      alert('Pick the Name column at minimum.')
+      pushToast('Pick the Name column at minimum.', 'warning')
       return
     }
     setImporting(true)
     setProgress({ done: 0, total: rows.length })
 
-    // Audit row first
-    const { data: importRow } = await supabase
+    // Phase 34a — audit row first. The old code destructured `data`
+    // without checking `error`, so if RLS or a constraint blocked the
+    // insert, `importId` ended up undefined and the loop below
+    // proceeded to insert hundreds of leads with `import_id = null` —
+    // orphan rows with no audit trail. Abort the import if the
+    // audit row didn't land.
+    const { data: importRow, error: impErr } = await supabase
       .from('lead_imports')
       .insert([{
         file_name: file?.name || 'unknown',
@@ -269,7 +277,13 @@ export default function LeadUploadV2() {
       .select()
       .single()
 
-    const importId = importRow?.id
+    if (impErr || !importRow?.id) {
+      setImporting(false)
+      toastError(impErr, 'Could not start import — audit row failed to save. No leads were imported.')
+      return
+    }
+
+    const importId = importRow.id
 
     let imported = 0
     let skipped  = 0
@@ -375,9 +389,11 @@ export default function LeadUploadV2() {
       if (i % 5 === 0) setProgress({ done: i + 1, total: rows.length })
     }
 
-    // Finalize audit
+    // Finalize audit. Phase 34a — surface error if the audit update
+    // itself fails so the rep doesn't see "import finished" while the
+    // lead_imports row stays stuck on "processing".
     if (importId) {
-      await supabase.from('lead_imports').update({
+      const { error: finErr } = await supabase.from('lead_imports').update({
         imported_count: imported,
         skipped_count: skipped,
         duplicate_count: dupes,
@@ -385,11 +401,22 @@ export default function LeadUploadV2() {
         status: errors.length === rows.length ? 'failed' : 'completed',
         completed_at: new Date().toISOString(),
       }).eq('id', importId)
+      if (finErr) toastError(finErr, 'Import audit row could not be finalised.')
     }
 
     setProgress({ done: rows.length, total: rows.length })
     setImporting(false)
     setResult({ imported, skipped, dupes, errors })
+
+    // Phase 34a — summary toast so the rep sees the outcome even if
+    // they scroll past the result panel.
+    if (errors.length === rows.length) {
+      pushToast(`Import failed — all ${rows.length} rows rejected. See error list.`, 'danger', { ttl: 0 })
+    } else if (errors.length) {
+      pushToast(`Imported ${imported} of ${rows.length} leads. ${errors.length} failed, ${dupes} duplicates skipped.`, 'warning')
+    } else {
+      toastSuccess(`Imported ${imported} leads${dupes ? ` (${dupes} duplicates skipped)` : ''}.`)
+    }
   }
 
   /* ─── Render ─── */

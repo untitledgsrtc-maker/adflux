@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useQuoteStore } from '../store/quoteStore'
 import { useAuthStore } from '../store/authStore'
 import { syncClientFromQuote } from '../utils/syncClient'
+import { toastError } from '../components/v2/Toast'
 
 // Generate a fresh quote number. Uses full millisecond timestamp + a
 // 5-digit random suffix so two near-simultaneous submits (including
@@ -117,18 +118,41 @@ export function useQuotes() {
 
     // Fire-and-forget client sync. Doesn't block the return; a clients
     // table failure must never cascade into "your quote didn't save".
-    syncClientFromQuote(quote, 'create')
+    // Phase 34a — surface failures via toast so the rep knows the
+    // Clients table is out of sync with this quote. Quote itself is
+    // already saved, so this is informational rather than blocking.
+    Promise.resolve(syncClientFromQuote(quote, 'create')).then(
+      (res) => {
+        if (res && res.error) {
+          toastError(res.error, 'Quote saved, but Client sync failed.')
+        }
+      },
+      (err) => {
+        toastError(err, 'Quote saved, but Client sync failed.')
+      },
+    )
 
     // Phase 14 — Lead → Quote linkage. If this quote was opened via
     // /leads/:id "Convert to Quote", quoteData carries lead_id (saved
     // on quotes.lead_id above). Advance the originating lead's stage
     // to QuoteSent + pin its quote_id so the lead funnel stays accurate.
+    //
+    // Phase 34a — previously fire-and-forget (silent on RLS / network
+    // failure), so a quote could ship while the lead stayed in its old
+    // stage. Now surface failures via toast — quote is already saved,
+    // but the rep needs to know the lead funnel did not advance.
     if (quote.lead_id) {
       supabase
         .from('leads')
         .update({ stage: 'QuoteSent', quote_id: quote.id })
         .eq('id', quote.lead_id)
-        .then(() => null, () => null)  // fire-and-forget
+        .then(({ error: leadErr }) => {
+          if (leadErr) {
+            toastError(leadErr, 'Quote saved, but lead stage did not advance to QuoteSent.')
+          }
+        }, (err) => {
+          toastError(err, 'Quote saved, but lead stage did not advance to QuoteSent.')
+        })
     }
 
     store.upsertQuote(quote)

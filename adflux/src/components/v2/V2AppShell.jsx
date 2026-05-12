@@ -31,6 +31,7 @@ import CopilotModal from '../copilot/CopilotModal'
 import GlobalSearchBar from './GlobalSearchBar'
 import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
+import { ToastViewport } from './Toast'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -552,6 +553,11 @@ export function V2AppShell() {
 
       {/* Phase 1.5 — Co-Pilot modal (Cmd+K) */}
       <CopilotModal open={copilotOpen} onClose={() => setCopilotOpen(false)} />
+
+      {/* Phase 34a — global toast viewport. Mounted once at the shell
+          root so any page, modal or store can call pushToast() and have
+          it render in the bottom-right corner. */}
+      <ToastViewport />
     </div>
   )
 }
