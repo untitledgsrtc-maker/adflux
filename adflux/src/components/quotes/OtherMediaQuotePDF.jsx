@@ -23,6 +23,7 @@ import {
   Document, Page, Text, View, StyleSheet, Font, pdf,
 } from '@react-pdf/renderer'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+import { rupeesToWords } from '../../utils/numberToWords'
 import { supabase } from '../../lib/supabase'
 
 // Same Roboto registration as QuotePDF.jsx — Helvetica's missing ₹
@@ -186,7 +187,7 @@ const S = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 20,
     marginTop: 10,
-    marginBottom: 16,
+    marginBottom: 4,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -198,6 +199,17 @@ const S = StyleSheet.create({
   grandHeroValue: {
     fontSize: 18, fontFamily: 'Roboto', fontWeight: 'bold',
     color: YELLOW,
+  },
+  // Phase 34.8 — "Total in Words" line under Grand Total. CLAUDE.md
+  // §18 mandates it on every invoice / quotation PDF.
+  grandHeroWords: {
+    fontSize: 9,
+    fontFamily: 'Roboto',
+    color: DARK,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
 
   // ── Terms ──
@@ -445,6 +457,13 @@ function OtherMediaQuoteDocument({ quote, lines, company }) {
             <Text style={S.grandHeroLabel}>GRAND TOTAL (INR)</Text>
             <Text style={S.grandHeroValue}>{formatCurrency(totalAmount)}</Text>
           </View>
+
+          {/* Phase 34.8 — Total in Words. CLAUDE.md §18 mandates this
+              on every invoice / quotation PDF; Indian lakh/crore
+              numbering via rupeesToWords(). */}
+          <Text style={S.grandHeroWords}>
+            Amount in Words: {rupeesToWords(totalAmount)}
+          </Text>
 
           {/* Terms */}
           <View style={S.termsBox}>
