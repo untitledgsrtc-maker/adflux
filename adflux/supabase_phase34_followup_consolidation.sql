@@ -263,14 +263,18 @@ NOTIFY pgrst, 'reload schema';
 
 -- ─── VERIFY ──────────────────────────────────────────────────────────
 -- Run these in Supabase Studio after the migration. Expected results:
---   1. business_moment_works → true (Saturday rolls to Monday).
+--   1. sunday_rolls_to_monday → true. A Sunday wall-clock input gets
+--      shifted to the next IST day; for any non-off day the function
+--      returns the input unchanged, so we must pick a Sunday to see
+--      it move. Brijesh's business is Mon–Sat (Sundays off only); a
+--      Saturday input is NOT a "business day rolls forward" case.
 --   2. round_robin_returns   → at least one uuid (assuming an active sales user exists).
 --   3. activity_sync_trigger → 1
 --   4. auto_assign_trigger   → 1
 --   5. handoff_trigger       → 1
 SELECT
-  (SELECT public.next_business_moment('2026-05-09 21:00:00+05:30'::timestamptz)
-            > '2026-05-09 21:00:00+05:30'::timestamptz) AS business_moment_works,
+  (SELECT public.next_business_moment('2026-05-10 14:00:00+05:30'::timestamptz)
+            > '2026-05-10 14:00:00+05:30'::timestamptz) AS sunday_rolls_to_monday,
   (SELECT public.assign_lead_round_robin('PRIVATE')) AS round_robin_returns,
   (SELECT count(*) FROM pg_trigger WHERE tgname='trg_lead_activity_sync_followup') AS activity_sync_trigger,
   (SELECT count(*) FROM pg_trigger WHERE tgname='trg_leads_auto_assign') AS auto_assign_trigger,
