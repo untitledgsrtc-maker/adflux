@@ -143,18 +143,19 @@ AS $$
 DECLARE
   v_user uuid;
 BEGIN
+  -- Inline the open-lead count as a correlated subquery so we don't
+  -- introduce a LATERAL-only alias the schema linter can't resolve.
   SELECT u.id INTO v_user
     FROM public.users u
-    LEFT JOIN LATERAL (
-      SELECT count(*)::int AS open_leads
-        FROM public.leads l
-       WHERE l.assigned_to = u.id
-         AND l.stage NOT IN ('Won', 'Lost')
-    ) load ON TRUE
    WHERE u.is_active = true
      AND u.team_role IN ('sales', 'telecaller', 'agency')
      AND (u.segment_access = 'ALL' OR u.segment_access = p_segment OR u.segment_access IS NULL)
-   ORDER BY load.open_leads ASC NULLS FIRST, u.id ASC
+   ORDER BY (
+     SELECT count(*)
+       FROM public.leads l
+      WHERE l.assigned_to = u.id
+        AND l.stage NOT IN ('Won', 'Lost')
+   ) ASC, u.id ASC
    LIMIT 1;
 
   RETURN v_user;
