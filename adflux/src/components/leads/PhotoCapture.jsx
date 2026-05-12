@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { Camera, Loader2, Sparkles, Check } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { resizeImage } from '../../utils/leadDedup'
+import { toastError } from '../v2/Toast'
 
 export default function PhotoCapture({
   leadId,
@@ -83,11 +84,19 @@ export default function PhotoCapture({
       if (res.ok) {
         ocr = await res.json()
         if (photoRow) {
-          await supabase.from('lead_photos').update({
+          // Phase 34b — was unchecked. If RLS or a stale row blocks
+          // the OCR update, the photo stays but the OCR text never
+          // attaches, so the rep sees no extracted fields and can't
+          // tell why. Surface via toast (non-blocking — the photo
+          // upload itself already succeeded).
+          const { error: ocrUpdErr } = await supabase.from('lead_photos').update({
             ocr_text:         ocr.ocr_text || null,
             ocr_fields:       ocr.fields || {},
             is_business_card: !!ocr.is_business_card,
           }).eq('id', photoRow.id)
+          if (ocrUpdErr) {
+            toastError(ocrUpdErr, 'Photo saved, but OCR fields could not be attached.')
+          }
         }
       } else {
         const txt = await res.text()

@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 import { X, Users as UsersIcon, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { toastError } from '../v2/Toast'
 
 export default function ReassignModal({ lead, onClose, onSaved }) {
   const profile = useAuthStore(s => s.profile)
@@ -53,12 +54,18 @@ export default function ReassignModal({ lead, onClose, onSaved }) {
     const note = reason.trim()
       ? `Reassigned to ${targetName}. ${reason.trim()}`
       : `Reassigned to ${targetName}.`
-    await supabase.from('lead_activities').insert([{
+    // Phase 34b — was unchecked. If this insert fails, the lead is
+    // reassigned but the timeline has no record of who/when. Surface
+    // via toast (non-blocking) so the rep can re-add the note.
+    const { error: actErr } = await supabase.from('lead_activities').insert([{
       lead_id:       lead.id,
       activity_type: 'status_change',
       notes:         note,
       created_by:    profile.id,
     }])
+    if (actErr) {
+      toastError(actErr, 'Reassigned, but the timeline note could not be saved.')
+    }
     setSaving(false)
     onSaved?.()
     onClose?.()

@@ -6,6 +6,7 @@ import { X, IndianRupee, Calendar, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { formatCurrency, formatMonthYear } from '../../utils/formatters'
+import { toastError } from '../v2/Toast'
 
 export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, onClose, onSaved }) {
   const { profile } = useAuth()
@@ -59,7 +60,18 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
 
   async function remove(id) {
     if (!confirm('Remove this payout entry?')) return
-    await supabase.from('incentive_payouts').delete().eq('id', id)
+    // Phase 34b — was unchecked. If RLS or the row's already-locked
+    // state blocks the delete, the UI reloaded with the row still
+    // there. Surface the real error so accounts knows the row is
+    // still on the books.
+    const { error } = await supabase
+      .from('incentive_payouts')
+      .delete()
+      .eq('id', id)
+    if (error) {
+      toastError(error, 'Could not remove payout entry.')
+      return
+    }
     await load()
     onSaved?.()
   }

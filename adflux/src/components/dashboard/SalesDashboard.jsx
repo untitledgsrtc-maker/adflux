@@ -15,6 +15,7 @@ import { useIncentive } from '../../hooks/useIncentive'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import { fetchMyPendingPayments } from '../../hooks/usePayments'
 import { RenewalReminderBanner } from './RenewalReminderBanner'
+import { toastError } from '../v2/Toast'
 import { RejectionBanner } from './RejectionBanner'
 import { PendingApprovalsBanner } from './PendingApprovalsBanner'
 
@@ -189,7 +190,19 @@ export function SalesDashboard() {
 
   async function markDone(id, e) {
     e.stopPropagation()
-    await supabase.from('follow_ups').update({ is_done: true, done_at: new Date().toISOString() }).eq('id', id)
+    // Phase 34b — was unchecked + optimistic. If the update failed
+    // (RLS, network, deleted row) the UI removed the row but the
+    // database still considered the follow-up open, so it'd reappear
+    // on next load. Now wait for the response, only remove on
+    // success, and surface failures via toast.
+    const { error } = await supabase
+      .from('follow_ups')
+      .update({ is_done: true, done_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) {
+      toastError(error, 'Could not mark follow-up as done.')
+      return
+    }
     setFollowups(prev => prev.filter(f => f.id !== id))
   }
 

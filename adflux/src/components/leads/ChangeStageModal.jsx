@@ -28,6 +28,7 @@ import {
   LEAD_STAGES, STAGE_LABELS, LOST_REASONS, WON_REASONS,
 } from '../../hooks/useLeads'
 import { StageChip } from './LeadShared'
+import { toastError } from '../v2/Toast'
 
 export default function ChangeStageModal({ lead, onClose, onSaved }) {
   const profile = useAuthStore(s => s.profile)
@@ -143,18 +144,25 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
       return
     }
 
-    // Status_change activity entry
+    // Status_change activity entry.
+    // Phase 34b — was unchecked; if the audit insert failed the lead
+    // stage moved but no activity row existed to prove who/when.
+    // Stage is already changed, so surface the failure via toast
+    // rather than rolling back — the audit gap is the real harm.
     const noteParts = [`Stage → ${STAGE_LABELS[target] || target}`]
     if (lostReason)  noteParts.push(`Lost reason: ${lostReason}`)
     if (wonReason)   noteParts.push(`Win source: ${wonReason}`)
     if (revisitDate) noteParts.push(`Revisit: ${revisitDate}`)
     if (note.trim()) noteParts.push(note.trim())
-    await supabase.from('lead_activities').insert([{
+    const { error: actErr } = await supabase.from('lead_activities').insert([{
       lead_id:       lead.id,
       activity_type: 'status_change',
       notes:         noteParts.join(' · '),
       created_by:    profile.id,
     }])
+    if (actErr) {
+      toastError(actErr, 'Stage changed, but the audit-log entry could not be saved.')
+    }
 
     // Phase 19b — close any open Smart Tasks for this lead. A stage
     // change usually invalidates whatever rule generated them
@@ -162,11 +170,16 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
     // sla_breach is no longer relevant if it left SalesReady; etc.).
     // Tomorrow's regenerate run will create new ones if rules still
     // apply.
-    await supabase
+    // Phase 34b — surface failure via toast; non-fatal since the
+    // task regenerator will reconcile tomorrow.
+    const { error: tasksErr } = await supabase
       .from('lead_tasks')
       .update({ status: 'skipped' })
       .eq('lead_id', lead.id)
       .eq('status', 'open')
+    if (tasksErr) {
+      toastError(tasksErr, 'Stage changed, but open Smart Tasks could not be closed.')
+    }
 
     setSaving(false)
     onSaved?.()
