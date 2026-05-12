@@ -21,6 +21,7 @@ import { PaymentModal } from '../components/payments/PaymentModal'
 import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
+import { toastError } from '../components/v2/Toast'
 import { FollowUpList } from '../components/followups/FollowUpList'
 import { formatCurrency, formatDate, formatDateTime, formatPhone, todayISO } from '../utils/formatters'
 import { STATUS_LABELS } from '../utils/constants'
@@ -265,10 +266,23 @@ export default function QuoteDetail() {
       setPdfLoading(true)
       pdfUrl = await uploadQuotePDF(quote, cities)
     } catch (e) {
+      // Phase 34c — the inner catch on downloadQuotePDF was empty, so
+      // if both upload AND local download failed the user saw
+      // "downloaded locally" while nothing was downloaded — then the
+      // WhatsApp opened with no attachment and they thought the deal
+      // had shipped with a PDF. Surface that double-failure via toast.
       console.warn('PDF upload failed, falling back:', e.message)
-      try { await downloadQuotePDF(quote, cities) } catch {}
-      setStatusMsg('PDF uploaded failed — downloaded locally. Please attach it in WhatsApp.')
-      setTimeout(() => setStatusMsg(''), 4000)
+      let downloadedLocally = false
+      try {
+        await downloadQuotePDF(quote, cities)
+        downloadedLocally = true
+      } catch (dlErr) {
+        toastError(dlErr, 'PDF upload AND local download failed. WhatsApp will open without an attachment.')
+      }
+      if (downloadedLocally) {
+        setStatusMsg('PDF upload failed — downloaded locally. Please attach it in WhatsApp.')
+        setTimeout(() => setStatusMsg(''), 4000)
+      }
     } finally {
       setPdfLoading(false)
     }
