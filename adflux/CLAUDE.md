@@ -18,7 +18,7 @@ Before writing a single line of code or proposing a plan:
 4. `src/styles/v2.css` — `.v2`-scoped tokens used inside V2AppShell pages.
 5. `AUDIT_2026_05_05.md` — current state of the codebase.
 6. `PHASE1_DESIGN.md` — module-level plan for the active phase.
-7. `_design_reference/dashboard_mockup.html` — owner-approved visual reference.
+7. `_design_reference/Leads/Adflux Dashboard.html` — owner-approved visual reference. (Older `_design_reference/dashboard_mockup.html` no longer exists; canonical mockups now live under `_design_reference/Leads/`.)
 8. The owner's auto-memory files at `~/Library/Application Support/Claude/local-agent-mode-sessions/.../memory/MEMORY.md`.
 
 If a token in `UI_DESIGN_SYSTEM.md` disagrees with `tokens.css` / `v2.css`, **the CSS file wins** — flag the doc drift but follow the live token. (Example: doc says brand yellow `#facc15`; live token is `#FFE600`. Use `#FFE600`.)

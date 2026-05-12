@@ -107,26 +107,3 @@ export function isIncrementEligible(streak) {
   return streak >= 6
 }
 
-/**
- * What-If simulator helper — returns incentive for a range of revenue values
- *
- * @param {Object} profile  staff_incentive_profiles row
- * @param {number} steps    number of data points to generate
- * @returns {Array} [{ revenue, incentive }]
- */
-export function generateWhatIfData(profile, steps = 20) {
-  const target = profile.monthly_salary * profile.sales_multiplier
-  const maxRevenue = target * 1.5
-
-  const result = []
-  for (let i = 0; i <= steps; i++) {
-    const revenue = (maxRevenue / steps) * i
-    const { incentive } = calculateIncentive({
-      ...profile,
-      newClientRevenue: revenue,
-      renewalRevenue: 0,
-    })
-    result.push({ revenue, incentive })
-  }
-  return result
-}

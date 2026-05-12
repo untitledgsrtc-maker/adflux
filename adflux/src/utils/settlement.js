@@ -111,13 +111,3 @@ function monthKey(d) {
   return s.slice(0, 7)
 }
 
-/**
- * Convenience: does this settledMonth fall inside the period window?
- * period.startIso / period.endIso are half-open ['start', 'end').
- */
-export function isSettledInPeriod(settlement, period) {
-  if (!settlement || !period) return false
-  const at = settlement.settledAt
-  if (!at) return false
-  return at >= period.startIso && at < period.endIso
-}

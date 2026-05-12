@@ -24,7 +24,7 @@ import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
 import { FollowUpList } from '../components/followups/FollowUpList'
-import { formatCurrency, formatDate, formatDateTime, formatPhone, todayISO } from '../utils/formatters'
+import { formatCurrency, formatDate, formatPhone, todayISO } from '../utils/formatters'
 import { STATUS_LABELS } from '../utils/constants'
 
 function getAllowedTransitions(quote, hasFinalPayment) {

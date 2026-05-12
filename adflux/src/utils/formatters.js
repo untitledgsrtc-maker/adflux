@@ -67,12 +67,6 @@ export function formatDate(date) {
   return format(d, 'dd MMM yyyy')
 }
 
-export function formatDateTime(date) {
-  if (!date) return '—'
-  const d = typeof date === 'string' ? parseISO(date) : date
-  return format(d, 'dd MMM yyyy, h:mm a')
-}
-
 export function formatRelative(date) {
   if (!date) return '—'
   const d = typeof date === 'string' ? parseISO(date) : date
@@ -84,11 +78,6 @@ export function formatMonthYear(monthYear) {
   const [year, month] = monthYear.split('-')
   const d = new Date(parseInt(year), parseInt(month) - 1, 1)
   return format(d, 'MMM yyyy')
-}
-
-export function toMonthYear(date) {
-  const d = date ? (typeof date === 'string' ? parseISO(date) : date) : new Date()
-  return format(d, 'yyyy-MM')
 }
 
 // ─── Numbers ─────────────────────────────────────────────────────

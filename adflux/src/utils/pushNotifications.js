@@ -168,13 +168,3 @@ export async function sendPushToRep({ userId, title, body, url, tag, requireInte
   }
 }
 
-export async function unsubscribeFromPush(userId) {
-  if (!userId) return
-  const reg = await navigator.serviceWorker?.ready
-  const sub = await reg?.pushManager?.getSubscription()
-  if (sub) {
-    await supabase.from('push_subscriptions')
-      .delete().eq('endpoint', sub.endpoint)
-    await sub.unsubscribe()
-  }
-}
