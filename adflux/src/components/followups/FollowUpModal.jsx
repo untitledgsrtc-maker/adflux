@@ -127,7 +127,14 @@ export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onResche
               className="btn btn-y"
               onClick={handleMarkDone}
               disabled={saving}
-              style={{ background: '#81c784', color: '#0a0e1a' }}
+              // Phase 34f — was hardcoded #81c784 (off-token success
+              // green) + #0a0e1a (legacy sidebar dark). Switched to
+              // the live tokens so the button matches the rest of v2
+              // and tracks any future theme change.
+              style={{
+                background: 'var(--success, #10B981)',
+                color: 'var(--accent-fg, #0f172a)',
+              }}
             >
               {saving ? 'Saving…' : '✓ Mark Done'}
             </button>

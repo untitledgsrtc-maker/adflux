@@ -1674,7 +1674,9 @@ export default function GovtProposalDetailV2() {
                 disabled={!hasLetterhead}
                 onChange={e => toggleLetterhead(e.target.checked)}
                 style={{
-                  accentColor: '#facc15',
+                  // Phase 34f — was off-brand #facc15. Live brand
+                  // yellow is #FFE600 per tokens.css.
+                  accentColor: 'var(--v2-yellow, #FFE600)',
                   cursor: hasLetterhead ? 'pointer' : 'not-allowed',
                 }}
               />
