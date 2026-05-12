@@ -32,14 +32,11 @@ import {
   uploadAttachment, getSignedUrl, fetchAsMergeInput,
   buildCombinedPdf, downloadPdfBlob, generateLockedProposalPdf,
 } from '../../utils/proposalPdf'
+import { STATUS_COLOR_VARS as STATUS_COLORS } from '../../utils/constants'
 
-const STATUS_COLORS = {
-  draft:        'var(--text-muted)',
-  sent:         'var(--blue)',
-  negotiating:  'var(--warning)',
-  won:          'var(--success)',
-  lost:         'var(--danger)',
-}
+// Phase 34g — STATUS_COLORS used to be a local copy of the same
+// token map. Now imported from utils/constants.js so QuoteDetail +
+// GovtProposalDetailV2 + SalesDashboard share one source.
 
 export default function GovtProposalDetailV2() {
   const { id } = useParams()

@@ -17,6 +17,19 @@ export const STATUS_COLORS = {
   lost: 'badge-lost',
 }
 
+// Phase 34g — inline-style colors for quote status chips, dots and
+// inline badges. Use these instead of hardcoding Material Design hex
+// values (#81c784, #ef9a9a, etc.) which were drifting from the brand
+// palette in QuoteDetail.jsx and SalesDashboard.jsx. Falls back to
+// safe defaults if a future status string isn't yet mapped here.
+export const STATUS_COLOR_VARS = {
+  draft:       'var(--text-muted, #94a3b8)',
+  sent:        'var(--blue, #3B82F6)',
+  negotiating: 'var(--warning, #F59E0B)',
+  won:         'var(--success, #10B981)',
+  lost:        'var(--danger, #EF4444)',
+}
+
 // City grades
 export const GRADES = ['A', 'B', 'C']
 

@@ -22,6 +22,7 @@ import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
+import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
 import { FollowUpList } from '../components/followups/FollowUpList'
 import { formatCurrency, formatDate, formatDateTime, formatPhone, todayISO } from '../utils/formatters'
 import { STATUS_LABELS } from '../utils/constants'
@@ -53,13 +54,10 @@ const TABS = [
   { key: 'followups', label: 'Follow-ups' },
 ]
 
-const STATUS_COLORS = {
-  draft: 'var(--gray)',
-  sent: '#64b5f6',
-  negotiating: '#ffb74d',
-  won: '#81c784',
-  lost: '#ef9a9a',
-}
+// Phase 34g — was a local hex-table (#64b5f6, #ffb74d, #81c784,
+// #ef9a9a — off-brand Material Design palette). Switched to the
+// single shared map STATUS_COLOR_VARS in utils/constants.js so brand
+// changes propagate automatically. Import is at the top of the file.
 
 export default function QuoteDetail() {
   const { id } = useParams()

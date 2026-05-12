@@ -16,6 +16,7 @@ import { calculateIncentive } from '../../utils/incentiveCalc'
 import { fetchMyPendingPayments } from '../../hooks/usePayments'
 import { RenewalReminderBanner } from './RenewalReminderBanner'
 import { toastError } from '../v2/Toast'
+import { STATUS_COLOR_VARS } from '../../utils/constants'
 import { RejectionBanner } from './RejectionBanner'
 import { PendingApprovalsBanner } from './PendingApprovalsBanner'
 
@@ -219,7 +220,11 @@ export function SalesDashboard() {
       : inRange(((q.updated_at || q.created_at || '')).slice(0, 10), range.from, range.to))
     .reduce((s, q) => s + (q.total_amount || 0), 0)
 
-  const STATUS_COLOR = { won: '#81c784', lost: '#ef9a9a', sent: '#64b5f6', negotiating: '#ffb74d', draft: '#888' }
+  // Phase 34g — was a local off-brand Material palette
+  // ({ won: '#81c784', lost: '#ef9a9a', sent: '#64b5f6',
+  //   negotiating: '#ffb74d', draft: '#888' }). Now reads from the
+  // shared utils/constants.js map so the dashboard tracks tokens.css.
+  const STATUS_COLOR = STATUS_COLOR_VARS
 
   // Per-quote potential incentive — only meaningful once slab is reached,
   // so we show marginal rate × subtotal as a rough-guide badge.
