@@ -120,7 +120,9 @@ export async function geocodeAddress(address) {
 
 /**
  * Build a single address string from lead fields. Caller passes a
- * lead row; we assemble city + address + country for Nominatim.
+ * lead row; we assemble whatever address signal exists + country for
+ * Nominatim. Current leads schema only has `city` (no `address`
+ * column) — when that lands later, prefer it over city.
  */
 export function leadAddressLine(lead) {
   if (!lead) return ''

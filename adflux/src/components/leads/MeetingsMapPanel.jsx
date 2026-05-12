@@ -77,10 +77,12 @@ export default function MeetingsMapPanel({ userId }) {
           return
         }
 
-        // Pull lead rows + their geo.
+        // Pull lead rows + their geo. Note: `address` is not a column
+        // on the current leads schema — we keep the select to `city`
+        // only. If a future migration adds `address`, restore here.
         const { data: leadRows, error: lErr } = await supabase
           .from('leads')
-          .select('id, name, company, city, address, lat, lng, stage')
+          .select('id, name, company, city, lat, lng, stage')
           .in('id', leadIds)
         if (lErr) throw lErr
 

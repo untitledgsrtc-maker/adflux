@@ -45,23 +45,20 @@ CREATE INDEX IF NOT EXISTS idx_leads_geocoded_at_null
 
 -- ─── 2. View: leads that still need geocoding ────────────────────────
 -- Returns id + addressable text the frontend can feed Nominatim.
--- We limit to leads with at least a city OR an address so we don't
--- waste API calls on rows with no signal.
+-- The current leads schema does NOT have an `address` column — only
+-- `city`. We filter to leads with at least a city so we don't waste
+-- API calls on rows with no signal.
 CREATE OR REPLACE VIEW public.leads_needing_geocode AS
 SELECT
   l.id,
   l.name,
   l.company,
   l.city,
-  l.address,
   l.assigned_to
 FROM public.leads l
 WHERE l.lat IS NULL
   AND l.lng IS NULL
-  AND (
-    NULLIF(TRIM(l.city),    '') IS NOT NULL
-    OR NULLIF(TRIM(l.address), '') IS NOT NULL
-  )
+  AND NULLIF(TRIM(l.city), '') IS NOT NULL
   AND l.stage NOT IN ('Lost')
 ;
 
