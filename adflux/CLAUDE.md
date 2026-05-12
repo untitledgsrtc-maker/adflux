@@ -513,6 +513,23 @@ import { STATUS_COLOR_VARS } from '../utils/constants'
 8. Wire `numberToWords.js::rupeesToWords` into `QuotePDF` + `OtherMediaQuotePDF` — CLAUDE.md §18 mandates "Total in Words" on every PDF; helper exists, no call site. Real bug.
 9. Split `src/utils/formatters.js` — code-review-graph flagged it as god-utility with 247 edges from `leads-handle` community (top coupling warning in arch overview). Deferred from Sprint D because risk:value bad without test coverage. Decompose into `formatters/currency.js` + `formatters/date.js` + `formatters/string.js` once tests exist or pair with a smoke-test session.
 
+### Sprint F (2026-05-13) — sales-module gap closure
+
+Closes 5 of 7 buildable items from the May 13 sales UX audit:
+
+- **Item 9 — phone-first dedup in LogMeetingModal** (`4359922`). Debounced 600 ms phone lookup surfaces the match inline before the rep types company/contact.
+- **Item 10 — soften auto-Lost on 3 attempts** (`4359922`, SQL `supabase_phase34b_soft_auto_lost.sql`). Trigger now sets `leads.auto_lost_suggested = true` instead of flipping `stage='Lost'`. LeadDetailV2 surfaces a banner with [Mark Lost] / [Dismiss] buttons. Dismiss calls new RPC `dismiss_auto_lost_suggestion(uuid)`.
+- **Item 2 — "Coming up" preview card on /work** (`4359922`). New `UpcomingTasksCard.jsx` shows Tomorrow + Next 7 days follow-up counts.
+- **Item 3 — "Copy from your last quote" button** (`4359922`). Private LED WizardShell pre-fills client + cities from rep's most recent non-Lost LED quote.
+- **Item 8 — Incentive forecaster on QuoteDetail** (`4359922`). `IncentiveForecastCard.jsx` runs `calculateIncentive` twice (before / after closing this quote) and shows delta + slab-crossing chips.
+
+#### Items NOT shipped this sprint + why
+
+- **Item 1 — CallKit auto-log on hang-up.** Requires iOS native bridge. Current app is React + Vite + Vercel PWA — no Capacitor/Cordova wrapper. Estimated 2-3 weeks to set up a native iOS shell with CallKit observers. Track as separate effort.
+- **Item 4 — Offline cache (PWA service worker for /work + /leads).** `public/sw.js` exists for push notifications only. Proper offline cache needs `vite-plugin-pwa` + Workbox + versioning strategy. Estimated 3-5 days including testing on real flaky network. Track as separate sprint; pair with a smoke-test session.
+- **Item 5 — Map view + route optimizer on /work.** `leaflet` already in node_modules (used by `GpsTrackV2.jsx`). But `leads` table has no `lat`/`lng` columns and `cities` master has no coordinates, so plotting "where to go today" needs either (a) geocoding addresses via Nominatim/Google or (b) adding lat/lng to leads. Until that prerequisite lands, only "where you've been today" (gps_pings overlay) is buildable — half the feature. Track as Sprint G; decide geocoding strategy first.
+- **Item 6 — Govt invoice template (post-WON automation).** Sprint 4 of the original plan. Needs TDS columns on `payments` (2% income + 2% GST) + a new renderer mirroring `OtherMediaQuotePDF` layout for govt segment. Don't sneak into Sprint F.
+
 ### Graph integration (added 2026-05-13)
 
 `code-review-graph` MCP installed at workspace root. Use it instead of ad-hoc grep for any dead-code / refactor / impact-radius work — the AST graph catches what basename grep misses, but be aware it ALSO under-reports (e.g. flagged `rupeesToWords` as dead while CLAUDE.md §18 mandates it). Cross-check with grep before any deletion.
