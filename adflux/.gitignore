@@ -7,3 +7,7 @@ dist
 *.log
 .vscode
 .idea
+
+# Phase 34.5 — Supabase CLI local cache. Generated per-machine and
+# contains the linked project ref + version pins; never commit.
+supabase/.temp/
