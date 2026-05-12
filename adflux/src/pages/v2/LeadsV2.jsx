@@ -38,6 +38,8 @@ import { formatCurrency, formatRelative } from '../../utils/formatters'
 import {
   StageChip, HeatDot, SegChip, LeadAvatar,
 } from '../../components/leads/LeadShared'
+import { toastError } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 
 /* The 5 tabs from the design — All + 4 groups. We re-use the
    underlying STAGE_GROUPS from useLeads but drop "in_progress"
@@ -800,9 +802,16 @@ export default function LeadsV2() {
               const stage = e.target.value
               e.target.value = ''
               if (!stage) return
-              if (!confirm(`Move ${selected.size} lead${selected.size === 1 ? '' : 's'} to ${stage}?`)) return
+              // Phase 34e — replaced browser confirm() with inline
+              // dialog so the look matches the rest of the app.
+              const ok = await confirmDialog({
+                title: 'Move stage?',
+                message: `Move ${selected.size} lead${selected.size === 1 ? '' : 's'} to ${stage}?`,
+                confirmLabel: 'Move',
+              })
+              if (!ok) return
               const { error: err } = await stageBulk(Array.from(selected), stage)
-              if (err) { alert('Bulk stage change failed: ' + err.message); return }
+              if (err) { toastError(err, 'Bulk stage change failed.'); return }
               setSelected(new Set())
             }}
           >
@@ -819,9 +828,17 @@ export default function LeadsV2() {
             className="lead-btn lead-btn-sm"
             style={{ borderColor: 'var(--red, #EF4444)', color: 'var(--red, #EF4444)' }}
             onClick={async () => {
-              if (!confirm(`DELETE ${selected.size} lead${selected.size === 1 ? '' : 's'} permanently? This cannot be undone.`)) return
+              // Phase 34e — replaced browser confirm() + alert() with
+              // inline dialog + toast.
+              const ok = await confirmDialog({
+                title: 'Delete leads?',
+                message: `Delete ${selected.size} lead${selected.size === 1 ? '' : 's'} permanently? This cannot be undone.`,
+                confirmLabel: 'Delete',
+                danger: true,
+              })
+              if (!ok) return
               const { error: err } = await deleteBulk(Array.from(selected))
-              if (err) { alert('Bulk delete failed: ' + err.message); return }
+              if (err) { toastError(err, 'Bulk delete failed.'); return }
               setSelected(new Set())
             }}
           >

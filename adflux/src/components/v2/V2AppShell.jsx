@@ -32,6 +32,7 @@ import GlobalSearchBar from './GlobalSearchBar'
 import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
 import { ToastViewport } from './Toast'
+import { ConfirmDialogViewport } from './ConfirmDialog'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -558,6 +559,11 @@ export function V2AppShell() {
           root so any page, modal or store can call pushToast() and have
           it render in the bottom-right corner. */}
       <ToastViewport />
+
+      {/* Phase 34e — promise-based confirm dialog. Replaces browser
+          confirm() for destructive operations so the look matches the
+          rest of v2. */}
+      <ConfirmDialogViewport />
     </div>
   )
 }
