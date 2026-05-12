@@ -40,6 +40,7 @@ import {
 } from '../../components/leads/LeadShared'
 import { toastError } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { DidYouKnow } from '../../components/v2/DidYouKnow'
 
 /* The 5 tabs from the design — All + 4 groups. We re-use the
    underlying STAGE_GROUPS from useLeads but drop "in_progress"
@@ -259,6 +260,13 @@ export default function LeadsV2() {
 
   return (
     <div className="lead-root">
+      {/* Phase 34.9 discoverability — surface Co-Pilot to reps who
+          live on /leads but never tried Cmd+K. Dismisses to localStorage. */}
+      <DidYouKnow id="leads-copilot-cmdk-2026-05-13" title="Press Cmd+K to ask anything">
+        Try "show hot leads I haven't called this week" or "Sondarva's pipeline this month".
+        Co-Pilot answers in plain English.
+      </DidYouKnow>
+
       {/* Phase 33F (C2) — dropped the "Your pipeline" eyebrow above
           the "My Leads" title. Redundant filler that pushed content
           down. */}

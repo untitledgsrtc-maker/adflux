@@ -26,6 +26,7 @@ import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
+import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 // Phase 31O — ProposedIncentiveCard import removed; the V2AppShell
 // now mounts it once at the top of every sales page, so /work
@@ -628,6 +629,13 @@ export default function WorkV2() {
   return (
     <div className="lead-root">
       <div className="m-screen">
+        {/* Phase 34.9 discoverability — surface a tip rep didn't know
+            existed. Dismisses to localStorage, never re-appears. */}
+        <DidYouKnow id="work-voice-plan-2026-05-13" title="Speak your day plan">
+          Tap the mic above and say what's on today. AI breaks it into tasks.
+          Saves 3-5 minutes vs typing each one.
+        </DidYouKnow>
+
         {/* Greet header — design: avatar on Plan, "● live" pill on Active,
             Day done greeting on D_DONE. */}
         <div className="m-greet">

@@ -45,6 +45,7 @@ import ChangeStageModal from '../../components/leads/ChangeStageModal'
 import ReassignModal   from '../../components/leads/ReassignModal'
 import PhotoCapture     from '../../components/leads/PhotoCapture'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
+import { DidYouKnow } from '../../components/v2/DidYouKnow'
 
 const ACTIVITY_ICON = {
   call:          Phone,
@@ -441,6 +442,13 @@ export default function LeadDetailV2() {
         <ArrowLeft size={12} />
         <span>Back to leads</span>
       </div>
+
+      {/* Phase 34.9 discoverability — surface the mic-in-notes feature
+          that most reps never discovered. Dismisses to localStorage. */}
+      <DidYouKnow id="leaddetail-mic-in-notes-2026-05-13" title="Use the mic inside notes">
+        When you open Log Activity, the notes field has a mic button.
+        Speak up to 60 seconds in Gujarati / Hindi / English — AI transcribes.
+      </DidYouKnow>
 
       {/* Phase 33D.6 — stale-lead banner. Shown when no contact in 30+ days. */}
       {isStale && (
