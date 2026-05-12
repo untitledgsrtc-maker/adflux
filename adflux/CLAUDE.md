@@ -505,8 +505,22 @@ import { STATUS_COLOR_VARS } from '../utils/constants'
 
 1. `--tint-*` tokens in `tokens.css` + `v2.css`, then sweep CockpitWidgets and any other chip-tint sites.
 2. MasterV2 brand cleanup (owner-scheduled commit).
-3. `_phase-b-backup-2026-05-01/` removal (owner approval).
+3. ~~`_phase-b-backup-2026-05-01/` removal~~ — DONE Phase 34.5 follow-up (`rm -rf`, was untracked, 180 KB reclaimed).
 4. Optional: squash Phase 4 (a–f) into one foundation file for fresh installs.
 5. Sprint 3 of the original plan: P&L module port.
 6. Sprint 4: receipts/TDS upgrade for govt deals.
 7. Govt invoice template (post-WON automation).
+8. Wire `numberToWords.js::rupeesToWords` into `QuotePDF` + `OtherMediaQuotePDF` — CLAUDE.md §18 mandates "Total in Words" on every PDF; helper exists, no call site. Real bug.
+9. Split `src/utils/formatters.js` — code-review-graph flagged it as god-utility with 247 edges from `leads-handle` community (top coupling warning in arch overview). Deferred from Sprint D because risk:value bad without test coverage. Decompose into `formatters/currency.js` + `formatters/date.js` + `formatters/string.js` once tests exist or pair with a smoke-test session.
+
+### Graph integration (added 2026-05-13)
+
+`code-review-graph` MCP installed at workspace root. Use it instead of ad-hoc grep for any dead-code / refactor / impact-radius work — the AST graph catches what basename grep misses, but be aware it ALSO under-reports (e.g. flagged `rupeesToWords` as dead while CLAUDE.md §18 mandates it). Cross-check with grep before any deletion.
+
+Useful invocations:
+- `refactor_tool mode=dead_code file_pattern=Untitled/adflux/src` — full dead-symbol list.
+- `query_graph pattern=callers_of target=<funcName>` — verify before deleting.
+- `get_architecture_overview_tool` — community structure + coupling warnings.
+- `get_impact_radius_tool` — blast-radius of a planned change.
+
+Graph DB at `~/Documents/untitled-os2/.code-review-graph/` (gitignored). Rebuilt automatically via the PostToolUse hook in `~/Documents/untitled-os2/.claude/settings.json`.
