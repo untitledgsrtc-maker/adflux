@@ -147,15 +147,31 @@ export default function GpsTrackV2() {
   // Raw km is exposed in the stats object too so the rep-day page
   // can show "filtered 215 km · raw 1,303 km" if needed for audit.
   const stats = useMemo(() => {
-    const MIN_SEG_KM     = 0.03       // 30 m — drift floor
+    const MIN_SEG_KM       = 0.03       // 30 m — drift floor
     const MAX_SEG_KM_PER_S = 200 / 3600  // 200 km/h ceiling
-    const MAX_DAILY_KM   = 600
-    const MAX_ACC_M      = 100
+    const MAX_DAILY_KM     = 600
+    const MAX_ACC_M        = 100
 
-    const usable = pings.filter((p) => {
+    // Phase 34U — Phase 34I dropped ALL pings whose accuracy_m > 100
+    // before summing distance. On Kevian's 13 May track every single
+    // ping came in with poor accuracy (rep had patchy signal — 28
+    // pings recorded, ALL above the 100 m threshold), so the filter
+    // erased the whole day and the page showed 0 km. The map still
+    // renders the polyline from `pings` directly so the rep's path
+    // was visible, but the headline km number stayed zero.
+    //
+    // Soften the rule: if more than half of today's pings would be
+    // dropped by the accuracy filter, fall back to using ALL pings
+    // (raw quality). User still sees the segment-min and speed
+    // ceiling filters which guard against the worst spikes; the raw
+    // banner shown beneath the headline indicates the looser path.
+    const usableStrict = pings.filter((p) => {
       const acc = Number(p.accuracy_m)
       return !Number.isFinite(acc) || acc <= MAX_ACC_M
     })
+    const tooMuchDropped = pings.length > 0
+      && usableStrict.length < Math.floor(pings.length * 0.5)
+    const usable = tooMuchDropped ? pings.slice() : usableStrict
 
     let kmRaw = 0
     let kmKept = 0

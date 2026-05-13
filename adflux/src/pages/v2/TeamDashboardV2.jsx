@@ -41,6 +41,11 @@ export default function TeamDashboardV2() {
   // since Phase 20 — placeholder copy was just stale. Wire actual
   // counts the same way callsByUser is wired.
   const [voiceByUser, setVoiceByUser] = useState({})
+  // Phase 34U — latest GPS ping per rep (today only). Used to show
+  // "📍 last seen N min ago" on each rep card instead of just the
+  // static profile city. Owner reported the static city read as
+  // "live location not fetched in dashboard".
+  const [latestPingByUser, setLatestPingByUser] = useState({})
   const [newLeadsToday, setNewLeadsToday] = useState(0)
   const [pipelineToday, setPipelineToday] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -53,7 +58,7 @@ export default function TeamDashboardV2() {
       const today = new Date().toISOString().slice(0, 10)
       const startOfDay = `${today}T00:00:00`
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -85,6 +90,14 @@ export default function TeamDashboardV2() {
         supabase.from('voice_logs')
           .select('user_id')
           .gte('created_at', startOfDay),
+        // Phase 34U — pull every GPS ping captured today; we'll pick
+        // the latest per user client-side. Cheaper than N round-trips
+        // (one per rep), and the per-day per-rep set is small (10-h
+        // shift × 1 ping / 5 min = ~120 rows / rep max).
+        supabase.from('gps_pings')
+          .select('user_id, lat, lng, captured_at, accuracy_m')
+          .gte('captured_at', startOfDay)
+          .order('captured_at', { ascending: false }),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
@@ -105,6 +118,14 @@ export default function TeamDashboardV2() {
         voiceMap[r.user_id] = (voiceMap[r.user_id] || 0) + 1
       })
       setVoiceByUser(voiceMap)
+      // Phase 34U — pick the latest ping per rep (rows already
+      // ordered desc by captured_at, so the FIRST ping seen wins).
+      const pingMap = {}
+      ;(pingsRes.data || []).forEach((p) => {
+        if (!p.user_id) return
+        if (!pingMap[p.user_id]) pingMap[p.user_id] = p
+      })
+      setLatestPingByUser(pingMap)
       setNewLeadsToday(newLeadsRes.count || 0)
       setPipelineToday((pipelineRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0))
       setLoading(false)
@@ -271,7 +292,30 @@ export default function TeamDashboardV2() {
               </div>
               <div className="lead-rep-foot">
                 <MapPin size={11} />
-                <span>{r.city || '—'}</span>
+                {/* Phase 34U — live GPS readout. Falls back to the
+                    static profile city when no ping was captured
+                    today. */}
+                <span>
+                  {(() => {
+                    const ping = latestPingByUser[r.id]
+                    if (!ping) return r.city || '—'
+                    const minsAgo = Math.max(0, Math.floor((Date.now() - new Date(ping.captured_at).getTime()) / 60000))
+                    const fresh = minsAgo <= 10
+                    const ago = minsAgo < 1
+                      ? 'just now'
+                      : minsAgo < 60
+                        ? `${minsAgo} min ago`
+                        : `${Math.floor(minsAgo / 60)}h ago`
+                    return (
+                      <>
+                        <span style={{ color: fresh ? 'var(--success, #10B981)' : 'var(--text-muted, #94a3b8)' }}>
+                          {fresh ? '● live' : '○'} {ago}
+                        </span>
+                        {r.city && <span style={{ color: 'var(--text-subtle, #64748b)', marginLeft: 6 }}>· {r.city}</span>}
+                      </>
+                    )
+                  })()}
+                </span>
                 <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                   {counters.new_leads ? <>Leads today: <b>{counters.new_leads}</b></> : null}
                   {/* Phase 31Z — owner couldn't find the GPS map view
