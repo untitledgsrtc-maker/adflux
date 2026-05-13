@@ -584,10 +584,19 @@ export function V2AppShell() {
   )
 }
 
-function greetingFor(profile) {
+// Phase 34Z.1 (13 May 2026) — owner asked for an emoji with the
+// greeting on mobile so the top of the page feels alive instead of
+// flat-text-pretending-to-be-a-greeting. Picked weather-style icons
+// (sun / partly-cloudy / moon) for the three time bands so the icon
+// reinforces the time of day without being childish.
+// Phase 34Z.1 — exported so WorkV2 (which renders its own greeting
+// inside the page body, not via the topbar) uses the SAME emoji
+// variant. Previously WorkV2 hardcoded 'Good morning, ' so the page
+// greeting drifted from the topbar greeting.
+export function greetingFor(profile) {
   const first = (profile?.name || '').split(' ')[0] || 'there'
   const h = new Date().getHours()
-  if (h < 12) return `Good morning, ${first}`
-  if (h < 17) return `Good afternoon, ${first}`
-  return `Good evening, ${first}`
+  if (h < 12) return `Good morning, ${first} ☀️`
+  if (h < 17) return `Good afternoon, ${first} ⛅`
+  return `Good evening, ${first} 🌙`
 }

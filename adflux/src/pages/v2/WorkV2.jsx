@@ -30,6 +30,10 @@ import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import V2Hero from '../../components/v2/V2Hero'
+// Phase 34Z.1 (13 May 2026) — pull the shared `greetingFor` so the
+// page-body greeting uses the same "morning ☀️ / afternoon ⛅ /
+// evening 🌙" emoji variant as the topbar.
+import { greetingFor as sharedGreetingFor } from '../../components/v2/V2AppShell'
 // Phase 34S — RingMilestoneRow import removed; only TaPayoutsAdminV2
 // still uses it. WorkV2 now relies on V2Hero alone for daily counters.
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
@@ -507,13 +511,24 @@ export default function WorkV2() {
       ...(session.daily_counters || {}),
       meetings: Math.max(0, (session.daily_counters?.meetings || 0) + (nowDone ? 1 : -1)),
     }
+    // Phase 34Z.1 (13 May 2026) — owner reported "swipe done refresh
+    // not working": after tapping Done the row stayed visible until
+    // the server roundtrip + load() completed (~1-2 s). Reps thought
+    // the action hadn't fired and tapped again, creating ghost
+    // double-toggles. Optimistic update flips the UI immediately;
+    // server reconciliation via load() catches up.
+    setSession(prev => prev ? { ...prev, planned_meetings: next, daily_counters: nextCounters } : prev)
     const { error: err } = await supabase
       .from('work_sessions')
       .update({ planned_meetings: next, daily_counters: nextCounters })
       .eq('user_id', profile.id)
       .eq('work_date', TODAY())
     setBusy(false)
-    if (err) { setError(err.message); return }
+    if (err) {
+      // Roll back the optimistic flip if the server rejected the write.
+      setSession(prev => prev ? { ...prev, planned_meetings: session.planned_meetings, daily_counters: session.daily_counters } : prev)
+      setError(err.message); return
+    }
     load()
   }
 
@@ -668,7 +683,10 @@ export default function WorkV2() {
             <div className="hello">
               {stateName === 'D_DONE' ? 'Day done.' :
                stateName === 'B_ACTIVE' ? 'Day in progress' :
-               'Good morning, ' + (profile?.name?.split(' ')[0] || '')}
+               /* Phase 34Z.1 — was hardcoded "Good morning, {first}",
+                  which never matched the topbar greeting after dark.
+                  Shared util now handles the time band + emoji. */
+               sharedGreetingFor(profile)}
             </div>
             <div className="date">{niceDate}{session?.check_in_at ? ` · checked in ${formatTime(session.check_in_at)}` : ''}</div>
           </div>
@@ -708,17 +726,31 @@ export default function WorkV2() {
             single "Start My Day" CTA. Reps who want to type/dictate a
             plan first can expand the "Add plan (optional)" section.
             Default flow: tap one button → plan submitted empty → GPS
-            captured → checked in → on Today screen in one tap. */}
+            captured → checked in → on Today screen in one tap.
+
+            Phase 34Z.1 (13 May 2026) — V2Hero added at the top so the
+            morning page has the same teal-gradient + pulsing dot the
+            rest of the app has. Shows today's targets so the rep
+            opens the app and instantly knows the numbers (≥ N
+            meetings, ≥ M calls, ≥ K new leads). */}
         {stateName === 'A_PLAN' && (
-          <button
-            className="m-cta"
-            onClick={startDay}
-            disabled={busy || parsing}
-            style={{ marginBottom: 16, minHeight: 64, fontSize: 18 }}
-          >
-            <Sun size={20} />
-            {(busy || parsing) ? 'Starting…' : 'Start My Day'}
-          </button>
+          <>
+            <V2Hero
+              eyebrow="Today · plan the day"
+              value={`${targets.meetings || 5} meetings`}
+              label="set the bar before you start"
+              chip={`${targets.calls || 0} calls · ${targets.new_leads || 0} new leads`}
+            />
+            <button
+              className="m-cta"
+              onClick={startDay}
+              disabled={busy || parsing}
+              style={{ marginBottom: 16, minHeight: 64, fontSize: 18 }}
+            >
+              <Sun size={20} />
+              {(busy || parsing) ? 'Starting…' : 'Start My Day'}
+            </button>
+          </>
         )}
 
         {/* ─── A_PLAN: morning plan form ─── */}
@@ -729,19 +761,29 @@ export default function WorkV2() {
             reps into skipping the plan. */}
         {stateName === 'A_PLAN' && (
           <div className="m-card" style={{ padding: 0 }}>
+            {/* Phase 34Z.1 — owner audit said the morning plan card
+                "didn't look professional". Reworked header: a single
+                clear heading with subtitle, no double-label, no
+                "Step 1 of 3" pill (the rep only fills one step from
+                this page so the count was confusing). Same data,
+                cleaner top. */}
             <div style={{
-              padding: '12px 16px',
-              fontSize: 13, color: 'var(--text)',
-              fontWeight: 600,
-              borderRadius: 10,
+              padding: '14px 16px 8px',
+              borderBottom: '1px solid var(--border, rgba(255,255,255,0.06))',
             }}>
-              Today's plan — speak it (mic below) or fill in
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontFamily: 'var(--font-display, "Space Grotesk", system-ui, sans-serif)',
+                fontWeight: 700, fontSize: 16, color: 'var(--text)',
+              }}>
+                <Sun size={18} style={{ color: 'var(--accent, #FFE600)' }} />
+                <span>Plan today</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                Speak in Gujarati / Hindi / English, or fill the form below.
+              </div>
             </div>
-            <div style={{ padding: '0 16px 16px' }}>
-            <div className="m-card-title">
-              <span>Today's plan <span className="pill">Step 1 of 3</span></span>
-              <Sun size={16} style={{ color: 'var(--warning)' }} />
-            </div>
+            <div style={{ padding: '14px 16px 16px' }}>
 
             {/* Phase 34O — prominent voice CTA. Tap to speak today's
                 plan; the existing parse-day-plan Edge Function fills
@@ -792,27 +834,32 @@ export default function WorkV2() {
             </div>
 
             <label className="lead-fld-label">Planned meetings</label>
+            {/* Phase 34Z.1 — owner audit: the type=time input at
+                width:80 was unreadable on iPhone (compact UA style
+                clipped the AM/PM to ellipsis "12:30 PM" was actually
+                "12:3…"). Bumped width + padding + font-size so the
+                full time string is visible without zooming. */}
             {plannedMeetings.map((m, i) => (
               <div key={i} className="m-meeting-row">
                 <input
-                  className="lead-inp"
+                  className="lead-inp m-time-inp"
                   type="time"
-                  style={{ width: 80, padding: '6px 8px' }}
+                  style={{ width: 108, padding: '10px 10px', fontSize: 14, fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)' }}
                   value={m.time}
                   onChange={e => setPlannedMeetings(prev => prev.map((x, j) => j === i ? { ...x, time: e.target.value } : x))}
                 />
-                <div className="info" style={{ display: 'grid', gap: 4 }}>
+                <div className="info" style={{ display: 'grid', gap: 6 }}>
                   <input
                     className="lead-inp"
                     placeholder="Client"
-                    style={{ padding: '6px 8px' }}
+                    style={{ padding: '10px 12px', fontSize: 14 }}
                     value={m.client}
                     onChange={e => setPlannedMeetings(prev => prev.map((x, j) => j === i ? { ...x, client: e.target.value } : x))}
                   />
                   <input
                     className="lead-inp"
                     placeholder="Where"
-                    style={{ padding: '6px 8px', fontSize: 12 }}
+                    style={{ padding: '8px 12px', fontSize: 13 }}
                     value={m.location}
                     onChange={e => setPlannedMeetings(prev => prev.map((x, j) => j === i ? { ...x, location: e.target.value } : x))}
                   />
@@ -1003,10 +1050,19 @@ export default function WorkV2() {
                 ring so the rep sees the full daily picture at a glance. */}
             <TodayTasksBreakdown userId={profile.id} navigate={navigate} />
 
-            {/* Phase 33A — 3 giant action buttons. Replace the 5-tile
-                grid below. Vertical stack, 72px tall, icon on top +
-                English label. Meeting = primary (brand accent border);
-                Call + Voice are secondary. */}
+            {/* Phase 33A — 3 giant action buttons (Meeting / Call /
+                Voice). Phase 34Z.1 (13 May 2026) — owner audit dropped
+                Call + Voice on mobile:
+                  • Call just navigated to /leads → /leads already has
+                    a per-lead Call button, so the global Call CTA
+                    duplicated the action and ate a third of the home
+                    screen.
+                  • Voice is reachable from the hamburger menu and the
+                    Speak button inside the morning plan card; the
+                    standalone Voice CTA was a third route that few
+                    reps used.
+                Meeting stays — primary daily action; opens the log
+                modal directly without navigation. */}
             <div className="m-cta-stack">
               <button
                 className="m-cta-big m-cta-primary"
@@ -1014,21 +1070,7 @@ export default function WorkV2() {
                 disabled={busy}
               >
                 <Calendar size={24} strokeWidth={1.8} />
-                <span>Meeting</span>
-              </button>
-              <button
-                className="m-cta-big"
-                onClick={() => navigate('/leads')}
-              >
-                <Phone size={24} strokeWidth={1.8} />
-                <span>Call</span>
-              </button>
-              <button
-                className="m-cta-big"
-                onClick={() => navigate('/voice')}
-              >
-                <Mic size={24} strokeWidth={1.8} />
-                <span>Voice</span>
+                <span>Log Meeting</span>
               </button>
             </div>
 

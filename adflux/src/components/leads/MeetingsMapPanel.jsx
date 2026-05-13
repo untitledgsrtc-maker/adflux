@@ -137,6 +137,23 @@ export default function MeetingsMapPanel({ userId }) {
       }).addTo(mapRef.current)
     }
 
+    // Phase 34Z.1 (13 May 2026) — owner reported the OSM tiles were
+    // never rendering: the map area showed zoom controls + the
+    // attribution strip but no tile imagery. Cause: when the panel
+    // is collapsed at mount the container has height 0; Leaflet
+    // initialises with that size and never requests tiles. After the
+    // user expands the panel the container has a real height but
+    // Leaflet doesn't know, so no tile request fires. The canonical
+    // fix is `invalidateSize()` once the container is visible. Two
+    // ticks (microtask + ~80 ms) covers both the first render and
+    // any CSS transition timing.
+    requestAnimationFrame(() => {
+      try { mapRef.current?.invalidateSize() } catch { /* ignore */ }
+    })
+    setTimeout(() => {
+      try { mapRef.current?.invalidateSize() } catch { /* ignore */ }
+    }, 80)
+
     // Clear existing markers
     markersRef.current.forEach((m) => m.remove())
     markersRef.current = []

@@ -47,6 +47,22 @@ body {
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: inherit; }
 
+/* Phase 34Z.1 (13 May 2026) — owner reported having to tap action
+   buttons twice on iPhone before they fired. Root cause: mobile
+   Safari adds a 300 ms tap delay on elements that look "scrollable"
+   plus a click vs touch race when no touch-action is declared.
+   `manipulation` disables double-tap-to-zoom on the element (we
+   don't want that gesture inside the app anyway) and removes the
+   delay so the first tap fires immediately. -webkit-tap-highlight
+   color clears the grey flash iOS adds on every tap; we have our
+   own active states. */
+button,
+[role="button"],
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* =====================================================
    APP SHELL LAYOUT
    ===================================================== */
