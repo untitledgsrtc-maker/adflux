@@ -28,10 +28,17 @@ import { supabase } from '../../lib/supabase'
 
 // Same Roboto registration as QuotePDF.jsx — Helvetica's missing ₹
 // glyph is the reason this exists.
+//
+// Phase 34P — register numeric weights AND string aliases. Newer
+// @react-pdf/renderer fails on the implicit `fontWeight: 400` from
+// JSX defaults if only 'normal' is registered. Add both so lookups
+// resolve regardless of weight spelling.
 Font.register({
   family: 'Roboto',
   fonts: [
+    { src: '/fonts/Roboto-Regular.ttf', fontWeight: 400 },
     { src: '/fonts/Roboto-Regular.ttf', fontWeight: 'normal' },
+    { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 700 },
     { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 'bold' },
   ],
 })

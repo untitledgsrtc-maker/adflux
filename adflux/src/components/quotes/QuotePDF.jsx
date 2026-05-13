@@ -26,10 +26,19 @@ import { supabase } from '../../lib/supabase'
 //   Earlier version tried jsDelivr CDN — failed in production because
 //   @react-pdf/renderer's fetch of cross-origin TTFs was blocked /
 //   mis-routed. Local paths are the reliable fix.
+// Phase 34P — register with numeric weights AND string weights.
+// Newer @react-pdf/renderer (v3.4+) resolves `fontWeight: 400` even
+// when the JSX uses the implicit default; the previous registration
+// only had 'normal'/'bold' (treated as 400/700 by older versions
+// but failing with "Could not resolve font for Roboto, fontWeight
+// 400" on the current version). Register both forms so it works
+// regardless of which lookup path @react-pdf takes.
 Font.register({
   family: 'Roboto',
   fonts: [
+    { src: '/fonts/Roboto-Regular.ttf', fontWeight: 400 },
     { src: '/fonts/Roboto-Regular.ttf', fontWeight: 'normal' },
+    { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 700 },
     { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 'bold' },
   ],
 })
