@@ -35,10 +35,23 @@ import {
 } from '@react-pdf/renderer'
 import { formatCurrency } from '../../utils/formatters'
 
+// Phase 34T — @react-pdf's Font registry is GLOBAL. OfferLetterPDF
+// registers `family: 'Roboto'` at module load. When QuotePDF or
+// OtherMediaQuotePDF also load, the LAST register call wins. Until
+// today this file only declared `fontWeight: 'normal'` and
+// `'bold'` — so when @react-pdf 3.4 resolved an implicit
+// `fontWeight: 400` from a quote PDF JSX node, it found no matching
+// font and threw "Could not resolve font for Roboto, fontWeight
+// 400". Phase 34P fixed the two quote renderers; this one was missed
+// and re-broke quote generation in any session that opened
+// /offer/:token first. Register both numeric weights AND string
+// aliases so the order of module load no longer matters.
 Font.register({
   family: 'Roboto',
   fonts: [
+    { src: '/fonts/Roboto-Regular.ttf', fontWeight: 400 },
     { src: '/fonts/Roboto-Regular.ttf', fontWeight: 'normal' },
+    { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 700 },
     { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 'bold' },
   ],
 })
