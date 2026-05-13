@@ -35,8 +35,8 @@ import { PeriodPicker } from '../../components/v2/PeriodPicker'
 // (8 May 2026): stale leads alert, pipeline funnel, win rate / avg
 // deal / projected, recent activity feed.
 import {
-  AiBriefingCard, LeadPipelinePanel, TeamActivityPanel, SlaBreachBanner,
-  StaleLeadsAlertCard, PipelineFunnelCard, WinRateCard, RecentActivityFeedCard,
+  AiBriefingCard, LeadPipelinePanel, TeamActivityPanel,
+  PipelineFunnelCard, WinRateCard, RecentActivityFeedCard,
 } from '../../components/dashboard/CockpitWidgets'
 import '../../styles/v2.css'
 
