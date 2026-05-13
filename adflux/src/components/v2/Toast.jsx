@@ -93,9 +93,16 @@ export function ToastViewport() {
   if (!toasts.length) return null
 
   return (
+    // Phase 34Z (13 May 2026) — `bottom` was 16 px + safe-area only,
+    // which on mobile placed the toast UNDER the .v2d-mnav (mobile
+    // bottom nav, height 64 + safe-area; visible <860 px in v2.css).
+    // Reps never saw the "Lead saved." or "Could not save" messages
+    // on phones. Bumping the bottom offset on mobile to clear the
+    // 64-px nav + safe-area. Desktop stays 16 + safe-area.
     <div
       role="status"
       aria-live="polite"
+      className="v2-toast-viewport"
       style={{
         position: 'fixed',
         right: 16,

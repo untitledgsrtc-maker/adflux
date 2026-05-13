@@ -21,13 +21,19 @@
 //
 // Place near the top of a page (inside the v2 scope) so it sits in
 // the rep's visual field without obstructing the work area.
+//
+// Phase 34Z (13 May 2026) — `desktopOnly` prop. Some tips reference
+// desktop-only mechanics (e.g. "Press Cmd+K…") that confuse mobile
+// reps because there's no keyboard. Pass `desktopOnly` and the tip
+// hides on viewports <860px (matches the v2 mobile breakpoint).
 
 import { useState, useEffect } from 'react'
 import { Lightbulb, X } from 'lucide-react'
 
 const STORAGE_PREFIX = 'dyk:'
+const MOBILE_BREAKPOINT = 860
 
-export function DidYouKnow({ id, title, children }) {
+export function DidYouKnow({ id, title, children, desktopOnly = false }) {
   if (!id) {
     // eslint-disable-next-line no-console
     console.warn('DidYouKnow: missing required `id` prop — tip will not persist dismiss state.')
@@ -36,6 +42,9 @@ export function DidYouKnow({ id, title, children }) {
   // Default to true so SSR / first-render does not flash the tip
   // before localStorage has been checked.
   const [dismissed, setDismissed] = useState(true)
+  // Phase 34Z — track viewport so desktopOnly tips hide on mobile.
+  // Default true (hidden) until we've measured.
+  const [isMobile, setIsMobile] = useState(true)
 
   useEffect(() => {
     if (typeof window === 'undefined' || !id) {
@@ -51,7 +60,26 @@ export function DidYouKnow({ id, title, children }) {
     }
   }, [id])
 
+  // Phase 34Z — listen to viewport. matchMedia is cheap; one listener
+  // per mounted tip is fine (typically 0-1 tips on screen at a time).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !desktopOnly) {
+      setIsMobile(false)
+      return
+    }
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    setIsMobile(mql.matches)
+    const handler = (e) => setIsMobile(e.matches)
+    if (mql.addEventListener) mql.addEventListener('change', handler)
+    else mql.addListener(handler) // Safari < 14 fallback
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', handler)
+      else mql.removeListener(handler)
+    }
+  }, [desktopOnly])
+
   if (dismissed) return null
+  if (desktopOnly && isMobile) return null
 
   function close() {
     if (id) {

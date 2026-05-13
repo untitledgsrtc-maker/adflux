@@ -109,7 +109,14 @@ export default function GlobalSearchBar() {
   }
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', minWidth: 220, maxWidth: 320 }}>
+    // Phase 34Z (13 May 2026) — wrap div gets `v2d-search-wrap` so the
+    // mobile breakpoint can collapse the ENTIRE pill on phones. Before
+    // this fix, the inner `.v2d-search` was display:none at ≤860px,
+    // but the outer wrap kept `minWidth: 220` and reserved 220 px of
+    // phantom width in the topbar flex row — squeezing the hamburger
+    // + greeting on the left and forcing the AI Copilot / pill / bell
+    // group to wrap. CSS rule at 860px now hides the whole wrap.
+    <div ref={wrapRef} className="v2d-search-wrap" style={{ position: 'relative', minWidth: 220, maxWidth: 320 }}>
       <div className="v2d-search" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px' }}>
         <Search size={14} style={{ color: 'var(--v2-ink-2)' }} />
         <input
