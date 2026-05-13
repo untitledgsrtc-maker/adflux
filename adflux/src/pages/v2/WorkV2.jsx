@@ -29,6 +29,8 @@ import UpcomingTasksCard from '../../components/leads/UpcomingTasksCard'
 import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
+import V2Hero from '../../components/v2/V2Hero'
+import { RingMilestoneRow } from '../../components/v2/RingMilestone'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 // Phase 31O — ProposedIncentiveCard import removed; the V2AppShell
 // now mounts it once at the top of every sales page, so /work
@@ -968,6 +970,38 @@ export default function WorkV2() {
         {/* ─── B_ACTIVE: checked in, working day ─── */}
         {stateName === 'B_ACTIVE' && (
           <>
+            {/* Phase 34R — teal-gradient day-progress hero from new
+                design package. Sits above the meeting ring so the
+                rep glances and instantly knows where they are vs
+                target. Falls back to brand defaults if v2 tokens
+                haven't loaded yet (inline gradient survives FOUC). */}
+            <V2Hero
+              eyebrow="Today · in progress"
+              value={`${counters.meetings || 0} / ${targets.meetings || 5}`}
+              label="meetings logged"
+              chip={`${counters.calls || 0} calls · ${counters.new_leads || 0} new leads`}
+              right={{
+                tone: (counters.meetings || 0) >= (targets.meetings || 5) ? 'up' : 'down',
+                text: (counters.meetings || 0) >= (targets.meetings || 5)
+                  ? 'target hit'
+                  : `${(targets.meetings || 5) - (counters.meetings || 0)} to go`,
+              }}
+              accent={(counters.meetings || 0) >= (targets.meetings || 5)}
+            />
+
+            {/* Phase 34R — 3-up ring milestones (meetings / calls /
+                new leads vs targets). Below the hero, above the
+                detailed MeetingRing so the rep sees all three
+                targets in one glance. The MeetingRing kept for the
+                tap-to-expand drawer with deeper breakdown. */}
+            <RingMilestoneRow
+              items={[
+                { value: counters.meetings  || 0, target: targets.meetings  || 5,  label: 'Meetings' },
+                { value: counters.calls     || 0, target: targets.calls     || 20, label: 'Calls'    },
+                { value: counters.new_leads || 0, target: targets.new_leads || 10, label: 'New leads' },
+              ]}
+            />
+
             {/* Phase 31O — moved the ProposedIncentiveCard into
                 V2AppShell. Persists across all sales pages now. */}
 

@@ -35,6 +35,22 @@
   --blue:          #3B82F6;
   --blue-soft:     rgba(59, 130, 246, 0.12);
 
+  /* ---- Tints (Phase 34R — chip / pill backgrounds, brought from
+           _design_reference/salesui/sales-styles.css). Use these
+           with the matching status colour as foreground / border. */
+  --tint-success:    rgba(16, 185, 129, 0.14);
+  --tint-success-bd: rgba(16, 185, 129, 0.40);
+  --tint-warning:    rgba(245, 158, 11, 0.14);
+  --tint-warning-bd: rgba(245, 158, 11, 0.40);
+  --tint-danger:     rgba(239, 68, 68, 0.14);
+  --tint-danger-bd:  rgba(239, 68, 68, 0.40);
+  --tint-blue:       rgba(59, 130, 246, 0.14);
+  --tint-blue-bd:    rgba(59, 130, 246, 0.40);
+  --tint-purple:     rgba(192, 132, 252, 0.16);
+  --tint-purple-bd:  rgba(192, 132, 252, 0.40);
+  --tint-yellow:     rgba(255, 230, 0, 0.14);
+  --tint-yellow-bd:  rgba(255, 230, 0, 0.50);
+
   /* ---- Sidebar (same as main bg for cohesion) ---- */
   --sidebar-bg:     #0F172A;
   --sidebar-text:   #CBD5E1;
