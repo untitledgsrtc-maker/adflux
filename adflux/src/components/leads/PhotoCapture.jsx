@@ -157,8 +157,8 @@ export default function PhotoCapture({
         <div style={{
           marginTop: 10,
           padding: '10px 14px',
-          background: 'rgba(255,230,0,0.08)',
-          border: '1px solid var(--accent, #FFE600)',
+          background: 'var(--tint-yellow, rgba(255,230,0,0.14))',
+          border: '1px solid var(--tint-yellow-bd, rgba(255,230,0,0.50))',
           borderRadius: 10,
           fontSize: 12,
         }}>

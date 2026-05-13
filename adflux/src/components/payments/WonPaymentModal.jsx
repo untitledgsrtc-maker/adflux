@@ -15,6 +15,7 @@
 import { useRef, useState } from 'react'
 import { CheckCircle2, Paperclip, Upload } from 'lucide-react'
 import { formatCurrency, todayISO } from '../../utils/formatters'
+import V2Hero from '../v2/V2Hero'
 
 /**
  * Mark-Won pre-flight + payment-capture modal.
@@ -161,21 +162,18 @@ export function WonPaymentModal({
           <button className="md-x" onClick={onClose}>✕</button>
         </div>
         <div className="md-b">
-          {/* Quote summary */}
-          <div style={{ background: 'var(--tint-yellow, rgba(255,230,0,0.14))', border: '1.5px solid var(--tint-yellow-bd, rgba(255,230,0,0.50))', borderRadius: 'var(--radius, 10px)', padding: '13px 16px', marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)' }}>Quote</div>
-                <div style={{ fontWeight: 700, color: 'var(--accent, #FFE600)' }}>{quote.quote_number || quote.ref_number}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)' }}>Invoice Total</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--accent, #FFE600)' }}>
-                  {formatCurrency(quote.total_amount)}
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Phase 34R+ — V2Hero strip replacing the previous yellow
+              quote-summary card. Same data (quote ref + invoice total)
+              presented in the teal-gradient hero that now anchors
+              every page in the app. Emotional moment — deal closes —
+              gets the brand pop. */}
+          <V2Hero
+            eyebrow="Mark this Won"
+            value={formatCurrency(quote.total_amount)}
+            label={quote.quote_number || quote.ref_number || 'Invoice total'}
+            chip={quote.client_company || quote.client_name || null}
+            accent={true}
+          />
 
           {/* Phase 11 — Work Order / PO copy gate.
               Phase 11d (rev4) — visually identical to Mark Sent's OC

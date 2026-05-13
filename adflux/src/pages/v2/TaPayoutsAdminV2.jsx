@@ -29,6 +29,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import V2Hero from '../../components/v2/V2Hero'
+import { RingMilestoneRow } from '../../components/v2/RingMilestone'
 
 function fmtINR(n) {
   return '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Number(n) || 0))
@@ -290,8 +292,51 @@ export default function TaPayoutsAdminV2() {
 
   if (!isAdmin) return null
 
+  // Phase 34R+ — rep name + month label for the hero.
+  const selectedRepName = useMemo(
+    () => users.find(u => u.id === fUser)?.name || 'Select a rep',
+    [users, fUser],
+  )
+
+  // Phase 34R+ — split totals by status so the ring milestones can
+  // show approved / paid / pending share of the month at a glance.
+  const statusSplit = useMemo(() => {
+    const out = { approved: 0, paid: 0, pending: 0 }
+    for (const r of rows) {
+      const amt = Number(r.total || 0)
+      if (r.status === 'paid')     out.paid     += amt
+      else if (r.status === 'approved') out.approved += amt
+      else                          out.pending  += amt
+    }
+    return out
+  }, [rows])
+
   return (
     <div className="v2d-ta" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Phase 34R+ — V2Hero header. Replaces the bare page-head
+          block. Eyebrow + selected rep + the month's grand total. */}
+      <V2Hero
+        eyebrow={`HR · Finance · ${monthLabel(fMonth)}`}
+        value={selectedRepName}
+        label={fUser ? `${rows.length} day${rows.length === 1 ? '' : 's'} · grand total ${fmtINR(totals.total)}` : 'pick a rep below'}
+        chip={fUser && rows.length ? `${Math.round(totals.km)} km this month` : null}
+        accent={false}
+      />
+
+      {/* Phase 34R+ — Approved / Paid / Pending split as ring
+          milestones. Targets = grand total so each ring shows the
+          share of this month that's in each status bucket. Skipped
+          when no rep selected or no rows yet. */}
+      {fUser && rows.length > 0 && (
+        <RingMilestoneRow
+          items={[
+            { value: Math.round(statusSplit.approved), target: Math.max(1, Math.round(totals.total)), label: 'Approved', sub: fmtINR(statusSplit.approved) },
+            { value: Math.round(statusSplit.paid),     target: Math.max(1, Math.round(totals.total)), label: 'Paid',     sub: fmtINR(statusSplit.paid) },
+            { value: Math.round(statusSplit.pending),  target: Math.max(1, Math.round(totals.total)), label: 'Pending',  sub: fmtINR(statusSplit.pending) },
+          ]}
+        />
+      )}
+
       <div className="v2d-page-head">
         <div>
           <div className="v2d-page-kicker">HR · Finance</div>
@@ -353,7 +398,7 @@ export default function TaPayoutsAdminV2() {
                         {c.is_home && (
                           <span style={{
                             padding: '1px 7px', borderRadius: 999, fontSize: 9, fontWeight: 700,
-                            background: 'rgba(255,230,0,.15)', color: 'var(--accent, #FFE600)',
+                            background: 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', color: 'var(--accent, #FFE600)',
                             textTransform: 'uppercase', letterSpacing: '.06em',
                           }}>HQ</span>
                         )}
@@ -436,7 +481,7 @@ export default function TaPayoutsAdminV2() {
         {err && (
           <div style={{
             marginTop: 10, padding: '8px 12px', borderRadius: 8,
-            background: 'rgba(239,68,68,.08)', color: 'var(--v2-rose, #EF4444)',
+            background: 'var(--v2-tint-danger, rgba(239,68,68,0.14))', color: 'var(--danger, #EF4444)',
             fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <AlertTriangle size={14} /> {err}
@@ -666,10 +711,10 @@ function TotalCard({ label, value, kind, suffix, accent }) {
 
 function statusChipStyle(status) {
   const map = {
-    pending:  { bg: 'rgba(245,158,11,.12)',  fg: '#F59E0B' },
-    approved: { bg: 'rgba(59,130,246,.12)',  fg: '#3B82F6' },
-    paid:     { bg: 'rgba(16,185,129,.12)',  fg: '#10B981' },
-    rejected: { bg: 'rgba(239,68,68,.12)',   fg: '#EF4444' },
+    pending:  { bg: 'var(--v2-tint-warning, rgba(245,158,11,0.14))', fg: 'var(--warning, #F59E0B)' },
+    approved: { bg: 'var(--v2-tint-blue,    rgba(59,130,246,0.14))', fg: 'var(--blue,    #3B82F6)' },
+    paid:     { bg: 'var(--v2-tint-success, rgba(16,185,129,0.14))', fg: 'var(--success, #10B981)' },
+    rejected: { bg: 'var(--v2-tint-danger,  rgba(239,68,68,0.14))',  fg: 'var(--danger,  #EF4444)' },
   }
   const c = map[status] || map.pending
   return {
