@@ -834,14 +834,14 @@ export default function AdminDashboardDesktop() {
                 deploys. */}
             <AiBriefingCard />
 
-            {/* Phase 12 rev3 — SLA breach alert. Only renders when
-                there's at least one Sales Ready lead past 24h. */}
-            <SlaBreachBanner />
-
-            {/* Phase 31A.2 — stale leads alert (only renders when count > 0). */}
-            <div style={{ marginTop: 12 }}>
-              <StaleLeadsAlertCard />
-            </div>
+            {/* Phase 34S — May 13 UX audit: AiBriefingCard above
+                already rolls hot-idle leads + SLA breaches into one
+                card. The standalone SlaBreachBanner + StaleLeadsAlertCard
+                were saying the same thing two more times; admin saw
+                "12 SLA breaches" up to 3× per dashboard load. Both
+                widgets removed. Bell icon in topbar handles roll-up
+                across surfaces for the moments admin wants the count
+                without opening this page. */}
 
             {/* Phase 31A.2 — pipeline funnel + win rate row. Two-column
                 on desktop, stacked on mobile via grid auto-fit. */}

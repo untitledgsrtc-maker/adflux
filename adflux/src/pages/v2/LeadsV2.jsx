@@ -993,7 +993,7 @@ function AIBriefingCard({ briefing, onOpenQueue }) {
             <div className="lead-ai-item">
               <HeatDot heat="hot" />
               <span>
-                <b>{slaBreaches.length} SalesReady</b> lead{slaBreaches.length !== 1 ? 's' : ''} past 24h SLA
+                <b>{slaBreaches.length}</b> lead{slaBreaches.length !== 1 ? 's' : ''} past 24h handoff SLA
               </span>
               <span className="meta">overdue</span>
             </div>

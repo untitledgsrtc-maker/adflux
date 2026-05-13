@@ -103,7 +103,9 @@ export default function IncentiveMiniPill() {
       <IndianRupee size={12} color={accent} strokeWidth={2} />
       <span style={{ color: accent }}>{formatShort(calc.incentive)}</span>
       <span style={{ color: 'var(--v2-ink-2, #6a7590)', fontSize: 11, fontWeight: 500 }}>
-        · {pctToTarget}%
+        {/* Phase 34S — May 13 UX audit: unlabelled "%" clashed with
+            the score-out-of-100 on /my-performance. Qualify it. */}
+        · {pctToTarget}% to {isSlabReached ? 'target' : 'slab'}
       </span>
       <TrendingUp size={11} color="var(--v2-ink-2, #6a7590)" strokeWidth={1.6} />
     </button>

@@ -30,7 +30,8 @@ import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import V2Hero from '../../components/v2/V2Hero'
-import { RingMilestoneRow } from '../../components/v2/RingMilestone'
+// Phase 34S — RingMilestoneRow import removed; only TaPayoutsAdminV2
+// still uses it. WorkV2 now relies on V2Hero alone for daily counters.
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 // Phase 31O — ProposedIncentiveCard import removed; the V2AppShell
 // now mounts it once at the top of every sales page, so /work
@@ -989,32 +990,13 @@ export default function WorkV2() {
               accent={(counters.meetings || 0) >= (targets.meetings || 5)}
             />
 
-            {/* Phase 34R — 3-up ring milestones (meetings / calls /
-                new leads vs targets). Below the hero, above the
-                detailed MeetingRing so the rep sees all three
-                targets in one glance. The MeetingRing kept for the
-                tap-to-expand drawer with deeper breakdown. */}
-            <RingMilestoneRow
-              items={[
-                { value: counters.meetings  || 0, target: targets.meetings  || 5,  label: 'Meetings' },
-                { value: counters.calls     || 0, target: targets.calls     || 20, label: 'Calls'    },
-                { value: counters.new_leads || 0, target: targets.new_leads || 10, label: 'New leads' },
-              ]}
-            />
-
-            {/* Phase 31O — moved the ProposedIncentiveCard into
-                V2AppShell. Persists across all sales pages now. */}
-
-            {/* Phase 33A — owner directive: one big meeting ring,
-                not 3 small counters. Meeting is THE daily milestone
-                (5/day, every meeting counts including rejections —
-                locked 10 May 2026). Tap the ring → sheet with all
-                targets (calls, new leads). Don't dilute attention. */}
-            <MeetingRing
-              done={counters.meetings || 0}
-              target={targets.meetings || 5}
-              extras={{ calls: counters.calls || 0, callTarget: targets.calls || 20, leads: counters.new_leads || 0, leadTarget: targets.new_leads || 10 }}
-            />
+            {/* Phase 34S — May 13 UX audit confirmed Phase 34R was
+                over-built. V2Hero above already shows meetings + the
+                "calls · new leads" chip. The RingMilestoneRow AND
+                MeetingRing both repeated the same data in two visual
+                styles below. Removed both — single source of truth
+                wins. The component imports are kept (used elsewhere)
+                so this is a 30-line UI delete, not a code rewrite. */}
 
             {/* Phase 33D.6 — Today's tasks breakdown: count of due
                 follow-ups + nurture calls. Shows alongside the meeting

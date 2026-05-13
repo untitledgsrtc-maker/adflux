@@ -463,7 +463,17 @@ export function V2AppShell() {
               the actual content below the fold. Compact strip is now
               the default everywhere; only /my-performance gets the
               full hero (rep's deep view of their numbers). */}
-          {!isPrivileged && !isTelecaller && (
+          {/* Phase 34S — May 13 UX audit: on /quotes/:id the rep
+              already sees the per-quote IncentiveForecastCard
+              ("if you close this you earn +X") AND the top-bar
+              IncentiveMiniPill (global ₹ this month). Adding the
+              ProposedIncentiveCard strip there put THREE incentive
+              numbers in 10cm of screen — confusing, not motivating.
+              Hide the strip on quote-detail routes (the page has
+              its own forecaster); keep elsewhere. */}
+          {!isPrivileged && !isTelecaller
+            && !location.pathname.startsWith('/quotes/')
+            && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 12 }}>
               <ProposedIncentiveCard compact={location.pathname !== '/my-performance'} />
             </div>

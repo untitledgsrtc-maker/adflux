@@ -88,27 +88,11 @@ export default function UpcomingTasksCard({ userId }) {
   const totalUpcoming = tomorrowCount + weekCount
 
   if (totalUpcoming === 0) {
-    return (
-      <div
-        onClick={() => navigate('/follow-ups')}
-        style={{
-          background: 'var(--v2-bg-1, #111a2e)',
-          border: '1px solid var(--v2-line, #1f2b47)',
-          borderRadius: 'var(--v2-r, 14px)',
-          padding: '12px 14px',
-          marginTop: 12,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          color: 'var(--v2-ink-1, #a9b3c7)',
-          fontSize: 13,
-        }}
-      >
-        <span>Nothing scheduled for tomorrow or this week — go hunt some leads.</span>
-        <ArrowRight size={14} />
-      </div>
-    )
+    // Phase 34S — May 13 UX audit: when there are no upcoming tasks,
+    // this card was rendering a useless "go hunt some leads" empty
+    // state that just ate vertical space on /work. Return null so
+    // the rep sees only what's actionable.
+    return null
   }
 
   return (

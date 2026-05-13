@@ -1197,10 +1197,20 @@ export default function LeadDetailV2() {
             </div>
           </div>
 
-          {/* Stage history */}
+          {/* Lead milestones */}
+          {/* Phase 34S — May 13 UX audit: the previous "Stage history"
+              card duplicated the activity timeline's status_change
+              rows. The audit said delete the card. But it ALSO held
+              unique data not in the timeline — leads.qualified_at,
+              leads.sales_ready_at, leads.lost_reason,
+              leads.nurture_revisit_date (column values, not activity
+              rows). Compromise: keep the card for those milestones,
+              drop the stageHistory repetition. Renamed "Stage history"
+              -> "Lead milestones" so it's clear the card is about
+              column-level timestamps, not about repeating events. */}
           <div className="lead-card">
             <div className="lead-card-head">
-              <div className="lead-card-title">Stage history</div>
+              <div className="lead-card-title">Lead milestones</div>
             </div>
             <div className="lead-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <Row label="Created"   right={<span className="mono">{lead.created_at ? formatDate(lead.created_at) : '—'}</span>} />
@@ -1210,18 +1220,6 @@ export default function LeadDetailV2() {
               {lead.sales_ready_at && (
                 <Row label="Sales Ready" right={<span className="mono">{formatDate(lead.sales_ready_at)}</span>} />
               )}
-              {stageHistory.slice(0, 5).map(h => (
-                <Row
-                  key={h.id}
-                  label={h.notes?.split(' · ')[0] || 'Status change'}
-                  right={
-                    <span style={{ color: 'var(--text-muted)' }}>
-                      {h.user?.name ? `${h.user.name} · ` : ''}
-                      <span className="mono">{formatDate(h.created_at)}</span>
-                    </span>
-                  }
-                />
-              ))}
               {lead.lost_reason && (
                 <Row label="Lost reason" right={<Pill tone="danger">{lead.lost_reason}</Pill>} />
               )}
