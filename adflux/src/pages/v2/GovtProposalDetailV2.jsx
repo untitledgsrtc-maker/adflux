@@ -308,6 +308,9 @@ export default function GovtProposalDetailV2() {
       recipient_block:        quote.recipient_block,
       proposal_date:          quote.proposal_date,
       auto_total_quantity:    quote.auto_total_quantity,
+      // Phase 34H — auto-hood campaign months for the multiplier in
+      // the Gujarati rate table. duration_months on the quote stores it.
+      auto_campaign_months:   Math.max(1, Number(quote.duration_months || 1)),
       gsrtc_campaign_months:  quote.gsrtc_campaign_months,
       unit_rate:              quote.media_type === 'AUTO_HOOD'
         ? Number(items[0]?.unit_rate ?? items[0]?.offered_rate ?? 825)

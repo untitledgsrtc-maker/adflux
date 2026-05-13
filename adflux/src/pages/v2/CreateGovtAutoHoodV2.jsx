@@ -62,6 +62,10 @@ export default function CreateGovtAutoHoodV2() {
     signer_user_id: null,
     // quantity
     auto_total_quantity: null,
+    // Phase 34H — campaign duration in months. Multiplied into the
+    // rate-table subtotal so a 3-month proposal shows 3× the monthly
+    // value rather than the legacy single-month total.
+    auto_campaign_months: 1,
     // districts
     selected_district_ids: null,    // null = uninitialized; the step seeds with all 33
   })
@@ -109,6 +113,9 @@ export default function CreateGovtAutoHoodV2() {
                           : prev.proposal_date,
         signer_user_id: q.signer_user_id || null,
         auto_total_quantity:    Number(q.auto_total_quantity || 0) || null,
+        // Phase 34H — restore the saved months so an edit session
+        // keeps the multiplier.
+        auto_campaign_months:   Math.max(1, Number(q.duration_months || 1)),
         selected_district_ids:  districtIds,
         district_qty_overrides: qtyOverrides,
       }))
@@ -173,7 +180,10 @@ export default function CreateGovtAutoHoodV2() {
     // saved to quote_cities.
     const actualQty = allocated.reduce((s, a) => s + (a.allocated_qty || 0), 0)
     const ratePer = rate ? Number(rate.davp_per_rickshaw_rate) : 825
-    const subtotal = actualQty * ratePer
+    // Phase 34H — multiply by campaign months. Falls back to 1 for
+    // legacy quotes that never had this field.
+    const months = Math.max(1, Number(data.auto_campaign_months) || 1)
+    const subtotal = actualQty * ratePer * months
     const gstAmount = Math.round(subtotal * GST_PCT / 100)
     const total = subtotal + gstAmount
 
@@ -192,7 +202,9 @@ export default function CreateGovtAutoHoodV2() {
       gst_rate:       GST_PCT / 100,
       gst_amount:     gstAmount,
       total_amount:   total,
-      duration_months: 1,    // proposal isn't time-bounded for auto hood
+      // Phase 34H — duration_months reused as the auto-hood campaign
+      // length. The Gujarati proposal table multiplies by this.
+      duration_months: months,
       // new govt fields
       segment:        'GOVERNMENT',
       media_type:     'AUTO_HOOD',
@@ -268,14 +280,16 @@ export default function CreateGovtAutoHoodV2() {
       description:  d.district_name_en,
       qty:          d.allocated_qty,
       unit_rate:    ratePer,
-      amount:       d.allocated_qty * ratePer,
+      // Phase 34H — amount + campaign_total include months multiplier
+      // so quote_cities row totals add up to quotes.total_amount.
+      amount:       d.allocated_qty * ratePer * months,
       // these legacy columns are required NOT NULL on the table
       screens:      0,
       grade:        null,
       listed_rate:  ratePer,
       offered_rate: ratePer,
-      campaign_total: d.allocated_qty * ratePer,
-      duration_months: 1,
+      campaign_total: d.allocated_qty * ratePer * months,
+      duration_months: months,
       slot_seconds: 10,
       slots_per_day: 100,
     }))

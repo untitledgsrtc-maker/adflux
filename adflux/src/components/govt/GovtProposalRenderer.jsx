@@ -135,7 +135,13 @@ export function GovtProposalRenderer({
     date:             dateGu,
     quantity:         toGujaratiDigits(formatINREnglish(data.auto_total_quantity || 0)),
     districts_count:  toGujaratiDigits(String(data.line_items?.length || 0)),
-    months:           toGujaratiDigits(String(data.gsrtc_campaign_months || 1)),
+    // Phase 34H — for AUTO_HOOD the months placeholder prefers
+    // auto_campaign_months; GSRTC stays on gsrtc_campaign_months.
+    months:           toGujaratiDigits(String(
+                        mediaType === 'AUTO_HOOD'
+                          ? (data.auto_campaign_months || 1)
+                          : (data.gsrtc_campaign_months || 1)
+                      )),
     selected_stations: toGujaratiDigits(String(data.line_items?.length || 0)),
     rate_table:       rateTableHtml,
     signer_block:     signerHtml,
@@ -339,20 +345,29 @@ function renderSignerBlock(signer, company, letterheadOn = false) {
 }
 
 function renderAutoTable(data) {
-  // Renders ONLY the rate summary (5 rows). The per-district allotment
-  // list lives on a separate A4 page — see renderDistrictListPage.
-  const qty = Number(data.auto_total_quantity || 0)
-  const rate = Number(data.unit_rate ?? 825)
-  const subtotal = qty * rate
+  // Renders ONLY the rate summary. The per-district allotment list
+  // lives on a separate A4 page — see renderDistrictListPage.
+  //
+  // Phase 34H — adds a Months column. Rate is per-rickshaw per-month;
+  // total = qty × rate × months. Legacy quotes with no months default
+  // to 1 (single-month behaviour), so old PDFs render unchanged.
+  const qty      = Number(data.auto_total_quantity || 0)
+  const rate     = Number(data.unit_rate ?? 825)
+  const months   = Math.max(1, Number(data.auto_campaign_months || 1))
+  const subtotal = qty * rate * months
   const gst      = Math.round(subtotal * GST_PCT / 100)
   const total    = subtotal + gst
 
-  const rowQty   = toGujaratiDigits(formatINREnglish(qty))
-  const rowRate  = toGujaratiDigits(formatINREnglish(rate)) + '/-'
-  const rowSub   = toGujaratiDigits(formatINREnglish(subtotal)) + '/-'
-  const rowGst   = toGujaratiDigits(formatINREnglish(gst)) + '/-'
-  const rowTotal = toGujaratiDigits(formatINREnglish(total)) + '/-'
+  const rowQty    = toGujaratiDigits(formatINREnglish(qty))
+  const rowRate   = toGujaratiDigits(formatINREnglish(rate)) + '/-'
+  const rowMonths = toGujaratiDigits(String(months))
+  const rowSub    = toGujaratiDigits(formatINREnglish(subtotal)) + '/-'
+  const rowGst    = toGujaratiDigits(formatINREnglish(gst)) + '/-'
+  const rowTotal  = toGujaratiDigits(formatINREnglish(total)) + '/-'
 
+  // 6-column table header. The first row spans qty / rate / months /
+  // subtotal across the 3 visual rows that describe the rickshaw
+  // surfaces (back + left + right) — single ad package.
   return `
   <table class="govt-letter__table">
     <thead>
@@ -360,16 +375,17 @@ function renderAutoTable(data) {
         <th>વિગત</th>
         <th>સાઇઝ</th>
         <th class="num">ઓટો રિક્ષાની સંખ્યા</th>
-        <th class="num">CBC ભાવ</th>
+        <th class="num">CBC ભાવ (દર મહિને)</th>
+        <th class="num">મહિના</th>
         <th class="num">કુલ રકમ</th>
       </tr>
     </thead>
     <tbody>
-      <tr><td>રિક્ષાની પાછળની બાજુ</td><td>4' × 3'</td><td class="num" rowspan="3">${rowQty}</td><td class="num" rowspan="3">${rowRate}</td><td class="num" rowspan="3">${rowSub}</td></tr>
+      <tr><td>રિક્ષાની પાછળની બાજુ</td><td>4' × 3'</td><td class="num" rowspan="3">${rowQty}</td><td class="num" rowspan="3">${rowRate}</td><td class="num" rowspan="3">${rowMonths}</td><td class="num" rowspan="3">${rowSub}</td></tr>
       <tr><td>રિક્ષાની ડાબી બાજુ</td><td>2' × 2'</td></tr>
       <tr><td>રિક્ષાની જમણી બાજુ</td><td>2' × 2'</td></tr>
-      <tr><td colspan="4">GST 18%</td><td class="num">${rowGst}</td></tr>
-      <tr><td colspan="4"><strong>કુલ રકમ</strong></td><td class="num"><strong>${rowTotal}</strong></td></tr>
+      <tr><td colspan="5">GST 18%</td><td class="num">${rowGst}</td></tr>
+      <tr><td colspan="5"><strong>કુલ રકમ</strong></td><td class="num"><strong>${rowTotal}</strong></td></tr>
     </tbody>
   </table>`
 }

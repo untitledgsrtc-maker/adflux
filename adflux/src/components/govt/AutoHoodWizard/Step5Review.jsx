@@ -84,6 +84,9 @@ export function Step5Review({ data }) {
     proposal_date:   data.proposal_date,
     auto_total_quantity: actualQty,
     unit_rate:       rate ? Number(rate.davp_per_rickshaw_rate) : 825,
+    // Phase 34H — campaign months drives the multiplier in the
+    // Gujarati proposal table.
+    auto_campaign_months: Number(data.auto_campaign_months) || 1,
     line_items:      allocated,                         // for districts_count placeholder
   }
 
