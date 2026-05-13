@@ -122,20 +122,72 @@ export default function GpsTrackV2() {
     return () => { cancelled = true }
   }, [userId, targetDate])
 
-  // Total km driven, computed via Haversine sum.
+  // Total km driven, computed via filtered Haversine sum.
+  //
+  // Phase 34I — owner reported Kevin's 13 May actual 200-300 km drive
+  // showed up as 1,300 km on this page. Root cause: this page summed
+  // RAW haversine between every consecutive ping with NO filter, so:
+  //   * Low-accuracy pings (cell-tower fallback indoors, ±500 m) get
+  //     counted as if the rep teleported 500 m every 5 min.
+  //   * GPS drift while parked (10-30 m / poll) accumulates over a
+  //     full day to tens of kilometres of fake "movement".
+  //   * Any single bad-fix outlier ping creates a huge spike (rep
+  //     jumps from Vadodara to Anand and back in 2 min).
+  //
+  // Same filter thresholds as Phase 33H TA module SQL
+  // (compute_daily_ta) so map display agrees with TA payouts:
+  //
+  //   * Discard pings with accuracy_m > 100 m (bad GPS fix).
+  //   * Discard segments shorter than 30 m (drift at standstill).
+  //   * Discard segments implying speed > 200 km/h (bad data /
+  //     impossible bike trip).
+  //   * Daily total cap at 600 km — sanity ceiling. Anything past
+  //     that almost certainly = bad data.
+  //
+  // Raw km is exposed in the stats object too so the rep-day page
+  // can show "filtered 215 km · raw 1,303 km" if needed for audit.
   const stats = useMemo(() => {
-    let km = 0
-    for (let i = 1; i < pings.length; i++) {
-      km += haversineKm(
-        { lat: Number(pings[i - 1].lat), lng: Number(pings[i - 1].lng) },
-        { lat: Number(pings[i].lat),     lng: Number(pings[i].lng) },
+    const MIN_SEG_KM     = 0.03       // 30 m — drift floor
+    const MAX_SEG_KM_PER_S = 200 / 3600  // 200 km/h ceiling
+    const MAX_DAILY_KM   = 600
+    const MAX_ACC_M      = 100
+
+    const usable = pings.filter((p) => {
+      const acc = Number(p.accuracy_m)
+      return !Number.isFinite(acc) || acc <= MAX_ACC_M
+    })
+
+    let kmRaw = 0
+    let kmKept = 0
+    let dropped = 0
+
+    for (let i = 1; i < usable.length; i++) {
+      const a = usable[i - 1]
+      const b = usable[i]
+      const seg = haversineKm(
+        { lat: Number(a.lat), lng: Number(a.lng) },
+        { lat: Number(b.lat), lng: Number(b.lng) },
       )
+      kmRaw += seg
+      const dtMs = new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime()
+      const dtSec = Math.max(1, dtMs / 1000)
+      const speed = seg / dtSec  // km/s
+      if (seg < MIN_SEG_KM)               { dropped++; continue }
+      if (speed > MAX_SEG_KM_PER_S)       { dropped++; continue }
+      kmKept += seg
     }
+
+    const kmCapped = Math.min(kmKept, MAX_DAILY_KM)
+
     return {
-      km:    km.toFixed(1),
-      pings: pings.length,
-      first: pings[0]?.captured_at,
-      last:  pings[pings.length - 1]?.captured_at,
+      km:           kmCapped.toFixed(1),
+      kmRaw:        kmRaw.toFixed(1),
+      pings:        pings.length,
+      usablePings:  usable.length,
+      droppedSegs:  dropped,
+      capped:       kmKept > MAX_DAILY_KM,
+      first:        pings[0]?.captured_at,
+      last:         pings[pings.length - 1]?.captured_at,
     }
   }, [pings])
 
@@ -240,7 +292,16 @@ export default function GpsTrackV2() {
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
             {stats.pings} pings
+            {stats.pings !== stats.usablePings && ` · ${stats.pings - stats.usablePings} low-accuracy dropped`}
           </div>
+          {/* Phase 34I — show raw vs filtered so owner can audit
+              drift. Hidden unless they diverge by 10%+. */}
+          {stats.kmRaw && Math.abs(Number(stats.kmRaw) - Number(stats.km)) > Number(stats.km) * 0.1 && (
+            <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 2 }}>
+              raw {stats.kmRaw} km · {stats.droppedSegs} drift/spike segments dropped
+              {stats.capped ? ' · capped at 600 km' : ''}
+            </div>
+          )}
         </div>
       </div>
 
