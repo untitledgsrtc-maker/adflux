@@ -764,7 +764,20 @@
 .v2d-main { min-width: 0; max-width: 100%; overflow-x: hidden; display: flex; flex-direction: column; }
 .v2d-topbar {
   display: flex; align-items: center; gap: 14px;
-  padding: 16px 28px;
+  /* Phase 34N — iOS PWA fix. apple-mobile-web-app-status-bar-style
+     in index.html is "black-translucent", which puts page content
+     UNDER the iPhone notch / status bar (~44-50 px on iPhone X+).
+     Without env(safe-area-inset-top) the hamburger button sits
+     behind the notch and reps cannot tap to open the side drawer
+     when the app is "added to home screen" / installed as a PWA.
+     Same fix applied to padding-left/right for landscape on
+     iPhones where the home indicator areas eat horizontal space.
+     Plain browser tabs see safe-area-inset = 0 so layout is
+     unchanged on desktop and non-PWA mobile. */
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-right: max(28px, env(safe-area-inset-right));
+  padding-bottom: 16px;
+  padding-left: max(28px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--v2-line);
   background: var(--v2-bg-0);
   position: sticky; top: 0; z-index: 10;
@@ -975,7 +988,18 @@
 @media (max-width: 860px) {
   .v2d-app { grid-template-columns: 1fr; }
   .v2d-side { display: none; }
-  .v2d-topbar { padding: 14px 16px; gap: 10px; }
+  /* Phase 34N — preserve safe-area-inset on mobile. The shorthand
+     `padding: 14px 16px` would have wiped the env() values above
+     and re-hidden the hamburger behind the iPhone notch when the
+     app is installed as a PWA. Keep per-side longhand so notch
+     padding survives the smaller breakpoint. */
+  .v2d-topbar {
+    padding-top: max(14px, env(safe-area-inset-top));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: 14px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    gap: 10px;
+  }
   .v2d-search { display: none; }
   .v2d-period { display: none; }
   /* Phase 31G — owner reported (9 May 2026) the avatar pill was
@@ -1002,7 +1026,10 @@
 }
 
 /* Mobile bottom nav (used when sidebar collapses) */
-.v2d-mnav { position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: color-mix(in srgb, var(--v2-bg-0) 92%, transparent); border-top: 1px solid var(--v2-line); backdrop-filter: blur(14px); z-index: 40; display: none; }
+/* Phase 34N — iOS PWA fix. Add safe-area-inset-bottom so the
+   iPhone home-indicator area doesn't cover the nav buttons. Plain
+   browser sees safe-area-inset = 0; layout unchanged elsewhere. */
+.v2d-mnav { position: fixed; bottom: 0; left: 0; right: 0; height: calc(64px + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px); background: color-mix(in srgb, var(--v2-bg-0) 92%, transparent); border-top: 1px solid var(--v2-line); backdrop-filter: blur(14px); z-index: 40; display: none; }
 .v2d-mnav-items { flex: 1; display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); }
 .v2d-mnav-item { background: 0; border: 0; color: var(--v2-ink-2); font-family: var(--v2-sans); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; position: relative; }
 .v2d-mnav-item--active { color: var(--v2-yellow); }
@@ -1085,7 +1112,15 @@
 
 /* Extra-narrow: topbar wraps and sidebar vanishes */
 @media (max-width: 860px) {
-  .v2d-topbar { flex-wrap: wrap; padding: 12px 14px; gap: 10px; }
+  /* Phase 34N — keep safe-area-inset on the narrowest breakpoint too. */
+  .v2d-topbar {
+    flex-wrap: wrap;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(14px, env(safe-area-inset-right));
+    padding-bottom: 12px;
+    padding-left: max(14px, env(safe-area-inset-left));
+    gap: 10px;
+  }
   .v2d-topbar > div:first-child { order: -1; }
   .v2d-search, .v2d-period { display: none; }
   /* Phase 31G — same orphan-avatar fix as the earlier 860px block. */
