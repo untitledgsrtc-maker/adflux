@@ -33,6 +33,7 @@ import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
 import { ToastViewport } from './Toast'
 import { ConfirmDialogViewport } from './ConfirmDialog'
+import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -389,6 +390,11 @@ export function V2AppShell() {
               <span>New Quote</span>
             </button>
           )}
+
+          {/* Phase 34M — incentive mini-pill. Sales / agency /
+              telecaller only. Shows projected incentive this month
+              + % to target on every page. Tap → /my-performance. */}
+          <IncentiveMiniPill />
 
           {/* Phase 31A.4 — real notification panel. Aggregates pending
               approvals + due follow-ups + SLA breaches + due actions

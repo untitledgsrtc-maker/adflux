@@ -16,6 +16,7 @@ import { useAuthStore } from '../../store/authStore'
 import { QUOTE_STATUSES, STATUS_LABELS } from '../../utils/constants'
 import { formatCurrency, formatDate, truncate } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
+import { DidYouKnow } from '../../components/v2/DidYouKnow'
 
 /* ─── Local helpers ────────────────────────────────── */
 function computeBalance(q) {
@@ -204,6 +205,14 @@ export default function QuotesV2() {
 
   return (
     <div className="v2d-quotes">
+      {/* Phase 34.9 (C) discoverability — surface the "Copy from last
+          quote" feature most reps don't know about. Phase 34E shipped
+          it; this nudge points reps to use it. */}
+      <DidYouKnow id="quotes-copy-from-last-2026-05-13" title="Start new quote 3x faster">
+        Open the Private LED wizard — Step 1 has a "Copy from your last quote"
+        button. Pre-fills client + cities + rates. Edit what changed, send.
+      </DidYouKnow>
+
       {/* ─── Page header ──────────────────────────────── */}
       <div className="v2d-page-head">
         <div>

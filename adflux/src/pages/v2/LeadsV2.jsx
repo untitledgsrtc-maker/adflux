@@ -38,6 +38,7 @@ import { formatCurrency, formatRelative } from '../../utils/formatters'
 import {
   StageChip, HeatDot, SegChip, LeadAvatar,
 } from '../../components/leads/LeadShared'
+import { StageAgeChip } from '../../components/leads/StageAgeChip'
 import { toastError } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
@@ -749,7 +750,14 @@ export default function LeadsV2() {
                   <td className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {l.phone || '—'}
                   </td>
-                  <td><StageChip stage={l.stage} /></td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                      <StageChip stage={l.stage} />
+                      {/* Phase 34L — age in current stage. Hidden for
+                          Won/Lost (terminal). Red after 5d, amber after 3d. */}
+                      <StageAgeChip stage={l.stage} stageChangedAt={l.stage_changed_at} />
+                    </div>
+                  </td>
                   <td><SegChip segment={l.segment} /></td>
                   <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {l.source || '—'}

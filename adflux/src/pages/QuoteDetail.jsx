@@ -24,6 +24,7 @@ import IncentiveForecastCard from '../components/quotes/IncentiveForecastCard'
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
+import { DidYouKnow } from '../components/v2/DidYouKnow'
 import { FollowUpList } from '../components/followups/FollowUpList'
 import { formatCurrency, formatDate, formatPhone, todayISO } from '../utils/formatters'
 import { STATUS_LABELS } from '../utils/constants'
@@ -388,6 +389,14 @@ export default function QuoteDetail() {
 
   return (
     <div className="page">
+      {/* Phase 34.9 (C) discoverability — show the rep where the
+          incentive forecast lives + remind about Mark Won workflow. */}
+      <DidYouKnow id="quote-detail-mark-won-2026-05-13" title="Closing this deal?">
+        Scroll to "If you close this this month" — shows exactly how much
+        incentive you'll earn. When client says yes, click <strong>Mark Won</strong>
+        — upload WO + dates + payment. Auto-credits your monthly slab.
+      </DidYouKnow>
+
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/quotes')}>

@@ -40,6 +40,7 @@ import { formatCurrency, formatDate, formatRelative } from '../../utils/formatte
 import {
   StageChip, HeatDot, SegChip, LeadAvatar, OutcomeChip, Pill,
 } from '../../components/leads/LeadShared'
+import { StageAgeChip } from '../../components/leads/StageAgeChip'
 import LogActivityModal from '../../components/leads/LogActivityModal'
 import ChangeStageModal from '../../components/leads/ChangeStageModal'
 import ReassignModal   from '../../components/leads/ReassignModal'
@@ -600,6 +601,9 @@ export default function LeadDetailV2() {
                 }}
               >
                 <StageChip stage={lead.stage} slaBreached={!!sla && sla.tone === 'danger'} />
+                {/* Phase 34L — days-in-current-stage chip. Hidden
+                    for Won/Lost. Red after 5 days, amber after 3. */}
+                <StageAgeChip stage={lead.stage} stageChangedAt={lead.stage_changed_at} />
                 <span style={{
                   fontSize: 10, fontWeight: 600, letterSpacing: '.08em',
                   color: 'var(--text-muted)', textTransform: 'uppercase',
