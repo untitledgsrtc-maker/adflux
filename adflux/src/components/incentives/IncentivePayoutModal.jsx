@@ -90,24 +90,24 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
           {/* Summary row */}
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10,
-            background: 'rgba(255,255,255,.03)', border: '1px solid var(--brd)',
+            background: 'rgba(255,255,255,.03)', border: '1px solid var(--border, #334155)',
             borderRadius: 8, padding: 12,
           }}>
             <div>
-              <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Computed</div>
+              <div style={{ fontSize: '.68rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase' }}>Computed</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem' }}>
                 {formatCurrency(computed || 0)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Paid</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#81c784' }}>
+              <div style={{ fontSize: '.68rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase' }}>Paid</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: 'var(--success, #10B981)' }}>
                 {formatCurrency(totalPaid)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Pending</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#ffb74d' }}>
+              <div style={{ fontSize: '.68rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase' }}>Pending</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: 'var(--warning, #F59E0B)' }}>
                 {formatCurrency(pendingPay)}
               </div>
             </div>
@@ -118,7 +118,7 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
             <form onSubmit={addPayout} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div className="grid2">
                 <label>
-                  <span style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Amount Paid</span>
+                  <span style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase' }}>Amount Paid</span>
                   <input
                     type="number" step="0.01" value={amount}
                     onChange={e => setAmount(e.target.value)}
@@ -128,7 +128,7 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
                   />
                 </label>
                 <label>
-                  <span style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Paid Date</span>
+                  <span style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase' }}>Paid Date</span>
                   <input
                     type="date" value={paidDate}
                     onChange={e => setPaidDate(e.target.value)}
@@ -138,7 +138,7 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
                 </label>
               </div>
               <label>
-                <span style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase' }}>Note (optional)</span>
+                <span style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase' }}>Note (optional)</span>
                 <input
                   type="text" value={note}
                   onChange={e => setNote(e.target.value)}
@@ -153,7 +153,7 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
                 />
                 Mark as full & final payment for this month
               </label>
-              {err && <div style={{ color: '#ef9a9a', fontSize: '.78rem' }}>{err}</div>}
+              {err && <div style={{ color: 'var(--danger, #EF4444)', fontSize: '.78rem' }}>{err}</div>}
               <button className="btn btn-y" disabled={saving} type="submit">
                 {saving ? 'Saving…' : 'Record Payout'}
               </button>
@@ -161,8 +161,8 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
           )}
           {hasFull && (
             <div style={{
-              background: 'rgba(129,199,132,.08)', border: '1px solid rgba(129,199,132,.3)',
-              color: '#81c784', padding: 10, borderRadius: 8, fontSize: '.82rem',
+              background: 'var(--tint-success, rgba(16,185,129,0.14))', border: '1px solid var(--tint-success-bd, rgba(16,185,129,0.40))',
+              color: 'var(--success, #10B981)', padding: 10, borderRadius: 8, fontSize: '.82rem',
             }}>
               Full & final payment already recorded. No further entries allowed for this month.
             </div>
@@ -170,24 +170,24 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
 
           {/* History */}
           <div>
-            <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', marginBottom: 8 }}>
+            <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase', marginBottom: 8 }}>
               Payout History
             </div>
             {payouts.length === 0 ? (
-              <div style={{ fontSize: '.8rem', color: 'var(--gray)' }}>No payouts recorded yet.</div>
+              <div style={{ fontSize: '.8rem', color: 'var(--text-muted, #94a3b8)' }}>No payouts recorded yet.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {payouts.map(p => (
                   <div key={p.id} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '8px 10px', border: '1px solid var(--brd)', borderRadius: 6,
+                    padding: '8px 10px', border: '1px solid var(--border, #334155)', borderRadius: 6,
                   }}>
                     <div>
                       <div style={{ fontSize: '.85rem', fontWeight: 600 }}>
                         {formatCurrency(p.amount_paid)}
-                        {p.is_full_payment && <span style={{ marginLeft: 8, color: '#81c784', fontSize: '.7rem' }}>FULL</span>}
+                        {p.is_full_payment && <span style={{ marginLeft: 8, color: 'var(--success, #10B981)', fontSize: '.7rem' }}>FULL</span>}
                       </div>
-                      <div style={{ fontSize: '.7rem', color: 'var(--gray)', marginTop: 2 }}>
+                      <div style={{ fontSize: '.7rem', color: 'var(--text-muted, #94a3b8)', marginTop: 2 }}>
                         <Calendar size={10} style={{ display: 'inline', marginRight: 4 }} />
                         {p.paid_date}
                         {p.note && <> · {p.note}</>}
@@ -195,7 +195,7 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
                     </div>
                     <button
                       onClick={() => remove(p.id)}
-                      style={{ background: 'none', border: 'none', color: '#ef9a9a', cursor: 'pointer', padding: 4 }}
+                      style={{ background: 'none', border: 'none', color: 'var(--danger, #EF4444)', cursor: 'pointer', padding: 4 }}
                       title="Delete payout"
                     >
                       <Trash2 size={14} />

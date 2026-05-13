@@ -52,11 +52,11 @@ export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onResche
             <div className="md-t">
               {mode === 'reschedule' ? '📅 Reschedule Follow-up' : '✓ Mark Done'}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--gray)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {quoteNum && (
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontSize: 11,
-                  color: 'var(--accent, #FFE600)', background: 'rgba(255,230,0,0.08)',
+                  color: 'var(--accent, #FFE600)', background: 'var(--tint-yellow, rgba(255,230,0,0.14))',
                   borderRadius: 4, padding: '1px 6px',
                 }}>{quoteNum}</span>
               )}
@@ -72,9 +72,9 @@ export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onResche
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: 12, padding: '16px 0', textAlign: 'center',
             }}>
-              <CheckCircle size={36} style={{ color: '#81c784' }} />
+              <CheckCircle size={36} style={{ color: 'var(--success, #10B981)' }} />
               <p style={{ margin: 0 }}>Mark this follow-up as <strong>done</strong>?</p>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--gray)' }}>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted, #94a3b8)' }}>
                 This will close the follow-up for {clientName}.
               </p>
             </div>
@@ -110,9 +110,9 @@ export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onResche
           {err && (
             <p style={{
               marginTop: 8, fontSize: 12,
-              color: '#ef9a9a',
-              background: 'rgba(229,57,53,.08)',
-              border: '1px solid rgba(229,57,53,.3)',
+              color: 'var(--danger, #EF4444)',
+              background: 'var(--tint-danger, rgba(239,68,68,0.14))',
+              border: '1px solid var(--tint-danger-bd, rgba(239,68,68,0.40))',
               borderRadius: 6, padding: '6px 10px',
             }}>{err}</p>
           )}

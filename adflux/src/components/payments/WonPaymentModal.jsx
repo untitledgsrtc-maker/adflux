@@ -154,7 +154,7 @@ export function WonPaymentModal({
         <div className="md-h">
           <div>
             <div className="md-t">💰 Mark as Won</div>
-            <div style={{ fontSize: '.75rem', color: 'var(--gray)', marginTop: 3 }}>
+            <div style={{ fontSize: '.75rem', color: 'var(--text-muted, #94a3b8)', marginTop: 3 }}>
               Record payment if collected — or leave blank to mark Won with payment pending
             </div>
           </div>
@@ -162,15 +162,15 @@ export function WonPaymentModal({
         </div>
         <div className="md-b">
           {/* Quote summary */}
-          <div style={{ background: 'rgba(255,230,0,.08)', border: '1.5px solid rgba(255,230,0,.2)', borderRadius: 9, padding: '13px 16px', marginBottom: 16 }}>
+          <div style={{ background: 'var(--tint-yellow, rgba(255,230,0,0.14))', border: '1.5px solid var(--tint-yellow-bd, rgba(255,230,0,0.50))', borderRadius: 'var(--radius, 10px)', padding: '13px 16px', marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '.72rem', color: 'var(--gray)' }}>Quote</div>
-                <div style={{ fontWeight: 700, color: 'var(--y)' }}>{quote.quote_number || quote.ref_number}</div>
+                <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)' }}>Quote</div>
+                <div style={{ fontWeight: 700, color: 'var(--accent, #FFE600)' }}>{quote.quote_number || quote.ref_number}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '.72rem', color: 'var(--gray)' }}>Invoice Total</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--y)' }}>
+                <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)' }}>Invoice Total</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--accent, #FFE600)' }}>
                   {formatCurrency(quote.total_amount)}
                 </div>
               </div>
@@ -190,12 +190,12 @@ export function WonPaymentModal({
             <div
               style={{
                 background: workOrderUploaded
-                  ? 'rgba(76,175,80,.08)'
-                  : 'rgba(245,158,11,.08)',
+                  ? 'var(--tint-success, rgba(16,185,129,0.14))'
+                  : 'var(--tint-warning, rgba(245,158,11,0.14))',
                 border: workOrderUploaded
-                  ? '1.5px solid rgba(76,175,80,.3)'
-                  : '1.5px solid rgba(245,158,11,.3)',
-                borderRadius: 9,
+                  ? '1.5px solid var(--tint-success-bd, rgba(16,185,129,0.40))'
+                  : '1.5px solid var(--tint-warning-bd, rgba(245,158,11,0.40))',
+                borderRadius: 'var(--radius, 10px)',
                 padding: '14px 16px',
                 marginBottom: 12,
                 fontSize: '.84rem',
@@ -229,9 +229,9 @@ export function WonPaymentModal({
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       padding: '8px 12px',
-                      background: 'rgba(245,158,11,.12)',
-                      border: '1px dashed rgba(245,158,11,.4)',
-                      borderRadius: 6,
+                      background: 'var(--tint-warning, rgba(245,158,11,0.14))',
+                      border: '1px dashed var(--tint-warning-bd, rgba(245,158,11,0.40))',
+                      borderRadius: 'var(--radius-sm, 6px)',
                       color: 'var(--warning, #F59E0B)',
                       fontSize: 12, fontWeight: 600,
                       cursor: uploadingWorkOrder ? 'wait' : 'pointer',
@@ -264,8 +264,8 @@ export function WonPaymentModal({
                       display: 'inline-flex', alignItems: 'center', gap: 6,
                       padding: '6px 10px', marginTop: 10,
                       background: 'transparent',
-                      border: '1px solid rgba(245,158,11,.4)',
-                      borderRadius: 6,
+                      border: '1px solid var(--tint-warning-bd, rgba(245,158,11,0.40))',
+                      borderRadius: 'var(--radius-sm, 6px)',
                       color: 'var(--warning, #F59E0B)',
                       fontSize: 12, fontWeight: 600,
                       cursor: uploadingWorkOrder ? 'wait' : 'pointer',
@@ -294,8 +294,8 @@ export function WonPaymentModal({
               style={{
                 width: '100%',
                 background: 'transparent',
-                border: '1px dashed rgba(255,255,255,.2)',
-                color: 'var(--gray)',
+                border: '1px dashed var(--border, #334155)',
+                color: 'var(--text-muted, #94a3b8)',
                 borderRadius: 8,
                 padding: '10px 14px',
                 marginBottom: 14,
@@ -310,17 +310,17 @@ export function WonPaymentModal({
           {showPaymentFields && (
             <>
               {hasExistingPayment && (
-                <div style={{ background: 'rgba(129,199,132,.1)', border: '1px solid rgba(129,199,132,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: '.82rem' }}>
+                <div style={{ background: 'var(--tint-success, rgba(16,185,129,0.14))', border: '1px solid var(--tint-success-bd, rgba(16,185,129,0.40))', borderRadius: 'var(--radius, 10px)', padding: '10px 14px', marginBottom: 14, fontSize: '.82rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ color: 'var(--success, #10B981)', fontWeight: 600 }}>Already Received</span>
                     <span style={{ color: 'var(--success, #10B981)', fontWeight: 700 }}>{formatCurrency(totalPaid)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--gray)' }}>Remaining Balance</span>
+                    <span style={{ color: 'var(--text-muted, #94a3b8)' }}>Remaining Balance</span>
                     <span style={{ color: remainingBalance > 0 ? 'var(--danger, #EF4444)' : 'var(--success, #10B981)', fontWeight: 700 }}>{formatCurrency(remainingBalance)}</span>
                   </div>
                   {remainingBalance > 0 && (
-                    <div style={{ fontSize: '.72rem', color: 'var(--gray)', marginTop: 8, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', marginTop: 8, lineHeight: 1.4 }}>
                       Leave the amount blank to mark <strong>Won with Payment Pending</strong>, or enter the balance to record the final payment now. Incentive only credits once 100% is received.
                     </div>
                   )}
@@ -359,8 +359,8 @@ export function WonPaymentModal({
             </>
           )}
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: 14, marginTop: 14 }}>
-            <div style={{ fontSize: '.78rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, fontWeight: 600 }}>Campaign Dates *</div>
+          <div style={{ borderTop: '1px solid var(--border, #334155)', paddingTop: 14, marginTop: 14 }}>
+            <div style={{ fontSize: '.78rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10, fontWeight: 600 }}>Campaign Dates *</div>
             <div className="grid2">
               <div className="fg">
                 <label>Start Date</label>
@@ -377,7 +377,7 @@ export function WonPaymentModal({
           </div>
 
           {newAmount > 0 && balance > 0 && (
-            <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: '.82rem', marginTop: 12 }}>
+            <div style={{ background: 'var(--tint-danger, rgba(239,68,68,0.14))', border: '1px solid var(--tint-danger-bd, rgba(239,68,68,0.40))', borderRadius: 'var(--radius, 10px)', padding: '10px 14px', marginBottom: 12, fontSize: '.82rem', marginTop: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--danger, #EF4444)', fontWeight: 700 }}>Balance Due After This Payment</span>
                 <span style={{ color: 'var(--danger, #EF4444)', fontWeight: 800 }}>{formatCurrency(balance)}</span>

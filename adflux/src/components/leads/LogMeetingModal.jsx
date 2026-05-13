@@ -357,8 +357,8 @@ export default function LogMeetingModal({ onClose, onSaved }) {
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '8px 10px',
-              background: gps ? 'rgba(16,185,129,.08)' : 'var(--surface-2)',
-              border: `1px solid ${gps ? 'var(--success)' : 'var(--border-strong)'}`,
+              background: gps ? 'var(--tint-success, rgba(16,185,129,0.14))' : 'var(--surface-2)',
+              border: `1px solid ${gps ? 'var(--tint-success-bd, rgba(16,185,129,0.40))' : 'var(--border-strong)'}`,
               borderRadius: 8, fontSize: 12,
             }}
           >
@@ -392,8 +392,8 @@ export default function LogMeetingModal({ onClose, onSaved }) {
               isn't a field on this modal so it's dropped. */}
           <div style={{
             padding: '10px 12px',
-            background: 'rgba(255,230,0,0.06)',
-            border: '1px dashed var(--accent, #FFE600)',
+            background: 'var(--tint-yellow, rgba(255,230,0,0.14))',
+            border: '1px dashed var(--tint-yellow-bd, rgba(255,230,0,0.50))',
             borderRadius: 8,
             display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           }}>
@@ -497,9 +497,9 @@ export default function LogMeetingModal({ onClose, onSaved }) {
               {OUTCOMES.map(o => {
                 const on = outcome === o.value
                 const tint =
-                  o.tone === 'success' ? 'rgba(16,185,129,.14)'
-                  : o.tone === 'warn'    ? 'rgba(245,158,11,.14)'
-                  :                        'rgba(239,68,68,.14)'
+                  o.tone === 'success' ? 'var(--tint-success, rgba(16,185,129,0.14))'
+                  : o.tone === 'warn'    ? 'var(--tint-warning, rgba(245,158,11,0.14))'
+                  :                        'var(--tint-danger, rgba(239,68,68,0.14))'
                 const bd =
                   o.tone === 'success' ? 'var(--success)'
                   : o.tone === 'warn'    ? 'var(--warning)'

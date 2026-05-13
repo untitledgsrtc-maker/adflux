@@ -322,8 +322,8 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
           {stageSuggestion && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10,
-              background: 'rgba(255,230,0,.08)',
-              border: '1px solid rgba(255,230,0,.25)',
+              background: 'var(--tint-yellow, rgba(255,230,0,0.14))',
+              border: '1px solid var(--tint-yellow-bd, rgba(255,230,0,0.50))',
               padding: '10px 12px', borderRadius: 8,
               fontSize: 12, color: 'var(--text)',
             }}>

@@ -344,8 +344,8 @@ export function PaymentModal({
               {/* Sales context: explain approval flow */}
               {!isAdmin && !isEdit && (
                 <div className="pm-alert pm-alert--info" style={{
-                  background: 'rgba(100,181,246,.08)',
-                  border: '1px solid rgba(100,181,246,.25)',
+                  background: 'var(--tint-blue, rgba(59,130,246,0.14))',
+                  border: '1px solid var(--tint-blue-bd, rgba(59,130,246,0.40))',
                   color: 'var(--text)',
                   fontSize: 12,
                 }}>

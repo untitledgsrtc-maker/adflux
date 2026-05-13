@@ -457,8 +457,11 @@ export default function LeadDetailV2() {
           no longer flips stage. Rep confirms or dismisses here. */}
       {lead.auto_lost_suggested && lead.stage !== 'Lost' && lead.stage !== 'Won' && lead.stage !== 'Nurture' && (
         <div style={{
-          background: 'rgba(244, 63, 94, .10)',
-          border: '1px solid var(--danger, #EF4444)',
+          // Phase 34R+ — use new tint tokens. Was raw rgba(244,63,94,.10)
+          // (Tailwind rose-500, off-brand). Now uses --tint-danger
+          // which matches the live #EF4444 danger token.
+          background: 'var(--tint-danger, rgba(239,68,68,0.14))',
+          border: '1px solid var(--tint-danger-bd, rgba(239,68,68,0.40))',
           borderRadius: 10, padding: '10px 14px', marginBottom: 12,
           fontSize: 13,
           display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
@@ -500,10 +503,13 @@ export default function LeadDetailV2() {
       )}
 
       {/* Phase 33D.6 — stale-lead banner. Shown when no contact in 30+ days. */}
+      {/* Phase 34R+ — retinted to use --tint-warning + -bd. Was raw
+          rgba(245,158,11,.08) + full-sat border which read louder
+          than the auto-Lost banner; matches it now. */}
       {isStale && (
         <div style={{
-          background: 'rgba(245, 158, 11, .08)',
-          border: '1px solid var(--warning, #F59E0B)',
+          background: 'var(--tint-warning, rgba(245,158,11,0.14))',
+          border: '1px solid var(--tint-warning-bd, rgba(245,158,11,0.40))',
           borderRadius: 10, padding: '10px 14px', marginBottom: 12,
           fontSize: 13,
         }}>
