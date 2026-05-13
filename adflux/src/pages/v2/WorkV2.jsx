@@ -98,6 +98,10 @@ export default function WorkV2() {
   // modal owns its own form state; we just open it and reload the
   // session row on save so the meetings counter ticks up visibly.
   const [meetingModalOpen, setMeetingModalOpen] = useState(false)
+  // Phase 34O — after LogMeetingModal saves a new lead, defer the
+  // navigation to /leads/<id> until the WhatsApp prompt also closes
+  // so the rep isn't yanked away mid-prompt.
+  const [pendingNavLead, setPendingNavLead] = useState(null)
   // Phase 33A — success toast after Log Meeting save. Owner audit
   // (11 May) caught the modal closed silently; rep had no
   // confirmation. 2-second brand-yellow strip with "✓ Saved · N/5".
@@ -523,6 +527,22 @@ export default function WorkV2() {
     if (stateName !== 'A_PLAN') {
       return doCheckIn()
     }
+    // Phase 34O — plan is now compulsory. Require at least ONE of:
+    //   * a planned meeting with a client name (or location)
+    //   * any free-text plan
+    //   * a calls-planned > 0 OR new-leads target > 0
+    // Voice dictation populates the free-text field automatically
+    // so reps who tap the mic and speak satisfy the gate without
+    // typing. Empty-plan reps see an inline error pointing them at
+    // the voice mic.
+    const hasMeeting = plannedMeetings.some((m) =>
+      (m.client && m.client.trim()) || (m.location && m.location.trim()))
+    const hasText    = !!(planText && planText.trim())
+    const hasNumeric = (Number(plannedCalls) > 0) || (Number(plannedLeads) > 0)
+    if (!hasMeeting && !hasText && !hasNumeric) {
+      setError('Please add your plan first — tap the mic and speak it, or fill at least one meeting / call target.')
+      return
+    }
     await submitPlan()
     // submitPlan calls load() which moves us to A_CHECKIN. Wait one
     // tick then advance to check-in. This is conservative — if the
@@ -698,22 +718,76 @@ export default function WorkV2() {
           </button>
         )}
 
-        {/* ─── A_PLAN: morning plan form (now collapsed, optional) ─── */}
+        {/* ─── A_PLAN: morning plan form ─── */}
+        {/* Phase 34O — plan is now compulsory. `<details>` removed
+            in favour of always-open card so the voice mic + plan
+            fields are visible without an extra tap. Header
+            relabelled to drop the "(optional)" hint that misled
+            reps into skipping the plan. */}
         {stateName === 'A_PLAN' && (
-          <details className="m-card" style={{ padding: 0 }}>
-            <summary style={{
-              padding: '12px 16px', cursor: 'pointer',
-              fontSize: 13, color: 'var(--text-muted)',
-              fontWeight: 500,
+          <div className="m-card" style={{ padding: 0 }}>
+            <div style={{
+              padding: '12px 16px',
+              fontSize: 13, color: 'var(--text)',
+              fontWeight: 600,
               borderRadius: 10,
             }}>
-              Add plan (optional) — meetings, calls, focus
-            </summary>
+              Today's plan — speak it (mic below) or fill in
+            </div>
             <div style={{ padding: '0 16px 16px' }}>
             <div className="m-card-title">
               <span>Today's plan <span className="pill">Step 1 of 3</span></span>
               <Sun size={16} style={{ color: 'var(--warning)' }} />
             </div>
+
+            {/* Phase 34O — prominent voice CTA. Tap to speak today's
+                plan; the existing parse-day-plan Edge Function fills
+                meetings + calls + focus automatically. Reps who don't
+                want to speak can fill the form below by hand. */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '12px 14px',
+              background: 'var(--accent-soft, rgba(255,230,0,0.14))',
+              border: '1px solid var(--accent, #FFE600)',
+              borderRadius: 10,
+              marginBottom: 14,
+            }}>
+              <button
+                type="button"
+                onClick={recState === 'recording' ? stopRecording : startRecording}
+                disabled={recState === 'sending' || busy || parsing}
+                style={{
+                  width: 48, height: 48, borderRadius: '50%',
+                  background: recState === 'recording'
+                    ? 'var(--danger, #EF4444)'
+                    : 'var(--accent, #FFE600)',
+                  color: recState === 'recording' ? '#fff' : '#0f172a',
+                  border: 'none', cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 22, fontWeight: 700,
+                }}
+                aria-label={recState === 'recording' ? 'Stop' : 'Speak plan'}
+              >
+                {recState === 'sending'
+                  ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  : recState === 'recording' ? '■' : '🎤'}
+              </button>
+              <div style={{ flex: 1, fontSize: 13, lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                  {recState === 'recording'
+                    ? 'Listening… tap to stop'
+                    : recState === 'sending'
+                      ? 'Reading your plan…'
+                      : 'Tap to speak today\'s plan'}
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                  Gujarati / Hindi / English — AI fills meetings + calls below.
+                </div>
+              </div>
+            </div>
+
             <label className="lead-fld-label">Planned meetings</label>
             {plannedMeetings.map((m, i) => (
               <div key={i} className="m-meeting-row">
@@ -855,7 +929,7 @@ export default function WorkV2() {
                 : 'Save plan only'}
             </button>
             </div>
-          </details>
+          </div>
         )}
 
         {/* ─── A_CHECKIN: plan submitted, waiting for check-in ─── */}
@@ -1313,8 +1387,20 @@ export default function WorkV2() {
           on lead_activities INSERT). */}
       {meetingModalOpen && (
         <LogMeetingModal
-          onClose={() => setMeetingModalOpen(false)}
-          onSaved={(_newLeadId) => {
+          onClose={() => {
+            setMeetingModalOpen(false)
+            // Phase 34O — owner directive: after saving a meeting +
+            // closing the post-save WhatsApp prompt, navigate the rep
+            // to the new lead so they can keep working it (notes,
+            // photo, schedule next-action). Previously the modal just
+            // closed and left the rep stranded on /work.
+            if (pendingNavLead) {
+              const id = pendingNavLead
+              setPendingNavLead(null)
+              navigate(`/leads/${id}`)
+            }
+          }}
+          onSaved={(newLeadId) => {
             // Phase 33A — surface a success toast so the rep gets
             // confirmation (audit P2 caught silent close on Phase 32M).
             // Compute the new meeting count optimistically — Phase 12
@@ -1325,6 +1411,10 @@ export default function WorkV2() {
             setTimeout(() => setToast(''), 2200)
             playChime()
             load()
+            // Phase 34O — remember the new lead id; when the modal
+            // closes (after the post-save WhatsApp prompt) navigate
+            // to /leads/<id>.
+            if (newLeadId) setPendingNavLead(newLeadId)
           }}
         />
       )}
