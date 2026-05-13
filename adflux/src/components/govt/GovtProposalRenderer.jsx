@@ -602,7 +602,7 @@ function renderGsrtcTable(data) {
         <th style="${headStyle}width:54px;">સ્પોટ ડ્યુ.</th>
         <th style="${headStyle}width:60px;">માસિક સ્પોટ</th>
         <th style="${headStyle}width:42px;">દિવસો</th>
-        <th style="${headStyle}width:68px;line-height:1.25;">૧ સ્લોટ (૧૦ સે.)<br/>નો ભાવ</th>
+        <th style="${headStyle}width:96px;line-height:1.2;font-size:10px;white-space:nowrap;">૧ સ્લોટ (૧૦ સે.)<br/>નો ભાવ</th>
         <th style="${headStyle}width:74px;">માસિક કુલ</th>
         <th style="${headStyle}width:80px;">${toGujaratiDigits(String(months))} માસ કુલ</th>
       </tr>
