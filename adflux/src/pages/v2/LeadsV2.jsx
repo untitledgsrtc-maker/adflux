@@ -43,6 +43,7 @@ import { toastError } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import V2Hero from '../../components/v2/V2Hero'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
+import FilterDrawer, { ActiveFilterChips } from '../../components/v2/FilterDrawer'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 
 /* The 5 tabs from the design — All + 4 groups. We re-use the
@@ -203,6 +204,79 @@ export default function LeadsV2() {
     const decided = totals.wonCount + totals.lostCount
     return decided === 0 ? null : Math.round((totals.wonCount / decided) * 100)
   }, [totals])
+
+  /* Phase 34Z.14 — schema array consumed by FilterDrawer + the
+     ActiveFilterChips row. Defaults match each filter's "all/any" state
+     so chips only appear once the rep narrows something. */
+  const filterFields = useMemo(() => {
+    const fields = [
+      {
+        key: 'segment',
+        label: 'Segment',
+        value: segmentFilter,
+        onChange: setSegmentFilter,
+        defaultValue: 'all',
+        dotColor: 'var(--accent, #FFE600)',
+        options: [
+          { value: 'all',        label: 'All' },
+          { value: 'PRIVATE',    label: 'Private' },
+          { value: 'GOVERNMENT', label: 'Govt' },
+        ],
+      },
+    ]
+    if (distinctSources.length > 0) {
+      fields.push({
+        key: 'source',
+        label: 'Source',
+        value: sourceFilter,
+        onChange: setSourceFilter,
+        defaultValue: 'all',
+        dotColor: 'var(--success, #10B981)',
+        options: [{ value: 'all', label: 'Any' }, ...distinctSources.map(s => ({ value: s, label: s }))],
+      })
+    }
+    if (distinctCities.length > 0) {
+      fields.push({
+        key: 'city',
+        label: 'City',
+        value: cityFilter,
+        onChange: setCityFilter,
+        defaultValue: 'all',
+        dotColor: 'var(--blue, #3B82F6)',
+        options: [{ value: 'all', label: 'All' }, ...distinctCities.map(c => ({ value: c, label: c }))],
+      })
+    }
+    if (isPrivileged) {
+      fields.push({
+        key: 'industry',
+        label: 'Industry',
+        value: industryFilter,
+        onChange: setIndustryFilter,
+        defaultValue: 'all',
+        dotColor: 'var(--warning, #F59E0B)',
+        options: [
+          { value: 'all', label: distinctIndustries.length === 0 ? '—' : 'All' },
+          ...distinctIndustries.map(i => ({ value: i, label: i })),
+        ],
+      })
+    }
+    if (isPrivileged && distinctReps.length > 0) {
+      fields.push({
+        key: 'rep',
+        label: 'Assigned',
+        value: repFilter,
+        onChange: setRepFilter,
+        defaultValue: 'all',
+        dotColor: 'var(--danger, #EF4444)',
+        options: [{ value: 'all', label: 'Anyone' }, ...distinctReps.map(r => ({ value: r.id, label: r.name }))],
+      })
+    }
+    return fields
+  }, [
+    segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter,
+    distinctSources, distinctCities, distinctIndustries, distinctReps,
+    isPrivileged,
+  ])
 
   /* ─── AI briefing computations (no mocks — real lead data) ─── */
   const aiBriefing = useMemo(() => {
@@ -510,85 +584,12 @@ export default function LeadsV2() {
           })}
         </div>
 
-        <select
-          value={segmentFilter}
-          onChange={e => setSegmentFilter(e.target.value)}
-          className="lead-filter-select"
-          style={{ minWidth: 130 }}
-          title="Segment"
-        >
-          <option value="all">Segment: All</option>
-          <option value="PRIVATE">Segment: Private</option>
-          <option value="GOVERNMENT">Segment: Govt</option>
-        </select>
-
-        {distinctSources.length > 0 && (
-          <select
-            value={sourceFilter}
-            onChange={e => setSourceFilter(e.target.value)}
-            className="lead-filter-select"
-            style={{ minWidth: 140 }}
-          >
-            <option value="all">Source: Any</option>
-            {distinctSources.map(s => (
-              <option key={s} value={s}>{`Source: ${s}`}</option>
-            ))}
-          </select>
-        )}
-
-        {distinctCities.length > 0 && (
-          <select
-            value={cityFilter}
-            onChange={e => setCityFilter(e.target.value)}
-            className="lead-filter-select"
-            style={{ minWidth: 130 }}
-          >
-            <option value="all">City: All</option>
-            {distinctCities.map(c => (
-              <option key={c} value={c}>{`City: ${c}`}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Phase 33B.3 — sales view doesn't see the industry filter
-            (owner audit 11 May: <5% use; clutter). Admin/co_owner
-            still get it for cross-rep slicing. */}
-        {isPrivileged && (
-        <select
-          value={industryFilter}
-          onChange={e => setIndustryFilter(e.target.value)}
-          className="lead-filter-select"
-          style={{ minWidth: 150 }}
-          title="Industry"
-          disabled={distinctIndustries.length === 0}
-        >
-          <option value="all">
-            {distinctIndustries.length === 0 ? 'Industry: —' : 'Industry: All'}
-          </option>
-          {distinctIndustries.map(i => (
-            <option key={i} value={i}>{`Industry: ${i}`}</option>
-          ))}
-        </select>
-        )}
-
-        {isPrivileged && distinctReps.length > 0 && (
-          <select
-            value={repFilter}
-            onChange={e => setRepFilter(e.target.value)}
-            className="lead-filter-select"
-            style={{ minWidth: 160 }}
-          >
-            <option value="all">Assigned: Anyone</option>
-            {distinctReps.map(r => (
-              <option key={r.id} value={r.id}>{`Assigned: ${r.name}`}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Phase 34Z.13 — unified pill-style DateRangeFilter replaces
-            the two raw date inputs. Preset menu + step arrows + custom
-            range. Defaults to This month. */}
+        {/* Phase 34Z.14 — date pill stays inline (most-used filter);
+            everything else folds into the gear popover so the default
+            state is just [search] [tabs] [date] [⚙ count]. */}
         <DateRangeFilter value={dateRange} onChange={setDateRange} />
+
+        <FilterDrawer fields={filterFields} />
 
         {hasActiveFilters && (
           <button
@@ -609,6 +610,10 @@ export default function LeadsV2() {
           </button>
         )}
       </div>
+
+      {/* Phase 34Z.14 — removable chips below the filter row, one per
+          active dropdown. Empty until rep narrows something. */}
+      <ActiveFilterChips fields={filterFields} />
 
       {/* ─── Status / loading / empty / error / table ─── */}
       {error && (
