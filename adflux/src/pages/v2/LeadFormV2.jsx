@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera, MapPin } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import PhotoCapture from '../../components/leads/PhotoCapture'
@@ -42,6 +42,11 @@ export default function LeadFormV2() {
   const isTelecaller = profile?.team_role === 'telecaller'
 
   const prefill = location.state?.prefill || {}
+  // Phase 34Z.20 — same form, two modes. meetingMode=true is set by
+  // /work "Log meeting" CTA; toggles title + adds Outcome section +
+  // inserts a lead_activities row with type='meeting' + GPS after the
+  // lead saves. No second form; one chrome end-to-end.
+  const meetingMode = location.state?.meetingMode === true
 
   const [form, setForm] = useState({
     name:           prefill.name        || '',
@@ -70,6 +75,13 @@ export default function LeadFormV2() {
   // Phase 33D.6 — duplicate phone warning
   const [dupLead, setDupLead] = useState(null)
 
+  // Phase 34Z.20 — GPS auto-fetch (always; meeting-mode needs it, and
+  // create-lead benefits from it for cold-walk-in audit even without
+  // outcome). Captures once on mount; rep can hit Refresh on the pill.
+  const [gps,    setGps]    = useState(null)   // { lat, lng, acc }
+  const [gpsBusy, setGpsBusy] = useState(false)
+  const [outcome, setOutcome] = useState('')   // meeting-mode only
+
   async function checkPhoneDup(p) {
     setDupLead(null)
     const hit = await findLeadByPhone(p)
@@ -94,6 +106,26 @@ export default function LeadFormV2() {
       .order('name')
       .then(({ data }) => setTelecallers(data || []))
   }, [])
+
+  // Phase 34Z.20 — auto-capture GPS on mount.
+  useEffect(() => { refreshGps() }, [])
+
+  function refreshGps() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    setGpsBusy(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGps({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          acc: Math.round(pos.coords.accuracy || 0) || null,
+        })
+        setGpsBusy(false)
+      },
+      () => { setGpsBusy(false) },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+    )
+  }
 
   async function handleSave(openAfter = false) {
     setError('')
@@ -132,6 +164,10 @@ export default function LeadFormV2() {
       setError('Segment is required.')
       return
     }
+    if (meetingMode && !outcome) {
+      setError('Pick an outcome — Good / Maybe / Lost.')
+      return
+    }
     setSaving(true)
     const payload = {
       name:          form.name.trim(),
@@ -152,17 +188,55 @@ export default function LeadFormV2() {
       telecaller_id: form.telecaller_id || null,
       created_by:    profile.id,
     }
+    // Phase 34Z.20 — meeting-mode pins source + segment overrides.
+    if (meetingMode) {
+      payload.source = 'Field Meeting'
+      payload.segment = 'PRIVATE'
+      payload.heat    = outcome === 'good' ? 'warm' : 'cold'
+      payload.stage   = outcome === 'lost' ? 'Lost' : 'Working'
+      if (outcome === 'lost') payload.lost_reason = 'NoNeed'
+    }
+
     const { data, error: err } = await supabase
       .from('leads')
       .insert([payload])
       .select()
       .single()
-    setSaving(false)
     if (err) {
+      setSaving(false)
       setError('Save failed: ' + err.message)
       return
     }
-    navigate(openAfter ? `/leads/${data.id}` : '/leads')
+
+    // Phase 34Z.20 — meeting activity row attached on save when
+    // meetingMode. Mirrors LogMeetingModal's insert: outcome maps to
+    // lead_activities.outcome enum, GPS coords attached if captured.
+    // Trigger Phase 32M bumps daily_counters.meetings server-side.
+    if (meetingMode) {
+      const activityNotes = [
+        `Field meeting · ${outcome}`,
+        form.notes.trim() || null,
+      ].filter(Boolean).join(' — ')
+      const { error: actErr } = await supabase.from('lead_activities').insert([{
+        lead_id:        data.id,
+        activity_type:  'meeting',
+        outcome:        outcome === 'good' ? 'positive'
+                        : outcome === 'maybe' ? 'neutral'
+                        : 'negative',
+        notes:          activityNotes,
+        created_by:     profile.id,
+        gps_lat:        gps?.lat || null,
+        gps_lng:        gps?.lng || null,
+        gps_accuracy_m: gps?.acc || null,
+      }])
+      if (actErr) {
+        setSaving(false)
+        setError(`Lead saved, but meeting log failed: ${actErr.message}.`)
+        return
+      }
+    }
+    setSaving(false)
+    navigate(openAfter ? `/leads/${data.id}` : (meetingMode ? '/work' : '/leads'))
   }
 
   return (
@@ -173,10 +247,45 @@ export default function LeadFormV2() {
 
       <div className="lead-page-head">
         <div>
-          <div className="lead-page-eyebrow">Add to pipeline</div>
-          <div className="lead-page-title">New Lead</div>
-          <div className="lead-page-sub">30 seconds · all fields can be edited later</div>
+          <div className="lead-page-eyebrow">{meetingMode ? 'Field visit' : 'Add to pipeline'}</div>
+          <div className="lead-page-title">{meetingMode ? 'Log meeting' : 'New Lead'}</div>
+          <div className="lead-page-sub">
+            {meetingMode
+              ? 'Cold walk-in · counts toward today\'s meetings'
+              : '30 seconds · all fields can be edited later'}
+          </div>
         </div>
+      </div>
+
+      {/* Phase 34Z.20 — GPS pin strip. Always-on; meeting-mode attaches
+          coords to the activity row, create-mode keeps it for the
+          owner's "where was this lead added from" audit. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 10px',
+        background: gps ? 'var(--tint-success, rgba(16,185,129,0.14))' : 'var(--surface-2)',
+        border: `1px solid ${gps ? 'var(--tint-success-bd, rgba(16,185,129,0.40))' : 'var(--border-strong)'}`,
+        borderRadius: 10,
+        fontSize: 12,
+        marginBottom: 14,
+      }}>
+        <MapPin size={14} style={{ color: gps ? 'var(--success)' : 'var(--text-muted)' }} />
+        {gpsBusy ? (
+          <span>Capturing GPS…</span>
+        ) : gps ? (
+          <span style={{ color: 'var(--text)' }}>Pin captured · ±{gps.acc}m</span>
+        ) : (
+          <span style={{ color: 'var(--text-muted)' }}>No GPS yet</span>
+        )}
+        <button
+          type="button"
+          className="lead-btn lead-btn-sm"
+          onClick={refreshGps}
+          disabled={gpsBusy}
+          style={{ marginLeft: 'auto' }}
+        >
+          {gpsBusy ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : 'Refresh'}
+        </button>
       </div>
 
       {/* Phase 33D.1 — business-card scanner. Owner directive (11 May
@@ -383,6 +492,51 @@ export default function LeadFormV2() {
         </div>
       </div>
 
+      {/* Phase 34Z.20 — Outcome section, meeting-mode only. Same three
+          tone buttons LogMeetingModal had. Drives heat + stage on the
+          new lead row and the lead_activities.outcome enum. */}
+      {meetingMode && (
+        <div className="lead-card" style={{ marginBottom: 14 }}>
+          <div className="lead-card-head"><div className="lead-card-title">Outcome *</div></div>
+          <div className="lead-card-pad">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {[
+                { value: 'good',  label: 'Good',  sub: 'Wants quote / more info', tone: 'success' },
+                { value: 'maybe', label: 'Maybe', sub: 'Come back in 30 days',    tone: 'warn'    },
+                { value: 'lost',  label: 'Lost',  sub: 'Politely refused',        tone: 'danger'  },
+              ].map((o) => {
+                const on = outcome === o.value
+                const tint =
+                  o.tone === 'success' ? 'var(--tint-success, rgba(16,185,129,0.14))'
+                  : o.tone === 'warn'  ? 'var(--tint-warning, rgba(245,158,11,0.14))'
+                  :                       'var(--tint-danger, rgba(239,68,68,0.14))'
+                const bd =
+                  o.tone === 'success' ? 'var(--success)'
+                  : o.tone === 'warn'  ? 'var(--warning)'
+                  :                       'var(--danger)'
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => setOutcome(o.value)}
+                    style={{
+                      padding: '10px 12px', borderRadius: 8,
+                      border: `1.5px solid ${on ? bd : 'var(--border-strong)'}`,
+                      background: on ? tint : 'var(--surface-2)',
+                      color: 'var(--text)', cursor: 'pointer',
+                      textAlign: 'left', fontFamily: 'inherit',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{o.label}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{o.sub}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Notes ─── */}
       {/* Phase 33F (K3) — voice mic on Notes textarea. */}
       <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
@@ -412,14 +566,14 @@ export default function LeadFormV2() {
       )}
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-        <button className="lead-btn" onClick={() => navigate('/leads')} disabled={saving}>Cancel</button>
+        <button className="lead-btn" onClick={() => navigate(meetingMode ? '/work' : '/leads')} disabled={saving}>Cancel</button>
         <button className="lead-btn" onClick={() => handleSave(true)} disabled={saving}>
           Save &amp; open
         </button>
         <button className="lead-btn lead-btn-primary" onClick={() => handleSave(false)} disabled={saving}>
           {saving
             ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
-            : <><Save size={12} /> Save Lead</>}
+            : <><Save size={12} /> {meetingMode ? 'Save meeting' : 'Save Lead'}</>}
         </button>
       </div>
     </div>

@@ -660,10 +660,17 @@ export default function WorkV2() {
           startDay={startDay}
           doCheckIn={doCheckIn}
           submitEvening={submitEvening}
-          onOpenMeeting={() => { setMeetingMode('meeting'); setMeetingModalOpen(true) }}
+          // Phase 34Z.20 — both CTAs now navigate to LeadFormV2.
+          // Meeting passes meetingMode=true → form shows Outcome
+          // section + GPS strip + saves a lead_activities row.
+          // Lead is the plain create flow. One form, two modes.
+          // Owner directive (14 May 2026): "I need same copy and
+          // paste form in log in the meeting. Both must have auto
+          // fetch GPS."
+          onOpenMeeting={() => navigate('/leads/new', {
+            state: { meetingMode: true, prefill: { city: profile?.city || '' } },
+          })}
           onOpenLead={() => navigate('/leads/new', {
-            // Phase 34Z.8 — full LeadFormV2 page instead of modal
-            // lead-mode. Owner: "i need this form in every lead created".
             state: { prefill: { city: profile?.city || '' } },
           })}
         />
