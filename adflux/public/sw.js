@@ -27,7 +27,21 @@ precacheAndRoute(self.__WB_MANIFEST || [])
 // /index.html (the React Router root). Lets reps land on /work,
 // /leads/<uuid>, /quotes etc. even when offline. The actual page
 // data still needs Supabase, but the chrome at least renders.
-registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html')))
+//
+// Phase 34Z.27 — denylist /assets/ + /fonts/ so dynamic JS chunks,
+// font files, and other build artefacts aren't replaced with the
+// index.html shell when the SW can't find them in precache. Without
+// this, `import('html2canvas')` for the PDF renderer was loading
+// HTML — Safari rejected it as "Expected a JavaScript-or-Wasm module
+// script but the server responded with a MIME type of text/html."
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
+  denylist: [
+    /^\/assets\//,
+    /^\/fonts\//,
+    /^\/letterheads\//,
+    /\.(?:js|mjs|css|map|json|png|jpg|jpeg|svg|webp|gif|ico|ttf|woff2?|wasm)$/,
+  ],
+}))
 
 // ─── RUNTIME CACHE — Google Fonts ────────────────────────────────────
 registerRoute(

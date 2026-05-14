@@ -20,6 +20,15 @@ import { createRoot } from 'react-dom/client'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { rupeesToWords } from '../../utils/numberToWords'
+// Phase 34Z.27 — static imports for html2canvas + jspdf. The previous
+// version used `await import('html2canvas')` and `await import('jspdf')`
+// which Vite split into separate /assets/*.js chunks. Workbox's
+// NavigationRoute then intercepted those chunk URLs and served
+// index.html → "Failed to fetch dynamically imported module" → PDF
+// generation died. Bundling them into the main chunk via static import
+// bypasses the SW fallback entirely.
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
 const YELLOW = '#FFE600'
 const INK    = '#0f172a'
@@ -196,11 +205,24 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
 
   return (
     <div style={styles.page}>
-      <div style={styles.headBand}>
+      {/* Phase 34Z.27 — column names now match companies schema
+          (address_line, bank_acc_number, phone, email, etc.). Letterhead
+          image renders behind the header as a watermark/background when
+          the companies row has letterhead_url set. */}
+      <div style={{
+        ...styles.headBand,
+        position: 'relative',
+        backgroundImage: company.letterhead_url ? `url("${company.letterhead_url}")` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}>
         <div>
-          <div style={styles.headBrand}>{company.name || 'Untitled Advertising'}</div>
-          <div style={styles.headSub}>{company.address || ''}</div>
-          <div style={styles.headSub}>GSTIN: {company.gstin || '—'}</div>
+          <div style={styles.headBrand}>{company.name || company.short_name || 'Untitled Advertising'}</div>
+          <div style={styles.headSub}>
+            {[company.address_line, company.city, company.state, company.pincode].filter(Boolean).join(', ')}
+          </div>
+          <div style={styles.headSub}>GSTIN: {company.gstin || '—'} · PAN: {company.pan || '—'}</div>
         </div>
         <div style={styles.headQuote}>
           <div style={styles.headQuoteLabel}>Quote #</div>
@@ -361,19 +383,22 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
           <div style={styles.footerCell}>
             <div style={styles.footerLabel}>Bank</div>
             <div style={styles.footerValue}>{company.bank_name || ''}</div>
-            <div>{company.bank_branch ? `Branch: ${company.bank_branch}` : ''}</div>
-            <div>{company.bank_account ? `A/C: ${company.bank_account}` : ''}</div>
-            <div>{company.bank_ifsc ? `IFSC: ${company.bank_ifsc}` : ''}</div>
+            {company.bank_branch && <div>Branch: {company.bank_branch}</div>}
+            {company.bank_acc_name && <div>A/C Name: {company.bank_acc_name}</div>}
+            {company.bank_acc_number && <div>A/C: {company.bank_acc_number}</div>}
+            {company.bank_ifsc && <div>IFSC: {company.bank_ifsc}</div>}
+            {company.bank_micr && <div>MICR: {company.bank_micr}</div>}
+            {company.upi_id && <div>UPI: {company.upi_id}</div>}
           </div>
           <div style={styles.footerCell}>
             <div style={styles.footerLabel}>Contact</div>
-            <div>{company.contact_phone || ''}</div>
-            <div>{company.contact_email || ''}</div>
-            <div>{company.website || ''}</div>
+            {company.phone && <div>Phone: {company.phone}</div>}
+            {company.email && <div>Email: {company.email}</div>}
+            {company.website && <div>Web: {company.website}</div>}
           </div>
           <div style={{ ...styles.footerCell, textAlign: 'right' }}>
             <div style={styles.footerLabel}>Prepared by</div>
-            <div style={styles.footerValue}>{quote?.sales_person_name || 'Sales Executive'}</div>
+            <div style={styles.footerValue}>{repName}</div>
             <div>{quote?.quote_number} · {quote?.created_at ? formatDate(quote.created_at) : ''}</div>
           </div>
         </div>
@@ -385,9 +410,6 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
 /* ─── Snapshot helper (mirrors GovtProposalDetailV2 combined-pdf) ─── */
 
 async function renderToPdfBlob(quote, cities, company) {
-  const html2canvas = (await import('html2canvas')).default
-  const { jsPDF }    = await import('jspdf')
-
   const A4_WIDTH_PX = 794
   const wrapper = document.createElement('div')
   wrapper.style.position   = 'fixed'
