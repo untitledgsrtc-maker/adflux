@@ -27,7 +27,7 @@ const VARIANT_STYLES = {
     bg:     'var(--danger, #EF4444)',
     fg:     '#fff',
     border: 'transparent',
-    hoverBg:'#dc2626',
+    hoverBg:'var(--danger-hover, #DC2626)',
   },
   subtle: {
     bg:     'var(--surface-2)',

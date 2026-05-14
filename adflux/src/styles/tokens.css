@@ -29,6 +29,10 @@
   --success:       #10B981;
   --success-soft:  rgba(16, 185, 129, 0.12);
   --warning:       #F59E0B;
+  /* Phase 35 PR 1 — danger hover sits next to other -hover tokens
+     so ActionButton variant="danger" hover state stops carrying a
+     raw #dc2626 literal inline. */
+  --danger-hover:  #DC2626;
   --warning-soft:  rgba(245, 158, 11, 0.12);
   --danger:        #EF4444;
   --danger-soft:   rgba(239, 68, 68, 0.12);
@@ -74,6 +78,10 @@
   --tint-purple-bd:  rgba(192, 132, 252, 0.40);
   --tint-yellow:     rgba(255, 230, 0, 0.14);
   --tint-yellow-bd:  rgba(255, 230, 0, 0.50);
+  /* Phase 35 PR 1 — fill the orange row in the tint grid so
+     StatusBadge tint="orange" stops carrying raw rgba inline. */
+  --tint-orange:     rgba(249, 115, 22, 0.14);
+  --tint-orange-bd:  rgba(249, 115, 22, 0.40);
 
   /* ---- Sidebar (same as main bg for cohesion) ---- */
   --sidebar-bg:     #0F172A;

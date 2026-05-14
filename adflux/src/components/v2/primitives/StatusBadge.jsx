@@ -22,7 +22,7 @@ const TINT_PALETTE = {
   blue:    { fg: 'var(--blue, #3B82F6)',    bg: 'var(--tint-blue, rgba(59,130,246,.14))',     bd: 'var(--tint-blue-bd, rgba(59,130,246,.40))' },
   purple:  { fg: 'var(--purple, #A78BFA)',  bg: 'var(--tint-purple, rgba(192,132,252,.16))',  bd: 'var(--tint-purple-bd, rgba(192,132,252,.40))' },
   yellow:  { fg: 'var(--accent, #FFE600)',  bg: 'var(--tint-yellow, rgba(255,230,0,.14))',    bd: 'var(--tint-yellow-bd, rgba(255,230,0,.50))' },
-  orange:  { fg: 'var(--orange, #F97316)',  bg: 'var(--orange-soft, rgba(249,115,22,.12))',   bd: 'rgba(249,115,22,.30)' },
+  orange:  { fg: 'var(--orange, #F97316)',  bg: 'var(--tint-orange, rgba(249,115,22,.14))',  bd: 'var(--tint-orange-bd, rgba(249,115,22,.40))' },
   neutral: { fg: 'var(--text-muted)',       bg: 'var(--surface-2)',                              bd: 'var(--border)' },
 }
 
