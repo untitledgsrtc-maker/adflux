@@ -33,6 +33,26 @@ import { geocodeAndPersistLead, leadAddressLine } from '../../utils/geocode'
 const FALLBACK_CENTER = [22.3072, 73.1812]
 const FALLBACK_ZOOM   = 7   // shows most of Gujarat
 
+// Phase 34Z.5 — Leaflet's default marker uses 3 PNG assets loaded from
+// `leaflet/dist/images/`. Vite's bundler doesn't auto-rewrite those URLs
+// so production builds 404 on marker-icon.png and the markers render
+// invisible (the 4 PINS chip shows but the map has no visible dots).
+// Replace the default icon with an inline brand-yellow SVG divIcon so
+// no extra assets are needed and the pin is on-brand. Owner reported
+// 14 May 2026: "showing wrong data and not pining properly".
+const BRAND_PIN_ICON = L.divIcon({
+  className: 'meetings-map-pin',
+  html: `
+    <svg width="22" height="30" viewBox="0 0 22 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M11 0C4.92 0 0 4.92 0 11c0 7.7 9.9 18.2 10.32 18.65a1 1 0 0 0 1.36 0C12.1 29.2 22 18.7 22 11c0-6.08-4.92-11-11-11z" fill="#FFE600" stroke="#0f172a" stroke-width="1.4"/>
+      <circle cx="11" cy="11" r="4" fill="#0f172a"/>
+    </svg>
+  `,
+  iconSize:   [22, 30],
+  iconAnchor: [11, 30],
+  popupAnchor:[0, -26],
+})
+
 function ymd(d) {
   d.setHours(0, 0, 0, 0)
   return d.toISOString().slice(0, 10)
@@ -197,12 +217,19 @@ export default function MeetingsMapPanel({ userId }) {
     // initialises with that size and never requests tiles. After the
     // user expands the panel the container has a real height but
     // Leaflet doesn't know, so no tile request fires. The canonical
-    // fix is `invalidateSize()` once the container is visible. Single
-    // requestAnimationFrame tick suffices now that MapTiler tiles
-    // load reliably and the panel renders only when `open === true`.
-    requestAnimationFrame(() => {
+    // fix is `invalidateSize()` once the container is visible.
+    //
+    // Phase 34Z.5 (14 May 2026) — single rAF still leaves the map
+    // blank on slow networks / first cold paint (the container is
+    // technically visible but layout hasn't fully settled inside the
+    // expanded card). Fire invalidateSize at three points: rAF,
+    // 120ms, 400ms. Cheap; covers iOS Safari's slower paint pass.
+    const sizeKick = () => {
       try { mapRef.current?.invalidateSize() } catch { /* ignore */ }
-    })
+    }
+    requestAnimationFrame(sizeKick)
+    const t1 = setTimeout(sizeKick, 120)
+    const t2 = setTimeout(sizeKick, 400)
 
     // Clear existing markers
     markersRef.current.forEach((m) => m.remove())
@@ -210,7 +237,10 @@ export default function MeetingsMapPanel({ userId }) {
 
     if (leads.length === 0) {
       mapRef.current.setView(FALLBACK_CENTER, FALLBACK_ZOOM)
-      return
+      return () => {
+        clearTimeout(t1)
+        clearTimeout(t2)
+      }
     }
 
     const bounds = []
@@ -218,7 +248,7 @@ export default function MeetingsMapPanel({ userId }) {
       const lat = Number(l.lat)
       const lng = Number(l.lng)
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
-      const marker = L.marker([lat, lng]).addTo(mapRef.current)
+      const marker = L.marker([lat, lng], { icon: BRAND_PIN_ICON }).addTo(mapRef.current)
       const labelHtml = [
         `<strong>${l.name || '—'}</strong>`,
         l.company ? `<br/>${l.company}` : '',
@@ -229,7 +259,21 @@ export default function MeetingsMapPanel({ userId }) {
       bounds.push([lat, lng])
     }
     if (bounds.length > 0) {
-      mapRef.current.fitBounds(bounds, { padding: [24, 24], maxZoom: 13 })
+      // Phase 34Z.5 — fitBounds runs synchronously before tile load
+      // completes, so the initial view can be wrong if the container
+      // resizes after layout settles. Re-fit on each invalidateSize
+      // kick so the pins land in-frame after MapTiler tiles arrive.
+      const fit = () => {
+        try { mapRef.current?.fitBounds(bounds, { padding: [24, 24], maxZoom: 13 }) } catch { /* ignore */ }
+      }
+      fit()
+      setTimeout(fit, 140)
+      setTimeout(fit, 420)
+    }
+
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
     }
   }, [open, leads])
 
