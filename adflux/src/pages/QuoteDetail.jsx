@@ -11,7 +11,15 @@ import { useQuotes } from '../hooks/useQuotes'
 import { usePayments } from '../hooks/usePayments'
 import { supabase } from '../lib/supabase'
 import { QuoteStatusBadge } from '../components/quotes/QuoteStatusBadge'
-import { downloadQuotePDF, uploadQuotePDF } from '../components/quotes/QuotePDF'
+// Phase 34Z.25 — switched to HTML/CSS renderer (html2canvas + jsPDF).
+// The @react-pdf/renderer path kept failing on font resolution in
+// production builds despite Phase 34Z.22-24 fixes. Owner directive
+// (14 May 2026): "take data from pdf genratore from govet proposal
+// genrates." Same pattern as GovtProposalDetailV2 combined-pdf path.
+import {
+  downloadQuotePDFHtml as downloadQuotePDF,
+  uploadQuotePDFHtml   as uploadQuotePDF,
+} from '../components/quotes/QuotePDFHtml'
 // Phase 15 — ENIL-style PDF for Other Media quotes (newspaper, hoarding,
 // cinema, …). Routed in handleDownloadPDF based on quote.media_type so
 // the existing private LED PDF stays untouched.
