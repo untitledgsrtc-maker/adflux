@@ -800,7 +800,7 @@ function DayStatusSurface(props) {
     return (
       <>
         <V2Hero
-          eyebrow={`Today · in progress${session?.check_in_at ? ` · checked in ${formatTime(session.check_in_at)}` : ''}`}
+          eyebrow={session?.check_in_at ? `In · ${formatTime(session.check_in_at)}` : 'In progress'}
           value={summary}
           label="meetings logged"
           chip={`${counters.calls || 0} call${(counters.calls || 0) === 1 ? '' : 's'} · ${counters.new_leads || 0} new lead${(counters.new_leads || 0) === 1 ? '' : 's'}`}

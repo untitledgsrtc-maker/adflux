@@ -49,7 +49,13 @@ export default function MeetingsMapPanel({ userId }) {
   const mapElRef     = useRef(null)
   const markersRef   = useRef([])
 
-  // Load this rep's upcoming follow-ups (today + next 7 days).
+  // Load lead pins from THREE sources, union them:
+  //   1. Open follow-ups (today → next 7 days, assigned to me)
+  //   2. Lead activities I logged today + last 7 days (so the rep
+  //      sees where they've BEEN, not just where they're going)
+  //   3. Leads I'm assigned to that have city set (background)
+  // Owner directive (14 May 2026): "pining not showing in sales side
+  // — i need every day pin." Single follow-up query was too narrow.
   useEffect(() => {
     if (!userId || !open) return
     let cancelled = false
@@ -59,19 +65,42 @@ export default function MeetingsMapPanel({ userId }) {
       try {
         const today    = new Date()
         const weekEnd  = new Date(); weekEnd.setDate(weekEnd.getDate() + 7)
+        const weekAgo  = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
+        const weekAgoIso = weekAgo.toISOString()
 
-        // Get all open follow-ups for me, this week.
-        const { data: fus, error: fuErr } = await supabase
-          .from('follow_ups')
-          .select('lead_id')
-          .eq('assigned_to', userId)
-          .eq('is_done', false)
-          .not('lead_id', 'is', null)
-          .gte('follow_up_date', ymd(today))
-          .lte('follow_up_date', ymd(weekEnd))
+        // Three parallel queries → union of lead_ids.
+        const [fuRes, actRes, mineRes] = await Promise.all([
+          supabase
+            .from('follow_ups')
+            .select('lead_id')
+            .eq('assigned_to', userId)
+            .eq('is_done', false)
+            .not('lead_id', 'is', null)
+            .gte('follow_up_date', ymd(today))
+            .lte('follow_up_date', ymd(weekEnd)),
+          supabase
+            .from('lead_activities')
+            .select('lead_id')
+            .eq('created_by', userId)
+            .not('lead_id', 'is', null)
+            .gte('created_at', weekAgoIso),
+          supabase
+            .from('leads')
+            .select('id')
+            .eq('assigned_to', userId)
+            .not('stage', 'in', '("Won","Lost")')
+            .limit(50),
+        ])
+        if (fuRes.error)   throw fuRes.error
+        if (actRes.error)  throw actRes.error
+        if (mineRes.error) throw mineRes.error
 
-        if (fuErr) throw fuErr
-        const leadIds = [...new Set((fus || []).map((r) => r.lead_id))]
+        const leadIds = [...new Set([
+          ...(fuRes.data || []).map(r => r.lead_id),
+          ...(actRes.data || []).map(r => r.lead_id),
+          ...(mineRes.data || []).map(r => r.id),
+        ].filter(Boolean))]
+
         if (leadIds.length === 0) {
           if (!cancelled) { setLeads([]); setNeedsGeo([]); setLoading(false) }
           return
