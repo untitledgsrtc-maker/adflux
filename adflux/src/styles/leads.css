@@ -364,7 +364,13 @@
   position: fixed; inset: 0;
   background: rgba(0,0,0,.5);
   display: grid; place-items: center;
-  z-index: 100;
+  /* Phase 35 PR 2.7 — z-index bumped 100 → 9000 so Leaflet's
+     attribution control (z-index 800 in leaflet.css) doesn't bleed
+     through the modal on /work where MeetingsMapPanel is mounted
+     underneath. Owner screenshot showed the "© MapTiler © OSM
+     contributors" pill rendered ON TOP of the LogMeetingModal's
+     City field. 9000 sits below ToastViewport (9999). */
+  z-index: 9000;
 }
 [data-theme="day"] .lead-modal-back { background: rgba(15,23,42,.4); }
 .lead-modal {

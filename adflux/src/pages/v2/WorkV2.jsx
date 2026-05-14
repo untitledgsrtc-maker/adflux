@@ -35,6 +35,11 @@ import { useAuthStore } from '../../store/authStore'
 import { Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
 import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
+// Phase 35 PR 2.7 — RepDayTools no longer mounted on /work (owner
+// asked to drop overnight/leave/test push from the Today panel).
+// Import kept (no-op) so the file's import-graph footprint doesn't
+// invalidate caches if it returns to a different surface later.
+// eslint-disable-next-line no-unused-vars
 import RepDayTools from '../../components/leads/RepDayTools'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import V2Hero from '../../components/v2/V2Hero'
@@ -619,28 +624,11 @@ export default function WorkV2() {
           />
         )}
 
-        {checkedIn && !dayDone && (
-          <>
-            <TodayTasksPanel userId={profile.id} limit={3} />
-            <MeetingsMapPanel userId={profile.id} />
-            <RepDayTools
-              workDate={TODAY()}
-              checkedIn={checkedIn}
-            />
-            {/* Phase 35 PR 2.6 — evening summary moved here, AFTER the
-                map + RepDayTools. Owner: "i want this evening summry
-                in bottome". Below this comes the inline Log meeting /
-                Log lead CTAs (no longer sticky-fixed per owner). */}
-            <EveningReportBlock
-              evening={evening}
-              setEvening={setEvening}
-              submitEvening={submitEvening}
-              busy={busy}
-              navigate={navigate}
-            />
-          </>
-        )}
-
+        {/* Phase 35 PR 2.7 — owner directive: Log meeting + Log lead
+            sit DIRECTLY UNDER the Next-up card, BEFORE Today's
+            tasks / map / evening summary. Inline (still not sticky)
+            so reps tapping Done on a Next-up item can immediately
+            log the next meeting/lead without scrolling. */}
         <StickyPrimaryCta
           session={session}
           busy={busy}
@@ -651,6 +639,28 @@ export default function WorkV2() {
           onOpenMeeting={() => { setMeetingMode('meeting'); setMeetingModalOpen(true) }}
           onOpenLead={() => { setMeetingMode('lead'); setMeetingModalOpen(true) }}
         />
+
+        {checkedIn && !dayDone && (
+          <>
+            <TodayTasksPanel userId={profile.id} limit={3} />
+            <MeetingsMapPanel userId={profile.id} />
+            {/* Phase 35 PR 2.7 — RepDayTools (Overnight stay toggle +
+                Request leave + Send test push) dropped from /work
+                per owner: "i dont want it at in today panel". These
+                are HR / admin self-service actions, not the rep's
+                daily workflow. Reachable via the More drawer
+                (hamburger) on V2AppShell instead. If the drawer
+                doesn't already surface them, owner will re-flag in
+                a separate sweep. */}
+            <EveningReportBlock
+              evening={evening}
+              setEvening={setEvening}
+              submitEvening={submitEvening}
+              busy={busy}
+              navigate={navigate}
+            />
+          </>
+        )}
       </div>
 
       {meetingModalOpen && (

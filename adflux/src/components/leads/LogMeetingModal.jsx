@@ -427,12 +427,15 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
 
           <div>
             <label className="lead-fld-label">Company / shop name *</label>
-            <VoiceInput
+            {/* Phase 35 PR 2.7 — mic dropped on Identity field, same
+                reason as LeadFormV2 PR 2.5: OCR populates it. Plain
+                text input. Notes mic below still kept (free-text). */}
+            <input
+              className="lead-inp"
               value={company}
-              onChange={setCompany}
+              onChange={e => setCompany(e.target.value)}
               placeholder="e.g. Sunrise Diagnostics"
               disabled={saving}
-              languageHint="gu"
             />
           </div>
 
