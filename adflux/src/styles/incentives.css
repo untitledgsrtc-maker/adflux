@@ -503,7 +503,13 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  overflow: hidden;
+  /* Phase 34Z.35 — was overflow:hidden, which clipped the Active
+     Campaigns / History tables on mobile (DAYS LEFT + VALUE columns
+     fell off the right edge on a 455px screen). Use overflow-x:auto
+     so the table scrolls horizontally inside the card while the
+     header stays anchored. */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .perf-history-header {
   padding: 16px 20px;
@@ -518,6 +524,10 @@
 .perf-history-table {
   width: 100%;
   border-collapse: collapse;
+  /* Phase 34Z.35 — min-width forces the table to be wider than the
+     card on phones, so the parent's overflow-x:auto kicks in and the
+     rep can swipe horizontally to reach Days Left + Value columns. */
+  min-width: 540px;
 }
 .perf-history-table th {
   padding: 10px 16px;
