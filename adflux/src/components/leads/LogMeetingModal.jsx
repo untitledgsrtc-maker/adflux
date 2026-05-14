@@ -244,7 +244,13 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
       email:       null,
       city:        city.trim() || null,
       segment:     'PRIVATE',
-      source:      isLead ? 'Manual Lead' : 'Field Meeting',
+      // Phase 34Z.12 — was `'Manual Lead'` for the isLead branch.
+       // Diverged from the canonical SOURCES list in LeadFormV2 and
+       // surfaced as a duplicate "Manual Lead" option in the /leads
+       // source filter dropdown. Phase 34Z.8 already routes pure
+       // "Log lead" through LeadFormV2 so this branch is rarely hit,
+       // but pin it to 'Manual' so the source list stays unified.
+      source:      isLead ? 'Manual' : 'Field Meeting',
       industry:    null,
       heat:        outcome === 'interested' ? 'warm'
                    : outcome === 'maybe' ? 'cold'
