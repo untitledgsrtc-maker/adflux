@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { Download, FileText, AlertCircle } from 'lucide-react'
 import { useOffers } from '../../hooks/useOffers'
 import { formatCurrency } from '../../utils/formatters'
+import TaDaRequestPanel from '../../components/incentives/TaDaRequestPanel'
 
 export default function MyOfferV2() {
   const { fetchMyOffer } = useOffers()
@@ -57,18 +58,17 @@ export default function MyOfferV2() {
       <div className="v2d-offer">
         <div className="v2d-page-head">
           <div>
-            <div className="v2d-page-kicker">Joining paperwork</div>
-            <h1 className="v2d-page-title">My Offer Letter</h1>
+            <div className="v2d-page-kicker">Travel & Daily Allowance</div>
+            <h1 className="v2d-page-title">My Offer & Claims</h1>
+            <div className="v2d-page-sub">
+              No offer letter on file. Submit TA / DA claims below for the admin to approve.
+            </div>
           </div>
         </div>
-        <div className="v2d-panel v2d-empty-card">
-          <div className="v2d-empty-ic"><AlertCircle size={32} /></div>
-          <div className="v2d-empty-t">No offer letter on file</div>
-          <div className="v2d-empty-s">
-            Your account wasn't created through the HR offer-letter flow.
-            If you think this is a mistake, contact your admin.
-          </div>
-        </div>
+        {/* Phase 34Z.37 — no offer letter? The page used to be blank
+            for admins / non-HR-onboarded reps. Now mounts the TA / DA
+            claim panel so the URL still pays its way. */}
+        <TaDaRequestPanel />
       </div>
     )
   }
@@ -207,6 +207,15 @@ export default function MyOfferV2() {
             </div>
           </div>
         ) : null}
+
+        {/* Phase 34Z.37 — TA / DA claim panel always available below
+            the offer letter. Rep sees today's auto-computed TA strip
+            + can submit Override TA (km) or DA night claims for
+            admin approval. */}
+        <div style={{ marginTop: 18 }}>
+          <div className="v2d-panel-t" style={{ marginBottom: 10 }}>Travel &amp; DA Claims</div>
+          <TaDaRequestPanel />
+        </div>
       </div>
     </div>
   )
