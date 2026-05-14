@@ -34,6 +34,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
 import PhotoCapture from './PhotoCapture'
+import { toastError } from '../v2/Toast'
 import WhatsAppPromptModal from './WhatsAppPromptModal'
 import { findLeadByPhone } from '../../utils/leadDedup'
 
@@ -179,35 +180,22 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
     )
   }
 
+  // Phase 35Z (14 May 2026) — surface validation errors via toast in
+  // addition to the inline banner so the rep sees feedback even if the
+  // banner is scrolled out of view at the bottom of a long modal.
+  function fail(msg) {
+    setError(msg)
+    toastError(new Error(msg), msg)
+  }
+
   async function handleSave() {
     if (saving) return
     setError('')
-    // Phase 33B.3 (11 May 2026) — owner locked the required-field set
-    // for both LogMeeting AND LeadForm: Company, Person, Phone, City
-    // are all mandatory. Email + address optional. Reason: a field
-    // meeting that's missing any of these can't be actioned later
-    // (no phone = can't call back, no city = can't route by territory,
-    // no person name = "Dr. X at Sunrise" is unidentifiable later).
-    if (!company.trim()) {
-      setError('Company / shop name is required.')
-      return
-    }
-    if (!contact.trim()) {
-      setError('Person name is required — who did you meet?')
-      return
-    }
-    if (!phone.trim()) {
-      setError('Mobile number is required — without it the lead can\'t be followed up.')
-      return
-    }
-    if (!city.trim()) {
-      setError('City is required.')
-      return
-    }
-    if (!outcome) {
-      setError('Pick an outcome — Good / Maybe / Lost.')
-      return
-    }
+    if (!company.trim()) { fail('Company / shop name is required.'); return }
+    if (!contact.trim()) { fail('Person name is required — who did you meet?'); return }
+    if (!phone.trim())   { fail('Mobile number is required — without it the lead can\'t be followed up.'); return }
+    if (!city.trim())    { fail('City is required.'); return }
+    if (!outcome)        { fail('Pick an outcome — Good / Maybe / Lost.'); return }
     const oc = OUTCOMES.find(o => o.value === outcome)
     setSaving(true)
 
@@ -579,7 +567,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
           <button
             className="lead-btn lead-btn-primary"
             onClick={handleSave}
-            disabled={saving || !company.trim() || !outcome}
+            disabled={saving}
           >
             {saving
               ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
