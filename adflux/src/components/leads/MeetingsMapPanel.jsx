@@ -148,10 +148,16 @@ export default function MeetingsMapPanel({ userId }) {
         ? '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
         : '&copy; OpenStreetMap'
 
+      // Phase 35 PR 2.4 — dropped `crossOrigin: true`. iOS Safari was
+      // failing to paint tiles when the crossorigin attribute was set
+      // on tile <img>s even though MapTiler sends Access-Control-Allow-
+      // Origin: *. Without the attribute, tiles paint as regular images
+      // (no canvas/SW cache benefit — that's the trade). Owner reported
+      // map showed zoom + attribution but tile area was black; this is
+      // the fix.
       L.tileLayer(tileUrl, {
         maxZoom: 19,
         attribution,
-        crossOrigin: true,
       }).addTo(mapRef.current)
     }
 

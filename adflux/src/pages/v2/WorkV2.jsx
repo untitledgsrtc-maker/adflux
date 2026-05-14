@@ -1318,27 +1318,33 @@ function StickyPrimaryCta({
   }
 
   return (
+    // Phase 35 PR 2.4 — `position: sticky` didn't pin; CTA scrolled
+    // with the page content because the page scrolls on body, not on
+    // a fixed-height ancestor. Switched to `position: fixed` so the
+    // CTA is always visible above the mobile bottom nav. Z-index 30
+    // sits above page chrome but below the 40-z mobile nav so the
+    // nav stays clickable.
     <div style={{
-      position: 'sticky',
-      bottom: `calc(76px + env(safe-area-inset-bottom, 0px))`,
-      zIndex: 5,
-      padding: '12px 16px 0',
-      marginTop: 16,
-      marginLeft: -16,
-      marginRight: -16,
-      background: 'linear-gradient(180deg, transparent 0%, var(--bg) 35%)',
+      position: 'fixed',
+      left: 12,
+      right: 12,
+      bottom: `calc(64px + env(safe-area-inset-bottom, 0px) + 12px)`,
+      zIndex: 30,
+      pointerEvents: 'none',  // wrapper transparent; button below catches taps
     }}>
-      <ActionButton
-        variant="primary"
-        size="lg"
-        iconLeft={icon}
-        onClick={handler}
-        disabled={isBusy}
-        loading={loading}
-        style={{ width: '100%', minHeight: 56 }}
-      >
-        {label}
-      </ActionButton>
+      <div style={{ pointerEvents: 'auto' }}>
+        <ActionButton
+          variant="primary"
+          size="lg"
+          iconLeft={icon}
+          onClick={handler}
+          disabled={isBusy}
+          loading={loading}
+          style={{ width: '100%', minHeight: 52, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}
+        >
+          {label}
+        </ActionButton>
+      </div>
     </div>
   )
 }
