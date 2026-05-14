@@ -613,6 +613,23 @@ export default function WorkV2() {
           navigate={navigate}
         />
 
+        {/* Phase 35 PR 2.9 — owner directive: Today's Tasks list goes
+            ABOVE the single Next-up priority card. Rationale: the
+            list shows everything the rep could do today; the Next-up
+            card is just the top item visually emphasised. Reading
+            order = list first, priority below.
+
+            Order top → bottom inside the B_ACTIVE branch:
+              Today's Tasks (smart-task list)
+              Next-up (single highest-priority card)
+              Log meeting + Log lead inline CTAs
+              Map
+              Evening summary
+        */}
+        {checkedIn && !dayDone && (
+          <TodayTasksPanel userId={profile.id} limit={3} />
+        )}
+
         {checkedIn && !dayDone && (
           <NextActionSurface
             session={session}
@@ -624,11 +641,6 @@ export default function WorkV2() {
           />
         )}
 
-        {/* Phase 35 PR 2.7 — owner directive: Log meeting + Log lead
-            sit DIRECTLY UNDER the Next-up card, BEFORE Today's
-            tasks / map / evening summary. Inline (still not sticky)
-            so reps tapping Done on a Next-up item can immediately
-            log the next meeting/lead without scrolling. */}
         <StickyPrimaryCta
           session={session}
           busy={busy}
@@ -642,16 +654,7 @@ export default function WorkV2() {
 
         {checkedIn && !dayDone && (
           <>
-            <TodayTasksPanel userId={profile.id} limit={3} />
             <MeetingsMapPanel userId={profile.id} />
-            {/* Phase 35 PR 2.7 — RepDayTools (Overnight stay toggle +
-                Request leave + Send test push) dropped from /work
-                per owner: "i dont want it at in today panel". These
-                are HR / admin self-service actions, not the rep's
-                daily workflow. Reachable via the More drawer
-                (hamburger) on V2AppShell instead. If the drawer
-                doesn't already surface them, owner will re-flag in
-                a separate sweep. */}
             <EveningReportBlock
               evening={evening}
               setEvening={setEvening}
