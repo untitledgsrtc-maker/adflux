@@ -392,11 +392,11 @@ The acceptance test for the ban is mechanical: between this commit and the PR 3 
 
 ---
 
-## 9 · Open questions for owner
+## 9 · Owner answers (locked 13 May 2026)
 
-1. **PR 3 review cadence:** review each subagent's commit immediately as it lands, or batch all 6 group commits and review at end? Recommendation: review per group; batches lose context.
-2. **Day theme rollout:** the Day theme has been declared in `v2.css` since Phase 31; PR 1 will wire a toggle. Is the owner OK exposing the Day theme via Settings, or keep it CSS-only / off?
-3. **Map provider:** OSM rate-limiting risk (Audit 1 P1-6) — switch to a paid Mapbox / Stadia tier as part of PR 2 or defer? Recommendation: defer to its own scoped commit; not critical for v2.1.
+1. **PR 3 review cadence — per group commit.** Owner reviews each subagent's commit as it lands, not batched. PR 3 ships in 6 review slices.
+2. **Day theme rollout — wire toggle in Settings during PR 1.** Day theme has been declared in `v2.css` since Phase 31. PR 1 adds the toggle UI (single switch in Settings) + localStorage persistence + the `<html data-theme="day|night">` attribute switcher. CSS does the rest — the override rules already exist in `v2.css`.
+3. **Map provider — MapTiler free tier.** Owner wants the cheapest option that still meets requirements. MapTiler offers 100k tile requests/month free for commercial use, India coverage solid, drop-in replacement for the current Leaflet tileLayer. Volume estimate: 22 reps × ~5 panel opens/day × ~30 tiles/open = ~3,300 tile requests/day = ~100k/month — within free tier. Fallback if signup is friction: Stadia Maps (200k/month free commercial). Migration lands inside PR 2 since `MeetingsMapPanel` is already in scope; the tileLayer URL is a one-line change. Owner provides the API key; spec parks it in env var `VITE_MAPTILER_KEY` so it's never committed to git.
 
 ---
 
