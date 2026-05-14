@@ -29,6 +29,7 @@
 // activeChips counts: fields.filter(f => f.value !== f.defaultValue).length.
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 
 export default function FilterDrawer({ fields = [] }) {
@@ -113,14 +114,21 @@ export default function FilterDrawer({ fields = [] }) {
         )}
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={popRef}
           style={{
+            // Phase 34Z.18 — portal-render to document.body. iOS Safari
+            // treats `position: fixed` as containing-block relative when
+            // ANY ancestor uses transform / filter / will-change /
+            // contain. Owner reported the panel still clipped after
+            // Phase 34Z.15's fixed positioning, even on a fresh PWA
+            // bundle. Rendering via createPortal escapes every
+            // ancestor stacking / containing context.
             position: 'fixed',
             top: popPos.top,
             right: popPos.right,
-            zIndex: 100,
+            zIndex: 1000,
             width: 'min(320px, calc(100vw - 24px))',
             background: 'var(--surface)',
             border: '1px solid var(--border-strong, var(--border))',
@@ -193,7 +201,8 @@ export default function FilterDrawer({ fields = [] }) {
               Reset all
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

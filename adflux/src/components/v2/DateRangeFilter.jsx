@@ -23,6 +23,7 @@
 // computes the same window for the same preset.
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 
 /* ─── Helpers ───────────────────────────────────────────────────── */
@@ -274,14 +275,17 @@ export default function DateRangeFilter({ value, onChange }) {
       </button>
 
       {/* Popover */}
-      {open && (
+      {open && createPortal(
         <div
           ref={popRef}
           style={{
+            // Phase 34Z.18 — portal-render to document.body so the
+            // popover escapes any ancestor containing block. Same
+            // root cause as FilterDrawer fix.
             position: 'fixed',
             top: popPos.top,
             left: popPos.left,
-            zIndex: 100,
+            zIndex: 1000,
             width: 'min(340px, calc(100vw - 24px))',
             background: 'var(--surface)',
             border: '1px solid var(--border-strong, var(--border))',
@@ -394,7 +398,8 @@ export default function DateRangeFilter({ value, onChange }) {
           >
             Apply range
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
