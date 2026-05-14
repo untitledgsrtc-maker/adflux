@@ -32,6 +32,20 @@
          to whatever system Gujarati font each machine happens to have,
          and the rendered Gujarati script looked different per user. -->
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+Gujarati:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Phase 35 PR 1 — Day theme FOUC fix. The React-side useEffect in
+         V2AppShell runs AFTER the first paint, so Day-theme users saw
+         one frame of Night theme on every refresh/navigation before the
+         attribute flipped. Reading the persisted value here, before
+         React mounts, eliminates that flash. try/catch keeps Safari
+         private-mode safe. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('theme') || 'night';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { /* localStorage blocked — default to night */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
