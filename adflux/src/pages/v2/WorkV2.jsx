@@ -30,9 +30,12 @@ import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import V2Hero from '../../components/v2/V2Hero'
-// Phase 34Z.2 (13 May 2026) — owner asked for a *big* incentive hero
-// on /work, not the small top-bar pill. New component renders the
-// same calculateIncentive result via V2Hero styling.
+// Phase 34Z.2 → 34Z.3 — the teal IncentiveHeroCard was pulled
+// (owner preferred the existing purple ProposedIncentiveCard from
+// /my-performance, now full-mode on /work via V2AppShell). Import
+// kept (no-op) so the next refactor that wants a teal incentive
+// strip elsewhere can drop it in without re-resolving the path.
+// eslint-disable-next-line no-unused-vars
 import IncentiveHeroCard from '../../components/incentives/IncentiveHeroCard'
 // Phase 34Z.1 (13 May 2026) — pulled the shared `greetingFor` so the
 // page-body greeting uses the same "morning ☀️ / afternoon ⛅ /
@@ -678,11 +681,14 @@ export default function WorkV2() {
   return (
     <div className="lead-root">
       <div className="m-screen">
-        {/* Phase 34Z.2 — incentive hero on top of /work. Big card,
-            same V2Hero gradient + pulse dot the rest of the app uses.
-            Auto-hides for admin/co_owner (no incentive applies) and
-            for reps without a `staff_incentive_profiles` row. */}
-        <IncentiveHeroCard />
+        {/* Phase 34Z.3 (13 May 2026) — the Phase 34Z.2 teal
+            IncentiveHeroCard was pulled. Owner wants the existing
+            purple ProposedIncentiveCard (Forecast / Pending / Earned
+            tabs, the one already live on /my-performance) on /work
+            instead. V2AppShell now passes `compact={false}` for
+            /work, so the full purple card auto-mounts at the top of
+            every sales page in the shell, ABOVE this component's
+            return tree. No need to mount it here. */}
 
         {/* Phase 34.9 discoverability — surface a tip rep didn't know
             existed. Dismisses to localStorage, never re-appears. */}

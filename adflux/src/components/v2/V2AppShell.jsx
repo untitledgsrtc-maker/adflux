@@ -483,7 +483,17 @@ export function V2AppShell() {
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 12 }}>
-              <ProposedIncentiveCard compact={location.pathname !== '/my-performance'} />
+              {/* Phase 34Z.3 (13 May 2026) — owner: "i want same card
+                  replica [the full purple Forecast / Pending / Earned
+                  card from /my-performance] to be pasted in today
+                  page." /work now joins /my-performance in showing
+                  the full version; every other page keeps the compact
+                  pill so /leads / /follow-ups don't lose viewport
+                  height to a hero they don't need. */}
+              <ProposedIncentiveCard compact={
+                location.pathname !== '/my-performance'
+                && location.pathname !== '/work'
+              } />
             </div>
           )}
           <Outlet />
