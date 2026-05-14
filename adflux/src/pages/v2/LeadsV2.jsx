@@ -42,6 +42,7 @@ import { StageAgeChip } from '../../components/leads/StageAgeChip'
 import { toastError } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import V2Hero from '../../components/v2/V2Hero'
+import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 
 /* The 5 tabs from the design — All + 4 groups. We re-use the
@@ -64,10 +65,11 @@ export default function LeadsV2() {
   const [cityFilter, setCityFilter]       = useState('all')
   const [industryFilter, setIndustryFilter] = useState('all')   // Phase 19
   const [repFilter, setRepFilter]         = useState('all')
-  // Phase 34Z.11 — date-range filter (owner: "data filter not there").
-  // Filters leads.created_at into [from, to] (both inclusive).
-  const [dateFrom, setDateFrom]           = useState('')
-  const [dateTo,   setDateTo]             = useState('')
+  // Phase 34Z.13 — unified DateRangeFilter (Phase 34Z.11's two raw
+  // <input type=date> replaced). Default preset = This month per owner.
+  const [dateRange, setDateRange] = useState(() => presetToRange('this_month'))
+  const dateFrom = dateRange?.from || ''
+  const dateTo   = dateRange?.to   || ''
 
   /* ─── Bulk select state ─── */
   const [selected, setSelected] = useState(new Set())
@@ -272,8 +274,7 @@ export default function LeadsV2() {
     cityFilter !== 'all' ||
     industryFilter !== 'all' ||
     repFilter !== 'all' ||
-    dateFrom ||
-    dateTo
+    (dateRange?.preset && dateRange.preset !== 'all')
 
   return (
     <div className="lead-root">
@@ -370,43 +371,10 @@ export default function LeadsV2() {
           'New + Contacted + Nurture' meta was misleading too — Contacted
           hasn't existed since Phase 30A, and Nurture is its own column
           now (Phase 31N). */}
-      {/* Phase 33F (C3) — owner audit (11 May): 4 stat cards × 110px
-          = 440px wasted on /leads. Same data is on the filter chips
-          below. Compact horizontal chip row instead. Tap a chip to
-          filter the list. */}
-      {leads.length > 0 && (
-        <div style={{
-          display: 'flex', gap: 8, flexWrap: 'wrap',
-          marginBottom: 12, fontSize: 12,
-        }}>
-          <span
-            onClick={() => setStageFilter('all')}
-            className="chip-link"
-            style={{ cursor: 'pointer', fontWeight: stageFilter === 'all' ? 700 : 500 }}
-          >
-            <b style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--text)' }}>{totals.total}</b>
-            <span style={{ marginLeft: 4 }}>total</span>
-          </span>
-          <span className="chip-link" style={{ cursor: 'pointer' }}
-            onClick={() => setStageFilter('new')}
-          >
-            <b style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--text)' }}>{totals.groupCounts.new || 0}</b>
-            <span style={{ marginLeft: 4 }}>new</span>
-          </span>
-          <span className="chip-link" style={{ cursor: 'pointer' }}
-            onClick={() => setStageFilter('working')}
-          >
-            <b style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--text)' }}>{totals.groupCounts.working || 0}</b>
-            <span style={{ marginLeft: 4 }}>follow-up</span>
-          </span>
-          <span className="chip-link" style={{ cursor: 'pointer' }}
-            onClick={() => setStageFilter('won')}
-          >
-            <b style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--success)' }}>{totals.wonCount}</b>
-            <span style={{ marginLeft: 4 }}>won{winRate != null ? ` · ${winRate}%` : ''}</span>
-          </span>
-        </div>
-      )}
+      {/* Phase 34Z.13 — 4-chip stats row retired. Counts now live as
+          badges inside each stage tab pill (e.g. "New 1 · Follow-up 1
+          · Won 0"). Owner directive 14 May 2026: "move into tab pills
+          as count badges". V2Hero strip already shows total pipeline. */}
 
       {/* Phase 32B — owner asked (10 May 2026) for a per-rep filter as
           one-tap chips so admin can see who owns what and bulk-reassign
@@ -519,16 +487,27 @@ export default function LeadsV2() {
             onClick={() => setStageFilter('all')}
           >
             All
+            <span className="lead-filter-tab-badge">{totals.total}</span>
           </span>
-          {VISIBLE_GROUPS.map(g => (
-            <span
-              key={g.key}
-              className={`lead-filter-tab ${stageFilter === g.key ? 'active' : ''}`}
-              onClick={() => setStageFilter(stageFilter === g.key ? 'all' : g.key)}
-            >
-              {g.label}
-            </span>
-          ))}
+          {VISIBLE_GROUPS.map(g => {
+            // Phase 34Z.13 — inline count badge per tab (owner: "move
+            // into tab pills as count badges"). Won uses the totals
+            // wonCount; Lost uses lostCount; the rest read from
+            // groupCounts keyed by tab.key.
+            const n = g.key === 'won'  ? totals.wonCount
+                    : g.key === 'lost' ? totals.lostCount
+                    : (totals.groupCounts[g.key] || 0)
+            return (
+              <span
+                key={g.key}
+                className={`lead-filter-tab ${stageFilter === g.key ? 'active' : ''}`}
+                onClick={() => setStageFilter(stageFilter === g.key ? 'all' : g.key)}
+              >
+                {g.label}
+                <span className="lead-filter-tab-badge">{n}</span>
+              </span>
+            )
+          })}
         </div>
 
         <select
@@ -606,25 +585,10 @@ export default function LeadsV2() {
           </select>
         )}
 
-        {/* Phase 34Z.11 — created-date range filter. Owner: "data
-            filter not there". Two native date inputs side-by-side;
-            either bound can be left blank for open-ended range. */}
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={e => setDateFrom(e.target.value)}
-          className="lead-filter-select"
-          style={{ minWidth: 130 }}
-          title="From date (created_at)"
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={e => setDateTo(e.target.value)}
-          className="lead-filter-select"
-          style={{ minWidth: 130 }}
-          title="To date (created_at)"
-        />
+        {/* Phase 34Z.13 — unified pill-style DateRangeFilter replaces
+            the two raw date inputs. Preset menu + step arrows + custom
+            range. Defaults to This month. */}
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
 
         {hasActiveFilters && (
           <button
@@ -637,8 +601,7 @@ export default function LeadsV2() {
               setCityFilter('all')
               setIndustryFilter('all')
               setRepFilter('all')
-              setDateFrom('')
-              setDateTo('')
+              setDateRange(presetToRange('all'))
             }}
           >
             <X size={11} />
