@@ -26,22 +26,40 @@ import { supabase } from '../../lib/supabase'
 //   Earlier version tried jsDelivr CDN — failed in production because
 //   @react-pdf/renderer's fetch of cross-origin TTFs was blocked /
 //   mis-routed. Local paths are the reliable fix.
-// Phase 34P — register with numeric weights AND string weights.
-// Newer @react-pdf/renderer (v3.4+) resolves `fontWeight: 400` even
-// when the JSX uses the implicit default; the previous registration
-// only had 'normal'/'bold' (treated as 400/700 by older versions
-// but failing with "Could not resolve font for Roboto, fontWeight
-// 400" on the current version). Register both forms so it works
-// regardless of which lookup path @react-pdf takes.
-Font.register({
-  family: 'Roboto',
-  fonts: [
-    { src: '/fonts/Roboto-Regular.ttf', fontWeight: 400 },
-    { src: '/fonts/Roboto-Regular.ttf', fontWeight: 'normal' },
-    { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 700 },
-    { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 'bold' },
-  ],
-})
+// Phase 34Z.24 — register fonts lazily, just before render. Module-
+// top-level Font.register() ran but the renderer in production still
+// raised "Could not resolve font for Roboto, fontWeight 400" — looks
+// like a registration-order race with Vite's prod bundling (the
+// registry the renderer reads from differs from the one the import
+// populates, OR registration is being tree-shaken in unrelated dynamic
+// imports). Calling Font.register inside ensureFontsRegistered() and
+// awaiting Font.load() before rendering guarantees the registry is
+// populated for the same instance the renderer uses.
+//
+// Builds on top of Phase 34P (registered both numeric + string weights).
+// Reduced to numeric weights only — @react-pdf/font v2.5+ documented
+// to prefer numbers; mixing both was a guess that didn't help.
+let _fontsReady = null
+async function ensureFontsRegistered() {
+  if (_fontsReady) return _fontsReady
+  _fontsReady = (async () => {
+    Font.register({
+      family: 'Roboto',
+      fonts: [
+        { src: '/fonts/Roboto-Regular.ttf', fontWeight: 400 },
+        { src: '/fonts/Roboto-Bold.ttf',    fontWeight: 700 },
+      ],
+    })
+    // Force the loader to fetch each weight now so the renderer never
+    // races. Font.load returns a Promise that resolves once the TTF
+    // bytes are in the registry.
+    await Promise.all([
+      Font.load({ fontFamily: 'Roboto', fontWeight: 400 }),
+      Font.load({ fontFamily: 'Roboto', fontWeight: 700 }),
+    ])
+  })()
+  return _fontsReady
+}
 
 // Disable word-break hyphenation for Roboto — the default dictionary
 // splits Indian place names awkwardly ("Ahme-dabad"), and our PDF has
@@ -964,6 +982,11 @@ async function fetchCompanyForQuote(quote) {
 }
 
 export async function downloadQuotePDF(quote, cities = []) {
+  // Phase 34Z.24 — ensure font registry is populated and the TTFs
+  // are fetched before the renderer kicks off. Without this the
+  // resolver throws "Could not resolve font for Roboto, fontWeight
+  // 400" in production builds.
+  await ensureFontsRegistered()
   const [enriched, company] = await Promise.all([
     enrichCitiesWithPhotos(cities),
     fetchCompanyForQuote(quote),
@@ -998,6 +1021,7 @@ export async function downloadQuotePDF(quote, cities = []) {
  * @returns {Promise<string>} public URL to the uploaded PDF
  */
 export async function uploadQuotePDF(quote, cities = []) {
+  await ensureFontsRegistered()
   const [enriched, company] = await Promise.all([
     enrichCitiesWithPhotos(cities),
     fetchCompanyForQuote(quote),

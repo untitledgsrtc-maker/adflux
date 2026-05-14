@@ -24,7 +24,12 @@ export default defineConfig({
       injectManifest: {
         // Limit precache to the app shell; don't precache PDFs /
         // user-generated content.
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Phase 34Z.24 — added `ttf` so the Roboto fonts used by the
+        // PDF renderer survive offline AND don't get hidden behind
+        // Workbox's navigation-fallback (which was serving index.html
+        // for any request the SW couldn't match — silently breaking
+        // the font fetch with HTML body).
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,ttf}'],
         // Skip enormous auto-generated bundles from the hard cap.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
