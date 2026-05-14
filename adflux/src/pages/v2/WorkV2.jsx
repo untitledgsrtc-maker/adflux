@@ -554,22 +554,6 @@ export default function WorkV2() {
   const checkedIn = !!session?.check_in_at
   const planSubmitted = !!session?.plan_submitted_at
 
-  // Phase 36 — gather activity timestamps for the Day Spine. Bin
-  // includes logged meetings (from planned_meetings .done=true) +
-  // smart tasks completed today. Pure derivation off `session` so
-  // the spine updates in lockstep with every save.
-  const spineActivities = useMemo(() => {
-    const ts = []
-    const pm = session?.planned_meetings || []
-    for (const m of pm) {
-      if (m.done && m.done_at) ts.push(m.done_at)
-    }
-    // If we ever store per-task completion timestamps in session,
-    // append them here. For now the meeting-done timestamps are the
-    // canonical activity feed.
-    return ts
-  }, [session])
-
   return (
     <div className="lead-root">
       <div className="m-screen">
