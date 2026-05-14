@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapPin, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
+import { MapPin, ChevronDown, ChevronUp, AlertCircle, Crosshair, Loader2 } from 'lucide-react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../../lib/supabase'
@@ -71,10 +71,40 @@ export default function MeetingsMapPanel({ userId }) {
   // summary = { km, kmRaw, pings, ... } from summariseTrack().
   const [track,   setTrack]   = useState([])           // [{lat,lng,captured_at,accuracy_m}]
   const [trackSummary, setTrackSummary] = useState(null)
+  const [pingBusy, setPingBusy] = useState(false)       // Phase 34Z.7 — "Ping now" button
   const mapRef       = useRef(null)
   const mapElRef     = useRef(null)
   const markersRef   = useRef([])
   const trackLayerRef= useRef(null)
+
+  // Phase 34Z.7 — "tracking paused" detection. If the last ping is
+  // more than 15 min old (default 5-min interval × 3 = 15), assume
+  // iOS Safari paused geolocation and surface a yellow banner so the
+  // rep knows to keep the app open during driving. Recomputed every
+  // 30s via interval below.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(id)
+  }, [])
+  const lastPingAt = track.length > 0
+    ? new Date(track[track.length - 1].captured_at).getTime()
+    : null
+  const minutesSinceLastPing = lastPingAt
+    ? Math.floor((now - lastPingAt) / 60000)
+    : null
+  const trackingPaused = minutesSinceLastPing != null && minutesSinceLastPing > 15
+
+  // Phase 34Z.7 — rough TA estimate so the rep sees the rupee value of
+  // their travel. Real TA is computed nightly per-city in
+  // compute_daily_ta (bike_per_km varies city to city, ₹3 default).
+  // For the live preview we use the ₹3/km floor — actual payout is
+  // computed by admin during TA approval. Labelled "≈" so the rep
+  // knows it's an estimate.
+  const TA_PREVIEW_RATE = 3
+  const taEstimate = trackSummary
+    ? Math.round(Number(trackSummary.km) * TA_PREVIEW_RATE)
+    : 0
 
   // Load lead pins from THREE sources, union them:
   //   1. Open follow-ups (today → next 7 days, assigned to me)
@@ -334,6 +364,45 @@ export default function MeetingsMapPanel({ userId }) {
     }
   }, [open, leads, track])
 
+  // Phase 34Z.7 — "Ping now" button forces an immediate GPS fix and
+  // inserts a row into gps_pings (source='manual'). Refreshes the
+  // track array so the new pin appears on the map without a reload.
+  // Catches the case where the rep parked, walked into a meeting,
+  // and wants the visit recorded before the next 5-min tick.
+  async function handlePingNow() {
+    if (pingBusy) return
+    if (!userId) return
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    setPingBusy(true)
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true, timeout: 15000, maximumAge: 0,
+        })
+      })
+      const row = {
+        user_id: userId,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy_m: Math.round(pos.coords.accuracy || 0) || null,
+        source: 'manual',
+      }
+      const { error: insErr } = await supabase.from('gps_pings').insert([row])
+      if (insErr) throw insErr
+      // Locally append so the polyline + km update immediately.
+      const localRow = { ...row, captured_at: new Date().toISOString() }
+      setTrack((prev) => {
+        const next = [...prev, localRow]
+        setTrackSummary(summariseTrack(next))
+        return next
+      })
+    } catch (e) {
+      setError(e?.message || 'Could not get GPS fix.')
+    } finally {
+      setPingBusy(false)
+    }
+  }
+
   // Tear down map on unmount.
   useEffect(() => () => {
     if (mapRef.current) {
@@ -408,6 +477,21 @@ export default function MeetingsMapPanel({ userId }) {
               {trackSummary.km} km today
             </span>
           )}
+          {/* Phase 34Z.7 — TA preview at flat ₹3/km. Real per-city rate
+              applied by admin in TA Payouts. */}
+          {trackSummary && taEstimate > 0 && (
+            <span style={{
+              padding: '1px 7px',
+              background: 'rgba(16,185,129,0.16)',
+              border: '1px solid rgba(16,185,129,0.40)',
+              borderRadius: 999,
+              color: 'var(--v2-ink-0, #f5f7fb)',
+              fontSize: 10,
+              fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+            }}>
+              ≈ ₹{taEstimate} TA
+            </span>
+          )}
         </div>
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
@@ -422,6 +506,45 @@ export default function MeetingsMapPanel({ userId }) {
           {error && (
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger, #EF4444)' }}>
               {error}
+            </div>
+          )}
+
+          {/* Phase 34Z.7 — paused-tracking banner. iOS Safari pauses
+              geolocation on backgrounded tabs; if the last ping is >15
+              min old, surface a yellow strip so the rep knows tracking
+              isn't live. The "Ping now" button forces an immediate fix
+              and inserts a manual gps_pings row. Pairs with the
+              visibility-change auto-ping in WorkV2 — between the two,
+              gaps shrink without a Capacitor wrapper. */}
+          {trackingPaused && (
+            <div style={{
+              marginTop: 10,
+              padding: '8px 10px',
+              background: 'rgba(245,158,11,0.10)',
+              border: '1px solid var(--warning, #F59E0B)',
+              borderRadius: 10,
+              fontSize: 12,
+              color: 'var(--v2-ink-1, #a9b3c7)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}>
+              <AlertCircle size={13} style={{ color: 'var(--warning, #F59E0B)', flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>
+                Tracking paused {minutesSinceLastPing} min — keep the app open while driving.
+              </span>
+              <button
+                type="button"
+                onClick={handlePingNow}
+                disabled={pingBusy}
+                className="lead-btn lead-btn-sm"
+                style={{ flexShrink: 0 }}
+              >
+                {pingBusy
+                  ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Crosshair size={12} />}
+                <span>Ping now</span>
+              </button>
             </div>
           )}
 
@@ -450,6 +573,7 @@ export default function MeetingsMapPanel({ userId }) {
               gap: 12,
               fontSize: 11,
               color: 'var(--v2-ink-1, #a9b3c7)',
+              flexWrap: 'wrap',
             }}>
               <span>
                 <b style={{
@@ -458,12 +582,35 @@ export default function MeetingsMapPanel({ userId }) {
                 }}>{trackSummary.km}</b> km today
               </span>
               <span>
+                ≈ <b style={{
+                  fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+                  color: 'var(--v2-ink-0, #f5f7fb)',
+                }}>₹{taEstimate}</b> TA est.
+              </span>
+              <span>
                 {trackSummary.pings} ping{trackSummary.pings === 1 ? '' : 's'}
               </span>
               {trackSummary.capped && (
                 <span style={{ color: 'var(--warning, #F59E0B)' }}>
                   capped at 600 km
                 </span>
+              )}
+              {/* Phase 34Z.7 — always-on "Ping now" so the rep can pin
+                  a trip-point at a meeting site without waiting for
+                  the 5-min tick. Same handler as paused-banner. */}
+              {!trackingPaused && (
+                <button
+                  type="button"
+                  onClick={handlePingNow}
+                  disabled={pingBusy}
+                  className="lead-btn lead-btn-sm"
+                  style={{ marginLeft: 'auto' }}
+                >
+                  {pingBusy
+                    ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                    : <Crosshair size={12} />}
+                  <span>Ping now</span>
+                </button>
               )}
             </div>
           )}

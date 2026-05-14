@@ -353,7 +353,28 @@ export default function WorkV2() {
 
     pingOnce('interval')
     const id = setInterval(() => pingOnce('interval'), 5 * 60 * 1000)
-    return () => { cancelled = true; clearInterval(id) }
+
+    // Phase 34Z.7 — iOS Safari pauses geolocation when tab backgrounds.
+    // True background tracking needs a Capacitor wrapper (separate
+    // phase). Cheap mitigation: when the rep brings the app back to
+    // the foreground, fire a ping immediately instead of waiting for
+    // the next 5-min tick. Closes the most painful gaps without any
+    // native code. Owner directive (14 May 2026) — "fetch his
+    // geolocation every five to ten minutes... I want it perfect."
+    function handleVisible() {
+      if (document.visibilityState === 'visible') {
+        pingOnce('resume')
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisible)
+    window.addEventListener('focus', handleVisible)
+
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisible)
+      window.removeEventListener('focus', handleVisible)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, session?.check_in_at, session?.evening_report_submitted_at])
 
