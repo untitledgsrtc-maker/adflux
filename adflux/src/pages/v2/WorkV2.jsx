@@ -627,9 +627,15 @@ export default function WorkV2() {
           </>
         )}
 
-        {checkedIn && !dayDone && (
-          <StickyLogMeetingCta onClick={() => setMeetingModalOpen(true)} disabled={busy} />
-        )}
+        <StickyPrimaryCta
+          session={session}
+          busy={busy}
+          parsing={parsing}
+          startDay={startDay}
+          doCheckIn={doCheckIn}
+          submitEvening={submitEvening}
+          onOpenMeeting={() => setMeetingModalOpen(true)}
+        />
       </div>
 
       {meetingModalOpen && (
@@ -1262,7 +1268,55 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
 
 /* ─── Surface 3: sticky Log Meeting CTA ─────────────────────────── */
 
-function StickyLogMeetingCta({ onClick, disabled }) {
+// State-aware sticky bottom CTA. Single button that always shows the
+// rep's NEXT primary action, picked from session attributes. Owner UX
+// feedback: when the plan form was scrolled, the in-card Start My Day
+// button slid off-screen and there was no submit button visible above
+// the bottom nav. Sticky CTA below the scroll content fixes that —
+// rep types plan, sees the CTA pinned at the bottom of the viewport.
+function StickyPrimaryCta({
+  session, busy, parsing,
+  startDay, doCheckIn, submitEvening,
+  onOpenMeeting,
+}) {
+  const planSubmitted = !!session?.plan_submitted_at
+  const checkedIn     = !!session?.check_in_at
+  const dayDone       = !!session?.evening_report_submitted_at
+  const eveningSent   = !!session?.evening_summary
+
+  let label = 'Log meeting'
+  let icon = Calendar
+  let handler = onOpenMeeting
+  let isBusy = busy
+  let loading = false
+
+  if (!planSubmitted) {
+    label   = (busy || parsing) ? 'Starting…' : 'Start My Day'
+    icon    = Sun
+    handler = startDay
+    isBusy  = busy || parsing
+    loading = busy || parsing
+  } else if (!checkedIn) {
+    label   = busy ? 'Capturing GPS…' : 'Check in'
+    icon    = MapPin
+    handler = doCheckIn
+    isBusy  = busy
+    loading = busy
+  } else if (!dayDone) {
+    label   = 'Log meeting'
+    icon    = Calendar
+    handler = onOpenMeeting
+    isBusy  = busy
+  } else if (!eveningSent) {
+    label   = busy ? 'Submitting…' : 'Submit evening report'
+    icon    = CheckCircle2
+    handler = submitEvening
+    isBusy  = busy
+    loading = busy
+  } else {
+    return null
+  }
+
   return (
     <div style={{
       position: 'sticky',
@@ -1277,12 +1331,13 @@ function StickyLogMeetingCta({ onClick, disabled }) {
       <ActionButton
         variant="primary"
         size="lg"
-        iconLeft={Calendar}
-        onClick={onClick}
-        disabled={disabled}
+        iconLeft={icon}
+        onClick={handler}
+        disabled={isBusy}
+        loading={loading}
         style={{ width: '100%', minHeight: 56 }}
       >
-        Log meeting
+        {label}
       </ActionButton>
     </div>
   )
