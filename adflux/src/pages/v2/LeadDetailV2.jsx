@@ -784,8 +784,16 @@ export default function LeadDetailV2() {
                   <Phone size={13} /> <span>Call</span>
                 </a>
               ) : (
-                <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('call')}>
-                  <Phone size={13} /> <span>Call</span>
+                // Phase 35Z (14 May 2026) — no-phone path used to open the
+                // activity modal which confused reps ("Call button didn't
+                // call"). Now opens a clear toast telling them to add the
+                // phone first via Edit.
+                <button
+                  className="lead-btn lead-btn-sm"
+                  onClick={() => setError('No phone on this lead — tap Edit (More menu) and add the mobile number first.')}
+                  style={{ opacity: 0.6 }}
+                >
+                  <Phone size={13} /> <span>Call (no phone)</span>
                 </button>
               )
             })()}
@@ -796,8 +804,12 @@ export default function LeadDetailV2() {
               const phone = cleanPhone(lead.phone)
               if (!phone) {
                 return (
-                  <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('whatsapp')}>
-                    <MessageCircle size={13} /> <span>WhatsApp</span>
+                  <button
+                    className="lead-btn lead-btn-sm"
+                    onClick={() => setError('No phone on this lead — tap Edit (More menu) and add the mobile number first.')}
+                    style={{ opacity: 0.6 }}
+                  >
+                    <MessageCircle size={13} /> <span>WhatsApp (no phone)</span>
                   </button>
                 )
               }

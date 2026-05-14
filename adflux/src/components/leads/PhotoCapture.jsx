@@ -103,11 +103,18 @@ export default function PhotoCapture({
         throw new Error('OCR failed: ' + txt.slice(0, 200))
       }
 
-      // 4. Show preview if business card with usable fields.
-      if (ocr?.is_business_card && ocr.fields && Object.values(ocr.fields).some(Boolean)) {
+      // 4. Show preview when ANY usable fields were extracted, even if
+      // OCR didn't classify the photo as a business card. Phase 35Z
+      // (14 May 2026) — owner uploads hiring posters / shop signage
+      // / receipts; OCR's text-extraction is useful even when the
+      // photo isn't a card. Drop the strict `is_business_card`
+      // gate so any photo with a name / phone / email / company
+      // string offers the apply-fields preview.
+      const hasFields = ocr?.fields && Object.values(ocr.fields).some(Boolean)
+      if (hasFields) {
         setOcrPreview({ photo_id: photoRow?.id, fields: ocr.fields })
       } else if (scanOnly) {
-        setError('No business card detected. Try a clearer photo.')
+        setError('No usable text found in photo. Try a clearer photo or type the details manually.')
       }
       if (photoRow) onSaved?.(photoRow)
     } catch (err) {
