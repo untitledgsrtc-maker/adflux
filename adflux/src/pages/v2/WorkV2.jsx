@@ -613,30 +613,15 @@ export default function WorkV2() {
           navigate={navigate}
         />
 
-        {/* Phase 35 PR 2.10 — restore PR 2.7 order. PR 2.9 moved
-            Today's Tasks ABOVE Next-up; owner clarified that was
-            wrong: "this was sequance: V2Hero / Next-up / Log
-            meeting+lead / Today's tasks / Map / Evening summary".
-
-            Locked order in B_ACTIVE state:
+        {/* Phase 35 PR 2.11 — locked order in B_ACTIVE state:
               V2Hero (in DayStatusSurface above)
+              Log meeting + Log lead inline CTAs   ← moved up
               Next-up priority card
-              Log meeting + Log lead inline CTAs
               Today's Tasks (smart-task list)
               Map
               Evening summary
+            Owner: "need Log meeting + Log lead above Next-up card".
         */}
-        {checkedIn && !dayDone && (
-          <NextActionSurface
-            session={session}
-            smartTasks={smartTasks}
-            navigate={navigate}
-            toggleMeetingDone={toggleMeetingDone}
-            toggleTaskDone={toggleTaskDone}
-            busy={busy}
-          />
-        )}
-
         <StickyPrimaryCta
           session={session}
           busy={busy}
@@ -647,6 +632,17 @@ export default function WorkV2() {
           onOpenMeeting={() => { setMeetingMode('meeting'); setMeetingModalOpen(true) }}
           onOpenLead={() => { setMeetingMode('lead'); setMeetingModalOpen(true) }}
         />
+
+        {checkedIn && !dayDone && (
+          <NextActionSurface
+            session={session}
+            smartTasks={smartTasks}
+            navigate={navigate}
+            toggleMeetingDone={toggleMeetingDone}
+            toggleTaskDone={toggleTaskDone}
+            busy={busy}
+          />
+        )}
 
         {checkedIn && !dayDone && (
           <>
