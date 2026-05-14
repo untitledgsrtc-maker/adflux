@@ -104,13 +104,18 @@ export async function subscribeForPush(userId) {
     }
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
     const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-    // Phase 34Z.10 — PostgREST upsert needs `on_conflict` to target
-    // the right unique constraint. Without it `resolution=merge-
-    // duplicates` falls back to PK conflict only, so re-subscribing
-    // the same endpoint after a token refresh 409s. The endpoint
-    // column has a UNIQUE constraint (push_subscriptions_endpoint_key);
-    // targeting it lets the row UPDATE in place — refreshes user_id +
-    // last_seen_at without churning the row id.
+    // Phase 34Z.19 — switched from `merge-duplicates` to
+    // `ignore-duplicates`. The push_subscriptions RLS policy
+    // `ps_self` is `FOR ALL USING (user_id = auth.uid())`; on
+    // re-subscribe the UPSERT's UPDATE half tries to overwrite an
+    // existing row whose user_id may differ (same endpoint, different
+    // signed-in user on the same device after a sign-out/sign-in
+    // cycle, OR auth.uid() returned null mid-refresh). The USING
+    // check then fails and PostgREST returns 403 ("new row violates
+    // RLS policy USING expression"). Switching to ignore-duplicates
+    // skips the UPDATE entirely — if the endpoint row already exists
+    // we leave it alone. last_seen_at staying stale is fine; we still
+    // capture fresh rows on first-ever subscribe.
     const resp = await fetch(
       `${SUPABASE_URL}/rest/v1/push_subscriptions?on_conflict=endpoint`,
       {
@@ -119,7 +124,7 @@ export async function subscribeForPush(userId) {
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': 'Bearer ' + at,
-          'Prefer': 'return=minimal,resolution=merge-duplicates',
+          'Prefer': 'return=minimal,resolution=ignore-duplicates',
         },
         body: JSON.stringify({
           user_id: userId,
