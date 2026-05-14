@@ -208,6 +208,24 @@ export function V2AppShell() {
   // Phase 33B.4 — More drawer for sales reps. Avatar tap opens it.
   const [moreOpen, setMoreOpen] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
+
+  // Phase 35 PR 2 — track viewport size so we can pass the right
+  // bottomGap to <ToastViewport /> (mobile has the 64 px bottom nav
+  // behind it; desktop doesn't). Reused by Task 5 to hide the
+  // IncentiveMiniPill on mobile.
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia('(max-width: 860px)')
+    const update = () => setIsMobile(mql.matches)
+    update()
+    if (mql.addEventListener) mql.addEventListener('change', update)
+    else mql.addListener(update)
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', update)
+      else mql.removeListener(update)
+    }
+  }, [])
   // Phase 1.5 — AI Co-Pilot. Cmd+K (Mac) / Ctrl+K (Win/Linux) opens.
   const [copilotOpen, setCopilotOpen] = useState(false)
   useEffect(() => {
@@ -602,8 +620,10 @@ export function V2AppShell() {
 
       {/* Phase 34a — global toast viewport. Mounted once at the shell
           root so any page, modal or store can call pushToast() and have
-          it render in the bottom-right corner. */}
-      <ToastViewport />
+          it render in the bottom-right corner. Phase 35 PR 2 — bottomGap
+          driven by viewport so toasts clear the mobile bottom nav (64 px
+          + 12 px gap = 76) without an !important CSS override. */}
+      <ToastViewport bottomGap={isMobile ? 76 : 16} />
 
       {/* Phase 34e — promise-based confirm dialog. Replaces browser
           confirm() for destructive operations so the look matches the
