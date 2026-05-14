@@ -131,26 +131,19 @@ export default function MeetingsMapPanel({ userId }) {
         zoom:   FALLBACK_ZOOM,
         scrollWheelZoom: false,
       })
-      // Phase 35 PR 2 — switched OSM operational tiles to MapTiler. OSM
-      // policy explicitly discourages production use of tile.openstreet
-      // map.org; MapTiler's free tier covers 100k requests/month, well
-      // above the rep team's expected traffic. Key lives in env var so
-      // it never enters git. If the key is missing at build time, fall
-      // back to OSM with a console warning — better than a blank map.
-      const mtKey = import.meta.env.VITE_MAPTILER_KEY
-      if (!mtKey) {
-        console.warn('[MeetingsMapPanel] VITE_MAPTILER_KEY missing — falling back to OSM')
-      }
-      const tileUrl = mtKey
-        ? `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${mtKey}`
-        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-      const attribution = mtKey
-        ? '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-        : '&copy; OpenStreetMap'
-
-      L.tileLayer(tileUrl, {
+      // Phase 34Z.2 (13 May 2026) — owner reported tiles STILL not
+      // loading after Phase 34Z.1's invalidateSize fix. Diagnosis:
+      // {s} subdomain rotation was producing `a/b/c.tile.openstreet
+      // map.org` URLs, but the OSM operational policy has been
+      // discouraging the legacy lettered subdomains since 2023 and
+      // some networks (incl. Indian ISPs) refuse them. Switching to
+      // the canonical `tile.openstreetmap.org` host with no subdomain
+      // template. Also bumped tile cross-origin to anonymous so the
+      // browser cache works across same-origin views and the service
+      // worker (Phase 34G) can hit-cache them properly.
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution,
+        attribution: '&copy; OpenStreetMap',
         crossOrigin: true,
       }).addTo(mapRef.current)
     }
@@ -162,12 +155,15 @@ export default function MeetingsMapPanel({ userId }) {
     // initialises with that size and never requests tiles. After the
     // user expands the panel the container has a real height but
     // Leaflet doesn't know, so no tile request fires. The canonical
-    // fix is `invalidateSize()` once the container is visible. Single
-    // requestAnimationFrame tick suffices now that MapTiler tiles
-    // load reliably and the panel renders only when `open === true`.
+    // fix is `invalidateSize()` once the container is visible. Two
+    // ticks (microtask + ~80 ms) covers both the first render and
+    // any CSS transition timing.
     requestAnimationFrame(() => {
       try { mapRef.current?.invalidateSize() } catch { /* ignore */ }
     })
+    setTimeout(() => {
+      try { mapRef.current?.invalidateSize() } catch { /* ignore */ }
+    }, 80)
 
     // Clear existing markers
     markersRef.current.forEach((m) => m.remove())

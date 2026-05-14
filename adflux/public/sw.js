@@ -49,7 +49,6 @@ registerRoute(
 registerRoute(
   ({ url }) => url.host === 'tile.openstreetmap.org'
             || url.host.endsWith('.tile.openstreetmap.org')
-            || url.host === 'api.maptiler.com'
             || url.host === 'a.basemaps.cartocdn.com'
             || url.host === 'b.basemaps.cartocdn.com'
             || url.host === 'c.basemaps.cartocdn.com',

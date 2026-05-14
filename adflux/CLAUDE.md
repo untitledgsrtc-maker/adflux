@@ -541,15 +541,3 @@ Useful invocations:
 - `get_impact_radius_tool` — blast-radius of a planned change.
 
 Graph DB at `~/Documents/untitled-os2/.code-review-graph/` (gitignored). Rebuilt automatically via the PostToolUse hook in `~/Documents/untitled-os2/.claude/settings.json`.
-
----
-
-## 27 · Emoji waivers (2026-05-13)
-
-Emoji are forbidden by default per §7 + §20. The following site-specific waivers are owner-approved:
-
-| Site | Glyphs | Approved in | Notes |
-|---|---|---|---|
-| `V2AppShell.greetingFor()` | `☀️ ⛅ 🌙` | Phase 34Z.1 | Time-band suffix on the greeting; replaces three Lucide icons that didn't carry enough warmth |
-
-No other emoji exceptions. The five sites flagged in the 2026-05-13 UI audit (`StaffTable.jsx:38 🎉`, `MyPerformance.jsx:188 🎉`, `WonPaymentModal.jsx:157 💰`, `AdminDashboardDesktop.jsx:899/1772 ⚡🎉`, `SalesDashboardDesktop.jsx:523/660 ⚡`) are NOT in this table and must be migrated to Lucide icons during PR 3.

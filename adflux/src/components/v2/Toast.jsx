@@ -86,26 +86,27 @@ const TINT = {
   info:    { bd: '#60a5fa', bg: 'rgba(96, 165, 250, 0.14)' },
 }
 
-/**
- * @param {object} props
- * @param {number} [props.bottomGap=16] — extra px above the bottom edge
- *   (default 16; pass 64+safe-area when a fixed bottom nav sits behind
- *   the toast). Replaces the Phase 34Z !important CSS override.
- */
-export function ToastViewport({ bottomGap = 16 } = {}) {
+export function ToastViewport() {
   const toasts = useToastStore((s) => s.toasts)
   const dismiss = useToastStore((s) => s.dismiss)
 
   if (!toasts.length) return null
 
   return (
+    // Phase 34Z (13 May 2026) — `bottom` was 16 px + safe-area only,
+    // which on mobile placed the toast UNDER the .v2d-mnav (mobile
+    // bottom nav, height 64 + safe-area; visible <860 px in v2.css).
+    // Reps never saw the "Lead saved." or "Could not save" messages
+    // on phones. Bumping the bottom offset on mobile to clear the
+    // 64-px nav + safe-area. Desktop stays 16 + safe-area.
     <div
       role="status"
       aria-live="polite"
+      className="v2-toast-viewport"
       style={{
         position: 'fixed',
         right: 16,
-        bottom: `calc(${bottomGap}px + env(safe-area-inset-bottom, 0px))`,
+        bottom: 'max(16px, calc(env(safe-area-inset-bottom, 0px) + 16px))',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
