@@ -36,14 +36,20 @@ export default function NotificationPanel() {
     const nowIso   = new Date().toISOString()
     const [apRes, fuRes, slaRes, naRes] = await Promise.all([
       supabase.from('payments')
-        .select('id, quote_id, amount_received, recorded_by, created_at, quotes(quote_number, ref_number, client_company, client_name)')
+        // ref_number was never a real column on quotes (Phase 33N
+        // confirmed; CLAUDE.md §4 ref formats are stored in
+        // quote_number directly). Selecting it broke the whole
+        // payments query with HTTP 400. Dropped.
+        .select('id, quote_id, amount_received, recorded_by, created_at, quotes(quote_number, client_company, client_name)')
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false })
         .limit(15),
       supabase.from('follow_ups')
         // Phase 31V — pulled follow_up_time too so notifications can
         // show "Meeting at 12:00" instead of just "Meeting today".
-        .select('id, quote_id, follow_up_date, follow_up_time, note, quotes(quote_number, ref_number, client_company, client_name, segment)')
+        // ref_number dropped per the same reason as the payments
+        // select above.
+        .select('id, quote_id, follow_up_date, follow_up_time, note, quotes(quote_number, client_company, client_name, segment)')
         .eq('is_done', false)
         .lte('follow_up_date', todayIso)
         .order('follow_up_date', { ascending: true })

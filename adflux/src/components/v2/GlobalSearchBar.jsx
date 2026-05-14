@@ -73,8 +73,11 @@ export default function GlobalSearchBar() {
           .or(`name.ilike.${like},company.ilike.${like},phone.ilike.${like}`)
           .limit(5),
         supabase.from('quotes')
-          .select('id, segment, media_type, quote_number, ref_number, client_name, client_company, status')
-          .or(`client_name.ilike.${like},client_company.ilike.${like},quote_number.ilike.${like},ref_number.ilike.${like}`)
+          // ref_number doesn't exist on quotes (Phase 33N + CLAUDE.md
+          // §4 — ref formats live inside quote_number). Selecting /
+          // filtering on it 400s the whole search.
+          .select('id, segment, media_type, quote_number, client_name, client_company, status')
+          .or(`client_name.ilike.${like},client_company.ilike.${like},quote_number.ilike.${like}`)
           .limit(5),
       ])
       if (ctrl.signal.aborted) return
