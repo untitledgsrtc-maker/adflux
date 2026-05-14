@@ -10,11 +10,6 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { initAuth } from './hooks/useAuth'
 import './styles/globals.css'
-// Phase 36 — Sales Operator visual vocabulary. Loaded after globals
-// so v3 tokens win on name overlap. v2.css and tokens.css are still
-// imported per-component where needed; v3-vocab declares NEW custom
-// properties only, no color overrides.
-import './styles/v3-vocab.css'
 
 // Phase 34G — register the PWA service worker (vite-plugin-pwa virtual
 // import). autoUpdate strategy means a new build reloads tabs once the

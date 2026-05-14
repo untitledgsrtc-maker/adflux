@@ -45,9 +45,6 @@ import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import V2Hero from '../../components/v2/V2Hero'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import LogMeetingModal from '../../components/leads/LogMeetingModal'
-// Phase 36 — Day Spine. Vertical timeline pinned to the left edge of
-// /work; dots represent working hours 08-20 with current-hour pulse.
-import DaySpine from '../../components/v2/DaySpine'
 import { useLeadTasks } from '../../hooks/useLeadTasks'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
 
@@ -574,14 +571,8 @@ export default function WorkV2() {
   const planSubmitted = !!session?.plan_submitted_at
 
   return (
-    <div className="lead-root v3-vocab">
-      <div className="m-screen v3-page">
-        {/* Phase 36 — Day Spine. Sits at the left edge of the page
-            wrapper (the .v3-page padding-left clears the gutter).
-            Activities + click-to-scroll hour targets are derived
-            from session state above. */}
-        <DaySpine activities={spineActivities} />
-
+    <div className="lead-root">
+      <div className="m-screen">
         {/* Discoverability tip — irrelevant once the day is over. */}
         {!dayDone && (
           <DidYouKnow id="work-voice-plan-2026-05-13" title="Speak your day plan">
