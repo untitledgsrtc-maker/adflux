@@ -13,6 +13,7 @@
 
 import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCard'
 import { MyPerformance } from '../../components/incentives/MyPerformance'
+import TotalPayableCard from '../../components/incentives/TotalPayableCard'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import '../../styles/incentives.css'
 
@@ -48,6 +49,11 @@ export default function MyPerformanceV2() {
       <div style={{ marginTop: 14 }}>
         <MyPerformance />
       </div>
+
+      {/* Phase 34Z.38 — single grand-total summary at the bottom.
+          Base + Variable + Incentive + TA/DA = one rupee number the
+          rep can read first thing. Owner directive 15 May 2026. */}
+      <TotalPayableCard />
     </div>
   )
 }
