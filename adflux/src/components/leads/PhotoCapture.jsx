@@ -17,7 +17,7 @@
 // so mobile reps get the rear camera.
 
 import { useState } from 'react'
-import { Camera, Loader2, Sparkles, Check } from 'lucide-react'
+import { Camera, Loader2, Sparkles, Check, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { resizeImage } from '../../utils/leadDedup'
 import { toastError } from '../v2/Toast'
@@ -130,26 +130,55 @@ export default function PhotoCapture({
 
   return (
     <div>
-      <label
-        className="lead-btn lead-btn-sm"
-        style={{
-          cursor: busy ? 'wait' : 'pointer',
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-        }}
-      >
-        {busy
-          ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-          : <Camera size={13} />}
-        <span>{busy ? (scanOnly ? 'Reading card…' : 'Uploading…') : (buttonLabel || 'Take photo')}</span>
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handleFile}
-          disabled={busy}
-          style={{ display: 'none' }}
-        />
-      </label>
+      {/* Phase 35 PR 2.10 — two buttons, one OCR pipeline. Owner: "i
+          want scan and upload option while create lead or log
+          meeting." `Scan` forces the rear camera via `capture=
+          environment` for live business-card capture. `Upload` omits
+          `capture` so iOS Safari + Android Chrome present the
+          photo-library picker (rep can pick an existing photo from
+          gallery / Files / iCloud). Both routes hit the same
+          handleFile → resize → OCR pipeline. */}
+      <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+        <label
+          className="lead-btn lead-btn-sm"
+          style={{
+            cursor: busy ? 'wait' : 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          {busy
+            ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+            : <Camera size={13} />}
+          <span>{busy ? (scanOnly ? 'Reading card…' : 'Uploading…') : (buttonLabel || 'Scan card')}</span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFile}
+            disabled={busy}
+            style={{ display: 'none' }}
+          />
+        </label>
+        {!busy && (
+          <label
+            className="lead-btn lead-btn-sm"
+            style={{
+              cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <Upload size={13} />
+            <span>Upload</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFile}
+              disabled={busy}
+              style={{ display: 'none' }}
+            />
+          </label>
+        )}
+      </div>
       {error && (
         <div style={{ marginTop: 6, fontSize: 11, color: 'var(--danger)' }}>{error}</div>
       )}

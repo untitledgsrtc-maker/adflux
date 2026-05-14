@@ -613,23 +613,19 @@ export default function WorkV2() {
           navigate={navigate}
         />
 
-        {/* Phase 35 PR 2.9 — owner directive: Today's Tasks list goes
-            ABOVE the single Next-up priority card. Rationale: the
-            list shows everything the rep could do today; the Next-up
-            card is just the top item visually emphasised. Reading
-            order = list first, priority below.
+        {/* Phase 35 PR 2.10 — restore PR 2.7 order. PR 2.9 moved
+            Today's Tasks ABOVE Next-up; owner clarified that was
+            wrong: "this was sequance: V2Hero / Next-up / Log
+            meeting+lead / Today's tasks / Map / Evening summary".
 
-            Order top → bottom inside the B_ACTIVE branch:
-              Today's Tasks (smart-task list)
-              Next-up (single highest-priority card)
+            Locked order in B_ACTIVE state:
+              V2Hero (in DayStatusSurface above)
+              Next-up priority card
               Log meeting + Log lead inline CTAs
+              Today's Tasks (smart-task list)
               Map
               Evening summary
         */}
-        {checkedIn && !dayDone && (
-          <TodayTasksPanel userId={profile.id} limit={3} />
-        )}
-
         {checkedIn && !dayDone && (
           <NextActionSurface
             session={session}
@@ -654,6 +650,7 @@ export default function WorkV2() {
 
         {checkedIn && !dayDone && (
           <>
+            <TodayTasksPanel userId={profile.id} limit={3} />
             <MeetingsMapPanel userId={profile.id} />
             <EveningReportBlock
               evening={evening}
