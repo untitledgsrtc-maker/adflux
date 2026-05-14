@@ -30,16 +30,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { formatDate } from '../../utils/formatters'
 
-// Haversine — straight-line km between two lat/lng pairs.
-function haversineKm(a, b) {
-  const R = 6371
-  const dLat = (b.lat - a.lat) * Math.PI / 180
-  const dLng = (b.lng - a.lng) * Math.PI / 180
-  const lat1 = a.lat * Math.PI / 180
-  const lat2 = b.lat * Math.PI / 180
-  const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(x))
-}
+// Phase 34Z.6 — haversine + summariseTrack live in src/utils/
+// gpsDistance.js so /work uses the same filter rules.
+import { summariseTrack } from '../../utils/gpsDistance'
 
 // Phase 32K — Leaflet imported directly from npm (`import L from 'leaflet'`).
 // No more CDN load gymnastics, no failover paths, no timeout guards.
@@ -147,63 +140,15 @@ export default function GpsTrackV2() {
   // Raw km is exposed in the stats object too so the rep-day page
   // can show "filtered 215 km · raw 1,303 km" if needed for audit.
   const stats = useMemo(() => {
-    const MIN_SEG_KM       = 0.03       // 30 m — drift floor
-    const MAX_SEG_KM_PER_S = 200 / 3600  // 200 km/h ceiling
-    const MAX_DAILY_KM     = 600
-    const MAX_ACC_M        = 100
-
-    // Phase 34U — Phase 34I dropped ALL pings whose accuracy_m > 100
-    // before summing distance. On Kevian's 13 May track every single
-    // ping came in with poor accuracy (rep had patchy signal — 28
-    // pings recorded, ALL above the 100 m threshold), so the filter
-    // erased the whole day and the page showed 0 km. The map still
-    // renders the polyline from `pings` directly so the rep's path
-    // was visible, but the headline km number stayed zero.
-    //
-    // Soften the rule: if more than half of today's pings would be
-    // dropped by the accuracy filter, fall back to using ALL pings
-    // (raw quality). User still sees the segment-min and speed
-    // ceiling filters which guard against the worst spikes; the raw
-    // banner shown beneath the headline indicates the looser path.
-    const usableStrict = pings.filter((p) => {
-      const acc = Number(p.accuracy_m)
-      return !Number.isFinite(acc) || acc <= MAX_ACC_M
-    })
-    const tooMuchDropped = pings.length > 0
-      && usableStrict.length < Math.floor(pings.length * 0.5)
-    const usable = tooMuchDropped ? pings.slice() : usableStrict
-
-    let kmRaw = 0
-    let kmKept = 0
-    let dropped = 0
-
-    for (let i = 1; i < usable.length; i++) {
-      const a = usable[i - 1]
-      const b = usable[i]
-      const seg = haversineKm(
-        { lat: Number(a.lat), lng: Number(a.lng) },
-        { lat: Number(b.lat), lng: Number(b.lng) },
-      )
-      kmRaw += seg
-      const dtMs = new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime()
-      const dtSec = Math.max(1, dtMs / 1000)
-      const speed = seg / dtSec  // km/s
-      if (seg < MIN_SEG_KM)               { dropped++; continue }
-      if (speed > MAX_SEG_KM_PER_S)       { dropped++; continue }
-      kmKept += seg
-    }
-
-    const kmCapped = Math.min(kmKept, MAX_DAILY_KM)
-
+    // Phase 34Z.6 — distance logic lives in src/utils/gpsDistance.js
+    // now (same function /work uses for the rep-side km chip), so
+    // both views always agree. first/last captured_at stays here
+    // because only this page renders them.
+    const base = summariseTrack(pings)
     return {
-      km:           kmCapped.toFixed(1),
-      kmRaw:        kmRaw.toFixed(1),
-      pings:        pings.length,
-      usablePings:  usable.length,
-      droppedSegs:  dropped,
-      capped:       kmKept > MAX_DAILY_KM,
-      first:        pings[0]?.captured_at,
-      last:         pings[pings.length - 1]?.captured_at,
+      ...base,
+      first: pings[0]?.captured_at,
+      last:  pings[pings.length - 1]?.captured_at,
     }
   }, [pings])
 

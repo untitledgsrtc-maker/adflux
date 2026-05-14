@@ -28,6 +28,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../../lib/supabase'
 import { geocodeAndPersistLead, leadAddressLine } from '../../utils/geocode'
+import { summariseTrack } from '../../utils/gpsDistance'
 
 // Vadodara fallback center (Untitled Advertising HQ).
 const FALLBACK_CENTER = [22.3072, 73.1812]
@@ -65,9 +66,15 @@ export default function MeetingsMapPanel({ userId }) {
   const [error,   setError]   = useState('')
   const [leads,   setLeads]   = useState([])           // { id, name, company, lat, lng, address, city }
   const [needsGeo, setNeedsGeo] = useState([])         // leads we tried to geocode but couldn't
+  // Phase 34Z.6 — today's own track (GPS pings since 00:00 local).
+  // Drawn as a yellow polyline so the rep sees where they've been.
+  // summary = { km, kmRaw, pings, ... } from summariseTrack().
+  const [track,   setTrack]   = useState([])           // [{lat,lng,captured_at,accuracy_m}]
+  const [trackSummary, setTrackSummary] = useState(null)
   const mapRef       = useRef(null)
   const mapElRef     = useRef(null)
   const markersRef   = useRef([])
+  const trackLayerRef= useRef(null)
 
   // Load lead pins from THREE sources, union them:
   //   1. Open follow-ups (today → next 7 days, assigned to me)
@@ -87,9 +94,17 @@ export default function MeetingsMapPanel({ userId }) {
         const weekEnd  = new Date(); weekEnd.setDate(weekEnd.getDate() + 7)
         const weekAgo  = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
         const weekAgoIso = weekAgo.toISOString()
+        // Phase 34Z.6 — also fetch today's own GPS pings so we can
+        // draw the rep's track + sum total km. Local-time midnight
+        // start / 23:59 end so the day boundary matches the rep's
+        // perception, not UTC.
+        const dayStartLocal = new Date()
+        dayStartLocal.setHours(0, 0, 0, 0)
+        const dayEndLocal = new Date()
+        dayEndLocal.setHours(23, 59, 59, 999)
 
-        // Three parallel queries → union of lead_ids.
-        const [fuRes, actRes, mineRes] = await Promise.all([
+        // Four parallel queries → union of lead_ids + own track.
+        const [fuRes, actRes, mineRes, trackRes] = await Promise.all([
           supabase
             .from('follow_ups')
             .select('lead_id')
@@ -110,10 +125,24 @@ export default function MeetingsMapPanel({ userId }) {
             .eq('assigned_to', userId)
             .not('stage', 'in', '("Won","Lost")')
             .limit(50),
+          supabase
+            .from('gps_pings')
+            .select('lat, lng, captured_at, accuracy_m, source')
+            .eq('user_id', userId)
+            .gte('captured_at', dayStartLocal.toISOString())
+            .lte('captured_at', dayEndLocal.toISOString())
+            .order('captured_at', { ascending: true }),
         ])
-        if (fuRes.error)   throw fuRes.error
-        if (actRes.error)  throw actRes.error
-        if (mineRes.error) throw mineRes.error
+        if (fuRes.error)    throw fuRes.error
+        if (actRes.error)   throw actRes.error
+        if (mineRes.error)  throw mineRes.error
+        if (trackRes.error) throw trackRes.error
+
+        if (!cancelled) {
+          const t = trackRes.data || []
+          setTrack(t)
+          setTrackSummary(summariseTrack(t))
+        }
 
         const leadIds = [...new Set([
           ...(fuRes.data || []).map(r => r.lead_id),
@@ -235,7 +264,33 @@ export default function MeetingsMapPanel({ userId }) {
     markersRef.current.forEach((m) => m.remove())
     markersRef.current = []
 
-    if (leads.length === 0) {
+    // Phase 34Z.6 — draw today's track as a yellow polyline + green
+    // start dot + red end dot so the rep sees A→B→C→… exactly as
+    // owner described. Filter out pings with bogus coords. Cleared
+    // and redrawn on every render so updates from interval pings
+    // refresh the line cleanly.
+    if (trackLayerRef.current) {
+      try { trackLayerRef.current.remove() } catch { /* ignore */ }
+      trackLayerRef.current = null
+    }
+    const trackPts = (track || [])
+      .map((p) => [Number(p.lat), Number(p.lng)])
+      .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b))
+    if (trackPts.length >= 2) {
+      const grp = L.layerGroup()
+      L.polyline(trackPts, { color: '#FFE600', weight: 4, opacity: 0.75 }).addTo(grp)
+      // start + end accent dots
+      L.circleMarker(trackPts[0], {
+        radius: 6, color: '#10B981', weight: 2, fillColor: '#10B981', fillOpacity: 0.9,
+      }).bindPopup('Check-in').addTo(grp)
+      L.circleMarker(trackPts[trackPts.length - 1], {
+        radius: 6, color: '#EF4444', weight: 2, fillColor: '#EF4444', fillOpacity: 0.9,
+      }).bindPopup('Latest position').addTo(grp)
+      grp.addTo(mapRef.current)
+      trackLayerRef.current = grp
+    }
+
+    if (leads.length === 0 && trackPts.length === 0) {
       mapRef.current.setView(FALLBACK_CENTER, FALLBACK_ZOOM)
       return () => {
         clearTimeout(t1)
@@ -243,7 +298,9 @@ export default function MeetingsMapPanel({ userId }) {
       }
     }
 
-    const bounds = []
+    // Seed bounds with the track so the rep's actual path always
+    // fits in the visible map area even if there are no lead pins.
+    const bounds = trackPts.slice()
     for (const l of leads) {
       const lat = Number(l.lat)
       const lng = Number(l.lng)
@@ -275,7 +332,7 @@ export default function MeetingsMapPanel({ userId }) {
       clearTimeout(t1)
       clearTimeout(t2)
     }
-  }, [open, leads])
+  }, [open, leads, track])
 
   // Tear down map on unmount.
   useEffect(() => () => {
@@ -333,6 +390,24 @@ export default function MeetingsMapPanel({ userId }) {
               {leads.length} pin{leads.length === 1 ? '' : 's'}
             </span>
           )}
+          {/* Phase 34Z.6 — today's distance chip (yellow accent so
+              it pops). Owner: "you will see the total number of
+              kilometer he drives or he travel". Reads from the same
+              gps_pings the day-track polyline uses, so the number
+              always matches the line. */}
+          {trackSummary && Number(trackSummary.km) > 0 && (
+            <span style={{
+              padding: '1px 7px',
+              background: 'rgba(255,230,0,0.18)',
+              border: '1px solid rgba(255,230,0,0.45)',
+              borderRadius: 999,
+              color: 'var(--v2-ink-0, #f5f7fb)',
+              fontSize: 10,
+              fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+            }}>
+              {trackSummary.km} km today
+            </span>
+          )}
         </div>
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
@@ -361,6 +436,38 @@ export default function MeetingsMapPanel({ userId }) {
             }}
           />
 
+          {/* Phase 34Z.6 — today's track summary. Green dot = check-in,
+              red dot = latest fix, yellow line = path. km count comes
+              from haversine sum of consecutive pings (drift + speed
+              filters applied so a parked phone doesn't add ghost km).
+              Owner directive (14 May 2026): "A→B + B→C + C→D… total
+              kilometer counted". */}
+          {trackSummary && (trackSummary.pings > 0) && (
+            <div style={{
+              marginTop: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              fontSize: 11,
+              color: 'var(--v2-ink-1, #a9b3c7)',
+            }}>
+              <span>
+                <b style={{
+                  fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+                  color: 'var(--v2-ink-0, #f5f7fb)',
+                }}>{trackSummary.km}</b> km today
+              </span>
+              <span>
+                {trackSummary.pings} ping{trackSummary.pings === 1 ? '' : 's'}
+              </span>
+              {trackSummary.capped && (
+                <span style={{ color: 'var(--warning, #F59E0B)' }}>
+                  capped at 600 km
+                </span>
+              )}
+            </div>
+          )}
+
           {needsGeo.length > 0 && (
             <div style={{
               marginTop: 10,
@@ -388,7 +495,7 @@ export default function MeetingsMapPanel({ userId }) {
             </div>
           )}
 
-          {leads.length === 0 && !loading && needsGeo.length === 0 && (
+          {leads.length === 0 && !loading && needsGeo.length === 0 && track.length === 0 && (
             <div style={{ marginTop: 10, fontSize: 12, color: 'var(--v2-ink-1, #a9b3c7)' }}>
               No follow-ups in the next 7 days — nothing to plot.
             </div>
