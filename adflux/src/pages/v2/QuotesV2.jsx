@@ -766,19 +766,13 @@ function FollowUpChip({ date, done }) {
        color to the rose accent (used for Outstanding so it reads as
        attention-needed instead of neutral). ─── */
 function TotalCard({ label, value, kind, warn }) {
-  // Phase 34Z.11 — compact format on cards. ₹5,52,240 → ₹5.52L,
-  // ₹1,05,070 → ₹1.05L, ₹62,500 → ₹62.5K. Owner reported the raw
-  // en-IN number overflowed the 3-col grid on phone widths. Lakh/
-  // crore form keeps the precision rep cares about + always fits.
-  function compactMoney(n) {
-    const v = Math.round(Number(n) || 0)
-    if (v >= 10000000) return '₹' + (v / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr'
-    if (v >= 100000)   return '₹' + (v / 100000).toFixed(2).replace(/\.?0+$/, '') + ' L'
-    if (v >= 1000)     return '₹' + (v / 1000).toFixed(1).replace(/\.0$/, '') + 'K'
-    return '₹' + v
-  }
+  // Phase 34Z.40 — reverted Phase 34Z.11 lakh/crore compact-money.
+  // DESIGN_SYSTEM.md §3.3 is explicit: "Never truncate to lakh/crore
+  // (no `₹1.5L`, no `₹2.3Cr`). The full number IS the design."
+  // Mobile clip is fixed by smaller font + tabular-nums + flexible
+  // grid; numbers stay full.
   const display = kind === 'money'
-    ? compactMoney(value)
+    ? '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Number(value) || 0))
     : (Number(value) || 0).toLocaleString('en-IN')
   return (
     <div
@@ -809,12 +803,17 @@ function TotalCard({ label, value, kind, warn }) {
       <div
         style={{
           fontFamily: 'var(--v2-display)',
-          fontSize: 20,
+          /* Phase 34Z.40 — full Indian-locale numbers can hit 10+
+             chars (₹1,01,03,750). Smaller font keeps them readable
+             without truncation. Display-700 still per §3.2. */
+          fontSize: 17,
           fontWeight: 700,
           color: warn ? 'var(--v2-amber)' : 'var(--v2-ink-0)',
           lineHeight: 1.1,
           minWidth: 0,
           whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
           fontVariantNumeric: 'tabular-nums',
         }}
       >

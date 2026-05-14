@@ -161,7 +161,7 @@ export default function TotalPayableCard() {
         fontWeight: 700,
       }}>
         <span style={{ fontSize: 13 }}>Grand total payable</span>
-        <span style={{ fontSize: 20, fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)' }}>
+        <span style={{ fontSize: 22, fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)', fontWeight: 700 }}>
           {formatCurrency(grand)}
         </span>
       </div>
@@ -177,8 +177,8 @@ export default function TotalPayableCard() {
 }
 
 const cardStyle = {
-  background: 'var(--surface)',
-  border: '1px solid var(--border)',
+  background: 'var(--v2-bg-1, var(--surface))',
+  border: '1px solid var(--v2-line, var(--border))',
   borderRadius: 14,
   padding: 16,
   marginTop: 14,
@@ -196,9 +196,9 @@ function Row({ label, value, sub, muted }) {
         {muted && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>{muted}</div>}
       </div>
       <div style={{
-        fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
-        fontWeight: 600,
-        color: value > 0 ? 'var(--text)' : 'var(--text-subtle)',
+        fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',
+        fontWeight: 700,
+        color: value > 0 ? 'var(--v2-ink-0, var(--text))' : 'var(--v2-ink-2, var(--text-subtle))',
       }}>
         {value > 0 ? formatCurrency(value) : '—'}
       </div>

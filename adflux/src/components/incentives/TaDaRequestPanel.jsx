@@ -130,8 +130,8 @@ export default function TaDaRequestPanel() {
 
   const styles = {
     card: {
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
+      background: 'var(--v2-bg-1, var(--surface))',
+      border: '1px solid var(--v2-line, var(--border))',
       borderRadius: 12,
       padding: 16,
       marginBottom: 14,
@@ -287,9 +287,9 @@ export default function TaDaRequestPanel() {
           <div style={{
             marginTop: 8,
             padding: '6px 10px',
-            background: 'var(--accent-soft, rgba(255,230,0,0.10))',
-            border: '1px dashed var(--accent, #FFE600)',
-            borderRadius: 8,
+            background: 'var(--accent-soft, rgba(255,230,0,0.14))',
+            border: '1px dashed var(--v2-yellow, var(--accent, #FFE600))',
+            borderRadius: 10,
             fontSize: 11, color: 'var(--text-muted)',
           }}>
             <b style={{ color: 'var(--accent)' }}>Pre-filled from GPS:</b> {liveTrack.km} km today.
@@ -359,7 +359,7 @@ function Stat({ label, value, highlight }) {
       <div style={{
         fontSize: 16, fontWeight: 700,
         color: highlight ? 'var(--accent, #FFE600)' : 'var(--text)',
-        fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+        fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',
         marginTop: 2,
       }}>
         {value}
