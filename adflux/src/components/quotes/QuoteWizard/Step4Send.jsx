@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import { CheckCircle, MessageCircle, FileText, ArrowRight } from 'lucide-react'
 import { buildWhatsAppMessage, openWhatsApp, shortenUrl } from '../../../utils/whatsapp'
-import { downloadQuotePDF, uploadQuotePDF } from '../QuotePDF'
+// Phase 34Z.33 — was importing the broken @react-pdf renderer
+// (`../QuotePDF`). Owner reported the post-create "Send via WhatsApp"
+// button always showed "Failed to generate PDF", while the same
+// action from QuoteDetail worked. Reason: QuoteDetail already moved
+// to QuotePDFHtml (html2canvas + jsPDF) in Phase 34Z.25 but Step4Send
+// was missed. Aliased imports to keep the call sites unchanged.
+import {
+  downloadQuotePDFHtml as downloadQuotePDF,
+  uploadQuotePDFHtml   as uploadQuotePDF,
+} from '../QuotePDFHtml'
 import { formatCurrency } from '../../../utils/formatters'
 
 export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, onDone, onViewQuote }) {
