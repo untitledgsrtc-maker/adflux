@@ -540,6 +540,22 @@ export default function WorkV2() {
   // Smart-task feed for the NextActionSurface priority resolver.
   const { tasks: smartTasks } = useLeadTasks({ userId: profile?.id })
 
+  // Phase 36 — gather activity timestamps for the Day Spine. Bin
+  // includes logged meetings (from planned_meetings .done=true) +
+  // smart tasks completed today. Pure derivation off `session` so
+  // the spine updates in lockstep with every save.
+  // CRITICAL: must run BEFORE the `if (loading) return …` below so
+  // the hook order stays stable across renders (React error #310 —
+  // hooks rendered more on second pass than first).
+  const spineActivities = useMemo(() => {
+    const ts = []
+    const pm = session?.planned_meetings || []
+    for (const m of pm) {
+      if (m.done && m.done_at) ts.push(m.done_at)
+    }
+    return ts
+  }, [session])
+
   if (loading) {
     return (
       <div className="lead-root">
@@ -556,22 +572,6 @@ export default function WorkV2() {
   const dayDone = !!session?.evening_report_submitted_at
   const checkedIn = !!session?.check_in_at
   const planSubmitted = !!session?.plan_submitted_at
-
-  // Phase 36 — gather activity timestamps for the Day Spine. Bin
-  // includes logged meetings (from planned_meetings .done=true) +
-  // smart tasks completed today. Pure derivation off `session` so
-  // the spine updates in lockstep with every save.
-  const spineActivities = useMemo(() => {
-    const ts = []
-    const pm = session?.planned_meetings || []
-    for (const m of pm) {
-      if (m.done && m.done_at) ts.push(m.done_at)
-    }
-    // If we ever store per-task completion timestamps in session,
-    // append them here. For now the meeting-done timestamps are the
-    // canonical activity feed.
-    return ts
-  }, [session])
 
   return (
     <div className="lead-root v3-vocab">
