@@ -59,17 +59,39 @@ export function useLeadTasks({ userId } = {}) {
 
   useEffect(() => { fetchTasks() }, [fetchTasks])
 
-  // Realtime — keep the panel fresh as tasks are completed elsewhere
+  // Realtime — keep the panel fresh as tasks are completed elsewhere.
+  // Phase 35 PR 2.3 — channel name was hardcoded `'lead-tasks-rt'`,
+  // so under React StrictMode double-mount (dev) OR any remount during
+  // a session (e.g. WorkV2 re-renders because of a session-state
+  // update), the second `.on()` call ran against a channel that
+  // Supabase's local registry treated as already-subscribed → threw
+  // "cannot add postgres_changes callbacks after subscribe()" which
+  // was uncaught and killed /work on mobile. Two fixes: (a) unique
+  // channel name per effect mount, (b) try/catch so a realtime
+  // wire-up failure can't take the page down.
   useEffect(() => {
-    const ch = supabase
-      .channel('lead-tasks-rt')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'lead_tasks' },
-        () => { fetchTasks() }   // cheap re-fetch; volume is small
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    const channelName = `lead-tasks-rt-${Math.random().toString(36).slice(2, 10)}`
+    let ch
+    try {
+      ch = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'lead_tasks' },
+          () => { fetchTasks() }   // cheap re-fetch; volume is small
+        )
+        .subscribe()
+    } catch (err) {
+      // Realtime failed to wire — the panel still works via initial
+      // fetch + explicit refresh calls; just no live update.
+      // eslint-disable-next-line no-console
+      console.warn('[useLeadTasks] realtime subscribe failed:', err?.message || err)
+    }
+    return () => {
+      if (ch) {
+        try { supabase.removeChannel(ch) } catch { /* ignore */ }
+      }
+    }
   }, [fetchTasks])
 
   const generate = useCallback(async () => {
