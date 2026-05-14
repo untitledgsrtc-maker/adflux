@@ -143,6 +143,12 @@ export default function LeadFormV2() {
   }
 
   async function handleSave(openAfter = false) {
+    // Phase 34Z.31 — owner reported the same lead saved twice on a
+    // single visit. The button has `disabled={saving}` but React
+    // batches state updates, so a second tap while the previous
+    // save's `setSaving(true)` is still pending sneaks through.
+    // Guard at the top of the handler closes that window.
+    if (saving) return
     setError('')
     if (!form.name.trim()) {
       setError('Person name is required.')
