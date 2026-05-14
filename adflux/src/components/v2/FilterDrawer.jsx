@@ -34,7 +34,7 @@ import { SlidersHorizontal, X } from 'lucide-react'
 
 export default function FilterDrawer({ fields = [] }) {
   const [open, setOpen] = useState(false)
-  const [popPos, setPopPos] = useState({ top: 0, right: 12 })
+  const [popPos, setPopPos] = useState({ top: 0, left: 12 })
   const wrapRef = useRef(null)
   const popRef  = useRef(null)
 
@@ -51,17 +51,28 @@ export default function FilterDrawer({ fields = [] }) {
     return () => document.removeEventListener('mousedown', down)
   }, [])
 
-  // Phase 34Z.15 — popover uses viewport-fixed positioning so it never
-  // clips off the left edge on mobile (owner reported it on a 393px
-  // screen: gear button was mid-row, absolute right:0 pushed the
-  // popover 280px LEFT and the start of the panel landed at x ≈ -80).
-  // Computed on open from the gear's bounding rect: drop directly
-  // below the button + clamp right edge inside the viewport.
+  // Phase 34Z.22 — popover position math rewritten. Phases 34Z.15 +
+  // 34Z.18 anchored via `right: window.innerWidth - r.right` which
+  // computed the distance from the right edge of the VIEWPORT to the
+  // right edge of the GEAR. But a 320px popover anchored at that right
+  // edge spans 320px LEFT — and on a phone where the gear sits in the
+  // middle of the row, the popover's left edge landed off-screen by
+  // ~(width - gear's left margin). Switching to LEFT anchor with a
+  // proper clamp so the panel always sits fully inside [12, viewport
+  // - 12 - width].
   useEffect(() => {
     if (!open || !wrapRef.current) return
     const r = wrapRef.current.getBoundingClientRect()
-    const right = Math.max(12, window.innerWidth - r.right)
-    setPopPos({ top: r.bottom + 6, right })
+    const popWidth = Math.min(320, window.innerWidth - 24)
+    // Prefer right-aligning the popover with the gear's right edge so
+    // it visually drops "from" the gear; clamp left so the entire
+    // panel fits in the viewport.
+    let left = r.right - popWidth
+    if (left < 12) left = 12
+    if (left + popWidth > window.innerWidth - 12) {
+      left = Math.max(12, window.innerWidth - 12 - popWidth)
+    }
+    setPopPos({ top: r.bottom + 6, left })
   }, [open])
 
   const activeCount = fields.filter((f) => f.value !== f.defaultValue).length
@@ -127,7 +138,7 @@ export default function FilterDrawer({ fields = [] }) {
             // ancestor stacking / containing context.
             position: 'fixed',
             top: popPos.top,
-            right: popPos.right,
+            left: popPos.left,
             zIndex: 1000,
             width: 'min(320px, calc(100vw - 24px))',
             background: 'var(--surface)',

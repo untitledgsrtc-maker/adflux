@@ -249,7 +249,19 @@ export default function QuoteDetail() {
         await downloadQuotePDF(quote, cities)
       }
     }
-    catch (e) { setError('PDF generation failed: ' + e.message) }
+    catch (e) {
+      // Phase 34Z.22 — surface the real reason. Common causes:
+      //   • No companies row for the quote's segment (Phase 10
+      //     hard-fail). Admin must seed Master → Companies.
+      //   • subtotal / total_amount = 0 (Phase 11 refuse-render).
+      //   • cities array empty (no line items added yet).
+      // Was setError-only which hid behind other banners on mobile.
+      // Now toast + setError so the rep can't miss it.
+      console.error('[handleDownloadPDF] failed:', e)
+      const msg = 'PDF generation failed: ' + (e?.message || String(e))
+      setError(msg)
+      toastError(e, msg)
+    }
     finally { setPdfLoading(false) }
   }
 
@@ -271,13 +283,19 @@ export default function QuoteDetail() {
       // "downloaded locally" while nothing was downloaded — then the
       // WhatsApp opened with no attachment and they thought the deal
       // had shipped with a PDF. Surface that double-failure via toast.
-      console.warn('PDF upload failed, falling back:', e.message)
+      // Phase 34Z.22 — log the upload error explicitly so the rep
+      // can read it. "PDF not generating" reports almost always come
+      // back to a missing companies row or a ₹0 subtotal; without
+      // the message the rep can't tell which.
+      console.warn('[handleWhatsApp] PDF upload failed:', e)
+      toastError(e, 'PDF upload failed: ' + (e?.message || 'unknown'))
       let downloadedLocally = false
       try {
         await downloadQuotePDF(quote, cities)
         downloadedLocally = true
       } catch (dlErr) {
-        toastError(dlErr, 'PDF upload AND local download failed. WhatsApp will open without an attachment.')
+        console.error('[handleWhatsApp] local download also failed:', dlErr)
+        toastError(dlErr, 'PDF upload AND local download failed: ' + (dlErr?.message || 'unknown') + '. WhatsApp will open without an attachment.')
       }
       if (downloadedLocally) {
         setStatusMsg('PDF upload failed — downloaded locally. Please attach it in WhatsApp.')
