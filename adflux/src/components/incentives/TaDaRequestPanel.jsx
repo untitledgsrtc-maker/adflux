@@ -26,12 +26,19 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+import { summariseTrack } from '../../utils/gpsDistance'
+import CityAutocomplete from '../leads/CityAutocomplete'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
 export default function TaDaRequestPanel() {
   const profile = useAuthStore(s => s.profile)
   const [todayRow, setTodayRow] = useState(null)
+  // Phase 34Z.39 — live GPS summary of today's track (works even
+  // before nightly daily_ta rollup; owner: "fetched by GPS box should
+  // be there"). Driven by the same summariseTrack util the /work map
+  // panel uses so numbers match.
+  const [liveTrack, setLiveTrack] = useState(null)
   const [requests, setRequests] = useState([])
   const [loading, setLoading]   = useState(true)
   const [tab, setTab]           = useState('ta')   // 'ta' | 'da'
@@ -47,7 +54,14 @@ export default function TaDaRequestPanel() {
   async function reload() {
     if (!profile?.id) return
     setLoading(true)
-    const [{ data: dt }, { data: reqs }] = await Promise.all([
+    // Phase 34Z.39 — also fetch today's gps_pings so we can compute
+    // the LIVE km right now (daily_ta only rolls up nightly, so
+    // mid-day reps would otherwise see "no GPS yet" even though the
+    // app pinged them all morning).
+    const today = new Date()
+    today.setHours(0,0,0,0)
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+    const [{ data: dt }, { data: reqs }, { data: pings }] = await Promise.all([
       supabase.from('daily_ta')
         .select('total_km, bike_amount, daily_da_amount, hotel_amount, total_amount')
         .eq('user_id', profile.id)
@@ -58,9 +72,23 @@ export default function TaDaRequestPanel() {
         .eq('user_id', profile.id)
         .order('created_at', { ascending: false })
         .limit(20),
+      supabase.from('gps_pings')
+        .select('lat, lng, captured_at, accuracy_m')
+        .eq('user_id', profile.id)
+        .gte('captured_at', today.toISOString())
+        .lt('captured_at', tomorrow.toISOString())
+        .order('captured_at', { ascending: true }),
     ])
+    const summary = summariseTrack(pings || [])
     setTodayRow(dt || null)
+    setLiveTrack(summary)
     setRequests(reqs || [])
+    // Pre-fill the override field with the live km so the rep doesn't
+    // have to retype. Override is opt-in: leave as-is = confirm GPS.
+    // Owner: "If person not override it should be counted as GPS tracked."
+    if (Number(summary?.km || 0) > 0) {
+      setClaimKm(String(summary.km))
+    }
     setLoading(false)
   }
   useEffect(() => { reload() /* eslint-disable-next-line */ }, [profile?.id])
@@ -146,30 +174,52 @@ export default function TaDaRequestPanel() {
 
   return (
     <div>
-      {/* ── Today auto-TA strip ── */}
+      {/* ── Today GPS / auto-TA strip ──
+          Phase 34Z.39 — always render the box. Prefer the nightly
+          daily_ta row when it's available (most accurate, factors in
+          city bike_per_km). Fall back to live gps_pings summarised
+          via summariseTrack so the rep sees today's km mid-day too.
+          Owner: "FETCHED BY GPS BOX SHOULD BE THERE." */}
       <div style={styles.card}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <MapPin size={14} style={{ color: 'var(--accent)' }} />
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
-            Today · auto-computed TA
+            Today · fetched by GPS
           </div>
         </div>
         {loading ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
             <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
           </div>
-        ) : todayRow ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            <Stat label="Distance"    value={`${Number(todayRow.total_km || 0).toFixed(1)} km`} />
-            <Stat label="Bike TA"     value={formatCurrency(todayRow.bike_amount || 0)} />
-            <Stat label="Day Total"   value={formatCurrency(todayRow.total_amount || 0)} highlight />
-          </div>
-        ) : (
-          <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-            No GPS distance logged for today yet — keep the app open during driving,
-            or use the override below if GPS missed a trip.
-          </div>
-        )}
+        ) : (() => {
+          // Prefer nightly daily_ta total when available; else live ping math.
+          const usingNightly = !!todayRow
+          const km = usingNightly
+            ? Number(todayRow.total_km || 0)
+            : Number(liveTrack?.km || 0)
+          const bikeTa = usingNightly
+            ? Number(todayRow.bike_amount || 0)
+            : Math.round(km * 3)          // ₹3/km fallback rate
+          const dayTotal = usingNightly
+            ? Number(todayRow.total_amount || 0)
+            : bikeTa
+          return (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                <Stat label="Distance" value={`${km.toFixed(1)} km`} />
+                <Stat label="Bike TA"  value={formatCurrency(bikeTa)} />
+                <Stat label="Day Total" value={formatCurrency(dayTotal)} highlight />
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                {usingNightly
+                  ? 'Approved last night — admin can adjust in TA Payouts.'
+                  : km > 0
+                    ? 'Live track from today\'s GPS pings — finalised tonight.'
+                    : 'No GPS yet today. Keep the app open while driving, or submit an override below.'}
+              </div>
+            </>
+          )
+        })()}
       </div>
 
       {/* ── Tabs + form ── */}
@@ -186,7 +236,16 @@ export default function TaDaRequestPanel() {
           </button>
         </div>
 
-        <div style={styles.grid}>
+        {/* Phase 34Z.39 — Date + km/₹ + City share one 3-column row on
+            wide screens; on phones they wrap. City is now a typeahead
+            bound to the cities master (same as /leads/new) so reps
+            don't free-type Anand / Anad / Adam. Reason still full-width
+            below. */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gap: 10,
+        }}>
           <div>
             <div style={styles.label}>Date</div>
             <input type="date" className="lead-inp"
@@ -197,7 +256,7 @@ export default function TaDaRequestPanel() {
               <div style={styles.label}>Claimed km</div>
               <input className="lead-inp" inputMode="decimal"
                 value={claimKm} onChange={(e) => setClaimKm(e.target.value)}
-                placeholder="e.g. 42.5" />
+                placeholder={liveTrack?.km > 0 ? `GPS: ${liveTrack.km} km` : 'e.g. 42.5'} />
             </div>
           ) : (
             <div>
@@ -207,21 +266,36 @@ export default function TaDaRequestPanel() {
                 placeholder="e.g. 700" />
             </div>
           )}
-          <div style={{ gridColumn: '1 / -1' }}>
+          <div>
             <div style={styles.label}>City</div>
-            <input className="lead-inp"
-              value={city} onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. Anand" />
+            <CityAutocomplete
+              value={city}
+              onChange={setCity}
+              placeholder="Type to search"
+            />
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <div style={styles.label}>Reason *</div>
             <textarea className="lead-inp" rows={2}
               value={reason} onChange={(e) => setReason(e.target.value)}
               placeholder={tab === 'ta'
-                ? 'Why is GPS distance wrong? e.g. "phone died near Anand depot — drove back manually"'
+                ? 'Why override? e.g. "phone died near Anand depot — drove back manually". Leave blank to confirm GPS km.'
                 : 'Why was the overnight needed? e.g. "client meeting next morning, hotel near depot"'} />
           </div>
         </div>
+        {tab === 'ta' && Number(liveTrack?.km || 0) > 0 && (
+          <div style={{
+            marginTop: 8,
+            padding: '6px 10px',
+            background: 'var(--accent-soft, rgba(255,230,0,0.10))',
+            border: '1px dashed var(--accent, #FFE600)',
+            borderRadius: 8,
+            fontSize: 11, color: 'var(--text-muted)',
+          }}>
+            <b style={{ color: 'var(--accent)' }}>Pre-filled from GPS:</b> {liveTrack.km} km today.
+            Edit only if the GPS missed a trip — otherwise submit to confirm.
+          </div>
+        )}
         <button
           type="button"
           className="lead-btn lead-btn-primary"
