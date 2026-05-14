@@ -42,6 +42,7 @@ import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 // eslint-disable-next-line no-unused-vars
 import RepDayTools from '../../components/leads/RepDayTools'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
+import { pushToast } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import LogMeetingModal from '../../components/leads/LogMeetingModal'
@@ -398,10 +399,15 @@ export default function WorkV2() {
           const json = await fnRes.json()
           parsedTasks = Array.isArray(json?.tasks) ? json.tasks : null
         } else {
-          console.warn('[parse-day-plan] non-OK', fnRes.status, await fnRes.text().catch(() => ''))
+          const detail = await fnRes.text().catch(() => '')
+          console.warn('[parse-day-plan] non-OK', fnRes.status, detail)
+          // Phase 34Z.9 — surface to user too. Plan still saves even if
+          // AI parsing fails, so this is informational not blocking.
+          pushToast('AI couldn\'t parse the plan — saved your text as-is.', 'warning')
         }
       } catch (e) {
         console.warn('[parse-day-plan] error', e?.message)
+        pushToast('AI plan parser unreachable — saved your text as-is.', 'warning')
       } finally {
         setParsing(false)
       }

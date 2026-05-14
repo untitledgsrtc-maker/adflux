@@ -449,7 +449,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
                 type="tel"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
-                placeholder="+91 98XXXX XXXXX"
+                placeholder="98XXXXXXXX or +91 98XXXXXXXX"
                 disabled={saving}
               />
               {/* Phase 34.10 — phone-first dedup preview. Shows the

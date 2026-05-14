@@ -223,7 +223,7 @@ export default function TelecallerV2() {
       {/* KPI strip */}
       <div className="lead-stat-strip">
         <Stat label="Today's calls"     num={callsToday}            meta="from call_logs" />
-        <Stat label="Qualified today"   num={qualifiedToday}        meta="lead → SalesReady" />
+        <Stat label="Qualified today"   num={qualifiedToday}        meta="handed off to sales" />
         <Stat label="Open queue"        num={leads.length}          meta={hotWarmCount(leads)} />
         <Stat label="Pending hand-offs" num={handoffs.length}       meta={overdueCount(handoffs)} />
       </div>
@@ -236,7 +236,7 @@ export default function TelecallerV2() {
             <div>
               <div className="lead-card-title">Pending hand-offs</div>
               <div className="lead-card-sub">
-                {handoffs.length} SalesReady · {handoffs.filter(h => slaPill(h.handoff_sla_due_at)?.tone === 'danger').length} SLA overdue
+                {handoffs.length} awaiting sales · {handoffs.filter(h => slaPill(h.handoff_sla_due_at)?.tone === 'danger').length} SLA overdue
               </div>
             </div>
           </div>

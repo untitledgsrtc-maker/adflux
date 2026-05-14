@@ -72,6 +72,7 @@ export default function MeetingsMapPanel({ userId }) {
   const [track,   setTrack]   = useState([])           // [{lat,lng,captured_at,accuracy_m}]
   const [trackSummary, setTrackSummary] = useState(null)
   const [pingBusy, setPingBusy] = useState(false)       // Phase 34Z.7 — "Ping now" button
+  const [osmFallback, setOsmFallback] = useState(false) // Phase 34Z.9 — MapTiler key missing
   const mapRef       = useRef(null)
   const mapElRef     = useRef(null)
   const markersRef   = useRef([])
@@ -246,6 +247,10 @@ export default function MeetingsMapPanel({ userId }) {
       // it never enters git. If the key is missing at build time, fall
       // back to OSM with a console warning — better than a blank map.
       const mtKey = import.meta.env.VITE_MAPTILER_KEY
+      // Phase 34Z.9 — surface OSM fallback in UI too. Reps don't see
+      // anything different (the OSM tiles render fine); the banner
+      // only appears when the build was deployed without a key.
+      setOsmFallback(!mtKey)
       if (!mtKey) {
         console.warn('[MeetingsMapPanel] VITE_MAPTILER_KEY missing — falling back to OSM')
       }
@@ -506,6 +511,24 @@ export default function MeetingsMapPanel({ userId }) {
           {error && (
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger, #EF4444)' }}>
               {error}
+            </div>
+          )}
+
+          {/* Phase 34Z.9 — OSM fallback notice. Build deployed without
+              VITE_MAPTILER_KEY so the panel uses raw OSM tiles. Reps see
+              the same map; this hint is for whoever debugs why tiles
+              look low-res. */}
+          {osmFallback && (
+            <div style={{
+              marginTop: 8,
+              padding: '6px 10px',
+              background: 'rgba(245,158,11,0.08)',
+              border: '1px dashed var(--warning, #F59E0B)',
+              borderRadius: 8,
+              fontSize: 11,
+              color: 'var(--v2-ink-1, #a9b3c7)',
+            }}>
+              MapTiler key missing — falling back to slower OSM tiles. Set <code>VITE_MAPTILER_KEY</code> in Vercel env.
             </div>
           )}
 

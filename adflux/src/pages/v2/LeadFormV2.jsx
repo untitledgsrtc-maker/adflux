@@ -260,7 +260,7 @@ export default function LeadFormV2() {
             value={form.phone}
             onChange={v => { set('phone', v); if (dupLead) setDupLead(null) }}
             onBlur={() => checkPhoneDup(form.phone)}
-            placeholder="+91 98XXXX XXXXX"
+            placeholder="98XXXXXXXX or +91 98XXXXXXXX"
           />
           <Field label="Email"          value={form.email}       onChange={v => set('email', v)}       placeholder="name@company.com" type="email" />
           <Field label="City *"         value={form.city}        onChange={v => set('city', v)}        placeholder="Surat" />

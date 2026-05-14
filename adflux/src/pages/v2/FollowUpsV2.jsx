@@ -579,7 +579,10 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, busy, navigate }) {
                 : row.cadence_type === 'quote_chase' ? `Quote chase ${row.sequence} of 3`
                 : row.cadence_type === 'nurture' ? 'Nurture check-in'
                 : row.cadence_type === 'lost_nurture' ? 'Lost · 30-day touch'
-                : ''}
+                : /* Phase 34Z.9 — fallback for unknown cadence types
+                     so the chip still renders something sensible
+                     instead of an empty " · " strand */
+                  `${row.cadence_type} ${row.sequence}`}
             </span>
           )}
         </div>
