@@ -17,6 +17,8 @@ import { QUOTE_STATUSES, STATUS_LABELS } from '../../utils/constants'
 import { formatCurrency, formatDate, truncate } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { toastError, toastSuccess } from '../../components/v2/Toast'
 
 /* ─── Local helpers ────────────────────────────────── */
 function computeBalance(q) {
@@ -65,12 +67,19 @@ export default function QuotesV2() {
   }
   async function deleteQuote(e, q) {
     e.stopPropagation()
-    if (!confirm(`DELETE draft ${q.quote_number || q.ref_number || ''} permanently? This cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: 'Delete draft quote?',
+      message: `Delete draft ${q.quote_number || q.ref_number || ''} permanently? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     const { error: delErr } = await supabase.from('quotes').delete().eq('id', q.id)
     if (delErr) {
-      alert('Could not delete: ' + delErr.message)
+      toastError(delErr, 'Could not delete quote.')
       return
     }
+    toastSuccess('Quote deleted.')
     fetchQuotes()
   }
   const [searchDraft, setSearchDraft] = useState(filters.search || '')
