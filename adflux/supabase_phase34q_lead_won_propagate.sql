@@ -1,6 +1,10 @@
 -- =====================================================================
 -- Phase 34Q — propagate quote.status='won' / 'lost' to leads.stage
 -- 13 May 2026
+-- 14 May 2026 — Phase 34Q rev2: also copy quote.total_amount into
+--               leads.expected_value on Won, so the lead screen shows
+--               the actual closed-deal value (owner reported "no value
+--               visible on lead after quote won").
 --
 -- WHY
 --
@@ -17,7 +21,9 @@
 --
 -- Adds AFTER UPDATE trigger on quotes:
 --   * When quote.status flips to 'won' AND quote has lead_id AND
---     lead.stage is NOT already Won/Lost → set lead.stage = 'Won'.
+--     lead.stage is NOT already Won/Lost → set lead.stage = 'Won'
+--     AND copy quote.total_amount into leads.expected_value so the
+--     lead row + hero card show the real won amount (rev2).
 --   * When quote.status flips to 'lost' AND quote has lead_id AND
 --     lead.stage is NOT already Won/Lost → set lead.stage = 'Lost',
 --     lost_reason = 'NoNeed' (default; rep can re-edit).
@@ -50,9 +56,14 @@ BEGIN
   END IF;
 
   IF NEW.status = 'won' THEN
+    -- rev2: also copy the won deal amount into expected_value so the
+    -- lead UI shows what the deal actually closed at. COALESCE keeps
+    -- a manually-entered expected_value if the quote total is null
+    -- (shouldn't happen in practice, defensive).
     UPDATE public.leads
-       SET stage      = 'Won',
-           updated_at = now()
+       SET stage          = 'Won',
+           expected_value = COALESCE(NEW.total_amount, expected_value),
+           updated_at     = now()
      WHERE id = NEW.lead_id
        AND stage NOT IN ('Won', 'Lost');
   ELSIF NEW.status = 'lost' THEN
