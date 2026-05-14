@@ -420,130 +420,133 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
             />
           </div>
 
-          <div>
-            <label className="lead-fld-label">Company / shop name *</label>
-            {/* Phase 35 PR 2.7 — mic dropped on Identity field, same
-                reason as LeadFormV2 PR 2.5: OCR populates it. Plain
-                text input. Notes mic below still kept (free-text). */}
-            <input
-              className="lead-inp"
-              value={company}
-              onChange={e => setCompany(e.target.value)}
-              placeholder="e.g. Sunrise Diagnostics"
-              disabled={saving}
-            />
-          </div>
+          {/* Phase 34Z.16 — body laid out as the same .lead-card section
+              stack used by LeadFormV2 so the create-lead and log-meeting
+              flows feel like one form. Owner directive (14 May 2026):
+              "log meeting form still old, not replica of create lead". */}
 
-          {/* Phase 33B.3 — owner revised (11 May 2026): Person, Phone,
-              City are now all REQUIRED (not collapsed). A field meeting
-              missing any of these can't be followed up. Email + address
-              still optional. */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label className="lead-fld-label">Person name *</label>
-              <input
-                className="lead-inp"
-                value={contact}
-                onChange={e => setContact(e.target.value)}
-                placeholder="e.g. Dr. Mehta"
-                disabled={saving}
-              />
-            </div>
-            <div>
-              <label className="lead-fld-label">Mobile number *</label>
-              <input
-                className="lead-inp"
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="98XXXXXXXX or +91 98XXXXXXXX"
-                disabled={saving}
-              />
-              {/* Phase 34.10 — phone-first dedup preview. Shows the
-                  match as the rep types, before they fill the rest. */}
-              {dupBusy && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
-                  Checking for existing lead…
-                </div>
-              )}
-              {dupPreview && !dupBusy && (
-                <div
-                  style={{
-                    marginTop: 6,
-                    padding: '8px 10px',
-                    background: 'rgba(245, 158, 11, .10)',
-                    border: '1px solid var(--warning, #F59E0B)',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <strong>Already in pipeline:</strong>{' '}
-                    {dupPreview.name || '—'}
-                    {dupPreview.company ? ` · ${dupPreview.company}` : ''}
-                    {dupPreview.stage ? ` (${dupPreview.stage})` : ''}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          <div>
-            <label className="lead-fld-label">City *</label>
-            {/* Phase 34Z.11 — typeahead bound to cities master to
-                avoid "Anand" / "Anad" / "Adam" spelling drift. */}
-            <CityAutocomplete
-              value={city}
-              onChange={v => setCity(v)}
-              placeholder="Type to search — e.g. Vadodara"
-              disabled={saving}
-            />
-          </div>
-
-          <div>
-            <label className="lead-fld-label">Outcome *</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {OUTCOMES.map(o => {
-                const on = outcome === o.value
-                const tint =
-                  o.tone === 'success' ? 'var(--tint-success, rgba(16,185,129,0.14))'
-                  : o.tone === 'warn'    ? 'var(--tint-warning, rgba(245,158,11,0.14))'
-                  :                        'var(--tint-danger, rgba(239,68,68,0.14))'
-                const bd =
-                  o.tone === 'success' ? 'var(--success)'
-                  : o.tone === 'warn'    ? 'var(--warning)'
-                  :                        'var(--danger)'
-                return (
-                  <button
-                    key={o.value}
-                    type="button"
-                    onClick={() => setOutcome(o.value)}
+          {/* ─── Identity ─── */}
+          <div className="lead-card" style={{ marginBottom: 14 }}>
+            <div className="lead-card-head"><div className="lead-card-title">Identity</div></div>
+            <div className="lead-card-pad" style={{ display: 'grid', gap: 14 }}>
+              <div>
+                <label className="lead-fld-label">Company / shop name *</label>
+                <input
+                  className="lead-inp"
+                  value={company}
+                  onChange={e => setCompany(e.target.value)}
+                  placeholder="e.g. Sunrise Diagnostics"
+                  disabled={saving}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <label className="lead-fld-label">Person name *</label>
+                  <input
+                    className="lead-inp"
+                    value={contact}
+                    onChange={e => setContact(e.target.value)}
+                    placeholder="e.g. Dr. Mehta"
                     disabled={saving}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      border: `1.5px solid ${on ? bd : 'var(--border-strong)'}`,
-                      background: on ? tint : 'var(--surface-2)',
-                      color: 'var(--text)',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{o.label}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {o.sub}
+                  />
+                </div>
+                <div>
+                  <label className="lead-fld-label">Mobile number *</label>
+                  <input
+                    className="lead-inp"
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="98XXXXXXXX or +91 98XXXXXXXX"
+                    disabled={saving}
+                  />
+                  {dupBusy && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
+                      Checking for existing lead…
                     </div>
-                  </button>
-                )
-              })}
+                  )}
+                  {dupPreview && !dupBusy && (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        padding: '8px 10px',
+                        background: 'rgba(245, 158, 11, .10)',
+                        border: '1px solid var(--warning, #F59E0B)',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <strong>Already in pipeline:</strong>{' '}
+                        {dupPreview.name || '—'}
+                        {dupPreview.company ? ` · ${dupPreview.company}` : ''}
+                        {dupPreview.stage ? ` (${dupPreview.stage})` : ''}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="lead-fld-label">City *</label>
+                <CityAutocomplete
+                  value={city}
+                  onChange={v => setCity(v)}
+                  placeholder="Type to search — e.g. Vadodara"
+                  disabled={saving}
+                />
+              </div>
             </div>
           </div>
 
-          <div>
+          {/* ─── Outcome ─── */}
+          <div className="lead-card" style={{ marginBottom: 14 }}>
+            <div className="lead-card-head"><div className="lead-card-title">Outcome</div></div>
+            <div className="lead-card-pad">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {OUTCOMES.map(o => {
+                  const on = outcome === o.value
+                  const tint =
+                    o.tone === 'success' ? 'var(--tint-success, rgba(16,185,129,0.14))'
+                    : o.tone === 'warn'    ? 'var(--tint-warning, rgba(245,158,11,0.14))'
+                    :                        'var(--tint-danger, rgba(239,68,68,0.14))'
+                  const bd =
+                    o.tone === 'success' ? 'var(--success)'
+                    : o.tone === 'warn'    ? 'var(--warning)'
+                    :                        'var(--danger)'
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => setOutcome(o.value)}
+                      disabled={saving}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        border: `1.5px solid ${on ? bd : 'var(--border-strong)'}`,
+                        background: on ? tint : 'var(--surface-2)',
+                        color: 'var(--text)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{o.label}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                        {o.sub}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* ─── Notes ─── */}
+          <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
             <label className="lead-fld-label">Notes (optional)</label>
             <VoiceInput
               multiline
