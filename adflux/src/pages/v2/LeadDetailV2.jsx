@@ -493,9 +493,14 @@ export default function LeadDetailV2() {
       </DidYouKnow>
 
       {/* Phase 34B — soft auto-Lost suggestion. Trigger sets
-          auto_lost_suggested=true after 3 non-positive attempts but
-          no longer flips stage. Rep confirms or dismisses here. */}
-      {lead.auto_lost_suggested && lead.stage !== 'Lost' && lead.stage !== 'Won' && lead.stage !== 'Nurture' && (
+          auto_lost_suggested=true after AUTO_LOST_THRESHOLD non-
+          positive attempts but no longer flips stage. Rep confirms
+          or dismisses here.
+          Phase 34Z.2 bumped threshold from 3 → 15. */}
+      {lead.auto_lost_suggested
+        && lead.stage !== 'Lost' && lead.stage !== 'Won' && lead.stage !== 'Nurture'
+        && Number(lead.contact_attempts_count || 0) >= 15
+        && (
         <div style={{
           // Phase 34R+ — use new tint tokens. Was raw rgba(244,63,94,.10)
           // (Tailwind rose-500, off-brand). Now uses --tint-danger
@@ -512,7 +517,7 @@ export default function LeadDetailV2() {
               System suggests marking Lost
             </div>
             <div style={{ color: 'var(--text-muted)', marginTop: 2, fontSize: 12 }}>
-              3+ attempts with no positive response. Confirm if truly lost, or dismiss to keep working the lead.
+              {lead.contact_attempts_count || 0} attempts with no positive response. Confirm if truly lost, or dismiss to keep working the lead.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
