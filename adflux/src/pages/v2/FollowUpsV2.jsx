@@ -379,6 +379,7 @@ export default function FollowUpsV2() {
         rows={buckets.overdue}
         tone="danger"
         icon={<AlertTriangle size={14} strokeWidth={2} />}
+        defaultOpen={true}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
         navigate={navigate}
       />
@@ -387,6 +388,7 @@ export default function FollowUpsV2() {
         rows={buckets.today}
         tone="warning"
         icon={<Clock size={14} strokeWidth={2} />}
+        defaultOpen={true}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
         navigate={navigate}
       />
@@ -394,6 +396,7 @@ export default function FollowUpsV2() {
         title="Tomorrow"
         rows={buckets.tomorrow}
         tone="neutral"
+        defaultOpen={false}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
         navigate={navigate}
       />
@@ -401,6 +404,7 @@ export default function FollowUpsV2() {
         title="This week"
         rows={buckets.week}
         tone="neutral"
+        defaultOpen={false}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
         navigate={navigate}
       />
@@ -455,30 +459,55 @@ export default function FollowUpsV2() {
   )
 }
 
-function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze, busyId, navigate }) {
+function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze, busyId, navigate, defaultOpen }) {
   if (rows.length === 0) return null
   const toneColor =
     tone === 'danger'  ? 'var(--danger)'  :
     tone === 'warning' ? 'var(--warning)' :
                          'var(--text-muted)'
+  // Phase 35Z (14 May 2026) — owner wanted sections to look "different"
+  // from a flat heading list. Converted each section into a native
+  // <details> accordion: tap the header to collapse / expand. Default
+  // open for Overdue + Due today (high priority); collapsed for
+  // Tomorrow + This week so the rep's screen isn't a wall of rows.
   return (
-    <section style={{ marginBottom: 16 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        fontSize: 11, fontWeight: 700, letterSpacing: '.1em',
-        textTransform: 'uppercase', color: toneColor,
-        marginBottom: 8, padding: '0 4px',
+    <details
+      open={defaultOpen}
+      style={{
+        marginBottom: 12,
+        background: 'var(--surface)',
+        border: `1px solid ${tone === 'danger' ? 'var(--danger)' : 'var(--border)'}`,
+        borderLeft: `3px solid ${toneColor}`,
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}
+    >
+      <summary style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '12px 14px',
+        cursor: 'pointer',
+        userSelect: 'none',
+        listStyle: 'none',
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: '.1em',
+        textTransform: 'uppercase',
+        color: toneColor,
       }}>
         {icon}
-        <span>{title}</span>
+        <span style={{ flex: 1 }}>{title}</span>
         <span style={{
-          fontSize: 10, color: 'var(--text-muted)',
-          background: 'var(--surface-2)', padding: '1px 7px', borderRadius: 999,
+          fontSize: 10, color: 'var(--text)',
+          background: 'var(--surface-2)', padding: '2px 9px', borderRadius: 999,
+          fontWeight: 700, letterSpacing: 0, textTransform: 'none',
         }}>
           {rows.length}
         </span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span style={{ fontSize: 14, color: 'var(--text-muted)', marginLeft: 4 }}>▾</span>
+      </summary>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 10px 12px' }}>
         {rows.map(r => (
           <Row
             key={r.id} row={r}
@@ -488,7 +517,8 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze
           />
         ))}
       </div>
-    </section>
+      <style>{`details[open] > summary > span:last-child { transform: rotate(180deg); display: inline-block; }`}</style>
+    </details>
   )
 }
 
