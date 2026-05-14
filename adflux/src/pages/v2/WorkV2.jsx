@@ -135,6 +135,9 @@ export default function WorkV2() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [meetingModalOpen, setMeetingModalOpen] = useState(false)
+  // Phase 35 PR 2.5 — modal mode: 'meeting' or 'lead'. Same form,
+  // different save semantics.
+  const [meetingMode, setMeetingMode] = useState('meeting')
   const [pendingNavLead, setPendingNavLead] = useState(null)
   const [toast, setToast] = useState('')
 
@@ -634,24 +637,46 @@ export default function WorkV2() {
           startDay={startDay}
           doCheckIn={doCheckIn}
           submitEvening={submitEvening}
-          onOpenMeeting={() => setMeetingModalOpen(true)}
+          onOpenMeeting={() => { setMeetingMode('meeting'); setMeetingModalOpen(true) }}
+          onOpenLead={() => { setMeetingMode('lead'); setMeetingModalOpen(true) }}
         />
       </div>
 
       {meetingModalOpen && (
         <LogMeetingModal
+          mode={meetingMode}
           onClose={() => {
             setMeetingModalOpen(false)
+            // Phase 35 PR 2.5 — direct navigate after save; the
+            // WhatsApp prompt step was removed inside the modal.
             if (pendingNavLead) {
               const id = pendingNavLead
               setPendingNavLead(null)
               navigate(`/leads/${id}`)
             }
           }}
-          onSaved={(newLeadId) => {
-            const next = (session?.daily_counters?.meetings || 0) + 1
-            const tgt = targets.meetings || 5
-            setToast(`Saved · ${next}/${tgt} meetings today`)
+          onSaved={(newLeadId, { mode: savedMode } = {}) => {
+            const isLeadSave = savedMode === 'lead'
+            if (isLeadSave) {
+              // Manual lead → bump new_leads counter client-side
+              // (no server trigger for this).
+              const cur = session?.daily_counters?.new_leads || 0
+              const tgt = targets.new_leads || 10
+              setToast(`Saved · ${cur + 1}/${tgt} new leads today`)
+              if (session) {
+                setSession({
+                  ...session,
+                  daily_counters: {
+                    ...(session.daily_counters || {}),
+                    new_leads: cur + 1,
+                  },
+                })
+              }
+            } else {
+              const next = (session?.daily_counters?.meetings || 0) + 1
+              const tgt = targets.meetings || 5
+              setToast(`Saved · ${next}/${tgt} meetings today`)
+            }
             setTimeout(() => setToast(''), 2200)
             playChime()
             load()
@@ -1277,12 +1302,17 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
 function StickyPrimaryCta({
   session, busy, parsing,
   startDay, doCheckIn, submitEvening,
-  onOpenMeeting,
+  onOpenMeeting, onOpenLead,
 }) {
   const planSubmitted = !!session?.plan_submitted_at
   const checkedIn     = !!session?.check_in_at
   const dayDone       = !!session?.evening_report_submitted_at
   const eveningSent   = !!session?.evening_summary
+
+  // Phase 35 PR 2.5 — B_ACTIVE state shows TWO sticky CTAs side by
+  // side (Log meeting + Log lead). Every other state shows a single
+  // primary CTA appropriate to the state.
+  const isActiveState = planSubmitted && checkedIn && !dayDone
 
   let label = 'Log meeting'
   let icon = Calendar
@@ -1303,10 +1333,7 @@ function StickyPrimaryCta({
     isBusy  = busy
     loading = busy
   } else if (!dayDone) {
-    label   = 'Log meeting'
-    icon    = Calendar
-    handler = onOpenMeeting
-    isBusy  = busy
+    // Falls through to two-button render below.
   } else if (!eveningSent) {
     label   = busy ? 'Submitting…' : 'Submit evening report'
     icon    = CheckCircle2
@@ -1332,18 +1359,43 @@ function StickyPrimaryCta({
       zIndex: 30,
       pointerEvents: 'none',  // wrapper transparent; button below catches taps
     }}>
-      <div style={{ pointerEvents: 'auto' }}>
-        <ActionButton
-          variant="primary"
-          size="lg"
-          iconLeft={icon}
-          onClick={handler}
-          disabled={isBusy}
-          loading={loading}
-          style={{ width: '100%', minHeight: 52, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}
-        >
-          {label}
-        </ActionButton>
+      <div style={{ pointerEvents: 'auto', display: 'flex', gap: 8 }}>
+        {isActiveState ? (
+          <>
+            <ActionButton
+              variant="primary"
+              size="lg"
+              iconLeft={Calendar}
+              onClick={onOpenMeeting}
+              disabled={busy}
+              style={{ flex: 1, minHeight: 52, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}
+            >
+              Log meeting
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
+              size="lg"
+              iconLeft={Plus}
+              onClick={onOpenLead}
+              disabled={busy}
+              style={{ flex: 1, minHeight: 52, boxShadow: '0 8px 24px rgba(0,0,0,0.45)', background: 'var(--surface)' }}
+            >
+              Log lead
+            </ActionButton>
+          </>
+        ) : (
+          <ActionButton
+            variant="primary"
+            size="lg"
+            iconLeft={icon}
+            onClick={handler}
+            disabled={isBusy}
+            loading={loading}
+            style={{ width: '100%', minHeight: 52, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}
+          >
+            {label}
+          </ActionButton>
+        )}
       </div>
     </div>
   )

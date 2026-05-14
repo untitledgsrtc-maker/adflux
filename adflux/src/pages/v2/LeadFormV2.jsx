@@ -247,8 +247,13 @@ export default function LeadFormV2() {
                 Company* / Person* / Designation / Mobile* / Email /
                 City* / Website. Govt segment exempts phone (tender
                 leads have only a department email). */}
-          <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     placeholder="e.g. Sunrise Diagnostics" voice />
-          <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" voice />
+          {/* Phase 35 PR 2.5 — mics dropped from Identity fields per
+              owner: OCR business-card scan already fills these, and
+              double mic-on-every-field added visual noise. Voice
+              still available on the Notes textarea below where
+              free-text actually benefits from dictation. */}
+          <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     placeholder="e.g. Sunrise Diagnostics" />
+          <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" />
           <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
           <Field
             label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Mobile *'}

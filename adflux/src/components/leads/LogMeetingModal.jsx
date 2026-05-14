@@ -77,7 +77,15 @@ const OUTCOMES = [
   },
 ]
 
-export default function LogMeetingModal({ onClose, onSaved }) {
+// Phase 35 PR 2.5 — `mode` prop added. Same form, two save paths:
+//   • 'meeting' (default) — field meeting; bumps `meetings` counter,
+//     activity_type='meeting', source='Field Meeting'.
+//   • 'lead'             — manual lead entry; bumps `new_leads`,
+//     activity_type='note', source='Manual Lead'. Owner directive:
+//     "log lead and meeting lead form must be same" — form is
+//     identical, only save logic differs.
+export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) {
+  const isLead = mode === 'lead'
   const profile = useAuthStore(s => s.profile)
 
   const [company, setCompany] = useState('')
@@ -247,7 +255,7 @@ export default function LogMeetingModal({ onClose, onSaved }) {
       email:       null,
       city:        city.trim() || null,
       segment:     'PRIVATE',
-      source:      'Field Meeting',
+      source:      isLead ? 'Manual Lead' : 'Field Meeting',
       industry:    null,
       heat:        outcome === 'interested' ? 'warm'
                    : outcome === 'maybe' ? 'cold'
@@ -279,13 +287,16 @@ export default function LogMeetingModal({ onClose, onSaved }) {
     //    field carries the structured outcome label so the timeline
     //    reads cleanly: "Meeting · Interested — Wants to know more".
     const activityNotes = [
-      `Field meeting · ${oc.label}`,
+      isLead ? `New lead · ${oc.label}` : `Field meeting · ${oc.label}`,
       notes.trim() || null,
     ].filter(Boolean).join(' — ')
 
     const activityPayload = {
       lead_id:        leadRow.id,
-      activity_type:  'meeting',
+      // Phase 35 PR 2.5 — 'note' for manual lead entry (counts in
+      // new_leads counter via client-side bump in parent); 'meeting'
+      // for field meeting (bumped server-side via Phase 32M trigger).
+      activity_type:  isLead ? 'note' : 'meeting',
       outcome:        outcome === 'interested' ? 'positive'
                       : outcome === 'maybe' ? 'neutral'
                       : 'negative',
@@ -312,15 +323,15 @@ export default function LogMeetingModal({ onClose, onSaved }) {
     }
 
     setSaving(false)
-    // Phase 33D.5 — fire onSaved (so counter ticks + parent reloads)
-    // but DEFER onClose. We open the WhatsApp prompt instead. The
-    // prompt's own Skip/Send buttons trigger the final close.
-    onSaved?.(leadRow.id)
-    setSavedLead({
-      ...leadRow,
-      // leadRow comes from .select().single() on the insert, so it
-      // already has all fields including segment for media mapping.
-    })
+    // Phase 35 PR 2.5 — skip the WhatsApp prompt; fire onSaved with
+    // the new lead id + close. Parent (WorkV2) navigates to the lead
+    // detail page so the rep lands on the row they just created
+    // (owner UX: "after adding it not land in any other page" was the
+    // bug). The WhatsApp prompt was Phase 33D.5; useful but blocked
+    // the navigate intent. If owner wants it back, gate behind a
+    // `promptWhatsApp` prop.
+    onSaved?.(leadRow.id, { mode })
+    onClose?.()
   }
 
   function closeAll() {
@@ -338,10 +349,12 @@ export default function LogMeetingModal({ onClose, onSaved }) {
           <div>
             <div className="lead-modal-title">
               <Building2 size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-              Log field meeting
+              {isLead ? 'Log new lead' : 'Log field meeting'}
             </div>
             <div className="lead-card-sub">
-              Cold walk-in · counts toward today's milestone
+              {isLead
+                ? 'Add manually · counts toward new leads today'
+                : 'Cold walk-in · counts toward today\'s milestone'}
             </div>
           </div>
           <button className="lead-btn lead-btn-sm" onClick={onClose} disabled={saving} aria-label="Close">
