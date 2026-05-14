@@ -137,7 +137,14 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
   // only create govt quotes; they don't do meetings or own leads.
   // The "log a meeting" prompt was confusing.
   const isAgency = profile?.role === 'agency'
-  if (!data) {
+  // Phase 34Z.36 — 0-working-day guard. monthly_score RPC was
+  // returning avg_score_pct=100 when no days had been counted yet
+  // (PG AVG() of zero rows → NULL → COALESCE on the RPC side to 100
+  // for a fresh-month default). UI was then declaring "On track for
+  // full variable payout" on day 1 with no meetings logged.
+  // Treat working_days === 0 as no-data and render the empty state
+  // instead of the score ring.
+  if (!data || (Number(data.working_days || 0) === 0 && !isAgency)) {
     return (
       <div className="lead-card" style={{
         padding: 20, marginBottom: 14, textAlign: 'center',
