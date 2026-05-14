@@ -2,15 +2,17 @@
 //
 // v2 "My Performance" page.
 //
-// Phase 33G (I5) — old MyPerformanceView slab card removed. It was
-// the legacy revenue/incentive-slab block that duplicated the salary
-// signal now shown by PerformanceScoreCard (70/30 base + variable,
-// 50% threshold). Two cards talking about the same number confused
-// reps — the new score card is the single source of truth.
+// Phase 33G (I5) — old MyPerformanceView slab card removed in favour
+// of PerformanceScoreCard alone.
 //
-// Sidebar / topbar / mobile-nav come from V2AppShell.
+// Phase 34Z.34 (15 May 2026) — owner reported the rich revenue /
+// active campaigns / 12-month history view was missing here. That
+// content moved to /incentives during Phase 33G but reps go to
+// /my-performance from the sidebar. Brought both back into one
+// page: meeting-score card on top, revenue + slab + history below.
 
 import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCard'
+import { MyPerformance } from '../../components/incentives/MyPerformance'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import '../../styles/incentives.css'
 
@@ -29,15 +31,23 @@ export default function MyPerformanceV2() {
           <div className="v2d-page-kicker">Your numbers</div>
           <h1 className="v2d-page-title">My Performance</h1>
           <div className="v2d-page-sub">
-            Your monthly score, base + variable salary projection, and
-            the targets you need to hit.
+            Monthly score, salary projection, revenue, active campaigns
+            and 12-month history.
           </div>
         </div>
       </div>
 
-      {/* Phase 33E — task-completion score + variable salary projection.
-          Phase 33G — now the only salary card on this page. */}
+      {/* Phase 33E — task-completion score (meetings done vs target)
+          + 70/30 base + variable salary projection. */}
       <PerformanceScoreCard />
+
+      {/* Phase 34Z.34 — revenue / incentive slab / active campaigns /
+          12-month history. Same component /incentives renders for the
+          sales role. Two cards same page means reps stop flipping
+          between two URLs to read their numbers. */}
+      <div style={{ marginTop: 14 }}>
+        <MyPerformance />
+      </div>
     </div>
   )
 }
