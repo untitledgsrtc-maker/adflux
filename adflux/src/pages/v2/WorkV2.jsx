@@ -627,6 +627,17 @@ export default function WorkV2() {
               workDate={TODAY()}
               checkedIn={checkedIn}
             />
+            {/* Phase 35 PR 2.6 — evening summary moved here, AFTER the
+                map + RepDayTools. Owner: "i want this evening summry
+                in bottome". Below this comes the inline Log meeting /
+                Log lead CTAs (no longer sticky-fixed per owner). */}
+            <EveningReportBlock
+              evening={evening}
+              setEvening={setEvening}
+              submitEvening={submitEvening}
+              busy={busy}
+              navigate={navigate}
+            />
           </>
         )}
 
@@ -793,13 +804,11 @@ function DayStatusSurface(props) {
           }}
           accent={hitTarget}
         />
-        <EveningReportBlock
-          evening={evening}
-          setEvening={setEvening}
-          submitEvening={submitEvening}
-          busy={busy}
-          navigate={navigate}
-        />
+        {/* Phase 35 PR 2.6 — EveningReportBlock moved OUT of the
+            B_ACTIVE branch of DayStatusSurface. Owner: "i want this
+            evening summry in bottome". It now mounts at the bottom of
+            the page main flow, below RepDayTools and just above the
+            Log meeting / Log lead inline CTAs. */}
       </>
     )
   }
@@ -1345,58 +1354,47 @@ function StickyPrimaryCta({
   }
 
   return (
-    // Phase 35 PR 2.4 — `position: sticky` didn't pin; CTA scrolled
-    // with the page content because the page scrolls on body, not on
-    // a fixed-height ancestor. Switched to `position: fixed` so the
-    // CTA is always visible above the mobile bottom nav. Z-index 30
-    // sits above page chrome but below the 40-z mobile nav so the
-    // nav stays clickable.
-    <div style={{
-      position: 'fixed',
-      left: 12,
-      right: 12,
-      bottom: `calc(64px + env(safe-area-inset-bottom, 0px) + 12px)`,
-      zIndex: 30,
-      pointerEvents: 'none',  // wrapper transparent; button below catches taps
-    }}>
-      <div style={{ pointerEvents: 'auto', display: 'flex', gap: 8 }}>
-        {isActiveState ? (
-          <>
-            <ActionButton
-              variant="primary"
-              size="lg"
-              iconLeft={Calendar}
-              onClick={onOpenMeeting}
-              disabled={busy}
-              style={{ flex: 1, minHeight: 52, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}
-            >
-              Log meeting
-            </ActionButton>
-            <ActionButton
-              variant="ghost"
-              size="lg"
-              iconLeft={Plus}
-              onClick={onOpenLead}
-              disabled={busy}
-              style={{ flex: 1, minHeight: 52, boxShadow: '0 8px 24px rgba(0,0,0,0.45)', background: 'var(--surface)' }}
-            >
-              Log lead
-            </ActionButton>
-          </>
-        ) : (
+    // Phase 35 PR 2.6 — inline (NOT sticky / NOT fixed) per owner
+    // directive. Earlier iterations tried sticky (didn't pin) and
+    // fixed (worked but owner preferred inline flow). CTAs sit at
+    // the end of the scroll content, after EveningReportBlock.
+    <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+      {isActiveState ? (
+        <>
           <ActionButton
             variant="primary"
             size="lg"
-            iconLeft={icon}
-            onClick={handler}
-            disabled={isBusy}
-            loading={loading}
-            style={{ width: '100%', minHeight: 52, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}
+            iconLeft={Calendar}
+            onClick={onOpenMeeting}
+            disabled={busy}
+            style={{ flex: 1, minHeight: 52 }}
           >
-            {label}
+            Log meeting
           </ActionButton>
-        )}
-      </div>
+          <ActionButton
+            variant="ghost"
+            size="lg"
+            iconLeft={Plus}
+            onClick={onOpenLead}
+            disabled={busy}
+            style={{ flex: 1, minHeight: 52, background: 'var(--surface)' }}
+          >
+            Log lead
+          </ActionButton>
+        </>
+      ) : (
+        <ActionButton
+          variant="primary"
+          size="lg"
+          iconLeft={icon}
+          onClick={handler}
+          disabled={isBusy}
+          loading={loading}
+          style={{ width: '100%', minHeight: 52 }}
+        >
+          {label}
+        </ActionButton>
+      )}
     </div>
   )
 }
