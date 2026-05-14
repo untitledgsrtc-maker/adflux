@@ -45,6 +45,9 @@ import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import V2Hero from '../../components/v2/V2Hero'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import LogMeetingModal from '../../components/leads/LogMeetingModal'
+// Phase 36 — Day Spine. Vertical timeline pinned to the left edge of
+// /work; dots represent working hours 08-20 with current-hour pulse.
+import DaySpine from '../../components/v2/DaySpine'
 import { useLeadTasks } from '../../hooks/useLeadTasks'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
 
@@ -554,9 +557,31 @@ export default function WorkV2() {
   const checkedIn = !!session?.check_in_at
   const planSubmitted = !!session?.plan_submitted_at
 
+  // Phase 36 — gather activity timestamps for the Day Spine. Bin
+  // includes logged meetings (from planned_meetings .done=true) +
+  // smart tasks completed today. Pure derivation off `session` so
+  // the spine updates in lockstep with every save.
+  const spineActivities = useMemo(() => {
+    const ts = []
+    const pm = session?.planned_meetings || []
+    for (const m of pm) {
+      if (m.done && m.done_at) ts.push(m.done_at)
+    }
+    // If we ever store per-task completion timestamps in session,
+    // append them here. For now the meeting-done timestamps are the
+    // canonical activity feed.
+    return ts
+  }, [session])
+
   return (
-    <div className="lead-root">
-      <div className="m-screen">
+    <div className="lead-root v3-vocab">
+      <div className="m-screen v3-page">
+        {/* Phase 36 — Day Spine. Sits at the left edge of the page
+            wrapper (the .v3-page padding-left clears the gutter).
+            Activities + click-to-scroll hour targets are derived
+            from session state above. */}
+        <DaySpine activities={spineActivities} />
+
         {/* Discoverability tip — irrelevant once the day is over. */}
         {!dayDone && (
           <DidYouKnow id="work-voice-plan-2026-05-13" title="Speak your day plan">

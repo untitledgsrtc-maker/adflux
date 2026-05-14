@@ -553,3 +553,30 @@ Emoji are forbidden by default per §7 + §20. The following site-specific waive
 | `V2AppShell.greetingFor()` | `☀️ ⛅ 🌙` | Phase 34Z.1 | Time-band suffix on the greeting; replaces three Lucide icons that didn't carry enough warmth |
 
 No other emoji exceptions. The five sites flagged in the 2026-05-13 UI audit (`StaffTable.jsx:38 🎉`, `MyPerformance.jsx:188 🎉`, `WonPaymentModal.jsx:157 💰`, `AdminDashboardDesktop.jsx:899/1772 ⚡🎉`, `SalesDashboardDesktop.jsx:523/660 ⚡`) are NOT in this table and must be migrated to Lucide icons during PR 3.
+
+---
+
+## 28 · Phase 36 visual vocabulary is law (2026-05-14)
+
+Phase 36 introduced the Sales Operator visual vocabulary — see `docs/superpowers/specs/2026-05-14-phase36-sales-operator-vocab.md`. The vocabulary file `src/styles/v3-vocab.css` is the only place where new design tokens may live.
+
+### Rules
+
+- **No new color hex codes.** Every UI surface resolves to an existing token from `tokens.css`. If a screen genuinely needs a new color, owner approves an update to the vocab spec before the new token lands.
+- **Two font families total.** `--v3-display` (mono, for big numbers + headings) + `--v3-body` (Inter). No third family. No DM Sans / Space Grotesk for new code (legacy v2 pages can keep them until PR 3 migrates).
+- **Spacing scale only:** 2 / 4 / 8 / 12 / 16 / 24 / 32 / 48. Arbitrary px values (7, 11, 13, 18, 22) are forbidden in new code.
+- **Three radii only:** 6 / 12 / 999. No 7 / 11 / 14 / 16 / 20.
+- **One easing curve:** `cubic-bezier(0.2, 0.8, 0.2, 1)` over 240ms (or 120ms for tap feedback). No bounce, no spring.
+- **Yellow is sacred.** Brand `#FFE600` appears at most twice in any viewport (one primary CTA + one accent on the Day Spine current-hour dot). Treat additional yellows as a smell.
+- **`.v3-vocab` opt-in.** New pages add the class to their top-level wrapper to activate vocab typography. Legacy v2 pages migrate via PR 3 sweep.
+
+### When a new design need surfaces
+
+1. Open the vocab spec doc. Propose the addition with rationale.
+2. Owner signs off (single yes/no, not a meeting).
+3. Add to `v3-vocab.css` with a comment linking back to the spec change.
+4. Migration: any conflicting older token gets deprecated in the same PR.
+
+### Why this exists
+
+Phase 35 PR 2 shipped in 11 sub-letter patches because each fix introduced its own color / radius / easing. `/work` ended with 4 yellows, 2 greens, 1 purple, 1 blue. CLAUDE.md §3 forbids that pattern; §28 codifies the alternative.
