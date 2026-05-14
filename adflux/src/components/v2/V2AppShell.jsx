@@ -160,9 +160,17 @@ const MOBILE_NAV_ADMIN = [
 // behind the hamburger was friction. Follow-ups is the main work-
 // queue surface and deserves its own slot. Voice gets used per-lead,
 // not as a global tab.
+// Phase 34Z.2 (13 May 2026) — owner audit: "can we create one new tab
+// called create lead? It will be fruitful if we create one new tab,
+// which is create new lead, so it will be easy to people create lead
+// instantly." Added a 5th slot in the middle so reps can jump to the
+// New Lead form without scrolling through /leads first. Center
+// position highlights the action visually and matches the FAB-style
+// pattern reps recognise from WhatsApp / Instagram.
 const MOBILE_NAV_SALES = [
   { to: '/work',              label: 'Today',          icon: Sun },
   { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
+  { to: '/leads/new',         label: 'New',            icon: Plus },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
 ]

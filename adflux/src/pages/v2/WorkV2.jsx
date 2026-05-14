@@ -30,9 +30,18 @@ import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import V2Hero from '../../components/v2/V2Hero'
-// Phase 34Z.1 (13 May 2026) — pull the shared `greetingFor` so the
+// Phase 34Z.2 (13 May 2026) — owner asked for a *big* incentive hero
+// on /work, not the small top-bar pill. New component renders the
+// same calculateIncentive result via V2Hero styling.
+import IncentiveHeroCard from '../../components/incentives/IncentiveHeroCard'
+// Phase 34Z.1 (13 May 2026) — pulled the shared `greetingFor` so the
 // page-body greeting uses the same "morning ☀️ / afternoon ⛅ /
-// evening 🌙" emoji variant as the topbar.
+// evening 🌙" variant as the topbar. Phase 34Z.2 (13 May 2026)
+// removed the body greeting on A_PLAN to stop the topbar/body
+// duplicate; the import is preserved (no-op now) so the next
+// refactor that wants a greeting in-page can re-use it without
+// re-resolving the path.
+// eslint-disable-next-line no-unused-vars
 import { greetingFor as sharedGreetingFor } from '../../components/v2/V2AppShell'
 // Phase 34S — RingMilestoneRow import removed; only TaPayoutsAdminV2
 // still uses it. WorkV2 now relies on V2Hero alone for daily counters.
@@ -669,6 +678,12 @@ export default function WorkV2() {
   return (
     <div className="lead-root">
       <div className="m-screen">
+        {/* Phase 34Z.2 — incentive hero on top of /work. Big card,
+            same V2Hero gradient + pulse dot the rest of the app uses.
+            Auto-hides for admin/co_owner (no incentive applies) and
+            for reps without a `staff_incentive_profiles` row. */}
+        <IncentiveHeroCard />
+
         {/* Phase 34.9 discoverability — surface a tip rep didn't know
             existed. Dismisses to localStorage, never re-appears. */}
         <DidYouKnow id="work-voice-plan-2026-05-13" title="Speak your day plan">
@@ -683,10 +698,13 @@ export default function WorkV2() {
             <div className="hello">
               {stateName === 'D_DONE' ? 'Day done.' :
                stateName === 'B_ACTIVE' ? 'Day in progress' :
-               /* Phase 34Z.1 — was hardcoded "Good morning, {first}",
-                  which never matched the topbar greeting after dark.
-                  Shared util now handles the time band + emoji. */
-               sharedGreetingFor(profile)}
+               /* Phase 34Z.2 — owner audit (13 May 2026): on A_PLAN
+                  the topbar greeting ("Good evening, test 🌙") AND
+                  the page-body greeting both rendered, the same text
+                  twice within 60 px. Body heading swapped to a
+                  state-specific label so we keep ONE greeting per
+                  screen (the topbar one, persistent across pages). */
+               'Plan your day'}
             </div>
             <div className="date">{niceDate}{session?.check_in_at ? ` · checked in ${formatTime(session.check_in_at)}` : ''}</div>
           </div>
@@ -1285,16 +1303,16 @@ export default function WorkV2() {
                 the m-cta-stack of 3 giant buttons above. Surfaces
                 left here as a small chip row for secondary actions
                 (Follow-ups merged into Today's tasks card below
-                already; this is the escape hatch). */}
+                already; this is the escape hatch).
+                Phase 34Z.2 (13 May 2026) — dropped "My leads" + "New
+                lead" chips. Owner audit: "My lead does it required
+                on this today page because it's just killing the
+                space." Both targets are now in the bottom-nav: LEADS
+                tab + the new center "New" tab from Phase 34Z.2 nav
+                update. /work doesn't need a third route to either. */}
             <div className="m-quick-chips">
               <button className="chip-link" onClick={() => navigate('/follow-ups')}>
                 <ClockIcon size={13} /> Follow-ups
-              </button>
-              <button className="chip-link" onClick={() => navigate('/leads')}>
-                <UsersIcon size={13} /> My leads
-              </button>
-              <button className="chip-link" onClick={() => navigate('/leads/new')}>
-                <UserPlus size={13} /> New lead
               </button>
             </div>
 
@@ -1535,15 +1553,18 @@ function TodayTasksBreakdown({ userId, navigate }) {
   const nurtureCalls     = rows.filter(r => r.follow_up_date >= today && isNurture(r))
   const overdueCount = overdueFollowUps.length + overdueNurture.length
 
-  if (rows.length === 0) {
-    return (
-      <div className="m-card" style={{ marginBottom: 14, padding: '14px 16px' }}>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
-          ✓ All caught up — no follow-ups due
-        </div>
-      </div>
-    )
-  }
+  // Phase 34Z.2 (13 May 2026) — owner audit showed THREE "All caught
+  // up" cards stacked on /work when the rep was idle:
+  //   1. Top "All caught up · No pending tasks or meetings…" (m-card
+  //      above the action stack)
+  //   2. This FollowUps banner — "✓ All caught up — no follow-ups
+  //      due"
+  //   3. TodayTasksPanel "All caught up — nothing flagged for today"
+  // Same words, three boxes, 200 px of redundant chrome. Dropped #2
+  // (this banner). #1 + #3 carry different signals (overall plan +
+  // smart-tasks) so they stay. When there are no follow-ups, render
+  // nothing here — the top m-card already covers the message.
+  if (rows.length === 0) return null
 
   function cleanPhone(raw) {
     if (!raw) return null

@@ -131,9 +131,20 @@ export default function MeetingsMapPanel({ userId }) {
         zoom:   FALLBACK_ZOOM,
         scrollWheelZoom: false,
       })
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 18,
+      // Phase 34Z.2 (13 May 2026) — owner reported tiles STILL not
+      // loading after Phase 34Z.1's invalidateSize fix. Diagnosis:
+      // {s} subdomain rotation was producing `a/b/c.tile.openstreet
+      // map.org` URLs, but the OSM operational policy has been
+      // discouraging the legacy lettered subdomains since 2023 and
+      // some networks (incl. Indian ISPs) refuse them. Switching to
+      // the canonical `tile.openstreetmap.org` host with no subdomain
+      // template. Also bumped tile cross-origin to anonymous so the
+      // browser cache works across same-origin views and the service
+      // worker (Phase 34G) can hit-cache them properly.
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
         attribution: '&copy; OpenStreetMap',
+        crossOrigin: true,
       }).addTo(mapRef.current)
     }
 

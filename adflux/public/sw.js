@@ -43,8 +43,12 @@ registerRoute(
 )
 
 // ─── RUNTIME CACHE — Leaflet map tiles ──────────────────────────────
+// Phase 34Z.2 — `tile.openstreetmap.org` (canonical, no subdomain
+// rotation) added alongside the legacy `a/b/c.tile.openstreetmap.org`
+// hosts so the new MeetingsMapPanel URL pattern also hits the cache.
 registerRoute(
-  ({ url }) => url.host.endsWith('.tile.openstreetmap.org')
+  ({ url }) => url.host === 'tile.openstreetmap.org'
+            || url.host.endsWith('.tile.openstreetmap.org')
             || url.host === 'a.basemaps.cartocdn.com'
             || url.host === 'b.basemaps.cartocdn.com'
             || url.host === 'c.basemaps.cartocdn.com',
