@@ -58,9 +58,11 @@
      Used by <V2Hero> + lead detail / follow-ups / quote detail
      hero rows. Yellow radial highlight at top-right adds the
      brand pop. */
-  --v2-grad-hero: radial-gradient(120% 80% at 100% 0%, rgba(255,230,0,0.18) 0%, rgba(255,230,0,0.00) 50%), linear-gradient(135deg, #0d3d3a 0%, #134e4a 50%, #0f766e 100%);
-
-  --v2-grad-incentive: linear-gradient(135deg, #4f2594 0%, #7a2ab8 45%, #c43ba8 100%);
+  /* Phase 35 (PR 1) — pull from tokens.css; keep --v2- prefix
+     for callers already using it. */
+  --v2-grad-hero:      var(--grad-hero);
+  --v2-grad-incentive: var(--grad-incentive);
+  --v2-grad-team:      var(--grad-team);
   --v2-grad-incentive-soft: linear-gradient(135deg, rgba(79,37,148,.85) 0%, rgba(196,59,168,.75) 100%);
 
   --v2-shadow-card: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 24px rgba(0,0,0,.35);

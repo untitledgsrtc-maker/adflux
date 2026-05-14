@@ -35,6 +35,30 @@
   --blue:          #3B82F6;
   --blue-soft:     rgba(59, 130, 246, 0.12);
 
+  /* ─── Phase 35 (PR 1) — gradient tokens ──────────────────────── */
+  /* Single source of truth replacing four duplicate inline gradients
+     (V2Hero.jsx:25-27, leads.css:619-670, v2.css:61-63, TeamDashboardV2.jsx:212). */
+  --grad-hero:
+    radial-gradient(380px 140px at 100% 0%, rgba(255,230,0,.22), transparent 60%),
+    linear-gradient(135deg, #0d3d3a 0%, #134e4a 55%, #0f766e 100%);
+
+  --grad-incentive:
+    radial-gradient(420px 160px at 100% 0%, rgba(167,139,250,.18), transparent 60%),
+    linear-gradient(135deg, #2e1065 0%, #4c1d95 55%, #5b21b6 100%);
+
+  --grad-team:
+    linear-gradient(135deg, #1e1b4b 0%, #312e81 55%, #4338ca 100%);
+
+  /* ─── Phase 35 (PR 1) — orange status tint ────────────────────── */
+  /* Closes the warm-orange gap in the status palette. Currently
+     #f97316 is hardcoded in AdminDashboardDesktop.jsx. */
+  --orange:      #F97316;
+  --orange-soft: rgba(249, 115, 22, 0.12);
+
+  /* ─── Phase 35 (PR 1) — purple promoted from leads.css local ──── */
+  --purple:      #A78BFA;
+  --purple-soft: rgba(167, 139, 250, 0.14);
+
   /* ---- Tints (Phase 34R — chip / pill backgrounds, brought from
            _design_reference/salesui/sales-styles.css). Use these
            with the matching status colour as foreground / border. */
