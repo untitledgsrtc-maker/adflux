@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import V2Hero from '../../components/v2/V2Hero'
 
 /* ─── Local helpers ────────────────────────────────── */
 function computeBalance(q) {
@@ -221,6 +222,19 @@ export default function QuotesV2() {
         Open the Private LED wizard — Step 1 has a "Copy from your last quote"
         button. Pre-fills client + cities + rates. Edit what changed, send.
       </DidYouKnow>
+
+      {/* Phase 34Z.4 — V2Hero strip for cross-page consistency
+          (same teal hero as /work, /leads, /follow-ups). Value =
+          total quoted amount in the current filter scope; chip =
+          outstanding balance from approved partial payments. */}
+      {displayed.length > 0 && (
+        <V2Hero
+          eyebrow={isAdmin ? 'Team quotes' : 'Your pipeline'}
+          value={formatCurrency(totals.amount)}
+          label={`${totals.count} quote${totals.count === 1 ? '' : 's'}${(hasActiveFilters || (isAdmin && repFilter !== 'all')) ? ' · filtered' : ''}`}
+          chip={totals.outstanding > 0 ? `${formatCurrency(totals.outstanding)} outstanding` : 'All collected'}
+        />
+      )}
 
       {/* ─── Page header ──────────────────────────────── */}
       <div className="v2d-page-head">

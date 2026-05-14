@@ -41,6 +41,7 @@ import {
 import { StageAgeChip } from '../../components/leads/StageAgeChip'
 import { toastError } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import V2Hero from '../../components/v2/V2Hero'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 
 /* The 5 tabs from the design — All + 4 groups. We re-use the
@@ -273,6 +274,18 @@ export default function LeadsV2() {
         Try "show hot leads I haven't called this week" or "Sondarva's pipeline this month".
         Co-Pilot answers in plain English.
       </DidYouKnow>
+
+      {/* Phase 34Z.4 — V2Hero strip on /leads for cross-page consistency
+          (same teal hero as /work, /quotes, /follow-ups). Value = total
+          expected pipeline; chip = won/lost split; right = win-rate. */}
+      {leads.length > 0 && (
+        <V2Hero
+          eyebrow={isAdmin ? 'Team pipeline' : 'My pipeline'}
+          value={formatCurrency(totals.value)}
+          label={`${totals.total} lead${totals.total === 1 ? '' : 's'}${winRate != null ? ` · ${winRate}% win rate` : ''}`}
+          chip={`${totals.wonCount} won · ${totals.lostCount} lost`}
+        />
+      )}
 
       {/* Phase 33F (C2) — dropped the "Your pipeline" eyebrow above
           the "My Leads" title. Redundant filler that pushed content

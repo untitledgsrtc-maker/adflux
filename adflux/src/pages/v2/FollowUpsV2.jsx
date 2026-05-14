@@ -32,6 +32,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
+import V2Hero from '../../components/v2/V2Hero'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 const ADD_DAYS  = (iso, n) => {
@@ -322,18 +323,25 @@ export default function FollowUpsV2() {
         Call → outcome. Else the same follow-up fires again tomorrow.
       </DidYouKnow>
 
-      <div style={{ marginBottom: 14, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22 }}>
-            Follow-ups
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {grandTotal === 0
-              ? 'Nothing on your plate today.'
-              : `${total} follow-up${total === 1 ? '' : 's'}${nurtureTotal > 0 ? ` · ${nurtureTotal} nurture revisit${nurtureTotal === 1 ? '' : 's'}` : ''} · ${buckets.overdue.length + nurtureBuckets.overdue.length} overdue`}
-          </div>
-        </div>
-      </div>
+      {/* Phase 34Z.4 — V2Hero strip for cross-page consistency
+          (same teal hero as /work, /leads, /quotes). Value = total
+          due today + overdue; chip = overdue count to keep the
+          rep honest about the red queue. */}
+      <V2Hero
+        eyebrow="Today"
+        value={String(total + nurtureTotal)}
+        label={
+          grandTotal === 0
+            ? 'Nothing on your plate today.'
+            : `${total} follow-up${total === 1 ? '' : 's'}${nurtureTotal > 0 ? ` · ${nurtureTotal} nurture revisit${nurtureTotal === 1 ? '' : 's'}` : ''}`
+        }
+        chip={
+          (buckets.overdue.length + nurtureBuckets.overdue.length) > 0
+            ? `${buckets.overdue.length + nurtureBuckets.overdue.length} overdue`
+            : 'On track'
+        }
+        accent={grandTotal > 0}
+      />
 
       {/* Phase 33D — empty-state CTA. Never a dead page; always show
           the next action. When no follow-ups, suggest logging a meeting. */}
