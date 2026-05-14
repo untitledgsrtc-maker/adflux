@@ -192,12 +192,33 @@ export default function FollowUpsV2() {
     return row.lead_id ? row.lead?.name : row.quote?.client_name
   }
 
+  // Phase 35Z (14 May 2026) — auto-log a lead_activities row when the
+  // rep taps Call or WhatsApp from a follow-up. Before this, owner saw
+  // his reps tap Call → make the call → forget to log it → daily
+  // counter stayed at 0 calls. Now the tap itself counts; rep can
+  // refine the activity later via the lead detail page if needed.
+  // Fire-and-forget insert — don't block the tel:/wa.me navigation.
+  async function logFollowUpActivity(row, kind) {
+    const leadId = row.lead_id || row.lead?.id
+    if (!leadId) return
+    const userId = (await supabase.auth.getUser()).data?.user?.id
+    if (!userId) return
+    supabase.from('lead_activities').insert([{
+      lead_id:       leadId,
+      activity_type: kind === 'whatsapp' ? 'whatsapp' : 'call',
+      outcome:       'neutral',
+      notes:         `${kind === 'whatsapp' ? 'WhatsApp' : 'Call'} from follow-ups · ${rowName(row) || ''}`.trim(),
+      created_by:    userId,
+    }]).then(() => {}, () => {})
+  }
+
   function openWhatsApp(row) {
     const phone = rowPhone(row)
     if (!phone) {
       setError(`${rowName(row) || 'Contact'} has no phone on file.`)
       return
     }
+    logFollowUpActivity(row, 'whatsapp')
     const clean = String(phone).replace(/\D/g, '')
     const e164  = clean.length === 10 ? `91${clean}` : clean
     const greet = row.note ? `Hi ${rowName(row) || ''}, following up on: ${row.note}` : `Hi ${rowName(row) || ''}`
@@ -211,6 +232,7 @@ export default function FollowUpsV2() {
       setError(`${rowName(row) || 'Contact'} has no phone on file.`)
       return
     }
+    logFollowUpActivity(row, 'call')
     window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
   }
 
@@ -218,11 +240,26 @@ export default function FollowUpsV2() {
   // row (no nested quote join), so the contact actions read lead.phone
   // / lead.name. Reactivate flips the stage back to Working, clears
   // revisit_date, and inserts a status_change activity for the timeline.
+  // Phase 35Z — same auto-log for the nurture-row contact actions.
+  async function logNurtureActivity(lead, kind) {
+    if (!lead?.id) return
+    const userId = (await supabase.auth.getUser()).data?.user?.id
+    if (!userId) return
+    supabase.from('lead_activities').insert([{
+      lead_id:       lead.id,
+      activity_type: kind === 'whatsapp' ? 'whatsapp' : 'call',
+      outcome:       'neutral',
+      notes:         `${kind === 'whatsapp' ? 'WhatsApp' : 'Call'} from nurture revisits · ${lead.name || ''}`.trim(),
+      created_by:    userId,
+    }]).then(() => {}, () => {})
+  }
+
   function nurtureCall(lead) {
     if (!lead.phone) {
       setError(`${lead.name || 'Lead'} has no phone on file.`)
       return
     }
+    logNurtureActivity(lead, 'call')
     window.location.href = `tel:${String(lead.phone).replace(/\s/g, '')}`
   }
   function nurtureWhatsApp(lead) {
@@ -230,6 +267,7 @@ export default function FollowUpsV2() {
       setError(`${lead.name || 'Lead'} has no phone on file.`)
       return
     }
+    logNurtureActivity(lead, 'whatsapp')
     const clean = String(lead.phone).replace(/\D/g, '')
     const e164  = clean.length === 10 ? `91${clean}` : clean
     const greet = `Hi ${lead.name || ''}, just checking back in as we discussed.`
