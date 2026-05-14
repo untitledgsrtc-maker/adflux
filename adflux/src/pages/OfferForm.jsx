@@ -34,11 +34,11 @@ function Field({ label, required, error, hint, children }) {
     <div className="fg" style={{ marginBottom: 12 }}>
       <label>
         {label}
-        {required && <span style={{ color: 'var(--red)' }}> *</span>}
+        {required && <span style={{ color: 'var(--danger)' }}> *</span>}
       </label>
       {children}
-      {error && <p style={{ fontSize: '.75rem', color: 'var(--red)', marginTop: 3 }}>{error}</p>}
-      {hint && !error && <p style={{ fontSize: '.75rem', color: 'var(--gray)', marginTop: 3 }}>{hint}</p>}
+      {error && <p style={{ fontSize: '.75rem', color: 'var(--danger)', marginTop: 3 }}>{error}</p>}
+      {hint && !error && <p style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: 3 }}>{hint}</p>}
     </div>
   )
 }
@@ -56,13 +56,13 @@ function Layout({ children }) {
         maxWidth: 760,
         margin: '0 auto',
         padding: '20px 22px 28px',
-        background: 'var(--card)',
-        border: '1px solid var(--brd)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
         borderRadius: 10,
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          borderBottom: '1px solid var(--brd)',
+          borderBottom: '1px solid var(--border)',
           paddingBottom: 14, marginBottom: 18,
         }}>
           <div style={{
@@ -75,7 +75,7 @@ function Layout({ children }) {
           </div>
           <div>
             <div style={{ fontWeight: 700 }}>Untitled Advertising</div>
-            <div style={{ fontSize: '.75rem', color: 'var(--gray)' }}>
+            <div style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>
               Offer Letter — Personal Details
             </div>
           </div>
@@ -323,7 +323,7 @@ export default function OfferForm() {
   if (loading) {
     return (
       <Layout>
-        <div style={{ textAlign: 'center', padding: 30, color: 'var(--gray)' }}>
+        <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>
           <Loader2 size={28} className="spin" style={{ marginBottom: 10 }} />
           <div>Loading offer…</div>
         </div>
@@ -335,10 +335,10 @@ export default function OfferForm() {
     return (
       <Layout>
         <div style={{ textAlign: 'center', padding: 20 }}>
-          <AlertTriangle size={40} color="var(--red)" style={{ marginBottom: 10 }} />
+          <AlertTriangle size={40} color="var(--danger)" style={{ marginBottom: 10 }} />
           <div style={{ fontWeight: 600, marginBottom: 6 }}>Link not valid</div>
-          <div style={{ color: 'var(--gray)', fontSize: '.9rem' }}>{loadErr}</div>
-          <div style={{ color: 'var(--gray)', fontSize: '.82rem', marginTop: 10 }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>{loadErr}</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '.82rem', marginTop: 10 }}>
             If you believe this is a mistake, contact the person who shared the link with you.
           </div>
         </div>
@@ -355,7 +355,7 @@ export default function OfferForm() {
           <div style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: 6 }}>
             Offer accepted
           </div>
-          <div style={{ color: 'var(--gray)', fontSize: '.9rem', marginBottom: 18 }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: '.9rem', marginBottom: 18 }}>
             Thank you, {offer.full_legal_name || offer.candidate_name}. Your
             signed offer letter has been generated. You can download a copy
             below.
@@ -371,7 +371,7 @@ export default function OfferForm() {
               Download Offer Letter PDF
             </a>
           )}
-          <div style={{ color: 'var(--gray)', fontSize: '.82rem', marginTop: 20 }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: '.82rem', marginTop: 20 }}>
             Our HR team will be in touch with next steps.
           </div>
         </div>
@@ -389,7 +389,7 @@ export default function OfferForm() {
         borderRadius: 8,
         marginBottom: 20,
       }}>
-        <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6 }}>
+        <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6 }}>
           Offer for {offer.candidate_name}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: '.88rem' }}>
@@ -492,7 +492,7 @@ export default function OfferForm() {
         <div style={{
           marginTop: 20, padding: 14,
           background: 'var(--subtle)', borderRadius: 8,
-          border: errors.accepted ? '1px solid var(--red)' : '1px solid var(--brd)',
+          border: errors.accepted ? '1px solid var(--danger)' : '1px solid var(--border)',
         }}>
           <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
             <input
@@ -512,7 +512,7 @@ export default function OfferForm() {
             </span>
           </label>
           {errors.accepted && (
-            <p style={{ fontSize: '.78rem', color: 'var(--red)', marginTop: 6 }}>
+            <p style={{ fontSize: '.78rem', color: 'var(--danger)', marginTop: 6 }}>
               {errors.accepted}
             </p>
           )}
@@ -524,7 +524,7 @@ export default function OfferForm() {
             background: 'rgba(229,57,53,.08)',
             border: '1px solid rgba(229,57,53,.25)',
             borderRadius: 8, padding: '11px 14px', fontSize: '.82rem',
-            color: '#ef9a9a',
+            color: 'var(--danger)',
           }}>
             {submitErr}
           </div>
@@ -539,7 +539,7 @@ export default function OfferForm() {
           {submitting ? 'Submitting…' : 'Submit & Accept Offer'}
         </button>
 
-        <div style={{ fontSize: '.76rem', color: 'var(--gray)', marginTop: 12, textAlign: 'center' }}>
+        <div style={{ fontSize: '.76rem', color: 'var(--text-muted)', marginTop: 12, textAlign: 'center' }}>
           Your data is sent securely to Untitled Advertising. A copy of
           your signed offer letter will be available to download as
           soon as you submit.
@@ -552,10 +552,10 @@ export default function OfferForm() {
 function SectionTitle({ children }) {
   return (
     <div style={{
-      fontSize: '.72rem', fontWeight: 700, color: 'var(--gray)',
+      fontSize: '.72rem', fontWeight: 700, color: 'var(--text-muted)',
       textTransform: 'uppercase', letterSpacing: '.1em',
       paddingBottom: 6, marginTop: 20, marginBottom: 12,
-      borderBottom: '1px solid var(--brd)',
+      borderBottom: '1px solid var(--border)',
     }}>
       {children}
     </div>
