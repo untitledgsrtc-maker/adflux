@@ -33,6 +33,7 @@ import {
   ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
   RefreshCw, Sparkles, FileText as FileTextIcon, Users as UsersIcon,
   AlertTriangle, Clock, Mic, ChevronDown, MoreHorizontal,
+  Trash2, Pencil,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -48,6 +49,7 @@ import PhotoCapture     from '../../components/leads/PhotoCapture'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { Modal, ActionButton } from '../../components/v2/primitives'
 
 const ACTIVITY_ICON = {
@@ -952,6 +954,57 @@ export default function LeadDetailV2() {
                   confirm() loop with a single batch Modal (iOS PWA
                   was suppressing the 2nd+ native dialog ~30% of the
                   time, silently dropping conflicts). */}
+              {/* Phase 34Z.32 — Edit hint. Owner reported "no option
+                  for editing." Inline click-to-edit was always there
+                  (EditableField wraps name / company / phone / email /
+                  city / value / notes) but the affordance was invisible
+                  (cursor:text only). Toasting a clear hint on tap is
+                  the smallest reliable fix; full edit-mode toggle is
+                  a follow-up. */}
+              <button
+                className="lead-btn lead-btn-sm"
+                onClick={() => {
+                  toastSuccess('Tap any field below (Name, Company, Phone, Email, City, Value, Notes) to edit it inline. Changes save automatically.')
+                  setMoreOpen(false)
+                }}
+                title="Edit lead details"
+              >
+                <Pencil size={13} /> <span>Edit</span>
+              </button>
+
+              {/* Phase 34Z.32 — Delete option. Owner: "Salesforce or
+                  anyone cannot delete the lead because there is no
+                  option." RLS gates the actual DELETE (admin / co_owner
+                  or owner of the row). On failure surface the real
+                  error so the rep knows whether it's permission or
+                  network. */}
+              <button
+                className="lead-btn lead-btn-sm"
+                style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                onClick={async () => {
+                  if (!lead?.id) return
+                  const ok = await confirmDialog({
+                    title: 'Delete this lead?',
+                    message: `Permanently delete "${lead.name || lead.company || 'this lead'}" and all its activity history. This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    cancelLabel: 'Cancel',
+                    danger: true,
+                  })
+                  if (!ok) return
+                  const { error: delErr } = await supabase
+                    .from('leads').delete().eq('id', lead.id)
+                  if (delErr) {
+                    toastError(delErr, 'Could not delete the lead. ' + delErr.message)
+                    return
+                  }
+                  toastSuccess('Lead deleted.')
+                  navigate('/leads')
+                }}
+                title="Delete lead"
+              >
+                <Trash2 size={13} /> <span>Delete</span>
+              </button>
+
               <PhotoCapture
                 leadId={lead.id}
                 profileId={profile?.id}
