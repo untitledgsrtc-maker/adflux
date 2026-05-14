@@ -27,6 +27,11 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+// Pill from LeadShared kept for any consumer below; NextActionCard
+// now uses the StatusBadge primitive (supports tints `warning`,
+// `blue`, `success` natively; LeadShared.Pill only had `warn`/`success`
+// /`danger`/`blue` classes, so `warning`/`info`/`neutral` rendered flat).
+// eslint-disable-next-line no-unused-vars
 import { Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
 import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
@@ -36,7 +41,7 @@ import V2Hero from '../../components/v2/V2Hero'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import LogMeetingModal from '../../components/leads/LogMeetingModal'
 import { useLeadTasks } from '../../hooks/useLeadTasks'
-import { EmptyState, ActionButton, MonoNumber } from '../../components/v2/primitives'
+import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -544,10 +549,13 @@ export default function WorkV2() {
   return (
     <div className="lead-root">
       <div className="m-screen">
-        <DidYouKnow id="work-voice-plan-2026-05-13" title="Speak your day plan">
-          Tap the mic above and say what's on today. AI breaks it into tasks.
-          Saves 3-5 minutes vs typing each one.
-        </DidYouKnow>
+        {/* Discoverability tip — irrelevant once the day is over. */}
+        {!dayDone && (
+          <DidYouKnow id="work-voice-plan-2026-05-13" title="Speak your day plan">
+            Tap the mic above and say what's on today. AI breaks it into tasks.
+            Saves 3-5 minutes vs typing each one.
+          </DidYouKnow>
+        )}
 
         {error && (
           <div
@@ -1126,7 +1134,7 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary }) {
     }}>
       <div className="m-card-title">
         <span>Next up</span>
-        <Pill tone={tone.toneName}>{tone.label}</Pill>
+        <StatusBadge tint={tone.tint}>{tone.label}</StatusBadge>
       </div>
       <div style={{ fontSize: 17, fontWeight: 600, marginTop: 4 }}>
         {title}
@@ -1196,7 +1204,7 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
     )
     return (
       <NextActionCard
-        tone={{ toneName: 'warning', label: 'meeting' }}
+        tone={{ tint: 'warning', label: 'meeting' }}
         title={m.client || 'Meeting'}
         meta={meta}
         primary={{ icon: CheckCircle2, label: 'Done', onClick: () => toggleMeetingDone(m.idx), disabled: busy }}
@@ -1219,7 +1227,7 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
     )
     return (
       <NextActionCard
-        tone={{ toneName: 'info', label: 'smart task' }}
+        tone={{ tint: 'blue', label: 'smart task' }}
         title={title}
         subtitle={t.reason}
         primary={phone
@@ -1243,7 +1251,7 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
   )
   return (
     <NextActionCard
-      tone={{ toneName: 'neutral', label: 'plan task' }}
+      tone={{ tint: 'neutral', label: 'plan task' }}
       title={p.title}
       meta={meta}
       primary={{ icon: CheckCircle2, label: 'Done', onClick: () => toggleTaskDone(p.id), disabled: busy }}
