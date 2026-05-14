@@ -1068,20 +1068,6 @@
 .v2d-mnav-badge { position: absolute; top: 4px; right: 50%; transform: translateX(18px); background: var(--v2-rose); color: #fff; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: var(--v2-r-pill); letter-spacing: 0; }
 @media (max-width: 860px) { .v2d-mnav { display: flex; } }
 
-/* Phase 34Z (13 May 2026) — Toast bottom offset must clear the
-   mobile bottom-nav band (.v2d-mnav: 64 px + safe-area). Without
-   this override, success / error toasts rendered behind the nav
-   and reps never saw save confirmations on phones. Inline style
-   on <ToastViewport /> remains the desktop default (16 px); this
-   rule wins under 860 px because of cascade order + later
-   declaration in the same file. !important is required because
-   the inline style is more specific than a normal class selector. */
-@media (max-width: 860px) {
-  .v2-toast-viewport {
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 12px) !important;
-  }
-}
-
 /* ═══════════════════════════════════════════════════════════════
    v2d — additions to support real JSX components (SalesDesktop /
    AdminDesktop / AdminMobile). These round out the kit with the

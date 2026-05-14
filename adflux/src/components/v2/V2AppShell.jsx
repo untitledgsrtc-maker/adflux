@@ -142,35 +142,14 @@ const MOBILE_NAV_ADMIN = [
   { to: '/team',              label: 'Team',           icon: Users },
 ]
 
-// Phase 31K — owner directive (10 May 2026): sales reps land on
-// /work now (Plan-A flow). Mobile bottom nav reorders accordingly:
-//   Today  → /work     (the new home — plan, check in, do the day)
-//   Quotes → /quotes
-//   Score  → /my-performance (was 'Perf' pre-31H; reps say "score")
-//   Follow → /follow-ups     (NEW — Phase 31K's dedicated screen)
-// "Reward" / /my-offer dropped from the thumb-zone — reps check that
-// weekly, not daily. Still reachable via the sidebar drawer.
-// Dashboard stays accessible via sidebar — it's the "view my numbers"
-// page, not the daily-action surface anymore.
-// Phase 33A — owner directive (11 May 2026): cut bottom nav to 3 items.
-// Phase 33J (owner directive, item F2) — sales bottom nav is now
-// 4 items: Today / Follow-ups / Leads / Quotes. Voice moves to the
-// sidebar drawer (still reachable via the Voice button on each lead).
-// Reasoning: Quotes is daily work for a closing rep — keeping it
-// behind the hamburger was friction. Follow-ups is the main work-
-// queue surface and deserves its own slot. Voice gets used per-lead,
-// not as a global tab.
-// Phase 34Z.2 (13 May 2026) — owner audit: "can we create one new tab
-// called create lead? It will be fruitful if we create one new tab,
-// which is create new lead, so it will be easy to people create lead
-// instantly." Added a 5th slot in the middle so reps can jump to the
-// New Lead form without scrolling through /leads first. Center
-// position highlights the action visually and matches the FAB-style
-// pattern reps recognise from WhatsApp / Instagram.
+// Phase 35 PR 2 — locked to 4 tabs. /work now sticky-mounts the
+// "Log meeting" CTA at the bottom of its scroll area (Task 6), so
+// the dedicated "New" tab is redundant. CLAUDE.md §3 (modules not
+// patches): nav count fluctuated 3 → 4 → 5 across Phase 33A /
+// 33J / 34Z.2; this is the stable shape.
 const MOBILE_NAV_SALES = [
   { to: '/work',              label: 'Today',          icon: Sun },
   { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
-  { to: '/leads/new',         label: 'New',            icon: Plus },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
 ]
@@ -192,9 +171,8 @@ const MOBILE_NAV_TELECALLER = [
 export function V2AppShell() {
   const { user, profile, isPrivileged, signOut } = useAuth()
 
-  // Phase 35 PR 1 — apply persisted theme on mount. CSS overrides in
-  // v2.css already key off `<html data-theme="day">`; this just reads
-  // the rep's stored preference and sets the attribute.
+  // Apply the rep's persisted theme preference on mount; CSS keys
+  // off `<html data-theme="day">` in v2.css.
   useEffect(() => {
     try {
       const t = localStorage.getItem('theme') || 'night'
@@ -205,9 +183,25 @@ export function V2AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  // Phase 33B.4 — More drawer for sales reps. Avatar tap opens it.
+  // Avatar-tap "More" drawer (overflow nav for sales).
   const [moreOpen, setMoreOpen] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
+
+  // Track viewport size so the topbar can hide the IncentiveMiniPill
+  // on mobile and the ToastViewport can clear the bottom nav.
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia('(max-width: 860px)')
+    const update = () => setIsMobile(mql.matches)
+    update()
+    if (mql.addEventListener) mql.addEventListener('change', update)
+    else mql.addListener(update)
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', update)
+      else mql.removeListener(update)
+    }
+  }, [])
   // Phase 1.5 — AI Co-Pilot. Cmd+K (Mac) / Ctrl+K (Win/Linux) opens.
   const [copilotOpen, setCopilotOpen] = useState(false)
   useEffect(() => {
@@ -221,10 +215,7 @@ export function V2AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Phase 12 — nav variants by role.
-  // Phase 32F — agency split out into its own variant (external
-  // commission partner, not an employee — minimal sidebar without
-  // /work, /follow-ups, GPS, or attendance flows).
+  // Nav variants by role:
   //   admin / co_owner → ADMIN_NAV (full chrome including govt masters)
   //   telecaller       → TELECALLER_NAV (queue-first, minimal)
   //   agency           → AGENCY_NAV (Quotes + Earnings + Offer only)
@@ -304,11 +295,6 @@ export function V2AppShell() {
           })}
           <div className="v2d-nav-spacer" />
           <div className="v2d-nav-foot">
-            {/* Phase 31D — owner reported (9 May 2026) the sidebar foot
-                only had a "Log out" button. Reps couldn't tell which
-                account was active when supporting each other. Added a
-                compact identity strip showing name + email above
-                Log out so the answer is always one glance away. */}
             <div className="v2d-side-me" title={user?.email || ''}>
               <div className="v2d-side-me-av">{initials(profile?.name || 'U')}</div>
               <div className="v2d-side-me-text">
@@ -327,15 +313,6 @@ export function V2AppShell() {
       {/* ─── Main ─────────────────────────────────────── */}
       <main className="v2d-main">
         <header className="v2d-topbar">
-          {/* Phase 33G.4 — hamburger restored for ALL roles on mobile.
-              Phase 33F (A5) hid it for sales/agency on the theory that
-              the bottom nav + avatar More drawer was enough. Owner
-              reported reps couldn't find the avatar (and the More
-              drawer behind it), so the long-tail screens (Quotes,
-              Clients, My Performance, Follow-ups) were effectively
-              orphaned. Bringing the hamburger back gives every role
-              one obvious nav surface. The bottom nav still covers the
-              hot paths (Today/Leads/Voice for sales). */}
           <button
             className="v2d-hamburger"
             onClick={() => setDrawerOpen(true)}
@@ -344,12 +321,6 @@ export function V2AppShell() {
             <Menu size={20} />
           </button>
 
-          {/* Phase 33G (A1, A2) — "SALES CONSOLE" eyebrow killed for
-              sales/agency. Greeting "Good evening, {name}" shown
-              only on /work for sales reps — repeating it on every
-              page navigation was wasteful chrome. Admin / telecaller
-              still see both since their workspace is more multi-
-              context and the label helps orientation. */}
           <div className="v2d-crumb">
             {(isPrivileged || isTelecaller) && (
               <div className="v2d-crumb-kicker">
@@ -367,9 +338,6 @@ export function V2AppShell() {
 
           <div className="v2d-topbar-spacer" />
 
-          {/* Phase 31A.3 — global cross-entity literal search. Fast
-              path for "find this lead/client/quote by name or number".
-              Co-Pilot below is for natural-language pipeline queries. */}
           <GlobalSearchBar />
 
           {/* Phase 1.5 — Co-Pilot trigger. Click or ⌘K opens the AI
@@ -396,10 +364,6 @@ export function V2AppShell() {
             </span>
           </button>
 
-          {/* Phase 33G (A4) — "New Quote" button hidden for sales/agency
-              except on /quotes routes. Reps create quotes from a
-              specific lead via "Convert to quote", not from a global
-              header button. Admin keeps the global shortcut. */}
           {(isPrivileged
             || isTelecaller
             || location.pathname.startsWith('/quotes')
@@ -410,14 +374,8 @@ export function V2AppShell() {
             </button>
           )}
 
-          {/* Phase 34M — incentive mini-pill. Sales / agency /
-              telecaller only. Shows projected incentive this month
-              + % to target on every page. Tap → /my-performance. */}
-          <IncentiveMiniPill />
+          {!isMobile && <IncentiveMiniPill />}
 
-          {/* Phase 31A.4 — real notification panel. Aggregates pending
-              approvals + due follow-ups + SLA breaches + due actions
-              from existing tables; no new schema. */}
           <NotificationPanel />
 
           <div
@@ -439,11 +397,7 @@ export function V2AppShell() {
           </div>
         </header>
 
-        {/* Phase 33B.4 — More drawer. Owner audit (11 May 2026)
-            flagged: cutting nav to 3 items without giving the dropped
-            items a new home was a regression. This sheet opens on
-            avatar tap and surfaces Follow-ups, Quotes, Clients, Voice,
-            Score, Logout. Sales-only — admin keeps full sidebar. */}
+        {/* Avatar-tap "More" drawer — surfaces overflow nav items. */}
         {moreOpen && (
           <div className="more-drawer-back" onClick={() => setMoreOpen(false)}>
             <div className="more-drawer" onClick={(e) => e.stopPropagation()}>
@@ -469,38 +423,14 @@ export function V2AppShell() {
         )}
 
         <div className="v2d-content">
-          {/* Phase 31O — owner directive (10 May 2026): the Proposed
-              Incentive card must be visible on every sales screen so
-              reps stay motivated by what they're earning while they
-              work. Mounted in the shell so it persists across route
-              changes (one fetch on app load, no extra round-trips per
-              page nav). Gated to non-privileged + non-telecaller —
-              admin/co_owner have their own incentive views, telecaller
-              doesn't earn the same incentives. Sales + agency see it. */}
-          {/* Phase 33G (C1) — owner audit (11 May): the big purple
-              hero on /leads / /follow-ups / lead detail was pushing
-              the actual content below the fold. Compact strip is now
-              the default everywhere; only /my-performance gets the
-              full hero (rep's deep view of their numbers). */}
-          {/* Phase 34S — May 13 UX audit: on /quotes/:id the rep
-              already sees the per-quote IncentiveForecastCard
-              ("if you close this you earn +X") AND the top-bar
-              IncentiveMiniPill (global ₹ this month). Adding the
-              ProposedIncentiveCard strip there put THREE incentive
-              numbers in 10cm of screen — confusing, not motivating.
-              Hide the strip on quote-detail routes (the page has
-              its own forecaster); keep elsewhere. */}
+          {/* ProposedIncentiveCard — sales / agency only. Compact pill
+              by default; full purple hero on /work + /my-performance.
+              Hidden on /quotes/:id and /quotes/new (those pages mount
+              their own per-quote forecaster). */}
           {!isPrivileged && !isTelecaller
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 12 }}>
-              {/* Phase 34Z.3 (13 May 2026) — owner: "i want same card
-                  replica [the full purple Forecast / Pending / Earned
-                  card from /my-performance] to be pasted in today
-                  page." /work now joins /my-performance in showing
-                  the full version; every other page keeps the compact
-                  pill so /leads / /follow-ups don't lose viewport
-                  height to a hero they don't need. */}
               <ProposedIncentiveCard compact={
                 location.pathname !== '/my-performance'
                 && location.pathname !== '/work'
@@ -557,7 +487,6 @@ export function V2AppShell() {
               })}
               <div className="v2d-nav-spacer" />
               <div className="v2d-nav-foot">
-                {/* Phase 31D — same identity strip as desktop sidebar. */}
                 <div className="v2d-side-me" title={user?.email || ''}>
                   <div className="v2d-side-me-av">{initials(profile?.name || 'U')}</div>
                   <div className="v2d-side-me-text">
@@ -600,14 +529,10 @@ export function V2AppShell() {
       {/* Phase 1.5 — Co-Pilot modal (Cmd+K) */}
       <CopilotModal open={copilotOpen} onClose={() => setCopilotOpen(false)} />
 
-      {/* Phase 34a — global toast viewport. Mounted once at the shell
-          root so any page, modal or store can call pushToast() and have
-          it render in the bottom-right corner. */}
-      <ToastViewport />
+      {/* Global toast viewport — bottomGap clears the mobile bottom nav. */}
+      <ToastViewport bottomGap={isMobile ? 76 : 16} />
 
-      {/* Phase 34e — promise-based confirm dialog. Replaces browser
-          confirm() for destructive operations so the look matches the
-          rest of v2. */}
+      {/* Promise-based confirm dialog viewport. */}
       <ConfirmDialogViewport />
     </div>
   )

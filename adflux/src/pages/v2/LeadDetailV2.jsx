@@ -47,7 +47,8 @@ import ReassignModal   from '../../components/leads/ReassignModal'
 import PhotoCapture     from '../../components/leads/PhotoCapture'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
-import { toastError } from '../../components/v2/Toast'
+import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { Modal, ActionButton } from '../../components/v2/primitives'
 
 const ACTIVITY_ICON = {
   call:          Phone,
@@ -128,6 +129,14 @@ export default function LeadDetailV2() {
   // Modal state
   const [activeModal, setActiveModal] = useState(null)   // null | 'stage' | 'reassign' | 'whatsapp_template'
   const [activityType, setActivityType] = useState(null) // null | 'call' | 'whatsapp' | …
+
+  // Phase 35 PR 2 — OCR conflict resolution.
+  // ocrConflicts is { conflicts: [{ key, label, curVal, ocrVal }], silentPatch }
+  // where silentPatch is the empty-field updates that always apply.
+  // acceptedKeys is the Set of conflict keys the rep has ticked (default = all).
+  // Replaces the per-conflict confirm() loop that iOS PWA dropped silently.
+  const [ocrConflicts, setOcrConflicts] = useState(null)
+  const [acceptedKeys, setAcceptedKeys] = useState(new Set())
 
   // Phase 33D.5 — post-action WhatsApp prompt. After quick-Call, stage
   // change, or any other touch, open the prompt with the right
@@ -327,6 +336,28 @@ export default function LeadDetailV2() {
     setLoading(false)
   }
   useEffect(() => { load() /* eslint-disable-next-line */ }, [id])
+
+  /* ─── Phase 35 PR 2 — OCR conflict apply ───
+     Called from the batch modal's "Apply" button. Merges the
+     silent empty-field patch with the ticked conflicts, writes
+     once, toasts, then reloads. */
+  async function applyOcrConflicts() {
+    if (!ocrConflicts) return
+    const patch = { ...(ocrConflicts.silentPatch || {}) }
+    for (const c of ocrConflicts.conflicts) {
+      if (acceptedKeys.has(c.key)) patch[c.key] = c.ocrVal
+    }
+    if (Object.keys(patch).length === 0) {
+      setOcrConflicts(null)
+      return
+    }
+    const { error: upErr } = await supabase.from('leads').update(patch).eq('id', lead.id)
+    if (upErr) { toastError(upErr, 'Could not apply OCR updates.'); return }
+    const n = Object.keys(patch).length
+    toastSuccess(`Updated ${n} field${n === 1 ? '' : 's'}.`)
+    setOcrConflicts(null)
+    load()
+  }
 
   /* ─── Phase 19 — Realtime: keep this lead + activity list fresh ─── */
   useEffect(() => {
@@ -887,10 +918,14 @@ export default function LeadDetailV2() {
               >
                 <RefreshCw size={13} /> <span>Stage</span>
               </button>
-              {/* Phase 33L (F7 fix) — OCR field merge now asks the rep
-                  to confirm when OCR has a value AND the existing
-                  field is non-empty AND they differ. Empty fields get
-                  patched silently as before. */}
+              {/* Phase 33L (F7 fix) — OCR field merge confirms when OCR
+                  has a value AND the existing field is non-empty AND
+                  they differ. Empty fields get patched silently as
+                  before.
+                  Phase 35 PR 2 — replaced the per-conflict forEach
+                  confirm() loop with a single batch Modal (iOS PWA
+                  was suppressing the 2nd+ native dialog ~30% of the
+                  time, silently dropping conflicts). */}
               <PhotoCapture
                 leadId={lead.id}
                 profileId={profile?.id}
@@ -914,16 +949,24 @@ export default function LeadDetailV2() {
                     }
                   })
 
-                  // Resolve conflicts via simple confirm prompts.
-                  // For each conflict, ask "Replace X with Y from card?"
-                  conflicts.forEach(c => {
-                    const msg = `${c.label}: replace "${c.curVal}" with "${c.ocrVal}" from the scanned card?`
-                    if (confirm(msg)) patch[c.key] = c.ocrVal
-                  })
+                  // No conflicts — apply empty-field updates silently
+                  // (or just reload if nothing to apply). Preserves
+                  // the pre-Phase-35 no-conflict branch verbatim.
+                  if (conflicts.length === 0) {
+                    if (Object.keys(patch).length === 0) { load(); return }
+                    const { error: upErr } = await supabase
+                      .from('leads').update(patch).eq('id', lead.id)
+                    if (upErr) { toastError(upErr, 'Could not apply OCR updates.'); return }
+                    load()
+                    return
+                  }
 
-                  if (Object.keys(patch).length === 0) { load(); return }
-                  await supabase.from('leads').update(patch).eq('id', lead.id)
-                  load()
+                  // Conflicts present — open batch modal. Default
+                  // accept-all (every key ticked). silentPatch carries
+                  // the empty-field updates so they apply whether or
+                  // not the rep ticks any conflict.
+                  setAcceptedKeys(new Set(conflicts.map(c => c.key)))
+                  setOcrConflicts({ conflicts, silentPatch: patch })
                 }}
               />
             </div>
@@ -1285,6 +1328,63 @@ export default function LeadDetailV2() {
         profile={profile}
         onClose={() => setWaPrompt(null)}
       />
+
+      {/* Phase 35 PR 2 — OCR batch confirm. One modal, checkbox per
+          conflict, default accept-all. Replaces the per-conflict
+          confirm() loop iOS PWA was silently dropping. */}
+      {ocrConflicts && (
+        <Modal
+          open={true}
+          onClose={() => setOcrConflicts(null)}
+          title="Confirm OCR changes"
+          size="md"
+          footer={
+            <>
+              <ActionButton variant="ghost" size="sm" onClick={() => setOcrConflicts(null)}>
+                Cancel
+              </ActionButton>
+              <ActionButton variant="primary" size="sm" onClick={applyOcrConflicts}>
+                Apply ({acceptedKeys.size})
+              </ActionButton>
+            </>
+          }
+        >
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+            OCR found different values for these fields. Untick anything that's wrong.
+          </p>
+          {ocrConflicts.conflicts.map(c => (
+            <label
+              key={c.key}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '8px 0', borderBottom: '1px solid var(--border)',
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={acceptedKeys.has(c.key)}
+                onChange={e => {
+                  const next = new Set(acceptedKeys)
+                  if (e.target.checked) next.add(c.key)
+                  else next.delete(c.key)
+                  setAcceptedKeys(next)
+                }}
+                style={{ marginTop: 3 }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{c.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  <s>{c.curVal || '(empty)'}</s>{' '}
+                  <span style={{ color: 'var(--text)' }}>
+                    → <strong>{c.ocrVal}</strong>
+                  </span>
+                </div>
+              </div>
+            </label>
+          ))}
+        </Modal>
+      )}
     </div>
   )
 }
