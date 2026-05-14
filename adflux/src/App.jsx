@@ -51,6 +51,7 @@ import GpsTrackV2            from './pages/v2/GpsTrackV2'
 import MasterV2              from './pages/v2/MasterV2'
 // Phase 35 PR 1 — admin-only primitives demo (sign-off gate before PR 2).
 import PrimitivesDemoV2      from './pages/v2/PrimitivesDemoV2'
+import SettingsV2            from './pages/v2/SettingsV2'
 
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
@@ -221,6 +222,7 @@ export default function App() {
           {/* Phase 35 PR 1 — primitives demo. Page handles role gate
               internally (Banner "Admin only" for non-privileged). */}
           <Route path="/primitives-demo"           element={<PrimitivesDemoV2 />} />
+          <Route path="/settings"                  element={<SettingsV2 />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

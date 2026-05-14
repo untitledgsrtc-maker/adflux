@@ -191,6 +191,17 @@ const MOBILE_NAV_TELECALLER = [
 
 export function V2AppShell() {
   const { user, profile, isPrivileged, signOut } = useAuth()
+
+  // Phase 35 PR 1 — apply persisted theme on mount. CSS overrides in
+  // v2.css already key off `<html data-theme="day">`; this just reads
+  // the rep's stored preference and sets the attribute.
+  useEffect(() => {
+    try {
+      const t = localStorage.getItem('theme') || 'night'
+      document.documentElement.setAttribute('data-theme', t)
+    } catch { /* localStorage blocked — leave attr empty, defaults to night */ }
+  }, [])
+
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
