@@ -171,16 +171,28 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
     footerValue: { color: INK, fontSize: 10, fontWeight: 600 },
   }
 
-  // Coerce city rows into a normalised line-item shape.
-  const lines = cities.map((c, i) => {
-    const desc = c.city_name || c.name || `Line ${i + 1}`
-    const qty  = Number(c.qty || c.quantity || c.spots_per_month || 1) || 1
-    const rate = Number(c.rate || c.unit_rate || c.monthly_rate || 0) || 0
-    const amount = Number(c.amount || (qty * rate)) || 0
-    const meta = [c.media_type, c.screens && `${c.screens} screens`, c.size]
-      .filter(Boolean).join(' · ')
-    return { desc, meta, qty, rate, amount }
-  })
+  // Phase 34Z.26 — full LED row shape, mirrors the on-screen quote
+  // detail table: CITY · GRADE · SCREENS · DURATION · SLOT · SLOTS/DAY
+  // · LISTED · OFFERED · TOTAL. Listed rendered struck-through when it
+  // differs from offered. Grade chip colored A=green / B=orange / C=gray
+  // (matches QuotePDF.jsx convention).
+  const lines = cities.map((c, i) => ({
+    sr:           i + 1,
+    cityName:     c.city_name || c.name || `Line ${i + 1}`,
+    station:      c.station || c.media_type || '',
+    grade:        c.grade || '',
+    screens:      Number(c.screens || 0),
+    sizeInch:     c.screen_size_inch ? `${c.screen_size_inch}"` : '',
+    slotSec:      Number(c.slot_seconds) || 10,
+    slotsPerDay:  Number(c.slots_per_day) || 100,
+    durationMo:   Number(c.duration_months) || Number(quote?.duration_months) || 1,
+    listedRate:   Number(c.listed_rate)  || 0,
+    offeredRate:  Number(c.offered_rate) || 0,
+    campaignTotal: Number(c.campaign_total) || (Number(c.offered_rate || 0) * Number(c.screens || 0) * (Number(c.duration_months) || 1)),
+  }))
+  const totalScreens = lines.reduce((s, l) => s + l.screens, 0)
+  const repName = quote?.sales_person_name || 'Sales Executive'
+  const campaignDurationLabel = `${quote?.duration_months || 1} Month${(quote?.duration_months || 1) !== 1 ? 's' : ''}`
 
   return (
     <div style={styles.page}>
@@ -205,7 +217,7 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
       </div>
 
       <div style={styles.body}>
-        <div style={styles.sectionTitle}>Bill To</div>
+        <div style={styles.sectionTitle}>Client Details</div>
         <div style={styles.clientGrid}>
           <div style={styles.clientCell}>
             <div style={styles.clientLabel}>Client</div>
@@ -225,30 +237,96 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
           </div>
         </div>
 
-        <div style={styles.sectionTitle}>Line Items</div>
+        {/* Campaign meta strip — mirrors on-screen detail (Duration /
+            Type / Prepared by / Locations / Total Screens). */}
+        <div style={styles.sectionTitle}>Campaign Details</div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: 14,
+          padding: '10px 14px',
+          background: SOFT,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 8,
+          marginBottom: 16,
+        }}>
+          <div>
+            <div style={styles.clientLabel}>Duration</div>
+            <div style={styles.clientValue}>{campaignDurationLabel}</div>
+          </div>
+          <div>
+            <div style={styles.clientLabel}>Type</div>
+            <div style={styles.clientValue}>{quote?.client_type || 'New Client'}</div>
+          </div>
+          <div>
+            <div style={styles.clientLabel}>Prepared by</div>
+            <div style={styles.clientValue}>{repName}</div>
+          </div>
+          <div>
+            <div style={styles.clientLabel}>Locations</div>
+            <div style={styles.clientValue}>{lines.length} City{lines.length !== 1 ? 's' : ''}</div>
+          </div>
+          <div>
+            <div style={styles.clientLabel}>Screens</div>
+            <div style={styles.clientValue}>{totalScreens}</div>
+          </div>
+        </div>
+
+        <div style={styles.sectionTitle}>Location Breakdown</div>
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={{ ...styles.th, width: 32 }}>#</th>
-              <th style={styles.th}>Description</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 60 }}>Qty</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 90 }}>Rate</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 110 }}>Amount</th>
+              <th style={{ ...styles.th, width: 28 }}>SR</th>
+              <th style={styles.th}>City</th>
+              <th style={{ ...styles.th, textAlign: 'center', width: 50 }}>Grade</th>
+              <th style={{ ...styles.th, ...styles.tdNum, width: 58 }}>Screens</th>
+              <th style={{ ...styles.th, ...styles.tdNum, width: 60 }}>Duration</th>
+              <th style={{ ...styles.th, ...styles.tdNum, width: 50 }}>Slot</th>
+              <th style={{ ...styles.th, ...styles.tdNum, width: 70 }}>Slots/Day</th>
+              <th style={{ ...styles.th, ...styles.tdNum, width: 90 }}>Listed</th>
+              <th style={{ ...styles.th, ...styles.tdNum, width: 90 }}>Offered</th>
+              <th style={{ ...styles.th, ...styles.tdNum, width: 110 }}>Total</th>
             </tr>
           </thead>
           <tbody>
-            {lines.map((l, i) => (
-              <tr key={i}>
-                <td style={styles.td}>{i + 1}</td>
-                <td style={styles.td}>
-                  <div style={{ fontWeight: 600 }}>{l.desc}</div>
-                  {l.meta && <div style={{ color: MUTED, fontSize: 9 }}>{l.meta}</div>}
-                </td>
-                <td style={{ ...styles.td, ...styles.tdNum }}>{l.qty}</td>
-                <td style={{ ...styles.td, ...styles.tdNum }}>{formatCurrency(l.rate)}</td>
-                <td style={{ ...styles.td, ...styles.tdNum }}>{formatCurrency(l.amount)}</td>
-              </tr>
-            ))}
+            {lines.map((l) => {
+              const gradeBg = l.grade === 'A' ? '#DCFCE7' : l.grade === 'B' ? '#FFEDD5' : '#F1F5F9'
+              const gradeFg = l.grade === 'A' ? '#166534' : l.grade === 'B' ? '#B45309' : '#475569'
+              const showListedStruck = l.listedRate && l.listedRate !== l.offeredRate
+              return (
+                <tr key={l.sr}>
+                  <td style={{ ...styles.td, color: MUTED }}>{l.sr}</td>
+                  <td style={styles.td}>
+                    <div style={{ fontWeight: 600 }}>{l.cityName}</div>
+                    {l.station && <div style={{ color: MUTED, fontSize: 9 }}>{l.station}</div>}
+                  </td>
+                  <td style={{ ...styles.td, textAlign: 'center' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 7px',
+                      background: gradeBg,
+                      color: gradeFg,
+                      borderRadius: 8,
+                      fontWeight: 700,
+                      fontSize: 9,
+                    }}>{l.grade || '—'}</span>
+                  </td>
+                  <td style={{ ...styles.td, ...styles.tdNum }}>{l.screens}</td>
+                  <td style={{ ...styles.td, ...styles.tdNum }}>{l.durationMo}mo</td>
+                  <td style={{ ...styles.td, ...styles.tdNum }}>{l.slotSec}s</td>
+                  <td style={{ ...styles.td, ...styles.tdNum }}>{l.slotsPerDay}</td>
+                  <td style={{ ...styles.td, ...styles.tdNum }}>
+                    {showListedStruck
+                      ? <span style={{ color: MUTED, textDecoration: 'line-through' }}>{formatCurrency(l.listedRate)}</span>
+                      : '—'}
+                  </td>
+                  <td style={{ ...styles.td, ...styles.tdNum, color: '#16a34a', fontWeight: 700 }}>
+                    {formatCurrency(l.offeredRate)}
+                  </td>
+                  <td style={{ ...styles.td, ...styles.tdNum, fontWeight: 700 }}>{formatCurrency(l.campaignTotal)}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
 
@@ -257,10 +335,17 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
             <span style={styles.sumLabel}>Subtotal</span>
             <span style={styles.sumValue}>{formatCurrency(subtotal)}</span>
           </div>
-          <div style={styles.sumRow}>
-            <span style={styles.sumLabel}>GST ({Math.round(gstRate * 100)}%)</span>
-            <span style={styles.sumValue}>{formatCurrency(gstAmount)}</span>
-          </div>
+          {gstRate > 0 ? (
+            <div style={styles.sumRow}>
+              <span style={styles.sumLabel}>GST ({Math.round(gstRate * 100)}%)</span>
+              <span style={styles.sumValue}>{formatCurrency(gstAmount)}</span>
+            </div>
+          ) : (
+            <div style={styles.sumRow}>
+              <span style={styles.sumLabel}>No GST</span>
+              <span style={styles.sumValue}>—</span>
+            </div>
+          )}
           <div style={styles.grandRow}>
             <span>Grand Total</span>
             <span>{formatCurrency(totalAmount)}</span>
