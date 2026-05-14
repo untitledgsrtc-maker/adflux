@@ -49,6 +49,8 @@ import GsrtcStationsV2       from './pages/v2/GsrtcStationsV2'
 import GovtProposalDetailV2  from './pages/v2/GovtProposalDetailV2'
 import GpsTrackV2            from './pages/v2/GpsTrackV2'
 import MasterV2              from './pages/v2/MasterV2'
+// Phase 35 PR 1 — admin-only primitives demo (sign-off gate before PR 2).
+import PrimitivesDemoV2      from './pages/v2/PrimitivesDemoV2'
 
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
@@ -216,6 +218,9 @@ export default function App() {
           <Route path="/admin/ta-payouts"          element={<RequirePrivileged><TaPayoutsAdminV2 /></RequirePrivileged>} />
           {/* Phase 8C — unified Master page (Attachments / Signers / Media / Documents) */}
           <Route path="/master"                    element={<RequirePrivileged><MasterV2 /></RequirePrivileged>} />
+          {/* Phase 35 PR 1 — primitives demo. Page handles role gate
+              internally (Banner "Admin only" for non-privileged). */}
+          <Route path="/primitives-demo"           element={<PrimitivesDemoV2 />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
