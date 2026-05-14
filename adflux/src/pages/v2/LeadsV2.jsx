@@ -753,8 +753,70 @@ export default function LeadsV2() {
                       </div>
                     </div>
                   </td>
-                  <td className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    {l.phone || '—'}
+                  <td
+                    className="mono"
+                    style={{ fontSize: 12, color: 'var(--text-muted)' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {l.phone ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span>{l.phone}</span>
+                        <a
+                          href={`tel:${String(l.phone).replace(/\s/g, '')}`}
+                          title="Call"
+                          onClick={async () => {
+                            // Phase 35Z (14 May 2026) — auto-log on /leads row
+                            // tap, same pattern as /follow-ups + lead detail.
+                            try {
+                              const { data: { user } } = await supabase.auth.getUser()
+                              if (!user?.id) return
+                              supabase.from('lead_activities').insert([{
+                                lead_id: l.id,
+                                activity_type: 'call',
+                                outcome: 'neutral',
+                                notes: `Call from leads list · ${l.name || ''}`.trim(),
+                                created_by: user.id,
+                              }]).then(() => {}, () => {})
+                            } catch { /* ignore */ }
+                          }}
+                          style={{
+                            color: 'var(--accent)',
+                            textDecoration: 'none',
+                            padding: '2px 6px',
+                            borderRadius: 999,
+                            border: '1px solid var(--border)',
+                            fontSize: 11,
+                          }}
+                        >Call</a>
+                        <a
+                          href={`https://wa.me/${String(l.phone).replace(/\D/g, '').replace(/^(\d{10})$/, '91$1')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="WhatsApp"
+                          onClick={async () => {
+                            try {
+                              const { data: { user } } = await supabase.auth.getUser()
+                              if (!user?.id) return
+                              supabase.from('lead_activities').insert([{
+                                lead_id: l.id,
+                                activity_type: 'whatsapp',
+                                outcome: 'neutral',
+                                notes: `WhatsApp from leads list · ${l.name || ''}`.trim(),
+                                created_by: user.id,
+                              }]).then(() => {}, () => {})
+                            } catch { /* ignore */ }
+                          }}
+                          style={{
+                            color: 'var(--success)',
+                            textDecoration: 'none',
+                            padding: '2px 6px',
+                            borderRadius: 999,
+                            border: '1px solid var(--border)',
+                            fontSize: 11,
+                          }}
+                        >WA</a>
+                      </span>
+                    ) : '—'}
                   </td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
