@@ -243,14 +243,25 @@
 }
 .lead-filter-search { flex: 1 1 260px; min-width: 220px; max-width: 320px; }
 .lead-filter-tabs {
-  display: inline-flex;
+  /* Phase 34Z.11 — was inline-flex on a 7-tab row; on a 360 px phone
+     the Lost pill fell past the viewport edge. Allow horizontal
+     scroll inside the pill bar so every tab stays reachable. */
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  max-width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px; padding: 3px;
 }
+.lead-filter-tabs::-webkit-scrollbar { display: none; }
 .lead-filter-tab {
   padding: 5px 12px; border-radius: 999px;
   font-size: 12px; color: var(--text-muted); cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .lead-filter-tab.active { background: var(--surface-3); color: var(--text); }
 [data-theme="day"] .lead-filter-tab.active { background: var(--bg); }

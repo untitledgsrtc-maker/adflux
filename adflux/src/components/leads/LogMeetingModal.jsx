@@ -34,6 +34,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
 import PhotoCapture from './PhotoCapture'
+import CityAutocomplete from './CityAutocomplete'
 import { toastError } from '../v2/Toast'
 import WhatsAppPromptModal from './WhatsAppPromptModal'
 import { findLeadByPhone } from '../../utils/leadDedup'
@@ -486,11 +487,12 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
           </div>
           <div>
             <label className="lead-fld-label">City *</label>
-            <input
-              className="lead-inp"
+            {/* Phase 34Z.11 — typeahead bound to cities master to
+                avoid "Anand" / "Anad" / "Adam" spelling drift. */}
+            <CityAutocomplete
               value={city}
-              onChange={e => setCity(e.target.value)}
-              placeholder="Surat"
+              onChange={v => setCity(v)}
+              placeholder="Type to search — e.g. Vadodara"
               disabled={saving}
             />
           </div>

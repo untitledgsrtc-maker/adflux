@@ -408,15 +408,15 @@ export default function QuotesV2() {
         )}
       </div>
 
-      {/* Totals strip — count, total amount, total outstanding for the
-          currently displayed (filtered) set. Reflects status tab,
-          search, date range, AND rep filter so admin can scope to one
-          rep and read their book at a glance. */}
+      {/* Phase 34Z.11 — totals strip retired. V2Hero above already
+          shows total amount + outstanding + filter scope. Mobile
+          screens clipped the 3-col grid (`₹5,52,24…` truncated, hero
+          duplicated the same number). Single source of truth now. */}
       <div
         className="v2d-totals-strip"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
           gap: 12,
           margin: '0 0 14px',
         }}
@@ -766,17 +766,30 @@ function FollowUpChip({ date, done }) {
        color to the rose accent (used for Outstanding so it reads as
        attention-needed instead of neutral). ─── */
 function TotalCard({ label, value, kind, warn }) {
+  // Phase 34Z.11 — compact format on cards. ₹5,52,240 → ₹5.52L,
+  // ₹1,05,070 → ₹1.05L, ₹62,500 → ₹62.5K. Owner reported the raw
+  // en-IN number overflowed the 3-col grid on phone widths. Lakh/
+  // crore form keeps the precision rep cares about + always fits.
+  function compactMoney(n) {
+    const v = Math.round(Number(n) || 0)
+    if (v >= 10000000) return '₹' + (v / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr'
+    if (v >= 100000)   return '₹' + (v / 100000).toFixed(2).replace(/\.?0+$/, '') + ' L'
+    if (v >= 1000)     return '₹' + (v / 1000).toFixed(1).replace(/\.0$/, '') + 'K'
+    return '₹' + v
+  }
   const display = kind === 'money'
-    ? `₹${new Intl.NumberFormat('en-IN').format(Math.round(Number(value) || 0))}`
+    ? compactMoney(value)
     : (Number(value) || 0).toLocaleString('en-IN')
   return (
     <div
       className="v2d-panel"
       style={{
-        padding: '14px 18px',
+        padding: '12px 14px',
         display: 'flex',
         flexDirection: 'column',
         gap: 4,
+        minWidth: 0,
+        overflow: 'hidden',
       }}
     >
       <div
@@ -786,6 +799,9 @@ function TotalCard({ label, value, kind, warn }) {
           textTransform: 'uppercase',
           fontWeight: 700,
           color: 'var(--v2-ink-2)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
         }}
       >
         {label}
@@ -793,10 +809,13 @@ function TotalCard({ label, value, kind, warn }) {
       <div
         style={{
           fontFamily: 'var(--v2-display)',
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: 700,
           color: warn ? 'var(--v2-amber)' : 'var(--v2-ink-0)',
           lineHeight: 1.1,
+          minWidth: 0,
+          whiteSpace: 'nowrap',
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
         {display}

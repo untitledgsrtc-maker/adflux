@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920,initial-scale=1" />
+<title>Adflux · Sales Module · Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Gujarati:wght@400;500;600&family=Noto+Serif+Gujarati:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sales-styles.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; height: 100%; }
+</style>
+</head>
+<body data-screen-label="Adflux Sales Module · Mobile-first Redesign">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="android-frame.jsx"></script>
+<script type="text/babel" src="sales-mobile.jsx"></script>
+<script type="text/babel" src="sales-rest.jsx"></script>
+<script type="text/babel" src="sales-dashboard.jsx"></script>
+
+<script type="text/babel">
+// Wrappers
+const Phone = ({ children, theme, dark }) => (
+  <div style={{ background: dark ? "#0a0d14" : "#f4f5f8", height: "100%", display: "grid", placeItems: "center" }}>
+    <window.AndroidDevice width={360} height={760} dark={dark}>
+      <div className="sm-root" data-theme={theme} style={{ height: "100%", position: "relative" }}>
+        {children}
+      </div>
+    </window.AndroidDevice>
+  </div>
+);
+
+const Desk = ({ children, theme }) => (
+  <div className="sm-root" data-theme={theme} style={{ background: "var(--bg)", height: "100%", overflowY: "auto" }}>
+    {children}
+  </div>
+);
+
+const App = () => {
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "theme": "day"
+  }/*EDITMODE-END*/;
+  const [t, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+  const theme = t.theme;
+  const dark = theme === "night";
+
+  return (
+    <window.DesignCanvas>
+      <window.DCSection id="dash" title="Sales Dashboard · icon-led" subtitle="The new desktop home — graphic, dense, alive. Day + Night.">
+        <window.DCArtboard id="sales-dashboard" label="Sales Dashboard · desktop" width={1440} height={1900}>
+          <Desk theme={theme}><window.SalesDashboard /></Desk>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="work" title="/work · Today" subtitle="3-state simplified day. One primary action. Always.">
+        <window.DCArtboard id="w-morn" label="1 · Morning · plan + check-in" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.WorkMorning /></Phone>
+        </window.DCArtboard>
+        <window.DCArtboard id="w-active" label="2 · Active · in field" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.WorkActive /></Phone>
+        </window.DCArtboard>
+        <window.DCArtboard id="w-wrap" label="3 · Wrap-up · evening" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.WorkWrap /></Phone>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="leads" title="/leads · Pipeline" subtitle="2-line rows · 3 filter pills · hot dot only when it matters">
+        <window.DCArtboard id="l-list" label="Lead list" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.Leads /></Phone>
+        </window.DCArtboard>
+        <window.DCArtboard id="l-detail" label="Lead detail" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.LeadDetail /></Phone>
+        </window.DCArtboard>
+        <window.DCArtboard id="l-follow" label="Follow-ups" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.FollowUps /></Phone>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="voice" title="/voice · Gujarati-first" subtitle="Speak naturally → AI extracts the rest">
+        <window.DCArtboard id="v-listen" label="1 · Listening · 0:24" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.VoiceListen /></Phone>
+        </window.DCArtboard>
+        <window.DCArtboard id="v-confirm" label="2 · Confirm AI extract" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.VoiceConfirm /></Phone>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="perf" title="/my-performance & quotes mobile" subtitle="Big number · what locks the next slab · clean quote list">
+        <window.DCArtboard id="p-score" label="Performance · score + salary" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.Performance /></Phone>
+        </window.DCArtboard>
+        <window.DCArtboard id="q-list" label="Quotes list" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.QuotesList /></Phone>
+        </window.DCArtboard>
+        <window.DCArtboard id="more" label="More menu · profile" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.MoreMenu /></Phone>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="tc" title="/telecaller · Inside-sales" subtitle="One big phone number. One green button. Aging in plain English.">
+        <window.DCArtboard id="tc-mob" label="Telecaller mobile · next call" width={400} height={820}>
+          <Phone theme={theme} dark={dark}><window.TelecallerMobile /></Phone>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.DCSection id="desk" title="Desktop · the rare 20%" subtitle="Quote detail + wizard · same calm system, more room to breathe">
+        <window.DCArtboard id="q-detail" label="Quote detail · inline sections" width={1200} height={1100}>
+          <Desk theme={theme}><window.QuoteDetail /></Desk>
+        </window.DCArtboard>
+        <window.DCArtboard id="q-wizard" label="Quote wizard · Private LED · step 2" width={1200} height={900}>
+          <Desk theme={theme}><window.QuoteWizard /></Desk>
+        </window.DCArtboard>
+      </window.DCSection>
+
+      <window.TweaksPanel title="Tweaks">
+        <window.TweakSection title="Theme">
+          <window.TweakRadio
+            label="Mode"
+            value={theme}
+            options={[{ value: "day", label: "Day" }, { value: "night", label: "Night" }]}
+            onChange={(v) => setTweak({ theme: v })}
+          />
+        </window.TweakSection>
+      </window.TweaksPanel>
+    </window.DesignCanvas>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>

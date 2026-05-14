@@ -1377,11 +1377,13 @@ function StickyPrimaryCta({
     isBusy  = busy || parsing
     loading = busy || parsing
   } else if (!checkedIn) {
-    label   = busy ? 'Capturing GPS…' : 'Check in'
-    icon    = MapPin
-    handler = doCheckIn
-    isBusy  = busy
-    loading = busy
+    // Phase 34Z.11 — owner reported (14 May 2026) two Check-in
+    // buttons stacked on /work. DayStatusSurface's variant B
+    // already renders a Check-in button right under the late-reason
+    // box; this surface mounts at the bottom of the page and was
+    // duplicating it. Return null so only the contextual button
+    // remains.
+    return null
   } else if (!dayDone) {
     // Falls through to two-button render below.
   } else if (!eveningSent) {

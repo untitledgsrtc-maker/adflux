@@ -64,6 +64,10 @@ export default function LeadsV2() {
   const [cityFilter, setCityFilter]       = useState('all')
   const [industryFilter, setIndustryFilter] = useState('all')   // Phase 19
   const [repFilter, setRepFilter]         = useState('all')
+  // Phase 34Z.11 — date-range filter (owner: "data filter not there").
+  // Filters leads.created_at into [from, to] (both inclusive).
+  const [dateFrom, setDateFrom]           = useState('')
+  const [dateTo,   setDateTo]             = useState('')
 
   /* ─── Bulk select state ─── */
   const [selected, setSelected] = useState(new Set())
@@ -149,6 +153,10 @@ export default function LeadsV2() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
+    // Phase 34Z.11 — date-range filter on lead.created_at (YYYY-MM-DD
+    // slice). Empty string means no bound on that end.
+    const fromIso = dateFrom ? dateFrom : null
+    const toIso   = dateTo   ? dateTo   : null
     return leads.filter(l => {
       if (queueIds && !queueIds.has(l.id)) return false
       if (stagesInGroup && !stagesInGroup.includes(l.stage)) return false
@@ -157,6 +165,11 @@ export default function LeadsV2() {
       if (cityFilter     !== 'all' && l.city     !== cityFilter)     return false
       if (industryFilter !== 'all' && l.industry !== industryFilter) return false
       if (repFilter      !== 'all' && l.assigned?.id !== repFilter)  return false
+      if (fromIso || toIso) {
+        const created = (l.created_at || '').slice(0, 10)
+        if (fromIso && created < fromIso) return false
+        if (toIso   && created > toIso)   return false
+      }
       if (!q) return true
       return (
         (l.name     || '').toLowerCase().includes(q) ||
@@ -166,7 +179,7 @@ export default function LeadsV2() {
         (l.industry || '').toLowerCase().includes(q)
       )
     })
-  }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter])
+  }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, dateFrom, dateTo])
 
   /* ─── Stat strip totals ─── */
   const totals = useMemo(() => {
@@ -258,7 +271,9 @@ export default function LeadsV2() {
     sourceFilter !== 'all' ||
     cityFilter !== 'all' ||
     industryFilter !== 'all' ||
-    repFilter !== 'all'
+    repFilter !== 'all' ||
+    dateFrom ||
+    dateTo
 
   return (
     <div className="lead-root">
@@ -591,6 +606,26 @@ export default function LeadsV2() {
           </select>
         )}
 
+        {/* Phase 34Z.11 — created-date range filter. Owner: "data
+            filter not there". Two native date inputs side-by-side;
+            either bound can be left blank for open-ended range. */}
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={e => setDateFrom(e.target.value)}
+          className="lead-filter-select"
+          style={{ minWidth: 130 }}
+          title="From date (created_at)"
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={e => setDateTo(e.target.value)}
+          className="lead-filter-select"
+          style={{ minWidth: 130 }}
+          title="To date (created_at)"
+        />
+
         {hasActiveFilters && (
           <button
             className="lead-btn lead-btn-sm"
@@ -602,6 +637,8 @@ export default function LeadsV2() {
               setCityFilter('all')
               setIndustryFilter('all')
               setRepFilter('all')
+              setDateFrom('')
+              setDateTo('')
             }}
           >
             <X size={11} />

@@ -20,6 +20,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import PhotoCapture from '../../components/leads/PhotoCapture'
 import VoiceInput   from '../../components/voice/VoiceInput'
+import CityAutocomplete from '../../components/leads/CityAutocomplete'
 import { findLeadByPhone } from '../../utils/leadDedup'
 
 const SOURCES = [
@@ -263,7 +264,16 @@ export default function LeadFormV2() {
             placeholder="98XXXXXXXX or +91 98XXXXXXXX"
           />
           <Field label="Email"          value={form.email}       onChange={v => set('email', v)}       placeholder="name@company.com" type="email" />
-          <Field label="City *"         value={form.city}        onChange={v => set('city', v)}        placeholder="Surat" />
+          {/* Phase 34Z.11 — city typeahead bound to cities master so
+              reps stop creating "Anand" / "Anad" / "Adam" spellings. */}
+          <div>
+            <label className="lead-fld-label">City *</label>
+            <CityAutocomplete
+              value={form.city}
+              onChange={v => set('city', v)}
+              placeholder="Type to search — e.g. Vadodara"
+            />
+          </div>
           <Field label="Website"        value={form.website}     onChange={v => set('website', v)}     placeholder="www.example.com" />
         </div>
       </div>
