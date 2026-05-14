@@ -796,14 +796,14 @@ function DayStatusSurface(props) {
   // Variant C — checked in, day running
   if (checkedIn) {
     const hitTarget = (counters.meetings || 0) >= (targets.meetings || 5)
-    const summary = `${counters.meetings || 0} / ${targets.meetings || 5} meetings`
+    const summary = `${counters.meetings || 0} / ${targets.meetings || 5}`
     return (
       <>
         <V2Hero
           eyebrow={`Today · in progress${session?.check_in_at ? ` · checked in ${formatTime(session.check_in_at)}` : ''}`}
           value={summary}
           label="meetings logged"
-          chip={`${counters.calls || 0} calls · ${counters.new_leads || 0} new leads`}
+          chip={`${counters.calls || 0} call${(counters.calls || 0) === 1 ? '' : 's'} · ${counters.new_leads || 0} new lead${(counters.new_leads || 0) === 1 ? '' : 's'}`}
           right={{
             tone: hitTarget ? 'up' : 'down',
             text: hitTarget ? 'target hit' : `${(targets.meetings || 5) - (counters.meetings || 0)} to go`,

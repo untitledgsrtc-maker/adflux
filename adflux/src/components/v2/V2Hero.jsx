@@ -91,18 +91,20 @@ export default function V2Hero({
           alignItems: 'flex-end',
           justifyContent: 'space-between',
           marginTop: 8,
-          gap: 10,
+          gap: 12,
+          flexWrap: 'wrap',  // chip wraps below value on narrow screens
         }}
       >
-        <div>
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           <div
             style={{
               fontFamily: 'var(--font-display, "Space Grotesk", system-ui, sans-serif)',
               fontWeight: 600,
-              fontSize: 26,
+              fontSize: 28,
               lineHeight: 1.1,
               letterSpacing: '-0.01em',
               color: accent ? 'var(--accent, #FFE600)' : '#fff',
+              whiteSpace: 'nowrap',
             }}
           >
             {value}
@@ -119,7 +121,8 @@ export default function V2Hero({
             textAlign: 'right',
             fontSize: 11,
             color: 'rgba(255,255,255,0.7)',
-            maxWidth: '60%',
+            flex: '0 1 auto',
+            maxWidth: '100%',
           }}
         >
           {chip && (
@@ -128,13 +131,14 @@ export default function V2Hero({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                padding: '3px 9px',
+                padding: '4px 10px',
                 borderRadius: 999,
                 background: 'rgba(255,255,255,0.10)',
                 border: '1px solid rgba(255,255,255,0.18)',
                 color: '#fff',
                 fontSize: 11,
                 fontWeight: 500,
+                whiteSpace: 'nowrap',
               }}
             >
               <YellowDot />
