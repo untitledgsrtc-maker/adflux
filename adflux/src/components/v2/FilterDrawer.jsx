@@ -33,15 +33,35 @@ import { SlidersHorizontal, X } from 'lucide-react'
 
 export default function FilterDrawer({ fields = [] }) {
   const [open, setOpen] = useState(false)
+  const [popPos, setPopPos] = useState({ top: 0, right: 12 })
   const wrapRef = useRef(null)
+  const popRef  = useRef(null)
 
   useEffect(() => {
     function down(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+      if (
+        wrapRef.current && !wrapRef.current.contains(e.target) &&
+        popRef.current && !popRef.current.contains(e.target)
+      ) {
+        setOpen(false)
+      }
     }
     document.addEventListener('mousedown', down)
     return () => document.removeEventListener('mousedown', down)
   }, [])
+
+  // Phase 34Z.15 — popover uses viewport-fixed positioning so it never
+  // clips off the left edge on mobile (owner reported it on a 393px
+  // screen: gear button was mid-row, absolute right:0 pushed the
+  // popover 280px LEFT and the start of the panel landed at x ≈ -80).
+  // Computed on open from the gear's bounding rect: drop directly
+  // below the button + clamp right edge inside the viewport.
+  useEffect(() => {
+    if (!open || !wrapRef.current) return
+    const r = wrapRef.current.getBoundingClientRect()
+    const right = Math.max(12, window.innerWidth - r.right)
+    setPopPos({ top: r.bottom + 6, right })
+  }, [open])
 
   const activeCount = fields.filter((f) => f.value !== f.defaultValue).length
 
@@ -95,17 +115,20 @@ export default function FilterDrawer({ fields = [] }) {
 
       {open && (
         <div
+          ref={popRef}
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            right: 0,
-            zIndex: 50,
-            minWidth: 280,
+            position: 'fixed',
+            top: popPos.top,
+            right: popPos.right,
+            zIndex: 100,
+            width: 'min(320px, calc(100vw - 24px))',
             background: 'var(--surface)',
             border: '1px solid var(--border-strong, var(--border))',
             borderRadius: 14,
             boxShadow: '0 12px 40px rgba(0,0,0,0.40)',
             padding: 14,
+            maxHeight: 'calc(100vh - 120px)',
+            overflowY: 'auto',
           }}
         >
           <div

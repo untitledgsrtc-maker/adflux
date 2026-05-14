@@ -391,7 +391,15 @@ export default function LeadDetailV2() {
   /* ─── Convert lead → quote (prefill wizard) ─── */
   function convertToQuote() {
     if (!lead) return
-    navigate(lead.segment === 'GOVERNMENT' ? '/quotes/new/government' : '/quotes/new/private', {
+    // Phase 34Z.15 — route to the master chooser (/quotes/new) so the
+    // rep picks LED Cities vs Other Media (Private) or Auto Hood vs
+    // GSRTC LED (Govt). Was deep-linking past the chooser straight
+    // into the LED wizard for Private leads, so reps could never reach
+    // Other Media from a lead. Owner directive (14 May 2026): "when we
+    // create quote from lead its not asking for which segment quote
+    // you wanna create." The chooser forwards location.state to
+    // whichever tile the rep picks.
+    navigate('/quotes/new', {
       state: {
         prefill: {
           client_name:    lead.name,
@@ -401,6 +409,7 @@ export default function LeadDetailV2() {
           client_address: '',
           client_notes:   lead.notes || '',
           lead_id:        lead.id,
+          segment:        lead.segment,
         },
       },
     })

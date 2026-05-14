@@ -106,16 +106,36 @@ export default function DateRangeFilter({ value, onChange }) {
   const [open, setOpen] = useState(false)
   const [customFrom, setCustomFrom] = useState(value?.from || '')
   const [customTo,   setCustomTo]   = useState(value?.to   || '')
+  const [popPos, setPopPos] = useState({ top: 0, left: 12 })
   const wrapRef = useRef(null)
+  const popRef  = useRef(null)
 
   // Close on outside-click.
   useEffect(() => {
     function down(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+      if (
+        wrapRef.current && !wrapRef.current.contains(e.target) &&
+        popRef.current && !popRef.current.contains(e.target)
+      ) {
+        setOpen(false)
+      }
     }
     document.addEventListener('mousedown', down)
     return () => document.removeEventListener('mousedown', down)
   }, [])
+
+  // Phase 34Z.15 — viewport-fixed positioning so the popover doesn't
+  // clip off either edge on narrow phones. Clamp to viewport.
+  useEffect(() => {
+    if (!open || !wrapRef.current) return
+    const r = wrapRef.current.getBoundingClientRect()
+    const popWidth = 340
+    let left = r.left
+    if (left + popWidth > window.innerWidth - 12) {
+      left = Math.max(12, window.innerWidth - popWidth - 12)
+    }
+    setPopPos({ top: r.bottom + 6, left })
+  }, [open])
 
   // Keep custom inputs in sync when parent changes value externally.
   useEffect(() => {
@@ -256,17 +276,20 @@ export default function DateRangeFilter({ value, onChange }) {
       {/* Popover */}
       {open && (
         <div
+          ref={popRef}
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: 0,
-            zIndex: 50,
-            minWidth: 320,
+            position: 'fixed',
+            top: popPos.top,
+            left: popPos.left,
+            zIndex: 100,
+            width: 'min(340px, calc(100vw - 24px))',
             background: 'var(--surface)',
             border: '1px solid var(--border-strong, var(--border))',
             borderRadius: 14,
             boxShadow: '0 12px 40px rgba(0,0,0,0.40)',
             padding: 14,
+            maxHeight: 'calc(100vh - 120px)',
+            overflowY: 'auto',
           }}
         >
           <div
