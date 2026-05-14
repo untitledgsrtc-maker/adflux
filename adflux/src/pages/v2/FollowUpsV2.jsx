@@ -564,7 +564,7 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, busy, navigate }) {
             <span style={{
               marginLeft: 8, fontSize: 10, fontWeight: 600,
               color: 'var(--accent-fg)', background: 'var(--accent)',
-              padding: '2px 6px', borderRadius: 4,
+              padding: '2px 6px', borderRadius: 6,
             }}>
               AUTO
             </span>

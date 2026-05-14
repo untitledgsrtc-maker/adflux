@@ -487,7 +487,7 @@ export default function QuotesV2() {
                       {q.segment === 'GOVERNMENT' && (
                         <span style={{
                           marginLeft: 6, padding: '1px 7px', borderRadius: 999,
-                          background: 'rgba(100,181,246,.15)', color: '#64b5f6',
+                          background: 'var(--blue-soft, rgba(59,130,246,0.12))', color: 'var(--blue, #3B82F6)',
                           fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
                           textTransform: 'uppercase',
                         }}>Govt</span>
@@ -583,7 +583,7 @@ export default function QuotesV2() {
                       {q.segment === 'GOVERNMENT' && (
                         <span style={{
                           marginLeft: 6, padding: '1px 7px', borderRadius: 999,
-                          background: 'rgba(100,181,246,.15)', color: '#64b5f6',
+                          background: 'var(--blue-soft, rgba(59,130,246,0.12))', color: 'var(--blue, #3B82F6)',
                           fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
                           textTransform: 'uppercase',
                         }}>Govt</span>

@@ -532,7 +532,7 @@ export default function LeadsV2() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '6px 12px', marginBottom: 10,
-            background: 'rgba(255,230,0,0.08)',
+            background: 'var(--accent-soft, rgba(255,230,0,0.14))',
             border: '1px solid var(--accent, #FFE600)',
             borderRadius: 999, fontSize: 12,
             width: 'fit-content',

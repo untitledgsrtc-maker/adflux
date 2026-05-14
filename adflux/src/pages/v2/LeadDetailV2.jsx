@@ -1547,7 +1547,7 @@ function InlineField({
         whiteSpace: multiline ? 'pre-line' : 'normal',
         padding: '2px 4px',
         margin: '-2px -4px',
-        borderRadius: 4,
+        borderRadius: 6,
         color: val ? 'var(--text)' : 'var(--text-subtle)',
         minHeight: multiline ? 36 : 'auto',
       }}

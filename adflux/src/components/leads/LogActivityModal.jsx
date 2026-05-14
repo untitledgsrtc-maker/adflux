@@ -42,6 +42,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
+import { toastError } from '../v2/Toast'
 
 const TYPE_META = {
   call:        { label: 'Call',        Icon: Phone,         showOutcome: true,  showDuration: true,
@@ -238,17 +239,29 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
     }
 
     // Phase 30G — optional: advance lead stage on positive-on-new.
+    // Phase 34Z.29 — both writes used to be fire-and-forget; if the
+    // UPDATE or the activity INSERT failed the rep still saw "saved"
+    // and the stage transition vanished silently. Now captures both
+    // errors and toasts. The primary activity already inserted above,
+    // so we don't unwind it — just surface the auto-advance failure.
     if (alsoAdvanceStage && stageSuggestion) {
-      await supabase
+      const { error: stageErr } = await supabase
         .from('leads')
         .update({ stage: 'Working', qualified_at: lead.qualified_at || new Date().toISOString() })
         .eq('id', lead.id)
-      await supabase.from('lead_activities').insert([{
-        lead_id:       lead.id,
-        activity_type: 'status_change',
-        notes:         'Stage → Working (auto-advanced from positive call)',
-        created_by:    profile.id,
-      }])
+      if (stageErr) {
+        toastError(stageErr, 'Activity saved, but auto-advance to Working failed. Open the lead and flip the stage manually.')
+      } else {
+        const { error: histErr } = await supabase.from('lead_activities').insert([{
+          lead_id:       lead.id,
+          activity_type: 'status_change',
+          notes:         'Stage → Working (auto-advanced from positive call)',
+          created_by:    profile.id,
+        }])
+        if (histErr) {
+          toastError(histErr, 'Stage moved to Working, but timeline note failed.')
+        }
+      }
     }
 
     setSaving(false)
