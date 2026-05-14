@@ -651,7 +651,11 @@ export default function WorkV2() {
           doCheckIn={doCheckIn}
           submitEvening={submitEvening}
           onOpenMeeting={() => { setMeetingMode('meeting'); setMeetingModalOpen(true) }}
-          onOpenLead={() => { setMeetingMode('lead'); setMeetingModalOpen(true) }}
+          onOpenLead={() => navigate('/leads/new', {
+            // Phase 34Z.8 — full LeadFormV2 page instead of modal
+            // lead-mode. Owner: "i need this form in every lead created".
+            state: { prefill: { city: profile?.city || '' } },
+          })}
         />
 
         {checkedIn && !dayDone && (
