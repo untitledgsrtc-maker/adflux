@@ -63,8 +63,8 @@ export default function SalesDashboardV2() {
         .eq('created_by', uid)
         .order('created_at', { ascending: false }),
       supabase.from('payments')
-        .select('id, amount_received, approval_status, rejection_reason, created_at, recorded_by, quote_id')
-        .eq('recorded_by', uid),
+        .select('id, amount_received, approval_status, rejection_reason, created_at, received_by, quote_id')
+        .eq('received_by', uid),
       supabase.from('follow_ups')
         .select('id')
         .eq('assigned_to', uid)
@@ -189,9 +189,9 @@ export default function SalesDashboardV2() {
     // Pull approved payments BY QUOTE_ID up front — both the forecast
     // calc (won-unsettled inclusion) and the outstanding KPI need to
     // know which quotes have a final payment cleared. We query by
-    // quote_id (not recorded_by) because admin can record payments
+    // quote_id (not received_by) because admin can record payments
     // against a rep's quote too — using the payments slice from above
-    // (.eq('recorded_by', uid)) would miss those and double-count
+    // (.eq('received_by', uid)) would miss those and double-count
     // forecast / inflate outstanding.
     const myQuoteIds = quotes.filter(q => q.status !== 'lost').map(q => q.id)
     let approvedPayments = []

@@ -364,7 +364,11 @@ export default function WorkV2() {
     // geolocation every five to ten minutes... I want it perfect."
     function handleVisible() {
       if (document.visibilityState === 'visible') {
-        pingOnce('resume')
+        // Phase 34Z.10 — gps_pings.source CHECK enum only allows
+        // ('checkin','interval','checkout','manual'). 'resume' 400s.
+        // Use 'interval' since a visibility-resume ping is the same
+        // semantic as the regular 5-min auto-ping.
+        pingOnce('interval')
       }
     }
     document.addEventListener('visibilitychange', handleVisible)

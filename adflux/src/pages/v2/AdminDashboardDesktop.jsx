@@ -118,14 +118,14 @@ export default function AdminDashboardDesktop() {
       // and let JS pick what's needed.
       supabase.from('quotes').select('*'),
       supabase.from('payments')
-        .select('id, quote_id, amount_received, is_final_payment, approval_status, rejection_reason, payment_date, created_at, recorded_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
+        .select('id, quote_id, amount_received, is_final_payment, approval_status, rejection_reason, payment_date, created_at, received_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
         .order('created_at', { ascending: false })
         .limit(40),
       supabase.from('payments')
         .select('quote_id, amount_received, payment_date, is_final_payment')
         .eq('approval_status', 'approved'),
       supabase.from('payments')
-        .select('id, quote_id, amount_received, created_at, recorded_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
+        .select('id, quote_id, amount_received, created_at, received_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false }),
       supabase.from('staff_incentive_profiles').select('*, users(name)').eq('is_active', true),
@@ -142,7 +142,7 @@ export default function AdminDashboardDesktop() {
         .select('user_id, min_quotes, min_followups, min_calls')
         .is('effective_to', null),
       // M1 — follow-ups completed today across the whole team.
-      // recorded_by isn't on follow_ups; we use assigned_to + is_done
+      // received_by isn't on follow_ups; we use assigned_to + is_done
       // + completed_at-on-today to count completions per user.
       supabase.from('follow_ups')
         .select('id, assigned_to, completed_at')
@@ -650,7 +650,7 @@ export default function AdminDashboardDesktop() {
         q.created_by === u.id && (q.created_at || '').slice(0, 10) === todayDate
       ).length
       const paymentsTodayCount = paymentsAll.filter(p =>
-        p.recorded_by === u.id && (p.created_at || '').slice(0, 10) === todayDate
+        p.received_by === u.id && (p.created_at || '').slice(0, 10) === todayDate
       ).length
       const followupsDone = followupCountByUser[u.id] || 0
       const stale = allQuotes.filter(q =>

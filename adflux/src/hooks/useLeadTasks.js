@@ -95,8 +95,14 @@ export function useLeadTasks({ userId } = {}) {
   }, [fetchTasks])
 
   const generate = useCallback(async () => {
+    // Phase 34Z.10 — Phase 33T renamed the RPC arg from no-arg to
+    // (p_user_id uuid). Calls without it 400 in production. Pass the
+    // current user's id; RLS is SECURITY DEFINER inside the function.
+    if (!userId) return { error: new Error('No user id') }
     setGenerating(true)
-    const { data, error: err } = await supabase.rpc('generate_lead_tasks')
+    const { data, error: err } = await supabase.rpc('generate_lead_tasks', {
+      p_user_id: userId,
+    })
     setGenerating(false)
     if (err) {
       console.error('[useLeadTasks] generate failed:', err)
@@ -104,7 +110,7 @@ export function useLeadTasks({ userId } = {}) {
     }
     await fetchTasks()
     return { data }   // integer = how many new rows inserted
-  }, [fetchTasks])
+  }, [fetchTasks, userId])
 
   const complete = useCallback(async (taskId) => {
     const { error: err } = await supabase.rpc('complete_lead_task', {

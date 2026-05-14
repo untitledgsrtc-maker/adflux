@@ -40,7 +40,7 @@ export default function NotificationPanel() {
         // confirmed; CLAUDE.md §4 ref formats are stored in
         // quote_number directly). Selecting it broke the whole
         // payments query with HTTP 400. Dropped.
-        .select('id, quote_id, amount_received, recorded_by, created_at, quotes(quote_number, client_company, client_name)')
+        .select('id, quote_id, amount_received, received_by, created_at, quotes(quote_number, client_company, client_name)')
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false })
         .limit(15),

@@ -104,23 +104,33 @@ export async function subscribeForPush(userId) {
     }
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
     const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': 'Bearer ' + at,
-        'Prefer': 'return=minimal,resolution=merge-duplicates',
+    // Phase 34Z.10 — PostgREST upsert needs `on_conflict` to target
+    // the right unique constraint. Without it `resolution=merge-
+    // duplicates` falls back to PK conflict only, so re-subscribing
+    // the same endpoint after a token refresh 409s. The endpoint
+    // column has a UNIQUE constraint (push_subscriptions_endpoint_key);
+    // targeting it lets the row UPDATE in place — refreshes user_id +
+    // last_seen_at without churning the row id.
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/push_subscriptions?on_conflict=endpoint`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': 'Bearer ' + at,
+          'Prefer': 'return=minimal,resolution=merge-duplicates',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          endpoint: sub.endpoint,
+          p256dh: json.keys?.p256dh,
+          auth:   json.keys?.auth,
+          user_agent: navigator.userAgent,
+          last_seen_at: new Date().toISOString(),
+        }),
       },
-      body: JSON.stringify({
-        user_id: userId,
-        endpoint: sub.endpoint,
-        p256dh: json.keys?.p256dh,
-        auth:   json.keys?.auth,
-        user_agent: navigator.userAgent,
-        last_seen_at: new Date().toISOString(),
-      }),
-    })
+    )
     if (!resp.ok) {
       console.warn('subscribeForPush insert failed:', resp.status, await resp.text())
     }

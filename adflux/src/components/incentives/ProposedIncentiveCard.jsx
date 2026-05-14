@@ -83,7 +83,7 @@ export default function ProposedIncentiveCard({ compact = false }) {
           { event: '*', schema: 'public', table: 'quotes', filter: `created_by=eq.${profile.id}` },
           () => setRefreshKey(k => k + 1))
       .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'payments', filter: `recorded_by=eq.${profile.id}` },
+          { event: '*', schema: 'public', table: 'payments', filter: `received_by=eq.${profile.id}` },
           () => setRefreshKey(k => k + 1))
       .subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -101,8 +101,8 @@ export default function ProposedIncentiveCard({ compact = false }) {
           .select('id, total_amount, subtotal, status, revenue_type, updated_at, created_at')
           .eq('created_by', uid),
         supabase.from('payments')
-          .select('quote_id, amount_received, approval_status, is_final_payment, recorded_by')
-          .eq('recorded_by', uid),
+          .select('quote_id, amount_received, approval_status, is_final_payment, received_by')
+          .eq('received_by', uid),
         supabase.from('monthly_sales_data')
           .select('*').eq('staff_id', uid).eq('month_year', monthKey).maybeSingle(),
         supabase.from('staff_incentive_profiles')

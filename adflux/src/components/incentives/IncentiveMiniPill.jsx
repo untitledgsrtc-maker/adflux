@@ -49,7 +49,7 @@ export default function IncentiveMiniPill() {
         .select('*').eq('user_id', profile.id).maybeSingle(),
       supabase.from('monthly_sales_data')
         .select('new_client_revenue, renewal_revenue')
-        .eq('user_id', profile.id).eq('month_year', monthYearISO())
+        .eq('staff_id', profile.id).eq('month_year', monthYearISO())
         .maybeSingle(),
     ]).then(([profRes, monthRes]) => {
       if (cancelled) return
