@@ -319,14 +319,23 @@ export default function LeadFormV2() {
           state below. Rep reviews + edits + saves. Photo itself is
           NOT stored (no lead row exists yet); rep can take a follow-
           up photo from the lead detail later to keep it on record. */}
+      {/* Phase 34Z.30 — banner layout rewritten for mobile. The flex:1
+          on the text container squeezed it under PhotoCapture's two
+          buttons on a 393px screen, forcing each word onto its own
+          line ("Have / a / business / card?"). Now the icon+text take
+          the full first row and the Scan/Upload buttons take the second
+          row on phones, side-by-side on desktop. */}
       <div className="lead-card" style={{
         marginBottom: 14,
         padding: '14px 16px',
         background: 'rgba(255,230,0,0.06)',
         border: '1px dashed var(--accent, #FFE600)',
+        display: 'grid',
+        gridTemplateColumns: '1fr',
+        gap: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Camera size={20} style={{ color: 'var(--accent)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Camera size={20} style={{ color: 'var(--accent)', flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
               Have a business card?
@@ -335,6 +344,8 @@ export default function LeadFormV2() {
               Snap or upload a photo — we'll fill the form for you.
             </div>
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <PhotoCapture
             buttonLabel="Scan card"
             onFieldsExtracted={(fields) => {
@@ -353,25 +364,42 @@ export default function LeadFormV2() {
         </div>
       </div>
 
-      {/* Phase 33D.6 — duplicate-phone warning. Fired when rep blurs
-          the Mobile field. Blocks save until rep changes the number
-          or navigates to the existing lead. */}
-      {dupLead && (
-        <div style={{
-          marginBottom: 14, padding: '12px 14px',
-          background: 'var(--danger-soft)', border: '1px solid var(--danger)',
-          borderRadius: 10,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
-        }}>
-          <div style={{ fontSize: 13, color: 'var(--danger)' }}>
-            This number is already in your pipeline as <b>{dupLead.name}</b>
-            {dupLead.company ? ` (${dupLead.company})` : ''} · {dupLead.stage}
+      {/* Phase 33D.6 + 34Z.30 — duplicate-phone warning, two messages.
+          findLeadByPhone returns matches across ALL reps (RPC is
+          SECURITY DEFINER); the message branches on ownership so a
+          rep doesn't see a useless "Open existing" button pointing
+          at a lead RLS won't let them view.
+          • Mine     → message says "your pipeline" + Open existing button.
+          • Someone else's → message says "already in the system on
+            another rep's pipeline" + ask-admin nudge, no Open button. */}
+      {dupLead && (() => {
+        const isMine = dupLead.assigned_to && profile?.id && dupLead.assigned_to === profile.id
+        return (
+          <div style={{
+            marginBottom: 14, padding: '12px 14px',
+            background: 'var(--danger-soft)', border: '1px solid var(--danger)',
+            borderRadius: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+          }}>
+            <div style={{ fontSize: 13, color: 'var(--danger)', flex: 1, minWidth: 200 }}>
+              {isMine ? (
+                <>This number is already in <b>your pipeline</b> as <b>{dupLead.name}</b>
+                  {dupLead.company ? ` (${dupLead.company})` : ''} · {dupLead.stage}.</>
+              ) : (
+                <>This number is already in the system on <b>another rep's pipeline</b>
+                  {' '}({dupLead.name || '—'}{dupLead.company ? ` · ${dupLead.company}` : ''}
+                  {dupLead.stage ? ` · ${dupLead.stage}` : ''}).
+                  Contact admin to reassign or use a different number.</>
+              )}
+            </div>
+            {isMine && (
+              <button className="lead-btn lead-btn-sm" onClick={() => navigate(`/leads/${dupLead.id}`)}>
+                Open existing
+              </button>
+            )}
           </div>
-          <button className="lead-btn lead-btn-sm" onClick={() => navigate(`/leads/${dupLead.id}`)}>
-            Open existing
-          </button>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ─── Identity ─── */}
       <div className="lead-card" style={{ marginBottom: 14 }}>
