@@ -40,6 +40,17 @@ export default function LeadFormV2() {
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
   const isManager    = profile?.team_role === 'sales_manager' || isPrivileged
   const isTelecaller = profile?.team_role === 'telecaller'
+  // Phase 34Z.21 — segment lock-down. Owner reported (14 May 2026)
+  // that a PRIVATE-only rep could still add a Government lead. Rule
+  // (CLAUDE.md §8): segment_access on the user row gates which
+  // segments a sales / telecaller rep may create. ALL = anything;
+  // PRIVATE = only Private; GOVERNMENT = only Govt. Admin / co_owner
+  // / agency / manager always get ALL access regardless of column.
+  const segmentAccess = (isPrivileged || profile?.team_role === 'sales_manager' || profile?.team_role === 'agency')
+    ? 'ALL'
+    : (profile?.segment_access || 'ALL')
+  const canPrivate = segmentAccess === 'ALL' || segmentAccess === 'PRIVATE'
+  const canGovt    = segmentAccess === 'ALL' || segmentAccess === 'GOVERNMENT'
 
   const prefill = location.state?.prefill || {}
   // Phase 34Z.20 — same form, two modes. meetingMode=true is set by
@@ -57,7 +68,11 @@ export default function LeadFormV2() {
     email:          prefill.email       || '',
     city:           prefill.city        || profile?.city || '',
     website:        prefill.website     || '',
-    segment:        prefill.segment     || 'PRIVATE',
+    // Phase 34Z.21 — default to whichever segment this rep CAN create.
+    // Was hard-coded 'PRIVATE' which then let a GOVERNMENT-only rep
+    // tap the disabled "Private" pill before being snapped to Govt.
+    segment:        prefill.segment
+                    || (segmentAccess === 'GOVERNMENT' ? 'GOVERNMENT' : 'PRIVATE'),
     source:         prefill.source      || 'Manual',
     industry:       prefill.industry    || '',
     expected_value: prefill.expected_value || '',
@@ -162,6 +177,15 @@ export default function LeadFormV2() {
     }
     if (!form.segment) {
       setError('Segment is required.')
+      return
+    }
+    // Phase 34Z.21 — refuse mismatched segment even if rep bypassed UI.
+    if (form.segment === 'GOVERNMENT' && !canGovt) {
+      setError('Your profile is not allowed to create Government leads.')
+      return
+    }
+    if (form.segment === 'PRIVATE' && !canPrivate) {
+      setError('Your profile is not allowed to create Private leads.')
       return
     }
     if (meetingMode && !outcome) {
@@ -399,19 +423,31 @@ export default function LeadFormV2() {
           </div>
           <div>
             <label className="lead-fld-label">Segment *</label>
+            {/* Phase 34Z.21 — segment lock-down. Reps without GOVERNMENT
+                access only see Private (and vice-versa). Owner: "He has
+                private only but still he can add in government lead." */}
             <div className="lead-radio-grp">
-              <span
-                className={`opt ${form.segment === 'GOVERNMENT' ? 'on' : ''}`}
-                onClick={() => set('segment', 'GOVERNMENT')}
-              >
-                Government
-              </span>
-              <span
-                className={`opt ${form.segment === 'PRIVATE' ? 'on' : ''}`}
-                onClick={() => set('segment', 'PRIVATE')}
-              >
-                Private
-              </span>
+              {canGovt && (
+                <span
+                  className={`opt ${form.segment === 'GOVERNMENT' ? 'on' : ''}`}
+                  onClick={() => set('segment', 'GOVERNMENT')}
+                >
+                  Government
+                </span>
+              )}
+              {canPrivate && (
+                <span
+                  className={`opt ${form.segment === 'PRIVATE' ? 'on' : ''}`}
+                  onClick={() => set('segment', 'PRIVATE')}
+                >
+                  Private
+                </span>
+              )}
+              {!canGovt && !canPrivate && (
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  No segment access — ask admin to update your profile.
+                </span>
+              )}
             </div>
           </div>
           <Field label="Industry" value={form.industry} onChange={v => set('industry', v)} placeholder="Healthcare, Retail, …" />
