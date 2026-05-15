@@ -33,7 +33,7 @@ import {
   ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
   RefreshCw, Sparkles, FileText as FileTextIcon, Users as UsersIcon,
   AlertTriangle, Clock, Mic, ChevronDown, MoreHorizontal,
-  Trash2, Pencil, ClipboardCheck,
+  Trash2, ClipboardCheck,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -944,13 +944,11 @@ export default function LeadDetailV2() {
               >
                 <Clock size={13} /> <span>Follow-up</span>
               </button>
-              <button
-                className="lead-btn lead-btn-sm"
-                onClick={() => setActiveModal('stage')}
-                title="Change stage"
-              >
-                <RefreshCw size={13} /> <span>Stage</span>
-              </button>
+              {/* Phase 34Z.57 (15 May 2026) — removed the Stage button
+                  from the More drawer. It was a duplicate of the
+                  "CHANGE" chip rendered right next to the stage pill
+                  at the top of the hero. Owner trimmed it out of the
+                  13-button action grid audit. */}
               {/* Phase 34Z.51 — manual "Log outcome" trigger. Owner
                   reported "how can I close it right now" when the
                   auto-popup is missed or dismissed. This re-opens the
@@ -978,23 +976,13 @@ export default function LeadDetailV2() {
                   confirm() loop with a single batch Modal (iOS PWA
                   was suppressing the 2nd+ native dialog ~30% of the
                   time, silently dropping conflicts). */}
-              {/* Phase 34Z.32 — Edit hint. Owner reported "no option
-                  for editing." Inline click-to-edit was always there
-                  (EditableField wraps name / company / phone / email /
-                  city / value / notes) but the affordance was invisible
-                  (cursor:text only). Toasting a clear hint on tap is
-                  the smallest reliable fix; full edit-mode toggle is
-                  a follow-up. */}
-              <button
-                className="lead-btn lead-btn-sm"
-                onClick={() => {
-                  toastSuccess('Tap any field below (Name, Company, Phone, Email, City, Value, Notes) to edit it inline. Changes save automatically.')
-                  setMoreOpen(false)
-                }}
-                title="Edit lead details"
-              >
-                <Pencil size={13} /> <span>Edit</span>
-              </button>
+              {/* Phase 34Z.57 (15 May 2026) — removed the Edit button.
+                  It only fired a toast hint pointing at the inline
+                  EditableField wrappers below; not an actual action.
+                  Owner cut it from the action grid. Inline click-to-
+                  edit on fields (Name / Company / Phone / Email / City
+                  / Value / Notes) is unchanged — rep still taps any
+                  field below and edits it. */}
 
               {/* Phase 34Z.32 — Delete option. Owner: "Salesforce or
                   anyone cannot delete the lead because there is no
