@@ -467,7 +467,7 @@ export default function LeadUploadV2() {
       {/* File pick */}
       {!rows.length && !result && (
         <div className="v2d-panel" style={{ padding: 28, textAlign: 'center' }}>
-          <FileSpreadsheet size={40} style={{ color: 'var(--v2-yellow, #FFE600)', margin: '0 auto 12px' }} />
+          <FileSpreadsheet size={22} style={{ color: 'var(--v2-yellow, #FFE600)', margin: '0 auto 12px' }} />
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Drop file or click to browse</div>
           <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginBottom: 16 }}>
             Accepts .csv files. For .xlsx, save as CSV in Excel first.
@@ -604,8 +604,8 @@ export default function LeadUploadV2() {
                                        'rgba(251,191,36,.10)',
                           color: p.isNurture ? '#60a5fa' :
                                  p.stage === 'Lost' ? '#f87171' :
-                                 p.stage === 'Won' ? '#4ade80' :
-                                 '#fbbf24',
+                                 p.stage === 'Won' ? 'var(--success, #10B981)' :
+                                 'var(--warning, #F59E0B)',
                         }}>
                           {p.isNurture ? 'Lost · revisit 90d' : p.stage}{p.lost_reason ? ` · ${p.lost_reason}` : ''}
                         </span>
@@ -655,15 +655,15 @@ export default function LeadUploadV2() {
       {/* Result */}
       {result && (
         <div className="v2d-panel" style={{ padding: 24, textAlign: 'center' }}>
-          <CheckCircle2 size={40} style={{ color: '#4ade80', margin: '0 auto 12px' }} />
+          <CheckCircle2 size={22} style={{ color: 'var(--success, #10B981)', margin: '0 auto 12px' }} />
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Import complete</div>
           <div style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap', margin: '16px 0' }}>
             <div>
-              <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: '#4ade80' }}>{result.imported}</div>
+              <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: 'var(--success, #10B981)' }}>{result.imported}</div>
               <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Imported</div>
             </div>
             <div>
-              <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: '#fbbf24' }}>{result.dupes}</div>
+              <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: 'var(--warning, #F59E0B)' }}>{result.dupes}</div>
               <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Duplicates</div>
             </div>
             <div>

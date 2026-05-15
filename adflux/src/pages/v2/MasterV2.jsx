@@ -860,7 +860,7 @@ function CompaniesTab() {
         padding: 30, textAlign: 'center', color: 'var(--text-muted)',
         border: '1px dashed var(--surface-3)', borderRadius: 12,
       }}>
-        <Building2 size={28} style={{ marginBottom: 8, color: 'var(--text-subtle)' }} />
+        <Building2 size={22} style={{ marginBottom: 8, color: 'var(--text-subtle)' }} />
         <div style={{ fontWeight: 600, color: 'var(--text)' }}>No companies seeded</div>
         <div style={{ fontSize: 13, marginTop: 6 }}>
           Run the Phase 10 SQL migration to seed the two legal entities.
@@ -2418,7 +2418,7 @@ function MediaTypesTab() {
           padding: 30, textAlign: 'center', color: 'var(--text-muted)',
           border: '1px dashed var(--surface-3)', borderRadius: 12,
         }}>
-          <Newspaper size={28} style={{ marginBottom: 8, color: 'var(--text-subtle)' }} />
+          <Newspaper size={22} style={{ marginBottom: 8, color: 'var(--text-subtle)' }} />
           <div style={{ fontWeight: 600, color: 'var(--text)' }}>No media types yet</div>
           <div style={{ fontSize: 13, marginTop: 6 }}>
             Add the first one above. Reps will see it in the Other Media wizard dropdown.

@@ -19,7 +19,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, BarChart3, Users, Building2,
   Repeat, Gift, Settings, LogOut, Search, Bell, Plus, AlertTriangle,
   CheckCircle2, CreditCard, Send, PenLine, ArrowUpRight,
-  Contact2, MapPin, Tv, FileBox,
+  Contact2, MapPin, Tv, FileBox, Zap,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -895,8 +895,9 @@ export default function AdminDashboardDesktop() {
               >
                 <AlertTriangle size={18} style={{ color: '#f97316', flex: '0 0 auto' }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>
-                    ⚡ {state.pending.length} payment{state.pending.length > 1 ? 's' : ''} waiting on approval
+                  <div style={{ fontWeight: 600, fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Zap size={14} strokeWidth={1.6} />
+                    {state.pending.length} payment{state.pending.length > 1 ? 's' : ''} waiting on approval
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.6))' }}>
                     Approve to credit the sales team.
@@ -1769,7 +1770,7 @@ function ActivityPanel({ items, onOpen }) {
       draft:       'Quote drafted',
       sent:        'Quote sent to client',
       negotiating: 'Quote under negotiation',
-      won:         'Quote marked Won 🎉',
+      won:         'Quote marked Won',
       lost:        'Quote marked Lost',
     }
     return map[item.status] || `Status: ${item.status}`

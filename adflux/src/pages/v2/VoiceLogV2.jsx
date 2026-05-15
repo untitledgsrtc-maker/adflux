@@ -569,7 +569,7 @@ function PickScreen({ leads, leadId, setLeadId, langHint, setLangHint, onBack, o
           onClick={onStart}
           aria-label="Start recording"
         >
-          <Mic size={36} />
+          <Mic size={22} />
         </button>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
           Tap to start. Up to {MAX_SECONDS}s. Speak naturally.
@@ -600,7 +600,7 @@ function ListeningScreen({ leadName, langLabel, seconds, onStop }) {
           onClick={onStop}
           aria-label="Stop recording"
         >
-          <Square size={32} />
+          <Square size={22} />
         </button>
         <div className="wave-big">
           {Array.from({ length: 20 }).map((_, i) => <span key={i} />)}
@@ -629,7 +629,7 @@ function ListeningScreen({ leadName, langLabel, seconds, onStop }) {
 function SendingScreen() {
   return (
     <div className="voice-card" style={{ textAlign: 'center', padding: 36 }}>
-      <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--purple)' }} />
+      <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--purple)' }} />
       <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 14 }}>
         Transcribing and classifying…
       </div>
@@ -818,7 +818,7 @@ function DoneScreen({ leadId, onView, onAnother }) {
   return (
     <>
       <div className="voice-card" style={{ textAlign: 'center', padding: 28 }}>
-        <CheckCircle2 size={36} style={{ color: 'var(--success)' }} />
+        <CheckCircle2 size={22} style={{ color: 'var(--success)' }} />
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, marginTop: 10 }}>
           Saved
         </div>
@@ -840,7 +840,7 @@ function DoneScreen({ leadId, onView, onAnother }) {
 function ErrorScreen({ error, onRetry }) {
   return (
     <div className="voice-card" style={{ textAlign: 'center', padding: 28 }}>
-      <AlertTriangle size={32} style={{ color: 'var(--danger)' }} />
+      <AlertTriangle size={22} style={{ color: 'var(--danger)' }} />
       <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 10, lineHeight: 1.5 }}>
         {error}
       </div>

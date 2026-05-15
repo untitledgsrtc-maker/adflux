@@ -49,10 +49,16 @@ function parseCallIntent(rawText) {
       || /हाँ\b|हां\b|पसंद|दिलचस्पी|खरीद/.test(text)) {
     out.outcome = 'positive'
   }
-  // Negative — not interested, refused, lost
-  if (/\b(not interested|no interest|lost|refused?|reject(ed)?|na nahi|nahi(\s|$)|nahi chahiye|no chance|dropped?|cancel(led)?)\b/.test(text)
-      || /રસ નથી|ના\s?પાડી|ખરીદવુ?\s?નથી|રિજેક્ટ/.test(text)
-      || /नहीं चाहिए|नहीं\s?चाहिए|दिलचस्पी नहीं|मना/.test(text)) {
+  // Negative — not interested, refused, lost.
+  // Phase 34Z.69 — broadened negation match. The earlier `\bnahi(\s|$)\b`
+  // word-boundary rejected "nahi chahiye", "nahi nakhari", "nahi
+  // interested" because Whisper sometimes emits them as one token or
+  // glues a non-word char between them. Drop the trailing boundary —
+  // any character after `nahi` is allowed; we just need to spot the
+  // negation root in the utterance.
+  if (/\b(not interested|no interest|lost|refused?|reject(ed)?|na nahi|nahi|na\s?nahi|nahi(\s|$)?(chahiye|nakhari|interested|kharido|levanu)?|no chance|dropped?|cancel(led)?)\b/.test(text)
+      || /રસ નથી|ના\s?પાડી|ખરીદવુ?\s?નથી|રિજેક્ટ|નથી\s?જોઈતું|નથી\s?લેવુ/.test(text)
+      || /नहीं चाहिए|नहीं\s?चाहिए|दिलचस्पी नहीं|मना|नहीं\s?लेना/.test(text)) {
     out.outcome = 'negative'
   }
   // Neutral — maybe, think, callback later
@@ -115,6 +121,12 @@ function parseCallIntent(rawText) {
       if (!morningHint && hour >= 1 && hour <= 7) hour += 12
     }
   }
+  // Phase 34Z.69 — clamp out-of-range hours. Whisper occasionally
+  // mis-transcribes "5" as "25", or matches the wrong digit group.
+  // follow_ups.follow_up_time is a Postgres `time` column and rejects
+  // hours >= 24 on insert. Drop the value rather than poison the row.
+  if (hour !== null && (hour < 0 || hour > 23)) hour = null
+  if (minute < 0 || minute > 59) minute = 0
   if (hour !== null) {
     const hh = String(hour).padStart(2, '0')
     const mm = String(minute).padStart(2, '0')

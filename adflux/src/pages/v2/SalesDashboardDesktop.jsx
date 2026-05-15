@@ -14,7 +14,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, BarChart3, Gift, Repeat, LogOut,
   Search, Bell, Plus, Flame, ArrowUpRight, Phone, AlertTriangle,
-  Contact2,
+  Contact2, Trophy, Zap,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -520,7 +520,9 @@ export default function SalesDashboardDesktop() {
             {/* Incentive Hero */}
             <section className="v2d-hero v2d-hero--incentive">
               <div className="v2d-hero-head">
-                <div className="v2d-hero-kicker">⚡ Proposed Incentive</div>
+                <div className="v2d-hero-kicker" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Zap size={13} strokeWidth={1.6} /> Proposed Incentive
+                </div>
                 <div className="v2d-hero-tabs">
                   <button className={`v2d-hero-tab ${tab === 'forecast' ? 'is-active' : ''}`} onClick={() => setTab('forecast')}>Forecast</button>
                   <button className={`v2d-hero-tab ${tab === 'pending' ? 'is-active' : ''}`} onClick={() => setTab('pending')}>Pending</button>
@@ -689,7 +691,7 @@ function EarnedPanel({ earned }) {
           <div className="v2d-panel-s">Updates the moment payments clear admin approval</div>
         </div>
         <div className={`v2d-badge ${hit ? 'v2d-badge--green' : 'v2d-badge--neutral'}`}>
-          {hit ? '🏆 Target hit' : `${threshPct}% to threshold`}
+          {hit ? <><Trophy size={13} strokeWidth={1.6} /> Target hit</> : `${threshPct}% to threshold`}
         </div>
       </div>
 

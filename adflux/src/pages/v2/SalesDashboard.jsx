@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Flame, Home, FileText, Plus, BarChart3, AlertTriangle, RefreshCw, LogOut } from 'lucide-react'
+import { Bell, Flame, Home, FileText, Plus, BarChart3, AlertTriangle, RefreshCw, LogOut, Trophy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
@@ -450,7 +450,7 @@ function Header({ name, streak, hasAlert, onLogout }) {
       <div className="v2-avatar">{initials(name)}</div>
       <div className="v2-hello">
         <div className="v2-hello-kicker">{greeting()}</div>
-        <div className="v2-hello-name">{firstName} 👋</div>
+        <div className="v2-hello-name">{firstName}</div>
       </div>
       {streak > 0 && (
         <div className="v2-streak">
@@ -512,7 +512,7 @@ function EarnedCard({ earned }) {
       <div className="v2-card-h">
         <div className="v2-card-t">{new Date().toLocaleDateString('en-IN', { month: 'long' })} incentive · Earned</div>
         <div className={`v2-badge ${hit ? 'v2-badge--green' : 'v2-badge--neutral'}`}>
-          {hit ? '🏆 Target hit' : `${threshPct}% to threshold`}
+          {hit ? <><Trophy size={13} strokeWidth={1.6} /> Target hit</> : `${threshPct}% to threshold`}
         </div>
       </div>
       <div className="v2-metric-big"><Money value={earned.incentive} /></div>

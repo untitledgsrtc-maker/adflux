@@ -75,13 +75,27 @@ export default function TodaySummaryCard({ userId, session }) {
   // is_done = true.
   useAutoRefresh(load, { enabled: !!userId })
 
+  // Phase 34Z.69 — fix #11: debounce the realtime callback so
+  // visibilitychange + realtime + focus don't triple-fire load()
+  // within a single tab resume. Single 800ms throttle, same as
+  // useAutoRefresh, sharing a timestamp ref.
+  const lastLoadAt = useRef(0)
   useEffect(() => {
     if (!userId) return
+    function safeLoad() {
+      const now = Date.now()
+      if (now - lastLoadAt.current < 800) return
+      lastLoadAt.current = now
+      load()
+    }
+    // Phase 34Z.69 — fix #18: stronger channel name uniqueness.
+    // userId + Date.now() so concurrent mounts (e.g. multi-tab,
+    // hot reload) never collide on the same channel name.
     const ch = supabase
-      .channel(`today-summary-${userId}-${Math.random().toString(36).slice(2, 8)}`)
+      .channel(`today-summary-${userId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'follow_ups', filter: `assigned_to=eq.${userId}` },
-        () => { load() })
+        safeLoad)
       .subscribe()
     return () => { try { supabase.removeChannel(ch) } catch { /* ignore */ } }
   }, [userId, load])
@@ -179,7 +193,7 @@ export default function TodaySummaryCard({ userId, session }) {
               color: c.tint, fontSize: 11, fontWeight: 600,
               textTransform: 'uppercase', letterSpacing: '.06em',
             }}>
-              <Icon size={12} strokeWidth={1.8} />
+              <Icon size={12} strokeWidth={1.6} />
               <span style={{ color: 'var(--text-muted)' }}>{c.label}</span>
             </div>
             <div style={{

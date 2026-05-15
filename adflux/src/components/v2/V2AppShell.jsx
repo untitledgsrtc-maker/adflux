@@ -34,6 +34,7 @@ import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
 import { ToastViewport } from './Toast'
 import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
+import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -202,6 +203,21 @@ export function V2AppShell() {
       else mql.removeListener(update)
     }
   }, [])
+  // Phase 34Z.69 — fix #4: enroll push subscription on EVERY page
+  // mount, not just /work. Reps who land directly on /leads/:id or
+  // /follow-ups never used to get prompted; now they do. Returns a
+  // status so the UI can decide whether to show the enrollment chip
+  // (fix #15).
+  const [pushStatus, setPushStatus] = useState('unknown')
+  useEffect(() => {
+    if (!profile?.id) return
+    let cancelled = false
+    ensurePushOnLogin(profile.id).then((s) => {
+      if (!cancelled) setPushStatus(s || 'unknown')
+    }).catch(() => { if (!cancelled) setPushStatus('error') })
+    return () => { cancelled = true }
+  }, [profile?.id])
+
   // Phase 1.5 — AI Co-Pilot. Cmd+K (Mac) / Ctrl+K (Win/Linux) opens.
   const [copilotOpen, setCopilotOpen] = useState(false)
   useEffect(() => {
@@ -375,6 +391,30 @@ export function V2AppShell() {
           )}
 
           {!isMobile && <IncentiveMiniPill />}
+
+          {/* Phase 34Z.69 — fix #15: push-enrollment chip. Shown only
+              when the rep hasn't granted permission yet AND the
+              browser supports push. Tap → /push-debug to enable. */}
+          {(pushStatus === 'no-permission' || pushStatus === 'no-subscription') && (
+            <button
+              type="button"
+              onClick={() => navigate('/push-debug')}
+              title="Enable push notifications on this device"
+              style={{
+                background: 'var(--warning-soft, rgba(245,158,11,0.16))',
+                border: '1px solid var(--warning, #F59E0B)',
+                color: 'var(--text)',
+                borderRadius: 999,
+                padding: '4px 10px',
+                fontSize: 11, fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                fontFamily: 'inherit',
+              }}
+            >
+              Enable push
+            </button>
+          )}
 
           <NotificationPanel />
 

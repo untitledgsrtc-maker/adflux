@@ -887,7 +887,7 @@ export default function LeadsV2() {
           </button>
           <select
             className="lead-inp"
-            style={{ height: 32, padding: '0 8px', fontSize: 12, width: 'auto' }}
+            style={{ height: 36, padding: '0 10px', fontSize: 12, width: 'auto' }}
             defaultValue=""
             onChange={async (e) => {
               const stage = e.target.value

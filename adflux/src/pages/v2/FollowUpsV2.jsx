@@ -35,6 +35,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import V2Hero from '../../components/v2/V2Hero'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
+import { toastError } from '../../components/v2/Toast'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 const ADD_DAYS  = (iso, n) => {
@@ -284,24 +285,35 @@ export default function FollowUpsV2() {
     setCallLead(leadObj || { id: leadId, phone, name: rowName(row) })
     // Fire dialer on the gesture, queue activity insert + modal.
     window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
+    // Phase 34Z.69 — fix #5: hardened error path. The earlier
+    // setTimeout body had no .catch so a network blip / RLS deny
+    // left pendingActivityId null forever → modal never opened.
+    // Now: explicit error toast AND fallback open of the modal in
+    // manual-insert mode so the rep can still log the outcome.
     setTimeout(async () => {
-      const { data: actRow, error: insErr } = await supabase
-        .from('lead_activities')
-        .insert([{
-          lead_id:       leadId,
-          activity_type: 'call',
-          outcome:       null,
-          notes:         `Call (follow-up) → ${rowName(row) || ''} · ${phone}`,
-          created_by:    profile?.id,
-        }])
-        .select('id')
-        .single()
-      if (insErr) {
-        setError('Could not log call: ' + insErr.message)
-        return
+      try {
+        const { data: actRow, error: insErr } = await supabase
+          .from('lead_activities')
+          .insert([{
+            lead_id:       leadId,
+            activity_type: 'call',
+            outcome:       null,
+            notes:         `Call (follow-up) → ${rowName(row) || ''} · ${phone}`,
+            created_by:    profile?.id,
+          }])
+          .select('id')
+          .single()
+        if (insErr) throw insErr
+        setPendingActivityId(actRow?.id || null)
+      } catch (err) {
+        // Don't block the outcome modal — open it with no
+        // pendingActivityId so it does a fresh insert on save.
+        setPendingActivityId(null)
+        setError('Call logged in fallback mode: ' + (err?.message || err))
+      } finally {
+        // Always open the modal so the rep can capture the outcome.
+        setTimeout(() => setPostCallOpen(true), 1500)
       }
-      setPendingActivityId(actRow?.id || null)
-      setTimeout(() => setPostCallOpen(true), 1500)
     }, 0)
   }
 
@@ -462,7 +474,7 @@ export default function FollowUpsV2() {
         <div className="lead-card lead-card-pad" style={{ textAlign: 'center', padding: 32 }}>
           <Inbox size={28} strokeWidth={1.6} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
           <div style={{ fontWeight: 600, marginBottom: 4 }}>No follow-ups due</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 320, margin: '0 auto' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 280, margin: '0 auto' }}>
             Either you're caught up or no one's expecting a call this week.
             Send a quote — a follow-up will be auto-scheduled three days later.
           </div>
@@ -559,27 +571,40 @@ export default function FollowUpsV2() {
         open={postCallOpen}
         lead={callLead}
         pendingActivityId={pendingActivityId}
-        onClose={() => { setPostCallOpen(false); setPendingActivityId(null) }}
+        onClose={() => {
+          // Phase 34Z.69 — fix #6: clear callLead too so the next
+          // open never renders stale data.
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+          setCallLead(null)
+        }}
         onSaved={async ({ nextAction }) => {
           setPostCallOpen(false)
           setPendingActivityId(null)
-          load()
+          const lockedLead = callLead  // capture before clearing
+          try { await load() } catch (err) {
+            toastError(err, 'Saved, but list refresh failed.')
+          }
           if (nextAction === 'meeting') {
-            if (callLead?.id) navigate(`/leads/${callLead.id}`)
+            if (lockedLead?.id) navigate(`/leads/${lockedLead.id}`)
+            setCallLead(null)
             return
           }
-          if (callLead?.id) {
+          if (lockedLead?.id) {
             const { data } = await supabase
-              .from('leads').select('stage').eq('id', callLead.id).maybeSingle()
+              .from('leads').select('stage').eq('id', lockedLead.id).maybeSingle()
             setTimeout(() => {
-              setWaPrompt({ stage: data?.stage || callLead.stage || 'post_call' })
+              setWaPrompt({ stage: data?.stage || lockedLead.stage || 'post_call' })
             }, 200)
           }
+          setCallLead(null)
         }}
         onLogMeeting={() => {
           setPostCallOpen(false)
           setPendingActivityId(null)
-          if (callLead?.id) navigate(`/leads/${callLead.id}`)
+          const lockedLead = callLead
+          setCallLead(null)
+          if (lockedLead?.id) navigate(`/leads/${lockedLead.id}`)
         }}
       />
 

@@ -103,7 +103,7 @@ export default function RenewalToolsV2() {
         <div className="v2d-loading"><div className="v2d-spinner" />Loading…</div>
       ) : quotes.length === 0 ? (
         <div className="v2d-panel v2d-empty-card">
-          <div className="v2d-empty-ic"><Calendar size={32} /></div>
+          <div className="v2d-empty-ic"><Calendar size={22} /></div>
           <div className="v2d-empty-t">Nothing due</div>
           <div className="v2d-empty-s">
             {isAdmin
