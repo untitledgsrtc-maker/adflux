@@ -47,6 +47,7 @@ import ChangeStageModal from '../../components/leads/ChangeStageModal'
 import ReassignModal   from '../../components/leads/ReassignModal'
 import PhotoCapture     from '../../components/leads/PhotoCapture'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
+import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
@@ -144,6 +145,11 @@ export default function LeadDetailV2() {
   // change, or any other touch, open the prompt with the right
   // template. State: { stage: 'post_call'|'New'|... } or null.
   const [waPrompt, setWaPrompt] = useState(null)
+  // Phase 34Z.49 — voice-driven outcome capture between dialer-return
+  // and the WhatsApp prompt. Holds the pending activity row id so we
+  // can patch outcome onto it (instead of inserting a duplicate).
+  const [postCallOpen, setPostCallOpen] = useState(false)
+  const [pendingActivityId, setPendingActivityId] = useState(null)
 
   // Phase 33B.4 — "I'm here" auto-checkin with 10-min dwell. Captures
   // GPS on tap, starts a 10-min timer. If still on this lead page when
@@ -282,24 +288,31 @@ export default function LeadDetailV2() {
      race. Email button restored to the grid with a real mailto: href. */
   async function quickLog(activityType, notes) {
     if (!lead?.id || !profile?.id) return
-    const { error: insErr } = await supabase.from('lead_activities').insert([{
-      lead_id:       lead.id,
-      activity_type: activityType,
-      outcome:       null,
-      notes,
-      created_by:    profile.id,
-    }])
+    // Phase 34Z.49 — capture the inserted row id so the post-call
+    // outcome modal can patch outcome onto the SAME row instead of
+    // inserting a duplicate.
+    const { data: actRow, error: insErr } = await supabase
+      .from('lead_activities')
+      .insert([{
+        lead_id:       lead.id,
+        activity_type: activityType,
+        outcome:       null,
+        notes,
+        created_by:    profile.id,
+      }])
+      .select('id')
+      .single()
     if (insErr) {
-      // Surface the failure so the rep knows the click wasn't logged.
       setError(`Could not log ${activityType}: ${insErr.message}`)
       return
     }
-    // Phase 33D.5 — after a call, prompt the rep to send a
-    // thank-you WhatsApp template. Delayed by 1.5s so the OS
-    // dialer's call screen takes priority first; when the rep
-    // returns to the app the prompt is waiting.
+    // Phase 34Z.49 — replace the WhatsApp pop with a voice-driven
+    // outcome modal. Owner wants the rep to log what happened on the
+    // call BEFORE the WA prompt fires. The modal's onSaved handler
+    // then opens the WA prompt.
     if (activityType === 'call') {
-      setTimeout(() => setWaPrompt({ stage: 'post_call' }), 1500)
+      setPendingActivityId(actRow?.id || null)
+      setTimeout(() => setPostCallOpen(true), 1500)
     }
     load()
   }
@@ -1397,8 +1410,37 @@ export default function LeadDetailV2() {
           onSaved={load}
         />
       )}
-      {/* Phase 33D.5 — post-action WhatsApp prompt. Opens after
-          quick-Call, after stage change, etc. Lead object stays
+      {/* Phase 34Z.49 — voice-driven post-call outcome capture. Owner
+          directive: speak/log outcome FIRST, then WA prompt. Opens
+          1.5s after tel: link fires (handled in quickLog). onSaved
+          chains into the WhatsApp prompt unless rep picked "Log a
+          meeting now" — that path opens LogMeetingModal instead. */}
+      <PostCallOutcomeModal
+        open={postCallOpen}
+        lead={lead}
+        pendingActivityId={pendingActivityId}
+        onClose={() => { setPostCallOpen(false); setPendingActivityId(null) }}
+        onSaved={({ nextAction }) => {
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+          load()
+          // Fire WA prompt next (skip when rep is jumping to a meeting
+          // log — the LogMeetingModal handles its own WA on save).
+          if (nextAction !== 'meeting') {
+            setTimeout(() => setWaPrompt({ stage: 'post_call' }), 200)
+          }
+        }}
+        onLogMeeting={() => {
+          // Future-Claude: wire to LogMeetingModal if owner wants
+          // an inline jump. Today we just close — the rep can tap
+          // the Meeting button in the action grid.
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+        }}
+      />
+
+      {/* Phase 33D.5 — post-action WhatsApp prompt. Opens after the
+          outcome modal saves (Phase 34Z.49 chain). Lead object stays
           current via the load() refetch that precedes it. */}
       <WhatsAppPromptModal
         open={!!waPrompt}
