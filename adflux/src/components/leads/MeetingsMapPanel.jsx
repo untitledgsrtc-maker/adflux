@@ -65,6 +65,24 @@ export default function MeetingsMapPanel({ userId }) {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
   const [leads,   setLeads]   = useState([])           // { id, name, company, lat, lng, address, city }
+  // Phase 34Z.64 — hide the panel entirely until the rep has logged
+  // at least one GPS ping today. Owner audit (15 May 2026): "MeetingsMapPanel
+  // useful for field reps but takes vertical space — hide until first ping."
+  // Null = still checking; 0 = render null; >0 = render card.
+  const [todayPingCount, setTodayPingCount] = useState(null)
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
+    supabase.from('gps_pings')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('captured_at', dayStart.toISOString())
+      .then(({ count }) => {
+        if (!cancelled) setTodayPingCount(count || 0)
+      })
+    return () => { cancelled = true }
+  }, [userId])
   const [needsGeo, setNeedsGeo] = useState([])         // leads we tried to geocode but couldn't
   // Phase 34Z.6 — today's own track (GPS pings since 00:00 local).
   // Drawn as a yellow polyline so the rep sees where they've been.
@@ -415,6 +433,13 @@ export default function MeetingsMapPanel({ userId }) {
       mapRef.current = null
     }
   }, [])
+
+  // Phase 34Z.64 — short-circuit when the rep has 0 pings today.
+  // Avoids the empty "This week on the map · 0 pins" header taking up
+  // a row on a fresh morning before any GPS interval has fired.
+  if (todayPingCount === 0 && !open) {
+    return null
+  }
 
   return (
     <div style={{

@@ -1298,6 +1298,40 @@ function PlanTodayBlock(props) {
 }
 
 function EveningReportBlock({ evening, setEvening, submitEvening, busy, navigate }) {
+  // Phase 34Z.64 — before 17:00 IST the evening summary CTA is noise.
+  // Owner audit: "EveningReportBlock — only relevant at end of day.
+  // Make a <details> that opens after 5 PM IST." When it's still
+  // daytime, collapse to a thin link. Rep can still expand if they're
+  // closing early.
+  const istHour = Number(new Date().toLocaleString('en-IN', {
+    hour: '2-digit', hour12: false, timeZone: 'Asia/Kolkata',
+  }))
+  const isEvening = istHour >= 17
+
+  if (!isEvening) {
+    return (
+      <details className="m-card" style={{ padding: 0, marginTop: 14 }}>
+        <summary style={{
+          padding: '10px 14px', cursor: 'pointer',
+          fontSize: 12, color: 'var(--text-muted)',
+        }}>
+          Evening summary · tap if you're closing early
+        </summary>
+        <div style={{ padding: '0 14px 14px' }}>
+          <ActionButton
+            variant="primary"
+            size="md"
+            iconLeft={Mic}
+            onClick={() => navigate('/voice/evening')}
+            style={{ width: '100%', marginTop: 8 }}
+          >
+            Speak evening summary
+          </ActionButton>
+        </div>
+      </details>
+    )
+  }
+
   return (
     <>
       <ActionButton
