@@ -34,6 +34,7 @@ import { useAuthStore } from '../../store/authStore'
 // eslint-disable-next-line no-unused-vars
 import { Pill } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
+import TodaySummaryCard from '../../components/leads/TodaySummaryCard'
 import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 // Phase 35 PR 2.7 — RepDayTools no longer mounted on /work (owner
 // asked to drop overnight/leave/test push from the Today panel).
@@ -740,6 +741,16 @@ export default function WorkV2() {
           doCheckOut={doCheckOut}
           navigate={navigate}
         />
+
+        {/* Phase 34Z.61 — today's load at a glance. Owner directive:
+            "When checking in the today page, somebody should show
+            there. Like today you have 10 follow-ups and 3 meetings
+            and 2 schedule meetings." Three-cell summary card. Hidden
+            on the morning-plan-not-submitted state — the rep should
+            see the plan form first, not their queue. */}
+        {checkedIn && !dayDone && (
+          <TodaySummaryCard userId={profile?.id} session={session} />
+        )}
 
         {/* Phase 35 PR 2.11 — locked order in B_ACTIVE state:
               V2Hero (in DayStatusSurface above)
