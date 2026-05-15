@@ -312,6 +312,23 @@ export default function PostCallOutcomeModal({
       if (stageErr) toastError(stageErr, 'Stage auto-advance failed (lead saved).')
     }
 
+    // Phase 34Z.62 — close the follow-up row that prompted this call.
+    // Owner reported the home-page summary count stayed put after a
+    // successful outcome because the OLD follow_up never flipped to
+    // is_done. Mark every open follow_up on this lead assigned to
+    // this rep with follow_up_date <= today as done. The follow-up
+    // count on TodaySummaryCard recomputes via realtime + auto-
+    // refresh, so the rep sees the number drop immediately.
+    if (profile?.id && lead.id) {
+      const today = new Date().toISOString().slice(0, 10)
+      await supabase.from('follow_ups')
+        .update({ is_done: true, completed_at: new Date().toISOString() })
+        .eq('lead_id', lead.id)
+        .eq('assigned_to', profile.id)
+        .eq('is_done', false)
+        .lte('follow_up_date', today)
+    }
+
     // 3. Next-action: insert a follow_ups row dated to customDate.
     //    Owner directive (15 May 2026): every chip — including
     //    Meeting and Custom — carries a user-pickable date, no longer
