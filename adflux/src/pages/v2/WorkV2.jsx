@@ -1242,9 +1242,12 @@ function SmartTaskSubtitle({ leadId, note, kind }) {
     site_visit: { txt: 'SITE VISIT', color: 'var(--accent, #FFE600)' },
     note:       { txt: 'NOTE',       color: 'var(--text-muted)' },
   }
-  const fallback = kind === 'follow_up_due' ? { txt: 'FOLLOW-UP', color: 'var(--accent, #FFE600)' }
-                 : kind === 'hot'           ? { txt: 'HOT',       color: 'var(--danger, #EF4444)' }
-                 : kind === 'new_lead'      ? { txt: 'NEW LEAD',  color: 'var(--blue, #3B82F6)' }
+  const fallback = kind === 'follow_up_due'    ? { txt: 'FOLLOW-UP', color: 'var(--accent, #FFE600)' }
+                 : kind === 'hot_idle'         ? { txt: 'HOT',       color: 'var(--danger, #EF4444)' }
+                 : kind === 'new_untouched'    ? { txt: 'NEW LEAD',  color: 'var(--blue, #3B82F6)' }
+                 : kind === 'sla_breach'       ? { txt: 'SLA',       color: 'var(--danger, #EF4444)' }
+                 : kind === 'qualified_no_quote' ? { txt: 'NEEDS QUOTE', color: 'var(--accent, #FFE600)' }
+                 : kind === 'nurture_revisit'  ? { txt: 'NURTURE',   color: 'var(--text-muted)' }
                  : { txt: 'TASK', color: 'var(--text-muted)' }
   const tag = (lastType && labelMap[lastType]) || fallback
 

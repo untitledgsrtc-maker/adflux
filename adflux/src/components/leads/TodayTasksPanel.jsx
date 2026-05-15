@@ -280,13 +280,15 @@ function SuggestedTasks({ userId }) {
     )
   }
 
-  const toneFor = (kind) => kind === 'new_lead' ? 'info'
+  const toneFor = (kind) => kind === 'new_lead' || kind === 'new_untouched' ? 'info'
     : kind === 'chase_quote' ? 'warning'
-    : kind === 'follow_up'  ? 'warning'
+    : kind === 'follow_up' || kind === 'follow_up_due'  ? 'warning'
+    : kind === 'hot_idle'   ? 'danger'
     : 'danger'
-  const labelFor = (kind) => kind === 'new_lead' ? 'NEW LEAD'
+  const labelFor = (kind) => kind === 'new_lead' || kind === 'new_untouched' ? 'NEW LEAD'
     : kind === 'chase_quote' ? 'CHASE'
-    : kind === 'follow_up'  ? 'FOLLOW-UP'
+    : kind === 'follow_up' || kind === 'follow_up_due' ? 'FOLLOW-UP'
+    : kind === 'hot_idle'   ? 'HOT'
     : 'COLLECT'
 
   return (
