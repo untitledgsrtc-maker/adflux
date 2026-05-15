@@ -33,7 +33,7 @@ import {
   ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
   RefreshCw, Sparkles, FileText as FileTextIcon, Users as UsersIcon,
   AlertTriangle, Clock, Mic, ChevronDown, MoreHorizontal,
-  Trash2, Pencil,
+  Trash2, Pencil, ClipboardCheck,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -958,6 +958,25 @@ export default function LeadDetailV2() {
                 title="Change stage"
               >
                 <RefreshCw size={13} /> <span>Stage</span>
+              </button>
+              {/* Phase 34Z.51 — manual "Log outcome" trigger. Owner
+                  reported "how can I close it right now" when the
+                  auto-popup is missed or dismissed. This re-opens the
+                  same PostCallOutcomeModal with pendingActivityId=null
+                  so it inserts a fresh activity instead of patching
+                  one. Use after a call when the auto-popup didn't
+                  fire (e.g. rep was on another page during the
+                  1.5s timer). */}
+              <button
+                className="lead-btn lead-btn-sm"
+                onClick={() => {
+                  setPendingActivityId(null)
+                  setPostCallOpen(true)
+                  setMoreOpen(false)
+                }}
+                title="Log the result of a call you just made"
+              >
+                <ClipboardCheck size={13} /> <span>Log outcome</span>
               </button>
               {/* Phase 33L (F7 fix) — OCR field merge confirms when OCR
                   has a value AND the existing field is non-empty AND

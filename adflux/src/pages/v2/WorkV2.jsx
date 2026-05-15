@@ -46,6 +46,13 @@ import { pushToast } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import LogMeetingModal from '../../components/leads/LogMeetingModal'
+// Phase 34Z.51 — bring the LeadDetailV2 call-outcome flow to the
+// /work Next-up smart-task card. Tapping Call on the card now inserts
+// the lead_activities row, fires the tel:, and opens the outcome modal
+// 1.5s later — same chain that LeadDetailV2 uses. After save, the
+// stage-aware WhatsApp prompt fires.
+import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
+import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { useLeadTasks } from '../../hooks/useLeadTasks'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
 
@@ -151,6 +158,16 @@ export default function WorkV2() {
   const [meetingMode, setMeetingMode] = useState('meeting')
   const [pendingNavLead, setPendingNavLead] = useState(null)
   const [toast, setToast] = useState('')
+
+  // Phase 34Z.51 — call-outcome modal state for the Next-up smart-task
+  // Call button. Mirrors the LeadDetailV2 chain: tel: fires, activity
+  // row inserted, modal opens 1.5s later, save chains into the
+  // WhatsApp prompt. callLead holds the full lead row so the modal +
+  // WA prompt have the same context they'd have on lead detail.
+  const [postCallOpen, setPostCallOpen] = useState(false)
+  const [pendingActivityId, setPendingActivityId] = useState(null)
+  const [callLead, setCallLead] = useState(null)
+  const [waPrompt, setWaPrompt] = useState(null)
 
   /* Morning plan draft */
   const [plannedMeetings, setPlannedMeetings] = useState([
@@ -488,6 +505,44 @@ export default function WorkV2() {
     load()
   }
 
+  // Phase 34Z.51 — quick-log a call from the Next-up smart-task card.
+  // Mirrors LeadDetailV2.quickLog('call', ...): inserts a lead_activities
+  // row, captures the id, fires the tel: link, and schedules the
+  // PostCallOutcomeModal 1.5s later. The setTimeout(0) wrapper around
+  // the insert keeps the user-gesture intact so iOS Safari hands off
+  // to the dialer reliably (same trick LeadDetailV2 uses).
+  async function quickLogCall(lead) {
+    if (!lead?.id || !profile?.id) return
+    const phone = cleanPhone(lead.phone)
+    if (!phone) {
+      pushToast('No phone on this lead — tap Open and add the mobile number first.', 'danger')
+      return
+    }
+    setCallLead(lead)
+    // Fire the dialer immediately on the user gesture, then queue the
+    // activity insert + modal on the next event-loop tick.
+    window.location.href = `tel:+${phone}`
+    setTimeout(async () => {
+      const { data: actRow, error: insErr } = await supabase
+        .from('lead_activities')
+        .insert([{
+          lead_id:       lead.id,
+          activity_type: 'call',
+          outcome:       null,
+          notes:         `Call → ${lead.phone}`,
+          created_by:    profile.id,
+        }])
+        .select('id')
+        .single()
+      if (insErr) {
+        pushToast(`Could not log call: ${insErr.message}`, 'danger')
+        return
+      }
+      setPendingActivityId(actRow?.id || null)
+      setTimeout(() => setPostCallOpen(true), 1500)
+    }, 0)
+  }
+
   // Collapse plan + check-in into a single "Start My Day" tap.
   async function startDay() {
     if (busy || parsing) return
@@ -697,6 +752,7 @@ export default function WorkV2() {
             navigate={navigate}
             toggleMeetingDone={toggleMeetingDone}
             toggleTaskDone={toggleTaskDone}
+            onCallLead={quickLogCall}
             busy={busy}
           />
         )}
@@ -774,6 +830,53 @@ export default function WorkV2() {
           <span>{toast}</span>
         </div>
       )}
+
+      {/* Phase 34Z.51 — voice-driven outcome capture for the Next-up
+          smart-task Call. Mirrors the LeadDetailV2 chain so the rep
+          gets the same flow no matter where they tap Call from. After
+          save, fires the stage-aware WhatsApp prompt unless they
+          picked "Log a meeting now" (rare path; LogMeetingModal lives
+          on lead detail). */}
+      <PostCallOutcomeModal
+        open={postCallOpen}
+        lead={callLead}
+        pendingActivityId={pendingActivityId}
+        onClose={() => { setPostCallOpen(false); setPendingActivityId(null) }}
+        onSaved={async ({ nextAction }) => {
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+          load()
+          if (nextAction === 'meeting') {
+            // Smart card has no LogMeetingModal mounted; send rep to
+            // lead detail where the Meeting button + map live.
+            if (callLead?.id) navigate(`/leads/${callLead.id}`)
+            return
+          }
+          // Refetch stage so WA prompt picks the right template
+          // (PostCallOutcomeModal may have flipped New → Working
+          // or set Nurture, which changes the canned message).
+          if (callLead?.id) {
+            const { data } = await supabase
+              .from('leads').select('stage').eq('id', callLead.id).maybeSingle()
+            setTimeout(() => {
+              setWaPrompt({ stage: data?.stage || callLead.stage || 'post_call' })
+            }, 200)
+          }
+        }}
+        onLogMeeting={() => {
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+          if (callLead?.id) navigate(`/leads/${callLead.id}`)
+        }}
+      />
+
+      <WhatsAppPromptModal
+        open={!!waPrompt}
+        stage={waPrompt?.stage}
+        lead={callLead}
+        profile={profile}
+        onClose={() => setWaPrompt(null)}
+      />
     </div>
   )
 }
@@ -1331,7 +1434,7 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary }) {
   )
 }
 
-function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, toggleTaskDone, busy }) {
+function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, toggleTaskDone, onCallLead, busy }) {
   const pick = pickNextAction({ session, smartTasks })
 
   if (!pick) {
@@ -1404,7 +1507,22 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
         title={title}
         subtitle={<SmartTaskSubtitle leadId={t.lead_id || lead.id} note={cleanReason} kind={t.kind} />}
         primary={phone
-          ? { icon: Phone, label: 'Call', onClick: () => { window.location.href = `tel:+${phone}` } }
+          ? {
+              icon: Phone,
+              label: 'Call',
+              // Phase 34Z.51 — same chain as LeadDetailV2's Call:
+              // inserts the activity row, fires tel:, then opens the
+              // PostCallOutcomeModal 1.5s later. Owner reported the
+              // smart-task card was firing tel: without logging the
+              // call or surfacing the outcome modal.
+              onClick: () => onCallLead?.({
+                id: t.lead_id || lead.id,
+                phone: lead.phone,
+                name: lead.name,
+                company: lead.company,
+                stage: lead.stage,
+              }),
+            }
           : { variant: 'subtle', label: 'No phone', disabled: true, onClick: () => {} }
         }
         secondary={{ label: 'Open', onClick: () => navigate(`/leads/${t.lead_id || lead.id}`) }}
