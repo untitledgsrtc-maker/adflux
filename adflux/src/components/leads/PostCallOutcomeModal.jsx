@@ -21,12 +21,101 @@
 //
 // All writes go through supabase directly. No new RPC needed.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+// eslint-disable-next-line no-unused-vars
 import { Phone, Loader2, CheckCircle2, X, Calendar, MessageSquare, Pencil } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
 import { toastError, toastSuccess } from '../v2/Toast'
+
+// Phase 34Z.53 — client-side intent parser. When the rep speaks
+// (Whisper transcript appended to the notes field), scan for outcome
+// + next-action + date keywords in English / Hindi / Gujarati and
+// pre-fill the chips and the date picker. Edge-fn Claude classify
+// would be more robust, but it inserts a duplicate lead_activities
+// row in lead mode — keeping this local for the v1.
+//
+// Returns { outcome?, nextAction?, days? } — only fields it found.
+function parseCallIntent(rawText) {
+  const text = (rawText || '').toLowerCase().normalize('NFC')
+  if (!text) return {}
+  const out = {}
+
+  // Outcome ---------------------------------------------------------
+  // Positive — wants quote, agreed, said yes
+  if (/\b(good|great|positive|interested|wants? (a )?(quote|price)|will (buy|book)|han|haan|haa\b|yes\b|yeah\b|agree[ds]?|confirmed|fix(ed)?)\b/.test(text)
+      || /ગમ્યુ|ગમ્યું|હા\b|રસ છે|ક્વોટ|ખરીદ/.test(text)
+      || /हाँ\b|हां\b|पसंद|दिलचस्पी|खरीद/.test(text)) {
+    out.outcome = 'positive'
+  }
+  // Negative — not interested, refused, lost
+  if (/\b(not interested|no interest|lost|refused?|reject(ed)?|na nahi|nahi(\s|$)|nahi chahiye|no chance|dropped?|cancel(led)?)\b/.test(text)
+      || /રસ નથી|ના\s?પાડી|ખરીદવુ?\s?નથી|રિજેક્ટ/.test(text)
+      || /नहीं चाहिए|नहीं\s?चाहिए|दिलचस्पी नहीं|मना/.test(text)) {
+    out.outcome = 'negative'
+  }
+  // Neutral — maybe, think, callback later
+  if (!out.outcome && /\b(maybe|think|considering|callback|call back|try again|later|baad me|बाद|પછી|વિચાર|sochenge|sochna|will see|let me know)\b/.test(text)) {
+    out.outcome = 'neutral'
+  }
+
+  // Days offset -----------------------------------------------------
+  // "after 3 days" / "in 3 days" / "3 days later" — English
+  let days = null
+  const wordToNum = {
+    // English
+    one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+    ten: 10, fifteen: 15, twenty: 20, thirty: 30,
+    // Hindi (Latin transliteration)
+    ek: 1, do: 2, teen: 3, char: 4, paanch: 5, saat: 7, das: 10, tees: 30,
+    // Gujarati (Latin transliteration) — overlaps with Hindi for some.
+    be: 2, tran: 3, panch: 5,
+  }
+  const m1 = text.match(/\b(?:after|in|aft|baad|બાદ|पछी|पछि)\s+(\d{1,3}|one|two|three|four|five|six|seven|ten|fifteen|twenty|thirty|ek|do|teen|char|paanch|saat|das|tees|be|tran|panch)\s*(?:days?|day|din|દિવસ|दिन)?/)
+  if (m1) {
+    const v = m1[1]
+    days = /^\d+$/.test(v) ? parseInt(v, 10) : (wordToNum[v] ?? null)
+  }
+  // "tomorrow" / "kal" / "આવતી કાલે"
+  if (days === null && /\btomorrow|kal\b|kalle\b|aavti\s?kaale|આવતી\s?કાલે|कल\b/.test(text)) {
+    days = 1
+  }
+  // "next week" / "agle hafte" / "આવતા અઠવાડિયે"
+  if (days === null && /next week|aglhe hafte|agla hafta|આવત(ા|ી)\s?અઠવાડિ|अगले हफ्ते/.test(text)) {
+    days = 7
+  }
+  // "next month" / "ek mahine" / "આવતા મહિને" / "nurture"
+  if (days === null && /next month|aagla mahina|agle maheene|આવત(ા|ી)\s?મહિને|अगले महीने|nurture/.test(text)) {
+    days = 30
+  }
+  if (days !== null) out.days = days
+
+  // Meeting keyword overrides ---------------------------------------
+  if (/\b(meeting|met him|met her|visit|site visit|in person|meet (them|him|her)|મીટિંગ|मीटिंग|मिलना|મળવા)\b/.test(text)) {
+    out.nextAction = 'meeting'
+  } else if (days === 1) {
+    out.nextAction = 'follow_up_tomorrow'
+  } else if (days === 3) {
+    out.nextAction = 'follow_up_3d'
+  } else if (days === 7) {
+    out.nextAction = 'follow_up_7d'
+  } else if (days === 30) {
+    out.nextAction = 'nurture_30d'
+  } else if (days !== null && days > 0) {
+    // Custom days — keep the date but don't pick a preset chip.
+    out.nextAction = 'follow_up_custom'
+  }
+
+  return out
+}
+
+function addDays(baseISO, days) {
+  const d = baseISO ? new Date(baseISO) : new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 
 const OUTCOMES = [
   { value: 'positive', label: 'Good',  sub: 'Wants quote / more info', tone: 'success' },
@@ -39,8 +128,22 @@ const NEXT_ACTIONS = [
   { value: 'follow_up_3d',       label: 'Follow up in 3 days', days: 3 },
   { value: 'follow_up_7d',       label: 'Follow up next week', days: 7 },
   { value: 'nurture_30d',        label: 'Nurture · 30 days',   days: 30 },
-  { value: 'meeting',            label: 'Log a meeting now',   days: null },
+  // Phase 34Z.53 — meeting now carries a date (default tomorrow). Date
+  // input below the chips lets the rep pick any date for any chip.
+  { value: 'meeting',            label: 'Schedule a meeting',  days: 1 },
+  { value: 'follow_up_custom',   label: 'Pick custom date…',   days: null },
   { value: 'none',               label: 'No next action',      days: 0 },
+]
+
+// Language toggle for the voice transcriber. 'auto' (default) sends an
+// empty hint to voice-process, which makes Whisper genuinely auto-
+// detect — fixes the Phase 34Z.49 default 'gu' that was biasing English
+// and Hindi speech into Gujarati script.
+const VOICE_LANGS = [
+  { value: 'auto', label: 'Auto', hint: '' },
+  { value: 'gu',   label: 'ગુ',    hint: 'gu' },
+  { value: 'hi',   label: 'हि',    hint: 'hi' },
+  { value: 'en',   label: 'En',   hint: 'en' },
 ]
 
 export default function PostCallOutcomeModal({
@@ -56,6 +159,14 @@ export default function PostCallOutcomeModal({
   const [nextAction, setNextAction] = useState('follow_up_3d')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  // Phase 34Z.53 — custom date picker drives the follow_ups row date.
+  // Defaults to the preset offset for the selected chip; rep can edit
+  // freely. Once edited manually, chip selection no longer overrides.
+  const [customDate, setCustomDate] = useState(addDays(null, 3))
+  const dateTouchedRef = useRef(false)
+  // Language toggle for the voice mic. 'auto' is the new default
+  // (Phase 34Z.49 hardcoded 'gu' which was biasing English/Hindi).
+  const [voiceLang, setVoiceLang] = useState('auto')
 
   // Reset state every time the modal opens for a fresh call.
   useEffect(() => {
@@ -63,13 +174,54 @@ export default function PostCallOutcomeModal({
       setOutcome('')
       setNextAction('follow_up_3d')
       setNotes('')
+      setCustomDate(addDays(null, 3))
+      setVoiceLang('auto')
+      dateTouchedRef.current = false
     }
   }, [open])
+
+  // When the rep picks a chip, snap the date input to the preset
+  // (unless they already overrode it manually).
+  useEffect(() => {
+    if (!open) return
+    if (dateTouchedRef.current) return
+    const meta = NEXT_ACTIONS.find(n => n.value === nextAction)
+    if (meta && meta.days != null && meta.days > 0) {
+      setCustomDate(addDays(null, meta.days))
+    }
+  }, [nextAction, open])
 
   if (!open || !lead) return null
 
   const tone = OUTCOMES.find(o => o.value === outcome)?.tone
   const nextActionMeta = NEXT_ACTIONS.find(n => n.value === nextAction)
+  const wantsDate = nextAction !== 'none'
+
+  // Voice intent — wraps VoiceInput.onChange so each appended transcript
+  // is scanned and the chips / date input updated. Owner directive:
+  // "If I say call him after three days... the action must be filled
+  // accordingly." Notes still receive the raw transcript so the rep
+  // can review the actual words spoken.
+  function handleVoiceNotes(next) {
+    setNotes(next)
+    if (!next) return
+    // Only run the parser on the most recent appended sentence — keeps
+    // the chips from flipping every keystroke. VoiceInput appends with
+    // a space, so the tail after the last newline / period is the new
+    // utterance.
+    const tail = String(next).split(/[.\n]/).filter(Boolean).pop() || next
+    const intent = parseCallIntent(tail)
+    if (intent.outcome) setOutcome(intent.outcome)
+    if (intent.nextAction) {
+      setNextAction(intent.nextAction)
+      if (intent.days != null && intent.days > 0) {
+        setCustomDate(addDays(null, intent.days))
+        // The voice command IS the rep's intent — let the chip-snap
+        // useEffect keep working after this point.
+        dateTouchedRef.current = false
+      }
+    }
+  }
 
   async function handleSave() {
     if (saving) return
@@ -119,28 +271,31 @@ export default function PostCallOutcomeModal({
       if (stageErr) toastError(stageErr, 'Stage auto-advance failed (lead saved).')
     }
 
-    // 3. Next-action: follow_up_* / nurture_30d → upsert follow_ups row.
-    //    meeting → caller opens LogMeetingModal.
-    //    none → no-op.
-    if (nextActionMeta?.days != null && nextActionMeta.days > 0) {
-      const d = new Date()
-      d.setDate(d.getDate() + nextActionMeta.days)
-      const isoDate = d.toISOString().slice(0, 10)
+    // 3. Next-action: insert a follow_ups row dated to customDate.
+    //    Owner directive (15 May 2026): every chip — including
+    //    Meeting and Custom — carries a user-pickable date, no longer
+    //    a fixed preset. 'none' is the only no-op.
+    if (nextAction !== 'none' && customDate) {
+      const isMeeting = nextAction === 'meeting'
+      const noteText = notes.trim()
+        || (isMeeting
+            ? `Meeting · ${OUTCOMES.find(o => o.value === outcome)?.label || 'after call'}`
+            : `After call · ${OUTCOMES.find(o => o.value === outcome)?.label}`)
       const { error: fuErr } = await supabase.from('follow_ups').insert([{
         lead_id: lead.id,
         assigned_to: profile?.id,
-        follow_up_date: isoDate,
-        note: notes.trim() || `After call · ${OUTCOMES.find(o => o.value === outcome)?.label}`,
+        follow_up_date: customDate,
+        note: isMeeting ? `Meeting — ${noteText}` : noteText,
         is_done: false,
       }])
       if (fuErr) {
         toastError(fuErr, 'Follow-up scheduled but DB write failed: ' + fuErr.message)
       }
-      // Nurture pseudo-action also flips stage.
+      // Nurture pseudo-action also flips the lead to Nurture stage.
       if (nextAction === 'nurture_30d' && lead.stage !== 'Won' && lead.stage !== 'Lost') {
         await supabase.from('leads').update({
           stage: 'Nurture',
-          revisit_date: isoDate,
+          revisit_date: customDate,
         }).eq('id', lead.id)
       }
     }
@@ -220,16 +375,59 @@ export default function PostCallOutcomeModal({
 
           {/* Voice notes */}
           <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
-            <label className="lead-fld-label">What did they say? (voice or type)</label>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 8, marginBottom: 6, flexWrap: 'wrap',
+            }}>
+              <label className="lead-fld-label" style={{ margin: 0 }}>
+                What did they say? (voice or type)
+              </label>
+              {/* Phase 34Z.53 — language toggle. Default Auto so Whisper
+                  detects the spoken language. Earlier 'gu' default was
+                  forcing Gujarati script on English/Hindi speech. */}
+              <div style={{ display: 'inline-flex', gap: 4 }}>
+                {VOICE_LANGS.map(l => {
+                  const on = voiceLang === l.value
+                  return (
+                    <button
+                      key={l.value}
+                      type="button"
+                      onClick={() => setVoiceLang(l.value)}
+                      disabled={saving}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 999,
+                        border: `1px solid ${on ? 'var(--v2-yellow, var(--accent, #FFE600))' : 'var(--border-strong, var(--v2-line))'}`,
+                        background: on
+                          ? 'var(--accent-soft, rgba(255,230,0,0.14))'
+                          : 'var(--v2-bg-2, var(--surface-2))',
+                        color: 'var(--text)',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: 11,
+                        lineHeight: 1.2,
+                      }}
+                      title={`Voice transcribe as ${l.label}`}
+                    >
+                      {l.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
             <VoiceInput
               multiline
               rows={3}
               value={notes}
-              onChange={setNotes}
-              placeholder="Decision-maker name · budget · next steps · objections"
+              onChange={handleVoiceNotes}
+              placeholder="Speak: 'after 3 days follow up' / 'મીટિંગ આવતી કાલે' / 'lost, not interested'"
               disabled={saving}
-              languageHint="gu"
+              languageHint={VOICE_LANGS.find(l => l.value === voiceLang)?.hint || ''}
             />
+            <div style={{ fontSize: 10, color: 'var(--text-subtle)', marginTop: 6, lineHeight: 1.4 }}>
+              Say outcome + next action — chips fill in automatically.
+              Examples: "good, follow up in 3 days" · "meeting tomorrow" · "lost, not interested".
+            </div>
           </div>
 
           {/* Next action chooser */}
@@ -241,13 +439,19 @@ export default function PostCallOutcomeModal({
                   const on = nextAction === n.value
                   const icon = n.value === 'meeting' ? Calendar
                              : n.value === 'none'    ? null
+                             : n.value === 'follow_up_custom' ? Pencil
                              :                         MessageSquare
                   const Icon = icon
                   return (
                     <button
                       key={n.value}
                       type="button"
-                      onClick={() => setNextAction(n.value)}
+                      onClick={() => {
+                        setNextAction(n.value)
+                        // Re-arm chip-driven date snap whenever the
+                        // rep deliberately picks a chip.
+                        dateTouchedRef.current = false
+                      }}
                       disabled={saving}
                       style={{
                         padding: '8px 12px',
@@ -270,6 +474,52 @@ export default function PostCallOutcomeModal({
                   )
                 })}
               </div>
+
+              {/* Phase 34Z.53 — custom date input. Visible for every
+                  chip except "No next action". Snaps to preset offset
+                  when chip changes; rep can pick any date freely.
+                  Owner directive: meeting + follow-up need date pickers. */}
+              {wantsDate && (
+                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <label className="lead-fld-label" style={{ margin: 0, fontSize: 11 }}>
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    className="lead-inp"
+                    value={customDate}
+                    min={TODAY_ISO()}
+                    onChange={(e) => {
+                      setCustomDate(e.target.value)
+                      dateTouchedRef.current = true
+                    }}
+                    disabled={saving}
+                    style={{ maxWidth: 200 }}
+                  />
+                  {dateTouchedRef.current && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const meta = NEXT_ACTIONS.find(n => n.value === nextAction)
+                        const d = (meta && meta.days != null && meta.days > 0) ? meta.days : 1
+                        setCustomDate(addDays(null, d))
+                        dateTouchedRef.current = false
+                      }}
+                      disabled={saving}
+                      style={{
+                        background: 'transparent',
+                        border: 0,
+                        color: 'var(--text-muted)',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      reset to preset
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
