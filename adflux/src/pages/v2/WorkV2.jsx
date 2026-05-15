@@ -361,7 +361,10 @@ export default function WorkV2() {
       } else if (status === 'no-subscription') {
         pushToast('Push permission granted but subscribe failed. Bell → diagnostics to retry.', 'warning')
       } else if (status === 'unsupported') {
-        pushToast('This browser does not support push. On iPhone, install the app to your home screen first.', 'warning')
+        // Android Chrome / Samsung Internet / Firefox / Edge all support
+        // Web Push in regular tabs. iOS Safari requires the PWA installed
+        // to the home screen on iOS 16.4+. Cover both in the hint.
+        pushToast('This browser does not support push. Use Chrome on Android, or on iPhone install the app to your home screen first.', 'warning')
       }
     }).catch(() => { /* unexpected — swallow */ })
   }, [profile?.id])

@@ -123,6 +123,20 @@ self.addEventListener('push', (event) => {
     tag:   payload.tag || 'untitled',
     data:  { url: payload.url || '/' },
     requireInteraction: !!payload.requireInteraction,
+    // Phase 34Z.56 — Android-friendly defaults. Majority of the team
+    // runs on Android tablets. iOS Safari silently ignores fields it
+    // doesn't support, so these are safe for both platforms.
+    //   vibrate    — short double-buzz; Android only.
+    //   silent     — explicit false because some Samsung Internet
+    //                versions default-mute push without it.
+    //   renotify   — re-notify when the same tag fires twice; rep
+    //                needs to see the second alert (e.g. two follow-
+    //                ups due in a row).
+    //   lang       — better TTS / accessibility on Android.
+    vibrate: [120, 60, 120],
+    silent: false,
+    renotify: true,
+    lang: 'en-IN',
   }
 
   event.waitUntil(self.registration.showNotification(title, options))

@@ -95,6 +95,8 @@ export default function PushDebugV2() {
   const [testing,            setTesting]            = useState(false)
   const [isStandalone,       setIsStandalone]       = useState(false)
   const [isIOS,              setIsIOS]              = useState(false)
+  const [isAndroid,          setIsAndroid]          = useState(false)
+  const [browserName,        setBrowserName]        = useState('')
 
   async function reload() {
     setLoading(true)
@@ -103,11 +105,22 @@ export default function PushDebugV2() {
     setPermission(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
     setVapidKey(import.meta.env.VITE_VAPID_PUBLIC_KEY || '')
 
-    // Detect iOS + standalone (PWA installed to home screen) — Safari
-    // requirement since iOS 16.4. In-browser Safari blocks Web Push
-    // entirely; the rep MUST install via Share → Add to Home Screen.
+    // Detect platform. iOS Safari has the strictest gate: PWA must be
+    // installed to the home screen on iOS 16.4+. Android Chrome accepts
+    // Web Push from regular browser tabs AND installed PWAs — no
+    // standalone requirement. Majority of the Untitled sales team is
+    // on Android tablets so the iOS-only banner is suppressed there.
     const ua = navigator.userAgent || ''
     setIsIOS(/iPad|iPhone|iPod/.test(ua) && !window.MSStream)
+    setIsAndroid(/Android/i.test(ua))
+    // Best-effort browser sniff for diagnostic copy (only used to
+    // surface battery-optimisation guidance per browser).
+    if (/SamsungBrowser/i.test(ua))      setBrowserName('Samsung Internet')
+    else if (/Edg\//i.test(ua))          setBrowserName('Edge')
+    else if (/Firefox/i.test(ua))        setBrowserName('Firefox')
+    else if (/Chrome\//i.test(ua))       setBrowserName('Chrome')
+    else if (/Safari/i.test(ua))         setBrowserName('Safari')
+    else                                 setBrowserName('Browser')
     setIsStandalone(
       window.matchMedia?.('(display-mode: standalone)').matches ||
       // iOS Safari uses this proprietary property when launched from
@@ -268,7 +281,9 @@ export default function PushDebugV2() {
           </div>
         </div>
 
-        {/* iOS PWA banner */}
+        {/* iOS PWA banner — only shown when actually on iOS Safari in
+            a non-standalone window. Android tablets (majority of the
+            team) never see this. */}
         {isIOS && !isStandalone && (
           <div style={{
             padding: '12px 14px', borderRadius: 10,
@@ -283,6 +298,33 @@ export default function PushDebugV2() {
               home screen. Tap the Share icon at the bottom of Safari →
               "Add to Home Screen" → open the new icon from the home
               screen. iOS 16.4 or newer required.
+            </div>
+          </div>
+        )}
+
+        {/* Android tablet banner. Push works in regular Chrome tabs OR
+            installed PWAs — no standalone requirement — but battery
+            optimisation kills it on most Android OEM skins (Samsung,
+            Xiaomi, Vivo, Oppo, OnePlus, Realme). Surface the fix the
+            rep can actually act on. */}
+        {isAndroid && (
+          <div style={{
+            padding: '12px 14px', borderRadius: 10,
+            background: 'var(--warning-soft, rgba(245,158,11,0.12))',
+            border: '1px solid var(--warning, #F59E0B)',
+            marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <Smartphone size={18} color="var(--warning, #F59E0B)" />
+            <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
+              <strong>Android · {browserName}.</strong> Push works in a
+              regular Chrome tab — no install needed. If the test push
+              doesn't land:
+              <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
+                <li>Settings → Apps → {browserName} → Battery → set to "Unrestricted" (Samsung / Xiaomi / OnePlus all kill background SW by default).</li>
+                <li>Settings → Apps → {browserName} → Data usage → allow background data.</li>
+                <li>Turn off Data Saver and Power Saving mode while testing.</li>
+                <li>Best reliability: tap the menu → "Install app" / "Add to Home screen" → open from the new icon. Installed PWAs get a separate battery whitelist on most OEMs.</li>
+              </ul>
             </div>
           </div>
         )}
@@ -414,10 +456,19 @@ export default function PushDebugV2() {
           <div style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 4 }}>
             If "Send test push" succeeds but no notification appears
           </div>
-          1. iOS: phone is in Focus / Do Not Disturb mode — turn off temporarily.<br/>
-          2. iOS: the PWA must be opened from the home-screen icon at least once after install.<br/>
-          3. Android Chrome: data saver or battery-saver killing background SW. Disable for this site.<br/>
-          4. The test took the dedup tag <code>push-debug-test</code> — only one notification can show per tag at a time.
+          <strong>Android (most reps):</strong><br/>
+          1. Settings → Apps → Chrome/Samsung Internet → Battery → "Unrestricted" (default "Optimised" kills push within minutes).<br/>
+          2. Settings → Apps → that browser → Data usage → allow background data.<br/>
+          3. Data Saver / Power Saving / Battery Saver mode must be OFF while testing.<br/>
+          4. On Samsung tablets: Settings → Device care → Battery → "Apps that won't be put to sleep" → add the browser.<br/>
+          5. Do Not Disturb / Focus mode silences pushes — pull down the quick-settings panel and turn off.<br/>
+          <br/>
+          <strong>iPhone / iPad:</strong><br/>
+          6. App must be opened from the home-screen icon at least once after Add to Home Screen.<br/>
+          7. Focus / Do Not Disturb off; allow notifications under Settings → Notifications → this PWA.<br/>
+          <br/>
+          <strong>Both:</strong><br/>
+          8. Test uses dedup tag <code>push-debug-test</code> — only one notification per tag can show at a time. Dismiss the old one before re-testing.
         </div>
       </div>
     </div>
