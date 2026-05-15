@@ -88,13 +88,25 @@ export default function VoiceInput({
         reader.onerror = reject
         reader.readAsDataURL(blob)
       })
+      // Phase 34Z.74 — owner reported "Auth failed: Auth session
+      // missing!" from the PostCallOutcomeModal mic. Root cause:
+      // header set only Authorization, no `apikey`. supabase edge
+      // fn's auth.getUser() needs BOTH to validate the JWT against
+      // the project. WorkV2's edgeFetch helper already does this;
+      // VoiceInput was the lone holdout. Also falls back to anon key
+      // for Authorization when the cached session is null (expired
+      // hour-long JWT) so the call still hits the edge fn instead of
+      // silently 401-ing on a stale token.
       const { data: { session } } = await supabase.auth.getSession()
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+      const bearer  = session?.access_token || anonKey
       const url = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/voice-process`
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
+          'Authorization': `Bearer ${bearer}`,
+          'apikey': anonKey,
         },
         body: JSON.stringify({
           audio_base64:  b64,
