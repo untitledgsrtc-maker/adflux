@@ -62,10 +62,17 @@ export default function TodayTasksPanel({ userId, limit = 10 }) {
   } = useLeadTasks({ userId })
 
   // Phase 33F (B7) — auto-regenerate when the tab regains focus.
-  // Saves the rep a tap; covers the case where they checked a meeting
-  // in another tab and want the smart-task list to refresh.
+  // Phase 34Z.45 — also fire ONCE on mount. Owner reported /work
+  // says "Day is clear" while /follow-ups shows 13 due today. Root
+  // cause: generate() only fired on window-focus, so a fresh route-
+  // mount never populated lead_tasks → empty list → fallback shows
+  // empty (todays_suggested_tasks doesn't read follow_ups). Mount-
+  // time generate ensures Rule 3 (follow_up_due) inserts today's
+  // tasks before the panel renders.
   useEffect(() => {
     if (!userId) return
+    // mount call
+    try { generate?.() } catch {}
     const onFocus = () => { try { generate?.() } catch {} }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
@@ -217,11 +224,34 @@ function SuggestedTasks({ userId }) {
     if (!userId) { setLoading(false); return }
     let cancelled = false
     ;(async () => {
-      const { data } = await supabase.rpc('todays_suggested_tasks', {
-        p_user_id: userId,
-      })
+      // Phase 34Z.45 — also union pending follow_ups due today, since
+      // the RPC doesn't read that table. Owner reported /work showed
+      // empty while /follow-ups had 13 entries — this closes the gap
+      // so the rep sees them even when generate_lead_tasks fails or
+      // hasn't fired yet.
+      const today = new Date().toISOString().slice(0, 10)
+      const [rpcRes, fuRes] = await Promise.all([
+        supabase.rpc('todays_suggested_tasks', { p_user_id: userId }),
+        supabase.from('follow_ups')
+          .select('id, lead_id, follow_up_date, note, lead:lead_id(name, company)')
+          .eq('assigned_to', userId)
+          .eq('is_done', false)
+          .lte('follow_up_date', today)
+          .order('follow_up_date', { ascending: true })
+          .limit(8),
+      ])
       if (cancelled) return
-      setItems(Array.isArray(data) ? data : [])
+      const rpcItems = Array.isArray(rpcRes.data) ? rpcRes.data : []
+      const fuItems = (fuRes.data || []).map((f) => ({
+        kind: 'follow_up',
+        lead_id: f.lead_id,
+        quote_id: null,
+        primary_text: `Follow up ${f.lead?.name || f.lead?.company || ''}`.trim(),
+        secondary_text: f.note || (f.follow_up_date === today ? 'due today' : `overdue · ${f.follow_up_date}`),
+        priority: 0,
+      }))
+      // Follow-ups first (most actionable), then RPC suggestions.
+      setItems([...fuItems, ...rpcItems])
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -245,9 +275,11 @@ function SuggestedTasks({ userId }) {
 
   const toneFor = (kind) => kind === 'new_lead' ? 'info'
     : kind === 'chase_quote' ? 'warning'
+    : kind === 'follow_up'  ? 'warning'
     : 'danger'
   const labelFor = (kind) => kind === 'new_lead' ? 'NEW LEAD'
     : kind === 'chase_quote' ? 'CHASE'
+    : kind === 'follow_up'  ? 'FOLLOW-UP'
     : 'COLLECT'
 
   return (
