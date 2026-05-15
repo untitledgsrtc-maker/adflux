@@ -1192,6 +1192,58 @@ function EveningReportBlock({ evening, setEvening, submitEvening, busy, navigate
   )
 }
 
+/* ─── Phase 34Z.46 — last-activity-aware subtitle for smart tasks.
+   Reads the most recent lead_activities row for the lead and surfaces
+   its activity_type as a coloured chip so owner sees
+   "MEETING · cd" instead of "Follow-up: cd". Falls back to the kind
+   label if no activity is on file. */
+function SmartTaskSubtitle({ leadId, note, kind }) {
+  const [lastType, setLastType] = useState(null)
+  useEffect(() => {
+    if (!leadId) return
+    let cancelled = false
+    supabase
+      .from('lead_activities')
+      .select('activity_type')
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled && data?.activity_type) setLastType(data.activity_type)
+      })
+    return () => { cancelled = true }
+  }, [leadId])
+
+  const labelMap = {
+    call:       { txt: 'CALL',       color: 'var(--success, #10B981)' },
+    whatsapp:   { txt: 'WHATSAPP',   color: 'var(--success, #10B981)' },
+    email:      { txt: 'EMAIL',      color: 'var(--blue, #3B82F6)' },
+    meeting:    { txt: 'MEETING',    color: 'var(--accent, #FFE600)' },
+    site_visit: { txt: 'SITE VISIT', color: 'var(--accent, #FFE600)' },
+    note:       { txt: 'NOTE',       color: 'var(--text-muted)' },
+  }
+  const fallback = kind === 'follow_up_due' ? { txt: 'FOLLOW-UP', color: 'var(--accent, #FFE600)' }
+                 : kind === 'hot'           ? { txt: 'HOT',       color: 'var(--danger, #EF4444)' }
+                 : kind === 'new_lead'      ? { txt: 'NEW LEAD',  color: 'var(--blue, #3B82F6)' }
+                 : { txt: 'TASK', color: 'var(--text-muted)' }
+  const tag = (lastType && labelMap[lastType]) || fallback
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <span style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+        padding: '2px 7px', borderRadius: 999,
+        color: tag.color,
+        background: 'color-mix(in srgb, currentColor 14%, transparent)',
+      }}>
+        {tag.txt}
+      </span>
+      {note && <span style={{ color: 'var(--accent)' }}>{note}</span>}
+    </span>
+  )
+}
+
 /* ─── Surface 2: Next action ────────────────────────────────────── */
 
 function pickNextAction({ session, smartTasks }) {
@@ -1310,6 +1362,12 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
     const t = pick.data
     const lead = t.lead || {}
     const phone = cleanPhone(lead.phone)
+    // Phase 34Z.46 — owner reported "Follow-up: cd" rendered on a
+    // task whose last activity was a Meeting. Strip the generic
+    // "Follow-up: " prefix from the reason so the rep sees just the
+    // free-text note. The action-type chip is rendered separately
+    // by SmartTaskSubtitle below from the lead's last activity.
+    const cleanReason = (t.reason || '').replace(/^Follow-up:\s*/i, '')
     const title = (
       <>
         {lead.name || 'Lead'}
@@ -1322,7 +1380,7 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
       <NextActionCard
         tone={{ tint: 'blue', label: 'smart task' }}
         title={title}
-        subtitle={t.reason}
+        subtitle={<SmartTaskSubtitle leadId={t.lead_id || lead.id} note={cleanReason} kind={t.kind} />}
         primary={phone
           ? { icon: Phone, label: 'Call', onClick: () => { window.location.href = `tel:+${phone}` } }
           : { variant: 'subtle', label: 'No phone', disabled: true, onClick: () => {} }
