@@ -572,6 +572,16 @@ export default function WorkV2() {
 
   // Smart-task feed for the NextActionSurface priority resolver.
   const { tasks: smartTasks } = useLeadTasks({ userId: profile?.id })
+  // Phase 34Z.47 — compute the Next-up pick once at parent scope so
+  // both NextActionSurface (uses it as the hero) and TodayTasksPanel
+  // (excludes the duplicate row) read the same reference. Owner
+  // reported the same lead appearing twice — once as "Next up", once
+  // as the first row in TODAY'S TASKS.
+  const nextActionPick = useMemo(
+    () => pickNextAction({ session, smartTasks }),
+    [session, smartTasks]
+  )
+  const nextUpSmartId = nextActionPick?.kind === 'smart' ? nextActionPick.data?.id : null
 
   if (loading) {
     return (
@@ -693,7 +703,16 @@ export default function WorkV2() {
 
         {checkedIn && !dayDone && (
           <>
-            <TodayTasksPanel userId={profile.id} limit={3} />
+            {/* Phase 34Z.47 — skip the smart-task that's already the
+                "Next up" hero so the same row doesn't appear twice on
+                /work. nextUpSmartId is null when the active pick is
+                a meeting / plan task (those don't appear in this list
+                anyway). */}
+            <TodayTasksPanel
+              userId={profile.id}
+              limit={3}
+              excludeTaskId={nextUpSmartId}
+            />
             <MeetingsMapPanel userId={profile.id} />
             <EveningReportBlock
               evening={evening}

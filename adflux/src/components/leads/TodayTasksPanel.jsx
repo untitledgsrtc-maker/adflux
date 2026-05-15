@@ -54,12 +54,19 @@ function trimReason(_kind, reason) {
   return out.trim()
 }
 
-export default function TodayTasksPanel({ userId, limit = 10 }) {
+export default function TodayTasksPanel({ userId, limit = 10, excludeTaskId = null }) {
   const navigate = useNavigate()
   const {
-    tasks, loading, generating, error,
+    tasks: rawTasks, loading, generating, error,
     generate, complete, snooze, skip,
   } = useLeadTasks({ userId })
+  // Phase 34Z.47 — caller may pass excludeTaskId so the active
+  // Next-up hero card doesn't render again at the top of this list.
+  // Without this the same lead appears twice on /work (once as
+  // "Next up", once as the first row here).
+  const tasks = excludeTaskId
+    ? rawTasks.filter((t) => t.id !== excludeTaskId)
+    : rawTasks
 
   // Phase 33F (B7) — auto-regenerate when the tab regains focus.
   // Phase 34Z.45 — also fire ONCE on mount. Owner reported /work
