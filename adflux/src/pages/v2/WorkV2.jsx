@@ -1545,16 +1545,11 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDis
 function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, toggleTaskDone, onCallLead, onDismissSmart, busy }) {
   const pick = pickNextAction({ session, smartTasks })
 
-  if (!pick) {
-    return (
-      <EmptyState
-        icon={CheckCircle2}
-        title="Day is clear"
-        sub="Send a quote or add a lead while you have a minute."
-        action={{ label: 'Add lead', onClick: () => navigate('/leads/new') }}
-      />
-    )
-  }
+  // Phase 34Z.65 — drop the "Day is clear · Add lead" empty card.
+  // Owner directive (15 May 2026): redundant with TodaySummaryCard's
+  // empty state + the /follow-ups page already shows the queue.
+  // Render nothing when there's no priority pick.
+  if (!pick) return null
 
   if (pick.kind === 'meeting') {
     const m = pick.data

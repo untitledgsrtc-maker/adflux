@@ -89,6 +89,12 @@ export default function TodayTasksPanel({ userId, limit = 10, excludeTaskId = nu
   const top = tasks.slice(0, limit)
   const overflow = Math.max(0, tasks.length - limit)
 
+  // Phase 34Z.65 — hide the whole panel when zero tasks. Owner audit
+  // (15 May 2026): the "TODAY'S TASKS · 0" header on top of an empty
+  // SuggestedTasks fallback was noise. /follow-ups page already
+  // surfaces the queue separately.
+  if (!loading && tasks.length === 0) return null
+
   return (
     <div className="lead-tasks-card">
       <div className="lead-tasks-head">
