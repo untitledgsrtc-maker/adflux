@@ -97,7 +97,7 @@ export default function CityAutocomplete({
         required={required}
         autoComplete="off"
       />
-      {open && !exact && suggestions.length > 0 && (
+      {open && !exact && (suggestions.length > 0 || q) && (
         <div
           role="listbox"
           style={{
@@ -139,6 +139,31 @@ export default function CityAutocomplete({
               {name}
             </div>
           ))}
+          {/* Phase 34Z.43 — owner reported "all city name not coming"
+              when typing a city not in the cities master (e.g. BHACHAU).
+              Show explicit "Use as new city" hint so rep knows free
+              text saves through. Admin can add to Master → Cities
+              later for proper dedupe. */}
+          {q && !cities.some(c => c.toLowerCase() === q) && (
+            <div
+              role="option"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                setOpen(false)
+              }}
+              style={{
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: 12,
+                color: 'var(--v2-ink-2, var(--text-muted))',
+                fontStyle: 'italic',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            >
+              Use &quot;{value}&quot; as new city · admin can add to Master later
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -20,7 +20,7 @@
 //   Opens LogMeetingModal.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Sun, MapPin, Phone, Calendar, Loader2, Trash2, Plus,
   CheckCircle2, Mic, Square, Clock, AlertTriangle,
@@ -134,6 +134,11 @@ function logGpsPing(userId, gps, source) {
 
 export default function WorkV2() {
   const navigate = useNavigate()
+  // Phase 34Z.43 — re-run load() on every navigate-back to /work
+  // (location.key changes per navigation). Owner reported saves
+  // don't reflect until manual reload because /work was retaining
+  // state from before the navigate-away.
+  const location = useLocation()
   const profile = useAuthStore(s => s.profile)
 
   const [session, setSession] = useState(null)
@@ -313,7 +318,7 @@ export default function WorkV2() {
     }
     setLoading(false)
   }
-  useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
+  useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id, location.key])
 
   useEffect(() => {
     if (profile?.id) {

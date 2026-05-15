@@ -26,7 +26,7 @@
 // is #FFE600 from tokens.css.
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Plus, Search, X, Upload, Users as UsersIcon, AlertTriangle,
   Sparkles, ArrowRight,
@@ -53,6 +53,9 @@ const VISIBLE_GROUPS = ALL_STAGE_GROUPS.filter(g => g.key !== 'in_progress')
 
 export default function LeadsV2() {
   const navigate = useNavigate()
+  // Phase 34Z.43 — refresh leads list on every navigation back so
+  // newly-created rows show without manual reload.
+  const location = useLocation()
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
@@ -82,7 +85,7 @@ export default function LeadsV2() {
   const [reassignErr, setReassignErr] = useState('')
   const [assignableUsers, setAssignableUsers] = useState([])
 
-  useEffect(() => { fetchLeads() }, [fetchLeads])
+  useEffect(() => { fetchLeads() /* eslint-disable-next-line */ }, [fetchLeads, location.key])
 
   // Phase 19 — realtime sync across tabs. Listens for any insert/update/
   // delete on leads; the hook re-fetches the single row with joins so
