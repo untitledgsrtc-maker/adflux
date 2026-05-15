@@ -341,9 +341,29 @@ export default function WorkV2() {
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id, location.key])
 
   useEffect(() => {
-    if (profile?.id) {
-      ensurePushOnLogin(profile.id).catch(() => { /* silent */ })
-    }
+    if (!profile?.id) return
+    // Phase 34Z.55 — surface push setup failures so reps know whether
+    // they actually have notifications. Owner reported "no push" with
+    // no diagnostic; the prior silent .catch hid every reason.
+    // Show the gentle hint once per session — sessionStorage gates
+    // re-toasting on every page navigate.
+    const seenKey = `push-hint-${profile.id}`
+    const alreadySeen = sessionStorage.getItem(seenKey) === '1'
+    ensurePushOnLogin(profile.id).then((status) => {
+      if (status === 'ok' || alreadySeen) return
+      sessionStorage.setItem(seenKey, '1')
+      if (status === 'no-vapid') {
+        pushToast('Push not configured for this site yet. Tap bell → diagnostics for details.', 'warning')
+      } else if (status === 'denied') {
+        pushToast('Notifications blocked. Open phone settings → this site → allow notifications.', 'warning')
+      } else if (status === 'no-permission') {
+        pushToast('Tap the bell icon to enable push notifications.', 'info')
+      } else if (status === 'no-subscription') {
+        pushToast('Push permission granted but subscribe failed. Bell → diagnostics to retry.', 'warning')
+      } else if (status === 'unsupported') {
+        pushToast('This browser does not support push. On iPhone, install the app to your home screen first.', 'warning')
+      }
+    }).catch(() => { /* unexpected — swallow */ })
   }, [profile?.id])
 
   // GPS interval polling while the rep is checked in and the day

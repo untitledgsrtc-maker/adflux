@@ -34,6 +34,7 @@ import LeadDetailV2        from './pages/v2/LeadDetailV2'
 import LeadFormV2          from './pages/v2/LeadFormV2'
 import LeadUploadV2        from './pages/v2/LeadUploadV2'
 import WorkV2              from './pages/v2/WorkV2'
+import PushDebugV2         from './pages/v2/PushDebugV2'
 import TelecallerV2        from './pages/v2/TelecallerV2'
 import VoiceLogV2          from './pages/v2/VoiceLogV2'
 import FollowUpsV2         from './pages/v2/FollowUpsV2'
@@ -184,6 +185,11 @@ export default function App() {
           <Route path="/leads/new"                 element={<LeadFormV2 />} />
           <Route path="/leads/:id"                 element={<LeadDetailV2 />} />
           <Route path="/work"                      element={<WorkV2 />} />
+          {/* Phase 34Z.55 — push notification diagnostics + test send.
+              Surfaces all six gates (Notification API, Push API, VAPID,
+              SW, permission, subscription) so owner can diagnose why
+              push isn't arriving without reading the console. */}
+          <Route path="/push-debug"                element={<PushDebugV2 />} />
           <Route path="/telecaller"                element={<TelecallerV2 />} />
           <Route path="/voice"                     element={<VoiceLogV2 />} />
           <Route path="/voice/evening"             element={<EveningVoiceV2 />} />

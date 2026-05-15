@@ -148,12 +148,24 @@ export async function subscribeForPush(userId) {
 
 // Single entry point for the rep's /work mount.
 // Quiet on already-set-up, only prompts once.
+// Phase 34Z.55 — returns a status string so callers can surface the
+// outcome (e.g. via a toast). 'ok' / 'denied' / 'no-vapid' /
+// 'no-subscription' / 'unsupported' / 'no-permission'. Owner reported
+// "no push" — the prior silent-return made it impossible to tell why.
 export async function ensurePushOnLogin(userId) {
-  if (!userId) return
+  if (!userId) return 'no-user'
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    return 'unsupported'
+  }
+  if (!import.meta.env.VITE_VAPID_PUBLIC_KEY) {
+    return 'no-vapid'
+  }
   await registerServiceWorker()
   const perm = await requestPermission()
-  if (perm !== 'granted') return
-  await subscribeForPush(userId)
+  if (perm === 'denied')  return 'denied'
+  if (perm !== 'granted') return 'no-permission'
+  const sub = await subscribeForPush(userId)
+  return sub ? 'ok' : 'no-subscription'
 }
 
 // Phase 33S — fire-and-forget helper to send a push to one rep.

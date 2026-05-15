@@ -244,6 +244,21 @@ export default function NotificationPanel() {
               )
             })
           )}
+          {/* Phase 34Z.55 — diagnostics shortcut. Owner reported push
+              not arriving on device. /push-debug shows each gate +
+              has a "send test push" button. Sits at the foot of the
+              drawer so it doesn't clutter the list. */}
+          <div
+            onClick={() => { setOpen(false); navigate('/push-debug') }}
+            style={{
+              borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))',
+              padding: '10px 14px',
+              fontSize: 11, color: 'var(--text-muted)',
+              cursor: 'pointer', textAlign: 'center',
+            }}
+          >
+            Push not arriving? Run diagnostics →
+          </div>
         </div>
       )}
     </div>
