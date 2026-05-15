@@ -91,6 +91,36 @@ function parseCallIntent(rawText) {
   }
   if (days !== null) out.days = days
 
+  // Time of day -----------------------------------------------------
+  // English: "at 3 pm", "at 11:30", "3 o'clock"
+  // Hindi/Gujarati: "3 baje", "तीन बजे", "ત્રણ વાગ્યે", "બાર વાગ્યે"
+  let hour = null, minute = 0
+  const mClock = text.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)\b/)
+  if (mClock) {
+    hour = parseInt(mClock[1], 10)
+    minute = mClock[2] ? parseInt(mClock[2], 10) : 0
+    const isPm = /p/.test(mClock[3])
+    if (isPm && hour < 12) hour += 12
+    if (!isPm && hour === 12) hour = 0
+  }
+  if (hour === null) {
+    const mBaje = text.match(/\b(\d{1,2})\s*(?:o'?clock|baje|बजे|વાગ્યે|vagye)\b/)
+    if (mBaje) {
+      hour = parseInt(mBaje[1], 10)
+      // Indian-English / Gujarati / Hindi reps usually mean PM for 1-7
+      // when they say "X વાગ્યે" / "X baje" in a sales context — calls
+      // happen in business hours. Treat 1-7 as PM unless "morning"
+      // / "savaare" / "subah" / "સવારે" is in the same phrase.
+      const morningHint = /\b(morning|am|savaare|savare|subah|સવારે)\b/.test(text)
+      if (!morningHint && hour >= 1 && hour <= 7) hour += 12
+    }
+  }
+  if (hour !== null) {
+    const hh = String(hour).padStart(2, '0')
+    const mm = String(minute).padStart(2, '0')
+    out.time = `${hh}:${mm}`
+  }
+
   // Meeting keyword overrides ---------------------------------------
   if (/\b(meeting|met him|met her|visit|site visit|in person|meet (them|him|her)|મીટિંગ|मीटिंग|मिलना|મળવા)\b/.test(text)) {
     out.nextAction = 'meeting'
@@ -163,7 +193,12 @@ export default function PostCallOutcomeModal({
   // Defaults to the preset offset for the selected chip; rep can edit
   // freely. Once edited manually, chip selection no longer overrides.
   const [customDate, setCustomDate] = useState(addDays(null, 3))
+  // Phase 34Z.60 — optional time of day. Owner asked for a time picker
+  // alongside the date so "meet at 11 AM tomorrow" is one tap. Empty
+  // string means "no time set" — follow_ups.follow_up_time stays null.
+  const [customTime, setCustomTime] = useState('')
   const dateTouchedRef = useRef(false)
+  const timeTouchedRef = useRef(false)
   // Language toggle for the voice mic. 'auto' is the new default
   // (Phase 34Z.49 hardcoded 'gu' which was biasing English/Hindi).
   const [voiceLang, setVoiceLang] = useState('auto')
@@ -175,8 +210,10 @@ export default function PostCallOutcomeModal({
       setNextAction('follow_up_3d')
       setNotes('')
       setCustomDate(addDays(null, 3))
+      setCustomTime('')
       setVoiceLang('auto')
       dateTouchedRef.current = false
+      timeTouchedRef.current = false
     }
   }, [open])
 
@@ -220,6 +257,10 @@ export default function PostCallOutcomeModal({
         // useEffect keep working after this point.
         dateTouchedRef.current = false
       }
+    }
+    if (intent.time) {
+      setCustomTime(intent.time)
+      timeTouchedRef.current = true
     }
   }
 
@@ -275,19 +316,26 @@ export default function PostCallOutcomeModal({
     //    Owner directive (15 May 2026): every chip — including
     //    Meeting and Custom — carries a user-pickable date, no longer
     //    a fixed preset. 'none' is the only no-op.
+    //    Phase 34Z.60 — also write follow_up_time when the rep set
+    //    one in the time picker / voice intent.
     if (nextAction !== 'none' && customDate) {
       const isMeeting = nextAction === 'meeting'
       const noteText = notes.trim()
         || (isMeeting
             ? `Meeting · ${OUTCOMES.find(o => o.value === outcome)?.label || 'after call'}`
             : `After call · ${OUTCOMES.find(o => o.value === outcome)?.label}`)
-      const { error: fuErr } = await supabase.from('follow_ups').insert([{
+      const fuRow = {
         lead_id: lead.id,
         assigned_to: profile?.id,
         follow_up_date: customDate,
         note: isMeeting ? `Meeting — ${noteText}` : noteText,
         is_done: false,
-      }])
+      }
+      if (customTime) {
+        // follow_ups.follow_up_time is a `time` column. HH:MM accepted.
+        fuRow.follow_up_time = customTime
+      }
+      const { error: fuErr } = await supabase.from('follow_ups').insert([fuRow])
       if (fuErr) {
         toastError(fuErr, 'Follow-up scheduled but DB write failed: ' + fuErr.message)
       }
@@ -298,6 +346,47 @@ export default function PostCallOutcomeModal({
           revisit_date: customDate,
         }).eq('id', lead.id)
       }
+      // Phase 34Z.60 — when nextAction is 'meeting', also insert a
+      // separate lead_activities row of type 'meeting'. Without this
+      // the timeline only shows the originating 'call' row and the
+      // rep wonders where the scheduled meeting went. Owner reported
+      // "when I schedule a meeting, it is not showing the meeting, it
+      // is showing only on call notes."
+      if (isMeeting) {
+        const whenLabel = customTime
+          ? `${customDate} ${customTime}`
+          : customDate
+        // Note: we deliberately DON'T pass next_action_date here —
+        // Phase 34 trg_lead_activity_sync_followup would then upsert
+        // another follow_ups row and overwrite the one we just wrote
+        // above (with our custom note + time). Bake the date into the
+        // notes text instead so the timeline still shows it.
+        const { error: mtErr } = await supabase.from('lead_activities').insert([{
+          lead_id: lead.id,
+          activity_type: 'meeting',
+          outcome: null,
+          notes: `Meeting scheduled · ${whenLabel}${notes.trim() ? ' — ' + notes.trim() : ''}`,
+          created_by: profile?.id,
+        }])
+        if (mtErr) {
+          // Non-fatal — the follow_ups row above is the source of
+          // truth for the rep's queue. Surface so we know.
+          toastError(mtErr, 'Meeting scheduled but timeline write failed: ' + mtErr.message)
+        }
+      }
+    }
+
+    // 4. Phase 34Z.60 — close any open smart task on this lead
+    //    assigned to this rep. Owner reported smart tasks staying
+    //    visible after the outcome was logged, even from lead detail
+    //    (Phase 34Z.54 only closed them when the call originated on
+    //    /work). Use a single best-effort UPDATE; failure is non-fatal.
+    if (profile?.id && lead.id) {
+      await supabase.from('lead_tasks')
+        .update({ status: 'done', completed_at: new Date().toISOString() })
+        .eq('lead_id', lead.id)
+        .eq('assigned_to', profile.id)
+        .eq('status', 'open')
     }
 
     setSaving(false)
@@ -478,24 +567,58 @@ export default function PostCallOutcomeModal({
               {/* Phase 34Z.53 — custom date input. Visible for every
                   chip except "No next action". Snaps to preset offset
                   when chip changes; rep can pick any date freely.
-                  Owner directive: meeting + follow-up need date pickers. */}
+                  Owner directive: meeting + follow-up need date pickers.
+                  Phase 34Z.60 — paired with an optional time picker.
+                  Voice intent ("at 11 am" / "3 baje" / "બાર વાગ્યે")
+                  fills it automatically. */}
               {wantsDate && (
-                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <label className="lead-fld-label" style={{ margin: 0, fontSize: 11 }}>
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    className="lead-inp"
-                    value={customDate}
-                    min={TODAY_ISO()}
-                    onChange={(e) => {
-                      setCustomDate(e.target.value)
-                      dateTouchedRef.current = true
-                    }}
-                    disabled={saving}
-                    style={{ maxWidth: 200 }}
-                  />
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <label className="lead-fld-label" style={{ margin: 0, fontSize: 11, minWidth: 36 }}>
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      className="lead-inp"
+                      value={customDate}
+                      min={TODAY_ISO()}
+                      onChange={(e) => {
+                        setCustomDate(e.target.value)
+                        dateTouchedRef.current = true
+                      }}
+                      disabled={saving}
+                      style={{ maxWidth: 180 }}
+                    />
+                    <label className="lead-fld-label" style={{ margin: 0, fontSize: 11, minWidth: 36 }}>
+                      Time
+                    </label>
+                    <input
+                      type="time"
+                      className="lead-inp"
+                      value={customTime}
+                      onChange={(e) => {
+                        setCustomTime(e.target.value)
+                        timeTouchedRef.current = true
+                      }}
+                      disabled={saving}
+                      placeholder="optional"
+                      style={{ maxWidth: 130 }}
+                    />
+                    {customTime && (
+                      <button
+                        type="button"
+                        onClick={() => { setCustomTime(''); timeTouchedRef.current = false }}
+                        disabled={saving}
+                        style={{
+                          background: 'transparent', border: 0,
+                          color: 'var(--text-muted)', fontSize: 11,
+                          cursor: 'pointer', textDecoration: 'underline',
+                        }}
+                      >
+                        clear time
+                      </button>
+                    )}
+                  </div>
                   {dateTouchedRef.current && (
                     <button
                       type="button"
@@ -507,15 +630,13 @@ export default function PostCallOutcomeModal({
                       }}
                       disabled={saving}
                       style={{
-                        background: 'transparent',
-                        border: 0,
-                        color: 'var(--text-muted)',
-                        fontSize: 11,
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
+                        marginTop: 6,
+                        background: 'transparent', border: 0,
+                        color: 'var(--text-muted)', fontSize: 11,
+                        cursor: 'pointer', textDecoration: 'underline',
                       }}
                     >
-                      reset to preset
+                      reset date to preset
                     </button>
                   )}
                 </div>
