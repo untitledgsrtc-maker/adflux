@@ -63,9 +63,9 @@ export default function TaDaRequestPanel() {
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
     const [{ data: dt }, { data: reqs }, { data: pings }] = await Promise.all([
       supabase.from('daily_ta')
-        .select('total_km, bike_amount, daily_da_amount, hotel_amount, total_amount')
+        .select('km_traveled, bike_amount, da_amount, hotel_amount, total_amount')
         .eq('user_id', profile.id)
-        .eq('work_date', TODAY())
+        .eq('ta_date', TODAY())
         .maybeSingle(),
       supabase.from('ta_da_requests')
         .select('id, claim_date, kind, claim_km, claim_amount, city, reason, status, admin_note, created_at, decided_at')
@@ -195,7 +195,7 @@ export default function TaDaRequestPanel() {
           // Prefer nightly daily_ta total when available; else live ping math.
           const usingNightly = !!todayRow
           const km = usingNightly
-            ? Number(todayRow.total_km || 0)
+            ? Number(todayRow.km_traveled || 0)
             : Number(liveTrack?.km || 0)
           const bikeTa = usingNightly
             ? Number(todayRow.bike_amount || 0)

@@ -72,7 +72,7 @@ export default function TotalPayableCard() {
         supabase.from('daily_ta')
           .select('total_amount')
           .eq('user_id', profile.id)
-          .gte('work_date', ms).lte('work_date', me),
+          .gte('ta_date', ms).lte('ta_date', me),
         supabase.from('ta_da_requests')
           .select('status, claim_amount, claim_km')
           .eq('user_id', profile.id)
