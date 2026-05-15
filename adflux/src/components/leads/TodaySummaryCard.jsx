@@ -134,9 +134,15 @@ export default function TodaySummaryCard({ userId, session }) {
   }
 
   const cells = [
+    // Follow-ups → /follow-ups (full queue, default order).
     { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Follow-ups',          n: counts.followUps,         to: '/follow-ups' },
-    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Meetings today',      n: counts.plannedMeetings,   to: '/follow-ups' },
-    { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled meetings',  n: counts.scheduledMeetings, to: '/follow-ups' },
+    // Meetings today → scroll to plan row on /work. Already on /work
+    // when this card renders, so anchor scroll surfaces the planned
+    // meeting list inside DayStatusSurface.
+    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Meetings today',      n: counts.plannedMeetings,   to: '/work#day-status' },
+    // Scheduled meetings → /follow-ups filtered to Meeting% notes
+    // (Phase 34Z.63 filter param on FollowUpsV2).
+    { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled meetings',  n: counts.scheduledMeetings, to: '/follow-ups?filter=meetings' },
   ]
 
   return (

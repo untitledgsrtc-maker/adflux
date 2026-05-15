@@ -24,7 +24,7 @@
 // render a blank box.
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Phone, MessageCircle, CheckCircle2, Loader2,
   Inbox, AlertTriangle, Clock, RefreshCw,
@@ -33,6 +33,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import V2Hero from '../../components/v2/V2Hero'
+import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
+import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 const ADD_DAYS  = (iso, n) => {
@@ -54,6 +56,21 @@ export default function FollowUpsV2() {
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState('')
   const [busyId, setBusyId]         = useState(null)
+  // Phase 34Z.63 — outcome-modal state mirroring WorkV2 + LeadDetailV2.
+  // Tap Call on a follow-up row → tel: opens → activity row inserted
+  // → outcome modal opens 1.5s later. After save the same modal
+  // refetches the queue + WhatsApp prompt fires.
+  const [postCallOpen, setPostCallOpen] = useState(false)
+  const [pendingActivityId, setPendingActivityId] = useState(null)
+  const [callLead, setCallLead] = useState(null)
+  const [waPrompt, setWaPrompt] = useState(null)
+
+  // Owner directive (15 May 2026): TodaySummaryCard cells should
+  // filter this page so a tap on "Scheduled meetings" only shows
+  // meeting rows. ?filter=meetings restricts to follow_ups whose
+  // note starts with "Meeting" (Phase 34Z.60 prefix).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filterParam = searchParams.get('filter') || ''
 
   const load = useCallback(async () => {
     if (!profile?.id) return
@@ -126,7 +143,15 @@ export default function FollowUpsV2() {
     const tomorrow = ADD_DAYS(today, 1)
     const weekEnd  = ADD_DAYS(today, 7)
     const out = { overdue: [], today: [], tomorrow: [], week: [] }
-    rows.forEach(r => {
+    // Phase 34Z.63 — when ?filter=meetings is on the URL, only
+    // surface rows whose note starts with "Meeting" (Phase 34Z.60
+    // prefix from PostCallOutcomeModal). Owner directive: the
+    // TodaySummaryCard "Scheduled meetings" tap should land on a
+    // meeting-only view, not the generic queue.
+    const filtered = filterParam === 'meetings'
+      ? rows.filter(r => /^meeting/i.test(String(r.note || '').trim()))
+      : rows
+    filtered.forEach(r => {
       const d = r.follow_up_date
       if (!d) return
       if (d < today)            out.overdue.push(r)
@@ -137,7 +162,7 @@ export default function FollowUpsV2() {
       // queue if they want to plan further out.
     })
     return out
-  }, [rows])
+  }, [rows, filterParam])
 
   // Phase 31S — same date bucketing for Nurture revisits.
   const nurtureBuckets = useMemo(() => {
@@ -230,14 +255,54 @@ export default function FollowUpsV2() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  // Phase 34Z.63 — Call now fires the same chain as WorkV2 +
+  // LeadDetailV2: tel: on the user gesture, lead_activities insert
+  // deferred one tick, PostCallOutcomeModal opens 1.5s later. Owner
+  // reported: "I tap Call, output of that call window not coming."
   function openCall(row) {
     const phone = rowPhone(row)
     if (!phone) {
       setError(`${rowName(row) || 'Contact'} has no phone on file.`)
       return
     }
-    logFollowUpActivity(row, 'call')
+    const leadObj = row.lead || (row.quote
+      ? {
+          id:      row.lead_id || row.quote.id,
+          name:    row.quote.client_name,
+          company: row.quote.client_company,
+          phone:   row.quote.client_phone || phone,
+          stage:   null,
+        }
+      : null)
+    const leadId = row.lead_id || row.lead?.id
+    // Govt + lead-less rows fall back to the legacy tel: + cheap log.
+    if (!leadId) {
+      logFollowUpActivity(row, 'call')
+      window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
+      return
+    }
+    setCallLead(leadObj || { id: leadId, phone, name: rowName(row) })
+    // Fire dialer on the gesture, queue activity insert + modal.
     window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
+    setTimeout(async () => {
+      const { data: actRow, error: insErr } = await supabase
+        .from('lead_activities')
+        .insert([{
+          lead_id:       leadId,
+          activity_type: 'call',
+          outcome:       null,
+          notes:         `Call (follow-up) → ${rowName(row) || ''} · ${phone}`,
+          created_by:    profile?.id,
+        }])
+        .select('id')
+        .single()
+      if (insErr) {
+        setError('Could not log call: ' + insErr.message)
+        return
+      }
+      setPendingActivityId(actRow?.id || null)
+      setTimeout(() => setPostCallOpen(true), 1500)
+    }, 0)
   }
 
   // Phase 31S — Nurture row handlers. Lead has phone directly on the
@@ -318,6 +383,33 @@ export default function FollowUpsV2() {
 
   return (
     <div className="lead-root" style={{ paddingBottom: 24 }}>
+      {/* Phase 34Z.63 — active filter banner. Shown only when
+          ?filter=meetings (or future filter values). Tap "Show all"
+          to drop the filter and see the full queue. */}
+      {filterParam === 'meetings' && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 14px', marginBottom: 12,
+          background: 'var(--blue-soft, rgba(59,130,246,0.12))',
+          border: '1px solid var(--blue, #3B82F6)',
+          borderRadius: 10, fontSize: 12, color: 'var(--text)',
+        }}>
+          <span>Showing only meetings.</span>
+          <button
+            type="button"
+            onClick={() => { searchParams.delete('filter'); setSearchParams(searchParams) }}
+            style={{
+              marginLeft: 'auto',
+              background: 'transparent', border: 0,
+              color: 'var(--blue, #3B82F6)', cursor: 'pointer',
+              fontSize: 12, textDecoration: 'underline',
+            }}
+          >
+            Show all follow-ups
+          </button>
+        </div>
+      )}
+
       {/* Phase 34Z.4 — V2Hero strip for cross-page consistency
           (same teal hero as /work, /leads, /quotes). Value = total
           due today + overdue; chip = overdue count to keep the
@@ -457,6 +549,46 @@ export default function FollowUpsV2() {
         tone="neutral"
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
+      />
+
+      {/* Phase 34Z.63 — outcome capture + WhatsApp prompt chain, same
+          flow as WorkV2 + LeadDetailV2. Tap Call → tel: → activity
+          row inserted → modal opens → save → WA prompt fires unless
+          rep picked "Log a meeting now". */}
+      <PostCallOutcomeModal
+        open={postCallOpen}
+        lead={callLead}
+        pendingActivityId={pendingActivityId}
+        onClose={() => { setPostCallOpen(false); setPendingActivityId(null) }}
+        onSaved={async ({ nextAction }) => {
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+          load()
+          if (nextAction === 'meeting') {
+            if (callLead?.id) navigate(`/leads/${callLead.id}`)
+            return
+          }
+          if (callLead?.id) {
+            const { data } = await supabase
+              .from('leads').select('stage').eq('id', callLead.id).maybeSingle()
+            setTimeout(() => {
+              setWaPrompt({ stage: data?.stage || callLead.stage || 'post_call' })
+            }, 200)
+          }
+        }}
+        onLogMeeting={() => {
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+          if (callLead?.id) navigate(`/leads/${callLead.id}`)
+        }}
+      />
+
+      <WhatsAppPromptModal
+        open={!!waPrompt}
+        stage={waPrompt?.stage}
+        lead={callLead}
+        profile={profile}
+        onClose={() => setWaPrompt(null)}
       />
     </div>
   )

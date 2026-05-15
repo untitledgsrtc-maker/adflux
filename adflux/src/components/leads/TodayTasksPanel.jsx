@@ -273,11 +273,11 @@ function SuggestedTasks({ userId }) {
   }
 
   if (items.length === 0) {
-    return (
-      <div className="lead-tasks-empty">
-        All caught up — nothing flagged for today.
-      </div>
-    )
+    // Phase 34Z.63 — owner reported the "All caught up" card here
+    // duplicated NextActionSurface's "Day is clear" empty state right
+    // above it. Render nothing — let the parent's empty state speak
+    // for both panels.
+    return null
   }
 
   const toneFor = (kind) => kind === 'new_lead' || kind === 'new_untouched' ? 'info'
