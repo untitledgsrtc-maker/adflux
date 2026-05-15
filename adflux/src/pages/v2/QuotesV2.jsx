@@ -13,6 +13,8 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText } from 'lucide-react'
 import { useQuotes } from '../../hooks/useQuotes'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
+import FilterDrawer, { ActiveFilterChips } from '../../components/v2/FilterDrawer'
 import { useAuthStore } from '../../store/authStore'
 import { QUOTE_STATUSES, STATUS_LABELS } from '../../utils/constants'
 import { formatCurrency, formatDate, truncate } from '../../utils/formatters'
@@ -273,7 +275,13 @@ export default function QuotesV2() {
         ))}
       </div>
 
-      {/* ─── Filters row ──────────────────────────────── */}
+      {/* ─── Filters row ──────────────────────────────────────────
+          Phase 34Z.68 — owner directive (15 May 2026): "Want same
+          filter UI from leads, in quote tab in sales mobile view."
+          Reordered to the LeadsV2 pattern: search → tabs (already
+          rendered above) → date range → gear popover → reset.
+          Segment / Media / Rep moved into the FilterDrawer fields
+          array so the inline bar stays single-line on phones. */}
       <div className="v2d-filter-row">
         <div className="v2d-search v2d-search--inline">
           <Search size={14} />
@@ -294,115 +302,113 @@ export default function QuotesV2() {
           )}
         </div>
 
-        <div className="v2d-date-group">
-          <input
-            type="date"
-            className="v2d-date"
-            value={filters.dateFrom || ''}
-            onChange={e => setFilters({ dateFrom: e.target.value })}
-            title="From date"
-          />
-          <span className="v2d-date-sep">to</span>
-          <input
-            type="date"
-            className="v2d-date"
-            value={filters.dateTo || ''}
-            onChange={e => setFilters({ dateTo: e.target.value })}
-            title="To date"
-          />
-        </div>
+        {/* Phase 34Z.68 — DateRangeFilter (same component LeadsV2 uses)
+            replaces the two raw <input type="date"> tags. Single pill
+            with month-cursor + presets popover. */}
+        <DateRangeFilter
+          value={
+            filters.dateFrom || filters.dateTo
+              ? {
+                  preset: 'custom',
+                  from:   filters.dateFrom || '',
+                  to:     filters.dateTo   || '',
+                  label:  'Custom',
+                }
+              : presetToRange('all')
+          }
+          onChange={(next) => setFilters({
+            dateFrom: next.from || '',
+            dateTo:   next.to   || '',
+          })}
+        />
 
-        {/* Admin-only sales-rep filter — scope the table + totals
-            strip to one rep. Hidden for sales role since RLS already
-            limits them to their own quotes. */}
-        {isAdmin && repOptions.length > 0 && (
-          <select
-            value={repFilter}
-            onChange={e => setRepFilter(e.target.value)}
-            className="v2d-date"
-            style={{ minWidth: 160, cursor: 'pointer' }}
-          >
-            <option value="all">All sales reps</option>
-            {repOptions.map(r => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Segment filter — slices the list by Private vs Government.
-            'all' keeps the historical mixed view. Tab counts + totals
-            recompute against this slice. */}
-        <div style={{
-          display: 'inline-flex', gap: 4, padding: 3,
-          background: 'var(--v2-bg-2)', borderRadius: 999,
-          border: '1px solid var(--v2-border)',
-        }}>
-          {[
-            { key: 'all',        label: 'All' },
-            { key: 'private',    label: 'Private' },
-            { key: 'government', label: 'Govt' },
-          ].map(o => (
-            <button
-              key={o.key}
-              onClick={() => {
-                setSegmentFilter(o.key)
-                // Auto-reset media sub-filter when leaving Govt — the
-                // pill disappears anyway, but a stale value would re-
-                // apply if the user toggled back to Govt later.
-                if (o.key !== 'government') setMediaFilter('all')
-              }}
-              style={{
-                padding: '5px 11px', borderRadius: 999, border: 'none',
-                cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                background: segmentFilter === o.key ? 'var(--v2-ink-0)' : 'transparent',
-                color:      segmentFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
-              }}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Govt-only media-type sub-filter — Auto vs GSRTC. Hidden
-            unless segmentFilter is 'government', because for All /
-            Private the media types either don't exist or aren't useful
-            to slice on. Auto-resets when leaving Govt below. */}
-        {segmentFilter === 'government' && (
-          <div style={{
-            display: 'inline-flex', gap: 4, padding: 3,
-            background: 'var(--v2-bg-2)', borderRadius: 999,
-            border: '1px solid var(--v2-border)',
-          }}>
-            {[
-              { key: 'all',        label: 'All' },
-              { key: 'AUTO_HOOD',  label: 'Auto' },
-              { key: 'GSRTC_LED',  label: 'GSRTC' },
-            ].map(o => (
-              <button
-                key={o.key}
-                onClick={() => setMediaFilter(o.key)}
-                style={{
-                  padding: '5px 11px', borderRadius: 999, border: 'none',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                  background: mediaFilter === o.key ? 'var(--v2-yellow, #FFE600)' : 'transparent',
-                  color:      mediaFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
-                }}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Phase 34Z.68 — gear-button popover for Segment / Media /
+            Rep. ActiveFilterChips below the row surfaces active
+            filters as removable chips, matching LeadsV2. */}
+        <FilterDrawer fields={[
+          {
+            key: 'segment',
+            label: 'Segment',
+            value: segmentFilter,
+            defaultValue: 'all',
+            options: [
+              { value: 'all',        label: 'All segments' },
+              { value: 'private',    label: 'Private' },
+              { value: 'government', label: 'Government' },
+            ],
+            onChange: (v) => {
+              setSegmentFilter(v)
+              if (v !== 'government') setMediaFilter('all')
+            },
+          },
+          // Media sub-filter only shows when segment = government.
+          ...(segmentFilter === 'government' ? [{
+            key: 'media',
+            label: 'Media',
+            value: mediaFilter,
+            defaultValue: 'all',
+            options: [
+              { value: 'all',       label: 'All media' },
+              { value: 'AUTO_HOOD', label: 'Auto Hood' },
+              { value: 'GSRTC_LED', label: 'GSRTC LED' },
+            ],
+            onChange: setMediaFilter,
+          }] : []),
+          // Admin-only rep filter.
+          ...(isAdmin && repOptions.length > 0 ? [{
+            key: 'rep',
+            label: 'Sales rep',
+            value: repFilter,
+            defaultValue: 'all',
+            options: [
+              { value: 'all', label: 'All sales reps' },
+              ...repOptions.map(r => ({ value: r.id, label: r.name })),
+            ],
+            onChange: setRepFilter,
+          }] : []),
+        ]} />
 
         {(hasActiveFilters || (isAdmin && repFilter !== 'all') || segmentFilter !== 'all' || mediaFilter !== 'all') && (
           <button className="v2d-ghost" onClick={() => {
             handleReset(); setRepFilter('all'); setSegmentFilter('all'); setMediaFilter('all')
           }}>
             <X size={13} />
-            <span>Clear</span>
+            <span>Reset</span>
           </button>
         )}
       </div>
+
+      {/* Phase 34Z.68 — chips below the filter row, one per active
+          filter. Same pattern as LeadsV2. */}
+      <ActiveFilterChips fields={[
+        {
+          key: 'segment', label: 'Segment',
+          value: segmentFilter, defaultValue: 'all',
+          options: [
+            { value: 'private',    label: 'Private' },
+            { value: 'government', label: 'Government' },
+          ],
+          onChange: (v) => {
+            setSegmentFilter(v)
+            if (v !== 'government') setMediaFilter('all')
+          },
+        },
+        ...(segmentFilter === 'government' ? [{
+          key: 'media', label: 'Media',
+          value: mediaFilter, defaultValue: 'all',
+          options: [
+            { value: 'AUTO_HOOD', label: 'Auto Hood' },
+            { value: 'GSRTC_LED', label: 'GSRTC LED' },
+          ],
+          onChange: setMediaFilter,
+        }] : []),
+        ...(isAdmin && repOptions.length > 0 ? [{
+          key: 'rep', label: 'Sales rep',
+          value: repFilter, defaultValue: 'all',
+          options: repOptions.map(r => ({ value: r.id, label: r.name })),
+          onChange: setRepFilter,
+        }] : []),
+      ]} />
 
       {/* Phase 34Z.11 — totals strip retired. V2Hero above already
           shows total amount + outstanding + filter scope. Mobile
