@@ -502,7 +502,7 @@ export default function CreateQuoteOtherMediaV2() {
           paddingTop: 12, marginTop: 12,
           borderTop: '1px solid var(--v2-line, rgba(255,255,255,.06))',
         }}>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>Total</span>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>Total</span>
           <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 22, color: 'var(--v2-yellow, #FFE600)' }}>
             ₹{totals.total.toLocaleString('en-IN')}
           </span>

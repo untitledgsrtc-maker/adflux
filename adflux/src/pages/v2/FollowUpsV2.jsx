@@ -462,7 +462,7 @@ export default function FollowUpsV2() {
         <div
           style={{
             background: 'var(--danger-soft)', border: '1px solid var(--danger)',
-            color: 'var(--danger)', borderRadius: 8, padding: '10px 14px',
+            color: 'var(--danger)', borderRadius: 10, padding: '10px 14px',
             marginBottom: 12, fontSize: 13,
           }}
         >

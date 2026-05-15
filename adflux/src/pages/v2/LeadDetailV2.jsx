@@ -1079,7 +1079,7 @@ export default function LeadDetailV2() {
             <div style={{
               marginTop: 12,
               padding: '12px 14px',
-              background: 'rgba(255,230,0,0.10)',
+              background: 'var(--accent-soft, rgba(255,230,0,0.10))',
               border: '1px solid var(--accent, #FFE600)',
               borderRadius: 10,
               display: 'flex', flexDirection: 'column', gap: 10,
@@ -1124,7 +1124,7 @@ export default function LeadDetailV2() {
               style={{
                 marginTop: 10,
                 borderColor: 'var(--accent, #FFE600)',
-                background: 'rgba(255,230,0,0.06)',
+                background: 'var(--accent-soft, rgba(255,230,0,0.06))',
               }}
             >
               <MapPin size={13} /> I'm here (auto-log in 10 min)

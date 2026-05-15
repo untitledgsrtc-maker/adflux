@@ -334,7 +334,7 @@ export default function LeadFormV2() {
       <div className="lead-card" style={{
         marginBottom: 14,
         padding: '14px 16px',
-        background: 'rgba(255,230,0,0.06)',
+        background: 'var(--accent-soft, rgba(255,230,0,0.06))',
         border: '1px dashed var(--accent, #FFE600)',
         display: 'grid',
         gridTemplateColumns: '1fr',

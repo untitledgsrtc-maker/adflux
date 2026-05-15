@@ -987,7 +987,7 @@ export default function LeadsV2() {
                     background: 'var(--danger-soft)',
                     border: '1px solid var(--danger)',
                     color: 'var(--danger)',
-                    borderRadius: 8, padding: '10px 14px', fontSize: 13,
+                    borderRadius: 10, padding: '10px 14px', fontSize: 13,
                   }}
                 >
                   {reassignErr}
