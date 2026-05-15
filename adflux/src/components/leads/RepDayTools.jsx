@@ -158,7 +158,10 @@ function OvernightToggle({ userId, workDate }) {
 }
 
 // ─── 3. RequestLeaveModal ───────────────────────────────────────
-function RequestLeaveModal({ userId, onClose, onSaved }) {
+// Phase 34Z.71 — exported so MyOfferV2 can mount it directly under
+// the offer letter. Same component the /work RepDayTools drawer
+// uses; one source of truth.
+export function RequestLeaveModal({ userId, onClose, onSaved }) {
   const [fDate, setFDate] = useState(todayISO())
   const [fType, setFType] = useState('personal')
   const [fReason, setFReason] = useState('')

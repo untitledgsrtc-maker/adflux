@@ -9,16 +9,23 @@
 // what the user sees here matches the offer letter they signed.
 
 import { useEffect, useState } from 'react'
-import { Download, FileText, AlertCircle } from 'lucide-react'
+// eslint-disable-next-line no-unused-vars
+import { Download, FileText, AlertCircle, CalendarOff } from 'lucide-react'
 import { useOffers } from '../../hooks/useOffers'
+import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/formatters'
 import TaDaRequestPanel from '../../components/incentives/TaDaRequestPanel'
+import { RequestLeaveModal } from '../../components/leads/RepDayTools'
+import { toastSuccess } from '../../components/v2/Toast'
 
 export default function MyOfferV2() {
   const { fetchMyOffer } = useOffers()
+  const profile = useAuthStore(s => s.profile)
   const [offer, setOffer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Phase 34Z.71 — Request Leave panel, owner directive 16 May 2026.
+  const [leaveOpen, setLeaveOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -64,11 +71,25 @@ export default function MyOfferV2() {
               No offer letter on file. Submit TA / DA claims below for the admin to approve.
             </div>
           </div>
+          {/* Phase 34Z.71 — request-leave entry point. */}
+          {profile?.id && (
+            <button className="v2d-cta" onClick={() => setLeaveOpen(true)}>
+              <CalendarOff size={15} />
+              <span>Request leave</span>
+            </button>
+          )}
         </div>
         {/* Phase 34Z.37 — no offer letter? The page used to be blank
             for admins / non-HR-onboarded reps. Now mounts the TA / DA
             claim panel so the URL still pays its way. */}
         <TaDaRequestPanel />
+        {leaveOpen && (
+          <RequestLeaveModal
+            userId={profile.id}
+            onClose={() => setLeaveOpen(false)}
+            onSaved={() => toastSuccess('Leave request submitted — admin will approve.')}
+          />
+        )}
       </div>
     )
   }
@@ -92,17 +113,27 @@ export default function MyOfferV2() {
             Accepted on {acceptedDate} · on file with HR
           </div>
         </div>
-        {offer.offer_pdf_url && (
-          <a
-            className="v2d-cta"
-            href={offer.offer_pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Download size={15} />
-            <span>Download PDF</span>
-          </a>
-        )}
+        <div style={{ display: 'inline-flex', gap: 8 }}>
+          {/* Phase 34Z.71 — request leave from the offer page so reps
+              don't have to dig into /work to file an off day. */}
+          {profile?.id && (
+            <button className="v2d-cta" onClick={() => setLeaveOpen(true)}>
+              <CalendarOff size={15} />
+              <span>Request leave</span>
+            </button>
+          )}
+          {offer.offer_pdf_url && (
+            <a
+              className="v2d-cta"
+              href={offer.offer_pdf_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Download size={15} />
+              <span>Download PDF</span>
+            </a>
+          )}
+        </div>
       </div>
 
       {/* ─── Hero summary card ──────────────────── */}
@@ -217,6 +248,14 @@ export default function MyOfferV2() {
           <TaDaRequestPanel />
         </div>
       </div>
+
+      {leaveOpen && (
+        <RequestLeaveModal
+          userId={profile.id}
+          onClose={() => setLeaveOpen(false)}
+          onSaved={() => toastSuccess('Leave request submitted — admin will approve.')}
+        />
+      )}
     </div>
   )
 }
