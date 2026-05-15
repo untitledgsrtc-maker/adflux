@@ -40,6 +40,13 @@ export function PaymentModal({
     [existingPayments]
   )
 
+  // Phase 34Z.44 — effective outstanding subtracts both approved AND
+  // pending. Owner reported reps forget the 1st partial sitting in
+  // admin's pending queue and re-enter the full quote total on the
+  // 2nd touch. Treat pending as "already claimed" for the rep's
+  // perspective and pre-fill / validate against that figure.
+  const effectiveOutstanding = Math.max(0, balance - pendingAmount)
+
   const [form, setForm] = useState(() => initialPayment ? {
     amount_received:   initialPayment.amount_received ?? '',
     payment_mode:      initialPayment.payment_mode    ?? 'NEFT',
@@ -48,7 +55,10 @@ export function PaymentModal({
     payment_notes:     initialPayment.payment_notes   ?? '',
     is_final_payment:  !!initialPayment.is_final_payment,
   } : {
-    amount_received: '',
+    // Phase 34Z.44 — pre-fill amount with effective outstanding so
+    // the rep sees what's actually owed before they type. Forces
+    // them to consciously change it if they want partial.
+    amount_received: effectiveOutstanding > 0 ? String(effectiveOutstanding) : '',
     payment_mode: 'NEFT',
     payment_date: today(),
     reference_number: '',
@@ -92,6 +102,14 @@ export function PaymentModal({
     }
     if (amt > balance + 0.5) {
       errs.amount_received = `Cannot exceed balance of ${formatCurrency(balance)}`
+    }
+    // Phase 34Z.44 — soft-block when amount > effective outstanding
+    // (= balance minus already-pending). Lets rep know the gap before
+    // admin has to reject. Hard block reserved for total-exceed above.
+    if (!isEdit && pendingAmount > 0 && amt > effectiveOutstanding + 0.5) {
+      errs.amount_received =
+        `${formatCurrency(pendingAmount)} is already submitted (pending admin approval). ` +
+        `Only ${formatCurrency(effectiveOutstanding)} is left to collect — adjust this amount or wait for admin to approve/reject the pending one.`
     }
     if (!form.payment_date) errs.payment_date = 'Date is required'
     return errs
@@ -238,12 +256,31 @@ export function PaymentModal({
               {/* Amount */}
               <div className="form-group">
                 <label className="form-label">Amount Received (₹) *</label>
+                {/* Phase 34Z.44 — pending hint inline above input so
+                    rep can't miss it. Owner: "team might forget that
+                    partial payment received, requests full again." */}
+                {!isEdit && pendingAmount > 0 && (
+                  <div style={{
+                    fontSize: 11.5,
+                    color: 'var(--warning)',
+                    background: 'rgba(245,158,11,0.10)',
+                    border: '1px solid rgba(245,158,11,0.35)',
+                    borderRadius: 8,
+                    padding: '6px 10px',
+                    marginBottom: 8,
+                    lineHeight: 1.5,
+                  }}>
+                    <strong>{formatCurrency(pendingAmount)}</strong> already submitted (pending admin approval).
+                    Only <strong>{formatCurrency(effectiveOutstanding)}</strong> left to collect on this quote.
+                    Pre-filled below.
+                  </div>
+                )}
                 <input
                   type="number"
                   className={`form-input${errors.amount_received ? ' input-error' : ''}`}
                   value={form.amount_received}
                   onChange={e => set('amount_received', e.target.value)}
-                  placeholder={`Max: ${formatCurrency(balance)}`}
+                  placeholder={`Max: ${formatCurrency(isEdit ? balance : effectiveOutstanding)}`}
                   min="1"
                   step="1"
                   autoFocus
