@@ -423,18 +423,18 @@ export function V2AppShell() {
         )}
 
         <div className="v2d-content">
-          {/* ProposedIncentiveCard — sales / agency only. Compact pill
-              by default; full purple hero on /work + /my-performance.
-              Hidden on /quotes/:id and /quotes/new (those pages mount
-              their own per-quote forecaster). */}
+          {/* ProposedIncentiveCard — sales / agency only.
+              Phase 34Z.58 (15 May 2026) — owner directive: "proposed
+              incentive card needed in every tab, fixed." Dropped the
+              compact-pill / full-hero split — full card now renders on
+              every rep-facing tab. Only /quotes/:id and /quotes/new
+              still hide it because those pages mount their own per-
+              quote IncentiveForecastCard right under the totals. */}
           {!isPrivileged && !isTelecaller
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 12 }}>
-              <ProposedIncentiveCard compact={
-                location.pathname !== '/my-performance'
-                && location.pathname !== '/work'
-              } />
+              <ProposedIncentiveCard compact={false} />
             </div>
           )}
           <Outlet />

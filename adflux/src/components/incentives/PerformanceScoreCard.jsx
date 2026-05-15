@@ -160,13 +160,33 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
           {isAgency ? 'No earnings yet this month' : 'No score yet this month'}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 14 }}>
           {isAgency
             ? 'Create a govt proposal and mark it won — your commission appears here once payment is recorded.'
             : `Log a meeting or move a lead through a stage and your score will
               start building. Sundays, holidays and approved leaves don't count
               against you.`}
         </div>
+        {/* Phase 34Z.58 — give the rep an exact next step. Owner
+            reported the empty state with no CTA was confusing. Both
+            paths land where the action lives. */}
+        {!isAgency ? (
+          <a
+            href="/work"
+            className="lead-btn lead-btn-primary"
+            style={{ textDecoration: 'none', display: 'inline-flex', gap: 6 }}
+          >
+            Start today on /work
+          </a>
+        ) : (
+          <a
+            href="/quotes/new/government"
+            className="lead-btn lead-btn-primary"
+            style={{ textDecoration: 'none', display: 'inline-flex', gap: 6 }}
+          >
+            Start a govt proposal
+          </a>
+        )}
       </div>
     )
   }
