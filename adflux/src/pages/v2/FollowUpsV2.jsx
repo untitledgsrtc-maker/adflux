@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import useAutoRefresh from '../../hooks/useAutoRefresh'
 import V2Hero from '../../components/v2/V2Hero'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
@@ -114,6 +115,9 @@ export default function FollowUpsV2() {
   }, [profile?.id, isPrivileged])
 
   useEffect(() => { load() }, [load])
+  // Phase 34Z.59 — refetch on tab-resume so completed follow-ups
+  // disappear from the queue without a manual reload.
+  useAutoRefresh(load, { enabled: !!profile?.id })
 
   // Bucket rows by date — labels chosen to read like a person would
   // describe them ("Overdue" not "<TODAY"; "Today" not "=TODAY").

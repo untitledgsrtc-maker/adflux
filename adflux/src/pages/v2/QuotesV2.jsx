@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText } from 'lucide-react'
 import { useQuotes } from '../../hooks/useQuotes'
+import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { useAuthStore } from '../../store/authStore'
 import { QUOTE_STATUSES, STATUS_LABELS } from '../../utils/constants'
 import { formatCurrency, formatDate, truncate } from '../../utils/formatters'
@@ -101,6 +102,10 @@ export default function QuotesV2() {
     fetchQuotes().finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters])
+
+  // Phase 34Z.59 — refetch on tab-resume / window focus so newly
+  // created or won quotes show up without a manual reload.
+  useAutoRefresh(fetchQuotes)
 
   // Keep the in-page search draft in sync with the store — the topbar
   // quick-search in V2AppShell also writes to filters.search, and

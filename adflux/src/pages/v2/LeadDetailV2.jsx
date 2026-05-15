@@ -48,6 +48,7 @@ import ReassignModal   from '../../components/leads/ReassignModal'
 import PhotoCapture     from '../../components/leads/PhotoCapture'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
+import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { Modal, ActionButton } from '../../components/v2/primitives'
@@ -350,6 +351,11 @@ export default function LeadDetailV2() {
     setLoading(false)
   }
   useEffect(() => { load() /* eslint-disable-next-line */ }, [id])
+  // Phase 34Z.59 — owner reported saves not reflecting until tab
+  // switch. Refetch the lead + its timeline on every tab-resume /
+  // window-focus so a return from tel: / wa.me: / Log meeting modal
+  // surfaces the new rows without a manual reload.
+  useAutoRefresh(load, { enabled: !!id })
 
   /* ─── Phase 35 PR 2 — OCR conflict apply ───
      Called from the batch modal's "Apply" button. Merges the

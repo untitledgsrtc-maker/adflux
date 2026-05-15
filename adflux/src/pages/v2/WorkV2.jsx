@@ -53,6 +53,7 @@ import LogMeetingModal from '../../components/leads/LogMeetingModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { useLeadTasks } from '../../hooks/useLeadTasks'
+import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
@@ -339,6 +340,10 @@ export default function WorkV2() {
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id, location.key])
+  // Phase 34Z.59 — also refetch on tab-resume (return from dialer /
+  // WhatsApp / Log meeting modal). location.key only fires on
+  // in-app router navigation, not on browser-level resume.
+  useAutoRefresh(load, { enabled: !!profile?.id })
 
   useEffect(() => {
     if (!profile?.id) return

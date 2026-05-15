@@ -11,12 +11,21 @@
 // /my-performance from the sidebar. Brought both back into one
 // page: meeting-score card on top, revenue + slab + history below.
 
+import { useState } from 'react'
 import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCard'
 import { MyPerformance } from '../../components/incentives/MyPerformance'
 import TotalPayableCard from '../../components/incentives/TotalPayableCard'
+import useAutoRefresh from '../../hooks/useAutoRefresh'
 import '../../styles/incentives.css'
 
 export default function MyPerformanceV2() {
+  // Phase 34Z.59 — bump a refresh key on tab-resume so the three
+  // self-fetching cards (PerformanceScoreCard / MyPerformance /
+  // TotalPayableCard) remount and re-pull. Owner reported saves not
+  // reflecting on the dashboard until a tab switch.
+  const [refreshKey, setRefreshKey] = useState(0)
+  useAutoRefresh(() => setRefreshKey(k => k + 1))
+
   return (
     <div className="v2d-perf">
       <div className="v2d-page-head">
@@ -32,20 +41,20 @@ export default function MyPerformanceV2() {
 
       {/* Phase 33E — task-completion score (meetings done vs target)
           + 70/30 base + variable salary projection. */}
-      <PerformanceScoreCard />
+      <PerformanceScoreCard key={`score-${refreshKey}`} />
 
       {/* Phase 34Z.34 — revenue / incentive slab / active campaigns /
           12-month history. Same component /incentives renders for the
           sales role. Two cards same page means reps stop flipping
           between two URLs to read their numbers. */}
       <div style={{ marginTop: 14 }}>
-        <MyPerformance />
+        <MyPerformance key={`perf-${refreshKey}`} />
       </div>
 
       {/* Phase 34Z.38 — single grand-total summary at the bottom.
           Base + Variable + Incentive + TA/DA = one rupee number the
           rep can read first thing. Owner directive 15 May 2026. */}
-      <TotalPayableCard />
+      <TotalPayableCard key={`tp-${refreshKey}`} />
     </div>
   )
 }
