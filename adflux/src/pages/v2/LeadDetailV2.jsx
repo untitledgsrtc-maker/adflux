@@ -48,7 +48,6 @@ import ReassignModal   from '../../components/leads/ReassignModal'
 import PhotoCapture     from '../../components/leads/PhotoCapture'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
-import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { Modal, ActionButton } from '../../components/v2/primitives'
@@ -499,13 +498,6 @@ export default function LeadDetailV2() {
         <ArrowLeft size={12} />
         <span>Back to leads</span>
       </div>
-
-      {/* Phase 34.9 discoverability — surface the mic-in-notes feature
-          that most reps never discovered. Dismisses to localStorage. */}
-      <DidYouKnow id="leaddetail-mic-in-notes-2026-05-13" title="Use the mic inside notes">
-        When you open Log Activity, the notes field has a mic button.
-        Speak up to 60 seconds in Gujarati / Hindi / English — AI transcribes.
-      </DidYouKnow>
 
       {/* Phase 34B — soft auto-Lost suggestion. Trigger sets
           auto_lost_suggested=true after AUTO_LOST_THRESHOLD non-

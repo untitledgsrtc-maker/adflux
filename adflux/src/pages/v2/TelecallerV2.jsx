@@ -29,7 +29,6 @@ import { formatDate, formatRelative } from '../../utils/formatters'
 import {
   StageChip, HeatDot, SegChip, LeadAvatar, Pill,
 } from '../../components/leads/LeadShared'
-import { DidYouKnow } from '../../components/v2/DidYouKnow'
 
 const HEAT_RANK = { hot: 0, warm: 1, cold: 2 }
 
@@ -124,14 +123,6 @@ export default function TelecallerV2() {
 
   return (
     <div className="lead-root">
-      {/* Phase 34.9 (C) discoverability — voice log + AI extract is
-          a hidden superpower. Most telecallers type notes manually. */}
-      <DidYouKnow id="telecaller-voice-log-2026-05-13" title="Stop typing call notes">
-        After a call, open /voice → pick the lead → speak 30 seconds in
-        Gujarati / Hindi / English. AI extracts outcome + next action + amount
-        and updates the lead for you.
-      </DidYouKnow>
-
       {/* Page head */}
       <div className="lead-page-head">
         <div>

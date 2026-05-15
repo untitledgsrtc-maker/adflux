@@ -31,7 +31,6 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import V2Hero from '../../components/v2/V2Hero'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
@@ -315,14 +314,6 @@ export default function FollowUpsV2() {
 
   return (
     <div className="lead-root" style={{ paddingBottom: 24 }}>
-      {/* Phase 34.9 discoverability — most reps don't log after the
-          call ends, so the same lead keeps reappearing on tomorrow's
-          list. Surface this nudge once. */}
-      <DidYouKnow id="followups-log-after-call-2026-05-13" title="After the call, log it">
-        Tap Call → phone dials. When call ends, open the lead and Log Activity →
-        Call → outcome. Else the same follow-up fires again tomorrow.
-      </DidYouKnow>
-
       {/* Phase 34Z.4 — V2Hero strip for cross-page consistency
           (same teal hero as /work, /leads, /quotes). Value = total
           due today + overdue; chip = overdue count to keep the

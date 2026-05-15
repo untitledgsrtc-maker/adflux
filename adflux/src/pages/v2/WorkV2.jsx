@@ -41,7 +41,6 @@ import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 // invalidate caches if it returns to a different surface later.
 // eslint-disable-next-line no-unused-vars
 import RepDayTools from '../../components/leads/RepDayTools'
-import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import { pushToast } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
@@ -658,14 +657,6 @@ export default function WorkV2() {
   return (
     <div className="lead-root">
       <div className="m-screen">
-        {/* Discoverability tip — irrelevant once the day is over. */}
-        {!dayDone && (
-          <DidYouKnow id="work-voice-plan-2026-05-13" title="Speak your day plan">
-            Tap the mic above and say what's on today. AI breaks it into tasks.
-            Saves 3-5 minutes vs typing each one.
-          </DidYouKnow>
-        )}
-
         {error && (
           <div
             role="alert"

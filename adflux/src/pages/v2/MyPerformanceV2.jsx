@@ -14,19 +14,11 @@
 import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCard'
 import { MyPerformance } from '../../components/incentives/MyPerformance'
 import TotalPayableCard from '../../components/incentives/TotalPayableCard'
-import { DidYouKnow } from '../../components/v2/DidYouKnow'
 import '../../styles/incentives.css'
 
 export default function MyPerformanceV2() {
   return (
     <div className="v2d-perf">
-      {/* Phase 34.9 (C) discoverability — most reps don't realize
-          there's an incentive forecaster on every quote detail page. */}
-      <DidYouKnow id="perf-quote-forecaster-2026-05-13" title="See per-quote incentive">
-        Open any quote — bottom card shows "If you close this this month, +₹X
-        to your monthly". Helps decide which deal to push first.
-      </DidYouKnow>
-
       <div className="v2d-page-head">
         <div>
           <div className="v2d-page-kicker">Your numbers</div>

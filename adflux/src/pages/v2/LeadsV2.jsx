@@ -44,7 +44,6 @@ import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import V2Hero from '../../components/v2/V2Hero'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
 import FilterDrawer, { ActiveFilterChips } from '../../components/v2/FilterDrawer'
-import { DidYouKnow } from '../../components/v2/DidYouKnow'
 
 /* The 5 tabs from the design — All + 4 groups. We re-use the
    underlying STAGE_GROUPS from useLeads but drop "in_progress"
@@ -355,19 +354,6 @@ export default function LeadsV2() {
 
   return (
     <div className="lead-root">
-      {/* Phase 34.9 discoverability — surface Co-Pilot to reps who
-          live on /leads but never tried Cmd+K. Dismisses to localStorage.
-          Phase 34Z — desktopOnly: keyboard shortcut means nothing on
-          phones; hide the tip on mobile viewports (<860px). */}
-      <DidYouKnow
-        id="leads-copilot-cmdk-2026-05-13"
-        title="Press Cmd+K to ask anything"
-        desktopOnly
-      >
-        Try "show hot leads I haven't called this week" or "Sondarva's pipeline this month".
-        Co-Pilot answers in plain English.
-      </DidYouKnow>
-
       {/* Phase 34Z.4 — V2Hero strip on /leads for cross-page consistency
           (same teal hero as /work, /quotes, /follow-ups). Value = total
           expected pipeline; chip = won/lost split; right = win-rate. */}
