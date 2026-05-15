@@ -291,7 +291,7 @@ export default function PostCallOutcomeModal({
     if (pendingActivityId) {
       const { error } = await supabase.from('lead_activities').update({
         outcome,
-        notes: [`Call · ${OUTCOMES.find(o => o.value === outcome)?.label}`, notes.trim() || null]
+        notes: [`Call · ${OUTCOMES.find(o => o.value === outcome)?.label || outcome}`, notes.trim() || null]
           .filter(Boolean).join(' — '),
       }).eq('id', pendingActivityId)
       activityError = error
@@ -300,7 +300,7 @@ export default function PostCallOutcomeModal({
         lead_id: lead.id,
         activity_type: 'call',
         outcome,
-        notes: [`Call · ${OUTCOMES.find(o => o.value === outcome)?.label}`, notes.trim() || null]
+        notes: [`Call · ${OUTCOMES.find(o => o.value === outcome)?.label || outcome}`, notes.trim() || null]
           .filter(Boolean).join(' — '),
         created_by: profile?.id,
       }])
@@ -352,7 +352,7 @@ export default function PostCallOutcomeModal({
       const noteText = notes.trim()
         || (isMeeting
             ? `Meeting · ${OUTCOMES.find(o => o.value === outcome)?.label || 'after call'}`
-            : `After call · ${OUTCOMES.find(o => o.value === outcome)?.label}`)
+            : `After call · ${OUTCOMES.find(o => o.value === outcome)?.label || outcome}`)
       const fuRow = {
         lead_id: lead.id,
         assigned_to: profile?.id,

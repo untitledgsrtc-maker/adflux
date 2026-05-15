@@ -31,6 +31,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import V2Hero from '../../components/v2/V2Hero'
+import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { RingMilestoneRow } from '../../components/v2/RingMilestone'
 
 function fmtINR(n) {
@@ -169,7 +170,7 @@ export default function TaPayoutsAdminV2() {
     if (Number.isNaN(num) || num === Number(row[field])) return
     const { error } = await supabase.from('city_da_ceilings')
       .update({ [field]: num }).eq('id', row.id)
-    if (error) { alert(`Save failed: ${error.message}`); return }
+    if (error) { toastError(error, `Save failed: ${error.message}`); return }
     loadCeilings()
   }
 
@@ -193,7 +194,7 @@ export default function TaPayoutsAdminV2() {
   async function bulkApprovePending() {
     const targets = visibleRows.filter(r => r.status === 'pending')
     if (targets.length === 0) {
-      alert('No pending rows in the current filter.')
+      toastError(new Error('No pending rows'), 'No pending rows in the current filter.')
       return
     }
     if (!confirm(`Approve all ${targets.length} pending TA rows for this rep + month?`)) return
@@ -205,7 +206,8 @@ export default function TaPayoutsAdminV2() {
       approved_at: new Date().toISOString(),
     }).in('id', ids)
     setBulkBusy(false)
-    if (error) { alert('Bulk approve failed: ' + error.message); return }
+    if (error) { toastError(error, 'Bulk approve failed: ' + error.message); return }
+    toastSuccess('Pending rows approved.')
     loadRows()
   }
 
@@ -244,7 +246,7 @@ export default function TaPayoutsAdminV2() {
     }
     const { error } = await supabase.from('daily_ta')
       .update(patch).eq('id', row.id)
-    if (error) { alert('Status update failed: ' + error.message); return }
+    if (error) { toastError(error, 'Status update failed: ' + error.message); return }
     loadRows()
   }
 
@@ -258,7 +260,7 @@ export default function TaPayoutsAdminV2() {
     const { error } = await supabase.from('daily_ta')
       .update({ hotel_amount: hotelValue, total_amount: newTotal })
       .eq('id', row.id)
-    if (error) { alert('Hotel save failed: ' + error.message); return }
+    if (error) { toastError(error, 'Hotel save failed: ' + error.message); return }
     loadRows()
   }
 
