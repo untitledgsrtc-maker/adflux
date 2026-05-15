@@ -44,7 +44,6 @@ import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
 import { pushToast } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
-import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import LogMeetingModal from '../../components/leads/LogMeetingModal'
 // Phase 34Z.51 — bring the LeadDetailV2 call-outcome flow to the
 // /work Next-up smart-task card. Tapping Call on the card now inserts
@@ -346,34 +345,12 @@ export default function WorkV2() {
   // in-app router navigation, not on browser-level resume.
   useAutoRefresh(load, { enabled: !!profile?.id })
 
-  useEffect(() => {
-    if (!profile?.id) return
-    // Phase 34Z.55 — surface push setup failures so reps know whether
-    // they actually have notifications. Owner reported "no push" with
-    // no diagnostic; the prior silent .catch hid every reason.
-    // Show the gentle hint once per session — sessionStorage gates
-    // re-toasting on every page navigate.
-    const seenKey = `push-hint-${profile.id}`
-    const alreadySeen = sessionStorage.getItem(seenKey) === '1'
-    ensurePushOnLogin(profile.id).then((status) => {
-      if (status === 'ok' || alreadySeen) return
-      sessionStorage.setItem(seenKey, '1')
-      if (status === 'no-vapid') {
-        pushToast('Push not configured for this site yet. Tap bell → diagnostics for details.', 'warning')
-      } else if (status === 'denied') {
-        pushToast('Notifications blocked. Open phone settings → this site → allow notifications.', 'warning')
-      } else if (status === 'no-permission') {
-        pushToast('Tap the bell icon to enable push notifications.', 'info')
-      } else if (status === 'no-subscription') {
-        pushToast('Push permission granted but subscribe failed. Bell → diagnostics to retry.', 'warning')
-      } else if (status === 'unsupported') {
-        // Android Chrome / Samsung Internet / Firefox / Edge all support
-        // Web Push in regular tabs. iOS Safari requires the PWA installed
-        // to the home screen on iOS 16.4+. Cover both in the hint.
-        pushToast('This browser does not support push. Use Chrome on Android, or on iPhone install the app to your home screen first.', 'warning')
-      }
-    }).catch(() => { /* unexpected — swallow */ })
-  }, [profile?.id])
+  // Phase 34Z.70 — fix #17: ensurePushOnLogin call moved to
+  // V2AppShell (Phase 34Z.69) so every rep-facing page enrolls,
+  // not just /work. Toast-on-failure logic moved into the shell
+  // too — see V2AppShell.jsx. This useEffect is intentionally
+  // empty here (kept as a marker so blame still points at the
+  // intent + history).
 
   // GPS interval polling while the rep is checked in and the day
   // isn't done. iOS Safari pauses geolocation on backgrounded tabs;
@@ -807,6 +784,10 @@ export default function WorkV2() {
               userId={profile.id}
               limit={3}
               excludeTaskId={nextUpSmartId}
+              // Phase 34Z.70 — fix #16: wire the same outcome modal
+              // chain that the Next-up card uses. Tap Phone icon →
+              // tel: + activity log + modal.
+              onCallLead={quickLogCall}
             />
             <MeetingsMapPanel userId={profile.id} />
             <EveningReportBlock

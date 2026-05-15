@@ -31,7 +31,7 @@ import CopilotModal from '../copilot/CopilotModal'
 import GlobalSearchBar from './GlobalSearchBar'
 import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
-import { ToastViewport } from './Toast'
+import { ToastViewport, pushToast } from './Toast'
 import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
@@ -207,13 +207,33 @@ export function V2AppShell() {
   // mount, not just /work. Reps who land directly on /leads/:id or
   // /follow-ups never used to get prompted; now they do. Returns a
   // status so the UI can decide whether to show the enrollment chip
-  // (fix #15).
+  // (fix #15). Phase 34Z.70 — also toasts the failure reason once
+  // per session (moved from WorkV2 to fix the double-fire #17).
   const [pushStatus, setPushStatus] = useState('unknown')
   useEffect(() => {
     if (!profile?.id) return
     let cancelled = false
+    const seenKey = `push-hint-${profile.id}`
+    const alreadySeen = typeof sessionStorage !== 'undefined'
+      ? sessionStorage.getItem(seenKey) === '1'
+      : true
     ensurePushOnLogin(profile.id).then((s) => {
-      if (!cancelled) setPushStatus(s || 'unknown')
+      if (cancelled) return
+      const status = s || 'unknown'
+      setPushStatus(status)
+      if (status === 'ok' || alreadySeen) return
+      try { sessionStorage.setItem(seenKey, '1') } catch { /* ignore */ }
+      if (status === 'no-vapid') {
+        pushToast('Push not configured for this site yet. Tap bell → diagnostics for details.', 'warning')
+      } else if (status === 'denied') {
+        pushToast('Notifications blocked. Open phone settings → this site → allow notifications.', 'warning')
+      } else if (status === 'no-permission') {
+        pushToast('Tap the bell icon to enable push notifications.', 'info')
+      } else if (status === 'no-subscription') {
+        pushToast('Push permission granted but subscribe failed. Bell → diagnostics to retry.', 'warning')
+      } else if (status === 'unsupported') {
+        pushToast('This browser does not support push. Use Chrome on Android, or on iPhone install the app to your home screen first.', 'warning')
+      }
     }).catch(() => { if (!cancelled) setPushStatus('error') })
     return () => { cancelled = true }
   }, [profile?.id])

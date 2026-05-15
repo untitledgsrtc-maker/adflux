@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import useAutoRefresh from '../../hooks/useAutoRefresh'
 import V2Hero from '../../components/v2/V2Hero'
 import { RingMilestoneRow } from '../../components/v2/RingMilestone'
 
@@ -53,7 +54,11 @@ function fmtDow(iso) {
 }
 
 function monthISO(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+  // Phase 34Z.70 — IST month-start so a 1:00 AM UTC visit (which is
+  // 6:30 AM IST same day) still resolves to the current Indian month
+  // instead of the previous UTC day.
+  const ist = new Date(d.getTime() + (5.5 * 60 * 60 * 1000))
+  return new Date(ist.getFullYear(), ist.getMonth(), 1).toISOString().slice(0, 10)
 }
 
 // Month label like "May 2026".
@@ -63,12 +68,17 @@ function monthLabel(iso) {
   return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 }
 
-// Build the list of last 6 months (newest first) for the picker.
+// Phase 34Z.70 — owner reported (15 May 2026) the month picker showed
+// April first instead of the current month. Root cause: lastSixMonths
+// used the browser's `new Date()` which on Vercel edge / mistuned
+// devices can drift one month. Force the current IST month to be the
+// first option, then walk back 5 months from there.
 function lastSixMonths() {
   const out = []
   const now = new Date()
+  const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000))
   for (let i = 0; i < 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const d = new Date(ist.getFullYear(), ist.getMonth() - i, 1)
     out.push(d.toISOString().slice(0, 10))
   }
   return out
@@ -138,6 +148,9 @@ export default function TaPayoutsAdminV2() {
     setRows(data || [])
   }
   useEffect(() => { loadRows() }, [fUser, fMonth]) // eslint-disable-line
+  // Phase 34Z.70 — refetch on tab-resume so admin sees newly-pinged
+  // rows the moment they switch back from another tab.
+  useAutoRefresh(loadRows, { enabled: !!fUser && !!fMonth })
 
   // Load city ceilings the first time the admin expands the editor.
   async function loadCeilings() {

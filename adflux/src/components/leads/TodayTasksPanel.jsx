@@ -54,7 +54,7 @@ function trimReason(_kind, reason) {
   return out.trim()
 }
 
-export default function TodayTasksPanel({ userId, limit = 10, excludeTaskId = null }) {
+export default function TodayTasksPanel({ userId, limit = 10, excludeTaskId = null, onCallLead = null }) {
   const navigate = useNavigate()
   const {
     tasks: rawTasks, loading, generating, error,
@@ -171,7 +171,25 @@ export default function TodayTasksPanel({ userId, limit = 10, excludeTaskId = nu
                     <a
                       href={`tel:${t.lead.phone}`}
                       className="lead-btn lead-btn-sm lead-task-btn-icon"
-                      onClick={e => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // Phase 34Z.70 — fix #16: when the parent
+                        // page mounts the outcome-modal chain
+                        // (WorkV2, /follow-ups, etc.) it passes
+                        // onCallLead. Letting the anchor fire tel:
+                        // first preserves the iOS Safari user
+                        // gesture; the parent's handler runs after
+                        // and inserts the activity + opens modal.
+                        if (typeof onCallLead === 'function') {
+                          onCallLead({
+                            id:      t.lead_id || t.lead?.id,
+                            phone:   t.lead?.phone,
+                            name:    t.lead?.name,
+                            company: t.lead?.company,
+                            stage:   t.lead?.stage,
+                          }, t.id)
+                        }
+                      }}
                       title="Call"
                       aria-label="Call"
                     >
