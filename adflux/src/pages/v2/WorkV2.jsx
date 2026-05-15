@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Sun, MapPin, Phone, Calendar, Loader2, Trash2, Plus,
-  CheckCircle2, Mic, Square, Clock, AlertTriangle,
+  CheckCircle2, Mic, Square, Clock, AlertTriangle, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -167,6 +167,10 @@ export default function WorkV2() {
   const [pendingActivityId, setPendingActivityId] = useState(null)
   const [callLead, setCallLead] = useState(null)
   const [waPrompt, setWaPrompt] = useState(null)
+  // Phase 34Z.54 — track which smart-task row triggered the call so
+  // we can close it from the outcome modal's onSaved callback. Owner
+  // reported the task stayed on /work after capturing the outcome.
+  const [callTaskId, setCallTaskId] = useState(null)
 
   /* Morning plan draft */
   const [plannedMeetings, setPlannedMeetings] = useState([
@@ -510,7 +514,7 @@ export default function WorkV2() {
   // PostCallOutcomeModal 1.5s later. The setTimeout(0) wrapper around
   // the insert keeps the user-gesture intact so iOS Safari hands off
   // to the dialer reliably (same trick LeadDetailV2 uses).
-  async function quickLogCall(lead) {
+  async function quickLogCall(lead, taskId = null) {
     if (!lead?.id || !profile?.id) return
     const phone = cleanPhone(lead.phone)
     if (!phone) {
@@ -518,6 +522,7 @@ export default function WorkV2() {
       return
     }
     setCallLead(lead)
+    setCallTaskId(taskId)
     // Fire the dialer immediately on the user gesture, then queue the
     // activity insert + modal on the next event-loop tick.
     window.location.href = `tel:+${phone}`
@@ -625,7 +630,10 @@ export default function WorkV2() {
   }
 
   // Smart-task feed for the NextActionSurface priority resolver.
-  const { tasks: smartTasks } = useLeadTasks({ userId: profile?.id })
+  // Phase 34Z.54 — also grab complete + skip so the Next-up card can
+  // (a) close itself when the rep saves an outcome, (b) expose a
+  // manual dismiss (X) for tasks the rep doesn't want to action.
+  const { tasks: smartTasks, complete: completeSmartTask, skip: skipSmartTask } = useLeadTasks({ userId: profile?.id })
   // Phase 34Z.47 — compute the Next-up pick once at parent scope so
   // both NextActionSurface (uses it as the hero) and TodayTasksPanel
   // (excludes the duplicate row) read the same reference. Owner
@@ -744,6 +752,7 @@ export default function WorkV2() {
             toggleMeetingDone={toggleMeetingDone}
             toggleTaskDone={toggleTaskDone}
             onCallLead={quickLogCall}
+            onDismissSmart={skipSmartTask}
             busy={busy}
           />
         )}
@@ -832,10 +841,17 @@ export default function WorkV2() {
         open={postCallOpen}
         lead={callLead}
         pendingActivityId={pendingActivityId}
-        onClose={() => { setPostCallOpen(false); setPendingActivityId(null) }}
+        onClose={() => { setPostCallOpen(false); setPendingActivityId(null); setCallTaskId(null) }}
         onSaved={async ({ nextAction }) => {
           setPostCallOpen(false)
           setPendingActivityId(null)
+          // Phase 34Z.54 — close the smart-task row that triggered
+          // this call so it stops appearing on /work. Owner reported
+          // the task stayed visible after a successful outcome save.
+          if (callTaskId) {
+            try { await completeSmartTask(callTaskId) } catch { /* non-fatal */ }
+            setCallTaskId(null)
+          }
           load()
           if (nextAction === 'meeting') {
             // Smart card has no LogMeetingModal mounted; send rep to
@@ -854,9 +870,13 @@ export default function WorkV2() {
             }, 200)
           }
         }}
-        onLogMeeting={() => {
+        onLogMeeting={async () => {
           setPostCallOpen(false)
           setPendingActivityId(null)
+          if (callTaskId) {
+            try { await completeSmartTask(callTaskId) } catch { /* non-fatal */ }
+            setCallTaskId(null)
+          }
           if (callLead?.id) navigate(`/leads/${callLead.id}`)
         }}
       />
@@ -1387,12 +1407,36 @@ function pickNextAction({ session, smartTasks }) {
   return null
 }
 
-function NextActionCard({ tone, title, subtitle, meta, primary, secondary }) {
+function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDismiss, dismissTitle }) {
   return (
     <div className="m-card" style={{
       borderColor: 'var(--accent, #FFE600)',
       background: 'rgba(255,230,0,0.04)',
+      position: 'relative',
     }}>
+      {/* Phase 34Z.54 — dismiss (X). Owner asked for a way to close a
+          smart task without making a call. Surfaces only when the
+          parent passes onDismiss (smart-task branch); plan / meeting
+          branches keep their existing Done CTAs. */}
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          title={dismissTitle || 'Dismiss task'}
+          aria-label={dismissTitle || 'Dismiss task'}
+          style={{
+            position: 'absolute', top: 10, right: 10,
+            width: 28, height: 28, borderRadius: 999,
+            background: 'transparent',
+            border: '1px solid var(--border-strong, var(--v2-line, #475569))',
+            color: 'var(--text-muted)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', padding: 0,
+          }}
+        >
+          <X size={14} strokeWidth={1.8} />
+        </button>
+      )}
       <div className="m-card-title">
         <span>Next up</span>
         <StatusBadge tint={tone.tint}>{tone.label}</StatusBadge>
@@ -1425,7 +1469,7 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary }) {
   )
 }
 
-function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, toggleTaskDone, onCallLead, busy }) {
+function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, toggleTaskDone, onCallLead, onDismissSmart, busy }) {
   const pick = pickNextAction({ session, smartTasks })
 
   if (!pick) {
@@ -1506,17 +1550,25 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
               // PostCallOutcomeModal 1.5s later. Owner reported the
               // smart-task card was firing tel: without logging the
               // call or surfacing the outcome modal.
+              // Phase 34Z.54 — pass the smart-task id so the parent
+              // can close it after the outcome is saved.
               onClick: () => onCallLead?.({
                 id: t.lead_id || lead.id,
                 phone: lead.phone,
                 name: lead.name,
                 company: lead.company,
                 stage: lead.stage,
-              }),
+              }, t.id),
             }
           : { variant: 'subtle', label: 'No phone', disabled: true, onClick: () => {} }
         }
         secondary={{ label: 'Open', onClick: () => navigate(`/leads/${t.lead_id || lead.id}`) }}
+        // Phase 34Z.54 — manual dismiss (X). Owner: "there is no
+        // option for close smart task close." Skips the row via the
+        // useLeadTasks hook; the realtime sub removes it from the
+        // list and a new Next-up pick is computed.
+        onDismiss={onDismissSmart ? () => onDismissSmart(t.id) : null}
+        dismissTitle="Dismiss this task"
       />
     )
   }

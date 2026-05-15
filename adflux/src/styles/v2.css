@@ -2201,6 +2201,11 @@
   .v2d-cta span { display: inline; }
   .v2d-cta { padding: 8px 12px; font-size: 12px; }
 }
+/* Phase 34Z.54 (15 May 2026) — owner reported "there is no bell icon
+   in the application or web app." The Phase 34N hide rule was making
+   the bell vanish on every phone <500px. Restore visibility — the row
+   still fits because GlobalSearchBar + Ask AI + IncentiveMiniPill +
+   v2d-me are all hidden on mobile, leaving plenty of room. */
 @media (max-width: 500px) {
-  .v2d-bell { display: none; }
+  .v2d-bell { width: 36px; height: 36px; }
 }
