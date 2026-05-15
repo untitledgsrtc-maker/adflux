@@ -88,24 +88,29 @@ export default function VoiceInput({
         reader.onerror = reject
         reader.readAsDataURL(blob)
       })
-      // Phase 34Z.74 — owner reported "Auth failed: Auth session
-      // missing!" from the PostCallOutcomeModal mic. Root cause:
-      // header set only Authorization, no `apikey`. supabase edge
-      // fn's auth.getUser() needs BOTH to validate the JWT against
-      // the project. WorkV2's edgeFetch helper already does this;
-      // VoiceInput was the lone holdout. Also falls back to anon key
-      // for Authorization when the cached session is null (expired
-      // hour-long JWT) so the call still hits the edge fn instead of
-      // silently 401-ing on a stale token.
-      const { data: { session } } = await supabase.auth.getSession()
+      // Phase 34Z.75 — fix "Auth session missing!" reliably. The
+      // root cause is a stale 1-hour Supabase JWT: when the PWA has
+      // been idle and the rep taps the mic, the cached
+      // access_token has expired. supabase-js auto-refreshes only on
+      // explicit calls — getSession() returns the STALE token.
+      // Call refreshSession() first so the bearer is always live.
+      // Also send `apikey` header for the project-scope claim the
+      // edge fn's auth.getUser() requires.
+      let { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        const refreshed = await supabase.auth.refreshSession()
+        session = refreshed?.data?.session || null
+      }
+      if (!session?.access_token) {
+        throw new Error('Sign-in expired. Reload the page and log in again.')
+      }
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-      const bearer  = session?.access_token || anonKey
       const url = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/voice-process`
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${bearer}`,
+          'Authorization': `Bearer ${session.access_token}`,
           'apikey': anonKey,
         },
         body: JSON.stringify({
