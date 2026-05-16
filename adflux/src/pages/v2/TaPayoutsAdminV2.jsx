@@ -143,6 +143,13 @@ export default function TaPayoutsAdminV2() {
   // hits every visible pending row in one supabase update.
   const [statusFilter, setStatusFilter] = useState('all')
   const [bulkBusy, setBulkBusy] = useState(false)
+  // Phase 36.3 — rep-side TA/DA claim requests. Reps submit via
+  // TaDaRequestPanel (lives on /my-offer); rows land in ta_da_requests
+  // with status='pending'. Admin had no view → owner reported the
+  // claim queue was invisible. Surface pending requests at the top of
+  // /admin/ta-payouts so admin can Approve / Reject in one place.
+  const [pendingRequests, setPendingRequests] = useState([])
+  const [requestActingOn, setRequestActingOn] = useState(null)
 
   // Load rep list once.
   useEffect(() => {
@@ -180,6 +187,20 @@ export default function TaPayoutsAdminV2() {
     setRows(data || [])
   }
   useEffect(() => { loadRows() }, [fUser, fMonth]) // eslint-disable-line
+
+  // Phase 36.3 — pending claim requests across all reps. Pulled
+  // independently of the per-rep daily_ta table so admin sees the
+  // global queue regardless of which rep is selected in the filter.
+  async function loadRequests() {
+    const { data, error } = await supabase
+      .from('ta_da_requests')
+      .select('id, user_id, claim_date, kind, claim_km, claim_amount, city, reason, receipt_url, status, created_at, users(name)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (!error) setPendingRequests(data || [])
+  }
+  useEffect(() => { if (isAdmin) loadRequests() }, [isAdmin])
   // Phase 34Z.70 — refetch on tab-resume so admin sees newly-pinged
   // rows the moment they switch back from another tab.
   // Phase 34Z.88 — dropped enabled gate. loadRows itself returns early
@@ -258,6 +279,36 @@ export default function TaPayoutsAdminV2() {
       return acc
     }, { km: 0, da: 0, bike: 0, hotel: 0, total: 0, approvedTotal: 0, paidTotal: 0 })
   }, [rows])
+
+  // Phase 36.3 — request approval handlers. Single-row flip on
+  // ta_da_requests. Approve → status='approved'; Reject → status=
+  // 'rejected' with an optional admin_note prompt. compute_monthly_salary
+  // can read approved requests on a follow-up commit.
+  async function handleApproveRequest(req) {
+    setRequestActingOn(req.id)
+    const { error } = await supabase.from('ta_da_requests').update({
+      status: 'approved',
+      decided_at: new Date().toISOString(),
+      decided_by: profile?.id,
+    }).eq('id', req.id)
+    setRequestActingOn(null)
+    if (error) { toastError(error, 'Approve failed: ' + error.message); return }
+    loadRequests()
+  }
+  async function handleRejectRequest(req) {
+    const note = prompt(`Reject ${req.users?.name || 'this'} claim — note for the rep (optional):`)
+    if (note === null) return
+    setRequestActingOn(req.id)
+    const { error } = await supabase.from('ta_da_requests').update({
+      status: 'rejected',
+      admin_note: note?.trim() || null,
+      decided_at: new Date().toISOString(),
+      decided_by: profile?.id,
+    }).eq('id', req.id)
+    setRequestActingOn(null)
+    if (error) { toastError(error, 'Reject failed: ' + error.message); return }
+    loadRequests()
+  }
 
   async function handleRecompute() {
     if (!fUser || !fMonth) return
@@ -397,6 +448,135 @@ export default function TaPayoutsAdminV2() {
           </div>
         </div>
       </div>
+
+      {/* Phase 36.3 — Pending rep-side TA/DA claim requests. Hidden
+          when zero pending. Shows across ALL reps so admin sees the
+          global queue regardless of the per-rep filter below. */}
+      {pendingRequests.length > 0 && (
+        <div className="v2d-panel" style={{ padding: 16 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 12,
+          }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              fontSize: 13, fontWeight: 600, color: 'var(--accent, #FFE600)',
+              letterSpacing: '0.04em', textTransform: 'uppercase',
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: 999,
+                background: 'var(--accent, #FFE600)',
+                boxShadow: '0 0 0 4px rgba(255,230,0,0.18)',
+              }} />
+              <span>Rep claim requests</span>
+              <span style={{
+                padding: '1px 7px', borderRadius: 999,
+                background: 'var(--accent, #FFE600)',
+                color: 'var(--accent-fg, #0f172a)',
+                fontSize: 11, fontWeight: 700,
+                fontFamily: 'var(--font-mono, monospace)',
+              }}>{pendingRequests.length}</span>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--v2-line)', color: 'var(--v2-ink-2)' }}>
+                  <th style={thStyle}>Rep</th>
+                  <th style={thStyle}>Date</th>
+                  <th style={thStyle}>Kind</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Claim</th>
+                  <th style={thStyle}>City</th>
+                  <th style={thStyle}>Reason</th>
+                  <th style={{ ...thStyle, width: 180, textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingRequests.map(req => {
+                  const busy = requestActingOn === req.id
+                  const claimDisplay = req.kind === 'ta_override'
+                    ? `${req.claim_km || 0} km`
+                    : fmtINR(req.claim_amount || 0)
+                  const kindLabel = req.kind === 'ta_override' ? 'TA km' : 'DA night'
+                  return (
+                    <tr key={req.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
+                      <td style={tdStyle}>
+                        <span style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
+                          {req.users?.name || '—'}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12 }}>
+                          {req.claim_date}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 10px',
+                          borderRadius: 999, fontSize: 11, fontWeight: 600,
+                          background: req.kind === 'da_night'
+                            ? 'rgba(255,230,0,0.14)'
+                            : 'rgba(90,176,255,0.14)',
+                          color: req.kind === 'da_night'
+                            ? 'var(--accent, #FFE600)'
+                            : '#5AB0FF',
+                        }}>
+                          {kindLabel}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>
+                        {claimDisplay}
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ color: 'var(--v2-ink-1)' }}>{req.city || '—'}</span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          color: 'var(--v2-ink-2)', fontSize: 12,
+                          display: 'inline-block', maxWidth: 220,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }} title={req.reason}>
+                          {req.reason || '—'}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleApproveRequest(req)}
+                            disabled={busy}
+                            className="v2d-ghost"
+                            title="Approve claim"
+                            style={{
+                              color: '#2BD8A0',
+                              borderColor: '#2BD8A044',
+                              background: 'rgba(43,216,160,.10)',
+                            }}
+                          >
+                            <Check size={13} /> Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectRequest(req)}
+                            disabled={busy}
+                            className="v2d-ghost"
+                            title="Reject claim"
+                            style={{
+                              color: '#FF6F61',
+                              borderColor: '#FF6F6144',
+                              background: 'rgba(255,111,97,.10)',
+                            }}
+                          >
+                            <X size={13} /> Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ─── City ceilings editor (collapsible) ───────── */}
       {/* Phase 33I (B9 fix) — admin can adjust DA, bike rate, hotel
