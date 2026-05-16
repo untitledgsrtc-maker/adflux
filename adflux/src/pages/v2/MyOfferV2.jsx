@@ -16,6 +16,7 @@ import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/formatters'
 import TaDaRequestPanel from '../../components/incentives/TaDaRequestPanel'
 import { RequestLeaveModal } from '../../components/leads/RepDayTools'
+import RepLeaveHistory from '../../components/leads/RepLeaveHistory'
 import { toastSuccess } from '../../components/v2/Toast'
 
 export default function MyOfferV2() {
@@ -26,6 +27,9 @@ export default function MyOfferV2() {
   const [error, setError] = useState('')
   // Phase 34Z.71 — Request Leave panel, owner directive 16 May 2026.
   const [leaveOpen, setLeaveOpen] = useState(false)
+  // Phase 36.11 — bump to force RepLeaveHistory remount after a
+  // new request is submitted, so the rep sees the new row land.
+  const [leaveRefresh, setLeaveRefresh] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -83,11 +87,20 @@ export default function MyOfferV2() {
             for admins / non-HR-onboarded reps. Now mounts the TA / DA
             claim panel so the URL still pays its way. */}
         <TaDaRequestPanel />
+        {/* Phase 36.11 — leave-history panel below TA/DA claims so rep
+            can see paid/unpaid + pending/approved status on every
+            request. */}
+        {profile?.id && (
+          <RepLeaveHistory userId={profile.id} refreshKey={leaveRefresh} />
+        )}
         {leaveOpen && (
           <RequestLeaveModal
             userId={profile.id}
             onClose={() => setLeaveOpen(false)}
-            onSaved={() => toastSuccess('Leave request submitted — admin will approve.')}
+            onSaved={() => {
+              toastSuccess('Leave request submitted — admin will approve.')
+              setLeaveRefresh(k => k + 1)
+            }}
           />
         )}
       </div>
@@ -247,13 +260,23 @@ export default function MyOfferV2() {
           <div className="v2d-panel-t" style={{ marginBottom: 10 }}>Travel &amp; DA Claims</div>
           <TaDaRequestPanel />
         </div>
+        {/* Phase 36.11 — leave history below claims (offer-loaded path). */}
+        {profile?.id && (
+          <div style={{ marginTop: 18 }}>
+            <div className="v2d-panel-t" style={{ marginBottom: 10 }}>Leave History</div>
+            <RepLeaveHistory userId={profile.id} refreshKey={leaveRefresh} />
+          </div>
+        )}
       </div>
 
       {leaveOpen && (
         <RequestLeaveModal
           userId={profile.id}
           onClose={() => setLeaveOpen(false)}
-          onSaved={() => toastSuccess('Leave request submitted — admin will approve.')}
+          onSaved={() => {
+            toastSuccess('Leave request submitted — admin will approve.')
+            setLeaveRefresh(k => k + 1)
+          }}
         />
       )}
     </div>
