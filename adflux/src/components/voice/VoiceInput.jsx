@@ -16,7 +16,7 @@
 //                           correction in voice-process when 'gu'.
 
 import { useRef, useState, useEffect } from 'react'
-import { Mic, Square, Loader2, RefreshCw, Check } from 'lucide-react'
+import { Mic, Square, Loader2, RefreshCw, Check, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 const RECORDING_MAX_MS = 60_000  // 60s cap
@@ -88,18 +88,19 @@ export default function VoiceInput({
         reader.onerror = reject
         reader.readAsDataURL(blob)
       })
-      // Phase 34Z.75 — fix "Auth session missing!" reliably. The
-      // root cause is a stale 1-hour Supabase JWT: when the PWA has
-      // been idle and the rep taps the mic, the cached
-      // access_token has expired. supabase-js auto-refreshes only on
-      // explicit calls — getSession() returns the STALE token.
-      // Call refreshSession() first so the bearer is always live.
-      // Also send `apikey` header for the project-scope claim the
-      // edge fn's auth.getUser() requires.
+      // Phase 34Z.78 — actual fix for "Auth session missing!".
+      // 34Z.75 had a logic bug: getSession() returns the cached
+      // session whether the access_token is fresh or expired. The
+      // `if (!session?.access_token)` check passed for stale tokens
+      // so refreshSession() never fired and the edge fn rejected.
+      // Fix: also refresh when expires_at is in the past (or within
+      // 30s of expiry — safe margin for the HTTP round-trip).
       let { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
+      const expiresAt = session?.expires_at ? session.expires_at * 1000 : 0
+      const stale = !session?.access_token || (expiresAt > 0 && expiresAt - Date.now() < 30_000)
+      if (stale) {
         const refreshed = await supabase.auth.refreshSession()
-        session = refreshed?.data?.session || null
+        session = refreshed?.data?.session || session || null
       }
       if (!session?.access_token) {
         throw new Error('Sign-in expired. Reload the page and log in again.')
@@ -196,7 +197,7 @@ export default function VoiceInput({
             color: state === 'recording'
               ? '#fff'
               : 'var(--accent-fg, #0f172a)',
-            border: 0, borderRadius: 8,
+            border: 0, borderRadius: 10,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer',
             alignSelf: multiline ? 'flex-start' : 'stretch',
@@ -219,7 +220,7 @@ export default function VoiceInput({
           padding: '8px 10px',
           background: 'rgba(255,230,0,0.08)',
           border: '1px solid var(--accent, #FFE600)',
-          borderRadius: 8,
+          borderRadius: 10,
           fontSize: 12,
           display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
         }}>
@@ -253,12 +254,15 @@ export default function VoiceInput({
             type="button"
             onClick={cancelConfirm}
             title="Discard"
+            aria-label="Discard"
             style={{
               background: 'transparent', color: 'var(--text-subtle)',
-              border: 0, cursor: 'pointer', fontSize: 11,
+              border: 0, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center',
+              padding: 2,
             }}
           >
-            ✕
+            <X size={12} strokeWidth={1.6} />
           </button>
         </div>
       )}
