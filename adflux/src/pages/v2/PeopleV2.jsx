@@ -130,11 +130,13 @@ export default function PeopleV2() {
         })}
       </div>
 
-      {/* Active tab content — render the existing page as-is. Mount
-          via key so switching tabs unmounts the previous one (frees
-          its in-flight Supabase requests + resets local state). */}
+      {/* Active tab content — render the existing page in `embedded`
+          mode so it suppresses its own page-head (the "People" head
+          above is the only one). Mount via key so switching tabs
+          unmounts the previous one (frees in-flight Supabase requests
+          + resets local state). */}
       <div key={active.key}>
-        <ActiveComp />
+        <ActiveComp embedded />
       </div>
     </div>
   )

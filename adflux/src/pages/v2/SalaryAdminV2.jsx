@@ -41,7 +41,11 @@ function currentMonthYM() {
   return `${y}-${m}`
 }
 
-export default function SalaryAdminV2() {
+// Phase 38 — `embedded` prop suppresses own page-head when mounted
+// inside PeopleV2 (which renders the shared "People" head once). When
+// embedded, the month picker + CSV export move to a toolbar row above
+// the table.
+export default function SalaryAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
   const isAdmin = ['admin', 'co_owner'].includes(profile?.role)
@@ -160,16 +164,9 @@ export default function SalaryAdminV2() {
 
   return (
     <div className="v2d-salary" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="v2d-page-head">
-        <div>
-          <div className="v2d-page-kicker">HR · Payroll</div>
-          <h1 className="v2d-page-title">Salary Sheet</h1>
-          <div className="v2d-page-sub">
-            Per-rep monthly breakdown: base + variable + incentive + TA – leave
-            deduction. Policy: {policy ? `${policy.paid_quota_days} paid days/year · base ÷ ${policy.unpaid_divisor} per unpaid day` : 'loading…'}.
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
+      {embedded ? (
+        // Phase 38 — toolbar row when inside PeopleV2.
+        <div style={{ display: 'flex', alignItems: 'end', gap: 8, justifyContent: 'flex-end' }}>
           <div>
             <label style={labelStyle}>Month</label>
             <input
@@ -189,7 +186,79 @@ export default function SalaryAdminV2() {
             <Download size={14} /> Export CSV
           </button>
         </div>
-      </div>
+      ) : (
+        <div className="v2d-page-head">
+          <div>
+            <div className="v2d-page-kicker">HR · Payroll</div>
+            <h1 className="v2d-page-title">Salary Sheet</h1>
+            <div className="v2d-page-sub">
+              Per-rep monthly breakdown: base + variable + incentive + TA – leave
+              deduction. Policy: {policy ? `${policy.paid_quota_days} paid days/year · base ÷ ${policy.unpaid_divisor} per unpaid day` : 'loading…'}.
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
+            <div>
+              <label style={labelStyle}>Month</label>
+              <input
+                type="month"
+                value={month}
+                onChange={e => setMonth(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={exportCSV}
+              disabled={loading || rows.length === 0}
+              className="v2d-cta"
+              style={{ height: 38 }}
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 38 — 4 summary cards. Matches owner-approved
+          people_module_mockup.html. Reuses totals + paidMap already
+          computed; no extra query. */}
+      {!loading && rows.length > 0 && (() => {
+        const totalPaid = Object.values(paidMap).reduce((s, v) => s + Number(v.paid || 0), 0)
+        const pending = Math.max(0, totals.net - totalPaid)
+        const repsNotFull = rows.filter(r => {
+          const pm = paidMap[r.user.id] || { paid: 0, hasFull: false }
+          return !pm.hasFull && Number(r.net_payable || 0) > pm.paid
+        }).length
+        const totalLeaveDays = rows.reduce((s, r) => s + Number(r.leave_days_unpaid || 0), 0)
+        const paidPct = totals.net > 0 ? Math.round((totalPaid / totals.net) * 100) : 0
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+            <SummaryCard
+              label="Net Payable"
+              value={fmtINR(totals.net)}
+              sub={`${rows.length} reps · ${month}`}
+            />
+            <SummaryCard
+              label="Already Paid"
+              value={fmtINR(totalPaid)}
+              valueColor="var(--v2-green, #10B981)"
+              sub={`${paidPct}% of ${month} payable`}
+            />
+            <SummaryCard
+              label="Pending"
+              value={fmtINR(pending)}
+              valueColor="var(--v2-amber, #F59E0B)"
+              sub={`${repsNotFull} reps not paid in full`}
+            />
+            <SummaryCard
+              label="Unpaid Leave Cut"
+              value={totals.deduction > 0 ? '−' + fmtINR(totals.deduction) : '—'}
+              valueColor={totals.deduction > 0 ? 'var(--v2-rose, #EF4444)' : 'var(--v2-ink-2)'}
+              sub={`${totalLeaveDays.toFixed(1)} days · base ÷ ${policy?.unpaid_divisor || 26}`}
+            />
+          </div>
+        )
+      })()}
 
       {err && (
         <div style={{
@@ -383,6 +452,40 @@ const inputStyle = {
   fontFamily: 'inherit',
   height: 38,
 }
+// Phase 38 — summary card used above the salary table.
+function SummaryCard({ label, value, sub, valueColor }) {
+  return (
+    <div style={{
+      background: 'var(--v2-bg-1, #0f1525)',
+      border: '1px solid var(--v2-line, #1f2a44)',
+      borderRadius: 14,
+      padding: '18px 20px',
+    }}>
+      <div style={{
+        fontSize: 11, color: 'var(--v2-ink-2, #8b95ad)',
+        textTransform: 'uppercase', letterSpacing: '.10em', fontWeight: 600,
+      }}>
+        {label}
+      </div>
+      <div style={{
+        fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',
+        fontSize: 26, fontWeight: 700,
+        color: valueColor || 'var(--v2-ink-0, #f1f5f9)',
+        marginTop: 6,
+      }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{
+          fontSize: 11, color: 'var(--v2-ink-2, #8b95ad)', marginTop: 4,
+        }}>
+          {sub}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const thStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em' }
 const thNum   = { ...thStyle, textAlign: 'right' }
 const tdStyle = { padding: '12px 14px', fontSize: 13, color: 'var(--v2-ink-1)', verticalAlign: 'top' }

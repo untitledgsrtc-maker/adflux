@@ -47,7 +47,9 @@ function fmtDate(iso) {
   } catch { return iso }
 }
 
-export default function LeavesAdminV2() {
+// Phase 38 — `embedded` prop suppresses own page-head when mounted
+// inside PeopleV2 (which renders the shared "People" head once).
+export default function LeavesAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
   const isAdmin = ['admin', 'co_owner'].includes(profile?.role)
@@ -236,17 +238,19 @@ export default function LeavesAdminV2() {
   return (
     <div className="v2d-leaves" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* ─── Header ────────────────────────────────────── */}
-      <div className="v2d-page-head">
-        <div>
-          <div className="v2d-page-kicker">HR · Time off</div>
-          <h1 className="v2d-page-title">Leaves</h1>
-          <div className="v2d-page-sub">
-            Mark approved leave days for the team. The performance score
-            excludes these days automatically — reps don't lose variable
-            salary for time off.
+      {!embedded && (
+        <div className="v2d-page-head">
+          <div>
+            <div className="v2d-page-kicker">HR · Time off</div>
+            <h1 className="v2d-page-title">Leaves</h1>
+            <div className="v2d-page-sub">
+              Mark approved leave days for the team. The performance score
+              excludes these days automatically — reps don't lose variable
+              salary for time off.
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ─── Add leave form ─────────────────────────────── */}
       <div className="v2d-panel" style={{ padding: 16 }}>

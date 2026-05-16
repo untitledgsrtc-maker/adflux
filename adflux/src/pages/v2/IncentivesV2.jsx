@@ -14,22 +14,26 @@ import { IncentiveDashboard } from '../../components/incentives/IncentiveDashboa
 import { MyPerformance } from '../../components/incentives/MyPerformance'
 import '../../styles/incentives.css'
 
-export default function IncentivesV2() {
+// Phase 38 — `embedded` prop suppresses own page-head when mounted
+// inside PeopleV2 (which renders the shared "People" head once).
+export default function IncentivesV2({ embedded = false }) {
   const profile = useAuthStore(s => s.profile)
   if (!profile) return null
 
   if (profile.role === 'admin') {
     return (
       <div className="v2d-inc">
-        <div className="v2d-page-head">
-          <div>
-            <div className="v2d-page-kicker">Compensation</div>
-            <h1 className="v2d-page-title">Incentives</h1>
-            <div className="v2d-page-sub">
-              Staff profiles, monthly performance, slab tracking and payout liability.
+        {!embedded && (
+          <div className="v2d-page-head">
+            <div>
+              <div className="v2d-page-kicker">Compensation</div>
+              <h1 className="v2d-page-title">Incentives</h1>
+              <div className="v2d-page-sub">
+                Staff profiles, monthly performance, slab tracking and payout liability.
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <div className="v2d-inc-body">
           <IncentiveDashboard />
         </div>
@@ -40,15 +44,17 @@ export default function IncentivesV2() {
   // Sales role fallback — preserved so old /incentives bookmarks still work.
   return (
     <div className="v2d-inc">
-      <div className="v2d-page-head">
-        <div>
-          <div className="v2d-page-kicker">Your numbers</div>
-          <h1 className="v2d-page-title">My Performance</h1>
-          <div className="v2d-page-sub">
-            Track your monthly revenue, incentive slab progress and history.
+      {!embedded && (
+        <div className="v2d-page-head">
+          <div>
+            <div className="v2d-page-kicker">Your numbers</div>
+            <h1 className="v2d-page-title">My Performance</h1>
+            <div className="v2d-page-sub">
+              Track your monthly revenue, incentive slab progress and history.
+            </div>
           </div>
         </div>
-      </div>
+      )}
       <div className="v2d-inc-body">
         <MyPerformance />
       </div>

@@ -21,7 +21,9 @@ const FILTERS = [
   { key: 'inactive', label: 'Inactive' },
 ]
 
-export default function TeamV2() {
+// Phase 38 — `embedded` prop suppresses own page-head when mounted
+// inside PeopleV2 (which renders the shared "People" head once).
+export default function TeamV2({ embedded = false }) {
   const { members, loading, fetchMembers, deactivateMember, reactivateMember } = useTeam()
   const { settings, fetchSettings } = useIncentive()
   const [filter,  setFilter]   = useState('all')
@@ -48,19 +50,28 @@ export default function TeamV2() {
 
   return (
     <div className="v2d-team">
-      <div className="v2d-page-head">
-        <div>
-          <div className="v2d-page-kicker">Your people</div>
-          <h1 className="v2d-page-title">Team</h1>
-          <div className="v2d-page-sub">
-            Manage your sales team, roles, and incentive profiles.
-          </div>
+      {embedded ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+          <button className="v2d-cta" onClick={() => setAddOpen(true)}>
+            <UserPlus size={15} />
+            <span>Add Member</span>
+          </button>
         </div>
-        <button className="v2d-cta" onClick={() => setAddOpen(true)}>
-          <UserPlus size={15} />
-          <span>Add Member</span>
-        </button>
-      </div>
+      ) : (
+        <div className="v2d-page-head">
+          <div>
+            <div className="v2d-page-kicker">Your people</div>
+            <h1 className="v2d-page-title">Team</h1>
+            <div className="v2d-page-sub">
+              Manage your sales team, roles, and incentive profiles.
+            </div>
+          </div>
+          <button className="v2d-cta" onClick={() => setAddOpen(true)}>
+            <UserPlus size={15} />
+            <span>Add Member</span>
+          </button>
+        </div>
+      )}
 
       <div className="v2d-hr-stats">
         <div className="v2d-panel v2d-stat">
