@@ -22,6 +22,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { formatCurrency, formatMonthYear } from '../../utils/formatters'
 import { toastError } from '../v2/Toast'
+import { confirmDialog } from '../v2/ConfirmDialog'
 
 // Phase 39 — IST today (was UTC). `new Date().toISOString()` returns
 // UTC, which from 18:30 onwards already rolled the date forward but
@@ -83,7 +84,14 @@ export function SalaryPayoutModal({ staff, monthYear, computed, onClose, onSaved
   }
 
   async function remove(id) {
-    if (!confirm('Remove this payout entry?')) return
+    // Phase 39.y — confirmDialog instead of native confirm() per
+    // CLAUDE.md §26 Sprint A (consistent + non-blocking).
+    if (!(await confirmDialog({
+      title: 'Remove payout?',
+      message: 'Remove this payout entry? This cannot be undone.',
+      confirmLabel: 'Remove',
+      danger: true,
+    }))) return
     const { error } = await supabase
       .from('salary_payouts')
       .delete()
@@ -111,7 +119,7 @@ export function SalaryPayoutModal({ staff, monthYear, computed, onClose, onSaved
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10,
             background: 'rgba(255,255,255,.03)', border: '1px solid var(--border, #334155)',
-            borderRadius: 8, padding: 12,
+            borderRadius: 'var(--v2-r-sm, 10px)', padding: 12,
           }}>
             <div>
               <div style={{ fontSize: '.68rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase' }}>Net payable</div>
@@ -182,7 +190,7 @@ export function SalaryPayoutModal({ staff, monthYear, computed, onClose, onSaved
           {hasFull && (
             <div style={{
               background: 'var(--tint-success, rgba(16,185,129,0.14))', border: '1px solid var(--tint-success-bd, rgba(16,185,129,0.40))',
-              color: 'var(--success, #10B981)', padding: 10, borderRadius: 8, fontSize: '.82rem',
+              color: 'var(--success, #10B981)', padding: 10, borderRadius: 'var(--v2-r-sm, 10px)', fontSize: '.82rem',
             }}>
               Full &amp; final payment already recorded. No further entries allowed for this month.
             </div>

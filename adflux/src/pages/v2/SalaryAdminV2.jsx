@@ -312,7 +312,7 @@ export default function SalaryAdminV2({ embedded = false }) {
 
       {err && (
         <div style={{
-          padding: '8px 12px', borderRadius: 8,
+          padding: '8px 12px', borderRadius: 'var(--v2-r-sm, 10px)',
           background: 'rgba(239,68,68,.08)', color: 'var(--v2-rose, #EF4444)',
           fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
         }}>
@@ -503,7 +503,7 @@ const inputStyle = {
   padding: '9px 12px',
   background: 'var(--v2-bg-2)',
   border: '1px solid var(--v2-line)',
-  borderRadius: 8,
+  borderRadius: 'var(--v2-r-sm, 10px)',
   color: 'var(--v2-ink-0)',
   fontSize: 13,
   outline: 'none',
@@ -556,13 +556,13 @@ const filtColStyle = { display: 'flex', flexDirection: 'column', gap: 4 }
 const ghostBtnStyle = {
   background: 'transparent', border: '1px solid var(--v2-line, #1f2a44)',
   color: 'var(--v2-ink-1, #cdd5e2)', padding: '0 12px', height: 36,
-  borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer',
+  borderRadius: 'var(--v2-r-sm, 10px)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
 }
 const ctaBtnStyle = {
   background: 'var(--v2-yellow, #FFE600)', border: 'none',
   color: '#0a0e1a', padding: '0 14px', height: 36,
-  borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+  borderRadius: 'var(--v2-r-sm, 10px)', fontWeight: 700, fontSize: 13, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
 }
 const miniBtnStyle = {
