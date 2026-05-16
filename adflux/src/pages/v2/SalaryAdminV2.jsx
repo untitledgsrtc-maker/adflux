@@ -61,6 +61,9 @@ export default function SalaryAdminV2({ embedded = false }) {
   const [err,   setErr]     = useState('')
   const [loading, setLoading] = useState(true)
   const [payoutTarget, setPayoutTarget] = useState(null) // { user_id, name, computed }
+  // Phase 38.2 — mockup filter row (embedded mode only).
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [searchQ, setSearchQ]       = useState('')
 
   async function load() {
     setLoading(true); setErr('')
@@ -115,8 +118,21 @@ export default function SalaryAdminV2({ embedded = false }) {
   useEffect(() => { if (isAdmin) load() }, [isAdmin, month]) // eslint-disable-line
   useAutoRefresh(load, { enabled: isAdmin })
 
+  // Phase 38.2 — apply role + search filters before render. Filters
+  // only have visible controls in embedded mode but logic is shared.
+  const filteredRows = useMemo(() => {
+    return rows.filter(r => {
+      if (roleFilter !== 'all' && r.user?.role !== roleFilter) return false
+      if (searchQ.trim()) {
+        const q = searchQ.toLowerCase()
+        if (!(r.user?.name || '').toLowerCase().includes(q)) return false
+      }
+      return true
+    })
+  }, [rows, roleFilter, searchQ])
+
   const totals = useMemo(() => {
-    return rows.reduce((acc, r) => {
+    return filteredRows.reduce((acc, r) => {
       acc.base       += Number(r.base || 0)
       acc.variable   += Number(r.variable || 0)
       acc.incentive  += Number(r.incentive || 0)
@@ -125,7 +141,7 @@ export default function SalaryAdminV2({ embedded = false }) {
       acc.net        += Number(r.net_payable || 0)
       return acc
     }, { base: 0, variable: 0, incentive: 0, ta_da: 0, deduction: 0, net: 0 })
-  }, [rows])
+  }, [filteredRows])
 
   function exportCSV() {
     const header = [
@@ -134,7 +150,7 @@ export default function SalaryAdminV2({ embedded = false }) {
       'Leave Total', 'Leave Paid', 'Leave Unpaid',
       'Unpaid Deduction', 'NET PAYABLE',
     ]
-    const lines = rows.map(r => [
+    const lines = filteredRows.map(r => [
       r.user?.name || '',
       r.user?.role || '',
       r.base || 0,
@@ -165,9 +181,10 @@ export default function SalaryAdminV2({ embedded = false }) {
   return (
     <div className="v2d-salary" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {embedded ? (
-        // Phase 38 — toolbar row when inside PeopleV2.
-        <div style={{ display: 'flex', alignItems: 'end', gap: 8, justifyContent: 'flex-end' }}>
-          <div>
+        // Phase 38.2 — mockup-matching filter row. Month + Role +
+        // Search on the left; Export + Bulk Full-Pay on the right.
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+          <div style={filtColStyle}>
             <label style={labelStyle}>Month</label>
             <input
               type="month"
@@ -176,14 +193,47 @@ export default function SalaryAdminV2({ embedded = false }) {
               style={inputStyle}
             />
           </div>
+          <div style={filtColStyle}>
+            <label style={labelStyle}>Role</label>
+            <select
+              value={roleFilter}
+              onChange={e => setRoleFilter(e.target.value)}
+              style={{ ...inputStyle, minWidth: 160 }}
+            >
+              <option value="all">All roles</option>
+              <option value="sales">Sales</option>
+              <option value="telecaller">Telecaller</option>
+              <option value="agency">Agency</option>
+              <option value="admin">Admin</option>
+              <option value="co_owner">Co-owner</option>
+            </select>
+          </div>
+          <div style={filtColStyle}>
+            <label style={labelStyle}>Search rep</label>
+            <input
+              type="text"
+              value={searchQ}
+              onChange={e => setSearchQ(e.target.value)}
+              placeholder="Name…"
+              style={{ ...inputStyle, minWidth: 160 }}
+            />
+          </div>
+          <div style={{ flex: 1 }} />
           <button
             type="button"
             onClick={exportCSV}
-            disabled={loading || rows.length === 0}
-            className="v2d-cta"
-            style={{ height: 38 }}
+            disabled={loading || filteredRows.length === 0}
+            style={ghostBtnStyle}
           >
             <Download size={14} /> Export CSV
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Coming next sprint — pays remaining balance for every rep below in one click."
+            style={{ ...ctaBtnStyle, opacity: 0.45, cursor: 'not-allowed' }}
+          >
+            <Wallet size={14} /> Bulk full-pay
           </button>
         </div>
       ) : (
@@ -293,6 +343,10 @@ export default function SalaryAdminV2({ embedded = false }) {
             </div>
             <div className="v2d-empty-t">No reps to compute</div>
           </div>
+        ) : filteredRows.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--v2-ink-2)', fontSize: 13 }}>
+            No reps match the current Role / Search filter. Clear filters to see all {rows.length} reps.
+          </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="v2d-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1300 }}>
@@ -312,7 +366,7 @@ export default function SalaryAdminV2({ embedded = false }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
+                {filteredRows.map(r => (
                   <tr key={r.user.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
@@ -384,26 +438,30 @@ export default function SalaryAdminV2({ embedded = false }) {
                       })()}
                     </td>
                     <td style={tdNum}>
-                      <button
-                        type="button"
-                        onClick={() => setPayoutTarget({
-                          user_id: r.user.id,
-                          name: r.user.name,
-                          computed: Number(r.net_payable || 0),
-                        })}
-                        className="btn btn-y"
-                        style={{
-                          padding: '6px 10px', fontSize: 11, fontWeight: 600,
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                        }}
-                      >
-                        <IndianRupee size={12} /> Payout
-                      </button>
+                      {(() => {
+                        const pm = paidMap[r.user.id] || { paid: 0, hasFull: false }
+                        const done = pm.hasFull
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setPayoutTarget({
+                              user_id: r.user.id,
+                              name: r.user.name,
+                              computed: Number(r.net_payable || 0),
+                            })}
+                            style={done ? miniGhostStyle : miniBtnStyle}
+                          >
+                            <IndianRupee size={12} /> {done ? 'View' : 'Payout'}
+                          </button>
+                        )
+                      })()}
                     </td>
                   </tr>
                 ))}
                 <tr style={{ borderTop: '2px solid var(--v2-line)', background: 'rgba(255,255,255,.02)' }}>
-                  <td style={{ ...tdStyle, fontWeight: 700, color: 'var(--v2-ink-0)' }}>TOTAL</td>
+                  <td style={{ ...tdStyle, fontWeight: 700, color: 'var(--v2-ink-0)' }}>
+                    TOTAL{filteredRows.length !== rows.length ? ` · ${filteredRows.length} of ${rows.length}` : ''}
+                  </td>
                   <td style={tdNum}>{fmtINR(totals.base)}</td>
                   <td style={tdNum}>{fmtINR(totals.variable)}</td>
                   <td style={tdNum}>—</td>
@@ -486,7 +544,36 @@ function SummaryCard({ label, value, sub, valueColor }) {
   )
 }
 
-const thStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em' }
+// Phase 38.2 — padding bumped 10/14 -> 12/16 (th), 12/14 -> 14/16 (td)
+// to match people_module_mockup.html spec exactly.
+const thStyle = { padding: '12px 16px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em', background: 'rgba(255,255,255,.02)' }
 const thNum   = { ...thStyle, textAlign: 'right' }
-const tdStyle = { padding: '12px 14px', fontSize: 13, color: 'var(--v2-ink-1)', verticalAlign: 'top' }
+const tdStyle = { padding: '14px 16px', fontSize: 13, color: 'var(--v2-ink-1)', verticalAlign: 'top' }
 const tdNum   = { ...tdStyle, textAlign: 'right', fontFamily: 'var(--font-mono, monospace)' }
+
+// Phase 38.2 — toolbar styles matching mockup.
+const filtColStyle = { display: 'flex', flexDirection: 'column', gap: 4 }
+const ghostBtnStyle = {
+  background: 'transparent', border: '1px solid var(--v2-line, #1f2a44)',
+  color: 'var(--v2-ink-1, #cdd5e2)', padding: '0 12px', height: 36,
+  borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer',
+  display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
+}
+const ctaBtnStyle = {
+  background: 'var(--v2-yellow, #FFE600)', border: 'none',
+  color: '#0a0e1a', padding: '0 14px', height: 36,
+  borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+  display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
+}
+const miniBtnStyle = {
+  background: 'var(--v2-yellow, #FFE600)', border: 'none',
+  color: '#0a0e1a', padding: '5px 10px', fontSize: 11, fontWeight: 700,
+  borderRadius: 6, cursor: 'pointer', display: 'inline-flex',
+  alignItems: 'center', gap: 4, fontFamily: 'inherit',
+}
+const miniGhostStyle = {
+  ...miniBtnStyle,
+  background: 'transparent',
+  border: '1px solid var(--v2-line, #1f2a44)',
+  color: 'var(--v2-ink-1, #cdd5e2)',
+}

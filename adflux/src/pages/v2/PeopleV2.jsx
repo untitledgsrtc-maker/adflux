@@ -23,15 +23,23 @@
 // Role gate: admin / co_owner only. Reps land here only via direct URL
 // and bounce to /dashboard.
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Users, Gift, Wallet, Clock as ClockIcon } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 
 import TeamV2          from './TeamV2'
 import IncentivesV2    from './IncentivesV2'
 import SalaryAdminV2   from './SalaryAdminV2'
 import LeavesAdminV2   from './LeavesAdminV2'
+
+// Phase 38.2 — IST month label for the Salary tab badge.
+function currentMonthLabel() {
+  const now = new Date()
+  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
+  return ist.toLocaleString('en-IN', { month: 'short', year: 'numeric' })
+}
 
 const TABS = [
   { key: 'team',       label: 'Team',       icon: Users,     Comp: TeamV2 },
@@ -51,6 +59,31 @@ export default function PeopleV2() {
     () => TABS.find(t => t.key === requested) || TABS[0],
     [requested]
   )
+
+  // Phase 38.2 — live counts for tab badges. Two cheap COUNT queries
+  // + one constant string. Loaded once on mount; non-blocking.
+  const [counts, setCounts] = useState({ team: null, leaves: null, salary: currentMonthLabel() })
+  useEffect(() => {
+    if (!isAdmin) return
+    let cancelled = false
+    async function loadCounts() {
+      const [teamRes, leavesRes] = await Promise.all([
+        supabase.from('users').select('id', { count: 'exact', head: true })
+          .in('role', ['sales', 'agency', 'telecaller', 'admin', 'co_owner'])
+          .eq('is_active', true),
+        supabase.from('leaves').select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+      ])
+      if (cancelled) return
+      setCounts(c => ({
+        ...c,
+        team:   teamRes.count   ?? null,
+        leaves: leavesRes.count ?? null,
+      }))
+    }
+    loadCounts()
+    return () => { cancelled = true }
+  }, [isAdmin])
 
   useEffect(() => {
     if (profile && !isAdmin) navigate('/dashboard', { replace: true })
@@ -91,6 +124,11 @@ export default function PeopleV2() {
         {TABS.map(t => {
           const Icon = t.icon
           const on = t.key === active.key
+          // Phase 38.2 — badge content per tab.
+          let badge = null
+          if (t.key === 'team'   && counts.team   != null) badge = String(counts.team)
+          if (t.key === 'salary')                          badge = counts.salary
+          if (t.key === 'leaves' && counts.leaves != null) badge = counts.leaves > 0 ? `${counts.leaves} pending` : null
           return (
             <button
               key={t.key}
@@ -125,6 +163,21 @@ export default function PeopleV2() {
             >
               <Icon size={14} strokeWidth={1.6} />
               {t.label}
+              {badge && (
+                <span style={{
+                  fontFamily: 'var(--font-mono, JetBrains Mono, monospace)',
+                  fontSize: 10,
+                  background: on ? 'var(--v2-yellow-soft, rgba(255,230,0,.14))' : 'var(--v2-bg-2, #141b2d)',
+                  border: '1px solid',
+                  borderColor: on ? 'transparent' : 'var(--v2-line, #1f2a44)',
+                  color: on ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-2, #8b95ad)',
+                  padding: '2px 6px',
+                  borderRadius: 999,
+                  whiteSpace: 'nowrap',
+                }}>
+                  {badge}
+                </span>
+              )}
             </button>
           )
         })}
