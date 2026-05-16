@@ -33,6 +33,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import V2Hero from '../../components/v2/V2Hero'
+import { logCallAudit } from '../../utils/callAudit'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { toastError } from '../../components/v2/Toast'
@@ -296,12 +297,16 @@ export default function FollowUpsV2() {
     // Govt + lead-less rows fall back to the legacy tel: + cheap log.
     if (!leadId) {
       logFollowUpActivity(row, 'call')
+      // Phase 35.0 pass 6 — call-tap audit (lead-less path).
+      logCallAudit(supabase, { userId: profile?.id, leadId: null, phone })
       window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
       return
     }
     setCallLead(leadObj || { id: leadId, phone, name: rowName(row) })
     // Fire dialer on the gesture, queue activity insert + modal.
     window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
+    // Phase 35.0 pass 6 — call-tap audit (modal-chain path).
+    logCallAudit(supabase, { userId: profile?.id, leadId, phone })
     // Phase 34Z.69 — fix #5: hardened error path. The earlier
     // setTimeout body had no .catch so a network blip / RLS deny
     // left pendingActivityId null forever → modal never opened.
@@ -358,6 +363,8 @@ export default function FollowUpsV2() {
       return
     }
     logNurtureActivity(lead, 'call')
+    // Phase 35.0 pass 6 — call-tap audit for nurture-row Call.
+    logCallAudit(supabase, { userId: profile?.id, leadId: lead.id, phone: lead.phone })
     window.location.href = `tel:${String(lead.phone).replace(/\s/g, '')}`
   }
   function nurtureWhatsApp(lead) {

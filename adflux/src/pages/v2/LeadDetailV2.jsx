@@ -49,6 +49,7 @@ import PhotoCapture     from '../../components/leads/PhotoCapture'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import { logCallAudit } from '../../utils/callAudit'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { Modal, ActionButton } from '../../components/v2/primitives'
@@ -288,6 +289,13 @@ export default function LeadDetailV2() {
      race. Email button restored to the grid with a real mailto: href. */
   async function quickLog(activityType, notes) {
     if (!lead?.id || !profile?.id) return
+    // Phase 35.0 pass 6 — call-tap audit. For `call` activities,
+    // also write a row to call_logs so admin has a tel-tap proof
+    // alongside the rep-claimed lead_activities row. Fire-and-forget
+    // — never blocks the modal chain.
+    if (activityType === 'call') {
+      logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
+    }
     // Phase 34Z.49 — capture the inserted row id so the post-call
     // outcome modal can patch outcome onto the SAME row instead of
     // inserting a duplicate.

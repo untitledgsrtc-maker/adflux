@@ -55,6 +55,7 @@ import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { useLeadTasks } from '../../hooks/useLeadTasks'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import { logCallAudit } from '../../utils/callAudit'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
@@ -540,6 +541,11 @@ export default function WorkV2() {
     // Fire the dialer immediately on the user gesture, then queue the
     // activity insert + modal on the next event-loop tick.
     window.location.href = `tel:+${phone}`
+    // Phase 35.0 pass 6 — fire-and-forget call_logs audit insert so
+    // admin has a tel-tap proof separate from the rep-claimed
+    // lead_activities row. Helper swallows errors; never blocks the
+    // dialer hand-off.
+    logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
     setTimeout(async () => {
       const { data: actRow, error: insErr } = await supabase
         .from('lead_activities')
