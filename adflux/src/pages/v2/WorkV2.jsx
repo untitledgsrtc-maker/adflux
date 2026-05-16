@@ -951,7 +951,6 @@ function DayStatusSurface(props) {
     return (
       <>
         <V2Hero
-          flat
           eyebrow="Today · day done"
           value="Day done."
           label="Final counters below."
@@ -1010,7 +1009,6 @@ function DayStatusSurface(props) {
     return (
       <>
         <V2Hero
-          flat
           eyebrow={session?.check_in_at ? `In · ${formatTime(session.check_in_at)}` : 'In progress'}
           value={summary}
           label="meetings logged"
@@ -1035,7 +1033,6 @@ function DayStatusSurface(props) {
     return (
       <>
         <V2Hero
-          flat
           eyebrow="Today · ready to start"
           value="Ready to check in"
           label="GPS captures your start location."
@@ -1118,7 +1115,6 @@ function PlanTodayBlock(props) {
   return (
     <>
       <V2Hero
-        flat
         eyebrow="Today · plan the day"
         value={`${targets.meetings || 5} meetings`}
         label="set the bar before you start"
