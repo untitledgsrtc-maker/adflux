@@ -41,7 +41,13 @@ export default function TaDaRequestPanel() {
   const [liveTrack, setLiveTrack] = useState(null)
   const [requests, setRequests] = useState([])
   const [loading, setLoading]   = useState(true)
-  const [tab, setTab]           = useState('ta')   // 'ta' | 'da'
+  // Phase 36.7 — owner directive: rep needs to claim hotel stays and
+  // generic "other" expenses too. Tabs extended to 4 kinds.
+  //   'ta'    → ta_override (km)
+  //   'da'    → da_night    (₹)
+  //   'hotel' → hotel       (₹ + city)
+  //   'other' → other       (₹ + description)
+  const [tab, setTab]           = useState('ta')   // 'ta' | 'da' | 'hotel' | 'other'
 
   // Form state
   const [claimDate,   setClaimDate]   = useState(TODAY())
@@ -103,17 +109,27 @@ export default function TaDaRequestPanel() {
       toastError(new Error('Enter km claimed.'), 'Add the kilometres for this TA override.')
       return
     }
-    if (tab === 'da' && (!claimAmount || Number(claimAmount) <= 0)) {
-      toastError(new Error('Enter the DA amount claimed (₹).'), 'Add the rupee amount for the night claim.')
+    if ((tab === 'da' || tab === 'hotel' || tab === 'other')
+        && (!claimAmount || Number(claimAmount) <= 0)) {
+      toastError(new Error('Enter the amount claimed (₹).'),
+        `Add the rupee amount for the ${tab} claim.`)
       return
     }
     setSaving(true)
+    // Phase 36.7 — map tab → kind. ta_override carries km; the other
+    // three carry claim_amount.
+    const kindByTab = {
+      ta:    'ta_override',
+      da:    'da_night',
+      hotel: 'hotel',
+      other: 'other',
+    }
     const payload = {
       user_id:      profile.id,
       claim_date:   claimDate,
-      kind:         tab === 'ta' ? 'ta_override' : 'da_night',
+      kind:         kindByTab[tab],
       claim_km:     tab === 'ta' ? Number(claimKm) : null,
-      claim_amount: tab === 'da' ? Number(claimAmount) : null,
+      claim_amount: tab === 'ta' ? null : Number(claimAmount),
       city:         city.trim() || null,
       reason:       reason.trim(),
     }
@@ -227,12 +243,20 @@ export default function TaDaRequestPanel() {
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
           Submit a claim
         </div>
-        <div style={styles.tabRow}>
+        {/* Phase 36.7 — 4-way tab row. Wrap on narrow screens so
+            phones don't get a horizontal-scroll bar. */}
+        <div style={{ ...styles.tabRow, flexWrap: 'wrap' }}>
           <button type="button" style={styles.tab(tab === 'ta')} onClick={() => setTab('ta')}>
             Override TA (km)
           </button>
           <button type="button" style={styles.tab(tab === 'da')} onClick={() => setTab('da')}>
             Claim DA (night)
+          </button>
+          <button type="button" style={styles.tab(tab === 'hotel')} onClick={() => setTab('hotel')}>
+            Hotel stay
+          </button>
+          <button type="button" style={styles.tab(tab === 'other')} onClick={() => setTab('other')}>
+            Other
           </button>
         </div>
 
@@ -263,7 +287,11 @@ export default function TaDaRequestPanel() {
               <div style={styles.label}>Amount (₹)</div>
               <input className="lead-inp" inputMode="decimal"
                 value={claimAmount} onChange={(e) => setClaimAmount(e.target.value)}
-                placeholder="e.g. 700" />
+                placeholder={
+                  tab === 'da'    ? 'e.g. 700' :
+                  tab === 'hotel' ? 'e.g. 2,500 — room rate' :
+                                    'e.g. 350 — parking / toll / misc'
+                } />
             </div>
           )}
           <div>
@@ -275,12 +303,20 @@ export default function TaDaRequestPanel() {
             />
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
-            <div style={styles.label}>Reason *</div>
+            <div style={styles.label}>
+              {tab === 'other' ? 'Description *' : 'Reason *'}
+            </div>
             <textarea className="lead-inp" rows={2}
               value={reason} onChange={(e) => setReason(e.target.value)}
-              placeholder={tab === 'ta'
-                ? 'Why override? e.g. "phone died near Anand depot — drove back manually". Leave blank to confirm GPS km.'
-                : 'Why was the overnight needed? e.g. "client meeting next morning, hotel near depot"'} />
+              placeholder={
+                tab === 'ta'
+                  ? 'Why override? e.g. "phone died near Anand depot — drove back manually". Leave blank to confirm GPS km.'
+                : tab === 'da'
+                  ? 'Why was the overnight needed? e.g. "client meeting next morning, hotel near depot"'
+                : tab === 'hotel'
+                  ? 'Hotel name + reason. e.g. "Hotel Surya Surat — Reliance pitch next morning"'
+                  : 'Describe the expense in detail. e.g. "Parking ₹150 + toll ₹200 — Vadodara→Surat trip"'
+              } />
           </div>
         </div>
         {tab === 'ta' && Number(liveTrack?.km || 0) > 0 && (
@@ -329,7 +365,13 @@ export default function TaDaRequestPanel() {
             {requests.map((r) => (
               <div key={r.id} style={styles.historyRow}>
                 <span>{r.claim_date}</span>
-                <span>{r.kind === 'ta_override' ? 'TA km' : 'DA night'}</span>
+                <span>
+                  {r.kind === 'ta_override' ? 'TA km' :
+                   r.kind === 'da_night'    ? 'DA night' :
+                   r.kind === 'hotel'       ? 'Hotel' :
+                   r.kind === 'other'       ? 'Other' :
+                   r.kind}
+                </span>
                 <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {r.kind === 'ta_override'
                     ? `${r.claim_km} km${r.city ? ` · ${r.city}` : ''}`

@@ -514,7 +514,13 @@ export default function TaPayoutsAdminV2() {
                   const claimDisplay = req.kind === 'ta_override'
                     ? `${req.claim_km || 0} km`
                     : fmtINR(req.claim_amount || 0)
-                  const kindLabel = req.kind === 'ta_override' ? 'TA km' : 'DA night'
+                  // Phase 36.7 — 4 kinds: ta_override, da_night, hotel, other.
+                  const kindMeta = {
+                    ta_override: { label: 'TA km',    bg: 'rgba(90,176,255,0.14)',  fg: '#5AB0FF' },
+                    da_night:    { label: 'DA night', bg: 'rgba(255,230,0,0.14)',   fg: 'var(--accent, #FFE600)' },
+                    hotel:       { label: 'Hotel',    bg: 'rgba(168,139,255,0.14)', fg: '#A88BFF' },
+                    other:       { label: 'Other',    bg: 'rgba(255,255,255,0.06)', fg: 'var(--v2-ink-1)' },
+                  }[req.kind] || { label: req.kind, bg: 'rgba(255,255,255,0.06)', fg: 'var(--v2-ink-1)' }
                   return (
                     <tr key={req.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
                       <td style={tdStyle}>
@@ -531,14 +537,10 @@ export default function TaPayoutsAdminV2() {
                         <span style={{
                           display: 'inline-block', padding: '2px 10px',
                           borderRadius: 999, fontSize: 11, fontWeight: 600,
-                          background: req.kind === 'da_night'
-                            ? 'rgba(255,230,0,0.14)'
-                            : 'rgba(90,176,255,0.14)',
-                          color: req.kind === 'da_night'
-                            ? 'var(--accent, #FFE600)'
-                            : '#5AB0FF',
+                          background: kindMeta.bg,
+                          color: kindMeta.fg,
                         }}>
-                          {kindLabel}
+                          {kindMeta.label}
                         </span>
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>
