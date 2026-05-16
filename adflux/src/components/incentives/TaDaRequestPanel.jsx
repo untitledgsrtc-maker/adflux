@@ -56,6 +56,24 @@ export default function TaDaRequestPanel() {
   const [city,        setCity]        = useState(profile?.city || '')
   const [reason,      setReason]      = useState('')
   const [saving,      setSaving]      = useState(false)
+  // Phase 36.9 — hard cap on DA night + Hotel based on city ceilings.
+  // Owner: "we have already TA / DA / Hotel fixed pricing in master,
+  // how can he claim more than that?" Fetch the ceiling for the
+  // currently-selected city; if amount > ceiling, block submit and
+  // surface the cap inline. TA km + Other carry no cap (km is what
+  // GPS says; Other is intentionally free-form).
+  const [cityCeiling, setCityCeiling] = useState(null) // { daily_da, hotel_rate } | null
+
+  useEffect(() => {
+    if (!city || city.trim().length < 2) { setCityCeiling(null); return }
+    let cancelled = false
+    supabase.from('city_da_ceilings')
+      .select('daily_da, hotel_rate')
+      .eq('city_name', city.trim())
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setCityCeiling(data || null) })
+    return () => { cancelled = true }
+  }, [city])
 
   async function reload() {
     if (!profile?.id) return
@@ -114,6 +132,25 @@ export default function TaDaRequestPanel() {
       toastError(new Error('Enter the amount claimed (₹).'),
         `Add the rupee amount for the ${tab} claim.`)
       return
+    }
+    // Phase 36.9 — hard cap. DA night capped at city.daily_da; Hotel
+    // capped at city.hotel_rate. Both need a city selected. ta + other
+    // pass through unchecked.
+    if (tab === 'da' || tab === 'hotel') {
+      if (!cityCeiling) {
+        toastError(new Error('Pick a city first.'),
+          'DA / hotel cap depends on the city — type the city to look up the ceiling.')
+        return
+      }
+      const cap = tab === 'da'
+        ? Number(cityCeiling.daily_da)
+        : Number(cityCeiling.hotel_rate)
+      if (Number(claimAmount) > cap) {
+        toastError(new Error(`Above ceiling.`),
+          `${tab === 'da' ? 'DA night' : 'Hotel'} cap in ${city} is ₹${cap}. ` +
+          `Contact admin offline for any amount above this.`)
+        return
+      }
     }
     setSaving(true)
     // Phase 36.7 — map tab → kind. ta_override carries km; the other
@@ -285,13 +322,42 @@ export default function TaDaRequestPanel() {
           ) : (
             <div>
               <div style={styles.label}>Amount (₹)</div>
-              <input className="lead-inp" inputMode="decimal"
-                value={claimAmount} onChange={(e) => setClaimAmount(e.target.value)}
-                placeholder={
-                  tab === 'da'    ? 'e.g. 700' :
-                  tab === 'hotel' ? 'e.g. 2,500 — room rate' :
-                                    'e.g. 350 — parking / toll / misc'
-                } />
+              {(() => {
+                // Phase 36.9 — show cap reference + red border when over.
+                const showCap = (tab === 'da' || tab === 'hotel') && cityCeiling
+                const cap = !showCap ? null
+                  : tab === 'da' ? Number(cityCeiling.daily_da)
+                                 : Number(cityCeiling.hotel_rate)
+                const overCap = cap != null && Number(claimAmount || 0) > cap
+                return (
+                  <>
+                    <input
+                      className="lead-inp"
+                      inputMode="decimal"
+                      value={claimAmount}
+                      onChange={(e) => setClaimAmount(e.target.value)}
+                      style={overCap ? {
+                        borderColor: 'var(--danger, #EF4444)',
+                        boxShadow: '0 0 0 2px rgba(239,68,68,.18)',
+                      } : undefined}
+                      placeholder={
+                        tab === 'da'    ? `e.g. ${cap || 200}` :
+                        tab === 'hotel' ? `e.g. ${cap || 700} — room rate` :
+                                          'e.g. 350 — parking / toll / misc'
+                      } />
+                    {showCap && (
+                      <div style={{
+                        marginTop: 4, fontSize: 11,
+                        color: overCap ? 'var(--danger, #EF4444)' : 'var(--text-muted)',
+                      }}>
+                        {overCap
+                          ? `Above ceiling. ${tab === 'da' ? 'DA' : 'Hotel'} cap in ${city} = ₹${cap}.`
+                          : `Cap in ${city}: ₹${cap}. Submit blocked if higher.`}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           )}
           <div>
