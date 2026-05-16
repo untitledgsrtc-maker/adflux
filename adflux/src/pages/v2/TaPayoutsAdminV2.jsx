@@ -58,15 +58,37 @@ function monthISO(d = new Date()) {
   // Phase 34Z.70 — IST month-start so a 1:00 AM UTC visit (which is
   // 6:30 AM IST same day) still resolves to the current Indian month
   // instead of the previous UTC day.
+  // Phase 36.2 — owner reported (16 May 2026) that the month picker
+  // showed April 2026 as the latest option on 16 May 2026. Root
+  // cause: `new Date(y, m, 1)` constructs a LOCAL-TZ midnight, and
+  // `.toISOString()` then shifts BACK by the UTC offset (IST = +5:30),
+  // landing on the 30th of the previous month. Build the ISO date
+  // string directly from UTC components — no round-trip through a
+  // local-tz Date constructor.
   const ist = new Date(d.getTime() + (5.5 * 60 * 60 * 1000))
-  return new Date(ist.getFullYear(), ist.getMonth(), 1).toISOString().slice(0, 10)
+  const y = ist.getUTCFullYear()
+  const m = String(ist.getUTCMonth() + 1).padStart(2, '0')
+  return `${y}-${m}-01`
 }
 
 // Month label like "May 2026".
 function monthLabel(iso) {
   if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+  // Phase 36.2 — parse YYYY-MM-DD without going through Date's
+  // TZ-aware parser. `new Date('2026-05-01')` is interpreted as
+  // UTC midnight; on the client side (IST) that renders as
+  // April 30 22:30 IST → toLocaleDateString → 'April 2026' (wrong
+  // month). Read year + month from the string itself.
+  const [yStr, mStr] = iso.split('-')
+  const y = parseInt(yStr, 10)
+  const m = parseInt(mStr, 10) - 1
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return iso
+  // Use UTC midnight + explicit timeZone:'UTC' so locale formatter
+  // doesn't shift the date back into the previous month.
+  const d = new Date(Date.UTC(y, m, 1))
+  return d.toLocaleDateString('en-IN', {
+    month: 'long', year: 'numeric', timeZone: 'UTC',
+  })
 }
 
 // Phase 34Z.70 — owner reported (15 May 2026) the month picker showed
@@ -75,12 +97,21 @@ function monthLabel(iso) {
 // devices can drift one month. Force the current IST month to be the
 // first option, then walk back 5 months from there.
 function lastSixMonths() {
+  // Phase 36.2 — same fix as monthISO above. Build ISO strings
+  // directly from year + month numbers; never round-trip through
+  // `new Date(y, m, 1).toISOString()` because the local-TZ midnight
+  // shifts to the previous month under any positive UTC offset
+  // (IST = +5:30 → result lands on day 30/31 of prior month).
   const out = []
   const now = new Date()
   const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000))
+  let y = ist.getUTCFullYear()
+  let m = ist.getUTCMonth() // 0..11
   for (let i = 0; i < 6; i++) {
-    const d = new Date(ist.getFullYear(), ist.getMonth() - i, 1)
-    out.push(d.toISOString().slice(0, 10))
+    const mm = String(m + 1).padStart(2, '0')
+    out.push(`${y}-${mm}-01`)
+    m -= 1
+    if (m < 0) { m = 11; y -= 1 }
   }
   return out
 }
