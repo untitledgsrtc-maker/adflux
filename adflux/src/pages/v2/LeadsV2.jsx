@@ -361,8 +361,16 @@ export default function LeadsV2() {
         <V2Hero
           eyebrow={isAdmin ? 'Team pipeline' : 'My pipeline'}
           value={formatCurrency(totals.value)}
-          label={`${totals.total} lead${totals.total === 1 ? '' : 's'}${winRate != null ? ` · ${winRate}% win rate` : ''}`}
-          chip={`${totals.wonCount} won · ${totals.lostCount} lost`}
+          label={`${totals.total} lead${totals.total === 1 ? '' : 's'}${winRate != null ? ` · win-rate` : ''}`}
+          // Phase 35.1 — design-rule rollout: ring + footer stats
+          // matching the /work hero pattern. `winRate` is already
+          // computed above (0..100 or null).
+          percent={typeof winRate === 'number' ? winRate : undefined}
+          footerStats={[
+            { label: 'won',  value: totals.wonCount,  tint: '#2BD8A0' },
+            { label: 'lost', value: totals.lostCount, tint: '#FF6F61' },
+          ]}
+          accent={winRate != null && winRate >= 50}
         />
       )}
 

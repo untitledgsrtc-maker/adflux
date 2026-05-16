@@ -448,21 +448,30 @@ export default function FollowUpsV2() {
           (same teal hero as /work, /leads, /quotes). Value = total
           due today + overdue; chip = overdue count to keep the
           rep honest about the red queue. */}
-      <V2Hero
-        eyebrow="Today"
-        value={String(total + nurtureTotal)}
-        label={
-          grandTotal === 0
-            ? 'Nothing on your plate today.'
-            : `${total} follow-up${total === 1 ? '' : 's'}${nurtureTotal > 0 ? ` · ${nurtureTotal} nurture revisit${nurtureTotal === 1 ? '' : 's'}` : ''}`
-        }
-        chip={
-          (buckets.overdue.length + nurtureBuckets.overdue.length) > 0
-            ? `${buckets.overdue.length + nurtureBuckets.overdue.length} overdue`
-            : 'On track'
-        }
-        accent={grandTotal > 0}
-      />
+      {/* Phase 35.1 — design-rule rollout: ring shows %-on-track
+          (non-overdue / total). footerStats surfaces overdue + due
+          today as colored bullet stats, matching /work hero. */}
+      {(() => {
+        const overdueCount = buckets.overdue.length + nurtureBuckets.overdue.length
+        const pct = grandTotal === 0 ? 100 : Math.round(((grandTotal - overdueCount) / grandTotal) * 100)
+        return (
+          <V2Hero
+            eyebrow="Today"
+            value={String(total + nurtureTotal)}
+            label={
+              grandTotal === 0
+                ? 'Nothing on your plate today.'
+                : `${total} follow-up${total === 1 ? '' : 's'}${nurtureTotal > 0 ? ` · ${nurtureTotal} nurture revisit${nurtureTotal === 1 ? '' : 's'}` : ''}`
+            }
+            percent={grandTotal > 0 ? pct : undefined}
+            footerStats={grandTotal > 0 ? [
+              { label: 'overdue',   value: overdueCount,                tint: '#FF6F61' },
+              { label: 'due today', value: total - overdueCount,        tint: 'var(--accent, #FFE600)' },
+            ] : undefined}
+            accent={grandTotal > 0 && overdueCount === 0}
+          />
+        )
+      })()}
 
       {/* Phase 33D — empty-state CTA. Never a dead page; always show
           the next action. When no follow-ups, suggest logging a meeting. */}

@@ -225,14 +225,28 @@ export default function QuotesV2() {
           (same teal hero as /work, /leads, /follow-ups). Value =
           total quoted amount in the current filter scope; chip =
           outstanding balance from approved partial payments. */}
-      {displayed.length > 0 && (
-        <V2Hero
-          eyebrow={isAdmin ? 'Team quotes' : 'Your pipeline'}
-          value={formatCurrency(totals.amount)}
-          label={`${totals.count} quote${totals.count === 1 ? '' : 's'}${(hasActiveFilters || (isAdmin && repFilter !== 'all')) ? ' · filtered' : ''}`}
-          chip={totals.outstanding > 0 ? `${formatCurrency(totals.outstanding)} outstanding` : 'All collected'}
-        />
-      )}
+      {displayed.length > 0 && (() => {
+        // Phase 35.1 — design-rule rollout: ring shows collection
+        // rate (collected / total amount). footerStats surfaces
+        // outstanding + filtered chip, matching /work hero.
+        const collected = Math.max(0, totals.amount - totals.outstanding)
+        const collectPct = totals.amount > 0
+          ? Math.round((collected / totals.amount) * 100)
+          : 100
+        return (
+          <V2Hero
+            eyebrow={isAdmin ? 'Team quotes' : 'Your pipeline'}
+            value={formatCurrency(totals.amount)}
+            label={`${totals.count} quote${totals.count === 1 ? '' : 's'}${(hasActiveFilters || (isAdmin && repFilter !== 'all')) ? ' · filtered' : ''}`}
+            percent={totals.amount > 0 ? collectPct : undefined}
+            footerStats={totals.amount > 0 ? [
+              { label: 'collected',   value: formatCurrency(collected),         tint: '#2BD8A0' },
+              { label: 'outstanding', value: formatCurrency(totals.outstanding), tint: '#FF6F61' },
+            ] : undefined}
+            accent={totals.outstanding === 0 && totals.amount > 0}
+          />
+        )
+      })()}
 
       {/* ─── Page header ──────────────────────────────── */}
       <div className="v2d-page-head">
