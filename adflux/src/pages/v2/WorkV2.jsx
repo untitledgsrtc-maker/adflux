@@ -1827,29 +1827,72 @@ function StickyPrimaryCta({
     // directive. Earlier iterations tried sticky (didn't pin) and
     // fixed (worked but owner preferred inline flow). CTAs sit at
     // the end of the scroll content, after EveningReportBlock.
-    <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+    // Phase 35.0 pass 3 — owner directive: match mockup buttons exactly.
+    // Mockup spec: _design_reference/newsalesui/.../app.jsx Actions
+    // (lines 332-365). Height 56, radius 16, dual gradient with heavy
+    // outer shadow + inner highlight. Brand yellow `#FFE600` instead
+    // of mockup's `#F5D90A`. Log lead uses the graphite-yellow dark
+    // gradient with brand yellow text.
+    <div style={{
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+      marginTop: 14,
+    }}>
       {isActiveState ? (
         <>
-          <ActionButton
-            variant="primary"
-            size="lg"
-            iconLeft={Calendar}
+          <button
+            type="button"
             onClick={onOpenMeeting}
             disabled={busy}
-            style={{ flex: 1, minHeight: 52 }}
+            style={{
+              position: 'relative', height: 56, borderRadius: 16,
+              background: 'linear-gradient(135deg, #FFEC40 0%, var(--accent, #FFE600) 45%, var(--warning, #F59E0B) 100%)',
+              color: 'var(--accent-fg, #1A1300)',
+              border: 0, cursor: busy ? 'default' : 'pointer',
+              fontFamily: 'var(--v2-sans, "DM Sans", system-ui)',
+              fontWeight: 700, fontSize: 15,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: '0 14px 30px -14px rgba(255,230,0,0.65), inset 0 1px 0 rgba(255,255,255,0.5)',
+              overflow: 'hidden',
+              opacity: busy ? 0.7 : 1,
+            }}
           >
-            Log meeting
-          </ActionButton>
-          <ActionButton
-            variant="ghost"
-            size="lg"
-            iconLeft={Plus}
+            <span style={{
+              position: 'absolute', inset: 0,
+              background: 'radial-gradient(60% 50% at 20% 0%, rgba(255,255,255,0.45), transparent 60%)',
+              pointerEvents: 'none',
+            }} />
+            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Calendar size={18} strokeWidth={1.6} />
+              Log meeting
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={onOpenLead}
             disabled={busy}
-            style={{ flex: 1, minHeight: 52, background: 'var(--surface)' }}
+            style={{
+              position: 'relative', height: 56, borderRadius: 16,
+              background: 'linear-gradient(135deg, #2A3346 0%, var(--v2-bg-2, #1B2233) 60%, var(--v2-bg-0, #0F1320) 100%)',
+              color: 'var(--accent, #FFE600)',
+              border: 0, cursor: busy ? 'default' : 'pointer',
+              fontFamily: 'var(--v2-sans, "DM Sans", system-ui)',
+              fontWeight: 700, fontSize: 15,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: '0 14px 30px -14px rgba(255,230,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)',
+              overflow: 'hidden',
+              opacity: busy ? 0.7 : 1,
+            }}
           >
-            Log lead
-          </ActionButton>
+            <span style={{
+              position: 'absolute', inset: 0,
+              background: 'radial-gradient(60% 50% at 20% 0%, rgba(255,255,255,0.06), transparent 60%)',
+              pointerEvents: 'none',
+            }} />
+            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Plus size={18} strokeWidth={1.6} />
+              Log lead
+            </span>
+          </button>
         </>
       ) : (
         <ActionButton
@@ -1859,7 +1902,12 @@ function StickyPrimaryCta({
           onClick={handler}
           disabled={isBusy}
           loading={loading}
-          style={{ width: '100%', minHeight: 52 }}
+          style={{
+            // Phase 35.0 pass 3 — fallback single-CTA spans both grid
+            // columns so it stays full-width.
+            gridColumn: '1 / -1',
+            width: '100%', minHeight: 52,
+          }}
         >
           {label}
         </ActionButton>
