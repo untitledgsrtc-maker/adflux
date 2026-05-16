@@ -29,6 +29,7 @@ import { formatDate, formatRelative } from '../../utils/formatters'
 import {
   StageChip, HeatDot, SegChip, LeadAvatar, Pill,
 } from '../../components/leads/LeadShared'
+import V2Hero from '../../components/v2/V2Hero'
 
 const HEAT_RANK = { hot: 0, warm: 1, cold: 2 }
 
@@ -121,8 +122,29 @@ export default function TelecallerV2() {
     )
   }
 
+  // Phase 35.1 pass 2 — design-rule rollout. Queue size + today's
+  // calls become V2Hero metrics; ring shows qualified-rate (qualified
+  // vs called today). Footer surfaces handoffs + open queue.
+  const queueOpen = leads.length
+  const qualifiedRate = callsToday > 0
+    ? Math.round((qualifiedToday / callsToday) * 100)
+    : 0
   return (
     <div className="lead-root">
+      {(queueOpen > 0 || callsToday > 0) && (
+        <V2Hero
+          eyebrow={`Telecaller · ${profile?.name || 'You'}`}
+          value={String(callsToday)}
+          label={`call${callsToday === 1 ? '' : 's'} logged today`}
+          percent={callsToday > 0 ? qualifiedRate : undefined}
+          footerStats={[
+            { label: 'in queue',   value: queueOpen,         tint: 'var(--accent, #FFE600)' },
+            { label: 'handoffs',   value: handoffs.length,   tint: '#5AB0FF' },
+            { label: 'qualified',  value: qualifiedToday,    tint: '#2BD8A0' },
+          ]}
+          accent={callsToday >= 10}
+        />
+      )}
       {/* Page head */}
       <div className="lead-page-head">
         <div>

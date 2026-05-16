@@ -13,6 +13,7 @@ import { Plus, Calendar, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { formatDate, formatCurrency, todayISO, addDaysISO } from '../../utils/formatters'
+import V2Hero from '../../components/v2/V2Hero'
 
 export default function RenewalToolsV2() {
   const navigate = useNavigate()
@@ -70,8 +71,29 @@ export default function RenewalToolsV2() {
     cool: quotes.filter(q => daysRemaining(q.campaign_end_date) >= 30).length,
   }
 
+  // Phase 35.1 pass 2 — hero stats for V2Hero.
+  const totalRenewing = bucketStats.hot + bucketStats.warm + bucketStats.cool
+  // % "safe" (>= 30 days out). Inverted urgency — higher = better.
+  const safePct = totalRenewing > 0
+    ? Math.round((bucketStats.cool / totalRenewing) * 100)
+    : 100
+
   return (
     <div className="v2d-rt">
+      {totalRenewing > 0 && (
+        <V2Hero
+          eyebrow={isAdmin ? 'Renewals · 60 days' : 'Your renewals'}
+          value={String(totalRenewing)}
+          label={`campaign${totalRenewing === 1 ? '' : 's'} ending in 60 days`}
+          percent={safePct}
+          footerStats={[
+            { label: '<7d',     value: bucketStats.hot,  tint: '#FF6F61' },
+            { label: '7-30d',   value: bucketStats.warm, tint: 'var(--accent, #FFE600)' },
+            { label: '30-60d',  value: bucketStats.cool, tint: '#2BD8A0' },
+          ]}
+          accent={bucketStats.hot === 0}
+        />
+      )}
       <div className="v2d-page-head">
         <div>
           <div className="v2d-page-kicker">Keep revenue recurring</div>
