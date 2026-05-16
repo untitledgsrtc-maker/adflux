@@ -93,7 +93,7 @@ export default function LeavesAdminV2() {
         .in('role', ['sales', 'agency', 'telecaller', 'admin', 'co_owner'])
         .order('name', { ascending: true }),
       supabase.from('leaves')
-        .select('id, user_id, leave_date, leave_type, reason, status, is_half_day, created_at')
+        .select('id, user_id, leave_date, leave_type, reason, status, is_half_day, is_paid_request, created_at')
         .gte('leave_date', sinceISO)
         .order('leave_date', { ascending: false })
         .order('created_at', { ascending: false }),
@@ -428,15 +428,37 @@ export default function LeavesAdminV2() {
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{
-                          display: 'inline-block', padding: '2px 10px',
-                          borderRadius: 999, fontSize: 11, fontWeight: 600,
-                          textTransform: 'capitalize',
-                          background: 'rgba(255,255,255,.06)',
-                          color: 'var(--v2-ink-1)',
-                        }}>
-                          {row.leave_type}{row.is_half_day ? ' · ½' : ''}
-                        </span>
+                        <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+                          <span style={{
+                            display: 'inline-block', padding: '2px 10px',
+                            borderRadius: 999, fontSize: 11, fontWeight: 600,
+                            textTransform: 'capitalize',
+                            background: 'rgba(255,255,255,.06)',
+                            color: 'var(--v2-ink-1)',
+                          }}>
+                            {row.leave_type}{row.is_half_day ? ' · ½' : ''}
+                          </span>
+                          {/* Phase 36.10 — paid / unpaid pill. */}
+                          {row.is_paid_request === false ? (
+                            <span style={{
+                              display: 'inline-block', padding: '2px 8px',
+                              borderRadius: 999, fontSize: 10, fontWeight: 700,
+                              background: 'rgba(255,111,97,.14)',
+                              color: '#FF6F61',
+                              border: '1px solid rgba(255,111,97,.35)',
+                              textTransform: 'uppercase', letterSpacing: '.04em',
+                            }}>Unpaid</span>
+                          ) : (
+                            <span style={{
+                              display: 'inline-block', padding: '2px 8px',
+                              borderRadius: 999, fontSize: 10, fontWeight: 700,
+                              background: 'rgba(43,216,160,.14)',
+                              color: '#2BD8A0',
+                              border: '1px solid rgba(43,216,160,.35)',
+                              textTransform: 'uppercase', letterSpacing: '.04em',
+                            }}>Paid</span>
+                          )}
+                        </div>
                       </td>
                       <td style={tdStyle}>
                         <span style={{

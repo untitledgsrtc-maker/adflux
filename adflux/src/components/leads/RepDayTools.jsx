@@ -169,6 +169,26 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
   // the admin LeavesAdminV2 checkbox. Salary RPC counts it as 0.5 day
   // against the annual paid quota.
   const [fHalfDay, setFHalfDay] = useState(false)
+  // Phase 36.10 — rep chooses Paid or Unpaid. Paid option only
+  // enabled when tenure ≥ 9 months from staff_incentive_profiles
+  // .join_date. Default Paid when eligible, else forced to Unpaid.
+  const [fIsPaid, setFIsPaid] = useState(true)
+  const [paidEligible, setPaidEligible] = useState(false)
+  const [eligLoading, setEligLoading] = useState(true)
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    setEligLoading(true)
+    supabase.rpc('eligible_for_paid_leave', { p_user_id: userId })
+      .then(({ data }) => {
+        if (cancelled) return
+        const ok = !!data
+        setPaidEligible(ok)
+        setFIsPaid(ok)  // Default Paid only if eligible.
+        setEligLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [userId])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -182,6 +202,12 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
       reason: (fReason || '').trim() || null,
       status: 'pending',
       is_half_day: fHalfDay,
+      // Phase 36.10 — paid/unpaid choice. Server-side
+      // eligible_for_paid_leave() is the policy source of truth; the
+      // UI just nudges the rep. If tenure < 9 months, client forces
+      // false; server can still validate via RLS / trigger if needed
+      // in a future phase.
+      is_paid_request: paidEligible ? fIsPaid : false,
       created_by: userId,
     })
     setSaving(false)
@@ -280,9 +306,7 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
             }}
           />
         </div>
-        {/* Phase 36.1 — half-day toggle. Submits with is_half_day=true
-            so the salary RPC counts the request as 0.5 day against
-            the annual paid quota. */}
+        {/* Phase 36.1 — half-day toggle. */}
         <label style={{
           display: 'inline-flex', alignItems: 'center', gap: 10,
           fontSize: 13, color: 'var(--text)', cursor: 'pointer',
@@ -300,6 +324,53 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
           />
           <span>Half-day only (counts as 0.5)</span>
         </label>
+
+        {/* Phase 36.10 — Paid / Unpaid toggle. Paid disabled when
+            tenure < 9 months. */}
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+            Pay status
+          </label>
+          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            {[
+              { key: true,  label: 'Paid leave',   disabled: !paidEligible },
+              { key: false, label: 'Unpaid leave', disabled: false },
+            ].map(opt => {
+              const on = fIsPaid === opt.key
+              return (
+                <button
+                  key={String(opt.key)}
+                  type="button"
+                  onClick={() => !opt.disabled && setFIsPaid(opt.key)}
+                  disabled={opt.disabled || eligLoading}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 10,
+                    border: `1px solid ${on ? 'var(--accent, #FFE600)' : 'var(--border)'}`,
+                    background: on ? 'rgba(255,230,0,.14)' : 'var(--surface-2)',
+                    color: opt.disabled
+                      ? 'var(--text-subtle)'
+                      : on ? 'var(--accent, #FFE600)' : 'var(--text)',
+                    fontSize: 13, fontWeight: 600,
+                    cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                    opacity: opt.disabled ? 0.55 : 1,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+          {!eligLoading && !paidEligible && (
+            <div style={{
+              marginTop: 6, fontSize: 11, color: 'var(--text-muted)',
+              padding: '6px 10px', background: 'rgba(255,230,0,.08)',
+              border: '1px dashed var(--accent, #FFE600)', borderRadius: 8,
+            }}>
+              Paid leave is available after 9 months from your joining date.
+              For now your request will be submitted as unpaid.
+            </div>
+          )}
+        </div>
         {err && (
           <div style={{ color: 'var(--danger)', fontSize: 12 }}>
             <AlertTriangle size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
