@@ -858,14 +858,44 @@ export default function LeadsV2() {
                   </td>
                   {isPrivileged && (
                     <td>
-                      {l.assigned?.name ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <LeadAvatar name={l.assigned.name} userId={l.assigned.id} />
-                          <span style={{ fontSize: 12 }}>{l.assigned.name}</span>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Unassigned</span>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {l.assigned?.name ? (
+                          <>
+                            <LeadAvatar name={l.assigned.name} userId={l.assigned.id} />
+                            <span style={{ fontSize: 12 }}>{l.assigned.name}</span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Unassigned</span>
+                        )}
+                        {/* Phase 34Z.77 — single-lead reassign without
+                            the sticky bulk bar. Owner kept losing the
+                            bottom-sticky Reassign button under scroll.
+                            Per-row icon: tap → select this one lead →
+                            open existing ReassignModal in single-lead
+                            mode. Uses same bulk-reassign code path. */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelected(new Set([l.id]))
+                            setReassignOpen(true)
+                          }}
+                          title="Reassign this lead"
+                          aria-label="Reassign this lead"
+                          style={{
+                            background: 'transparent',
+                            border: '1px solid var(--border-strong, var(--border))',
+                            color: 'var(--text-muted)',
+                            borderRadius: 999,
+                            padding: '3px 8px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                          }}
+                        >
+                          <UsersIcon size={11} /> Reassign
+                        </button>
+                      </div>
                     </td>
                   )}
                   <td className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
