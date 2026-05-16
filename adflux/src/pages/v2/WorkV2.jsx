@@ -209,7 +209,13 @@ export default function WorkV2() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       recStreamRef.current = stream
-      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      // Phase 34Z.80 — drop hardcoded `audio/webm` mimeType. iOS
+      // Safari MediaRecorder ONLY supports `audio/mp4`; the forced
+      // webm option threw NotSupportedError and the morning voice
+      // plan was silently broken for every iOS rep. Let the browser
+      // pick its native format and read `mr.mimeType` after start
+      // for the blob + edge-fn payload. Whisper accepts both.
+      const mr = new MediaRecorder(stream)
       const chunks = []
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
       mr.onstop = async () => {
@@ -222,14 +228,15 @@ export default function WorkV2() {
         recStreamRef.current = null
         setRecState('sending')
         try {
-          const blob = new Blob(chunks, { type: 'audio/webm' })
+          const recMime = mr.mimeType || 'audio/webm'
+          const blob = new Blob(chunks, { type: recMime })
           const buf = await blob.arrayBuffer()
           let bin = ''
           const bytes = new Uint8Array(buf)
           for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i])
           const audio_base64 = btoa(bin)
           const res = await edgeFetch('voice-process', {
-            audio_base64, mime_type: 'audio/webm',
+            audio_base64, mime_type: recMime,
             lead_id: null, duration_seconds: null, mode: 'transcribe_only',
           })
           if (!res.ok) {
