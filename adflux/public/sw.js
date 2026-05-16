@@ -4,6 +4,12 @@
 // Phase 34G — extended with Workbox precache + runtime caching so the
 // app shell loads on flaky / dead-zone connections (Gujarat field
 // reality). Push handlers from 33R kept intact.
+// Phase 35.0 pass 5 — version bump to force installed PWAs to drop the
+// old bundle. Owner reported the Log meeting/lead position fix wasn't
+// visible after `7ac8783` deployed — root cause: SW served the cached
+// bundle. Touching this header changes the SW hash, which triggers
+// `update found` on every client and a fresh precache rebuild on next
+// navigation. SW_BUILD_TAG = '2026-05-16T18:00'
 //
 // Lives at /sw.js (root scope) so it can intercept push events
 // for the whole app. Registered from src/utils/pushNotifications.js
