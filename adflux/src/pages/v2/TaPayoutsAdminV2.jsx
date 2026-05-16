@@ -151,7 +151,10 @@ export default function TaPayoutsAdminV2() {
   useEffect(() => { loadRows() }, [fUser, fMonth]) // eslint-disable-line
   // Phase 34Z.70 — refetch on tab-resume so admin sees newly-pinged
   // rows the moment they switch back from another tab.
-  useAutoRefresh(loadRows, { enabled: !!fUser && !!fMonth })
+  // Phase 34Z.88 — dropped enabled gate. loadRows itself returns early
+  // when fUser / fMonth missing (line 134), so unconditional mount
+  // covers the case where admin clears filters then returns to tab.
+  useAutoRefresh(loadRows)
 
   // Load city ceilings the first time the admin expands the editor.
   async function loadCeilings() {

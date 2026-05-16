@@ -553,3 +553,121 @@ Emoji are forbidden by default per §7 + §20. The following site-specific waive
 | `V2AppShell.greetingFor()` | `☀️ ⛅ 🌙` | Phase 34Z.1 | Time-band suffix on the greeting; replaces three Lucide icons that didn't carry enough warmth |
 
 No other emoji exceptions. The five sites flagged in the 2026-05-13 UI audit (`StaffTable.jsx:38 🎉`, `MyPerformance.jsx:188 🎉`, `WonPaymentModal.jsx:157 💰`, `AdminDashboardDesktop.jsx:899/1772 ⚡🎉`, `SalesDashboardDesktop.jsx:523/660 ⚡`) are NOT in this table and must be migrated to Lucide icons during PR 3.
+
+---
+
+## 28 · Sales module FROZEN (16 May 2026 baseline, commit `e232069`)
+
+Phase 34Z.73 closed the sales-module audit cycle. The rep-facing flow is locked. Any future edit that touches the surrounding code — whether or not the file is in `/pages/v2/` — MUST be audited by the `sales-module-guardian` agent before commit. The full contract list lives at `.claude/agents/sales-module-guardian.md`. Summary:
+
+**Frozen frontend files** (full list in agent file):
+- `WorkV2.jsx`, `LeadDetailV2.jsx`, `LeadFormV2.jsx`, `LeadsV2.jsx`, `FollowUpsV2.jsx`,
+  `QuotesV2.jsx`, `MyOfferV2.jsx`, `MyPerformanceV2.jsx`, `PushDebugV2.jsx`,
+  `SalesDashboard*.jsx`, `CreateQuote*V2.jsx`
+- `V2AppShell.jsx`, `PostCallOutcomeModal.jsx`, `TodaySummaryCard.jsx`,
+  `TodayTasksPanel.jsx`, `MeetingsMapPanel.jsx`
+- `useLeadTasks.js`, `useAutoRefresh.js`, `pushNotifications.js`, `public/sw.js`
+
+**Frozen DB contracts**:
+- Lead stages: `New | Working | QuoteSent | Won | Lost | Nurture` (NO others).
+- Cadence types: `lead_intro | quote_chase | nurture | lost_nurture` (Phase 33D.6).
+- `lead_activities.activity_type` for score: `meeting | call | site_visit` only
+  (Phase 34Z.66). WhatsApp + notes intentionally excluded.
+- Phase 34Z.50 quote→lead propagation triggers (insert + delete rollback).
+- Phase 34Z.55 per-task push triggers on `lead_tasks` + `follow_ups`.
+- Phase 34Z.61 9:30 IST morning push (skips Sunday only — Saturday IS a workday).
+- Phase 34Z.66 `compute_daily_score` trigger on `lead_activities` AFTER INSERT.
+- Phase 34Z.67 `compute_daily_ta` trigger on every `gps_pings` INSERT.
+- Phase 34Z.69 `enqueue_push` 5s timeout + `push_log` audit + HARDCODED anon key
+  (Supabase hosted blocks ALTER DATABASE — do NOT revert to `current_setting`).
+- Phase 34Z.70 `push_failures` view.
+
+**Frozen UX contracts**:
+- PostCallOutcomeModal chain: tel: → 1.5s → activity log + modal → save closes old
+  follow-up + spawns new + closes any open smart_task for the (lead, rep).
+- `useAutoRefresh` mounted on: WorkV2, LeadDetailV2, FollowUpsV2, QuotesV2,
+  MyPerformanceV2, TaPayoutsAdminV2.
+- Push enrollment lives in **V2AppShell only** (not WorkV2 anymore).
+- DESIGN_SYSTEM.md tokens enforced: `--v2-yellow` (brand+CTA only), `--v2-bg-0..3`,
+  `--v2-ink-0..2`, `--v2-line`, `--v2-green/blue/amber/rose`.
+- No hardcoded hex on sales pages, no truncated lakh/crore, no 16px font,
+  no border-radius 4-8px.
+
+**Anti-patterns the guardian blocks**:
+- New emoji on rep-facing pages (waivers only per §27).
+- Hardcoded `#facc15` (brand yellow is `#FFE600`).
+- Removing `useAutoRefresh` from a frozen page.
+- Adding a stage / cadence type / activity type without preserving the existing set.
+- Reintroducing `owner` role.
+- Removing idempotency guards (`IF NOT EXISTS`, `ON CONFLICT`).
+- Removing `NOTIFY pgrst, 'reload schema'` from a schema-mutating SQL file.
+- Breaking the tel:→1.5s→modal chain in PostCallOutcomeModal.
+- Adding push enrollment to a page other than V2AppShell.
+
+When in doubt: invoke the guardian. It's cheap; the regression isn't.
+
+---
+
+## 29 · Sales module FINAL — ship-ready (Phase 34Z.88, 2026-05-16)
+
+Final pre-ship sweep complete. Sales module is SHIPPED on `untitled-os` and ready for Sunday 17 May 2026 deadline. Treat as a closed module — no inline patches without a guardian audit.
+
+### What Phase 34Z.88 fixed (post-freeze audit)
+
+Guardian agent returned 7 findings — 1 P0, 4 P1, 2 P2. All applied. No contract churn, no functional change, no SQL.
+
+| # | Sev | File | Fix |
+|---|-----|------|-----|
+| 1 | P0 | `src/styles/v2.css` `.v2d-mdrawer` / inner | `z-index 60 → 200` + inner `201`. Topbar bell + `11` badge no longer bleed over the mobile sidebar drawer on iOS. |
+| 2 | P0 | `src/components/v2/NotificationPanel.jsx:214` | Dropdown `zIndex 200 → 100`. Drawer always wins, topbar (10) + nav (40) still lose. |
+| 3 | P1 | `NotificationPanel.jsx:231` | Unicode `✓` → `<CheckCircle2 size={22} />` in empty state. §7 Lucide-only. |
+| 4 | P1 | `NotificationPanel.jsx:196` | Bell badge `borderRadius 8 → 999` (pill, on-scale). |
+| 5 | P1 | `src/pages/v2/TaPayoutsAdminV2.jsx:154` | Dropped `enabled` gate on `useAutoRefresh`. `loadRows` early-returns when filters empty, so unconditional mount covers tab-resume even with cleared month. |
+| 6 | P2 | `src/components/v2/V2AppShell.jsx:396` | ⌘K hint `borderRadius 4 → 6` (token scale min). |
+| 7 | P2 | `NotificationPanel.jsx:249` | Notification item icon `borderRadius 8 → 10` (`--radius`). |
+
+### Z-index landscape (frozen 16 May 2026)
+
+```
+10    sticky topbar
+40    mobile bottom nav, PeriodPicker
+50    ClientsV2 modal, more-drawer backdrop
+60    avatar more-drawer
+100   NotificationPanel + GlobalSearchBar dropdowns
+100   MasterV2 modal (admin only)
+200   v2d-mdrawer (mobile sidebar)
+201   v2d-mdrawer-inner
+1000  FilterDrawer, DateRangeFilter
+9000  Modal primitive (PostCallOutcomeModal lives here)
+9999  Toast
+10000 ConfirmDialog
+```
+
+Any new overlay MUST slot into this scale. Do not invent new tiers.
+
+### Sales module is now a "no-touch" surface
+
+Anything that even brushes the frozen files in §28 — including styling, imports, or fallback values — needs the `sales-module-guardian` agent to PASS before commit. Patch-chain anti-pattern (§3) is the explicit failure mode the freeze prevents.
+
+If a real bug surfaces post-ship, the right path is:
+1. Reproduce on staging.
+2. Run guardian on the proposed diff.
+3. Land as a single Phase 34Z.{N+1} commit, not as a sub-letter chain.
+
+### What's still NOT built (do not assume otherwise)
+
+- **P&L module** — spec only. `docs/UNTITLED_OS_v2_ARCHITECTURE.md` §7.5 + §8.2 describes the tables (`quote_pnl`, `monthly_admin_expenses`), pages (`PnLLanding`, `PnLSummary`, `QuotePnL`, `AdminExpenses`), store (`pnlStore`), trigger (`auto_create_quote_pnl`), and owner-only RLS gating. **No code, no SQL, no routes exist.** Listed as Sprint 3 pending in §22 + §26 backlog item #5.
+- **Govt invoice template** — backlog item, Sprint 4.
+- **TDS columns on `payments`** — required before first Govt deal hits PARTIAL_PAID. Not added yet.
+- **Telecaller module Sprint 1** — PostCallOutcomeModal wiring into TelecallerV2 audited + scoped but NOT shipped. Awaiting go-ahead.
+
+### Push deadline
+
+Owner pushes from his Mac terminal:
+```
+cd ~/Documents/untitled-os2/Untitled/adflux
+git push origin untitled-os
+```
+Vercel auto-deploys. No SQL for 34Z.88. Smoke test = open hamburger drawer at `/work` on iPhone, confirm bell + badge sit BEHIND the drawer overlay.
+
+No other emoji exceptions. The five sites flagged in the 2026-05-13 UI audit (`StaffTable.jsx:38 🎉`, `MyPerformance.jsx:188 🎉`, `WonPaymentModal.jsx:157 💰`, `AdminDashboardDesktop.jsx:899/1772 ⚡🎉`, `SalesDashboardDesktop.jsx:523/660 ⚡`) are NOT in this table and must be migrated to Lucide icons during PR 3.

@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Bell, X, AlertTriangle, Clock, CheckSquare, Calendar, ArrowRight,
+  Bell, X, AlertTriangle, Clock, CheckSquare, Calendar, ArrowRight, CheckCircle2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -193,7 +193,7 @@ export default function NotificationPanel() {
           <span style={{
             position: 'absolute', top: 4, right: 4,
             minWidth: 16, height: 16, padding: '0 4px',
-            borderRadius: 8, background: '#EF4444', color: '#fff',
+            borderRadius: 999, background: '#EF4444', color: '#fff',
             fontSize: 9, fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: '2px solid var(--v2-bg-0, #0f172a)',
@@ -211,7 +211,10 @@ export default function NotificationPanel() {
           border: '1px solid var(--border, #334155)',
           borderRadius: 12,
           boxShadow: '0 12px 40px rgba(0,0,0,.4)',
-          maxHeight: '70vh', overflowY: 'auto', zIndex: 200,
+          // Phase 34Z.88 — was 200 (rendered OVER mobile sidebar drawer at
+          // z-60). Drawer now at 200 (v2.css); dropdown moves to 100 so the
+          // drawer always wins. Still above topbar (10) + nav (40).
+          maxHeight: '70vh', overflowY: 'auto', zIndex: 100,
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -228,7 +231,13 @@ export default function NotificationPanel() {
             <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)' }}>Loading…</div>
           ) : items.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: 24, marginBottom: 6 }}>✓</div>
+              {/* Phase 34Z.88 — Unicode ✓ → Lucide per §7 (Lucide only). */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 6, color: 'var(--success, #10B981)',
+              }}>
+                <CheckCircle2 size={22} strokeWidth={1.6} />
+              </div>
               All clear — nothing pending right now.
             </div>
           ) : (
@@ -246,7 +255,7 @@ export default function NotificationPanel() {
                   }}
                 >
                   <div style={{
-                    width: 28, height: 28, borderRadius: 8,
+                    width: 28, height: 28, borderRadius: 10,
                     background: `${tint}1A`, color: tint,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,

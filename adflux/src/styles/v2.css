@@ -1187,13 +1187,18 @@
 
 .v2d-crumb { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 
+/* Phase 34Z.88 — drawer was z-60. NotificationPanel dropdown ran at
+   z-200 → on iOS the topbar bell + 11-badge bled OVER the drawer
+   when both were open. Drawer lifted above the dropdown (now z-100);
+   modals (9000), Toast (9999), ConfirmDialog (10000) still win. */
 .v2d-mdrawer {
-  position: fixed; inset: 0; z-index: 60;
+  position: fixed; inset: 0; z-index: 200;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
   display: flex;
 }
 .v2d-mdrawer-inner {
+  position: relative; z-index: 201;
   width: min(280px, 85vw);
   background: var(--v2-bg-1);
   border-right: 1px solid var(--v2-line);
