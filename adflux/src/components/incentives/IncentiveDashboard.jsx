@@ -10,8 +10,9 @@ import { StaffTable } from './StaffTable'
 import { StaffModal } from './StaffModal'
 import { WhatIfSimulator } from './WhatIfSimulator'
 import { IncentiveSettings } from './IncentiveSettings'
-// Phase 39 — IncentivePayoutModal import dropped. Owner directive:
-// one payout flow only. All money flows through People → Salary tab.
+// Phase 39.x — IncentivePayoutModal restored. Single-payout-flow
+// decision parked (owner: "put back we will discuss tomorrow").
+import { IncentivePayoutModal } from './IncentivePayoutModal'
 
 // Build last 12 month options
 function buildMonthOptions() {
@@ -35,8 +36,8 @@ export function IncentiveDashboard() {
   })
   const [activeTab, setActiveTab]   = useState('staff')
   const [editProfile, setEditProfile] = useState(null)
-  // Phase 39 — payoutFor state removed. Single payout flow lives in
-  // People → Salary tab (SalaryPayoutModal against full NET).
+  // Phase 39.x — payoutFor restored (Incentives tab back per owner).
+  const [payoutFor, setPayoutFor]   = useState(null) // { staff, computed }
   const [loading, setLoading]       = useState(true)
   // Per-staff aggregates from the get_team_leaderboard RPC for the
   // selected month — feeds the Proposed (forecast) column. RLS would
@@ -217,10 +218,12 @@ export function IncentiveDashboard() {
             const m = members.find(mem => mem.id === p.user_id) || p.users || {}
             setEditProfile({ ...p, _member: { ...m, staff_incentive_profiles: [p] } })
           }}
-          /* Phase 39 — Incentive Payout button removed. Owner directive:
-             one payout flow only. All money now flows through Salary
-             NET (People → Salary tab → Payout). Existing
-             incentive_payouts rows kept for audit. */
+          onPayout={(p, computed) => {
+            setPayoutFor({
+              staff: { user_id: p.user_id, name: p.users?.name || '—' },
+              computed,
+            })
+          }}
         />
       ) : activeTab === 'simulator' ? (
         <WhatIfSimulator profiles={salesProfiles} settings={settings} />
@@ -241,8 +244,16 @@ export function IncentiveDashboard() {
         />
       )}
 
-      {/* Phase 39 — Incentive Payout modal mount removed. Single
-          payout flow lives in People → Salary tab. */}
+      {/* Incentive payout punch modal */}
+      {payoutFor && (
+        <IncentivePayoutModal
+          staff={payoutFor.staff}
+          monthYear={selectedMonth}
+          computed={payoutFor.computed}
+          onClose={() => setPayoutFor(null)}
+          onSaved={() => { /* no-op — modal reloads its own history */ }}
+        />
+      )}
     </div>
   )
 }

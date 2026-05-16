@@ -25,16 +25,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Users, Wallet, Clock as ClockIcon, MapPin } from 'lucide-react'
+import { Users, Gift, Wallet, Clock as ClockIcon, MapPin } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 
 import TeamV2            from './TeamV2'
+import IncentivesV2      from './IncentivesV2'
 import SalaryAdminV2     from './SalaryAdminV2'
 import LeavesAdminV2     from './LeavesAdminV2'
-// Phase 39 — TA Claims tab. Incentive tab dropped; incentive slabs +
-// what-if simulator + staff profile editor still reachable via the
-// /incentives deep-link (kept in App.jsx, no sidebar entry).
+// Phase 39 — TA Claims tab also lives inside People.
 import TaPayoutsAdminV2  from './TaPayoutsAdminV2'
 
 // Phase 38.2 — IST month label for the Salary tab badge.
@@ -44,15 +43,15 @@ function currentMonthLabel() {
   return ist.toLocaleString('en-IN', { month: 'short', year: 'numeric' })
 }
 
-// Phase 39 — 4 tabs: Team · Salary · Leaves · TA Claims. Incentives
-// tab dropped (was its own payout flow — owner reported confusion
-// from accounts paying both incentive and salary separately). All
-// money now flows through Salary NET — single payout per rep/month.
+// Phase 39.x — 5 tabs. Incentives kept (owner: "put back we will
+// discuss tomorrow" — single-payout-flow decision parked). All
+// editing surfaces preserved while structure is being debated.
 const TABS = [
-  { key: 'team',     label: 'Team',      icon: Users,     Comp: TeamV2 },
-  { key: 'salary',   label: 'Salary',    icon: Wallet,    Comp: SalaryAdminV2 },
-  { key: 'leaves',   label: 'Leaves',    icon: ClockIcon, Comp: LeavesAdminV2 },
-  { key: 'ta',       label: 'TA Claims', icon: MapPin,    Comp: TaPayoutsAdminV2 },
+  { key: 'team',       label: 'Team',       icon: Users,     Comp: TeamV2 },
+  { key: 'incentives', label: 'Incentives', icon: Gift,      Comp: IncentivesV2 },
+  { key: 'salary',     label: 'Salary',     icon: Wallet,    Comp: SalaryAdminV2 },
+  { key: 'leaves',     label: 'Leaves',     icon: ClockIcon, Comp: LeavesAdminV2 },
+  { key: 'ta',         label: 'TA Claims',  icon: MapPin,    Comp: TaPayoutsAdminV2 },
 ]
 
 export default function PeopleV2() {
