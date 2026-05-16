@@ -22,7 +22,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, Plus, Trash2, Calendar, AlertTriangle } from 'lucide-react'
+import { Users, Plus, Trash2, Calendar, AlertTriangle, Check, X as XIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 
@@ -62,6 +62,13 @@ export default function LeavesAdminV2() {
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const [err, setErr]           = useState('')
+  // Phase 35.0 pass 11 — admin approval queue. Status filter
+  // defaults to 'pending' so admin opens the page and immediately
+  // sees what needs action. Rep-submitted leaves (via Phase 34Z.71
+  // Request Leave on MyOfferV2) land as status='pending'; this
+  // page now lets admin Approve or Reject them.
+  const [statusFilter, setStatusFilter] = useState('pending')
+  const [actingOn, setActingOn] = useState(null)  // row id being acted on
 
   // Form state — defaults pick "today" so common case (rep didn't
   // come in today) is one-tap.
@@ -160,6 +167,62 @@ export default function LeavesAdminV2() {
     load()
   }
 
+  // Phase 35.0 pass 11 — Approve / Reject handlers for pending
+  // leave rows. Both flip status + recompute that rep's daily
+  // score so the change is immediately reflected in /my-performance.
+  async function handleApprove(row) {
+    setActingOn(row.id)
+    const { error } = await supabase.from('leaves')
+      .update({ status: 'approved' })
+      .eq('id', row.id)
+    setActingOn(null)
+    if (error) {
+      setErr('Approve failed: ' + error.message)
+      return
+    }
+    try {
+      await supabase.rpc('compute_daily_score', {
+        p_user_id: row.user_id, p_date: row.leave_date,
+      })
+    } catch (_) { /* ignore */ }
+    load()
+  }
+  async function handleReject(row) {
+    if (!confirm(`Reject leave for ${userMap[row.user_id] || 'this rep'} on ${fmtDate(row.leave_date)}? Rep will be marked working for that day.`)) return
+    setActingOn(row.id)
+    const { error } = await supabase.from('leaves')
+      .update({ status: 'rejected' })
+      .eq('id', row.id)
+    setActingOn(null)
+    if (error) {
+      setErr('Reject failed: ' + error.message)
+      return
+    }
+    // Re-score with rejected status so the day counts again.
+    try {
+      await supabase.rpc('compute_daily_score', {
+        p_user_id: row.user_id, p_date: row.leave_date,
+      })
+    } catch (_) { /* ignore */ }
+    load()
+  }
+
+  // Filter leaves by status tab.
+  const filteredLeaves = useMemo(() => {
+    if (statusFilter === 'all') return leaves
+    return leaves.filter(l => (l.status || 'approved') === statusFilter)
+  }, [leaves, statusFilter])
+
+  // Count per status for tab badges.
+  const statusCounts = useMemo(() => {
+    const c = { pending: 0, approved: 0, rejected: 0, all: leaves.length }
+    leaves.forEach(l => {
+      const s = l.status || 'approved'
+      if (c[s] != null) c[s] += 1
+    })
+    return c
+  }, [leaves])
+
   if (!isAdmin) return null
 
   return (
@@ -248,21 +311,66 @@ export default function LeavesAdminV2() {
         )}
       </div>
 
+      {/* Phase 35.0 pass 11 — status filter tabs above the table.
+          Defaults to 'pending' so the admin sees the action queue
+          first. Counts come from the un-filtered leaves array. */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {[
+          { key: 'pending',  label: 'Pending',  tint: 'var(--accent, #FFE600)' },
+          { key: 'approved', label: 'Approved', tint: '#2BD8A0' },
+          { key: 'rejected', label: 'Rejected', tint: '#FF6F61' },
+          { key: 'all',      label: 'All',      tint: 'var(--v2-ink-2)' },
+        ].map(t => {
+          const active = statusFilter === t.key
+          const count = statusCounts[t.key] || 0
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setStatusFilter(t.key)}
+              style={{
+                padding: '8px 14px', borderRadius: 999,
+                border: `1px solid ${active ? t.tint : 'var(--v2-line)'}`,
+                background: active ? `${t.tint}22` : 'transparent',
+                color: active ? t.tint : 'var(--v2-ink-1)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <span>{t.label}</span>
+              <span style={{
+                padding: '1px 7px', borderRadius: 999,
+                background: active ? t.tint : 'var(--v2-bg-2)',
+                color: active ? 'var(--accent-fg, #0f172a)' : 'var(--v2-ink-2)',
+                fontSize: 11, fontWeight: 700,
+                fontFamily: 'var(--font-mono, monospace)',
+              }}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
       {/* ─── Last 60 days of leaves ──────────────────────── */}
       <div className="v2d-panel" style={{ overflow: 'hidden', padding: 0 }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--v2-ink-2)' }}>
             Loading leaves…
           </div>
-        ) : leaves.length === 0 ? (
+        ) : filteredLeaves.length === 0 ? (
           <div className="v2d-empty-card" style={{ padding: 40, textAlign: 'center' }}>
             <div className="v2d-empty-ic" style={{ marginBottom: 12 }}>
               <Calendar size={28} strokeWidth={1.6} />
             </div>
-            <div className="v2d-empty-t">No leaves recorded</div>
+            <div className="v2d-empty-t">
+              {statusFilter === 'pending' && 'No pending requests'}
+              {statusFilter === 'approved' && 'No approved leaves'}
+              {statusFilter === 'rejected' && 'No rejected leaves'}
+              {statusFilter === 'all' && 'No leaves recorded'}
+            </div>
             <div className="v2d-empty-s">
-              When a rep is on approved time off, mark it here so it doesn't
-              count against their monthly performance score.
+              {statusFilter === 'pending'
+                ? 'Reps can request leave from the My Offer page — requests land here for your approval.'
+                : 'When a rep is on approved time off, mark it here so it doesn\'t count against their monthly performance score.'}
             </div>
           </div>
         ) : (
@@ -273,47 +381,99 @@ export default function LeavesAdminV2() {
                   <th style={thStyle}>Date</th>
                   <th style={thStyle}>Team member</th>
                   <th style={thStyle}>Type</th>
+                  <th style={thStyle}>Status</th>
                   <th style={thStyle}>Reason</th>
-                  <th style={{ ...thStyle, width: 80, textAlign: 'right' }}>Actions</th>
+                  <th style={{ ...thStyle, width: 160, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {leaves.map(row => (
-                  <tr key={row.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
-                    <td style={tdStyle}>{fmtDate(row.leave_date)}</td>
-                    <td style={tdStyle}>
-                      <span style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
-                        {userMap[row.user_id] || 'Unknown'}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        display: 'inline-block', padding: '2px 10px',
-                        borderRadius: 999, fontSize: 11, fontWeight: 600,
-                        textTransform: 'capitalize',
-                        background: 'rgba(255,255,255,.06)',
-                        color: 'var(--v2-ink-1)',
-                      }}>
-                        {row.leave_type}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{ color: 'var(--v2-ink-2)' }}>
-                        {row.reason || '—'}
-                      </span>
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      <button
-                        onClick={() => handleDelete(row)}
-                        className="v2d-ghost"
-                        title="Delete leave"
-                        style={{ color: 'var(--v2-rose, #EF4444)' }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredLeaves.map(row => {
+                  const status = row.status || 'approved'
+                  const statusTint = status === 'pending'  ? 'var(--accent, #FFE600)'
+                                   : status === 'approved' ? '#2BD8A0'
+                                   : '#FF6F61'
+                  const busy = actingOn === row.id
+                  return (
+                    <tr key={row.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
+                      <td style={tdStyle}>{fmtDate(row.leave_date)}</td>
+                      <td style={tdStyle}>
+                        <span style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
+                          {userMap[row.user_id] || 'Unknown'}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 10px',
+                          borderRadius: 999, fontSize: 11, fontWeight: 600,
+                          textTransform: 'capitalize',
+                          background: 'rgba(255,255,255,.06)',
+                          color: 'var(--v2-ink-1)',
+                        }}>
+                          {row.leave_type}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 10px',
+                          borderRadius: 999, fontSize: 11, fontWeight: 700,
+                          textTransform: 'capitalize',
+                          background: `${statusTint}22`,
+                          color: statusTint,
+                          border: `1px solid ${statusTint}44`,
+                        }}>
+                          {status}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ color: 'var(--v2-ink-2)' }}>
+                          {row.reason || '—'}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+                          {status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => handleApprove(row)}
+                                disabled={busy}
+                                className="v2d-ghost"
+                                title="Approve leave"
+                                style={{
+                                  color: '#2BD8A0',
+                                  borderColor: '#2BD8A044',
+                                  background: 'rgba(43,216,160,.10)',
+                                }}
+                              >
+                                <Check size={13} /> Approve
+                              </button>
+                              <button
+                                onClick={() => handleReject(row)}
+                                disabled={busy}
+                                className="v2d-ghost"
+                                title="Reject leave"
+                                style={{
+                                  color: '#FF6F61',
+                                  borderColor: '#FF6F6144',
+                                  background: 'rgba(255,111,97,.10)',
+                                }}
+                              >
+                                <XIcon size={13} /> Reject
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => handleDelete(row)}
+                            className="v2d-ghost"
+                            title="Delete leave"
+                            style={{ color: 'var(--v2-rose, #EF4444)' }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
