@@ -457,8 +457,12 @@
   height: 100%; overflow-y: auto;
   /* Phase 35 PR 2.6 — CTA is back to inline flow (per owner). Only
      need to clear the mobile bottom-nav band (64 px + safe-area)
-     plus a small gap. Tighter padding than PR 2.4. */
-  padding: 16px 14px calc(64px + 16px + env(safe-area-inset-bottom, 0px));
+     plus a small gap. Tighter padding than PR 2.4.
+     Phase 34Z.89 — owner reported "Today's tasks" Done/X chip row
+     clipped behind the bottom nav on iPhone with home-indicator.
+     Bumped bottom padding by 24 px so the last card always clears
+     the nav comfortably. Doesn't affect non-iPhone devices. */
+  padding: 16px 14px calc(80px + 24px + env(safe-area-inset-bottom, 0px));
 }
 .m-greet { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
 .m-greet .hello { font-family: var(--font-display); font-size: 22px; font-weight: 600; }

@@ -951,6 +951,7 @@ function DayStatusSurface(props) {
     return (
       <>
         <V2Hero
+          flat
           eyebrow="Today · day done"
           value="Day done."
           label="Final counters below."
@@ -1009,6 +1010,7 @@ function DayStatusSurface(props) {
     return (
       <>
         <V2Hero
+          flat
           eyebrow={session?.check_in_at ? `In · ${formatTime(session.check_in_at)}` : 'In progress'}
           value={summary}
           label="meetings logged"
@@ -1033,6 +1035,7 @@ function DayStatusSurface(props) {
     return (
       <>
         <V2Hero
+          flat
           eyebrow="Today · ready to start"
           value="Ready to check in"
           label="GPS captures your start location."
@@ -1115,6 +1118,7 @@ function PlanTodayBlock(props) {
   return (
     <>
       <V2Hero
+        flat
         eyebrow="Today · plan the day"
         value={`${targets.meetings || 5} meetings`}
         label="set the bar before you start"
@@ -1500,7 +1504,11 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDis
           <X size={14} strokeWidth={1.8} />
         </button>
       )}
-      <div className="m-card-title">
+      {/* Phase 34Z.89 — when dismiss (X) is present, push the
+          badge left by 36 px so it doesn't sit under the X. Owner
+          reported the "smart task" pill clipping the close button
+          at top-right of the Next-up card. */}
+      <div className="m-card-title" style={onDismiss ? { paddingRight: 36 } : undefined}>
         <span>Next up</span>
         <StatusBadge tint={tone.tint}>{tone.label}</StatusBadge>
       </div>

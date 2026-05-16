@@ -43,6 +43,12 @@ function YellowDot({ size = 6 }) {
   )
 }
 
+// Phase 34Z.89 — `flat` prop. Owner reported the teal gradient
+// stacked with the purple Incentive card on /work looked
+// "consumer-fintech". Flat mode renders the same hero shape on
+// a solid panel + token text colours. /work passes flat=true;
+// /leads, /follow-ups, /quotes, /telecaller, /my-performance
+// keep the gradient hero unchanged.
 export default function V2Hero({
   eyebrow,
   value,
@@ -50,15 +56,37 @@ export default function V2Hero({
   chip,
   right,
   accent = false,
+  flat = false,
 }) {
   const isDown = right?.tone === 'down'
   const rightFg = isDown ? '#fca5a5' : '#86efac'
-  return (
-    <div
-      style={{
+
+  // Flat-mode colour overrides. Kept narrow so the existing
+  // gradient design remains the default for non-/work pages.
+  const containerStyle = flat
+    ? {
+        background: 'var(--v2-bg-1, #1e293b)',
+        border: '1px solid var(--v2-line, #334155)',
+        color: 'var(--text, #f1f5f9)',
+      }
+    : {
         background: HERO_GRADIENT,
         border: '1px solid #1c5856',
         color: '#fff',
+      }
+  const eyebrowColor = flat ? 'var(--text-muted, #94a3b8)' : 'rgba(255,255,255,0.65)'
+  const labelColor   = flat ? 'var(--text-muted, #94a3b8)' : 'rgba(255,255,255,0.7)'
+  const chipBg       = flat ? 'var(--v2-bg-2, rgba(255,255,255,0.06))' : 'rgba(255,255,255,0.10)'
+  const chipBorder   = flat ? '1px solid var(--v2-line, #334155)' : '1px solid rgba(255,255,255,0.18)'
+  const chipColor    = flat ? 'var(--text, #f1f5f9)' : '#fff'
+  const valueColor   = accent
+    ? 'var(--accent, #FFE600)'
+    : (flat ? 'var(--text, #f1f5f9)' : '#fff')
+
+  return (
+    <div
+      style={{
+        ...containerStyle,
         borderRadius: 'var(--radius-lg, 14px)',
         padding: '16px 18px',
         marginBottom: 12,
@@ -76,7 +104,7 @@ export default function V2Hero({
             fontSize: 10,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.65)',
+            color: eyebrowColor,
             fontWeight: 500,
           }}
         >
@@ -103,14 +131,14 @@ export default function V2Hero({
               fontSize: 28,
               lineHeight: 1.1,
               letterSpacing: '-0.01em',
-              color: accent ? 'var(--accent, #FFE600)' : '#fff',
+              color: valueColor,
               whiteSpace: 'nowrap',
             }}
           >
             {value}
           </div>
           {label && (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: labelColor, marginTop: 4 }}>
               {label}
             </div>
           )}
@@ -120,7 +148,7 @@ export default function V2Hero({
           style={{
             textAlign: 'right',
             fontSize: 11,
-            color: 'rgba(255,255,255,0.7)',
+            color: labelColor,
             flex: '0 1 auto',
             maxWidth: '100%',
           }}
@@ -133,9 +161,9 @@ export default function V2Hero({
                 gap: 6,
                 padding: '4px 10px',
                 borderRadius: 999,
-                background: 'rgba(255,255,255,0.10)',
-                border: '1px solid rgba(255,255,255,0.18)',
-                color: '#fff',
+                background: chipBg,
+                border: chipBorder,
+                color: chipColor,
                 fontSize: 11,
                 fontWeight: 500,
                 whiteSpace: 'nowrap',

@@ -253,7 +253,10 @@ export default function ProposedIncentiveCard({ compact = false }) {
       <div className="v2-incentive-strip" ref={pickerRef} style={{ position: 'relative' }}>
         <div className="v2-incentive-strip-left">
           <span className="v2-incentive-strip-num">
-            {isForecast && p.value > 0 && '+'}
+            {/* Phase 34Z.89 — dropped leading "+" on forecast value.
+                The plus implied "you earned MORE" which is confusing
+                for a forecast. Same change applied to the full-card
+                variant below. */}
             <Money value={p.value} />
           </span>
         </div>
@@ -333,7 +336,7 @@ export default function ProposedIncentiveCard({ compact = false }) {
         <button className={`v2-tab ${tab === 'earned'   ? 'v2-tab--active' : ''}`} onClick={() => setTab('earned')}>Earned</button>
       </div>
       <div className="v2-incentive-big">
-        {isForecast && p.value > 0 && '+'}
+        {/* Phase 34Z.89 — leading "+" removed (see strip variant). */}
         <Money value={p.value} />
       </div>
       <div className="v2-incentive-sub">{p.sub}</div>
