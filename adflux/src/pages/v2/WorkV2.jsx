@@ -698,6 +698,28 @@ export default function WorkV2() {
           </div>
         )}
 
+        {/* Phase 35.0 pass 4 — owner directive: Log meeting + Log lead
+            buttons sit BETWEEN the purple Incentive card (rendered in
+            V2AppShell above the Outlet) and the green Today/progress
+            hero. Active-state only. Other states keep the original
+            flow with the CTAs at the bottom. */}
+        {checkedIn && !dayDone && (
+          <StickyPrimaryCta
+            session={session}
+            busy={busy}
+            parsing={parsing}
+            startDay={startDay}
+            doCheckIn={doCheckIn}
+            submitEvening={submitEvening}
+            onOpenMeeting={() => navigate('/leads/new', {
+              state: { meetingMode: true, prefill: { city: profile?.city || '' } },
+            })}
+            onOpenLead={() => navigate('/leads/new', {
+              state: { prefill: { city: profile?.city || '' } },
+            })}
+          />
+        )}
+
         <DayStatusSurface
           session={session}
           profile={profile}
@@ -740,36 +762,29 @@ export default function WorkV2() {
           <TodaySummaryCard userId={profile?.id} session={session} />
         )}
 
-        {/* Phase 35 PR 2.11 — locked order in B_ACTIVE state:
-              V2Hero (in DayStatusSurface above)
-              Log meeting + Log lead inline CTAs   ← moved up
-              Next-up priority card
-              Today's Tasks (smart-task list)
-              Map
-              Evening summary
-            Owner: "need Log meeting + Log lead above Next-up card".
-        */}
-        <StickyPrimaryCta
-          session={session}
-          busy={busy}
-          parsing={parsing}
-          startDay={startDay}
-          doCheckIn={doCheckIn}
-          submitEvening={submitEvening}
-          // Phase 34Z.20 — both CTAs now navigate to LeadFormV2.
-          // Meeting passes meetingMode=true → form shows Outcome
-          // section + GPS strip + saves a lead_activities row.
-          // Lead is the plain create flow. One form, two modes.
-          // Owner directive (14 May 2026): "I need same copy and
-          // paste form in log in the meeting. Both must have auto
-          // fetch GPS."
-          onOpenMeeting={() => navigate('/leads/new', {
-            state: { meetingMode: true, prefill: { city: profile?.city || '' } },
-          })}
-          onOpenLead={() => navigate('/leads/new', {
-            state: { prefill: { city: profile?.city || '' } },
-          })}
-        />
+        {/* Phase 35.0 pass 4 — StickyPrimaryCta now only renders here
+            for NON-active states (start day / check-in / submit
+            evening). In active state the same component renders ABOVE
+            DayStatusSurface (per owner's design-reference layout). */}
+        {(!checkedIn || dayDone) && (
+          <StickyPrimaryCta
+            session={session}
+            busy={busy}
+            parsing={parsing}
+            startDay={startDay}
+            doCheckIn={doCheckIn}
+            submitEvening={submitEvening}
+            // Phase 34Z.20 — both CTAs now navigate to LeadFormV2.
+            // Meeting passes meetingMode=true → form shows Outcome
+            // section + GPS strip + saves a lead_activities row.
+            onOpenMeeting={() => navigate('/leads/new', {
+              state: { meetingMode: true, prefill: { city: profile?.city || '' } },
+            })}
+            onOpenLead={() => navigate('/leads/new', {
+              state: { prefill: { city: profile?.city || '' } },
+            })}
+          />
+        )}
 
         {checkedIn && !dayDone && (
           <NextActionSurface
