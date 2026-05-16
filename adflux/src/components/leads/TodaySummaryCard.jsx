@@ -198,25 +198,28 @@ export default function TodaySummaryCard({ userId, session }) {
     )
   }
 
-  // Phase 34Z.85 — six-bucket grid. Row 1 = call-action items the
-  // rep should chase today. Row 2 = future / informational. Each
-  // cell taps to a filtered /follow-ups view (Phase 34Z.63 filter
-  // param accepts the new values added below).
+  // Phase 34Z.86 — re-laid out cells. Earlier 3-col grid clipped
+  // 2-word labels on phone (PAYMEN…/RENEW… got truncated). Now:
+  //   - Single-word short labels: FOLLOW-UP, QUOTE, PAYMENT, TODAY,
+  //     SCHEDULED, RENEWAL.
+  //   - Icon above label (not inline), tightens column width.
+  //   - Big number centered, label centered below.
+  //   - Padding 8/8, gap 6, radius 12 — same spec.
   const cells = [
-    // Row 1
-    { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Follow-ups',         n: counts.followUps,       to: '/follow-ups' },
-    { icon: FileText,      tint: 'var(--blue, #3B82F6)',    label: 'Quote chase',        n: counts.quoteChase,      to: '/follow-ups?filter=quote_chase' },
-    { icon: IndianRupee,   tint: 'var(--danger, #EF4444)',  label: 'Payment chase',      n: counts.paymentChase,    to: '/follow-ups?filter=payment' },
-    // Row 2
-    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Meetings today',     n: counts.plannedMeetings, to: '/work#day-status' },
-    { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled meetings', n: counts.scheduledMeetings, to: '/follow-ups?filter=meetings' },
-    { icon: Repeat,        tint: 'var(--success, #10B981)', label: 'Renewal',            n: counts.renewal,         to: '/renewal-tools' },
+    // Row 1 — call-action today
+    { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Follow-up',     n: counts.followUps,         to: '/follow-ups' },
+    { icon: FileText,      tint: 'var(--blue, #3B82F6)',    label: 'Quote',         n: counts.quoteChase,        to: '/follow-ups?filter=quote_chase' },
+    { icon: IndianRupee,   tint: 'var(--danger, #EF4444)',  label: 'Payment',       n: counts.paymentChase,      to: '/follow-ups?filter=payment' },
+    // Row 2 — future / informational
+    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Today',         n: counts.plannedMeetings,   to: '/work#day-status' },
+    { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled',     n: counts.scheduledMeetings, to: '/follow-ups?filter=meetings' },
+    { icon: Repeat,        tint: 'var(--success, #10B981)', label: 'Renewal',       n: counts.renewal,           to: '/renewal-tools' },
   ]
 
   return (
     <div className="m-card" style={{
-      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
-      padding: 12,
+      display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
+      padding: 10,
     }}>
       {cells.map(c => {
         const Icon = c.icon
@@ -228,33 +231,36 @@ export default function TodaySummaryCard({ userId, session }) {
             onClick={() => navigate(c.to)}
             disabled={empty}
             style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
               gap: 4,
-              padding: '10px 10px',
-              borderRadius: 10,
+              padding: '12px 6px',
+              borderRadius: 12,
               background: `${c.tint}14`,
               border: `1px solid ${c.tint}33`,
               cursor: empty ? 'default' : 'pointer',
-              opacity: empty ? 0.55 : 1,
+              opacity: empty ? 0.5 : 1,
               fontFamily: 'inherit',
-              textAlign: 'left',
               color: 'inherit',
+              minHeight: 78,
             }}
             title={empty ? `No ${c.label.toLowerCase()}` : `Open ${c.label.toLowerCase()}`}
           >
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              color: c.tint, fontSize: 11, fontWeight: 600,
-              textTransform: 'uppercase', letterSpacing: '.06em',
-            }}>
-              <Icon size={12} strokeWidth={1.6} />
-              <span style={{ color: 'var(--text-muted)' }}>{c.label}</span>
-            </div>
+            <Icon size={14} strokeWidth={1.6} style={{ color: c.tint }} />
             <div style={{
               fontFamily: 'var(--font-display, "Space Grotesk")',
-              fontSize: 26, fontWeight: 700, color: 'var(--text)', lineHeight: 1,
+              fontSize: 22, fontWeight: 700, color: 'var(--text)', lineHeight: 1,
             }}>
               {c.n}
+            </div>
+            <div style={{
+              fontSize: 9, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '.08em',
+              color: 'var(--text-muted)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              maxWidth: '100%',
+            }}>
+              {c.label}
             </div>
           </button>
         )
