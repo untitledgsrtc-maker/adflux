@@ -23,7 +23,7 @@
 //   Identical to the original — same v2-incentive / v2-tabs CSS.
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive } from '../../utils/incentiveCalc'
@@ -327,9 +327,52 @@ export default function ProposedIncentiveCard({ compact = false }) {
   // The dropdown chip variant from Phase 33G.6 was rolled back per
   // 'forcasted card must be as old one'. Compact strip variant
   // (top of this file) keeps the dropdown for narrow-page contexts.
+  // Phase 35.0 — progress-to-next-tier numbers. Only shown when we
+  // have a real threshold (slab boundary) AND the rep is currently
+  // accruing. Reads from `earned` panel data; pure-display, no extra
+  // fetch. Owner directive (16 May 2026, mockup app.jsx line 178-182).
+  const slabTarget = Number(earned?.threshold || 0)
+  const slabCurrent = Number(earned?.incentive || 0)
+  const slabHasProgress = slabTarget > 0
+  const slabPct = slabHasProgress
+    ? Math.min(100, Math.max(0, (slabCurrent / slabTarget) * 100))
+    : 0
+  const slabRemaining = Math.max(0, slabTarget - slabCurrent)
+  const slabRemainingLabel = slabRemaining >= 100000
+    ? `₹${(slabRemaining / 100000).toFixed(1)}L`
+    : slabRemaining >= 1000
+      ? `₹${(slabRemaining / 1000).toFixed(1)}k`
+      : `₹${slabRemaining}`
+
+  // Phase 35.0 — "On track" / "Behind" sparkle pill. Forecast tab
+  // only — shows whether the rep is currently above 50 % of the
+  // earned threshold. Cheap motivation cue; no new data.
+  const onTrack = slabHasProgress && slabPct >= 50
+
   return (
     <div className="v2-incentive">
-      <div className="v2-incentive-kicker">Proposed Incentive</div>
+      {/* Phase 35.0 — kicker + sparkle status pill in one row. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 12,
+      }}>
+        <div className="v2-incentive-kicker" style={{ marginBottom: 0 }}>Proposed Incentive</div>
+        {slabHasProgress && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 11, fontWeight: 700,
+            // Phase 35.0 — guardian P2: §7 icon stroke 1.6, sizes
+            // 14/16/18/22. §5 colour from tokens — brand yellow for
+            // "On track", muted white for "Behind".
+            color: onTrack ? 'var(--accent, #FFE600)' : 'rgba(255,255,255,0.78)',
+            background: 'rgba(255,255,255,0.12)',
+            padding: '4px 9px', borderRadius: 999,
+          }}>
+            <Sparkles size={14} strokeWidth={1.6} />
+            <span>{onTrack ? 'On track' : 'Behind'}</span>
+          </div>
+        )}
+      </div>
       <div className="v2-tabs">
         <button className={`v2-tab ${tab === 'forecast' ? 'v2-tab--active' : ''}`} onClick={() => setTab('forecast')}>Forecast</button>
         <button className={`v2-tab ${tab === 'pending'  ? 'v2-tab--active' : ''}`} onClick={() => setTab('pending')}>Pending</button>
@@ -340,6 +383,34 @@ export default function ProposedIncentiveCard({ compact = false }) {
         <Money value={p.value} />
       </div>
       <div className="v2-incentive-sub">{p.sub}</div>
+
+      {/* Phase 35.0 — progress bar to next slab. Mockup spec line 177-182.
+          Hidden when threshold is 0 (rep has no slab yet) or already past
+          target (slabPct === 100). */}
+      {slabHasProgress && slabPct < 100 && slabRemaining > 0 && (
+        <div style={{
+          marginTop: 16, display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <div style={{
+            flex: 1, height: 6, borderRadius: 999,
+            background: 'rgba(0,0,0,0.22)', overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${slabPct}%`, height: '100%', borderRadius: 999,
+              background: 'linear-gradient(90deg, #FFE680, #FFD061)',
+            }} />
+          </div>
+          <div style={{
+            fontSize: 11, fontWeight: 600,
+            color: 'rgba(255,255,255,0.88)',
+            whiteSpace: 'nowrap',
+          }}>
+            <span style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+              {slabRemainingLabel}
+            </span> to next tier
+          </div>
+        </div>
+      )}
     </div>
   )
 }

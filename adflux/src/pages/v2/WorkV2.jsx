@@ -1006,18 +1006,26 @@ function DayStatusSurface(props) {
   if (checkedIn) {
     const hitTarget = (counters.meetings || 0) >= (targets.meetings || 5)
     const summary = `${counters.meetings || 0} / ${targets.meetings || 5}`
+    // Phase 35.0 — progress ring + bullet stats + View pipeline CTA.
+    // Mockup spec line 188-247 of _design_reference/newsalesui/.../app.jsx.
+    const pct = ((counters.meetings || 0) / (targets.meetings || 5)) * 100
     return (
       <>
         <V2Hero
           eyebrow={session?.check_in_at ? `In · ${formatTime(session.check_in_at)}` : 'In progress'}
           value={summary}
           label="meetings logged"
-          chip={`${counters.calls || 0} call${(counters.calls || 0) === 1 ? '' : 's'} · ${counters.new_leads || 0} new lead${(counters.new_leads || 0) === 1 ? '' : 's'}`}
+          percent={pct}
           right={{
             tone: hitTarget ? 'up' : 'down',
             text: hitTarget ? 'target hit' : `${(targets.meetings || 5) - (counters.meetings || 0)} to go`,
           }}
           accent={hitTarget}
+          footerStats={[
+            { label: 'calls',     value: counters.calls || 0,     tint: 'var(--v2-yellow, #FFE600)' },
+            { label: 'new leads', value: counters.new_leads || 0, tint: 'var(--v2-yellow, #FFE600)' },
+          ]}
+          footerCta={{ label: 'View pipeline', onClick: () => navigate('/leads') }}
         />
         {/* Phase 35 PR 2.6 — EveningReportBlock moved OUT of the
             B_ACTIVE branch of DayStatusSurface. Owner: "i want this
