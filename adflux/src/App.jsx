@@ -25,6 +25,8 @@ import HRV2               from './pages/v2/HRV2'
 import LeavesAdminV2     from './pages/v2/LeavesAdminV2'
 // Phase 36 — per-rep monthly salary breakdown.
 import SalaryAdminV2     from './pages/v2/SalaryAdminV2'
+// Phase 38 — People module (Team + Incentives + Salary + Leaves tabs).
+import PeopleV2          from './pages/v2/PeopleV2'
 // Phase 33H — admin TA Payouts (GPS-driven travel allowance).
 import TaPayoutsAdminV2  from './pages/v2/TaPayoutsAdminV2'
 import ClientsV2          from './pages/v2/ClientsV2'
@@ -228,6 +230,9 @@ export default function App() {
           {/* Phase 36 — Salary Sheet. Per-rep monthly breakdown with
               auto leave deduction. Admin / co_owner only. */}
           <Route path="/admin/salary"              element={<RequirePrivileged><SalaryAdminV2 /></RequirePrivileged>} />
+          {/* Phase 38 — People (consolidated). Old routes above stay
+              as deep-links; sidebar uses /people. */}
+          <Route path="/people"                    element={<RequirePrivileged><PeopleV2 /></RequirePrivileged>} />
           {/* Phase 8C — unified Master page (Attachments / Signers / Media / Documents) */}
           <Route path="/master"                    element={<RequirePrivileged><MasterV2 /></RequirePrivileged>} />
           {/* Phase 35 PR 1 — primitives demo. Page handles role gate

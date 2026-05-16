@@ -64,18 +64,13 @@ const ADMIN_NAV = [
   { to: '/auto-districts',    label: 'Auto Districts', icon: MapPin },
   { to: '/gsrtc-stations',    label: 'GSRTC Stations', icon: Tv },
   { to: '/master',            label: 'Master',         icon: FileBox },
-  { to: '/team',              label: 'Team',           icon: Users },
+  // Phase 38 — People consolidates Team + Incentives + Salary + Leaves
+  // into one module with sub-tabs. Old routes still work as deep-links.
+  { to: '/people',            label: 'People',         icon: Users },
   { to: '/hr',                label: 'HR',             icon: UserCircle2 },
-  // Phase 33G.8 — admin Leaves (item 82). Sits next to HR since it's
-  // the same operational neighbourhood.
-  { to: '/admin/leaves',      label: 'Leaves',         icon: ClockIcon },
   // Phase 33H — TA (travel allowance) auto-computed from GPS pings.
   { to: '/admin/ta-payouts',  label: 'TA Payouts',     icon: TrendingUp },
-  // Phase 36 — Salary Sheet. Per-rep monthly breakdown with auto
-  // leave deduction. Admin / co_owner only.
-  { to: '/admin/salary',      label: 'Salary Sheet',   icon: Wallet },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
-  { to: '/incentives',        label: 'Incentives',     icon: Gift },
 ]
 
 const SALES_NAV = [
@@ -143,7 +138,8 @@ const MOBILE_NAV_ADMIN = [
   { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
   { to: '/pending-approvals', label: 'Approve',        icon: CheckSquare },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
-  { to: '/team',              label: 'Team',           icon: Users },
+  // Phase 38 — was /team, now /people (consolidated module).
+  { to: '/people',            label: 'People',         icon: Users },
 ]
 
 // Phase 35 PR 2 — locked to 4 tabs. /work now sticky-mounts the

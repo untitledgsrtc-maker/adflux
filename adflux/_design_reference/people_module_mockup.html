@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>People Module — mockup (Phase 38 proposal)</title>
+<meta name="viewport" content="width=1280, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e1a; --bg-1:#0f1525; --bg-2:#141b2d; --bg-3:#1c2540;
+    --line:#1f2a44; --line-2:#2a3556;
+    --ink-0:#f1f5f9; --ink-1:#cdd5e2; --ink-2:#8b95ad;
+    --yellow:#FFE600; --yellow-soft:rgba(255,230,0,0.14);
+    --green:#10B981; --green-soft:rgba(16,185,129,0.14);
+    --blue:#3B82F6;  --blue-soft:rgba(59,130,246,0.14);
+    --amber:#F59E0B; --amber-soft:rgba(245,158,11,0.14);
+    --rose:#EF4444;  --rose-soft:rgba(239,68,68,0.14);
+    --display:'Space Grotesk', system-ui, sans-serif;
+    --sans:'DM Sans', system-ui, sans-serif;
+    --mono:'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--ink-1);font-family:var(--sans);font-size:14px;line-height:1.5;}
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:1280px;margin:0 auto;padding:32px 28px 80px;}
+
+  /* page head */
+  .kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);font-weight:600;}
+  h1.title{font-family:var(--display);font-size:30px;font-weight:700;margin:6px 0 4px;color:var(--ink-0);letter-spacing:-.01em;}
+  .sub{font-size:13px;color:var(--ink-2);max-width:680px;}
+
+  /* sub-tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:24px 0 22px;}
+  .tab{padding:11px 16px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:8px;}
+  .tab:hover{color:var(--ink-1);}
+  .tab.active{color:var(--yellow);border-bottom-color:var(--yellow);}
+  .tab .count{font-family:var(--mono);font-size:10px;background:var(--bg-2);border:1px solid var(--line);padding:2px 6px;border-radius:999px;color:var(--ink-2);}
+  .tab.active .count{background:var(--yellow-soft);border-color:transparent;color:var(--yellow);}
+
+  /* summary cards */
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .card{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:18px 20px;}
+  .card .lbl{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.10em;font-weight:600;}
+  .card .val{font-family:var(--display);font-size:26px;font-weight:700;color:var(--ink-0);margin-top:6px;}
+  .card .delta{font-size:11px;color:var(--green);margin-top:4px;display:flex;align-items:center;gap:4px;}
+  .card.warn .val{color:var(--amber);}
+  .card.rose .val{color:var(--rose);}
+
+  /* filter row */
+  .filters{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .filt{display:flex;flex-direction:column;gap:4px;}
+  .filt label{font-size:10px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.10em;font-weight:600;}
+  .filt input, .filt select{
+    height:36px;padding:0 12px;background:var(--bg-2);border:1px solid var(--line);
+    border-radius:8px;color:var(--ink-0);font-family:inherit;font-size:13px;outline:none;min-width:160px;
+  }
+  .spacer{flex:1;}
+  .btn-y{background:var(--yellow);color:#0a0e1a;padding:0 14px;height:36px;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink-1);padding:0 12px;height:36px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+
+  /* panel */
+  .panel{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{padding:12px 16px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);border-bottom:1px solid var(--line);background:rgba(255,255,255,.02);white-space:nowrap;}
+  thead th.num{text-align:right;}
+  tbody td{padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody td.num{text-align:right;font-family:var(--mono);font-weight:500;}
+  tbody tr:hover{background:rgba(255,255,255,.015);}
+  tbody tr:last-child td{border-bottom:none;}
+  .name{font-weight:600;color:var(--ink-0);}
+  .role{font-size:10px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+  .net{font-family:var(--mono);font-weight:700;color:var(--yellow);}
+  .total-row td{background:rgba(255,255,255,.025);font-weight:700;border-top:2px solid var(--line);}
+  .total-row td:first-child{color:var(--ink-0);}
+
+  /* chips */
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+  .chip-g{background:var(--green-soft);color:var(--green);}
+  .chip-a{background:var(--amber-soft);color:var(--amber);}
+  .chip-r{background:var(--rose-soft);color:var(--rose);}
+  .chip-b{background:var(--blue-soft);color:var(--blue);}
+  .chip-y{background:var(--yellow-soft);color:var(--yellow);}
+
+  .btn-mini{background:var(--yellow);color:#0a0e1a;padding:5px 10px;font-size:11px;font-weight:700;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+  .btn-mini.ghost{background:transparent;border:1px solid var(--line);color:var(--ink-1);}
+
+  .legend{font-size:11px;color:var(--ink-2);margin-top:14px;line-height:1.6;}
+  .note{font-size:11px;color:var(--amber);background:var(--amber-soft);border:1px solid rgba(245,158,11,.3);padding:8px 12px;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+
+  /* preview cards in collapsed tabs */
+  .preview-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:18px;}
+  .preview{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:18px;}
+  .preview h3{font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink-0);margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .preview p{font-size:12px;color:var(--ink-2);margin:0 0 12px;}
+  .preview ul{margin:0;padding-left:18px;font-size:12px;color:var(--ink-1);}
+  .preview ul li{margin-bottom:4px;}
+
+  /* modal */
+  .modal-shadow{margin-top:32px;background:rgba(0,0,0,.4);border:1px dashed var(--line-2);border-radius:14px;padding:24px;}
+  .modal{max-width:560px;margin:0 auto;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  .modal-h{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .modal-h .t{font-family:var(--display);font-size:16px;font-weight:600;color:var(--ink-0);}
+  .modal-h .x{color:var(--ink-2);font-size:18px;cursor:pointer;}
+  .modal-b{padding:18px 20px;display:flex;flex-direction:column;gap:14px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:12px;}
+  .grid3 .k{font-size:10px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;}
+  .grid3 .v{font-family:var(--display);font-size:18px;font-weight:600;margin-top:4px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .modal label{display:flex;flex-direction:column;gap:6px;}
+  .modal label span{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600;}
+  .modal input{height:38px;padding:0 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--ink-0);font-family:inherit;font-size:13px;outline:none;}
+  .modal .hist{display:flex;flex-direction:column;gap:6px;}
+  .modal .hist-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;}
+  .modal .hist-row .a{font-size:13px;font-weight:600;color:var(--ink-0);}
+  .modal .hist-row .d{font-size:10px;color:var(--ink-2);margin-top:2px;}
+
+  .footer-note{margin-top:40px;padding:16px 20px;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;font-size:12px;color:var(--ink-2);line-height:1.7;}
+  .footer-note b{color:var(--ink-0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEAD -->
+  <div class="kicker">HR · Payroll · Performance</div>
+  <h1 class="title">People</h1>
+  <div class="sub">One module for everything that touches your team: profile, monthly score, salary breakdown, payout history, leave roster. Replaces the four separate admin pages (Team / Incentives / Salary / Leaves).</div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab"><span>Team</span><span class="count">24</span></div>
+    <div class="tab"><span>Incentives</span><span class="count">9</span></div>
+    <div class="tab active"><span>Salary</span><span class="count">May 2026</span></div>
+    <div class="tab"><span>Leaves</span><span class="count">3 pending</span></div>
+  </div>
+
+  <!-- SUMMARY CARDS (Salary tab) -->
+  <div class="summary">
+    <div class="card">
+      <div class="lbl">Net Payable</div>
+      <div class="val">₹14,68,200</div>
+      <div class="delta">+₹46,500 vs Apr</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Already Paid</div>
+      <div class="val" style="color:var(--green)">₹6,20,000</div>
+      <div class="delta" style="color:var(--ink-2)">42% of May payable</div>
+    </div>
+    <div class="card warn">
+      <div class="lbl">Pending</div>
+      <div class="val">₹8,48,200</div>
+      <div class="delta" style="color:var(--amber)">15 reps not paid in full</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Unpaid Leave Cut</div>
+      <div class="val" style="color:var(--rose)">−₹18,400</div>
+      <div class="delta" style="color:var(--ink-2)">11 days · base ÷ 26</div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters">
+    <div class="filt">
+      <label>Month</label>
+      <input type="month" value="2026-05" />
+    </div>
+    <div class="filt">
+      <label>Role</label>
+      <select><option>All roles</option><option>Sales</option><option>Telecaller</option><option>Agency</option></select>
+    </div>
+    <div class="filt">
+      <label>Search rep</label>
+      <input type="text" placeholder="Name…" />
+    </div>
+    <div class="spacer"></div>
+    <button class="btn-ghost">⤓ Export CSV</button>
+    <button class="btn-y">⚡ Bulk full-pay</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th>Rep</th>
+          <th class="num">Base</th>
+          <th class="num">Variable</th>
+          <th class="num">Score</th>
+          <th class="num">Incentive</th>
+          <th class="num">TA/DA</th>
+          <th class="num">Leave</th>
+          <th class="num">Deduct</th>
+          <th class="num">NET</th>
+          <th class="num">Paid</th>
+          <th class="num">Payout</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr>
+          <td>
+            <div class="name">Brahmbhatt Jignesh</div>
+            <div class="role">Sales · Private</div>
+          </td>
+          <td class="num">₹56,000</td>
+          <td class="num">₹22,800</td>
+          <td class="num"><span style="color:var(--green)">95%</span></td>
+          <td class="num">₹38,500</td>
+          <td class="num">₹4,200</td>
+          <td class="num">0.0d</td>
+          <td class="num" style="color:var(--ink-2)">—</td>
+          <td class="num net">₹1,21,500</td>
+          <td class="num"><span style="color:var(--green);font-weight:700">₹1,21,500</span><div><span class="chip chip-g">FULL</span></div></td>
+          <td class="num"><button class="btn-mini ghost">View</button></td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="name">Sondarva Kiran</div>
+            <div class="role">Sales · Private</div>
+          </td>
+          <td class="num">₹49,000</td>
+          <td class="num">₹15,750</td>
+          <td class="num"><span style="color:var(--amber)">75%</span></td>
+          <td class="num">₹22,000</td>
+          <td class="num">₹6,800</td>
+          <td class="num">1.0d <div style="font-size:10px;color:var(--ink-2)">1.0 unpaid</div></td>
+          <td class="num" style="color:var(--rose)">−₹1,885</td>
+          <td class="num net">₹91,665</td>
+          <td class="num"><span style="color:var(--green);font-weight:700">₹50,000</span><div style="font-size:9px;color:var(--amber)">pending ₹41,665</div></td>
+          <td class="num"><button class="btn-mini">₹ Payout</button></td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="name">Dhara Patel</div>
+            <div class="role">Sales · Private</div>
+          </td>
+          <td class="num">₹42,000</td>
+          <td class="num">₹12,600</td>
+          <td class="num"><span style="color:var(--amber)">70%</span></td>
+          <td class="num">₹14,000</td>
+          <td class="num">₹3,400</td>
+          <td class="num">0.5d <div style="font-size:10px;color:var(--ink-2)">0.5 paid</div></td>
+          <td class="num" style="color:var(--ink-2)">—</td>
+          <td class="num net">₹72,000</td>
+          <td class="num" style="color:var(--ink-2)">—</td>
+          <td class="num"><button class="btn-mini">₹ Payout</button></td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="name">Vishnu Solanki</div>
+            <div class="role">Sales · Private</div>
+          </td>
+          <td class="num">₹52,000</td>
+          <td class="num">₹19,500</td>
+          <td class="num"><span style="color:var(--green)">85%</span></td>
+          <td class="num">₹31,200</td>
+          <td class="num">₹5,100</td>
+          <td class="num">2.0d <div style="font-size:10px;color:var(--ink-2)">2.0 unpaid</div></td>
+          <td class="num" style="color:var(--rose)">−₹4,000</td>
+          <td class="num net">₹1,03,800</td>
+          <td class="num"><span style="color:var(--green);font-weight:700">₹40,000</span><div style="font-size:9px;color:var(--amber)">pending ₹63,800</div></td>
+          <td class="num"><button class="btn-mini">₹ Payout</button></td>
+        </tr>
+
+        <tr>
+          <td>
+            <div class="name">Nikhil Vyas</div>
+            <div class="role">Telecaller</div>
+          </td>
+          <td class="num">₹28,000</td>
+          <td class="num">₹8,400</td>
+          <td class="num"><span style="color:var(--amber)">72%</span></td>
+          <td class="num">—</td>
+          <td class="num">—</td>
+          <td class="num">0.0d</td>
+          <td class="num" style="color:var(--ink-2)">—</td>
+          <td class="num net">₹36,400</td>
+          <td class="num"><span style="color:var(--green);font-weight:700">₹36,400</span><div><span class="chip chip-g">FULL</span></div></td>
+          <td class="num"><button class="btn-mini ghost">View</button></td>
+        </tr>
+
+        <tr class="total-row">
+          <td>TOTAL · 5 of 24</td>
+          <td class="num">₹2,27,000</td>
+          <td class="num">₹79,050</td>
+          <td class="num">—</td>
+          <td class="num">₹1,05,700</td>
+          <td class="num">₹19,500</td>
+          <td class="num">3.5d</td>
+          <td class="num" style="color:var(--rose)">−₹5,885</td>
+          <td class="num" style="color:var(--yellow);font-size:14px">₹4,25,365</td>
+          <td class="num" style="color:var(--green)">₹2,47,900</td>
+          <td class="num">—</td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <div class="legend">
+    NET = base + variable + incentive + TA/DA − unpaid-leave deduction. Paid column rolls up <span class="chip chip-y">salary_payouts</span> rows for the selected month. FULL chip means is_full_payment=true; no further entries allowed for that rep that month. Pending = NET − Paid.
+  </div>
+
+  <!-- MODAL preview -->
+  <div class="modal-shadow">
+    <div style="text-align:center;font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.10em;margin-bottom:14px;">↓ click "Payout" → modal opens ↓</div>
+    <div class="modal">
+      <div class="modal-h">
+        <div class="t">Salary Payout — Sondarva Kiran · May 2026</div>
+        <div class="x">✕</div>
+      </div>
+      <div class="modal-b">
+        <div class="grid3">
+          <div><div class="k">Net payable</div><div class="v" style="color:var(--ink-0)">₹91,665</div></div>
+          <div><div class="k">Paid</div><div class="v" style="color:var(--green)">₹50,000</div></div>
+          <div><div class="k">Pending</div><div class="v" style="color:var(--amber)">₹41,665</div></div>
+        </div>
+        <div class="grid2">
+          <label><span>Amount paid</span><input value="41665" /></label>
+          <label><span>Paid date</span><input value="2026-05-17" /></label>
+        </div>
+        <label><span>Note (optional)</span><input placeholder="e.g. NEFT ref, salary advance, split reason" /></label>
+        <label style="flex-direction:row;align-items:center;gap:8px;font-size:13px;color:var(--ink-1);">
+          <input type="checkbox" checked />
+          Mark as full & final salary payment for this month
+        </label>
+        <button class="btn-y" style="width:100%;justify-content:center;">Record Payout</button>
+
+        <div>
+          <div style="font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Payout History</div>
+          <div class="hist">
+            <div class="hist-row">
+              <div>
+                <div class="a">₹50,000</div>
+                <div class="d">📅 2026-05-10 · part payment NEFT 2710045</div>
+              </div>
+              <div style="color:var(--rose);font-size:12px;cursor:pointer;">🗑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OTHER TAB PREVIEWS -->
+  <div class="preview-grid">
+    <div class="preview">
+      <h3>👥 Team tab</h3>
+      <p>Roster grid: avatar · name · role · join date · tenure · manager · is_active toggle. Click row → side drawer with profile + score history + payout history.</p>
+      <ul>
+        <li>Same table chrome as Salary, different columns</li>
+        <li>"Add staff" CTA → existing StaffForm modal</li>
+        <li>Filters: role, segment, active/inactive</li>
+      </ul>
+    </div>
+    <div class="preview">
+      <h3>⚡ Incentives tab</h3>
+      <p>Current /incentives page lifted as-is. Cards + slab editor + per-rep table. UI stays exactly the same — only the tab chrome wraps it.</p>
+      <ul>
+        <li>Slab configurator unchanged</li>
+        <li>IncentivePayoutModal unchanged</li>
+        <li>calculateIncentive forecast preview unchanged</li>
+      </ul>
+    </div>
+    <div class="preview">
+      <h3>🌴 Leaves tab</h3>
+      <p>Pending approval queue at top (3 today). Below: month grid of all leaves with paid/unpaid pill and admin_note inline. Same panel chrome.</p>
+      <ul>
+        <li>Approve/Reject inline (no modal)</li>
+        <li>Paid eligibility: shows tenure-locked reps in muted style</li>
+        <li>Filters: month, status, rep</li>
+      </ul>
+    </div>
+    <div class="preview">
+      <h3>↳ What stays</h3>
+      <p>All four current pages keep their existing routes as deep-links. Sidebar collapses 4 entries into one "People" entry with the 4 sub-tabs. Zero RPC / SQL / data-model change.</p>
+      <ul>
+        <li>/team, /incentives, /salary, /leaves still work (redirect to /people?tab=…)</li>
+        <li>No new tables, no new RLS</li>
+        <li>One sidebar entry instead of four</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    <b>Proposal scope.</b> Consolidate 4 admin pages into one People module with sub-tabs. Use the Incentives-page UI vocabulary (summary cards + filter row + panel table + modal) consistently. No functional change — every RPC, every modal, every column behaviour preserved.
+    <br><br>
+    <b>What ships in Phase 38.</b> 1 new page `PeopleV2.jsx` with 4 tabs that mount the existing page contents as sub-components. Sidebar entry consolidation. Deep-link redirects from /team /incentives /salary /leaves.
+    <br><br>
+    <b>What does NOT ship.</b> No DB change. No RPC change. No new master config. No incentive-formula change. No salary-formula change. No new payout flow beyond Phase 37 (already merged).
+  </div>
+
+</div>
+</body>
+</html>
