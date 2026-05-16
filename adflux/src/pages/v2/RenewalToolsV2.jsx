@@ -16,7 +16,7 @@ import { formatDate, formatCurrency, todayISO, addDaysISO } from '../../utils/fo
 
 export default function RenewalToolsV2() {
   const navigate = useNavigate()
-  const { profile, isAdmin } = useAuth()
+  const { profile, isAdmin, isPrivileged } = useAuth()
   const [quotes, setQuotes] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -26,7 +26,7 @@ export default function RenewalToolsV2() {
   useEffect(() => {
     if (profile?.id) load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, isAdmin])
+  }, [profile?.id, isAdmin, isPrivileged])
 
   async function load() {
     setLoading(true)
@@ -38,7 +38,11 @@ export default function RenewalToolsV2() {
       .lte('campaign_end_date', future60)
       .order('campaign_end_date', { ascending: true })
 
-    if (!isAdmin) q = q.eq('created_by', profile.id)
+    // Phase 34Z.87 — co_owner should see every rep's renewal list,
+    // not just rows they personally created. /leads + /quotes admin
+    // views already use isPrivileged for the same reason. Earlier
+    // `!isAdmin` filter falsely scoped co_owners to their own quotes.
+    if (!isPrivileged) q = q.eq('created_by', profile.id)
 
     const { data, error } = await q
     if (!error) setQuotes(data || [])
