@@ -143,7 +143,14 @@ export default function V2Hero({
             textAlign: 'right',
             fontSize: 11,
             color: 'rgba(255,255,255,0.7)',
-            flex: '0 1 auto',
+            // Phase 35.0 pass 7 — when the circular ring is rendered
+            // (`percent` set) the right column MUST NOT shrink below
+            // the ring's 62 px or it clips the card's right edge.
+            // `flex: 0 0 auto` locks the column width to the ring's
+            // natural size on every viewport. Without ring, falls
+            // back to the original `0 1 auto` shrinkable column for
+            // text-only chip layouts.
+            flex: ringPct !== null ? '0 0 auto' : '0 1 auto',
             maxWidth: '100%',
           }}
         >

@@ -1362,8 +1362,16 @@ function EveningReportBlock({ evening, setEvening, submitEvening, busy, navigate
         style={{ width: '100%', minHeight: 64, marginTop: 14, marginBottom: 14 }}
       >
         {/* Phase 35.0 pass 2 — duration pill inline with label.
-            Mockup spec: app.jsx lines 558-562. */}
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+            Phase 35.0 pass 7 — owner reported text + ~30s pill were
+            CENTERED together instead of justify-between. Mockup spec
+            line 553-563: text on the LEFT, duration pill on the
+            RIGHT. Wrapping span now spans full width with space-between
+            so children align to opposite ends. */}
+        <span style={{
+          display: 'flex', width: '100%',
+          alignItems: 'center', justifyContent: 'space-between',
+          gap: 12,
+        }}>
           <span>Speak evening summary</span>
           <span style={{
             fontFamily: 'var(--font-mono, monospace)',
