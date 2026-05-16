@@ -91,6 +91,7 @@ export default function FollowUpsV2() {
     let q = supabase.from('follow_ups')
       .select(`
         id, follow_up_date, follow_up_time, note, is_done, auto_generated,
+        cadence_type, sequence,
         quote_id, lead_id,
         quote:quotes (
           id, client_name, client_company, client_phone, segment,
@@ -144,14 +145,30 @@ export default function FollowUpsV2() {
     const tomorrow = ADD_DAYS(today, 1)
     const weekEnd  = ADD_DAYS(today, 7)
     const out = { overdue: [], today: [], tomorrow: [], week: [] }
-    // Phase 34Z.63 — when ?filter=meetings is on the URL, only
-    // surface rows whose note starts with "Meeting" (Phase 34Z.60
-    // prefix from PostCallOutcomeModal). Owner directive: the
-    // TodaySummaryCard "Scheduled meetings" tap should land on a
-    // meeting-only view, not the generic queue.
-    const filtered = filterParam === 'meetings'
-      ? rows.filter(r => /^meeting/i.test(String(r.note || '').trim()))
-      : rows
+    // Phase 34Z.63 / 34Z.85 — filter modes from TodaySummaryCard
+    // cell taps. Each restricts the queue to a specific bucket.
+    //   meetings    → note starts with "Meeting" (Phase 34Z.60 prefix)
+    //   quote_chase → cadence_type='quote_chase'
+    //   payment     → linked won quote with outstanding amount
+    const filtered = (() => {
+      if (filterParam === 'meetings') {
+        return rows.filter(r => /^meeting/i.test(String(r.note || '').trim()))
+      }
+      if (filterParam === 'quote_chase') {
+        return rows.filter(r => r.cadence_type === 'quote_chase')
+      }
+      if (filterParam === 'payment') {
+        return rows.filter(r => {
+          const q = r.quote
+          if (!q || q.status !== 'won') return false
+          const paid = (q.payments || [])
+            .filter(p => (p.approval_status || 'approved') === 'approved')
+            .reduce((s, p) => s + Number(p.amount_received || 0), 0)
+          return Number(q.total_amount || 0) - paid > 0
+        })
+      }
+      return rows
+    })()
     filtered.forEach(r => {
       const d = r.follow_up_date
       if (!d) return
@@ -398,7 +415,7 @@ export default function FollowUpsV2() {
       {/* Phase 34Z.63 — active filter banner. Shown only when
           ?filter=meetings (or future filter values). Tap "Show all"
           to drop the filter and see the full queue. */}
-      {filterParam === 'meetings' && (
+      {['meetings', 'quote_chase', 'payment'].includes(filterParam) && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '10px 14px', marginBottom: 12,
@@ -406,7 +423,12 @@ export default function FollowUpsV2() {
           border: '1px solid var(--blue, #3B82F6)',
           borderRadius: 10, fontSize: 12, color: 'var(--text)',
         }}>
-          <span>Showing only meetings.</span>
+          <span>
+            Showing only{' '}
+            {filterParam === 'meetings'    ? 'meetings'
+             : filterParam === 'quote_chase' ? 'quote-sent follow-ups'
+             :                                 'payment follow-ups (won quotes outstanding)'}.
+          </span>
           <button
             type="button"
             onClick={() => { searchParams.delete('filter'); setSearchParams(searchParams) }}

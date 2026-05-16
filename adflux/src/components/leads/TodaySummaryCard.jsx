@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Clock, Calendar, CalendarClock, Loader2, CheckCircle2 } from 'lucide-react'
+import { Clock, Calendar, CalendarClock, Loader2, CheckCircle2, FileText, IndianRupee, Repeat } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 
@@ -34,36 +34,85 @@ export default function TodaySummaryCard({ userId, session }) {
   const load = useCallback(async () => {
     if (!userId) return
     const today = TODAY_ISO()
+    // Phase 34Z.85 — renewal window: won quotes whose campaign ends
+    // within 60 days (mirrors RenewalToolsV2 query).
+    const sixtyDaysOut = (() => {
+      const d = new Date()
+      d.setDate(d.getDate() + 60)
+      return d.toISOString().slice(0, 10)
+    })()
 
-    const [fuRes, mtRes] = await Promise.all([
-      // Follow-ups: due today or overdue, not done.
+    const [fuRes, chaseRes, paymentRes, scheduledRes, renewalRes] = await Promise.all([
+      // 1. Pending follow-ups — lead_intro + nurture cadences, due
+      //    today or earlier. Quote-chase + payment broken out below
+      //    so they don't double-count here.
       supabase.from('follow_ups')
-        .select('id, follow_up_date, note', { count: 'exact', head: false })
+        .select('id, cadence_type', { count: 'exact', head: false })
         .eq('assigned_to', userId)
         .eq('is_done', false)
-        .lte('follow_up_date', today),
-      // Scheduled meetings: future follow_ups whose note starts with
-      // "Meeting" (Phase 34Z.60 prefix). Counted separately so the
-      // rep sees the breakdown between "you have to call X" and
-      // "you have meetings booked."
+        .lte('follow_up_date', today)
+        .or('cadence_type.is.null,cadence_type.in.(lead_intro,nurture,lost_nurture)'),
+
+      // 2. Quote chases — cadence_type=quote_chase due today.
       supabase.from('follow_ups')
-        .select('id, follow_up_date, note', { count: 'exact', head: false })
+        .select('id', { count: 'exact', head: false })
+        .eq('assigned_to', userId)
+        .eq('is_done', false)
+        .lte('follow_up_date', today)
+        .eq('cadence_type', 'quote_chase'),
+
+      // 3. Payment chases — open FU linked to a won quote with
+      //    outstanding amount. The list comes back joined to quotes
+      //    + payments so we can filter outstanding > 0 client-side.
+      supabase.from('follow_ups')
+        .select(`id, quotes!inner(id, status, total_amount, payments(amount_received, approval_status))`)
+        .eq('assigned_to', userId)
+        .eq('is_done', false)
+        .lte('follow_up_date', today)
+        .eq('quotes.status', 'won'),
+
+      // 4. Scheduled meetings — future follow_ups whose note starts
+      //    with "Meeting" (Phase 34Z.60 prefix).
+      supabase.from('follow_ups')
+        .select('id', { count: 'exact', head: false })
         .eq('assigned_to', userId)
         .eq('is_done', false)
         .gt('follow_up_date', today)
         .ilike('note', 'Meeting%'),
+
+      // 5. Renewal — won quotes assigned to this rep with campaign
+      //    end within 60 days. Mirrors RenewalToolsV2 query.
+      supabase.from('quotes')
+        .select('id', { count: 'exact', head: false })
+        .eq('created_by', userId)
+        .eq('status', 'won')
+        .gte('campaign_end_date', today)
+        .lte('campaign_end_date', sixtyDaysOut),
     ])
+
+    // Compute payment-outstanding count client-side (Postgres can't
+    // express "sum of payments < quote total" in a single
+    // PostgREST filter without an RPC).
+    const paymentChases = (paymentRes.data || []).filter(r => {
+      const q = r.quotes
+      if (!q || q.status !== 'won') return false
+      const paid = (q.payments || [])
+        .filter(p => (p.approval_status || 'approved') === 'approved')
+        .reduce((sum, p) => sum + Number(p.amount_received || 0), 0)
+      return Number(q.total_amount || 0) - paid > 0
+    }).length
 
     const nextFollowUps = fuRes.data?.length || 0
     highMarkRef.current = Math.max(highMarkRef.current, nextFollowUps)
     setCounts({
-      followUps: nextFollowUps,
-      scheduledMeetings: mtRes.data?.length || 0,
-      // Today's planned meetings from work_sessions.planned_meetings.
-      // Lives on the session JSON; null-safe.
-      plannedMeetings: Array.isArray(session?.planned_meetings)
+      followUps:         nextFollowUps,
+      quoteChase:        chaseRes.data?.length || 0,
+      paymentChase:      paymentChases,
+      plannedMeetings:   Array.isArray(session?.planned_meetings)
         ? session.planned_meetings.filter(m => (m.client || '').trim() || (m.location || '').trim()).length
         : 0,
+      scheduledMeetings: scheduledRes.data?.length || 0,
+      renewal:           renewalRes.data?.length || 0,
     })
   }, [userId, session?.planned_meetings])
 
@@ -109,13 +158,15 @@ export default function TodaySummaryCard({ userId, session }) {
     )
   }
 
-  const total = counts.followUps + counts.plannedMeetings + counts.scheduledMeetings
+  // Phase 34Z.85 — six-bucket total.
+  const total = counts.followUps + counts.quoteChase + counts.paymentChase
+              + counts.plannedMeetings + counts.scheduledMeetings + counts.renewal
 
   // Phase 34Z.62 — celebration when the rep clears every follow-up
   // they had this session. Only fires when the high-mark was > 0,
   // so a fresh-mount day with 0 follow-ups still gets the gentle
   // empty state below, not a fake "you finished!" pat on the back.
-  if (counts.followUps === 0 && highMarkRef.current > 0 && counts.plannedMeetings === 0 && counts.scheduledMeetings === 0) {
+  if (counts.followUps === 0 && highMarkRef.current > 0 && total === 0) {
     return (
       <div className="m-card" style={{
         padding: 18, textAlign: 'center',
@@ -147,16 +198,19 @@ export default function TodaySummaryCard({ userId, session }) {
     )
   }
 
+  // Phase 34Z.85 — six-bucket grid. Row 1 = call-action items the
+  // rep should chase today. Row 2 = future / informational. Each
+  // cell taps to a filtered /follow-ups view (Phase 34Z.63 filter
+  // param accepts the new values added below).
   const cells = [
-    // Follow-ups → /follow-ups (full queue, default order).
-    { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Follow-ups',          n: counts.followUps,         to: '/follow-ups' },
-    // Meetings today → scroll to plan row on /work. Already on /work
-    // when this card renders, so anchor scroll surfaces the planned
-    // meeting list inside DayStatusSurface.
-    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Meetings today',      n: counts.plannedMeetings,   to: '/work#day-status' },
-    // Scheduled meetings → /follow-ups filtered to Meeting% notes
-    // (Phase 34Z.63 filter param on FollowUpsV2).
-    { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled meetings',  n: counts.scheduledMeetings, to: '/follow-ups?filter=meetings' },
+    // Row 1
+    { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Follow-ups',         n: counts.followUps,       to: '/follow-ups' },
+    { icon: FileText,      tint: 'var(--blue, #3B82F6)',    label: 'Quote chase',        n: counts.quoteChase,      to: '/follow-ups?filter=quote_chase' },
+    { icon: IndianRupee,   tint: 'var(--danger, #EF4444)',  label: 'Payment chase',      n: counts.paymentChase,    to: '/follow-ups?filter=payment' },
+    // Row 2
+    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Meetings today',     n: counts.plannedMeetings, to: '/work#day-status' },
+    { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled meetings', n: counts.scheduledMeetings, to: '/follow-ups?filter=meetings' },
+    { icon: Repeat,        tint: 'var(--success, #10B981)', label: 'Renewal',            n: counts.renewal,         to: '/renewal-tools' },
   ]
 
   return (
