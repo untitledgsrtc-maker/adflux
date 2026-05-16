@@ -696,6 +696,27 @@ export default function LeadDetailV2() {
               {lead.last_contact_at && (
                 <span>· last contact {formatRelative(lead.last_contact_at)}</span>
               )}
+              {/* Phase 34Z.76 — owner directive: flag any lead with
+                  no phone. Govt rows are allowed to save without one
+                  (tender / RFP path), but admin should still see the
+                  gap. Amber pill in meta row. */}
+              {!lead.phone && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    display: 'inline-flex', alignItems: 'center',
+                    padding: '2px 8px', borderRadius: 999,
+                    background: 'var(--warning-soft, rgba(245,158,11,0.14))',
+                    border: '1px solid var(--warning, #F59E0B)',
+                    color: 'var(--warning, #F59E0B)',
+                    fontSize: 10, fontWeight: 600,
+                    textTransform: 'uppercase', letterSpacing: '.06em',
+                  }}
+                  title="No phone on file — Call / WhatsApp won't work. Add a number via Edit."
+                >
+                  no phone
+                </span>
+              )}
             </div>
           </div>
 

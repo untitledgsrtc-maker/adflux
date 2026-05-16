@@ -767,7 +767,7 @@ export default function LeadsV2() {
                   >
                     {l.phone ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span>{l.phone}</span>
+                        <span>{l.phone}</span>{/* Phase 34Z.76 */}
                         <a
                           href={`tel:${String(l.phone).replace(/\s/g, '')}`}
                           title="Call"
@@ -823,7 +823,26 @@ export default function LeadsV2() {
                           }}
                         >WA</a>
                       </span>
-                    ) : '—'}
+                    ) : (
+                      // Phase 34Z.76 — owner directive (16 May 2026):
+                      // allow govt leads to save without phone, but
+                      // visually flag every row that has none so admin
+                      // can chase the gap. Amber dot + "no phone" chip.
+                      <span
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '2px 8px', borderRadius: 999,
+                          background: 'var(--warning-soft, rgba(245,158,11,0.14))',
+                          border: '1px solid var(--warning, #F59E0B)',
+                          color: 'var(--warning, #F59E0B)',
+                          fontSize: 10, fontWeight: 600,
+                          textTransform: 'uppercase', letterSpacing: '.06em',
+                        }}
+                        title="No phone on file — call / WhatsApp won't work"
+                      >
+                        no phone
+                      </span>
+                    )}
                   </td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
