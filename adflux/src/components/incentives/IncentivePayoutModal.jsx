@@ -8,13 +8,22 @@ import { useAuth } from '../../hooks/useAuth'
 import { formatCurrency, formatMonthYear } from '../../utils/formatters'
 import { toastError } from '../v2/Toast'
 
+// Phase 39 — IST today (was UTC). `new Date().toISOString()` returns
+// UTC, which from 18:30 onwards already rolled the date forward but
+// before that left it on yesterday in IST. Force IST anchor.
+function istTodayISO() {
+  const now = new Date()
+  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
+  return ist.toISOString().slice(0, 10)
+}
+
 export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, onClose, onSaved }) {
   const { profile } = useAuth()
   const [payouts,  setPayouts]  = useState([])
   const [amount,   setAmount]   = useState('')
   const [isFull,   setIsFull]   = useState(false)
   const [note,     setNote]     = useState('')
-  const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10))
+  const [paidDate, setPaidDate] = useState(istTodayISO())
   const [saving,   setSaving]   = useState(false)
   const [err,      setErr]      = useState('')
 

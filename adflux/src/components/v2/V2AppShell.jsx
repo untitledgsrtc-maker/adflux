@@ -64,12 +64,12 @@ const ADMIN_NAV = [
   { to: '/auto-districts',    label: 'Auto Districts', icon: MapPin },
   { to: '/gsrtc-stations',    label: 'GSRTC Stations', icon: Tv },
   { to: '/master',            label: 'Master',         icon: FileBox },
-  // Phase 38 — People consolidates Team + Incentives + Salary + Leaves
-  // into one module with sub-tabs. Old routes still work as deep-links.
+  // Phase 38 + 39 — People consolidates Team + Incentives + Salary +
+  // Leaves + TA Claims into one module with sub-tabs. Old routes
+  // (/team, /incentives, /admin/leaves, /admin/salary, /admin/ta-
+  // payouts) still work as deep-links.
   { to: '/people',            label: 'People',         icon: Users },
   { to: '/hr',                label: 'HR',             icon: UserCircle2 },
-  // Phase 33H — TA (travel allowance) auto-computed from GPS pings.
-  { to: '/admin/ta-payouts',  label: 'TA Payouts',     icon: TrendingUp },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
 ]
 

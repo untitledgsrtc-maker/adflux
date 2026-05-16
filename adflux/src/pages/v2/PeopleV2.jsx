@@ -25,14 +25,17 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Users, Gift, Wallet, Clock as ClockIcon } from 'lucide-react'
+import { Users, Wallet, Clock as ClockIcon, MapPin } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 
-import TeamV2          from './TeamV2'
-import IncentivesV2    from './IncentivesV2'
-import SalaryAdminV2   from './SalaryAdminV2'
-import LeavesAdminV2   from './LeavesAdminV2'
+import TeamV2            from './TeamV2'
+import SalaryAdminV2     from './SalaryAdminV2'
+import LeavesAdminV2     from './LeavesAdminV2'
+// Phase 39 — TA Claims tab. Incentive tab dropped; incentive slabs +
+// what-if simulator + staff profile editor still reachable via the
+// /incentives deep-link (kept in App.jsx, no sidebar entry).
+import TaPayoutsAdminV2  from './TaPayoutsAdminV2'
 
 // Phase 38.2 — IST month label for the Salary tab badge.
 function currentMonthLabel() {
@@ -41,11 +44,15 @@ function currentMonthLabel() {
   return ist.toLocaleString('en-IN', { month: 'short', year: 'numeric' })
 }
 
+// Phase 39 — 4 tabs: Team · Salary · Leaves · TA Claims. Incentives
+// tab dropped (was its own payout flow — owner reported confusion
+// from accounts paying both incentive and salary separately). All
+// money now flows through Salary NET — single payout per rep/month.
 const TABS = [
-  { key: 'team',       label: 'Team',       icon: Users,     Comp: TeamV2 },
-  { key: 'incentives', label: 'Incentives', icon: Gift,      Comp: IncentivesV2 },
-  { key: 'salary',     label: 'Salary',     icon: Wallet,    Comp: SalaryAdminV2 },
-  { key: 'leaves',     label: 'Leaves',     icon: ClockIcon, Comp: LeavesAdminV2 },
+  { key: 'team',     label: 'Team',      icon: Users,     Comp: TeamV2 },
+  { key: 'salary',   label: 'Salary',    icon: Wallet,    Comp: SalaryAdminV2 },
+  { key: 'leaves',   label: 'Leaves',    icon: ClockIcon, Comp: LeavesAdminV2 },
+  { key: 'ta',       label: 'TA Claims', icon: MapPin,    Comp: TaPayoutsAdminV2 },
 ]
 
 export default function PeopleV2() {
@@ -62,16 +69,19 @@ export default function PeopleV2() {
 
   // Phase 38.2 — live counts for tab badges. Two cheap COUNT queries
   // + one constant string. Loaded once on mount; non-blocking.
-  const [counts, setCounts] = useState({ team: null, leaves: null, salary: currentMonthLabel() })
+  const [counts, setCounts] = useState({ team: null, leaves: null, ta: null, salary: currentMonthLabel() })
   useEffect(() => {
     if (!isAdmin) return
     let cancelled = false
     async function loadCounts() {
-      const [teamRes, leavesRes] = await Promise.all([
+      const [teamRes, leavesRes, taRes] = await Promise.all([
         supabase.from('users').select('id', { count: 'exact', head: true })
           .in('role', ['sales', 'agency', 'telecaller', 'admin', 'co_owner'])
           .eq('is_active', true),
         supabase.from('leaves').select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+        // Phase 39 — TA Claims pending count for the TA tab badge.
+        supabase.from('ta_da_requests').select('id', { count: 'exact', head: true })
           .eq('status', 'pending'),
       ])
       if (cancelled) return
@@ -79,6 +89,7 @@ export default function PeopleV2() {
         ...c,
         team:   teamRes.count   ?? null,
         leaves: leavesRes.count ?? null,
+        ta:     taRes.count     ?? null,
       }))
     }
     loadCounts()
@@ -129,6 +140,7 @@ export default function PeopleV2() {
           if (t.key === 'team'   && counts.team   != null) badge = String(counts.team)
           if (t.key === 'salary')                          badge = counts.salary
           if (t.key === 'leaves' && counts.leaves != null) badge = counts.leaves > 0 ? `${counts.leaves} pending` : null
+          if (t.key === 'ta'     && counts.ta     != null) badge = counts.ta     > 0 ? `${counts.ta} pending`     : null
           return (
             <button
               key={t.key}

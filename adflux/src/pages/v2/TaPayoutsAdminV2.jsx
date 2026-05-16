@@ -116,7 +116,9 @@ function lastSixMonths() {
   return out
 }
 
-export default function TaPayoutsAdminV2() {
+// Phase 39 — `embedded` prop suppresses own page-head when mounted
+// inside PeopleV2 (which renders the shared "People" head once).
+export default function TaPayoutsAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
   const isAdmin = ['admin', 'co_owner'].includes(profile?.role)
@@ -454,17 +456,19 @@ export default function TaPayoutsAdminV2() {
         />
       )}
 
-      <div className="v2d-page-head">
-        <div>
-          <div className="v2d-page-kicker">HR · Finance</div>
-          <h1 className="v2d-page-title">TA Payouts</h1>
-          <div className="v2d-page-sub">
-            Travel allowance computed from each rep's GPS pings. Daily DA + bike
-            (₹3/km) auto-calculated by city ceiling. Hotel is added by you per
-            day when the rep stayed overnight. Approve before finance pays out.
+      {!embedded && (
+        <div className="v2d-page-head">
+          <div>
+            <div className="v2d-page-kicker">HR · Finance</div>
+            <h1 className="v2d-page-title">TA Payouts</h1>
+            <div className="v2d-page-sub">
+              Travel allowance computed from each rep's GPS pings. Daily DA + bike
+              (₹3/km) auto-calculated by city ceiling. Hotel is added by you per
+              day when the rep stayed overnight. Approve before finance pays out.
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Phase 36.3 — Pending rep-side TA/DA claim requests. Hidden
           when zero pending. Shows across ALL reps so admin sees the
