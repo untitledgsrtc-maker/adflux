@@ -76,6 +76,9 @@ export default function LeavesAdminV2() {
   const [fDate, setFDate]   = useState(todayISO())
   const [fType, setFType]   = useState('personal')
   const [fReason, setFReason] = useState('')
+  // Phase 36 — half-day support. When true the leave row is saved
+  // with is_half_day=true and the salary RPC counts it as 0.5.
+  const [fHalfDay, setFHalfDay] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -90,7 +93,7 @@ export default function LeavesAdminV2() {
         .in('role', ['sales', 'agency', 'telecaller', 'admin', 'co_owner'])
         .order('name', { ascending: true }),
       supabase.from('leaves')
-        .select('id, user_id, leave_date, leave_type, reason, status, created_at')
+        .select('id, user_id, leave_date, leave_type, reason, status, is_half_day, created_at')
         .gte('leave_date', sinceISO)
         .order('leave_date', { ascending: false })
         .order('created_at', { ascending: false }),
@@ -120,6 +123,10 @@ export default function LeavesAdminV2() {
       leave_type: fType,
       reason:     (fReason || '').trim() || null,
       status:     'approved',
+      // Phase 36 — half-day. Column added in
+      // supabase_phase36_salary_policy.sql. Defaults false at DB,
+      // so existing inserts elsewhere stay compatible.
+      is_half_day: fHalfDay,
       created_by: profile?.id,
     })
     setSaving(false)
@@ -147,6 +154,7 @@ export default function LeavesAdminV2() {
     setFDate(todayISO())
     setFType('personal')
     setFReason('')
+    setFHalfDay(false)
     load()
   }
 
@@ -290,6 +298,24 @@ export default function LeavesAdminV2() {
               style={inputStyle}
             />
           </div>
+          {/* Phase 36 — half-day checkbox. When checked, the row
+              saves with is_half_day=true and the salary RPC counts
+              it as 0.5 day against the rep's annual quota. */}
+          <div style={{ alignSelf: 'end', display: 'flex', alignItems: 'center', gap: 8, height: 38 }}>
+            <label style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              fontSize: 13, color: 'var(--v2-ink-1)', cursor: 'pointer',
+              userSelect: 'none',
+            }}>
+              <input
+                type="checkbox"
+                checked={fHalfDay}
+                onChange={e => setFHalfDay(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: 'var(--accent, #FFE600)', cursor: 'pointer' }}
+              />
+              <span>Half-day (0.5)</span>
+            </label>
+          </div>
           <button
             type="button"
             onClick={handleSave}
@@ -409,7 +435,7 @@ export default function LeavesAdminV2() {
                           background: 'rgba(255,255,255,.06)',
                           color: 'var(--v2-ink-1)',
                         }}>
-                          {row.leave_type}
+                          {row.leave_type}{row.is_half_day ? ' · ½' : ''}
                         </span>
                       </td>
                       <td style={tdStyle}>

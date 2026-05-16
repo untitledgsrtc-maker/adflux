@@ -39,7 +39,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, Contact2, MapPin, Tv, FileBox,
-  Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon,
+  Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -71,6 +71,9 @@ const ADMIN_NAV = [
   { to: '/admin/leaves',      label: 'Leaves',         icon: ClockIcon },
   // Phase 33H — TA (travel allowance) auto-computed from GPS pings.
   { to: '/admin/ta-payouts',  label: 'TA Payouts',     icon: TrendingUp },
+  // Phase 36 — Salary Sheet. Per-rep monthly breakdown with auto
+  // leave deduction. Admin / co_owner only.
+  { to: '/admin/salary',      label: 'Salary Sheet',   icon: Wallet },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/incentives',        label: 'Incentives',     icon: Gift },
 ]
