@@ -21,10 +21,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Loader2, AlertTriangle, Wallet } from 'lucide-react'
+import { Download, Loader2, AlertTriangle, Wallet, IndianRupee } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import { SalaryPayoutModal } from '../../components/incentives/SalaryPayoutModal'
 
 function fmtINR(n) {
   if (n == null || isNaN(n)) return '—'
@@ -51,17 +52,19 @@ export default function SalaryAdminV2() {
 
   const [month, setMonth]   = useState(currentMonthYM())
   const [rows,  setRows]    = useState([])    // [{ user, salary, ... }]
+  const [paidMap, setPaidMap] = useState({})  // { user_id: { paid, hasFull } } from salary_payouts
   const [policy, setPolicy] = useState(null)
   const [err,   setErr]     = useState('')
   const [loading, setLoading] = useState(true)
+  const [payoutTarget, setPayoutTarget] = useState(null) // { user_id, name, computed }
 
   async function load() {
     setLoading(true); setErr('')
     const [y, m] = month.split('-').map(n => parseInt(n, 10))
     if (!y || !m) { setErr('Pick a month.'); setLoading(false); return }
 
-    // Pull active reps + policy in parallel.
-    const [usersRes, polRes] = await Promise.all([
+    // Pull active reps + policy + this month's salary_payouts in parallel.
+    const [usersRes, polRes, payRes] = await Promise.all([
       supabase.from('users')
         .select('id, name, role')
         .in('role', ['sales', 'agency', 'telecaller', 'admin', 'co_owner'])
@@ -71,9 +74,22 @@ export default function SalaryAdminV2() {
         .select('*')
         .order('effective_from', { ascending: false })
         .limit(1),
+      supabase.from('salary_payouts')
+        .select('user_id, amount_paid, is_full_payment')
+        .eq('month_year', month),
     ])
     if (usersRes.error) { setErr(usersRes.error.message); setLoading(false); return }
     setPolicy(polRes.data?.[0] || null)
+
+    // Roll up payouts by user_id.
+    const pm = {}
+    for (const p of (payRes.data || [])) {
+      const k = p.user_id
+      if (!pm[k]) pm[k] = { paid: 0, hasFull: false }
+      pm[k].paid += Number(p.amount_paid || 0)
+      if (p.is_full_payment) pm[k].hasFull = true
+    }
+    setPaidMap(pm)
 
     // RPC per rep. Cheap (24 reps × 1 RPC). Sequential keeps Supabase
     // load light + avoids RLS bursts.
@@ -185,6 +201,16 @@ export default function SalaryAdminV2() {
         </div>
       )}
 
+      {payoutTarget && (
+        <SalaryPayoutModal
+          staff={payoutTarget}
+          monthYear={month}
+          computed={payoutTarget.computed}
+          onClose={() => setPayoutTarget(null)}
+          onSaved={() => load()}
+        />
+      )}
+
       <div className="v2d-panel" style={{ overflow: 'hidden', padding: 0 }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--v2-ink-2)' }}>
@@ -200,7 +226,7 @@ export default function SalaryAdminV2() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="v2d-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
+            <table className="v2d-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1300 }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--v2-line)', color: 'var(--v2-ink-2)' }}>
                   <th style={thStyle}>Name</th>
@@ -212,6 +238,8 @@ export default function SalaryAdminV2() {
                   <th style={thNum}>Leave</th>
                   <th style={thNum}>Deduction</th>
                   <th style={{ ...thNum, color: 'var(--accent, #FFE600)' }}>NET</th>
+                  <th style={thNum}>Paid</th>
+                  <th style={thNum}>Payout</th>
                 </tr>
               </thead>
               <tbody>
@@ -260,6 +288,49 @@ export default function SalaryAdminV2() {
                     }}>
                       {fmtINR(r.net_payable)}
                     </td>
+                    <td style={tdNum}>
+                      {(() => {
+                        const pm = paidMap[r.user.id] || { paid: 0, hasFull: false }
+                        const net = Number(r.net_payable || 0)
+                        const pending = Math.max(0, net - pm.paid)
+                        return (
+                          <div>
+                            <div style={{
+                              color: pm.paid > 0 ? 'var(--success, #10B981)' : 'var(--v2-ink-2)',
+                              fontWeight: pm.paid > 0 ? 600 : 400,
+                            }}>
+                              {pm.paid > 0 ? fmtINR(pm.paid) : '—'}
+                            </div>
+                            {pm.hasFull ? (
+                              <div style={{ fontSize: 9, color: 'var(--success, #10B981)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                                FULL
+                              </div>
+                            ) : pending > 0 && pm.paid > 0 ? (
+                              <div style={{ fontSize: 9, color: 'var(--warning, #F59E0B)' }}>
+                                pending {fmtINR(pending)}
+                              </div>
+                            ) : null}
+                          </div>
+                        )
+                      })()}
+                    </td>
+                    <td style={tdNum}>
+                      <button
+                        type="button"
+                        onClick={() => setPayoutTarget({
+                          user_id: r.user.id,
+                          name: r.user.name,
+                          computed: Number(r.net_payable || 0),
+                        })}
+                        className="btn btn-y"
+                        style={{
+                          padding: '6px 10px', fontSize: 11, fontWeight: 600,
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <IndianRupee size={12} /> Payout
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 <tr style={{ borderTop: '2px solid var(--v2-line)', background: 'rgba(255,255,255,.02)' }}>
@@ -276,6 +347,13 @@ export default function SalaryAdminV2() {
                   <td style={{ ...tdNum, fontWeight: 800, color: 'var(--accent, #FFE600)', fontSize: 14 }}>
                     {fmtINR(totals.net)}
                   </td>
+                  <td style={{ ...tdNum, fontWeight: 700, color: 'var(--success, #10B981)' }}>
+                    {(() => {
+                      const tp = Object.values(paidMap).reduce((s, v) => s + Number(v.paid || 0), 0)
+                      return tp > 0 ? fmtINR(tp) : '—'
+                    })()}
+                  </td>
+                  <td style={tdNum}>—</td>
                 </tr>
               </tbody>
             </table>
