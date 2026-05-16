@@ -24,6 +24,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Sun, MapPin, Phone, Calendar, Loader2, Trash2, Plus,
   CheckCircle2, Mic, Square, Clock, AlertTriangle, X,
+  Sparkles,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -1339,7 +1340,18 @@ function EveningReportBlock({ evening, setEvening, submitEvening, busy, navigate
         onClick={() => navigate('/voice/evening')}
         style={{ width: '100%', minHeight: 64, marginTop: 14, marginBottom: 14 }}
       >
-        Speak evening summary
+        {/* Phase 35.0 pass 2 — duration pill inline with label.
+            Mockup spec: app.jsx lines 558-562. */}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+          <span>Speak evening summary</span>
+          <span style={{
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: 11, fontWeight: 600,
+            color: 'rgba(26,19,0,0.7)',
+            background: 'rgba(255,255,255,0.4)',
+            padding: '4px 9px', borderRadius: 999,
+          }}>~30s</span>
+        </span>
       </ActionButton>
       <details className="m-card" style={{ padding: 0 }}>
         <summary style={{
@@ -1478,17 +1490,21 @@ function pickNextAction({ session, smartTasks }) {
   return null
 }
 
-function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDismiss, dismissTitle }) {
+function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDismiss, dismissTitle, countdown, avatar }) {
+  // Phase 35.0 pass 2 — smart-task variant uses the "NEXT UP · 22 MIN"
+  // kicker with a yellow pulse-dot, a purple sparkle pill for the
+  // "smart task" label, and a yellow avatar tile next to the title.
+  // Mockup spec: _design_reference/newsalesui/project/app.jsx
+  // (NextUp component, lines 368-439). When countdown / avatar are
+  // not passed (meeting / plan branches), the card renders the
+  // original layout.
+  const isSmart = tone?.label === 'smart task'
   return (
     <div className="m-card" style={{
       borderColor: 'var(--accent, #FFE600)',
       background: 'rgba(255,230,0,0.04)',
       position: 'relative',
     }}>
-      {/* Phase 34Z.54 — dismiss (X). Owner asked for a way to close a
-          smart task without making a call. Surfaces only when the
-          parent passes onDismiss (smart-task branch); plan / meeting
-          branches keep their existing Done CTAs. */}
       {onDismiss && (
         <button
           type="button"
@@ -1505,25 +1521,92 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDis
             cursor: 'pointer', padding: 0,
           }}
         >
-          <X size={14} strokeWidth={1.8} />
+          <X size={14} strokeWidth={1.6} />
         </button>
       )}
-      {/* Phase 34Z.89 — when dismiss (X) is present, push the
-          badge left by 36 px so it doesn't sit under the X. Owner
-          reported the "smart task" pill clipping the close button
-          at top-right of the Next-up card. */}
-      <div className="m-card-title" style={onDismiss ? { paddingRight: 36 } : undefined}>
-        <span>Next up</span>
-        <StatusBadge tint={tone.tint}>{tone.label}</StatusBadge>
-      </div>
-      <div style={{ fontSize: 17, fontWeight: 600, marginTop: 4 }}>
-        {title}
-      </div>
-      {subtitle && (
-        <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
-          {subtitle}
+      {/* Phase 35.0 pass 2 — kicker with yellow pulse dot + optional
+          mono countdown, replaces the plain "Next up" line. Sparkle
+          pill renders in purple for smart-task, in tone color for
+          other variants. */}
+      <div style={onDismiss ? { paddingRight: 36 } : undefined}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 10, flexWrap: 'wrap',
+        }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 11, fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--accent, #FFE600)',
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: 999,
+              background: 'var(--accent, #FFE600)',
+              boxShadow: '0 0 0 4px rgba(255,230,0,0.18)',
+            }} />
+            <span>Next up</span>
+            {countdown && (
+              <>
+                <span style={{ color: 'var(--text-muted)' }}> · </span>
+                <span style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                  {countdown}
+                </span>
+              </>
+            )}
+          </div>
+          {isSmart ? (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '0 8px', height: 22, borderRadius: 999,
+              // Phase 35.0 pass 2 — guardian P2: use declared tokens
+              // for purple tint + foreground (v2.css --v2-tint-purple
+              // + tokens.css --purple) instead of hardcoded hex.
+              background: 'var(--v2-tint-purple, rgba(192,132,252,0.16))',
+              color: 'var(--purple, #A78BFA)',
+              fontSize: 10.5, fontWeight: 700,
+              letterSpacing: '0.04em', textTransform: 'uppercase',
+            }}>
+              <Sparkles size={14} strokeWidth={1.6} />
+              <span>Smart task</span>
+            </div>
+          ) : (
+            <StatusBadge tint={tone.tint}>{tone.label}</StatusBadge>
+          )}
         </div>
-      )}
+      </div>
+      {/* Phase 35.0 pass 2 — body row: optional avatar tile + title. */}
+      <div style={{
+        marginTop: 12,
+        display: 'flex', alignItems: 'center', gap: 12,
+      }}>
+        {avatar && (
+          <div style={{
+            width: 42, height: 42, borderRadius: 14, flexShrink: 0,
+            // Phase 35.0 pass 2 — guardian P2: avatar gradient uses
+            // declared tokens (brand yellow → warning amber) instead
+            // of the mockup's raw #FFB152. Visually identical warm
+            // gradient, fully token-traceable.
+            background: 'linear-gradient(135deg, var(--accent, #FFE600), var(--warning, #F59E0B))',
+            color: 'var(--accent-fg, #0f172a)',
+            display: 'grid', placeItems: 'center',
+            fontFamily: 'var(--font-display, "Space Grotesk")',
+            fontWeight: 700, fontSize: 17,
+          }}>
+            {String(avatar).slice(0, 1).toUpperCase()}
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 17, fontWeight: 600 }}>
+            {title}
+          </div>
+          {subtitle && (
+            <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 4 }}>
+              {subtitle}
+            </div>
+          )}
+        </div>
+      </div>
       {meta && <div style={{ marginTop: 4 }}>{meta}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
         <ActionButton
@@ -1592,6 +1675,24 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
     const t = pick.data
     const lead = t.lead || {}
     const phone = cleanPhone(lead.phone)
+    // Phase 35.0 pass 2 — mono countdown for the "NEXT UP · X MIN"
+    // kicker. Reads t.due_at. If the task is overdue, format as
+    // "Xh OVERDUE"; if within 60 min, "X MIN"; otherwise "Xh Ym".
+    let countdown = null
+    if (t.due_at) {
+      const ms = new Date(t.due_at).getTime() - Date.now()
+      if (ms < 0) {
+        const overdueMin = Math.abs(Math.round(ms / 60000))
+        countdown = overdueMin < 60
+          ? `${overdueMin} MIN OVERDUE`
+          : `${Math.round(overdueMin / 60)}H OVERDUE`
+      } else {
+        const mins = Math.round(ms / 60000)
+        if (mins < 60) countdown = `${mins} MIN`
+        else countdown = `${Math.floor(mins / 60)}H ${mins % 60} MIN`
+      }
+    }
+    const avatar = (lead.name || '?').trim().slice(0, 1).toUpperCase()
     // Phase 34Z.46 — owner reported "Follow-up: cd" rendered on a
     // task whose last activity was a Meeting. Strip the generic
     // "Follow-up: " prefix from the reason so the rep sees just the
@@ -1610,6 +1711,8 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
       <NextActionCard
         tone={{ tint: 'blue', label: 'smart task' }}
         title={title}
+        countdown={countdown}
+        avatar={avatar}
         subtitle={<SmartTaskSubtitle leadId={t.lead_id || lead.id} note={cleanReason} kind={t.kind} />}
         primary={phone
           ? {

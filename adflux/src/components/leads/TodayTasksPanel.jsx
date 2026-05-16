@@ -140,6 +140,25 @@ export default function TodayTasksPanel({ userId, limit = 10, excludeTaskId = nu
                   navigate(`/leads/${t.lead_id}`)
                 }}
               >
+                {/* Phase 35.0 pass 2 — mono time column on the left of
+                    each row. Reads t.due_at and renders HH:MM in 24h.
+                    Shows "—" when due_at is missing so the column
+                    alignment stays consistent across rows. Mockup
+                    spec: _design_reference/newsalesui/.../app.jsx
+                    Tasks lines 462-466. */}
+                <span style={{
+                  width: 48, flexShrink: 0, textAlign: 'center',
+                  fontFamily: 'var(--font-mono, monospace)',
+                  fontSize: 12, fontWeight: 500,
+                  color: 'var(--text-muted)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {t.due_at
+                    ? new Date(t.due_at).toLocaleTimeString('en-IN', {
+                        hour: '2-digit', minute: '2-digit', hour12: false,
+                      })
+                    : '—'}
+                </span>
                 <span className="lead-task-heat">
                   <HeatDot heat={t.lead?.heat || 'warm'} />
                 </span>
