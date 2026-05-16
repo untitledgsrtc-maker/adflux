@@ -309,22 +309,92 @@ export default function PushDebugV2() {
             rep can actually act on. */}
         {isAndroid && (
           <div style={{
-            padding: '12px 14px', borderRadius: 10,
+            padding: '14px 16px', borderRadius: 10,
             background: 'var(--warning-soft, rgba(245,158,11,0.12))',
             border: '1px solid var(--warning, #F59E0B)',
-            marginBottom: 14, display: 'flex', gap: 10, alignItems: 'flex-start',
+            marginBottom: 14,
           }}>
-            <Smartphone size={18} color="var(--warning, #F59E0B)" />
-            <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
-              <strong>Android · {browserName}.</strong> Push works in a
-              regular Chrome tab — no install needed. If the test push
-              doesn't land:
-              <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
-                <li>Settings → Apps → {browserName} → Battery → set to "Unrestricted" (Samsung / Xiaomi / OnePlus all kill background SW by default).</li>
-                <li>Settings → Apps → {browserName} → Data usage → allow background data.</li>
-                <li>Turn off Data Saver and Power Saving mode while testing.</li>
-                <li>Best reliability: tap the menu → "Install app" / "Add to Home screen" → open from the new icon. Installed PWAs get a separate battery whitelist on most OEMs.</li>
-              </ul>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+              <Smartphone size={18} color="var(--warning, #F59E0B)" />
+              <strong style={{ fontSize: 13, color: 'var(--text)' }}>
+                Android · {browserName} — fix background notifications
+              </strong>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
+              Web Push works, but Android battery saver kills the background
+              service worker after a few minutes. Open your phone Settings
+              app and walk through these once:
+            </div>
+
+            {/* Step 1 — Battery */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
+              }}>Step 1 · Battery → Unrestricted</div>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <li>Open <b>Settings</b> on your phone</li>
+                <li>Tap <b>Apps</b> (or "Applications")</li>
+                <li>Find <b>{browserName}</b> in the list, tap it</li>
+                <li>Tap <b>Battery</b></li>
+                <li>Choose <b>Unrestricted</b> (NOT "Optimised" — that's the default that kills push)</li>
+              </ol>
+            </div>
+
+            {/* Step 2 — Background data */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
+              }}>Step 2 · Background data ON</div>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <li>Same Settings → Apps → <b>{browserName}</b> screen</li>
+                <li>Tap <b>Mobile data &amp; Wi-Fi</b> (or "Data usage")</li>
+                <li>Turn ON <b>Background data</b></li>
+                <li>Turn ON <b>Unrestricted data usage</b> if you see it</li>
+              </ol>
+            </div>
+
+            {/* Step 3 — Battery saver */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
+              }}>Step 3 · Battery Saver OFF</div>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <li>Open <b>Settings</b> → <b>Battery</b></li>
+                <li>Tap <b>Battery saver</b></li>
+                <li>Turn it <b>OFF</b> (or set "Schedule" → Never)</li>
+              </ol>
+            </div>
+
+            {/* Step 4 — Samsung specific */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
+              }}>Step 4 · Samsung only — whitelist {browserName}</div>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <li>Open <b>Settings</b> → <b>Device care</b> (or "Battery and device care")</li>
+                <li>Tap <b>Battery</b></li>
+                <li>Tap <b>Background usage limits</b></li>
+                <li>Open <b>Apps that won't be put to sleep</b></li>
+                <li>Tap <b>+</b> Add → select <b>{browserName}</b></li>
+              </ol>
+            </div>
+
+            {/* Step 5 — Install PWA */}
+            <div>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
+              }}>Step 5 · Install app to home screen (recommended)</div>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <li>In {browserName}, tap the <b>⋮ menu</b> top-right</li>
+                <li>Tap <b>Install app</b> or <b>Add to Home screen</b></li>
+                <li>Close {browserName}, open the new icon from your home screen</li>
+                <li>Re-run "Send test push" below — installed PWAs have their own battery whitelist on most phones</li>
+              </ol>
             </div>
           </div>
         )}
