@@ -490,10 +490,17 @@ export function V2AppShell() {
               every rep-facing tab. Only /quotes/:id and /quotes/new
               still hide it because those pages mount their own per-
               quote IncentiveForecastCard right under the totals. */}
+          {/* Phase 35.0 pass 8 — outer marginBottom 12 → 0.
+              ProposedIncentiveCard already owns marginBottom: 14 on
+              its inner .v2-incentive wrapper (v2.css). Stacking
+              margins on the outer wrapper doubled the gap to 26 px
+              between the card and the next section (Log meeting +
+              Log lead on /work). Owner annotated this as wasted
+              vertical air. */}
           {!isPrivileged && !isTelecaller
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 0 }}>
               <ProposedIncentiveCard compact={false} />
             </div>
           )}

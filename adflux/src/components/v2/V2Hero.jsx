@@ -83,7 +83,10 @@ export default function V2Hero({
         color: '#fff',
         borderRadius: 'var(--radius-lg, 14px)',
         padding: '16px 18px',
-        marginBottom: 12,
+        // Phase 35.0 pass 8 — tightened from 12 → 8 to match the
+        // overall page rhythm. Owner audit: stacks above the V2Hero
+        // (Log buttons / TodaySummaryCard) were giving too much air.
+        marginBottom: 8,
         position: 'relative',
         overflow: 'hidden',
         fontFamily: 'var(--font-sans, "DM Sans", system-ui, sans-serif)',

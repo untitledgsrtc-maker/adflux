@@ -1862,9 +1862,14 @@ function StickyPrimaryCta({
     // outer shadow + inner highlight. Brand yellow `#FFE600` instead
     // of mockup's `#F5D90A`. Log lead uses the graphite-yellow dark
     // gradient with brand yellow text.
+    // Phase 35.0 pass 8 — tightened vertical rhythm. Was marginTop:
+    // 14 above + V2Hero marginBottom: 12 below = 26 px around the
+    // buttons. Owner annotated the loose stacking; brought to a
+    // single 6-8 px buffer so the row sits visually inside the
+    // Incentive→Hero sandwich.
     <div style={{
       display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
-      marginTop: 14,
+      marginTop: 6, marginBottom: 6,
     }}>
       {isActiveState ? (
         <>
