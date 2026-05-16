@@ -67,11 +67,19 @@ export default function TaDaRequestPanel() {
   useEffect(() => {
     if (!city || city.trim().length < 2) { setCityCeiling(null); return }
     let cancelled = false
+    // Phase 36.9.1 — case-insensitive lookup. Owner typed "BHAVNAGAR"
+    // (uppercase autocomplete output); master row stored as
+    // "Bhavnagar". `.eq` failed → ceiling null → "Pick a city first"
+    // false-alarm toast. Use ilike for an exact-but-case-insensitive
+    // match, and order by best-match length=1 row.
     supabase.from('city_da_ceilings')
-      .select('daily_da, hotel_rate')
-      .eq('city_name', city.trim())
-      .maybeSingle()
-      .then(({ data }) => { if (!cancelled) setCityCeiling(data || null) })
+      .select('city_name, daily_da, hotel_rate')
+      .ilike('city_name', city.trim())
+      .limit(1)
+      .then(({ data }) => {
+        if (cancelled) return
+        setCityCeiling(data && data.length > 0 ? data[0] : null)
+      })
     return () => { cancelled = true }
   }, [city])
 
@@ -137,18 +145,26 @@ export default function TaDaRequestPanel() {
     // capped at city.hotel_rate. Both need a city selected. ta + other
     // pass through unchecked.
     if (tab === 'da' || tab === 'hotel') {
-      if (!cityCeiling) {
+      if (!city || city.trim().length < 2) {
         toastError(new Error('Pick a city first.'),
           'DA / hotel cap depends on the city — type the city to look up the ceiling.')
+        return
+      }
+      if (!cityCeiling) {
+        // Phase 36.9.1 — city typed but no ceiling row matched. Tell
+        // rep to verify the city spelling rather than the misleading
+        // "Pick a city first." message.
+        toastError(new Error('City not in master.'),
+          `"${city}" is not in the city ceilings master. Pick the city from the suggestions or ask admin to add it.`)
         return
       }
       const cap = tab === 'da'
         ? Number(cityCeiling.daily_da)
         : Number(cityCeiling.hotel_rate)
       if (Number(claimAmount) > cap) {
-        toastError(new Error(`Above ceiling.`),
-          `${tab === 'da' ? 'DA night' : 'Hotel'} cap in ${city} is ₹${cap}. ` +
-          `Contact admin offline for any amount above this.`)
+        toastError(new Error('Above ceiling.'),
+          `${tab === 'da' ? 'DA night' : 'Hotel'} cap in ${cityCeiling.city_name || city} is ₹${cap}. ` +
+          `You can claim up to ₹${cap} only. Contact admin offline for higher amounts.`)
         return
       }
     }
