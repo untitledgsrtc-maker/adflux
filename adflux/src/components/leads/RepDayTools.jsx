@@ -165,6 +165,10 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
   const [fDate, setFDate] = useState(todayISO())
   const [fType, setFType] = useState('personal')
   const [fReason, setFReason] = useState('')
+  // Phase 36.1 — half-day support on rep-side leave request. Matches
+  // the admin LeavesAdminV2 checkbox. Salary RPC counts it as 0.5 day
+  // against the annual paid quota.
+  const [fHalfDay, setFHalfDay] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -177,6 +181,7 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
       leave_type: fType,
       reason: (fReason || '').trim() || null,
       status: 'pending',
+      is_half_day: fHalfDay,
       created_by: userId,
     })
     setSaving(false)
@@ -275,6 +280,26 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
             }}
           />
         </div>
+        {/* Phase 36.1 — half-day toggle. Submits with is_half_day=true
+            so the salary RPC counts the request as 0.5 day against
+            the annual paid quota. */}
+        <label style={{
+          display: 'inline-flex', alignItems: 'center', gap: 10,
+          fontSize: 13, color: 'var(--text)', cursor: 'pointer',
+          padding: '8px 0', userSelect: 'none',
+        }}>
+          <input
+            type="checkbox"
+            checked={fHalfDay}
+            onChange={e => setFHalfDay(e.target.checked)}
+            style={{
+              width: 18, height: 18,
+              accentColor: 'var(--accent, #FFE600)',
+              cursor: 'pointer',
+            }}
+          />
+          <span>Half-day only (counts as 0.5)</span>
+        </label>
         {err && (
           <div style={{ color: 'var(--danger)', fontSize: 12 }}>
             <AlertTriangle size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
