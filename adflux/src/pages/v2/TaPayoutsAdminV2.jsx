@@ -192,13 +192,30 @@ export default function TaPayoutsAdminV2() {
   // independently of the per-rep daily_ta table so admin sees the
   // global queue regardless of which rep is selected in the filter.
   async function loadRequests() {
-    const { data, error } = await supabase
+    // Phase 36.6 — owner reported the rep claim queue panel never
+    // rendered despite 4 pending rows visible to admin in SQL. Root
+    // cause: PostgREST `users(name)` embed silently returns null /
+    // empty under some FK / RLS combos, and the array we set was
+    // either empty or had no `.users` field, breaking the {req.users?.name}
+    // render. Fix — split into two plain selects and merge client-side.
+    // No FK embed = no edge cases.
+    const { data: reqs, error: reqErr } = await supabase
       .from('ta_da_requests')
-      .select('id, user_id, claim_date, kind, claim_km, claim_amount, city, reason, receipt_url, status, created_at, users(name)')
+      .select('id, user_id, claim_date, kind, claim_km, claim_amount, city, reason, receipt_url, status, created_at')
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
       .limit(50)
-    if (!error) setPendingRequests(data || [])
+    if (reqErr || !reqs || reqs.length === 0) {
+      setPendingRequests([])
+      return
+    }
+    const ids = [...new Set(reqs.map(r => r.user_id))]
+    const { data: usersRows } = await supabase
+      .from('users')
+      .select('id, name')
+      .in('id', ids)
+    const nameById = Object.fromEntries((usersRows || []).map(u => [u.id, u.name]))
+    setPendingRequests(reqs.map(r => ({ ...r, users: { name: nameById[r.user_id] || '—' } })))
   }
   useEffect(() => { if (isAdmin) loadRequests() }, [isAdmin])
   // Phase 34Z.70 — refetch on tab-resume so admin sees newly-pinged
