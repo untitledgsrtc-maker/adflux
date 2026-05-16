@@ -63,30 +63,50 @@ export default function TotalPayableCard() {
       const ms = monthStart()
       const me = monthEnd()
       const mk = monthKey()
+      // Phase 36.12 — call compute_monthly_salary RPC. Single source
+      // of truth for base + variable + incentive + ta_da + leave
+      // deduction + net_payable. Replaces the client-side math that
+      // (a) re-implemented base/variable from monthly_score and
+      // (b) forgot to subtract unpaid-leave deduction entirely.
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth() + 1
 
-      const [scoreRes, msdRes, taRes, tdaRes] = await Promise.all([
-        supabase.rpc('monthly_score', { p_user_id: profile.id, p_month_start: ms }),
+      const [salaryRes, tdaRes, msdRes] = await Promise.all([
+        supabase.rpc('compute_monthly_salary', {
+          p_user_id: profile.id,
+          p_year: year,
+          p_month: month,
+        }),
+        // Pending claims still surfaced as a hint (RPC only counts
+        // approved). Same query as before, narrowed to pending.
+        supabase.from('ta_da_requests')
+          .select('claim_amount, claim_km')
+          .eq('user_id', profile.id)
+          .eq('status', 'pending')
+          .gte('claim_date', ms).lte('claim_date', me),
         supabase.from('monthly_sales_data')
           .select('new_client_revenue, renewal_revenue')
           .eq('staff_id', profile.id).eq('month_year', mk).maybeSingle(),
-        supabase.from('daily_ta')
-          .select('total_amount')
-          .eq('user_id', profile.id)
-          .gte('ta_date', ms).lte('ta_date', me),
-        supabase.from('ta_da_requests')
-          .select('status, claim_amount, claim_km')
-          .eq('user_id', profile.id)
-          .gte('claim_date', ms).lte('claim_date', me),
       ])
       if (cancelled) return
 
-      const scoreRow = Array.isArray(scoreRes.data) ? scoreRes.data[0] : scoreRes.data
-      const base = Number(scoreRow?.base_amount    || 0)
-      const variable = Number(scoreRow?.variable_earned || 0)
-      const variableCap = Number(scoreRow?.variable_cap || 0)
+      const salary = salaryRes.data || {}
+      const base = Number(salary.base || 0)
+      const variable = Number(salary.variable || 0)
+      // variable_cap not in RPC payload — compute from monthly_salary
+      // (30% cap) for the muted-helper line.
+      const variableCap = Number(myProfile?.monthly_salary || 0) * 0.30
+      const taDaTotal = Number(salary.ta_da || 0)
+      const leaveUnpaid = Number(salary.leave_days_unpaid || 0)
+      const unpaidDeduction = Number(salary.unpaid_deduction || 0)
+      const netPayable = Number(salary.net_payable || 0)
 
-      // Incentive (Earned + Proposed forecast).
-      let incentive = 0, incentiveProposed = 0
+      // Incentive — RPC returns paid-out portion (incentive_payouts).
+      // For forecast display, also run client-side calculateIncentive
+      // so rep sees what they'd earn if the month closed today.
+      let incentive = Number(salary.incentive || 0)
+      let incentiveProposed = 0
       if (myProfile) {
         const cfg = {
           monthlySalary:    Number(myProfile.monthly_salary || 0),
@@ -100,26 +120,23 @@ export default function TotalPayableCard() {
           newClientRevenue: msdRes.data?.new_client_revenue || 0,
           renewalRevenue:   msdRes.data?.renewal_revenue    || 0,
         })
-        incentive = Number(earned.incentive || 0)
-        incentiveProposed = incentive  // no forecast extension here — kept simple
+        incentiveProposed = Number(earned.incentive || 0)
+        // If RPC paid-out is 0 but forecast non-zero, show forecast
+        // so the rep isn't surprised at month-end.
+        if (incentive === 0) incentive = incentiveProposed
       }
 
-      const taAuto = (taRes.data || [])
-        .reduce((s, r) => s + Number(r.total_amount || 0), 0)
-
-      const allReq = tdaRes.data || []
-      const taDaApproved = allReq
-        .filter(r => r.status === 'approved')
-        .reduce((s, r) => s + Number(r.claim_amount || 0) + Number(r.claim_km || 0) * 3, 0)
-      const pendingRows = allReq.filter(r => r.status === 'pending')
+      const pendingRows = tdaRes.data || []
       const taDaPending = pendingRows
         .reduce((s, r) => s + Number(r.claim_amount || 0) + Number(r.claim_km || 0) * 3, 0)
 
       setData({
         base, variable, variableCap,
         incentive, incentiveProposed,
-        taAuto, taDaApproved, taDaPending,
-        pendingCount: pendingRows.length,
+        taDaTotal,
+        leaveUnpaid, unpaidDeduction,
+        netPayable,
+        taDaPending, pendingCount: pendingRows.length,
       })
       setLoading(false)
     }
@@ -136,8 +153,9 @@ export default function TotalPayableCard() {
     )
   }
 
-  const taTotal = data.taAuto + data.taDaApproved
-  const grand   = data.base + data.variable + data.incentive + taTotal
+  // Phase 36.12 — grand total = NET from RPC (already deducts
+  // unpaid leave). No client-side recompute.
+  const grand = data.netPayable
 
   return (
     <div style={cardStyle}>
@@ -151,8 +169,17 @@ export default function TotalPayableCard() {
       <Row label="Base salary (70%)"            value={data.base} />
       <Row label={`Variable salary (30%)`}      value={data.variable} sub={data.variableCap > 0 ? `cap ${formatCurrency(data.variableCap)}` : null} />
       <Row label="Incentive earned"             value={data.incentive} muted={data.incentive === 0 ? 'No final payment yet' : null} />
-      <Row label="TA — auto from GPS"           value={data.taAuto} />
-      <Row label="TA / DA — approved claims"    value={data.taDaApproved} muted={data.pendingCount > 0 ? `${data.pendingCount} pending · ${formatCurrency(data.taDaPending)} not added` : null} />
+      <Row label="TA / DA — approved + GPS"     value={data.taDaTotal} muted={data.pendingCount > 0 ? `${data.pendingCount} pending · ${formatCurrency(data.taDaPending)} not added` : null} />
+      {/* Phase 36.12 — unpaid leave deduction line. Negative number
+          shown in danger red so the rep sees what's being cut. */}
+      {data.unpaidDeduction > 0 && (
+        <Row
+          label="Unpaid-leave deduction"
+          value={-data.unpaidDeduction}
+          sub={`${data.leaveUnpaid} day${data.leaveUnpaid === 1 ? '' : 's'} · base ÷ 26`}
+          negative
+        />
+      )}
 
       <div style={{
         marginTop: 14, padding: '14px 16px', borderRadius: 12,
@@ -184,7 +211,15 @@ const cardStyle = {
   marginTop: 14,
 }
 
-function Row({ label, value, sub, muted }) {
+function Row({ label, value, sub, muted, negative }) {
+  // Phase 36.12 — `negative` prop renders the amount in danger red
+  // for deduction lines (unpaid-leave deduction). Value is passed in
+  // as a negative number (e.g. -404) so the sign shows.
+  const displayValue = value < 0
+    ? `- ${formatCurrency(Math.abs(value))}`
+    : value > 0
+      ? formatCurrency(value)
+      : '—'
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
@@ -198,9 +233,13 @@ function Row({ label, value, sub, muted }) {
       <div style={{
         fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',
         fontWeight: 700,
-        color: value > 0 ? 'var(--v2-ink-0, var(--text))' : 'var(--v2-ink-2, var(--text-subtle))',
+        color: negative || value < 0
+          ? 'var(--danger, #EF4444)'
+          : value > 0
+            ? 'var(--v2-ink-0, var(--text))'
+            : 'var(--v2-ink-2, var(--text-subtle))',
       }}>
-        {value > 0 ? formatCurrency(value) : '—'}
+        {displayValue}
       </div>
     </div>
   )
