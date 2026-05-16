@@ -334,7 +334,7 @@ export default function PostCallOutcomeModal({
     if (profile?.id && lead.id) {
       const today = new Date().toISOString().slice(0, 10)
       await supabase.from('follow_ups')
-        .update({ is_done: true, completed_at: new Date().toISOString() })
+        .update({ is_done: true, done_at: new Date().toISOString() })
         .eq('lead_id', lead.id)
         .eq('assigned_to', profile.id)
         .eq('is_done', false)

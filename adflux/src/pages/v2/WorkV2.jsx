@@ -639,7 +639,10 @@ export default function WorkV2() {
   // Phase 34Z.54 — also grab complete + skip so the Next-up card can
   // (a) close itself when the rep saves an outcome, (b) expose a
   // manual dismiss (X) for tasks the rep doesn't want to action.
-  const { tasks: smartTasks, complete: completeSmartTask, skip: skipSmartTask } = useLeadTasks({ userId: profile?.id })
+  // Phase 34Z.79 — completeSmartTask no longer destructured; modal
+  // handles task close via direct UPDATE. Keep `skip` for the
+  // manual dismiss-X path on NextActionSurface.
+  const { tasks: smartTasks, skip: skipSmartTask } = useLeadTasks({ userId: profile?.id })
   // Phase 34Z.47 — compute the Next-up pick once at parent scope so
   // both NextActionSurface (uses it as the hero) and TodayTasksPanel
   // (excludes the duplicate row) read the same reference. Owner
@@ -865,13 +868,13 @@ export default function WorkV2() {
         onSaved={async ({ nextAction }) => {
           setPostCallOpen(false)
           setPendingActivityId(null)
-          // Phase 34Z.54 — close the smart-task row that triggered
-          // this call so it stops appearing on /work. Owner reported
-          // the task stayed visible after a successful outcome save.
-          if (callTaskId) {
-            try { await completeSmartTask(callTaskId) } catch { /* non-fatal */ }
-            setCallTaskId(null)
-          }
+          // Phase 34Z.79 — dropped explicit completeSmartTask RPC.
+          // PostCallOutcomeModal handleSave already closes EVERY open
+          // lead_task for (lead, rep) via direct UPDATE (Phase 34Z.60).
+          // Calling complete_lead_task(p_task_id) here raised P0001
+          // 'Task not found or RLS denied' because the row was already
+          // status='done' by the time this ran. Just clear local state.
+          if (callTaskId) setCallTaskId(null)
           load()
           if (nextAction === 'meeting') {
             // Smart card has no LogMeetingModal mounted; send rep to
@@ -890,13 +893,12 @@ export default function WorkV2() {
             }, 200)
           }
         }}
-        onLogMeeting={async () => {
+        onLogMeeting={() => {
           setPostCallOpen(false)
           setPendingActivityId(null)
-          if (callTaskId) {
-            try { await completeSmartTask(callTaskId) } catch { /* non-fatal */ }
-            setCallTaskId(null)
-          }
+          // Phase 34Z.79 — same reasoning as onSaved above; modal
+          // already closed the task via direct UPDATE.
+          if (callTaskId) setCallTaskId(null)
           if (callLead?.id) navigate(`/leads/${callLead.id}`)
         }}
       />
