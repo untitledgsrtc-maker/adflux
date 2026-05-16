@@ -49,7 +49,11 @@ export default function NotificationPanel() {
         // show "Meeting at 12:00" instead of just "Meeting today".
         // ref_number dropped per the same reason as the payments
         // select above.
-        .select('id, quote_id, follow_up_date, follow_up_time, note, quotes(quote_number, client_company, client_name, segment)')
+        // Phase 34Z.81 — pull lead join too. Owner reported
+        // "Follow-up: —" entries because PostCallOutcomeModal-spawned
+        // follow_ups are lead-linked (no quote_id), so the quotes
+        // join returned null and the title fell through to '—'.
+        .select('id, quote_id, lead_id, follow_up_date, follow_up_time, note, quotes(quote_number, client_company, client_name, segment), lead:lead_id(id, name, company)')
         .eq('is_done', false)
         .lte('follow_up_date', todayIso)
         .order('follow_up_date', { ascending: true })
@@ -82,14 +86,22 @@ export default function NotificationPanel() {
     })
     ;(fuRes.data || []).forEach(r => {
       const q = r.quotes
-      // Phase 31V — bake follow_up_time into the title and sub when
-      // present, so the rep sees "Follow-up at 14:30" before tapping in.
+      const l = r.lead
+      // Phase 31V — bake follow_up_time into the title and sub.
+      // Phase 34Z.81 — fall back to the lead's company/name when no
+      // quote is attached (post-call modal spawned FUs are lead-only).
+      // Also route to /leads/:id in that case.
       const tStr = r.follow_up_time ? String(r.follow_up_time).slice(0, 5) : ''
+      const titleSubject = q?.client_company || q?.client_name
+                        || l?.company || l?.name
+                        || '—'
       list.push({
         kind: 'followup', id: r.id,
-        title: `Follow-up${tStr ? ` at ${tStr}` : ''}: ${q?.client_company || q?.client_name || '—'}`,
+        title: `Follow-up${tStr ? ` at ${tStr}` : ''}: ${titleSubject}`,
         sub: r.note || `${q?.quote_number || q?.ref_number || ''} · ${r.follow_up_date}${tStr ? ` ${tStr}` : ''}`,
-        to: q ? (q.segment === 'GOVERNMENT' ? `/proposal/${r.quote_id}` : `/quotes/${r.quote_id}`) : '/quotes',
+        to: q
+          ? (q.segment === 'GOVERNMENT' ? `/proposal/${r.quote_id}` : `/quotes/${r.quote_id}`)
+          : (l?.id || r.lead_id ? `/leads/${l?.id || r.lead_id}` : '/follow-ups'),
         ts: r.follow_up_date,
       })
     })
