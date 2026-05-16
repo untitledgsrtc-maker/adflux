@@ -1862,15 +1862,17 @@ function StickyPrimaryCta({
     // outer shadow + inner highlight. Brand yellow `#FFE600` instead
     // of mockup's `#F5D90A`. Log lead uses the graphite-yellow dark
     // gradient with brand yellow text.
-    // Phase 35.0 pass 9 — owner-spec'd exact gaps: 15 px above and
-    // 15 px below the Log row. `.v2-incentive` (Proposed Incentive
-    // card) ships marginBottom: 14 in v2.css, so a marginTop: 1 here
-    // sums to 15 px between Incentive bottom and Log row top.
-    // marginBottom: 15 gives 15 px between Log row bottom and the
-    // V2Hero green card top.
+    // Phase 35.0 pass 10 — owner-spec'd exact gaps:
+    //   Incentive bottom → Log row top  : 10 px
+    //   Log row bottom   → Green hero   : 15 px
+    // `.v2-incentive` ships marginBottom: 14 in v2.css. A
+    // marginTop: -4 here collapses with that 14 → net 10 px above.
+    // marginBottom: 15 keeps the 15 px gap below the Log row.
+    // Touching only WorkV2 keeps other pages' Incentive spacing
+    // untouched.
     <div style={{
       display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
-      marginTop: 1, marginBottom: 15,
+      marginTop: -4, marginBottom: 15,
     }}>
       {isActiveState ? (
         <>
