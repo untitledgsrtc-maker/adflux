@@ -53,7 +53,11 @@ export default function NotificationPanel() {
         // "Follow-up: —" entries because PostCallOutcomeModal-spawned
         // follow_ups are lead-linked (no quote_id), so the quotes
         // join returned null and the title fell through to '—'.
-        .select('id, quote_id, lead_id, follow_up_date, follow_up_time, note, quotes(quote_number, client_company, client_name, segment), lead:lead_id(id, name, company)')
+        // Phase 34Z.83 — also pull quote.lead_id so quote-chase
+        // follow-ups can route to /leads/:id (where the outcome
+        // modal lives) instead of /quotes/:id (which has no Log
+        // Outcome button).
+        .select('id, quote_id, lead_id, follow_up_date, follow_up_time, note, quotes(quote_number, client_company, client_name, segment, lead_id), lead:lead_id(id, name, company)')
         .eq('is_done', false)
         .lte('follow_up_date', todayIso)
         .order('follow_up_date', { ascending: true })
@@ -95,13 +99,25 @@ export default function NotificationPanel() {
       const titleSubject = q?.client_company || q?.client_name
                         || l?.company || l?.name
                         || '—'
+      // Phase 34Z.83 — prefer routing to /leads/:id so the rep lands
+      // on the page that has the Call → outcome modal flow. Quote-
+      // chase FUs were dumping to /quotes/:id which has no Log
+      // Outcome action. Order of preference:
+      //   1. The FU's own lead_id (post-call modal-spawned FUs)
+      //   2. The linked quote's lead_id (Phase 14 — every quote has one)
+      //   3. Fall back to /quotes/:id when quote is govt or lead_id null
+      //   4. Last resort: /follow-ups
+      const leadIdForRoute = r.lead_id || l?.id || q?.lead_id || null
+      const route = leadIdForRoute
+        ? `/leads/${leadIdForRoute}`
+        : (q
+          ? (q.segment === 'GOVERNMENT' ? `/proposal/${r.quote_id}` : `/quotes/${r.quote_id}`)
+          : '/follow-ups')
       list.push({
         kind: 'followup', id: r.id,
         title: `Follow-up${tStr ? ` at ${tStr}` : ''}: ${titleSubject}`,
         sub: r.note || `${q?.quote_number || q?.ref_number || ''} · ${r.follow_up_date}${tStr ? ` ${tStr}` : ''}`,
-        to: q
-          ? (q.segment === 'GOVERNMENT' ? `/proposal/${r.quote_id}` : `/quotes/${r.quote_id}`)
-          : (l?.id || r.lead_id ? `/leads/${l?.id || r.lead_id}` : '/follow-ups'),
+        to: route,
         ts: r.follow_up_date,
       })
     })
