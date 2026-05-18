@@ -13,6 +13,7 @@
 
 import { useState } from 'react'
 import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCard'
+import TcWeeklyTiles from '../../components/incentives/TcWeeklyTiles'
 import { MyPerformance } from '../../components/incentives/MyPerformance'
 import TotalPayableCard from '../../components/incentives/TotalPayableCard'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
@@ -42,6 +43,12 @@ export default function MyPerformanceV2() {
       {/* Phase 33E — task-completion score (meetings done vs target)
           + 70/30 base + variable salary projection. */}
       <PerformanceScoreCard key={`score-${refreshKey}`} />
+
+      {/* Phase 53 — TC-only weekly KPI strip + variable-unlock gate.
+          Hidden for sales / agency / staff. Surfaces connect rate
+          (observability), qualified handoffs / week (gate), quotes /
+          week (gate). */}
+      <TcWeeklyTiles key={`tc-${refreshKey}`} />
 
       {/* Phase 34Z.34 — revenue / incentive slab / active campaigns /
           12-month history. Same component /incentives renders for the
