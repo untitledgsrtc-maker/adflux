@@ -44,6 +44,16 @@ function cleanPhone(raw) {
   return d.length === 10 ? '91' + d : d
 }
 
+// Phase 43.4 — IST anchor for "today" (callsToday + connectedToday
+// counts) and callback window. `new Date().toISOString()` returns
+// UTC; before 18:30 IST that's yesterday. Same helper as
+// SalaryPayoutModal:30 + IncentivePayoutModal:14.
+function istTodayISO() {
+  const now = new Date()
+  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
+  return ist.toISOString().slice(0, 10)
+}
+
 const HEAT_RANK = { hot: 0, warm: 1, cold: 2 }
 
 function slaPill(due) {
@@ -77,12 +87,19 @@ export default function TelecallerV2() {
 
   async function load() {
     setLoading(true)
-    const today = new Date().toISOString().slice(0, 10)
+    // Phase 43.4 — IST anchor (was UTC; broke counts before 18:30 IST).
+    const today = istTodayISO()
     const startOfDay = `${today}T00:00:00`
 
     // Phase 43.3 — 48 hour cutoff for callback panel.
-    const todayDateISO = new Date().toISOString().slice(0, 10)
-    const in2Days = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    // Phase 43.4 — IST anchor.
+    const todayDateISO = istTodayISO()
+    const in2Days = (() => {
+      const now = new Date()
+      const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
+      ist.setUTCDate(ist.getUTCDate() + 2)
+      return ist.toISOString().slice(0, 10)
+    })()
 
     const [leadsRes, callsRes, connectedRes, qualRes, handoffRes, targetRes, callbacksRes] = await Promise.all([
       supabase
@@ -136,7 +153,7 @@ export default function TelecallerV2() {
       // the panel renders without extra round-trips.
       supabase
         .from('follow_ups')
-        .select('id, follow_up_date, follow_up_time, notes, lead_id, leads(id, name, phone, company)')
+        .select('id, follow_up_date, follow_up_time, note, lead_id, leads(id, name, phone, company)')
         .eq('assigned_to', profile.id)
         .eq('is_done', false)
         .gte('follow_up_date', todayDateISO)
@@ -244,10 +261,10 @@ export default function TelecallerV2() {
           label={`call${callsToday === 1 ? '' : 's'} today · target ${callTarget}`}
           percent={callTargetPct}
           footerStats={[
-            { label: `${connectRatePct}% connected`, value: connectedToday, tint: connectRatePct >= 30 ? '#2BD8A0' : '#F59E0B' },
-            { label: 'qualified',                    value: qualifiedToday, tint: '#5AB0FF' },
+            { label: `${connectRatePct}% connected`, value: connectedToday, tint: connectRatePct >= 30 ? 'var(--v2-green, #10B981)' : 'var(--v2-amber, #F59E0B)' },
+            { label: 'qualified',                    value: qualifiedToday, tint: 'var(--v2-blue, #3B82F6)' },
             { label: 'in queue',                     value: queueOpen,      tint: 'var(--accent, #FFE600)' },
-            { label: 'handoffs',                     value: handoffs.length, tint: handoffs.length > 0 ? '#F59E0B' : 'var(--v2-ink-2, #94a3b8)' },
+            { label: 'handoffs',                     value: handoffs.length, tint: handoffs.length > 0 ? 'var(--v2-amber, #F59E0B)' : 'var(--v2-ink-2, #94a3b8)' },
           ]}
           accent={callTargetPct >= 100}
         />
@@ -390,7 +407,7 @@ export default function TelecallerV2() {
                 <div style={{ minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/leads/${lead.id}`)}>
                   <div style={{ fontWeight: 500, fontSize: 13 }}>{lead.name || '—'}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
-                    {lead.company || '—'}{cb.notes ? ` · ${cb.notes.slice(0, 60)}` : ''}
+                    {lead.company || '—'}{cb.note ? ` · ${cb.note.slice(0, 60)}` : ''}
                   </div>
                 </div>
                 <Pill tone="warn">{dateLabel}{timeLabel ? ` · ${timeLabel}` : ''}</Pill>
