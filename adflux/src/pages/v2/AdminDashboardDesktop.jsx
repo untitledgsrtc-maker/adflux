@@ -34,9 +34,12 @@ import { PeriodPicker } from '../../components/v2/PeriodPicker'
 // Phase 31A.2 — added 4 sales-exec analysis widgets per owner spec
 // (8 May 2026): stale leads alert, pipeline funnel, win rate / avg
 // deal / projected, recent activity feed.
+// Phase 41.5 — AiBriefingCard / PipelineFunnelCard / WinRateCard /
+// RecentActivityFeedCard imports dropped (mounts removed; widgets
+// duplicated content below the hero). Kept: LeadPipelinePanel +
+// TeamActivityPanel still mounted in Row 4c.
 import {
-  AiBriefingCard, LeadPipelinePanel, TeamActivityPanel,
-  PipelineFunnelCard, WinRateCard, RecentActivityFeedCard,
+  LeadPipelinePanel, TeamActivityPanel,
 } from '../../components/dashboard/CockpitWidgets'
 import '../../styles/v2.css'
 
@@ -870,36 +873,9 @@ export default function AdminDashboardDesktop() {
           {/* Period picker — month nav + presets + custom range. */}
           <PeriodPicker period={period} onChange={setPeriod} />
 
-          {/* Segment filter — slices quote-derived KPIs by segment. */}
-          <div style={{
-            display: 'inline-flex', gap: 4, padding: 3,
-            background: 'var(--v2-bg-2)', borderRadius: 999,
-            border: '1px solid var(--v2-border, var(--v2-line))',
-          }}>
-            {[
-              { key: 'all',        label: 'All' },
-              { key: 'private',    label: 'Private' },
-              { key: 'government', label: 'Govt' },
-            ].map(o => (
-              <button
-                key={o.key}
-                onClick={() => setSegmentFilter(o.key)}
-                style={{
-                  padding: '5px 11px', borderRadius: 999, border: 'none',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                  background: segmentFilter === o.key ? 'var(--v2-ink-0)' : 'transparent',
-                  color:      segmentFilter === o.key ? 'var(--v2-bg-0)' : 'var(--v2-ink-2)',
-                }}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Phase 25b — "Create Quote" CTA dropped from the page head.
-              The V2AppShell topbar already has a global "+ New Quote"
-              button. Two yellow CTAs side-by-side doing the same thing
-              was visual noise. */}
+          {/* Phase 41.5 — segment chip-toggle removed from filter bar;
+              Phase 41.2 SegmentToggle pill below the hero is the single
+              source. Was duplicated (chips here + pill below). */}
         </header>
 
         {/* end page-head, body below */}
@@ -936,42 +912,16 @@ export default function AdminDashboardDesktop() {
               </div>
             )}
 
-            {/* Phase 12 rev3 — AI Briefing card hoisted to the top so
-                it's the first thing Brijesh sees on /dashboard. Pulls
-                its own data; rule-based until daily-brief Edge Function
-                deploys. */}
-            <AiBriefingCard />
-
-            {/* Phase 34S — May 13 UX audit: AiBriefingCard above
-                already rolls hot-idle leads + SLA breaches into one
-                card. The standalone SlaBreachBanner + StaleLeadsAlertCard
-                were saying the same thing two more times; admin saw
-                "12 SLA breaches" up to 3× per dashboard load. Both
-                widgets removed. Bell icon in topbar handles roll-up
-                across surfaces for the moments admin wants the count
-                without opening this page. */}
-
-            {/* Phase 31A.2 — pipeline funnel + win rate row. Two-column
-                on desktop, stacked on mobile via grid auto-fit. */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: 12, marginTop: 12,
-            }}>
-              <PipelineFunnelCard />
-              <WinRateCard />
-            </div>
-
-            {/* Phase 31A.2 — recent activity feed (admin sees all reps). */}
-            <div style={{ marginTop: 12 }}>
-              <RecentActivityFeedCard limit={10} />
-            </div>
-
-            {/* Dashboard spec — Action Queue card. Was the hero slot;
-                now sits below AI Briefing. Only renders when there's
-                actually something to act on; an empty action queue
-                shows "Inbox zero". */}
-            <ActionQueueCard items={state.actionQueue || []} onOpen={(route) => navigate(route)} />
+            {/* Phase 41.5 — removed 5 top-of-page widgets that duplicated
+                content rendered below the hero:
+                - AiBriefingCard (replaced by BriefDeliveryCard Phase 41.3)
+                - PipelineFunnelCard (FunnelPanel period-bucketed below)
+                - WinRateCard (folded into upcoming polish; was redundant
+                  with leaderboard win counts)
+                - RecentActivityFeedCard (noise; dropped per Sprint 1 spec
+                  but this CockpitWidgets variant survived)
+                - ActionQueueCard items-list (replaced by AdminActionsCard
+                  Phase 41.2 below the hero) */}
 
             {/* M1 — Missed-targets banner. Shown only when at least one
                 rep is currently below their daily quota. Lists names so
