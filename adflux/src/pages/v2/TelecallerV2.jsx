@@ -38,7 +38,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
 // Phase 47.1 — WhatsApp 1-click send.
 import WhatsAppSendModal from '../../components/leads/WhatsAppSendModal'
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, ChevronRight, ChevronDown } from 'lucide-react'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -519,10 +519,11 @@ export default function TelecallerV2() {
                   color: 'var(--v2-yellow, #FFE600)',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   padding: 0, fontFamily: 'inherit',
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}
               >
-                {scriptOpen ? '▾' : '▸'} Script · {activeScript.name}
+                {scriptOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {' '}Script · {activeScript.name}
               </button>
               {scriptOpen && (
                 <div style={{
@@ -674,7 +675,7 @@ export default function TelecallerV2() {
                         background: 'transparent',
                         border: '1px solid var(--v2-green, #10B981)',
                         color: 'var(--v2-green, #10B981)',
-                        borderRadius: 8, cursor: 'pointer',
+                        borderRadius: 10, cursor: 'pointer',
                         display: 'inline-flex', alignItems: 'center', gap: 4,
                         fontFamily: 'inherit',
                       }}
@@ -753,7 +754,7 @@ export default function TelecallerV2() {
                     background: 'transparent',
                     border: '1px solid var(--v2-green, #10B981)',
                     color: 'var(--v2-green, #10B981)',
-                    borderRadius: 8, cursor: 'pointer',
+                    borderRadius: 10, cursor: 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                     fontFamily: 'inherit',
                   }}

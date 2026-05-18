@@ -435,7 +435,9 @@ export default function PostCallOutcomeModal({
     // count on TodaySummaryCard recomputes via realtime + auto-
     // refresh, so the rep sees the number drop immediately.
     if (profile?.id && lead.id) {
-      const today = new Date().toISOString().slice(0, 10)
+      // Phase 49.1 — IST today (was UTC slice; before 18:30 IST that's
+      // yesterday, so today's open follow_ups missed the close query).
+      const today = istTodayISO()
       await supabase.from('follow_ups')
         .update({ is_done: true, done_at: new Date().toISOString() })
         .eq('lead_id', lead.id)

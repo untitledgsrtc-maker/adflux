@@ -749,7 +749,7 @@ export default function LeadDetailV2() {
                   border: '1px solid',
                   background: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'transparent',
                   borderColor: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'var(--border)',
-                  color: lead.wa_opt_out ? '#0a0e1a' : 'var(--text-muted)',
+                  color: lead.wa_opt_out ? 'var(--accent-fg, #0f172a)' : 'var(--text-muted)',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
