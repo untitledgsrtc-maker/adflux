@@ -46,6 +46,10 @@ const TABS = [
   // Phase 47.2 — call scripts shown on TC Next Call hero.
   // Segment-specific (Private / Government / generic fallback).
   { key: 'call_scripts', label: 'Scripts', icon: MessageCircle },
+  // Phase 50.1 — Designations master: HR + admin manage roles +
+  // salary bands + default targets. Feeds the Create User wizard
+  // (Phase 50.2) and offer letter renderer (Phase 50.3).
+  { key: 'designations', label: 'Designations', icon: UserCheck },
   // Phase 33E — performance score + variable salary (70/30 split).
   { key: 'performance', label: 'Performance', icon: TrendingUp },
   { key: 'documents',   label: 'Documents',   icon: FileText },
@@ -128,6 +132,7 @@ export default function MasterV2() {
       {activeTab === 'templates'   && <MessageTemplatesTab />}
       {activeTab === 'wa_templates' && <WhatsAppTemplatesTab />}
       {activeTab === 'call_scripts' && <CallScriptsTab />}
+      {activeTab === 'designations' && <DesignationsTab />}
       {activeTab === 'performance' && <PerformanceTab />}
       {activeTab === 'documents'   && <DocumentsTab />}
 
@@ -2903,5 +2908,283 @@ function CallScriptsTab() {
         ))}
       </div>
     </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 50.1 — Designations master (HR + admin roster management)
+   ════════════════════════════════════════════════════════════════════ */
+
+const AUTH_ROLES = [
+  { v: 'admin',         label: 'Admin' },
+  { v: 'co_owner',      label: 'Co-owner' },
+  { v: 'sales',         label: 'Sales' },
+  { v: 'telecaller',    label: 'Telecaller' },
+  { v: 'agency',        label: 'Agency' },
+  { v: 'hr',            label: 'HR' },
+  { v: 'accounts',      label: 'Accounts' },
+  { v: 'staff',         label: 'Staff' },
+]
+const TEAM_ROLES = [
+  'admin', 'owner', 'government_partner', 'sales_manager', 'sales',
+  'telecaller', 'creative_lead', 'designer', 'video_editor',
+  'ops_execution', 'accounts', 'hr', 'admin_staff', 'office_boy', 'agency',
+]
+
+function DesignationsTab() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState(null)
+  const [status, setStatus] = useState({})
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState({
+    name: '', auth_role: 'staff', team_role: 'designer',
+    default_monthly_salary: '', has_incentive: false,
+    default_variable_pct: 0,
+    default_min_calls: 0, default_min_quotes: 0, default_min_followups: 0,
+  })
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('designations')
+      .select('*')
+      .order('display_order', { ascending: true })
+    setRows(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  async function saveField(row, field, value) {
+    setSavingId(row.id)
+    const { error } = await supabase
+      .from('designations')
+      .update({ [field]: value })
+      .eq('id', row.id)
+    setSavingId(null)
+    setStatus(s => ({ ...s, [row.id]: error ? error.message : 'saved' }))
+    setTimeout(() => setStatus(s => ({ ...s, [row.id]: '' })), 1800)
+    if (!error) load()
+  }
+
+  async function toggleActive(row) {
+    await supabase.from('designations')
+      .update({ is_active: !row.is_active })
+      .eq('id', row.id)
+    load()
+  }
+
+  async function remove(row) {
+    if (!window.confirm(`Delete designation "${row.name}"? This cannot be undone (existing users keep their team_role).`)) return
+    await supabase.from('designations').delete().eq('id', row.id)
+    load()
+  }
+
+  async function add() {
+    if (!draft.name.trim()) return
+    setAdding(true)
+    const maxOrder = rows.reduce((m, r) => Math.max(m, r.display_order || 0), 0)
+    const { error } = await supabase.from('designations').insert([{
+      ...draft,
+      name: draft.name.trim(),
+      default_monthly_salary: Number(draft.default_monthly_salary) || 0,
+      default_variable_pct: Number(draft.default_variable_pct) || 0,
+      default_min_calls: Number(draft.default_min_calls) || 0,
+      default_min_quotes: Number(draft.default_min_quotes) || 0,
+      default_min_followups: Number(draft.default_min_followups) || 0,
+      display_order: maxOrder + 10,
+    }])
+    setAdding(false)
+    if (!error) {
+      setDraft({
+        name: '', auth_role: 'staff', team_role: 'designer',
+        default_monthly_salary: '', has_incentive: false,
+        default_variable_pct: 0,
+        default_min_calls: 0, default_min_quotes: 0, default_min_followups: 0,
+      })
+      load()
+    }
+  }
+
+  if (loading) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>Loading…</div>
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 18 }}>
+      <div style={{ marginBottom: 16 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: 16, color: 'var(--text)' }}>Designations</h3>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+          Master roster of roles. Each new hire picks one designation in the Create User wizard — salary, auth role, team role, and daily targets auto-fill from the row below. HR overrides per-user if needed.
+        </p>
+      </div>
+
+      {/* Add form */}
+      <div style={{
+        background: 'var(--surface-2, var(--bg))',
+        border: '1px solid var(--border)',
+        borderRadius: 10, padding: 14, marginBottom: 16,
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: 8, marginBottom: 8 }}>
+          <DesIn label="Name" v={draft.name} onChange={v => setDraft(d => ({ ...d, name: v }))} placeholder="e.g. Senior Designer" />
+          <DesSel label="Auth role" v={draft.auth_role} onChange={v => setDraft(d => ({ ...d, auth_role: v }))} options={AUTH_ROLES.map(o => [o.v, o.label])} />
+          <DesSel label="Team role" v={draft.team_role} onChange={v => setDraft(d => ({ ...d, team_role: v }))} options={TEAM_ROLES.map(t => [t, t])} />
+          <DesIn label="Monthly salary ₹" v={draft.default_monthly_salary} onChange={v => setDraft(d => ({ ...d, default_monthly_salary: v }))} type="number" placeholder="25000" />
+          <button
+            type="button"
+            onClick={add}
+            disabled={adding || !draft.name.trim()}
+            style={{
+              alignSelf: 'end',
+              padding: '8px 14px',
+              background: 'var(--accent, #FFE600)',
+              border: 'none', borderRadius: 6,
+              color: 'var(--accent-fg, #0f172a)',
+              fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              opacity: adding || !draft.name.trim() ? 0.55 : 1,
+            }}
+          >
+            {adding ? 'Adding…' : '+ Add'}
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'end', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+            <input type="checkbox" checked={draft.has_incentive} onChange={e => setDraft(d => ({ ...d, has_incentive: e.target.checked }))} />
+            Has incentive
+          </label>
+          <DesIn label="Variable %" v={draft.default_variable_pct} onChange={v => setDraft(d => ({ ...d, default_variable_pct: v }))} type="number" placeholder="30" />
+          <DesIn label="Min calls/day" v={draft.default_min_calls} onChange={v => setDraft(d => ({ ...d, default_min_calls: v }))} type="number" />
+          <DesIn label="Min quotes/wk" v={draft.default_min_quotes} onChange={v => setDraft(d => ({ ...d, default_min_quotes: v }))} type="number" />
+          <span />
+        </div>
+      </div>
+
+      {/* Rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {rows.length === 0 && (
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 16, textAlign: 'center' }}>
+            No designations. Add one above.
+          </div>
+        )}
+        {rows.map(r => (
+          <div key={r.id} style={{
+            background: 'var(--surface-2, var(--bg))',
+            border: '1px solid var(--border)',
+            borderRadius: 10, padding: 12,
+            opacity: r.is_active ? 1 : 0.55,
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr auto auto', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <input
+                defaultValue={r.name}
+                onBlur={e => e.target.value !== r.name && saveField(r, 'name', e.target.value)}
+                style={inputBase}
+                title="Name"
+              />
+              <select
+                defaultValue={r.auth_role}
+                onBlur={e => e.target.value !== r.auth_role && saveField(r, 'auth_role', e.target.value)}
+                style={inputBase}
+                title="Auth role"
+              >
+                {AUTH_ROLES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
+              </select>
+              <select
+                defaultValue={r.team_role}
+                onBlur={e => e.target.value !== r.team_role && saveField(r, 'team_role', e.target.value)}
+                style={inputBase}
+                title="Team role"
+              >
+                {TEAM_ROLES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <input
+                type="number"
+                defaultValue={r.default_monthly_salary}
+                onBlur={e => Number(e.target.value) !== r.default_monthly_salary && saveField(r, 'default_monthly_salary', Number(e.target.value))}
+                style={inputBase}
+                title="Monthly salary"
+              />
+              <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                {r.is_active ? 'Active' : 'Off'}
+              </button>
+              <button onClick={() => remove(r)} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--danger, #EF4444)', border: '1px solid var(--danger, #EF4444)', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                Delete
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 8, alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                <input
+                  type="checkbox"
+                  defaultChecked={r.has_incentive}
+                  onChange={e => saveField(r, 'has_incentive', e.target.checked)}
+                />
+                Has incentive
+              </label>
+              <NumIn label="Variable %" v={r.default_variable_pct} onSave={v => saveField(r, 'default_variable_pct', v)} />
+              <NumIn label="Min calls" v={r.default_min_calls} onSave={v => saveField(r, 'default_min_calls', v)} />
+              <NumIn label="Min quotes/wk" v={r.default_min_quotes} onSave={v => saveField(r, 'default_min_quotes', v)} />
+              <NumIn label="Display order" v={r.display_order} onSave={v => saveField(r, 'display_order', v)} />
+            </div>
+            {r.notes && (
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                {r.notes}
+              </div>
+            )}
+            {status[r.id] && (
+              <div style={{ fontSize: 11, marginTop: 6, color: status[r.id] === 'saved' ? 'var(--success)' : 'var(--danger)' }}>
+                {savingId === r.id ? 'Saving…' : status[r.id]}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const inputBase = {
+  padding: '7px 10px',
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 6,
+  color: 'var(--text)',
+  fontSize: 13, fontFamily: 'inherit',
+}
+function DesIn({ label, v, onChange, type = 'text', placeholder }) {
+  return (
+    <div>
+      <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>{label}</label>
+      <input
+        type={type}
+        value={v}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ ...inputBase, width: '100%' }}
+      />
+    </div>
+  )
+}
+function DesSel({ label, v, onChange, options }) {
+  return (
+    <div>
+      <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>{label}</label>
+      <select
+        value={v}
+        onChange={e => onChange(e.target.value)}
+        style={{ ...inputBase, width: '100%' }}
+      >
+        {options.map(([val, lbl]) => <option key={val} value={val}>{lbl}</option>)}
+      </select>
+    </div>
+  )
+}
+function NumIn({ label, v, onSave }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11, color: 'var(--text-muted)' }}>
+      <span>{label}</span>
+      <input
+        type="number"
+        defaultValue={v}
+        onBlur={e => Number(e.target.value) !== v && onSave(Number(e.target.value))}
+        style={{ ...inputBase, padding: '4px 8px', fontSize: 12 }}
+      />
+    </label>
   )
 }
