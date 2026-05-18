@@ -57,6 +57,9 @@ export default function SalaryAdminV2({ embedded = false }) {
   const [month, setMonth]   = useState(currentMonthYM())
   const [rows,  setRows]    = useState([])    // [{ user, salary, ... }]
   const [paidMap, setPaidMap] = useState({})  // { user_id: { paid, hasFull } } from salary_payouts
+  // Phase 40 — { user_id: { ta_override, da_night, hotel, other } }
+  // from approved ta_da_requests rows in the selected month.
+  const [taBreakdown, setTaBreakdown] = useState({})
   const [policy, setPolicy] = useState(null)
   const [err,   setErr]     = useState('')
   const [loading, setLoading] = useState(true)
@@ -70,8 +73,14 @@ export default function SalaryAdminV2({ embedded = false }) {
     const [y, m] = month.split('-').map(n => parseInt(n, 10))
     if (!y || !m) { setErr('Pick a month.'); setLoading(false); return }
 
-    // Pull active reps + policy + this month's salary_payouts in parallel.
-    const [usersRes, polRes, payRes] = await Promise.all([
+    // Pull active reps + policy + salary_payouts + TA claim
+    // breakdown in parallel.
+    const monthStart = `${month}-01`
+    const monthEnd = (() => {
+      const d = new Date(y, m, 0)
+      return d.toISOString().slice(0, 10)
+    })()
+    const [usersRes, polRes, payRes, taRes] = await Promise.all([
       supabase.from('users')
         .select('id, name, role')
         .in('role', ['sales', 'agency', 'telecaller', 'admin', 'co_owner'])
@@ -84,6 +93,14 @@ export default function SalaryAdminV2({ embedded = false }) {
       supabase.from('salary_payouts')
         .select('user_id, amount_paid, is_full_payment')
         .eq('month_year', month),
+      // Phase 40 — approved TA claims broken down by kind for the
+      // hover tooltip on the TA/DA column. (GPS portion is whatever
+      // remains after subtracting these from r.ta_da.)
+      supabase.from('ta_da_requests')
+        .select('user_id, kind, claim_amount, claim_km')
+        .eq('status', 'approved')
+        .gte('claim_date', monthStart)
+        .lte('claim_date', monthEnd),
     ])
     if (usersRes.error) { setErr(usersRes.error.message); setLoading(false); return }
     setPolicy(polRes.data?.[0] || null)
@@ -97,6 +114,19 @@ export default function SalaryAdminV2({ embedded = false }) {
       if (p.is_full_payment) pm[k].hasFull = true
     }
     setPaidMap(pm)
+
+    // Phase 40 — TA breakdown by kind. Bike claim_km × ₹3 added to
+    // claim_amount for ta_override (legacy field).
+    const tb = {}
+    for (const c of (taRes.data || [])) {
+      const k = c.user_id
+      if (!tb[k]) tb[k] = { ta_override: 0, da_night: 0, hotel: 0, other: 0 }
+      const amt = Number(c.claim_amount || 0) + Number(c.claim_km || 0) * 3
+      const kind = c.kind || 'other'
+      if (tb[k][kind] != null) tb[k][kind] += amt
+      else tb[k].other += amt
+    }
+    setTaBreakdown(tb)
 
     // RPC per rep. Cheap (24 reps × 1 RPC). Sequential keeps Supabase
     // load light + avoids RLS bursts.
@@ -133,6 +163,7 @@ export default function SalaryAdminV2({ embedded = false }) {
 
   const totals = useMemo(() => {
     return filteredRows.reduce((acc, r) => {
+      acc.totalSalary += Number(r.monthly_salary || 0)
       acc.base       += Number(r.base || 0)
       acc.variable   += Number(r.variable || 0)
       acc.incentive  += Number(r.incentive || 0)
@@ -140,12 +171,12 @@ export default function SalaryAdminV2({ embedded = false }) {
       acc.deduction  += Number(r.unpaid_deduction || 0)
       acc.net        += Number(r.net_payable || 0)
       return acc
-    }, { base: 0, variable: 0, incentive: 0, ta_da: 0, deduction: 0, net: 0 })
+    }, { totalSalary: 0, base: 0, variable: 0, incentive: 0, ta_da: 0, deduction: 0, net: 0 })
   }, [filteredRows])
 
   function exportCSV() {
     const header = [
-      'Name', 'Role', 'Base', 'Variable', 'Score %',
+      'Name', 'Role', 'Total Salary', 'Base', 'Variable', 'Score %',
       'Incentive', 'TA/DA',
       'Leave Total', 'Leave Paid', 'Leave Unpaid',
       'Unpaid Deduction', 'NET PAYABLE',
@@ -153,6 +184,7 @@ export default function SalaryAdminV2({ embedded = false }) {
     const lines = filteredRows.map(r => [
       r.user?.name || '',
       r.user?.role || '',
+      r.monthly_salary || 0,
       r.base || 0,
       r.variable || 0,
       r.score_pct || 0,
@@ -349,10 +381,15 @@ export default function SalaryAdminV2({ embedded = false }) {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="v2d-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1300 }}>
+            <table className="v2d-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1400 }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--v2-line)', color: 'var(--v2-ink-2)' }}>
                   <th style={thStyle}>Name</th>
+                  {/* Phase 40 — Total = full monthly salary contract
+                      (base + variable cap), shown before Base/Variable
+                      breakdown so accounts can see "this rep is on
+                      ₹50k slot → after score gets ₹35k variable". */}
+                  <th style={thNum}>Total Salary</th>
                   <th style={thNum}>Base</th>
                   <th style={thNum}>Variable</th>
                   <th style={thNum}>Score</th>
@@ -376,18 +413,40 @@ export default function SalaryAdminV2({ embedded = false }) {
                         {r.user.role}
                       </div>
                     </td>
+                    {/* Phase 40 — Total Salary = monthly_salary
+                        contract from staff_incentive_profiles. */}
+                    <td style={{ ...tdNum, color: 'var(--v2-ink-0)', fontWeight: 600 }}>
+                      {fmtINR(r.monthly_salary)}
+                    </td>
                     <td style={tdNum}>{fmtINR(r.base)}</td>
                     <td style={tdNum}>{fmtINR(r.variable)}</td>
                     <td style={tdNum}>
                       <span style={{
                         fontFamily: 'var(--font-mono, monospace)',
-                        fontSize: 11, color: 'var(--v2-ink-2)',
+                        fontSize: 11,
+                        color: (Number(r.score_pct || 0) >= 80) ? 'var(--v2-green, #10B981)'
+                             : (Number(r.score_pct || 0) >= 50) ? 'var(--v2-amber, #F59E0B)'
+                             :                                    'var(--v2-rose, #EF4444)',
                       }}>
                         {r.score_pct != null ? `${r.score_pct}%` : '—'}
                       </span>
                     </td>
                     <td style={tdNum}>{fmtINR(r.incentive)}</td>
-                    <td style={tdNum}>{fmtINR(r.ta_da)}</td>
+                    {/* Phase 40 — TA/DA cell hover tooltip shows
+                        breakdown by kind (GPS · DA night · Hotel ·
+                        Other). taBreakdown captured separately from
+                        approved ta_da_requests; GPS = ta_da - claims. */}
+                    {(() => {
+                      const tb = taBreakdown[r.user.id] || { ta_override: 0, da_night: 0, hotel: 0, other: 0 }
+                      const claimsTotal = tb.ta_override + tb.da_night + tb.hotel + tb.other
+                      const gpsOnly = Math.max(0, Number(r.ta_da || 0) - claimsTotal)
+                      const tip = `GPS-TA ${fmtINR(gpsOnly)} · DA night ${fmtINR(tb.da_night)} · Hotel ${fmtINR(tb.hotel)} · Other ${fmtINR(tb.other + tb.ta_override)}`
+                      return (
+                        <td style={tdNum} title={tip}>
+                          {fmtINR(r.ta_da)}
+                        </td>
+                      )
+                    })()}
                     <td style={tdNum}>
                       <div style={{
                         fontFamily: 'var(--font-mono, monospace)',
@@ -462,6 +521,7 @@ export default function SalaryAdminV2({ embedded = false }) {
                   <td style={{ ...tdStyle, fontWeight: 700, color: 'var(--v2-ink-0)' }}>
                     TOTAL{filteredRows.length !== rows.length ? ` · ${filteredRows.length} of ${rows.length}` : ''}
                   </td>
+                  <td style={{ ...tdNum, fontWeight: 700, color: 'var(--v2-ink-0)' }}>{fmtINR(totals.totalSalary)}</td>
                   <td style={tdNum}>{fmtINR(totals.base)}</td>
                   <td style={tdNum}>{fmtINR(totals.variable)}</td>
                   <td style={tdNum}>—</td>
