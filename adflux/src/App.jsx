@@ -21,6 +21,7 @@ import IncentivesV2       from './pages/v2/IncentivesV2'
 import RenewalToolsV2     from './pages/v2/RenewalToolsV2'
 import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
 import HRV2               from './pages/v2/HRV2'
+import HRNewUserV2        from './pages/v2/HRNewUserV2'
 // Phase 33G.8 — admin Leaves page (item 82 real leaves table).
 import LeavesAdminV2     from './pages/v2/LeavesAdminV2'
 // Phase 36 — per-rep monthly salary breakdown.
@@ -219,6 +220,7 @@ export default function App() {
           <Route path="/incentives"                element={<RequirePrivileged><IncentivesV2 /></RequirePrivileged>} />
           <Route path="/pending-approvals"         element={<RequirePrivileged><PendingApprovalsV2 /></RequirePrivileged>} />
           <Route path="/hr"                        element={<RequirePrivileged><HRV2 /></RequirePrivileged>} />
+          <Route path="/hr/new-user"               element={<RequirePrivileged><HRNewUserV2 /></RequirePrivileged>} />
           {/* Phase 33G.8 — admin Leaves CRUD. Excluded days for the
               monthly performance score now come from a real table
               instead of the work_sessions.is_off_day proxy. */}

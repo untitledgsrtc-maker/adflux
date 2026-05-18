@@ -10,8 +10,9 @@
 // the dark theme.
 
 import { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  UserPlus, Search, Briefcase, Clock, CheckCircle2, Users,
+  UserPlus, UserCheck, Search, Briefcase, Clock, CheckCircle2, Users,
 } from 'lucide-react'
 import { useOffers, STATUS_META } from '../../hooks/useOffers'
 import { SendOfferModal }   from '../../components/hr/SendOfferModal'
@@ -36,6 +37,7 @@ function matchesFilter(offer, key) {
 }
 
 export default function HRV2() {
+  const navigate = useNavigate()
   const { offers, loading, fetchOffers } = useOffers()
   const [filter, setFilter]   = useState('all')
   const [search, setSearch]   = useState('')
@@ -76,10 +78,20 @@ export default function HRV2() {
             accepted candidates into sales users.
           </div>
         </div>
-        <button className="v2d-cta" onClick={() => setSendOpen(true)}>
-          <UserPlus size={15} />
-          <span>Send Offer</span>
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="v2d-cta v2d-cta--ghost"
+            onClick={() => navigate('/hr/new-user')}
+            style={{ background: 'transparent', color: 'var(--v2-ink-1)', border: '1px solid var(--v2-line)' }}
+          >
+            <UserCheck size={15} />
+            <span>Create User</span>
+          </button>
+          <button className="v2d-cta" onClick={() => setSendOpen(true)}>
+            <UserPlus size={15} />
+            <span>Send Offer</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
