@@ -502,7 +502,7 @@ export default function MeetingsMapPanel({ userId }) {
               borderRadius: 999,
               color: 'var(--v2-ink-0, #f5f7fb)',
               fontSize: 10,
-              fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+              fontFamily: 'var(--font-mono, inherit)',
             }}>
               {trackSummary.km} km today
             </span>
@@ -517,7 +517,7 @@ export default function MeetingsMapPanel({ userId }) {
               borderRadius: 999,
               color: 'var(--v2-ink-0, #f5f7fb)',
               fontSize: 10,
-              fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+              fontFamily: 'var(--font-mono, inherit)',
             }}>
               ≈ ₹{taEstimate} TA
             </span>
@@ -625,13 +625,13 @@ export default function MeetingsMapPanel({ userId }) {
             }}>
               <span>
                 <b style={{
-                  fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+                  fontFamily: 'var(--font-mono, inherit)',
                   color: 'var(--v2-ink-0, #f5f7fb)',
                 }}>{trackSummary.km}</b> km today
               </span>
               <span>
                 ≈ <b style={{
-                  fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+                  fontFamily: 'var(--font-mono, inherit)',
                   color: 'var(--v2-ink-0, #f5f7fb)',
                 }}>₹{taEstimate}</b> TA est.
               </span>

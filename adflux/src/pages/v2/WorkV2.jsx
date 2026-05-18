@@ -1226,7 +1226,7 @@ function PlanTodayBlock(props) {
               <input
                 className="lead-inp m-time-inp"
                 type="time"
-                style={{ width: 108, padding: '10px 10px', fontSize: 14, fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)' }}
+                style={{ width: 108, padding: '10px 10px', fontSize: 14, fontFamily: 'var(--font-mono, inherit)' }}
                 value={m.time}
                 onChange={e => setPlannedMeetings(prev => prev.map((x, j) => j === i ? { ...x, time: e.target.value } : x))}
               />

@@ -32,6 +32,7 @@ import { useAuthStore } from '../../store/authStore'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import V2Hero from '../../components/v2/V2Hero'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { RingMilestoneRow } from '../../components/v2/RingMilestone'
 
 function fmtINR(n) {
@@ -271,7 +272,12 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       toastError(new Error('No pending rows'), 'No pending rows in the current filter.')
       return
     }
-    if (!confirm(`Approve all ${targets.length} pending TA rows for this rep + month?`)) return
+    // Phase 41.8 — confirmDialog instead of native confirm() per §26.
+    if (!(await confirmDialog({
+      title: 'Approve all pending TA rows?',
+      message: `Approve all ${targets.length} pending TA rows for this rep + month? This credits the rep's TA total.`,
+      confirmLabel: 'Approve all',
+    }))) return
     setBulkBusy(true)
     const ids = targets.map(r => r.id)
     const { error } = await supabase.from('daily_ta').update({
@@ -331,7 +337,12 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
 
   async function handleRecompute() {
     if (!fUser || !fMonth) return
-    if (!confirm(`Recompute TA for the whole month for this rep? Approved/paid days are preserved.`)) return
+    // Phase 41.8 — confirmDialog instead of native confirm() per §26.
+    if (!(await confirmDialog({
+      title: 'Recompute this month?',
+      message: 'Recompute TA for the whole month for this rep? Approved + paid days are preserved.',
+      confirmLabel: 'Recompute',
+    }))) return
     setRecomputing(true); setErr('')
     const { error } = await supabase.rpc('backfill_ta', {
       p_user_id: fUser, p_month_start: fMonth,
@@ -732,7 +743,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
         </div>
         {err && (
           <div style={{
-            marginTop: 10, padding: '8px 12px', borderRadius: 8,
+            marginTop: 10, padding: '8px 12px', borderRadius: 'var(--radius-sm, 6px)',
             background: 'var(--v2-tint-danger, rgba(239,68,68,0.14))', color: 'var(--danger, #EF4444)',
             fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
           }}>
@@ -1000,7 +1011,7 @@ const inputStyle = {
   padding: '9px 12px',
   background: 'var(--v2-bg-2)',
   border: '1px solid var(--v2-line)',
-  borderRadius: 8,
+  borderRadius: 'var(--v2-r-sm, 10px)',
   color: 'var(--v2-ink-0)',
   fontSize: 13, outline: 'none',
   fontFamily: 'inherit', height: 38,

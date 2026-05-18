@@ -14,7 +14,7 @@
 export default function MonoNumber({ children, size, style = {} }) {
   return (
     <span style={{
-      fontFamily: 'var(--font-mono, "JetBrains Mono", Menlo, monospace)',
+      fontFamily: 'var(--font-mono, inherit)',
       fontVariantNumeric: 'tabular-nums',
       fontSize: size,
       ...style,
