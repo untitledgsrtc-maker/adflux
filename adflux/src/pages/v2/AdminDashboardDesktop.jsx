@@ -116,7 +116,7 @@ export default function AdminDashboardDesktop() {
     // Reps-in-field cards. All counts only (head: true), so cheap.
     const liveCutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString()
 
-    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes, hotLeadsRes, briefLogRes] = await Promise.all([
+    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes, hotLeadsRes, briefLogRes, sourceAttribRes] = await Promise.all([
       // Use `*` to be tolerant of schema drift — earlier we enumerated
       // columns including `ref_number`, and a single missing column
       // would silently return an empty array (not throw), which made
@@ -192,6 +192,18 @@ export default function AdminDashboardDesktop() {
           .gte('created_at', `${todayDate}T00:00:00`)
           .lte('created_at', `${todayDate}T23:59:59`)
       })(),
+      // Phase 47.7 — source attribution. Pull every lead's source +
+      // stage to compute "Cronberry 23% convert vs JustDial 4%" type
+      // breakdown. Filtered to last 90 days so old batches don't
+      // dilute current performance.
+      (async () => {
+        const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+        return supabase.from('leads')
+          .select('source, stage')
+          .not('source', 'is', null)
+          .gte('created_at', cutoff)
+          .limit(20000)
+      })(),
     ])
 
     const allQuotes    = quotesRes.data       || []
@@ -238,6 +250,21 @@ export default function AdminDashboardDesktop() {
       delivered: briefRows.filter(r => r.success).length,
       failed:    briefRows.filter(r => !r.success).length,
     }
+
+    // Phase 47.7 — source attribution: per source count + won-count
+    // + conversion %. Sorted by conversion desc; top 6 surfaced.
+    const sourceAgg = new Map()
+    for (const l of (sourceAttribRes?.data || [])) {
+      const key = (l.source || '').trim() || '—'
+      const row = sourceAgg.get(key) || { source: key, total: 0, won: 0 }
+      row.total += 1
+      if (l.stage === 'Won') row.won += 1
+      sourceAgg.set(key, row)
+    }
+    const sourceAttrib = Array.from(sourceAgg.values())
+      .map(r => ({ ...r, pct: r.total > 0 ? Math.round((r.won / r.total) * 100) : 0 }))
+      .sort((a, b) => b.pct - a.pct || b.total - a.total)
+      .slice(0, 6)
 
     // Apply segment filter to the quote-derived calcs. Private rows
     // historically have segment=null (pre-Phase 4) so 'private' must
@@ -809,6 +836,8 @@ export default function AdminDashboardDesktop() {
       // Phase 41.3
       hotLeads,
       briefStats,
+      // Phase 47.7
+      sourceAttrib,
     })
   }
 
@@ -1099,6 +1128,12 @@ export default function AdminDashboardDesktop() {
                 salesUsers={state.salesUsersForLive}
                 onRetry={() => navigate('/admin/push-debug')}
               />
+            </section>
+
+            {/* Phase 47.7 — source attribution: which lead source
+                is converting best in the last 90 days. */}
+            <section style={{ marginBottom: 16 }}>
+              <SourceAttribCard rows={state.sourceAttrib || []} />
             </section>
 
             {/* Row 2: Revenue trend + Funnel */}
@@ -2156,6 +2191,66 @@ function ForecastBar({ label, value, pct, color }) {
           background: color, borderRadius: 999,
           transition: 'width 240ms ease',
         }} />
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 47.7 — Source attribution card
+   ════════════════════════════════════════════════════════════════════ */
+function SourceAttribCard({ rows = [] }) {
+  if (rows.length === 0) return null
+  const maxTotal = Math.max(1, ...rows.map(r => r.total))
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Source attribution · last 90 days</div>
+          <div className="v2d-panel-s">Which lead source is converting best (Won / total leads).</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {rows.map(r => {
+          const widthPct = Math.round((r.total / maxTotal) * 100)
+          const goodPct  = r.pct >= 15
+          return (
+            <div
+              key={r.source}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '160px 1fr 90px 70px',
+                gap: 10, alignItems: 'center',
+                padding: '8px 12px',
+                background: 'rgba(255,255,255,.02)',
+                border: '1px solid var(--v2-line)',
+                borderRadius: 10,
+              }}
+            >
+              <div style={{ fontSize: 13, color: 'var(--v2-ink-0)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {r.source}
+              </div>
+              <div style={{ height: 8, background: 'rgba(255,255,255,.04)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{
+                  width: `${Math.max(2, widthPct)}%`, height: '100%',
+                  background: goodPct ? 'var(--v2-green, #10B981)' : 'var(--v2-amber, #F59E0B)',
+                  borderRadius: 999,
+                  transition: 'width 220ms ease',
+                }} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textAlign: 'right' }}>
+                {r.won} / {r.total}
+              </div>
+              <div style={{
+                fontFamily: 'var(--v2-display)',
+                fontSize: 14, fontWeight: 700, textAlign: 'right',
+                color: goodPct ? 'var(--v2-green, #10B981)' : 'var(--v2-amber, #F59E0B)',
+              }}>
+                {r.pct}%
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
