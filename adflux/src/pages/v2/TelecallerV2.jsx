@@ -36,6 +36,9 @@ import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import { logCallAudit } from '../../utils/callAudit'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
+// Phase 47.1 — WhatsApp 1-click send.
+import WhatsAppSendModal from '../../components/leads/WhatsAppSendModal'
+import { MessageSquare } from 'lucide-react'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -84,6 +87,9 @@ export default function TelecallerV2() {
   // Phase 43.3 — upcoming callbacks (this rep's open follow_ups due
   // in the next 48 hours, joined to the lead for name + phone).
   const [callbacks, setCallbacks] = useState([])
+  // Phase 47.1 — WhatsApp send modal state.
+  const [waLead, setWaLead] = useState(null)
+  const [waOpen, setWaOpen] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -352,6 +358,18 @@ export default function TelecallerV2() {
                 <Phone size={16} /> Open lead
               </button>
             )}
+            {/* Phase 47.1 — WhatsApp 1-click send. Shown only when
+                phone present. Same row as Call now. */}
+            {nextCall.phone && (
+              <button
+                type="button"
+                className="tc-open-ghost"
+                style={{ background: 'var(--v2-green-soft, rgba(16,185,129,.14))', borderColor: 'var(--v2-green, #10B981)', color: 'var(--v2-green, #10B981)' }}
+                onClick={() => { setWaLead(nextCall); setWaOpen(true) }}
+              >
+                <MessageSquare size={14} /> WhatsApp
+              </button>
+            )}
             <button className="tc-open-ghost" onClick={() => navigate(`/leads/${nextCall.id}`)}>
               Open lead
             </button>
@@ -412,14 +430,32 @@ export default function TelecallerV2() {
                 </div>
                 <Pill tone="warn">{dateLabel}{timeLabel ? ` · ${timeLabel}` : ''}</Pill>
                 {lead.phone && (
-                  <button
-                    type="button"
-                    className="tc-call-cta"
-                    style={{ padding: '6px 12px', fontSize: 12 }}
-                    onClick={() => quickLogCall(lead)}
-                  >
-                    <Phone size={12} /> Call
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="tc-call-cta"
+                      style={{ padding: '6px 12px', fontSize: 12 }}
+                      onClick={() => quickLogCall(lead)}
+                    >
+                      <Phone size={12} /> Call
+                    </button>
+                    {/* Phase 47.1 — WhatsApp send on callback row. */}
+                    <button
+                      type="button"
+                      style={{
+                        padding: '6px 10px', fontSize: 12,
+                        background: 'transparent',
+                        border: '1px solid var(--v2-green, #10B981)',
+                        color: 'var(--v2-green, #10B981)',
+                        borderRadius: 8, cursor: 'pointer',
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        fontFamily: 'inherit',
+                      }}
+                      onClick={() => { setWaLead(lead); setWaOpen(true) }}
+                    >
+                      <MessageSquare size={12} /> WhatsApp
+                    </button>
+                  </>
                 )}
               </div>
             )
@@ -545,6 +581,14 @@ export default function TelecallerV2() {
           // them to the lead detail where the meeting flow lives.
           if (callLead?.id) navigate(`/leads/${callLead.id}`)
         }}
+      />
+
+      {/* Phase 47.1 — WhatsApp 1-click send modal. */}
+      <WhatsAppSendModal
+        open={waOpen}
+        lead={waLead}
+        onClose={() => { setWaOpen(false); setWaLead(null) }}
+        onSent={() => load()}
       />
     </div>
   )
