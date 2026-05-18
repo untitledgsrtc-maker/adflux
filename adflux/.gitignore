@@ -28,6 +28,10 @@ android/app/*.iml
 android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
+# Phase 56d — Firebase project config. Contains API key + project
+# id — keep OFF the repo. Each developer / build machine drops a
+# copy in android/app/ locally; release builds inject via CI.
+android/app/google-services.json
 # Signed APK / keystore — keep keystores OFF the repo always.
 *.apk
 *.aab

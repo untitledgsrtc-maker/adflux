@@ -36,6 +36,7 @@ import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import { startBackgroundGps, stopBackgroundGps } from '../../utils/backgroundGps'
+import { registerNativePush, deregisterNativePush } from '../../utils/nativePush'
 import NativeOnboarding from '../native/NativeOnboarding'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
@@ -259,6 +260,17 @@ export function V2AppShell() {
       console.warn('[v2-shell] bg-gps start failed:', e?.message || e)
     )
     return () => { stopBackgroundGps().catch(() => {}) }
+  }, [profile?.id])
+
+  // Phase 56d — register for FCM on the Android wrapper. Idempotent +
+  // native-only. Web app continues to use the VAPID web push path
+  // above (ensurePushOnLogin). Sign-out clears this device's token.
+  useEffect(() => {
+    if (!profile?.id) return
+    registerNativePush(profile.id).catch((e) =>
+      console.warn('[v2-shell] fcm register failed:', e?.message || e)
+    )
+    return () => { deregisterNativePush().catch(() => {}) }
   }, [profile?.id])
 
   // Phase 1.5 — AI Co-Pilot. Cmd+K (Mac) / Ctrl+K (Win/Linux) opens.
