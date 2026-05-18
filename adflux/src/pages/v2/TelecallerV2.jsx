@@ -223,37 +223,6 @@ export default function TelecallerV2() {
     return () => { cancelled = true }
   }, [])
 
-  // Phase 51 — fetch the latest quote for the current Next Call
-  // lead. Single row, cheapest possible (`limit(1)` ordered desc).
-  // Re-runs when the hero advances to the next lead in the queue.
-  useEffect(() => {
-    let cancelled = false
-    const leadId = sortedQueue[0]?.id
-    if (!leadId) {
-      setLastQuote(null)
-      return
-    }
-    supabase
-      .from('quotes')
-      .select('id, quote_number, ref_number, total_amount, status, media_type, created_at')
-      .eq('lead_id', leadId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return
-        if (error) {
-          // Don't toast — quote backreference is a soft enhancement.
-          // Log only.
-          console.warn('[tc] last quote fetch failed:', error.message)
-          setLastQuote(null)
-          return
-        }
-        setLastQuote(data || null)
-      })
-    return () => { cancelled = true }
-  }, [sortedQueue[0]?.id])
-
   // Phase 51 — quote → detail route. Govt quotes route to
   // /proposal/:id; private + other media to /quotes/:id
   // (per CLAUDE.md §10 routing rules).
@@ -382,6 +351,41 @@ export default function TelecallerV2() {
   }, [leads])
 
   const nextCall = sortedQueue[0] || null
+
+  // Phase 51 — fetch the latest quote for the current Next Call
+  // lead. Single row, cheapest possible (`limit(1)` ordered desc).
+  // Re-runs when the hero advances to the next lead in the queue.
+  // Placed AFTER `nextCall` declaration (was earlier and triggered
+  // TDZ in the minified prod build — Vite hoists const inside the
+  // component body, so the dep array tried to read `sortedQueue`
+  // before its `useMemo` line ran).
+  useEffect(() => {
+    let cancelled = false
+    const leadId = nextCall?.id
+    if (!leadId) {
+      setLastQuote(null)
+      return
+    }
+    supabase
+      .from('quotes')
+      .select('id, quote_number, ref_number, total_amount, status, media_type, created_at')
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          // Don't toast — quote backreference is a soft enhancement.
+          // Log only.
+          console.warn('[tc] last quote fetch failed:', error.message)
+          setLastQuote(null)
+          return
+        }
+        setLastQuote(data || null)
+      })
+    return () => { cancelled = true }
+  }, [nextCall?.id])
 
   // Phase 47.6 — stale leads (no contact 3+ days). Computed
   // client-side from the queue. Surfaces as a banner above the
