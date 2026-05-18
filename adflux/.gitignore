@@ -11,3 +11,25 @@ dist
 # Phase 34.5 — Supabase CLI local cache. Generated per-machine and
 # contains the linked project ref + version pins; never commit.
 supabase/.temp/
+
+# Phase 56 — Capacitor Android build artifacts. The android/ project
+# itself IS committed (so anyone can clone + build); only the
+# generated build outputs + IDE files are excluded.
+android/.gradle/
+android/app/build/
+android/app/release/
+android/app/debug/
+android/build/
+android/captures/
+android/.idea/
+android/local.properties
+android/*.iml
+android/app/*.iml
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+# Signed APK / keystore — keep keystores OFF the repo always.
+*.apk
+*.aab
+*.keystore
+*.jks

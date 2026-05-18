@@ -1,0 +1,26 @@
+{
+  "appId": "in.untitledad.app",
+  "appName": "Untitled OS",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#0F172A",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": true,
+      "androidSpinnerStyle": "large",
+      "spinnerColor": "#FFE600",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "Geolocation": {},
+    "PushNotifications": {}
+  }
+}
