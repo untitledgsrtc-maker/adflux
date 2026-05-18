@@ -109,7 +109,11 @@ export default function AdminDashboardDesktop() {
     // without an extra round-trip.
     const todayDate = todayISO()
 
-    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes] = await Promise.all([
+    // Phase 41.2 — Sprint 2 add: 3 new queries for Action Queue +
+    // Reps-in-field cards. All counts only (head: true), so cheap.
+    const liveCutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+
+    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes] = await Promise.all([
       // Use `*` to be tolerant of schema drift — earlier we enumerated
       // columns including `ref_number`, and a single missing column
       // would silently return an empty array (not throw), which made
@@ -149,6 +153,20 @@ export default function AdminDashboardDesktop() {
         .eq('is_done', true)
         .gte('completed_at', `${todayDate}T00:00:00`)
         .lte('completed_at', `${todayDate}T23:59:59`),
+      // Phase 41.2 — pending leaves count for Action Queue card.
+      supabase.from('leaves').select('id', { count: 'exact', head: true })
+        .eq('status', 'pending'),
+      // Phase 41.2 — pending TA/DA claims count for Action Queue.
+      supabase.from('ta_da_requests').select('id', { count: 'exact', head: true })
+        .eq('status', 'pending'),
+      // Phase 41.2 — Reps in field RIGHT NOW. Distinct users with a
+      // gps_ping in the last 30 minutes. Single SELECT then we de-dupe
+      // client-side (count distinct over time-windowed rows is cheap).
+      supabase.from('gps_pings')
+        .select('user_id, created_at, lat, lng')
+        .gte('created_at', liveCutoffIso)
+        .order('created_at', { ascending: false })
+        .limit(500),
     ])
 
     const allQuotes    = quotesRes.data       || []
@@ -161,6 +179,17 @@ export default function AdminDashboardDesktop() {
     const dailyTargets    = dailyTargetsRes.data || []
     const followupsToday  = followupsDoneTodayRes.data || []
     const settings     = settingsRes.data     || {}
+    // Phase 41.2 — Sprint 2 derived values.
+    const pendingLeavesCount = pendingLeavesRes.count ?? 0
+    const pendingTaCount     = pendingTaRes.count     ?? 0
+    // Reps in field = distinct user_id with a ping in last 30 min.
+    const liveRepsById = new Map()
+    for (const ping of (liveGpsRes.data || [])) {
+      if (!liveRepsById.has(ping.user_id)) liveRepsById.set(ping.user_id, ping)
+    }
+    const liveReps = Array.from(liveRepsById.entries()).map(([user_id, ping]) => ({
+      user_id, lastPing: ping.created_at, lat: ping.lat, lng: ping.lng,
+    }))
 
     // Apply segment filter to the quote-derived calcs. Private rows
     // historically have segment=null (pre-Phase 4) so 'private' must
@@ -447,7 +476,7 @@ export default function AdminDashboardDesktop() {
     }
 
     // Outstanding list (top 8)
-    const outstandingList = quotes
+    const outstandingFull = quotes
       .filter(q => q.status === 'won')
       .map(q => {
         const qPayments = paymentsApr.filter(p => p.quote_id === q.id)
@@ -457,8 +486,21 @@ export default function AdminDashboardDesktop() {
         return { ...q, paid, balance, final }
       })
       .filter(q => !q.final && q.balance > 0)
+    const outstandingList = outstandingFull
       .sort((a, b) => b.balance - a.balance)
       .slice(0, 6)
+
+    // Phase 41.2 — cash forecast aging buckets. Age = days since
+    // updated_at (when quote flipped to 'won'). 3 buckets:
+    // fresh (<30d), waiting (30–60d), stale (60d+).
+    const cashBuckets = { fresh: 0, waiting: 0, stale: 0 }
+    const NOW = Date.now()
+    for (const q of outstandingFull) {
+      const age = Math.max(0, Math.round((NOW - new Date(q.updated_at || q.created_at).getTime()) / (1000 * 60 * 60 * 24)))
+      if (age < 30) cashBuckets.fresh += q.balance
+      else if (age < 60) cashBuckets.waiting += q.balance
+      else cashBuckets.stale += q.balance
+    }
 
     // Active campaigns (won, campaign_end_date >= today) — top 6
     const activeCampaigns = quotes
@@ -698,6 +740,12 @@ export default function AdminDashboardDesktop() {
       // Dashboard spec — Action Queue + Renewal Opportunities
       actionQueue: actionQueueAll,
       renewals: { list: renewalsList, estValue: renewalEstValue },
+      // Phase 41.2 — admin Action Queue + Reps-in-field cards.
+      pendingLeaves: pendingLeavesCount,
+      pendingTa:     pendingTaCount,
+      liveReps,
+      cashBuckets,
+      salesUsersForLive: salesUsers,
     })
   }
 
@@ -995,10 +1043,39 @@ export default function AdminDashboardDesktop() {
               </div>
             </section>
 
-            {/* Phase 41.1 — 2-col KPI row dropped. Outstanding was
-                triplicated (hero + this row + Outstanding panel) and
-                Active Quotes was already covered by Pipeline value +
-                count in hero. */}
+            {/* Phase 41.2 — Segment toggle (was hidden state-only). */}
+            <SegmentToggle value={segmentFilter} onChange={setSegmentFilter} />
+
+            {/* Phase 41.2 — Action queue + Reps in field + Cash
+                forecast. Three glance cards above the panels. */}
+            <section className="v2d-grid-2" style={{ marginBottom: 16 }}>
+              <AdminActionsCard
+                payments={state.pending.length}
+                leaves={state.pendingLeaves}
+                ta={state.pendingTa}
+                onPayments={() => navigate('/pending-approvals')}
+                onLeaves={() => navigate('/people?tab=leaves')}
+                onTa={() => navigate('/people?tab=ta')}
+              />
+              <RepsInFieldCard
+                rows={state.liveReps}
+                salesUsers={state.salesUsersForLive}
+                onOpen={() => navigate('/team-dashboard')}
+              />
+            </section>
+
+            <section style={{ marginBottom: 16 }}>
+              <CashForecastCard
+                outstanding={state.kpi.outstanding}
+                overdueCount={state.kpi.outstandingOver45d}
+                buckets={state.cashBuckets}
+                onChase={() => {
+                  useQuoteStore.getState().resetFilters()
+                  useQuoteStore.getState().setFilters({ status: 'won' })
+                  navigate('/quotes')
+                }}
+              />
+            </section>
 
             {/* Row 2: Revenue trend + Funnel */}
             <section className="v2d-grid-2">
@@ -1749,5 +1826,198 @@ function ActivityPanel({ items, onOpen }) {
         </div>
       ))}
     </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Phase 41.2 — Sprint 2 cards: Segment toggle + Admin Actions
+   queue + Reps-in-field + Cash forecast.
+   ═══════════════════════════════════════════════════════════ */
+
+function SegmentToggle({ value, onChange }) {
+  const opts = [
+    { k: 'all',        label: 'All' },
+    { k: 'private',    label: 'Private' },
+    { k: 'government', label: 'Government' },
+  ]
+  return (
+    <div style={{
+      display: 'inline-flex', gap: 4, padding: 4,
+      background: 'var(--v2-bg-1)', border: '1px solid var(--v2-line)',
+      borderRadius: 999, marginBottom: 16,
+    }}>
+      {opts.map(o => {
+        const on = value === o.k
+        return (
+          <button
+            key={o.k}
+            type="button"
+            onClick={() => onChange(o.k)}
+            style={{
+              padding: '6px 14px', fontSize: 12, fontWeight: 600,
+              border: 'none', borderRadius: 999, cursor: 'pointer',
+              background: on ? 'var(--v2-yellow, #FFE600)' : 'transparent',
+              color:      on ? '#0a0e1a' : 'var(--v2-ink-2)',
+              fontFamily: 'inherit',
+            }}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function AdminActionsCard({ payments, leaves, ta, onPayments, onLeaves, onTa }) {
+  const total = (payments || 0) + (leaves || 0) + (ta || 0)
+  const rows = [
+    { k: 'pay',    label: 'Payments waiting approval',  count: payments, action: onPayments, tone: 'amber' },
+    { k: 'leave',  label: 'Leave requests pending',     count: leaves,   action: onLeaves,   tone: 'blue'  },
+    { k: 'ta',     label: 'TA/DA claims pending',       count: ta,       action: onTa,      tone: 'green' },
+  ]
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Your action queue</div>
+          <div className="v2d-panel-s">{total > 0 ? `${total} item${total > 1 ? 's' : ''} need you today` : 'All clear — nothing waiting'}</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {rows.map(r => (
+          <button
+            key={r.k}
+            type="button"
+            onClick={r.count > 0 ? r.action : undefined}
+            disabled={!(r.count > 0)}
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 14px',
+              background: r.count > 0 ? 'rgba(255,255,255,.02)' : 'transparent',
+              border: '1px solid var(--v2-line)',
+              borderRadius: 10,
+              cursor: r.count > 0 ? 'pointer' : 'default',
+              opacity: r.count > 0 ? 1 : 0.55,
+              fontFamily: 'inherit', textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 13, color: 'var(--v2-ink-1)' }}>{r.label}</span>
+            <span style={{
+              fontFamily: 'var(--font-mono, monospace)',
+              fontSize: 14, fontWeight: 700,
+              color: r.count > 0
+                ? (r.tone === 'amber' ? 'var(--v2-amber, #F59E0B)'
+                 : r.tone === 'blue'  ? 'var(--v2-blue, #3B82F6)'
+                 :                       'var(--v2-green, #10B981)')
+                : 'var(--v2-ink-2)',
+            }}>
+              {r.count || 0}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RepsInFieldCard({ rows = [], salesUsers = [], onOpen }) {
+  const nameById = new Map((salesUsers || []).map(u => [u.id, u.name]))
+  const count = rows.length
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Reps in field right now</div>
+          <div className="v2d-panel-s">GPS ping in last 30 min · live</div>
+        </div>
+        {count > 0 && (
+          <button className="v2d-banner-cta" onClick={onOpen}>Open map</button>
+        )}
+      </div>
+      {count === 0 ? (
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--v2-ink-2)', fontSize: 13 }}>
+          No reps live right now.
+        </div>
+      ) : (
+        <div>
+          <div style={{
+            fontFamily: 'var(--v2-display, Space Grotesk, sans-serif)',
+            fontSize: 30, fontWeight: 700, color: 'var(--v2-green, #10B981)',
+            marginBottom: 8,
+          }}>
+            {count} live
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {rows.slice(0, 12).map(r => (
+              <span key={r.user_id} style={{
+                fontSize: 11, padding: '4px 10px',
+                background: 'rgba(16,185,129,.14)',
+                color: 'var(--v2-green, #10B981)',
+                borderRadius: 999, fontWeight: 600,
+              }}>
+                {nameById.get(r.user_id) || '—'}
+              </span>
+            ))}
+            {rows.length > 12 && (
+              <span style={{ fontSize: 11, color: 'var(--v2-ink-2)', padding: '4px 6px' }}>
+                +{rows.length - 12} more
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CashForecastCard({ outstanding, overdueCount, buckets = {}, onChase }) {
+  const fresh   = Number(buckets.fresh   || 0)
+  const waiting = Number(buckets.waiting || 0)
+  const stale   = Number(buckets.stale   || 0)
+  const total = fresh + waiting + stale
+  function pct(n) { return total > 0 ? Math.round((n / total) * 100) : 0 }
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Cash forecast · outstanding aging</div>
+          <div className="v2d-panel-s">Total owed: <Money value={outstanding} /> {overdueCount > 0 ? `· ${overdueCount} over 45d` : ''}</div>
+        </div>
+        {outstanding > 0 && (
+          <button className="v2d-banner-cta" onClick={onChase}>Chase</button>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <ForecastBar label="Fresh · under 30 days"    value={fresh}   pct={pct(fresh)}   color="var(--v2-green, #10B981)" />
+        <ForecastBar label="Waiting · 30 to 60 days"  value={waiting} pct={pct(waiting)} color="var(--v2-amber, #F59E0B)" />
+        <ForecastBar label="Stale · 60+ days"         value={stale}   pct={pct(stale)}   color="var(--v2-rose, #EF4444)" />
+      </div>
+    </div>
+  )
+}
+
+function ForecastBar({ label, value, pct, color }) {
+  return (
+    <div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 12, marginBottom: 4, color: 'var(--v2-ink-1)',
+      }}>
+        <span>{label}</span>
+        <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>
+          <Money value={value} /> · {pct}%
+        </span>
+      </div>
+      <div style={{
+        height: 8, background: 'rgba(255,255,255,.04)', borderRadius: 999, overflow: 'hidden',
+      }}>
+        <div style={{
+          width: `${Math.max(2, pct)}%`, height: '100%',
+          background: color, borderRadius: 999,
+          transition: 'width 240ms ease',
+        }} />
+      </div>
+    </div>
   )
 }
