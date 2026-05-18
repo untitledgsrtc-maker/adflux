@@ -71,13 +71,20 @@ export default function TelecallerV2() {
   const [pendingActivityId, setPendingActivityId] = useState(null)
   // Phase 43.2 — daily call target for the ring + accountability.
   const [callTarget, setCallTarget] = useState(50)
+  // Phase 43.3 — upcoming callbacks (this rep's open follow_ups due
+  // in the next 48 hours, joined to the lead for name + phone).
+  const [callbacks, setCallbacks] = useState([])
 
   async function load() {
     setLoading(true)
     const today = new Date().toISOString().slice(0, 10)
     const startOfDay = `${today}T00:00:00`
 
-    const [leadsRes, callsRes, connectedRes, qualRes, handoffRes, targetRes] = await Promise.all([
+    // Phase 43.3 — 48 hour cutoff for callback panel.
+    const todayDateISO = new Date().toISOString().slice(0, 10)
+    const in2Days = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+    const [leadsRes, callsRes, connectedRes, qualRes, handoffRes, targetRes, callbacksRes] = await Promise.all([
       supabase
         .from('leads')
         .select('*, assigned:assigned_to(id, name, city)')
@@ -124,6 +131,19 @@ export default function TelecallerV2() {
         .eq('user_id', profile.id)
         .is('effective_to', null)
         .maybeSingle(),
+      // Phase 43.3 — upcoming callbacks (this rep's open follow_ups
+      // due today or tomorrow). Joined to lead for name + phone so
+      // the panel renders without extra round-trips.
+      supabase
+        .from('follow_ups')
+        .select('id, follow_up_date, follow_up_time, notes, lead_id, leads(id, name, phone, company)')
+        .eq('assigned_to', profile.id)
+        .eq('is_done', false)
+        .gte('follow_up_date', todayDateISO)
+        .lte('follow_up_date', in2Days)
+        .order('follow_up_date', { ascending: true })
+        .order('follow_up_time', { ascending: true, nullsFirst: true })
+        .limit(10),
     ])
 
     setLeads(leadsRes.data || [])
@@ -132,6 +152,7 @@ export default function TelecallerV2() {
     setQualifiedToday(qualRes.count || 0)
     setHandoffs(handoffRes.data || [])
     setCallTarget(Number(targetRes?.data?.min_calls) || 50)
+    setCallbacks(callbacksRes?.data || [])
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
@@ -337,6 +358,57 @@ export default function TelecallerV2() {
         <Stat label="Qualified today"   num={qualifiedToday}                meta="handed off to sales" />
         <Stat label="Pending hand-offs" num={handoffs.length}               meta={overdueCount(handoffs)} />
       </div>
+
+      {/* Phase 43.3 — upcoming callbacks panel. Shows the rep's open
+          follow_ups due in the next 48 hours. Each row has a Call
+          button that fires the same quickLogCall chain. Empty when
+          nothing scheduled, so doesn't take space unnecessarily. */}
+      {callbacks.length > 0 && (
+        <div className="lead-card" style={{ marginBottom: 16 }}>
+          <div className="lead-card-head">
+            <div>
+              <div className="lead-card-title">Upcoming callbacks</div>
+              <div className="lead-card-sub">{callbacks.length} scheduled · next 48 hours</div>
+            </div>
+          </div>
+          {callbacks.map((cb) => {
+            const lead = cb.leads || {}
+            const dateLabel = cb.follow_up_date ? formatDate(cb.follow_up_date) : 'today'
+            const timeLabel = cb.follow_up_time ? cb.follow_up_time.slice(0, 5) : ''
+            return (
+              <div
+                key={cb.id}
+                style={{
+                  padding: '12px 18px',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto auto',
+                  gap: 10,
+                  alignItems: 'center',
+                  borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))',
+                }}
+              >
+                <div style={{ minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/leads/${lead.id}`)}>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>{lead.name || '—'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
+                    {lead.company || '—'}{cb.notes ? ` · ${cb.notes.slice(0, 60)}` : ''}
+                  </div>
+                </div>
+                <Pill tone="warn">{dateLabel}{timeLabel ? ` · ${timeLabel}` : ''}</Pill>
+                {lead.phone && (
+                  <button
+                    type="button"
+                    className="tc-call-cta"
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                    onClick={() => quickLogCall(lead)}
+                  >
+                    <Phone size={12} /> Call
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Two-col: hand-offs + queue */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 16, marginTop: 4 }}>
