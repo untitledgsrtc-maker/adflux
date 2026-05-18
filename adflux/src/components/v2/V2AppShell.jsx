@@ -133,6 +133,10 @@ const TELECALLER_NAV = [
   // it). Voice input lives inside lead activity note flow now, not as
   // a standalone surface. /voice route + page kept as deep-link.
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
+  // Phase 52 — TC needs /my-offer for leave + TA/DA + offer letter
+  // (same access sales reps have). Sidebar entry only; mobile stays
+  // at 4 thumb-zone tabs (drawer reaches /my-offer).
+  { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
 
 const MOBILE_NAV_ADMIN = [
