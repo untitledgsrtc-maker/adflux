@@ -36,6 +36,7 @@ import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import { startBackgroundGps, stopBackgroundGps } from '../../utils/backgroundGps'
+import NativeOnboarding from '../native/NativeOnboarding'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -623,6 +624,12 @@ export function V2AppShell() {
 
       {/* Promise-based confirm dialog viewport. */}
       <ConfirmDialogViewport />
+
+      {/* Phase 56f — first-launch native permission walkthrough.
+          Component self-gates on Capacitor.isNativePlatform() +
+          Preferences flag; renders null on web and after the rep
+          has completed (or skipped) onboarding once. */}
+      <NativeOnboarding userId={profile?.id} />
     </div>
   )
 }
