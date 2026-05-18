@@ -9,7 +9,7 @@
 // view any rep.
 
 import { useEffect, useState } from 'react'
-import { Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles } from 'lucide-react'
+import { Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles, CheckCircle2, Circle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -137,6 +137,15 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
   // only create govt quotes; they don't do meetings or own leads.
   // The "log a meeting" prompt was confusing.
   const isAgency = profile?.role === 'agency'
+  // Phase 52b — TC scores against calls, not meetings (paired with
+  // supabase_phase52_score_tc_aware.sql which branches the score
+  // RPC on role). Copy + empty-state CTA swap accordingly. Covers
+  // both regular TC (team_role='telecaller') and TC head
+  // (team_role='sales_manager') — both carry role='telecaller'.
+  const isTelecaller = profile?.role === 'telecaller'
+  const activityNoun     = isTelecaller ? 'call'           : 'meeting'
+  const activityNounPlur = isTelecaller ? 'calls'          : 'meetings'
+  const targetNoun       = isTelecaller ? 'call target'    : 'meeting target'
   // Phase 34Z.36 — 0-working-day guard. monthly_score RPC was
   // returning avg_score_pct=100 when no days had been counted yet
   // (PG AVG() of zero rows → NULL → COALESCE on the RPC side to 100
@@ -163,28 +172,40 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
         <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 14 }}>
           {isAgency
             ? 'Create a govt proposal and mark it won — your commission appears here once payment is recorded.'
-            : `Log a meeting or move a lead through a stage and your score will
-              start building. Sundays, holidays and approved leaves don't count
-              against you.`}
+            : isTelecaller
+              ? `Log a call (or move a lead through a stage) and your score will
+                start building. Sundays, holidays and approved leaves don't count
+                against you.`
+              : `Log a meeting or move a lead through a stage and your score will
+                start building. Sundays, holidays and approved leaves don't count
+                against you.`}
         </div>
         {/* Phase 34Z.58 — give the rep an exact next step. Owner
             reported the empty state with no CTA was confusing. Both
             paths land where the action lives. */}
-        {!isAgency ? (
-          <a
-            href="/work"
-            className="lead-btn lead-btn-primary"
-            style={{ textDecoration: 'none', display: 'inline-flex', gap: 6 }}
-          >
-            Start today on /work
-          </a>
-        ) : (
+        {isAgency ? (
           <a
             href="/quotes/new/government"
             className="lead-btn lead-btn-primary"
             style={{ textDecoration: 'none', display: 'inline-flex', gap: 6 }}
           >
             Start a govt proposal
+          </a>
+        ) : isTelecaller ? (
+          <a
+            href="/telecaller"
+            className="lead-btn lead-btn-primary"
+            style={{ textDecoration: 'none', display: 'inline-flex', gap: 6 }}
+          >
+            Open your call queue
+          </a>
+        ) : (
+          <a
+            href="/work"
+            className="lead-btn lead-btn-primary"
+            style={{ textDecoration: 'none', display: 'inline-flex', gap: 6 }}
+          >
+            Start today on /work
           </a>
         )}
       </div>
@@ -282,27 +303,36 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
               display: 'grid', gridTemplateColumns: 'auto 1fr',
               gap: '4px 10px', fontSize: 12,
             }}>
-              <span style={{ color: hitFifty   ? 'var(--success)' : 'var(--danger)' }}>
-                {hitFifty ? '✓' : '○'} 50% threshold
+              <span style={{ color: hitFifty   ? 'var(--success)' : 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                {hitFifty
+                  ? <CheckCircle2 size={12} strokeWidth={1.6} />
+                  : <Circle size={12} strokeWidth={1.6} />}
+                50% threshold
               </span>
               <span style={{ color: 'var(--text-muted)' }}>
                 {hitFifty ? 'Variable unlocked' : `${remainingToFifty}% to unlock variable salary`}
               </span>
-              <span style={{ color: hitEighty  ? 'var(--success)' : 'var(--warning)' }}>
-                {hitEighty ? '✓' : '○'} 80% target
+              <span style={{ color: hitEighty  ? 'var(--success)' : 'var(--warning)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                {hitEighty
+                  ? <CheckCircle2 size={12} strokeWidth={1.6} />
+                  : <Circle size={12} strokeWidth={1.6} />}
+                80% target
               </span>
               <span style={{ color: 'var(--text-muted)' }}>
                 {hitEighty ? 'Strong month' : `${remainingToEighty}% to hit team target`}
               </span>
-              <span style={{ color: hitHundred ? 'var(--success)' : 'var(--text-muted)' }}>
-                {hitHundred ? '✓' : '○'} 100% max
+              <span style={{ color: hitHundred ? 'var(--success)' : 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                {hitHundred
+                  ? <CheckCircle2 size={12} strokeWidth={1.6} />
+                  : <Circle size={12} strokeWidth={1.6} />}
+                100% max
               </span>
               <span style={{ color: 'var(--text-muted)' }}>
                 {hitHundred ? 'Maxed out' : `${remainingToHundred}% to maximise payout`}
               </span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
-              Score = (meetings done ÷ daily target) × 100, averaged across {days} working day{days !== 1 ? 's' : ''} this month.
+              Score = ({activityNounPlur} done ÷ daily {activityNoun} target) × 100, averaged across {days} working day{days !== 1 ? 's' : ''} this month.
             </div>
           </div>
         )
@@ -318,7 +348,7 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
         fontSize: 12, display: 'flex', alignItems: 'center', gap: 6,
       }}>
         {isLow
-          ? <><AlertTriangle size={13} color="var(--danger)" /> Below 50% — variable salary is zero this month. Hit your meeting target to unlock.</>
+          ? <><AlertTriangle size={13} color="var(--danger)" /> Below 50% — variable salary is zero this month. Hit your {targetNoun} to unlock.</>
           : isGreat
             ? <><TrendingUp size={13} color="var(--success)" /> On track for full variable payout.</>
             : <><TrendingDown size={13} color="var(--warning)" /> Variable scales with your score — hit 100% to maximise.</>}
