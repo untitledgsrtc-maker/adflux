@@ -701,6 +701,60 @@ export default function LeadDetailV2() {
                 }}
               />
               {lead.segment && <SegChip segment={lead.segment} />}
+              {/* Phase 47.5 — DNC + WhatsApp opt-out toggle chips.
+                  Click to flip flag. Solid red when active. */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const next = !lead.do_not_call
+                  const { error } = await supabase
+                    .from('leads')
+                    .update({
+                      do_not_call: next,
+                      dnc_at: next ? new Date().toISOString() : null,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', lead.id)
+                  if (error) toastError(error, 'Could not update DNC flag.')
+                  else setLead(l => ({ ...l, do_not_call: next, dnc_at: next ? new Date().toISOString() : null }))
+                }}
+                title={lead.do_not_call ? 'DNC active — tap to lift' : 'Tap to mark Do Not Call'}
+                style={{
+                  padding: '4px 10px', borderRadius: 999,
+                  fontSize: 11, fontWeight: 700,
+                  border: '1px solid',
+                  background: lead.do_not_call ? 'var(--danger, #EF4444)' : 'transparent',
+                  borderColor: lead.do_not_call ? 'var(--danger, #EF4444)' : 'var(--border)',
+                  color: lead.do_not_call ? '#fff' : 'var(--text-muted)',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                DNC{lead.do_not_call ? ' ON' : ''}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const next = !lead.wa_opt_out
+                  const { error } = await supabase
+                    .from('leads')
+                    .update({ wa_opt_out: next, updated_at: new Date().toISOString() })
+                    .eq('id', lead.id)
+                  if (error) toastError(error, 'Could not update WhatsApp opt-out.')
+                  else setLead(l => ({ ...l, wa_opt_out: next }))
+                }}
+                title={lead.wa_opt_out ? 'WhatsApp opt-out active — tap to lift' : 'Tap to mark WhatsApp opt-out'}
+                style={{
+                  padding: '4px 10px', borderRadius: 999,
+                  fontSize: 11, fontWeight: 700,
+                  border: '1px solid',
+                  background: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'transparent',
+                  borderColor: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'var(--border)',
+                  color: lead.wa_opt_out ? '#0a0e1a' : 'var(--text-muted)',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                WA opt-out{lead.wa_opt_out ? ' ON' : ''}
+              </button>
             </div>
 
             {/* Meta row: source · assigned · telecaller · last contact */}
@@ -1268,7 +1322,7 @@ export default function LeadDetailV2() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <InlineField value={lead.phone} field="phone" leadId={lead.id} type="tel" onSaved={onLeadFieldSaved} />
                   </div>
-                  {cleanPhone(lead.phone) && (
+                  {cleanPhone(lead.phone) && !lead.do_not_call && (
                     <a
                       href={`tel:+${cleanPhone(lead.phone)}`}
                       onClick={() => fireAndForgetLog('call', `Call → ${lead.phone}`)}
@@ -1280,6 +1334,19 @@ export default function LeadDetailV2() {
                     >
                       <Phone size={14} />
                     </a>
+                  )}
+                  {/* Phase 47.5 — DNC blocks the tel: link with a
+                      muted icon + tooltip explaining why. */}
+                  {cleanPhone(lead.phone) && lead.do_not_call && (
+                    <span
+                      title="Do Not Call is ON for this lead. Lift the DNC flag in the hero to enable calling."
+                      style={{
+                        color: 'var(--danger)', opacity: 0.65,
+                        display: 'inline-flex', padding: 4, cursor: 'not-allowed',
+                      }}
+                    >
+                      <Phone size={14} />
+                    </span>
                   )}
                 </div>
               </FieldCell>

@@ -215,11 +215,31 @@ export default function TelecallerV2() {
     }
   }
 
+  // Phase 47.5 — DNC + WhatsApp opt-out enforcement on the TC
+  // surface. Both call and WA buttons disable when the lead is
+  // flagged. Toast explains why instead of silent no-op.
+  function blockedByDNC(lead) {
+    if (lead?.do_not_call) {
+      pushToast(`${lead.name || 'This lead'} is marked Do Not Call. Open the lead to lift the flag.`, 'danger')
+      return true
+    }
+    return false
+  }
+  function blockedByWaOptOut(lead) {
+    if (lead?.wa_opt_out) {
+      pushToast(`${lead.name || 'This lead'} opted out of WhatsApp.`, 'danger')
+      return true
+    }
+    return false
+  }
+
   // Phase 43.1 — quickLogCall mirrors WorkV2:532 chain.
   // tel: link fires immediately on user gesture (iOS Safari requirement),
   // then logCallAudit + lead_activities insert + open modal 1.5s later.
   async function quickLogCall(lead) {
     if (!lead?.id || !profile?.id) return
+    // Phase 47.5 — DNC gate. Block call entirely if flagged.
+    if (blockedByDNC(lead)) return
     const phone = cleanPhone(lead.phone)
     if (!phone) {
       pushToast('No phone on this lead — open the lead and add the mobile number first.', 'danger')
@@ -488,7 +508,7 @@ export default function TelecallerV2() {
                 type="button"
                 className="tc-open-ghost"
                 style={{ background: 'var(--v2-green-soft, rgba(16,185,129,.14))', borderColor: 'var(--v2-green, #10B981)', color: 'var(--v2-green, #10B981)' }}
-                onClick={() => { setWaLead(nextCall); setWaOpen(true) }}
+                onClick={() => { if (blockedByWaOptOut(nextCall)) return; setWaLead(nextCall); setWaOpen(true) }}
               >
                 <MessageSquare size={14} /> WhatsApp
               </button>
@@ -574,7 +594,7 @@ export default function TelecallerV2() {
                         display: 'inline-flex', alignItems: 'center', gap: 4,
                         fontFamily: 'inherit',
                       }}
-                      onClick={() => { setWaLead(lead); setWaOpen(true) }}
+                      onClick={() => { if (blockedByWaOptOut(lead)) return; setWaLead(lead); setWaOpen(true) }}
                     >
                       <MessageSquare size={12} /> WhatsApp
                     </button>
@@ -653,7 +673,7 @@ export default function TelecallerV2() {
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                     fontFamily: 'inherit',
                   }}
-                  onClick={(e) => { e.stopPropagation(); setWaLead(l); setWaOpen(true) }}
+                  onClick={(e) => { e.stopPropagation(); if (blockedByWaOptOut(l)) return; setWaLead(l); setWaOpen(true) }}
                 >
                   <MessageSquare size={12} /> WA
                 </button>
