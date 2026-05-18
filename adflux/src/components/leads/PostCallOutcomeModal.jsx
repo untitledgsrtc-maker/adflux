@@ -253,6 +253,10 @@ export default function PostCallOutcomeModal({
   // Language toggle for the voice mic. 'auto' is the new default
   // (Phase 34Z.49 hardcoded 'gu' which was biasing English/Hindi).
   const [voiceLang, setVoiceLang] = useState('auto')
+  // Phase 47.8 — call language (what language the CUSTOMER spoke).
+  // Distinct from voiceLang above which controls the rep's speech
+  // transcriber. Used for analytics on which language converts best.
+  const [callLanguage, setCallLanguage] = useState('')  // '' = unset
 
   // Reset state every time the modal opens for a fresh call.
   useEffect(() => {
@@ -263,6 +267,7 @@ export default function PostCallOutcomeModal({
       setCustomDate(addDays(null, 3))
       setCustomTime('')
       setVoiceLang('auto')
+      setCallLanguage('')
       dateTouchedRef.current = false
       timeTouchedRef.current = false
       // Phase 45.1 — reset smart-default tracker so each fresh modal
@@ -386,6 +391,21 @@ export default function PostCallOutcomeModal({
       setSaving(false)
       toastError(activityError, 'Could not save call outcome.')
       return
+    }
+
+    // Phase 47.8 — patch most recent call_logs row for this user +
+    // lead in the last 10 minutes with the picked call language.
+    // Fire-and-forget; failure doesn't block save (analytics only).
+    if (callLanguage && profile?.id && lead?.id) {
+      const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      supabase.from('call_logs')
+        .update({ language: callLanguage })
+        .eq('user_id', profile.id)
+        .eq('lead_id', lead.id)
+        .gte('call_at', cutoff)
+        .then(({ error }) => {
+          if (error) console.warn('[call-lang] update failed:', error.message)
+        })
     }
 
     // 2. Stage advancement based on outcome.
@@ -628,6 +648,47 @@ export default function PostCallOutcomeModal({
             <div style={{ fontSize: 10, color: 'var(--text-subtle)', marginTop: 6, lineHeight: 1.4 }}>
               Say outcome + next action — chips fill in automatically.
               Examples: "good, follow up in 3 days" · "meeting tomorrow" · "lost, not interested".
+            </div>
+          </div>
+
+          {/* Phase 47.8 — call language tag (what the CUSTOMER spoke).
+              Optional. Skipping leaves the call_logs row's language
+              column as NULL. Used for analytics only — admin can later
+              see "Hindi calls convert 23%, English 14%". */}
+          <div className="lead-card" style={{ marginBottom: 12 }}>
+            <div className="lead-card-head"><div className="lead-card-title">Call language <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 400 }}>(optional)</span></div></div>
+            <div className="lead-card-pad" style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+              {[
+                { v: '',   label: '— skip —' },
+                { v: 'gu', label: 'Gujarati' },
+                { v: 'hi', label: 'Hindi' },
+                { v: 'en', label: 'English' },
+              ].map(l => {
+                const on = callLanguage === l.v
+                return (
+                  <button
+                    key={l.v}
+                    type="button"
+                    onClick={() => setCallLanguage(l.v)}
+                    disabled={saving}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 999,
+                      border: `1px solid ${on ? 'var(--v2-yellow, var(--accent, #FFE600))' : 'var(--border-strong, var(--v2-line))'}`,
+                      background: on
+                        ? 'var(--accent-soft, rgba(255,230,0,0.14))'
+                        : 'var(--v2-bg-2, var(--surface-2))',
+                      color: on ? 'var(--v2-yellow, var(--accent))' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {l.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
