@@ -21,11 +21,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
-function istTodayISO() {
-  const now = new Date()
-  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
-  return ist.toISOString().slice(0, 10)
-}
+// Phase 47.9 — IST today via shared util.
+import { istTodayISO } from '../../utils/istDate'
 
 function isoMinusDays(iso, days) {
   const d = new Date(iso + 'T00:00:00Z')

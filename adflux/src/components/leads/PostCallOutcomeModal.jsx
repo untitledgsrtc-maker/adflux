@@ -159,25 +159,34 @@ function addDays(baseISO, days) {
 }
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 
-// Phase 45.1 — IST today + now+N hours formatted as HH:MM for the
-// follow_up_time column. Anchored to IST so 18:30 UTC boundary
-// doesn't skew the date / time pair.
+// Phase 47.9 — IST helpers via Intl.DateTimeFormat. Earlier
+// version did `(5.5*60 - getTimezoneOffset())*60000` which only
+// works when device is UTC. On an IST iOS device (offset = -330),
+// the formula added 11h instead of 5.5h. Owner saw "Call back in
+// 2h" at 18:21 IST set date=May 19 + time=01:50 AM (wrong).
+// Intl with timeZone: 'Asia/Kolkata' always returns IST regardless
+// of where the device clock is set.
 function istTodayISO() {
-  const now = new Date()
-  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
-  return ist.toISOString().slice(0, 10)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date())
+  const m = Object.fromEntries(parts.map(p => [p.type, p.value]))
+  return `${m.year}-${m.month}-${m.day}`
 }
-// Phase 45.4 — returns { date, time } both rolled if now+N crosses
-// midnight IST. Previously returned HH:MM only and customDate stayed
-// today → could schedule a follow_up in the past (e.g. 22:30 + 4h =
-// 02:30 same day = stale).
 function istNowPlusHoursDateTime(hours) {
-  const now = new Date()
-  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
-  ist.setUTCHours(ist.getUTCHours() + hours)
+  const future = new Date(Date.now() + hours * 60 * 60 * 1000)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(future)
+  const m = Object.fromEntries(parts.map(p => [p.type, p.value]))
+  // Some Intl impls return '24' for midnight; normalize.
+  const hh = m.hour === '24' ? '00' : m.hour
   return {
-    date: ist.toISOString().slice(0, 10),
-    time: ist.toISOString().slice(11, 16),
+    date: `${m.year}-${m.month}-${m.day}`,
+    time: `${hh}:${m.minute}`,
   }
 }
 
@@ -193,13 +202,11 @@ const OUTCOMES = [
 ]
 
 const NEXT_ACTIONS = [
-  // Phase 45.1 — same-day callback chips. Owner directive: rep needs
-  // "call again in 2 hours" without manually picking custom date +
-  // resetting it to today. days=0 keeps follow_up_date=today; new
-  // `hours` field auto-sets follow_up_time = now + N hours IST.
+  // Phase 45.1 / 47.9 — same-day callback chip. Owner trimmed
+  // "Call back in 4 hours" + "Call back later today" — only
+  // "Call back in 2 hours" remains. days=0 + hours=2 → auto-set
+  // customDate=today (IST) and customTime=now+2h (IST).
   { value: 'call_back_2h',       label: 'Call back in 2 hours', days: 0, hours: 2 },
-  { value: 'call_back_4h',       label: 'Call back in 4 hours', days: 0, hours: 4 },
-  { value: 'call_back_today',    label: 'Call back later today', days: 0, hours: null }, // rep picks time
   { value: 'follow_up_tomorrow', label: 'Follow up tomorrow', days: 1 },
   { value: 'follow_up_3d',       label: 'Follow up in 3 days', days: 3 },
   { value: 'follow_up_7d',       label: 'Follow up next week', days: 7 },

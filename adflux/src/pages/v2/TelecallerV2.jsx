@@ -47,15 +47,8 @@ function cleanPhone(raw) {
   return d.length === 10 ? '91' + d : d
 }
 
-// Phase 43.4 — IST anchor for "today" (callsToday + connectedToday
-// counts) and callback window. `new Date().toISOString()` returns
-// UTC; before 18:30 IST that's yesterday. Same helper as
-// SalaryPayoutModal:30 + IncentivePayoutModal:14.
-function istTodayISO() {
-  const now = new Date()
-  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
-  return ist.toISOString().slice(0, 10)
-}
+// Phase 47.9 — IST today via shared util.
+import { istTodayISO, istTodayPlusDays } from '../../utils/istDate'
 
 const HEAT_RANK = { hot: 0, warm: 1, cold: 2 }
 
@@ -100,15 +93,9 @@ export default function TelecallerV2() {
     const today = istTodayISO()
     const startOfDay = `${today}T00:00:00`
 
-    // Phase 43.3 — 48 hour cutoff for callback panel.
-    // Phase 43.4 — IST anchor.
+    // Phase 47.9 — IST today + today+2d via shared util.
     const todayDateISO = istTodayISO()
-    const in2Days = (() => {
-      const now = new Date()
-      const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
-      ist.setUTCDate(ist.getUTCDate() + 2)
-      return ist.toISOString().slice(0, 10)
-    })()
+    const in2Days = istTodayPlusDays(2)
 
     const [leadsRes, callsRes, connectedRes, qualRes, handoffRes, targetRes, callbacksRes] = await Promise.all([
       supabase

@@ -32,14 +32,9 @@ function fmtINR(n) {
   return '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Number(n)))
 }
 
-function currentMonthYM() {
-  // IST-anchored current month in YYYY-MM for the input[type=month].
-  const now = new Date()
-  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
-  const y = ist.getFullYear()
-  const m = String(ist.getMonth() + 1).padStart(2, '0')
-  return `${y}-${m}`
-}
+// Phase 47.9 — IST current month YYYY-MM via shared util.
+import { istCurrentMonthYM } from '../../utils/istDate'
+function currentMonthYM() { return istCurrentMonthYM() }
 
 // Phase 38 — `embedded` prop suppresses own page-head when mounted
 // inside PeopleV2 (which renders the shared "People" head once). When

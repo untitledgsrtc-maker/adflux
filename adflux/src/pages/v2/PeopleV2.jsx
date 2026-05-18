@@ -36,12 +36,9 @@ import LeavesAdminV2     from './LeavesAdminV2'
 // Phase 39 — TA Claims tab also lives inside People.
 import TaPayoutsAdminV2  from './TaPayoutsAdminV2'
 
-// Phase 38.2 — IST month label for the Salary tab badge.
-function currentMonthLabel() {
-  const now = new Date()
-  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
-  return ist.toLocaleString('en-IN', { month: 'short', year: 'numeric' })
-}
+// Phase 47.9 — IST month label via shared util.
+import { istCurrentMonthLabel } from '../../utils/istDate'
+function currentMonthLabel() { return istCurrentMonthLabel() }
 
 // Phase 39.x — 5 tabs. Incentives kept (owner: "put back we will
 // discuss tomorrow" — single-payout-flow decision parked). All

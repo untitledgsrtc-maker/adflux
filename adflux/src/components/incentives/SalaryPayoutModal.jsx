@@ -24,14 +24,9 @@ import { formatCurrency, formatMonthYear } from '../../utils/formatters'
 import { toastError } from '../v2/Toast'
 import { confirmDialog } from '../v2/ConfirmDialog'
 
-// Phase 39 — IST today (was UTC). `new Date().toISOString()` returns
-// UTC, which from 18:30 onwards already rolled the date forward but
-// before that left it on yesterday in IST. Force IST anchor.
-function istTodayISO() {
-  const now = new Date()
-  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
-  return ist.toISOString().slice(0, 10)
-}
+// Phase 47.9 — IST today via shared util (was inline broken
+// formula that double-applied offset on IST-set devices).
+import { istTodayISO } from '../../utils/istDate'
 
 export function SalaryPayoutModal({ staff, monthYear, computed, onClose, onSaved }) {
   const { profile } = useAuth()
