@@ -267,7 +267,7 @@ After every commit:
 | Branch | Vercel | Supabase | Purpose |
 |---|---|---|---|
 | `main` | adflux-iota.vercel.app | Original AdFlux Supabase | Live production. Real money. Touch only for production fixes. |
-| `untitled-os` | untitled-os-xxxx.vercel.app | New staging Supabase | All consolidation + new module work. |
+| `untitled-os` | **app.untitledad.in** (custom domain, Phase 56 18 May 2026) — also reachable at untitled-os-tau.vercel.app | New staging Supabase | All consolidation + new module work. Canonical URL is the custom domain; vercel.app subdomain redirects. |
 
 Never merge `untitled-os` to `main` until a sprint is genuinely shippable. Production stays running while consolidation happens in parallel.
 
@@ -671,3 +671,144 @@ git push origin untitled-os
 Vercel auto-deploys. No SQL for 34Z.88. Smoke test = open hamburger drawer at `/work` on iPhone, confirm bell + badge sit BEHIND the drawer overlay.
 
 No other emoji exceptions. The five sites flagged in the 2026-05-13 UI audit (`StaffTable.jsx:38 🎉`, `MyPerformance.jsx:188 🎉`, `WonPaymentModal.jsx:157 💰`, `AdminDashboardDesktop.jsx:899/1772 ⚡🎉`, `SalesDashboardDesktop.jsx:523/660 ⚡`) are NOT in this table and must be migrated to Lucide icons during PR 3.
+
+---
+
+## 30 · Telecaller module SHIPPED (Phase 43–49.1, 2026-05-18)
+
+Full-day sprint built the telecaller (TC) module end-to-end. TC =
+inside-sales rep who closes deals via phone (no field meetings) +
+earns same incentive as field sales. Dhara + Rima (existing) +
+Renuka (new TC lead) start using Monday 19 May 2026.
+
+### What shipped (chronological)
+
+| Phase | What | SHA |
+|---|---|---|
+| 43.1 | Bleed-stop: tel-tap audit + PostCallOutcomeModal chain + useAutoRefresh; /voice dropped from TELECALLER_NAV; loading spinner | `583fd38` |
+| 43.2 | Productivity: daily call target ring + connect-rate KPI + auto-advance after modal save | `35b650c` |
+| 43.3 | Upcoming callbacks panel (next 48h open follow_ups) | `b4d9458` |
+| 43.4 | Guardian fixes: IST date anchor + brand-token tints + note column | `4617a6e` |
+| 47.1 | WhatsApp 1-click template send (new `whatsapp_templates` master + WhatsAppSendModal + Master tab) | `6df030b` |
+| 47.2 | Inline call scripts on hero (new `call_scripts` master + Master tab + collapsible panel; segment-matched) | `e24b368` |
+| 47.3 | HeatPicker component + inline on TC hero/queue/LeadDetail + TC top-hot-leads card | `e5d1847` |
+| 47.4 | SQL trigger `trg_lead_auto_heat_from_outcome` (positive→hot, negative→cold; skips Won/Lost) | `53e5c6a` |
+| 47.5 | DNC + WhatsApp opt-out (`leads.do_not_call` + `leads.wa_opt_out` + `dnc_reason` + `dnc_at`) + call/WA button guards | `8823867` |
+| 47.6 | Stale lead alert banner on /telecaller (3+ days no contact, DNC excluded) | `b671580` |
+| 47.7 | Source attribution card on admin /dashboard (last 90 days, conversion per source) | `98c7110` |
+| 47.8 | Call language tag on `call_logs.language` ('gu'/'hi'/'en'); chip in PostCallOutcomeModal | `8b3fb07` |
+| 47.9 | IST helper unified — new `src/utils/istDate.js` via Intl.DateTimeFormat (Asia/Kolkata); 7 sites swapped; "Call back in 4h"/"Call back later today" chips removed | `2fef352` |
+| 49 | 4 TC policies surfaced: 50 calls/day · 30% connect · 5 qualified/week · 0 SLA breaches; `daily_targets.min_connect_pct` + `min_qualified_weekly` | `19a1d33` |
+| 49.1 | Guardian P2 fixes: Unicode arrows → Lucide; UTC bug in close query → istTodayISO; #0a0e1a → var(--accent-fg); borderRadius 8 → 10 (4 sites) | `0be3395` |
+
+### New SQL tables / columns
+
+- `whatsapp_templates` (47.1) — admin CRUD via Master → WhatsApp
+- `call_scripts` (47.2) — admin CRUD via Master → Scripts
+- `lead_activities.outcome` enum widened to add 'callback' (Phase 45.3 from earlier sprint)
+- `leads.do_not_call` boolean + `leads.wa_opt_out` boolean + `leads.dnc_reason` text + `leads.dnc_at` timestamptz (47.5)
+- `call_logs.language` text CHECK ('gu','hi','en') (47.8)
+- `daily_targets.min_connect_pct` int DEFAULT 30 + `daily_targets.min_qualified_weekly` int DEFAULT 5 (49)
+
+### New triggers
+
+- `trg_lead_first_engagement_advance` (Phase 45.2 earlier) — call/meeting/site_visit on 'New' lead → stage='Working'
+- `trg_lead_auto_heat_from_outcome` (47.4) — outcome positive→hot, negative→cold; skips closed leads + neutral/callback
+
+### Frozen file touches this sprint (all guardian-cleared PASS)
+
+| File | What changed | Risk |
+|---|---|---|
+| `src/pages/v2/TelecallerV2.jsx` | New call chain, heat picker, WA button, scripts, callbacks, hot-leads card, IST fix, 4 policy KPIs | None — additive |
+| `src/pages/v2/LeadDetailV2.jsx` | HeatPicker on hero, DNC toggle, WA opt-out toggle, Phone field DNC gate | None — additive |
+| `src/components/leads/PostCallOutcomeModal.jsx` | 'callback' outcome chip, call_back_2h chip, call language picker, IST fix via shared util | Save chain intact |
+| `src/components/leads/LeadShared.jsx` | New HeatPicker component (popover) | New export only |
+| `src/components/v2/V2AppShell.jsx` | /voice dropped from TELECALLER_NAV; MOBILE_NAV_TELECALLER /voice → /quotes | SALES_NAV / AGENCY_NAV / MOBILE_NAV_SALES / ADMIN untouched |
+
+### TC compensation model (parked decision)
+
+Owner clarified: **TC closes deals via phone + earns same incentive
+as sales reps** (not flat salary). compute_monthly_salary RPC still
+applies 70/30 base/variable to TC. No special role gate built —
+existing sales math works.
+
+Open gap: monthly_score formula counts `meeting | call | site_visit`
+equally. For a TC who only does calls, score formula already works
+(calls count). No change needed unless owner wants TC-specific
+weighting later.
+
+### Renuka team-lead view — DEFERRED
+
+Renuka (TC lead) needs a team dashboard to monitor Dhara + Rima:
+- Per-TC call disposition (calls / connected / qualified daily)
+- Connect rate per TC
+- Conversion funnel: calls → connected → qualified → handed-off → won
+- Reassign authority between TCs
+
+Folds into Phase 42.2 sales_manager frontend work — same MANAGER_NAV
++ /people-style scope. Phase 42 DB foundation already shipped (Jubin
++ Renuka inserted, manager_id chain ready, incentive_override_pct
+column ready). Frontend deferred until owner names the priority.
+
+### Frozen contracts protected (re-verified)
+
+Same §28 + §29 + §31 contracts hold:
+- SALES_NAV / AGENCY_NAV / MOBILE_NAV_SALES / MOBILE_NAV_ADMIN byte-identical
+- useAutoRefresh on 6 frozen pages (including TaPayoutsAdminV2)
+- Push enrollment V2AppShell only
+- PostCallOutcomeModal tel:→1.5s→modal save chain intact
+- Lead stages / cadence types / activity_type enums unchanged
+- lead_activities.outcome widened to add 'callback' (additive)
+- No `#facc15`, no new emoji on rep-facing pages
+
+### Foot-guns added this sprint (don't repeat)
+
+- ❌ `(5.5*60 - now.getTimezoneOffset())*60000` IST formula — only works on UTC devices. Use `src/utils/istDate.js` helpers (`istTodayISO`, `istNowPlusHoursDateTime`, `istTodayPlusDays`, `istCurrentMonthYM`, `istCurrentMonthLabel`).
+- ❌ Unicode triangle/check/star characters as icons — Lucide only.
+- ❌ `borderRadius: 8` — off-scale on v2 (10/14/20). Use `var(--v2-r-sm)` (10) or 14.
+- ❌ `#0a0e1a` hardcoded — not a token. Use `var(--accent-fg, #0f172a)`.
+
+### Smoke checklist for Dhara + Rima + Renuka (Monday handoff)
+
+- [ ] Open `/telecaller` → loading spinner, then hero with name + Next Call card
+- [ ] Hero shows `X/50` calls today + connect-rate chip + ring %
+- [ ] KPI strip below hero: 4 tiles with target compare (Calls / Connect / Qualified weekly / SLA breaches)
+- [ ] Tap "Call now" → dialer opens → return to app → modal opens after 1.5s
+- [ ] Modal outcome row has 4 chips: Good · Maybe · Call later · Lost
+- [ ] Modal next-action first chip is "Call back in 2 hours"; date = today IST, time = now+2h IST
+- [ ] Pick outcome "Good" + save → lead heat auto-flips to hot
+- [ ] Tap heat dot on any lead → popover → set to hot → reload → hot leads card shows it
+- [ ] WhatsApp green button on hero → modal opens → pick template → text pre-fills → "Open WhatsApp" → handoff to app
+- [ ] Tap "▾ Script" on hero → collapsible panel shows pitch with `{name}` replaced
+- [ ] Upcoming callbacks panel appears when ≥1 follow_up due in next 48h
+- [ ] Mark lead "DNC ON" → tel: button disabled with tooltip
+- [ ] Mark "WA opt-out ON" → WhatsApp button blocked with toast
+- [ ] Stale lead banner appears if ≥1 lead has no contact 3+ days
+- [ ] `/voice` not in sidebar (deep-link still works)
+- [ ] Admin /dashboard → "Source attribution · last 90 days" card shows conversion per source
+
+### Deferred for next sprint (not blocker)
+
+- Renuka's team-lead dashboard (folds into Phase 42.2)
+- TC incentive engine variation (today: same as sales — owner can override)
+- Power dialer integration (Exotel/Knowlarity) — needs procurement decision
+
+### Commit log (untitled-os branch, this sprint)
+
+```
+0be3395 Phase 49.1: guardian P2 fixes
+19a1d33 Phase 49: 4 TC policies surfaced
+2fef352 Phase 47.9: IST bug fix via Intl + chip trim
+8b3fb07 Phase 47.8: call_logs.language tag
+98c7110 Phase 47.7: source attribution card (admin)
+b671580 Phase 47.6: stale lead alert banner
+8823867 Phase 47.5: DNC + WA opt-out
+53e5c6a Phase 47.4: auto-heat trigger
+e5d1847 Phase 47.3: heat picker + TC hot leads card
+e24b368 Phase 47.2: inline call scripts on hero
+6df030b Phase 47.1: WhatsApp 1-click template send
+4617a6e Phase 43.4: guardian P1+P2 fixes
+b4d9458 Phase 43.3: upcoming callbacks panel
+35b650c Phase 35b650c: productivity layer
+583fd38 Phase 43.1: bleed-stop (call audit + modal + auto-refresh)
+```
