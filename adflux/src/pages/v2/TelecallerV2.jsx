@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Phone, ArrowRight, MapPin, Clock, Plus, Sparkles,
+  Phone, ArrowRight, MapPin, Clock, Plus, Sparkles, Loader2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -30,6 +30,19 @@ import {
   StageChip, HeatDot, SegChip, LeadAvatar, Pill,
 } from '../../components/leads/LeadShared'
 import V2Hero from '../../components/v2/V2Hero'
+// Phase 43.1 — parity with WorkV2 + LeadDetailV2 call chain. Tel-tap
+// audit + post-call outcome capture + auto-refresh.
+import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
+import { logCallAudit } from '../../utils/callAudit'
+import useAutoRefresh from '../../hooks/useAutoRefresh'
+import { pushToast } from '../../components/v2/Toast'
+
+function cleanPhone(raw) {
+  if (!raw) return null
+  const d = String(raw).replace(/\D/g, '')
+  if (d.length < 10) return null
+  return d.length === 10 ? '91' + d : d
+}
 
 const HEAT_RANK = { hot: 0, warm: 1, cold: 2 }
 
@@ -48,27 +61,43 @@ export default function TelecallerV2() {
 
   const [leads, setLeads] = useState([])
   const [callsToday, setCallsToday] = useState(0)
+  const [connectedToday, setConnectedToday] = useState(0)
   const [qualifiedToday, setQualifiedToday] = useState(0)
   const [handoffs, setHandoffs] = useState([])
   const [loading, setLoading] = useState(true)
+  // Phase 43.1 — PostCallOutcomeModal chain state (mirror of WorkV2).
+  const [callLead, setCallLead] = useState(null)
+  const [postCallOpen, setPostCallOpen] = useState(false)
+  const [pendingActivityId, setPendingActivityId] = useState(null)
 
   async function load() {
     setLoading(true)
     const today = new Date().toISOString().slice(0, 10)
     const startOfDay = `${today}T00:00:00`
 
-    const [leadsRes, callsRes, qualRes, handoffRes] = await Promise.all([
+    const [leadsRes, callsRes, connectedRes, qualRes, handoffRes] = await Promise.all([
       supabase
         .from('leads')
         .select('*, assigned:assigned_to(id, name, city)')
         .eq('telecaller_id', profile.id)
-        .not('stage', 'in', '("Won","Lost","SalesReady","QuoteSent","Negotiating","MeetingScheduled")')
+        // Phase 43.1 — dropped stale `SalesReady` filter string (stage
+        // removed in Phase 30A). Active queue = anything not closed
+        // or pending sales handoff.
+        .not('stage', 'in', '("Won","Lost","QuoteSent","Negotiating","MeetingScheduled")')
         .order('created_at', { ascending: false })
         .limit(50),
       supabase
         .from('call_logs')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id)
+        .gte('call_at', startOfDay),
+      // Phase 43.2 prep — connected-rate KPI. Count tel-tap rows that
+      // came back with outcome='connected' (vs no-answer/busy/etc).
+      supabase
+        .from('call_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .eq('outcome', 'connected')
         .gte('call_at', startOfDay),
       supabase
         .from('leads')
@@ -90,11 +119,48 @@ export default function TelecallerV2() {
 
     setLeads(leadsRes.data || [])
     setCallsToday(callsRes.count || 0)
+    setConnectedToday(connectedRes.count || 0)
     setQualifiedToday(qualRes.count || 0)
     setHandoffs(handoffRes.data || [])
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
+  // Phase 43.1 — match sales-frozen contract: auto-refresh queue.
+  useAutoRefresh(load)
+
+  // Phase 43.1 — quickLogCall mirrors WorkV2:532 chain.
+  // tel: link fires immediately on user gesture (iOS Safari requirement),
+  // then logCallAudit + lead_activities insert + open modal 1.5s later.
+  async function quickLogCall(lead) {
+    if (!lead?.id || !profile?.id) return
+    const phone = cleanPhone(lead.phone)
+    if (!phone) {
+      pushToast('No phone on this lead — open the lead and add the mobile number first.', 'danger')
+      return
+    }
+    setCallLead(lead)
+    window.location.href = `tel:+${phone}`
+    logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
+    setTimeout(async () => {
+      const { data: actRow, error: insErr } = await supabase
+        .from('lead_activities')
+        .insert([{
+          lead_id:       lead.id,
+          activity_type: 'call',
+          outcome:       null,
+          notes:         `Call → ${lead.phone}`,
+          created_by:    profile.id,
+        }])
+        .select('id')
+        .single()
+      if (insErr) {
+        pushToast(`Could not log call: ${insErr.message}`, 'danger')
+        return
+      }
+      setPendingActivityId(actRow?.id || null)
+      setTimeout(() => setPostCallOpen(true), 1500)
+    }, 0)
+  }
 
   /* ─── Sort queue by heat (hot first), then oldest contact first ─── */
   const sortedQueue = useMemo(() => {
@@ -115,8 +181,13 @@ export default function TelecallerV2() {
   if (loading) {
     return (
       <div className="lead-root">
-        <div className="lead-card lead-card-pad" style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
-          Loading queue…
+        <div className="lead-card lead-card-pad" style={{
+          textAlign: 'center', padding: 48,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+          color: 'var(--text-muted)',
+        }}>
+          <Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} />
+          <div style={{ fontSize: 13 }}>Loading queue…</div>
         </div>
       </div>
     )
@@ -210,10 +281,19 @@ export default function TelecallerV2() {
             </span>
           </div>
           <div className="tc-hero-actions">
+            {/* Phase 43.1 — was raw tel: link with no audit / outcome
+                capture. Now routes through quickLogCall which fires
+                the dialer + logs call_audit + opens
+                PostCallOutcomeModal 1.5s later (same chain sales
+                reps get via WorkV2). */}
             {nextCall.phone ? (
-              <a href={`tel:${nextCall.phone}`} className="tc-call-cta" style={{ textDecoration: 'none' }}>
+              <button
+                type="button"
+                className="tc-call-cta"
+                onClick={() => quickLogCall(nextCall)}
+              >
                 <Phone size={16} /> Call now
-              </a>
+              </button>
             ) : (
               <button className="tc-call-cta" onClick={() => navigate(`/leads/${nextCall.id}`)}>
                 <Phone size={16} /> Open lead
@@ -336,6 +416,30 @@ export default function TelecallerV2() {
           )}
         </div>
       </div>
+
+      {/* Phase 43.1 — PostCallOutcomeModal chain. Sales reps already
+          get this via WorkV2 + LeadDetailV2; telecaller now gets
+          parity. Save closes the modal + reloads the queue so
+          callsToday + connectedToday refresh inline. */}
+      <PostCallOutcomeModal
+        open={postCallOpen}
+        lead={callLead}
+        pendingActivityId={pendingActivityId}
+        onClose={() => {
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+        }}
+        onSaved={() => {
+          setPostCallOpen(false)
+          setPendingActivityId(null)
+          load()
+        }}
+        onLogMeeting={() => {
+          // Telecaller doesn't run LogMeetingModal directly — route
+          // them to the lead detail where the meeting flow lives.
+          if (callLead?.id) navigate(`/leads/${callLead.id}`)
+        }}
+      />
     </div>
   )
 }

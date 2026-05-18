@@ -129,8 +129,9 @@ const TELECALLER_NAV = [
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
-  // Phase 20 — telecallers benefit even more from voice logging.
-  { to: '/voice',             label: 'Voice Log',      icon: Mic },
+  // Phase 43.1 — /voice dropped per Phase 33N (sales already removed
+  // it). Voice input lives inside lead activity note flow now, not as
+  // a standalone surface. /voice route + page kept as deep-link.
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
 ]
 
@@ -165,7 +166,10 @@ const MOBILE_NAV_TELECALLER = [
   { to: '/work',              label: 'Today',          icon: Sun },
   { to: '/telecaller',        label: 'Queue',          icon: Phone },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
-  { to: '/voice',             label: 'Voice',          icon: Mic },
+  // Phase 43.1 — /voice swap to /quotes (more useful daily for
+  // telecaller who escalates leads). Voice route still works as
+  // deep-link.
+  { to: '/quotes',            label: 'Quotes',         icon: FileText },
 ]
 
 export function V2AppShell() {
