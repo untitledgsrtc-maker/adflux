@@ -135,14 +135,14 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
                       </div>
                     </div>
                   </td>
-                  <td style={monoCell}>{salary ? formatCurrency(salary) : <span style={{ color: 'var(--v2-ink-2)', fontFamily: 'inherit' }}>Not set</span>}</td>
-                  <td style={monoCell}>{target ? formatCurrency(target) : '—'}</td>
-                  <td style={monoCell}>
+                  <td>{salary ? formatCurrency(salary) : <span style={{ color: 'var(--text-muted)' }}>Not set</span>}</td>
+                  <td>{target ? formatCurrency(target) : '—'}</td>
+                  <td>
                     <div style={{ fontSize: 13 }}>
                       {formatCurrency(result.total)}
                     </div>
                     {md && (
-                      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2, fontFamily: 'inherit' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                         New: {formatCurrency(md.new_client_revenue)} / Ren: {formatCurrency(md.renewal_revenue)}
                       </div>
                     )}
@@ -154,11 +154,10 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
                       targetExceeded={result.targetExceeded}
                     />
                   </td>
-                  <td style={monoCell}>
+                  <td>
                     <span style={{
-                      fontFamily: 'var(--font-mono, JetBrains Mono, monospace)',
                       fontWeight: 700,
-                      color: result.incentive > 0 ? 'var(--v2-green, var(--success))' : 'var(--v2-ink-2)',
+                      color: result.incentive > 0 ? 'var(--success)' : 'var(--text-muted)',
                       fontSize: 14,
                     }}>
                       {result.incentive > 0 ? formatCurrency(result.incentive) : '—'}
@@ -186,23 +185,25 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
                     )}
                   </td>
                   <td onClick={e => e.stopPropagation()}>
-                    {/* Phase 40 — mini-chip buttons matching Salary
-                        tab Payout style exactly. */}
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button
+                        className="btn btn-ghost"
+                        style={{ padding: '5px 10px', fontSize: 12 }}
                         onClick={() => onEdit(p)}
                         title="Edit profile"
-                        style={miniGhostStyle}
                       >
-                        <Pencil size={12} /> Edit
+                        <Pencil size={13} style={{ marginRight: 4 }} />
+                        Edit
                       </button>
                       {onPayout && (
                         <button
+                          className="btn btn-ghost"
+                          style={{ padding: '5px 10px', fontSize: 12 }}
                           onClick={() => onPayout(p, result.incentive)}
                           title="Record incentive payout"
-                          style={miniBtnStyle}
                         >
-                          <IndianRupee size={12} /> Payout
+                          <IndianRupee size={13} style={{ marginRight: 4 }} />
+                          Payout
                         </button>
                       )}
                     </div>
@@ -217,20 +218,3 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
   )
 }
 
-// Phase 40 — mono font on currency cells (matches Salary tab tdNum).
-const monoCell = { fontFamily: 'var(--font-mono, JetBrains Mono, monospace)' }
-
-// Phase 40 — mini-chip buttons matching SalaryAdminV2 spec
-// (padding 5/10, 11/700, radius 6, JetBrains Mono fallback safe).
-const miniBtnStyle = {
-  background: 'var(--v2-yellow, #FFE600)', border: 'none',
-  color: '#0a0e1a', padding: '5px 10px', fontSize: 11, fontWeight: 700,
-  borderRadius: 6, cursor: 'pointer', display: 'inline-flex',
-  alignItems: 'center', gap: 4, fontFamily: 'inherit',
-}
-const miniGhostStyle = {
-  ...miniBtnStyle,
-  background: 'transparent',
-  border: '1px solid var(--v2-line, #1f2a44)',
-  color: 'var(--v2-ink-1, #cdd5e2)',
-}

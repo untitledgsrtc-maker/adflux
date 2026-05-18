@@ -503,14 +503,16 @@ export default function SalaryAdminV2({ embedded = false }) {
                         return (
                           <button
                             type="button"
+                            className="btn btn-ghost"
+                            style={{ padding: '5px 10px', fontSize: 12 }}
                             onClick={() => setPayoutTarget({
                               user_id: r.user.id,
                               name: r.user.name,
                               computed: Number(r.net_payable || 0),
                             })}
-                            style={done ? miniGhostStyle : miniBtnStyle}
                           >
-                            <IndianRupee size={12} /> {done ? 'View' : 'Payout'}
+                            <IndianRupee size={13} style={{ marginRight: 4 }} />
+                            {done ? 'View' : 'Payout'}
                           </button>
                         )
                       })()}
@@ -570,32 +572,36 @@ const inputStyle = {
   fontFamily: 'inherit',
   height: 38,
 }
-// Phase 38 — summary card used above the salary table.
+// Phase 41.4 — SummaryCard restyled to MATCH the Incentive page
+// .inc-summary-card spec exactly (owner directive: copy Incentive
+// styling to Salary, not the other way). Surface bg, border-radius
+// 12, label 12px 0.5 letter-spacing, value 22px without display
+// font — identical to .inc-summary-card / .inc-summary-label /
+// .inc-summary-value in incentives.css.
 function SummaryCard({ label, value, sub, valueColor }) {
   return (
     <div style={{
-      background: 'var(--v2-bg-1, #0f1525)',
-      border: '1px solid var(--v2-line, #1f2a44)',
-      borderRadius: 14,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 12,
       padding: '18px 20px',
     }}>
       <div style={{
-        fontSize: 11, color: 'var(--v2-ink-2, #8b95ad)',
-        textTransform: 'uppercase', letterSpacing: '.10em', fontWeight: 600,
+        fontSize: 12, color: 'var(--text-muted)',
+        textTransform: 'uppercase', letterSpacing: '0.5px',
+        margin: '0 0 8px',
       }}>
         {label}
       </div>
       <div style={{
-        fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',
-        fontSize: 26, fontWeight: 700,
-        color: valueColor || 'var(--v2-ink-0, #f1f5f9)',
-        marginTop: 6,
+        fontSize: 22, fontWeight: 700,
+        color: valueColor || 'var(--text)',
       }}>
         {value}
       </div>
       {sub && (
         <div style={{
-          fontSize: 11, color: 'var(--v2-ink-2, #8b95ad)', marginTop: 4,
+          fontSize: 12, color: 'var(--text-muted)', marginTop: 4,
         }}>
           {sub}
         </div>
@@ -604,36 +610,27 @@ function SummaryCard({ label, value, sub, valueColor }) {
   )
 }
 
-// Phase 38.2 — padding bumped 10/14 -> 12/16 (th), 12/14 -> 14/16 (td)
-// to match people_module_mockup.html spec exactly.
-const thStyle = { padding: '12px 16px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em', background: 'rgba(255,255,255,.02)' }
+// Phase 41.4 — th/td padding matches .staff-table spec from
+// incentives.css (owner directive: copy Incentive styling to
+// Salary). th 10/16 + surface2 thead bg + 0.5px letter-spacing,
+// td 13/16 + vertical-align middle, no mono font on currency.
+const thStyle = { padding: '10px 16px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.5px', background: 'var(--surface-2)' }
 const thNum   = { ...thStyle, textAlign: 'right' }
-const tdStyle = { padding: '14px 16px', fontSize: 13, color: 'var(--v2-ink-1)', verticalAlign: 'top' }
-const tdNum   = { ...tdStyle, textAlign: 'right', fontFamily: 'var(--font-mono, monospace)' }
+const tdStyle = { padding: '13px 16px', fontSize: 13, color: 'var(--text)', verticalAlign: 'middle' }
+const tdNum   = { ...tdStyle, textAlign: 'right' }
 
-// Phase 38.2 — toolbar styles matching mockup.
+// Phase 41.4 — toolbar styles use .btn / .btn-y / .btn-ghost class
+// names where possible; remaining inline ones use canonical tokens.
 const filtColStyle = { display: 'flex', flexDirection: 'column', gap: 4 }
 const ghostBtnStyle = {
-  background: 'transparent', border: '1px solid var(--v2-line, #1f2a44)',
-  color: 'var(--v2-ink-1, #cdd5e2)', padding: '0 12px', height: 36,
+  background: 'transparent', border: '1px solid var(--border)',
+  color: 'var(--text)', padding: '0 12px', height: 36,
   borderRadius: 'var(--v2-r-sm, 10px)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
 }
 const ctaBtnStyle = {
-  background: 'var(--v2-yellow, #FFE600)', border: 'none',
-  color: '#0a0e1a', padding: '0 14px', height: 36,
+  background: 'var(--accent, #FFE600)', border: 'none',
+  color: 'var(--accent-fg, #0a0e1a)', padding: '0 14px', height: 36,
   borderRadius: 'var(--v2-r-sm, 10px)', fontWeight: 700, fontSize: 13, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
-}
-const miniBtnStyle = {
-  background: 'var(--v2-yellow, #FFE600)', border: 'none',
-  color: '#0a0e1a', padding: '5px 10px', fontSize: 11, fontWeight: 700,
-  borderRadius: 6, cursor: 'pointer', display: 'inline-flex',
-  alignItems: 'center', gap: 4, fontFamily: 'inherit',
-}
-const miniGhostStyle = {
-  ...miniBtnStyle,
-  background: 'transparent',
-  border: '1px solid var(--v2-line, #1f2a44)',
-  color: 'var(--v2-ink-1, #cdd5e2)',
 }
