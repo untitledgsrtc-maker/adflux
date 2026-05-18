@@ -995,56 +995,10 @@ export default function AdminDashboardDesktop() {
               </div>
             </section>
 
-            {/* KPI row — Revenue and Pipeline value are now in the hero
-                above, so this row is trimmed to the two metrics that
-                *aren't* already covered up there: Active quotes (count)
-                and Outstanding (unpaid won-quote balance). The inline
-                grid override forces 2-up on desktop since the base
-                .v2d-kpi-row rule is repeat(4, 1fr) which would leave
-                two empty gutters with only two children. */}
-            <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-              {/* Phase 31E — Active Quotes now shows total ₹ value and
-                  overdue count under the headline number.
-                  Phase 31F — added "View all" CTA that resets quote
-                  filters and routes to /quotes (the global filter store
-                  was holding stale dashboard slices, so .resetFilters()
-                  before nav). */}
-              <Kpi
-                label="Active quotes"
-                count={state.kpi.activeQuotes}
-                tone="blue"
-                sub={
-                  state.kpi.activeQuotes > 0
-                    ? `${formatCompact(state.kpi.activeValue)} value${state.kpi.activeOverdue > 0 ? ` · ${state.kpi.activeOverdue} overdue 30d+` : ''}`
-                    : 'No active quotes'
-                }
-                dot={state.kpi.activeOverdue > 0}
-                cta={{
-                  label: 'View all',
-                  onClick: () => {
-                    useQuoteStore.getState().resetFilters()
-                    navigate('/quotes')
-                  },
-                }}
-              />
-              {/* Phase 31F — Outstanding gets a "Chase" CTA that filters
-                  /quotes to status='won' (i.e. won-but-not-fully-paid
-                  is what Outstanding represents). */}
-              <Kpi
-                label="Outstanding"
-                value={state.kpi.outstanding}
-                tone="rose"
-                dot={state.kpi.outstanding > 0}
-                cta={state.kpi.outstanding > 0 ? {
-                  label: 'Chase',
-                  onClick: () => {
-                    useQuoteStore.getState().resetFilters()
-                    useQuoteStore.getState().setFilters({ status: 'won' })
-                    navigate('/quotes')
-                  },
-                } : undefined}
-              />
-            </section>
+            {/* Phase 41.1 — 2-col KPI row dropped. Outstanding was
+                triplicated (hero + this row + Outstanding panel) and
+                Active Quotes was already covered by Pipeline value +
+                count in hero. */}
 
             {/* Row 2: Revenue trend + Funnel */}
             <section className="v2d-grid-2">
@@ -1110,22 +1064,15 @@ export default function AdminDashboardDesktop() {
               </section>
             )}
 
-            {/* M1 — Per-rep daily activity strip. One row per sales
-                user with today's quote count + follow-ups + payments
-                + stale-quote count, each with a "missed" indicator
-                when below target. Reps who missed today bubble to the
-                top via the load() sort. */}
-            {state.repActivity && state.repActivity.length > 0 && (
-              <RepActivityPanel rows={state.repActivity} />
-            )}
+            {/* Phase 41.1 — RepActivityPanel dropped (folded into
+                TeamActivityPanel above). Recent activity feed
+                (ActivityPanel) dropped — audit trail moves to a
+                separate /audit-log page if needed; not daily-glance
+                material. */}
 
             {/* Row 5: Active campaigns — horizontal grid of cards needs
                 the full row width to lay out without wrapping awkwardly. */}
             <ActiveCampaignsPanel rows={state.activeCampaigns} onOpen={(row) => openQuote(row)} />
-
-            {/* Row 6: Recent activity — vertical event feed, full width
-                so timestamps + descriptions don't truncate. */}
-            <ActivityPanel items={state.activity} onOpen={(item) => openQuote(item)} />
 
             <div className="v2d-foot">
               v2 · admin · {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
