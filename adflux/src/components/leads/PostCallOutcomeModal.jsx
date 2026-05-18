@@ -28,6 +28,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
 import { toastError, toastSuccess } from '../v2/Toast'
+// Phase 56c — auto-fetch real call duration from Android CallLog
+// after the modal save. No-op on web.
+import { fetchAndPatchCallDuration } from '../../utils/callLogReader'
 
 // Phase 34Z.53 — client-side intent parser. When the rep speaks
 // (Whisper transcript appended to the notes field), scan for outcome
@@ -426,6 +429,25 @@ export default function PostCallOutcomeModal({
           .then(({ error }) => {
             if (error) console.warn('[call-log-patch] update failed:', error.message)
           })
+      }
+
+      // Phase 56c — Android wrapper only. Ask the native CallLog
+      // reader for the real call duration (system call log holds
+      // duration in seconds) and patch our row. Fire-and-forget
+      // so the modal save UX doesn't wait for it. On web this
+      // call returns null instantly.
+      if (lead.phone) {
+        // Pass the modal-save moment as telTapMs; callLogReader
+        // applies its own 60-min lookback. Avoids compound
+        // subtraction (guardian P3, 18 May 2026).
+        fetchAndPatchCallDuration({
+          userId:   profile.id,
+          leadId:   lead.id,
+          phone:    lead.phone,
+          telTapMs: Date.now(),
+        }).then((dur) => {
+          if (dur != null) console.info('[call-log] patched duration', dur, 's')
+        }).catch(() => { /* swallowed; permission deny is normal */ })
       }
     }
 
