@@ -12,6 +12,7 @@
     "cap:run:android": "npm run build && npx cap sync android && npx cap run android"
   },
   "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.26",
     "@capacitor/android": "^8.3.4",
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.3.4",

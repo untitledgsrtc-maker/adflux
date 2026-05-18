@@ -35,6 +35,7 @@ import { ToastViewport, pushToast } from './Toast'
 import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
+import { startBackgroundGps, stopBackgroundGps } from '../../utils/backgroundGps'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
@@ -243,6 +244,20 @@ export function V2AppShell() {
       }
     }).catch(() => { if (!cancelled) setPushStatus('error') })
     return () => { cancelled = true }
+  }, [profile?.id])
+
+  // Phase 56b — start background GPS watcher when running inside the
+  // Capacitor Android wrapper. Idempotent + native-only. Web app
+  // continues to use WorkV2's foreground logGpsPing path. Owner ask
+  // (18 May 2026): "main point is i want map route accurate with
+  // runs" — denser pings = polyline that follows roads instead of
+  // straight-line jumps between sparse points.
+  useEffect(() => {
+    if (!profile?.id) return
+    startBackgroundGps(profile.id).catch((e) =>
+      console.warn('[v2-shell] bg-gps start failed:', e?.message || e)
+    )
+    return () => { stopBackgroundGps().catch(() => {}) }
   }, [profile?.id])
 
   // Phase 1.5 — AI Co-Pilot. Cmd+K (Mac) / Ctrl+K (Win/Linux) opens.
