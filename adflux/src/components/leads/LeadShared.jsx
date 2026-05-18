@@ -24,6 +24,7 @@
 // `.display`/`h1-h3`, JetBrains Mono on `.mono`/`.num`), wrap the page
 // content in <div className="lead-root">.
 
+import { useState } from 'react'
 import { initials as initialsHelper } from '../../utils/formatters'
 // Phase 31R (10 May 2026) — owner audit caught a load-bearing bug:
 // this file had its own duplicate STAGE_LABELS / STAGE_GROUPS /
@@ -62,6 +63,92 @@ export function StageChip({ stage, sm = false, slaBreached = false }) {
 export function HeatDot({ heat }) {
   const h = heat || 'cold'
   return <span className={`heat-dot heat-${h}`} title={h} />
+}
+
+/* ─── Phase 47.3 — Heat picker chip ────────────────────────────────
+   Click the dot → small popover with 3 options (hot/warm/cold).
+   Pick → fires onChange(value). Use everywhere a rep wants to
+   quick-set heat without opening the full lead edit form.
+   Optional `compact` prop drops the label text (dot only). */
+export function HeatPicker({ value, onChange, compact = false, disabled = false }) {
+  const [open, setOpen] = useState(false)
+  const h = value || 'cold'
+  const opts = [
+    { v: 'hot',  label: 'Hot',  color: 'var(--v2-rose, #EF4444)' },
+    { v: 'warm', label: 'Warm', color: 'var(--v2-amber, #F59E0B)' },
+    { v: 'cold', label: 'Cold', color: 'var(--v2-blue, #3B82F6)' },
+  ]
+  return (
+    <span style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
+        title={`Heat: ${h}${disabled ? '' : ' — tap to change'}`}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: compact ? '2px 6px' : '4px 10px',
+          background: 'transparent',
+          border: '1px solid var(--v2-line, var(--border))',
+          borderRadius: 999,
+          color: 'var(--v2-ink-1, var(--text))',
+          fontSize: compact ? 10 : 11,
+          fontWeight: 600,
+          cursor: disabled ? 'default' : 'pointer',
+          fontFamily: 'inherit',
+        }}
+      >
+        <HeatDot heat={h} />
+        {!compact && <span style={{ textTransform: 'capitalize' }}>{h}</span>}
+      </button>
+      {open && (
+        <>
+          {/* Backdrop to close on outside-click. */}
+          <div
+            onClick={(e) => { e.stopPropagation(); setOpen(false) }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 100, background: 'transparent',
+            }}
+          />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0,
+            zIndex: 101,
+            display: 'flex', flexDirection: 'column', gap: 2,
+            padding: 4, minWidth: 110,
+            background: 'var(--v2-bg-2, var(--surface))',
+            border: '1px solid var(--v2-line, var(--border))',
+            borderRadius: 8,
+            boxShadow: '0 6px 18px rgba(0,0,0,.35)',
+          }}>
+            {opts.map(o => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpen(false)
+                  if (o.v !== h) onChange?.(o.v)
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 10px',
+                  background: o.v === h ? 'rgba(255,255,255,.05)' : 'transparent',
+                  border: 'none', borderRadius: 6,
+                  color: o.color,
+                  fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', textAlign: 'left',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <HeatDot heat={o.v} />
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </span>
+  )
 }
 
 /* ─── Segment chip ──────────────────────────────────────────────────

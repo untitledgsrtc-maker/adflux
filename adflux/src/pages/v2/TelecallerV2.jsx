@@ -27,7 +27,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { formatDate, formatRelative } from '../../utils/formatters'
 import {
-  StageChip, HeatDot, SegChip, LeadAvatar, Pill,
+  StageChip, HeatDot, HeatPicker, SegChip, LeadAvatar, Pill,
 } from '../../components/leads/LeadShared'
 import V2Hero from '../../components/v2/V2Hero'
 // Phase 43.1 — parity with WorkV2 + LeadDetailV2 call chain. Tel-tap
@@ -198,6 +198,23 @@ export default function TelecallerV2() {
     return () => { cancelled = true }
   }, [])
 
+  // Phase 47.3 — quick-set heat on any lead without leaving the
+  // TC page. Optimistic local update + DB write.
+  async function updateLeadHeat(leadId, newHeat) {
+    if (!leadId) return
+    // Optimistic update to the rendered queue so the chip flips
+    // before the network round-trip.
+    setLeads(curr => curr.map(l => l.id === leadId ? { ...l, heat: newHeat } : l))
+    const { error } = await supabase
+      .from('leads')
+      .update({ heat: newHeat, updated_at: new Date().toISOString() })
+      .eq('id', leadId)
+    if (error) {
+      pushToast(`Could not update heat: ${error.message}`, 'danger')
+      load()  // rollback to server truth
+    }
+  }
+
   // Phase 43.1 — quickLogCall mirrors WorkV2:532 chain.
   // tel: link fires immediately on user gesture (iOS Safari requirement),
   // then logCallAudit + lead_activities insert + open modal 1.5s later.
@@ -247,6 +264,20 @@ export default function TelecallerV2() {
   }, [leads])
 
   const nextCall = sortedQueue[0] || null
+
+  // Phase 47.3 — top hot leads for this TC. Same source as the
+  // queue but filtered to heat='hot' + sorted by last-touch
+  // oldest-first. Surfaces "must-call NOW" leads above everything.
+  const hotLeads = useMemo(() => {
+    return leads
+      .filter(l => l.heat === 'hot')
+      .sort((a, b) => {
+        const la = a.last_contact_at ? new Date(a.last_contact_at).getTime() : 0
+        const lb = b.last_contact_at ? new Date(b.last_contact_at).getTime() : 0
+        return la - lb
+      })
+      .slice(0, 3)
+  }, [leads])
 
   // Phase 47.2 — pick best-match script for the current lead.
   // 1. segment-specific script first
@@ -369,6 +400,14 @@ export default function TelecallerV2() {
             </div>
             <div style={{ marginLeft: 'auto' }}>
               <StageChip stage={nextCall.stage} />
+              {/* Phase 47.3 — quick heat picker on hero. Tap to
+                  open popover, pick → DB updated optimistically. */}
+              <span style={{ marginLeft: 6 }}>
+                <HeatPicker
+                  value={nextCall.heat}
+                  onChange={(v) => updateLeadHeat(nextCall.id, v)}
+                />
+              </span>
             </div>
           </div>
           <div className="tc-hero-meta">
@@ -547,6 +586,83 @@ export default function TelecallerV2() {
         </div>
       )}
 
+      {/* Phase 47.3 — Top hot leads card. Renders only when there's
+          at least one hot-marked lead in this rep's queue. Rep gets
+          a 1-line "must-call" surface above the broader queue. */}
+      {hotLeads.length > 0 && (
+        <div className="lead-card" style={{ marginBottom: 16 }}>
+          <div className="lead-card-head">
+            <div>
+              <div className="lead-card-title">Top hot leads</div>
+              <div className="lead-card-sub">
+                {hotLeads.length} hot · sorted by oldest contact first
+              </div>
+            </div>
+          </div>
+          {hotLeads.map((l, i) => (
+            <div
+              key={l.id}
+              onClick={() => navigate(`/leads/${l.id}`)}
+              style={{
+                padding: '12px 18px',
+                display: 'grid',
+                gridTemplateColumns: 'auto 1fr auto auto auto',
+                gap: 10,
+                alignItems: 'center',
+                borderBottom: i < hotLeads.length - 1
+                  ? '1px solid var(--border-soft, rgba(255,255,255,.06))'
+                  : 0,
+                cursor: 'pointer',
+              }}
+            >
+              <HeatDot heat="hot" />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{l.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
+                  {l.company || '—'} · {l.last_contact_at
+                    ? `${formatRelative(l.last_contact_at)} since last touch`
+                    : 'never contacted'}
+                </div>
+              </div>
+              <span onClick={(e) => e.stopPropagation()}>
+                <HeatPicker
+                  value={l.heat}
+                  onChange={(v) => updateLeadHeat(l.id, v)}
+                  compact
+                />
+              </span>
+              {l.phone && (
+                <button
+                  type="button"
+                  className="tc-call-cta"
+                  style={{ padding: '6px 12px', fontSize: 12 }}
+                  onClick={(e) => { e.stopPropagation(); quickLogCall(l) }}
+                >
+                  <Phone size={12} /> Call
+                </button>
+              )}
+              {l.phone && (
+                <button
+                  type="button"
+                  style={{
+                    padding: '6px 10px', fontSize: 12,
+                    background: 'transparent',
+                    border: '1px solid var(--v2-green, #10B981)',
+                    color: 'var(--v2-green, #10B981)',
+                    borderRadius: 8, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    fontFamily: 'inherit',
+                  }}
+                  onClick={(e) => { e.stopPropagation(); setWaLead(l); setWaOpen(true) }}
+                >
+                  <MessageSquare size={12} /> WA
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Two-col: hand-offs + queue */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 16, marginTop: 4 }}>
         {/* Pending hand-offs */}
@@ -624,7 +740,9 @@ export default function TelecallerV2() {
                 style={{
                   padding: '10px 18px',
                   display: 'grid',
-                  gridTemplateColumns: '10px 1fr auto',
+                  // Phase 47.3 — added heat-picker column on the right
+                  // before StageChip. 28px slot for the chip.
+                  gridTemplateColumns: 'auto 1fr auto auto',
                   gap: 10,
                   alignItems: 'center',
                   borderBottom: i < Math.min(sortedQueue.length, 12) - 1 ? '1px solid var(--border-soft, rgba(255,255,255,.06))' : 0,
@@ -636,6 +754,14 @@ export default function TelecallerV2() {
                   <div style={{ fontWeight: 500, fontSize: 13 }}>{l.name}</div>
                   <div className="mono" style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{l.phone || '—'}</div>
                 </div>
+                {/* Phase 47.3 — quick heat picker per queue row. */}
+                <span onClick={(e) => e.stopPropagation()}>
+                  <HeatPicker
+                    value={l.heat}
+                    onChange={(v) => updateLeadHeat(l.id, v)}
+                    compact
+                  />
+                </span>
                 <StageChip stage={l.stage} sm />
               </div>
             ))

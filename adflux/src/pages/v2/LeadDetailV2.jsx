@@ -39,7 +39,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency, formatDate, formatRelative } from '../../utils/formatters'
 import {
-  StageChip, HeatDot, SegChip, LeadAvatar, OutcomeChip, Pill,
+  StageChip, HeatDot, HeatPicker, SegChip, LeadAvatar, OutcomeChip, Pill,
 } from '../../components/leads/LeadShared'
 import { StageAgeChip } from '../../components/leads/StageAgeChip'
 import LogActivityModal from '../../components/leads/LogActivityModal'
@@ -683,12 +683,23 @@ export default function LeadDetailV2() {
                 }}>Change</span>
                 <ChevronDown size={11} style={{ color: 'var(--text-muted)' }} />
               </button>
-              {lead.heat && (
-                <span className="lead-hero-heat">
-                  <HeatDot heat={lead.heat} />
-                  <span className="lead-hero-heat-label">{heatLabel}</span>
-                </span>
-              )}
+              {/* Phase 47.3 — inline heat picker. Click chip → popover
+                  with hot/warm/cold → save. Replaces the read-only
+                  HeatDot + label combo. */}
+              <HeatPicker
+                value={lead.heat}
+                onChange={async (v) => {
+                  const { error } = await supabase
+                    .from('leads')
+                    .update({ heat: v, updated_at: new Date().toISOString() })
+                    .eq('id', lead.id)
+                  if (error) {
+                    toastError(error, 'Could not update heat.')
+                  } else {
+                    setLead(l => ({ ...l, heat: v }))
+                  }
+                }}
+              />
               {lead.segment && <SegChip segment={lead.segment} />}
             </div>
 
