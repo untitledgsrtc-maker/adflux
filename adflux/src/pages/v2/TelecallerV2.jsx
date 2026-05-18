@@ -90,6 +90,9 @@ export default function TelecallerV2() {
   // Phase 47.1 — WhatsApp send modal state.
   const [waLead, setWaLead] = useState(null)
   const [waOpen, setWaOpen] = useState(false)
+  // Phase 47.2 — call scripts master + collapsible script panel.
+  const [scripts, setScripts] = useState([])
+  const [scriptOpen, setScriptOpen] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -182,6 +185,19 @@ export default function TelecallerV2() {
   // Phase 43.1 — match sales-frozen contract: auto-refresh queue.
   useAutoRefresh(load)
 
+  // Phase 47.2 — fetch active call scripts once. Cheap; admin
+  // edits don't fire often. Frontend picks the best-match script
+  // per lead based on segment.
+  useEffect(() => {
+    let cancelled = false
+    supabase.from('call_scripts')
+      .select('id, name, body, segment, display_order')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .then(({ data }) => { if (!cancelled) setScripts(data || []) })
+    return () => { cancelled = true }
+  }, [])
+
   // Phase 43.1 — quickLogCall mirrors WorkV2:532 chain.
   // tel: link fires immediately on user gesture (iOS Safari requirement),
   // then logCallAudit + lead_activities insert + open modal 1.5s later.
@@ -231,6 +247,31 @@ export default function TelecallerV2() {
   }, [leads])
 
   const nextCall = sortedQueue[0] || null
+
+  // Phase 47.2 — pick best-match script for the current lead.
+  // 1. segment-specific script first
+  // 2. fall back to NULL-segment generic
+  const activeScript = useMemo(() => {
+    if (!nextCall) return null
+    const seg = nextCall.segment || 'PRIVATE'
+    return (
+      scripts.find(s => s.segment === seg) ||
+      scripts.find(s => !s.segment) ||
+      null
+    )
+  }, [nextCall, scripts])
+
+  // Phase 47.2 — render placeholders with lead + rep context.
+  function renderScript(body) {
+    if (!body || !nextCall) return ''
+    return body
+      .replaceAll('{name}',         nextCall.name || '')
+      .replaceAll('{company}',      nextCall.company || nextCall.name || '')
+      .replaceAll('{phone}',        nextCall.phone || '')
+      .replaceAll('{city}',         nextCall.city || '')
+      .replaceAll('{rep_name}',     profile?.name || '')
+      .replaceAll('{company_name}', 'Untitled Advertising')
+  }
 
   if (loading) {
     return (
@@ -339,6 +380,49 @@ export default function TelecallerV2() {
               {nextCall.last_contact_at ? `${formatRelative(nextCall.last_contact_at)} since last touch` : 'never contacted'}
             </span>
           </div>
+          {/* Phase 47.2 — collapsible call script. Renders only when
+              a matching script exists. Default collapsed; rep taps
+              "Show script" to expand. Script body shown in a fixed-
+              width box that scrolls if long, with newlines preserved
+              via whiteSpace: pre-wrap. Placeholders rendered with
+              current lead context. */}
+          {activeScript && (
+            <div style={{
+              marginTop: 10, marginBottom: 4,
+              borderTop: '1px solid rgba(255,255,255,.08)',
+              paddingTop: 10,
+            }}>
+              <button
+                type="button"
+                onClick={() => setScriptOpen(v => !v)}
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: 'var(--v2-yellow, #FFE600)',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  padding: 0, fontFamily: 'inherit',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {scriptOpen ? '▾' : '▸'} Script · {activeScript.name}
+              </button>
+              {scriptOpen && (
+                <div style={{
+                  marginTop: 8,
+                  padding: '12px 14px',
+                  background: 'rgba(255,255,255,.05)',
+                  border: '1px solid rgba(255,255,255,.08)',
+                  borderRadius: 10,
+                  fontSize: 13, lineHeight: 1.55,
+                  color: 'var(--v2-ink-1, var(--text))',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: 260, overflowY: 'auto',
+                }}>
+                  {renderScript(activeScript.body)}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="tc-hero-actions">
             {/* Phase 43.1 — was raw tel: link with no audit / outcome
                 capture. Now routes through quickLogCall which fires

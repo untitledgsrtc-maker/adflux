@@ -43,6 +43,9 @@ const TABS = [
   // Phase 47.1 — TC 1-click WhatsApp send templates (different
   // from Messages above which is stage-driven; these are rep-picked).
   { key: 'wa_templates', label: 'WhatsApp', icon: MessageCircle },
+  // Phase 47.2 — call scripts shown on TC Next Call hero.
+  // Segment-specific (Private / Government / generic fallback).
+  { key: 'call_scripts', label: 'Scripts', icon: MessageCircle },
   // Phase 33E — performance score + variable salary (70/30 split).
   { key: 'performance', label: 'Performance', icon: TrendingUp },
   { key: 'documents',   label: 'Documents',   icon: FileText },
@@ -124,6 +127,7 @@ export default function MasterV2() {
       {activeTab === 'media_types' && <MediaTypesTab />}
       {activeTab === 'templates'   && <MessageTemplatesTab />}
       {activeTab === 'wa_templates' && <WhatsAppTemplatesTab />}
+      {activeTab === 'call_scripts' && <CallScriptsTab />}
       {activeTab === 'performance' && <PerformanceTab />}
       {activeTab === 'documents'   && <DocumentsTab />}
 
@@ -2693,6 +2697,201 @@ function WhatsAppTemplatesTab() {
               defaultValue={r.body}
               onBlur={e => e.target.value !== r.body && saveField(r, 'body', e.target.value)}
               rows={3}
+              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, lineHeight: 1.5, fontFamily: 'inherit', resize: 'vertical' }}
+            />
+            {status[r.id] && (
+              <div style={{ fontSize: 11, marginTop: 4, color: status[r.id] === 'saved' ? 'var(--success)' : 'var(--danger)' }}>
+                {savingId === r.id ? 'Saving…' : status[r.id]}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 47.2 — Call scripts (TC Next Call hero panel + sales)
+   ════════════════════════════════════════════════════════════════════ */
+function CallScriptsTab() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState(null)
+  const [status, setStatus] = useState({})
+  const [newName, setNewName] = useState('')
+  const [newSegment, setNewSegment] = useState('')   // '' = any
+  const [newBody, setNewBody] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('call_scripts')
+      .select('*')
+      .order('display_order', { ascending: true })
+    setRows(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  async function saveField(row, field, value) {
+    setSavingId(row.id)
+    const { error } = await supabase
+      .from('call_scripts')
+      .update({ [field]: value })
+      .eq('id', row.id)
+    setSavingId(null)
+    setStatus(s => ({ ...s, [row.id]: error ? error.message : 'saved' }))
+    setTimeout(() => setStatus(s => ({ ...s, [row.id]: '' })), 1800)
+    if (!error) load()
+  }
+
+  async function toggleActive(row) {
+    await supabase.from('call_scripts')
+      .update({ is_active: !row.is_active })
+      .eq('id', row.id)
+    load()
+  }
+
+  async function remove(row) {
+    if (!window.confirm(`Delete script "${row.name}"?`)) return
+    await supabase.from('call_scripts').delete().eq('id', row.id)
+    load()
+  }
+
+  async function add() {
+    if (!newName.trim() || !newBody.trim()) return
+    setAdding(true)
+    const maxOrder = rows.reduce((m, r) => Math.max(m, r.display_order || 0), 0)
+    const { error } = await supabase
+      .from('call_scripts')
+      .insert([{
+        name: newName.trim(),
+        body: newBody.trim(),
+        segment: newSegment || null,
+        display_order: maxOrder + 10,
+      }])
+    setAdding(false)
+    if (!error) {
+      setNewName(''); setNewBody(''); setNewSegment('')
+      load()
+    }
+  }
+
+  if (loading) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>Loading…</div>
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 18 }}>
+      <div style={{ marginBottom: 16 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: 16, color: 'var(--text)' }}>Call Scripts</h3>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+          Shown to TC on Next Call hero. Matches lead by segment (Private/Government); falls back to generic (no segment). Placeholders: <code>{'{name} {company} {phone} {city} {rep_name} {company_name}'}</code>
+        </p>
+      </div>
+
+      {/* Add form */}
+      <div style={{
+        background: 'var(--surface-2, var(--bg))',
+        border: '1px solid var(--border)',
+        borderRadius: 10, padding: 14, marginBottom: 16,
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 2fr auto', gap: 10, alignItems: 'end' }}>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Name</label>
+            <input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="e.g. Govt — intro pitch"
+              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, marginTop: 4 }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Segment</label>
+            <select
+              value={newSegment}
+              onChange={e => setNewSegment(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, marginTop: 4 }}
+            >
+              <option value="">Any</option>
+              <option value="PRIVATE">Private</option>
+              <option value="GOVERNMENT">Government</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Body</label>
+            <input
+              value={newBody}
+              onChange={e => setNewBody(e.target.value)}
+              placeholder="Hi {name}, this is {rep_name}…"
+              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, marginTop: 4 }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={add}
+            disabled={adding || !newName.trim() || !newBody.trim()}
+            style={{
+              padding: '8px 14px',
+              background: 'var(--accent, #FFE600)',
+              border: 'none', borderRadius: 6,
+              color: 'var(--accent-fg, #0f172a)',
+              fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              opacity: adding || !newName.trim() || !newBody.trim() ? 0.55 : 1,
+            }}
+          >
+            {adding ? 'Adding…' : '+ Add'}
+          </button>
+        </div>
+      </div>
+
+      {/* Rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {rows.length === 0 && (
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 16, textAlign: 'center' }}>
+            No scripts yet. Add one above.
+          </div>
+        )}
+        {rows.map(r => (
+          <div key={r.id} style={{
+            background: 'var(--surface-2, var(--bg))',
+            border: '1px solid var(--border)',
+            borderRadius: 10, padding: 12,
+            opacity: r.is_active ? 1 : 0.55,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+              <input
+                defaultValue={r.name}
+                onBlur={e => e.target.value !== r.name && saveField(r, 'name', e.target.value)}
+                style={{ flex: 1, minWidth: 180, padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, fontWeight: 600 }}
+              />
+              <select
+                defaultValue={r.segment || ''}
+                onBlur={e => (e.target.value || null) !== r.segment && saveField(r, 'segment', e.target.value || null)}
+                style={{ width: 120, padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12 }}
+              >
+                <option value="">Any</option>
+                <option value="PRIVATE">Private</option>
+                <option value="GOVERNMENT">Government</option>
+              </select>
+              <input
+                type="number"
+                defaultValue={r.display_order}
+                onBlur={e => Number(e.target.value) !== r.display_order && saveField(r, 'display_order', Number(e.target.value))}
+                style={{ width: 60, padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, textAlign: 'center' }}
+                title="Display order"
+              />
+              <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                {r.is_active ? 'Active' : 'Off'}
+              </button>
+              <button onClick={() => remove(r)} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--danger, #EF4444)', border: '1px solid var(--danger, #EF4444)', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                Delete
+              </button>
+            </div>
+            <textarea
+              defaultValue={r.body}
+              onBlur={e => e.target.value !== r.body && saveField(r, 'body', e.target.value)}
+              rows={6}
               style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, lineHeight: 1.5, fontFamily: 'inherit', resize: 'vertical' }}
             />
             {status[r.id] && (
