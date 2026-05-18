@@ -75,8 +75,12 @@ export default function TelecallerV2() {
   const [callLead, setCallLead] = useState(null)
   const [postCallOpen, setPostCallOpen] = useState(false)
   const [pendingActivityId, setPendingActivityId] = useState(null)
-  // Phase 43.2 — daily call target for the ring + accountability.
+  // Phase 43.2 + Phase 49 — daily/weekly TC policy targets.
   const [callTarget, setCallTarget] = useState(50)
+  const [connectTarget, setConnectTarget] = useState(30)   // %
+  const [qualifiedWeeklyTarget, setQualifiedWeeklyTarget] = useState(5)
+  const [qualifiedThisWeek, setQualifiedThisWeek] = useState(0)
+  const [slaBreachCount, setSlaBreachCount] = useState(0)
   // Phase 43.3 — upcoming callbacks (this rep's open follow_ups due
   // in the next 48 hours, joined to the lead for name + phone).
   const [callbacks, setCallbacks] = useState([])
@@ -97,7 +101,17 @@ export default function TelecallerV2() {
     const todayDateISO = istTodayISO()
     const in2Days = istTodayPlusDays(2)
 
-    const [leadsRes, callsRes, connectedRes, qualRes, handoffRes, targetRes, callbacksRes] = await Promise.all([
+    // Phase 49 — week-start anchor for weekly qualified count.
+    // Monday 00:00 IST is the week boundary (Indian work week).
+    const weekStartISO = (() => {
+      const t = new Date(today + 'T00:00:00')
+      const dow = t.getDay() // 0=Sun..6=Sat
+      const diff = dow === 0 ? -6 : 1 - dow  // back to Monday
+      t.setDate(t.getDate() + diff)
+      return t.toISOString().slice(0, 10)
+    })()
+
+    const [leadsRes, callsRes, connectedRes, qualRes, handoffRes, targetRes, callbacksRes, qualifiedWeekRes] = await Promise.all([
       supabase
         .from('leads')
         .select('*, assigned:assigned_to(id, name, city)')
@@ -137,10 +151,11 @@ export default function TelecallerV2() {
         .not('stage', 'in', '(Won,Lost)')
         .order('handoff_sla_due_at', { ascending: true, nullsFirst: false })
         .limit(20),
-      // Phase 43.2 — read this rep's active daily target for min_calls.
+      // Phase 43.2 + Phase 49 — read this rep's full policy row:
+      // min_calls + min_connect_pct + min_qualified_weekly.
       supabase
         .from('daily_targets')
-        .select('min_calls')
+        .select('min_calls, min_connect_pct, min_qualified_weekly')
         .eq('user_id', profile.id)
         .is('effective_to', null)
         .maybeSingle(),
@@ -157,6 +172,13 @@ export default function TelecallerV2() {
         .order('follow_up_date', { ascending: true })
         .order('follow_up_time', { ascending: true, nullsFirst: true })
         .limit(10),
+      // Phase 49 — qualified handoffs THIS WEEK. Counts leads this
+      // TC flipped to SalesReady (sales_ready_at) since Monday.
+      supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('telecaller_id', profile.id)
+        .gte('sales_ready_at', `${weekStartISO}T00:00:00`),
     ])
 
     setLeads(leadsRes.data || [])
@@ -165,6 +187,18 @@ export default function TelecallerV2() {
     setQualifiedToday(qualRes.count || 0)
     setHandoffs(handoffRes.data || [])
     setCallTarget(Number(targetRes?.data?.min_calls) || 50)
+    // Phase 49 — connect-rate + weekly-qualified targets + counts.
+    setConnectTarget(Number(targetRes?.data?.min_connect_pct) || 30)
+    setQualifiedWeeklyTarget(Number(targetRes?.data?.min_qualified_weekly) || 5)
+    setQualifiedThisWeek(qualifiedWeekRes?.count || 0)
+    // SLA breaches = handoffs with handoff_sla_due_at in the past
+    // and lead still not flipped (computed from existing handoffRes).
+    const nowMs = Date.now()
+    const breached = (handoffRes?.data || []).filter(h => {
+      if (!h.handoff_sla_due_at) return false
+      return new Date(h.handoff_sla_due_at).getTime() < nowMs
+    }).length
+    setSlaBreachCount(breached)
     setCallbacks(callbacksRes?.data || [])
     setLoading(false)
   }
@@ -556,11 +590,35 @@ export default function TelecallerV2() {
       {/* Phase 43.2 — KPI strip swaps "Today's calls" → "Calls / target"
           and surfaces connect-rate as a separate tile. Connect-rate is
           the real TC KPI (just "calls logged" is gaming-able). */}
+      {/* Phase 49 — KPI strip surfaces all 4 TC policies with
+          target compare + color (red below, green hit). Owner-
+          approved: 50 calls/day · 30% connect · 5 qualified/week
+          · 0 SLA breaches. */}
       <div className="lead-stat-strip">
-        <Stat label="Calls today"       num={`${callsToday}/${callTarget}`} meta={`${callTargetPct}% of target`} />
-        <Stat label="Connect rate"      num={`${connectRatePct}%`}          meta={`${connectedToday} of ${callsToday} connected`} />
-        <Stat label="Qualified today"   num={qualifiedToday}                meta="handed off to sales" />
-        <Stat label="Pending hand-offs" num={handoffs.length}               meta={overdueCount(handoffs)} />
+        <Stat
+          label="Calls today"
+          num={`${callsToday}/${callTarget}`}
+          meta={`${callTargetPct}% of target`}
+          dotColor={callsToday >= callTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
+        />
+        <Stat
+          label={`Connect rate · ≥${connectTarget}%`}
+          num={`${connectRatePct}%`}
+          meta={`${connectedToday} of ${callsToday} connected`}
+          dotColor={connectRatePct >= connectTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-amber, #F59E0B)'}
+        />
+        <Stat
+          label={`Qualified this week · ≥${qualifiedWeeklyTarget}`}
+          num={`${qualifiedThisWeek}/${qualifiedWeeklyTarget}`}
+          meta="handed off to sales"
+          dotColor={qualifiedThisWeek >= qualifiedWeeklyTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
+        />
+        <Stat
+          label="SLA breaches"
+          num={slaBreachCount}
+          meta={slaBreachCount === 0 ? 'all on time' : '24h cutoff missed'}
+          dotColor={slaBreachCount === 0 ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
+        />
       </div>
 
       {/* Phase 43.3 — upcoming callbacks panel. Shows the rep's open
@@ -851,9 +909,9 @@ export default function TelecallerV2() {
 }
 
 /* ─── Sub-components ─── */
-function Stat({ label, num, meta }) {
+function Stat({ label, num, meta, dotColor }) {
   return (
-    <div className="lead-stat-card">
+    <div className="lead-stat-card" style={dotColor ? { borderLeft: `3px solid ${dotColor}` } : undefined}>
       <div className="lead-stat-eyebrow">{label}</div>
       <div className="lead-stat-num">{num}</div>
       {meta ? <div className="lead-stat-meta">{meta}</div> : null}
