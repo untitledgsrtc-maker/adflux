@@ -70,6 +70,11 @@ export default function LeadsV2() {
   const [cityFilter, setCityFilter]       = useState('all')
   const [industryFilter, setIndustryFilter] = useState('all')   // Phase 19
   const [repFilter, setRepFilter]         = useState('all')
+  // Phase 46.1 — filter by latest call outcome (positive / neutral
+  // / callback / negative). Built from a one-shot subquery against
+  // lead_activities (latest outcome per lead).
+  const [outcomeFilter, setOutcomeFilter] = useState('all')
+  const [leadOutcomeMap, setLeadOutcomeMap] = useState({})
   // Phase 34Z.13 — unified DateRangeFilter (Phase 34Z.11's two raw
   // <input type=date> replaced). Default preset = This month per owner.
   const [dateRange, setDateRange] = useState(() => presetToRange('this_month'))
@@ -87,6 +92,30 @@ export default function LeadsV2() {
   const [assignableUsers, setAssignableUsers] = useState([])
 
   useEffect(() => { fetchLeads() /* eslint-disable-next-line */ }, [fetchLeads, location.key])
+
+  // Phase 46.1 — latest call outcome per lead. One query: pull
+  // lead_activities with outcome set, ordered desc, dedup client-
+  // side (first hit per lead = latest). Cap 5000 to keep payload
+  // bounded; covers ~6 months of activity for an active team.
+  useEffect(() => {
+    let cancelled = false
+    async function loadOutcomes() {
+      const { data } = await supabase
+        .from('lead_activities')
+        .select('lead_id, outcome, created_at')
+        .not('outcome', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(5000)
+      if (cancelled) return
+      const map = {}
+      for (const r of (data || [])) {
+        if (!(r.lead_id in map)) map[r.lead_id] = r.outcome
+      }
+      setLeadOutcomeMap(map)
+    }
+    loadOutcomes()
+    return () => { cancelled = true }
+  }, [location.key])
 
   // Phase 19 — realtime sync across tabs. Listens for any insert/update/
   // delete on leads; the hook re-fetches the single row with joins so
@@ -172,6 +201,8 @@ export default function LeadsV2() {
       if (cityFilter     !== 'all' && l.city     !== cityFilter)     return false
       if (industryFilter !== 'all' && l.industry !== industryFilter) return false
       if (repFilter      !== 'all' && l.assigned?.id !== repFilter)  return false
+      // Phase 46.1 — outcome filter (latest activity outcome).
+      if (outcomeFilter  !== 'all' && (leadOutcomeMap[l.id] || '') !== outcomeFilter) return false
       if (fromIso || toIso) {
         const created = (l.created_at || '').slice(0, 10)
         if (fromIso && created < fromIso) return false
@@ -186,7 +217,7 @@ export default function LeadsV2() {
         (l.industry || '').toLowerCase().includes(q)
       )
     })
-  }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, dateFrom, dateTo])
+  }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, leadOutcomeMap, dateFrom, dateTo])
 
   /* ─── Stat strip totals ─── */
   const totals = useMemo(() => {
@@ -275,9 +306,25 @@ export default function LeadsV2() {
         options: [{ value: 'all', label: 'Anyone' }, ...distinctReps.map(r => ({ value: r.id, label: r.name }))],
       })
     }
+    // Phase 46.1 — outcome filter (latest call outcome per lead).
+    fields.push({
+      key: 'outcome',
+      label: 'Outcome',
+      value: outcomeFilter,
+      onChange: setOutcomeFilter,
+      defaultValue: 'all',
+      dotColor: 'var(--warning, #F59E0B)',
+      options: [
+        { value: 'all',      label: 'Any outcome' },
+        { value: 'positive', label: 'Good' },
+        { value: 'neutral',  label: 'Maybe' },
+        { value: 'callback', label: 'Call later' },
+        { value: 'negative', label: 'Lost' },
+      ],
+    })
     return fields
   }, [
-    segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter,
+    segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter,
     distinctSources, distinctCities, distinctIndustries, distinctReps,
     isPrivileged,
   ])
