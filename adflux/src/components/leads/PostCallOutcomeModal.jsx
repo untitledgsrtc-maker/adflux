@@ -175,9 +175,14 @@ function istNowPlusHoursHHMM(hours) {
 }
 
 const OUTCOMES = [
-  { value: 'positive', label: 'Good',  sub: 'Wants quote / more info', tone: 'success' },
-  { value: 'neutral',  label: 'Maybe', sub: 'Try again in a few days', tone: 'warn' },
-  { value: 'negative', label: 'Lost',  sub: 'Politely refused',        tone: 'danger' },
+  { value: 'positive', label: 'Good',       sub: 'Wants quote / more info', tone: 'success' },
+  { value: 'neutral',  label: 'Maybe',      sub: 'Try again in a few days', tone: 'warn' },
+  // Phase 45.3 — new "Call later" outcome. Distinct from Maybe so
+  // we can capture "they want a callback" as a real signal (vs
+  // generic Maybe = "not sure yet"). When picked, auto-fills
+  // next_action = call_back_2h with today's date + now+2h.
+  { value: 'callback', label: 'Call later', sub: 'Wants a callback',       tone: 'warn' },
+  { value: 'negative', label: 'Lost',       sub: 'Politely refused',       tone: 'danger' },
 ]
 
 const NEXT_ACTIONS = [
@@ -254,14 +259,15 @@ export default function PostCallOutcomeModal({
     }
   }, [open])
 
-  // Phase 45.1 — smart default for outcome=neutral ("Maybe", which in
-  // practice means "they didn't pick"). Default the next-action to
-  // "call back in 2 hours" instead of "follow up in 3 days". Only
-  // fires if the rep hasn't already manually picked a next-action.
+  // Phase 45.1 + 45.3 — smart default. outcome='neutral' (Maybe) or
+  // outcome='callback' (Call later) both default next-action to
+  // "call back in 2 hours". Only fires if rep hasn't manually picked.
+  // The call_back_2h chip's own auto-snap then fills customDate=today
+  // and customTime=now+2h IST.
   const nextActionTouchedRef = useRef(false)
   useEffect(() => {
     if (!open || nextActionTouchedRef.current) return
-    if (outcome === 'neutral') {
+    if (outcome === 'neutral' || outcome === 'callback') {
       setNextAction('call_back_2h')
     }
   }, [outcome, open])
