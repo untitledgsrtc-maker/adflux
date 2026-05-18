@@ -33,6 +33,12 @@ const TODAY = () => new Date().toISOString().slice(0, 10)
 
 export default function TaDaRequestPanel() {
   const profile = useAuthStore(s => s.profile)
+  // Phase 52c — telecallers are office-based. They get no field
+  // travel, no overnight DA, no hotel stays. They can still claim
+  // generic "Other" expenses (mobile data, recharge, headphones,
+  // local conveyance to office, etc.). Gate the 3 field-only tabs
+  // and default the form to 'other' for TC.
+  const isTelecaller = profile?.role === 'telecaller'
   const [todayRow, setTodayRow] = useState(null)
   // Phase 34Z.39 — live GPS summary of today's track (works even
   // before nightly daily_ta rollup; owner: "fetched by GPS box should
@@ -47,7 +53,8 @@ export default function TaDaRequestPanel() {
   //   'da'    → da_night    (₹)
   //   'hotel' → hotel       (₹ + city)
   //   'other' → other       (₹ + description)
-  const [tab, setTab]           = useState('ta')   // 'ta' | 'da' | 'hotel' | 'other'
+  // Phase 52c — TC defaults straight to 'other' (only tab they see).
+  const [tab, setTab]           = useState(isTelecaller ? 'other' : 'ta')   // 'ta' | 'da' | 'hotel' | 'other'
 
   // Form state
   const [claimDate,   setClaimDate]   = useState(TODAY())
@@ -248,7 +255,10 @@ export default function TaDaRequestPanel() {
           daily_ta row when it's available (most accurate, factors in
           city bike_per_km). Fall back to live gps_pings summarised
           via summariseTrack so the rep sees today's km mid-day too.
-          Owner: "FETCHED BY GPS BOX SHOULD BE THERE." */}
+          Owner: "FETCHED BY GPS BOX SHOULD BE THERE."
+          Phase 52c — TC is office-based, no field GPS to show. Hide
+          the entire GPS strip for telecallers. */}
+      {!isTelecaller && (
       <div style={styles.card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <MapPin size={14} style={{ color: 'var(--accent)' }} />
@@ -290,26 +300,35 @@ export default function TaDaRequestPanel() {
           )
         })()}
       </div>
+      )}
 
       {/* ── Tabs + form ── */}
       <div style={styles.card}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
-          Submit a claim
+          {isTelecaller ? 'Submit expense claim' : 'Submit a claim'}
         </div>
         {/* Phase 36.7 — 4-way tab row. Wrap on narrow screens so
             phones don't get a horizontal-scroll bar. */}
         <div style={{ ...styles.tabRow, flexWrap: 'wrap' }}>
-          <button type="button" style={styles.tab(tab === 'ta')} onClick={() => setTab('ta')}>
-            Override TA (km)
-          </button>
-          <button type="button" style={styles.tab(tab === 'da')} onClick={() => setTab('da')}>
-            Claim DA (night)
-          </button>
-          <button type="button" style={styles.tab(tab === 'hotel')} onClick={() => setTab('hotel')}>
-            Hotel stay
-          </button>
+          {/* Phase 52c — Override TA / DA / Hotel are field-rep
+              tabs. Hidden for TC (office-based; no km, no overnight,
+              no hotel). TC sees only the Other tab and the existing
+              "Submit a claim" form for free-form expenses. */}
+          {!isTelecaller && (
+            <>
+              <button type="button" style={styles.tab(tab === 'ta')} onClick={() => setTab('ta')}>
+                Override TA (km)
+              </button>
+              <button type="button" style={styles.tab(tab === 'da')} onClick={() => setTab('da')}>
+                Claim DA (night)
+              </button>
+              <button type="button" style={styles.tab(tab === 'hotel')} onClick={() => setTab('hotel')}>
+                Hotel stay
+              </button>
+            </>
+          )}
           <button type="button" style={styles.tab(tab === 'other')} onClick={() => setTab('other')}>
-            Other
+            {isTelecaller ? 'Other expense' : 'Other'}
           </button>
         </div>
 
