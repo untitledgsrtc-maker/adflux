@@ -459,13 +459,13 @@ export function TeamActivityPanel() {
                     {u.team_role?.replace('_', ' ')}{u.city && ` · ${u.city}`}
                   </div>
                 </td>
-                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, color: c.meetings >= targets.meetings ? '#4ade80' : 'var(--v2-ink-1, rgba(255,255,255,.62))' }}>
+                <td style={{ textAlign: 'right', fontFamily: 'inherit', fontSize: 12, color: c.meetings >= targets.meetings ? '#4ade80' : 'var(--v2-ink-1, rgba(255,255,255,.62))' }}>
                   {c.meetings || 0}/{targets.meetings}
                 </td>
-                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, color: c.calls >= targets.calls ? '#4ade80' : 'var(--v2-ink-1, rgba(255,255,255,.62))' }}>
+                <td style={{ textAlign: 'right', fontFamily: 'inherit', fontSize: 12, color: c.calls >= targets.calls ? '#4ade80' : 'var(--v2-ink-1, rgba(255,255,255,.62))' }}>
                   {c.calls || 0}/{targets.calls}
                 </td>
-                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, color: c.new_leads >= targets.new_leads ? '#4ade80' : 'var(--v2-ink-1, rgba(255,255,255,.62))' }}>
+                <td style={{ textAlign: 'right', fontFamily: 'inherit', fontSize: 12, color: c.new_leads >= targets.new_leads ? '#4ade80' : 'var(--v2-ink-1, rgba(255,255,255,.62))' }}>
                   {c.new_leads || 0}/{targets.new_leads}
                 </td>
                 <td>

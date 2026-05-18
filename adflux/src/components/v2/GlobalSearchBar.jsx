@@ -145,7 +145,7 @@ export default function GlobalSearchBar() {
           </button>
         ) : (
           <span style={{
-            fontFamily: 'monospace', fontSize: 10,
+            fontFamily: 'inherit', fontSize: 10,
             background: 'rgba(255,255,255,.06)',
             padding: '2px 6px', borderRadius: 4,
             color: 'var(--v2-ink-2)',

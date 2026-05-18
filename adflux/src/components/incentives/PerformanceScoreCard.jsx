@@ -75,7 +75,7 @@ function ScoreSparkline({ userId }) {
                 {m.month_label}
               </div>
               <div style={{
-                fontSize: 9, fontFamily: 'monospace',
+                fontSize: 9, fontFamily: 'inherit',
                 color: 'var(--text-muted)',
               }}>
                 {pct.toFixed(0)}%

@@ -390,7 +390,7 @@ export function V2AppShell() {
               Ask AI…
             </span>
             <span style={{
-              fontFamily: 'monospace', fontSize: 10,
+              fontFamily: 'inherit', fontSize: 10,
               background: 'rgba(255,255,255,.06)',
               padding: '2px 6px', borderRadius: 6,
               color: 'var(--v2-ink-2)',

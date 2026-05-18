@@ -672,7 +672,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                             background: 'var(--v2-bg-2)',
                             border: '1px solid var(--v2-line)',
                             color: 'var(--v2-ink-0)', fontSize: 12,
-                            fontFamily: 'monospace',
+                            fontFamily: 'inherit',
                           }}
                         />
                       </td>
@@ -861,13 +861,13 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                         {r.gps_pings_count || 0} GPS pings
                       </div>
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'monospace' }}>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
                       {Number(r.km_traveled || 0).toFixed(1)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'monospace' }}>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
                       {fmtINR(r.da_amount)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'monospace' }}>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
                       {fmtINR(r.bike_amount)}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -882,14 +882,14 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                             background: 'var(--v2-bg-2)',
                             border: '1px solid var(--v2-line)',
                             color: 'var(--v2-ink-0)', fontSize: 12,
-                            fontFamily: 'monospace',
+                            fontFamily: 'inherit',
                           }}
                         />
                       ) : (
-                        <span style={{ fontFamily: 'monospace' }}>{fmtINR(r.hotel_amount)}</span>
+                        <span style={{ fontFamily: 'inherit' }}>{fmtINR(r.hotel_amount)}</span>
                       )}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: 'var(--v2-ink-0)' }}>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit', fontWeight: 600, color: 'var(--v2-ink-0)' }}>
                       {fmtINR(r.total_amount)}
                     </td>
                     <td style={tdStyle}>

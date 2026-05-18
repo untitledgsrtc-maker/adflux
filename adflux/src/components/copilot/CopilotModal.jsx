@@ -262,7 +262,7 @@ export default function CopilotModal({ open, onClose }) {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span>Powered by Claude Haiku · costs ~₹0.30 per query</span>
-          <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', padding: '2px 6px', borderRadius: 4 }}>
+          <span style={{ fontFamily: 'inherit', background: 'rgba(255,255,255,.06)', padding: '2px 6px', borderRadius: 4 }}>
             ESC to close
           </span>
         </div>

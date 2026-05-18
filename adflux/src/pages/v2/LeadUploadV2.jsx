@@ -588,7 +588,7 @@ export default function LeadUploadV2() {
                   {preview.map((p, i) => (
                     <tr key={i}>
                       <td><strong>{p.name}</strong>{p.company && <div style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{p.company}</div>}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.phone || '—'}</td>
+                      <td style={{ fontFamily: 'inherit', fontSize: 12 }}>{p.phone || '—'}</td>
                       <td>
                         {/* Phase 30A — 5 stages. Lost-with-revisit
                             (the ex-Nurture branch) gets the blue tint
@@ -615,7 +615,7 @@ export default function LeadUploadV2() {
                           p.parsed?.telecallerName ? <span style={{ color: 'var(--v2-ink-2)' }}>{p.parsed.telecallerName} (no match)</span> :
                           <span style={{ color: 'var(--v2-ink-2)' }}>—</span>}
                       </td>
-                      <td style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--v2-ink-2)' }}>
+                      <td style={{ fontSize: 11, fontFamily: 'inherit', color: 'var(--v2-ink-2)' }}>
                         {p.parsed?.timestamp ? new Date(p.parsed.timestamp).toLocaleDateString() : '—'}
                       </td>
                       <td style={{ fontSize: 11, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -723,7 +723,9 @@
   font-size: 13.5px;
 }
 textarea.govt-input-cell--wide {
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  /* Phase 41.6 — was 'SF Mono', Menlo, Consolas, monospace. Owner
+     directive: no monospace anywhere. Inherit page font. */
+  font-family: inherit;
   font-size: 12.5px;
   line-height: 1.55;
   resize: vertical;
