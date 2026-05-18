@@ -113,7 +113,7 @@ export default function AdminDashboardDesktop() {
     // Reps-in-field cards. All counts only (head: true), so cheap.
     const liveCutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString()
 
-    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes] = await Promise.all([
+    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes, hotLeadsRes, briefLogRes] = await Promise.all([
       // Use `*` to be tolerant of schema drift — earlier we enumerated
       // columns including `ref_number`, and a single missing column
       // would silently return an empty array (not throw), which made
@@ -167,6 +167,28 @@ export default function AdminDashboardDesktop() {
         .gte('created_at', liveCutoffIso)
         .order('created_at', { ascending: false })
         .limit(500),
+      // Phase 41.3 — Top hot leads. Leads in stage=Working with any
+      // activity in the last 7 days. Sorted by activity-count desc
+      // (most-touched = hottest). Limit 50 server-side; we collapse
+      // to top 3 client-side after grouping.
+      (async () => {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        return supabase.from('lead_activities')
+          .select('lead_id, created_at, leads(id, name, company, stage, assigned_to)')
+          .gte('created_at', sevenDaysAgo)
+          .order('created_at', { ascending: false })
+          .limit(500)
+      })(),
+      // Phase 41.3 — Today's morning brief delivery status. push_log
+      // captures every enqueued push with success/error; brief pushes
+      // are tagged kind='morning_brief' per Phase 34Z.61.
+      (async () => {
+        return supabase.from('push_log')
+          .select('id, user_id, success, error_msg, created_at, kind')
+          .eq('kind', 'morning_brief')
+          .gte('created_at', `${todayDate}T00:00:00`)
+          .lte('created_at', `${todayDate}T23:59:59`)
+      })(),
     ])
 
     const allQuotes    = quotesRes.data       || []
@@ -190,6 +212,29 @@ export default function AdminDashboardDesktop() {
     const liveReps = Array.from(liveRepsById.entries()).map(([user_id, ping]) => ({
       user_id, lastPing: ping.created_at, lat: ping.lat, lng: ping.lng,
     }))
+    // Phase 41.3 — Hot leads. Group activities by lead, keep only
+    // stage=Working, sort by touch count desc, take top 3.
+    const leadTouches = new Map()
+    for (const a of (hotLeadsRes?.data || [])) {
+      const lead = a.leads
+      if (!lead || lead.stage !== 'Working') continue
+      const id = lead.id
+      const prev = leadTouches.get(id) || { ...lead, touches: 0, lastTouch: null }
+      prev.touches += 1
+      if (!prev.lastTouch || a.created_at > prev.lastTouch) prev.lastTouch = a.created_at
+      leadTouches.set(id, prev)
+    }
+    const hotLeads = Array.from(leadTouches.values())
+      .sort((a, b) => b.touches - a.touches || (b.lastTouch || '').localeCompare(a.lastTouch || ''))
+      .slice(0, 3)
+    // Phase 41.3 — Brief delivery stats. push_log entries for today
+    // with kind='morning_brief'. delivered / failed / total counts.
+    const briefRows = briefLogRes?.data || []
+    const briefStats = {
+      total:     briefRows.length,
+      delivered: briefRows.filter(r => r.success).length,
+      failed:    briefRows.filter(r => !r.success).length,
+    }
 
     // Apply segment filter to the quote-derived calcs. Private rows
     // historically have segment=null (pre-Phase 4) so 'private' must
@@ -306,9 +351,21 @@ export default function AdminDashboardDesktop() {
       return paid < Number(q.total_amount || 0) ? c + 1 : c
     }, 0)
 
-    // Pipeline funnel
+    // Phase 41.3 — Pipeline funnel now period-bucketed. Terminal
+    // stages (won, lost) filter by updated_at inside the selected
+    // period; in-progress stages (draft, sent, negotiating) keep
+    // all-open behaviour since those are forward-looking. Was
+    // all-time on every status, which made the funnel useless for
+    // monthly tracking.
+    const inPeriod = (ts) =>
+      ts && ts >= monthStartIso && ts < monthEndIso
     const stages = ['draft', 'sent', 'negotiating', 'won', 'lost'].map(s => {
-      const qs = quotes.filter(q => q.status === s)
+      const isTerminal = s === 'won' || s === 'lost'
+      const qs = quotes.filter(q => {
+        if (q.status !== s) return false
+        if (!isTerminal) return true
+        return inPeriod(q.updated_at || q.created_at)
+      })
       return {
         status: s,
         count: qs.length,
@@ -746,6 +803,9 @@ export default function AdminDashboardDesktop() {
       liveReps,
       cashBuckets,
       salesUsersForLive: salesUsers,
+      // Phase 41.3
+      hotLeads,
+      briefStats,
     })
   }
 
@@ -1074,6 +1134,20 @@ export default function AdminDashboardDesktop() {
                   useQuoteStore.getState().setFilters({ status: 'won' })
                   navigate('/quotes')
                 }}
+              />
+            </section>
+
+            {/* Phase 41.3 — Top hot leads + brief delivery status. */}
+            <section className="v2d-grid-2" style={{ marginBottom: 16 }}>
+              <TopHotLeadsCard
+                rows={state.hotLeads}
+                onOpen={(id) => navigate(`/leads/${id}`)}
+                onAll={() => navigate('/leads')}
+              />
+              <BriefDeliveryCard
+                stats={state.briefStats}
+                salesUsers={state.salesUsersForLive}
+                onRetry={() => navigate('/admin/push-debug')}
               />
             </section>
 
@@ -1992,6 +2066,121 @@ function CashForecastCard({ outstanding, overdueCount, buckets = {}, onChase }) 
         <ForecastBar label="Fresh · under 30 days"    value={fresh}   pct={pct(fresh)}   color="var(--v2-green, #10B981)" />
         <ForecastBar label="Waiting · 30 to 60 days"  value={waiting} pct={pct(waiting)} color="var(--v2-amber, #F59E0B)" />
         <ForecastBar label="Stale · 60+ days"         value={stale}   pct={pct(stale)}   color="var(--v2-rose, #EF4444)" />
+      </div>
+    </div>
+  )
+}
+
+function TopHotLeadsCard({ rows = [], onOpen, onAll }) {
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Top hot leads · this week</div>
+          <div className="v2d-panel-s">Most-touched Working leads in the last 7 days</div>
+        </div>
+        <button className="v2d-banner-cta" onClick={onAll}>All leads</button>
+      </div>
+      {rows.length === 0 ? (
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--v2-ink-2)', fontSize: 13 }}>
+          No active lead activity in last 7 days.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {rows.map((r, i) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => onOpen?.(r.id)}
+              style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '12px 14px', borderRadius: 10,
+                border: '1px solid var(--v2-line)', background: 'rgba(255,255,255,.02)',
+                cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <span style={{
+                  fontFamily: 'var(--v2-display, Space Grotesk, sans-serif)',
+                  fontSize: 18, fontWeight: 700, color: 'var(--v2-yellow, #FFE600)',
+                  width: 24, textAlign: 'center',
+                }}>
+                  {i + 1}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v2-ink-0)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.company || r.name || '—'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
+                    {r.name || '—'} · {r.stage}
+                  </div>
+                </div>
+              </div>
+              <span style={{
+                fontFamily: 'var(--font-mono, monospace)',
+                fontSize: 12, fontWeight: 700, color: 'var(--v2-green, #10B981)',
+                padding: '3px 9px', background: 'rgba(16,185,129,.14)',
+                borderRadius: 999,
+              }}>
+                {r.touches} touch{r.touches > 1 ? 'es' : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BriefDeliveryCard({ stats = {}, salesUsers = [], onRetry }) {
+  const total = stats.total || 0
+  const delivered = stats.delivered || 0
+  const failed = stats.failed || 0
+  const teamSize = (salesUsers || []).length || 0
+  const expected = teamSize > 0 ? teamSize : total
+  const allOk = total > 0 && failed === 0
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Morning brief · today</div>
+          <div className="v2d-panel-s">
+            {total === 0
+              ? 'No brief enqueued yet today (sends 9:30 IST)'
+              : allOk
+                ? `Delivered to ${delivered}/${expected}`
+                : `${delivered}/${expected} delivered · ${failed} failed`}
+          </div>
+        </div>
+        {failed > 0 && (
+          <button className="v2d-banner-cta" onClick={onRetry}>Open log</button>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <BriefStat label="Sent"      value={total}     color="var(--v2-blue, #3B82F6)" />
+        <BriefStat label="Delivered" value={delivered} color="var(--v2-green, #10B981)" />
+        <BriefStat label="Failed"    value={failed}    color={failed > 0 ? 'var(--v2-rose, #EF4444)' : 'var(--v2-ink-2)'} />
+      </div>
+    </div>
+  )
+}
+
+function BriefStat({ label, value, color }) {
+  return (
+    <div style={{
+      flex: 1, padding: '14px 16px',
+      background: 'rgba(255,255,255,.02)',
+      border: '1px solid var(--v2-line)',
+      borderRadius: 10, textAlign: 'center',
+    }}>
+      <div style={{
+        fontFamily: 'var(--v2-display, Space Grotesk, sans-serif)',
+        fontSize: 22, fontWeight: 700, color,
+      }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.10em', marginTop: 4, fontWeight: 600 }}>
+        {label}
       </div>
     </div>
   )
