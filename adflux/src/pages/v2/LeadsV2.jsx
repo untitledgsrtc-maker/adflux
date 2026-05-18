@@ -44,6 +44,8 @@ import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import V2Hero from '../../components/v2/V2Hero'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
 import FilterDrawer, { ActiveFilterChips } from '../../components/v2/FilterDrawer'
+// Phase 44.1 — daily leads-collected bar chart at top of /leads.
+import LeadsCollectedChart from '../../components/leads/LeadsCollectedChart'
 
 /* The 5 tabs from the design — All + 4 groups. We re-use the
    underlying STAGE_GROUPS from useLeads but drop "in_progress"
@@ -400,6 +402,10 @@ export default function LeadsV2() {
           </button>
         </div>
       </div>
+
+      {/* Phase 44.1 — daily leads-collected chart. Read-only,
+          doesn't touch the existing filter store below. */}
+      <LeadsCollectedChart />
 
       {/* ─── AI briefing card (real data, not mock) ─── */}
       {leads.length > 0 && (
