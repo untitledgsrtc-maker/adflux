@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { formatDate, formatRelative } from '../../utils/formatters'
+import { formatCurrency, formatDate, formatRelative } from '../../utils/formatters'
 import {
   StageChip, HeatDot, HeatPicker, SegChip, LeadAvatar, Pill,
 } from '../../components/leads/LeadShared'
@@ -38,7 +38,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
 // Phase 47.1 — WhatsApp 1-click send.
 import WhatsAppSendModal from '../../components/leads/WhatsAppSendModal'
-import { MessageSquare, ChevronRight, ChevronDown } from 'lucide-react'
+import { MessageSquare, ChevronRight, ChevronDown, FileText } from 'lucide-react'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -90,6 +90,10 @@ export default function TelecallerV2() {
   // Phase 47.2 — call scripts master + collapsible script panel.
   const [scripts, setScripts] = useState([])
   const [scriptOpen, setScriptOpen] = useState(false)
+  // Phase 51 — last quote for the current Next Call lead. Surfaces
+  // ref + amount + status + age on the hero so TC can answer "did
+  // we already quote them?" without leaving the page.
+  const [lastQuote, setLastQuote] = useState(null)
 
   async function load() {
     setLoading(true)
@@ -218,6 +222,79 @@ export default function TelecallerV2() {
       .then(({ data }) => { if (!cancelled) setScripts(data || []) })
     return () => { cancelled = true }
   }, [])
+
+  // Phase 51 — fetch the latest quote for the current Next Call
+  // lead. Single row, cheapest possible (`limit(1)` ordered desc).
+  // Re-runs when the hero advances to the next lead in the queue.
+  useEffect(() => {
+    let cancelled = false
+    const leadId = sortedQueue[0]?.id
+    if (!leadId) {
+      setLastQuote(null)
+      return
+    }
+    supabase
+      .from('quotes')
+      .select('id, quote_number, ref_number, total_amount, status, media_type, created_at')
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          // Don't toast — quote backreference is a soft enhancement.
+          // Log only.
+          console.warn('[tc] last quote fetch failed:', error.message)
+          setLastQuote(null)
+          return
+        }
+        setLastQuote(data || null)
+      })
+    return () => { cancelled = true }
+  }, [sortedQueue[0]?.id])
+
+  // Phase 51 — quote → detail route. Govt quotes route to
+  // /proposal/:id; private + other media to /quotes/:id
+  // (per CLAUDE.md §10 routing rules).
+  function quoteHref(q) {
+    if (!q) return '/quotes'
+    const govt = q.media_type === 'AUTO_HOOD' || q.media_type === 'GSRTC_LED'
+    return govt ? `/proposal/${q.id}` : `/quotes/${q.id}`
+  }
+
+  // Phase 51 — status chip palette. Uses v2 tokens with hex
+  // fallbacks (same pattern as the WhatsApp button on this page).
+  function quoteStatusStyle(s) {
+    switch (s) {
+      case 'won':
+        return {
+          background: 'var(--v2-green-soft, rgba(34,197,94,.14))',
+          color:      'var(--v2-green, #22c55e)',
+          border:     '1px solid var(--v2-green, #22c55e)',
+        }
+      case 'lost':
+        return {
+          background: 'var(--v2-rose-soft, rgba(244,63,94,.14))',
+          color:      'var(--v2-rose, #f43f5e)',
+          border:     '1px solid var(--v2-rose, #f43f5e)',
+        }
+      case 'sent':
+      case 'negotiating':
+        return {
+          background: 'var(--v2-amber-soft, rgba(245,158,11,.14))',
+          color:      'var(--v2-amber, #f59e0b)',
+          border:     '1px solid var(--v2-amber, #f59e0b)',
+        }
+      case 'draft':
+      default:
+        return {
+          background: 'rgba(255,255,255,.06)',
+          color:      'var(--v2-ink-2, #6a7590)',
+          border:     '1px solid var(--v2-line, rgba(255,255,255,.12))',
+        }
+    }
+  }
 
   // Phase 47.3 — quick-set heat on any lead without leaving the
   // TC page. Optimistic local update + DB write.
@@ -499,6 +576,53 @@ export default function TelecallerV2() {
               {nextCall.last_contact_at ? `${formatRelative(nextCall.last_contact_at)} since last touch` : 'never contacted'}
             </span>
           </div>
+          {/* Phase 51 — last-quote backreference. Renders only when
+              `quotes.lead_id` resolves a row. Shows ref + amount +
+              status chip + age; taps through to detail (govt routes
+              to /proposal/:id, others to /quotes/:id per §10). */}
+          {lastQuote && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                onClick={() => navigate(quoteHref(lastQuote))}
+                style={{
+                  background: 'rgba(255,255,255,.05)',
+                  border: '1px solid rgba(255,255,255,.10)',
+                  borderRadius: 10,
+                  padding: '7px 12px',
+                  color: 'var(--v2-ink-1, var(--text))',
+                  fontSize: 12,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <FileText size={14} />
+                <span style={{ fontWeight: 600 }}>
+                  Last quote · {lastQuote.quote_number || lastQuote.ref_number || lastQuote.id.slice(0, 8)}
+                </span>
+                <span style={{ opacity: 0.5 }}>·</span>
+                <span style={{ fontWeight: 600 }}>{formatCurrency(lastQuote.total_amount || 0)}</span>
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  textTransform: 'uppercase',
+                  ...quoteStatusStyle(lastQuote.status),
+                }}>
+                  {lastQuote.status || 'draft'}
+                </span>
+                <span style={{ color: 'var(--text-muted)', marginLeft: 2 }}>
+                  · {formatRelative(lastQuote.created_at)}
+                </span>
+              </button>
+            </div>
+          )}
           {/* Phase 47.2 — collapsible call script. Renders only when
               a matching script exists. Default collapsed; rep taps
               "Show script" to expand. Script body shown in a fixed-
