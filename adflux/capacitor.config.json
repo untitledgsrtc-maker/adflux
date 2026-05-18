@@ -2,6 +2,12 @@
   "appId": "in.untitledad.app",
   "appName": "Untitled OS",
   "webDir": "dist",
+  "server": {
+    "url": "https://app.untitledad.in",
+    "cleartext": false,
+    "androidScheme": "https",
+    "errorPath": "/"
+  },
   "android": {
     "allowMixedContent": false,
     "captureInput": true,
