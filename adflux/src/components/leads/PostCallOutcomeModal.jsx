@@ -167,11 +167,18 @@ function istTodayISO() {
   const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
   return ist.toISOString().slice(0, 10)
 }
-function istNowPlusHoursHHMM(hours) {
+// Phase 45.4 — returns { date, time } both rolled if now+N crosses
+// midnight IST. Previously returned HH:MM only and customDate stayed
+// today → could schedule a follow_up in the past (e.g. 22:30 + 4h =
+// 02:30 same day = stale).
+function istNowPlusHoursDateTime(hours) {
   const now = new Date()
   const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
   ist.setUTCHours(ist.getUTCHours() + hours)
-  return ist.toISOString().slice(11, 16)  // "HH:MM"
+  return {
+    date: ist.toISOString().slice(0, 10),
+    time: ist.toISOString().slice(11, 16),
+  }
 }
 
 const OUTCOMES = [
@@ -238,6 +245,11 @@ export default function PostCallOutcomeModal({
   const [customTime, setCustomTime] = useState('')
   const dateTouchedRef = useRef(false)
   const timeTouchedRef = useRef(false)
+  // Phase 45.4 — declared up here alongside the other touched refs
+  // so it exists before the reset useEffect callback writes to it.
+  // (Previously declared after, which worked at runtime but was a
+  // linter/reader hazard.)
+  const nextActionTouchedRef = useRef(false)
   // Language toggle for the voice mic. 'auto' is the new default
   // (Phase 34Z.49 hardcoded 'gu' which was biasing English/Hindi).
   const [voiceLang, setVoiceLang] = useState('auto')
@@ -264,7 +276,7 @@ export default function PostCallOutcomeModal({
   // "call back in 2 hours". Only fires if rep hasn't manually picked.
   // The call_back_2h chip's own auto-snap then fills customDate=today
   // and customTime=now+2h IST.
-  const nextActionTouchedRef = useRef(false)
+  // (nextActionTouchedRef declared above with the other touched refs.)
   useEffect(() => {
     if (!open || nextActionTouchedRef.current) return
     if (outcome === 'neutral' || outcome === 'callback') {
@@ -281,17 +293,26 @@ export default function PostCallOutcomeModal({
     if (!open) return
     const meta = NEXT_ACTIONS.find(n => n.value === nextAction)
     if (!meta) return
-    if (!dateTouchedRef.current) {
-      if (meta.days != null && meta.days > 0) {
-        setCustomDate(addDays(null, meta.days))
-      } else if (meta.days === 0 && meta.value.startsWith('call_back_')) {
-        // Same-day callback — today (IST).
-        setCustomDate(istTodayISO())
-      }
+    // Phase 45.4 — for call_back_* chips with hours set, compute
+    // BOTH date + time together so midnight rollover (e.g. 22:30
+    // IST + 4h = 02:30 next day) advances customDate too. Previous
+    // implementation set customDate=today and customTime=02:30,
+    // yielding a follow_up in the past.
+    if (meta.days === 0 && meta.value.startsWith('call_back_') && typeof meta.hours === 'number') {
+      const { date, time } = istNowPlusHoursDateTime(meta.hours)
+      if (!dateTouchedRef.current) setCustomDate(date)
+      if (!timeTouchedRef.current) setCustomTime(time)
+      return
     }
-    if (!timeTouchedRef.current && typeof meta.hours === 'number') {
-      // Auto-set HH:MM = now + N hours IST.
-      setCustomTime(istNowPlusHoursHHMM(meta.hours))
+    // Same-day callback without preset hours (call_back_today):
+    // snap date to today; rep picks time manually.
+    if (meta.days === 0 && meta.value.startsWith('call_back_')) {
+      if (!dateTouchedRef.current) setCustomDate(istTodayISO())
+      return
+    }
+    // Standard chips with day offset.
+    if (!dateTouchedRef.current && meta.days != null && meta.days > 0) {
+      setCustomDate(addDays(null, meta.days))
     }
   }, [nextAction, open])
 
@@ -509,7 +530,14 @@ export default function PostCallOutcomeModal({
           <div className="lead-card" style={{ marginBottom: 14 }}>
             <div className="lead-card-head"><div className="lead-card-title">Outcome *</div></div>
             <div className="lead-card-pad">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {/* Phase 45.4 — 4-col grid (was 3) for 4 outcome chips
+                  (Good / Maybe / Call later / Lost). Wraps to 2-col
+                  on narrow screens. */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+                gap: 8,
+              }}>
                 {OUTCOMES.map(o => {
                   const on = outcome === o.value
                   const tint =
