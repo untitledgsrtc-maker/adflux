@@ -159,6 +159,21 @@ function addDays(baseISO, days) {
 }
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 
+// Phase 45.1 — IST today + now+N hours formatted as HH:MM for the
+// follow_up_time column. Anchored to IST so 18:30 UTC boundary
+// doesn't skew the date / time pair.
+function istTodayISO() {
+  const now = new Date()
+  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
+  return ist.toISOString().slice(0, 10)
+}
+function istNowPlusHoursHHMM(hours) {
+  const now = new Date()
+  const ist = new Date(now.getTime() + (5.5 * 60 - now.getTimezoneOffset()) * 60_000)
+  ist.setUTCHours(ist.getUTCHours() + hours)
+  return ist.toISOString().slice(11, 16)  // "HH:MM"
+}
+
 const OUTCOMES = [
   { value: 'positive', label: 'Good',  sub: 'Wants quote / more info', tone: 'success' },
   { value: 'neutral',  label: 'Maybe', sub: 'Try again in a few days', tone: 'warn' },
@@ -166,6 +181,13 @@ const OUTCOMES = [
 ]
 
 const NEXT_ACTIONS = [
+  // Phase 45.1 — same-day callback chips. Owner directive: rep needs
+  // "call again in 2 hours" without manually picking custom date +
+  // resetting it to today. days=0 keeps follow_up_date=today; new
+  // `hours` field auto-sets follow_up_time = now + N hours IST.
+  { value: 'call_back_2h',       label: 'Call back in 2 hours', days: 0, hours: 2 },
+  { value: 'call_back_4h',       label: 'Call back in 4 hours', days: 0, hours: 4 },
+  { value: 'call_back_today',    label: 'Call back later today', days: 0, hours: null }, // rep picks time
   { value: 'follow_up_tomorrow', label: 'Follow up tomorrow', days: 1 },
   { value: 'follow_up_3d',       label: 'Follow up in 3 days', days: 3 },
   { value: 'follow_up_7d',       label: 'Follow up next week', days: 7 },
@@ -226,17 +248,44 @@ export default function PostCallOutcomeModal({
       setVoiceLang('auto')
       dateTouchedRef.current = false
       timeTouchedRef.current = false
+      // Phase 45.1 — reset smart-default tracker so each fresh modal
+      // open re-runs the outcome→nextAction default rule.
+      nextActionTouchedRef.current = false
     }
   }, [open])
 
+  // Phase 45.1 — smart default for outcome=neutral ("Maybe", which in
+  // practice means "they didn't pick"). Default the next-action to
+  // "call back in 2 hours" instead of "follow up in 3 days". Only
+  // fires if the rep hasn't already manually picked a next-action.
+  const nextActionTouchedRef = useRef(false)
+  useEffect(() => {
+    if (!open || nextActionTouchedRef.current) return
+    if (outcome === 'neutral') {
+      setNextAction('call_back_2h')
+    }
+  }, [outcome, open])
+
   // When the rep picks a chip, snap the date input to the preset
-  // (unless they already overrode it manually).
+  // (unless they already overrode it manually). Phase 45.1 — extended
+  // for same-day callback chips (days=0): force customDate to today
+  // (IST), and if the chip carries an `hours` offset, auto-set
+  // customTime = now + N hours IST. Rep can still override either.
   useEffect(() => {
     if (!open) return
-    if (dateTouchedRef.current) return
     const meta = NEXT_ACTIONS.find(n => n.value === nextAction)
-    if (meta && meta.days != null && meta.days > 0) {
-      setCustomDate(addDays(null, meta.days))
+    if (!meta) return
+    if (!dateTouchedRef.current) {
+      if (meta.days != null && meta.days > 0) {
+        setCustomDate(addDays(null, meta.days))
+      } else if (meta.days === 0 && meta.value.startsWith('call_back_')) {
+        // Same-day callback — today (IST).
+        setCustomDate(istTodayISO())
+      }
+    }
+    if (!timeTouchedRef.current && typeof meta.hours === 'number') {
+      // Auto-set HH:MM = now + N hours IST.
+      setCustomTime(istNowPlusHoursHHMM(meta.hours))
     }
   }, [nextAction, open])
 
@@ -569,6 +618,15 @@ export default function PostCallOutcomeModal({
                         // Re-arm chip-driven date snap whenever the
                         // rep deliberately picks a chip.
                         dateTouchedRef.current = false
+                        // Phase 45.1 — same-day callback chips also
+                        // need the time-snap re-armed so the auto
+                        // now+Nh fires after manual override.
+                        if (n.value && n.value.startsWith('call_back_')) {
+                          timeTouchedRef.current = false
+                        }
+                        // Phase 45.1 — mark next-action as touched so
+                        // the outcome→default rule won't override.
+                        nextActionTouchedRef.current = true
                       }}
                       disabled={saving}
                       style={{
