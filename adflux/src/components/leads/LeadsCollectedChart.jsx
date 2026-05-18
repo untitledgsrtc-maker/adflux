@@ -141,37 +141,35 @@ export default function LeadsCollectedChart() {
 
   return (
     <div style={styles.card}>
-      {/* Header row: title + filters */}
+      {/* Header row: title + filters. Phase 44.2 — single date range
+          (from/to inputs side-by-side, no duplicate visible pill). */}
       <div style={styles.head}>
         <div style={styles.title}>Leads Collected</div>
         <div style={styles.filters}>
-          <input
-            type="text"
-            readOnly
-            value={fmtRangeLabel(from, to)}
-            onClick={(e) => e.currentTarget.nextElementSibling?.click()}
-            style={styles.rangeInput}
-          />
-          <input
-            type="date" value={from}
-            onChange={e => setFrom(e.target.value)}
-            max={to}
-            style={styles.dateHidden}
-          />
-          <input
-            type="date" value={to}
-            onChange={e => setTo(e.target.value)}
-            min={from} max={today}
-            style={styles.dateVisible}
-            title="End date"
-          />
+          <div style={styles.rangeBox}>
+            <input
+              type="date" value={from}
+              onChange={e => setFrom(e.target.value)}
+              max={to}
+              style={styles.dateInline}
+              title="Start date"
+            />
+            <span style={styles.rangeSep}>→</span>
+            <input
+              type="date" value={to}
+              onChange={e => setTo(e.target.value)}
+              min={from} max={today}
+              style={styles.dateInline}
+              title="End date"
+            />
+          </div>
           <select value={segment} onChange={e => setSegment(e.target.value)} style={styles.select}>
-            <option value="all">All</option>
+            <option value="all">All segments</option>
             <option value="private">Private</option>
             <option value="government">Government</option>
           </select>
           <select value={source} onChange={e => setSource(e.target.value)} style={styles.select}>
-            <option value="all">Audience</option>
+            <option value="all">All sources</option>
             {sources.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
@@ -201,6 +199,10 @@ export default function LeadsCollectedChart() {
             <div style={styles.bars}>
               {rows.map(r => {
                 const h = (r.count / yMax) * 100
+                // Phase 44.2 — brand-yellow bars. Full saturation at
+                // top, faded for lower bars so the eye still groups
+                // them without using a non-brand colour.
+                const isHi = r.count >= yMax * 0.6
                 return (
                   <div key={r.date} style={styles.barCol} title={`${r.count} leads on ${r.date}`}>
                     <div style={styles.countLabel}>{r.count > 0 ? r.count : ''}</div>
@@ -208,11 +210,8 @@ export default function LeadsCollectedChart() {
                       <div style={{
                         ...styles.barFill,
                         height: `${Math.max(r.count > 0 ? 4 : 0, h)}%`,
-                        background: r.count >= yMax * 0.6
-                          ? 'var(--v2-rose, #EF4444)'
-                          : r.count >= yMax * 0.3
-                            ? '#E5739B'
-                            : '#B85870',
+                        background: 'var(--v2-yellow, #FFE600)',
+                        opacity: r.count === 0 ? 0 : isHi ? 1 : 0.62,
                       }} />
                     </div>
                     <div style={styles.dayLabel}>{fmtDayLabel(r.date)}</div>
@@ -245,26 +244,24 @@ const styles = {
     letterSpacing: '0.02em',
   },
   filters: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  rangeInput: {
-    height: 32, padding: '0 12px',
-    background: 'var(--v2-bg-2, var(--surface))',
-    border: '1px solid var(--v2-line, var(--border))',
-    borderRadius: 8,
-    color: 'var(--v2-ink-1, var(--text))',
-    fontSize: 12, fontFamily: 'inherit', minWidth: 180,
-    cursor: 'pointer',
-  },
-  dateHidden: {
-    position: 'absolute', opacity: 0, pointerEvents: 'auto',
-    width: 0, height: 0, padding: 0, border: 'none',
-  },
-  dateVisible: {
+  // Phase 44.2 — single date range pill with two inline inputs.
+  rangeBox: {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
     height: 32, padding: '0 10px',
     background: 'var(--v2-bg-2, var(--surface))',
     border: '1px solid var(--v2-line, var(--border))',
     borderRadius: 8,
+  },
+  dateInline: {
+    height: 24, padding: '0 4px',
+    background: 'transparent', border: 'none', outline: 'none',
     color: 'var(--v2-ink-1, var(--text))',
     fontSize: 12, fontFamily: 'inherit',
+    colorScheme: 'dark',
+  },
+  rangeSep: {
+    fontSize: 12, color: 'var(--v2-ink-2, var(--text-muted))',
+    padding: '0 2px',
   },
   select: {
     height: 32, padding: '0 28px 0 10px',
