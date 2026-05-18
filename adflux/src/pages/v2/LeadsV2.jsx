@@ -403,9 +403,24 @@ export default function LeadsV2() {
         </div>
       </div>
 
-      {/* Phase 44.1 — daily leads-collected chart. Read-only,
-          doesn't touch the existing filter store below. */}
-      <LeadsCollectedChart />
+      {/* Phase 44.1 — daily leads-collected chart.
+          Phase 44.3 — clicking a bar filters the table date range
+          to that single day. Rep clicks "07 May" → table shows
+          only leads created 07 May. */}
+      <LeadsCollectedChart
+        onDayClick={(dateISO) => {
+          const d = new Date(dateISO + 'T00:00:00Z')
+          const label = d.toLocaleDateString('en-IN', {
+            day: 'numeric', month: 'short', timeZone: 'UTC',
+          })
+          setDateRange({
+            preset: 'custom',
+            from: dateISO,
+            to:   dateISO,
+            label,
+          })
+        }}
+      />
 
       {/* ─── AI briefing card (real data, not mock) ─── */}
       {leads.length > 0 && (

@@ -50,7 +50,7 @@ function fmtRangeLabel(from, to) {
   return `${fmt(f)} - ${fmt(t)}`
 }
 
-export default function LeadsCollectedChart() {
+export default function LeadsCollectedChart({ onDayClick }) {
   const today = istTodayISO()
   const [from, setFrom] = useState(isoMinusDays(today, 29))
   const [to,   setTo]   = useState(today)
@@ -144,7 +144,10 @@ export default function LeadsCollectedChart() {
       {/* Header row: title + filters. Phase 44.2 — single date range
           (from/to inputs side-by-side, no duplicate visible pill). */}
       <div style={styles.head}>
-        <div style={styles.title}>Leads Collected</div>
+        <div>
+          <div style={styles.title}>Leads Collected</div>
+          <div style={styles.sub}>Click a bar to filter the table to that day</div>
+        </div>
         <div style={styles.filters}>
           <div style={styles.rangeBox}>
             <input
@@ -187,39 +190,45 @@ export default function LeadsCollectedChart() {
       ) : rows.length === 0 ? (
         <div style={styles.empty}>No leads in this range.</div>
       ) : (
-        <div style={styles.chartWrap}>
-          {/* Y-axis labels (4 ticks). */}
-          <div style={styles.yAxis}>
-            {[yMax, Math.round(yMax * 0.8), Math.round(yMax * 0.6), Math.round(yMax * 0.4), Math.round(yMax * 0.2), 0].map((v, i) => (
-              <div key={i} style={styles.yTick}>{v}</div>
-            ))}
-          </div>
-          {/* Bars + day labels */}
-          <div style={styles.barsWrap}>
-            <div style={styles.bars}>
-              {rows.map(r => {
-                const h = (r.count / yMax) * 100
-                // Phase 44.2 — brand-yellow bars. Full saturation at
-                // top, faded for lower bars so the eye still groups
-                // them without using a non-brand colour.
-                const isHi = r.count >= yMax * 0.6
-                return (
-                  <div key={r.date} style={styles.barCol} title={`${r.count} leads on ${r.date}`}>
-                    <div style={styles.countLabel}>{r.count > 0 ? r.count : ''}</div>
-                    <div style={styles.barTrack}>
-                      <div style={{
-                        ...styles.barFill,
-                        height: `${Math.max(r.count > 0 ? 4 : 0, h)}%`,
-                        background: 'var(--v2-yellow, #FFE600)',
-                        opacity: r.count === 0 ? 0 : isHi ? 1 : 0.62,
-                      }} />
-                    </div>
-                    <div style={styles.dayLabel}>{fmtDayLabel(r.date)}</div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+        /* Phase 44.3 — bars match AdminDashboard RevenueTrendPanel
+           spec exactly: yellow gradient (top 88% → bottom 45%),
+           radius 6 6 0 0, min-height 6 even for empty days, count
+           label absolute -18 above each bar, day label uppercase
+           10/600 letter-spacing below. Today gets the brighter
+           is-current gradient + glow. */
+        <div style={styles.barsWrap}>
+          {rows.map((r, i) => {
+            const h = Math.max(6, Math.round((r.count / yMax) * 170))
+            const isToday = r.date === today
+            const clickable = !!onDayClick && r.count > 0
+            return (
+              <button
+                key={r.date}
+                type="button"
+                onClick={clickable ? () => onDayClick(r.date) : undefined}
+                disabled={!clickable}
+                title={clickable
+                  ? `Open ${r.count} lead${r.count > 1 ? 's' : ''} from ${fmtDayLabel(r.date)}`
+                  : `${fmtDayLabel(r.date)}: ${r.count} leads`}
+                style={{
+                  ...styles.barCol,
+                  cursor: clickable ? 'pointer' : 'default',
+                }}
+              >
+                <div style={{
+                  ...styles.bar,
+                  height: h,
+                  background: isToday
+                    ? 'linear-gradient(180deg, #FFE600, #f59e0b)'
+                    : 'linear-gradient(180deg, rgba(255,230,0,.88), rgba(255,230,0,.45))',
+                  boxShadow: isToday ? '0 0 0 2px rgba(255,230,0,.18)' : 'none',
+                }}>
+                  <div style={styles.barValue}>{r.count > 0 ? r.count : '0'}</div>
+                </div>
+                <div style={styles.dayLabel}>{fmtDayLabel(r.date)}</div>
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
@@ -239,9 +248,14 @@ const styles = {
     gap: 10, marginBottom: 14, flexWrap: 'wrap',
   },
   title: {
+    fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',
     fontSize: 14, fontWeight: 700,
     color: 'var(--v2-ink-0, var(--text))',
     letterSpacing: '0.02em',
+  },
+  sub: {
+    fontSize: 11, color: 'var(--v2-ink-2, var(--text-muted))',
+    marginTop: 2,
   },
   filters: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   // Phase 44.2 — single date range pill with two inline inputs.
@@ -288,43 +302,43 @@ const styles = {
     padding: 40, textAlign: 'center',
     fontSize: 13, color: 'var(--v2-ink-2, var(--text-muted))',
   },
-  chartWrap: {
-    display: 'flex', gap: 10, height: 230,
-  },
-  yAxis: {
-    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-    paddingBottom: 24, paddingTop: 18,
-    fontSize: 10, color: 'var(--v2-ink-2, var(--text-muted))',
-    minWidth: 28, textAlign: 'right',
-  },
-  yTick: { lineHeight: 1 },
-  barsWrap: { flex: 1, overflowX: 'auto' },
-  bars: {
+  /* Phase 44.3 — bar styles mirror .v2d-bars / .v2d-bar from
+     v2.css (RevenueTrendPanel). One-row flex with gap, bars grow
+     up from baseline. Height computed inline per bar. */
+  barsWrap: {
     display: 'flex', alignItems: 'flex-end',
-    gap: 6, height: '100%', minWidth: '100%',
+    gap: 6, height: 200,
+    padding: '24px 4px 0',
+    overflowX: 'auto',
   },
   barCol: {
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'flex-end',
-    flex: '1 0 28px', minWidth: 28, height: '100%',
+    gap: 6, height: '100%',
+    flex: '1 0 28px', minWidth: 28,
+    background: 'transparent', border: 0, padding: 0,
+    color: 'inherit', font: 'inherit', textAlign: 'inherit',
   },
-  countLabel: {
-    fontSize: 10, fontWeight: 600,
-    color: 'var(--v2-ink-1, var(--text))',
-    marginBottom: 4, minHeight: 14, lineHeight: 1,
-  },
-  barTrack: {
-    width: '100%', flex: 1,
-    display: 'flex', alignItems: 'flex-end',
-  },
-  barFill: {
+  bar: {
     width: '100%',
-    borderRadius: '4px 4px 0 0',
+    borderRadius: '6px 6px 0 0',
+    minHeight: 6,
+    position: 'relative',
     transition: 'height 220ms ease',
+  },
+  barValue: {
+    position: 'absolute', top: -18, left: '50%',
+    transform: 'translateX(-50%)',
+    fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',
+    fontSize: 10, fontWeight: 700,
+    color: 'var(--v2-ink-0, var(--text))',
+    whiteSpace: 'nowrap',
   },
   dayLabel: {
     fontSize: 10,
     color: 'var(--v2-ink-2, var(--text-muted))',
-    marginTop: 6, whiteSpace: 'nowrap',
+    fontWeight: 600, letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    whiteSpace: 'nowrap',
   },
 }
