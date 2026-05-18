@@ -285,6 +285,22 @@ export default function TelecallerV2() {
 
   const nextCall = sortedQueue[0] || null
 
+  // Phase 47.6 — stale leads (no contact 3+ days). Computed
+  // client-side from the queue. Surfaces as a banner above the
+  // hero when ≥1 stale. Zero new infra (no edge function, no
+  // push trigger) — just visual nudge inline.
+  const staleLeads = useMemo(() => {
+    const threeDays = 3 * 24 * 60 * 60 * 1000
+    const now = Date.now()
+    return leads.filter(l => {
+      if (l.do_not_call) return false  // DNC isn't stale; it's done
+      const lastTouch = l.last_contact_at ? new Date(l.last_contact_at).getTime() : 0
+      // No contact ever counts as stale too; use created_at floor.
+      const baseTs = lastTouch || (l.created_at ? new Date(l.created_at).getTime() : now)
+      return (now - baseTs) >= threeDays
+    })
+  }, [leads])
+
   // Phase 47.3 — top hot leads for this TC. Same source as the
   // queue but filtered to heat='hot' + sorted by last-touch
   // oldest-first. Surfaces "must-call NOW" leads above everything.
@@ -400,6 +416,29 @@ export default function TelecallerV2() {
             </p>
           </div>
           <div />
+        </div>
+      )}
+
+      {/* Phase 47.6 — stale lead alert banner. Renders only when
+          ≥1 lead has had no contact for 3+ days. Click → scroll
+          into the queue below. No push (notification fatigue);
+          visible-when-open is enough. */}
+      {staleLeads.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 14px', marginBottom: 14,
+          background: 'rgba(245,158,11,.10)',
+          border: '1px solid rgba(245,158,11,.35)',
+          borderRadius: 10,
+          fontSize: 13, color: 'var(--warning, #F59E0B)',
+        }}>
+          <Clock size={14} />
+          <div style={{ flex: 1 }}>
+            <strong>{staleLeads.length} lead{staleLeads.length > 1 ? 's' : ''} idle 3+ days.</strong>{' '}
+            <span style={{ color: 'var(--v2-ink-2)' }}>
+              Tap one in the queue below to call. Oldest at top.
+            </span>
+          </div>
         </div>
       )}
 
