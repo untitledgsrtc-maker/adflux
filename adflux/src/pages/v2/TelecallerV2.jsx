@@ -69,13 +69,15 @@ export default function TelecallerV2() {
   const [callLead, setCallLead] = useState(null)
   const [postCallOpen, setPostCallOpen] = useState(false)
   const [pendingActivityId, setPendingActivityId] = useState(null)
+  // Phase 43.2 — daily call target for the ring + accountability.
+  const [callTarget, setCallTarget] = useState(50)
 
   async function load() {
     setLoading(true)
     const today = new Date().toISOString().slice(0, 10)
     const startOfDay = `${today}T00:00:00`
 
-    const [leadsRes, callsRes, connectedRes, qualRes, handoffRes] = await Promise.all([
+    const [leadsRes, callsRes, connectedRes, qualRes, handoffRes, targetRes] = await Promise.all([
       supabase
         .from('leads')
         .select('*, assigned:assigned_to(id, name, city)')
@@ -115,6 +117,13 @@ export default function TelecallerV2() {
         .not('stage', 'in', '(Won,Lost)')
         .order('handoff_sla_due_at', { ascending: true, nullsFirst: false })
         .limit(20),
+      // Phase 43.2 — read this rep's active daily target for min_calls.
+      supabase
+        .from('daily_targets')
+        .select('min_calls')
+        .eq('user_id', profile.id)
+        .is('effective_to', null)
+        .maybeSingle(),
     ])
 
     setLeads(leadsRes.data || [])
@@ -122,6 +131,7 @@ export default function TelecallerV2() {
     setConnectedToday(connectedRes.count || 0)
     setQualifiedToday(qualRes.count || 0)
     setHandoffs(handoffRes.data || [])
+    setCallTarget(Number(targetRes?.data?.min_calls) || 50)
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
@@ -193,27 +203,32 @@ export default function TelecallerV2() {
     )
   }
 
-  // Phase 35.1 pass 2 — design-rule rollout. Queue size + today's
-  // calls become V2Hero metrics; ring shows qualified-rate (qualified
-  // vs called today). Footer surfaces handoffs + open queue.
+  // Phase 43.2 — ring now shows progress toward daily call target
+  // (callsToday / callTarget × 100). Connect-rate joins the footer
+  // stats so TC can read connect-quality at a glance. Qualified
+  // count stays in footer.
   const queueOpen = leads.length
-  const qualifiedRate = callsToday > 0
-    ? Math.round((qualifiedToday / callsToday) * 100)
+  const callTargetPct = callTarget > 0
+    ? Math.round((callsToday / callTarget) * 100)
+    : 0
+  const connectRatePct = callsToday > 0
+    ? Math.round((connectedToday / callsToday) * 100)
     : 0
   return (
     <div className="lead-root">
       {(queueOpen > 0 || callsToday > 0) && (
         <V2Hero
           eyebrow={`Telecaller · ${profile?.name || 'You'}`}
-          value={String(callsToday)}
-          label={`call${callsToday === 1 ? '' : 's'} logged today`}
-          percent={callsToday > 0 ? qualifiedRate : undefined}
+          value={`${callsToday}/${callTarget}`}
+          label={`call${callsToday === 1 ? '' : 's'} today · target ${callTarget}`}
+          percent={callTargetPct}
           footerStats={[
-            { label: 'in queue',   value: queueOpen,         tint: 'var(--accent, #FFE600)' },
-            { label: 'handoffs',   value: handoffs.length,   tint: '#5AB0FF' },
-            { label: 'qualified',  value: qualifiedToday,    tint: '#2BD8A0' },
+            { label: `${connectRatePct}% connected`, value: connectedToday, tint: connectRatePct >= 30 ? '#2BD8A0' : '#F59E0B' },
+            { label: 'qualified',                    value: qualifiedToday, tint: '#5AB0FF' },
+            { label: 'in queue',                     value: queueOpen,      tint: 'var(--accent, #FFE600)' },
+            { label: 'handoffs',                     value: handoffs.length, tint: handoffs.length > 0 ? '#F59E0B' : 'var(--v2-ink-2, #94a3b8)' },
           ]}
-          accent={callsToday >= 10}
+          accent={callTargetPct >= 100}
         />
       )}
       {/* Page head */}
@@ -313,12 +328,14 @@ export default function TelecallerV2() {
         </div>
       )}
 
-      {/* KPI strip */}
+      {/* Phase 43.2 — KPI strip swaps "Today's calls" → "Calls / target"
+          and surfaces connect-rate as a separate tile. Connect-rate is
+          the real TC KPI (just "calls logged" is gaming-able). */}
       <div className="lead-stat-strip">
-        <Stat label="Today's calls"     num={callsToday}            meta="from call_logs" />
-        <Stat label="Qualified today"   num={qualifiedToday}        meta="handed off to sales" />
-        <Stat label="Open queue"        num={leads.length}          meta={hotWarmCount(leads)} />
-        <Stat label="Pending hand-offs" num={handoffs.length}       meta={overdueCount(handoffs)} />
+        <Stat label="Calls today"       num={`${callsToday}/${callTarget}`} meta={`${callTargetPct}% of target`} />
+        <Stat label="Connect rate"      num={`${connectRatePct}%`}          meta={`${connectedToday} of ${callsToday} connected`} />
+        <Stat label="Qualified today"   num={qualifiedToday}                meta="handed off to sales" />
+        <Stat label="Pending hand-offs" num={handoffs.length}               meta={overdueCount(handoffs)} />
       </div>
 
       {/* Two-col: hand-offs + queue */}
