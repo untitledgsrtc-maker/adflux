@@ -166,9 +166,12 @@ export default function TelecallerV2() {
       // Phase 43.3 — upcoming callbacks (this rep's open follow_ups
       // due today or tomorrow). Joined to lead for name + phone so
       // the panel renders without extra round-trips.
+      // Phase 54 F3 — embed widened so the lead from the first callback
+      // can be promoted into the Next Call hero when the active queue
+      // is empty. Same field shape `nextCall` uses on the hero render.
       supabase
         .from('follow_ups')
-        .select('id, follow_up_date, follow_up_time, note, lead_id, leads(id, name, phone, company)')
+        .select('id, follow_up_date, follow_up_time, note, lead_id, leads(id, name, phone, company, city, segment, stage, source, heat, last_contact_at, do_not_call, wa_opt_out)')
         .eq('assigned_to', profile.id)
         .eq('is_done', false)
         .gte('follow_up_date', todayDateISO)
@@ -350,7 +353,16 @@ export default function TelecallerV2() {
     return arr
   }, [leads])
 
-  const nextCall = sortedQueue[0] || null
+  // Phase 54 F3 — when the active queue is empty but the rep has at
+  // least one upcoming callback, surface that callback's lead as the
+  // Next Call hero so the rep has something actionable on screen.
+  // Without this fallback, Dhara opens /telecaller, sees "Queue
+  // empty — nice." and has no clear "start here" cue even though 10
+  // callbacks are due in the next 48 hours.
+  const fallbackFromCallback = (sortedQueue.length === 0 && callbacks.length > 0)
+    ? (callbacks[0]?.leads || null)
+    : null
+  const nextCall = sortedQueue[0] || fallbackFromCallback || null
 
   // Phase 51 — fetch the latest quote for the current Next Call
   // lead. Single row, cheapest possible (`limit(1)` ordered desc).

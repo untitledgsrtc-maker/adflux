@@ -22,11 +22,19 @@
 //
 // Schema constraint: outcome NOT NULL with CHECK enum. At tel-tap
 // time we don't know the real outcome — the rep hasn't said the
-// call connected, was no-answer, etc. We write `outcome='connected'`
-// as a permissive default (it satisfies the CHECK constraint while
-// preserving the audit signal). The real outcome lives in the
-// paired lead_activities.outcome that the PostCallOutcomeModal
-// saves once the rep returns from the dialer.
+// call connected, was no-answer, etc.
+//
+// Phase 54 F2 — was defaulting to 'connected' which inflated the
+// connect-rate KPI to ~100% on /telecaller (every tel-tap counted
+// as connected even when no human picked up). Owner-approved 30%
+// min connect rate was meaningless under that default.
+//
+// New default: 'no_answer'. PostCallOutcomeModal updates this row
+// to 'connected' (when outcome positive/neutral/negative) or
+// 'callback_requested' (when outcome callback) once the rep saves
+// the modal. Calls where the rep skips the modal stay at
+// 'no_answer' — accurate, because if no follow-up was logged the
+// rep most likely didn't actually have a conversation.
 //
 // Fire-and-forget: we deliberately do NOT await this in the calling
 // code. The tel: link MUST fire on the user gesture or iOS Safari
@@ -47,8 +55,8 @@ export function logCallAudit(supabase, { userId, leadId, phone }) {
       user_id:      userId,
       lead_id:      leadId || null,
       client_phone: phone || null,
-      outcome:      'connected',
-      notes:        'tel-tap audit (Phase 35.0 pass 6)',
+      outcome:      'no_answer',
+      notes:        'tel-tap audit (Phase 35.0 pass 6, Phase 54 F2 default)',
     }]).then(({ error }) => {
       if (error) {
         // Don't toast — this is best-effort audit only.

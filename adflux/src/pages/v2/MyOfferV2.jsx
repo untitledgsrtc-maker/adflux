@@ -64,15 +64,24 @@ export default function MyOfferV2() {
     )
   }
 
+  // Phase 54 F5 — TC sees Other expense only (no TA/DA/Hotel per
+  // Phase 52c). Page header copy was sales-rep framed ("Travel &
+  // Daily Allowance" / "TA / DA claims") which was confusing for
+  // office-based TC. Swap kicker + sub for telecaller role.
+  const isTelecaller = profile?.role === 'telecaller'
   if (!offer) {
     return (
       <div className="v2d-offer">
         <div className="v2d-page-head">
           <div>
-            <div className="v2d-page-kicker">Travel & Daily Allowance</div>
+            <div className="v2d-page-kicker">
+              {isTelecaller ? 'Expenses & Leave' : 'Travel & Daily Allowance'}
+            </div>
             <h1 className="v2d-page-title">My Offer & Claims</h1>
             <div className="v2d-page-sub">
-              No offer letter on file. Submit TA / DA claims below for the admin to approve.
+              {isTelecaller
+                ? 'No offer letter on file. Submit expense claims below for the admin to approve.'
+                : 'No offer letter on file. Submit TA / DA claims below for the admin to approve.'}
             </div>
           </div>
           {/* Phase 34Z.71 — request-leave entry point. */}

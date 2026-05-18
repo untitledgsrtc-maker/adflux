@@ -168,7 +168,22 @@ export default function TotalPayableCard() {
 
       <Row label="Base salary (70%)"            value={data.base} />
       <Row label={`Variable salary (30%)`}      value={data.variable} sub={data.variableCap > 0 ? `cap ${formatCurrency(data.variableCap)}` : null} />
-      <Row label="Incentive earned"             value={data.incentive} muted={data.incentive === 0 ? 'No final payment yet' : null} />
+      {/* Phase 54 F1 — label clarified. RPC value is
+          SUM(incentive_payouts.amount_paid) for the month — i.e.
+          incentive ALREADY paid out by admin, not the forecast.
+          The "Proposed" line on MyPerformance shows the forecast.
+          Two numbers on one page was confusing; this is the
+          minimum-risk fix until owner refactors the section. */}
+      <Row
+        label="Incentive already paid"
+        value={data.incentive}
+        sub={data.incentiveProposed > 0 && data.incentiveProposed > data.incentive
+          ? `Proposed: ${formatCurrency(data.incentiveProposed)} once pipeline closes`
+          : null}
+        muted={data.incentive === 0 && data.incentiveProposed === 0
+          ? 'No final payment yet'
+          : null}
+      />
       <Row label="TA / DA — approved + GPS"     value={data.taDaTotal} muted={data.pendingCount > 0 ? `${data.pendingCount} pending · ${formatCurrency(data.taDaPending)} not added` : null} />
       {/* Phase 36.12 — unpaid leave deduction line. Negative number
           shown in danger red so the rep sees what's being cut. */}
@@ -194,10 +209,11 @@ export default function TotalPayableCard() {
       </div>
 
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.6 }}>
-        Approx — base + variable use the live score, incentive is what the system
-        has recorded so far this month, TA is the GPS distance × city rate plus
-        any admin-approved manual claims. Pending claims appear in the line above
-        but don't add until admin approves.
+        Approx — base + variable use the live score. "Incentive already paid"
+        is what admin has paid out so far this month (proposed/forecast
+        appears separately on the Active Campaigns card). TA is the GPS
+        distance × city rate plus any admin-approved manual claims. Pending
+        claims appear in the line above but don't add until admin approves.
       </div>
     </div>
   )

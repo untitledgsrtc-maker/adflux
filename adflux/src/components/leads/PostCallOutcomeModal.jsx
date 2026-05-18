@@ -402,17 +402,31 @@ export default function PostCallOutcomeModal({
 
     // Phase 47.8 — patch most recent call_logs row for this user +
     // lead in the last 10 minutes with the picked call language.
+    // Phase 54 F2 — same patch also writes the real outcome back to
+    // call_logs (tel-tap defaults to 'no_answer'; here we upgrade
+    // to 'connected' or 'callback_requested' once the rep confirms
+    // what happened on the call). Combined patch = one round-trip.
     // Fire-and-forget; failure doesn't block save (analytics only).
-    if (callLanguage && profile?.id && lead?.id) {
+    if (profile?.id && lead?.id) {
       const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-      supabase.from('call_logs')
-        .update({ language: callLanguage })
-        .eq('user_id', profile.id)
-        .eq('lead_id', lead.id)
-        .gte('call_at', cutoff)
-        .then(({ error }) => {
-          if (error) console.warn('[call-lang] update failed:', error.message)
-        })
+      const callLogPatch = {}
+      if (callLanguage) callLogPatch.language = callLanguage
+      // Map lead_activities outcome → call_logs outcome enum.
+      if (outcome === 'positive' || outcome === 'neutral' || outcome === 'negative') {
+        callLogPatch.outcome = 'connected'
+      } else if (outcome === 'callback') {
+        callLogPatch.outcome = 'callback_requested'
+      }
+      if (Object.keys(callLogPatch).length > 0) {
+        supabase.from('call_logs')
+          .update(callLogPatch)
+          .eq('user_id', profile.id)
+          .eq('lead_id', lead.id)
+          .gte('call_at', cutoff)
+          .then(({ error }) => {
+            if (error) console.warn('[call-log-patch] update failed:', error.message)
+          })
+      }
     }
 
     // 2. Stage advancement based on outcome.
