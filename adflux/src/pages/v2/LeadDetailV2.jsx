@@ -744,74 +744,13 @@ export default function LeadDetailV2() {
                 }}
               />
               {lead.segment && <SegChip segment={lead.segment} />}
-              {/* Phase 47.5 — DNC + WhatsApp opt-out toggle chips.
-                  Click to flip flag. Solid red when active.
-                  Phase 62.3 (20 May 2026) — only render when flag is
-                  ON. Reps don't need to see "DNC OFF" / "WA opt-out
-                  OFF" as default chip wallpaper. The toggles still
-                  exist inside Lead details panel where admin/rep can
-                  flip them when needed. */}
-              {lead.do_not_call && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const next = !lead.do_not_call
-                  const { error } = await supabase
-                    .from('leads')
-                    .update({
-                      do_not_call: next,
-                      dnc_at: next ? new Date().toISOString() : null,
-                      updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', lead.id)
-                  if (error) toastError(error, 'Could not update DNC flag.')
-                  else setLead(l => ({ ...l, do_not_call: next, dnc_at: next ? new Date().toISOString() : null }))
-                }}
-                title={lead.do_not_call ? 'DNC active — tap to lift' : 'Tap to mark Do Not Call'}
-                aria-pressed={!!lead.do_not_call}
-                style={{
-                  // Phase 62.2 (20 May 2026) — demoted from solid red
-                  // to soft-tinted chip when ON. Was out-shouting the
-                  // primary Stage chip on first paint. Same flag, less
-                  // visual weight.
-                  padding: '4px 10px', borderRadius: 999,
-                  fontSize: 11, fontWeight: 600,
-                  border: '1px solid',
-                  background: lead.do_not_call ? 'rgba(239,68,68,0.14)' : 'transparent',
-                  borderColor: lead.do_not_call ? 'var(--danger, #EF4444)' : 'var(--border)',
-                  color: lead.do_not_call ? 'var(--danger, #EF4444)' : 'var(--text-muted)',
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >
-                DNC ON
-              </button>
-              )}
-              {lead.wa_opt_out && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const next = !lead.wa_opt_out
-                  const { error } = await supabase
-                    .from('leads')
-                    .update({ wa_opt_out: next, updated_at: new Date().toISOString() })
-                    .eq('id', lead.id)
-                  if (error) toastError(error, 'Could not update WhatsApp opt-out.')
-                  else setLead(l => ({ ...l, wa_opt_out: next }))
-                }}
-                title="WhatsApp opt-out active — tap to lift"
-                aria-pressed={true}
-                style={{
-                  padding: '4px 10px', borderRadius: 999,
-                  fontSize: 11, fontWeight: 600,
-                  border: '1px solid var(--warning, #F59E0B)',
-                  background: 'rgba(245,158,11,0.14)',
-                  color: 'var(--warning, #F59E0B)',
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >
-                WA opt-out ON
-              </button>
-              )}
+              {/* Phase 62.4 (20 May 2026) — DNC + WA opt-out chips
+                  moved OUT of the hero into the Lead details panel
+                  (right rail / mobile bottom section). They're
+                  contact-preference settings, not status indicators
+                  — they don't belong next to Stage / Heat / Segment.
+                  When ON they still affect the sticky bottom CTA
+                  buttons + the Phone chip render. */}
             </div>
 
             {/* Phase 62.1 (20 May 2026) — promoted Phone chip + days-
@@ -1522,6 +1461,57 @@ export default function LeadDetailV2() {
                   placeholder="Click to add notes…"
                 />
               </div>
+
+              {/* Phase 62.4 (20 May 2026) — contact preference toggles
+                  moved here from the hero chip row. Two compact rows
+                  with a switch-like ghost chip. ON state uses soft
+                  tint (no solid red shouting). */}
+              <div style={{
+                gridColumn: '1 / span 2',
+                borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))',
+                paddingTop: 12, marginTop: 4,
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
+                  Contact preferences
+                </div>
+                <ContactPrefRow
+                  label="Do Not Call"
+                  sublabel="Blocks the Call buttons when ON"
+                  active={!!lead.do_not_call}
+                  activeColor="var(--danger, #EF4444)"
+                  activeBg="rgba(239,68,68,0.14)"
+                  onToggle={async () => {
+                    const next = !lead.do_not_call
+                    const { error } = await supabase
+                      .from('leads')
+                      .update({
+                        do_not_call: next,
+                        dnc_at: next ? new Date().toISOString() : null,
+                        updated_at: new Date().toISOString(),
+                      })
+                      .eq('id', lead.id)
+                    if (error) toastError(error, 'Could not update DNC flag.')
+                    else setLead(l => ({ ...l, do_not_call: next, dnc_at: next ? new Date().toISOString() : null }))
+                  }}
+                />
+                <ContactPrefRow
+                  label="WhatsApp opt-out"
+                  sublabel="Blocks the WhatsApp buttons when ON"
+                  active={!!lead.wa_opt_out}
+                  activeColor="var(--warning, #F59E0B)"
+                  activeBg="rgba(245,158,11,0.14)"
+                  onToggle={async () => {
+                    const next = !lead.wa_opt_out
+                    const { error } = await supabase
+                      .from('leads')
+                      .update({ wa_opt_out: next, updated_at: new Date().toISOString() })
+                      .eq('id', lead.id)
+                    if (error) toastError(error, 'Could not update WhatsApp opt-out.')
+                    else setLead(l => ({ ...l, wa_opt_out: next }))
+                  }}
+                />
+              </div>
             </div>
           </div>
 
@@ -1929,6 +1919,48 @@ function Row({ label, right }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>{label}</span>
       <span>{right}</span>
+    </div>
+  )
+}
+
+// Phase 62.4 (20 May 2026) — compact toggle row used inside the Lead
+// details "Contact preferences" subsection. Replaces the noisy
+// solid-color chips that used to live in the hero. Soft-tint ON
+// state with aria-pressed for a11y. Two rows per lead (DNC + WA).
+function ContactPrefRow({ label, sublabel, active, activeColor, activeBg, onToggle }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      gap: 10,
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+          {label}
+        </div>
+        {sublabel && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+            {sublabel}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={active}
+        style={{
+          flexShrink: 0,
+          padding: '5px 12px',
+          borderRadius: 999,
+          fontSize: 11, fontWeight: 700, letterSpacing: '.04em',
+          border: `1px solid ${active ? activeColor : 'var(--border)'}`,
+          background: active ? activeBg : 'transparent',
+          color: active ? activeColor : 'var(--text-muted)',
+          cursor: 'pointer', fontFamily: 'inherit',
+          minWidth: 56,
+        }}
+      >
+        {active ? 'ON' : 'OFF'}
+      </button>
     </div>
   )
 }
