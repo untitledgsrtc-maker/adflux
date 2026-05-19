@@ -277,7 +277,7 @@ export default function HRNewUserV2() {
             <option value="">— Pick a designation —</option>
             {designations.map(d => (
               <option key={d.id} value={d.id}>
-                {d.name}{d.default_monthly_salary ? ` · ₹${Number(d.default_monthly_salary).toLocaleString('en-IN')}/mo` : ''}
+                {d.name}
               </option>
             ))}
           </select>
