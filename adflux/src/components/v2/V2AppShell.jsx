@@ -130,9 +130,15 @@ const AGENCY_NAV = [
 // Dashboard entry. Added at the top so reps can see the same
 // pipeline / KPI / leaderboard widgets the sales role gets.
 const TELECALLER_NAV = [
+  // Phase 61.1 (19 May 2026) — /work dropped per owner directive
+  // "telecaller seen 2 page /work and /telecaller". TC daily flow
+  // IS the queue at /telecaller; /work is the sales-only Plan-A
+  // morning page. /work route + page kept as a deep-link so reps
+  // who hit the URL directly still render — just not surfaced in
+  // the TC nav anymore.
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/telecaller',        label: 'Call Queue',     icon: Phone },
-  { to: '/work',              label: 'Today',          icon: Sun },
+  { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
@@ -202,8 +208,10 @@ const MOBILE_NAV_SALES = [
 // the mobile thumb-zone — telecallers rarely create quotes from
 // mobile and can still reach those via the sidebar drawer.
 const MOBILE_NAV_TELECALLER = [
-  { to: '/work',              label: 'Today',          icon: Sun },
+  // Phase 61.1 (19 May 2026) — /work dropped; /follow-ups in its
+  // place. TC daily flow doesn't include the Plan-A morning page.
   { to: '/telecaller',        label: 'Queue',          icon: Phone },
+  { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   // Phase 43.1 — /voice swap to /quotes (more useful daily for
   // telecaller who escalates leads). Voice route still works as

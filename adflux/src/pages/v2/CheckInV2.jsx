@@ -98,7 +98,7 @@ export default function CheckInV2() {
   // is uniform /work to match the daily-plan muscle memory.
   useEffect(() => {
     if (checkedIn) {
-      navigate('/work', { replace: true })
+      navigate('/', { replace: true })
     }
   }, [checkedIn, navigate])
 
@@ -206,7 +206,7 @@ export default function CheckInV2() {
       // On-time → straight home via RootRedirect.
       setTimeout(async () => {
         await refetch()
-        navigate('/work', { replace: true })
+        navigate('/', { replace: true })
       }, 800)
     } catch (e) {
       toastError(e, 'Could not save check-in. Try once more.')
@@ -233,7 +233,7 @@ export default function CheckInV2() {
       }
       setReasonOpen(false)
       await refetch()
-      navigate('/work', { replace: true })
+      navigate('/', { replace: true })
     } catch (e) {
       toastError(e, 'Could not save reason. Try once more.')
     } finally {
