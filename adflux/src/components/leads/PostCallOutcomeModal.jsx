@@ -440,11 +440,17 @@ export default function PostCallOutcomeModal({
         // Pass the modal-save moment as telTapMs; callLogReader
         // applies its own 60-min lookback. Avoids compound
         // subtraction (guardian P3, 18 May 2026).
+        // Phase 56j — also pass pendingActivityId so the patch
+        // writes duration into lead_activities (which the
+        // LeadDetailV2 timeline reads at line 1254). Without this
+        // the duration sat in call_logs only and the timeline
+        // showed no duration even after capture.
         fetchAndPatchCallDuration({
-          userId:   profile.id,
-          leadId:   lead.id,
-          phone:    lead.phone,
-          telTapMs: Date.now(),
+          userId:     profile.id,
+          leadId:     lead.id,
+          phone:      lead.phone,
+          telTapMs:   Date.now(),
+          activityId: pendingActivityId || null,
         }).then((dur) => {
           if (dur != null) console.info('[call-log] patched duration', dur, 's')
         }).catch(() => { /* swallowed; permission deny is normal */ })

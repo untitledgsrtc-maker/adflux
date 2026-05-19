@@ -62,15 +62,20 @@ export async function lookupCall({ phone, sinceMs, windowMinutes = 60 }) {
 
 /**
  * Convenience wrapper that wires the lookup into a Supabase patch.
- * Patches the most recent call_logs row for (user, lead) within the
- * given window with the duration from Android CallLog. Returns the
- * patched duration (seconds) or null.
+ * Patches:
+ *   1. The most recent call_logs row for (user, lead) within the
+ *      given window with the duration from Android CallLog.
+ *   2. The lead_activities row (when activityId is supplied) so the
+ *      lead-detail Activity Timeline renders the duration inline
+ *      ("Call · 34 sec") — the UI already reads
+ *      `lead_activities.duration_seconds` (LeadDetailV2.jsx:1254).
  *
+ * Returns the patched duration (seconds) or null.
  * Designed to be called from PostCallOutcomeModal save handler;
  * fire-and-forget OK (no UI dependency).
  */
 export async function fetchAndPatchCallDuration({
-  userId, leadId, phone, telTapMs,
+  userId, leadId, phone, telTapMs, activityId,
 }) {
   if (!Capacitor.isNativePlatform()) return null
   if (!userId || !leadId || !phone || !telTapMs) return null
@@ -91,11 +96,13 @@ export async function fetchAndPatchCallDuration({
   const duration = Number(result.durationSeconds) || 0
   if (duration < 0) return null
 
-  // Patch the matching call_logs row. Match by user + lead + recency
-  // (cap at 60 min). The audit row was just inserted by callAudit
-  // moments earlier so it'll be the freshest row.
+  // Phase 56j — patch BOTH tables in parallel.
+  //   • call_logs: audit row written by callAudit at tel-tap time.
+  //   • lead_activities: the row the timeline renders. Without this
+  //     patch the duration sits in call_logs only and the lead
+  //     detail UI shows no duration even though we captured it.
   const cutoff = new Date(telTapMs - 60 * 60_000).toISOString()
-  const { error } = await supabase
+  const callLogsPromise = supabase
     .from('call_logs')
     .update({ duration_seconds: duration })
     .eq('user_id', userId)
@@ -103,10 +110,21 @@ export async function fetchAndPatchCallDuration({
     .gte('call_at', cutoff)
     .order('call_at', { ascending: false })
     .limit(1)
-  if (error) {
-    console.warn('[call-log] patch failed:', error.message)
-    return null
-  }
+
+  const activityPromise = activityId
+    ? supabase
+        .from('lead_activities')
+        .update({ duration_seconds: duration })
+        .eq('id', activityId)
+    : Promise.resolve({ error: null })
+
+  const [{ error: clErr }, { error: aErr }] = await Promise.all([
+    callLogsPromise,
+    activityPromise,
+  ])
+  if (clErr) console.warn('[call-log] call_logs patch failed:', clErr.message)
+  if (aErr)  console.warn('[call-log] lead_activities patch failed:', aErr.message)
+  if (clErr && aErr) return null
   return duration
 }
 
