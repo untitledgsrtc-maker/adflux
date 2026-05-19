@@ -137,10 +137,14 @@ export default function AdminDashboardDesktop() {
         .order('created_at', { ascending: false }),
       supabase.from('staff_incentive_profiles').select('*, users(name)').eq('is_active', true),
       supabase.from('monthly_sales_data').select('staff_id, month_year, new_client_revenue, renewal_revenue'),
-      // Everyone with role='sales' — used for the leaderboard so reps with
-      // zero wins still show up (and to resolve names without relying on
-      // the denormalized sales_person_name column).
-      supabase.from('users').select('id, name, role').eq('role', 'sales'),
+      // Everyone with role in (sales, telecaller, agency) — used for
+      // the leaderboard so reps with zero wins still show up, AND for
+      // RepsInFieldCard so TC + agency appear when their phone is pinging.
+      // Phase 56l-fix (19 May 2026): owner reported "Dhara GPS is on
+      // but admin can't see location". Pings WERE fetched but the
+      // sales-only name filter dropped Dhara → card showed "No reps
+      // live right now" despite 318 live pings.
+      supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']),
       supabase.from('incentive_settings').select('*').maybeSingle(),
       // M1 — every rep's active daily target. Filtered by effective_to
       // is null (the unique partial index in supabase_phase9 ensures one
