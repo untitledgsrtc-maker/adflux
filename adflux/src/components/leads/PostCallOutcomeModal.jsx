@@ -459,14 +459,25 @@ export default function PostCallOutcomeModal({
 
     // 2. Stage advancement based on outcome.
     //    positive on New → Working (auto-qualify)
-    //    negative on anything → suggest Lost via the existing 15-attempt
-    //    soft trigger (don't flip stage hard here)
+    //    negative (rep tapped the Lost chip) → flip stage to Lost.
+    //      Phase 56k (19 May 2026) — owner reported the Lost chip
+    //      tagged the activity but left lead.stage untouched, so
+    //      "Lost" leads kept appearing in the queue. Hard-flip on
+    //      explicit Lost click. lost_reason stays NULL — rep can
+    //      set it via Change stage modal later if they want a
+    //      specific reason. stage_changed_at auto-stamps via the
+    //      Phase 34L trigger.
     if (outcome === 'positive' && lead.stage === 'New') {
       const { error: stageErr } = await supabase.from('leads').update({
         stage: 'Working',
         qualified_at: lead.qualified_at || new Date().toISOString(),
       }).eq('id', lead.id)
       if (stageErr) toastError(stageErr, 'Stage auto-advance failed (lead saved).')
+    } else if (outcome === 'negative' && lead.stage !== 'Lost' && lead.stage !== 'Won') {
+      const { error: stageErr } = await supabase.from('leads').update({
+        stage: 'Lost',
+      }).eq('id', lead.id)
+      if (stageErr) toastError(stageErr, 'Stage auto-flip to Lost failed (lead saved).')
     }
 
     // Phase 34Z.62 — close the follow-up row that prompted this call.
