@@ -33,12 +33,23 @@ const TODAY = () => new Date().toISOString().slice(0, 10)
 
 export default function TaDaRequestPanel() {
   const profile = useAuthStore(s => s.profile)
-  // Phase 52c — telecallers are office-based. They get no field
-  // travel, no overnight DA, no hotel stays. They can still claim
-  // generic "Other" expenses (mobile data, recharge, headphones,
-  // local conveyance to office, etc.). Gate the 3 field-only tabs
-  // and default the form to 'other' for TC.
+  // Phase 57 (supersedes Phase 52c role-gate) — per-user expense
+  // toggles. Each user row carries 4 booleans (allow_ta / allow_da
+  // / allow_hotel / allow_other) which the HR wizard snaps from the
+  // designation defaults but allows per-rep override. Telecaller
+  // who never travels stays at "Other only"; specific TC who DOES
+  // travel gets TA + DA + Hotel ticked at create time.
+  // Fall-back when columns are missing (e.g. profile cached before
+  // Phase 57 deploy): treat the legacy role gate as the default.
   const isTelecaller = profile?.role === 'telecaller'
+  const allowTa    = profile?.allow_ta    ?? !isTelecaller
+  const allowDa    = profile?.allow_da    ?? !isTelecaller
+  const allowHotel = profile?.allow_hotel ?? !isTelecaller
+  const allowOther = profile?.allow_other ?? true
+  // True when this user can only file "other" expenses — used for
+  // copy + GPS strip visibility (no point in showing today's km if
+  // the user can't claim TA).
+  const onlyOther = !allowTa && !allowDa && !allowHotel && allowOther
   const [todayRow, setTodayRow] = useState(null)
   // Phase 34Z.39 — live GPS summary of today's track (works even
   // before nightly daily_ta rollup; owner: "fetched by GPS box should
@@ -53,8 +64,13 @@ export default function TaDaRequestPanel() {
   //   'da'    → da_night    (₹)
   //   'hotel' → hotel       (₹ + city)
   //   'other' → other       (₹ + description)
-  // Phase 52c — TC defaults straight to 'other' (only tab they see).
-  const [tab, setTab]           = useState(isTelecaller ? 'other' : 'ta')   // 'ta' | 'da' | 'hotel' | 'other'
+  // Phase 57 — default tab = first allowed kind (left-to-right).
+  // If allow_ta → 'ta'; else if allow_da → 'da'; else hotel; else other.
+  const defaultTab = allowTa ? 'ta'
+                   : allowDa ? 'da'
+                   : allowHotel ? 'hotel'
+                   : 'other'
+  const [tab, setTab]           = useState(defaultTab)
 
   // Form state
   const [claimDate,   setClaimDate]   = useState(TODAY())
@@ -256,9 +272,11 @@ export default function TaDaRequestPanel() {
           city bike_per_km). Fall back to live gps_pings summarised
           via summariseTrack so the rep sees today's km mid-day too.
           Owner: "FETCHED BY GPS BOX SHOULD BE THERE."
-          Phase 52c — TC is office-based, no field GPS to show. Hide
-          the entire GPS strip for telecallers. */}
-      {!isTelecaller && (
+          Phase 52c → Phase 57 — GPS strip hidden when user can't
+          claim TA (no point showing today's km when they can't bill
+          it). Matches the per-user allow_ta flag instead of the old
+          role gate. */}
+      {allowTa && (
       <div style={styles.card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <MapPin size={14} style={{ color: 'var(--accent)' }} />
@@ -305,31 +323,35 @@ export default function TaDaRequestPanel() {
       {/* ── Tabs + form ── */}
       <div style={styles.card}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
-          {isTelecaller ? 'Submit expense claim' : 'Submit a claim'}
+          {onlyOther ? 'Submit expense claim' : 'Submit a claim'}
         </div>
         {/* Phase 36.7 — 4-way tab row. Wrap on narrow screens so
             phones don't get a horizontal-scroll bar. */}
         <div style={{ ...styles.tabRow, flexWrap: 'wrap' }}>
-          {/* Phase 52c — Override TA / DA / Hotel are field-rep
-              tabs. Hidden for TC (office-based; no km, no overnight,
-              no hotel). TC sees only the Other tab and the existing
-              "Submit a claim" form for free-form expenses. */}
-          {!isTelecaller && (
-            <>
-              <button type="button" style={styles.tab(tab === 'ta')} onClick={() => setTab('ta')}>
-                Override TA (km)
-              </button>
-              <button type="button" style={styles.tab(tab === 'da')} onClick={() => setTab('da')}>
-                Claim DA (night)
-              </button>
-              <button type="button" style={styles.tab(tab === 'hotel')} onClick={() => setTab('hotel')}>
-                Hotel stay
-              </button>
-            </>
+          {/* Phase 57 — render only tabs the user is allowed to file.
+              HR controls each rep's allowed kinds via the new-user
+              wizard. Per-user gate replaces the old role-based gate
+              from Phase 52c. */}
+          {allowTa && (
+            <button type="button" style={styles.tab(tab === 'ta')} onClick={() => setTab('ta')}>
+              Override TA (km)
+            </button>
           )}
-          <button type="button" style={styles.tab(tab === 'other')} onClick={() => setTab('other')}>
-            {isTelecaller ? 'Other expense' : 'Other'}
-          </button>
+          {allowDa && (
+            <button type="button" style={styles.tab(tab === 'da')} onClick={() => setTab('da')}>
+              Claim DA (night)
+            </button>
+          )}
+          {allowHotel && (
+            <button type="button" style={styles.tab(tab === 'hotel')} onClick={() => setTab('hotel')}>
+              Hotel stay
+            </button>
+          )}
+          {allowOther && (
+            <button type="button" style={styles.tab(tab === 'other')} onClick={() => setTab('other')}>
+              {onlyOther ? 'Other expense' : 'Other'}
+            </button>
+          )}
         </div>
 
         {/* Phase 34Z.39 — Date + km/₹ + City share one 3-column row on

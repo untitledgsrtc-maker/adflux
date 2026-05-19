@@ -65,6 +65,12 @@ export default function HRNewUserV2() {
     min_calls:         0,
     min_quotes:        0,
     min_followups:     0,
+    // Phase 57 — per-user expense kind toggles. Snap from
+    // designation default; HR overrides per-user.
+    allow_ta:          false,
+    allow_da:          false,
+    allow_hotel:       false,
+    allow_other:       true,
   })
 
   useEffect(() => {
@@ -101,6 +107,12 @@ export default function HRNewUserV2() {
       min_calls:      d.default_min_calls || 0,
       min_quotes:     d.default_min_quotes || 0,
       min_followups:  d.default_min_followups || 0,
+      // Phase 57 — pull the 4 expense flags from the designation
+      // defaults. HR can override the checkboxes after this snap.
+      allow_ta:       !!d.default_allow_ta,
+      allow_da:       !!d.default_allow_da,
+      allow_hotel:    !!d.default_allow_hotel,
+      allow_other:    d.default_allow_other !== false,  // default true
     }))
   }, [form.designation_id, designations])
 
@@ -130,6 +142,11 @@ export default function HRNewUserV2() {
         city:           form.city,
         role:           pickedDesignation.auth_role,
         team_role:      pickedDesignation.team_role,
+        // Phase 57 — 4 expense kind flags persisted with the user.
+        allow_ta:       !!form.allow_ta,
+        allow_da:       !!form.allow_da,
+        allow_hotel:    !!form.allow_hotel,
+        allow_other:    form.allow_other !== false,
         segment_access: form.segment_access,
         manager_id:     form.manager_id || null,
         is_active:      true,
@@ -316,6 +333,45 @@ export default function HRNewUserV2() {
             <FormField label="Min quotes / wk" v={form.min_quotes} onChange={v => set('min_quotes', v)} type="number" />
             <FormField label="Min follow-ups" v={form.min_followups} onChange={v => set('min_followups', v)} type="number" />
           </div>
+
+          {/* Phase 57 — per-user expense kind toggles. Snap defaults
+              from designation; HR overrides per rep (e.g. specific
+              TC who occasionally travels gets TA + DA + Hotel
+              ticked). TaDaRequestPanel reads these flags and only
+              shows tabs the user is allowed to file. */}
+          <div style={{
+            marginTop: 14,
+            padding: '12px 14px',
+            background: 'rgba(255,255,255,.03)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+          }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: '.12em',
+              color: 'var(--text-muted)', textTransform: 'uppercase',
+              marginBottom: 10,
+            }}>
+              Expense claims this user can file
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, fontSize: 13 }}>
+              <label style={checkRow}>
+                <input type="checkbox" checked={form.allow_ta} onChange={e => set('allow_ta', e.target.checked)} />
+                TA (bike km × city rate)
+              </label>
+              <label style={checkRow}>
+                <input type="checkbox" checked={form.allow_da} onChange={e => set('allow_da', e.target.checked)} />
+                DA (overnight)
+              </label>
+              <label style={checkRow}>
+                <input type="checkbox" checked={form.allow_hotel} onChange={e => set('allow_hotel', e.target.checked)} />
+                Hotel stay
+              </label>
+              <label style={checkRow}>
+                <input type="checkbox" checked={form.allow_other} onChange={e => set('allow_other', e.target.checked)} />
+                Other expenses
+              </label>
+            </div>
+          </div>
         </Card>
 
         <div style={{
@@ -391,6 +447,11 @@ function SelectField({ label, v, onChange, options }) {
 const fieldLabel = {
   fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase',
   letterSpacing: '.08em', fontWeight: 600,
+}
+const checkRow = {
+  display: 'inline-flex', alignItems: 'center', gap: 8,
+  padding: '6px 0', fontSize: 13,
+  color: 'var(--text)', cursor: 'pointer',
 }
 const fullInput = {
   width: '100%', padding: '9px 12px',
