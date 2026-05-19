@@ -75,7 +75,17 @@ export async function fetchAndPatchCallDuration({
   if (!Capacitor.isNativePlatform()) return null
   if (!userId || !leadId || !phone || !telTapMs) return null
 
-  const result = await lookupCall({ phone, sinceMs: telTapMs })
+  // Phase 56i — the Java plugin's `sinceTimestamp + windowMinutes`
+  // window is FORWARD-looking. The call we want already ended before
+  // the modal save fired, so we need to point the window 60 min
+  // BACKWARD from now. Shift the lower bound back by one hour; the
+  // plugin's default 60-min window then yields [now-60min, now]
+  // which catches the just-finished call. Previous behaviour
+  // (sinceMs = telTapMs = Date.now()) queried [now, now+60min] and
+  // never matched anything — that's why duration_seconds stayed
+  // NULL for every rep call.
+  const lookbackMs = telTapMs - 60 * 60_000
+  const result = await lookupCall({ phone, sinceMs: lookbackMs })
   if (!result || !result.found) return null
 
   const duration = Number(result.durationSeconds) || 0
