@@ -721,12 +721,10 @@ export default function LeadDetailV2() {
                 {/* Phase 34L — days-in-current-stage chip. Hidden
                     for Won/Lost. Red after 5 days, amber after 3. */}
                 <StageAgeChip stage={lead.stage} stageChangedAt={lead.stage_changed_at} />
-                <span style={{
-                  fontSize: 10, fontWeight: 600, letterSpacing: '.08em',
-                  color: 'var(--text-muted)', textTransform: 'uppercase',
-                  marginLeft: 2,
-                }}>Change</span>
-                <ChevronDown size={11} style={{ color: 'var(--text-muted)' }} />
+                {/* Phase 62.3 — "Change" word dropped. ChevronDown
+                    alone is enough affordance; the word was visual
+                    noise next to the stage label. */}
+                <ChevronDown size={14} strokeWidth={1.8} style={{ color: 'var(--text-muted)', marginLeft: 2 }} />
               </button>
               {/* Phase 47.3 — inline heat picker. Click chip → popover
                   with hot/warm/cold → save. Replaces the read-only
@@ -747,7 +745,13 @@ export default function LeadDetailV2() {
               />
               {lead.segment && <SegChip segment={lead.segment} />}
               {/* Phase 47.5 — DNC + WhatsApp opt-out toggle chips.
-                  Click to flip flag. Solid red when active. */}
+                  Click to flip flag. Solid red when active.
+                  Phase 62.3 (20 May 2026) — only render when flag is
+                  ON. Reps don't need to see "DNC OFF" / "WA opt-out
+                  OFF" as default chip wallpaper. The toggles still
+                  exist inside Lead details panel where admin/rep can
+                  flip them when needed. */}
+              {lead.do_not_call && (
               <button
                 type="button"
                 onClick={async () => {
@@ -779,8 +783,10 @@ export default function LeadDetailV2() {
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
-                DNC{lead.do_not_call ? ' ON' : ''}
+                DNC ON
               </button>
+              )}
+              {lead.wa_opt_out && (
               <button
                 type="button"
                 onClick={async () => {
@@ -792,21 +798,20 @@ export default function LeadDetailV2() {
                   if (error) toastError(error, 'Could not update WhatsApp opt-out.')
                   else setLead(l => ({ ...l, wa_opt_out: next }))
                 }}
-                title={lead.wa_opt_out ? 'WhatsApp opt-out active — tap to lift' : 'Tap to mark WhatsApp opt-out'}
-                aria-pressed={!!lead.wa_opt_out}
+                title="WhatsApp opt-out active — tap to lift"
+                aria-pressed={true}
                 style={{
-                  // Phase 62.2 — demoted from solid amber to soft tint.
                   padding: '4px 10px', borderRadius: 999,
                   fontSize: 11, fontWeight: 600,
-                  border: '1px solid',
-                  background: lead.wa_opt_out ? 'rgba(245,158,11,0.14)' : 'transparent',
-                  borderColor: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'var(--border)',
-                  color: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'var(--text-muted)',
+                  border: '1px solid var(--warning, #F59E0B)',
+                  background: 'rgba(245,158,11,0.14)',
+                  color: 'var(--warning, #F59E0B)',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
-                WA opt-out{lead.wa_opt_out ? ' ON' : ''}
+                WA opt-out ON
               </button>
+              )}
             </div>
 
             {/* Phase 62.1 (20 May 2026) — promoted Phone chip + days-
@@ -1425,15 +1430,15 @@ export default function LeadDetailV2() {
 
         {/* RIGHT — side panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Lead details — Phase 19 inline-edit */}
+          {/* Lead details — Phase 19 inline-edit. Phase 62.3 (20 May
+              2026) — dropped "Click any field to edit" hint. The hover
+              affordance + cursor change on each value already telegraphs
+              editability; the explanatory text was clutter. */}
           <div className="lead-card">
             <div className="lead-card-head">
               <div className="lead-card-title">Lead details</div>
-              <span className="lead-card-sub" style={{ fontSize: 10, color: 'var(--text-subtle)' }}>
-                Click any field to edit
-              </span>
             </div>
-            <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
+            <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
               {/* Phase 32P — the inline-edit field opens edit mode on
                   click, which blocks the obvious "tap to call" / "tap
                   to email" affordance. Small action icon next to each
