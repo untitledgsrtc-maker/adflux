@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "cap:sync": "vite build && npx cap sync android",
+    "cap:sweep": "find android/app/src/main/res -name '* *.*' -print -delete || true",
+    "cap:sync": "vite build && npx cap sync android && npm run cap:sweep",
     "cap:open:android": "npx cap open android",
-    "cap:run:android": "npm run build && npx cap sync android && npx cap run android"
+    "cap:run:android": "npm run build && npx cap sync android && npm run cap:sweep && npx cap run android",
+    "cap:build:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",
