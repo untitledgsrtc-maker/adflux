@@ -39,7 +39,7 @@ import {
   StageChip, HeatDot, SegChip, LeadAvatar,
 } from '../../components/leads/LeadShared'
 import { StageAgeChip } from '../../components/leads/StageAgeChip'
-import { toastError } from '../../components/v2/Toast'
+import { toastError, pushToast } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import V2Hero from '../../components/v2/V2Hero'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
@@ -83,6 +83,18 @@ export default function LeadsV2() {
 
   /* ─── Bulk select state ─── */
   const [selected, setSelected] = useState(new Set())
+
+  // Phase 62.8 (20 May 2026) — pagination + CSV export. Owner reported
+  // /leads becomes a giant unbreakable scroll once the list passes
+  // ~200 rows. Paginating client-side keeps every existing filter +
+  // search + sort behavior intact (no server-side change). Default
+  // 50/page; rep can pick 100 / 200 / 500. Resetting any filter or
+  // search drops back to page 1 via the useEffect below.
+  const [pageSize, setPageSize] = useState(() => {
+    const saved = parseInt(localStorage.getItem('leads_page_size') || '50', 10)
+    return [50, 100, 200, 500].includes(saved) ? saved : 50
+  })
+  const [page, setPage] = useState(1)
 
   /* ─── Reassign modal ─── */
   const [reassignOpen, setReassignOpen] = useState(false)
@@ -218,6 +230,62 @@ export default function LeadsV2() {
       )
     })
   }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, leadOutcomeMap, dateFrom, dateTo])
+
+  // Phase 62.8 — paginated slice. Filter computes the full set; the
+  // table only renders one page worth. Reset to page 1 whenever the
+  // filtered list changes (filter / search / sort / stage / segment).
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  useEffect(() => {
+    if (page > totalPages) setPage(1)
+  }, [filtered.length, pageSize, totalPages, page])
+  useEffect(() => { setPage(1) }, [search, stageFilter, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, dateFrom, dateTo, queueIds])
+  useEffect(() => { localStorage.setItem('leads_page_size', String(pageSize)) }, [pageSize])
+  const paged = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  // Phase 62.8 — CSV export of currently selected rows. If nothing
+  // selected, falls back to exporting the FILTERED set (so admin
+  // can "click filter then export all"). Fields chosen to match the
+  // /leads table columns the rep already sees on screen.
+  function exportSelectedCsv() {
+    const idsToExport = selected.size > 0 ? selected : new Set(filtered.map(l => l.id))
+    const rows = filtered.filter(l => idsToExport.has(l.id))
+    if (rows.length === 0) {
+      pushToast('Nothing to export — no rows selected.', 'warning')
+      return
+    }
+    const headers = ['name','company','phone','email','stage','segment','source','city','industry','assigned','heat','last_contact_at','expected_value','created_at']
+    const escape = (v) => {
+      if (v == null) return ''
+      const s = String(v)
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+      return s
+    }
+    const out = [headers.join(',')]
+    for (const l of rows) {
+      out.push([
+        l.name, l.company, l.phone, l.email,
+        l.stage, l.segment, l.source, l.city, l.industry,
+        l.assigned?.name || '',
+        l.heat || '',
+        l.last_contact_at ? new Date(l.last_contact_at).toISOString() : '',
+        l.expected_value || '',
+        l.created_at ? new Date(l.created_at).toISOString() : '',
+      ].map(escape).join(','))
+    }
+    const blob = new Blob([out.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `leads-${new Date().toISOString().slice(0,10)}-${rows.length}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    pushToast(`Exported ${rows.length} lead${rows.length === 1 ? '' : 's'} to CSV.`, 'success')
+  }
 
   /* ─── Stat strip totals ─── */
   const totals = useMemo(() => {
@@ -767,7 +835,7 @@ export default function LeadsV2() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(l => {
+              {paged.map(l => {
                 // Phase 33B — color-coded row tint + days-since-contact dot.
                 // Owner directive: reps scan the list by color, not text.
                 //   Green: won OR contacted within 3 days
@@ -984,6 +1052,88 @@ export default function LeadsV2() {
               )})}
             </tbody>
           </table>
+          {/* Phase 62.8 (20 May 2026) — pagination + export footer.
+              Sits inside the lead-card so it scrolls with the table.
+              Hidden when filtered set fits in one page AND no selection
+              (no point showing controls when 5 rows render). */}
+          {(filtered.length > pageSize || selected.size > 0) && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12, padding: '12px 14px',
+              borderTop: '1px solid var(--border)',
+              flexWrap: 'wrap',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--text-muted)' }}>
+                <span>
+                  Showing <b style={{ color: 'var(--text)' }}>
+                    {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}
+                  </b>–
+                  <b style={{ color: 'var(--text)' }}>
+                    {Math.min(page * pageSize, filtered.length)}
+                  </b>{' '}of <b style={{ color: 'var(--text)' }}>{filtered.length}</b>
+                </span>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span>Per page</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
+                    style={{
+                      padding: '4px 8px', borderRadius: 6,
+                      background: 'var(--surface)', color: 'var(--text)',
+                      border: '1px solid var(--border)', fontFamily: 'inherit', fontSize: 12,
+                    }}
+                  >
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={200}>200</option>
+                    <option value={500}>500</option>
+                  </select>
+                </label>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* Phase 62.8.1 (20 May 2026) — CSV export gated to
+                    admin / co_owner only per owner directive. Sales /
+                    telecaller / manager / agency reps should NOT be
+                    able to bulk-extract the lead list. Pagination
+                    controls below remain visible to all roles. */}
+                {isPrivileged && (
+                  <button
+                    type="button"
+                    className="lead-btn lead-btn-sm"
+                    onClick={exportSelectedCsv}
+                    title={selected.size > 0
+                      ? `Export ${selected.size} selected to CSV`
+                      : 'Export all filtered rows to CSV'}
+                  >
+                    Export CSV{selected.size > 0 ? ` (${selected.size})` : ''}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="lead-btn lead-btn-sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  aria-label="Previous page"
+                >
+                  ‹
+                </button>
+                <span style={{
+                  fontSize: 12, color: 'var(--text-muted)', minWidth: 56, textAlign: 'center',
+                }}>
+                  Page {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="lead-btn lead-btn-sm"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  aria-label="Next page"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
