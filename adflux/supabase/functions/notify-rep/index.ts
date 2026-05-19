@@ -258,14 +258,34 @@ async function sendFcm(
         tag: payload.tag,
       },
       android: {
+        // Phase 56h.1 (19 May 2026) — `priority: 'high'` bypasses
+        // Android Doze so the device wakes for delivery instead of
+        // batching the push for hours.
+        priority: 'high',
         notification: {
           // tag dedupes notifications on the device — re-sending
           // same tag replaces the existing one in the tray.
           tag: payload.tag,
-          // Default click action; the React app's URL bar updates
-          // via deep-link handling if the data.url is wired in
-          // pushNotificationActionPerformed listener.
-          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+          // Heads-up banner + sound + vibration.
+          notification_priority: 'PRIORITY_HIGH',
+          default_sound: true,
+          default_vibrate_timings: true,
+          // Phase 56h.2 (19 May 2026) — route the notification to
+          // the high-importance channel created in
+          // src/utils/nativePush.js → CHANNEL_ID + declared as the
+          // default in AndroidManifest meta-data. Without this,
+          // OEMs that don't honor message-level priority (Samsung
+          // One UI, Xiaomi MIUI, Realme ColorOS) fall back to the
+          // auto-generated low-importance "Miscellaneous" channel
+          // and the rep never hears the alert.
+          channel_id: 'untitled_default',
+          // Small icon name (without the @drawable/ prefix or
+          // extension). Resolves against the monochrome vector at
+          // android/app/src/main/res/drawable/ic_stat_notification.xml
+          // declared as the FCM default in AndroidManifest. Setting
+          // it here makes the icon explicit in every push — belt +
+          // suspenders for OEMs that ignore the manifest default.
+          icon: 'ic_stat_notification',
         },
       },
     },

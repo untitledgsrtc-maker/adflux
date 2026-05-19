@@ -29,9 +29,66 @@
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { supabase } from '../lib/supabase'
+import { pushToast } from '../components/v2/Toast'
 
-let registered = false   // module-level guard
-let activeUser  = null
+let registered      = false   // module-level guard
+let channelEnsured  = false   // notification channel idempotency guard
+let activeUser      = null
+
+// Phase 56h.2 (19 May 2026) — high-importance channel ID. MUST match
+// the AndroidManifest meta-data
+// `com.google.firebase.messaging.default_notification_channel_id`
+// AND the FCM payload `android.notification.channel_id` field in
+// `supabase/functions/notify-rep/index.ts`. Changing the ID here
+// without updating both other places will silently drop pushes
+// back onto the auto-created low-importance "Miscellaneous" channel.
+const CHANNEL_ID = 'untitled_default'
+
+/**
+ * Phase 56h.2 — create the notification channel before registering
+ * for FCM. On Android 8+ every notification must belong to a
+ * channel; if FCM payload's channel_id doesn't match an existing
+ * channel, Android falls back to the auto-created "Miscellaneous"
+ * channel (IMPORTANCE_DEFAULT — silent, no heads-up).
+ *
+ * Channel properties (importance: 5 = IMPORTANCE_HIGH):
+ *   - heads-up banner over lock screen
+ *   - default sound + vibration
+ *   - shows in status bar
+ *   - lights pulse (on devices with notification LED)
+ *
+ * The channel's user-visible properties (name, importance) are
+ * locked at first creation — Android does NOT honor changes on
+ * subsequent calls. To change them, increment the channel ID
+ * (e.g. `untitled_default_v2`) and update BOTH the manifest
+ * meta-data AND the FCM payload to match.
+ */
+async function ensureChannel() {
+  if (channelEnsured) return
+  if (!Capacitor.isNativePlatform()) return
+  // PushNotifications.createChannel is Android-only; on iOS the
+  // plugin throws "not implemented". Guard explicitly.
+  if (Capacitor.getPlatform() !== 'android') {
+    channelEnsured = true
+    return
+  }
+  try {
+    await PushNotifications.createChannel({
+      id:          CHANNEL_ID,
+      name:        'Untitled OS',
+      description: 'Lead alerts, follow-up reminders, and smart tasks.',
+      importance:  5,        // IMPORTANCE_HIGH
+      visibility:  1,        // VISIBILITY_PUBLIC — show on lock screen
+      sound:       'default',
+      vibration:   true,
+      lights:      true,
+      lightColor:  '#FFE600',
+    })
+    channelEnsured = true
+  } catch (e) {
+    console.warn('[fcm] createChannel failed:', e?.message || e)
+  }
+}
 
 /**
  * Register the device for FCM, listen for the token, persist it to
@@ -50,6 +107,13 @@ export async function registerNativePush(userId) {
   activeUser = userId
   if (registered) return
 
+  // Phase 56h.2 — ensure the high-importance channel exists BEFORE
+  // register() fires. Without this channel, FCM falls back to the
+  // auto-created "Miscellaneous" channel which is IMPORTANCE_DEFAULT
+  // (no heads-up, no sound on Android 8+). Idempotent — Android
+  // ignores duplicate createChannel calls.
+  await ensureChannel()
+
   // Register listeners BEFORE calling register() so the first
   // token event isn't missed.
   await PushNotifications.addListener('registration', async (token) => {
@@ -65,17 +129,41 @@ export async function registerNativePush(userId) {
   })
 
   await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-    // Foreground notification — Android shows it as a system tray
-    // entry by default. If we want an in-app banner instead, route
-    // through pushToast here.
-    console.info('[fcm] received:', notification?.title)
+    // Phase 56h.2 — when the app is in the foreground, Android does
+    // NOT auto-display the FCM notification (by design — the app
+    // gets a chance to handle it). Previously this handler was just
+    // a console.info, so reps saw nothing when a push arrived while
+    // the app was open. Now we surface an in-app toast with the
+    // same title + body so the rep gets feedback either way.
+    const title = notification?.title || 'Untitled OS'
+    const body  = notification?.body  || ''
+    // Compose into a single line for the toast — Toast renders one
+    // string, not title+body separately.
+    const msg = body ? `${title} — ${body}` : title
+    try {
+      pushToast(msg, 'info')
+    } catch (e) {
+      console.warn('[fcm] toast failed:', e?.message || e)
+    }
   })
 
   await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
     // Rep tapped a push notification. action.notification.data may
     // carry a lead_id / route — could push history.push here once
     // server-side payload is finalised.
-    console.info('[fcm] tapped:', action?.notification?.data)
+    try {
+      const data = action?.notification?.data || {}
+      const path = data.url
+      if (path && typeof path === 'string' && path.startsWith('/')) {
+        // Use full-page navigation rather than React Router push
+        // because this listener fires outside the React tree.
+        // The HashRouter / BrowserRouter picks the path up on next
+        // mount. window.location is safe for the Capacitor WebView.
+        window.location.assign(path)
+      }
+    } catch (e) {
+      console.warn('[fcm] tap navigation failed:', e?.message || e)
+    }
   })
 
   // Permission check. Onboarding (Phase 56f) should have prompted

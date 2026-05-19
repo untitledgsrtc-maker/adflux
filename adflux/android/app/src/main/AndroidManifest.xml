@@ -27,6 +27,26 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Phase 56h.2 (19 May 2026) — Firebase Cloud Messaging
+             defaults. Without these three meta-data tags, FCM falls
+             back to the multi-color launcher icon (Samsung/Xiaomi
+             silently drop) and the auto-created "Miscellaneous"
+             channel (IMPORTANCE_DEFAULT — no heads-up, no sound).
+             The matching channel is created in JS in
+             src/utils/nativePush.js → createChannel('untitled_default').
+             Server-side FCM payload sets
+             android.notification.channel_id = 'untitled_default'
+             which the OS matches against the JS-created channel. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="untitled_default" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
     </application>
 
     <!-- Permissions -->

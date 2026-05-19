@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 56h.2 (19 May 2026) — accent color for FCM notification
+  small icon. Brand yellow (#FFE600) per UI_DESIGN_SYSTEM tokens.
+  AndroidManifest references this via
+  com.google.firebase.messaging.default_notification_color.
+-->
+<resources>
+    <color name="notification_color">#FFE600</color>
+</resources>
