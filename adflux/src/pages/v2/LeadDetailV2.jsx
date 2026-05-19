@@ -46,6 +46,7 @@ import LogActivityModal from '../../components/leads/LogActivityModal'
 import ChangeStageModal from '../../components/leads/ChangeStageModal'
 import ReassignModal   from '../../components/leads/ReassignModal'
 import PhotoCapture     from '../../components/leads/PhotoCapture'
+import LeadCallHistory  from '../../components/leads/LeadCallHistory'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
@@ -1299,6 +1300,15 @@ export default function LeadDetailV2() {
               })}
             </div>
           )}
+
+          {/* Phase 56n — per-lead call history. Sits below Activity
+              Timeline so the rep can see in / out / missed in a
+              tabular view (Cronberry-style: Date / Type / Duration /
+              Outcome / Called by / Notes). Merges call_logs +
+              lead_activities; deduped by timestamp within 60 sec. */}
+          <div style={{ marginTop: 16 }}>
+            <LeadCallHistory leadId={id} />
+          </div>
         </div>
 
         {/* RIGHT — side panel */}

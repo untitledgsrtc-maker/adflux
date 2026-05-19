@@ -182,4 +182,98 @@ public class CallLogPlugin extends Plugin {
             default:                          return "unknown";
         }
     }
+
+    /**
+     * Phase 56l — bulk scan of recent calls. Owner directive
+     * (19 May 2026): inbound + missed calls need to land in our
+     * call_logs so per-lead + per-rep call history is complete.
+     *
+     * Inputs (JSObject):
+     *   sinceTimestamp  long  — epoch-millis lower bound (e.g. last scan time)
+     *   limit           int   — optional, default 100, cap 500
+     *
+     * Outputs (JSObject):
+     *   calls: array of { number, type, date, durationSeconds }
+     *
+     * Returns ALL types (outgoing / incoming / missed / voicemail /
+     * rejected / blocked). JS side filters to the three we ingest.
+     */
+    @PluginMethod
+    public void scanRecentCalls(PluginCall call) {
+        if (getPermissionState("callLog") != com.getcapacitor.PermissionState.GRANTED) {
+            requestPermissionForAlias("callLog", call, "scanCallLogPermissionCallback");
+            return;
+        }
+        doScan(call);
+    }
+
+    @PermissionCallback
+    private void scanCallLogPermissionCallback(PluginCall call) {
+        if (getPermissionState("callLog") == com.getcapacitor.PermissionState.GRANTED) {
+            doScan(call);
+        } else {
+            call.reject("READ_CALL_LOG permission denied");
+        }
+    }
+
+    private void doScan(PluginCall call) {
+        Long sinceTimestamp = call.getLong("sinceTimestamp");
+        Integer limit       = call.getInt("limit", 100);
+        if (sinceTimestamp == null) {
+            call.reject("sinceTimestamp is required");
+            return;
+        }
+        if (limit == null || limit <= 0) limit = 100;
+        if (limit > 500) limit = 500;
+
+        ContentResolver resolver = getContext().getContentResolver();
+        Uri uri = CallLog.Calls.CONTENT_URI;
+        String[] projection = new String[] {
+            CallLog.Calls.NUMBER,
+            CallLog.Calls.TYPE,
+            CallLog.Calls.DATE,
+            CallLog.Calls.DURATION
+        };
+        String selection = CallLog.Calls.DATE + " >= ?";
+        String[] selectionArgs = new String[] { String.valueOf(sinceTimestamp) };
+        String sortOrder = CallLog.Calls.DATE + " DESC LIMIT " + limit;
+
+        com.getcapacitor.JSArray calls = new com.getcapacitor.JSArray();
+        Cursor cursor = null;
+        try {
+            cursor = resolver.query(uri, projection, selection, selectionArgs, sortOrder);
+            if (cursor == null) {
+                JSObject ret = new JSObject();
+                ret.put("calls", calls);
+                call.resolve(ret);
+                return;
+            }
+            int numIdx = cursor.getColumnIndex(CallLog.Calls.NUMBER);
+            int typIdx = cursor.getColumnIndex(CallLog.Calls.TYPE);
+            int datIdx = cursor.getColumnIndex(CallLog.Calls.DATE);
+            int durIdx = cursor.getColumnIndex(CallLog.Calls.DURATION);
+            while (cursor.moveToNext()) {
+                String number = cursor.getString(numIdx);
+                if (number == null) continue;
+                int type = cursor.getInt(typIdx);
+                long date = cursor.getLong(datIdx);
+                int duration = cursor.getInt(durIdx);
+                JSObject row = new JSObject();
+                row.put("number", number);
+                row.put("type", typeLabel(type));
+                row.put("date", date);
+                row.put("durationSeconds", duration);
+                calls.put(row);
+            }
+            JSObject ret = new JSObject();
+            ret.put("calls", calls);
+            call.resolve(ret);
+        } catch (SecurityException se) {
+            call.reject("READ_CALL_LOG permission denied at query time", se);
+        } catch (Exception e) {
+            call.reject("call log scan failed: " + e.getMessage(), e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
 }

@@ -23,6 +23,7 @@ import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
 import HRV2               from './pages/v2/HRV2'
 import HRNewUserV2        from './pages/v2/HRNewUserV2'
 import HROfferLetterV2    from './pages/v2/HROfferLetterV2'
+import CallLogsV2         from './pages/v2/CallLogsV2'
 // Phase 33G.8 — admin Leaves page (item 82 real leaves table).
 import LeavesAdminV2     from './pages/v2/LeavesAdminV2'
 // Phase 36 — per-rep monthly salary breakdown.
@@ -191,6 +192,9 @@ export default function App() {
           <Route path="/leads/new"                 element={<LeadFormV2 />} />
           <Route path="/leads/:id"                 element={<LeadDetailV2 />} />
           <Route path="/work"                      element={<WorkV2 />} />
+          {/* Phase 56m — per-rep call log (own + admin view of any rep). */}
+          <Route path="/calls"                     element={<CallLogsV2 />} />
+          <Route path="/admin/calls/:userId"       element={<RequirePrivileged><CallLogsV2 /></RequirePrivileged>} />
           {/* Phase 34Z.55 — push notification diagnostics + test send.
               Surfaces all six gates (Notification API, Push API, VAPID,
               SW, permission, subscription) so owner can diagnose why

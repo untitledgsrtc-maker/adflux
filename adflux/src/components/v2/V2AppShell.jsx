@@ -37,6 +37,7 @@ import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import { startBackgroundGps, stopBackgroundGps } from '../../utils/backgroundGps'
 import { registerNativePush, deregisterNativePush } from '../../utils/nativePush'
+import { startCallHistoryPoller, stopCallHistoryPoller } from '../../utils/callHistoryIngest'
 import NativeOnboarding from '../native/NativeOnboarding'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
@@ -94,6 +95,7 @@ const SALES_NAV = [
   // as a single tap inside an action they already understand.
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
+  { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
@@ -136,6 +138,9 @@ const TELECALLER_NAV = [
   // it). Voice input lives inside lead activity note flow now, not as
   // a standalone surface. /voice route + page kept as deep-link.
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
+  // Phase 56m — TC also gets My Calls (same view sales reps have).
+  // Lists outgoing / incoming / missed per day with duration totals.
+  { to: '/calls',             label: 'My Calls',       icon: Phone },
   // Phase 52 — TC needs /my-offer for leave + TA/DA + offer letter
   // (same access sales reps have). Sidebar entry only; mobile stays
   // at 4 thumb-zone tabs (drawer reaches /my-offer).
@@ -271,6 +276,18 @@ export function V2AppShell() {
       console.warn('[v2-shell] fcm register failed:', e?.message || e)
     )
     return () => { deregisterNativePush().catch(() => {}) }
+  }, [profile?.id])
+
+  // Phase 56l — periodic scan of the Android system call log so
+  // inbound + missed calls land in our call_logs (and lead_activities
+  // when a lead matches). Native-only; web is a no-op. Runs every 5
+  // min while foregrounded + on every visibility change.
+  useEffect(() => {
+    if (!profile?.id) return
+    startCallHistoryPoller(profile.id).catch((e) =>
+      console.warn('[v2-shell] call-history poller failed:', e?.message || e)
+    )
+    return () => { stopCallHistoryPoller() }
   }, [profile?.id])
 
   // Phase 1.5 — AI Co-Pilot. Cmd+K (Mac) / Ctrl+K (Win/Linux) opens.
