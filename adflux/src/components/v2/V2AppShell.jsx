@@ -57,9 +57,11 @@ const ADMIN_NAV = [
   // Phase 12 rev3 — owner spec: ONE landing page, not two. Cockpit
   // widgets folded into AdminDashboardDesktop.
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
-  // Phase 41.1 — /lead-dashboard + /team-dashboard dropped from
-  // sidebar. Lead pipeline + team activity now live as panels on
-  // /dashboard; both routes kept as deep-links in App.jsx.
+  // Phase 41.1 dropped /team-dashboard from the sidebar; Phase 57d
+  // (19 May 2026) reinstates it. Owner asked "in admin no tab for
+  // team tracking" — the panels on /dashboard show summary cards
+  // but admin wants the full per-rep live grid one click away.
+  { to: '/team-dashboard',    label: 'Team Live',      icon: Users },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
