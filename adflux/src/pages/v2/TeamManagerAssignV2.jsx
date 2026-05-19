@@ -28,7 +28,10 @@ import { useAuth } from '../../hooks/useAuth'
 import { Loader2, UserCheck, ArrowRight } from 'lucide-react'
 import { pushToast, toastError } from '../../components/v2/Toast'
 
-export default function TeamManagerAssignV2() {
+// Phase 61 — `embedded` prop suppresses own page-head when mounted
+// inside PeopleV2 (which renders the shared "People" head once).
+// Matches the §30 pattern used by TeamV2 / IncentivesV2 / SalaryAdminV2.
+export default function TeamManagerAssignV2({ embedded = false }) {
   const navigate = useNavigate()
   const { isPrivileged } = useAuth()
 
@@ -115,27 +118,41 @@ export default function TeamManagerAssignV2() {
   if (!isPrivileged) return null
 
   return (
-    <div className="v2" style={{ padding: '24px 20px', maxWidth: 1024, margin: '0 auto' }}>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{
-          fontFamily: 'var(--v2-display, "Space Grotesk")',
-          fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: 'var(--v2-ink-2, #94a3b8)',
-        }}>
-          People · Manager assignment
+    <div
+      className={embedded ? '' : 'v2'}
+      style={{
+        padding:   embedded ? 0 : '24px 20px',
+        maxWidth:  embedded ? '100%' : 1024,
+        margin:    embedded ? 0 : '0 auto',
+      }}
+    >
+      {!embedded && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{
+            fontFamily: 'var(--v2-display, "Space Grotesk")',
+            fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase',
+            color: 'var(--v2-ink-2, #94a3b8)',
+          }}>
+            People · Manager assignment
+          </div>
+          <h1 style={{
+            fontFamily: 'var(--v2-display, "Space Grotesk")',
+            fontSize: 28, fontWeight: 700,
+            margin: '6px 0 0',
+            color: 'var(--v2-ink-0, #f1f5f9)',
+          }}>
+            Reassign reps to manager
+          </h1>
+          <div style={{ marginTop: 6, fontSize: 13, color: 'var(--v2-ink-2, #94a3b8)' }}>
+            Sales reps pair with sales heads. Telecallers pair with TC heads.
+          </div>
         </div>
-        <h1 style={{
-          fontFamily: 'var(--v2-display, "Space Grotesk")',
-          fontSize: 28, fontWeight: 700,
-          margin: '6px 0 0',
-          color: 'var(--v2-ink-0, #f1f5f9)',
-        }}>
-          Reassign reps to manager
-        </h1>
-        <div style={{ marginTop: 6, fontSize: 13, color: 'var(--v2-ink-2, #94a3b8)' }}>
-          Sales reps pair with sales heads. Telecallers pair with TC heads.
+      )}
+      {embedded && (
+        <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--v2-ink-2, #94a3b8)' }}>
+          Sales reps pair with sales heads. Telecallers pair with TC heads. Saves on dropdown change.
         </div>
-      </div>
+      )}
 
       <input
         value={search}

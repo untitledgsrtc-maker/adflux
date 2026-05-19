@@ -25,7 +25,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Users, Gift, Wallet, Clock as ClockIcon, MapPin } from 'lucide-react'
+import { Users, Gift, Wallet, Clock as ClockIcon, MapPin, UserCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 
@@ -35,6 +35,7 @@ import SalaryAdminV2     from './SalaryAdminV2'
 import LeavesAdminV2     from './LeavesAdminV2'
 // Phase 39 — TA Claims tab also lives inside People.
 import TaPayoutsAdminV2  from './TaPayoutsAdminV2'
+import TeamManagerAssignV2 from './TeamManagerAssignV2'   // Phase 61
 
 // Phase 47.9 — IST month label via shared util.
 import { istCurrentMonthLabel } from '../../utils/istDate'
@@ -43,12 +44,17 @@ function currentMonthLabel() { return istCurrentMonthLabel() }
 // Phase 39.x — 5 tabs. Incentives kept (owner: "put back we will
 // discuss tomorrow" — single-payout-flow decision parked). All
 // editing surfaces preserved while structure is being debated.
+// Phase 61 (19 May 2026) — added 'Assign' tab. Lets admin reassign
+// any sales / telecaller rep to a different manager via dropdown.
+// Sits last in the tab row because it's a config surface, not a
+// daily-flow tab.
 const TABS = [
   { key: 'team',       label: 'Team',       icon: Users,     Comp: TeamV2 },
   { key: 'incentives', label: 'Incentives', icon: Gift,      Comp: IncentivesV2 },
   { key: 'salary',     label: 'Salary',     icon: Wallet,    Comp: SalaryAdminV2 },
   { key: 'leaves',     label: 'Leaves',     icon: ClockIcon, Comp: LeavesAdminV2 },
   { key: 'ta',         label: 'TA Claims',  icon: MapPin,    Comp: TaPayoutsAdminV2 },
+  { key: 'assign',     label: 'Assign',     icon: UserCheck, Comp: TeamManagerAssignV2 },
 ]
 
 export default function PeopleV2() {
