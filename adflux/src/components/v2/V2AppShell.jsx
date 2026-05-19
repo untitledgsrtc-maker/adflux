@@ -66,9 +66,11 @@ const ADMIN_NAV = [
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/pending-approvals', label: 'Approvals',      icon: CheckSquare },
-  { to: '/cities',            label: 'Cities',         icon: Building2 },
-  { to: '/auto-districts',    label: 'Auto Districts', icon: MapPin },
-  { to: '/gsrtc-stations',    label: 'GSRTC Stations', icon: Tv },
+  // Phase 62.7 (20 May 2026) — Cities / Auto Districts / GSRTC
+  // Stations entries dropped per owner directive. Same admin
+  // surfaces still exist as tabs inside /master and via direct URL
+  // deep-link. Removing them from the sidebar trims a frequently-
+  // overlooked section without losing any function.
   { to: '/master',            label: 'Master',         icon: FileBox },
   // Phase 38 + 39 — People consolidates Team + Incentives + Salary +
   // Leaves + TA Claims into one module with sub-tabs. Old routes
