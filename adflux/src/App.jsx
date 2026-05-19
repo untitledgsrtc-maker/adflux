@@ -12,6 +12,8 @@ import DashboardV2 from './pages/v2/DashboardV2'
 // v2 inner pages — all share V2AppShell via react-router Outlet.
 import QuotesV2           from './pages/v2/QuotesV2'
 import MyPerformanceV2    from './pages/v2/MyPerformanceV2'
+import CheckInV2          from './pages/v2/CheckInV2'   // Phase 60
+import CheckInGate        from './components/v2/CheckInGate'   // Phase 60
 import MyOfferV2          from './pages/v2/MyOfferV2'
 import CreateQuoteV2      from './pages/v2/CreateQuoteV2'
 import CreateQuoteOtherMediaV2 from './pages/v2/CreateQuoteOtherMediaV2'
@@ -144,12 +146,21 @@ export default function App() {
 
         <Route path="/" element={<RootRedirect />} />
 
+        {/* Phase 60 — attendance check-in landing. Authenticated but
+            outside V2AppShell (no sidebar / topbar). CheckInGate
+            inside V2AppShell redirects sales + telecaller reps here
+            on app open until they've checked in today. */}
+        <Route path="/check-in" element={<RequireAuth><CheckInV2 /></RequireAuth>} />
+
         {/* ─── v2 inner pages (share V2AppShell chrome) ───
             Phase 18 — /dashboard moved INSIDE V2AppShell so it shares
             the same sidebar (Lead Pipeline, Team Live, Leads, etc) as
             every other page. Previously it sat outside and rendered
-            its own chrome which dropped the new nav links. */}
-        <Route element={<RequireAuth><V2AppShell /></RequireAuth>}>
+            its own chrome which dropped the new nav links.
+            Phase 60 — V2AppShell wrapped in CheckInGate so the gate
+            runs on every authenticated page mount; the gate only
+            applies to sales + telecaller roles. */}
+        <Route element={<RequireAuth><CheckInGate><V2AppShell /></CheckInGate></RequireAuth>}>
           <Route path="/dashboard"    element={<DashboardV2 />} />
           <Route path="/v2/dashboard" element={<DashboardV2 />} />
           {/* Shared — admin + sales */}
