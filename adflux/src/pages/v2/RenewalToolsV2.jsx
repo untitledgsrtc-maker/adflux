@@ -31,9 +31,17 @@ export default function RenewalToolsV2() {
 
   async function load() {
     setLoading(true)
+    // Phase 62.5 (20 May 2026) — owner reported /renewal-tools showed
+    // "Nothing due" while SQL confirmed 46 won quotes ending in 60d.
+    // Root cause: the `users(name)` PostgREST FK embed silently
+    // returns null under some RLS/schema-cache combos (documented
+    // §26 Sprint A + §36.6 "users(name) embed bypassed with two-
+    // query merge"). When the embed null-payloads, supabase-js
+    // returns an empty result. Fix: drop the embed, fetch user
+    // names separately, merge client-side.
     let q = supabase
       .from('quotes')
-      .select('id, quote_number, client_name, campaign_end_date, created_by, users(name), total_amount')
+      .select('id, quote_number, client_name, campaign_end_date, created_by, total_amount')
       .eq('status', 'won')
       .gte('campaign_end_date', today)
       .lte('campaign_end_date', future60)
@@ -45,8 +53,31 @@ export default function RenewalToolsV2() {
     // `!isAdmin` filter falsely scoped co_owners to their own quotes.
     if (!isPrivileged) q = q.eq('created_by', profile.id)
 
-    const { data, error } = await q
-    if (!error) setQuotes(data || [])
+    const { data: qRows, error: qErr } = await q
+    if (qErr) {
+      console.warn('[renewal-tools] quotes query failed:', qErr.message)
+      setQuotes([])
+      setLoading(false)
+      return
+    }
+
+    // Phase 62.5 — fetch the seller names in a second query + merge.
+    // Only fire when admin/co_owner because non-admins only see their
+    // own row (created_by = self) and the name is already on profile.
+    let rows = qRows || []
+    if (isPrivileged && rows.length > 0) {
+      const ids = Array.from(new Set(rows.map(r => r.created_by).filter(Boolean)))
+      if (ids.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name')
+          .in('id', ids)
+        const byId = Object.fromEntries((users || []).map(u => [u.id, u.name]))
+        rows = rows.map(r => ({ ...r, users: { name: byId[r.created_by] || '—' } }))
+      }
+    }
+
+    setQuotes(rows)
     setLoading(false)
   }
 
