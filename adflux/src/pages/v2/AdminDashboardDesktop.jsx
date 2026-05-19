@@ -114,7 +114,12 @@ export default function AdminDashboardDesktop() {
 
     // Phase 41.2 — Sprint 2 add: 3 new queries for Action Queue +
     // Reps-in-field cards. All counts only (head: true), so cheap.
-    const liveCutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+    // Phase 57c — widened from 30 min to 60 min so reps with brief
+    // GPS gaps (tunnels, weak signal, distance-filter quiet periods)
+    // don't drop off the "Reps in field right now" card. Plugin
+    // distanceFilter dropped to 10m in parallel; together they keep
+    // stationary reps visible.
+    const liveCutoffIso = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
     const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes, hotLeadsRes, briefLogRes, sourceAttribRes] = await Promise.all([
       // Use `*` to be tolerant of schema drift — earlier we enumerated

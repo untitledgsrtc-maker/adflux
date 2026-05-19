@@ -70,7 +70,14 @@ export async function startBackgroundGps(userId, opts = {}) {
   if (activeWatcherId) await stopBackgroundGps()
 
   const {
-    distanceFilter   = 25,
+    // Phase 57c (19 May 2026) — was 25m. Owner reported "again
+    // gps gone of dhara" after she sat at her desk for 38 min.
+    // Plugin only fires on movement >distanceFilter, so stationary
+    // reps look offline in /dashboard live cards. 10m catches
+    // natural GPS jitter even when the phone is still → continuous
+    // pings → admin always sees live. Battery hit is negligible
+    // because the foreground service was already running.
+    distanceFilter   = 10,
     requestPermissions = true,
   } = opts
 
