@@ -149,6 +149,31 @@ const TELECALLER_NAV = [
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
 
+// Phase 61 (19 May 2026) — manager nav for team_role='sales_manager'
+// users (Jubin = sales head, Renuka = TC head). Extends their base
+// role's daily flow with a "My Team" entry at the top.
+//
+// Why not separate sales-manager vs telecaller-manager navs:
+//   - Both heads still close their own deals + run their team. The
+//     workflow under the surface is identical; "My Team" is the only
+//     additional surface they need. Two parallel navs would create
+//     extra maintenance for zero UX gain.
+//   - If a sales head needs the call queue or a TC head needs the
+//     dashboard, they reach the deep-link route directly (RLS scopes
+//     visibility to their team via manager_id chain).
+const MANAGER_NAV = [
+  { to: '/manager',           label: 'My Team',        icon: Users },
+  { to: '/work',              label: 'Today',          icon: Sun },
+  { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
+  { to: '/leads',             label: 'Leads',          icon: Inbox },
+  { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/clients',           label: 'Clients',        icon: Contact2 },
+  { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
+  { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
+  { to: '/calls',             label: 'My Calls',       icon: Phone },
+  { to: '/my-offer',          label: 'My Offer',       icon: FileText },
+]
+
 const MOBILE_NAV_ADMIN = [
   { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
   { to: '/pending-approvals', label: 'Approve',        icon: CheckSquare },
@@ -186,8 +211,17 @@ const MOBILE_NAV_TELECALLER = [
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
 ]
 
+// Phase 61 — 4 thumb-zone tabs for managers. Lead with team, then the
+// rep workflow they still own day-to-day.
+const MOBILE_NAV_MANAGER = [
+  { to: '/manager',           label: 'Team',           icon: Users },
+  { to: '/leads',             label: 'Leads',          icon: Inbox },
+  { to: '/work',              label: 'Today',          icon: Sun },
+  { to: '/quotes',            label: 'Quotes',         icon: FileText },
+]
+
 export function V2AppShell() {
-  const { user, profile, isPrivileged, signOut } = useAuth()
+  const { user, profile, isPrivileged, isManager, signOut } = useAuth()
 
   // Apply the rep's persisted theme preference on mount; CSS keys
   // off `<html data-theme="day">` in v2.css.
@@ -306,14 +340,19 @@ export function V2AppShell() {
   }, [])
 
   // Nav variants by role:
-  //   admin / co_owner → ADMIN_NAV (full chrome including govt masters)
-  //   telecaller       → TELECALLER_NAV (queue-first, minimal)
-  //   agency           → AGENCY_NAV (Quotes + Earnings + Offer only)
-  //   sales            → SALES_NAV (full daily flow)
+  //   admin / co_owner                → ADMIN_NAV (full chrome including govt masters)
+  //   team_role='sales_manager'       → MANAGER_NAV (Phase 61, leads with My Team)
+  //   team_role='telecaller'          → TELECALLER_NAV (queue-first, minimal)
+  //   agency                          → AGENCY_NAV (Quotes + Earnings + Offer only)
+  //   sales (default)                 → SALES_NAV (full daily flow)
+  // Phase 61 — Manager branch sits ABOVE telecaller so Renuka
+  // (role='telecaller' + team_role='sales_manager') gets MANAGER_NAV
+  // instead of TELECALLER_NAV.
   const isTelecaller = profile?.team_role === 'telecaller'
   const isAgency     = profile?.role === 'agency'
   const nav =
     isPrivileged   ? ADMIN_NAV :
+    isManager      ? MANAGER_NAV :
     isTelecaller   ? TELECALLER_NAV :
     isAgency       ? AGENCY_NAV :
                      SALES_NAV
@@ -323,6 +362,7 @@ export function V2AppShell() {
   // mostly anyway).
   const mobileNav =
     isPrivileged   ? MOBILE_NAV_ADMIN :
+    isManager      ? MOBILE_NAV_MANAGER :
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES

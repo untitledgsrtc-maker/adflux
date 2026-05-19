@@ -14,6 +14,8 @@ import QuotesV2           from './pages/v2/QuotesV2'
 import MyPerformanceV2    from './pages/v2/MyPerformanceV2'
 import CheckInV2          from './pages/v2/CheckInV2'   // Phase 60
 import CheckInGate        from './components/v2/CheckInGate'   // Phase 60
+import ManagerDashboardV2 from './pages/v2/ManagerDashboardV2' // Phase 61
+import TeamManagerAssignV2 from './pages/v2/TeamManagerAssignV2' // Phase 61
 import MyOfferV2          from './pages/v2/MyOfferV2'
 import CreateQuoteV2      from './pages/v2/CreateQuoteV2'
 import CreateQuoteOtherMediaV2 from './pages/v2/CreateQuoteOtherMediaV2'
@@ -90,6 +92,16 @@ function RequirePrivileged({ children }) {
   return children
 }
 
+/* Phase 61 (19 May 2026) — Manager guard. Gates `/manager` route to
+   team leads (team_role='sales_manager') and admins. Non-managers
+   bounce to their role's home via RootRedirect. */
+function RequireManager({ children }) {
+  const { isPrivileged, isManager, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!isPrivileged && !isManager) return <Navigate to="/" replace />
+  return children
+}
+
 /* Govt-segment guard. Used by the Government wizard so a Private-only
    sales rep can't reach it via direct URL. ALL or GOVERNMENT is OK. */
 function RequireGovtAccess({ children }) {
@@ -129,7 +141,14 @@ function RootRedirect() {
   // first, then fall back to role for admin/co_owner.
   const role     = profile?.role
   const teamRole = profile?.team_role
-  if (teamRole === 'telecaller')               return <Navigate to="/telecaller" replace />
+  // Phase 61 (19 May 2026) — sales_manager (Jubin + Renuka) lands
+  // on /manager (their team-lead dashboard). Branch BEFORE the base
+  // role checks so a sales-flavored manager doesn't fall through
+  // to /work and a TC-flavored manager doesn't fall through to
+  // /telecaller. They can still reach /work or /telecaller from
+  // their sidebar — the landing just defaults to the team view.
+  if (teamRole === 'sales_manager')               return <Navigate to="/manager" replace />
+  if (teamRole === 'telecaller')                  return <Navigate to="/telecaller" replace />
   if (teamRole === 'sales' || role === 'sales')   return <Navigate to="/work" replace />
   if (teamRole === 'agency' || role === 'agency') return <Navigate to="/quotes" replace />
   return <Navigate to="/dashboard" replace />
@@ -203,6 +222,12 @@ export default function App() {
           <Route path="/leads/new"                 element={<LeadFormV2 />} />
           <Route path="/leads/:id"                 element={<LeadDetailV2 />} />
           <Route path="/work"                      element={<WorkV2 />} />
+          {/* Phase 61 — Manager dashboard. Shows the team-lead's
+              direct reports + today's metrics. Sales head + TC head
+              land here on app open via RootRedirect. */}
+          <Route path="/manager"                   element={<RequireManager><ManagerDashboardV2 /></RequireManager>} />
+          {/* Phase 61 — Admin reassigns reps to managers. */}
+          <Route path="/admin/team-assign"         element={<RequirePrivileged><TeamManagerAssignV2 /></RequirePrivileged>} />
           {/* Phase 56m — per-rep call log (own + admin view of any rep). */}
           <Route path="/calls"                     element={<CallLogsV2 />} />
           <Route path="/admin/calls/:userId"       element={<RequirePrivileged><CallLogsV2 /></RequirePrivileged>} />

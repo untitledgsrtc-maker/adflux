@@ -31,7 +31,16 @@ import { formatCurrency } from '../../utils/formatters'
 export default function TeamDashboardV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isPrivileged = ['admin', 'co_owner', 'sales_manager'].includes(profile?.role)
+  // Phase 61 (19 May 2026) — Bug 2 fix. Prior gate checked
+  // `profile.role IN ('admin','co_owner','sales_manager')` but
+  // `sales_manager` is a `team_role` value, not a `role` value.
+  // Jubin (role='sales' + team_role='sales_manager') and Renuka
+  // (role='telecaller' + team_role='sales_manager') were both
+  // BLOCKED from a page they're supposed to access. Now accepts
+  // either signal.
+  const isPrivileged =
+    ['admin', 'co_owner'].includes(profile?.role)
+    || profile?.team_role === 'sales_manager'
 
   const [reps, setReps] = useState([])
   const [sessions, setSessions] = useState([])

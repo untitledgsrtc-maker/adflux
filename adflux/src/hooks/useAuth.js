@@ -91,6 +91,23 @@ export function useAuth() {
     // Full-access set used by sidebar gating + master-data pages
     isPrivileged: ['admin','co_owner'].includes(profile?.role),
 
+    // Phase 61 (19 May 2026) — Manager helpers. `team_role` is the
+    // canonical signal for management (Phase 42 design). Two
+    // sub-flavors so manager dashboards can branch on what kind of
+    // team the manager runs without re-deriving from `role` everywhere.
+    //
+    //   isManager           — any team_role='sales_manager'
+    //   isManagerSales      — sales head (Jubin: role='sales')
+    //   isManagerTelecaller — TC head (Renuka: role='telecaller')
+    //
+    // Both managers still see their base role's workflow (Jubin uses
+    // sales pipeline, Renuka uses telecaller queue). The Manager UI
+    // extends that base with team-level visibility — it does not
+    // replace it.
+    isManager:            profile?.team_role === 'sales_manager',
+    isManagerSales:       profile?.team_role === 'sales_manager' && profile?.role === 'sales',
+    isManagerTelecaller:  profile?.team_role === 'sales_manager' && profile?.role === 'telecaller',
+
     // Segment scope (PRIVATE / GOVERNMENT / ALL) — defaults ALL if
     // somehow null, mirrors the DB default.
     segmentAccess: profile?.segment_access || 'ALL',
