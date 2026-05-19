@@ -55,6 +55,11 @@ export default function TeamDashboardV2() {
   // static profile city. Owner reported the static city read as
   // "live location not fetched in dashboard".
   const [latestPingByUser, setLatestPingByUser] = useState({})
+  // Phase 62.9 (20 May 2026) — owner directive: show GPS / Internet /
+  // Push status pills per rep card, color-coded red when OFF, so
+  // admin can spot any rep with a broken signal at-a-glance.
+  // pushByUser maps user_id → {has_sub, last_seen_at}.
+  const [pushByUser, setPushByUser] = useState({})
   const [newLeadsToday, setNewLeadsToday] = useState(0)
   const [pipelineToday, setPipelineToday] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -141,6 +146,29 @@ export default function TeamDashboardV2() {
       setLatestPingByUser(pingMap)
       setNewLeadsToday(newLeadsRes.count || 0)
       setPipelineToday((pipelineRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0))
+
+      // Phase 62.9 — load push subscriptions per rep. Used to render
+      // the "Push on/off" + "Online" status pills below the KPI row.
+      // Last-seen-at acts as a proxy for whether the device has been
+      // reachable recently (3h+ stale = treat as offline).
+      try {
+        const { data: pushRows } = await supabase
+          .from('push_subscriptions')
+          .select('user_id, last_seen_at')
+          .order('last_seen_at', { ascending: false })
+        const pm = {}
+        ;(pushRows || []).forEach((r) => {
+          // Keep the freshest row per user.
+          if (!pm[r.user_id]) {
+            pm[r.user_id] = { has_sub: true, last_seen_at: r.last_seen_at }
+          }
+        })
+        setPushByUser(pm)
+      } catch (e) {
+        // Defensive — RLS hiccup shouldn't break the page render.
+        console.warn('[team-dashboard] push load failed:', e?.message || e)
+      }
+
       setLoading(false)
     }
     load()
@@ -300,6 +328,68 @@ export default function TeamDashboardV2() {
                   <div className="lbl">Voice</div>
                 </div>
               </div>
+              {/* Phase 62.9 (20 May 2026) — GPS / Online / Push status
+                  pills per rep. Color-banded so admin spots any rep
+                  with a broken signal at-a-glance. Green = healthy,
+                  red = OFF / stale.
+                    GPS    — fresh ping in last 30 min
+                    Online — push_subscriptions.last_seen_at < 3h ago
+                    Push   — push_subscriptions row exists
+                  Rule of thumb: if all three are red, the rep's
+                  phone is likely off or out of signal area. */}
+              {(() => {
+                const ping = latestPingByUser[r.id]
+                const pingMins = ping
+                  ? Math.floor((Date.now() - new Date(ping.captured_at).getTime()) / 60000)
+                  : Infinity
+                const gpsOn = pingMins <= 30
+                const push = pushByUser[r.id]
+                const pushOn = !!push?.has_sub
+                const lastSeenMins = push?.last_seen_at
+                  ? Math.floor((Date.now() - new Date(push.last_seen_at).getTime()) / 60000)
+                  : Infinity
+                const onlineOk = lastSeenMins <= 180   // 3h
+                const pill = (label, ok) => (
+                  <span
+                    style={{
+                      display:      'inline-flex',
+                      alignItems:   'center',
+                      gap:          4,
+                      padding:      '3px 8px',
+                      borderRadius: 999,
+                      fontSize:     10,
+                      fontWeight:   600,
+                      letterSpacing:'.04em',
+                      textTransform:'uppercase',
+                      border:       `1px solid ${ok ? 'var(--success, #10B981)' : 'var(--danger, #EF4444)'}`,
+                      background:   ok ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.14)',
+                      color:        ok ? 'var(--success, #10B981)' : 'var(--danger, #EF4444)',
+                    }}
+                  >
+                    <span style={{
+                      width: 5, height: 5, borderRadius: '50%',
+                      background: ok ? 'var(--success, #10B981)' : 'var(--danger, #EF4444)',
+                    }} />
+                    {label} {ok ? 'on' : 'off'}
+                  </span>
+                )
+                return (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      display:    'flex',
+                      flexWrap:   'wrap',
+                      gap:        6,
+                      marginTop:  6, marginBottom: 4,
+                    }}
+                    title="GPS / Online / Push status — red if rep's phone signal is broken"
+                  >
+                    {pill('GPS',    gpsOn)}
+                    {pill('Online', onlineOk)}
+                    {pill('Push',   pushOn)}
+                  </div>
+                )
+              })()}
               <div className="lead-rep-progress">
                 <span className={cls} style={{ width: `${Math.min(callPct, 100)}%` }} />
               </div>
