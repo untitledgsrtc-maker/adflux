@@ -29,7 +29,7 @@ import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import { Geolocation } from '@capacitor/geolocation'
 import { PushNotifications } from '@capacitor/push-notifications'
-import { MapPin, PhoneCall, Bell, BatteryCharging, CheckCircle2, X, ArrowRight } from 'lucide-react'
+import { MapPin, PhoneCall, Bell, BatteryCharging, CheckCircle2, X, ArrowRight, ShieldCheck, Loader2 } from 'lucide-react'
 import {
   checkCallLogPermission,
   requestCallLogPermission,
@@ -101,38 +101,50 @@ export default function NativeOnboarding({ userId, onClose }) {
   }
 
   async function askLocation() {
-    setBusy(true)
     try {
       const res = await Geolocation.requestPermissions()
       setLocState(res?.location === 'granted' ? 'granted' : 'denied')
     } catch {
       setLocState('denied')
-    } finally {
-      setBusy(false)
     }
   }
 
   async function askCallLog() {
-    setBusy(true)
     try {
       const r = await requestCallLogPermission()
       setCallState(r === 'granted' ? 'granted' : 'denied')
-    } finally {
-      setBusy(false)
+    } catch {
+      setCallState('denied')
     }
   }
 
   async function askPush() {
-    setBusy(true)
     try {
       const r = await PushNotifications.requestPermissions()
       setPushState(r?.receive === 'granted' ? 'granted' : 'denied')
     } catch {
       setPushState('denied')
+    }
+  }
+
+  // Phase 57e — fire all 3 permission prompts back-to-back. Android
+  // OS rule forces a separate dialog per category (Google audit
+  // requirement), but the prompts auto-chain in 8-10 seconds. Each
+  // requestPermissions resolves only after the user taps Allow /
+  // Deny, then the next one fires.
+  async function grantAllAccess() {
+    setBusy(true)
+    try {
+      await askLocation()
+      await askCallLog()
+      await askPush()
     } finally {
       setBusy(false)
     }
   }
+
+  const allThreeGranted = locState === 'granted' && callState === 'granted' && pushState === 'granted'
+  const anyAttempted    = locState !== 'unknown' || callState !== 'unknown' || pushState !== 'unknown'
 
   async function markDone() {
     try {
@@ -182,42 +194,51 @@ export default function NativeOnboarding({ userId, onClose }) {
         <h2 style={title}>{current.title}</h2>
         <p style={body}>{current.body}</p>
 
-        {/* Per-step CTA */}
+        {/* Step 0 — single "Allow all access" CTA chains 3 prompts.
+            Phase 57e (19 May 2026): owner asked "can we override all
+            permission in one allow". Android OS forces separate
+            dialogs per category, but they auto-chain so user taps
+            Allow 3× in ~10 seconds instead of stepping through 3
+            onboarding screens. */}
         {step === 0 && (
-          <StepCta
-            state={locState}
-            grantedLabel="Location granted"
-            askLabel="Allow location access"
-            deniedLabel="Reopen phone settings"
-            busy={busy}
-            onAsk={askLocation}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Permission status pills — surface what's granted so far. */}
+            {anyAttempted && (
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: 6,
+                fontSize: 11, color: 'var(--text-muted)',
+              }}>
+                <PermPill icon={<MapPin size={10} strokeWidth={1.6} />} label="Location" state={locState} />
+                <PermPill icon={<PhoneCall size={10} strokeWidth={1.6} />} label="Call log" state={callState} />
+                <PermPill icon={<Bell size={10} strokeWidth={1.6} />} label="Notifications" state={pushState} />
+              </div>
+            )}
+            {allThreeGranted ? (
+              <div style={grantedRow}>
+                <CheckCircle2 size={16} strokeWidth={1.6} />
+                <span>All 3 permissions granted</span>
+              </div>
+            ) : (
+              <button style={primaryBtn} onClick={grantAllAccess} disabled={busy}>
+                {busy
+                  ? <><Loader2 size={14} strokeWidth={1.6} style={{ animation: 'spin 1s linear infinite' }} /> Granting…</>
+                  : <><ShieldCheck size={14} strokeWidth={1.6} /> Allow all access</>}
+              </button>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+              You'll see 3 Android prompts in sequence — tap <b>Allow</b> on each.
+              For Location, pick <b>"Allow all the time"</b> so tracking continues when the screen is off.
+            </div>
+          </div>
         )}
+
+        {/* Step 1 — battery settings (manual; Android won't let
+            apps flip this). */}
         {step === 1 && (
-          <StepCta
-            state={callState}
-            grantedLabel="Call log granted"
-            askLabel="Allow call log access"
-            deniedLabel="Reopen phone settings"
-            busy={busy}
-            onAsk={askCallLog}
-          />
-        )}
-        {step === 2 && (
-          <StepCta
-            state={pushState}
-            grantedLabel="Notifications granted"
-            askLabel="Allow notifications"
-            deniedLabel="Reopen phone settings"
-            busy={busy}
-            onAsk={askPush}
-          />
-        )}
-        {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={battNote}>
               Phone settings can&apos;t be flipped from inside the app.
-              Open settings, find <b>Untitled OS</b>, set battery to
+              Open Settings, find <b>Untitled OS</b>, set battery to
               <b> Unrestricted</b>. Without this, Samsung / Xiaomi /
               OnePlus phones stop GPS tracking when the screen turns
               off.
@@ -226,7 +247,9 @@ export default function NativeOnboarding({ userId, onClose }) {
               style={primaryBtn}
               onClick={() => { setBattOpened(true) }}
             >
-              I&apos;ve opened battery settings
+              {battOpened
+                ? <><CheckCircle2 size={14} strokeWidth={1.6} /> Battery settings opened</>
+                : <>I&apos;ve opened battery settings</>}
             </button>
           </div>
         )}
@@ -258,19 +281,19 @@ export default function NativeOnboarding({ userId, onClose }) {
   )
 }
 
-function StepCta({ state, grantedLabel, askLabel, deniedLabel, busy, onAsk }) {
-  if (state === 'granted') {
-    return (
-      <div style={grantedRow}>
-        <CheckCircle2 size={16} strokeWidth={1.6} />
-        <span>{grantedLabel}</span>
-      </div>
-    )
-  }
+function PermPill({ icon, label, state }) {
+  const color = state === 'granted' ? 'var(--success, #10B981)'
+              : state === 'denied'  ? 'var(--danger, #EF4444)'
+              :                       'var(--text-muted, #94a3b8)'
   return (
-    <button style={primaryBtn} onClick={onAsk} disabled={busy}>
-      {state === 'denied' ? deniedLabel : askLabel}
-    </button>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '2px 8px', borderRadius: 999,
+      border: `1px solid ${color}`, color,
+      fontSize: 10, fontWeight: 600,
+    }}>
+      {icon} {label}{state === 'granted' ? ' ✓' : state === 'denied' ? ' ✗' : ''}
+    </span>
   )
 }
 
@@ -281,28 +304,18 @@ function doneKeyFor(userId) {
 }
 
 /* ─── Step config ─────────────────────────────────────────────── */
+/* Phase 57e — collapsed from 4 steps to 2. Step 1 chains the 3
+   runtime permission prompts in one tap; step 2 is the manual
+   battery exclusion (Android forces Settings navigation; can't be
+   programmatic). */
 const STEPS = [
   {
-    Icon: MapPin,
-    title: 'Allow location all day',
+    Icon: ShieldCheck,
+    title: 'Allow access',
     body:
-      'Untitled OS tracks your route so admin can settle TA / DA correctly. ' +
-      'Pick "Allow all the time" so tracking continues when the phone screen is off.',
-  },
-  {
-    Icon: PhoneCall,
-    title: 'Read call duration',
-    body:
-      'After every call, the app reads the call duration from your Android call log ' +
-      'so you don\'t have to type it manually. SIM choice is ignored — only the lead ' +
-      'number you tapped is matched.',
-  },
-  {
-    Icon: Bell,
-    title: 'Get push notifications',
-    body:
-      'New leads, callback reminders, and admin pings arrive as real notifications, ' +
-      'not in-app banners.',
+      'Untitled OS needs 3 phone permissions: location (for route tracking), ' +
+      'call log (for duration), and notifications. Tap the button below — ' +
+      'Android will show 3 prompts one after another. Tap Allow on each.',
   },
   {
     Icon: BatteryCharging,
