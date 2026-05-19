@@ -1200,15 +1200,18 @@
   margin-top: 4px;
 }
 .lead-hero-actions-grid .lead-btn-sm {
-  height: 38px;
+  /* Phase 62.0 (20 May 2026) — bump 38 → 44 (Apple HIG min tap
+     target). Reps reported fat-finger misclicks between Call /
+     WhatsApp / Meeting on iPhone SE / small Androids. */
+  height: 44px;
   padding: 0 10px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   justify-content: center;
   gap: 6px;
 }
 .lead-hero-actions-grid .lead-btn-sm span {
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
 }
 @media (min-width: 720px) {
@@ -1218,8 +1221,68 @@
     margin-left: auto;
   }
   .lead-hero-actions-grid .lead-btn-sm {
-    height: 32px;
+    /* Desktop pointer fine — keep compact 36px (still on tap-target
+       scale for trackpads/mice). */
+    height: 36px;
     padding: 0 12px;
+  }
+}
+
+/* Phase 62.0 — sticky bottom action bar on mobile. Primary actions
+   (Call · WhatsApp · Log outcome) stay reachable when the rep
+   scrolls through a long activity timeline. Hidden on ≥720px (the
+   in-card action grid is enough there). */
+.lead-mobile-sticky-bar {
+  /* Phase 62.0 — sits ABOVE the mobile bottom nav (62px) so both
+     bars are reachable without overlap. z-index 45 = above the
+     nav (40), below any drawer (50+). Anchored against the §29
+     z-index landscape. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--mobile-nav-height, 62px) + env(safe-area-inset-bottom, 0));
+  z-index: 45;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0));
+  background: var(--v2-bg-1, #1e293b);
+  border-top: 1px solid var(--v2-line, #334155);
+  box-shadow: 0 -8px 20px rgba(0,0,0,0.25);
+}
+.lead-mobile-sticky-bar .lead-mobile-sticky-btn {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--v2-line, #334155);
+  background: var(--v2-bg-2, #0f172a);
+  color: var(--v2-ink-0, #f1f5f9);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.lead-mobile-sticky-bar .lead-mobile-sticky-btn.is-primary {
+  background: var(--v2-yellow, #FFE600);
+  color: var(--accent-fg, #0f172a);
+  border-color: var(--v2-yellow, #FFE600);
+}
+.lead-mobile-sticky-bar .lead-mobile-sticky-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (min-width: 720px) {
+  .lead-mobile-sticky-bar { display: none; }
+}
+/* Phase 62.0 — extra bottom padding on the page so the sticky CTA
+   + mobile nav don't cover the last timeline row.
+   72 px sticky bar + 62 px mobile nav + safe area inset. */
+@media (max-width: 719.98px) {
+  .lead-root {
+    padding-bottom: calc(72px + var(--mobile-nav-height, 62px) + env(safe-area-inset-bottom, 0));
   }
 }
 

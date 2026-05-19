@@ -166,6 +166,16 @@ export default function LeadDetailV2() {
   // in the hero, and email still works via the mailto link on the
   // lead.email field below.
   const [moreOpen, setMoreOpen] = useState(false)
+
+  // Phase 62.1 (20 May 2026) — Linked Quotes + Open Follow-ups for
+  // THIS lead. Previously the hero had a single "View quote" CTA
+  // that only opened lead.quote_id (first linked quote). Reps with
+  // 2+ quotes for a customer couldn't reach the others. And open
+  // follow-ups on this lead were buried in the global /follow-ups
+  // page — out of context. Both load on lead mount + after any
+  // local activity save.
+  const [linkedQuotes, setLinkedQuotes] = useState([])
+  const [openFollowUps, setOpenFollowUps] = useState([])
   async function imHere() {
     if (!navigator.geolocation) {
       setError('GPS not available on this device.')
@@ -358,6 +368,30 @@ export default function LeadDetailV2() {
     }
     setActivities(actRes.data || [])
     setLoading(false)
+
+    // Phase 62.1 — load linked quotes + open follow-ups for this
+    // lead. Separate from the main load() promises so a quote/RLS
+    // hiccup doesn't break the page render.
+    try {
+      const [qRes, fuRes] = await Promise.all([
+        supabase.from('quotes')
+          .select('id, ref, status, segment, media_type, total_amount, created_at')
+          .eq('lead_id', id)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase.from('follow_ups')
+          .select('id, follow_up_date, follow_up_time, note, is_done')
+          .eq('lead_id', id)
+          .eq('is_done', false)
+          .order('follow_up_date', { ascending: true })
+          .limit(10),
+      ])
+      setLinkedQuotes(qRes.data || [])
+      setOpenFollowUps(fuRes.data || [])
+    } catch (e) {
+      // Non-fatal — leave cards empty.
+      console.warn('[lead] linked load failed:', e?.message || e)
+    }
   }
   useEffect(() => { load() /* eslint-disable-next-line */ }, [id])
   // Phase 34Z.59 — owner reported saves not reflecting until tab
@@ -507,12 +541,20 @@ export default function LeadDetailV2() {
 
   return (
     <div className="lead-root">
-      {/* Back link */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 12, marginBottom: 12, cursor: 'pointer' }}
-           onClick={() => navigate('/leads')}>
-        <ArrowLeft size={12} />
+      {/* Back link — Phase 62.0: div → button for keyboard a11y */}
+      <button
+        type="button"
+        onClick={() => navigate('/leads')}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          color: 'var(--text-muted)', fontSize: 13, marginBottom: 12,
+          cursor: 'pointer', background: 'transparent', border: 0,
+          padding: '4px 6px', borderRadius: 6, fontFamily: 'inherit',
+        }}
+      >
+        <ArrowLeft size={14} strokeWidth={1.8} />
         <span>Back to leads</span>
-      </div>
+      </button>
 
       {/* Phase 34B — soft auto-Lost suggestion. Trigger sets
           auto_lost_suggested=true after AUTO_LOST_THRESHOLD non-
@@ -547,9 +589,10 @@ export default function LeadDetailV2() {
               type="button"
               onClick={() => setActiveModal('stage')}
               style={{
-                padding: '6px 12px', borderRadius: 8,
+                // Phase 62.0 — radius 8 → 10 (off-scale; v2 = 10/14/20)
+                padding: '6px 12px', borderRadius: 10,
                 background: 'var(--danger, #EF4444)', border: 'none',
-                color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                color: 'var(--accent-fg, #fff)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               }}
             >Mark Lost</button>
             <button
@@ -560,9 +603,10 @@ export default function LeadDetailV2() {
                 setLead(prev => prev ? { ...prev, auto_lost_suggested: false, auto_lost_suggested_at: null } : prev)
               }}
               style={{
-                padding: '6px 12px', borderRadius: 8,
+                // Phase 62.0 — radius 8 → 10
+                padding: '6px 12px', borderRadius: 10,
                 background: 'transparent', border: '1px solid var(--border)',
-                color: 'var(--text)', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                color: 'var(--text)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
               }}
             >Dismiss</button>
           </div>
@@ -720,13 +764,18 @@ export default function LeadDetailV2() {
                   else setLead(l => ({ ...l, do_not_call: next, dnc_at: next ? new Date().toISOString() : null }))
                 }}
                 title={lead.do_not_call ? 'DNC active — tap to lift' : 'Tap to mark Do Not Call'}
+                aria-pressed={!!lead.do_not_call}
                 style={{
+                  // Phase 62.2 (20 May 2026) — demoted from solid red
+                  // to soft-tinted chip when ON. Was out-shouting the
+                  // primary Stage chip on first paint. Same flag, less
+                  // visual weight.
                   padding: '4px 10px', borderRadius: 999,
-                  fontSize: 11, fontWeight: 700,
+                  fontSize: 11, fontWeight: 600,
                   border: '1px solid',
-                  background: lead.do_not_call ? 'var(--danger, #EF4444)' : 'transparent',
+                  background: lead.do_not_call ? 'rgba(239,68,68,0.14)' : 'transparent',
                   borderColor: lead.do_not_call ? 'var(--danger, #EF4444)' : 'var(--border)',
-                  color: lead.do_not_call ? '#fff' : 'var(--text-muted)',
+                  color: lead.do_not_call ? 'var(--danger, #EF4444)' : 'var(--text-muted)',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
@@ -744,18 +793,80 @@ export default function LeadDetailV2() {
                   else setLead(l => ({ ...l, wa_opt_out: next }))
                 }}
                 title={lead.wa_opt_out ? 'WhatsApp opt-out active — tap to lift' : 'Tap to mark WhatsApp opt-out'}
+                aria-pressed={!!lead.wa_opt_out}
                 style={{
+                  // Phase 62.2 — demoted from solid amber to soft tint.
                   padding: '4px 10px', borderRadius: 999,
-                  fontSize: 11, fontWeight: 700,
+                  fontSize: 11, fontWeight: 600,
                   border: '1px solid',
-                  background: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'transparent',
+                  background: lead.wa_opt_out ? 'rgba(245,158,11,0.14)' : 'transparent',
                   borderColor: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'var(--border)',
-                  color: lead.wa_opt_out ? 'var(--accent-fg, #0f172a)' : 'var(--text-muted)',
+                  color: lead.wa_opt_out ? 'var(--warning, #F59E0B)' : 'var(--text-muted)',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
                 WA opt-out{lead.wa_opt_out ? ' ON' : ''}
               </button>
+            </div>
+
+            {/* Phase 62.1 (20 May 2026) — promoted Phone chip + days-
+                since-contact chip. Both moved above the meta text
+                row so they show in the first paint (previously phone
+                lived only inside the Lead details right rail / mobile
+                stacked below the fold). */}
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', alignItems: 'center',
+              gap: 8, marginTop: 10, marginBottom: 6,
+            }}>
+              {lead.phone && (
+                <a
+                  href={lead.do_not_call ? undefined : `tel:+${cleanPhone(lead.phone)}`}
+                  onClick={() => lead.phone && !lead.do_not_call && fireAndForgetLog('call', `Call → ${lead.phone}`)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '8px 14px', borderRadius: 999,
+                    background: lead.do_not_call
+                      ? 'var(--surface-2, #334155)'
+                      : 'var(--accent, #FFE600)',
+                    color: lead.do_not_call
+                      ? 'var(--text-muted)'
+                      : 'var(--accent-fg, #0f172a)',
+                    fontFamily: 'var(--v2-display, "Space Grotesk")',
+                    fontSize: 14, fontWeight: 700,
+                    border: 0, textDecoration: 'none',
+                    cursor: lead.do_not_call ? 'default' : 'pointer',
+                    opacity: lead.do_not_call ? 0.65 : 1,
+                  }}
+                  title={lead.do_not_call ? 'DNC ON — calling blocked' : `Call ${lead.phone}`}
+                >
+                  <Phone size={14} strokeWidth={1.8} />
+                  <span className="tabular-nums">{lead.phone}</span>
+                </a>
+              )}
+              {lead.last_contact_at && (() => {
+                const days = Math.floor((Date.now() - new Date(lead.last_contact_at).getTime()) / 86400000)
+                const color = days <= 3
+                  ? 'var(--success, #10B981)'
+                  : days <= 7 ? 'var(--warning, #F59E0B)'
+                              : 'var(--danger, #EF4444)'
+                const bg = days <= 3
+                  ? 'rgba(16,185,129,0.12)'
+                  : days <= 7 ? 'rgba(245,158,11,0.14)'
+                              : 'rgba(239,68,68,0.14)'
+                return (
+                  <span
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 10px', borderRadius: 999,
+                      background: bg, color, fontSize: 12, fontWeight: 600,
+                    }}
+                    title={`Last contact: ${new Date(lead.last_contact_at).toLocaleString('en-IN')}`}
+                  >
+                    <Clock size={12} strokeWidth={1.8} />
+                    {days === 0 ? 'today' : `${days}d ago`}
+                  </span>
+                )
+              })()}
             </div>
 
             {/* Meta row: source · assigned · telecaller · last contact */}
@@ -1201,11 +1312,12 @@ export default function LeadDetailV2() {
                 className="lead-btn lead-btn-primary"
                 onClick={saveHereMeeting}
                 style={{
-                  width: '100%', padding: '10px 14px',
+                  // Phase 62.0 — radius 8 → 10 (off-scale)
+                  width: '100%', padding: '12px 14px',
                   fontSize: 14, fontWeight: 700,
                   background: 'var(--accent, #FFE600)',
                   color: 'var(--accent-fg, #0f172a)',
-                  border: 0, borderRadius: 8, cursor: 'pointer',
+                  border: 0, borderRadius: 10, cursor: 'pointer',
                 }}
               >
                 Save meeting now
@@ -1407,6 +1519,118 @@ export default function LeadDetailV2() {
               </div>
             </div>
           </div>
+
+          {/* Phase 62.1 (20 May 2026) — Open follow-ups for this
+              lead. Surfaces what's due next without making the rep
+              jump to the global /follow-ups list. Empty state copy
+              is encouraging, not nagging. */}
+          {openFollowUps.length > 0 && (
+            <div className="lead-card">
+              <div className="lead-card-head">
+                <div className="lead-card-title">Open follow-ups · {openFollowUps.length}</div>
+              </div>
+              <div className="lead-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {openFollowUps.slice(0, 5).map(fu => {
+                  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+                  const overdue = fu.follow_up_date && fu.follow_up_date < today
+                  return (
+                    <div
+                      key={fu.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 10px', borderRadius: 10,
+                        background: 'var(--surface-2, #0f172a)',
+                        border: `1px solid ${overdue ? 'var(--danger, #EF4444)' : 'var(--border)'}`,
+                      }}
+                    >
+                      <div style={{
+                        minWidth: 56, fontFamily: 'var(--v2-display, "Space Grotesk")',
+                        fontSize: 12, fontWeight: 600,
+                        color: overdue ? 'var(--danger, #EF4444)' : 'var(--text-muted)',
+                      }}>
+                        {fu.follow_up_date ? new Date(fu.follow_up_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                        {fu.follow_up_time && <div style={{ fontSize: 10, opacity: 0.8 }}>{String(fu.follow_up_time).slice(0,5)}</div>}
+                      </div>
+                      <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>
+                        {fu.note || 'Follow-up scheduled'}
+                      </div>
+                    </div>
+                  )
+                })}
+                {openFollowUps.length > 5 && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 2 }}>
+                    + {openFollowUps.length - 5} more
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Phase 62.1 — Linked quotes for this lead. If 2+ quotes
+              exist (e.g. rep sent LED v1 + LED v2 + Other Media),
+              all are reachable here. Lead hero CTA only opens the
+              first (lead.quote_id) — this card fills the gap. */}
+          {linkedQuotes.length > 0 && (
+            <div className="lead-card">
+              <div className="lead-card-head">
+                <div className="lead-card-title">Quotes · {linkedQuotes.length}</div>
+              </div>
+              <div className="lead-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {linkedQuotes.map(q => {
+                  const status = (q.status || 'draft').toLowerCase()
+                  const statusColor = status === 'won' ? 'var(--success, #10B981)'
+                    : status === 'lost' ? 'var(--danger, #EF4444)'
+                    : status === 'sent' || status === 'negotiating' ? 'var(--blue, #3B82F6)'
+                    : 'var(--text-muted)'
+                  const target = q.segment === 'GOVERNMENT' ? `/proposal/${q.id}` : `/quotes/${q.id}`
+                  return (
+                    <div
+                      key={q.id}
+                      onClick={() => navigate(target)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') navigate(target) }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 10px', borderRadius: 10,
+                        background: 'var(--surface-2, #0f172a)',
+                        border: '1px solid var(--border)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600,
+                                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {q.ref || q.id.slice(0,8)}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {q.media_type || q.segment || 'Quote'}
+                          {q.created_at && ' · ' + new Date(q.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                        </div>
+                      </div>
+                      <div style={{
+                        fontFamily: 'var(--v2-display, "Space Grotesk")',
+                        fontSize: 13, fontWeight: 700,
+                        color: 'var(--text)',
+                      }}
+                      className="tabular-nums">
+                        {q.total_amount ? formatCurrency(q.total_amount) : '—'}
+                      </div>
+                      <div style={{
+                        fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                        letterSpacing: '.06em',
+                        padding: '3px 8px', borderRadius: 999,
+                        background: 'transparent', color: statusColor,
+                        border: `1px solid ${statusColor}`,
+                      }}>
+                        {status}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Ownership */}
           <div className="lead-card">
@@ -1628,6 +1852,69 @@ export default function LeadDetailV2() {
           ))}
         </Modal>
       )}
+
+      {/* Phase 62.0 (20 May 2026) — mobile-only sticky bottom CTA.
+          Keeps Call · WhatsApp · Log outcome within thumb-reach when
+          the rep is reading the activity timeline lower down the
+          page. Hidden ≥720px via CSS (lead-mobile-sticky-bar).
+          Uses the same handlers as the in-card action grid — Call
+          fires fireAndForgetLog + tel: handoff; WhatsApp opens
+          wa.me; Outcome opens PostCallOutcomeModal. */}
+      <div className="lead-mobile-sticky-bar">
+        {lead.phone && !lead.do_not_call ? (
+          <a
+            href={`tel:+${cleanPhone(lead.phone)}`}
+            className="lead-mobile-sticky-btn is-primary"
+            onClick={() => fireAndForgetLog('call', `Call → ${lead.phone}`)}
+            aria-label="Call lead"
+          >
+            <Phone size={16} strokeWidth={1.8} />
+            <span>Call</span>
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="lead-mobile-sticky-btn is-primary"
+            disabled
+            aria-label="Call disabled"
+          >
+            <Phone size={16} strokeWidth={1.8} />
+            <span>{lead.do_not_call ? 'DNC' : 'No phone'}</span>
+          </button>
+        )}
+        {lead.phone && !lead.wa_opt_out ? (
+          <a
+            href={`https://wa.me/${cleanPhone(lead.phone)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="lead-mobile-sticky-btn"
+            onClick={() => fireAndForgetLog('whatsapp', `WhatsApp → ${lead.phone}`)}
+            aria-label="WhatsApp"
+          >
+            <MessageCircle size={16} strokeWidth={1.8} />
+            <span>WhatsApp</span>
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="lead-mobile-sticky-btn"
+            disabled
+            aria-label="WhatsApp disabled"
+          >
+            <MessageCircle size={16} strokeWidth={1.8} />
+            <span>{lead.wa_opt_out ? 'Opt-out' : 'No phone'}</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className="lead-mobile-sticky-btn"
+          onClick={() => setPostCallOpen(true)}
+          aria-label="Log outcome"
+        >
+          <ClipboardCheck size={16} strokeWidth={1.8} />
+          <span>Outcome</span>
+        </button>
+      </div>
     </div>
   )
 }
@@ -1732,8 +2019,12 @@ function InlineField({
         background: 'var(--surface-3, rgba(255,255,255,.04))',
         border: '1px solid var(--border-strong)',
         borderRadius: 6,
-        padding: '6px 8px',
-        fontSize: 12,
+        padding: '8px 10px',
+        // Phase 62.0 (20 May 2026) — fontSize 12 → 16 to kill iOS
+        // Safari auto-zoom on focus (Safari zooms any input <16px).
+        // Reps reported the page jumping every time they tapped to
+        // edit a field. 16 px keeps Mobile Safari calm.
+        fontSize: 16,
         color: 'var(--text)',
         fontFamily: 'inherit',
         outline: 'none',
