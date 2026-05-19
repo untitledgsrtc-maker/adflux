@@ -32,7 +32,7 @@ import { formatDate } from '../../utils/formatters'
 
 // Phase 34Z.6 — haversine + summariseTrack live in src/utils/
 // gpsDistance.js so /work uses the same filter rules.
-import { summariseTrack } from '../../utils/gpsDistance'
+import { summariseTrack, cleanTrack, detectStops } from '../../utils/gpsDistance'
 
 // Phase 32K — Leaflet imported directly from npm (`import L from 'leaflet'`).
 // No more CDN load gymnastics, no failover paths, no timeout guards.
@@ -164,7 +164,23 @@ export default function GpsTrackV2() {
       mapRef.current = null
     }
     try {
-      const center = [Number(pings[0].lat), Number(pings[0].lng)]
+      // Phase 61.3 (19 May 2026) — owner reported the map showed
+      // clusters of dots and a noisy polyline instead of a clean
+      // route. Three changes:
+      //   1. Polyline now uses cleanTrack() — drops accuracy outliers
+      //      + sub-30m drift + speed spikes. Visualization matches
+      //      the km math.
+      //   2. Drop the 394 yellow interval-ping circles. Only
+      //      check-in (green) + check-out (red) markers remain.
+      //   3. Numbered stop markers (1, 2, 3, ...) at every place
+      //      the rep stayed >= 10 minutes within an 80m radius —
+      //      mirrors the reference design owner showed.
+      const cleaned = cleanTrack(pings)
+      const stops   = detectStops(pings, { radiusM: 80, minMinutes: 10 })
+
+      const center = cleaned.length > 0
+        ? [Number(cleaned[0].lat), Number(cleaned[0].lng)]
+        : [Number(pings[0].lat), Number(pings[0].lng)]
       const map = L.map(containerRef.current).setView(center, 13)
       mapRef.current = map
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -172,27 +188,149 @@ export default function GpsTrackV2() {
         maxZoom: 19,
       }).addTo(map)
 
-      // Polyline of the day.
-      const latlngs = pings.map(p => [Number(p.lat), Number(p.lng)])
-      const line = L.polyline(latlngs, { color: '#FFE600', weight: 4, opacity: 0.85 }).addTo(map)
-      map.fitBounds(line.getBounds(), { padding: [30, 30] })
+      // Phase 61.5 (19 May 2026) — road snap via OSRM. Owner reported
+      // "pining not aline with route of road" — even after cleanTrack
+      // drops drift / spike pings, the polyline still cuts across
+      // buildings between the remaining points because raw GPS
+      // doesn't sit perfectly on road centerlines.
+      //
+      // OSRM /match endpoint returns a road-network-matched geometry
+      // for a sequence of coordinates + timestamps. Free public
+      // demo server (routing.openstreetmap.de) — rate-limited but
+      // fine for occasional admin review pages.
+      //
+      // Render strategy:
+      //   1. Draw the cleaned-but-raw polyline immediately in a faint
+      //      yellow so the page paints without waiting.
+      //   2. Fire the OSRM POST in parallel.
+      //   3. When OSRM returns, replace the raw polyline with the
+      //      matched (road-snapped) geometry in bright yellow.
+      //
+      // Failures (network down, OSRM 4xx/5xx, >100 pings = batch too
+      // large) silently leave the raw polyline in place.
+      let rawLine = null
+      if (cleaned.length >= 2) {
+        const latlngs = cleaned.map(p => [Number(p.lat), Number(p.lng)])
+        rawLine = L.polyline(latlngs, {
+          color:    '#FFE600',
+          weight:   5,
+          opacity:  0.45,        // faint until road-matched line lands
+          lineCap:  'round',
+          lineJoin: 'round',
+        }).addTo(map)
+        map.fitBounds(rawLine.getBounds(), { padding: [40, 40] })
 
-      // Start (green), end (red), interval pings (small yellow circles).
-      pings.forEach((p, i) => {
-        const isStart = i === 0
-        const isEnd   = i === pings.length - 1
-        const color = isStart ? '#10B981' : isEnd ? '#EF4444' : '#F59E0B'
-        const radius = isStart || isEnd ? 8 : 4
-        L.circleMarker([Number(p.lat), Number(p.lng)], {
-          radius, color, weight: 2, fillColor: color, fillOpacity: 0.9,
+        // OSRM /match — best-effort. Capped to 100 pings; longer
+        // sequences need chunking which isn't worth the complexity
+        // for a single rep-day page.
+        const sample = cleaned.length > 100
+          ? cleaned.filter((_, i) => i % Math.ceil(cleaned.length / 100) === 0)
+          : cleaned
+        const coordStr = sample
+          .map(p => `${Number(p.lng).toFixed(6)},${Number(p.lat).toFixed(6)}`)
+          .join(';')
+        const tsStr = sample
+          .map(p => Math.floor(new Date(p.captured_at).getTime() / 1000))
+          .join(';')
+        const url = `https://routing.openstreetmap.de/routed-car/match/v1/driving/${coordStr}`
+          + `?steps=false&geometries=geojson&overview=full&timestamps=${tsStr}`
+
+        fetch(url)
+          .then(r => r.ok ? r.json() : null)
+          .then(json => {
+            if (!json || !mapRef.current) return
+            if (json.code !== 'Ok' || !Array.isArray(json.matchings)) return
+            // Replace the raw line with each matched leg drawn as a
+            // road-snapped polyline. Multiple matchings can come back
+            // when OSRM splits the track on confidence drops.
+            if (rawLine) {
+              try { rawLine.remove() } catch (_) {}
+            }
+            const matchedGroup = []
+            for (const m of json.matchings) {
+              const coords = m?.geometry?.coordinates
+              if (!Array.isArray(coords) || coords.length < 2) continue
+              const latlngs = coords.map(c => [c[1], c[0]])  // GeoJSON is lng,lat
+              const ln = L.polyline(latlngs, {
+                color:    '#FFE600',
+                weight:   5,
+                opacity:  0.95,
+                lineCap:  'round',
+                lineJoin: 'round',
+              }).addTo(mapRef.current)
+              matchedGroup.push(ln)
+            }
+            // Re-fit if we got new geometry.
+            if (matchedGroup.length > 0) {
+              const fg = L.featureGroup(matchedGroup)
+              mapRef.current.fitBounds(fg.getBounds(), { padding: [40, 40] })
+            }
+          })
+          .catch(() => { /* leave raw polyline visible */ })
+      } else if (cleaned.length === 1) {
+        map.setView([Number(cleaned[0].lat), Number(cleaned[0].lng)], 14)
+      }
+
+      // Check-in (green) + check-out (red) pins only — drop the
+      // interval circles that used to clutter the map.
+      const first = pings[0]
+      const last  = pings[pings.length - 1]
+      if (first) {
+        L.circleMarker([Number(first.lat), Number(first.lng)], {
+          radius: 9, color: '#10B981', weight: 3,
+          fillColor: '#10B981', fillOpacity: 0.92,
         })
         .addTo(map)
         .bindPopup(
-          `<b>${isStart ? 'Check-in' : isEnd ? 'Check-out' : p.source}</b><br/>` +
-          `${new Date(p.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` +
-          (p.accuracy_m ? `<br/><small>±${p.accuracy_m}m accuracy</small>` : '')
+          `<b>Check-in</b><br/>${new Date(first.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
         )
-      })
+      }
+      if (last && last !== first) {
+        L.circleMarker([Number(last.lat), Number(last.lng)], {
+          radius: 9, color: '#EF4444', weight: 3,
+          fillColor: '#EF4444', fillOpacity: 0.92,
+        })
+        .addTo(map)
+        .bindPopup(
+          `<b>Check-out</b><br/>${new Date(last.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+        )
+      }
+
+      // Numbered stop markers.
+      for (const s of stops) {
+        const icon = L.divIcon({
+          className: 'gps-stop-pin',
+          html: `
+            <div style="
+              width: 32px; height: 32px;
+              background: #F59E0B;
+              border: 2px solid #fff;
+              border-radius: 50% 50% 50% 0;
+              transform: rotate(-45deg);
+              display: flex; align-items: center; justify-content: center;
+              box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+            ">
+              <span style="
+                transform: rotate(45deg);
+                color: #fff;
+                font-weight: 700;
+                font-size: 13px;
+                font-family: 'Space Grotesk', sans-serif;
+              ">${s.id}</span>
+            </div>
+          `,
+          iconSize:   [32, 32],
+          iconAnchor: [16, 32],
+        })
+        L.marker([s.lat, s.lng], { icon })
+          .addTo(map)
+          .bindPopup(
+            `<b>Stop ${s.id}</b><br/>` +
+            `${new Date(s.started_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} ` +
+            `– ${new Date(s.ended_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}<br/>` +
+            `<small>${s.minutes} min dwell</small>`
+          )
+      }
     } catch (e) {
       setError('Map render failed: ' + (e?.message || String(e)))
     }
