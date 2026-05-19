@@ -64,11 +64,17 @@ export default function LeadsCollectedChart({ onDayClick }) {
     async function load() {
       setLoading(true); setErr('')
 
+      // Phase 61.2 (19 May 2026) — IST window. Postgres treats
+      // bare `2026-05-19T00:00:00` as UTC; we want IST midnight so
+      // the bucket boundaries match what the rep sees on the clock.
+      // +05:30 suffix anchors to Asia/Kolkata. Without this, a lead
+      // created at 02:00 IST today lands in yesterday's bucket and
+      // today's bar undercounts.
       let q = supabase
         .from('leads')
         .select('id, created_at, segment, source')
-        .gte('created_at', `${from}T00:00:00`)
-        .lte('created_at', `${to}T23:59:59`)
+        .gte('created_at', `${from}T00:00:00+05:30`)
+        .lte('created_at', `${to}T23:59:59+05:30`)
         .limit(20000)
       if (segment !== 'all') {
         // Private rows historically have segment=null (pre-Phase 4).
@@ -84,11 +90,21 @@ export default function LeadsCollectedChart({ onDayClick }) {
       if (cancelled) return
       if (error) { setErr(error.message); setLoading(false); return }
 
-      // Bucket by date.
+      // Phase 61.2 — bucket by IST calendar day, not UTC slice.
+      // `r.created_at` is a Postgres timestamptz that arrives as an
+      // ISO UTC string; slicing the first 10 chars gives the UTC
+      // date which is off by up to 5h30 from the IST workday. Using
+      // Intl.DateTimeFormat with timeZone='Asia/Kolkata' gives the
+      // correct IST date even when the lead was inserted between
+      // midnight and 5:30am IST.
+      const istFmt = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        timeZone: 'Asia/Kolkata',
+      })
       const bucket = new Map()
       for (const r of (data || [])) {
-        const d = (r.created_at || '').slice(0, 10)
-        if (!d) continue
+        if (!r.created_at) continue
+        const d = istFmt.format(new Date(r.created_at))  // yyyy-mm-dd IST
         bucket.set(d, (bucket.get(d) || 0) + 1)
       }
       // Fill every day in range (including zero days) so the X axis is
