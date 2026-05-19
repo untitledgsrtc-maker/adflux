@@ -64,9 +64,13 @@ export default function TeamDashboardV2() {
         // an employee. They don't have GPS / attendance / morning
         // plan, so Team Live (a 'where are my reps right now' view)
         // doesn't apply. Reps shown here are the in-house field team.
+        // Phase 56-fix (19 May 2026): added 'telecaller' to the
+        // team_role filter. TC also pings GPS, logs calls, and
+        // counts against daily targets — owner reported Dhara not
+        // appearing in /team-dashboard despite live pings + 26 calls.
         supabase.from('users')
           .select('id, name, team_role, city, daily_targets, is_active')
-          .in('team_role', ['sales', 'sales_manager'])
+          .in('team_role', ['sales', 'sales_manager', 'telecaller'])
           .eq('is_active', true)
           .order('name'),
         supabase.from('work_sessions')
