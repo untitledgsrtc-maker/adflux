@@ -17,7 +17,7 @@
 // Default range: last 30 days inclusive (so today's bar is the
 // last one on the right).
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -58,6 +58,19 @@ export default function LeadsCollectedChart({ onDayClick }) {
   const [err, setErr] = useState('')
   const [rows, setRows] = useState([])       // [{date, count}]
   const [sources, setSources] = useState([]) // distinct source list
+
+  // Phase 61.2 (19 May 2026) — owner wanted the chart to open on
+  // the CURRENT date window, not the oldest end. Default 30-day
+  // range starts at today-29 and ends at today; the bars wrap
+  // overflows horizontally and natively shows the leftmost (oldest)
+  // bar first. Scrolling the wrap to its right edge on every load
+  // puts today's bar in view immediately.
+  const barsWrapRef = useRef(null)
+  useEffect(() => {
+    if (loading || rows.length === 0) return
+    const el = barsWrapRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [loading, rows])
 
   useEffect(() => {
     let cancelled = false
@@ -209,7 +222,7 @@ export default function LeadsCollectedChart({ onDayClick }) {
            label absolute -18 above each bar, day label uppercase
            10/600 letter-spacing below. Today gets the brighter
            is-current gradient + glow. */
-        <div style={styles.barsWrap}>
+        <div ref={barsWrapRef} style={styles.barsWrap}>
           {rows.map((r, i) => {
             const h = Math.max(6, Math.round((r.count / yMax) * 170))
             const isToday = r.date === today
