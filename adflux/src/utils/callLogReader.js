@@ -75,7 +75,7 @@ export async function lookupCall({ phone, sinceMs, windowMinutes = 60 }) {
  * fire-and-forget OK (no UI dependency).
  */
 export async function fetchAndPatchCallDuration({
-  userId, leadId, phone, telTapMs, activityId,
+  userId, leadId, phone, telTapMs, activityId, onlyIfMissing = false,
 }) {
   if (!Capacitor.isNativePlatform()) return null
   if (!userId || !leadId || !phone || !telTapMs) return null
@@ -101,8 +101,14 @@ export async function fetchAndPatchCallDuration({
   //   • lead_activities: the row the timeline renders. Without this
   //     patch the duration sits in call_logs only and the lead
   //     detail UI shows no duration even though we captured it.
+  // Phase 66 (21 May 2026) — guardian P1 fix. The 60s auto-patch
+  // timer (Phase 65) passes onlyIfMissing=true so we DON'T clobber a
+  // duration that the modal-save path already wrote. Modal-save calls
+  // pass onlyIfMissing=false (default) — it has the freshest read and
+  // can overwrite freely. This eliminates the race between the timer
+  // and the modal save.
   const cutoff = new Date(telTapMs - 60 * 60_000).toISOString()
-  const callLogsPromise = supabase
+  const callLogsQuery = supabase
     .from('call_logs')
     .update({ duration_seconds: duration })
     .eq('user_id', userId)
@@ -110,12 +116,21 @@ export async function fetchAndPatchCallDuration({
     .gte('call_at', cutoff)
     .order('call_at', { ascending: false })
     .limit(1)
+  const callLogsPromise = onlyIfMissing
+    ? callLogsQuery.is('duration_seconds', null)
+    : callLogsQuery
 
   const activityPromise = activityId
-    ? supabase
-        .from('lead_activities')
-        .update({ duration_seconds: duration })
-        .eq('id', activityId)
+    ? (onlyIfMissing
+        ? supabase
+            .from('lead_activities')
+            .update({ duration_seconds: duration })
+            .eq('id', activityId)
+            .is('duration_seconds', null)
+        : supabase
+            .from('lead_activities')
+            .update({ duration_seconds: duration })
+            .eq('id', activityId))
     : Promise.resolve({ error: null })
 
   const [{ error: clErr }, { error: aErr }] = await Promise.all([

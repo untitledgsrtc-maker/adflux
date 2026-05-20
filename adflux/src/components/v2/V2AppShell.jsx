@@ -601,7 +601,11 @@ export function V2AppShell() {
               between the card and the next section (Log meeting +
               Log lead on /work). Owner annotated this as wasted
               vertical air. */}
-          {!isPrivileged && !isTelecaller
+          {/* Phase 66 (21 May 2026) — TC included. Per CLAUDE.md §30
+              "TC closes deals via phone + earns same incentive as
+              sales reps". The card uses compute_monthly_salary which
+              already covers TC. Dropping the !isTelecaller exclusion. */}
+          {!isPrivileged
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 0 }}>

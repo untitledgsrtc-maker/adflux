@@ -351,6 +351,7 @@ export default function TelecallerV2() {
             phone:    lead.phone,
             telTapMs,
             activityId: actRow?.id || null,
+            onlyIfMissing: true,   // Phase 66 — don't clobber modal-save patch
           }).catch(() => {})
         }).catch(() => {})
       }, 60_000)

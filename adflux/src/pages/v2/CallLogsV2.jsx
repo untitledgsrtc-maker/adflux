@@ -45,6 +45,11 @@ export default function CallLogsV2() {
   const [targetUser, setTargetUser] = useState(null)
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState('')
+  // Phase 66 (21 May 2026) — direction filter chip. Owner asked for
+  // a donut chart at the top + click-to-filter. dirFilter='all' shows
+  // every direction; clicking a tile / donut slice narrows to that
+  // direction only. Click again to clear.
+  const [dirFilter, setDirFilter] = useState('all')
 
   async function load() {
     if (!targetUserId || !canViewTarget) {
@@ -80,15 +85,19 @@ export default function CallLogsV2() {
   useEffect(() => { load() /* eslint-disable-next-line */ }, [targetUserId, dateFrom, dateTo])
   useAutoRefresh(load)
 
-  // Filter by search (phone or lead name).
+  // Filter by search (phone or lead name) + direction.
   const visibleRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(r =>
+    let base = rows
+    if (dirFilter !== 'all') {
+      base = base.filter(r => (r.direction || 'outgoing') === dirFilter)
+    }
+    if (!q) return base
+    return base.filter(r =>
       (r.client_phone || '').toLowerCase().includes(q) ||
       (r.lead?.name || '').toLowerCase().includes(q)
     )
-  }, [rows, search])
+  }, [rows, search, dirFilter])
 
   // Top tiles.
   const stats = useMemo(() => {
@@ -178,6 +187,8 @@ export default function CallLogsV2() {
           count={stats.outgoing.count}
           sub={`Duration: ${formatMinutes(stats.outgoing.sec)}`}
           color="var(--accent)"
+          active={dirFilter === 'outgoing'}
+          onClick={() => setDirFilter(dirFilter === 'outgoing' ? 'all' : 'outgoing')}
         />
         <Tile
           icon={<PhoneIncoming size={14} strokeWidth={1.6} />}
@@ -185,6 +196,8 @@ export default function CallLogsV2() {
           count={stats.incoming.count}
           sub={`Duration: ${formatMinutes(stats.incoming.sec)}`}
           color="var(--success)"
+          active={dirFilter === 'incoming'}
+          onClick={() => setDirFilter(dirFilter === 'incoming' ? 'all' : 'incoming')}
         />
         <Tile
           icon={<PhoneMissed size={14} strokeWidth={1.6} />}
@@ -192,8 +205,50 @@ export default function CallLogsV2() {
           count={stats.missed.count}
           sub={stats.missed.count === 0 ? 'No misses' : 'No answer'}
           color="var(--danger)"
+          active={dirFilter === 'missed'}
+          onClick={() => setDirFilter(dirFilter === 'missed' ? 'all' : 'missed')}
         />
       </div>
+
+      {/* Phase 66 (21 May 2026) — call-distribution donut. Inspired
+          by the "Call Assist" reference owner shared. Pure SVG; no
+          chart library dependency. Click a slice to filter, same as
+          clicking a tile. Hidden when zero calls in range. */}
+      {(stats.outgoing.count + stats.incoming.count + stats.missed.count) > 0 && (
+        <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+            <CallDonut
+              outgoing={stats.outgoing.count}
+              incoming={stats.incoming.count}
+              missed={stats.missed.count}
+              active={dirFilter}
+              onSliceClick={(dir) => setDirFilter(dirFilter === dir ? 'all' : dir)}
+            />
+            <div style={{ minWidth: 160, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+              <div style={{ fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                {stats.outgoing.count + stats.incoming.count + stats.missed.count} total calls
+              </div>
+              <LegendRow color="var(--accent, #FFE600)" label="Outgoing" value={stats.outgoing.count} />
+              <LegendRow color="var(--success, #10B981)" label="Incoming" value={stats.incoming.count} />
+              <LegendRow color="var(--danger, #EF4444)" label="Missed" value={stats.missed.count} />
+              {dirFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setDirFilter('all')}
+                  style={{
+                    marginTop: 6, padding: '4px 10px', borderRadius: 999,
+                    background: 'transparent', border: '1px solid var(--border)',
+                    color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="lead-card">
@@ -238,7 +293,40 @@ export default function CallLogsV2() {
                         <span style={{ color: 'var(--text-subtle)' }}>—</span>
                       )}
                     </Td>
-                    <Td><code style={{ fontFamily: 'inherit' }}>{r.client_phone || '—'}</code></Td>
+                    {/* Phase 66 — phone column is now clickable.
+                        If lead_id is set → navigate to lead detail.
+                        Otherwise tel: handoff (open dialer). */}
+                    <Td>
+                      {r.client_phone ? (
+                        r.lead_id ? (
+                          <a
+                            href={`/leads/${r.lead_id}`}
+                            style={{
+                              color: 'var(--text)', textDecoration: 'none',
+                              borderBottom: '1px dotted var(--text-muted)',
+                              fontFamily: 'inherit',
+                            }}
+                            title="Open lead"
+                          >
+                            {r.client_phone}
+                          </a>
+                        ) : (
+                          <a
+                            href={`tel:+${(r.client_phone || '').replace(/\D/g, '')}`}
+                            style={{
+                              color: 'var(--text)', textDecoration: 'none',
+                              borderBottom: '1px dotted var(--accent)',
+                              fontFamily: 'inherit',
+                            }}
+                            title="Call this number"
+                          >
+                            {r.client_phone}
+                          </a>
+                        )
+                      ) : (
+                        <span style={{ color: 'var(--text-subtle)' }}>—</span>
+                      )}
+                    </Td>
                     <Td>{formatDuration(r.duration_seconds)}</Td>
                     <Td>{formatDateTime(r.call_at)}</Td>
                     <Td><DirectionPill direction={r.direction || 'outgoing'} /></Td>
@@ -264,14 +352,23 @@ export default function CallLogsV2() {
   )
 }
 
-function Tile({ icon, label, count, sub, color }) {
+function Tile({ icon, label, count, sub, color, active, onClick }) {
+  const clickable = typeof onClick === 'function'
   return (
-    <div style={{
-      padding: '12px 14px',
-      borderRadius: 10,
-      border: '1px solid var(--border)',
-      background: 'var(--surface)',
-    }}>
+    <div
+      onClick={onClick}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e => { if (e.key === 'Enter') onClick?.() }) : undefined}
+      style={{
+        padding: '12px 14px',
+        borderRadius: 10,
+        border: `1px solid ${active ? color : 'var(--border)'}`,
+        background: active ? `color-mix(in srgb, ${color} 10%, var(--surface))` : 'var(--surface)',
+        cursor: clickable ? 'pointer' : 'default',
+        transition: 'border-color 160ms, background 160ms',
+      }}
+    >
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
         fontSize: 10, fontWeight: 700, letterSpacing: '.10em',
@@ -285,6 +382,86 @@ function Tile({ icon, label, count, sub, color }) {
         color: 'var(--text)',
       }}>{count}</div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub}</div>
+    </div>
+  )
+}
+
+// Phase 66 — donut chart for outgoing/incoming/missed distribution.
+// Pure SVG: 100×100 viewBox, single circle with three dasharray
+// segments. Click a segment to filter.
+function CallDonut({ outgoing, incoming, missed, active, onSliceClick }) {
+  const total = outgoing + incoming + missed
+  if (total === 0) return null
+  const R = 38
+  const C = 2 * Math.PI * R
+  const pctOut = outgoing / total
+  const pctIn  = incoming / total
+  const pctMis = missed   / total
+  // SVG stroke-dasharray segments. Use offsets to position each arc.
+  const segOut = pctOut * C
+  const segIn  = pctIn  * C
+  const segMis = pctMis * C
+  return (
+    <svg viewBox="0 0 100 100" width={140} height={140} style={{ flexShrink: 0 }}>
+      {/* Outgoing — yellow */}
+      <circle
+        cx={50} cy={50} r={R}
+        fill="none"
+        stroke="var(--accent, #FFE600)"
+        strokeWidth={active === 'outgoing' ? 18 : 14}
+        strokeDasharray={`${segOut} ${C - segOut}`}
+        strokeDashoffset={0}
+        transform="rotate(-90 50 50)"
+        style={{ cursor: 'pointer', opacity: active && active !== 'outgoing' ? 0.35 : 1 }}
+        onClick={() => onSliceClick?.('outgoing')}
+      />
+      {/* Incoming — green */}
+      <circle
+        cx={50} cy={50} r={R}
+        fill="none"
+        stroke="var(--success, #10B981)"
+        strokeWidth={active === 'incoming' ? 18 : 14}
+        strokeDasharray={`${segIn} ${C - segIn}`}
+        strokeDashoffset={-segOut}
+        transform="rotate(-90 50 50)"
+        style={{ cursor: 'pointer', opacity: active && active !== 'incoming' ? 0.35 : 1 }}
+        onClick={() => onSliceClick?.('incoming')}
+      />
+      {/* Missed — red */}
+      <circle
+        cx={50} cy={50} r={R}
+        fill="none"
+        stroke="var(--danger, #EF4444)"
+        strokeWidth={active === 'missed' ? 18 : 14}
+        strokeDasharray={`${segMis} ${C - segMis}`}
+        strokeDashoffset={-(segOut + segIn)}
+        transform="rotate(-90 50 50)"
+        style={{ cursor: 'pointer', opacity: active && active !== 'missed' ? 0.35 : 1 }}
+        onClick={() => onSliceClick?.('missed')}
+      />
+      <text
+        x={50} y={48}
+        textAnchor="middle"
+        style={{
+          fontFamily: 'var(--v2-display, "Space Grotesk")',
+          fontSize: 16, fontWeight: 700, fill: 'var(--text)',
+        }}
+      >{total}</text>
+      <text
+        x={50} y={62}
+        textAnchor="middle"
+        style={{ fontSize: 6, fill: 'var(--text-muted)' }}
+      >TOTAL CALLS</text>
+    </svg>
+  )
+}
+
+function LegendRow({ color, label, value }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+      <span style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
+      <span style={{ flex: 1, color: 'var(--text)' }}>{label}</span>
+      <span className="tabular-nums" style={{ color: 'var(--text)', fontWeight: 600 }}>{value}</span>
     </div>
   )
 }
