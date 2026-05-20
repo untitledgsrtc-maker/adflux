@@ -352,7 +352,9 @@ export default function WorkV2() {
   // Phase 34Z.59 — also refetch on tab-resume (return from dialer /
   // WhatsApp / Log meeting modal). location.key only fires on
   // in-app router navigation, not on browser-level resume.
-  useAutoRefresh(load, { enabled: !!profile?.id })
+  // Phase 65 (20 May 2026) — 20s poll so /work picks up calls
+  // logged in last minute (Today's Tasks + call counters).
+  useAutoRefresh(load, { enabled: !!profile?.id, pollSeconds: 20 })
 
   // Phase 34Z.70 — fix #17: ensurePushOnLogin call moved to
   // V2AppShell (Phase 34Z.69) so every rep-facing page enrolls,
@@ -564,6 +566,26 @@ export default function WorkV2() {
       }
       setPendingActivityId(actRow?.id || null)
       setTimeout(() => setPostCallOpen(true), 1500)
+
+      // Phase 65 (20 May 2026) — auto-patch call_logs.duration_seconds
+      // 60 seconds after tel-tap, regardless of whether the rep saves
+      // PostCallOutcomeModal. Owner reported "if status not submitted
+      // duration not visible". Modal save still patches both tables;
+      // this timer patches call_logs so the LeadCallHistory panel
+      // shows duration even when reps jump to the next call without
+      // saving outcome.
+      const telTapMs = Date.now()
+      setTimeout(() => {
+        import('../../utils/callLogReader').then(({ fetchAndPatchCallDuration }) => {
+          fetchAndPatchCallDuration({
+            userId:   profile.id,
+            leadId:   lead.id,
+            phone:    lead.phone,
+            telTapMs,
+            activityId: actRow?.id || null,
+          }).catch(() => {})
+        }).catch(() => {})
+      }, 60_000)
     }, 0)
   }
 

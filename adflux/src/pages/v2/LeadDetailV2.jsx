@@ -332,6 +332,30 @@ export default function LeadDetailV2() {
     if (activityType === 'call') {
       setPendingActivityId(actRow?.id || null)
       setTimeout(() => setPostCallOpen(true), 1500)
+
+      // Phase 65 (20 May 2026) — auto-patch call_logs.duration_seconds
+      // 60 seconds after tel-tap, EVEN IF the rep skips PostCallOutcome
+      // modal save. Previously fetchAndPatchCallDuration only fired on
+      // modal save (Phase 56k design) — but reps often jump to the
+      // next call without saving outcome, leaving duration NULL forever.
+      // The auto-patch fires independently. Modal save still patches
+      // both call_logs + lead_activities; this timer only patches
+      // call_logs (because we don't know the lead_activities row id
+      // for sure outside the modal save path — actRow.id is captured
+      // separately by the modal). Result: duration shows in
+      // LeadCallHistory panel regardless of outcome submission.
+      const telTapMs = Date.now()
+      setTimeout(() => {
+        import('../../utils/callLogReader').then(({ fetchAndPatchCallDuration }) => {
+          fetchAndPatchCallDuration({
+            userId:   profile.id,
+            leadId:   lead.id,
+            phone:    lead.phone,
+            telTapMs,
+            activityId: actRow?.id || null,
+          }).catch(() => {})
+        }).catch(() => {})
+      }, 60_000)
     }
     load()
   }
@@ -398,7 +422,12 @@ export default function LeadDetailV2() {
   // switch. Refetch the lead + its timeline on every tab-resume /
   // window-focus so a return from tel: / wa.me: / Log meeting modal
   // surfaces the new rows without a manual reload.
-  useAutoRefresh(load, { enabled: !!id })
+  // Phase 65 (20 May 2026) — owner reported "Call history visible
+  // only after 1 minute of call completion". Adding a 20-second
+  // poll on lead detail so call_logs / activities refetch even
+  // without a visibility-change trigger. Visibility + focus still
+  // fire as before for instant return-from-dialer refresh.
+  useAutoRefresh(load, { enabled: !!id, pollSeconds: 20 })
 
   /* ─── Phase 35 PR 2 — OCR conflict apply ───
      Called from the batch modal's "Apply" button. Merges the

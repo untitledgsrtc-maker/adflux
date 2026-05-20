@@ -211,7 +211,9 @@ export default function TelecallerV2() {
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
   // Phase 43.1 — match sales-frozen contract: auto-refresh queue.
-  useAutoRefresh(load)
+  // Phase 65 — 20s poll so call counters + connect-rate update
+  // without waiting for tab-resume.
+  useAutoRefresh(load, { pollSeconds: 20 })
 
   // Phase 47.2 — fetch active call scripts once. Cheap; admin
   // edits don't fire often. Frontend picks the best-match script
@@ -336,6 +338,22 @@ export default function TelecallerV2() {
       }
       setPendingActivityId(actRow?.id || null)
       setTimeout(() => setPostCallOpen(true), 1500)
+
+      // Phase 65 (20 May 2026) — auto-patch duration_seconds 60s
+      // after tel-tap so LeadCallHistory shows duration even when
+      // TC skips PostCallOutcomeModal save.
+      const telTapMs = Date.now()
+      setTimeout(() => {
+        import('../../utils/callLogReader').then(({ fetchAndPatchCallDuration }) => {
+          fetchAndPatchCallDuration({
+            userId:   profile.id,
+            leadId:   lead.id,
+            phone:    lead.phone,
+            telTapMs,
+            activityId: actRow?.id || null,
+          }).catch(() => {})
+        }).catch(() => {})
+      }, 60_000)
     }, 0)
   }
 
