@@ -27,7 +27,7 @@
 // RLS lets in: admin, govt_partner (Govt leads), assigned sales rep,
 // telecaller, sales_manager (direct reports).
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
@@ -197,8 +197,18 @@ export default function LeadDetailV2() {
       { enableHighAccuracy: true, timeout: 8000 }
     )
   }
+  // Phase 65 (20 May 2026) — idempotency guard on saveHereMeeting.
+  // Owner reported "meeting log inserted 2 times" — the countdown
+  // useEffect calls saveHereMeeting() from inside a setHereCountdown
+  // updater (side-effect-in-reducer anti-pattern). Under React 18
+  // StrictMode + the new 20s poll re-render cadence, the updater
+  // can run twice → double INSERT. Ref guard ensures the actual
+  // Supabase write fires AT MOST ONCE per hereGps session.
+  const savingHereRef = useRef(false)
   async function saveHereMeeting() {
+    if (savingHereRef.current) return
     if (!hereGps || !lead?.id || !profile?.id) return
+    savingHereRef.current = true
     const dwellMin = Math.round((Date.now() - hereGps.startedAt) / 60000)
     const { error: insErr } = await supabase.from('lead_activities').insert([{
       lead_id:        lead.id,
@@ -211,20 +221,33 @@ export default function LeadDetailV2() {
       gps_accuracy_m: hereGps.acc,
     }])
     if (insErr) {
+      savingHereRef.current = false
       setError('Could not log: ' + insErr.message)
       return
     }
     setHereGps(null)
     setHereCountdown(0)
+    // Keep guard true until hereGps clears — re-entry blocked
+    // even if a stray timer tick fires after the row landed.
+    // savingHereRef resets in the useEffect below when a fresh
+    // hereGps starts.
     load()
   }
+  // Reset the idempotency guard whenever a NEW "I'm here" session
+  // starts (hereGps transitions from null → object).
+  useEffect(() => {
+    if (hereGps) savingHereRef.current = false
+  }, [hereGps])
   // Countdown tick — auto-save when it hits 0.
   useEffect(() => {
     if (hereCountdown <= 0) return
     const t = setInterval(() => {
       setHereCountdown(c => {
         if (c <= 1) {
-          saveHereMeeting()
+          // Defer side effect outside the setState updater. The
+          // updater can run twice under StrictMode; deferring to
+          // setTimeout(0) + guard ensures one insert.
+          setTimeout(() => saveHereMeeting(), 0)
           return 0
         }
         return c - 1
