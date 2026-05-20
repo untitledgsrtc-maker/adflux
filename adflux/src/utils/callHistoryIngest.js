@@ -41,7 +41,11 @@ import { supabase } from '../lib/supabase'
 const CallLogReader = registerPlugin('CallLogReader')
 
 const STORE_KEY = (userId) => `last-call-scan-ms-${userId}`
-const DEFAULT_LOOKBACK_MS = 30 * 60_000   // 30 min on first scan
+// Phase 68.3 (21 May 2026) — widen first-scan window to 7 days. The
+// 30-min default meant a fresh APK install missed every call older
+// than half an hour. 7 days = matches typical rep call history visible
+// in /calls page (default date range).
+const DEFAULT_LOOKBACK_MS = 7 * 24 * 60 * 60_000  // 7 days on first scan
 const POLL_INTERVAL_MS    = 5  * 60_000   // re-scan every 5 min while foregrounded
 const DEDUPE_WINDOW_SEC   = 60            // call_logs row within 60s = same call
 
@@ -96,6 +100,67 @@ export function stopCallHistoryPoller() {
   if (visListener) {
     document.removeEventListener('visibilitychange', visListener)
     visListener = null
+  }
+}
+
+/**
+ * Phase 68.3 — force a full ingest pass with explicit lookback.
+ * Used by the PushDebug "Scan call log now" button to ingest the
+ * last N days in one shot (default 7 days). Bypasses the
+ * last-scan-ms checkpoint so historical calls land.
+ * Returns { found, inserted, skipped, errors }.
+ */
+export async function forceIngestRecentCalls(userId, lookbackMs = 7 * 24 * 60 * 60_000) {
+  if (!Capacitor.isNativePlatform()) {
+    return { found: 0, inserted: 0, skipped: 0, errors: ['web build — no native call log'] }
+  }
+  if (!userId) return { found: 0, inserted: 0, skipped: 0, errors: ['no user'] }
+
+  const sinceMs = Date.now() - lookbackMs
+  let calls = []
+  try {
+    const res = await CallLogReader.scanRecentCalls({
+      sinceTimestamp: sinceMs,
+      limit: 500,
+    })
+    calls = Array.isArray(res?.calls) ? res.calls : []
+  } catch (e) {
+    return { found: 0, inserted: 0, skipped: 0, errors: [e?.message || String(e)] }
+  }
+
+  // Snapshot count of call_logs for this user BEFORE we ingest, so we
+  // can report inserted vs skipped accurately.
+  const beforeRes = await supabase
+    .from('call_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  const before = beforeRes?.count || 0
+
+  // Process oldest-first so dedupe sees stable order.
+  calls.sort((a, b) => Number(a.date) - Number(b.date))
+  const errors = []
+  for (const c of calls) {
+    try {
+      await ingestOne(userId, c)
+    } catch (e) {
+      errors.push(`${c?.number || '?'}: ${e?.message || String(e)}`)
+    }
+  }
+
+  // Refresh poll checkpoint so the periodic scan doesn't re-process.
+  await updateScanTimestamp(userId, Date.now())
+
+  const afterRes = await supabase
+    .from('call_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  const after = afterRes?.count || 0
+
+  return {
+    found: calls.length,
+    inserted: Math.max(0, after - before),
+    skipped: calls.length - Math.max(0, after - before),
+    errors,
   }
 }
 

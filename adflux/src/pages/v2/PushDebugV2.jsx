@@ -41,6 +41,7 @@ import {
   subscribeForPush, sendPushToRep,
 } from '../../utils/pushNotifications'
 import { checkCallLogPermission, requestCallLogPermission } from '../../utils/callLogReader'
+import { forceIngestRecentCalls } from '../../utils/callHistoryIngest'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 
 const CallLogReader = registerPlugin('CallLogReader')
@@ -231,25 +232,25 @@ export default function PushDebugV2() {
     setCallScanBusy(true)
     setCallScanResult(null)
     try {
-      // Look back 24h on this manual scan to catch any missed inbound
-      // calls from before the periodic poller started.
-      const sinceMs = Date.now() - 24 * 60 * 60 * 1000
-      const res = await CallLogReader.scanRecentCalls({
-        sinceTimestamp: sinceMs,
-        limit: 200,
-      })
-      const calls = Array.isArray(res?.calls) ? res.calls : []
-      const byType = calls.reduce((acc, c) => {
-        const t = (c?.type || 'unknown').toString()
-        acc[t] = (acc[t] || 0) + 1
-        return acc
-      }, {})
+      // Phase 68.3 — actually INGEST into call_logs, not just preview.
+      // 7-day lookback so fresh APK installs backfill a week of history
+      // in one shot. Previously this button only displayed counts and
+      // the periodic poller (30-min initial window) missed older calls.
+      const lookbackMs = 7 * 24 * 60 * 60 * 1000
+      const result = await forceIngestRecentCalls(profile.id, lookbackMs)
       setCallScanResult({
-        total: calls.length,
-        byType,
-        latest: calls[0],
+        total: result.found,
+        inserted: result.inserted,
+        skipped: result.skipped,
+        errors: result.errors,
       })
-      toastSuccess(`Scan done — ${calls.length} call${calls.length === 1 ? '' : 's'} found in last 24h.`)
+      if ((result.errors || []).length > 0) {
+        toastError(new Error(result.errors[0]), `Scan finished with ${result.errors.length} error${result.errors.length === 1 ? '' : 's'}.`)
+      } else {
+        toastSuccess(
+          `Scan done — ${result.found} call${result.found === 1 ? '' : 's'} found, ${result.inserted} new row${result.inserted === 1 ? '' : 's'} inserted.`
+        )
+      }
     } catch (e) {
       const msg = e?.message || String(e)
       setCallScanResult({ error: msg })
