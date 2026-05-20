@@ -31,15 +31,19 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, XCircle, RefreshCw,
-  Send, Bell, Smartphone, Wifi,
+  Send, Bell, Smartphone, Wifi, Phone as PhoneIcon,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import {
   registerServiceWorker, requestPermission,
   subscribeForPush, sendPushToRep,
 } from '../../utils/pushNotifications'
+import { checkCallLogPermission, requestCallLogPermission } from '../../utils/callLogReader'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+
+const CallLogReader = registerPlugin('CallLogReader')
 
 function Status({ ok, warn, label, detail, action }) {
   const tone = ok ? 'success' : warn ? 'warning' : 'danger'
@@ -98,12 +102,33 @@ export default function PushDebugV2() {
   const [isAndroid,          setIsAndroid]          = useState(false)
   const [browserName,        setBrowserName]        = useState('')
 
+  // Phase 65 (20 May 2026) — call-log scan diagnostic. Phase 56l
+  // shipped scanRecentCalls() in the Capacitor Java plugin but reps
+  // report inbound + missed calls aren't landing in our call_logs.
+  // This section exposes:
+  //   - Capacitor native? (web shows N/A)
+  //   - READ_CALL_LOG permission state
+  //   - Manual "Scan now" button → runs scanRecentCalls with last 24h
+  //     window, shows count + breakdown by type. If permission is
+  //     denied, request prompt fires.
+  const [callPerm,           setCallPerm]           = useState('unsupported')
+  const [callScanBusy,       setCallScanBusy]       = useState(false)
+  const [callScanResult,     setCallScanResult]     = useState(null)
+
   async function reload() {
     setLoading(true)
     setHasNotificationApi('Notification' in window)
     setHasPushApi('serviceWorker' in navigator && 'PushManager' in window)
     setPermission(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
     setVapidKey(import.meta.env.VITE_VAPID_PUBLIC_KEY || '')
+
+    // Phase 65 — refresh READ_CALL_LOG permission state.
+    try {
+      const p = await checkCallLogPermission()
+      setCallPerm(p)
+    } catch {
+      setCallPerm('unsupported')
+    }
 
     // Detect platform. iOS Safari has the strictest gate: PWA must be
     // installed to the home screen on iOS 16.4+. Android Chrome accepts
@@ -181,6 +206,56 @@ export default function PushDebugV2() {
       await reload()
     } catch (e) {
       toastError(e, 'Enable push failed.')
+    }
+  }
+
+  // Phase 65 (20 May 2026) — call-log permission + manual scan.
+  // Web build: button is hidden (Capacitor.isNativePlatform() = false).
+  async function handleGrantCallLog() {
+    try {
+      const p = await requestCallLogPermission()
+      setCallPerm(p)
+      if (p === 'granted') toastSuccess('Call log permission granted.')
+      else toastError(new Error(`Permission ${p}`), 'Could not grant call log permission.')
+    } catch (e) {
+      toastError(e, 'Call log permission request failed.')
+    }
+  }
+
+  async function handleScanCallLog() {
+    if (!Capacitor.isNativePlatform()) {
+      toastError(new Error('Native only'), 'Call log scan only works inside the APK.')
+      return
+    }
+    if (!profile?.id) return
+    setCallScanBusy(true)
+    setCallScanResult(null)
+    try {
+      // Look back 24h on this manual scan to catch any missed inbound
+      // calls from before the periodic poller started.
+      const sinceMs = Date.now() - 24 * 60 * 60 * 1000
+      const res = await CallLogReader.scanRecentCalls({
+        sinceTimestamp: sinceMs,
+        limit: 200,
+      })
+      const calls = Array.isArray(res?.calls) ? res.calls : []
+      const byType = calls.reduce((acc, c) => {
+        const t = (c?.type || 'unknown').toString()
+        acc[t] = (acc[t] || 0) + 1
+        return acc
+      }, {})
+      setCallScanResult({
+        total: calls.length,
+        byType,
+        latest: calls[0],
+      })
+      toastSuccess(`Scan done — ${calls.length} call${calls.length === 1 ? '' : 's'} found in last 24h.`)
+    } catch (e) {
+      const msg = e?.message || String(e)
+      setCallScanResult({ error: msg })
+      toastError(e, `Scan failed: ${msg}`)
+    } finally {
+      setCallScanBusy(false)
     }
   }
 
@@ -483,6 +558,104 @@ export default function PushDebugV2() {
             </button>
           )}
         </div>
+
+        {/* Phase 65 (20 May 2026) — Call log scan diagnostic.
+            Visible only inside the Capacitor wrapper (APK) — web has
+            no Android CallLog access. Shows READ_CALL_LOG permission
+            state + a manual "Scan now" button that runs the Phase 56l
+            scanRecentCalls() plugin call with a 24h look-back. Result
+            breaks down by call type so admin can confirm inbound /
+            missed are detected. */}
+        {Capacitor.isNativePlatform() && (
+          <div style={{
+            marginTop: 28,
+            padding: 16,
+            borderRadius: 14,
+            background: 'var(--v2-bg-1, #1e293b)',
+            border: '1px solid var(--v2-line, #334155)',
+          }}>
+            <div style={{
+              fontFamily: 'var(--v2-display, "Space Grotesk")',
+              fontSize: 15, fontWeight: 700,
+              color: 'var(--v2-ink-0, #f1f5f9)',
+              display: 'flex', alignItems: 'center', gap: 8,
+              marginBottom: 8,
+            }}>
+              <PhoneIcon size={16} strokeWidth={1.8} />
+              Call log scan diagnostic
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginBottom: 12 }}>
+              Confirms inbound + missed calls are reaching call_logs.
+              Permission must be Allowed for the periodic poller (every
+              5 min) to write rows.
+            </div>
+
+            <Status
+              ok={callPerm === 'granted'}
+              warn={callPerm === 'prompt'}
+              label={`READ_CALL_LOG: ${callPerm}`}
+              detail={callPerm === 'granted'
+                ? 'Plugin can query the Android system call log.'
+                : callPerm === 'denied'
+                  ? 'Denied. Open Settings → Apps → Untitled OS → Permissions → enable Phone / Call log.'
+                  : 'Not granted yet. Tap "Request permission" below.'}
+              action={callPerm !== 'granted' ? (
+                <button onClick={handleGrantCallLog} className="lead-btn lead-btn-sm lead-btn-primary">
+                  Request permission
+                </button>
+              ) : null}
+            />
+
+            <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={handleScanCallLog}
+                disabled={callScanBusy || callPerm !== 'granted'}
+                className="lead-btn lead-btn-sm lead-btn-primary"
+                title="Scan last 24h of Android call log"
+              >
+                {callScanBusy ? 'Scanning…' : 'Scan call log now'}
+              </button>
+            </div>
+
+            {callScanResult && (
+              <div style={{
+                marginTop: 14,
+                padding: 12,
+                borderRadius: 10,
+                background: 'var(--v2-bg-2, #0f172a)',
+                border: '1px solid var(--v2-line, #334155)',
+                fontSize: 12,
+                color: 'var(--v2-ink-1, #cbd5e1)',
+                fontFamily: 'monospace',
+              }}>
+                {callScanResult.error ? (
+                  <div style={{ color: 'var(--v2-rose, #EF4444)' }}>
+                    Error: {callScanResult.error}
+                  </div>
+                ) : (
+                  <>
+                    <div><b>Total calls (24h):</b> {callScanResult.total}</div>
+                    <div style={{ marginTop: 4 }}>
+                      <b>By type:</b>{' '}
+                      {Object.keys(callScanResult.byType).length === 0
+                        ? '(empty)'
+                        : Object.entries(callScanResult.byType)
+                            .map(([t, n]) => `${t}: ${n}`)
+                            .join(' · ')}
+                    </div>
+                    {callScanResult.latest && (
+                      <div style={{ marginTop: 4, color: 'var(--v2-ink-2, #94a3b8)' }}>
+                        Latest: {callScanResult.latest.type} from {callScanResult.latest.number}
+                        {' '}({callScanResult.latest.durationSeconds}s,{' '}
+                        {new Date(Number(callScanResult.latest.date)).toLocaleString('en-IN')})
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Existing subscriptions */}
         {subRows.length > 0 && (
