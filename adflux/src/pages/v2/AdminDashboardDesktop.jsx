@@ -1661,8 +1661,8 @@ function ActionQueueCard({ items, onOpen }) {
           <div style={{ fontSize: 11, letterSpacing: '.12em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>
             Action queue {!allClear && `· ${items.length} item${items.length === 1 ? '' : 's'}`}
           </div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--v2-ink-0)' }}>
-            {allClear ? '✓  Inbox zero — nothing needs your attention.' : 'What you should act on today'}
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--v2-ink-0)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            {allClear ? (<><CheckCircle2 size={16} /> Inbox zero — nothing needs your attention.</>) : 'What you should act on today'}
           </div>
         </div>
       </div>
@@ -1807,8 +1807,9 @@ function RepActivityPanel({ rows }) {
                 <span style={{
                   fontWeight: 600,
                   color: hit ? 'var(--v2-green)' : 'var(--v2-amber)',
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
-                  {value} / {target}{hit && ' ✓'}
+                  {value} / {target}{hit && <CheckCircle2 size={12} />}
                 </span>
               )
             }

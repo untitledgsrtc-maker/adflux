@@ -23,10 +23,12 @@ import { useNavigate } from 'react-router-dom'
 import {
   Paperclip, UserCheck, Tv, FileText, Upload, Loader2, Plus, Trash2,
   Save, ArrowLeft, FileBox, Building2, Newspaper, MessageCircle, TrendingUp,
+  CheckCircle2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { uploadAttachment, getSignedUrl, slugifyLabel } from '../../utils/proposalPdf'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 
 const TABS = [
   { key: 'attachments', label: 'Attachments', icon: Paperclip },
@@ -263,7 +265,12 @@ function AttachmentsTab() {
   async function handleClearDefaultFile(idx) {
     const r = rows[idx]
     if (!r?.id) return
-    if (!window.confirm(`Remove the default file for "${r.label}"? New proposals will no longer auto-link this attachment.`)) return
+    if (!(await confirmDialog({
+      title: 'Remove default file?',
+      message: `New proposals will no longer auto-link the default file for "${r.label}".`,
+      confirmLabel: 'Remove',
+      danger: true,
+    }))) return
     setSavingIdx(idx)
     const { data, error } = await supabase
       .from('attachment_templates')
@@ -323,7 +330,12 @@ function AttachmentsTab() {
   async function handleDeactivateRow(idx) {
     const r = rows[idx]
     if (!r?.id) return
-    if (!window.confirm(`Hide "${r.label}" from new proposals? Existing proposals keep whatever was saved on them.`)) return
+    if (!(await confirmDialog({
+      title: 'Hide attachment?',
+      message: `Hide "${r.label}" from new proposals. Existing proposals keep whatever was saved on them.`,
+      confirmLabel: 'Hide',
+      danger: true,
+    }))) return
     const { error } = await supabase
       .from('attachment_templates')
       .update({ is_active: false })
@@ -371,10 +383,11 @@ function AttachmentsTab() {
 
       {statusMsg && (
         <div style={{
-          background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)',
-          borderRadius: 8, padding: '8px 12px', marginBottom: 12,
-          fontSize: '.82rem', color: '#81c784',
-        }}>✓ {statusMsg}</div>
+          background: 'var(--success-soft, rgba(16,185,129,0.12))', border: '1px solid var(--success, #10B981)',
+          borderRadius: 10, padding: '8px 12px', marginBottom: 12,
+          fontSize: '.82rem', color: 'var(--success, #10B981)',
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+        }}><CheckCircle2 size={14} /> {statusMsg}</div>
       )}
       {statusError && (
         <div style={{
@@ -885,7 +898,7 @@ function CompaniesTab() {
   return (
     <>
       {statusMsg && (
-        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#81c784' }}>✓ {statusMsg}</div>
+        <div style={{ background: 'var(--success-soft, rgba(16,185,129,0.12))', border: '1px solid var(--success, #10B981)', borderRadius: 10, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--success, #10B981)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={14} /> {statusMsg}</div>
       )}
       {statusError && (
         <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
@@ -1099,12 +1112,12 @@ function SignersTab() {
   async function handleRemoveSigner(id) {
     const u = users.find(x => x.id === id)
     if (!u) return
-    if (!confirm(
-      `Remove ${u.name} as a signer?\n\n` +
-      `Their signature title and mobile will be cleared, and their role ` +
-      `will be set to 'sales' so they no longer appear in the signer ` +
-      `dropdown. Existing proposals already signed by them are NOT affected.`
-    )) return
+    if (!(await confirmDialog({
+      title: `Remove ${u.name} as a signer?`,
+      message: `Their signature title and mobile will be cleared, and their role will be set to 'sales' so they no longer appear in the signer dropdown. Existing proposals already signed by them are NOT affected.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    }))) return
     setSavingId(id)
     setStatusError('')
     const { error } = await supabase
@@ -1144,7 +1157,7 @@ function SignersTab() {
   return (
     <>
       {statusMsg && (
-        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#81c784' }}>✓ {statusMsg}</div>
+        <div style={{ background: 'var(--success-soft, rgba(16,185,129,0.12))', border: '1px solid var(--success, #10B981)', borderRadius: 10, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--success, #10B981)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={14} /> {statusMsg}</div>
       )}
       {statusError && (
         <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
@@ -1572,7 +1585,12 @@ function DocumentsTab() {
       setStatusError('Cannot delete an active template. Activate a different version first.')
       return
     }
-    if (!window.confirm(`Delete v${t.version} of ${t.segment} — ${t.media_type} (${t.language})? This cannot be undone.`)) return
+    if (!(await confirmDialog({
+      title: 'Delete template version?',
+      message: `Delete v${t.version} of ${t.segment} — ${t.media_type} (${t.language}). This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return
     setSaving(true)
     setStatusError('')
     const { error } = await supabase
@@ -1630,7 +1648,11 @@ function DocumentsTab() {
   }
 
   async function activateVersion(t) {
-    if (!window.confirm(`Activate v${t.version} for ${t.segment} — ${t.media_type} (${t.language})?\n\nThis will retire all other versions of this template. Existing locked proposal PDFs are NOT changed (they're snapshots).`)) return
+    if (!(await confirmDialog({
+      title: `Activate v${t.version}?`,
+      message: `Activate v${t.version} for ${t.segment} — ${t.media_type} (${t.language}). This will retire all other versions of this template. Existing locked proposal PDFs are NOT changed (they're snapshots).`,
+      confirmLabel: 'Activate',
+    }))) return
     setSaving(true)
     setStatusError('')
     // 1. Retire every active row for the same (segment, media_type, language)
@@ -1680,7 +1702,7 @@ function DocumentsTab() {
   return (
     <>
       {statusMsg && (
-        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#81c784' }}>✓ {statusMsg}</div>
+        <div style={{ background: 'var(--success-soft, rgba(16,185,129,0.12))', border: '1px solid var(--success, #10B981)', borderRadius: 10, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--success, #10B981)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={14} /> {statusMsg}</div>
       )}
       {statusError && (
         <div style={{ background: 'rgba(229,57,53,.1)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: '#ef9a9a' }}>{statusError}</div>
@@ -2267,7 +2289,7 @@ function TemplateEditor({ row, stageMeta, busy, status, onSave, onToggleActive }
           </button>
         )}
         {status === 'saved' && (
-          <span style={{ fontSize: 11, color: 'var(--success)' }}>✓ Saved</span>
+          <span style={{ fontSize: 11, color: 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Saved</span>
         )}
         {status && status !== 'saved' && (
           <span style={{ fontSize: 11, color: 'var(--danger)' }}>{status}</span>
@@ -2357,7 +2379,12 @@ function MediaTypesTab() {
   }
 
   async function handleDelete(r) {
-    if (!window.confirm(`Delete media type "${r.name}"? Existing quote lines that reference it by name are not affected.`)) return
+    if (!(await confirmDialog({
+      title: 'Delete media type?',
+      message: `Delete media type "${r.name}". Existing quote lines that reference it by name are not affected.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return
     setSavingId(r.id)
     const { error } = await supabase
       .from('media_types')
@@ -2382,7 +2409,7 @@ function MediaTypesTab() {
   return (
     <>
       {statusMsg && (
-        <div style={{ background: 'var(--success-soft)', border: '1px solid var(--success)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--success)' }}>✓ {statusMsg}</div>
+        <div style={{ background: 'var(--success-soft)', border: '1px solid var(--success)', borderRadius: 10, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={14} /> {statusMsg}</div>
       )}
       {statusError && (
         <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--danger)' }}>{statusError}</div>
@@ -2590,7 +2617,12 @@ function WhatsAppTemplatesTab() {
   }
 
   async function remove(row) {
-    if (!window.confirm(`Delete template "${row.name}"?`)) return
+    if (!(await confirmDialog({
+      title: 'Delete template?',
+      message: `Delete WhatsApp template "${row.name}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return
     await supabase.from('whatsapp_templates').delete().eq('id', row.id)
     load()
   }
@@ -2760,7 +2792,12 @@ function CallScriptsTab() {
   }
 
   async function remove(row) {
-    if (!window.confirm(`Delete script "${row.name}"?`)) return
+    if (!(await confirmDialog({
+      title: 'Delete script?',
+      message: `Delete call script "${row.name}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return
     await supabase.from('call_scripts').delete().eq('id', row.id)
     load()
   }
@@ -2975,7 +3012,12 @@ function DesignationsTab() {
   }
 
   async function remove(row) {
-    if (!window.confirm(`Delete designation "${row.name}"? This cannot be undone (existing users keep their team_role).`)) return
+    if (!(await confirmDialog({
+      title: 'Delete designation?',
+      message: `Delete designation "${row.name}". This cannot be undone (existing users keep their team_role).`,
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return
     await supabase.from('designations').delete().eq('id', row.id)
     load()
   }

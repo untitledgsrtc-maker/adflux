@@ -13,7 +13,7 @@
 // incentive until that final tick happens.
 
 import { useRef, useState } from 'react'
-import { CheckCircle2, Paperclip, Upload } from 'lucide-react'
+import { CheckCircle2, Paperclip, Upload, Trophy } from 'lucide-react'
 import { formatCurrency, todayISO } from '../../utils/formatters'
 import V2Hero from '../v2/V2Hero'
 
@@ -154,7 +154,7 @@ export function WonPaymentModal({
       <div className="md">
         <div className="md-h">
           <div>
-            <div className="md-t">💰 Mark as Won</div>
+            <div className="md-t" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Trophy size={18} /> Mark as Won</div>
             <div style={{ fontSize: '.75rem', color: 'var(--text-muted, #94a3b8)', marginTop: 3 }}>
               Record payment if collected — or leave blank to mark Won with payment pending
             </div>
@@ -205,7 +205,7 @@ export function WonPaymentModal({
                   : <Paperclip   size={18} style={{ color: 'var(--warning, #F59E0B)', flexShrink: 0 }} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>
-                    Work Order / PO copy {workOrderUploaded ? '✓ uploaded' : '— required'}
+                    Work Order / PO copy {workOrderUploaded ? 'uploaded' : '— required'}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                     {workOrderUploaded
@@ -408,7 +408,7 @@ export function WonPaymentModal({
                     : ''
             }
           >
-            ✓ Confirm & Mark Won
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={14} /> Confirm &amp; Mark Won</span>
           </button>
         </div>
       </div>

@@ -417,7 +417,7 @@ export default function SalaryAdminV2({ embedded = false }) {
                     <td style={tdNum}>{fmtINR(r.variable)}</td>
                     <td style={tdNum}>
                       <span style={{
-                        fontFamily: 'var(--font-mono, monospace)',
+                        fontFamily: 'inherit',
                         fontSize: 11,
                         color: (Number(r.score_pct || 0) >= 80) ? 'var(--v2-green, #10B981)'
                              : (Number(r.score_pct || 0) >= 50) ? 'var(--v2-amber, #F59E0B)'
@@ -444,7 +444,7 @@ export default function SalaryAdminV2({ embedded = false }) {
                     })()}
                     <td style={tdNum}>
                       <div style={{
-                        fontFamily: 'var(--font-mono, monospace)',
+                        fontFamily: 'inherit',
                         fontSize: 11, color: 'var(--v2-ink-1)',
                       }}>
                         {Number(r.leave_days_total || 0).toFixed(1)}d
@@ -625,7 +625,7 @@ const ghostBtnStyle = {
 }
 const ctaBtnStyle = {
   background: 'var(--accent, #FFE600)', border: 'none',
-  color: 'var(--accent-fg, #0a0e1a)', padding: '0 14px', height: 36,
+  color: 'var(--accent-fg, #0f172a)', padding: '0 14px', height: 36,
   borderRadius: 'var(--v2-r-sm, 10px)', fontWeight: 700, fontSize: 13, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
 }

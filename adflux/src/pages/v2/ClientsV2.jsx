@@ -546,14 +546,15 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
     if (others.length === 0) return
     const primaryName = group.rows.find(r => r.id === primaryId)?.company
       || group.rows.find(r => r.id === primaryId)?.name || 'this client'
-    if (!confirm(
-      `Delete ${others.length} duplicate row${others.length > 1 ? 's' : ''} ` +
-      `and keep "${primaryName}" as the primary? ` +
-      `Past quotes are unaffected.`
-    )) return
+    if (!(await confirmDialog({
+      title: 'Merge duplicates?',
+      message: `Delete ${others.length} duplicate row${others.length > 1 ? 's' : ''} and keep "${primaryName}" as the primary. Past quotes are unaffected.`,
+      confirmLabel: 'Merge',
+      danger: true,
+    }))) return
     const ids = others.map(r => r.id)
     const { error } = await supabase.from('clients').delete().in('id', ids)
-    if (error) { alert('Merge failed: ' + error.message); return }
+    if (error) { toastError(error, 'Merge failed.'); return }
     onChanged()
   }
 

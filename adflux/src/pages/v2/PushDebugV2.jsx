@@ -626,7 +626,7 @@ export default function PushDebugV2() {
                 border: '1px solid var(--v2-line, #334155)',
                 fontSize: 12,
                 color: 'var(--v2-ink-1, #cbd5e1)',
-                fontFamily: 'monospace',
+                fontFamily: 'inherit',
               }}>
                 {callScanResult.error ? (
                   <div style={{ color: 'var(--v2-rose, #EF4444)' }}>

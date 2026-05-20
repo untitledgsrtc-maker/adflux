@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText } from 'lucide-react'
+import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react'
 import { useQuotes } from '../../hooks/useQuotes'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
@@ -772,8 +772,8 @@ function FollowUpChip({ date, done }) {
   if (done)         cls += ' v2d-fu--done'
   else if (overdue) cls += ' v2d-fu--overdue'
   return (
-    <span className={cls}>
-      {done ? '✓ Done' : formatDate(date)}
+    <span className={cls} style={done ? { display: 'inline-flex', alignItems: 'center', gap: 4 } : undefined}>
+      {done ? (<><CheckCircle2 size={12} /> Done</>) : formatDate(date)}
     </span>
   )
 }

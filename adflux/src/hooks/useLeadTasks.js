@@ -16,7 +16,8 @@ const SELECT_COLUMNS = `
   *,
   lead:lead_id (
     id, name, company, phone, stage, segment, heat,
-    expected_value, last_contact_at, city
+    expected_value, last_contact_at, city,
+    do_not_call, created_at
   )
 `
 

@@ -19,7 +19,7 @@
 //   Fixed Log Meeting CTA. Sits above the mobile bottom nav (76 px).
 //   Opens LogMeetingModal.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Sun, MapPin, Phone, Calendar, Loader2, Trash2, Plus,
@@ -33,7 +33,7 @@ import { useAuthStore } from '../../store/authStore'
 // `blue`, `success` natively; LeadShared.Pill only had `warn`/`success`
 // /`danger`/`blue` classes, so `warning`/`info`/`neutral` rendered flat).
 // eslint-disable-next-line no-unused-vars
-import { Pill } from '../../components/leads/LeadShared'
+import { Pill, HeatPicker } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
 import TodaySummaryCard from '../../components/leads/TodaySummaryCard'
 import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
@@ -174,6 +174,12 @@ export default function WorkV2() {
   // we can close it from the outcome modal's onSaved callback. Owner
   // reported the task stayed on /work after capturing the outcome.
   const [callTaskId, setCallTaskId] = useState(null)
+
+  // Phase 67 (21 May 2026) — read this rep's calls target from the
+  // daily_targets TABLE (Phase 49) — same source TC uses. Previously
+  // the ring read from profile.daily_targets JSONB which is unmaintained
+  // for most reps. Default 20 calls/day if no policy row.
+  const [policyMinCalls, setPolicyMinCalls] = useState(null)
 
   /* Morning plan draft */
   const [plannedMeetings, setPlannedMeetings] = useState([
@@ -425,9 +431,30 @@ export default function WorkV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, session?.check_in_at, session?.evening_report_submitted_at])
 
+  // Phase 67 — fetch policy row from daily_targets table on mount.
+  // Merges DB min_calls over the JSONB fallback. Same query shape as
+  // TelecallerV2.jsx Phase 43.2 + 49.
+  useEffect(() => {
+    if (!profile?.id) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('daily_targets')
+        .select('min_calls')
+        .eq('user_id', profile.id)
+        .is('effective_to', null)
+        .maybeSingle()
+      if (!cancelled) setPolicyMinCalls(Number(data?.min_calls) || null)
+    })()
+    return () => { cancelled = true }
+  }, [profile?.id])
+
   const targets = useMemo(() => {
-    return profile?.daily_targets || { meetings: 5, calls: 20, new_leads: 10 }
-  }, [profile])
+    const base = profile?.daily_targets || { meetings: 5, calls: 20, new_leads: 10 }
+    // DB policy wins; JSONB fallback is the last-resort default.
+    if (policyMinCalls != null) return { ...base, calls: policyMinCalls }
+    return base
+  }, [profile, policyMinCalls])
   const counters = session?.daily_counters || { meetings: 0, calls: 0, new_leads: 0 }
 
   /* Submit morning plan */
@@ -680,6 +707,45 @@ export default function WorkV2() {
   // handles task close via direct UPDATE. Keep `skip` for the
   // manual dismiss-X path on NextActionSurface.
   const { tasks: smartTasks, skip: skipSmartTask } = useLeadTasks({ userId: profile?.id })
+
+  // Phase 67 (21 May 2026) — quick-set heat from the Next-up smart-task
+  // card without leaving /work. Backported from TelecallerV2 Phase 47.3.
+  // Optimistic local update via smartTasks refetch + DB write.
+  const updateLeadHeat = useCallback(async (leadId, newHeat) => {
+    if (!leadId) return
+    const { error } = await supabase
+      .from('leads')
+      .update({ heat: newHeat, updated_at: new Date().toISOString() })
+      .eq('id', leadId)
+    if (error) {
+      pushToast(`Could not update heat: ${error.message}`, 'danger')
+    }
+  }, [])
+
+  // Phase 67 (21 May 2026) — stale leads (no contact 3+ days) for
+  // sales rep. Backported from TelecallerV2 Phase 47.6. Computed
+  // client-side from smartTasks.lead embed so no extra DB hit.
+  // DNC excluded — those are intentionally idle.
+  const staleLeads = useMemo(() => {
+    const threeDays = 3 * 24 * 60 * 60 * 1000
+    const now = Date.now()
+    const seen = new Set()
+    const out = []
+    for (const t of (smartTasks || [])) {
+      const l = t.lead
+      if (!l || !l.id || seen.has(l.id)) continue
+      if (l.do_not_call) continue
+      const lastTouch = l.last_contact_at ? new Date(l.last_contact_at).getTime() : 0
+      // Never-contacted leads age from created_at (matches TC Phase 47.6).
+      // If both are absent, treat as epoch so it always reads stale.
+      const baseTs = lastTouch || (l.created_at ? new Date(l.created_at).getTime() : 0)
+      if ((now - baseTs) >= threeDays) {
+        seen.add(l.id)
+        out.push(l)
+      }
+    }
+    return out
+  }, [smartTasks])
   // Phase 34Z.47 — compute the Next-up pick once at parent scope so
   // both NextActionSurface (uses it as the hero) and TodayTasksPanel
   // (excludes the duplicate row) read the same reference. Owner
@@ -791,6 +857,29 @@ export default function WorkV2() {
           <TodaySummaryCard userId={profile?.id} session={session} />
         )}
 
+        {/* Phase 67 (21 May 2026) — stale leads alert banner (3+ days
+            no contact). Backported from TelecallerV2 Phase 47.6. DNC
+            excluded — those are intentionally idle. Surfaces only when
+            ≥1 stale to avoid notification fatigue. */}
+        {checkedIn && !dayDone && staleLeads.length > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 14px', marginBottom: 14,
+            background: 'var(--warning-soft, rgba(245,158,11,0.12))',
+            border: '1px solid var(--warning, #F59E0B)',
+            borderRadius: 10,
+            fontSize: 13, color: 'var(--warning, #F59E0B)',
+          }}>
+            <Clock size={14} />
+            <div style={{ flex: 1 }}>
+              <strong>{staleLeads.length} lead{staleLeads.length > 1 ? 's' : ''} idle 3+ days.</strong>{' '}
+              <span style={{ color: 'var(--v2-ink-2)' }}>
+                Open the lead and call — oldest needs you first.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Phase 35.0 pass 4 — StickyPrimaryCta now only renders here
             for NON-active states (start day / check-in / submit
             evening). In active state the same component renders ABOVE
@@ -824,6 +913,7 @@ export default function WorkV2() {
             toggleTaskDone={toggleTaskDone}
             onCallLead={quickLogCall}
             onDismissSmart={skipSmartTask}
+            onSetLeadHeat={updateLeadHeat}
             busy={busy}
           />
         )}
@@ -1542,7 +1632,7 @@ function pickNextAction({ session, smartTasks }) {
   return null
 }
 
-function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDismiss, dismissTitle, countdown, avatar }) {
+function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDismiss, dismissTitle, countdown, avatar, headerExtra }) {
   // Phase 35.0 pass 2 — smart-task variant uses the "NEXT UP · 22 MIN"
   // kicker with a yellow pulse-dot, a purple sparkle pill for the
   // "smart task" label, and a yellow avatar tile next to the title.
@@ -1658,6 +1748,9 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDis
             </div>
           )}
         </div>
+        {headerExtra && (
+          <div style={{ flexShrink: 0 }}>{headerExtra}</div>
+        )}
       </div>
       {meta && <div style={{ marginTop: 4 }}>{meta}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
@@ -1679,7 +1772,7 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDis
   )
 }
 
-function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, toggleTaskDone, onCallLead, onDismissSmart, busy }) {
+function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, toggleTaskDone, onCallLead, onDismissSmart, onSetLeadHeat, busy }) {
   const pick = pickNextAction({ session, smartTasks })
 
   // Phase 34Z.65 — drop the "Day is clear · Add lead" empty card.
@@ -1766,6 +1859,12 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
         countdown={countdown}
         avatar={avatar}
         subtitle={<SmartTaskSubtitle leadId={t.lead_id || lead.id} note={cleanReason} kind={t.kind} />}
+        headerExtra={onSetLeadHeat && (t.lead_id || lead.id) ? (
+          <HeatPicker
+            value={lead.heat}
+            onChange={(v) => onSetLeadHeat(t.lead_id || lead.id, v)}
+          />
+        ) : null}
         primary={phone
           ? {
               icon: Phone,

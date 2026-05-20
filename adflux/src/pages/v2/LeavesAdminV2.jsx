@@ -25,6 +25,8 @@ import { useNavigate } from 'react-router-dom'
 import { Users, Plus, Trash2, Calendar, AlertTriangle, Check, X as XIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { toastError } from '../../components/v2/Toast'
 
 const LEAVE_TYPES = [
   { key: 'sick',         label: 'Sick'        },
@@ -161,10 +163,15 @@ export default function LeavesAdminV2({ embedded = false }) {
   }
 
   async function handleDelete(row) {
-    if (!confirm(`Delete leave for ${userMap[row.user_id] || 'this rep'} on ${fmtDate(row.leave_date)}?`)) return
+    if (!(await confirmDialog({
+      title: 'Delete leave?',
+      message: `Delete leave for ${userMap[row.user_id] || 'this rep'} on ${fmtDate(row.leave_date)}?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return
     const { error } = await supabase.from('leaves').delete().eq('id', row.id)
     if (error) {
-      alert('Delete failed: ' + error.message)
+      toastError(error, 'Delete failed.')
       return
     }
     // Re-score that day so the rep's performance flips back to
@@ -198,7 +205,12 @@ export default function LeavesAdminV2({ embedded = false }) {
     load()
   }
   async function handleReject(row) {
-    if (!confirm(`Reject leave for ${userMap[row.user_id] || 'this rep'} on ${fmtDate(row.leave_date)}? Rep will be marked working for that day.`)) return
+    if (!(await confirmDialog({
+      title: 'Reject leave?',
+      message: `Reject leave for ${userMap[row.user_id] || 'this rep'} on ${fmtDate(row.leave_date)}. Rep will be marked working for that day.`,
+      confirmLabel: 'Reject',
+      danger: true,
+    }))) return
     setActingOn(row.id)
     const { error } = await supabase.from('leaves')
       .update({ status: 'rejected' })
