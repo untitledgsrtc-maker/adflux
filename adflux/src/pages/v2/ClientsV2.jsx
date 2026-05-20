@@ -26,6 +26,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { pushToast, toastError } from '../../components/v2/Toast'
 
 function formatCurrency(n) {
   return `₹${new Intl.NumberFormat('en-IN').format(Math.round(Number(n) || 0))}`
@@ -173,6 +175,47 @@ export default function ClientsV2() {
       return
     }
     setEditing(null)
+    load()
+  }
+
+  // Phase 65 (20 May 2026) — owner directive: "how can I remove client
+  // while I deleted quote". Clients table is decoupled from quote
+  // history (every quote carries its own client_* snapshot), so
+  // deleting a client does NOT affect past quotes. Confirms via
+  // confirmDialog. Reports how many quotes still reference the
+  // client so admin makes an informed call.
+  async function handleDelete() {
+    if (!editing?.id) return
+    setSaveErr('')
+
+    // Count quotes that reference this client.
+    const { count: quoteCount } = await supabase
+      .from('quotes')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', editing.id)
+
+    const refLine = quoteCount && quoteCount > 0
+      ? `${quoteCount} quote${quoteCount === 1 ? '' : 's'} reference this client. They will keep their own client snapshot — only the link to this row is removed.`
+      : 'No quotes reference this client.'
+
+    const ok = await confirmDialog({
+      title:         `Delete ${editing.name || 'client'}?`,
+      message:       `${refLine}\n\nThis cannot be undone.`,
+      confirmLabel:  'Delete client',
+      cancelLabel:   'Keep',
+      danger:        true,
+    })
+    if (!ok) return
+
+    setSaving(true)
+    const { error } = await supabase.from('clients').delete().eq('id', editing.id)
+    setSaving(false)
+    if (error) {
+      toastError(error, 'Could not delete client.')
+      return
+    }
+    setEditing(null)
+    pushToast(`Client deleted.`, 'success')
     load()
   }
 
@@ -425,22 +468,47 @@ export default function ClientsV2() {
               <div style={{ color: 'var(--v2-rose)', fontSize: 13 }}>{saveErr}</div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              {/* Phase 65 (20 May 2026) — Delete button on the LEFT
+                  (destructive). confirmDialog blocks accidental nuke
+                  and shows how many quotes reference the client. */}
               <button
-                onClick={() => setEditing(null)}
+                onClick={handleDelete}
                 disabled={saving}
-                className="v2d-btn-ghost"
-                style={{ padding: '8px 14px', borderRadius: 10 }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 10,
+                  background: 'transparent',
+                  border: '1px solid var(--v2-rose, #EF4444)',
+                  color: 'var(--v2-rose, #EF4444)',
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: saving ? 'default' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
               >
-                Cancel
+                <Trash2 size={14} /> Delete
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="v2d-cta"
-              >
-                <Save size={14} /> {saving ? 'Saving…' : 'Save changes'}
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => setEditing(null)}
+                  disabled={saving}
+                  className="v2d-btn-ghost"
+                  style={{ padding: '8px 14px', borderRadius: 10 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="v2d-cta"
+                >
+                  <Save size={14} /> {saving ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
