@@ -208,65 +208,71 @@ export default function GpsTrackV2() {
       //
       // Failures (network down, OSRM 4xx/5xx, >100 pings = batch too
       // large) silently leave the raw polyline in place.
+      // Phase 65 (20 May 2026) — owner reported "gps km not properly
+      // working" with raw 46.7 km but only a tiny polyline showing.
+      // Bug: previous Phase 61.5 code REMOVED the raw cleaned polyline
+      // when OSRM matched, but OSRM often matches only partial route
+      // (confidence drops on highway gaps, low-speed dwell etc.) so
+      // the user lost visibility of the actual route.
+      // Fix: always render the raw cleaned polyline as a yellow base
+      // layer. OSRM matched legs overlay in a slightly brighter yellow
+      // on top WHEN available, never replacing the underlying line.
+      // Sample size bumped 100 → 200 (OSRM /match limit is 100 per
+      // request — chunk in 2 batches now). Map fitBounds anchored to
+      // the RAW cleaned set so the whole route stays in view.
       let rawLine = null
       if (cleaned.length >= 2) {
         const latlngs = cleaned.map(p => [Number(p.lat), Number(p.lng)])
         rawLine = L.polyline(latlngs, {
           color:    '#FFE600',
-          weight:   5,
-          opacity:  0.45,        // faint until road-matched line lands
+          weight:   4,
+          opacity:  0.75,        // visible always; OSRM overlays on top
           lineCap:  'round',
           lineJoin: 'round',
         }).addTo(map)
         map.fitBounds(rawLine.getBounds(), { padding: [40, 40] })
 
-        // OSRM /match — best-effort. Capped to 100 pings; longer
-        // sequences need chunking which isn't worth the complexity
-        // for a single rep-day page.
-        const sample = cleaned.length > 100
-          ? cleaned.filter((_, i) => i % Math.ceil(cleaned.length / 100) === 0)
-          : cleaned
-        const coordStr = sample
-          .map(p => `${Number(p.lng).toFixed(6)},${Number(p.lat).toFixed(6)}`)
-          .join(';')
-        const tsStr = sample
-          .map(p => Math.floor(new Date(p.captured_at).getTime() / 1000))
-          .join(';')
-        const url = `https://routing.openstreetmap.de/routed-car/match/v1/driving/${coordStr}`
-          + `?steps=false&geometries=geojson&overview=full&timestamps=${tsStr}`
-
-        fetch(url)
-          .then(r => r.ok ? r.json() : null)
-          .then(json => {
-            if (!json || !mapRef.current) return
-            if (json.code !== 'Ok' || !Array.isArray(json.matchings)) return
-            // Replace the raw line with each matched leg drawn as a
-            // road-snapped polyline. Multiple matchings can come back
-            // when OSRM splits the track on confidence drops.
-            if (rawLine) {
-              try { rawLine.remove() } catch (_) {}
-            }
-            const matchedGroup = []
-            for (const m of json.matchings) {
-              const coords = m?.geometry?.coordinates
-              if (!Array.isArray(coords) || coords.length < 2) continue
-              const latlngs = coords.map(c => [c[1], c[0]])  // GeoJSON is lng,lat
-              const ln = L.polyline(latlngs, {
-                color:    '#FFE600',
-                weight:   5,
-                opacity:  0.95,
-                lineCap:  'round',
-                lineJoin: 'round',
-              }).addTo(mapRef.current)
-              matchedGroup.push(ln)
-            }
-            // Re-fit if we got new geometry.
-            if (matchedGroup.length > 0) {
-              const fg = L.featureGroup(matchedGroup)
-              mapRef.current.fitBounds(fg.getBounds(), { padding: [40, 40] })
+        // OSRM /match — best-effort overlay. Chunk the cleaned set
+        // into batches of 100 (OSRM hard limit). For each batch,
+        // request the matched geometry. Failures silently leave the
+        // raw line visible underneath.
+        const BATCH = 100
+        const chunks = []
+        for (let i = 0; i < cleaned.length; i += BATCH) {
+          chunks.push(cleaned.slice(i, i + BATCH))
+        }
+        const fetchOne = (sample) => {
+          if (sample.length < 2) return Promise.resolve(null)
+          const coordStr = sample
+            .map(p => `${Number(p.lng).toFixed(6)},${Number(p.lat).toFixed(6)}`)
+            .join(';')
+          const tsStr = sample
+            .map(p => Math.floor(new Date(p.captured_at).getTime() / 1000))
+            .join(';')
+          const url = `https://routing.openstreetmap.de/routed-car/match/v1/driving/${coordStr}`
+            + `?steps=false&geometries=geojson&overview=full&timestamps=${tsStr}`
+          return fetch(url).then(r => r.ok ? r.json() : null).catch(() => null)
+        }
+        Promise.all(chunks.map(fetchOne))
+          .then(results => {
+            if (!mapRef.current) return
+            for (const json of results) {
+              if (!json || json.code !== 'Ok' || !Array.isArray(json.matchings)) continue
+              for (const m of json.matchings) {
+                const coords = m?.geometry?.coordinates
+                if (!Array.isArray(coords) || coords.length < 2) continue
+                const latlngs = coords.map(c => [c[1], c[0]])  // GeoJSON is lng,lat
+                L.polyline(latlngs, {
+                  color:    '#FFE600',
+                  weight:   6,
+                  opacity:  1,
+                  lineCap:  'round',
+                  lineJoin: 'round',
+                }).addTo(mapRef.current)
+              }
             }
           })
-          .catch(() => { /* leave raw polyline visible */ })
+          .catch(() => { /* raw line stays as fallback */ })
       } else if (cleaned.length === 1) {
         map.setView([Number(cleaned[0].lat), Number(cleaned[0].lng)], 14)
       }
