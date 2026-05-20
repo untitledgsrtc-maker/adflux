@@ -53,6 +53,10 @@ export default function HRNewUserV2() {
     designation_id:    '',
     name:              '',
     email:             '',
+    // Phase 66 (21 May 2026) — password field. Form now creates
+    // auth.users + public.users in one shot via admin_create_user
+    // RPC, so HR doesn't need to open Studio Auth UI separately.
+    password:          '',
     phone:             '',
     city:              'Vadodara',
     segment_access:    'PRIVATE',
@@ -130,35 +134,41 @@ export default function HRNewUserV2() {
       toastError(new Error('Missing fields'), 'Name, email and designation are required.')
       return
     }
-    setSaving(true)
-
-    // 1. INSERT public.users row.
-    const { data: userRow, error: userErr } = await supabase
-      .from('users')
-      .insert([{
-        name:           form.name.trim(),
-        email:          form.email.trim().toLowerCase(),
-        phone:          form.phone.trim() || null,
-        city:           form.city,
-        role:           pickedDesignation.auth_role,
-        team_role:      pickedDesignation.team_role,
-        // Phase 57 — 4 expense kind flags persisted with the user.
-        allow_ta:       !!form.allow_ta,
-        allow_da:       !!form.allow_da,
-        allow_hotel:    !!form.allow_hotel,
-        allow_other:    form.allow_other !== false,
-        segment_access: form.segment_access,
-        manager_id:     form.manager_id || null,
-        is_active:      true,
-      }])
-      .select('*')
-      .single()
-
-    if (userErr) {
-      setSaving(false)
-      toastError(userErr, 'Could not create user.')
+    if (!form.password || form.password.length < 4) {
+      toastError(new Error('Bad password'), 'Set a login password (min 4 chars).')
       return
     }
+    setSaving(true)
+
+    // Phase 66 (21 May 2026) — single RPC creates auth.users +
+    // public.users with bcrypt-hashed password. Replaces the prior
+    // direct INSERT INTO public.users which (a) crashed on the
+    // non-existent `phone` column and (b) required admin to set
+    // the login password manually in Studio Auth UI afterwards.
+    const { data: created, error: rpcErr } = await supabase.rpc('admin_create_user', {
+      p_email:            form.email.trim().toLowerCase(),
+      p_password:         form.password,
+      p_name:             form.name.trim(),
+      p_role:             pickedDesignation.auth_role,
+      p_team_role:        pickedDesignation.team_role,
+      p_designation:      pickedDesignation.name || null,
+      p_signature_mobile: form.phone.trim() || null,
+      p_city:             form.city || null,
+      p_segment_access:   form.segment_access || 'PRIVATE',
+      p_manager_id:       form.manager_id || null,
+      p_allow_ta:         !!form.allow_ta,
+      p_allow_da:         !!form.allow_da,
+      p_allow_hotel:      !!form.allow_hotel,
+      p_allow_other:      form.allow_other !== false,
+    })
+
+    if (rpcErr) {
+      setSaving(false)
+      toastError(rpcErr, 'Could not create user.')
+      return
+    }
+
+    const userRow = { id: created?.id, email: created?.email }
 
     // 2. INSERT staff_incentive_profile (so salary tab works).
     if (form.monthly_salary && Number(form.monthly_salary) > 0) {
@@ -229,7 +239,7 @@ export default function HRNewUserV2() {
             <button
               type="button"
               onClick={() => { setCreatedUser(null); setForm({
-                designation_id: '', name: '', email: '', phone: '', city: 'Vadodara',
+                designation_id: '', name: '', email: '', password: '', phone: '', city: 'Vadodara',
                 segment_access: 'PRIVATE', manager_id: '',
                 join_date: new Date().toISOString().slice(0, 10),
                 monthly_salary: '', has_incentive: false, variable_pct: 0,
@@ -300,6 +310,10 @@ export default function HRNewUserV2() {
             <FormField label="Name *" v={form.name} onChange={v => set('name', v)} required />
             <FormField label="Email *" v={form.email} onChange={v => set('email', v)} type="email" required placeholder="firstname@untitledadvertising.in" />
             <FormField label="Phone" v={form.phone} onChange={v => set('phone', v)} type="tel" />
+            {/* Phase 66 — login password (creates auth.users row).
+                Min 4 chars enforced server-side. Owner default = 123456
+                for staging; rep can change later via password-reset. */}
+            <FormField label="Login password *" v={form.password} onChange={v => set('password', v)} type="password" required placeholder="min 4 chars" />
             <SelectField label="City" v={form.city} onChange={v => set('city', v)} options={CITIES.map(c => [c, c])} />
             <SelectField label="Segment access" v={form.segment_access} onChange={v => set('segment_access', v)} options={SEGMENTS.map(s => [s.v, s.label])} />
             <FormField label="Join date" v={form.join_date} onChange={v => set('join_date', v)} type="date" />
@@ -385,7 +399,9 @@ export default function HRNewUserV2() {
         }}>
           <AlertTriangle size={14} style={{ color: 'var(--warning)', flex: '0 0 auto', marginTop: 2 }} />
           <div>
-            <strong>This creates the public.users row only.</strong> After save, invite the user via Supabase Studio → Auth → Users using the same email. Their auth.uid links to this row on first sign-in.
+            {/* Phase 66 — RPC creates BOTH auth.users + public.users.
+                Rep can log in with the password above immediately. */}
+            <strong>User created in one shot.</strong> Rep can sign in immediately with the email + login password set above. No extra Supabase Studio step needed.
           </div>
         </div>
 
