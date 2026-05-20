@@ -236,7 +236,10 @@ public class CallLogPlugin extends Plugin {
         };
         String selection = CallLog.Calls.DATE + " >= ?";
         String[] selectionArgs = new String[] { String.valueOf(sinceTimestamp) };
-        String sortOrder = CallLog.Calls.DATE + " DESC LIMIT " + limit;
+        // Phase 68.1 (21 May 2026) — Android API 24+ rejects "LIMIT" in
+        // ContentResolver.query sortOrder ("Invalid token LIMIT"). Sort
+        // newest-first via SQL, then truncate in Java via a counter.
+        String sortOrder = CallLog.Calls.DATE + " DESC";
 
         com.getcapacitor.JSArray calls = new com.getcapacitor.JSArray();
         Cursor cursor = null;
@@ -252,7 +255,8 @@ public class CallLogPlugin extends Plugin {
             int typIdx = cursor.getColumnIndex(CallLog.Calls.TYPE);
             int datIdx = cursor.getColumnIndex(CallLog.Calls.DATE);
             int durIdx = cursor.getColumnIndex(CallLog.Calls.DURATION);
-            while (cursor.moveToNext()) {
+            int kept = 0;
+            while (cursor.moveToNext() && kept < limit) {
                 String number = cursor.getString(numIdx);
                 if (number == null) continue;
                 int type = cursor.getInt(typIdx);
@@ -264,6 +268,7 @@ public class CallLogPlugin extends Plugin {
                 row.put("date", date);
                 row.put("durationSeconds", duration);
                 calls.put(row);
+                kept++;
             }
             JSObject ret = new JSObject();
             ret.put("calls", calls);
