@@ -17,7 +17,7 @@
 //   6. After hand-off, logs a `lead_activities` row (activity_type=
 //      'whatsapp', notes=rendered_body) for audit + reporting.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { X, MessageSquare, Send, Loader2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -49,9 +49,15 @@ export default function WhatsAppSendModal({ open, lead, onClose, onSent }) {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [sending, setSending] = useState(false)
+  // Phase 68.2 (21 May 2026) — ref guard against rapid double-tap.
+  // setSending toggles too fast for the disabled prop to catch a
+  // back-to-back press; ref short-circuits the second call sync.
+  const sendingRef = useRef(false)
 
   useEffect(() => {
     if (!open) return
+    // Phase 68.2 — reset send-guard whenever the modal re-opens.
+    sendingRef.current = false
     let cancelled = false
     setLoading(true); setErr('')
     supabase
@@ -91,6 +97,10 @@ export default function WhatsAppSendModal({ open, lead, onClose, onSent }) {
       pushToast('Message body is empty.', 'danger')
       return
     }
+    // Phase 68.2 — sync ref guard. State-based `disabled` flips too
+    // late for a rapid second tap; ref short-circuits immediately.
+    if (sendingRef.current) return
+    sendingRef.current = true
     setSending(true)
     // Open wa.me on user gesture FIRST so iOS Safari hands off.
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(body)}`
@@ -106,6 +116,8 @@ export default function WhatsAppSendModal({ open, lead, onClose, onSent }) {
       if (error) console.warn('[wa-send] activity log failed:', error.message)
     })
     setSending(false)
+    // Leave sendingRef true until modal closes — onClose clears it
+    // on next open via the useEffect below.
     onSent?.()
     onClose?.()
   }
