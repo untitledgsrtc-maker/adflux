@@ -95,8 +95,15 @@ export default function TelecallerV2() {
   // we already quote them?" without leaving the page.
   const [lastQuote, setLastQuote] = useState(null)
 
-  async function load() {
-    setLoading(true)
+  // Phase 71 (21 May 2026) — `silent` flag skips the full-page
+  // spinner during background refreshes. Owner reported: "when we do
+  // anything in outcome it auto resets in whole page". Root cause:
+  // every onSaved callback called load() which set loading=true →
+  // queue unmounted → scroll jumped to top → rep lost place.
+  // silent=true keeps the DOM mounted, scroll preserved, data still
+  // refreshes underneath.
+  async function load(silent = false) {
+    if (!silent) setLoading(true)
     // Phase 43.4 — IST anchor (was UTC; broke counts before 18:30 IST).
     const today = istTodayISO()
     const startOfDay = `${today}T00:00:00`
@@ -213,7 +220,7 @@ export default function TelecallerV2() {
   // Phase 43.1 — match sales-frozen contract: auto-refresh queue.
   // Phase 65 — 20s poll so call counters + connect-rate update
   // without waiting for tab-resume.
-  useAutoRefresh(load, { pollSeconds: 20 })
+  useAutoRefresh(() => load(true), { pollSeconds: 20 })  // Phase 71 — silent background refresh
 
   // Phase 47.2 — fetch active call scripts once. Cheap; admin
   // edits don't fire often. Frontend picks the best-match script
@@ -283,7 +290,7 @@ export default function TelecallerV2() {
       .eq('id', leadId)
     if (error) {
       pushToast(`Could not update heat: ${error.message}`, 'danger')
-      load()  // rollback to server truth
+      load(true)  // Phase 71 — silent rollback, preserve scroll
     }
   }
 
@@ -1048,7 +1055,7 @@ export default function TelecallerV2() {
         onSaved={() => {
           setPostCallOpen(false)
           setPendingActivityId(null)
-          load()
+          load(true)  // Phase 71 — silent refresh, preserve scroll
         }}
         onLogMeeting={() => {
           // Telecaller doesn't run LogMeetingModal directly — route
@@ -1062,7 +1069,7 @@ export default function TelecallerV2() {
         open={waOpen}
         lead={waLead}
         onClose={() => { setWaOpen(false); setWaLead(null) }}
-        onSent={() => load()}
+        onSent={() => load(true)}  /* Phase 71 — silent refresh */
       />
     </div>
   )

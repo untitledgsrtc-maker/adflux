@@ -327,8 +327,12 @@ export default function WorkV2() {
     return now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 30)
   })()
 
-  async function load() {
-    setLoading(true)
+  // Phase 71 (21 May 2026) — silent flag skips the full-page spinner
+  // on background refreshes. Was: every onSaved + useAutoRefresh tick
+  // ran setLoading(true) → /work unmounted → rep's scroll jumped to top
+  // mid-call-outcome. silent=true preserves DOM + scroll.
+  async function load(silent = false) {
+    if (!silent) setLoading(true)
     setError('')
     const { data, error: err } = await supabase
       .from('work_sessions')
@@ -360,7 +364,7 @@ export default function WorkV2() {
   // in-app router navigation, not on browser-level resume.
   // Phase 65 (20 May 2026) — 20s poll so /work picks up calls
   // logged in last minute (Today's Tasks + call counters).
-  useAutoRefresh(load, { enabled: !!profile?.id, pollSeconds: 20 })
+  useAutoRefresh(() => load(true), { enabled: !!profile?.id, pollSeconds: 20 })  // Phase 71 — silent background refresh
 
   // Phase 34Z.70 — fix #17: ensurePushOnLogin call moved to
   // V2AppShell (Phase 34Z.69) so every rep-facing page enrolls,
@@ -983,7 +987,7 @@ export default function WorkV2() {
             }
             setTimeout(() => setToast(''), 2200)
             playChime()
-            load()
+            load(true)  // Phase 71 — silent refresh, preserve scroll
             if (newLeadId) setPendingNavLead(newLeadId)
           }}
         />
@@ -1017,7 +1021,7 @@ export default function WorkV2() {
           // 'Task not found or RLS denied' because the row was already
           // status='done' by the time this ran. Just clear local state.
           if (callTaskId) setCallTaskId(null)
-          load()
+          load(true)  // Phase 71 — silent refresh, preserve scroll
           if (nextAction === 'meeting') {
             // Smart card has no LogMeetingModal mounted; send rep to
             // lead detail where the Meeting button + map live.

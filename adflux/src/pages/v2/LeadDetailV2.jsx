@@ -231,7 +231,7 @@ export default function LeadDetailV2() {
     // even if a stray timer tick fires after the row landed.
     // savingHereRef resets in the useEffect below when a fresh
     // hereGps starts.
-    load()
+    load(true)  // Phase 71 — silent refresh, preserve scroll
   }
   // Reset the idempotency guard whenever a NEW "I'm here" session
   // starts (hereGps transitions from null → object).
@@ -381,7 +381,7 @@ export default function LeadDetailV2() {
         }).catch(() => {})
       }, 60_000)
     }
-    load()
+    load(true)  // Phase 71 — silent refresh, preserve scroll
   }
 
   // Phase 32P — defer the activity insert so the tel:/wa.me/mailto:
@@ -392,8 +392,12 @@ export default function LeadDetailV2() {
     setTimeout(() => { quickLog(activityType, notes) }, 0)
   }
 
-  async function load() {
-    setLoading(true)
+  // Phase 71 (21 May 2026) — silent flag skips the full-page spinner
+  // on background refreshes. Owner reported: outcome save resets the
+  // whole page → scroll jumped. Modal onSaved now calls load(true)
+  // to refresh quietly under the open lead detail.
+  async function load(silent = false) {
+    if (!silent) setLoading(true)
     setError('')
     const [leadRes, actRes] = await Promise.all([
       supabase.from('leads')
@@ -451,7 +455,7 @@ export default function LeadDetailV2() {
   // poll on lead detail so call_logs / activities refetch even
   // without a visibility-change trigger. Visibility + focus still
   // fire as before for instant return-from-dialer refresh.
-  useAutoRefresh(load, { enabled: !!id, pollSeconds: 20 })
+  useAutoRefresh(() => load(true), { enabled: !!id, pollSeconds: 20 })  // Phase 71 — silent background refresh
 
   /* ─── Phase 35 PR 2 — OCR conflict apply ───
      Called from the batch modal's "Apply" button. Merges the
@@ -472,7 +476,7 @@ export default function LeadDetailV2() {
     const n = Object.keys(patch).length
     toastSuccess(`Updated ${n} field${n === 1 ? '' : 's'}.`)
     setOcrConflicts(null)
-    load()
+    load(true)  // Phase 71 — silent refresh
   }
 
   /* ─── Phase 19 — Realtime: keep this lead + activity list fresh ─── */
@@ -492,7 +496,7 @@ export default function LeadDetailV2() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'lead_activities', filter: `lead_id=eq.${id}` },
-        () => { load() }
+        () => { load(true) }  /* Phase 71 — silent realtime refresh */
       )
       .subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -588,7 +592,7 @@ export default function LeadDetailV2() {
       .from('leads')
       .update({ cadence_paused: !lead.cadence_paused })
       .eq('id', lead.id)
-    load()
+    load(true)  // Phase 71 — silent refresh
   }
   const heatLabel = lead.heat ? lead.heat[0].toUpperCase() + lead.heat.slice(1) : null
 
@@ -1229,7 +1233,7 @@ export default function LeadDetailV2() {
               <PhotoCapture
                 leadId={lead.id}
                 profileId={profile?.id}
-                onSaved={() => load()}
+                onSaved={() => load(true)}  /* Phase 71 — silent refresh */
                 onPatchLead={async (fields) => {
                   const patch = {}
                   const conflicts = []
@@ -1253,11 +1257,11 @@ export default function LeadDetailV2() {
                   // (or just reload if nothing to apply). Preserves
                   // the pre-Phase-35 no-conflict branch verbatim.
                   if (conflicts.length === 0) {
-                    if (Object.keys(patch).length === 0) { load(); return }
+                    if (Object.keys(patch).length === 0) { load(true); return }
                     const { error: upErr } = await supabase
                       .from('leads').update(patch).eq('id', lead.id)
                     if (upErr) { toastError(upErr, 'Could not apply OCR updates.'); return }
-                    load()
+                    load(true)  // Phase 71 — silent refresh
                     return
                   }
 
@@ -1772,7 +1776,7 @@ export default function LeadDetailV2() {
           type={activityType === 'followup' ? 'note' : activityType}
           focusFollowup={activityType === 'followup'}
           onClose={() => setActivityType(null)}
-          onSaved={load}
+          onSaved={() => load(true)}  /* Phase 71 — silent refresh */
         />
       )}
       {activeModal === 'stage' && (
@@ -1780,7 +1784,7 @@ export default function LeadDetailV2() {
           lead={lead}
           onClose={() => setActiveModal(null)}
           onSaved={(newStage) => {
-            load()
+            load(true)  // Phase 71 — silent refresh, preserve scroll
             // Phase 33D.5 — open the post-stage-change WhatsApp prompt
             // with the new stage's template. ChangeStageModal calls
             // onSaved() with no args, so we re-fetch the lead first
@@ -1801,7 +1805,7 @@ export default function LeadDetailV2() {
         <ReassignModal
           lead={lead}
           onClose={() => setActiveModal(null)}
-          onSaved={load}
+          onSaved={() => load(true)}  /* Phase 71 — silent refresh */
         />
       )}
       {/* Phase 34Z.49 — voice-driven post-call outcome capture. Owner
@@ -1817,7 +1821,7 @@ export default function LeadDetailV2() {
         onSaved={({ nextAction }) => {
           setPostCallOpen(false)
           setPendingActivityId(null)
-          load()
+          load(true)  // Phase 71 — silent refresh, preserve scroll
           // Fire WA prompt next (skip when rep is jumping to a meeting
           // log — the LogMeetingModal handles its own WA on save).
           if (nextAction !== 'meeting') {
