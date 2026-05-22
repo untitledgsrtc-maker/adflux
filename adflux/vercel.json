@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/pdf/(.*)", "destination": "https://kompjctmisnitjpbjalh.supabase.co/storage/v1/object/public/quote-pdfs/$1" },
+    { "source": "/pdf/:path*", "destination": "https://kompjctmisnitjpbjalh.supabase.co/storage/v1/object/public/quote-pdfs/:path*" },
     { "source": "/((?!api/|pdf/).*)", "destination": "/" }
   ],
   "headers": [{
