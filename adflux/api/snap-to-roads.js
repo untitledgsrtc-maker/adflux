@@ -20,7 +20,54 @@
 //     → 400 { error: "..." }                      // missing path / >100 pts
 //     → 502 { error: "..." }                      // Google unreachable
 
-import { guardProxy } from './_guard'
+// Phase 85.3.2 — guard inlined per-endpoint. See api/directions.js
+// for the explanation: Vercel's bundler does not include
+// `_`-prefixed sibling files, so any helper import crashes the
+// function at startup.
+
+const ALLOWED_ORIGINS = [
+  'https://app.untitledad.in',
+  'https://untitled-os-tau.vercel.app',
+]
+const RATE_WINDOW_MS = 60 * 1000
+const RATE_MAX       = 60
+const rateBucket     = new Map()
+
+function guardProxy(req, res) {
+  const origin  = req.headers?.origin || ''
+  const referer = req.headers?.referer || ''
+  const candidate = origin || referer
+  let sameOrigin = false
+  if (candidate) {
+    try {
+      const u = new URL(candidate)
+      const host = `${u.protocol}//${u.host}`
+      sameOrigin = ALLOWED_ORIGINS.includes(host) || u.host.endsWith('.vercel.app')
+    } catch {
+      sameOrigin = false
+    }
+  }
+  if (!sameOrigin) {
+    res.status(403).json({ error: 'Cross-origin requests not allowed' })
+    return false
+  }
+  const ip = (req.headers?.['x-forwarded-for'] || '').split(',')[0].trim()
+          || req.socket?.remoteAddress
+          || 'unknown'
+  const now = Date.now()
+  const entry = rateBucket.get(ip)
+  if (!entry || entry.resetAt < now) {
+    rateBucket.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS })
+  } else if (entry.count >= RATE_MAX) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000)
+    res.setHeader('Retry-After', String(retryAfter))
+    res.status(429).json({ error: `Rate limit exceeded. Retry in ${retryAfter}s.` })
+    return false
+  } else {
+    entry.count += 1
+  }
+  return true
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -28,10 +75,6 @@ export default async function handler(req, res) {
     return
   }
 
-  // Phase 85.3.1 — same-origin + rate-limit guard. Audit 24 May 2026
-  // still satisfied (origin allowlist + 60 req/min/IP). Replaces
-  // Phase 85.3 hard JWT requirement which broke road-snap on expired
-  // PWA sessions.
   if (!guardProxy(req, res)) return
 
   const key = process.env.ROADS_KEY_SERVER
