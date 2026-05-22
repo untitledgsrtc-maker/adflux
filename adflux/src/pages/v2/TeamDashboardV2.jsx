@@ -686,16 +686,29 @@ export default function TeamDashboardV2() {
     if (!google) return
     const seen = new Set()
     const repNameById = new Map(reps.map(r => [r.id, r.name]))
-    // Lead-pin icon: filled blue circle with dark stroke. Distinct
-    // from the avatar rep pins (which carry a freshness colour band).
-    const ICON = {
+    // Phase 89.4 — pin colour tracks meeting outcome. Owner
+    // directive 23 May 2026: "as per lead outcome color shuld be
+    // chmaged". Same palette as GpsTrackV2.
+    //   positive → green  / neutral → amber
+    //   negative → red    / callback → blue
+    //   null     → slate (outcome not yet logged)
+    const colorForOutcome = (o) => {
+      switch (o) {
+        case 'positive': return '#10B981'
+        case 'negative': return '#EF4444'
+        case 'neutral':  return '#F59E0B'
+        case 'callback': return '#3B82F6'
+        default:         return '#94A3B8'
+      }
+    }
+    const iconFor = (o) => ({
       path:         google.maps.SymbolPath.CIRCLE,
       scale:        8,
-      fillColor:    '#3B82F6',
+      fillColor:    colorForOutcome(o),
       fillOpacity:  0.9,
       strokeColor:  '#0f172a',
       strokeWeight: 2,
-    }
+    })
     const esc = (v) => String(v ?? '')
       .replace(/&/g,  '&amp;')
       .replace(/</g,  '&lt;')
@@ -726,12 +739,16 @@ export default function TeamDashboardV2() {
       const existing = leadMarkersRef.current[a.id]
       if (existing) {
         existing.setPosition(pos)
+        // Phase 89.4 — outcome may flip after the pin first rendered
+        // (rep logs result later). Reset icon so the colour band
+        // tracks the current outcome on every effect re-run.
+        existing.setIcon(iconFor(a.outcome))
         existing.__iw?.setContent(html)
       } else {
         const m = new google.maps.Marker({
           position: pos,
           map,
-          icon: ICON,
+          icon: iconFor(a.outcome),
           title: heading,
           zIndex: 1,  // Below rep avatar pins.
         })
