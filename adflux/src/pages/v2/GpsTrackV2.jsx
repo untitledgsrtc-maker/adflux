@@ -76,6 +76,11 @@ export default function GpsTrackV2() {
   const [voiceLogs, setVoiceLogs] = useState([])
   const mapRef     = useRef(null)
   const containerRef = useRef(null)
+  // Phase 70.10 — view-mode toggle: all (route + stops + meetings),
+  // route-only (no meeting pins), meetings-only (no route polyline +
+  // no GPS stop pins, just blue meeting pins so admin counts where
+  // rep met clients today).
+  const [viewMode, setViewMode] = useState('all')
 
   // Fetch the rep + their pings + their day-activity for the date.
   useEffect(() => {
@@ -242,8 +247,12 @@ export default function GpsTrackV2() {
       // opacity so the user has SOMETHING visible until the Directions
       // API result lands. Once Directions returns a real road-following
       // polyline, the raw line is removed (rawLine.setMap(null)).
+      // Phase 70.10 — only render route polyline + stops in 'all' or
+      // 'route' view modes. 'meetings' hides them.
+      const showRoute = viewMode === 'all' || viewMode === 'route'
+      const showMeetings = viewMode === 'all' || viewMode === 'meetings'
       let rawLine = null
-      if (cleaned.length >= 2) {
+      if (showRoute && cleaned.length >= 2) {
         const path = cleaned.map(p => ({
           lat: Number(p.lat),
           lng: Number(p.lng),
@@ -348,20 +357,20 @@ export default function GpsTrackV2() {
       // Check-in + check-out markers.
       const first = pings[0]
       const last  = pings[pings.length - 1]
-      // Phase 70.9 (22 May 2026) — owner directive: navigation pin
-      // shape, not round dot. Teardrop SVG path; tip at (0,0) so the
-      // marker's lat/lng anchors at the bottom point of the pin.
-      // labelOrigin centers any text label inside the pin head.
-      const PIN_PATH = 'M 0,0 C -7,-12 -14,-20 -14,-30 A 14,14 0 1,1 14,-30 C 14,-20 7,-12 0,0 z'
+      // Phase 70.10 (22 May 2026) — Material "place" pin shape with an
+      // inner hole (even-odd fill rule) so the inside reads white on
+      // light tiles. Brand-aligned: dark navy stroke matches --v2-bg-0.
+      // Owner: "pin not aligned with our brand".
+      const PIN_PATH = 'M 0,0 c -4.5,-7.5 -10.5,-14.25 -10.5,-19.5 a 10.5,10.5 0 1,1 21,0 c 0,5.25 -6,12 -10.5,19.5 z m 0,-26.25 a 3.75,3.75 0 1,0 0,7.5 a 3.75,3.75 0 1,0 0,-7.5 z'
       const pinIcon = (color) => ({
         path:           PIN_PATH,
         fillColor:      color,
         fillOpacity:    1,
-        strokeColor:    '#ffffff',
-        strokeWeight:   2,
-        scale:          1,
+        strokeColor:    '#0f172a',
+        strokeWeight:   1.5,
+        scale:          1.4,
         anchor:         new google.maps.Point(0, 0),
-        labelOrigin:    new google.maps.Point(0, -30),
+        labelOrigin:    new google.maps.Point(0, -20),
       })
       if (first) {
         const m1 = new google.maps.Marker({
@@ -390,12 +399,14 @@ export default function GpsTrackV2() {
       // show on the day-track map with a blue pin + lead name. Click
       // the lead name in the popup → navigate to /leads/:id. Activity
       // types meeting + site_visit count.
-      const meetingActs = (activities || []).filter(a =>
-        (a.activity_type === 'meeting' || a.activity_type === 'site_visit')
-        && Number.isFinite(Number(a.gps_lat))
-        && Number.isFinite(Number(a.gps_lng))
-        && a.lead?.id
-      )
+      const meetingActs = showMeetings
+        ? (activities || []).filter(a =>
+            (a.activity_type === 'meeting' || a.activity_type === 'site_visit')
+            && Number.isFinite(Number(a.gps_lat))
+            && Number.isFinite(Number(a.gps_lng))
+            && a.lead?.id
+          )
+        : []
       for (const a of meetingActs) {
         const m = new google.maps.Marker({
           position: { lat: Number(a.gps_lat), lng: Number(a.gps_lng) },
@@ -426,8 +437,9 @@ export default function GpsTrackV2() {
       }
 
       // Numbered stop pins — same teardrop shape; label sits inside
-      // the pin head via labelOrigin.
-      for (const s of stops) {
+      // the pin head via labelOrigin. Hidden in 'meetings' view.
+      const stopsToShow = showRoute ? stops : []
+      for (const s of stopsToShow) {
         const m = new google.maps.Marker({
           position: { lat: s.lat, lng: s.lng },
           map,
@@ -458,7 +470,7 @@ export default function GpsTrackV2() {
     return () => {
       mapRef.current = null
     }
-  }, [loading, pings, activities])
+  }, [loading, pings, activities, viewMode])
 
   if (!isPrivileged) {
     return (
@@ -550,6 +562,41 @@ export default function GpsTrackV2() {
         </div>
       ) : (
         <>
+          {/* Phase 70.10 — view-mode toggle. 3-way chip group: All /
+              Route only / Meetings only. Lets admin focus the map on
+              just where the rep met clients (Meetings only) without
+              the noisy GPS route + stop pins. */}
+          <div style={{
+            display: 'inline-flex', gap: 4, marginBottom: 10,
+            padding: 4, background: 'var(--v2-bg-2)',
+            border: '1px solid var(--v2-line)',
+            borderRadius: 10,
+          }}>
+            {[
+              { key: 'all',      label: 'All' },
+              { key: 'route',    label: 'Route only' },
+              { key: 'meetings', label: `Meetings · ${activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && a.lead?.id).length}` },
+            ].map(opt => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setViewMode(opt.key)}
+                style={{
+                  background: viewMode === opt.key ? 'var(--accent, #FFE600)' : 'transparent',
+                  color:      viewMode === opt.key ? 'var(--accent-fg, #0f172a)' : 'var(--text)',
+                  border:     'none',
+                  padding:    '6px 14px',
+                  borderRadius: 8,
+                  fontSize:   12,
+                  fontWeight: 600,
+                  cursor:     'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <div
             ref={containerRef}
             style={{
