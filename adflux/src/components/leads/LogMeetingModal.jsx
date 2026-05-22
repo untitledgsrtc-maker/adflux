@@ -233,18 +233,22 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
         gps_lng:        gps?.lng || null,
         gps_accuracy_m: gps?.acc || null,
       }
-      const { error: actErr } = await supabase
-        .from('lead_activities').insert([activityPayload])
-      if (actErr) {
-        setSaving(false)
-        setError('Could not log follow-up meeting: ' + actErr.message)
-        return
-      }
+      // Phase 88.1 — optimistic save. Dup path: lead exists, the
+      // only DB write is the activity insert. Fire it in the
+      // background + close modal immediately so the rep perceives
+      // the save as instant. On error, toastError surfaces async.
       setSaving(false)
-      // Treat as a save — surface that it's a follow-up + open the
-      // existing lead for the prompt.
       onSaved?.(dup.id)
       setSavedLead({ id: dup.id, name: dup.name, company: dup.company, phone, segment: 'PRIVATE' })
+      ;(async () => {
+        try {
+          const { error: actErr } = await supabase
+            .from('lead_activities').insert([activityPayload])
+          if (actErr) toastError(actErr, 'Follow-up activity log failed — open the lead and re-log.')
+        } catch (e) {
+          toastError(e, 'Network error logging follow-up.')
+        }
+      })()
       return
     }
 
@@ -316,22 +320,12 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
       gps_lng:        gps?.lng || null,
       gps_accuracy_m: gps?.acc || null,
     }
-    const { error: actErr } = await supabase
-      .from('lead_activities')
-      .insert([activityPayload])
-
-    if (actErr) {
-      setSaving(false)
-      // Lead was created but activity failed — surface so the rep can
-      // open the lead and log the activity from there. Counter won't
-      // bump but at least the lead exists.
-      setError(
-        `Lead created but activity log failed: ${actErr.message}. ` +
-        `Open the lead and log the meeting from there.`
-      )
-      return
-    }
-
+    // Phase 88.1 — optimistic save. Lead insert above MUST await
+    // (we need leadRow.id to navigate + to attach the activity FK).
+    // Activity insert no longer blocks — fire in background, close
+    // modal immediately. Perceived save time drops from ~600ms
+    // (both await) to ~200ms (lead RTT only). Failure path toasts
+    // async; rep can re-log from the lead detail timeline.
     setSaving(false)
     // Phase 35 PR 2.5 — skip the WhatsApp prompt; fire onSaved with
     // the new lead id + close. Parent (WorkV2) navigates to the lead
@@ -342,6 +336,21 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
     // `promptWhatsApp` prop.
     onSaved?.(leadRow.id, { mode })
     onClose?.()
+    ;(async () => {
+      try {
+        const { error: actErr } = await supabase
+          .from('lead_activities')
+          .insert([activityPayload])
+        if (actErr) {
+          toastError(
+            actErr,
+            'Lead saved but activity log failed. Open the lead and log the meeting from there.'
+          )
+        }
+      } catch (e) {
+        toastError(e, 'Network error logging the meeting.')
+      }
+    })()
   }
 
   function closeAll() {

@@ -403,6 +403,26 @@ export default function PostCallOutcomeModal({
       return
     }
 
+    // Phase 88.1 — optimistic close after the core write succeeds.
+    // The activity row is the source of truth (Phase 34Z.66 score
+    // trigger fires on it, Phase 34Z.55 push trigger fires on the
+    // follow_up insert below, but neither blocks the user from
+    // closing this modal). Everything below is secondary — fire in
+    // the background so perceived save time drops from ~1500ms
+    // (4-5 sequential awaits) to ~200ms (single activity round-
+    // trip). Errors toast async; the chain contract still holds.
+    setSaving(false)
+    toastSuccess('Call outcome saved.')
+    onSaved?.({ outcome, nextAction })
+    if (nextAction === 'meeting') {
+      onLogMeeting?.()
+    }
+    // Phase 88.1 — secondary writes in background. Wrapped in an
+    // IIFE so the synchronous return path above can complete + the
+    // modal can unmount before these promises resolve.
+    ;(async () => {
+      try {
+
     // Phase 47.8 — patch most recent call_logs row for this user +
     // lead in the last 10 minutes with the picked call language.
     // Phase 54 F2 — same patch also writes the real outcome back to
@@ -575,16 +595,13 @@ export default function PostCallOutcomeModal({
         .eq('assigned_to', profile.id)
         .eq('status', 'open')
     }
-
-    setSaving(false)
-    toastSuccess('Call outcome saved.')
-
-    // 4. Hand off to parent. parent decides whether to open WA prompt
-    //    or jump to Log meeting based on nextAction.
-    onSaved?.({ outcome, nextAction })
-    if (nextAction === 'meeting') {
-      onLogMeeting?.()
-    }
+      } catch (e) {
+        // Phase 88.1 — never throw out of the background IIFE; the
+        // modal already closed + the rep already moved on.
+        console.warn('[post-call-outcome] background write failed:', e?.message || e)
+        toastError(e, 'Some follow-up writes failed — refresh to recheck.')
+      }
+    })()
   }
 
   return (
