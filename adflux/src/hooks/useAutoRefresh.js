@@ -1,6 +1,9 @@
 // src/hooks/useAutoRefresh.js
 //
 // Phase 34Z.59 — shared auto-refresh hook.
+// Phase 88.6 — added Supabase Realtime sub on the two highest-
+// churn tables (lead_activities + follow_ups) so refresh fires
+// the moment a row changes anywhere, not only on tab focus.
 //
 // Owner reported (15 May 2026): "auto refresh not working properly,
 // when I punch anything it's not update until I switch to another
@@ -10,18 +13,24 @@
 // LeadsV2 + WorkV2 had partial coverage (location.key), but
 // LeadDetailV2, FollowUpsV2, QuotesV2, MyPerformanceV2 had none.
 //
-// Three triggers fire the refetch:
+// Triggers fire the refetch:
 //   1. document.visibilitychange — fires when the browser tab moves
 //      from background to foreground (typical Android Chrome flow
 //      after returning from a tel:/wa.me: handoff).
 //   2. window focus — covers desktop / iPad / split-view edge cases
 //      where visibilitychange doesn't fire.
-//   3. Optional polling interval (default 0 = off).
+//   3. Supabase Realtime INSERT/UPDATE on lead_activities or
+//      follow_ups — fires the moment ANY rep punches an activity
+//      or a follow-up flips. Owner wanted 'feely done in
+//      milisecons'. Phase 88.6 SQL adds both tables to the
+//      supabase_realtime publication.
+//   4. Optional polling interval (default 0 = off).
 //
-// Debounce: 800ms so the focus + visibilitychange double-fire only
-// triggers one refetch.
+// Debounce: 800ms so the focus + visibilitychange + realtime push
+// triple-fire only triggers one refetch.
 
 import { useEffect, useRef } from 'react'
+import { supabase } from '../lib/supabase'
 
 export default function useAutoRefresh(loadFn, {
   enabled = true,
@@ -56,10 +65,26 @@ export default function useAutoRefresh(loadFn, {
       pollId = setInterval(fire, pollSeconds * 1000)
     }
 
+    // Phase 88.6 — Realtime channels on lead_activities +
+    // follow_ups. Unique channel name per mount so multiple pages
+    // using the hook get isolated subscriptions (Supabase merges
+    // them server-side on the same connection). Failure modes:
+    // - Table not in publication → silent no-op, fire() still
+    //   covered by visibility/focus listeners.
+    // - WebSocket disconnect → Supabase reconnects automatically.
+    const channel = supabase
+      .channel(`auto-refresh-${Math.random().toString(36).slice(2, 10)}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lead_activities' }, fire)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lead_activities' }, fire)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follow_ups' }, fire)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'follow_ups' }, fire)
+      .subscribe()
+
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('focus', fire)
       if (pollId) clearInterval(pollId)
+      try { supabase.removeChannel(channel) } catch { /* */ }
     }
   }, [enabled, pollSeconds])
 }
