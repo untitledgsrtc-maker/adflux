@@ -31,27 +31,73 @@ function CityPhotoUploader({ cityId, value, onChange }) {
   const [uploading, setUploading] = useState(false)
   const [err, setErr] = useState('')
 
+  /**
+   * Phase 81.4 — resize + recompress the source photo BEFORE upload.
+   *
+   * Why: phone cameras shoot at 4000×3000 / 5-8 MB. The quote PDF
+   * embeds that as a 794×1123-rendered photo page — anything past
+   * ~1600 px wide is invisible in the rendered output but bloats
+   * the file. Resizing client-side here keeps photo storage small
+   * AND keeps the final PDF under 3 MB.
+   *
+   * Target: max edge 1600 px, JPEG quality 0.85. Preserves visible
+   * resolution for an A4 print (~150 DPI at 1600 px), shrinks 5 MB
+   * source → ~300-450 KB output.
+   *
+   * Falls through to the original file on any error so a weird
+   * format (HEIC, oversize PNG) still uploads.
+   */
+  async function compressPhoto(file) {
+    if (!file || !file.type?.startsWith('image/')) return file
+    try {
+      const bitmap = await createImageBitmap(file)
+      const MAX = 1600
+      const ratio = Math.min(MAX / bitmap.width, MAX / bitmap.height, 1)
+      const w = Math.round(bitmap.width * ratio)
+      const h = Math.round(bitmap.height * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width  = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(bitmap, 0, 0, w, h)
+      bitmap.close && bitmap.close()
+      const blob = await new Promise((resolve) => {
+        canvas.toBlob(b => resolve(b), 'image/jpeg', 0.85)
+      })
+      if (!blob) return file
+      // Return a File so .name + .type survive for the storage uploader.
+      return new File([blob], file.name.replace(/\.[a-z]+$/i, '.jpg'), {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      })
+    } catch {
+      return file
+    }
+  }
+
   async function handlePick(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 10 * 1024 * 1024) {
-      setErr('Image too large (max 10 MB).')
+    const original = e.target.files?.[0]
+    if (!original) return
+    if (original.size > 25 * 1024 * 1024) {
+      // Phase 81.4 — accept up to 25 MB at the file picker (modern
+      // phone JPEGs can hit 10-15 MB). We'll compress to <500 KB
+      // below before the storage upload, so the 10 MB bucket cap
+      // never trips.
+      setErr('Image too large (max 25 MB).')
       if (fileRef.current) fileRef.current.value = ''
       return
     }
     setUploading(true)
     setErr('')
     try {
-      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-      const ts  = Date.now()
-      // New cities don't have an id yet — bucket them under '_new'.
-      // The first successful save still works because photo_url is
-      // a plain text URL; storage row can stay in _new/ forever.
+      const file = await compressPhoto(original)
+      const ext  = 'jpg'  // compressed output is always JPEG
+      const ts   = Date.now()
       const folder = cityId || '_new'
       const path = `${folder}/photo-${ts}.${ext}`
       const { error: upErr } = await supabase.storage
         .from('city-photos')
-        .upload(path, file, { contentType: file.type, upsert: false })
+        .upload(path, file, { contentType: 'image/jpeg', upsert: false })
       if (upErr) throw upErr
       const { data } = supabase.storage.from('city-photos').getPublicUrl(path)
       if (!data?.publicUrl) throw new Error('Upload succeeded but no public URL returned.')

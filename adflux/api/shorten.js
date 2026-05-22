@@ -34,6 +34,11 @@
 const ALLOWED_HOST_SUFFIXES = [
   '.supabase.co',   // our PDF storage URLs
   'wa.me',          // WhatsApp click-to-chat links
+  // Phase 81.4 — quote PDFs now served via the app.untitledad.in
+  // domain (Vercel rewrite → Supabase storage). Allowlist the
+  // root so the shortener accepts them too.
+  '.untitledad.in',
+  'untitledad.in',
 ]
 
 export default async function handler(req, res) {

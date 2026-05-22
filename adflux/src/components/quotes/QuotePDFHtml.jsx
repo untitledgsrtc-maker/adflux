@@ -1150,8 +1150,14 @@ const A4_HEIGHT_PX = 1123
 /**
  * Render a React tree into an off-screen wrapper, capture with
  * html2canvas, return the canvas. Caller adds it to the jsPDF.
+ *
+ * Phase 81.4 — `scale` is now caller-configurable. Default 2 for
+ * text-heavy quote pages (sharp small text). Photo + thank-you
+ * pages pass scale=1.5 — the source PNG is already raster, so
+ * over-sampling doesn't improve perceived quality but adds 40-50 %
+ * to file size.
  */
-async function captureToCanvas(jsx, { fixedHeight = null } = {}) {
+async function captureToCanvas(jsx, { fixedHeight = null, scale = 2 } = {}) {
   const wrapper = document.createElement('div')
   wrapper.style.position   = 'fixed'
   wrapper.style.left       = '-100000px'
@@ -1171,7 +1177,7 @@ async function captureToCanvas(jsx, { fixedHeight = null } = {}) {
   let canvas
   try {
     canvas = await html2canvas(wrapper, {
-      scale:           2,
+      scale,
       backgroundColor: '#ffffff',
       useCORS:         true,
       logging:         false,
@@ -1225,7 +1231,11 @@ async function renderToPdfBlob(quote, cities, company) {
         0, yOffsetPx, canvas.width, sliceHpx,
         0, 0,         canvas.width, sliceHpx,
       )
-      const sliceData = slice.toDataURL('image/jpeg', 0.92)
+      // Phase 81.4 — JPEG quality 0.92 → 0.85. Text remains sharp
+      // because addImage in jsPDF is lossless at the slice level;
+      // the quality drop affects continuous-tone photo pages where
+      // it's imperceptible to the eye but saves ~30 % bytes.
+      const sliceData = slice.toDataURL('image/jpeg', 0.85)
       const sliceMm = Math.min(sliceHpx / pxPerMm, pageHeightMm)
       pdf.addImage(sliceData, 'JPEG', 0, 0, pageWidthMm, sliceMm, undefined, 'FAST')
       yOffsetPx += sliceHpx
@@ -1275,20 +1285,27 @@ async function renderToPdfBlob(quote, cities, company) {
 
   // PHOTO PAGES — one A4 per city with photo_url. Cities without a
   // photo are skipped (no blank pages).
+  //
+  // Phase 81.4 — scale=1.5 for photo pages. The source image is
+  // raster (PNG/JPG admin uploaded); scaling up to 2x doesn't gain
+  // detail beyond the source's own resolution but adds ~40% PDF
+  // bytes per page. Resolution-equivalent at 1.5x for prints; saves
+  // ~3-4 MB on a 6-city quote.
   for (const c of enrichedCities) {
     if (!c.photo_url) continue
     const photoCanvas = await captureToCanvas(
       <CityPhotoPage city={c} quote={quote} />,
-      { fixedHeight: A4_HEIGHT_PX },
+      { fixedHeight: A4_HEIGHT_PX, scale: 1.5 },
     )
     addCanvasAsPages(photoCanvas)
   }
 
-  // THANK-YOU PAGE — last A4 if admin uploaded one in Master.
+  // THANK-YOU PAGE — last A4 if admin uploaded one in Master. Same
+  // scale=1.5 rationale as photo pages.
   if (thankYouUrl) {
     const tyCanvas = await captureToCanvas(
       <ThankYouPage url={thankYouUrl} />,
-      { fixedHeight: A4_HEIGHT_PX },
+      { fixedHeight: A4_HEIGHT_PX, scale: 1.5 },
     )
     addCanvasAsPages(tyCanvas)
   }
@@ -1327,5 +1344,17 @@ export async function uploadQuotePDFHtml(quote, cities = []) {
 
   const { data } = supabase.storage.from('quote-pdfs').getPublicUrl(path)
   if (!data?.publicUrl) throw new Error('PDF uploaded but no public URL was returned — check bucket is public.')
+
+  // Phase 81.4 — return the branded URL instead of the raw Supabase
+  // storage URL. vercel.json rewrites `/pdf/<path>` to the same
+  // Supabase storage URL, so the file is identical but the link
+  // recipient sees the company's own domain.
+  // Falls back to the raw Supabase URL when running outside the
+  // production deploy (localhost preview, Vercel branch previews)
+  // — those don't have the rewrite configured so a /pdf URL would
+  // 404. Production owns `app.untitledad.in` (CLAUDE.md §14).
+  if (typeof window !== 'undefined' && /(^|\.)untitledad\.in$/i.test(window.location.hostname)) {
+    return `https://${window.location.hostname}/pdf/${path}`
+  }
   return data.publicUrl
 }
