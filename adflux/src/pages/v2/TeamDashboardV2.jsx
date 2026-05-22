@@ -309,20 +309,25 @@ export default function TeamDashboardV2() {
         // unsettled-quote counts.
         supabase.from('payments')
           .select('quote_id, amount_received, approval_status'),
-        // Phase 89.1 + 89.6 + 89.8 — geo-tagged meeting / site_visit
-        // activities as permanent pins on the live field map.
-        // Owner directive 23 May 2026: meeting pins must "alway
-        // in map" — date filter ONLY affects KPIs, not the map
-        // pins. Capped to last 90 days + 500 rows for query
-        // performance. Phase 89.8 — lead_id may be null for
-        // field-walk-in meetings (LogMeetingModal allows unlinked
-        // captures), so the FK embed is left optional and the
-        // post-fetch filter no longer requires a.lead.id.
+        // Phase 89.1 + 89.6 + 89.8 + 89.9 — geo-tagged meeting /
+        // site_visit activities as permanent pins on the live
+        // field map. Owner directive 23 May 2026.
+        //
+        // Phase 89.9 — removed server-side .not('gps_lat','is',null)
+        // because PostgREST IS-NULL filters were yielding zero
+        // rows in production despite GpsTrackV2 (which doesn't
+        // filter on null) returning matching activities. Cause is
+        // probably a supabase-js serialization quirk on the
+        // (col, 'is', null) negation. Move the null check to the
+        // client-side .filter() instead — same result, no risk
+        // of misencoding.
+        //
+        // FK embed `lead:lead_id(...)` may resolve null on RLS
+        // edge cases — handled client-side via optional chaining
+        // in the row transform.
         supabase.from('lead_activities')
           .select('id, created_at, created_by, activity_type, outcome, gps_lat, gps_lng, lead:lead_id(id, name, company)')
           .in('activity_type', ['meeting', 'site_visit'])
-          .not('gps_lat', 'is', null)
-          .not('gps_lng', 'is', null)
           .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
           .order('created_at', { ascending: false })
           .limit(500),
@@ -728,16 +733,21 @@ export default function TeamDashboardV2() {
         default:         return '#3B82F6'
       }
     }
-    // Phase 89.8 — bumped scale 8 → 13 + thicker stroke so pins
-    // are visible at the Gujarat-wide default zoom (~10). Owner
-    // reported pins invisible at city-wide view.
+    // Phase 89.9 — owner directive 23 May 2026: use the teardrop
+    // PIN_PATH from GpsTrackV2 (Phase 70.10 brand pin shape) so
+    // Team Dashboard meeting pins look the same as the rep-day
+    // map. Small circles were invisible; teardrops are tall enough
+    // to read at Gujarat-wide zoom.
+    const PIN_PATH = 'M 0,0 c -4.5,-7.5 -10.5,-14.25 -10.5,-19.5 a 10.5,10.5 0 1,1 21,0 c 0,5.25 -6,12 -10.5,19.5 z m 0,-26.25 a 3.75,3.75 0 1,0 0,7.5 a 3.75,3.75 0 1,0 0,-7.5 z'
     const iconFor = (o) => ({
-      path:         google.maps.SymbolPath.CIRCLE,
-      scale:        13,
+      path:         PIN_PATH,
       fillColor:    colorForOutcome(o),
-      fillOpacity:  0.95,
-      strokeColor:  '#ffffff',
-      strokeWeight: 3,
+      fillOpacity:  1,
+      strokeColor:  '#0f172a',
+      strokeWeight: 1.5,
+      scale:        1.4,
+      anchor:       new google.maps.Point(0, 0),
+      labelOrigin:  new google.maps.Point(0, -20),
     })
     const esc = (v) => String(v ?? '')
       .replace(/&/g,  '&amp;')
