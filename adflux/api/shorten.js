@@ -41,7 +41,40 @@ const ALLOWED_HOST_SUFFIXES = [
   'untitledad.in',
 ]
 
+// Phase 85.4 — per-IP rate limiter. Audit 24 May 2026 flagged that a
+// bot could burn through is.gd quota by hammering this endpoint.
+// In-memory Map keyed by client IP; entries auto-expire after the
+// window. Vercel cold start (~5 min idle) wipes the bucket — that's
+// fine for this scale (single-tenant ~6 reps).
+const RATE_WINDOW_MS  = 60 * 1000   // 1 minute
+const RATE_MAX        = 60           // 60 calls / IP / minute
+const rateBucket      = new Map()    // ip → { count, resetAt }
+
+function rateLimit(ip) {
+  const now   = Date.now()
+  const entry = rateBucket.get(ip)
+  if (!entry || entry.resetAt < now) {
+    rateBucket.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS })
+    return { ok: true, remaining: RATE_MAX - 1 }
+  }
+  if (entry.count >= RATE_MAX) {
+    return { ok: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
+  }
+  entry.count += 1
+  return { ok: true, remaining: RATE_MAX - entry.count }
+}
+
 export default async function handler(req, res) {
+  // Phase 85.4 — rate limit before any other work.
+  const ip = (req.headers?.['x-forwarded-for'] || '').split(',')[0].trim()
+            || req.socket?.remoteAddress
+            || 'unknown'
+  const rl = rateLimit(ip)
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfter))
+    return res.status(429).json({ error: `Rate limit exceeded. Retry in ${rl.retryAfter}s.` })
+  }
+
   const { url } = req.query || {}
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'Missing url query parameter' })

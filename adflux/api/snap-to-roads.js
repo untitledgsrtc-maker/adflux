@@ -20,11 +20,19 @@
 //     → 400 { error: "..." }                      // missing path / >100 pts
 //     → 502 { error: "..." }                      // Google unreachable
 
+import { requireAuth } from './_auth'
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'POST only' })
     return
   }
+
+  // Phase 85.3 — require Supabase JWT. Audit 24 May 2026 flagged
+  // unauthenticated access as P1; anyone with the URL could drain
+  // your Google Roads API spend.
+  const user = await requireAuth(req, res)
+  if (!user) return
 
   const key = process.env.ROADS_KEY_SERVER
   if (!key) {

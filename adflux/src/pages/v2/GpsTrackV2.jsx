@@ -333,7 +333,15 @@ export default function GpsTrackV2() {
           // (older API: geometry library loaded via `libraries: ['geometry']`
           // in Loader. We add it below if importLibrary not available.)
 
-          fetch(`/api/directions?${qs.toString()}`)
+          // Phase 85.3 — pass Supabase JWT in Authorization header.
+          // /api/directions now rejects unauthenticated callers.
+          ;(async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            const token = session?.access_token
+            if (!token) return  // bail silently — admin must be logged in
+            fetch(`/api/directions?${qs.toString()}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
             .then(r => r.ok ? r.json() : null)
             .then(json => {
               if (!mapRef.current) return
@@ -361,6 +369,7 @@ export default function GpsTrackV2() {
               }
             })
             .catch(() => { /* raw line stays as fallback */ })
+          })()
         }
       } else if (cleaned.length === 1) {
         map.setCenter(center)
@@ -433,23 +442,41 @@ export default function GpsTrackV2() {
           map,
           icon: pinIcon(pinColor),
         })
-        const leadName  = hasLead ? (a.lead.company || a.lead.name || 'Lead') : '(unlinked meeting)'
+        // Phase 85.2 — escape user-supplied fields before HTML
+        // string-concat. Audit caught XSS: lead.company / lead.name
+        // were injected unescaped into the InfoWindow content. A
+        // lead named `<img src=x onerror=alert(1)>` (possible via
+        // CSV import) would execute JS in the admin browser on
+        // pin click. Notes had partial escape; lead name + outcome
+        // chip CSS branches were also unescaped.
+        const esc = (v) => String(v ?? '')
+          .replace(/&/g,  '&amp;')
+          .replace(/</g,  '&lt;')
+          .replace(/>/g,  '&gt;')
+          .replace(/"/g,  '&quot;')
+          .replace(/'/g,  '&#39;')
+        const rawLeadName = hasLead ? (a.lead.company || a.lead.name || 'Lead') : '(unlinked meeting)'
+        const leadName    = esc(rawLeadName)
+        // leadHref built from UUID `a.lead.id` (PG-validated UUID, safe)
         const leadHref  = hasLead ? `/leads/${a.lead.id}` : null
-        const timeLabel = new Date(a.created_at).toLocaleTimeString('en-IN', {
+        const timeLabel = esc(new Date(a.created_at).toLocaleTimeString('en-IN', {
           hour: '2-digit', minute: '2-digit',
           timeZone: 'Asia/Kolkata',
-        })
+        }))
         const typeChip  = a.activity_type === 'site_visit' ? 'Site visit' : 'Meeting'
-        const outcomeChip = a.outcome
-          ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:${a.outcome==='positive'?'#dcfce7':a.outcome==='negative'?'#fee2e2':'#f1f5f9'};color:${a.outcome==='positive'?'#166534':a.outcome==='negative'?'#991b1b':'#475569'};">${a.outcome}</span>`
+        const outcome   = a.outcome === 'positive' || a.outcome === 'negative' || a.outcome === 'neutral'
+          ? a.outcome
+          : null  // whitelist — never inject arbitrary outcome strings
+        const outcomeChip = outcome
+          ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:${outcome==='positive'?'#dcfce7':outcome==='negative'?'#fee2e2':'#f1f5f9'};color:${outcome==='positive'?'#166534':outcome==='negative'?'#991b1b':'#475569'};">${esc(outcome)}</span>`
           : ''
 
         const linkHtml = hasLead
-          ? `<a href="${leadHref}" data-lead-id="${a.lead.id}" style="color:#0f172a;font-weight:700;font-size:14px;text-decoration:none;border-bottom:2px solid #FFE600;padding-bottom:2px;display:inline-block;">${leadName}</a>`
+          ? `<a href="${esc(leadHref)}" data-lead-id="${esc(a.lead.id)}" style="color:#0f172a;font-weight:700;font-size:14px;text-decoration:none;border-bottom:2px solid #FFE600;padding-bottom:2px;display:inline-block;">${leadName}</a>`
           : `<span style="color:#64748b;font-weight:600;font-size:13px;">${leadName}</span>`
 
         const noteHtml = a.notes
-          ? `<div style="margin-top:8px;font-size:11px;color:#475569;line-height:1.4;max-width:240px;">${(a.notes || '').replace(/</g, '&lt;')}</div>`
+          ? `<div style="margin-top:8px;font-size:11px;color:#475569;line-height:1.4;max-width:240px;">${esc(a.notes).slice(0, 600)}</div>`
           : ''
 
         const iw = new google.maps.InfoWindow({

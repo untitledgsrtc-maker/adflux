@@ -47,8 +47,26 @@ function CityPhotoUploader({ cityId, value, onChange }) {
    * Falls through to the original file on any error so a weird
    * format (HEIC, oversize PNG) still uploads.
    */
+  /**
+   * Phase 85.6 — return shape now includes a `compressed` flag so
+   * the caller knows whether the file actually went through the
+   * canvas re-encode (which strips EXIF as a side effect) or fell
+   * through to the original. Original passthrough = compression
+   * failed (HEIC on older Safari, oversized PNG, no
+   * createImageBitmap support).
+   *
+   * EXIF strip note: canvas.toBlob() re-encodes from raw pixel
+   * data; the source EXIF metadata is never carried into the new
+   * blob. Privacy fix (GPS / device / timestamp EXIF leak) is
+   * automatic when this path succeeds. When it fails and we fall
+   * through to the original, EXIF survives — so handlePick now
+   * rejects fallback files above the bucket cap and warns the
+   * admin if a fallback occurred at all.
+   */
   async function compressPhoto(file) {
-    if (!file || !file.type?.startsWith('image/')) return file
+    if (!file || !file.type?.startsWith('image/')) {
+      return { file, compressed: false }
+    }
     try {
       const bitmap = await createImageBitmap(file)
       const MAX = 1600
@@ -64,14 +82,16 @@ function CityPhotoUploader({ cityId, value, onChange }) {
       const blob = await new Promise((resolve) => {
         canvas.toBlob(b => resolve(b), 'image/jpeg', 0.85)
       })
-      if (!blob) return file
-      // Return a File so .name + .type survive for the storage uploader.
-      return new File([blob], file.name.replace(/\.[a-z]+$/i, '.jpg'), {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
-      })
+      if (!blob) return { file, compressed: false }
+      return {
+        file: new File([blob], file.name.replace(/\.[a-z]+$/i, '.jpg'), {
+          type: 'image/jpeg',
+          lastModified: Date.now(),
+        }),
+        compressed: true,
+      }
     } catch {
-      return file
+      return { file, compressed: false }
     }
   }
 
@@ -79,10 +99,6 @@ function CityPhotoUploader({ cityId, value, onChange }) {
     const original = e.target.files?.[0]
     if (!original) return
     if (original.size > 25 * 1024 * 1024) {
-      // Phase 81.4 — accept up to 25 MB at the file picker (modern
-      // phone JPEGs can hit 10-15 MB). We'll compress to <500 KB
-      // below before the storage upload, so the 10 MB bucket cap
-      // never trips.
       setErr('Image too large (max 25 MB).')
       if (fileRef.current) fileRef.current.value = ''
       return
@@ -90,14 +106,32 @@ function CityPhotoUploader({ cityId, value, onChange }) {
     setUploading(true)
     setErr('')
     try {
-      const file = await compressPhoto(original)
-      const ext  = 'jpg'  // compressed output is always JPEG
+      const { file, compressed } = await compressPhoto(original)
+
+      // Phase 85.6 — if compression failed (HEIC / unsupported)
+      // AND the original is too big for the bucket cap (10 MB),
+      // reject up front with a clear message. Also reject the
+      // EXIF-laden fallback when it's a HEIC that couldn't be
+      // re-encoded (privacy risk: original carries phone GPS).
+      if (!compressed) {
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error('Could not compress (HEIC or unsupported). Convert to JPEG and retry.')
+        }
+        // Soft warn: EXIF may have survived. Reps will see this in
+        // the inline status banner.
+        setErr('Heads up: image not re-encoded — EXIF metadata may remain.')
+      }
+
+      const ext  = compressed ? 'jpg' : (file.name.split('.').pop() || 'jpg').toLowerCase()
       const ts   = Date.now()
       const folder = cityId || '_new'
       const path = `${folder}/photo-${ts}.${ext}`
       const { error: upErr } = await supabase.storage
         .from('city-photos')
-        .upload(path, file, { contentType: 'image/jpeg', upsert: false })
+        .upload(path, file, {
+          contentType: file.type || 'image/jpeg',
+          upsert: false,
+        })
       if (upErr) throw upErr
       const { data } = supabase.storage.from('city-photos').getPublicUrl(path)
       if (!data?.publicUrl) throw new Error('Upload succeeded but no public URL returned.')

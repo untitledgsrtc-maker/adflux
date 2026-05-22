@@ -22,11 +22,17 @@
 //   The polyline is Google's encoded format. Frontend decodes via
 //   google.maps.geometry.encoding.decodePath().
 
+import { requireAuth } from './_auth'
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'GET only' })
     return
   }
+
+  // Phase 85.3 — require Supabase JWT.
+  const user = await requireAuth(req, res)
+  if (!user) return
 
   const key = process.env.ROADS_KEY_SERVER
   if (!key) {

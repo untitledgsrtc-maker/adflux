@@ -3292,6 +3292,11 @@ function MaintenanceTab() {
   // Generic "list folders → list each folder → filter files → remove
   // in chunks" helper. Filter takes (folderName, file) and returns
   // true to delete.
+  // Phase 85.5 — safety cap. Audit 24 May 2026: unbounded purge
+  // loops could hang the browser tab on bloated buckets. Cap each
+  // run at MAX_CAP files; admin re-runs to drain the rest.
+  const PURGE_MAX_CAP = 10000
+
   async function purgeBucketFiltered({ bucket, filter }) {
     setProgress({ scanned: 0, deleted: 0, failed: 0 })
     const store = supabase.storage.from(bucket)
@@ -3307,6 +3312,7 @@ function MaintenanceTab() {
     setProgress(p => ({ ...p, scanned: folders.length }))
 
     for (const folder of folders) {
+      if (paths.length >= PURGE_MAX_CAP) break
       const { data: files, error: listErr } = await store.list(folder, { limit: 1000 })
       if (listErr) {
         console.warn('[Maintenance] list failed for', folder, listErr.message)
@@ -3314,9 +3320,14 @@ function MaintenanceTab() {
       }
       for (const f of (files || [])) {
         if (f.id === null) continue
-        if (filter(folder, f)) paths.push(`${folder}/${f.name}`)
+        if (filter(folder, f)) {
+          paths.push(`${folder}/${f.name}`)
+          if (paths.length >= PURGE_MAX_CAP) break
+        }
       }
     }
+
+    const capped = paths.length >= PURGE_MAX_CAP
 
     const CHUNK = 100
     let deleted = 0, failed = 0
@@ -3327,7 +3338,7 @@ function MaintenanceTab() {
       else       { deleted += slice.length }
       setProgress(p => ({ ...p, deleted, failed }))
     }
-    return { folders: folders.length, deleted, failed }
+    return { folders: folders.length, deleted, failed, capped }
   }
 
   // ─ Op 1: legacy quote-pdfs (anything with a slash = old folder layout)
@@ -3574,7 +3585,7 @@ function CleanupCard({ title, body, ctaLabel, onClick, busy, disabled, progress,
           lineHeight:   1.45,
         }}>
           {result.ok
-            ? <>Removed <b>{result.deleted}</b> {resultNoun}{result.deleted === 1 ? '' : 's'}{typeof result.folders === 'number' ? <> across <b>{result.folders}</b> folder{result.folders === 1 ? '' : 's'}</> : null} at {result.ts}.{result.failed > 0 && <> {result.failed} failed.</>}</>
+            ? <>Removed <b>{result.deleted}</b> {resultNoun}{result.deleted === 1 ? '' : 's'}{typeof result.folders === 'number' ? <> across <b>{result.folders}</b> folder{result.folders === 1 ? '' : 's'}</> : null} at {result.ts}.{result.failed > 0 && <> {result.failed} failed.</>}{result.capped && <> <b>Cap hit (10K)</b> — re-run to drain the remainder.</>}</>
             : <>Cleanup failed: {result.message}</>
           }
         </div>
