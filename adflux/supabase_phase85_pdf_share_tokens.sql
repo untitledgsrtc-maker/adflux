@@ -39,10 +39,12 @@ CREATE TABLE IF NOT EXISTS public.pdf_share_tokens (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- Hot path lookups: by token, filtered to non-expired.
-CREATE INDEX IF NOT EXISTS pdf_share_tokens_token_idx
-  ON public.pdf_share_tokens (token)
-  WHERE expires_at > now();
+-- Hot-path lookups: by token. The UNIQUE constraint on `token`
+-- already creates a btree index; no extra partial index needed.
+-- (Original attempt used `WHERE expires_at > now()` but PG rejects
+-- non-IMMUTABLE functions in index predicates with
+-- ERROR 42P17 — same class as the timestamptz date_trunc issue we
+-- hit on Phase 76.1.)
 
 -- Quote-side lookups (e.g. "regenerate all tokens for this quote").
 CREATE INDEX IF NOT EXISTS pdf_share_tokens_quote_idx
@@ -95,4 +97,7 @@ NOTIFY pgrst, 'reload schema';
 --
 -- SELECT indexname FROM pg_indexes
 --   WHERE schemaname='public' AND tablename='pdf_share_tokens';
---     → 3 (PK + 2 secondary).
+--     → 3 rows:
+--         pdf_share_tokens_pkey       (id PK)
+--         pdf_share_tokens_token_key  (UNIQUE on token, auto)
+--         pdf_share_tokens_quote_idx  (quote_id, created_at DESC)
