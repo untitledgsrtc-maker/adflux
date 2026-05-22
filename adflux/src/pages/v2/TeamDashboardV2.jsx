@@ -309,13 +309,15 @@ export default function TeamDashboardV2() {
         // unsettled-quote counts.
         supabase.from('payments')
           .select('quote_id, amount_received, approval_status'),
-        // Phase 89.1 + 89.6 — geo-tagged meeting / site_visit
+        // Phase 89.1 + 89.6 + 89.8 — geo-tagged meeting / site_visit
         // activities as permanent pins on the live field map.
         // Owner directive 23 May 2026: meeting pins must "alway
         // in map" — date filter ONLY affects KPIs, not the map
         // pins. Capped to last 90 days + 500 rows for query
-        // performance; older meetings won't display but the
-        // current month is fully covered.
+        // performance. Phase 89.8 — lead_id may be null for
+        // field-walk-in meetings (LogMeetingModal allows unlinked
+        // captures), so the FK embed is left optional and the
+        // post-fetch filter no longer requires a.lead.id.
         supabase.from('lead_activities')
           .select('id, created_at, created_by, activity_type, outcome, gps_lat, gps_lng, lead:lead_id(id, name, company)')
           .in('activity_type', ['meeting', 'site_visit'])
@@ -441,14 +443,15 @@ export default function TeamDashboardV2() {
         console.warn('[team-dashboard] push load failed:', e?.message || e)
       }
 
-      // Phase 89.1 — geo-tagged lead activities populate blue
-      // lead pins on the field map. Coerced to numbers + filtered
-      // to drop malformed rows (defensive: PostgREST nests join
-      // result as `lead`, may be null if FK orphaned).
+      // Phase 89.1 + 89.8 — geo-tagged lead activities populate
+      // pins on the field map. Coerced to numbers + filtered to
+      // drop malformed rows. Phase 89.8 — `lead` embed may be
+      // null on unlinked field-walk-in meetings AND on rare RLS
+      // race conditions. Don't reject those — show them as
+      // generic "Field visit" pins without the Open lead link.
       const geoRows = (actGeoRes?.data || [])
         .filter(a => Number.isFinite(Number(a.gps_lat))
-                  && Number.isFinite(Number(a.gps_lng))
-                  && a.lead?.id)
+                  && Number.isFinite(Number(a.gps_lng)))
         .map(a => ({
           id:        a.id,
           lat:       Number(a.gps_lat),
@@ -457,9 +460,9 @@ export default function TeamDashboardV2() {
           created_by: a.created_by,
           activity_type: a.activity_type,
           outcome:   a.outcome,
-          lead_id:   a.lead.id,
-          lead_name: a.lead.name || '',
-          lead_company: a.lead.company || '',
+          lead_id:   a.lead?.id || null,
+          lead_name: a.lead?.name || '',
+          lead_company: a.lead?.company || '',
         }))
       setLeadActivitiesGeo(geoRows)
 
@@ -725,13 +728,16 @@ export default function TeamDashboardV2() {
         default:         return '#3B82F6'
       }
     }
+    // Phase 89.8 — bumped scale 8 → 13 + thicker stroke so pins
+    // are visible at the Gujarat-wide default zoom (~10). Owner
+    // reported pins invisible at city-wide view.
     const iconFor = (o) => ({
       path:         google.maps.SymbolPath.CIRCLE,
-      scale:        8,
+      scale:        13,
       fillColor:    colorForOutcome(o),
-      fillOpacity:  0.9,
-      strokeColor:  '#0f172a',
-      strokeWeight: 2,
+      fillOpacity:  0.95,
+      strokeColor:  '#ffffff',
+      strokeWeight: 3,
     })
     const esc = (v) => String(v ?? '')
       .replace(/&/g,  '&amp;')
@@ -746,7 +752,9 @@ export default function TeamDashboardV2() {
       const timeStr = new Date(a.created_at).toLocaleTimeString('en-IN', {
         hour: '2-digit', minute: '2-digit', hour12: true,
       })
-      const heading = a.lead_company || a.lead_name || 'Lead'
+      // Phase 89.8 — unlinked field meetings (no lead_id) show
+      // as "Field visit" with no deep link.
+      const heading = a.lead_company || a.lead_name || (a.lead_id ? 'Lead' : 'Field visit')
       const sub = a.lead_company && a.lead_name ? esc(a.lead_name) : ''
       const kind = a.activity_type === 'site_visit' ? 'Site visit' : 'Meeting'
       // Phase 89.5 — colour outcome pill to match pin colour band.
@@ -758,13 +766,15 @@ export default function TeamDashboardV2() {
         ? ` · <span style="text-transform:capitalize;color:${outcomeColor};font-weight:700">${esc(a.outcome)}</span>`
         : ''
       // Phase 89.5 — brand palette on dark InfoWindow chrome.
+      // Phase 89.8 — hide "Open lead →" link when activity is
+      // unlinked (lead_id null), avoids broken /leads/ navigation.
       const html = `
         <div style="font-family:'DM Sans','Inter',sans-serif;min-width:180px;">
           <div style="font-size:9.5px;color:#98a4bf;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:6px;">${kind} · ${timeStr}${outcomeBit}</div>
           <div style="font-weight:700;font-size:14px;color:#f5f7fb;border-bottom:2px solid #FFE600;padding-bottom:3px;display:inline-block;">${esc(heading)}</div>
           ${sub ? `<div style="font-size:11px;color:#98a4bf;margin-top:6px;">${sub}</div>` : ''}
           <div style="font-size:11px;color:#cbd5e1;margin-top:6px;">${esc(repName)}</div>
-          <a href="/leads/${esc(a.lead_id)}" style="display:inline-block;margin-top:10px;font-size:11px;color:#FFE600;text-decoration:none;font-weight:700;letter-spacing:.04em;">Open lead →</a>
+          ${a.lead_id ? `<a href="/leads/${esc(a.lead_id)}" style="display:inline-block;margin-top:10px;font-size:11px;color:#FFE600;text-decoration:none;font-weight:700;letter-spacing:.04em;">Open lead →</a>` : ''}
         </div>
       `
       const existing = leadMarkersRef.current[a.id]
