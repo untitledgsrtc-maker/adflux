@@ -696,7 +696,14 @@ function RepDaySections({ session, activities, voiceLogs, navigate }) {
         }}>
           <RepDayStat label="Check-in"  value={checkIn  ? new Date(checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'} />
           <RepDayStat label="Check-out" value={checkOut ? new Date(checkOut).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Open'} tone={checkOut ? '' : 'warn'} />
-          <RepDayStat label="Meetings"  value={counters.meetings || 0} />
+          {/* Phase 84.3 — Meetings KPI now derived from the SAME
+              filter that drives the blue map pins (activity_type
+              meeting/site_visit + GPS coords). counters.meetings
+              was reading from work_sessions.daily_counters which
+              also bumped on check-in / interval pings / other
+              non-meeting taps — owner reported KPI=3 with only 1
+              location pin. The blue-pin count is the truth. */}
+          <RepDayStat label="Meetings" value={activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng).length} />
           <RepDayStat label="Calls"     value={counters.calls || 0} />
           <RepDayStat label="New leads" value={counters.new_leads || 0} />
           <RepDayStat label="Voice notes" value={voiceLogs.length} />
