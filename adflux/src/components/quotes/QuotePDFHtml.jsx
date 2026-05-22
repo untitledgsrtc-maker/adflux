@@ -464,15 +464,15 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
           <thead>
             <tr>
               <th style={styles.th}>SR</th>
-              <th style={styles.th}>City</th>
-              <th style={{ ...styles.th, textAlign: 'center' }}>Grade</th>
-              <th style={{ ...styles.th, ...styles.tdNum }}>Screens</th>
-              <th style={{ ...styles.th, ...styles.tdNum }}>Duration</th>
-              <th style={{ ...styles.th, ...styles.tdNum }}>Slot</th>
-              <th style={{ ...styles.th, ...styles.tdNum }}>Slots/Day</th>
-              <th style={{ ...styles.th, ...styles.tdNum }}>Listed</th>
-              <th style={{ ...styles.th, ...styles.tdNum }}>Offered/Screen</th>
-              <th style={{ ...styles.th, ...styles.tdNum }}>Total</th>
+              <th style={styles.th}>CITY</th>
+              <th style={{ ...styles.th, textAlign: 'center' }}>GRADE</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>SCRNS</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>MONTHS</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>SLOT</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>SLOTS<br/>/DAY</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>LISTED</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>OFFER<br/>/SCRN</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>TOTAL</th>
             </tr>
           </thead>
           <tbody>
@@ -719,20 +719,20 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
     }
   })
 
-  // Phase 81.3.2: allow th text to wrap. table-layout:fixed truncates
-  // any cell content that overflows; "OFFERED/SCREEN" + "SLOTS/DAY"
-  // need two lines in the narrow numeric cols.
+  // Phase 81.3.3: only break headers at explicit <br/> points.
+  // wordBreak break-word was chopping "GRADE" → "GRAD E", "SCREENS"
+  // → "SCREEN S" etc. on owner's UA-2026-0055.
   const tableTh = {
     background:    INK,
     color:         '#fff',
-    padding:       '6px 8px',
+    padding:       '6px 6px',
     textAlign:     'left',
     fontWeight:    600,
-    fontSize:      9.5,
-    letterSpacing: '0.04em',
-    lineHeight:    1.15,
+    fontSize:      9,
+    letterSpacing: '0.02em',
+    lineHeight:    1.2,
     whiteSpace:    'normal',
-    wordBreak:     'break-word',
+    wordBreak:     'normal',
     verticalAlign: 'middle',
   }
   const tableTd  = { padding: '8px 10px', borderBottom: `1px solid ${BORDER}`, fontSize: 10.5, color: INK, verticalAlign: 'top' }
@@ -853,28 +853,28 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10.5, tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: 22 }} />
-          <col style={{ width: 130 }} />
-          <col style={{ width: 44 }} />
+          <col style={{ width: 116 }} />
+          <col style={{ width: 42 }} />
           <col style={{ width: 56 }} />
-          <col style={{ width: 58 }} />
-          <col style={{ width: 38 }} />
           <col style={{ width: 56 }} />
+          <col style={{ width: 36 }} />
+          <col style={{ width: 50 }} />
           <col style={{ width: 64 }} />
-          <col style={{ width: 78 }} />
-          <col style={{ width: 80 }} />
+          <col style={{ width: 76 }} />
+          <col style={{ width: 76 }} />
         </colgroup>
         <thead>
           <tr>
             <th style={tableTh}>SR</th>
-            <th style={tableTh}>City</th>
-            <th style={{ ...tableTh, textAlign: 'center' }}>Grade</th>
-            <th style={{ ...tableTh, ...tdNum }}>Screens</th>
-            <th style={{ ...tableTh, ...tdNum }}>Duration</th>
-            <th style={{ ...tableTh, ...tdNum }}>Slot</th>
-            <th style={{ ...tableTh, ...tdNum }}>Slots/Day</th>
-            <th style={{ ...tableTh, ...tdNum }}>Listed</th>
-            <th style={{ ...tableTh, ...tdNum }}>Offered/Screen</th>
-            <th style={{ ...tableTh, ...tdNum }}>Total</th>
+            <th style={tableTh}>CITY</th>
+            <th style={{ ...tableTh, textAlign: 'center' }}>GRADE</th>
+            <th style={{ ...tableTh, ...tdNum }}>SCRNS</th>
+            <th style={{ ...tableTh, ...tdNum }}>MONTHS</th>
+            <th style={{ ...tableTh, ...tdNum }}>SLOT</th>
+            <th style={{ ...tableTh, ...tdNum }}>SLOTS<br/>/DAY</th>
+            <th style={{ ...tableTh, ...tdNum }}>LISTED</th>
+            <th style={{ ...tableTh, ...tdNum }}>OFFER<br/>/SCRN</th>
+            <th style={{ ...tableTh, ...tdNum }}>TOTAL</th>
           </tr>
         </thead>
         <tbody>
