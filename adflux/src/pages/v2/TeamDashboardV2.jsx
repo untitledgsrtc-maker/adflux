@@ -527,9 +527,21 @@ export default function TeamDashboardV2() {
     return m
   }, [sessions])
 
+  // Phase 84 — "live" matches the new 4-state badge:
+  //   checked-in + GPS ping within 30 min + not checked-out.
+  // Old version counted every check_in_at, including reps who went
+  // dark hours ago — inflated the hero number.
   const live = useMemo(() => {
-    return reps.filter(r => sessionByUser.get(r.id)?.check_in_at).length
-  }, [reps, sessionByUser])
+    const now = Date.now()
+    return reps.filter(r => {
+      const s = sessionByUser.get(r.id)
+      if (!s?.check_in_at) return false
+      if (s.check_out_at || s.auto_checked_out) return false
+      const p = latestPingByUser[r.id]
+      if (!p?.captured_at) return false
+      return (now - new Date(p.captured_at).getTime()) / 60000 <= 30
+    }).length
+  }, [reps, sessionByUser, latestPingByUser])
 
   const totalCallsToday = useMemo(() => {
     return Object.values(callsByUser).reduce((s, n) => s + n, 0)
@@ -649,7 +661,35 @@ export default function TeamDashboardV2() {
       <div className="lead-team-grid">
         {reps.map(r => {
           const sess = sessionByUser.get(r.id)
-          const isLive = !!sess?.check_in_at
+          // Phase 84 — 4-state status badge.
+          // Was: isLive = !!check_in_at (anyone who tapped check-in
+          // today, regardless of subsequent activity → misleading
+          // green "in field" pill on reps who went dark 10 h ago).
+          // New rule:
+          //   • DONE       check_out_at set OR auto_checked_out
+          //   • OFF        no check_in_at today
+          //   • IN FIELD   check_in_at set AND GPS ping ≤ 30 min
+          //   • IDLE       check_in_at set AND GPS ping > 30 min OR
+          //                no ping today
+          const _ping     = latestPingByUser[r.id]
+          const _pingMins = _ping
+            ? Math.floor((Date.now() - new Date(_ping.captured_at).getTime()) / 60000)
+            : Infinity
+          let statusKind, statusLabel
+          if (sess?.check_out_at || sess?.auto_checked_out) {
+            statusKind  = 'done'
+            statusLabel = 'done'
+          } else if (!sess?.check_in_at) {
+            statusKind  = 'off'
+            statusLabel = 'off'
+          } else if (_pingMins <= 30) {
+            statusKind  = 'in_field'
+            statusLabel = 'in field'
+          } else {
+            statusKind  = 'idle'
+            statusLabel = 'idle'
+          }
+          const isLive = statusKind === 'in_field'
           const counters = sess?.daily_counters || {}
           // Phase 73 — role-aware target. TC reads min_calls from
           // daily_targets table (default 50). Sales falls back to
@@ -688,13 +728,22 @@ export default function TeamDashboardV2() {
                   </div>
                 </div>
                 <div className="lead-rep-status">
-                  {isLive ? (
-                    <Pill tone="success">
+                  {statusKind === 'in_field' && (
+                    <Pill tone="success" title="Checked in + GPS ping within last 30 min">
                       <span className="lead-live-dot" style={{ marginRight: 5, width: 6, height: 6 }} />
                       in field
                     </Pill>
-                  ) : (
-                    <Pill>off</Pill>
+                  )}
+                  {statusKind === 'idle' && (
+                    <Pill tone="warning" title="Checked in but no GPS ping in last 30 min">
+                      idle
+                    </Pill>
+                  )}
+                  {statusKind === 'done' && (
+                    <Pill title="Checked out for the day">done</Pill>
+                  )}
+                  {statusKind === 'off' && (
+                    <Pill title="Not checked in today">off</Pill>
                   )}
                 </div>
               </div>
