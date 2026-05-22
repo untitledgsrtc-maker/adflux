@@ -208,6 +208,15 @@ export default function TeamDashboardV2() {
   const [followUpsByUser,    setFollowUpsByUser]    = useState({})
   const [quoteChaseByUser,   setQuoteChaseByUser]   = useState({})
   const [paymentChaseByUser, setPaymentChaseByUser] = useState({})
+  // Phase 89.10 — flag that flips true once the Google Map mounts.
+  // Marker render effects depend on mapRef.current + map.__google
+  // both being non-null; refs don't trigger React re-runs, so
+  // without this flag the marker effect can fire BEFORE map is
+  // ready, return early, and then never re-run because
+  // leadActivitiesGeo + reps already settled. Owner reported pins
+  // never appearing on /team-dashboard despite live data showing
+  // 7 GPS-tagged meetings in the query response.
+  const [mapReady, setMapReady] = useState(false)
 
   useEffect(() => {
     if (!isPrivileged) return
@@ -454,8 +463,14 @@ export default function TeamDashboardV2() {
       // null on unlinked field-walk-in meetings AND on rare RLS
       // race conditions. Don't reject those — show them as
       // generic "Field visit" pins without the Open lead link.
+      // Phase 89.10 — explicit null check BEFORE Number()
+      // because Number(null)===0 (not NaN), so the old isFinite
+      // filter let null-GPS rows through and plotted pins at
+      // (0,0). Live audit confirmed 2 of 9 returned rows had
+      // null lat/lng.
       const geoRows = (actGeoRes?.data || [])
-        .filter(a => Number.isFinite(Number(a.gps_lat))
+        .filter(a => a.gps_lat != null && a.gps_lng != null
+                  && Number.isFinite(Number(a.gps_lat))
                   && Number.isFinite(Number(a.gps_lng)))
         .map(a => ({
           id:        a.id,
@@ -554,12 +569,16 @@ export default function TeamDashboardV2() {
       mapRef.current = map
       // Stash google reference on map so the markers effect can use it.
       map.__google = google
+      // Phase 89.10 — flip ready flag so marker effects re-run
+      // now that map is mountable.
+      setMapReady(true)
     })()
 
     return () => {
       cancelled = true
       mapRef.current = null
       markersRef.current = {}
+      setMapReady(false)
     }
   }, [isPrivileged, loading])
 
@@ -707,7 +726,7 @@ export default function TeamDashboardV2() {
         map.__teamDashboardFitDone = true
       } catch { /* swallow */ }
     }
-  }, [latestPingByUser, reps, iconBump])
+  }, [latestPingByUser, reps, iconBump, mapReady])
 
   // Phase 89.1 — Lead pins from geo-tagged activities. Blue
   // map pins where the team met clients in the selected period.
@@ -816,7 +835,7 @@ export default function TeamDashboardV2() {
         delete leadMarkersRef.current[id]
       }
     }
-  }, [leadActivitiesGeo, reps])
+  }, [leadActivitiesGeo, reps, mapReady])
 
   // Phase 70.2 — Supabase Realtime subscription on gps_pings INSERT.
   // Updates latestPingByUser in-place so the marker effect re-runs.
