@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { X, Upload, Trash2 } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 
 const GRADES = ['A', 'B', 'C']
 
@@ -16,6 +17,157 @@ const EMPTY = {
   unique_viewers: '',
   photo_url: '',
   is_active: true,
+}
+
+/**
+ * Phase 80 — city photo uploader. Drops the bare URL text input.
+ * Uploads to the `city-photos` Supabase storage bucket under
+ *   city-photos/<city_id_or_new>/photo-<timestamp>.<ext>
+ * On success the returned public URL is set on form.photo_url.
+ * Cap: 10 MB (matches bucket file_size_limit). Accepts PNG / JPEG.
+ */
+function CityPhotoUploader({ cityId, value, onChange }) {
+  const fileRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function handlePick(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      setErr('Image too large (max 10 MB).')
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+    setUploading(true)
+    setErr('')
+    try {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+      const ts  = Date.now()
+      // New cities don't have an id yet — bucket them under '_new'.
+      // The first successful save still works because photo_url is
+      // a plain text URL; storage row can stay in _new/ forever.
+      const folder = cityId || '_new'
+      const path = `${folder}/photo-${ts}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('city-photos')
+        .upload(path, file, { contentType: file.type, upsert: false })
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from('city-photos').getPublicUrl(path)
+      if (!data?.publicUrl) throw new Error('Upload succeeded but no public URL returned.')
+      onChange(data.publicUrl)
+    } catch (e2) {
+      setErr(e2?.message || String(e2))
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  return (
+    <div>
+      <label className="form-label">City Photo</label>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        onChange={handlePick}
+        style={{ display: 'none' }}
+      />
+      {value ? (
+        <div style={{
+          display:      'flex',
+          alignItems:   'center',
+          gap:          12,
+          padding:      10,
+          borderRadius: 8,
+          background:   'var(--surface-2)',
+          border:       '1px solid var(--surface-3)',
+        }}>
+          <img
+            src={value}
+            alt="city preview"
+            style={{
+              width:        96,
+              height:       72,
+              flexShrink:   0,
+              objectFit:    'cover',
+              borderRadius: 6,
+              background:   'var(--surface-3)',
+              border:       '1px solid var(--surface-3)',
+            }}
+            onError={e => {
+              e.currentTarget.style.background = 'var(--surface-3)'
+              e.currentTarget.removeAttribute('src')
+            }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize:   11.5,
+              color:      'var(--text-muted)',
+              wordBreak:  'break-all',
+              lineHeight: 1.4,
+            }}>
+              {value.length > 60 ? value.slice(0, 30) + '…' + value.slice(-25) : value}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-mini"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+              >
+                <Upload size={12} strokeWidth={1.8} />
+                {uploading ? 'Uploading…' : 'Replace'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-mini"
+                onClick={() => onChange('')}
+                disabled={uploading}
+              >
+                <Trash2 size={12} strokeWidth={1.8} />
+                Remove
+              </button>
+            </div>
+            {err && (
+              <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 6 }}>
+                {err}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          style={{
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'center',
+            gap:            8,
+            width:          '100%',
+            padding:        '14px 12px',
+            background:     'var(--surface-2)',
+            border:         '1px dashed var(--surface-3)',
+            borderRadius:   8,
+            color:          'var(--text-muted)',
+            fontSize:       12.5,
+            cursor:         uploading ? 'wait' : 'pointer',
+          }}
+        >
+          <Upload size={14} strokeWidth={1.6} />
+          {uploading ? 'Uploading…' : 'Click to upload city photo (PNG / JPG, max 10 MB)'}
+        </button>
+      )}
+      {!value && err && (
+        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 6 }}>
+          {err}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function CityModal({ city, onClose, onSave, loading }) {
@@ -137,13 +289,11 @@ export function CityModal({ city, onClose, onSave, loading }) {
                   placeholder="e.g. 55"
                 />
               </div>
-              <div className="form-group">
-                <label className="form-label">Photo URL</label>
-                <input
-                  className="form-input"
+              <div className="form-group" style={{ gridColumn: '1 / span 2' }}>
+                <CityPhotoUploader
+                  cityId={city?.id}
                   value={form.photo_url}
-                  onChange={e => set('photo_url', e.target.value)}
-                  placeholder="https://..."
+                  onChange={url => set('photo_url', url)}
                 />
               </div>
             </div>

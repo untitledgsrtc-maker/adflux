@@ -799,6 +799,9 @@ function CompaniesTab() {
       // Empty value → NULL → renderer falls back to plain white page.
       letterhead_url:  (r.letterhead_url || '').trim() || null,
       logo_url:        (r.logo_url || '').trim() || null,
+      // Phase 80 — admin-uploaded thank-you page for the Private LED
+      // quotation PDF. Null = renderer skips the final page.
+      thank_you_url:   (r.thank_you_url || '').trim() || null,
     }
     const { error } = await supabase
       .from('companies')
@@ -1001,6 +1004,20 @@ function CompaniesTab() {
                     accept="image/png,image/jpeg,image/svg+xml"
                     onUpload={url => handleAssetUploaded(r.id, 'logo_url', url)}
                     onClear={()  => handleAssetCleared(r.id, 'logo_url')}
+                  />
+                  {/* Phase 80 — Thank-you page asset. Rendered as the
+                      final page of the Private LED quotation PDF
+                      (Phase 81). Govt segment can leave this null;
+                      its renderer is untouched per owner directive
+                      22 May 2026. */}
+                  <AssetUploader
+                    row={r}
+                    field="thank_you_url"
+                    label="Thank-you page (private quote PDF)"
+                    kind="thankyou"
+                    accept="image/png,image/jpeg"
+                    onUpload={url => handleAssetUploaded(r.id, 'thank_you_url', url)}
+                    onClear={()  => handleAssetCleared(r.id, 'thank_you_url')}
                   />
                 </div>
               </div>
