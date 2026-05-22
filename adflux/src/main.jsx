@@ -26,6 +26,48 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 // Bootstrap auth listener a single time, before render.
 initAuth()
 
+// Phase 87.7 — native dialer auto-launch on Capacitor APK.
+// Owner directive 22 May 2026: tap any tel:<number> link inside the
+// installed app should open the OS dialer directly, no "Open with..."
+// picker, no in-WebView intercept.
+//
+// Default Android WebView already routes tel: via Intent.ACTION_DIAL,
+// but a small minority of devices show a chooser. Forcing the call
+// through Capacitor App.openUrl guarantees the OS handles it.
+//
+// Web path is untouched — Capacitor.isNativePlatform() returns false
+// in a browser, so this listener no-ops there. Programmatic
+// `window.location.href = 'tel:...'` is NOT intercepted (those live in
+// §28 frozen files; default WebView covers them). Only the rendered
+// <a href="tel:..."> click path needs explicit handling so the
+// in-page navigation doesn't take precedence over the OS intent.
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  document.addEventListener('click', (event) => {
+    try {
+      // Quick exit if we're not on a Capacitor-wrapped build. Avoid
+      // importing @capacitor/core at the top level so the web bundle
+      // doesn't pay the cost.
+      const cap = window.Capacitor
+      if (!cap?.isNativePlatform?.()) return
+      const target = event.target
+      const link = target?.closest?.('a[href^="tel:"]')
+      if (!link) return
+      const href = link.getAttribute('href')
+      if (!href) return
+      event.preventDefault()
+      event.stopPropagation()
+      // Lazy-load @capacitor/app only on native. Falls back to a plain
+      // navigation if the plugin isn't available so worst-case the
+      // user still gets the browser-default behaviour.
+      import('@capacitor/app')
+        .then(({ App }) => App.openUrl({ url: href }))
+        .catch(() => { window.location.href = href })
+    } catch {
+      /* swallow — never break a click event */
+    }
+  }, true)
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
