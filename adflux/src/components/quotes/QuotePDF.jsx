@@ -351,13 +351,86 @@ const S = StyleSheet.create({
   footerBottomText: { fontSize: 7, color: LGRAY },
   footerBottomHighlight: { fontSize: 7, color: YELLOW },
 
-  // ── Phase 81 — letterhead band (top of page 1) ─────────────────
-  // Renders companies.letterhead_url full-width when present.
-  // Replaces the hand-built UA badge headerBand for Private LED PDFs.
-  letterheadBand: {
+  // ── Phase 81.1 — letterhead FULL-PAGE background ───────────────
+  // Owner sample PDF (UA-2026-0057) revealed the letterhead PNG is a
+  // full-page design (top logo + bottom address strip + blank middle).
+  // The earlier 110pt header-band crop only showed the logo and broke
+  // the brand. New approach mirrors GovtProposalRenderer (Phase 10b /
+  // 28b): letterhead becomes the page background, content draws in the
+  // safe middle zone.
+  //
+  // Safe-zone padding derived from govt renderer:
+  //   govt: paddingTop 110px / paddingBottom 105px @ 96dpi A4 (794×1123)
+  //   pdf:  ×72/96 → ~85pt top, ~80pt bottom, 50pt sides
+  letterheadBg: {
+    position: 'absolute',
+    top:    0,
+    left:   0,
+    right:  0,
+    bottom: 0,
     width:  '100%',
-    height: 110,           // ~14% of A4 height — enough for letterhead
-    objectFit: 'cover',
+    height: '100%',
+  },
+  pageContent: {
+    paddingTop:        85,
+    paddingBottom:     80,
+    paddingHorizontal: 50,
+  },
+  // Clean-text title (replaces the dark titleBlock bar which clashed
+  // with the letterhead's own brand chrome).
+  quoteTitleRow: {
+    flexDirection:  'row',
+    justifyContent: 'space-between',
+    alignItems:     'flex-end',
+    marginBottom:   18,
+    paddingBottom:  10,
+    borderBottom:   '1pt solid ' + DARK,
+  },
+  quoteTitleText: {
+    fontSize:      20,
+    fontFamily:    'Roboto',
+    fontWeight:    'bold',
+    color:         DARK,
+    letterSpacing: 1.5,
+  },
+  quoteTitleMeta: { alignItems: 'flex-end', gap: 2 },
+  quoteTitleRef: {
+    fontSize:   11,
+    fontFamily: 'Roboto',
+    fontWeight: 'bold',
+    color:      DARK,
+  },
+  quoteTitleDate: { fontSize: 9, color: GRAY },
+  // Network stats inside content area — light card, not full-bleed
+  // yellow strip (yellow band conflicts with letterhead bottom).
+  statsCard: {
+    flexDirection: 'row',
+    border:        '0.5pt solid ' + BORDER,
+    borderRadius:  4,
+    marginBottom:  18,
+    overflow:      'hidden',
+  },
+  statsCardItem: {
+    flex:         1,
+    paddingVertical:   10,
+    paddingHorizontal: 8,
+    alignItems:   'center',
+    borderRight:  '0.5pt solid ' + BORDER,
+  },
+  statsCardItemLast: {
+    borderRight: 'none',
+  },
+  statsCardNum: {
+    fontSize:   13,
+    fontFamily: 'Roboto', fontWeight: 'bold',
+    color:      DARK,
+  },
+  statsCardLabel: {
+    fontSize:        7,
+    color:           GRAY,
+    marginTop:       2,
+    textTransform:   'uppercase',
+    letterSpacing:   0.5,
   },
 
   // ── Phase 81 — per-city photo page ─────────────────────────────
@@ -567,66 +640,113 @@ function QuoteDocument({ quote, cities, company, letterheadDataUrl, thankYouData
     <Document>
       <Page size="A4" style={S.page}>
 
-        {/* ── TOP HEADER ──
-            Phase 81 — render the admin-uploaded letterhead band when
-            present. Falls back to the hand-built UA badge layout if
-            no letterhead has been uploaded yet so old setups keep
-            working. */}
-        {letterheadDataUrl ? (
-          <Image src={letterheadDataUrl} style={S.letterheadBand} />
-        ) : (
-          <View style={S.headerBand}>
-            <View style={S.headerLeft}>
-              <View style={S.uaBadge}>
-                <Text style={S.uaBadgeText}>UA</Text>
-              </View>
-              <View style={S.brandBlock}>
-                <Text style={S.brandName}>UNTITLED ADVERTISING</Text>
-                <Text style={S.brandSub}>UNTITLED ADFLUX PRIVATE LIMITED</Text>
-                <Text style={S.brandNetwork}>GSRTC LED Screen Network — Gujarat</Text>
-              </View>
-            </View>
-            <View style={S.headerRight}>
-              <Text style={S.headerWebsite}>{co.website || 'untitledad.in'}</Text>
-              <Text style={S.headerEmail}>{co.email || 'hello@untitledad.in'}</Text>
-            </View>
-          </View>
+        {/* Phase 81.1 — letterhead as FULL-PAGE background.
+            Mirrors the govt renderer pattern (Phase 10b / 28b): the
+            admin-uploaded letterhead PNG covers the full A4 page,
+            content draws inside the empty middle zone via
+            S.pageContent padding. `fixed` would repeat on every page;
+            we want letterhead on page 1 only so it's not fixed. */}
+        {letterheadDataUrl && (
+          <Image src={letterheadDataUrl} style={S.letterheadBg} />
         )}
 
-        {/* ── STATS BAR ── Network-wide marketing stats, not quote-specific.
-            These are the pitch for the whole GSRTC fleet; the quote's own
-            totals live in the "At a Glance" block further down. */}
-        <View style={S.statsBar}>
-          <View style={S.statItem}>
-            <Text style={S.statNum}>{NETWORK.totalScreens}</Text>
-            <Text style={S.statLabel}>Total Screens</Text>
-          </View>
-          <View style={S.statItem}>
-            <Text style={S.statNum}>{NETWORK.cities}</Text>
-            <Text style={S.statLabel}>Cities</Text>
-          </View>
-          <View style={S.statItem}>
-            <Text style={S.statNum}>{NETWORK.monthlyImpressions}</Text>
-            <Text style={S.statLabel}>Monthly Impressions</Text>
-          </View>
-          <View style={S.statItem}>
-            <Text style={S.statNum}>{NETWORK.uniquePerDay}</Text>
-            <Text style={S.statLabel}>Unique/Day</Text>
-          </View>
-        </View>
+        {/* Fallback header for setups with no letterhead uploaded yet.
+            Keeps legacy chrome (UA badge + yellow stats + dark title +
+            yellow/dark footer bands at the bottom of the original
+            Page). When letterhead IS present, none of this renders —
+            content lives entirely inside the letterhead's empty zone. */}
+        {!letterheadDataUrl && (
+          <>
+            <View style={S.headerBand}>
+              <View style={S.headerLeft}>
+                <View style={S.uaBadge}>
+                  <Text style={S.uaBadgeText}>UA</Text>
+                </View>
+                <View style={S.brandBlock}>
+                  <Text style={S.brandName}>UNTITLED ADVERTISING</Text>
+                  <Text style={S.brandSub}>UNTITLED ADFLUX PRIVATE LIMITED</Text>
+                  <Text style={S.brandNetwork}>GSRTC LED Screen Network — Gujarat</Text>
+                </View>
+              </View>
+              <View style={S.headerRight}>
+                <Text style={S.headerWebsite}>{co.website || 'untitledad.in'}</Text>
+                <Text style={S.headerEmail}>{co.email || 'hello@untitledad.in'}</Text>
+              </View>
+            </View>
+            <View style={S.statsBar}>
+              <View style={S.statItem}>
+                <Text style={S.statNum}>{NETWORK.totalScreens}</Text>
+                <Text style={S.statLabel}>Total Screens</Text>
+              </View>
+              <View style={S.statItem}>
+                <Text style={S.statNum}>{NETWORK.cities}</Text>
+                <Text style={S.statLabel}>Cities</Text>
+              </View>
+              <View style={S.statItem}>
+                <Text style={S.statNum}>{NETWORK.monthlyImpressions}</Text>
+                <Text style={S.statLabel}>Monthly Impressions</Text>
+              </View>
+              <View style={S.statItem}>
+                <Text style={S.statNum}>{NETWORK.uniquePerDay}</Text>
+                <Text style={S.statLabel}>Unique/Day</Text>
+              </View>
+            </View>
+            <View style={S.titleBlock}>
+              <Text style={S.mediaQuotationText}>MEDIA QUOTATION</Text>
+              <View style={S.quoteMetaRight}>
+                <Text style={S.quoteNumText}>{quote.quote_number}</Text>
+                <Text style={S.quoteDateSmall}>{formatDate(quote.created_at)}</Text>
+                <Text style={S.quoteValid}>Valid 30 Days</Text>
+              </View>
+            </View>
+          </>
+        )}
 
-        {/* ── MEDIA QUOTATION TITLE ── */}
-        <View style={S.titleBlock}>
-          <Text style={S.mediaQuotationText}>MEDIA QUOTATION</Text>
-          <View style={S.quoteMetaRight}>
-            <Text style={S.quoteNumText}>{quote.quote_number}</Text>
-            <Text style={S.quoteDateSmall}>{formatDate(quote.created_at)}</Text>
-            <Text style={S.quoteValid}>Valid 30 Days</Text>
-          </View>
-        </View>
+        {/* Phase 81.1 — content area. Padding is letterhead-aware:
+            when a letterhead is set we use the govt-style safe zone
+            (85/50/80/50 in pt to clear top logo + bottom address).
+            When no letterhead is set we use the legacy 32pt body
+            padding because the hand-built chrome above already
+            occupies the top and the legacy footer bands occupy the
+            bottom. */}
+        <View style={letterheadDataUrl ? S.pageContent : S.body}>
 
-        {/* ── BODY ── */}
-        <View style={S.body}>
+          {/* Phase 81.1 — when letterhead is on, the dark titleBlock
+              bar is replaced with a clean text title + meta row inside
+              the safe zone. When letterhead is off, the bar already
+              rendered above and we skip this. */}
+          {letterheadDataUrl && (
+            <>
+              <View style={S.quoteTitleRow}>
+                <Text style={S.quoteTitleText}>MEDIA QUOTATION</Text>
+                <View style={S.quoteTitleMeta}>
+                  <Text style={S.quoteTitleRef}>{quote.quote_number}</Text>
+                  <Text style={S.quoteTitleDate}>{formatDate(quote.created_at)} · Valid 30 days</Text>
+                </View>
+              </View>
+              {/* Quote-specific glance stats moved to inside the
+                  content area as a clean bordered card — no more
+                  full-bleed yellow strip clashing with letterhead. */}
+              <View style={S.statsCard}>
+                <View style={S.statsCardItem}>
+                  <Text style={S.statsCardNum}>{NETWORK.totalScreens}</Text>
+                  <Text style={S.statsCardLabel}>Total Screens</Text>
+                </View>
+                <View style={S.statsCardItem}>
+                  <Text style={S.statsCardNum}>{NETWORK.cities}</Text>
+                  <Text style={S.statsCardLabel}>Cities</Text>
+                </View>
+                <View style={S.statsCardItem}>
+                  <Text style={S.statsCardNum}>{NETWORK.monthlyImpressions}</Text>
+                  <Text style={S.statsCardLabel}>Monthly Impressions</Text>
+                </View>
+                <View style={[S.statsCardItem, S.statsCardItemLast]}>
+                  <Text style={S.statsCardNum}>{NETWORK.uniquePerDay}</Text>
+                  <Text style={S.statsCardLabel}>Unique/Day</Text>
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Client Info */}
           <View style={S.sectionBar}>
@@ -857,22 +977,30 @@ function QuoteDocument({ quote, cities, company, letterheadDataUrl, thankYouData
 
         </View>{/* end body */}
 
-        {/* ── FOOTER YELLOW BAND ── */}
-        <View style={S.footerBand}>
-          <Text style={S.footerPrepared}>
-            Prepared by: {quote.sales_person_name || 'Sales Executive'}
-          </Text>
-          <Text style={S.footerQuoteRef}>
-            Quote: {quote.quote_number} · {formatDate(quote.created_at)}
-          </Text>
-        </View>
-        <View style={S.footerBottomBand}>
-          <Text style={S.footerBottomText}>{co.website || 'untitledad.in'} | {co.email || 'hello@untitledad.in'}</Text>
-          <Text style={S.footerBottomText}>GSRTC LED Screen Network — Gujarat</Text>
-          <Text style={S.footerBottomHighlight}>
-            {NETWORK.totalScreens} Screens · {NETWORK.cities} Cities · {NETWORK.monthlyImpressions} Monthly · {NETWORK.uniquePerDay} Unique/Day
-          </Text>
-        </View>
+        {/* Phase 81.1 — bottom footer bands ONLY when no letterhead.
+            The admin letterhead has its own address strip at the
+            bottom; rendering our yellow + dark bands over it caused
+            owner's "footer cutting / not aligned" complaint on the
+            UA-2026-0057 sample PDF. */}
+        {!letterheadDataUrl && (
+          <>
+            <View style={S.footerBand}>
+              <Text style={S.footerPrepared}>
+                Prepared by: {quote.sales_person_name || 'Sales Executive'}
+              </Text>
+              <Text style={S.footerQuoteRef}>
+                Quote: {quote.quote_number} · {formatDate(quote.created_at)}
+              </Text>
+            </View>
+            <View style={S.footerBottomBand}>
+              <Text style={S.footerBottomText}>{co.website || 'untitledad.in'} | {co.email || 'hello@untitledad.in'}</Text>
+              <Text style={S.footerBottomText}>GSRTC LED Screen Network — Gujarat</Text>
+              <Text style={S.footerBottomHighlight}>
+                {NETWORK.totalScreens} Screens · {NETWORK.cities} Cities · {NETWORK.monthlyImpressions} Monthly · {NETWORK.uniquePerDay} Unique/Day
+              </Text>
+            </View>
+          </>
+        )}
 
       </Page>
 
