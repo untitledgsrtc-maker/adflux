@@ -20,9 +20,11 @@
 //   • Calls from call_logs count grouped by user_id today
 //   • Won today value from quotes status='won' + payments today (rough)
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users as UsersIcon, MapPin, Mic, Loader2 } from 'lucide-react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
@@ -63,6 +65,13 @@ export default function TeamDashboardV2() {
   // admin can spot any rep with a broken signal at-a-glance.
   // pushByUser maps user_id → {has_sub, last_seen_at}.
   const [pushByUser, setPushByUser] = useState({})
+  // Phase 70.2 (22 May 2026) — live admin map. mapRef holds the
+  // Leaflet instance; markersRef indexes Leaflet circle markers by
+  // user_id so Realtime INSERT events can move existing markers
+  // instead of re-rendering all.
+  const mapContainerRef = useRef(null)
+  const mapRef          = useRef(null)
+  const markersRef      = useRef({})
   const [newLeadsToday, setNewLeadsToday] = useState(0)
   const [pipelineToday, setPipelineToday] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -192,6 +201,128 @@ export default function TeamDashboardV2() {
     load()
   }, [isPrivileged])
 
+  // Phase 70.2 (22 May 2026) — initialize Leaflet map once + subscribe
+  // to Supabase Realtime for gps_pings INSERT. Owner directive: "live
+  // track admin dashboard via Supabase Realtime channel" + "rep dots
+  // refresh every 5 min". With Realtime, dots actually refresh on
+  // every new ping (~5-min cadence on rep side); admin sees live
+  // movement as it happens. No polling required.
+  useEffect(() => {
+    if (!isPrivileged) return
+    if (!mapContainerRef.current) return
+    if (mapRef.current) return  // already mounted
+
+    // Default centre: Vadodara. Adjusts to fit reps as markers land.
+    const map = L.map(mapContainerRef.current).setView([22.3072, 73.1812], 12)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+      maxZoom: 19,
+    }).addTo(map)
+    mapRef.current = map
+
+    return () => {
+      try { map.remove() } catch { /* swallow */ }
+      mapRef.current = null
+      markersRef.current = {}
+    }
+  }, [isPrivileged])
+
+  // Phase 70.2 — Render / update markers whenever latestPingByUser
+  // changes. New rep ping → new marker; updated ping → move marker.
+  // Stale rep (no ping today) → no marker. Marker color by freshness:
+  //   green = ping within last 5 min
+  //   amber = 5–30 min stale
+  //   red   = 30+ min stale
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const now = Date.now()
+    const seenIds = new Set()
+    const bounds = []
+
+    for (const r of reps) {
+      const ping = latestPingByUser[r.id]
+      if (!ping || !ping.lat || !ping.lng) continue
+      const ageMs = ping.captured_at
+        ? now - new Date(ping.captured_at).getTime()
+        : Infinity
+      const ageMin = ageMs / 60_000
+      const color = ageMin <= 5 ? '#10B981'
+                  : ageMin <= 30 ? '#F59E0B'
+                  : '#EF4444'
+      seenIds.add(r.id)
+      bounds.push([Number(ping.lat), Number(ping.lng)])
+
+      const existing = markersRef.current[r.id]
+      if (existing) {
+        existing.setLatLng([Number(ping.lat), Number(ping.lng)])
+        existing.setStyle({ color, fillColor: color })
+        existing.bindPopup(
+          `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>` +
+          `${Math.round(ageMin)} min ago`
+        )
+      } else {
+        const m = L.circleMarker([Number(ping.lat), Number(ping.lng)], {
+          radius: 9,
+          color,
+          weight: 2,
+          fillColor: color,
+          fillOpacity: 0.85,
+        }).addTo(map)
+        m.bindPopup(
+          `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>` +
+          `${Math.round(ageMin)} min ago`
+        )
+        markersRef.current[r.id] = m
+      }
+    }
+
+    // Remove markers for reps with no ping today (cleanup).
+    for (const uid of Object.keys(markersRef.current)) {
+      if (!seenIds.has(uid)) {
+        try { map.removeLayer(markersRef.current[uid]) } catch { /* */ }
+        delete markersRef.current[uid]
+      }
+    }
+
+    // Fit map to all visible markers on first render only.
+    if (bounds.length >= 1 && !map._teamDashboardFitDone) {
+      try {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 })
+        map._teamDashboardFitDone = true
+      } catch { /* swallow */ }
+    }
+  }, [latestPingByUser, reps])
+
+  // Phase 70.2 — Supabase Realtime subscription on gps_pings INSERT.
+  // Updates latestPingByUser in-place so the marker effect re-runs.
+  useEffect(() => {
+    if (!isPrivileged) return
+    const channel = supabase
+      .channel('team-live-gps')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'gps_pings' },
+        (payload) => {
+          const p = payload?.new
+          if (!p?.user_id) return
+          setLatestPingByUser(prev => {
+            const cur = prev[p.user_id]
+            if (cur && new Date(cur.captured_at) >= new Date(p.captured_at)) {
+              // older event arriving out-of-order; keep newer
+              return prev
+            }
+            return { ...prev, [p.user_id]: p }
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      try { supabase.removeChannel(channel) } catch { /* */ }
+    }
+  }, [isPrivileged])
+
   const sessionByUser = useMemo(() => {
     const m = new Map()
     sessions.forEach(s => m.set(s.user_id, s))
@@ -285,6 +416,31 @@ export default function TeamDashboardV2() {
           <HeroStat label="New leads added"   value={newLeadsToday}                delta="today"                                   up={newLeadsToday > 0} />
           <HeroStat label="Won today"         value={formatLakh(pipelineToday)}    delta="status=won"                              up={pipelineToday > 0} />
         </div>
+      </div>
+
+      {/* Phase 70.2 (22 May 2026) — live admin map. Each rep with a
+          ping today shows as a colored dot. Green = ping <5min, amber
+          = 5-30min stale, red = 30min+ stale. Marker popups show name
+          + role + age. Realtime subscription updates dots as new
+          pings arrive — no manual refresh needed. */}
+      <div className="lead-card" style={{ marginBottom: 14, padding: 0, overflow: 'hidden' }}>
+        <div className="lead-card-head" style={{ padding: '12px 16px' }}>
+          <div>
+            <div className="lead-card-title">Live field map</div>
+            <div className="lead-card-sub">
+              Updates as reps ping in. Tap a dot to see who.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text-muted)' }}>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 999, background: '#10B981', marginRight: 4 }} />fresh</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 999, background: '#F59E0B', marginRight: 4 }} />5-30min</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 999, background: '#EF4444', marginRight: 4 }} />stale</span>
+          </div>
+        </div>
+        <div
+          ref={mapContainerRef}
+          style={{ width: '100%', height: 360 }}
+        />
       </div>
 
       {/* Rep grid */}

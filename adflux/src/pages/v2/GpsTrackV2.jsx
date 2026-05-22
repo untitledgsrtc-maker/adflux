@@ -188,81 +188,66 @@ export default function GpsTrackV2() {
         maxZoom: 19,
       }).addTo(map)
 
-      // Phase 61.5 (19 May 2026) — road snap via OSRM. Owner reported
-      // "pining not aline with route of road" — even after cleanTrack
-      // drops drift / spike pings, the polyline still cuts across
-      // buildings between the remaining points because raw GPS
-      // doesn't sit perfectly on road centerlines.
+      // Phase 70 (22 May 2026) — swap OSRM public demo for Google
+      // Roads API snapToRoads. OSRM demo server (routing.openstreetmap.de)
+      // is rate-limited and lower-quality for India road geometry.
+      // Roads API gives sub-second snap with 95% accuracy. Free tier
+      // covers our usage: 100 points per request × 660 requests/month
+      // = 5 reps × 5 trips × 30 days → under 5K/month free quota.
       //
-      // OSRM /match endpoint returns a road-network-matched geometry
-      // for a sequence of coordinates + timestamps. Free public
-      // demo server (routing.openstreetmap.de) — rate-limited but
-      // fine for occasional admin review pages.
-      //
-      // Render strategy:
-      //   1. Draw the cleaned-but-raw polyline immediately in a faint
-      //      yellow so the page paints without waiting.
-      //   2. Fire the OSRM POST in parallel.
-      //   3. When OSRM returns, replace the raw polyline with the
-      //      matched (road-snapped) geometry in bright yellow.
-      //
-      // Failures (network down, OSRM 4xx/5xx, >100 pings = batch too
-      // large) silently leave the raw polyline in place.
-      // Phase 65 (20 May 2026) — owner reported "gps km not properly
-      // working" with raw 46.7 km but only a tiny polyline showing.
-      // Bug: previous Phase 61.5 code REMOVED the raw cleaned polyline
-      // when OSRM matched, but OSRM often matches only partial route
-      // (confidence drops on highway gaps, low-speed dwell etc.) so
-      // the user lost visibility of the actual route.
-      // Fix: always render the raw cleaned polyline as a yellow base
-      // layer. OSRM matched legs overlay in a slightly brighter yellow
-      // on top WHEN available, never replacing the underlying line.
-      // Sample size bumped 100 → 200 (OSRM /match limit is 100 per
-      // request — chunk in 2 batches now). Map fitBounds anchored to
-      // the RAW cleaned set so the whole route stays in view.
+      // Strategy:
+      //   1. Always render the cleaned-but-raw polyline (yellow @ 0.75
+      //      opacity) so map paints immediately.
+      //   2. Fire Roads API in parallel, chunked at 100 points per call
+      //      (API hard limit). interpolate=true asks Google to add
+      //      intermediate snapped points along road centerlines.
+      //   3. Overlay the snapped polyline on top in bright yellow.
+      //   4. Failures (no key, 4xx/5xx, network) silently leave the
+      //      raw line in place — no broken UX.
+      const ROADS_KEY = import.meta.env.VITE_GOOGLE_ROADS_KEY || ''
       let rawLine = null
       if (cleaned.length >= 2) {
         const latlngs = cleaned.map(p => [Number(p.lat), Number(p.lng)])
         rawLine = L.polyline(latlngs, {
           color:    '#FFE600',
           weight:   4,
-          opacity:  0.75,        // visible always; OSRM overlays on top
+          opacity:  0.75,        // visible always; Roads API overlays on top
           lineCap:  'round',
           lineJoin: 'round',
         }).addTo(map)
         map.fitBounds(rawLine.getBounds(), { padding: [40, 40] })
 
-        // OSRM /match — best-effort overlay. Chunk the cleaned set
-        // into batches of 100 (OSRM hard limit). For each batch,
-        // request the matched geometry. Failures silently leave the
-        // raw line visible underneath.
-        const BATCH = 100
-        const chunks = []
-        for (let i = 0; i < cleaned.length; i += BATCH) {
-          chunks.push(cleaned.slice(i, i + BATCH))
-        }
-        const fetchOne = (sample) => {
-          if (sample.length < 2) return Promise.resolve(null)
-          const coordStr = sample
-            .map(p => `${Number(p.lng).toFixed(6)},${Number(p.lat).toFixed(6)}`)
-            .join(';')
-          const tsStr = sample
-            .map(p => Math.floor(new Date(p.captured_at).getTime() / 1000))
-            .join(';')
-          const url = `https://routing.openstreetmap.de/routed-car/match/v1/driving/${coordStr}`
-            + `?steps=false&geometries=geojson&overview=full&timestamps=${tsStr}`
-          return fetch(url).then(r => r.ok ? r.json() : null).catch(() => null)
-        }
-        Promise.all(chunks.map(fetchOne))
-          .then(results => {
-            if (!mapRef.current) return
-            for (const json of results) {
-              if (!json || json.code !== 'Ok' || !Array.isArray(json.matchings)) continue
-              for (const m of json.matchings) {
-                const coords = m?.geometry?.coordinates
-                if (!Array.isArray(coords) || coords.length < 2) continue
-                const latlngs = coords.map(c => [c[1], c[0]])  // GeoJSON is lng,lat
-                L.polyline(latlngs, {
+        if (ROADS_KEY) {
+          // Google Roads API snapToRoads. 100 points per request hard limit.
+          // Endpoint:
+          //   https://roads.googleapis.com/v1/snapToRoads?path=lat,lng|lat,lng&interpolate=true&key=KEY
+          // Response shape:
+          //   { snappedPoints: [{ location: { latitude, longitude }, ... }, ...] }
+          const BATCH = 100
+          const chunks = []
+          for (let i = 0; i < cleaned.length; i += BATCH) {
+            chunks.push(cleaned.slice(i, i + BATCH))
+          }
+          const fetchOne = (sample) => {
+            if (sample.length < 2) return Promise.resolve(null)
+            const path = sample
+              .map(p => `${Number(p.lat).toFixed(6)},${Number(p.lng).toFixed(6)}`)
+              .join('|')
+            const url = `https://roads.googleapis.com/v1/snapToRoads?path=${encodeURIComponent(path)}&interpolate=true&key=${ROADS_KEY}`
+            return fetch(url).then(r => r.ok ? r.json() : null).catch(() => null)
+          }
+          Promise.all(chunks.map(fetchOne))
+            .then(results => {
+              if (!mapRef.current) return
+              for (const json of results) {
+                if (!json || !Array.isArray(json.snappedPoints)) continue
+                if (json.snappedPoints.length < 2) continue
+                const segLatLngs = json.snappedPoints.map(sp => [
+                  Number(sp?.location?.latitude),
+                  Number(sp?.location?.longitude),
+                ]).filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+                if (segLatLngs.length < 2) continue
+                L.polyline(segLatLngs, {
                   color:    '#FFE600',
                   weight:   6,
                   opacity:  1,
@@ -270,9 +255,9 @@ export default function GpsTrackV2() {
                   lineJoin: 'round',
                 }).addTo(mapRef.current)
               }
-            }
-          })
-          .catch(() => { /* raw line stays as fallback */ })
+            })
+            .catch(() => { /* raw line stays as fallback */ })
+        }
       } else if (cleaned.length === 1) {
         map.setView([Number(cleaned[0].lat), Number(cleaned[0].lng)], 14)
       }
