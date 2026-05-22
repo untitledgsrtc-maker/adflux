@@ -32,6 +32,102 @@ import { formatCurrency } from '../../utils/formatters'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import { presetToday } from '../../utils/period'
 
+// Phase 87.6 — avatar marker helpers. Owner directive 24 May 2026:
+// reference Pimpri-Chinchwad map pin with profile pic. Renders the
+// rep's profile_image_url inside a coloured ring (freshness band),
+// falls back to brand-yellow initials when no pic.
+const AVATAR_MARKER_SIZE = 52
+
+function drawInitialsOnCanvas(ctx, name, size) {
+  ctx.fillStyle = '#FFE600'
+  ctx.fillRect(5, 5, size - 10, size - 10)
+  ctx.fillStyle = '#0f172a'
+  ctx.font = '700 18px "DM Sans", "Inter", system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  const initials = (name || 'U')
+    .split(/\s+/)
+    .map(w => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+  ctx.fillText(initials, size / 2, size / 2 + 1)
+}
+
+function buildAvatarMarkerIcon(google, name, profileUrl, color, imageCache) {
+  const SIZE = AVATAR_MARKER_SIZE
+  const cv = document.createElement('canvas')
+  // 2x for hidpi crispness.
+  cv.width = SIZE * 2
+  cv.height = SIZE * 2
+  const ctx = cv.getContext('2d')
+  ctx.scale(2, 2)
+
+  // Outer coloured ring = freshness band (green / amber / red).
+  ctx.beginPath()
+  ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 2, 0, Math.PI * 2)
+  ctx.fillStyle = color
+  ctx.fill()
+
+  // Thin white separator between ring and avatar (matches reference).
+  ctx.beginPath()
+  ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 5, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+
+  // Clip inner circle for avatar / initials.
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 7, 0, Math.PI * 2)
+  ctx.clip()
+
+  const img = profileUrl ? imageCache[profileUrl] : null
+  if (img && img.complete && img.naturalWidth) {
+    try {
+      ctx.drawImage(img, 7, 7, SIZE - 14, SIZE - 14)
+    } catch {
+      // CORS-tainted canvas; fall back to initials.
+      drawInitialsOnCanvas(ctx, name, SIZE)
+    }
+  } else {
+    drawInitialsOnCanvas(ctx, name, SIZE)
+  }
+  ctx.restore()
+
+  let url
+  try {
+    url = cv.toDataURL('image/png')
+  } catch {
+    // Canvas tainted — rebuild initials-only (clean) and retry.
+    const cv2 = document.createElement('canvas')
+    cv2.width = SIZE * 2
+    cv2.height = SIZE * 2
+    const ctx2 = cv2.getContext('2d')
+    ctx2.scale(2, 2)
+    ctx2.beginPath()
+    ctx2.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 2, 0, Math.PI * 2)
+    ctx2.fillStyle = color
+    ctx2.fill()
+    ctx2.beginPath()
+    ctx2.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 5, 0, Math.PI * 2)
+    ctx2.fillStyle = '#ffffff'
+    ctx2.fill()
+    ctx2.save()
+    ctx2.beginPath()
+    ctx2.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 7, 0, Math.PI * 2)
+    ctx2.clip()
+    drawInitialsOnCanvas(ctx2, name, SIZE)
+    ctx2.restore()
+    url = cv2.toDataURL('image/png')
+  }
+  return {
+    url,
+    scaledSize: new google.maps.Size(SIZE, SIZE),
+    anchor: new google.maps.Point(SIZE / 2, SIZE / 2),
+  }
+}
+
 export default function TeamDashboardV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
@@ -81,6 +177,12 @@ export default function TeamDashboardV2() {
   const mapContainerRef = useRef(null)
   const mapRef          = useRef(null)
   const markersRef      = useRef({})
+  // Phase 87.6 — cache of pre-loaded HTMLImageElements keyed by
+  // profile_image_url so canvas drawImage doesn't async-block the
+  // marker effect. iconBump bumps when a new image finishes loading
+  // to force the marker effect to re-run with the now-cached image.
+  const imageCacheRef   = useRef({})
+  const [iconBump, setIconBump] = useState(0)
   const [newLeadsToday, setNewLeadsToday] = useState(0)
   const [pipelineToday, setPipelineToday] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -127,7 +229,7 @@ export default function TeamDashboardV2() {
         // counts against daily targets — owner reported Dhara not
         // appearing in /team-dashboard despite live pings + 26 calls.
         supabase.from('users')
-          .select('id, name, team_role, city, daily_targets, is_active')
+          .select('id, name, team_role, city, daily_targets, is_active, profile_image_url')
           .in('team_role', ['sales', 'sales_manager', 'telecaller'])
           .eq('is_active', true)
           .order('name'),
@@ -409,11 +511,47 @@ export default function TeamDashboardV2() {
     }
   }, [isPrivileged, loading])
 
-  // Phase 70.3 — Render / update Google Maps markers whenever
-  // latestPingByUser changes. Marker color band by freshness:
-  //   green = ping within last 5 min
-  //   amber = 5–30 min stale
-  //   red   = 30+ min stale
+  // Phase 87.6 — pre-load every rep's profile_image_url into an
+  // HTMLImageElement cache so the marker-icon canvas can draw the
+  // pic synchronously. Owner directive 24 May 2026: live field map
+  // shows faces, not coloured dots. Avatars are cross-origin loaded
+  // from the public user-avatars bucket; canvas needs CORS-safe
+  // images to call toDataURL without tainting.
+  useEffect(() => {
+    const cache = imageCacheRef.current
+    const urls = Array.from(new Set(
+      reps.map(r => r.profile_image_url).filter(u => u && !cache[u])
+    ))
+    if (!urls.length) return
+    let cancelled = false
+    Promise.all(urls.map(url => new Promise(resolve => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.referrerPolicy = 'no-referrer'
+      img.onload = () => resolve({ url, img })
+      img.onerror = () => resolve({ url, img: null })
+      img.src = url
+    }))).then(results => {
+      if (cancelled) return
+      let added = 0
+      results.forEach(({ url, img }) => {
+        if (img && img.naturalWidth > 0) {
+          cache[url] = img
+          added += 1
+        }
+      })
+      if (added > 0) setIconBump(n => n + 1)
+    })
+    return () => { cancelled = true }
+  }, [reps])
+
+  // Phase 70.3 + 87.6 — Render / update Google Maps markers whenever
+  // latestPingByUser changes. Marker = circular profile-pic avatar
+  // (Phase 87.6) inside a coloured freshness ring:
+  //   green  = ping within last 5 min
+  //   amber  = 5–30 min stale
+  //   red    = 30+ min stale
+  // Initials in brand yellow are used when no profile pic on file.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -439,17 +577,20 @@ export default function TeamDashboardV2() {
       bounds.extend(pos)
       anyPinned = true
 
+      // Cache key avoids rebuilding the canvas every effect tick.
+      // Rebuild only when the ring colour band changes OR the
+      // profile pic URL changes OR a new image just finished loading.
+      const iconKey = `${r.id}|${r.profile_image_url || ''}|${color}`
+
       const existing = markersRef.current[r.id]
       if (existing) {
         existing.setPosition(pos)
-        existing.setIcon({
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 9,
-          fillColor: color,
-          fillOpacity: 0.85,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-        })
+        if (existing.__iconKey !== iconKey) {
+          existing.setIcon(buildAvatarMarkerIcon(
+            google, r.name, r.profile_image_url, color, imageCacheRef.current,
+          ))
+          existing.__iconKey = iconKey
+        }
         existing.__iw?.setContent(
           `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>${Math.round(ageMin)} min ago`
         )
@@ -457,15 +598,14 @@ export default function TeamDashboardV2() {
         const m = new google.maps.Marker({
           position: pos,
           map,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 9,
-            fillColor: color,
-            fillOpacity: 0.85,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-          },
+          // Anchor at centre + slight vertical bump so the avatar
+          // sits over the geo-point not above it.
+          icon: buildAvatarMarkerIcon(
+            google, r.name, r.profile_image_url, color, imageCacheRef.current,
+          ),
+          title: r.name,
         })
+        m.__iconKey = iconKey
         const iw = new google.maps.InfoWindow({
           content: `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>${Math.round(ageMin)} min ago`,
         })
@@ -490,7 +630,7 @@ export default function TeamDashboardV2() {
         map.__teamDashboardFitDone = true
       } catch { /* swallow */ }
     }
-  }, [latestPingByUser, reps])
+  }, [latestPingByUser, reps, iconBump])
 
   // Phase 70.2 — Supabase Realtime subscription on gps_pings INSERT.
   // Updates latestPingByUser in-place so the marker effect re-runs.
