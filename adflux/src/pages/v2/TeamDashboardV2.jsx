@@ -55,6 +55,9 @@ export default function TeamDashboardV2() {
   // static profile city. Owner reported the static city read as
   // "live location not fetched in dashboard".
   const [latestPingByUser, setLatestPingByUser] = useState({})
+  // Phase 73 — per-rep daily_targets row (Phase 49 table). Maps
+  // user_id → { min_calls, min_qualified_weekly }.
+  const [policyByUser, setPolicyByUser] = useState({})
   // Phase 62.9 (20 May 2026) — owner directive: show GPS / Internet /
   // Push status pills per rep card, color-coded red when OFF, so
   // admin can spot any rep with a broken signal at-a-glance.
@@ -72,7 +75,7 @@ export default function TeamDashboardV2() {
       const today = new Date().toISOString().slice(0, 10)
       const startOfDay = `${today}T00:00:00`
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -116,6 +119,13 @@ export default function TeamDashboardV2() {
           .select('user_id, lat, lng, captured_at, accuracy_m')
           .gte('captured_at', startOfDay)
           .order('captured_at', { ascending: false }),
+        // Phase 73 (21 May 2026) — pull each rep's daily_targets row
+        // (Phase 49 table, NOT users.daily_targets JSONB). TC reps have
+        // min_calls=50 here while users.daily_targets fallback was 20,
+        // causing the TC card to show /20 instead of /50.
+        supabase.from('daily_targets')
+          .select('user_id, min_calls, min_qualified_weekly')
+          .is('effective_to', null),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
@@ -144,6 +154,14 @@ export default function TeamDashboardV2() {
         if (!pingMap[p.user_id]) pingMap[p.user_id] = p
       })
       setLatestPingByUser(pingMap)
+      // Phase 73 — index policy rows by user_id for O(1) lookup per
+      // rep card. Defaults absorbed at the render site (50 for TC,
+      // 20 for sales).
+      const polMap = {}
+      ;(policyRes?.data || []).forEach((p) => {
+        if (p.user_id) polMap[p.user_id] = p
+      })
+      setPolicyByUser(polMap)
       setNewLeadsToday(newLeadsRes.count || 0)
       setPipelineToday((pipelineRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0))
 
@@ -275,10 +293,20 @@ export default function TeamDashboardV2() {
           const sess = sessionByUser.get(r.id)
           const isLive = !!sess?.check_in_at
           const counters = sess?.daily_counters || {}
-          const targets = r.daily_targets || { meetings: 5, calls: 20, new_leads: 10 }
+          // Phase 73 — role-aware target. TC reads min_calls from
+          // daily_targets table (default 50). Sales falls back to
+          // users.daily_targets JSONB (default 20).
+          const isTC = r.team_role === 'telecaller'
+          const policy = policyByUser[r.id]
+          const usersJsonbTargets = r.daily_targets || { meetings: 5, calls: 20, new_leads: 10 }
           const callsHere = callsByUser[r.id] || 0
-          const callsTarget = targets.calls || 20
-          const callPct = Math.round((callsHere / callsTarget) * 100)
+          const callsTarget = policy?.min_calls
+            ? Number(policy.min_calls)
+            : (isTC ? 50 : (usersJsonbTargets.calls || 20))
+          const meetingsTarget = isTC ? 0 : (usersJsonbTargets.meetings || 5)
+          const callPct = callsTarget > 0
+            ? Math.round((callsHere / callsTarget) * 100)
+            : 0
           const cls = callPct >= 80 ? '' : callPct >= 50 ? 'warn' : 'dng'
           return (
             <div
@@ -308,12 +336,17 @@ export default function TeamDashboardV2() {
                 </div>
               </div>
               <div className="lead-rep-kpis">
-                <div className="lead-rep-kpi">
-                  <div className={`num ${counters.meetings >= targets.meetings ? 'suc' : counters.meetings === 0 ? 'dng' : ''}`}>
-                    {counters.meetings || 0}/{targets.meetings || 0}
+                {/* Phase 73 — Meet tile hidden for TC (they don't do
+                    field meetings; their target is call-only). Sales
+                    reps still see Meet against their personal target. */}
+                {!isTC && (
+                  <div className="lead-rep-kpi">
+                    <div className={`num ${counters.meetings >= meetingsTarget ? 'suc' : counters.meetings === 0 ? 'dng' : ''}`}>
+                      {counters.meetings || 0}/{meetingsTarget || 0}
+                    </div>
+                    <div className="lbl">Meet</div>
                   </div>
-                  <div className="lbl">Meet</div>
-                </div>
+                )}
                 <div className="lead-rep-kpi">
                   <div className={`num ${callPct >= 80 ? 'suc' : callPct >= 50 ? '' : 'dng'}`}>
                     {callsHere}/{callsTarget}
