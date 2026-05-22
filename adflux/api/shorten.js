@@ -95,32 +95,69 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Host not on allowlist' })
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 5000)
+  // Phase 86.2 — server-side cascade. is.gd is flaky in 2026 (owner
+  // hit 502 on UA-2026-0055). Try multiple shortener providers
+  // server-side so the client sees one consistent /api/shorten
+  // response. Order: cleanuri (most reliable today) → is.gd → tinyurl
+  // legacy. First success wins. Long URL returned only if all fail.
 
-  try {
-    const upstream = await fetch(
-      `https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`,
-      { signal: controller.signal }
-    )
-    clearTimeout(timer)
-
-    if (!upstream.ok) {
-      return res.status(502).json({ error: `is.gd ${upstream.status}` })
-    }
-    const short = (await upstream.text()).trim()
-    // is.gd returns `Error: ...` as plaintext on failure (still HTTP 200).
-    if (!/^https?:\/\/\S+$/i.test(short) || /^error:/i.test(short)) {
-      return res.status(502).json({ error: 'is.gd returned malformed body' })
-    }
-
-    // Cache for 1 hour — same URL shortens to the same short URL and
-    // upstream can be slow under load. Safe because URLs in this app
-    // are immutable (PDF uploads use a fresh timestamped path).
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400')
-    return res.status(200).json({ short })
-  } catch (e) {
-    clearTimeout(timer)
-    return res.status(502).json({ error: e.message || 'Upstream error' })
+  // Cleanuri — POST form-urlencoded, JSON response, no auth.
+  async function tryCleanuri(longUrl, signal) {
+    const r = await fetch('https://cleanuri.com/api/v1/shorten', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    `url=${encodeURIComponent(longUrl)}`,
+      signal,
+    })
+    if (!r.ok) return null
+    const j = await r.json().catch(() => null)
+    const s = j?.result_url
+    return (typeof s === 'string' && /^https?:\/\/\S+$/i.test(s)) ? s : null
   }
+  // is.gd — GET plaintext response, no auth.
+  async function tryIsGd(longUrl, signal) {
+    const r = await fetch(
+      `https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`,
+      { signal }
+    )
+    if (!r.ok) return null
+    const t = (await r.text()).trim()
+    if (!/^https?:\/\/\S+$/i.test(t) || /^error:/i.test(t)) return null
+    return t
+  }
+  // TinyURL legacy — GET plaintext. Shipped deprecation interstitial
+  // in 2025 (Phase 34Z note) but still produces a redirect that works
+  // when the others are down. Last resort.
+  async function tryTinyUrl(longUrl, signal) {
+    const r = await fetch(
+      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`,
+      { signal }
+    )
+    if (!r.ok) return null
+    const t = (await r.text()).trim()
+    if (!/^https?:\/\/tinyurl\.com\/\S+$/i.test(t)) return null
+    return t
+  }
+
+  const providers = [tryCleanuri, tryIsGd, tryTinyUrl]
+
+  for (const fn of providers) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 4000) // 4s per provider
+    try {
+      const short = await fn(url, controller.signal)
+      clearTimeout(timer)
+      if (short && short.length < url.length) {
+        res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400')
+        return res.status(200).json({ short, provider: fn.name.replace(/^try/, '').toLowerCase() })
+      }
+    } catch {
+      clearTimeout(timer)
+      // continue to next provider
+    }
+  }
+
+  // All providers failed. Return the original URL so the client can
+  // gracefully fall back (whatsapp.js shortenUrl already does this).
+  return res.status(200).json({ short: url, provider: 'fallback-original' })
 }

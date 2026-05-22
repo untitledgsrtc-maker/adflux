@@ -104,12 +104,15 @@ export default function SalesDashboardDesktop() {
       // M1 — follow-ups COMPLETED today (for the daily counter). The
       // open-followups query above pulls is_done=false; this one pulls
       // done=true to count today's completions.
+      // Phase 86.1 — follow_ups column is `done_at` (NOT
+       // `completed_at` which doesn't exist on this table). Fixed
+       // same as AdminDashboardDesktop:170.
       supabase.from('follow_ups')
-        .select('id, completed_at')
+        .select('id, done_at')
         .eq('assigned_to', uid)
         .eq('is_done', true)
-        .gte('completed_at', `${todayDate}T00:00:00`)
-        .lte('completed_at', `${todayDate}T23:59:59`),
+        .gte('done_at', `${todayDate}T00:00:00`)
+        .lte('done_at', `${todayDate}T23:59:59`),
     ])
 
     const quotes = qRes.data || []

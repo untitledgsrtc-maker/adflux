@@ -129,15 +129,19 @@ export default function AdminDashboardDesktop() {
       // dashboard touches lots of fields; safer to pull the whole row
       // and let JS pick what's needed.
       supabase.from('quotes').select('*'),
+      // Phase 86.1 — `quotes.ref_number` does NOT exist (Phase 33N
+       // confirmed). Embed dropped to use `quote_number` only.
+       // Audit 24 May 2026 console showed 4× 400 from PostgREST
+       // when this query hit prod.
       supabase.from('payments')
-        .select('id, quote_id, amount_received, is_final_payment, approval_status, rejection_reason, payment_date, created_at, received_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
+        .select('id, quote_id, amount_received, is_final_payment, approval_status, rejection_reason, payment_date, created_at, received_by, quotes(quote_number, client_name, sales_person_name, segment)')
         .order('created_at', { ascending: false })
         .limit(40),
       supabase.from('payments')
         .select('quote_id, amount_received, payment_date, is_final_payment')
         .eq('approval_status', 'approved'),
       supabase.from('payments')
-        .select('id, quote_id, amount_received, created_at, received_by, quotes(quote_number, ref_number, client_name, sales_person_name, segment)')
+        .select('id, quote_id, amount_received, created_at, received_by, quotes(quote_number, client_name, sales_person_name, segment)')
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false }),
       supabase.from('staff_incentive_profiles').select('*, users(name)').eq('is_active', true),
@@ -157,14 +161,15 @@ export default function AdminDashboardDesktop() {
       supabase.from('daily_targets')
         .select('user_id, min_quotes, min_followups, min_calls')
         .is('effective_to', null),
+      // Phase 86.1 — follow_ups column is `done_at`, NOT
+      // `completed_at`. Comment was stale; query was 400ing in
+      // PostgREST with `column completed_at does not exist`.
       // M1 — follow-ups completed today across the whole team.
-      // received_by isn't on follow_ups; we use assigned_to + is_done
-      // + completed_at-on-today to count completions per user.
       supabase.from('follow_ups')
-        .select('id, assigned_to, completed_at')
+        .select('id, assigned_to, done_at')
         .eq('is_done', true)
-        .gte('completed_at', `${todayDate}T00:00:00`)
-        .lte('completed_at', `${todayDate}T23:59:59`),
+        .gte('done_at', `${todayDate}T00:00:00`)
+        .lte('done_at', `${todayDate}T23:59:59`),
       // Phase 41.2 — pending leaves count for Action Queue card.
       supabase.from('leaves').select('id', { count: 'exact', head: true })
         .eq('status', 'pending'),
