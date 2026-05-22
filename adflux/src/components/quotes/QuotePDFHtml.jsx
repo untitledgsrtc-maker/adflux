@@ -1329,16 +1329,33 @@ export async function downloadQuotePDFHtml(quote, cities = []) {
 export async function uploadQuotePDFHtml(quote, cities = []) {
   const company = await fetchCompanyForQuote(quote)
   const blob    = await renderToPdfBlob(quote, cities, company)
-  const ts      = Date.now()
   const safeNumber = (quote?.quote_number || 'quote').replace(/[^A-Za-z0-9_-]/g, '_')
-  const path    = `${safeNumber}/${ts}.pdf`
+  // Phase 81.5 — owner directive 23 May 2026: "dont store every PDF
+  // version, only the latest. Every regen overwrites."
+  // Path used to be `{quote_number}/{timestamp_ms}.pdf` so every
+  // WhatsApp send produced a new file forever — bucket grew
+  // unbounded. New path is a single file per quote at the bucket
+  // root; upsert:true overwrites in place on each regen.
+  //
+  // Side-effects:
+  //   • Stable URL: app.untitledad.in/pdf/{quote_number}.pdf —
+  //     same link every time, recipients of an older share auto-
+  //     see the latest version when they reopen it.
+  //   • cacheControl 60s so Supabase CDN doesn't serve a stale
+  //     copy after a regen. WhatsApp recipients refresh within
+  //     a minute. Higher TTLs broke "rep changed quote, client
+  //     still sees old PDF" on the same URL.
+  //   • is.gd shortened link keeps working because the underlying
+  //     URL is identical across regens.
+  const path = `${safeNumber}.pdf`
 
   const { error: uploadErr } = await supabase
     .storage
     .from('quote-pdfs')
     .upload(path, blob, {
-      contentType: 'application/pdf',
-      upsert: false,
+      contentType:  'application/pdf',
+      upsert:       true,         // overwrite previous version
+      cacheControl: '60',         // CDN refreshes within 1 min
     })
   if (uploadErr) throw new Error(`PDF upload failed: ${uploadErr.message}`)
 
