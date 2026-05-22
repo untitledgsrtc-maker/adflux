@@ -246,15 +246,27 @@ export default function TeamDashboardV2() {
       const map = new google.maps.Map(mapContainerRef.current, {
         center: { lat: 22.3072, lng: 73.1812 },  // Vadodara
         zoom: 12,
+        // Phase 70.7 — lightened road palette so streets read clearly
+        // against the dark canvas. Same DARK_MAP_STYLE shape used by
+        // GpsTrackV2; duplicated here to avoid a cross-module import
+        // from a page file.
         styles: [
-          { elementType: 'geometry',       stylers: [{ color: '#1d2129' }] },
-          { elementType: 'labels.text.stroke', stylers: [{ color: '#1d2129' }] },
-          { elementType: 'labels.text.fill',   stylers: [{ color: '#94a3b8' }] },
-          { featureType: 'road',           elementType: 'geometry', stylers: [{ color: '#334155' }] },
-          { featureType: 'road.highway',   elementType: 'geometry', stylers: [{ color: '#475569' }] },
-          { featureType: 'water',          elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-          { featureType: 'poi',            elementType: 'labels',   stylers: [{ visibility: 'off' }] },
-          { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+          { elementType: 'geometry',            stylers: [{ color: '#1d2129' }] },
+          { elementType: 'labels.text.stroke',  stylers: [{ color: '#1d2129' }] },
+          { elementType: 'labels.text.fill',    stylers: [{ color: '#e2e8f0' }] },
+          { featureType: 'administrative',      elementType: 'geometry', stylers: [{ color: '#334155' }] },
+          { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#f1f5f9' }] },
+          { featureType: 'poi',                 elementType: 'labels',   stylers: [{ visibility: 'off' }] },
+          { featureType: 'road',                elementType: 'geometry', stylers: [{ color: '#64748b' }] },
+          { featureType: 'road',                elementType: 'geometry.stroke', stylers: [{ color: '#475569' }] },
+          { featureType: 'road',                elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+          { featureType: 'road.arterial',       elementType: 'geometry', stylers: [{ color: '#94a3b8' }] },
+          { featureType: 'road.highway',        elementType: 'geometry', stylers: [{ color: '#cbd5e1' }] },
+          { featureType: 'road.highway',        elementType: 'geometry.stroke', stylers: [{ color: '#64748b' }] },
+          { featureType: 'road.local',          elementType: 'geometry', stylers: [{ color: '#475569' }] },
+          { featureType: 'transit',             elementType: 'labels',   stylers: [{ visibility: 'off' }] },
+          { featureType: 'water',               elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+          { featureType: 'water',               elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
         ],
         disableDefaultUI: false,
         mapTypeControl: false,

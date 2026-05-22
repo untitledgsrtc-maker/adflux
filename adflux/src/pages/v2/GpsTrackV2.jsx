@@ -33,10 +33,29 @@ import { formatDate } from '../../utils/formatters'
 // gpsDistance.js so /work uses the same filter rules.
 import { summariseTrack, cleanTrack, detectStops } from '../../utils/gpsDistance'
 
-// Phase 32K — Leaflet imported directly from npm (`import L from 'leaflet'`).
-// No more CDN load gymnastics, no failover paths, no timeout guards.
-// Vite bundles Leaflet into the GpsTrack chunk so the map works
-// offline / on flaky networks / behind firewalls.
+// Phase 70.7 (22 May 2026) — dark Google Maps style that matches the
+// v2 chrome but keeps road network legible. Previous palette had
+// roads only ~30% lighter than ground; new palette lifts roads to
+// ~70% lighter so streets stand out clearly against the dark
+// background. Locality / arterial labels also bumped for readability.
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry',            stylers: [{ color: '#1d2129' }] },
+  { elementType: 'labels.text.stroke',  stylers: [{ color: '#1d2129' }] },
+  { elementType: 'labels.text.fill',    stylers: [{ color: '#e2e8f0' }] },
+  { featureType: 'administrative',      elementType: 'geometry', stylers: [{ color: '#334155' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#f1f5f9' }] },
+  { featureType: 'poi',                 elementType: 'labels',   stylers: [{ visibility: 'off' }] },
+  { featureType: 'road',                elementType: 'geometry', stylers: [{ color: '#64748b' }] },
+  { featureType: 'road',                elementType: 'geometry.stroke', stylers: [{ color: '#475569' }] },
+  { featureType: 'road',                elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+  { featureType: 'road.arterial',       elementType: 'geometry', stylers: [{ color: '#94a3b8' }] },
+  { featureType: 'road.highway',        elementType: 'geometry', stylers: [{ color: '#cbd5e1' }] },
+  { featureType: 'road.highway',        elementType: 'geometry.stroke', stylers: [{ color: '#64748b' }] },
+  { featureType: 'road.local',          elementType: 'geometry', stylers: [{ color: '#475569' }] },
+  { featureType: 'transit',             elementType: 'labels',   stylers: [{ visibility: 'off' }] },
+  { featureType: 'water',               elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+  { featureType: 'water',               elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
+]
 
 export default function GpsTrackV2() {
   const navigate = useNavigate()
@@ -204,19 +223,12 @@ export default function GpsTrackV2() {
       const map = new google.maps.Map(containerRef.current, {
         center,
         zoom: 13,
-        // Dark style matches v2 theme. Google Maps stock light tiles
-        // look out of place inside the v2 admin chrome; this is the
-        // closest built-in option to our --v2-bg-0/1/2 palette.
-        styles: [
-          { elementType: 'geometry',       stylers: [{ color: '#1d2129' }] },
-          { elementType: 'labels.text.stroke', stylers: [{ color: '#1d2129' }] },
-          { elementType: 'labels.text.fill',   stylers: [{ color: '#94a3b8' }] },
-          { featureType: 'road',           elementType: 'geometry', stylers: [{ color: '#334155' }] },
-          { featureType: 'road.highway',   elementType: 'geometry', stylers: [{ color: '#475569' }] },
-          { featureType: 'water',          elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-          { featureType: 'poi',            elementType: 'labels',   stylers: [{ visibility: 'off' }] },
-          { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
-        ],
+        // Phase 70.7 (22 May 2026) — lightened dark style so streets
+        // read clearly against the dark canvas. Previous palette had
+        // roads at #334155 which was almost the same value as the
+        // ground (#1d2129) — owner reported "map tiles too dark, road
+        // network barely visible".
+        styles: DARK_MAP_STYLE,
         disableDefaultUI: false,
         mapTypeControl: false,
         streetViewControl: false,
@@ -226,21 +238,22 @@ export default function GpsTrackV2() {
 
       const bounds = new google.maps.LatLngBounds()
 
-      // Phase 70 — raw cleaned polyline rendered first as a base layer
-      // (faint yellow). Roads API snapToRoads result overlays on top
-      // in bright yellow once it returns. Failures silently leave the
-      // raw line as the only visible path.
+      // Phase 70.7 — raw cleaned polyline is the fallback. Drawn at low
+      // opacity so the user has SOMETHING visible until the Directions
+      // API result lands. Once Directions returns a real road-following
+      // polyline, the raw line is removed (rawLine.setMap(null)).
+      let rawLine = null
       if (cleaned.length >= 2) {
         const path = cleaned.map(p => ({
           lat: Number(p.lat),
           lng: Number(p.lng),
         }))
         path.forEach(pt => bounds.extend(pt))
-        new google.maps.Polyline({
+        rawLine = new google.maps.Polyline({
           path,
           strokeColor:    '#FFE600',
-          strokeOpacity:  0.75,
-          strokeWeight:   4,
+          strokeOpacity:  0.45,
+          strokeWeight:   3,
           map,
         })
         map.fitBounds(bounds, 60)
@@ -319,6 +332,11 @@ export default function GpsTrackV2() {
                 strokeWeight:  6,
                 map: mapRef.current,
               })
+              // Phase 70.7 — remove the raw fallback line now that the
+              // road-snapped polyline is on the map.
+              if (rawLine) {
+                try { rawLine.setMap(null) } catch { /* swallow */ }
+              }
             })
             .catch(() => { /* raw line stays as fallback */ })
         }
