@@ -18,11 +18,22 @@ import { useNavigate } from 'react-router-dom'
 import { Clock, Calendar, CalendarClock, Loader2, CheckCircle2, FileText, IndianRupee, Repeat } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import { useAuthStore } from '../../store/authStore'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 
 export default function TodaySummaryCard({ userId, session }) {
   const navigate = useNavigate()
+  // Phase 87.3 — hide meeting-related tiles for telecallers (Dhara,
+  // Rima) AND the TC head (Renuka: role=telecaller, team_role=
+  // sales_manager). Owner directive 24 May 2026: "telecaller still
+  // show meetings in kpi". TC doesn't do field meetings so the
+  // Today + Scheduled tiles read as noise.
+  // Sales managers who run field teams (Jubin: role=sales,
+  // team_role=sales_manager) keep seeing meetings — they DO meet
+  // clients. Filter only on role.
+  const profile = useAuthStore(s => s.profile)
+  const isTC = profile?.role === 'telecaller'
   const [counts, setCounts] = useState(null)
   // Phase 34Z.62 — remember the highest follow-up count we've seen
   // this session. When the current count drops to 0 AND the high
@@ -205,16 +216,20 @@ export default function TodaySummaryCard({ userId, session }) {
   //   - Icon above label (not inline), tightens column width.
   //   - Big number centered, label centered below.
   //   - Padding 8/8, gap 6, radius 12 — same spec.
-  const cells = [
+  const allCells = [
     // Row 1 — call-action today
     { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Follow-up',     n: counts.followUps,         to: '/follow-ups' },
     { icon: FileText,      tint: 'var(--blue, #3B82F6)',    label: 'Quote',         n: counts.quoteChase,        to: '/follow-ups?filter=quote_chase' },
     { icon: IndianRupee,   tint: 'var(--danger, #EF4444)',  label: 'Payment',       n: counts.paymentChase,      to: '/follow-ups?filter=payment' },
     // Row 2 — future / informational
-    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Today',         n: counts.plannedMeetings,   to: '/work#day-status' },
-    { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled',     n: counts.scheduledMeetings, to: '/follow-ups?filter=meetings' },
+    // Phase 87.3 — `meetingTile=true` flag marks tiles that get
+    // hidden for TC users. Today + Scheduled both surface field-
+    // meeting counts; TC doesn't do field meetings.
+    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Today',         n: counts.plannedMeetings,   to: '/work#day-status',          meetingTile: true },
+    { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled',     n: counts.scheduledMeetings, to: '/follow-ups?filter=meetings', meetingTile: true },
     { icon: Repeat,        tint: 'var(--success, #10B981)', label: 'Renewal',       n: counts.renewal,           to: '/renewal-tools' },
   ]
+  const cells = isTC ? allCells.filter(c => !c.meetingTile) : allCells
 
   return (
     <div className="m-card" style={{

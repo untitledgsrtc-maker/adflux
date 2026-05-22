@@ -1094,7 +1094,7 @@ export default function WorkV2() {
 
 function DayStatusSurface(props) {
   const {
-    session, targets, counters,
+    session, profile, targets, counters,
     plannedMeetings, setPlannedMeetings,
     plannedCalls, setPlannedCalls,
     plannedLeads, setPlannedLeads,
@@ -1130,7 +1130,12 @@ function DayStatusSurface(props) {
           accent={tone === 'good'}
         />
         <div className="m-counters">
-          <Counter num={counters.meetings || 0} target={targets.meetings} label="Meetings" tone={counters.meetings >= targets.meetings ? 'good' : 'warn'} />
+          {/* Phase 87.3 — hide Meetings counter for TC. Same logic
+              as TodaySummaryCard: role=telecaller catches Dhara,
+              Rima, Renuka (TC head). */}
+          {profile?.role !== 'telecaller' && (
+            <Counter num={counters.meetings || 0} target={targets.meetings} label="Meetings" tone={counters.meetings >= targets.meetings ? 'good' : 'warn'} />
+          )}
           <Counter num={counters.calls || 0} target={targets.calls} label="Calls" tone={counters.calls >= targets.calls ? 'good' : 'warn'} />
           <Counter num={counters.new_leads || 0} target={targets.new_leads} label="Leads" tone={counters.new_leads >= targets.new_leads ? 'good' : 'warn'} />
         </div>

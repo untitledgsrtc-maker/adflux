@@ -170,6 +170,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   }, [isAdmin])
 
   // Load TA rows whenever rep or month changes.
+  // Phase 87.1 — fUser='ALL' loads rows across every active rep.
   async function loadRows() {
     if (!fUser || !fMonth) { setRows([]); return }
     setLoading(true); setErr('')
@@ -179,12 +180,13 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       d.setDate(0)
       return d.toISOString().slice(0, 10)
     })()
-    const { data, error } = await supabase.from('daily_ta')
+    let q = supabase.from('daily_ta')
       .select('*')
-      .eq('user_id', fUser)
       .gte('ta_date', fMonth)
       .lte('ta_date', monthEnd)
       .order('ta_date', { ascending: true })
+    if (fUser !== 'ALL') q = q.eq('user_id', fUser)
+    const { data, error } = await q
     setLoading(false)
     if (error) { setErr(error.message); return }
     setRows(data || [])
@@ -249,21 +251,42 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     loadCeilings()
   }
 
+  // Phase 87.2 — hide zero-value rows from the approval list.
+  // Owner directive 24 May 2026: "with 0 amount why we need to
+  // approve it? it should not show if all value is 0". When a rep
+  // has no GPS pings for a day, compute_daily_ta auto-creates a
+  // row with km=0, da=0, bike=0, hotel=0, total=0. Surfacing 22
+  // such rows per rep × 6 reps was noise.
+  // Toggle `showEmpty` lets admin opt back in if they want to see
+  // the full calendar including idle days.
+  const [showEmpty, setShowEmpty] = useState(false)
+  const isZeroRow = (r) =>
+    Number(r.km_traveled || 0) === 0 &&
+    Number(r.da_amount   || 0) === 0 &&
+    Number(r.bike_amount || 0) === 0 &&
+    Number(r.hotel_amount|| 0) === 0 &&
+    Number(r.total_amount|| 0) === 0
+
   // Phase 33M — scope rows to status filter. Totals + bulk operations
   // act on the FILTERED set so admin can "approve all visible
   // pending" without affecting other statuses.
   const visibleRows = useMemo(() => {
-    if (statusFilter === 'all') return rows
-    return rows.filter(r => r.status === statusFilter)
-  }, [rows, statusFilter])
+    const byStatus = statusFilter === 'all'
+      ? rows
+      : rows.filter(r => r.status === statusFilter)
+    return showEmpty ? byStatus : byStatus.filter(r => !isZeroRow(r))
+  }, [rows, statusFilter, showEmpty])
 
-  // Status counts for the filter chips — show counts so admin sees
-  // at-a-glance how many rows are pending vs approved etc.
+  // Status counts — recompute on the non-empty subset by default so
+  // the chip badges match what admin actually sees.
   const statusCounts = useMemo(() => {
-    const out = { all: rows.length, pending: 0, approved: 0, paid: 0, rejected: 0 }
-    rows.forEach(r => { out[r.status] = (out[r.status] || 0) + 1 })
+    const source = showEmpty ? rows : rows.filter(r => !isZeroRow(r))
+    const out = { all: source.length, pending: 0, approved: 0, paid: 0, rejected: 0 }
+    source.forEach(r => { out[r.status] = (out[r.status] || 0) + 1 })
     return out
-  }, [rows])
+  }, [rows, showEmpty])
+
+  const hiddenZeroCount = rows.filter(isZeroRow).length
 
   // Bulk approve every visible pending row. Confirmation required.
   async function bulkApprovePending() {
@@ -708,6 +731,11 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
           <div>
             <label style={labelStyle}>Team member</label>
             <select value={fUser} onChange={e => setFUser(e.target.value)} style={inputStyle}>
+              {/* Phase 87.1 — "All team" option. fUser='ALL' loads
+                  aggregated rows across all reps for the month.
+                  Recompute button disables when ALL is selected
+                  (per-rep operation only). */}
+              <option value="ALL">All team</option>
               {users.map(u => (
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
@@ -724,10 +752,12 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
           <button
             type="button"
             onClick={handleRecompute}
-            disabled={recomputing || !fUser}
+            disabled={recomputing || !fUser || fUser === 'ALL'}
             className="v2d-ghost"
             style={{ alignSelf: 'end', height: 38 }}
-            title="Re-run compute_daily_ta for every day in this month. Approved/paid days are preserved."
+            title={fUser === 'ALL'
+              ? 'Pick a specific rep to recompute their month'
+              : 'Re-run compute_daily_ta for every day in this month. Approved/paid days are preserved.'}
           >
             <RefreshCw size={14} /> {recomputing ? 'Recomputing…' : 'Recompute month'}
           </button>
@@ -792,6 +822,25 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
             </button>
           ))}
         </div>
+        {/* Phase 87.2 — show-empty-days toggle. Default OFF (clean
+            list). Click to re-include zero-amount auto-rows. */}
+        {hiddenZeroCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowEmpty(v => !v)}
+            style={{
+              padding: '5px 10px', borderRadius: 999, border: '1px solid var(--v2-line)',
+              background: 'transparent', color: 'var(--v2-ink-2)',
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+            title={showEmpty ? 'Hide days with no TA earned' : 'Show all days including idle ones'}
+          >
+            {showEmpty
+              ? `Hide ${hiddenZeroCount} empty day${hiddenZeroCount === 1 ? '' : 's'}`
+              : `Show ${hiddenZeroCount} empty day${hiddenZeroCount === 1 ? '' : 's'}`}
+          </button>
+        )}
         <button
           type="button"
           onClick={bulkApprovePending}
@@ -839,6 +888,9 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--v2-line)', color: 'var(--v2-ink-2)' }}>
                   <th style={thStyle}>Date</th>
+                  {/* Phase 87.1 — Rep column shown only when "All
+                      team" is selected; per-rep view doesn't need it. */}
+                  {fUser === 'ALL' && <th style={thStyle}>Rep</th>}
                   <th style={thStyle}>City</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>KM</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>DA</th>
@@ -856,6 +908,13 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                       <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{fmtDateShort(r.ta_date)}</div>
                       <div style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{fmtDow(r.ta_date)}</div>
                     </td>
+                    {fUser === 'ALL' && (
+                      <td style={tdStyle}>
+                        <span style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
+                          {users.find(u => u.id === r.user_id)?.name || '—'}
+                        </span>
+                      </td>
+                    )}
                     <td style={tdStyle}>
                       {r.primary_city ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
