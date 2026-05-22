@@ -275,7 +275,12 @@ export default function GpsTrackV2() {
             .map(p => `${Number(p.lat).toFixed(6)},${Number(p.lng).toFixed(6)}`)
             .join('|')
           const url = `https://roads.googleapis.com/v1/snapToRoads?path=${encodeURIComponent(pathStr)}&interpolate=true&key=${MAPS_KEY}`
-          fetch(url).then(r => r.ok ? r.json() : null).then(json => {
+          // Phase 70.5 (22 May 2026) — explicit referrerPolicy: 'origin'
+          // so Chrome sends the page origin as Referer header. Without
+          // it, fetch() sometimes sends empty referer → Google rejects
+          // with API_KEY_HTTP_REFERRER_BLOCKED.
+          fetch(url, { referrerPolicy: 'origin' })
+            .then(r => r.ok ? r.json() : null).then(json => {
             if (!mapRef.current) return
             if (!json || !Array.isArray(json.snappedPoints)) return
             if (json.snappedPoints.length < 2) return
