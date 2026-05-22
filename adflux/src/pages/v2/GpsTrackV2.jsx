@@ -192,7 +192,9 @@ export default function GpsTrackV2() {
       const loader = new Loader({
         apiKey: MAPS_KEY,
         version: 'weekly',
-        libraries: [],
+        // Phase 70.6 — geometry library needed for decodePath() to
+        // render the Directions API encoded polyline.
+        libraries: ['geometry'],
       })
       const google = await loader.load()
 
@@ -243,14 +245,29 @@ export default function GpsTrackV2() {
         })
         map.fitBounds(bounds, 60)
 
-        // Phase 70.4 (22 May 2026) — owner reported "still direct
-        // line not actual route". Cause: cleanTrack drops drift +
-        // speed-spike pings, often shrinking 37 raw pings down to 2.
-        // Roads API snapToRoads with only 2 points = straight line
-        // between snapped endpoints. Fix: send RAW pings (sorted by
-        // time, loose accuracy filter ≤200m, sampled to 100 max) so
-        // snapToRoads has enough waypoints to follow the road
-        // network with interpolate=true.
+        // Phase 70.6 (22 May 2026) — owner reported "still direct line".
+        // Real cause: 46 raw pings cluster at 2-3 spots (rep had GPS at
+        // checkin + parked + checkout, missed in-vehicle travel pings).
+        // Roads API snapToRoads can't reconstruct a 7km route from 2
+        // distinct geographic points; interpolate=true only works for
+        // points along the same road.
+        //
+        // Switch to Directions API via a server-side proxy
+        // (/api/directions). Server proxy avoids the Chrome
+        // referrer-policy block that hits client-side Roads API calls
+        // restricted by Websites referers. Server key is stored in
+        // Vercel env as ROADS_KEY_SERVER (no VITE_ prefix → never in
+        // client bundle).
+        //
+        // Strategy:
+        //   • origin      = first raw ping (check-in)
+        //   • destination = last raw ping (check-out)
+        //   • waypoints   = up to 8 intermediate stop centroids (from
+        //                   detectStops) so the route hits where the
+        //                   rep actually parked, not just start→end
+        //
+        // Directions API returns the encoded polyline; we decode via
+        // google.maps.geometry.encoding.decodePath().
         const ACC_LOOSE = 200
         const sortedRaw = pings
           .filter(p => {
@@ -259,44 +276,51 @@ export default function GpsTrackV2() {
           })
           .slice()
           .sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at))
-        // Sample down to 100 evenly. Roads API hard limit per request.
-        let snapInput = sortedRaw
-        if (sortedRaw.length > 100) {
-          const step = sortedRaw.length / 100
-          snapInput = []
-          for (let i = 0; i < 100; i++) {
-            snapInput.push(sortedRaw[Math.floor(i * step)])
-          }
-          // Always include final ping so route ends at check-out.
-          snapInput.push(sortedRaw[sortedRaw.length - 1])
-        }
-        if (snapInput.length >= 2) {
-          const pathStr = snapInput
-            .map(p => `${Number(p.lat).toFixed(6)},${Number(p.lng).toFixed(6)}`)
+
+        if (sortedRaw.length >= 2) {
+          const origin = sortedRaw[0]
+          const dest   = sortedRaw[sortedRaw.length - 1]
+          const wayPts = (stops || [])
+            .slice(0, 8)
+            .map(s => `${Number(s.lat).toFixed(6)},${Number(s.lng).toFixed(6)}`)
             .join('|')
-          const url = `https://roads.googleapis.com/v1/snapToRoads?path=${encodeURIComponent(pathStr)}&interpolate=true&key=${MAPS_KEY}`
-          // Phase 70.5 (22 May 2026) — explicit referrerPolicy: 'origin'
-          // so Chrome sends the page origin as Referer header. Without
-          // it, fetch() sometimes sends empty referer → Google rejects
-          // with API_KEY_HTTP_REFERRER_BLOCKED.
-          fetch(url, { referrerPolicy: 'origin' })
-            .then(r => r.ok ? r.json() : null).then(json => {
-            if (!mapRef.current) return
-            if (!json || !Array.isArray(json.snappedPoints)) return
-            if (json.snappedPoints.length < 2) return
-            const segPath = json.snappedPoints.map(sp => ({
-              lat: Number(sp?.location?.latitude),
-              lng: Number(sp?.location?.longitude),
-            })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
-            if (segPath.length < 2) return
-            new google.maps.Polyline({
-              path: segPath,
-              strokeColor:   '#FFE600',
-              strokeOpacity: 1,
-              strokeWeight:  6,
-              map: mapRef.current,
+          const qs = new URLSearchParams({
+            origin:      `${Number(origin.lat).toFixed(6)},${Number(origin.lng).toFixed(6)}`,
+            destination: `${Number(dest.lat).toFixed(6)},${Number(dest.lng).toFixed(6)}`,
+            mode:        'driving',
+          })
+          if (wayPts) qs.set('waypoints', wayPts)
+
+          // Need google.maps.geometry to decode polyline.
+          const geometry = await google.maps.importLibrary
+            ? await google.maps.importLibrary('geometry')
+            : null
+          // (older API: geometry library loaded via `libraries: ['geometry']`
+          // in Loader. We add it below if importLibrary not available.)
+
+          fetch(`/api/directions?${qs.toString()}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(json => {
+              if (!mapRef.current) return
+              if (!json?.polyline) return
+              let decoded = null
+              try {
+                if (geometry?.encoding?.decodePath) {
+                  decoded = geometry.encoding.decodePath(json.polyline)
+                } else if (google.maps.geometry?.encoding?.decodePath) {
+                  decoded = google.maps.geometry.encoding.decodePath(json.polyline)
+                }
+              } catch (_) { /* fall through */ }
+              if (!decoded || decoded.length < 2) return
+              new google.maps.Polyline({
+                path: decoded,
+                strokeColor:   '#FFE600',
+                strokeOpacity: 1,
+                strokeWeight:  6,
+                map: mapRef.current,
+              })
             })
-          }).catch(() => { /* raw line stays as fallback */ })
+            .catch(() => { /* raw line stays as fallback */ })
         }
       } else if (cleaned.length === 1) {
         map.setCenter(center)
