@@ -1068,3 +1068,147 @@ d018bdd Phase 84.5.1: fix gpsOffEvents ReferenceError in RepDaySections
   Phase 70.6.1; restated here because TeamDashboardV2 uses
   `libraries: ['geometry']` which must match GpsTrackV2's loader
   for the singleton to settle clean.
+
+---
+
+## 35 · Blast-radius rule — NEVER push without surrounding-code audit (2026-05-23, OWNER DIRECTIVE)
+
+Owner directive 23 May 2026 (after 4 recovery cycles in one session
+from Phase 84.5 `gpsOffEvents` scope bug + Phase 85.3 `_auth.js`
+Vercel bundling crash + Phase 85.3.1 `_guard.js` same bundling crash):
+
+> "now make perment rule any chnages even small chek entire
+>  surrouding code so this not happned. dont push untile all no
+>  bug free for that of you need agent you can create. but i
+>  dont want to spile time just to recover what we build"
+
+This is a HARD rule. Higher priority than ship-speed. No exceptions.
+
+### What "surrounding code" means
+
+For EVERY change, before commit, audit:
+
+1. **Direct callers** — every file that imports / calls the
+   symbol you touched. Use `Grep` or
+   `query_graph pattern=callers_of target=<symbol>`.
+2. **Scope chain** — if you add / extract / move a sub-component,
+   verify every state + prop + ref it closes over still resolves.
+   The Phase 84.5 `gpsOffEvents` bug: state in parent, used in
+   child sub-component, no prop wire → free reference → runtime
+   crash. Always grep the moved code for identifiers and confirm
+   each one is either (a) in the new scope, (b) imported, or (c)
+   passed as a prop.
+3. **Build-system contract** — Vercel serverless functions do NOT
+   bundle `_`-prefixed sibling files (confirmed via 85.3 + 85.3.1
+   double-crash). Other build quirks: Vite chunk splits,
+   Capacitor `server.url` vs bundled, PWA service-worker cache,
+   esbuild minifier free-variable preservation. If your change
+   touches an `api/*.js` file, a Vite config, or a `capacitor.
+   config.json` — read the build docs OR test in deployed preview
+   before pushing to prod.
+4. **Runtime contract** — what's actually executed in production?
+   Vercel functions on Node 18+ ESM, Capacitor APK shell, PWA on
+   iOS Safari home-screen, browser web. The same JS line behaves
+   differently across these. If you can't predict the runtime
+   behaviour, deploy to a Vercel preview branch FIRST.
+5. **Sales-frozen contracts** (§28 / §29 / §31) — if the change
+   touches a frozen file, INVOKE sales-module-guardian agent
+   BEFORE commit. The guardian is read-only; it costs nothing
+   to run and catches contract drift the eyeball misses.
+
+### Pre-commit verification (mandatory, supersedes §15)
+
+This replaces the lighter §15 protocol. New gates, in order:
+
+| Gate | Tool | Pass condition |
+|---|---|---|
+| 1 | `esbuild --loader:.jsx=jsx` parse on every changed `.jsx` | No syntax error |
+| 2 | `node --check` on every changed `.js` API file | No syntax error |
+| 3 | `bash scripts/check-sql-schema.sh` on every changed `.sql` | No structure warning |
+| 4 | `bash scripts/check-jsx-brand.sh` on every changed `.jsx` | No `#facc15` / off-token violations |
+| 5 | **Blast-radius scan** — for each touched symbol, `grep -rn '<symbol>'` across `src/` + `api/`. Read every match. Confirm scope, types, deps still valid. | Zero free references, zero stale callers |
+| 6 | **Build-system check** — if change touches `api/*`, `vite.config.*`, `capacitor.config.*`, `vercel.json`, `index.html`, `package.json`: spawn `Plan` agent OR test in Vercel preview deploy. | Plan agent PASS or preview deploy returns expected behaviour |
+| 7 | **Frozen-module check** — if change touches any §28 file: invoke `sales-module-guardian` agent | Guardian PASS (no P0/P1 findings) |
+| 8 | **Runtime check** — predict the deployed behaviour. If you can't predict it (new Vercel function, new APK plugin, new service worker), DO NOT commit-to-push. Deploy to preview branch first. | Owner-verifiable smoke OR preview confirms |
+
+Skip a gate only with owner's explicit one-line approval. Never
+skip silently.
+
+### When to spawn an agent
+
+If the change is bigger than a 1-file pure tweak:
+
+- **`Plan` agent** — multi-file changes, refactors, new architecture.
+  Returns ordered steps + critical files. Use BEFORE writing code.
+- **`Explore` agent** — "what's the blast radius of touching
+  `<symbol>`" or "where is `<X>` used across the codebase". Returns
+  reference list.
+- **`general-purpose` agent (worktree)** — full-scope verification
+  (parse all changed files, grep all consumers, simulate a build).
+  Use when the change is risky AND you don't have a preview deploy.
+- **`sales-module-guardian` agent** — read-only audit of sales-
+  frozen surfaces. Cheap; ALWAYS use when a §28 file is in the diff.
+- **`code-reviewer` agent** — second-opinion review for any change
+  that landed bugs in the past 3 sessions (e.g. API endpoints +
+  sub-component extractions).
+
+Agent cost ≪ owner's recovery cost. When in doubt, spawn.
+
+### "Don't push until bug-free"
+
+A push fires Vercel deploy → owner smokes on iPhone → if broken,
+owner has to:
+1. Notice the bug.
+2. Wait for me to diagnose.
+3. Wait for me to fix.
+4. Push again.
+5. Wait for new build.
+6. Re-smoke.
+
+That cycle is ~10-15 min minimum, often longer with PWA cache.
+Today wasted 3 cycles on the same Vercel `_` bundling issue.
+
+NEW RULE: I do NOT advise pushing until I have verified the
+change works. Verification path:
+
+- **Pure FE change with parse-check + grep-clean**: OK to advise
+  push immediately.
+- **Vercel API change**: MUST hit the function via curl on a
+  preview URL OR confirm the import graph is `_`-prefix-free
+  AND the helper is inlined OR the helper has a bare name AND
+  has been tested in a previous deploy. NO theoretical fixes.
+- **Sub-component extraction / state move**: MUST grep every
+  identifier in the moved block. Confirm parent + child have
+  matching scopes. If unsure, run general-purpose agent first.
+- **SQL migration**: MUST end with `-- VERIFY` block. Idempotent
+  re-run friendly. Owner pastes manually; can't test from here.
+- **Build / capacitor / vercel.json change**: MUST deploy to a
+  preview URL FIRST. Confirm runtime behaviour. Only then push
+  to `untitled-os` (production).
+
+If a fix has any uncertainty, SAY SO explicitly. Don't claim
+"fixed" when it's "I think it's fixed but haven't tested in the
+target runtime".
+
+### Today's lessons baked in
+
+- ❌ Don't extract a sub-component without grepping every
+  identifier in the moved block. Phase 84.5 cost a recovery cycle.
+- ❌ Don't add a Vercel `_`-prefixed helper expecting it to be
+  bundled. It isn't on this project. Inline OR rename without
+  underscore. Phase 85.3 + 85.3.1 cost TWO recovery cycles for
+  the same root issue.
+- ❌ Don't silent-bail in a fetch IIFE. If auth check fails,
+  surface it (toast + console) so the bug is visible. Phase 85.3
+  hid the FUNCTION_INVOCATION_FAILED for the entire deploy window.
+- ❌ Don't push a "fix" without running curl / claude-in-chrome
+  against the new endpoint. Phase 85.3.1 was committed as a fix,
+  pushed, and still 500-ed. We learn this AFTER the push.
+
+### Owner's expectation
+
+When I say "push now" — it means I have verified the change works.
+When I say "let me verify first" — that's the new default for
+anything outside trivial scope. Recovery cycles are MY failure to
+audit, not the owner's failure to test. The buck stops here.
+
