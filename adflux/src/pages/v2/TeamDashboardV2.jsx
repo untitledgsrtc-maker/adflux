@@ -183,6 +183,13 @@ export default function TeamDashboardV2() {
   // to force the marker effect to re-run with the now-cached image.
   const imageCacheRef   = useRef({})
   const [iconBump, setIconBump] = useState(0)
+  // Phase 89.1 — lead pins on the live field map. Activities with
+  // GPS coords during the period window (meeting / site_visit)
+  // surface as blue pins so admin sees where the team actually went
+  // even on quiet days with zero rep pings. Owner directive 23 May
+  // 2026: "i want pin lead and person whne they are in field".
+  const [leadActivitiesGeo, setLeadActivitiesGeo] = useState([])
+  const leadMarkersRef = useRef({})
   const [newLeadsToday, setNewLeadsToday] = useState(0)
   const [pipelineToday, setPipelineToday] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -218,7 +225,7 @@ export default function TeamDashboardV2() {
       // the pre-Phase-82 code path.
       const today = period.startIso
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, actGeoRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -302,6 +309,19 @@ export default function TeamDashboardV2() {
         // unsettled-quote counts.
         supabase.from('payments')
           .select('quote_id, amount_received, approval_status'),
+        // Phase 89.1 — geo-tagged lead activities in the period
+        // window for blue lead pins on the live field map.
+        // Meeting / site_visit only — calls + notes don't earn a
+        // location pin since the rep isn't physically there.
+        // Joined to leads(name, company) for InfoWindow content.
+        supabase.from('lead_activities')
+          .select('id, created_at, created_by, activity_type, outcome, gps_lat, gps_lng, lead:lead_id(id, name, company)')
+          .in('activity_type', ['meeting', 'site_visit'])
+          .not('gps_lat', 'is', null)
+          .not('gps_lng', 'is', null)
+          .gte('created_at', startOfDay)
+          .lt ('created_at', endOfDay)
+          .order('created_at', { ascending: false }),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
@@ -418,6 +438,28 @@ export default function TeamDashboardV2() {
         // Defensive — RLS hiccup shouldn't break the page render.
         console.warn('[team-dashboard] push load failed:', e?.message || e)
       }
+
+      // Phase 89.1 — geo-tagged lead activities populate blue
+      // lead pins on the field map. Coerced to numbers + filtered
+      // to drop malformed rows (defensive: PostgREST nests join
+      // result as `lead`, may be null if FK orphaned).
+      const geoRows = (actGeoRes?.data || [])
+        .filter(a => Number.isFinite(Number(a.gps_lat))
+                  && Number.isFinite(Number(a.gps_lng))
+                  && a.lead?.id)
+        .map(a => ({
+          id:        a.id,
+          lat:       Number(a.gps_lat),
+          lng:       Number(a.gps_lng),
+          created_at: a.created_at,
+          created_by: a.created_by,
+          activity_type: a.activity_type,
+          outcome:   a.outcome,
+          lead_id:   a.lead.id,
+          lead_name: a.lead.name || '',
+          lead_company: a.lead.company || '',
+        }))
+      setLeadActivitiesGeo(geoRows)
 
       setLoading(false)
     }
@@ -631,6 +673,82 @@ export default function TeamDashboardV2() {
       } catch { /* swallow */ }
     }
   }, [latestPingByUser, reps, iconBump])
+
+  // Phase 89.1 — Lead pins from geo-tagged activities. Blue
+  // map pins where the team met clients in the selected period.
+  // InfoWindow shows company/name + rep + time + outcome chip.
+  // Reuses the same map ref; separate marker dict keyed by
+  // activity id so reps + leads coexist without overwriting.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const google = map.__google
+    if (!google) return
+    const seen = new Set()
+    const repNameById = new Map(reps.map(r => [r.id, r.name]))
+    // Lead-pin icon: filled blue circle with dark stroke. Distinct
+    // from the avatar rep pins (which carry a freshness colour band).
+    const ICON = {
+      path:         google.maps.SymbolPath.CIRCLE,
+      scale:        8,
+      fillColor:    '#3B82F6',
+      fillOpacity:  0.9,
+      strokeColor:  '#0f172a',
+      strokeWeight: 2,
+    }
+    const esc = (v) => String(v ?? '')
+      .replace(/&/g,  '&amp;')
+      .replace(/</g,  '&lt;')
+      .replace(/>/g,  '&gt;')
+      .replace(/"/g,  '&quot;')
+      .replace(/'/g,  '&#39;')
+    for (const a of leadActivitiesGeo) {
+      seen.add(a.id)
+      const pos = { lat: a.lat, lng: a.lng }
+      const repName = repNameById.get(a.created_by) || '—'
+      const timeStr = new Date(a.created_at).toLocaleTimeString('en-IN', {
+        hour: '2-digit', minute: '2-digit', hour12: true,
+      })
+      const heading = a.lead_company || a.lead_name || 'Lead'
+      const sub = a.lead_company && a.lead_name ? esc(a.lead_name) : ''
+      const kind = a.activity_type === 'site_visit' ? 'Site visit' : 'Meeting'
+      const outcomeBit = a.outcome
+        ? ` · <span style="text-transform:capitalize">${esc(a.outcome)}</span>`
+        : ''
+      const html = `
+        <div style="font-family:'DM Sans',sans-serif;min-width:180px">
+          <div style="font-weight:700;font-size:13px;color:#0f172a">${esc(heading)}</div>
+          ${sub ? `<div style="font-size:11px;color:#475569;margin-top:2px">${sub}</div>` : ''}
+          <div style="font-size:11px;color:#475569;margin-top:6px">${kind} · ${esc(repName)} · ${timeStr}${outcomeBit}</div>
+          <a href="/leads/${esc(a.lead_id)}" style="display:inline-block;margin-top:8px;font-size:11px;color:#1d4ed8;text-decoration:none;font-weight:600">Open lead →</a>
+        </div>
+      `
+      const existing = leadMarkersRef.current[a.id]
+      if (existing) {
+        existing.setPosition(pos)
+        existing.__iw?.setContent(html)
+      } else {
+        const m = new google.maps.Marker({
+          position: pos,
+          map,
+          icon: ICON,
+          title: heading,
+          zIndex: 1,  // Below rep avatar pins.
+        })
+        const iw = new google.maps.InfoWindow({ content: html })
+        m.addListener('click', () => iw.open({ anchor: m, map }))
+        m.__iw = iw
+        leadMarkersRef.current[a.id] = m
+      }
+    }
+    // Cleanup stale markers (activity removed / date changed).
+    for (const id of Object.keys(leadMarkersRef.current)) {
+      if (!seen.has(id)) {
+        try { leadMarkersRef.current[id].setMap(null) } catch { /* */ }
+        delete leadMarkersRef.current[id]
+      }
+    }
+  }, [leadActivitiesGeo, reps])
 
   // Phase 70.2 — Supabase Realtime subscription on gps_pings INSERT.
   // Updates latestPingByUser in-place so the marker effect re-runs.
