@@ -23,8 +23,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users as UsersIcon, MapPin, Mic, Loader2 } from 'lucide-react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { Loader } from '@googlemaps/js-api-loader'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
@@ -215,47 +214,75 @@ export default function TeamDashboardV2() {
   // fired. Re-runs when loading flips false so the map mounts as soon
   // as the container is in the DOM. Includes a 50ms timeout so layout
   // settles + invalidateSize after attach to force tile load.
+  // Phase 70.3 (22 May 2026) — Google Maps JS API. Owner: "we paid
+  // for Google Maps API, use it". Free tier 10K map loads/month
+  // covers our usage. Realtime channel updates marker positions in
+  // place via google.maps.Marker.setPosition(); no re-render of all
+  // markers needed.
   useEffect(() => {
     if (!isPrivileged) return
     if (loading) return
     if (mapRef.current) return  // already mounted
 
-    const t = setTimeout(() => {
+    const MAPS_KEY = import.meta.env.VITE_GOOGLE_ROADS_KEY || ''
+    if (!MAPS_KEY) return  // silent — page still works without map
+
+    let cancelled = false
+    ;(async () => {
+      const loader = new Loader({
+        apiKey: MAPS_KEY,
+        version: 'weekly',
+        libraries: [],
+      })
+      const google = await loader.load()
+      if (cancelled) return
       if (!mapContainerRef.current) return
       if (mapRef.current) return
-      // Default centre: Vadodara. Adjusts to fit reps as markers land.
-      const map = L.map(mapContainerRef.current).setView([22.3072, 73.1812], 12)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
-        maxZoom: 19,
-      }).addTo(map)
+
+      const map = new google.maps.Map(mapContainerRef.current, {
+        center: { lat: 22.3072, lng: 73.1812 },  // Vadodara
+        zoom: 12,
+        styles: [
+          { elementType: 'geometry',       stylers: [{ color: '#1d2129' }] },
+          { elementType: 'labels.text.stroke', stylers: [{ color: '#1d2129' }] },
+          { elementType: 'labels.text.fill',   stylers: [{ color: '#94a3b8' }] },
+          { featureType: 'road',           elementType: 'geometry', stylers: [{ color: '#334155' }] },
+          { featureType: 'road.highway',   elementType: 'geometry', stylers: [{ color: '#475569' }] },
+          { featureType: 'water',          elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+          { featureType: 'poi',            elementType: 'labels',   stylers: [{ visibility: 'off' }] },
+          { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+        ],
+        disableDefaultUI: false,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+      })
       mapRef.current = map
-      // Force tile recalc once container is in flow.
-      setTimeout(() => { try { map.invalidateSize() } catch { /* */ } }, 100)
-    }, 50)
+      // Stash google reference on map so the markers effect can use it.
+      map.__google = google
+    })()
 
     return () => {
-      clearTimeout(t)
-      if (mapRef.current) {
-        try { mapRef.current.remove() } catch { /* swallow */ }
-        mapRef.current = null
-        markersRef.current = {}
-      }
+      cancelled = true
+      mapRef.current = null
+      markersRef.current = {}
     }
   }, [isPrivileged, loading])
 
-  // Phase 70.2 — Render / update markers whenever latestPingByUser
-  // changes. New rep ping → new marker; updated ping → move marker.
-  // Stale rep (no ping today) → no marker. Marker color by freshness:
+  // Phase 70.3 — Render / update Google Maps markers whenever
+  // latestPingByUser changes. Marker color band by freshness:
   //   green = ping within last 5 min
   //   amber = 5–30 min stale
   //   red   = 30+ min stale
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
+    const google = map.__google
+    if (!google) return
     const now = Date.now()
     const seenIds = new Set()
-    const bounds = []
+    const bounds = new google.maps.LatLngBounds()
+    let anyPinned = false
 
     for (const r of reps) {
       const ping = latestPingByUser[r.id]
@@ -268,28 +295,42 @@ export default function TeamDashboardV2() {
                   : ageMin <= 30 ? '#F59E0B'
                   : '#EF4444'
       seenIds.add(r.id)
-      bounds.push([Number(ping.lat), Number(ping.lng)])
+      const pos = { lat: Number(ping.lat), lng: Number(ping.lng) }
+      bounds.extend(pos)
+      anyPinned = true
 
       const existing = markersRef.current[r.id]
       if (existing) {
-        existing.setLatLng([Number(ping.lat), Number(ping.lng)])
-        existing.setStyle({ color, fillColor: color })
-        existing.bindPopup(
-          `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>` +
-          `${Math.round(ageMin)} min ago`
-        )
-      } else {
-        const m = L.circleMarker([Number(ping.lat), Number(ping.lng)], {
-          radius: 9,
-          color,
-          weight: 2,
+        existing.setPosition(pos)
+        existing.setIcon({
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 9,
           fillColor: color,
           fillOpacity: 0.85,
-        }).addTo(map)
-        m.bindPopup(
-          `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>` +
-          `${Math.round(ageMin)} min ago`
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+        })
+        existing.__iw?.setContent(
+          `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>${Math.round(ageMin)} min ago`
         )
+      } else {
+        const m = new google.maps.Marker({
+          position: pos,
+          map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: color,
+            fillOpacity: 0.85,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          },
+        })
+        const iw = new google.maps.InfoWindow({
+          content: `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>${Math.round(ageMin)} min ago`,
+        })
+        m.addListener('click', () => iw.open({ anchor: m, map }))
+        m.__iw = iw
         markersRef.current[r.id] = m
       }
     }
@@ -297,16 +338,16 @@ export default function TeamDashboardV2() {
     // Remove markers for reps with no ping today (cleanup).
     for (const uid of Object.keys(markersRef.current)) {
       if (!seenIds.has(uid)) {
-        try { map.removeLayer(markersRef.current[uid]) } catch { /* */ }
+        try { markersRef.current[uid].setMap(null) } catch { /* */ }
         delete markersRef.current[uid]
       }
     }
 
     // Fit map to all visible markers on first render only.
-    if (bounds.length >= 1 && !map._teamDashboardFitDone) {
+    if (anyPinned && !map.__teamDashboardFitDone) {
       try {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 })
-        map._teamDashboardFitDone = true
+        map.fitBounds(bounds, 60)
+        map.__teamDashboardFitDone = true
       } catch { /* swallow */ }
     }
   }, [latestPingByUser, reps])

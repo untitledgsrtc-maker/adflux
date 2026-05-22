@@ -24,8 +24,7 @@ import { ArrowLeft, MapPin } from 'lucide-react'
 // firewall / corporate-proxy interference. Leaflet now bundled via
 // npm so it ships in the Vite chunk; no CDN dependency at runtime.
 // Adds ~40KB gzip to the GpsTrack chunk only (lazy-loaded).
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { Loader } from '@googlemaps/js-api-loader'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { formatDate } from '../../utils/formatters'
@@ -160,9 +159,11 @@ export default function GpsTrackV2() {
     if (pings.length === 0) return
     // Clean up any earlier map on this node (StrictMode double-mounts).
     if (mapRef.current) {
-      try { mapRef.current.remove() } catch (_) {}
       mapRef.current = null
     }
+    // Wrap async work inside a self-invoking async fn — useEffect
+    // can't return a Promise directly.
+    ;(async () => {
     try {
       // Phase 61.3 (19 May 2026) — owner reported the map showed
       // clusters of dots and a noisy polyline instead of a clean
@@ -178,158 +179,182 @@ export default function GpsTrackV2() {
       const cleaned = cleanTrack(pings)
       const stops   = detectStops(pings, { radiusM: 80, minMinutes: 10 })
 
+      // Phase 70.3 (22 May 2026) — swap Leaflet+OSM tiles for Google
+      // Maps JS API. Owner: "we paid for Google Maps API, use it".
+      // Free tier 10K map loads/month covers our usage. Roads API
+      // snap still applies; result rendered as google.maps.Polyline
+      // on top of the Google tiles.
+      const MAPS_KEY = import.meta.env.VITE_GOOGLE_ROADS_KEY || ''
+      if (!MAPS_KEY) {
+        setError('Google Maps key missing — set VITE_GOOGLE_ROADS_KEY in Vercel env.')
+        return
+      }
+      const loader = new Loader({
+        apiKey: MAPS_KEY,
+        version: 'weekly',
+        libraries: [],
+      })
+      const google = await loader.load()
+
       const center = cleaned.length > 0
-        ? [Number(cleaned[0].lat), Number(cleaned[0].lng)]
-        : [Number(pings[0].lat), Number(pings[0].lng)]
-      const map = L.map(containerRef.current).setView(center, 13)
+        ? { lat: Number(cleaned[0].lat), lng: Number(cleaned[0].lng) }
+        : { lat: Number(pings[0].lat), lng: Number(pings[0].lng) }
+      const map = new google.maps.Map(containerRef.current, {
+        center,
+        zoom: 13,
+        // Dark style matches v2 theme. Google Maps stock light tiles
+        // look out of place inside the v2 admin chrome; this is the
+        // closest built-in option to our --v2-bg-0/1/2 palette.
+        styles: [
+          { elementType: 'geometry',       stylers: [{ color: '#1d2129' }] },
+          { elementType: 'labels.text.stroke', stylers: [{ color: '#1d2129' }] },
+          { elementType: 'labels.text.fill',   stylers: [{ color: '#94a3b8' }] },
+          { featureType: 'road',           elementType: 'geometry', stylers: [{ color: '#334155' }] },
+          { featureType: 'road.highway',   elementType: 'geometry', stylers: [{ color: '#475569' }] },
+          { featureType: 'water',          elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+          { featureType: 'poi',            elementType: 'labels',   stylers: [{ visibility: 'off' }] },
+          { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+        ],
+        disableDefaultUI: false,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+      })
       mapRef.current = map
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 19,
-      }).addTo(map)
 
-      // Phase 70 (22 May 2026) — swap OSRM public demo for Google
-      // Roads API snapToRoads. OSRM demo server (routing.openstreetmap.de)
-      // is rate-limited and lower-quality for India road geometry.
-      // Roads API gives sub-second snap with 95% accuracy. Free tier
-      // covers our usage: 100 points per request × 660 requests/month
-      // = 5 reps × 5 trips × 30 days → under 5K/month free quota.
-      //
-      // Strategy:
-      //   1. Always render the cleaned-but-raw polyline (yellow @ 0.75
-      //      opacity) so map paints immediately.
-      //   2. Fire Roads API in parallel, chunked at 100 points per call
-      //      (API hard limit). interpolate=true asks Google to add
-      //      intermediate snapped points along road centerlines.
-      //   3. Overlay the snapped polyline on top in bright yellow.
-      //   4. Failures (no key, 4xx/5xx, network) silently leave the
-      //      raw line in place — no broken UX.
-      const ROADS_KEY = import.meta.env.VITE_GOOGLE_ROADS_KEY || ''
-      let rawLine = null
+      const bounds = new google.maps.LatLngBounds()
+
+      // Phase 70 — raw cleaned polyline rendered first as a base layer
+      // (faint yellow). Roads API snapToRoads result overlays on top
+      // in bright yellow once it returns. Failures silently leave the
+      // raw line as the only visible path.
       if (cleaned.length >= 2) {
-        const latlngs = cleaned.map(p => [Number(p.lat), Number(p.lng)])
-        rawLine = L.polyline(latlngs, {
-          color:    '#FFE600',
-          weight:   4,
-          opacity:  0.75,        // visible always; Roads API overlays on top
-          lineCap:  'round',
-          lineJoin: 'round',
-        }).addTo(map)
-        map.fitBounds(rawLine.getBounds(), { padding: [40, 40] })
+        const path = cleaned.map(p => ({
+          lat: Number(p.lat),
+          lng: Number(p.lng),
+        }))
+        path.forEach(pt => bounds.extend(pt))
+        new google.maps.Polyline({
+          path,
+          strokeColor:    '#FFE600',
+          strokeOpacity:  0.75,
+          strokeWeight:   4,
+          map,
+        })
+        map.fitBounds(bounds, 60)
 
-        if (ROADS_KEY) {
-          // Google Roads API snapToRoads. 100 points per request hard limit.
-          // Endpoint:
-          //   https://roads.googleapis.com/v1/snapToRoads?path=lat,lng|lat,lng&interpolate=true&key=KEY
-          // Response shape:
-          //   { snappedPoints: [{ location: { latitude, longitude }, ... }, ...] }
-          const BATCH = 100
-          const chunks = []
-          for (let i = 0; i < cleaned.length; i += BATCH) {
-            chunks.push(cleaned.slice(i, i + BATCH))
-          }
-          const fetchOne = (sample) => {
-            if (sample.length < 2) return Promise.resolve(null)
-            const path = sample
-              .map(p => `${Number(p.lat).toFixed(6)},${Number(p.lng).toFixed(6)}`)
-              .join('|')
-            const url = `https://roads.googleapis.com/v1/snapToRoads?path=${encodeURIComponent(path)}&interpolate=true&key=${ROADS_KEY}`
-            return fetch(url).then(r => r.ok ? r.json() : null).catch(() => null)
-          }
-          Promise.all(chunks.map(fetchOne))
-            .then(results => {
-              if (!mapRef.current) return
-              for (const json of results) {
-                if (!json || !Array.isArray(json.snappedPoints)) continue
-                if (json.snappedPoints.length < 2) continue
-                const segLatLngs = json.snappedPoints.map(sp => [
-                  Number(sp?.location?.latitude),
-                  Number(sp?.location?.longitude),
-                ]).filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
-                if (segLatLngs.length < 2) continue
-                L.polyline(segLatLngs, {
-                  color:    '#FFE600',
-                  weight:   6,
-                  opacity:  1,
-                  lineCap:  'round',
-                  lineJoin: 'round',
-                }).addTo(mapRef.current)
-              }
-            })
-            .catch(() => { /* raw line stays as fallback */ })
+        // Roads API snapToRoads — 100 points/request hard limit.
+        const BATCH = 100
+        const chunks = []
+        for (let i = 0; i < cleaned.length; i += BATCH) {
+          chunks.push(cleaned.slice(i, i + BATCH))
         }
+        const fetchOne = (sample) => {
+          if (sample.length < 2) return Promise.resolve(null)
+          const pathStr = sample
+            .map(p => `${Number(p.lat).toFixed(6)},${Number(p.lng).toFixed(6)}`)
+            .join('|')
+          const url = `https://roads.googleapis.com/v1/snapToRoads?path=${encodeURIComponent(pathStr)}&interpolate=true&key=${MAPS_KEY}`
+          return fetch(url).then(r => r.ok ? r.json() : null).catch(() => null)
+        }
+        Promise.all(chunks.map(fetchOne))
+          .then(results => {
+            if (!mapRef.current) return
+            for (const json of results) {
+              if (!json || !Array.isArray(json.snappedPoints)) continue
+              if (json.snappedPoints.length < 2) continue
+              const segPath = json.snappedPoints.map(sp => ({
+                lat: Number(sp?.location?.latitude),
+                lng: Number(sp?.location?.longitude),
+              })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+              if (segPath.length < 2) continue
+              new google.maps.Polyline({
+                path: segPath,
+                strokeColor:   '#FFE600',
+                strokeOpacity: 1,
+                strokeWeight:  6,
+                map: mapRef.current,
+              })
+            }
+          })
+          .catch(() => { /* raw line stays as fallback */ })
       } else if (cleaned.length === 1) {
-        map.setView([Number(cleaned[0].lat), Number(cleaned[0].lng)], 14)
+        map.setCenter(center)
+        map.setZoom(14)
       }
 
-      // Check-in (green) + check-out (red) pins only — drop the
-      // interval circles that used to clutter the map.
+      // Check-in + check-out markers.
       const first = pings[0]
       const last  = pings[pings.length - 1]
+      const dotIcon = (color) => ({
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 9,
+        fillColor: color,
+        fillOpacity: 0.92,
+        strokeColor: '#ffffff',
+        strokeWeight: 3,
+      })
       if (first) {
-        L.circleMarker([Number(first.lat), Number(first.lng)], {
-          radius: 9, color: '#10B981', weight: 3,
-          fillColor: '#10B981', fillOpacity: 0.92,
+        const m1 = new google.maps.Marker({
+          position: { lat: Number(first.lat), lng: Number(first.lng) },
+          map,
+          icon: dotIcon('#10B981'),
         })
-        .addTo(map)
-        .bindPopup(
-          `<b>Check-in</b><br/>${new Date(first.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
-        )
+        const iw1 = new google.maps.InfoWindow({
+          content: `<b>Check-in</b><br/>${new Date(first.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
+        })
+        m1.addListener('click', () => iw1.open({ anchor: m1, map }))
       }
       if (last && last !== first) {
-        L.circleMarker([Number(last.lat), Number(last.lng)], {
-          radius: 9, color: '#EF4444', weight: 3,
-          fillColor: '#EF4444', fillOpacity: 0.92,
+        const m2 = new google.maps.Marker({
+          position: { lat: Number(last.lat), lng: Number(last.lng) },
+          map,
+          icon: dotIcon('#EF4444'),
         })
-        .addTo(map)
-        .bindPopup(
-          `<b>Check-out</b><br/>${new Date(last.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
-        )
+        const iw2 = new google.maps.InfoWindow({
+          content: `<b>Check-out</b><br/>${new Date(last.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
+        })
+        m2.addListener('click', () => iw2.open({ anchor: m2, map }))
       }
 
-      // Numbered stop markers.
+      // Numbered stop markers — Google Maps Marker with custom label.
       for (const s of stops) {
-        const icon = L.divIcon({
-          className: 'gps-stop-pin',
-          html: `
-            <div style="
-              width: 32px; height: 32px;
-              background: #F59E0B;
-              border: 2px solid #fff;
-              border-radius: 50% 50% 50% 0;
-              transform: rotate(-45deg);
-              display: flex; align-items: center; justify-content: center;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.35);
-            ">
-              <span style="
-                transform: rotate(45deg);
-                color: #fff;
-                font-weight: 700;
-                font-size: 13px;
-                font-family: 'Space Grotesk', sans-serif;
-              ">${s.id}</span>
-            </div>
-          `,
-          iconSize:   [32, 32],
-          iconAnchor: [16, 32],
+        const m = new google.maps.Marker({
+          position: { lat: s.lat, lng: s.lng },
+          map,
+          label: {
+            text: String(s.id),
+            color: '#ffffff',
+            fontWeight: '700',
+            fontSize: '13px',
+          },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 14,
+            fillColor: '#F59E0B',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          },
         })
-        L.marker([s.lat, s.lng], { icon })
-          .addTo(map)
-          .bindPopup(
+        const iw = new google.maps.InfoWindow({
+          content:
             `<b>Stop ${s.id}</b><br/>` +
             `${new Date(s.started_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} ` +
             `– ${new Date(s.ended_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}<br/>` +
-            `<small>${s.minutes} min dwell</small>`
-          )
+            `<small>${s.minutes} min dwell</small>`,
+        })
+        m.addListener('click', () => iw.open({ anchor: m, map }))
       }
     } catch (e) {
       setError('Map render failed: ' + (e?.message || String(e)))
     }
+    })()
+    // Google Maps doesn't expose a .remove() like Leaflet; clearing
+    // mapRef is enough — React unmounts the container and GC handles
+    // the rest.
     return () => {
-      if (mapRef.current) {
-        try { mapRef.current.remove() } catch (_) {}
-        mapRef.current = null
-      }
+      mapRef.current = null
     }
   }, [loading, pings])
 
