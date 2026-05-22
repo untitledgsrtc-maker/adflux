@@ -448,19 +448,31 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
         )}
 
         <div style={styles.sectionTitle}>Location Breakdown</div>
-        <table style={styles.table}>
+        <table style={{ ...styles.table, tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: 28 }} />
+            <col style={{ width: 180 }} />
+            <col style={{ width: 42 }} />
+            <col style={{ width: 50 }} />
+            <col style={{ width: 50 }} />
+            <col style={{ width: 38 }} />
+            <col style={{ width: 56 }} />
+            <col style={{ width: 70 }} />
+            <col style={{ width: 100 }} />
+            <col style={{ width: 100 }} />
+          </colgroup>
           <thead>
             <tr>
-              <th style={{ ...styles.th, width: 28 }}>SR</th>
+              <th style={styles.th}>SR</th>
               <th style={styles.th}>City</th>
-              <th style={{ ...styles.th, textAlign: 'center', width: 50 }}>Grade</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 58 }}>Screens</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 60 }}>Duration</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 50 }}>Slot</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 70 }}>Slots/Day</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 90 }}>Listed</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 90 }}>Offered</th>
-              <th style={{ ...styles.th, ...styles.tdNum, width: 110 }}>Total</th>
+              <th style={{ ...styles.th, textAlign: 'center' }}>Grade</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>Screens</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>Duration</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>Slot</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>Slots/Day</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>Listed</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>Offered/Screen</th>
+              <th style={{ ...styles.th, ...styles.tdNum }}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -825,21 +837,37 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
         </>
       )}
 
-      {/* Location table — every page */}
+      {/* Location table — every page. Phase 81.3.1: lock layout to
+          fixed widths via colgroup + table-layout:fixed so the grade
+          chips + numeric cols align identically across pages
+          (auto-layout was flexing the City col per-page chunk and
+          throwing downstream columns out of vertical alignment). */}
       <div style={sectionTitle}>Location Breakdown{!isFirst ? ' (cont.)' : ''}</div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10.5 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10.5, tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: 24 }} />
+          <col style={{ width: 158 }} />
+          <col style={{ width: 38 }} />
+          <col style={{ width: 46 }} />
+          <col style={{ width: 46 }} />
+          <col style={{ width: 36 }} />
+          <col style={{ width: 50 }} />
+          <col style={{ width: 64 }} />
+          <col style={{ width: 92 }} />
+          <col style={{ width: 92 }} />
+        </colgroup>
         <thead>
           <tr>
-            <th style={{ ...tableTh, width: 28 }}>SR</th>
+            <th style={tableTh}>SR</th>
             <th style={tableTh}>City</th>
-            <th style={{ ...tableTh, textAlign: 'center', width: 50 }}>Grade</th>
-            <th style={{ ...tableTh, ...tdNum, width: 58 }}>Screens</th>
-            <th style={{ ...tableTh, ...tdNum, width: 60 }}>Duration</th>
-            <th style={{ ...tableTh, ...tdNum, width: 50 }}>Slot</th>
-            <th style={{ ...tableTh, ...tdNum, width: 70 }}>Slots/Day</th>
-            <th style={{ ...tableTh, ...tdNum, width: 90 }}>Listed</th>
-            <th style={{ ...tableTh, ...tdNum, width: 90 }}>Offered</th>
-            <th style={{ ...tableTh, ...tdNum, width: 110 }}>Total</th>
+            <th style={{ ...tableTh, textAlign: 'center' }}>Grade</th>
+            <th style={{ ...tableTh, ...tdNum }}>Screens</th>
+            <th style={{ ...tableTh, ...tdNum }}>Duration</th>
+            <th style={{ ...tableTh, ...tdNum }}>Slot</th>
+            <th style={{ ...tableTh, ...tdNum }}>Slots/Day</th>
+            <th style={{ ...tableTh, ...tdNum }}>Listed</th>
+            <th style={{ ...tableTh, ...tdNum }}>Offered/Screen</th>
+            <th style={{ ...tableTh, ...tdNum }}>Total</th>
           </tr>
         </thead>
         <tbody>
