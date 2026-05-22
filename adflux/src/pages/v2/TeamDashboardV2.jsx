@@ -633,9 +633,22 @@ export default function TeamDashboardV2() {
           ))
           existing.__iconKey = iconKey
         }
-        existing.__iw?.setContent(
-          `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>${Math.round(ageMin)} min ago`
-        )
+        // Phase 89.5 — brand-aligned popup. Light text on dark
+        // chrome (v2.css .gm-style-iw-c override) + esc()'d
+        // user-supplied fields so a malicious name can't XSS the
+        // admin browser (Phase 85.2 pattern carried over).
+        const escStr = (v) => String(v ?? '')
+          .replace(/&/g,  '&amp;')
+          .replace(/</g,  '&lt;')
+          .replace(/>/g,  '&gt;')
+          .replace(/"/g,  '&quot;')
+          .replace(/'/g,  '&#39;')
+        const repPopupHtml = `<div style="font-family:'DM Sans','Inter',sans-serif;min-width:160px;">`
+          + `<div style="font-weight:700;font-size:14px;color:#f5f7fb;border-bottom:2px solid #FFE600;padding-bottom:3px;display:inline-block;">${escStr(r.name)}</div>`
+          + `<div style="font-size:11px;color:#98a4bf;margin-top:6px;text-transform:capitalize;">${escStr(r.team_role || '')}</div>`
+          + `<div style="font-size:11px;color:#cbd5e1;margin-top:4px;">${Math.round(ageMin)} min ago</div>`
+          + `</div>`
+        existing.__iw?.setContent(repPopupHtml)
       } else {
         const m = new google.maps.Marker({
           position: pos,
@@ -648,8 +661,20 @@ export default function TeamDashboardV2() {
           title: r.name,
         })
         m.__iconKey = iconKey
+        // Phase 89.5 — same brand popup as the setContent branch.
+        const escStr = (v) => String(v ?? '')
+          .replace(/&/g,  '&amp;')
+          .replace(/</g,  '&lt;')
+          .replace(/>/g,  '&gt;')
+          .replace(/"/g,  '&quot;')
+          .replace(/'/g,  '&#39;')
+        const repPopupHtml = `<div style="font-family:'DM Sans','Inter',sans-serif;min-width:160px;">`
+          + `<div style="font-weight:700;font-size:14px;color:#f5f7fb;border-bottom:2px solid #FFE600;padding-bottom:3px;display:inline-block;">${escStr(r.name)}</div>`
+          + `<div style="font-size:11px;color:#98a4bf;margin-top:6px;text-transform:capitalize;">${escStr(r.team_role || '')}</div>`
+          + `<div style="font-size:11px;color:#cbd5e1;margin-top:4px;">${Math.round(ageMin)} min ago</div>`
+          + `</div>`
         const iw = new google.maps.InfoWindow({
-          content: `<strong>${r.name}</strong><br/>${r.team_role || ''}<br/>${Math.round(ageMin)} min ago`,
+          content: repPopupHtml,
         })
         m.addListener('click', () => iw.open({ anchor: m, map }))
         m.__iw = iw
@@ -722,15 +747,22 @@ export default function TeamDashboardV2() {
       const heading = a.lead_company || a.lead_name || 'Lead'
       const sub = a.lead_company && a.lead_name ? esc(a.lead_name) : ''
       const kind = a.activity_type === 'site_visit' ? 'Site visit' : 'Meeting'
+      // Phase 89.5 — colour outcome pill to match pin colour band.
+      const outcomeColor = a.outcome === 'positive' ? '#34d399'
+                         : a.outcome === 'negative' ? '#f87171'
+                         : a.outcome === 'neutral'  ? '#fbbf24'
+                         : '#98a4bf'
       const outcomeBit = a.outcome
-        ? ` · <span style="text-transform:capitalize">${esc(a.outcome)}</span>`
+        ? ` · <span style="text-transform:capitalize;color:${outcomeColor};font-weight:700">${esc(a.outcome)}</span>`
         : ''
+      // Phase 89.5 — brand palette on dark InfoWindow chrome.
       const html = `
-        <div style="font-family:'DM Sans',sans-serif;min-width:180px">
-          <div style="font-weight:700;font-size:13px;color:#0f172a">${esc(heading)}</div>
-          ${sub ? `<div style="font-size:11px;color:#475569;margin-top:2px">${sub}</div>` : ''}
-          <div style="font-size:11px;color:#475569;margin-top:6px">${kind} · ${esc(repName)} · ${timeStr}${outcomeBit}</div>
-          <a href="/leads/${esc(a.lead_id)}" style="display:inline-block;margin-top:8px;font-size:11px;color:#1d4ed8;text-decoration:none;font-weight:600">Open lead →</a>
+        <div style="font-family:'DM Sans','Inter',sans-serif;min-width:180px;">
+          <div style="font-size:9.5px;color:#98a4bf;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:6px;">${kind} · ${timeStr}${outcomeBit}</div>
+          <div style="font-weight:700;font-size:14px;color:#f5f7fb;border-bottom:2px solid #FFE600;padding-bottom:3px;display:inline-block;">${esc(heading)}</div>
+          ${sub ? `<div style="font-size:11px;color:#98a4bf;margin-top:6px;">${sub}</div>` : ''}
+          <div style="font-size:11px;color:#cbd5e1;margin-top:6px;">${esc(repName)}</div>
+          <a href="/leads/${esc(a.lead_id)}" style="display:inline-block;margin-top:10px;font-size:11px;color:#FFE600;text-decoration:none;font-weight:700;letter-spacing:.04em;">Open lead →</a>
         </div>
       `
       const existing = leadMarkersRef.current[a.id]

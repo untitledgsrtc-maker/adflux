@@ -399,7 +399,8 @@ export default function GpsTrackV2() {
           icon: pinIcon('#10B981'),
         })
         const iw1 = new google.maps.InfoWindow({
-          content: `<b>Check-in</b><br/>${new Date(first.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
+          // Phase 89.5 — light text for dark InfoWindow chrome.
+          content: `<div style="font-family:'DM Sans','Inter',sans-serif;color:#f5f7fb;font-size:13px;"><b style="color:#10B981">Check-in</b><br/><span style="color:#cbd5e1">${new Date(first.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span></div>`,
         })
         m1.addListener('click', () => iw1.open({ anchor: m1, map }))
       }
@@ -410,7 +411,8 @@ export default function GpsTrackV2() {
           icon: pinIcon('#EF4444'),
         })
         const iw2 = new google.maps.InfoWindow({
-          content: `<b>Check-out</b><br/>${new Date(last.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
+          // Phase 89.5 — light text for dark InfoWindow chrome.
+          content: `<div style="font-family:'DM Sans','Inter',sans-serif;color:#f5f7fb;font-size:13px;"><b style="color:#EF4444">Check-out</b><br/><span style="color:#cbd5e1">${new Date(last.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span></div>`,
         })
         m2.addListener('click', () => iw2.open({ anchor: m2, map }))
       }
@@ -479,22 +481,26 @@ export default function GpsTrackV2() {
         const outcome   = a.outcome === 'positive' || a.outcome === 'negative' || a.outcome === 'neutral'
           ? a.outcome
           : null  // whitelist — never inject arbitrary outcome strings
+        // Phase 89.5 — brand palette on the InfoWindow content.
+        // The Google chrome is now dark (v2.css .gm-style-iw-c
+        // override), so inline text colours flip to the light end
+        // of the v2 ink ladder.
         const outcomeChip = outcome
-          ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:${outcome==='positive'?'#dcfce7':outcome==='negative'?'#fee2e2':'#f1f5f9'};color:${outcome==='positive'?'#166534':outcome==='negative'?'#991b1b':'#475569'};">${esc(outcome)}</span>`
+          ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:${outcome==='positive'?'rgba(16,185,129,.18)':outcome==='negative'?'rgba(239,68,68,.18)':'rgba(245,158,11,.18)'};color:${outcome==='positive'?'#34d399':outcome==='negative'?'#f87171':'#fbbf24'};">${esc(outcome)}</span>`
           : ''
 
         const linkHtml = hasLead
-          ? `<a href="${esc(leadHref)}" data-lead-id="${esc(a.lead.id)}" style="color:#0f172a;font-weight:700;font-size:14px;text-decoration:none;border-bottom:2px solid #FFE600;padding-bottom:2px;display:inline-block;">${leadName}</a>`
-          : `<span style="color:#64748b;font-weight:600;font-size:13px;">${leadName}</span>`
+          ? `<a href="${esc(leadHref)}" data-lead-id="${esc(a.lead.id)}" style="color:#f5f7fb;font-weight:700;font-size:14px;text-decoration:none;border-bottom:2px solid #FFE600;padding-bottom:2px;display:inline-block;">${leadName}</a>`
+          : `<span style="color:#98a4bf;font-weight:600;font-size:13px;">${leadName}</span>`
 
         const noteHtml = a.notes
-          ? `<div style="margin-top:8px;font-size:11px;color:#475569;line-height:1.4;max-width:240px;">${esc(a.notes).slice(0, 600)}</div>`
+          ? `<div style="margin-top:8px;font-size:11px;color:#cbd5e1;line-height:1.4;max-width:240px;">${esc(a.notes).slice(0, 600)}</div>`
           : ''
 
         const iw = new google.maps.InfoWindow({
           content:
-            `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;padding:2px 4px 4px;min-width:200px;max-width:260px;">`
-          + `<div style="font-size:9.5px;color:#64748b;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px;">${typeChip} · ${timeLabel} IST${outcomeChip}</div>`
+            `<div style="font-family:'DM Sans','Inter',-apple-system,BlinkMacSystemFont,sans-serif;min-width:200px;max-width:260px;">`
+          + `<div style="font-size:9.5px;color:#98a4bf;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:6px;">${typeChip} · ${timeLabel} IST${outcomeChip}</div>`
           + linkHtml
           + noteHtml
           + `</div>`,
@@ -531,11 +537,13 @@ export default function GpsTrackV2() {
           icon: pinIcon('#F59E0B'),
         })
         const iw = new google.maps.InfoWindow({
+          // Phase 89.5 — light text for dark InfoWindow chrome.
           content:
-            `<b>Stop ${s.id}</b><br/>` +
-            `${new Date(s.started_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} ` +
-            `– ${new Date(s.ended_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}<br/>` +
-            `<small>${s.minutes} min dwell</small>`,
+            `<div style="font-family:'DM Sans','Inter',sans-serif;color:#f5f7fb;font-size:13px;">` +
+            `<b style="color:#FFE600">Stop ${s.id}</b><br/>` +
+            `<span style="color:#cbd5e1">${new Date(s.started_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} ` +
+            `– ${new Date(s.ended_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span><br/>` +
+            `<small style="color:#98a4bf">${s.minutes} min dwell</small></div>`,
         })
         m.addListener('click', () => iw.open({ anchor: m, map }))
       }

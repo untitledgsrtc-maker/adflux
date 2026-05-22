@@ -2269,3 +2269,52 @@
 @media (max-width: 500px) {
   .v2d-bell { width: 36px; height: 36px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Phase 89.5 — brand-aligned Google Maps InfoWindow (2026-05-23)
+   ═══════════════════════════════════════════════════════════════
+   Owner directive 23 May 2026 (screenshot of meeting popup at
+   /admin/gps/<userId>): "i just wnat this tab to be aline with our
+   brand colors nothing els e". Reskins Google's InfoWindow chrome
+   to navy + yellow so the popup matches the dark map.
+
+   Google's bubble is built from a handful of injected divs:
+     .gm-style-iw-c   outer rounded chrome
+     .gm-style-iw     inner scroll container
+     .gm-style-iw-d   scroll wrapper
+     .gm-style-iw-tc  bottom speech-bubble tail
+     .gm-ui-hover-effect  the X close button
+   Content text colours flip light at every InfoWindow content
+   site (Phase 89.5 inline edits in GpsTrackV2 + TeamDashboardV2).
+*/
+.gm-style-iw-c {
+  background: var(--v2-bg-1, #111a2e) !important;
+  border: 1px solid var(--v2-line, #1f2a44) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45) !important;
+  padding: 14px 16px !important;
+}
+.gm-style-iw {
+  background: transparent !important;
+  color: var(--v2-ink-0, #f5f7fb) !important;
+  max-width: 280px !important;
+  overflow: visible !important;
+}
+.gm-style-iw-d {
+  background: transparent !important;
+  overflow: visible !important;
+}
+.gm-style-iw-tc::after {
+  background: var(--v2-bg-1, #111a2e) !important;
+  box-shadow: -1px 1px 0 var(--v2-line, #1f2a44) !important;
+}
+.gm-style-iw .gm-ui-hover-effect {
+  top: 4px !important;
+  right: 4px !important;
+}
+.gm-style-iw .gm-ui-hover-effect > span {
+  background-color: var(--v2-ink-2, #98a4bf) !important;
+}
+.gm-style-iw .gm-ui-hover-effect:hover > span {
+  background-color: var(--v2-yellow, #FFE600) !important;
+}
