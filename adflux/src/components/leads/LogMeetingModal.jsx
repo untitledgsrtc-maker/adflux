@@ -197,6 +197,21 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
     if (!phone.trim())   { fail('Mobile number is required — without it the lead can\'t be followed up.'); return }
     if (!city.trim())    { fail('City is required.'); return }
     if (!outcome)        { fail('Pick an outcome — Good / Maybe / Lost.'); return }
+    // Phase 84.4 — GPS now hard-gated. Owner directive 23 May 2026:
+    // "we have compulsory gps fetched while add meeting then why gps
+    // not punch?". Pre-Phase-84.4 the modal silently allowed save
+    // with null GPS when location permission was denied / timeout;
+    // those meetings then had no map pin and inflated counters.
+    // Strict gate now blocks save until lat/lng captured. Rep can
+    // tap "Refresh GPS" to retry. GPS-permission denial = no save.
+    if (gpsBusy) {
+      fail('GPS still locking — wait 2 seconds and try again.')
+      return
+    }
+    if (!gps?.lat || !gps?.lng) {
+      fail('GPS required to log a meeting. Tap "Refresh GPS" or turn on Location and retry.')
+      return
+    }
     const oc = OUTCOMES.find(o => o.value === outcome)
     setSaving(true)
 
