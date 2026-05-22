@@ -697,7 +697,11 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
     backgroundRepeat:   'no-repeat',
     backgroundSize:     '794px 1123px',  // FIXED — no stretch
     backgroundPosition: 'top center',
-    padding:            letterheadOn ? '110px 70px 105px 70px' : '0',
+    // Phase 81.3.7: bottom padding bumped 105 → 140 so the last
+    // page's bank + prepared-by block clears the letterhead's bottom
+    // address strip. Owner caught the IFSC line overlapping
+    // "203, Sidcup Tower..." on UA-2026-0053.
+    padding:            letterheadOn ? '110px 70px 140px 70px' : '0',
     fontFamily:         '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
     color:              INK,
     fontSize:           10.5,
@@ -1019,17 +1023,20 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
           })()}
 
           <div style={{
-            marginTop: 4, padding: '8px 12px',
+            marginTop: 4, padding: '6px 10px',
             background: SOFT, border: `1px dashed ${BORDER}`,
-            borderRadius: 6, fontSize: 10.5, color: INK,
+            borderRadius: 6, fontSize: 10, color: INK,
           }}>
             <b>Total in Words:</b> {inWords}
           </div>
 
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER}`, fontSize: 10, color: MUTED }}>
+          {/* Phase 81.3.7: compact bank + prepared-by block. Tighter
+              line-height + smaller padding so the entire footer
+              clears the letterhead's bottom address strip. */}
+          <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px solid ${BORDER}`, fontSize: 9.5, color: MUTED, lineHeight: 1.35 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
               <div>
-                <div style={{ fontSize: 8, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', marginBottom: 2 }}>Bank</div>
+                <div style={{ fontSize: 8, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', marginBottom: 1 }}>Bank</div>
                 {company.bank_name && <div><b style={{ color: INK }}>{company.bank_name}</b></div>}
                 {company.bank_acc_name && <div>{company.bank_acc_name}</div>}
                 {company.bank_acc_number && <div>A/C: {company.bank_acc_number}</div>}
@@ -1037,7 +1044,7 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
                 {company.upi_id && <div>UPI: {company.upi_id}</div>}
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 8, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', marginBottom: 2 }}>Prepared by</div>
+                <div style={{ fontSize: 8, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', marginBottom: 1 }}>Prepared by</div>
                 <div style={{ color: INK, fontWeight: 600 }}>{repName}</div>
                 <div>{quote?.quote_number} · {quote?.created_at ? formatDate(quote.created_at) : ''}</div>
               </div>
