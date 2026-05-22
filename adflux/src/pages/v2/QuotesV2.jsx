@@ -68,11 +68,34 @@ export default function QuotesV2() {
       navigate(`/quotes/new/private?editOf=${q.id}`)
     }
   }
+  // Phase 74 (21 May 2026) — owner directive: team can delete any
+  // quote except Won. Admin / co_owner can delete Won only if no
+  // payments rows exist. Trigger quotes_no_delete_after_draft enforces
+  // this server-side; this frontend mirrors the rules so the button
+  // hides for terminal cases instead of throwing.
+  function canDeleteQuote(q) {
+    if (!q) return false
+    const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+    if (q.status === 'won') {
+      // Won always blocked when payments present. Trigger does the
+      // FK check; we hide it here too for cleaner UX. useQuotes
+      // already joins payments(amount_received, approval_status),
+      // so q.payments is an array.
+      const hasPayments = Array.isArray(q.payments) && q.payments.length > 0
+      if (hasPayments) return false
+      // Won-without-payments: admin/co_owner only.
+      return isPrivileged
+    }
+    // Draft / sent / negotiating / lost / nurture: any role.
+    return true
+  }
+
   async function deleteQuote(e, q) {
     e.stopPropagation()
+    const label = (q.status || 'draft').toLowerCase()
     const ok = await confirmDialog({
-      title: 'Delete draft quote?',
-      message: `Delete draft ${q.quote_number || q.ref_number || ''} permanently? This cannot be undone.`,
+      title: `Delete ${label} quote?`,
+      message: `Delete ${q.quote_number || q.ref_number || ''} permanently. This cannot be undone.`,
       confirmLabel: 'Delete',
       danger: true,
     })
@@ -551,12 +574,12 @@ export default function QuotesV2() {
                             <Pencil size={13} />
                           </button>
                         )}
-                        {q.status === 'draft' && (
+                        {canDeleteQuote(q) && (
                           <button
                             type="button"
                             className="v2d-ghost"
                             style={{ color: 'var(--red)' }}
-                            title="Delete draft"
+                            title={`Delete ${q.status || 'quote'}`}
                             onClick={e => deleteQuote(e, q)}
                           >
                             <Trash2 size={13} />
@@ -654,7 +677,7 @@ export default function QuotesV2() {
                           <Pencil size={13} /> Edit
                         </button>
                       )}
-                      {q.status === 'draft' && (
+                      {canDeleteQuote(q) && (
                         <button
                           type="button"
                           className="v2d-ghost"
