@@ -812,3 +812,82 @@ b4d9458 Phase 43.3: upcoming callbacks panel
 35b650c Phase 35b650c: productivity layer
 583fd38 Phase 43.1: bleed-stop (call audit + modal + auto-refresh)
 ```
+
+
+---
+
+## 33 · Phase 76 — Evening Day Summary + GPS lockdown v1 (2026-05-22)
+
+Web/PWA portion shipped. Native APK plugin (76.2) PARKED to next
+session per owner directive 22 May 2026.
+
+### What shipped this session
+
+| Phase | What | SHA |
+|---|---|---|
+| 76.1 | SQL — 4 tracking event tables + work_sessions column + gps_pings dedup unique constraint | `50a6ba1` |
+| 76.3 | DaySummaryCard + GpsOffBanner + useDaySummary + useGpsLock + whatsappSummary formatter | `567e771` |
+| 76.4 | Wire DaySummaryCard + GpsOffBanner into WorkV2 + LeadDetailV2 (guardian PASS after 2 fixes) | `f02682f` |
+
+### New SQL tables (all RLS-protected, admin_all + self_read/write/close-while-null)
+
+- `gps_off_events`     cycle log of Location toggle off/on
+- `network_off_events` cycle log of internet drop/regain
+- `force_stop_events`  heartbeat-gap detection on app relaunch
+- `gps_block_events`   UI banner blocks (CHECK on action_attempted: start_day | i_am_here | log_meeting | log_lead | mark_followup_done | quote_sent)
+
+### New column + constraint
+
+- `work_sessions.evening_summary_sent_at` — dedup for any future 7:30 PM auto-send
+- `gps_pings UNIQUE (user_id, captured_at)` — prevents offline-queue retries from inflating daily_ta km counts
+
+### Owner-locked decisions (DO NOT relax without re-approval)
+
+1. **No GPS-off score penalty in v1.** Owner: "no need right now." Penalty column on `daily_score` + trigger reading `gps_off_events.duration_seconds` can be added later.
+2. **No server-side 7:30 PM WhatsApp auto-send.** Manual rep-tap-only for v1. Existing scorecard cron untouched.
+3. **No admin push when rep dark.** Owner watches /team-dashboard manually for now.
+4. **No weekly GPS leaderboard.** Deferred to Phase 77.
+5. **No productive-button gating.** Phase 76.4 is additive only — banner + card mount, no `disabled={!gpsOn}` wrapping on Log meeting / I'm here / Mark done. If owner wants this later it's Phase 76.4b. Guardian PASS contingent on this scope.
+6. **Emoji in WhatsApp text body: APPROVED (Option X).** Owner picked emoji format 22 May 2026. Routed to WhatsApp NOT in-app UI → §7 + §20 emoji ban does not apply. The `🟡 📅 👤 📋 📊 🛰️ ⚠️ ✅` set in `src/utils/whatsappSummary.js` is permanent unless owner says otherwise.
+7. **Recipient flow: one extra tap.** `whatsapp://send?text=...` deep-link opens WhatsApp; rep picks role group manually from contact picker. No master config of group invite links. Owner approved Option A 22 May 2026.
+
+### PENDING — Phase 76.2 Android plugin (carry over to next session)
+
+Owner said: "i will do tomorrow... remind me when i say we will do tomorrow."
+
+Build when owner reopens this conversation tomorrow:
+
+| File | What |
+|---|---|
+| `android/.../service/GpsToggleReceiver.kt` | BroadcastReceiver on `LocationManager.MODE_CHANGED_ACTION` — writes gps_off_events row on flip OFF, closes row on flip ON |
+| `android/.../service/NetworkWatcher.kt` | `ConnectivityManager.NetworkCallback` `onLost`/`onAvailable` — writes network_off_events row |
+| `android/.../service/HeartbeatService.kt` | 60-second tick into SharedPreferences `last_seen_at`. On next app launch compare to now; gap >5 min during 10-7 IST → write force_stop_events row |
+| `android/.../service/EventQueueDb.kt` | Room/SQLite local table for offline events; drain to Supabase on network reconnect |
+| `android/.../plugin/TrackingPlugin.kt` | Capacitor plugin registers as `UntitledTracking`. Methods: `isGpsOn()` → `{value:boolean}`, `requestEnableGps()` → invokes `SettingsClient.checkLocationSettings` resolution dialog, `addListener('gpsStateChanged', cb)` → fires on every receiver event |
+| `android/.../AndroidManifest.xml` | Add permissions: `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE_LOCATION`, `WAKE_LOCK`, `RECEIVE_BOOT_COMPLETED`. Register receivers + plugin |
+| APK rebuild | New signed APK; redistribute to all 6 reps via existing channel (`app.untitledad.in/apk` or WhatsApp) |
+
+Owner already approved force-stop heartbeat 2-3% battery cost.
+
+### Smoke test for the shipped portion (after owner pushes + runs SQL)
+
+- [ ] 7 PM IST → DaySummaryCard appears on /work above TodaySummaryCard
+- [ ] Before 7 PM → card hidden (no flash). Card render gate: `Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false })` parsed hour ≥ 19
+- [ ] Plan numbers populate from work_sessions.planned_* OR daily_targets.min_calls fallback
+- [ ] Actual numbers populate from lead_activities (created_by filter — fixed in guardian P1)
+- [ ] Tap X → card dismisses, stays dismissed until reload
+- [ ] Tap "Share to your group" → WhatsApp opens with text pre-filled, rep picks group
+- [ ] work_sessions.evening_summary_sent_at stamped on share
+- [ ] "Last shared HH:MM IST" shows underneath CTA on re-render
+- [ ] Disable phone Location → red GpsOffBanner appears on /work + /leads/:id
+- [ ] Tap "Turn on GPS" → web build re-probes geolocation; native build will fire SettingsClient once 76.2 ships
+- [ ] Admin / co_owner do NOT see DaySummaryCard (role gate)
+- [ ] TC role: Meetings + Site visits rows hidden, Qualified row visible
+- [ ] Guardian PASS on WorkV2 + LeadDetailV2 (already verified this session)
+
+### Foot-guns added this phase (don't repeat)
+
+- ❌ `.eq('user_id', ...)` on `lead_activities` — column is `created_by` (Phase 12 schema). Guardian P1 caught the silent-zero-rows bug.
+- ❌ Passing `color="..."` to a Lucide icon — must inherit via wrapping span's `color` style (CLAUDE.md §7 "Color inherits from parent. Don't hardcode color on `<Icon>`"). Guardian P2 caught this.
+- ❌ Querying `quotes.won_at` — column doesn't exist. Use `updated_at` as proxy when filtering `status='won'` (matches AdminDashboardDesktop:385 + SalesDashboard:575 pattern).
+- ❌ Native `Date().toISOString().slice(0,10)` for IST today — returns UTC. Use `istTodayISO()` from `src/utils/istDate.js` (Phase 47.9 single source of truth).
