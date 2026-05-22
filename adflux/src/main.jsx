@@ -26,6 +26,20 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 // Bootstrap auth listener a single time, before render.
 initAuth()
 
+// Phase 76.2 — initialise native tracking plugin (Android only).
+// Web bundle: no-op. Subscribes to gpsStateChanged + networkState
+// Changed + forceStopDetected from native, writes Phase 76.1 event
+// tables in Supabase. getUserId callback pulls the current auth
+// user lazily so it picks up sign-in transitions.
+import('./utils/nativeTracking').then(({ initNativeTracking }) => {
+  initNativeTracking(async () => {
+    try {
+      const { data } = await (await import('./lib/supabase')).supabase.auth.getUser()
+      return data?.user?.id || null
+    } catch { return null }
+  })
+}).catch(() => { /* web build / dynamic import disabled */ })
+
 // Phase 87.7 — native dialer auto-launch on Capacitor APK.
 // Owner directive 22 May 2026: tap any tel:<number> link inside the
 // installed app should open the OS dialer directly, no "Open with..."
