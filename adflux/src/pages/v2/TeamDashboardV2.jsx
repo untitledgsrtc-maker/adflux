@@ -232,7 +232,11 @@ export default function TeamDashboardV2() {
       const loader = new Loader({
         apiKey: MAPS_KEY,
         version: 'weekly',
-        libraries: [],
+        // Phase 70.6.1 — geometry library must match GpsTrackV2's Loader
+        // call. @googlemaps/js-api-loader is a singleton; mismatched
+        // libraries on second mount throw "Loader must not be called
+        // again with different options".
+        libraries: ['geometry'],
       })
       const google = await loader.load()
       if (cancelled) return
