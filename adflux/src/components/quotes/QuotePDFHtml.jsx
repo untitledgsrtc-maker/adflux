@@ -129,16 +129,17 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
     body:   { padding: letterheadOn ? 0 : '20px 32px' },
     // Phase 81.2 — clean text title used WITH letterhead (replaces
     // the dark titleBand bar that would clash with letterhead chrome).
+    // Phase 81.2.1 — entire block left-aligned to leave room for the
+    // letterhead's top-right logo + wordmark. Earlier flex-row layout
+    // placed ref/date on the right which overlapped UNTITLED ADFLUX
+    // PVT.LTD. on owner's UA-2026-0055 sample.
     quoteTitleRow: {
-      display:        'flex',
-      justifyContent: 'space-between',
-      alignItems:     'flex-end',
       marginBottom:   18,
       paddingBottom:  10,
       borderBottom:   `2px solid ${INK}`,
     },
     quoteTitleText:  { fontSize: 22, fontWeight: 700, color: INK, letterSpacing: '0.05em' },
-    quoteTitleMeta:  { textAlign: 'right' },
+    quoteTitleMeta:  { marginTop: 4 },
     quoteTitleRef:   { fontSize: 13, fontWeight: 700, color: INK },
     quoteTitleDate:  { fontSize: 10, color: MUTED, marginTop: 2 },
     quoteTitleSub:   { fontSize: 10, color: MUTED, marginTop: 1 },
@@ -256,11 +257,11 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
         <div style={styles.quoteTitleRow}>
           <div style={styles.quoteTitleText}>MEDIA QUOTATION</div>
           <div style={styles.quoteTitleMeta}>
-            <div style={styles.quoteTitleRef}>{quote?.quote_number || '—'}</div>
-            <div style={styles.quoteTitleDate}>{quote?.created_at ? formatDate(quote.created_at) : ''}</div>
-            <div style={styles.quoteTitleSub}>
-              {quote?.media_type === 'OTHER_MEDIA' ? 'Private — Other Media' : 'Private — LED Cities'}
-            </div>
+            <span style={styles.quoteTitleRef}>{quote?.quote_number || '—'}</span>
+            <span style={{ ...styles.quoteTitleDate, marginLeft: 12 }}>{quote?.created_at ? formatDate(quote.created_at) : ''}</span>
+            <span style={{ ...styles.quoteTitleSub, marginLeft: 12 }}>
+              {quote?.media_type === 'OTHER_MEDIA' ? '· Private — Other Media' : '· Private — LED Cities'}
+            </span>
           </div>
         </div>
       ) : (
@@ -499,18 +500,21 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
 // canvas-per-page exactly A4-sized avoids the slicer chopping a photo
 // across page boundaries.
 
-function CityPhotoPage({ city, quote }) {
+function CityPhotoPage({ city /*, quote */ }) {
+  // Phase 81.2.1 — owner directive 22 May 2026: "you dont need to
+  // write anything in photo just attach photo". City photo PNGs
+  // already have city name + screens + impressions burned in. The
+  // dark caption strip was duplicating that info and clashing with
+  // the image content. Photo now renders full-bleed with zero
+  // overlay.
   const cityName = city.city_name || city.name || ''
-  const station  = city.station || city.media_type || ''
-  const grade    = city.grade || ''
   return (
     <div style={{
-      width:    '794px',
-      height:   '1123px',
-      position: 'relative',
+      width:      '794px',
+      height:     '1123px',
+      position:   'relative',
       background: '#0f172a',
-      overflow: 'hidden',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+      overflow:   'hidden',
     }}>
       <img
         src={city.photo_url}
@@ -523,33 +527,6 @@ function CityPhotoPage({ city, quote }) {
           display:   'block',
         }}
       />
-      <div style={{
-        position:        'absolute',
-        bottom:          0,
-        left:            0,
-        right:           0,
-        background:      'rgba(15,23,42,0.92)',
-        color:           '#ffffff',
-        padding:         '20px 32px',
-        display:         'flex',
-        justifyContent:  'space-between',
-        alignItems:      'flex-end',
-      }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.04em' }}>{cityName}</div>
-          {station && <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>{station}</div>}
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          {grade && (
-            <div style={{ fontSize: 12, fontWeight: 700, color: YELLOW, letterSpacing: '0.08em' }}>
-              GRADE {grade}
-            </div>
-          )}
-          <div style={{ fontSize: 10, color: '#cbd5e1', marginTop: 4 }}>
-            {quote?.quote_number}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
