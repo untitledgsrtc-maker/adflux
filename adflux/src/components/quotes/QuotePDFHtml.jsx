@@ -1002,8 +1002,14 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
                 alignItems:     'center',
                 fontSize:       11,
               }}>
-                <span style={{ letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: 9, color: '#cbd5e1' }}>
-                  CPM · Cost per 1,000 impressions
+                {/* Phase 81.3.6 — owner directive: write full form +
+                    explicit "per 1000 impressions" so clients reading
+                    the PDF without OOH-jargon background still
+                    understand the metric. */}
+                <span style={{ letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: 9, color: '#cbd5e1', lineHeight: 1.3 }}>
+                  CPM · Cost Per Mille
+                  <br />
+                  (Cost per 1,000 Impressions)
                 </span>
                 <span style={{ fontWeight: 700, fontSize: 14, color: YELLOW, fontVariantNumeric: 'tabular-nums' }}>
                   {formatCurrency(Math.round(cpm))}
