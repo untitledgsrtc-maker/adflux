@@ -165,10 +165,55 @@ FOR EACH ROW
 EXECUTE FUNCTION public.lead_activity_aftermath();
 
 -- ─── Re-attach UPDATE-only auto_heat trigger ─────────────────────
--- The original lead_auto_heat_from_outcome() function still works
--- for the UPDATE path (admin edits outcome on a past activity).
--- Re-attach it with a tighter trigger that fires ONLY on UPDATE
--- of outcome — INSERT now goes through the consolidated function.
+-- The INSERT path is now in the consolidated function. The UPDATE
+-- path (admin manually edits outcome on a past activity) needs its
+-- own trigger.
+--
+-- Phase 88.4.1 (hotfix 2026-05-23): the original
+-- lead_auto_heat_from_outcome() function from Phase 47.4 wasn't
+-- deployed on this database. Inline the definition here so the
+-- SQL file is self-contained — no dependency on Phase 47.4 source
+-- ever having been run.
+CREATE OR REPLACE FUNCTION public.lead_auto_heat_from_outcome()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_target_heat text;
+  v_current     record;
+BEGIN
+  IF NEW.outcome IS NULL THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'UPDATE' AND OLD.outcome IS NOT DISTINCT FROM NEW.outcome THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.outcome = 'positive' THEN
+    v_target_heat := 'hot';
+  ELSIF NEW.outcome = 'negative' THEN
+    v_target_heat := 'cold';
+  ELSE
+    RETURN NEW;
+  END IF;
+  SELECT stage, heat INTO v_current
+    FROM public.leads
+   WHERE id = NEW.lead_id;
+  IF v_current.stage IN ('Won', 'Lost') THEN
+    RETURN NEW;
+  END IF;
+  IF v_current.heat = v_target_heat THEN
+    RETURN NEW;
+  END IF;
+  UPDATE public.leads
+     SET heat       = v_target_heat,
+         updated_at = now()
+   WHERE id = NEW.lead_id;
+  RETURN NEW;
+END;
+$$;
+
 DROP TRIGGER IF EXISTS trg_lead_auto_heat_on_update
   ON public.lead_activities;
 CREATE TRIGGER trg_lead_auto_heat_on_update
