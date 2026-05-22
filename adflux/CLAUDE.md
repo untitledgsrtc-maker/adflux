@@ -891,3 +891,180 @@ Owner already approved force-stop heartbeat 2-3% battery cost.
 - ❌ Passing `color="..."` to a Lucide icon — must inherit via wrapping span's `color` style (CLAUDE.md §7 "Color inherits from parent. Don't hardcode color on `<Icon>`"). Guardian P2 caught this.
 - ❌ Querying `quotes.won_at` — column doesn't exist. Use `updated_at` as proxy when filtering `status='won'` (matches AdminDashboardDesktop:385 + SalesDashboard:575 pattern).
 - ❌ Native `Date().toISOString().slice(0,10)` for IST today — returns UTC. Use `istTodayISO()` from `src/utils/istDate.js` (Phase 47.9 single source of truth).
+
+---
+
+## 34 · Phase 87 batch + 84.5.1 + 85.3.1 (2026-05-23)
+
+Full-day batch closing owner's 24 May directive: TA approval UX,
+TC visibility, rep profile pic, profile-pic map pins, plus two
+production bug fixes uncovered during smoke (gpsOffEvents crash +
+straight-line route).
+
+### What shipped (chronological)
+
+| Phase | What | SHA |
+|---|---|---|
+| 87.1 | "All team" option on TA Claims dropdown (`TaPayoutsAdminV2`) | `05847bf` |
+| 87.2 | Hide zero-value TA rows from approval list (Option A) + "Show empty" toggle | `05847bf` |
+| 87.3 | Hide MEET KPI on TC rep-side `/work` + `/telecaller` (applies to role='telecaller' AND team_role='sales_manager' so Renuka also affected) | `05847bf` |
+| 87.5 | Rep profile picture upload (`ProfilePicUploader` + MyOfferV2 mount + `user-avatars` bucket + RLS) | `4cb4250` |
+| 87.6 | Profile-pic markers on Live field map (`TeamDashboardV2` — circular avatar pins inside freshness ring) | `7fc346d` |
+| 84.5.1 | Fix `gpsOffEvents` ReferenceError on `/admin/gps` (Phase 84.5 left it as free reference inside `RepDaySections` sub-component) | `d018bdd` |
+| 85.3.1 | Swap JWT requireAuth → same-origin + rate-limit on `/api/directions` + `/api/snap-to-roads` (Phase 85.3 was silently bailing on expired PWA sessions → straight-line route) | `883ae11` |
+
+### New SQL — Phase 87.5
+
+`supabase_phase87_user_avatars.sql` (idempotent, owner-applied
+2026-05-23). Adds:
+- `users.profile_image_url text`
+- `storage.buckets` row for `user-avatars` (public, 5 MB cap)
+- 4 RLS policies: public SELECT; INSERT/UPDATE/DELETE when path
+  starts with `<auth.uid()>/...` OR `get_my_role() IN ('admin',
+  'co_owner')` for HR onboarding.
+
+Path convention: `user-avatars/<user_id>/<timestamp>.jpg`. Client
+canvas re-encode strips EXIF + caps long edge at 512 px.
+
+### New helper file — Phase 85.3.1
+
+`api/_guard.js` — shared `guardProxy(req, res)` that combines:
+1. `Origin` / `Referer` allowlist check (`app.untitledad.in`,
+   `untitled-os-tau.vercel.app`, any `*.vercel.app` for previews).
+2. Per-IP rate limit (60 req / 60s / IP) — same in-memory bucket
+   pattern as `/api/shorten` Phase 85.4.
+
+Used by `/api/directions` + `/api/snap-to-roads`. Replaces
+Phase 85.3 `requireAuth` on both. JWT path retired for these two
+proxies; `_auth.js` stays for any future endpoint that genuinely
+needs per-user identity (e.g. `/api/pdf/[ref]` still uses it via
+service-role for the share-token lookup).
+
+### New component — Phase 87.5
+
+`src/components/profile/ProfilePicUploader.jsx` — 72 px circular
+avatar with brand-yellow initials fallback. File-picker → canvas
+resize to 512 px + JPEG 0.85 → upload to `user-avatars/<uid>/
+<ts>.jpg` → update `users.profile_image_url` → refresh auth store
+`profile` so topbar + sidebar + map avatar all see the new pic
+immediately. Upload / Replace / Remove buttons. Inline error.
+Toast on success.
+
+Mounts at the top of both `MyOfferV2` render paths (offer-loaded
+and no-offer-on-file).
+
+### New helpers in TeamDashboardV2 — Phase 87.6
+
+- `drawInitialsOnCanvas(ctx, name, size)` — brand-yellow square +
+  navy initials text.
+- `buildAvatarMarkerIcon(google, name, profileUrl, color,
+  imageCache)` — returns Google Maps icon `{ url:
+  'data:image/png;base64,...', scaledSize, anchor }`. Draws:
+  1. Outer freshness-colour ring (green ≤5min, amber ≤30min, red
+     30min+).
+  2. Thin white separator.
+  3. Inner clip → `drawImage(cached HTMLImageElement)` OR
+     initials fallback.
+  4. `canvas.toDataURL('image/png')`. Falls back to initials-only
+     canvas if cross-origin taint blocks `toDataURL`.
+- New ref `imageCacheRef` + state `iconBump` so images pre-load
+  once and the marker effect re-runs when any image finishes.
+- Marker effect cache key `${user_id}|${profile_image_url}|
+  ${color}` — canvas rebuilds only when ring band or pic URL
+  changes. No per-tick CPU on the Realtime 5-min ping cadence.
+
+### Owner-locked decisions
+
+1. **`user-avatars` bucket is public + 5 MB cap.** Same shape as
+   `letterheads`, `city-photos`. Owner approved 24 May 2026 — pics
+   are inherently shareable (badge on PDFs / map pins).
+2. **Phase 87.6 didn't extend `LeadAvatar`.** Shared component is
+   imported into sales-frozen pages; extending it triggers a
+   sales-module-guardian re-audit cycle. Defer until owner asks
+   for avatars on rep grid cards too.
+3. **Phase 85.3.1 trade-off accepted.** Determined attacker with
+   curl + spoofed Origin can still hit Google proxies within rate
+   limit. At single-tenant scale + Cloud Console key restrictions
+   (Directions / Roads / Maps JS only), that's tighter than the
+   alternative (silent road-snap failure on every PWA-session
+   expiry). Stays this way until someone reports real abuse.
+
+### Anti-patterns the guardian / I caught this batch
+
+- ❌ **State declared in parent, used in child sub-component
+  without prop wire.** Phase 84.5 bug — `gpsOffEvents` declared
+  in `GpsTrackV2()` but referenced inside `RepDaySections()`,
+  sibling sub-component. Free reference → esbuild left
+  unmangled → runtime `ReferenceError`. Always pass state down
+  via props when extracting a sub-component.
+- ❌ **Silent bail on auth header inside fetch IIFE.** Phase 85.3
+  pattern: `if (!token) return  // bail silently` is a foot-gun.
+  PWA sessions expire silently on iOS home-screen installs. If
+  you must auth, surface the failure (toast + console). Better:
+  use same-origin guard instead of per-user JWT for endpoints
+  that don't need user identity.
+
+### Smoke checklist (post-deploy)
+
+- [ ] `/my-offer` → `ProfilePicUploader` mounts at top. Initials
+      in brand yellow before upload. Upload swaps to pic.
+      Topbar + sidebar avatar refresh inline.
+- [ ] `/team-dashboard` → live map shows circular avatar pins
+      inside green/amber/red rings. Reps without `profile_image_
+      url` get initials in brand yellow inside same ring.
+- [ ] `/admin/gps/<userId>` → page renders, activity timeline
+      shows gps_off events inline, road-snapped Google
+      polyline paints (NOT the raw 2-3-point line).
+- [ ] TA Claims tab (admin /people?tab=ta) → team dropdown has
+      "All team" option. Zero-value rows hidden by default;
+      "Show empty (N)" toggle reveals them.
+- [ ] TC role on `/work` and `/telecaller` → MEET KPI tile
+      absent from KPI row + DayStatusSurface. Renuka
+      (team_role='sales_manager' + role='telecaller') also
+      sees TC variant.
+- [ ] No console errors. No silent fetch bails.
+
+### Pending after this batch
+
+- **Phase 87.4** — telecaller flow audit (read-only doc). 30 min.
+  Next default move.
+- **Phase 87.7** — native dialer auto-launch in APK (Capacitor
+  intent `ACTION_DIAL`). ~2 hr. Blocked on 76.2 APK rebuild.
+- **Phase 76.2** — Android plugin (GPS toggle + network watcher
+  + heartbeat + event queue + manifest) + APK rebuild. 4-6 hr.
+  Owner-deferred to "tomorrow" 22 May 2026.
+- **Phase 88.x** — save-speed sprint proposed (optimistic UI +
+  Capacitor bundled mode + PWA cache + trigger consolidation +
+  bundle slim + realtime replace polling). 20 hr total. Owner
+  hasn't named priority.
+
+### Commit log (untitled-os branch, this batch)
+
+```
+883ae11 Phase 85.3.1: swap JWT auth for same-origin guard on Google proxies
+d018bdd Phase 84.5.1: fix gpsOffEvents ReferenceError in RepDaySections
+7fc346d Phase 87.6: profile-pic map pins on Live field map
+4cb4250 Phase 87.5: rep profile picture upload (MyOfferV2 + bucket)
+05847bf Phase 87.1-.3: TC MEET hide + TA zero-row hide + All-team filter
+```
+
+### Foot-guns added this batch (don't repeat)
+
+- ❌ Extracting a sub-component without passing every closed-over
+  state as a prop. Sibling functions don't share parent's
+  `useState` bindings.
+- ❌ JWT bearer header on endpoints that don't need user identity
+  — choose same-origin + rate-limit instead. PWA session expiry
+  is the silent killer.
+- ❌ Public storage bucket without `file_size_limit`. Owner-side
+  cost discipline. Phase 87.5 caps at 5 MB.
+- ❌ `crossOrigin="anonymous"` on `<img>` for Supabase storage
+  WITHOUT `Access-Control-Allow-Origin: *` from the server — would
+  taint canvas. Supabase public buckets serve `*` by default; if
+  ever swapping to a private CDN the avatar canvas will silently
+  fall back to initials.
+- ❌ Reusing the same `Loader` from `@googlemaps/js-api-loader`
+  with different `libraries:` between mounts. Already documented
+  Phase 70.6.1; restated here because TeamDashboardV2 uses
+  `libraries: ['geometry']` which must match GpsTrackV2's loader
+  for the singleton to settle clean.
