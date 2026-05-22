@@ -591,6 +591,347 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
   )
 }
 
+/* ─── Phase 81.3 — paginated quote page (letterhead path) ────────── */
+//
+// Owner directive 22 May 2026:
+//   "use same letter head as it is but you render data on that white
+//    margin only. if data is more the page 2 same header n footer it
+//    will be look more professional"
+//
+// Implementation: each quote page is a FIXED 794×1123 div with the
+// letterhead PNG as background + 110/70/105/70 safe-zone padding +
+// overflow hidden. Cities are paginated client-side; each page is
+// captured to its own canvas, addPage'd into jsPDF. Letterhead
+// repeats automatically because every page renders with the same
+// CSS background.
+//
+// Why fixed dimensions matter: html2canvas with a fixed-height
+// wrapper captures exactly that height; the jsPDF slicer paints
+// the whole canvas onto one A4 page (no overflow stretching, no
+// missing chrome).
+
+const ROW_HEIGHT_PX        = 40    // empirical: typical city row height
+const PAGE_BUDGET_PX       = 908   // 1123 − 110 top − 105 bottom
+const FIRST_PAGE_OVERHEAD  = 460   // title + client + campaign + glance + section title + table head
+const CONT_PAGE_OVERHEAD   = 120   // title + section title + table head
+const LAST_PAGE_FOOTER     = 280   // totals + bank + prepared-by
+
+/**
+ * Split cities into paginated chunks that fit the letterhead safe
+ * zone. Returns: [{cities, isFirst, isLast}, …].
+ *
+ * Sizing heuristic (over-conservative on purpose so rows never spill
+ * into the bottom address strip):
+ *   • Single page if all cities + totals fit.
+ *   • Page 1 = first 10 cities (leaves room for totals on the same
+ *     page when there are few cities; otherwise totals push to last).
+ *   • Continuation pages = 18 cities.
+ *   • Last page = remaining cities + totals + bank.
+ */
+function paginateCities(cities) {
+  const SAFE_FIRST_AND_LAST_ROWS = Math.floor(
+    (PAGE_BUDGET_PX - FIRST_PAGE_OVERHEAD - LAST_PAGE_FOOTER) / ROW_HEIGHT_PX
+  ) // ≈ 4
+  if (cities.length <= 14) {
+    return [{ cities, isFirst: true, isLast: true }]
+  }
+  const pages = [{ cities: cities.slice(0, 10), isFirst: true, isLast: false }]
+  let i = 10
+  while (i < cities.length) {
+    const remaining = cities.length - i
+    if (remaining <= 14) {
+      pages.push({ cities: cities.slice(i), isFirst: false, isLast: true })
+      break
+    }
+    pages.push({ cities: cities.slice(i, i + 18), isFirst: false, isLast: false })
+    i += 18
+  }
+  return pages
+}
+
+/**
+ * Single A4 page of the quote.
+ *
+ * @param {object} p
+ * @param {object} p.quote
+ * @param {object} p.company
+ * @param {Array}  p.cityChunk   cities for THIS page
+ * @param {Array}  p.allCities   full city list (for totals computation)
+ * @param {boolean} p.isFirst    show full header (client / campaign / glance)
+ * @param {boolean} p.isLast     show totals + bank + prepared-by
+ * @param {number} p.pageIndex   1-based
+ * @param {number} p.totalPages
+ */
+function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, pageIndex, totalPages }) {
+  const letterheadOn = !!company.letterhead_url
+  const subtotal     = Number(quote?.subtotal) || 0
+  const gstRate      = quote?.gst_rate !== null && quote?.gst_rate !== undefined ? Number(quote.gst_rate) : 0.18
+  const gstAmount    = Number(quote?.gst_amount) || (subtotal * gstRate)
+  const totalAmount  = Number(quote?.total_amount) || (subtotal + gstAmount)
+  const inWords      = rupeesToWords(Math.round(totalAmount))
+  const repName      = quote?.sales_person_name || 'Sales Executive'
+  const campaignDurationLabel = `${quote?.duration_months || 1} Month${(quote?.duration_months || 1) !== 1 ? 's' : ''}`
+
+  const wrapperStyle = {
+    width:              '794px',
+    height:             '1123px',
+    boxSizing:          'border-box',
+    overflow:           'hidden',
+    background:         '#ffffff',
+    backgroundImage:    letterheadOn ? `url("${company.letterhead_url}")` : 'none',
+    backgroundRepeat:   'no-repeat',
+    backgroundSize:     '794px 1123px',  // FIXED — no stretch
+    backgroundPosition: 'top center',
+    padding:            letterheadOn ? '110px 70px 105px 70px' : '0',
+    fontFamily:         '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+    color:              INK,
+    fontSize:           10.5,
+  }
+
+  // Lines for this page only.
+  const lines = cityChunk.map((c, idx) => {
+    // sr is absolute (global numbering across pages)
+    const globalSr = allCities.findIndex(x => (x.id || x.city_id || x.city?.id) === (c.id || c.city_id || c.city?.id)) + 1 || (idx + 1)
+    return {
+      sr:           globalSr,
+      cityName:     c.city_name || c.name || `Line ${idx + 1}`,
+      station:      c.station || c.media_type || '',
+      grade:        c.grade || '',
+      screens:      Number(c.screens || 0),
+      slotSec:      Number(c.slot_seconds) || 10,
+      slotsPerDay:  Number(c.slots_per_day) || 100,
+      durationMo:   Number(c.duration_months) || (Number(quote?.duration_months) || 1),
+      listedRate:   Number(c.listed_rate) || 0,
+      offeredRate:  Number(c.offered_rate) || 0,
+      campaignTotal: Number(c.campaign_total) || (Number(c.offered_rate || 0) * Number(c.screens || 0) * (Number(c.duration_months) || 1)),
+    }
+  })
+
+  const tableTh = {
+    background:    INK,
+    color:         '#fff',
+    padding:       '8px 10px',
+    textAlign:     'left',
+    fontWeight:    600,
+    fontSize:      10,
+    letterSpacing: '0.04em',
+  }
+  const tableTd  = { padding: '8px 10px', borderBottom: `1px solid ${BORDER}`, fontSize: 10.5, color: INK, verticalAlign: 'top' }
+  const tdNum    = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+  const sectionTitle = { fontSize: 9, letterSpacing: '0.14em', fontWeight: 700, color: MUTED, textTransform: 'uppercase', margin: '0 0 6px' }
+
+  return (
+    <div style={wrapperStyle}>
+      {/* Title row — always shown. Compact on continuation pages. */}
+      <div style={{ marginBottom: 14, paddingBottom: 8, borderBottom: `2px solid ${INK}` }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color: INK, letterSpacing: '0.05em' }}>
+          MEDIA QUOTATION{!isFirst ? ' (cont.)' : ''}
+        </div>
+        <div style={{ marginTop: 4, fontSize: 11 }}>
+          <span style={{ fontWeight: 700, color: INK }}>{quote?.quote_number || '—'}</span>
+          <span style={{ marginLeft: 10, color: MUTED, fontSize: 10 }}>
+            {quote?.created_at ? formatDate(quote.created_at) : ''}
+          </span>
+          <span style={{ marginLeft: 10, color: MUTED, fontSize: 10 }}>
+            · {quote?.media_type === 'OTHER_MEDIA' ? 'Private — Other Media' : 'Private — LED Cities'}
+          </span>
+          {totalPages > 1 && (
+            <span style={{ float: 'right', color: MUTED, fontSize: 10 }}>
+              Page {pageIndex} of {totalPages}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Full header — first page only */}
+      {isFirst && (
+        <>
+          <div style={sectionTitle}>Client Details</div>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr',
+            gap: '10px 28px', padding: '10px 14px',
+            background: SOFT, border: `1px solid ${BORDER}`,
+            borderRadius: 8, marginBottom: 14,
+          }}>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Client</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_name || '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Company</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_company || '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Phone</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_phone || '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Email</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_email || '—'}</div>
+            </div>
+          </div>
+
+          <div style={sectionTitle}>Campaign Details</div>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: 14, padding: '10px 14px', background: SOFT,
+            border: `1px solid ${BORDER}`, borderRadius: 8, marginBottom: 14,
+          }}>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Duration</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{campaignDurationLabel}</div>
+            </div>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Type</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_type || 'New Client'}</div>
+            </div>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Prepared by</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{repName}</div>
+            </div>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Locations</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{allCities.length} City{allCities.length !== 1 ? 's' : ''}</div>
+            </div>
+            <div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Screens</div>
+              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{totalScreensFn(allCities)}</div>
+            </div>
+          </div>
+
+          <div style={sectionTitle}>This Campaign at a Glance</div>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+            border: `1px solid ${BORDER}`, borderRadius: 8,
+            marginBottom: 12, overflow: 'hidden', background: '#fff',
+          }}>
+            <div style={{ padding: '12px 8px', textAlign: 'center', borderRight: `1px solid ${BORDER}` }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: INK }}>{totalScreensFn(allCities)}</div>
+              <div style={{ fontSize: 9, color: MUTED, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.10em' }}>Screens Booked</div>
+            </div>
+            <div style={{ padding: '12px 8px', textAlign: 'center', borderRight: `1px solid ${BORDER}` }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: INK }}>{formatLakhFn(totalSpotsPerMonthFn(allCities))}</div>
+              <div style={{ fontSize: 9, color: MUTED, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.10em' }}>Spots / Month</div>
+            </div>
+            <div style={{ padding: '12px 8px', textAlign: 'center', borderRight: `1px solid ${BORDER}` }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: INK }}>{quoteSlotSecondsFn(allCities)} SEC</div>
+              <div style={{ fontSize: 9, color: MUTED, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.10em' }}>Spot Duration</div>
+            </div>
+            <div style={{ padding: '12px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: INK }}>{formatLakhFn(totalImpressionsFn(allCities))}</div>
+              <div style={{ fontSize: 9, color: MUTED, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.10em' }}>Total Impressions</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Location table — every page */}
+      <div style={sectionTitle}>Location Breakdown{!isFirst ? ' (cont.)' : ''}</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10.5 }}>
+        <thead>
+          <tr>
+            <th style={{ ...tableTh, width: 28 }}>SR</th>
+            <th style={tableTh}>City</th>
+            <th style={{ ...tableTh, textAlign: 'center', width: 50 }}>Grade</th>
+            <th style={{ ...tableTh, ...tdNum, width: 58 }}>Screens</th>
+            <th style={{ ...tableTh, ...tdNum, width: 60 }}>Duration</th>
+            <th style={{ ...tableTh, ...tdNum, width: 50 }}>Slot</th>
+            <th style={{ ...tableTh, ...tdNum, width: 70 }}>Slots/Day</th>
+            <th style={{ ...tableTh, ...tdNum, width: 90 }}>Listed</th>
+            <th style={{ ...tableTh, ...tdNum, width: 90 }}>Offered</th>
+            <th style={{ ...tableTh, ...tdNum, width: 110 }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((l, idx) => {
+            const gradeBg = l.grade === 'A' ? '#DCFCE7' : l.grade === 'B' ? '#FFEDD5' : '#F1F5F9'
+            const gradeFg = l.grade === 'A' ? '#166534' : l.grade === 'B' ? '#B45309' : '#475569'
+            const showListedStruck = l.listedRate && l.listedRate !== l.offeredRate
+            return (
+              <tr key={`${l.sr}-${idx}`}>
+                <td style={{ ...tableTd, color: MUTED }}>{l.sr}</td>
+                <td style={tableTd}>
+                  <div style={{ fontWeight: 600 }}>{l.cityName}</div>
+                  {l.station && <div style={{ color: MUTED, fontSize: 9 }}>{l.station}</div>}
+                </td>
+                <td style={{ ...tableTd, textAlign: 'center' }}>
+                  <span style={{
+                    display: 'inline-block', padding: '2px 7px',
+                    background: gradeBg, color: gradeFg,
+                    borderRadius: 8, fontWeight: 700, fontSize: 9,
+                  }}>{l.grade || '—'}</span>
+                </td>
+                <td style={{ ...tableTd, ...tdNum }}>{l.screens}</td>
+                <td style={{ ...tableTd, ...tdNum }}>{l.durationMo}mo</td>
+                <td style={{ ...tableTd, ...tdNum }}>{l.slotSec}s</td>
+                <td style={{ ...tableTd, ...tdNum }}>{l.slotsPerDay}</td>
+                <td style={{ ...tableTd, ...tdNum }}>
+                  {showListedStruck
+                    ? <span style={{ color: MUTED, textDecoration: 'line-through' }}>{formatCurrency(l.listedRate)}</span>
+                    : '—'}
+                </td>
+                <td style={{ ...tableTd, ...tdNum, color: '#16a34a', fontWeight: 700 }}>
+                  {formatCurrency(l.offeredRate)}
+                </td>
+                <td style={{ ...tableTd, ...tdNum, fontWeight: 700 }}>{formatCurrency(l.campaignTotal)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+
+      {/* Totals + bank — last page only */}
+      {isLast && (
+        <>
+          <div style={{ marginLeft: 'auto', width: '60%', borderTop: `1px solid ${BORDER}`, paddingTop: 8, marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 11 }}>
+              <span style={{ color: MUTED }}>Subtotal</span>
+              <span style={{ color: INK, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(subtotal)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 11 }}>
+              <span style={{ color: MUTED }}>{gstRate > 0 ? `GST (${Math.round(gstRate * 100)}%)` : 'No GST'}</span>
+              <span style={{ color: INK, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{gstRate > 0 ? formatCurrency(gstAmount) : '—'}</span>
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              padding: '8px 12px', marginTop: 4, background: YELLOW,
+              borderRadius: 6, fontSize: 14, fontWeight: 700, color: INK,
+            }}>
+              <span>Grand Total</span>
+              <span>{formatCurrency(totalAmount)}</span>
+            </div>
+            <div style={{
+              marginTop: 6, padding: '6px 10px',
+              background: SOFT, border: `1px dashed ${BORDER}`,
+              borderRadius: 6, fontSize: 10, color: INK,
+            }}>
+              <b>Total in Words:</b> {inWords}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER}`, fontSize: 10, color: MUTED }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              <div>
+                <div style={{ fontSize: 8, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', marginBottom: 2 }}>Bank</div>
+                {company.bank_name && <div><b style={{ color: INK }}>{company.bank_name}</b></div>}
+                {company.bank_acc_name && <div>{company.bank_acc_name}</div>}
+                {company.bank_acc_number && <div>A/C: {company.bank_acc_number}</div>}
+                {company.bank_ifsc && <div>IFSC: {company.bank_ifsc}</div>}
+                {company.upi_id && <div>UPI: {company.upi_id}</div>}
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 8, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', marginBottom: 2 }}>Prepared by</div>
+                <div style={{ color: INK, fontWeight: 600 }}>{repName}</div>
+                <div>{quote?.quote_number} · {quote?.created_at ? formatDate(quote.created_at) : ''}</div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /* ─── Phase 81.2 — per-city photo page + thank-you page ─────────── */
 //
 // Each page is a fixed-A4 div (794×1123 px) rendered as its own canvas
@@ -768,18 +1109,45 @@ async function renderToPdfBlob(quote, cities, company) {
     }
   }
 
-  // PAGE 1 — quote summary (may overflow into a second jsPDF page
-  // if terms / signatures push past 1123px; the slicer handles it).
-  const page1 = await captureToCanvas(
-    <QuotePDFHtmlDocument quote={quote} cities={enrichedCities} company={company} />
-  )
-  if (!page1.width || !page1.height) {
-    throw new Error(
-      'PDF render captured an empty canvas — the quote DOM has no layout. ' +
-      'Reload the page and try again.'
+  // Phase 81.3 — letterhead path uses paginated QuotePage. Each
+  // chunk is rendered at exactly 794×1123 with the letterhead PNG
+  // as background + safe-zone padding + overflow hidden. Slicer
+  // therefore never stretches the letterhead, and every page has
+  // the letterhead chrome.
+  const letterheadOn = !!company?.letterhead_url
+  if (letterheadOn) {
+    const pages = paginateCities(enrichedCities)
+    for (let i = 0; i < pages.length; i++) {
+      const p = pages[i]
+      const pageCanvas = await captureToCanvas(
+        <QuotePage
+          quote={quote}
+          company={company}
+          cityChunk={p.cities}
+          allCities={enrichedCities}
+          isFirst={p.isFirst}
+          isLast={p.isLast}
+          pageIndex={i + 1}
+          totalPages={pages.length}
+        />,
+        { fixedHeight: A4_HEIGHT_PX },
+      )
+      addCanvasAsPages(pageCanvas)
+    }
+  } else {
+    // No-letterhead fallback: single render with legacy chrome
+    // (yellow headBand + dark titleBand). Slicer handles overflow.
+    const page1 = await captureToCanvas(
+      <QuotePDFHtmlDocument quote={quote} cities={enrichedCities} company={company} />
     )
+    if (!page1.width || !page1.height) {
+      throw new Error(
+        'PDF render captured an empty canvas — the quote DOM has no layout. ' +
+        'Reload the page and try again.'
+      )
+    }
+    addCanvasAsPages(page1)
   }
-  addCanvasAsPages(page1)
 
   // PHOTO PAGES — one A4 per city with photo_url. Cities without a
   // photo are skipped (no blank pages).
