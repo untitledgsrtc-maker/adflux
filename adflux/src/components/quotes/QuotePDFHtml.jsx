@@ -64,16 +64,37 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
   const totalAmount = Number(quote?.total_amount) || (subtotal + gstAmount)
   const inWords     = rupeesToWords(Math.round(totalAmount))
 
+  // Phase 81.2 — letterhead-aware page.
+  //   When companies.letterhead_url is present, render the page on
+  //   top of the rasterised letterhead PNG (top logo + bottom address
+  //   strip). Content padded into the safe middle zone the way
+  //   GovtProposalRenderer does (Phase 10b / 28b).
+  //   When no letterhead is set, fall back to the legacy yellow
+  //   headBand + dark titleBand chrome.
+  const letterheadOn = !!company.letterhead_url
   const styles = {
-    page: {
-      width: '794px',
+    page: letterheadOn ? {
+      width:             '794px',
+      minHeight:         '1123px',
+      background:        '#ffffff',
+      backgroundImage:   `url("${company.letterhead_url}")`,
+      backgroundRepeat:  'no-repeat',
+      backgroundSize:    '100% 100%',
+      backgroundPosition:'top center',
+      fontFamily:        '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+      color:             INK,
+      boxSizing:         'border-box',
+      padding:           '110px 70px 105px 70px',  // letterhead safe zone
+      margin:            0,
+    } : {
+      width:     '794px',
       minHeight: '1123px',
       background: '#ffffff',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
-      color: INK,
-      boxSizing: 'border-box',
-      padding: 0,
-      margin: 0,
+      color:      INK,
+      boxSizing:  'border-box',
+      padding:    0,
+      margin:     0,
     },
     headBand: {
       background: YELLOW,
@@ -100,7 +121,27 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
     titleText: { fontSize: 16, fontWeight: 700, letterSpacing: '0.04em' },
     titleSub:  { fontSize: 10, color: '#e2e8f0' },
 
-    body:   { padding: '20px 32px' },
+    // Phase 81.2 — body padding is letterhead-aware. When letterhead
+    // is on, the outer page already has the 70px / 110px / 105px safe
+    // zone applied, so body padding collapses to 0. Without letterhead
+    // the legacy headBand/titleBand sit above and body keeps its own
+    // 20/32 padding.
+    body:   { padding: letterheadOn ? 0 : '20px 32px' },
+    // Phase 81.2 — clean text title used WITH letterhead (replaces
+    // the dark titleBand bar that would clash with letterhead chrome).
+    quoteTitleRow: {
+      display:        'flex',
+      justifyContent: 'space-between',
+      alignItems:     'flex-end',
+      marginBottom:   18,
+      paddingBottom:  10,
+      borderBottom:   `2px solid ${INK}`,
+    },
+    quoteTitleText:  { fontSize: 22, fontWeight: 700, color: INK, letterSpacing: '0.05em' },
+    quoteTitleMeta:  { textAlign: 'right' },
+    quoteTitleRef:   { fontSize: 13, fontWeight: 700, color: INK },
+    quoteTitleDate:  { fontSize: 10, color: MUTED, marginTop: 2 },
+    quoteTitleSub:   { fontSize: 10, color: MUTED, marginTop: 1 },
     sectionTitle: { fontSize: 9, letterSpacing: '0.14em', fontWeight: 700, color: MUTED, textTransform: 'uppercase', margin: '0 0 6px' },
 
     clientGrid: {
@@ -205,38 +246,51 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
 
   return (
     <div style={styles.page}>
-      {/* Phase 34Z.27 — column names now match companies schema
-          (address_line, bank_acc_number, phone, email, etc.). Letterhead
-          image renders behind the header as a watermark/background when
-          the companies row has letterhead_url set. */}
-      <div style={{
-        ...styles.headBand,
-        position: 'relative',
-        backgroundImage: company.letterhead_url ? `url("${company.letterhead_url}")` : 'none',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }}>
-        <div>
-          <div style={styles.headBrand}>{company.name || company.short_name || 'Untitled Advertising'}</div>
-          <div style={styles.headSub}>
-            {[company.address_line, company.city, company.state, company.pincode].filter(Boolean).join(', ')}
+      {/* Phase 81.2 — when letterhead is uploaded, the page already
+          shows top logo + bottom address from the letterhead PNG, so
+          we drop the yellow headBand + dark titleBand entirely
+          (otherwise they cover the letterhead's own brand chrome).
+          A clean text title takes their place. When no letterhead,
+          fall back to the legacy yellow + dark bands. */}
+      {letterheadOn ? (
+        <div style={styles.quoteTitleRow}>
+          <div style={styles.quoteTitleText}>MEDIA QUOTATION</div>
+          <div style={styles.quoteTitleMeta}>
+            <div style={styles.quoteTitleRef}>{quote?.quote_number || '—'}</div>
+            <div style={styles.quoteTitleDate}>{quote?.created_at ? formatDate(quote.created_at) : ''}</div>
+            <div style={styles.quoteTitleSub}>
+              {quote?.media_type === 'OTHER_MEDIA' ? 'Private — Other Media' : 'Private — LED Cities'}
+            </div>
           </div>
-          <div style={styles.headSub}>GSTIN: {company.gstin || '—'} · PAN: {company.pan || '—'}</div>
         </div>
-        <div style={styles.headQuote}>
-          <div style={styles.headQuoteLabel}>Quote #</div>
-          <div style={styles.headQuoteNum}>{quote?.quote_number || '—'}</div>
-          <div style={styles.headQuoteDate}>{quote?.created_at ? formatDate(quote.created_at) : ''}</div>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div style={{
+            ...styles.headBand,
+            position: 'relative',
+          }}>
+            <div>
+              <div style={styles.headBrand}>{company.name || company.short_name || 'Untitled Advertising'}</div>
+              <div style={styles.headSub}>
+                {[company.address_line, company.city, company.state, company.pincode].filter(Boolean).join(', ')}
+              </div>
+              <div style={styles.headSub}>GSTIN: {company.gstin || '—'} · PAN: {company.pan || '—'}</div>
+            </div>
+            <div style={styles.headQuote}>
+              <div style={styles.headQuoteLabel}>Quote #</div>
+              <div style={styles.headQuoteNum}>{quote?.quote_number || '—'}</div>
+              <div style={styles.headQuoteDate}>{quote?.created_at ? formatDate(quote.created_at) : ''}</div>
+            </div>
+          </div>
 
-      <div style={styles.titleBand}>
-        <div style={styles.titleText}>MEDIA QUOTATION</div>
-        <div style={styles.titleSub}>
-          {quote?.media_type === 'OTHER_MEDIA' ? 'Private — Other Media' : 'Private — LED Cities'}
-        </div>
-      </div>
+          <div style={styles.titleBand}>
+            <div style={styles.titleText}>MEDIA QUOTATION</div>
+            <div style={styles.titleSub}>
+              {quote?.media_type === 'OTHER_MEDIA' ? 'Private — Other Media' : 'Private — LED Cities'}
+            </div>
+          </div>
+        </>
+      )}
 
       <div style={styles.body}>
         <div style={styles.sectionTitle}>Client Details</div>
@@ -378,28 +432,121 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
         </div>
       </div>
 
-      <div style={styles.footer}>
-        <div style={styles.footerRow}>
-          <div style={styles.footerCell}>
-            <div style={styles.footerLabel}>Bank</div>
-            <div style={styles.footerValue}>{company.bank_name || ''}</div>
-            {company.bank_branch && <div>Branch: {company.bank_branch}</div>}
-            {company.bank_acc_name && <div>A/C Name: {company.bank_acc_name}</div>}
-            {company.bank_acc_number && <div>A/C: {company.bank_acc_number}</div>}
-            {company.bank_ifsc && <div>IFSC: {company.bank_ifsc}</div>}
-            {company.bank_micr && <div>MICR: {company.bank_micr}</div>}
-            {company.upi_id && <div>UPI: {company.upi_id}</div>}
+      {/* Phase 81.2 — when letterhead is on, suppress the legacy
+          footer block. Bank details are kept inside the body via
+          Terms (or could move into a Payment Details block); the
+          letterhead's own bottom address strip carries contact info.
+          When letterhead is OFF, the full legacy footer renders. */}
+      {!letterheadOn && (
+        <div style={styles.footer}>
+          <div style={styles.footerRow}>
+            <div style={styles.footerCell}>
+              <div style={styles.footerLabel}>Bank</div>
+              <div style={styles.footerValue}>{company.bank_name || ''}</div>
+              {company.bank_branch && <div>Branch: {company.bank_branch}</div>}
+              {company.bank_acc_name && <div>A/C Name: {company.bank_acc_name}</div>}
+              {company.bank_acc_number && <div>A/C: {company.bank_acc_number}</div>}
+              {company.bank_ifsc && <div>IFSC: {company.bank_ifsc}</div>}
+              {company.bank_micr && <div>MICR: {company.bank_micr}</div>}
+              {company.upi_id && <div>UPI: {company.upi_id}</div>}
+            </div>
+            <div style={styles.footerCell}>
+              <div style={styles.footerLabel}>Contact</div>
+              {company.phone && <div>Phone: {company.phone}</div>}
+              {company.email && <div>Email: {company.email}</div>}
+              {company.website && <div>Web: {company.website}</div>}
+            </div>
+            <div style={{ ...styles.footerCell, textAlign: 'right' }}>
+              <div style={styles.footerLabel}>Prepared by</div>
+              <div style={styles.footerValue}>{repName}</div>
+              <div>{quote?.quote_number} · {quote?.created_at ? formatDate(quote.created_at) : ''}</div>
+            </div>
           </div>
-          <div style={styles.footerCell}>
-            <div style={styles.footerLabel}>Contact</div>
-            {company.phone && <div>Phone: {company.phone}</div>}
-            {company.email && <div>Email: {company.email}</div>}
-            {company.website && <div>Web: {company.website}</div>}
+        </div>
+      )}
+
+      {/* Phase 81.2 — when letterhead is on, drop a compact Bank /
+          Prepared-by block INSIDE the safe-zone body so the rep info
+          + payment details still print. Sits above the letterhead's
+          bottom address strip. */}
+      {letterheadOn && (
+        <div style={{ marginTop: 24, paddingTop: 14, borderTop: `1px solid ${BORDER}`, fontSize: 10, color: MUTED }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+            <div>
+              <div style={styles.footerLabel}>Bank</div>
+              {company.bank_name && <div><b style={{ color: INK }}>{company.bank_name}</b></div>}
+              {company.bank_acc_name && <div>{company.bank_acc_name}</div>}
+              {company.bank_acc_number && <div>A/C: {company.bank_acc_number}</div>}
+              {company.bank_ifsc && <div>IFSC: {company.bank_ifsc}</div>}
+              {company.upi_id && <div>UPI: {company.upi_id}</div>}
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={styles.footerLabel}>Prepared by</div>
+              <div style={{ color: INK, fontWeight: 600 }}>{repName}</div>
+              <div>{quote?.quote_number} · {quote?.created_at ? formatDate(quote.created_at) : ''}</div>
+            </div>
           </div>
-          <div style={{ ...styles.footerCell, textAlign: 'right' }}>
-            <div style={styles.footerLabel}>Prepared by</div>
-            <div style={styles.footerValue}>{repName}</div>
-            <div>{quote?.quote_number} · {quote?.created_at ? formatDate(quote.created_at) : ''}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── Phase 81.2 — per-city photo page + thank-you page ─────────── */
+//
+// Each page is a fixed-A4 div (794×1123 px) rendered as its own canvas
+// via html2canvas, then added as a discrete jsPDF page. Keeping the
+// canvas-per-page exactly A4-sized avoids the slicer chopping a photo
+// across page boundaries.
+
+function CityPhotoPage({ city, quote }) {
+  const cityName = city.city_name || city.name || ''
+  const station  = city.station || city.media_type || ''
+  const grade    = city.grade || ''
+  return (
+    <div style={{
+      width:    '794px',
+      height:   '1123px',
+      position: 'relative',
+      background: '#0f172a',
+      overflow: 'hidden',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+    }}>
+      <img
+        src={city.photo_url}
+        alt={cityName}
+        crossOrigin="anonymous"
+        style={{
+          width:     '100%',
+          height:    '100%',
+          objectFit: 'cover',
+          display:   'block',
+        }}
+      />
+      <div style={{
+        position:        'absolute',
+        bottom:          0,
+        left:            0,
+        right:           0,
+        background:      'rgba(15,23,42,0.92)',
+        color:           '#ffffff',
+        padding:         '20px 32px',
+        display:         'flex',
+        justifyContent:  'space-between',
+        alignItems:      'flex-end',
+      }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.04em' }}>{cityName}</div>
+          {station && <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>{station}</div>}
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          {grade && (
+            <div style={{ fontSize: 12, fontWeight: 700, color: YELLOW, letterSpacing: '0.08em' }}>
+              GRADE {grade}
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: '#cbd5e1', marginTop: 4 }}>
+            {quote?.quote_number}
           </div>
         </div>
       </div>
@@ -407,76 +554,178 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
   )
 }
 
+function ThankYouPage({ url }) {
+  return (
+    <div style={{
+      width:    '794px',
+      height:   '1123px',
+      position: 'relative',
+      background: '#ffffff',
+      overflow: 'hidden',
+    }}>
+      <img
+        src={url}
+        alt="Thank you"
+        crossOrigin="anonymous"
+        style={{
+          width:     '100%',
+          height:    '100%',
+          objectFit: 'cover',
+          display:   'block',
+        }}
+      />
+    </div>
+  )
+}
+
+/* ─── Phase 81.2 — enrichment helpers ───────────────────────────── */
+
+/**
+ * Resolve master cities photo_url + companies.thank_you_url from the
+ * DB. Both are needed for the multi-page PDF.
+ */
+async function enrichCitiesWithPhotos(cities) {
+  if (!cities?.length) return cities
+  const ids = [...new Set(
+    cities.map(c => c.city_id || c.city?.id).filter(Boolean)
+  )]
+  if (!ids.length) return cities
+  const { data, error } = await supabase
+    .from('cities')
+    .select('id, photo_url')
+    .in('id', ids)
+  if (error || !data) return cities
+  const photoMap = Object.fromEntries(data.map(m => [m.id, m.photo_url]))
+  return cities.map(c => ({
+    ...c,
+    photo_url: c.photo_url || photoMap[c.city_id || c.city?.id] || null,
+  }))
+}
+
 /* ─── Snapshot helper (mirrors GovtProposalDetailV2 combined-pdf) ─── */
 
-async function renderToPdfBlob(quote, cities, company) {
-  const A4_WIDTH_PX = 794
+const A4_WIDTH_PX  = 794
+const A4_HEIGHT_PX = 1123
+
+/**
+ * Render a React tree into an off-screen wrapper, capture with
+ * html2canvas, return the canvas. Caller adds it to the jsPDF.
+ */
+async function captureToCanvas(jsx, { fixedHeight = null } = {}) {
   const wrapper = document.createElement('div')
   wrapper.style.position   = 'fixed'
   wrapper.style.left       = '-100000px'
   wrapper.style.top        = '0'
   wrapper.style.width      = `${A4_WIDTH_PX}px`
+  if (fixedHeight) wrapper.style.height = `${fixedHeight}px`
   wrapper.style.background = '#ffffff'
   wrapper.style.zIndex     = '-1'
   document.body.appendChild(wrapper)
 
   const root = createRoot(wrapper)
   await new Promise((resolve) => {
-    root.render(<QuotePDFHtmlDocument quote={quote} cities={cities} company={company} />)
-    // Two RAFs ensure layout settles before snapshot.
+    root.render(jsx)
     requestAnimationFrame(() => requestAnimationFrame(resolve))
   })
 
   let canvas
   try {
     canvas = await html2canvas(wrapper, {
-      scale: 2,
+      scale:           2,
       backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
-      width: A4_WIDTH_PX,
-      windowWidth: A4_WIDTH_PX,
+      useCORS:         true,
+      logging:         false,
+      width:           A4_WIDTH_PX,
+      windowWidth:     A4_WIDTH_PX,
+      height:          fixedHeight || undefined,
+      windowHeight:    fixedHeight || undefined,
     })
   } finally {
     try { root.unmount() } catch { /* ignore */ }
     if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper)
   }
+  return canvas
+}
 
-  if (!canvas.width || !canvas.height) {
+async function renderToPdfBlob(quote, cities, company) {
+  // Phase 81.2 — enrich cities with master photo_url so each city's
+  // photo page can render. Best-effort: failure just skips that
+  // city's page silently (no broken-image placeholder).
+  const enrichedCities = await enrichCitiesWithPhotos(cities)
+  const thankYouUrl    = company?.thank_you_url || null
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageWidthMm  = 210
+  const pageHeightMm = 297
+  let isFirstSlice = true
+
+  /**
+   * Slice a tall canvas into A4-height jsPDF pages. For exactly-A4
+   * canvases (photo / thank-you) the loop runs once.
+   */
+  function addCanvasAsPages(canvas) {
+    if (!canvas.width || !canvas.height) return
+    const pxPerMm = canvas.width / pageWidthMm
+    const pageHpx = Math.floor(pageHeightMm * pxPerMm)
+    let remaining = canvas.height
+    let yOffsetPx = 0
+    while (remaining > 0) {
+      const sliceHpx = Math.min(pageHpx, remaining)
+      // Drop tiny tail slices (<5%) that would render as a blank
+      // page. Only applies after we've already added at least one
+      // slice for this canvas.
+      if (yOffsetPx > 0 && sliceHpx < pageHpx * 0.05) break
+      if (!isFirstSlice) pdf.addPage()
+      isFirstSlice = false
+      const slice = document.createElement('canvas')
+      slice.width  = canvas.width
+      slice.height = sliceHpx
+      slice.getContext('2d').drawImage(
+        canvas,
+        0, yOffsetPx, canvas.width, sliceHpx,
+        0, 0,         canvas.width, sliceHpx,
+      )
+      const sliceData = slice.toDataURL('image/jpeg', 0.92)
+      const sliceMm = Math.min(sliceHpx / pxPerMm, pageHeightMm)
+      pdf.addImage(sliceData, 'JPEG', 0, 0, pageWidthMm, sliceMm, undefined, 'FAST')
+      yOffsetPx += sliceHpx
+      remaining -= sliceHpx
+    }
+  }
+
+  // PAGE 1 — quote summary (may overflow into a second jsPDF page
+  // if terms / signatures push past 1123px; the slicer handles it).
+  const page1 = await captureToCanvas(
+    <QuotePDFHtmlDocument quote={quote} cities={enrichedCities} company={company} />
+  )
+  if (!page1.width || !page1.height) {
     throw new Error(
       'PDF render captured an empty canvas — the quote DOM has no layout. ' +
       'Reload the page and try again.'
     )
   }
+  addCanvasAsPages(page1)
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const pageWidthMm  = 210
-  const pageHeightMm = 297
-  const pxPerMm      = canvas.width / pageWidthMm
-  const pageHpx      = Math.floor(pageHeightMm * pxPerMm)
-
-  let remaining = canvas.height
-  let yOffsetPx = 0
-  let isFirstPage = true
-  while (remaining > 0) {
-    const sliceHpx = Math.min(pageHpx, remaining)
-    if (!isFirstPage && sliceHpx < pageHpx * 0.05) break
-    if (!isFirstPage) pdf.addPage()
-    const slice = document.createElement('canvas')
-    slice.width  = canvas.width
-    slice.height = sliceHpx
-    slice.getContext('2d').drawImage(
-      canvas,
-      0, yOffsetPx, canvas.width, sliceHpx,
-      0, 0,         canvas.width, sliceHpx,
+  // PHOTO PAGES — one A4 per city with photo_url. Cities without a
+  // photo are skipped (no blank pages).
+  for (const c of enrichedCities) {
+    if (!c.photo_url) continue
+    const photoCanvas = await captureToCanvas(
+      <CityPhotoPage city={c} quote={quote} />,
+      { fixedHeight: A4_HEIGHT_PX },
     )
-    const sliceData = slice.toDataURL('image/jpeg', 0.92)
-    const sliceMm = Math.min(sliceHpx / pxPerMm, pageHeightMm)
-    pdf.addImage(sliceData, 'JPEG', 0, 0, pageWidthMm, sliceMm, undefined, 'FAST')
-    isFirstPage = false
-    yOffsetPx += sliceHpx
-    remaining -= sliceHpx
+    addCanvasAsPages(photoCanvas)
   }
+
+  // THANK-YOU PAGE — last A4 if admin uploaded one in Master.
+  if (thankYouUrl) {
+    const tyCanvas = await captureToCanvas(
+      <ThankYouPage url={thankYouUrl} />,
+      { fixedHeight: A4_HEIGHT_PX },
+    )
+    addCanvasAsPages(tyCanvas)
+  }
+
   return pdf.output('blob')
 }
 
