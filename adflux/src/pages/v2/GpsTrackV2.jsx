@@ -348,19 +348,26 @@ export default function GpsTrackV2() {
       // Check-in + check-out markers.
       const first = pings[0]
       const last  = pings[pings.length - 1]
-      const dotIcon = (color) => ({
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 9,
-        fillColor: color,
-        fillOpacity: 0.92,
-        strokeColor: '#ffffff',
-        strokeWeight: 3,
+      // Phase 70.9 (22 May 2026) — owner directive: navigation pin
+      // shape, not round dot. Teardrop SVG path; tip at (0,0) so the
+      // marker's lat/lng anchors at the bottom point of the pin.
+      // labelOrigin centers any text label inside the pin head.
+      const PIN_PATH = 'M 0,0 C -7,-12 -14,-20 -14,-30 A 14,14 0 1,1 14,-30 C 14,-20 7,-12 0,0 z'
+      const pinIcon = (color) => ({
+        path:           PIN_PATH,
+        fillColor:      color,
+        fillOpacity:    1,
+        strokeColor:    '#ffffff',
+        strokeWeight:   2,
+        scale:          1,
+        anchor:         new google.maps.Point(0, 0),
+        labelOrigin:    new google.maps.Point(0, -30),
       })
       if (first) {
         const m1 = new google.maps.Marker({
           position: { lat: Number(first.lat), lng: Number(first.lng) },
           map,
-          icon: dotIcon('#10B981'),
+          icon: pinIcon('#10B981'),
         })
         const iw1 = new google.maps.InfoWindow({
           content: `<b>Check-in</b><br/>${new Date(first.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
@@ -371,7 +378,7 @@ export default function GpsTrackV2() {
         const m2 = new google.maps.Marker({
           position: { lat: Number(last.lat), lng: Number(last.lng) },
           map,
-          icon: dotIcon('#EF4444'),
+          icon: pinIcon('#EF4444'),
         })
         const iw2 = new google.maps.InfoWindow({
           content: `<b>Check-out</b><br/>${new Date(last.captured_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
@@ -393,14 +400,7 @@ export default function GpsTrackV2() {
         const m = new google.maps.Marker({
           position: { lat: Number(a.gps_lat), lng: Number(a.gps_lng) },
           map,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: '#3B82F6',
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-          },
+          icon: pinIcon('#3B82F6'),
         })
         const leadName = a.lead.company || a.lead.name || 'Lead'
         const leadHref = `/leads/${a.lead.id}`
@@ -425,7 +425,8 @@ export default function GpsTrackV2() {
         m.addListener('click', () => iw.open({ anchor: m, map }))
       }
 
-      // Numbered stop markers — Google Maps Marker with custom label.
+      // Numbered stop pins — same teardrop shape; label sits inside
+      // the pin head via labelOrigin.
       for (const s of stops) {
         const m = new google.maps.Marker({
           position: { lat: s.lat, lng: s.lng },
@@ -436,14 +437,7 @@ export default function GpsTrackV2() {
             fontWeight: '700',
             fontSize: '13px',
           },
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 14,
-            fillColor: '#F59E0B',
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-          },
+          icon: pinIcon('#F59E0B'),
         })
         const iw = new google.maps.InfoWindow({
           content:
