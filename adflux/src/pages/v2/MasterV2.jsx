@@ -23,12 +23,13 @@ import { useNavigate } from 'react-router-dom'
 import {
   Paperclip, UserCheck, Tv, FileText, Upload, Loader2, Plus, Trash2,
   Save, ArrowLeft, FileBox, Building2, Newspaper, MessageCircle, TrendingUp,
-  CheckCircle2,
+  CheckCircle2, Wrench,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { uploadAttachment, getSignedUrl, slugifyLabel } from '../../utils/proposalPdf'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { toastError, toastSuccess } from '../../components/v2/Toast'
 
 const TABS = [
   { key: 'attachments', label: 'Attachments', icon: Paperclip },
@@ -55,6 +56,10 @@ const TABS = [
   // Phase 33E — performance score + variable salary (70/30 split).
   { key: 'performance', label: 'Performance', icon: TrendingUp },
   { key: 'documents',   label: 'Documents',   icon: FileText },
+  // Phase 81.5.1 — one-time maintenance utilities. Today: purge
+  // legacy quote-pdfs (pre-flat-path layout from Phase 34Z.25).
+  // Future utilities live here too.
+  { key: 'maintenance', label: 'Maintenance', icon: Wrench },
 ]
 
 const MEDIA_FILTERS = [
@@ -137,6 +142,7 @@ export default function MasterV2() {
       {activeTab === 'designations' && <DesignationsTab />}
       {activeTab === 'performance' && <PerformanceTab />}
       {activeTab === 'documents'   && <DocumentsTab />}
+      {activeTab === 'maintenance' && <MaintenanceTab />}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
     </div>
@@ -3245,5 +3251,206 @@ function NumIn({ label, v, onSave }) {
         style={{ ...inputBase, padding: '4px 8px', fontSize: 12 }}
       />
     </label>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Phase 81.5.1 — Maintenance tab
+ *
+ * Owner directive (23 May 2026):
+ *   "don't store every version, only latest. every regen
+ *    overwrites" — Phase 81.5 already does this going forward.
+ *   But pre-Phase-81.5 PDFs sit in the bucket as
+ *     quote-pdfs/{quote_number}/{timestamp_ms}.pdf
+ *   Supabase blocks direct DELETE on storage.objects via SQL
+ *   (storage.protect_delete()), so cleanup runs through the
+ *   Storage API. This tab is the one-time admin-only cleanup
+ *   surface.
+ *
+ * Approach: list every object under quote-pdfs, keep only those
+ *   whose name contains a slash (= old folder layout), batch-
+ *   remove via supabase.storage.from(bucket).remove([paths]).
+ *
+ * Safe: new flat files like 'UA-2026-0057.pdf' have no slash so
+ *   the filter never touches them.
+ * ───────────────────────────────────────────────────────────── */
+
+function MaintenanceTab() {
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState({ scanned: 0, deleted: 0, failed: 0 })
+  const [lastResult, setLastResult] = useState(null)
+
+  async function purgeLegacyQuotePdfs() {
+    if (busy) return
+    const ok = await confirmDialog({
+      title:        'Purge legacy quote PDFs?',
+      message:      'Deletes all PDF versions under the old folder-per-quote layout. '
+                  + 'New flat-path files (1 per quote) are kept. This cannot be undone.',
+      confirmLabel: 'Purge legacy',
+      danger:       true,
+    })
+    if (!ok) return
+
+    setBusy(true)
+    setProgress({ scanned: 0, deleted: 0, failed: 0 })
+    setLastResult(null)
+
+    const bucket = supabase.storage.from('quote-pdfs')
+    const oldPaths = []
+
+    try {
+      // Step 1 — list root entries. Folders appear with id=null in
+      // the storage API. Files appear with metadata.
+      const { data: rootEntries, error: rootErr } = await bucket.list('', {
+        limit: 1000,
+        sortBy: { column: 'name', order: 'asc' },
+      })
+      if (rootErr) throw rootErr
+
+      const folders = (rootEntries || []).filter(e => e.id === null).map(e => e.name)
+      setProgress(p => ({ ...p, scanned: folders.length }))
+
+      // Step 2 — for each folder, list its files + collect full paths.
+      for (const folder of folders) {
+        const { data: files, error: listErr } = await bucket.list(folder, {
+          limit: 1000,
+        })
+        if (listErr) {
+          console.warn('[Maintenance] list failed for', folder, listErr.message)
+          continue
+        }
+        for (const f of (files || [])) {
+          // Skip phantom folder entries from nested layouts; only
+          // count real files.
+          if (f.id === null) continue
+          oldPaths.push(`${folder}/${f.name}`)
+        }
+      }
+
+      // Step 3 — batch-remove. Supabase API caps batch size at 1000
+      // paths; chunk if needed (defensive — we rarely hit that).
+      const CHUNK = 100
+      let deleted = 0
+      let failed  = 0
+      for (let i = 0; i < oldPaths.length; i += CHUNK) {
+        const slice = oldPaths.slice(i, i + CHUNK)
+        const { error: rmErr } = await bucket.remove(slice)
+        if (rmErr) {
+          console.warn('[Maintenance] remove failed', rmErr.message)
+          failed += slice.length
+        } else {
+          deleted += slice.length
+        }
+        setProgress(p => ({ ...p, deleted, failed }))
+      }
+
+      setLastResult({
+        ok:       true,
+        folders:  folders.length,
+        deleted,
+        failed,
+        ts:       new Date().toLocaleTimeString('en-IN', {
+          hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
+        }) + ' IST',
+      })
+      toastSuccess(`Purged ${deleted} legacy file${deleted === 1 ? '' : 's'}` +
+                   `${failed > 0 ? ` (${failed} failed)` : ''}.`)
+    } catch (e) {
+      setLastResult({ ok: false, message: e?.message || String(e) })
+      toastError(e, 'Cleanup failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={{
+      maxWidth: 720,
+      padding: 18,
+      background: 'var(--surface)',
+      border:     '1px solid var(--border)',
+      borderRadius: 10,
+    }}>
+      <div style={{
+        fontSize:      11,
+        fontWeight:    700,
+        letterSpacing: '.08em',
+        color:         'var(--text-subtle)',
+        textTransform: 'uppercase',
+        marginBottom:  6,
+      }}>
+        One-time cleanup
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+        Purge legacy quote PDFs
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 14 }}>
+        Pre-Phase-81.5 quote PDFs were stored as
+        <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, margin: '0 4px', fontSize: 12 }}>
+          quote-pdfs/&lt;ref&gt;/&lt;timestamp&gt;.pdf
+        </code>
+        — every WhatsApp send produced a new file. The new code writes
+        a single
+        <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, margin: '0 4px', fontSize: 12 }}>
+          quote-pdfs/&lt;ref&gt;.pdf
+        </code>
+        per quote and overwrites on every regen. This button removes
+        the old folder-layout files. Flat-path files are kept.
+      </div>
+
+      <button
+        type="button"
+        onClick={purgeLegacyQuotePdfs}
+        disabled={busy}
+        style={{
+          display:      'inline-flex',
+          alignItems:   'center',
+          gap:          8,
+          padding:      '10px 16px',
+          background:   'var(--danger)',
+          color:        '#fff',
+          border:       'none',
+          borderRadius: 10,
+          fontSize:     13,
+          fontWeight:   600,
+          cursor:       busy ? 'wait' : 'pointer',
+          opacity:      busy ? 0.7 : 1,
+        }}
+      >
+        {busy
+          ? <><Loader2 size={14} strokeWidth={1.8} className="animate-spin" /> Purging…</>
+          : <><Trash2 size={14} strokeWidth={1.8} /> Purge legacy PDFs</>
+        }
+      </button>
+
+      {busy && (
+        <div style={{
+          marginTop: 12,
+          fontSize:  12,
+          color:     'var(--text-muted)',
+        }}>
+          Scanned folders: {progress.scanned} · Deleted: {progress.deleted}
+          {progress.failed > 0 ? ` · Failed: ${progress.failed}` : ''}
+        </div>
+      )}
+
+      {lastResult && (
+        <div style={{
+          marginTop:    12,
+          padding:      '10px 14px',
+          background:   lastResult.ok ? 'var(--success-soft)' : 'var(--danger-soft)',
+          border:       `1px solid ${lastResult.ok ? 'var(--success)' : 'var(--danger)'}`,
+          color:        lastResult.ok ? 'var(--success)' : 'var(--danger)',
+          borderRadius: 8,
+          fontSize:     12,
+          lineHeight:   1.45,
+        }}>
+          {lastResult.ok
+            ? <>Removed <b>{lastResult.deleted}</b> legacy file{lastResult.deleted === 1 ? '' : 's'} across <b>{lastResult.folders}</b> folder{lastResult.folders === 1 ? '' : 's'} at {lastResult.ts}.{lastResult.failed > 0 && <> {lastResult.failed} failed.</>}</>
+            : <>Cleanup failed: {lastResult.message}</>
+          }
+        </div>
+      )}
+    </div>
   )
 }
