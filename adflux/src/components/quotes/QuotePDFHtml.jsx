@@ -1362,16 +1362,56 @@ export async function uploadQuotePDFHtml(quote, cities = []) {
   const { data } = supabase.storage.from('quote-pdfs').getPublicUrl(path)
   if (!data?.publicUrl) throw new Error('PDF uploaded but no public URL was returned — check bucket is public.')
 
-  // Phase 81.4 — return the branded URL instead of the raw Supabase
-  // storage URL. vercel.json rewrites `/pdf/<path>` to the same
-  // Supabase storage URL, so the file is identical but the link
-  // recipient sees the company's own domain.
-  // Falls back to the raw Supabase URL when running outside the
-  // production deploy (localhost preview, Vercel branch previews)
-  // — those don't have the rewrite configured so a /pdf URL would
-  // 404. Production owns `app.untitledad.in` (CLAUDE.md §14).
-  if (typeof window !== 'undefined' && /(^|\.)untitledad\.in$/i.test(window.location.hostname)) {
-    return `https://${window.location.hostname}/pdf/${path}`
+  // Phase 85.1 — issue a signed-URL share token instead of returning
+  // the raw public URL. Audit 24 May 2026 flagged the public-bucket
+  // + sequential-ref combo as P0 enumeration risk.
+  //
+  // New flow:
+  //   1. Generate a 32-byte URL-safe random token.
+  //   2. Insert into pdf_share_tokens with 90-day expiry + quote_id
+  //      + created_by = current user.
+  //   3. Return https://app.untitledad.in/pdf/<ref>?t=<token>.
+  //   4. /api/pdf/[ref] (Vercel route) validates the token, issues a
+  //      60-second signed URL via service role, 302 redirects.
+  //
+  // The bucket stays public-read during the 30-day migration window
+  // so old shortlinks keep working; Phase 85.1b flips it to private.
+  // Falls back to the raw Supabase URL on localhost / branch
+  // previews where the /api/pdf route isn't wired up to a domain.
+  if (quote?.id && typeof window !== 'undefined' && /(^|\.)untitledad\.in$/i.test(window.location.hostname)) {
+    try {
+      // Generate random token. crypto.getRandomValues is available
+      // in every modern browser + every Capacitor WebView.
+      const bytes = new Uint8Array(32)
+      crypto.getRandomValues(bytes)
+      const token = btoa(String.fromCharCode(...bytes))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '')
+      const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()  // +90 days
+
+      // Get current user id for created_by (best-effort).
+      const { data: { user } } = await supabase.auth.getUser()
+      const createdBy = user?.id || null
+
+      const { error: tErr } = await supabase
+        .from('pdf_share_tokens')
+        .insert([{
+          quote_id:   quote.id,
+          token,
+          expires_at: expiresAt,
+          created_by: createdBy,
+        }])
+
+      if (!tErr) {
+        return `https://${window.location.hostname}/pdf/${safeNumber}?t=${token}`
+      }
+      // Token insert failed (RLS hiccup, etc.) — fall through to
+      // public URL so the rep can still share. Logged for triage.
+      console.warn('[pdf-share-token] insert failed:', tErr.message)
+    } catch (tokenErr) {
+      console.warn('[pdf-share-token] generation failed:', tokenErr?.message)
+    }
   }
   return data.publicUrl
 }
