@@ -528,9 +528,9 @@ export default function TeamDashboardV2() {
   }, [sessions])
 
   // Phase 84 — "live" matches the new 4-state badge:
-  //   checked-in + GPS ping within 30 min + not checked-out.
-  // Old version counted every check_in_at, including reps who went
-  // dark hours ago — inflated the hero number.
+  //   checked-in + GPS ping within 90 min + not checked-out.
+  // 90 min covers a rep on a long meeting / lunch / desk-bound TC
+  // without flipping to "idle" too aggressively.
   const live = useMemo(() => {
     const now = Date.now()
     return reps.filter(r => {
@@ -539,7 +539,7 @@ export default function TeamDashboardV2() {
       if (s.check_out_at || s.auto_checked_out) return false
       const p = latestPingByUser[r.id]
       if (!p?.captured_at) return false
-      return (now - new Date(p.captured_at).getTime()) / 60000 <= 30
+      return (now - new Date(p.captured_at).getTime()) / 60000 <= 90
     }).length
   }, [reps, sessionByUser, latestPingByUser])
 
@@ -668,9 +668,11 @@ export default function TeamDashboardV2() {
           // New rule:
           //   • DONE       check_out_at set OR auto_checked_out
           //   • OFF        no check_in_at today
-          //   • IN FIELD   check_in_at set AND GPS ping ≤ 30 min
-          //   • IDLE       check_in_at set AND GPS ping > 30 min OR
+          //   • IN FIELD   check_in_at set AND GPS ping ≤ 90 min
+          //   • IDLE       check_in_at set AND GPS ping > 90 min OR
           //                no ping today
+          //   (Phase 84 tune: 30 min → 90 min so long meetings, lunch,
+          //    or desk-bound TC reps don't flip to amber too fast.)
           const _ping     = latestPingByUser[r.id]
           const _pingMins = _ping
             ? Math.floor((Date.now() - new Date(_ping.captured_at).getTime()) / 60000)
@@ -682,7 +684,7 @@ export default function TeamDashboardV2() {
           } else if (!sess?.check_in_at) {
             statusKind  = 'off'
             statusLabel = 'off'
-          } else if (_pingMins <= 30) {
+          } else if (_pingMins <= 90) {
             statusKind  = 'in_field'
             statusLabel = 'in field'
           } else {
@@ -729,13 +731,13 @@ export default function TeamDashboardV2() {
                 </div>
                 <div className="lead-rep-status">
                   {statusKind === 'in_field' && (
-                    <Pill tone="success" title="Checked in + GPS ping within last 30 min">
+                    <Pill tone="success" title="Checked in + GPS ping within last 90 min">
                       <span className="lead-live-dot" style={{ marginRight: 5, width: 6, height: 6 }} />
                       in field
                     </Pill>
                   )}
                   {statusKind === 'idle' && (
-                    <Pill tone="warning" title="Checked in but no GPS ping in last 30 min">
+                    <Pill tone="warning" title="Checked in but no GPS ping in last 90 min">
                       idle
                     </Pill>
                   )}
