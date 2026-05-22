@@ -184,22 +184,29 @@ export default function ClientsV2() {
   // deleting a client does NOT affect past quotes. Confirms via
   // confirmDialog. Reports how many quotes still reference the
   // client so admin makes an informed call.
-  async function handleDelete() {
-    if (!editing?.id) return
+  /**
+   * Phase 83.1 — accepts a client object so the same logic powers
+   * both the inline row Trash button AND the modal-footer Delete
+   * button. Old signature (no arg) still works when called from
+   * the modal since it falls back to `editing`.
+   */
+  async function handleDelete(client = null) {
+    const target = client || editing
+    if (!target?.id) return
     setSaveErr('')
 
     // Count quotes that reference this client.
     const { count: quoteCount } = await supabase
       .from('quotes')
       .select('id', { count: 'exact', head: true })
-      .eq('client_id', editing.id)
+      .eq('client_id', target.id)
 
     const refLine = quoteCount && quoteCount > 0
       ? `${quoteCount} quote${quoteCount === 1 ? '' : 's'} reference this client. They will keep their own client snapshot — only the link to this row is removed.`
       : 'No quotes reference this client.'
 
     const ok = await confirmDialog({
-      title:         `Delete ${editing.name || 'client'}?`,
+      title:         `Delete ${target.name || 'client'}?`,
       message:       `${refLine}\n\nThis cannot be undone.`,
       confirmLabel:  'Delete client',
       cancelLabel:   'Keep',
@@ -208,13 +215,13 @@ export default function ClientsV2() {
     if (!ok) return
 
     setSaving(true)
-    const { error } = await supabase.from('clients').delete().eq('id', editing.id)
+    const { error } = await supabase.from('clients').delete().eq('id', target.id)
     setSaving(false)
     if (error) {
       toastError(error, 'Could not delete client.')
       return
     }
-    setEditing(null)
+    if (editing?.id === target.id) setEditing(null)
     pushToast(`Client deleted.`, 'success')
     load()
   }
@@ -395,6 +402,23 @@ export default function ClientsV2() {
                           style={iconBtnStyle}
                         >
                           <Plus size={14} />
+                        </button>
+                        {/* Phase 83.1 — direct row delete. Owner
+                            reported "i cant removed client" — delete
+                            existed only inside the edit modal, was
+                            not discoverable. confirmDialog blocks
+                            accidental nuke + shows quote-reference
+                            count. */}
+                        <button
+                          className="v2d-btn-ghost"
+                          title="Delete client"
+                          onClick={() => handleDelete(c)}
+                          style={{
+                            ...iconBtnStyle,
+                            color: 'var(--v2-rose, #EF4444)',
+                          }}
+                        >
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
