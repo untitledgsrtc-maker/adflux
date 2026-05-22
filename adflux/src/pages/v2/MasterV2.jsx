@@ -3276,132 +3276,264 @@ function NumIn({ label, v, onSave }) {
  * ───────────────────────────────────────────────────────────── */
 
 function MaintenanceTab() {
-  const [busy, setBusy] = useState(false)
+  // Phase 81.5.2 — three cleanup operations share one busy lock so
+  // only one storage scan runs at a time. busyKey holds the running
+  // op's name; results stored per-key.
+  const [busyKey, setBusyKey] = useState(null)
   const [progress, setProgress] = useState({ scanned: 0, deleted: 0, failed: 0 })
-  const [lastResult, setLastResult] = useState(null)
+  const [results,  setResults]  = useState({})
 
+  function timestamp() {
+    return new Date().toLocaleTimeString('en-IN', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
+    }) + ' IST'
+  }
+
+  // Generic "list folders → list each folder → filter files → remove
+  // in chunks" helper. Filter takes (folderName, file) and returns
+  // true to delete.
+  async function purgeBucketFiltered({ bucket, filter }) {
+    setProgress({ scanned: 0, deleted: 0, failed: 0 })
+    const store = supabase.storage.from(bucket)
+    const paths = []
+
+    const { data: rootEntries, error: rootErr } = await store.list('', {
+      limit: 1000,
+      sortBy: { column: 'name', order: 'asc' },
+    })
+    if (rootErr) throw rootErr
+
+    const folders = (rootEntries || []).filter(e => e.id === null).map(e => e.name)
+    setProgress(p => ({ ...p, scanned: folders.length }))
+
+    for (const folder of folders) {
+      const { data: files, error: listErr } = await store.list(folder, { limit: 1000 })
+      if (listErr) {
+        console.warn('[Maintenance] list failed for', folder, listErr.message)
+        continue
+      }
+      for (const f of (files || [])) {
+        if (f.id === null) continue
+        if (filter(folder, f)) paths.push(`${folder}/${f.name}`)
+      }
+    }
+
+    const CHUNK = 100
+    let deleted = 0, failed = 0
+    for (let i = 0; i < paths.length; i += CHUNK) {
+      const slice = paths.slice(i, i + CHUNK)
+      const { error: rmErr } = await store.remove(slice)
+      if (rmErr) { console.warn('[Maintenance] remove failed', rmErr.message); failed += slice.length }
+      else       { deleted += slice.length }
+      setProgress(p => ({ ...p, deleted, failed }))
+    }
+    return { folders: folders.length, deleted, failed }
+  }
+
+  // ─ Op 1: legacy quote-pdfs (anything with a slash = old folder layout)
   async function purgeLegacyQuotePdfs() {
-    if (busy) return
+    if (busyKey) return
     const ok = await confirmDialog({
       title:        'Purge legacy quote PDFs?',
-      message:      'Deletes all PDF versions under the old folder-per-quote layout. '
-                  + 'New flat-path files (1 per quote) are kept. This cannot be undone.',
+      message:      'Deletes all PDF versions under the old folder-per-quote layout in quote-pdfs. New flat-path files (1 per quote) are kept. This cannot be undone.',
       confirmLabel: 'Purge legacy',
       danger:       true,
     })
     if (!ok) return
+    setBusyKey('legacy_pdfs')
+    try {
+      const r = await purgeBucketFiltered({
+        bucket: 'quote-pdfs',
+        filter: () => true,   // every folder file is legacy
+      })
+      setResults(prev => ({ ...prev, legacy_pdfs: { ok: true, ...r, ts: timestamp() } }))
+      toastSuccess(`Purged ${r.deleted} legacy PDF${r.deleted === 1 ? '' : 's'}${r.failed > 0 ? ` (${r.failed} failed)` : ''}.`)
+    } catch (e) {
+      setResults(prev => ({ ...prev, legacy_pdfs: { ok: false, message: e?.message || String(e) } }))
+      toastError(e, 'Cleanup failed.')
+    } finally {
+      setBusyKey(null)
+    }
+  }
 
-    setBusy(true)
+  // ─ Op 2: govt combined PDFs only (`{quote_id}/99-combined.pdf`).
+  // Master attachments (_master/...) + per-proposal OC/PO copies stay.
+  async function purgeGovtCombinedPdfs() {
+    if (busyKey) return
+    const ok = await confirmDialog({
+      title:        'Purge govt combined PDFs?',
+      message:      'Deletes every quote-attachments/<id>/99-combined.pdf file. Master attachments + per-proposal OC/PO uploads are kept. Reps can regenerate Combined PDF on demand.',
+      confirmLabel: 'Purge combined',
+      danger:       true,
+    })
+    if (!ok) return
+    setBusyKey('combined_pdfs')
+    try {
+      const r = await purgeBucketFiltered({
+        bucket: 'quote-attachments',
+        filter: (folder, f) => folder !== '_master' && f.name === '99-combined.pdf',
+      })
+      setResults(prev => ({ ...prev, combined_pdfs: { ok: true, ...r, ts: timestamp() } }))
+      toastSuccess(`Purged ${r.deleted} combined PDF${r.deleted === 1 ? '' : 's'}${r.failed > 0 ? ` (${r.failed} failed)` : ''}.`)
+    } catch (e) {
+      setResults(prev => ({ ...prev, combined_pdfs: { ok: false, message: e?.message || String(e) } }))
+      toastError(e, 'Cleanup failed.')
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  // ─ Op 3: every file belonging to WON govt proposals. Lists quotes
+  // table for segment='GOVERNMENT' status='won', then nukes each
+  // quote_id folder in quote-attachments. _master untouched.
+  async function purgeWonGovtProposalFiles() {
+    if (busyKey) return
+    const ok = await confirmDialog({
+      title:        'Purge WON govt proposal files?',
+      message:      'Removes every file in quote-attachments belonging to WON government proposals (OC copies, work orders, combined PDFs). Master defaults + active drafts kept. Lost / sent / negotiating proposals untouched. This cannot be undone.',
+      confirmLabel: 'Purge WON files',
+      danger:       true,
+    })
+    if (!ok) return
+    setBusyKey('won_govt_files')
     setProgress({ scanned: 0, deleted: 0, failed: 0 })
-    setLastResult(null)
-
-    const bucket = supabase.storage.from('quote-pdfs')
-    const oldPaths = []
 
     try {
-      // Step 1 — list root entries. Folders appear with id=null in
-      // the storage API. Files appear with metadata.
-      const { data: rootEntries, error: rootErr } = await bucket.list('', {
-        limit: 1000,
-        sortBy: { column: 'name', order: 'asc' },
-      })
+      // Step 1 — find WON govt quote ids.
+      const { data: wonRows, error: qErr } = await supabase
+        .from('quotes')
+        .select('id')
+        .eq('segment', 'GOVERNMENT')
+        .eq('status',  'won')
+      if (qErr) throw qErr
+      const wonIds = new Set((wonRows || []).map(r => r.id))
+      setProgress(p => ({ ...p, scanned: wonIds.size }))
+
+      if (wonIds.size === 0) {
+        setResults(prev => ({
+          ...prev,
+          won_govt_files: { ok: true, folders: 0, deleted: 0, failed: 0, ts: timestamp() },
+        }))
+        toastSuccess('No WON govt proposals — nothing to purge.')
+        return
+      }
+
+      // Step 2 — list quote-attachments folders + match against
+      // wonIds. _master kept by definition (it's not a UUID).
+      const store = supabase.storage.from('quote-attachments')
+      const { data: rootEntries, error: rootErr } = await store.list('', { limit: 1000 })
       if (rootErr) throw rootErr
+      const folders = (rootEntries || [])
+        .filter(e => e.id === null)
+        .map(e => e.name)
+        .filter(name => wonIds.has(name))
 
-      const folders = (rootEntries || []).filter(e => e.id === null).map(e => e.name)
-      setProgress(p => ({ ...p, scanned: folders.length }))
-
-      // Step 2 — for each folder, list its files + collect full paths.
+      const paths = []
       for (const folder of folders) {
-        const { data: files, error: listErr } = await bucket.list(folder, {
-          limit: 1000,
-        })
-        if (listErr) {
-          console.warn('[Maintenance] list failed for', folder, listErr.message)
-          continue
-        }
+        const { data: files, error: listErr } = await store.list(folder, { limit: 1000 })
+        if (listErr) { console.warn('[Maintenance] list failed for', folder, listErr.message); continue }
         for (const f of (files || [])) {
-          // Skip phantom folder entries from nested layouts; only
-          // count real files.
           if (f.id === null) continue
-          oldPaths.push(`${folder}/${f.name}`)
+          paths.push(`${folder}/${f.name}`)
         }
       }
 
-      // Step 3 — batch-remove. Supabase API caps batch size at 1000
-      // paths; chunk if needed (defensive — we rarely hit that).
       const CHUNK = 100
-      let deleted = 0
-      let failed  = 0
-      for (let i = 0; i < oldPaths.length; i += CHUNK) {
-        const slice = oldPaths.slice(i, i + CHUNK)
-        const { error: rmErr } = await bucket.remove(slice)
-        if (rmErr) {
-          console.warn('[Maintenance] remove failed', rmErr.message)
-          failed += slice.length
-        } else {
-          deleted += slice.length
-        }
+      let deleted = 0, failed = 0
+      for (let i = 0; i < paths.length; i += CHUNK) {
+        const slice = paths.slice(i, i + CHUNK)
+        const { error: rmErr } = await store.remove(slice)
+        if (rmErr) { console.warn('[Maintenance] remove failed', rmErr.message); failed += slice.length }
+        else       { deleted += slice.length }
         setProgress(p => ({ ...p, deleted, failed }))
       }
 
-      setLastResult({
-        ok:       true,
-        folders:  folders.length,
-        deleted,
-        failed,
-        ts:       new Date().toLocaleTimeString('en-IN', {
-          hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
-        }) + ' IST',
-      })
-      toastSuccess(`Purged ${deleted} legacy file${deleted === 1 ? '' : 's'}` +
-                   `${failed > 0 ? ` (${failed} failed)` : ''}.`)
+      setResults(prev => ({
+        ...prev,
+        won_govt_files: { ok: true, folders: folders.length, deleted, failed, ts: timestamp() },
+      }))
+      toastSuccess(`Purged ${deleted} file${deleted === 1 ? '' : 's'} across ${folders.length} WON govt proposal${folders.length === 1 ? '' : 's'}.`)
     } catch (e) {
-      setLastResult({ ok: false, message: e?.message || String(e) })
+      setResults(prev => ({ ...prev, won_govt_files: { ok: false, message: e?.message || String(e) } }))
       toastError(e, 'Cleanup failed.')
     } finally {
-      setBusy(false)
+      setBusyKey(null)
     }
   }
 
   return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 720 }}>
+      <CleanupCard
+        title="Purge legacy quote PDFs"
+        body={<>Pre-Phase-81.5 quote PDFs were stored as <code style={codeChip}>quote-pdfs/&lt;ref&gt;/&lt;timestamp&gt;.pdf</code> — every WhatsApp send produced a new file. New code writes a single <code style={codeChip}>quote-pdfs/&lt;ref&gt;.pdf</code> per quote and overwrites on every regen. This removes the old folder-layout files. Flat-path files kept.</>}
+        ctaLabel="Purge legacy PDFs"
+        onClick={purgeLegacyQuotePdfs}
+        busy={busyKey === 'legacy_pdfs'}
+        disabled={!!busyKey}
+        progress={busyKey === 'legacy_pdfs' ? progress : null}
+        result={results.legacy_pdfs}
+        resultNoun="legacy file"
+      />
+      <CleanupCard
+        title="Purge govt combined PDFs"
+        body={<>Government proposal "Combined PDF" output (locked cover + merged attachments) is stored at <code style={codeChip}>quote-attachments/&lt;quote_id&gt;/99-combined.pdf</code>. This removes those output snapshots only. Master defaults + per-proposal OC/PO uploads are KEPT. Reps regenerate the combined PDF on demand.</>}
+        ctaLabel="Purge combined PDFs"
+        onClick={purgeGovtCombinedPdfs}
+        busy={busyKey === 'combined_pdfs'}
+        disabled={!!busyKey}
+        progress={busyKey === 'combined_pdfs' ? progress : null}
+        result={results.combined_pdfs}
+        resultNoun="combined PDF"
+      />
+      <CleanupCard
+        title="Purge WON govt proposal files"
+        body={<>Deletes <b>every</b> file in <code style={codeChip}>quote-attachments/&lt;quote_id&gt;/*</code> for proposals where <code style={codeChip}>segment=GOVERNMENT</code> AND <code style={codeChip}>status=won</code>. Master defaults stay. Active drafts / sent / negotiating / lost proposals untouched. Use when archiving closed deals.</>}
+        ctaLabel="Purge WON files"
+        onClick={purgeWonGovtProposalFiles}
+        busy={busyKey === 'won_govt_files'}
+        disabled={!!busyKey}
+        progress={busyKey === 'won_govt_files' ? progress : null}
+        result={results.won_govt_files}
+        resultNoun="WON-proposal file"
+      />
+    </div>
+  )
+}
+
+const codeChip = {
+  background:   'var(--surface-2)',
+  padding:      '2px 6px',
+  borderRadius: 4,
+  margin:       '0 4px',
+  fontSize:     12,
+  fontFamily:   'var(--font-mono, JetBrains Mono, monospace)',
+}
+
+function CleanupCard({ title, body, ctaLabel, onClick, busy, disabled, progress, result, resultNoun }) {
+  return (
     <div style={{
-      maxWidth: 720,
-      padding: 18,
-      background: 'var(--surface)',
-      border:     '1px solid var(--border)',
+      padding:      18,
+      background:   'var(--surface)',
+      border:       '1px solid var(--border)',
       borderRadius: 10,
     }}>
       <div style={{
-        fontSize:      11,
-        fontWeight:    700,
-        letterSpacing: '.08em',
-        color:         'var(--text-subtle)',
-        textTransform: 'uppercase',
-        marginBottom:  6,
+        fontSize: 11, fontWeight: 700, letterSpacing: '.08em',
+        color: 'var(--text-subtle)', textTransform: 'uppercase',
+        marginBottom: 6,
       }}>
         One-time cleanup
       </div>
       <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
-        Purge legacy quote PDFs
+        {title}
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 14 }}>
-        Pre-Phase-81.5 quote PDFs were stored as
-        <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, margin: '0 4px', fontSize: 12 }}>
-          quote-pdfs/&lt;ref&gt;/&lt;timestamp&gt;.pdf
-        </code>
-        — every WhatsApp send produced a new file. The new code writes
-        a single
-        <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, margin: '0 4px', fontSize: 12 }}>
-          quote-pdfs/&lt;ref&gt;.pdf
-        </code>
-        per quote and overwrites on every regen. This button removes
-        the old folder-layout files. Flat-path files are kept.
+        {body}
       </div>
-
       <button
         type="button"
-        onClick={purgeLegacyQuotePdfs}
-        disabled={busy}
+        onClick={onClick}
+        disabled={disabled}
         style={{
           display:      'inline-flex',
           alignItems:   'center',
@@ -3413,41 +3545,37 @@ function MaintenanceTab() {
           borderRadius: 10,
           fontSize:     13,
           fontWeight:   600,
-          cursor:       busy ? 'wait' : 'pointer',
-          opacity:      busy ? 0.7 : 1,
+          cursor:       disabled ? 'wait' : 'pointer',
+          opacity:      disabled ? 0.7 : 1,
         }}
       >
         {busy
           ? <><Loader2 size={14} strokeWidth={1.8} className="animate-spin" /> Purging…</>
-          : <><Trash2 size={14} strokeWidth={1.8} /> Purge legacy PDFs</>
+          : <><Trash2 size={14} strokeWidth={1.8} /> {ctaLabel}</>
         }
       </button>
 
-      {busy && (
-        <div style={{
-          marginTop: 12,
-          fontSize:  12,
-          color:     'var(--text-muted)',
-        }}>
-          Scanned folders: {progress.scanned} · Deleted: {progress.deleted}
+      {progress && (
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+          Scanned: {progress.scanned} · Deleted: {progress.deleted}
           {progress.failed > 0 ? ` · Failed: ${progress.failed}` : ''}
         </div>
       )}
 
-      {lastResult && (
+      {result && (
         <div style={{
           marginTop:    12,
           padding:      '10px 14px',
-          background:   lastResult.ok ? 'var(--success-soft)' : 'var(--danger-soft)',
-          border:       `1px solid ${lastResult.ok ? 'var(--success)' : 'var(--danger)'}`,
-          color:        lastResult.ok ? 'var(--success)' : 'var(--danger)',
+          background:   result.ok ? 'var(--success-soft)' : 'var(--danger-soft)',
+          border:       `1px solid ${result.ok ? 'var(--success)' : 'var(--danger)'}`,
+          color:        result.ok ? 'var(--success)' : 'var(--danger)',
           borderRadius: 8,
           fontSize:     12,
           lineHeight:   1.45,
         }}>
-          {lastResult.ok
-            ? <>Removed <b>{lastResult.deleted}</b> legacy file{lastResult.deleted === 1 ? '' : 's'} across <b>{lastResult.folders}</b> folder{lastResult.folders === 1 ? '' : 's'} at {lastResult.ts}.{lastResult.failed > 0 && <> {lastResult.failed} failed.</>}</>
-            : <>Cleanup failed: {lastResult.message}</>
+          {result.ok
+            ? <>Removed <b>{result.deleted}</b> {resultNoun}{result.deleted === 1 ? '' : 's'}{typeof result.folders === 'number' ? <> across <b>{result.folders}</b> folder{result.folders === 1 ? '' : 's'}</> : null} at {result.ts}.{result.failed > 0 && <> {result.failed} failed.</>}</>
+            : <>Cleanup failed: {result.message}</>
           }
         </div>
       )}
