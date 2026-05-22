@@ -682,11 +682,16 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
   const repName      = quote?.sales_person_name || 'Sales Executive'
   const campaignDurationLabel = `${quote?.duration_months || 1} Month${(quote?.duration_months || 1) !== 1 ? 's' : ''}`
 
+  // Phase 81.3.5: position:relative so the title can sit absolutely
+  // in the letterhead's top-left empty zone (owner directive on
+  // UA-2026-0053 — uses the otherwise-wasted whitespace beside the
+  // top-right logo).
   const wrapperStyle = {
     width:              '794px',
     height:             '1123px',
     boxSizing:          'border-box',
     overflow:           'hidden',
+    position:           'relative',
     background:         '#ffffff',
     backgroundImage:    letterheadOn ? `url("${company.letterhead_url}")` : 'none',
     backgroundRepeat:   'no-repeat',
@@ -739,26 +744,54 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
 
   return (
     <div style={wrapperStyle}>
-      {/* Title row — always shown. Compact on continuation pages. */}
-      <div style={{ marginBottom: 14, paddingBottom: 8, borderBottom: `2px solid ${INK}` }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: INK, letterSpacing: '0.05em' }}>
-          MEDIA QUOTATION{!isFirst ? ' (cont.)' : ''}
-        </div>
-        <div style={{ marginTop: 4, fontSize: 11 }}>
-          <span style={{ fontWeight: 700, color: INK }}>{quote?.quote_number || '—'}</span>
-          <span style={{ marginLeft: 10, color: MUTED, fontSize: 10 }}>
-            {quote?.created_at ? formatDate(quote.created_at) : ''}
-          </span>
-          <span style={{ marginLeft: 10, color: MUTED, fontSize: 10 }}>
-            · {quote?.media_type === 'OTHER_MEDIA' ? 'Private — Other Media' : 'Private — LED Cities'}
-          </span>
-          {totalPages > 1 && (
-            <span style={{ float: 'right', color: MUTED, fontSize: 10 }}>
-              Page {pageIndex} of {totalPages}
+      {/* Phase 81.3.5 — title block placed absolutely in the
+          letterhead's top-LEFT zone (between page edge and the
+          letterhead PNG's right-side logo). Owner: "we can use
+          blank space left side of logo". Width 350px keeps it
+          clear of the right-side logo wordmark. */}
+      {letterheadOn ? (
+        <div style={{
+          position: 'absolute',
+          top:      30,
+          left:     70,
+          width:    350,
+          color:    INK,
+        }}>
+          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.05em' }}>
+            MEDIA QUOTATION{!isFirst ? ' (cont.)' : ''}
+          </div>
+          <div style={{ marginTop: 4, fontSize: 11 }}>
+            <span style={{ fontWeight: 700, color: INK }}>{quote?.quote_number || '—'}</span>
+            <span style={{ marginLeft: 8, color: MUTED, fontSize: 10 }}>
+              {quote?.created_at ? formatDate(quote.created_at) : ''}
             </span>
-          )}
+          </div>
+          <div style={{ marginTop: 2, fontSize: 10, color: MUTED }}>
+            {quote?.media_type === 'OTHER_MEDIA' ? 'Private — Other Media' : 'Private — LED Cities'}
+            {totalPages > 1 && ` · Page ${pageIndex} of ${totalPages}`}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={{ marginBottom: 14, paddingBottom: 8, borderBottom: `2px solid ${INK}` }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: INK, letterSpacing: '0.05em' }}>
+            MEDIA QUOTATION{!isFirst ? ' (cont.)' : ''}
+          </div>
+          <div style={{ marginTop: 4, fontSize: 11 }}>
+            <span style={{ fontWeight: 700, color: INK }}>{quote?.quote_number || '—'}</span>
+            <span style={{ marginLeft: 10, color: MUTED, fontSize: 10 }}>
+              {quote?.created_at ? formatDate(quote.created_at) : ''}
+            </span>
+            <span style={{ marginLeft: 10, color: MUTED, fontSize: 10 }}>
+              · {quote?.media_type === 'OTHER_MEDIA' ? 'Private — Other Media' : 'Private — LED Cities'}
+            </span>
+            {totalPages > 1 && (
+              <span style={{ float: 'right', color: MUTED, fontSize: 10 }}>
+                Page {pageIndex} of {totalPages}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Full header — first page only */}
       {isFirst && (
@@ -948,6 +981,37 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
               </div>
             </div>
           </div>
+          {/* Phase 81.3.5 — CPM (Cost Per Mille / 1000 impressions).
+              Owner asked for this metric on UA-2026-0053. Industry
+              standard OOH benchmark; tells the client the unit cost
+              of reach. Formula: (subtotal / total_impressions) × 1000.
+              Hidden when impressions = 0 (defensive). */}
+          {(() => {
+            const totalImps = totalImpressionsFn(allCities)
+            if (!totalImps || subtotal <= 0) return null
+            const cpm = (subtotal / totalImps) * 1000
+            return (
+              <div style={{
+                marginTop:      4,
+                padding:        '10px 14px',
+                background:     '#0f172a',
+                color:          '#ffffff',
+                borderRadius:   6,
+                display:        'flex',
+                justifyContent: 'space-between',
+                alignItems:     'center',
+                fontSize:       11,
+              }}>
+                <span style={{ letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: 9, color: '#cbd5e1' }}>
+                  CPM · Cost per 1,000 impressions
+                </span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: YELLOW, fontVariantNumeric: 'tabular-nums' }}>
+                  {formatCurrency(Math.round(cpm))}
+                </span>
+              </div>
+            )
+          })()}
+
           <div style={{
             marginTop: 4, padding: '8px 12px',
             background: SOFT, border: `1px dashed ${BORDER}`,
