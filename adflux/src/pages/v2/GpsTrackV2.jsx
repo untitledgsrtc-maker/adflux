@@ -712,7 +712,13 @@ export default function GpsTrackV2() {
           voice logs. Owner directive: clicking a rep card on Team Live
           should give the FULL day picture, not just the GPS map. */}
       {!loading && (
-        <RepDaySections session={session} activities={activities} voiceLogs={voiceLogs} navigate={navigate} />
+        <RepDaySections
+          session={session}
+          activities={activities}
+          voiceLogs={voiceLogs}
+          gpsOffEvents={gpsOffEvents}
+          navigate={navigate}
+        />
       )}
     </div>
   )
@@ -722,7 +728,7 @@ export default function GpsTrackV2() {
    stays readable. Renders three stacked sections: today's counters
    from work_sessions.daily_counters, the lead-activities timeline
    (scoped to this rep + this day), and voice logs filed today. */
-function RepDaySections({ session, activities, voiceLogs, navigate }) {
+function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], navigate }) {
   const counters = session?.daily_counters || {}
   const checkIn  = session?.check_in_at
   const checkOut = session?.check_out_at
