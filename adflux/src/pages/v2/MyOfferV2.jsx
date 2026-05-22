@@ -17,6 +17,7 @@ import { formatCurrency } from '../../utils/formatters'
 import TaDaRequestPanel from '../../components/incentives/TaDaRequestPanel'
 import { RequestLeaveModal } from '../../components/leads/RepDayTools'
 import RepLeaveHistory from '../../components/leads/RepLeaveHistory'
+import ProfilePicUploader from '../../components/profile/ProfilePicUploader'
 import { toastSuccess } from '../../components/v2/Toast'
 
 export default function MyOfferV2() {
@@ -92,6 +93,13 @@ export default function MyOfferV2() {
             </button>
           )}
         </div>
+        {/* Phase 87.5 — rep profile picture uploader. Owner directive
+            24 May 2026: rep can see own details + upload pic. */}
+        {profile?.id && (
+          <div style={{ marginBottom: 18 }}>
+            <ProfilePicUploader />
+          </div>
+        )}
         {/* Phase 34Z.37 — no offer letter? The page used to be blank
             for admins / non-HR-onboarded reps. Now mounts the TA / DA
             claim panel so the URL still pays its way. */}
@@ -157,6 +165,15 @@ export default function MyOfferV2() {
           )}
         </div>
       </div>
+
+      {/* Phase 87.5 — rep profile picture uploader sits between the
+          page header and the offer hero card so the avatar shows
+          near the rep's name/role for visual association. */}
+      {profile?.id && (
+        <div style={{ marginBottom: 18 }}>
+          <ProfilePicUploader />
+        </div>
+      )}
 
       {/* ─── Hero summary card ──────────────────── */}
       <div className="v2d-panel v2d-offer-hero">
