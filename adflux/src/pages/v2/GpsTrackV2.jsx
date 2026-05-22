@@ -74,6 +74,11 @@ export default function GpsTrackV2() {
   const [session, setSession] = useState(null)
   const [activities, setActivities] = useState([])
   const [voiceLogs, setVoiceLogs] = useState([])
+  // Phase 84.5 — surface GPS-off events from Phase 76.1 inline in
+  // the activity timeline. Owner directive 23 May 2026: "when rep
+  // turn off gps put it in activity log also". Same data feeds
+  // Phase 76 DaySummaryCard.
+  const [gpsOffEvents, setGpsOffEvents] = useState([])
   const mapRef     = useRef(null)
   const containerRef = useRef(null)
   // Phase 70.10 — view-mode toggle: all (route + stops + meetings),
@@ -91,7 +96,7 @@ export default function GpsTrackV2() {
     ;(async () => {
       const start = `${targetDate}T00:00:00`
       const end   = `${targetDate}T23:59:59`
-      const [userRes, pingsRes, sessionRes, actsRes, voiceRes] = await Promise.all([
+      const [userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
         supabase.from('gps_pings')
           .select('id, captured_at, lat, lng, accuracy_m, source')
@@ -124,6 +129,13 @@ export default function GpsTrackV2() {
           .lte('created_at', end)
           .order('created_at', { ascending: false })
           .limit(20),
+        // Phase 84.5 — GPS-off events for this rep+day (Phase 76.1).
+        supabase.from('gps_off_events')
+          .select('id, toggled_off_at, toggled_on_at, duration_seconds, source')
+          .eq('user_id', userId)
+          .gte('toggled_off_at', start)
+          .lte('toggled_off_at', end)
+          .order('toggled_off_at', { ascending: false }),
       ])
       if (cancelled) return
       if (userRes.error)  { setError(userRes.error.message);  setLoading(false); return }
@@ -133,6 +145,7 @@ export default function GpsTrackV2() {
       setSession(sessionRes.data || null)
       setActivities(actsRes.data || [])
       setVoiceLogs(voiceRes.data || [])
+      setGpsOffEvents(gpsOffRes?.data || [])
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -710,69 +723,132 @@ function RepDaySections({ session, activities, voiceLogs, navigate }) {
         </div>
       )}
 
-      {/* Activity timeline */}
-      <div className="lead-card">
-        <div className="lead-card-head">
-          <div>
-            <div className="lead-card-title">Activity timeline · {activities.length}</div>
-            <div className="lead-card-sub">Every call / WhatsApp / meeting / note logged today</div>
-          </div>
-        </div>
-        {activities.length === 0 ? (
-          <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-            No activities logged on this date.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {activities.map(a => {
-              const t = new Date(a.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-              return (
-                <div
-                  key={a.id}
-                  onClick={() => a.lead?.id && navigate(`/leads/${a.lead.id}`)}
-                  style={{
-                    cursor: a.lead?.id ? 'pointer' : 'default',
-                    padding: '10px 14px',
-                    borderTop: '1px solid var(--border)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 11,
-                      color: 'var(--text-muted)', minWidth: 44,
-                    }}>{t}</span>
-                    <span style={{
-                      fontWeight: 700, color: 'var(--text)',
-                      textTransform: 'capitalize',
-                    }}>{a.activity_type}</span>
-                    {a.outcome && (
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
-                        textTransform: 'uppercase',
-                        color: a.outcome === 'positive' ? 'var(--success)'
-                              : a.outcome === 'negative' ? 'var(--danger)' : 'var(--text-muted)',
-                      }}>{a.outcome}</span>
-                    )}
-                    <span style={{ color: 'var(--text-muted)' }}>
-                      → {a.lead?.company || a.lead?.name || '—'}
-                    </span>
-                  </div>
-                  {a.notes && (
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, marginLeft: 52, lineHeight: 1.5 }}>
-                      {a.notes.slice(0, 200)}{a.notes.length > 200 ? '…' : ''}
-                    </div>
-                  )}
-                  {a.next_action && (
-                    <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, marginLeft: 52 }}>
-                      Next: {a.next_action}
-                    </div>
-                  )}
+      {/* Activity timeline — Phase 84.5 merges gps_off_events inline. */}
+      {(() => {
+        function fmtDur(s) {
+          if (s == null || !Number.isFinite(s) || s <= 0) return '—'
+          const m = Math.floor(s / 60), sec = Math.floor(s % 60)
+          if (m >= 60) return `${Math.floor(m / 60)}h ${m % 60}m`
+          if (m > 0)   return `${m}m ${sec}s`
+          return `${sec}s`
+        }
+        const tl = [
+          ...activities.map(a => ({
+            kind: 'activity',
+            ts:   new Date(a.created_at).getTime(),
+            raw:  a,
+          })),
+          ...gpsOffEvents.map(e => ({
+            kind: 'gps_off',
+            ts:   new Date(e.toggled_off_at).getTime(),
+            raw:  e,
+          })),
+        ].sort((a, b) => b.ts - a.ts)
+
+        return (
+          <div className="lead-card">
+            <div className="lead-card-head">
+              <div>
+                <div className="lead-card-title">Activity timeline · {tl.length}</div>
+                <div className="lead-card-sub">
+                  Calls · WhatsApp · meetings · notes · GPS-off events
                 </div>
-              )
-            })}
+              </div>
+            </div>
+            {tl.length === 0 ? (
+              <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                No activities logged on this date.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {tl.map(item => {
+                  if (item.kind === 'gps_off') {
+                    const e = item.raw
+                    const t  = new Date(e.toggled_off_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                    const onT = e.toggled_on_at
+                      ? new Date(e.toggled_on_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                      : null
+                    return (
+                      <div
+                        key={`gpsoff-${e.id}`}
+                        style={{
+                          padding: '10px 14px',
+                          borderTop: '1px solid var(--border)',
+                          background: 'var(--danger-soft, rgba(239,68,68,.08))',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                          <span style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 11,
+                            color: 'var(--text-muted)', minWidth: 44,
+                          }}>{t}</span>
+                          <span style={{
+                            fontWeight: 700,
+                            color: 'var(--danger, #EF4444)',
+                            letterSpacing: '.04em',
+                            textTransform: 'uppercase',
+                            fontSize: 12,
+                          }}>GPS turned off</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                            duration {fmtDur(e.duration_seconds)}
+                            {onT ? ` · back on at ${onT}` : ' · still off'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+                  // activity
+                  const a = item.raw
+                  const t = new Date(a.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                  return (
+                    <div
+                      key={a.id}
+                      onClick={() => a.lead?.id && navigate(`/leads/${a.lead.id}`)}
+                      style={{
+                        cursor: a.lead?.id ? 'pointer' : 'default',
+                        padding: '10px 14px',
+                        borderTop: '1px solid var(--border)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 11,
+                          color: 'var(--text-muted)', minWidth: 44,
+                        }}>{t}</span>
+                        <span style={{
+                          fontWeight: 700, color: 'var(--text)',
+                          textTransform: 'capitalize',
+                        }}>{a.activity_type}</span>
+                        {a.outcome && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                            textTransform: 'uppercase',
+                            color: a.outcome === 'positive' ? 'var(--success)'
+                                  : a.outcome === 'negative' ? 'var(--danger)' : 'var(--text-muted)',
+                          }}>{a.outcome}</span>
+                        )}
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          → {a.lead?.company || a.lead?.name || '—'}
+                        </span>
+                      </div>
+                      {a.notes && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, marginLeft: 52, lineHeight: 1.5 }}>
+                          {a.notes.slice(0, 200)}{a.notes.length > 200 ? '…' : ''}
+                        </div>
+                      )}
+                      {a.next_action && (
+                        <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, marginLeft: 52 }}>
+                          Next: {a.next_action}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        )
+      })()}
 
       {/* Voice logs */}
       {voiceLogs.length > 0 && (
