@@ -309,19 +309,21 @@ export default function TeamDashboardV2() {
         // unsettled-quote counts.
         supabase.from('payments')
           .select('quote_id, amount_received, approval_status'),
-        // Phase 89.1 — geo-tagged lead activities in the period
-        // window for blue lead pins on the live field map.
-        // Meeting / site_visit only — calls + notes don't earn a
-        // location pin since the rep isn't physically there.
-        // Joined to leads(name, company) for InfoWindow content.
+        // Phase 89.1 + 89.6 — geo-tagged meeting / site_visit
+        // activities as permanent pins on the live field map.
+        // Owner directive 23 May 2026: meeting pins must "alway
+        // in map" — date filter ONLY affects KPIs, not the map
+        // pins. Capped to last 90 days + 500 rows for query
+        // performance; older meetings won't display but the
+        // current month is fully covered.
         supabase.from('lead_activities')
           .select('id, created_at, created_by, activity_type, outcome, gps_lat, gps_lng, lead:lead_id(id, name, company)')
           .in('activity_type', ['meeting', 'site_visit'])
           .not('gps_lat', 'is', null)
           .not('gps_lng', 'is', null)
-          .gte('created_at', startOfDay)
-          .lt ('created_at', endOfDay)
-          .order('created_at', { ascending: false }),
+          .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: false })
+          .limit(500),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')

@@ -2288,15 +2288,19 @@
    site (Phase 89.5 inline edits in GpsTrackV2 + TeamDashboardV2).
 */
 .gm-style-iw-c {
-  background: var(--v2-bg-1, #111a2e) !important;
-  border: 1px solid var(--v2-line, #1f2a44) !important;
+  /* Phase 89.6 — solid opaque navy. Earlier var fallback was
+     rendering semi-transparent on owner's iPhone (token resolution
+     race during first paint). Hardcode the colour for the popup
+     chrome so it's always opaque. */
+  background: #0c1224 !important;
+  border: 1px solid #1f2a44 !important;
   border-radius: 14px !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .45) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .55) !important;
   padding: 14px 16px !important;
 }
 .gm-style-iw {
   background: transparent !important;
-  color: var(--v2-ink-0, #f5f7fb) !important;
+  color: #f5f7fb !important;
   max-width: 280px !important;
   overflow: visible !important;
 }
@@ -2305,16 +2309,16 @@
   overflow: visible !important;
 }
 .gm-style-iw-tc::after {
-  background: var(--v2-bg-1, #111a2e) !important;
-  box-shadow: -1px 1px 0 var(--v2-line, #1f2a44) !important;
+  background: #0c1224 !important;
+  box-shadow: -1px 1px 0 #1f2a44 !important;
 }
 .gm-style-iw .gm-ui-hover-effect {
   top: 4px !important;
   right: 4px !important;
 }
 .gm-style-iw .gm-ui-hover-effect > span {
-  background-color: var(--v2-ink-2, #98a4bf) !important;
+  background-color: #cbd5e1 !important;
 }
 .gm-style-iw .gm-ui-hover-effect:hover > span {
-  background-color: var(--v2-yellow, #FFE600) !important;
+  background-color: #FFE600 !important;
 }
