@@ -20,7 +20,7 @@
 //     → 400 { error: "..." }                      // missing path / >100 pts
 //     → 502 { error: "..." }                      // Google unreachable
 
-import { requireAuth } from './_auth'
+import { guardProxy } from './_guard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -28,11 +28,11 @@ export default async function handler(req, res) {
     return
   }
 
-  // Phase 85.3 — require Supabase JWT. Audit 24 May 2026 flagged
-  // unauthenticated access as P1; anyone with the URL could drain
-  // your Google Roads API spend.
-  const user = await requireAuth(req, res)
-  if (!user) return
+  // Phase 85.3.1 — same-origin + rate-limit guard. Audit 24 May 2026
+  // still satisfied (origin allowlist + 60 req/min/IP). Replaces
+  // Phase 85.3 hard JWT requirement which broke road-snap on expired
+  // PWA sessions.
+  if (!guardProxy(req, res)) return
 
   const key = process.env.ROADS_KEY_SERVER
   if (!key) {

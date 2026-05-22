@@ -22,7 +22,7 @@
 //   The polyline is Google's encoded format. Frontend decodes via
 //   google.maps.geometry.encoding.decodePath().
 
-import { requireAuth } from './_auth'
+import { guardProxy } from './_guard'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -30,9 +30,10 @@ export default async function handler(req, res) {
     return
   }
 
-  // Phase 85.3 — require Supabase JWT.
-  const user = await requireAuth(req, res)
-  if (!user) return
+  // Phase 85.3.1 — same-origin + rate-limit guard (Phase 85.3 JWT
+  // requirement was silently bailing on expired PWA sessions and
+  // breaking the road-snapped route on /admin/gps).
+  if (!guardProxy(req, res)) return
 
   const key = process.env.ROADS_KEY_SERVER
   if (!key) {

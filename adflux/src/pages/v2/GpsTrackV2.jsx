@@ -333,15 +333,14 @@ export default function GpsTrackV2() {
           // (older API: geometry library loaded via `libraries: ['geometry']`
           // in Loader. We add it below if importLibrary not available.)
 
-          // Phase 85.3 — pass Supabase JWT in Authorization header.
-          // /api/directions now rejects unauthenticated callers.
-          ;(async () => {
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token
-            if (!token) return  // bail silently — admin must be logged in
-            fetch(`/api/directions?${qs.toString()}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            })
+          // Phase 85.3.1 — drop the JWT bearer header that Phase 85.3
+          // added. /api/directions is now guarded same-origin +
+          // rate-limit instead, which keeps Google billing safe
+          // without depending on a still-valid Supabase session.
+          // Symptom that motivated the revert: expired PWA session
+          // → getSession() returned null → silent bail → only the
+          // raw 2-3 point line painted, owner saw "straight line".
+          fetch(`/api/directions?${qs.toString()}`)
             .then(r => r.ok ? r.json() : null)
             .then(json => {
               if (!mapRef.current) return
@@ -369,7 +368,6 @@ export default function GpsTrackV2() {
               }
             })
             .catch(() => { /* raw line stays as fallback */ })
-          })()
         }
       } else if (cleaned.length === 1) {
         map.setCenter(center)
