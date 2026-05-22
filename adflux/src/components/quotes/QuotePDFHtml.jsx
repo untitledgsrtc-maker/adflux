@@ -502,10 +502,8 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
                   <td style={{ ...styles.td, ...styles.tdNum }}>{l.durationMo}mo</td>
                   <td style={{ ...styles.td, ...styles.tdNum }}>{l.slotSec}s</td>
                   <td style={{ ...styles.td, ...styles.tdNum }}>{l.slotsPerDay}</td>
-                  <td style={{ ...styles.td, ...styles.tdNum }}>
-                    {showListedStruck
-                      ? <span style={{ color: MUTED, textDecoration: 'line-through' }}>{formatCurrency(l.listedRate)}</span>
-                      : '—'}
+                  <td style={{ ...styles.td, ...styles.tdNum, color: MUTED }}>
+                    {showListedStruck ? formatCurrency(l.listedRate) : '—'}
                   </td>
                   <td style={{ ...styles.td, ...styles.tdNum, color: '#16a34a', fontWeight: 700 }}>
                     {formatCurrency(l.offeredRate)}
@@ -881,7 +879,11 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
           {lines.map((l, idx) => {
             const gradeBg = l.grade === 'A' ? '#DCFCE7' : l.grade === 'B' ? '#FFEDD5' : '#F1F5F9'
             const gradeFg = l.grade === 'A' ? '#166534' : l.grade === 'B' ? '#B45309' : '#475569'
-            const showListedStruck = l.listedRate && l.listedRate !== l.offeredRate
+            // Phase 81.3.4: drop strikethrough on listed rate.
+            // html2canvas was rendering line-through at scale=2 as
+            // two parallel lines sandwiching the number, looked like
+            // a glitch on owner's UA-2026-0055.
+            const hasListed = l.listedRate && l.listedRate !== l.offeredRate
             return (
               <tr key={`${l.sr}-${idx}`}>
                 <td style={{ ...tableTd, color: MUTED }}>{l.sr}</td>
@@ -900,10 +902,8 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
                 <td style={{ ...tableTd, ...tdNum }}>{l.durationMo}mo</td>
                 <td style={{ ...tableTd, ...tdNum }}>{l.slotSec}s</td>
                 <td style={{ ...tableTd, ...tdNum }}>{l.slotsPerDay}</td>
-                <td style={{ ...tableTd, ...tdNum }}>
-                  {showListedStruck
-                    ? <span style={{ color: MUTED, textDecoration: 'line-through' }}>{formatCurrency(l.listedRate)}</span>
-                    : '—'}
+                <td style={{ ...tableTd, ...tdNum, color: MUTED }}>
+                  {hasListed ? formatCurrency(l.listedRate) : '—'}
                 </td>
                 <td style={{ ...tableTd, ...tdNum, color: '#16a34a', fontWeight: 700 }}>
                   {formatCurrency(l.offeredRate)}
