@@ -49,6 +49,43 @@ async function fetchCompanyForQuote(quote) {
   return data || null
 }
 
+/* ─── Phase 81.2.2 — glance helpers (ported from QuotePDF.jsx) ────── */
+
+function totalScreensFn(cities) {
+  return cities.reduce((s, c) => s + (Number(c.screens) || 0), 0)
+}
+function spotsPerMonthFn(city) {
+  const screens     = Number(city?.screens) || 0
+  const slotsPerDay = Number(city?.slots_per_day) || 100
+  return screens * slotsPerDay * 30
+}
+function totalSpotsPerMonthFn(cities) {
+  return cities.reduce((s, c) => s + spotsPerMonthFn(c), 0)
+}
+function quoteSlotSecondsFn(cities) {
+  if (!cities?.length) return 10
+  const byScreens = new Map()
+  for (const c of cities) {
+    const sec    = Number(c.slot_seconds) || 10
+    const weight = Number(c.screens) || 1
+    byScreens.set(sec, (byScreens.get(sec) || 0) + weight)
+  }
+  let bestSec = 10, bestWeight = -1
+  for (const [sec, weight] of byScreens) {
+    if (weight > bestWeight) { bestSec = sec; bestWeight = weight }
+  }
+  return bestSec
+}
+function totalImpressionsFn(cities) {
+  // ~5200 impressions/screen/month (matches reference PDF ratios).
+  return cities.reduce((s, c) => s + (Number(c.screens) || 0) * 5200, 0)
+}
+function formatLakhFn(n) {
+  if (n >= 100000) return (n / 100000).toFixed(1) + 'L'
+  if (n >= 1000)   return (n / 1000).toFixed(0) + 'K'
+  return String(n)
+}
+
 /* ─── Renderer component (off-screen DOM only) ───────────────────── */
 
 export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
@@ -143,6 +180,39 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
     quoteTitleRef:   { fontSize: 13, fontWeight: 700, color: INK },
     quoteTitleDate:  { fontSize: 10, color: MUTED, marginTop: 2 },
     quoteTitleSub:   { fontSize: 10, color: MUTED, marginTop: 1 },
+
+    // Phase 81.2.2 — "This Campaign at a Glance" 4-card strip.
+    // Quote-level headline numbers (screens / spots-month / spot-
+    // duration / total-impressions). Ported from the dead QuotePDF.jsx
+    // — owner caught the omission on UA-2026-0055.
+    glanceRow: {
+      display:        'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      border:         `1px solid ${BORDER}`,
+      borderRadius:   8,
+      marginBottom:   16,
+      overflow:       'hidden',
+      background:     '#ffffff',
+    },
+    glanceItem: {
+      padding:       '14px 10px',
+      textAlign:     'center',
+      borderRight:   `1px solid ${BORDER}`,
+    },
+    glanceItemLast: { borderRight: 'none' },
+    glanceNum: {
+      fontSize:    20,
+      fontWeight:  700,
+      color:       INK,
+      letterSpacing: '0.01em',
+    },
+    glanceLabel: {
+      fontSize:        9,
+      color:           MUTED,
+      marginTop:       4,
+      textTransform:   'uppercase',
+      letterSpacing:   '0.10em',
+    },
     sectionTitle: { fontSize: 9, letterSpacing: '0.14em', fontWeight: 700, color: MUTED, textTransform: 'uppercase', margin: '0 0 6px' },
 
     clientGrid: {
@@ -348,6 +418,34 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
             <div style={styles.clientValue}>{totalScreens}</div>
           </div>
         </div>
+
+        {/* Phase 81.2.2 — "This Campaign at a Glance" — quote-level
+            headline numbers. Mirrors the on-screen quote detail glance
+            card so the PDF tells the same story. Skipped if cities is
+            empty (defensive — would render zeroes otherwise). */}
+        {lines.length > 0 && (
+          <>
+            <div style={styles.sectionTitle}>This Campaign at a Glance</div>
+            <div style={styles.glanceRow}>
+              <div style={styles.glanceItem}>
+                <div style={styles.glanceNum}>{totalScreensFn(cities)}</div>
+                <div style={styles.glanceLabel}>Screens Booked</div>
+              </div>
+              <div style={styles.glanceItem}>
+                <div style={styles.glanceNum}>{formatLakhFn(totalSpotsPerMonthFn(cities))}</div>
+                <div style={styles.glanceLabel}>Spots / Month</div>
+              </div>
+              <div style={styles.glanceItem}>
+                <div style={styles.glanceNum}>{quoteSlotSecondsFn(cities)} SEC</div>
+                <div style={styles.glanceLabel}>Spot Duration</div>
+              </div>
+              <div style={{ ...styles.glanceItem, ...styles.glanceItemLast }}>
+                <div style={styles.glanceNum}>{formatLakhFn(totalImpressionsFn(cities))}</div>
+                <div style={styles.glanceLabel}>Total Impressions</div>
+              </div>
+            </div>
+          </>
+        )}
 
         <div style={styles.sectionTitle}>Location Breakdown</div>
         <table style={styles.table}>
