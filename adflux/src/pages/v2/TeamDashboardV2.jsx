@@ -190,15 +190,6 @@ export default function TeamDashboardV2() {
   // 2026: "i want pin lead and person whne they are in field".
   const [leadActivitiesGeo, setLeadActivitiesGeo] = useState([])
   const leadMarkersRef = useRef({})
-  // Phase 89.3 — permanent lead pins. Owner directive 23 May 2026:
-  // "Permanent lead address pin (lat/lng on leads table) ... must
-  // seen alway in map. via date filter we can see all meeting
-  // leads". Pins every OPEN lead (not Won / Lost) that has a
-  // lat/lng (auto-inherited from cities master via trigger
-  // `fill_lead_geo_from_city` — Phase 89.3 SQL). Greyer + smaller
-  // than the blue meeting pins so meeting pins still pop visually.
-  const [openLeadsGeo, setOpenLeadsGeo] = useState([])
-  const openLeadMarkersRef = useRef({})
   const [newLeadsToday, setNewLeadsToday] = useState(0)
   const [pipelineToday, setPipelineToday] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -234,7 +225,7 @@ export default function TeamDashboardV2() {
       // the pre-Phase-82 code path.
       const today = period.startIso
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, actGeoRes, openLeadGeoRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, actGeoRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -331,17 +322,6 @@ export default function TeamDashboardV2() {
           .gte('created_at', startOfDay)
           .lt ('created_at', endOfDay)
           .order('created_at', { ascending: false }),
-        // Phase 89.3 — every OPEN lead with a lat/lng for permanent
-        // grey pins on the map. Open = stage NOT IN ('Won','Lost').
-        // No date filter: these pins always show so admin sees the
-        // territory at-a-glance. Capped at 1000 for sanity (current
-        // open lead count ~200; raise if needed).
-        supabase.from('leads')
-          .select('id, name, company, city, stage, assigned_to, lat, lng')
-          .not('lat', 'is', null)
-          .not('lng', 'is', null)
-          .not('stage', 'in', '(Won,Lost)')
-          .limit(1000),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
@@ -480,24 +460,6 @@ export default function TeamDashboardV2() {
           lead_company: a.lead.company || '',
         }))
       setLeadActivitiesGeo(geoRows)
-
-      // Phase 89.3 — open-lead permanent pins. Same filter logic
-      // as the query (defensive: query returns only non-null
-      // lat/lng + non-Won/Lost stage; we still coerce to Numbers
-      // here so the map effect can trust the shape).
-      const openLeadRows = (openLeadGeoRes?.data || [])
-        .filter(l => Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng)))
-        .map(l => ({
-          id:         l.id,
-          name:       l.name || '',
-          company:    l.company || '',
-          city:       l.city || '',
-          stage:      l.stage || '',
-          assigned_to: l.assigned_to || null,
-          lat:        Number(l.lat),
-          lng:        Number(l.lng),
-        }))
-      setOpenLeadsGeo(openLeadRows)
 
       setLoading(false)
     }
@@ -787,75 +749,6 @@ export default function TeamDashboardV2() {
       }
     }
   }, [leadActivitiesGeo, reps])
-
-  // Phase 89.3 — Permanent open-lead pins. Always rendered (no
-  // date filter). Smaller + greyer than blue meeting pins so
-  // recent activity still pops visually. Click → opens the lead
-  // detail page. Cities that share the same centroid (e.g. 50
-  // leads all from Vadodara) overlap — admin gets that aggregation
-  // for free; clicking still opens whichever lead drew last.
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    const google = map.__google
-    if (!google) return
-    const seen = new Set()
-    const ICON = {
-      path:         google.maps.SymbolPath.CIRCLE,
-      scale:        5,
-      fillColor:    '#94a3b8',  // var(--text-muted) — soft slate.
-      fillOpacity:  0.7,
-      strokeColor:  '#1d2129',
-      strokeWeight: 1,
-    }
-    const esc = (v) => String(v ?? '')
-      .replace(/&/g,  '&amp;')
-      .replace(/</g,  '&lt;')
-      .replace(/>/g,  '&gt;')
-      .replace(/"/g,  '&quot;')
-      .replace(/'/g,  '&#39;')
-    const repNameById = new Map(reps.map(r => [r.id, r.name]))
-    for (const l of openLeadsGeo) {
-      seen.add(l.id)
-      const pos = { lat: l.lat, lng: l.lng }
-      const heading = l.company || l.name || 'Lead'
-      const sub = l.company && l.name ? esc(l.name) : ''
-      const repLabel = l.assigned_to ? (repNameById.get(l.assigned_to) || 'Unassigned') : 'Unassigned'
-      const html = `
-        <div style="font-family:'DM Sans',sans-serif;min-width:170px">
-          <div style="font-weight:700;font-size:13px;color:#0f172a">${esc(heading)}</div>
-          ${sub ? `<div style="font-size:11px;color:#475569;margin-top:2px">${sub}</div>` : ''}
-          <div style="font-size:11px;color:#475569;margin-top:6px">${esc(l.stage)} · ${esc(l.city)} · ${esc(repLabel)}</div>
-          <a href="/leads/${esc(l.id)}" style="display:inline-block;margin-top:8px;font-size:11px;color:#1d4ed8;text-decoration:none;font-weight:600">Open lead →</a>
-        </div>
-      `
-      const existing = openLeadMarkersRef.current[l.id]
-      if (existing) {
-        existing.setPosition(pos)
-        existing.__iw?.setContent(html)
-      } else {
-        const m = new google.maps.Marker({
-          position: pos,
-          map,
-          icon: ICON,
-          title: heading,
-          zIndex: 0,  // Below meeting pins (1) and rep avatar pins (default).
-        })
-        const iw = new google.maps.InfoWindow({ content: html })
-        m.addListener('click', () => iw.open({ anchor: m, map }))
-        m.__iw = iw
-        openLeadMarkersRef.current[l.id] = m
-      }
-    }
-    // Cleanup: leads dropped from set (stage flipped Won/Lost, or
-    // lat/lng cleared). Active pins survive across renders.
-    for (const id of Object.keys(openLeadMarkersRef.current)) {
-      if (!seen.has(id)) {
-        try { openLeadMarkersRef.current[id].setMap(null) } catch { /* */ }
-        delete openLeadMarkersRef.current[id]
-      }
-    }
-  }, [openLeadsGeo, reps])
 
   // Phase 70.2 — Supabase Realtime subscription on gps_pings INSERT.
   // Updates latestPingByUser in-place so the marker effect re-runs.
