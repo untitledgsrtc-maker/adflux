@@ -686,19 +686,16 @@ export default function TeamDashboardV2() {
     if (!google) return
     const seen = new Set()
     const repNameById = new Map(reps.map(r => [r.id, r.name]))
-    // Phase 89.4 — pin colour tracks meeting outcome. Owner
-    // directive 23 May 2026: "as per lead outcome color shuld be
-    // chmaged". Same palette as GpsTrackV2.
-    //   positive → green  / neutral → amber
-    //   negative → red    / callback → blue
-    //   null     → slate (outcome not yet logged)
+    // Phase 89.4 — pin colour tracks meeting outcome. Owner-locked
+    // meeting outcome set is 3 states (LogMeetingModal Phase 33A):
+    // positive / neutral / negative. Default blue covers rows where
+    // outcome wasn't logged (legacy pre-89.4 data).
     const colorForOutcome = (o) => {
       switch (o) {
         case 'positive': return '#10B981'
-        case 'negative': return '#EF4444'
         case 'neutral':  return '#F59E0B'
-        case 'callback': return '#3B82F6'
-        default:         return '#94A3B8'
+        case 'negative': return '#EF4444'
+        default:         return '#3B82F6'
       }
     }
     const iconFor = (o) => ({

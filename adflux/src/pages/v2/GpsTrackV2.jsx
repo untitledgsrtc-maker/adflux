@@ -435,17 +435,18 @@ export default function GpsTrackV2() {
       for (const a of meetingActs) {
         const hasLead  = !!a.lead?.id
         // Phase 89.4 — pin colour tracks the meeting outcome so admin
-        // can read the field map at a glance (green = good, red =
-        // bad, amber = neutral, blue = pending callback). Owner
-        // directive 23 May 2026.
+        // can read the field map at a glance. Owner-locked meeting
+        // outcome model is the 3-state set from LogMeetingModal
+        // (Phase 33A): positive / neutral / negative. No callback
+        // here — that's a call-only outcome. Default blue covers
+        // legacy rows where outcome was never written.
         const pinColor = (() => {
           if (!hasLead) return '#94A3B8'  // unlinked meeting stays slate
           switch (a.outcome) {
             case 'positive': return '#10B981'
-            case 'negative': return '#EF4444'
             case 'neutral':  return '#F59E0B'
-            case 'callback': return '#3B82F6'
-            default:         return '#94A3B8'  // outcome not yet set
+            case 'negative': return '#EF4444'
+            default:         return '#3B82F6'  // pre-Phase-89.4 / outcome missing
           }
         })()
         const m = new google.maps.Marker({
