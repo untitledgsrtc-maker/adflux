@@ -243,41 +243,56 @@ export default function GpsTrackV2() {
         })
         map.fitBounds(bounds, 60)
 
-        // Roads API snapToRoads — 100 points/request hard limit.
-        const BATCH = 100
-        const chunks = []
-        for (let i = 0; i < cleaned.length; i += BATCH) {
-          chunks.push(cleaned.slice(i, i + BATCH))
+        // Phase 70.4 (22 May 2026) — owner reported "still direct
+        // line not actual route". Cause: cleanTrack drops drift +
+        // speed-spike pings, often shrinking 37 raw pings down to 2.
+        // Roads API snapToRoads with only 2 points = straight line
+        // between snapped endpoints. Fix: send RAW pings (sorted by
+        // time, loose accuracy filter ≤200m, sampled to 100 max) so
+        // snapToRoads has enough waypoints to follow the road
+        // network with interpolate=true.
+        const ACC_LOOSE = 200
+        const sortedRaw = pings
+          .filter(p => {
+            const a = Number(p.accuracy_m)
+            return !Number.isFinite(a) || a <= ACC_LOOSE
+          })
+          .slice()
+          .sort((a, b) => new Date(a.captured_at) - new Date(b.captured_at))
+        // Sample down to 100 evenly. Roads API hard limit per request.
+        let snapInput = sortedRaw
+        if (sortedRaw.length > 100) {
+          const step = sortedRaw.length / 100
+          snapInput = []
+          for (let i = 0; i < 100; i++) {
+            snapInput.push(sortedRaw[Math.floor(i * step)])
+          }
+          // Always include final ping so route ends at check-out.
+          snapInput.push(sortedRaw[sortedRaw.length - 1])
         }
-        const fetchOne = (sample) => {
-          if (sample.length < 2) return Promise.resolve(null)
-          const pathStr = sample
+        if (snapInput.length >= 2) {
+          const pathStr = snapInput
             .map(p => `${Number(p.lat).toFixed(6)},${Number(p.lng).toFixed(6)}`)
             .join('|')
           const url = `https://roads.googleapis.com/v1/snapToRoads?path=${encodeURIComponent(pathStr)}&interpolate=true&key=${MAPS_KEY}`
-          return fetch(url).then(r => r.ok ? r.json() : null).catch(() => null)
-        }
-        Promise.all(chunks.map(fetchOne))
-          .then(results => {
+          fetch(url).then(r => r.ok ? r.json() : null).then(json => {
             if (!mapRef.current) return
-            for (const json of results) {
-              if (!json || !Array.isArray(json.snappedPoints)) continue
-              if (json.snappedPoints.length < 2) continue
-              const segPath = json.snappedPoints.map(sp => ({
-                lat: Number(sp?.location?.latitude),
-                lng: Number(sp?.location?.longitude),
-              })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
-              if (segPath.length < 2) continue
-              new google.maps.Polyline({
-                path: segPath,
-                strokeColor:   '#FFE600',
-                strokeOpacity: 1,
-                strokeWeight:  6,
-                map: mapRef.current,
-              })
-            }
-          })
-          .catch(() => { /* raw line stays as fallback */ })
+            if (!json || !Array.isArray(json.snappedPoints)) return
+            if (json.snappedPoints.length < 2) return
+            const segPath = json.snappedPoints.map(sp => ({
+              lat: Number(sp?.location?.latitude),
+              lng: Number(sp?.location?.longitude),
+            })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+            if (segPath.length < 2) return
+            new google.maps.Polyline({
+              path: segPath,
+              strokeColor:   '#FFE600',
+              strokeOpacity: 1,
+              strokeWeight:  6,
+              map: mapRef.current,
+            })
+          }).catch(() => { /* raw line stays as fallback */ })
+        }
       } else if (cleaned.length === 1) {
         map.setCenter(center)
         map.setZoom(14)
