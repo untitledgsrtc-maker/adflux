@@ -57,6 +57,12 @@ import { useLeadTasks } from '../../hooks/useLeadTasks'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { logCallAudit } from '../../utils/callAudit'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
+// Phase 76 — evening day summary + GPS-off banner. Both are additive
+// mounts; no productive flow is gated in this phase (button-blocking
+// deferred to Phase 76.4b pending owner sign-off).
+import DaySummaryCard from '../../components/work/DaySummaryCard'
+import GpsOffBanner from '../../components/work/GpsOffBanner'
+import useGpsLock from '../../hooks/useGpsLock'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
 
@@ -202,6 +208,12 @@ export default function WorkV2() {
   const [lateReason, setLateReason] = useState('')
 
   /* Voice dictation */
+  // Phase 76 — GPS toggle awareness. `gpsOn` starts null (loading),
+  // resolves to true/false. requestEnable opens SettingsClient on
+  // native or re-probes on web. Used only to render the banner; no
+  // productive button is gated in this phase.
+  const { gpsOn, requestEnable, isNative: gpsIsNative } = useGpsLock()
+
   const [recState, setRecState] = useState('idle') // 'idle' | 'recording' | 'sending'
   const mediaRecorderRef = useRef(null)
   const recTimerRef = useRef(null)
@@ -797,6 +809,16 @@ export default function WorkV2() {
           </div>
         )}
 
+        {/* Phase 76 — GPS toggle awareness. Banner appears any time
+            Location is off (rep can't be tracked → can't earn TA →
+            morning plan is meaningless). Hidden while we don't yet
+            know (gpsOn === null) so the page doesn't flash a banner
+            during initial probe. Additive only; no productive button
+            is gated in this phase. */}
+        {gpsOn === false && (
+          <GpsOffBanner onEnable={requestEnable} isNative={gpsIsNative} />
+        )}
+
         {/* Phase 35.0 pass 4 — owner directive: Log meeting + Log lead
             buttons sit BETWEEN the purple Incentive card (rendered in
             V2AppShell above the Outlet) and the green Today/progress
@@ -850,6 +872,14 @@ export default function WorkV2() {
           doCheckOut={doCheckOut}
           navigate={navigate}
         />
+
+        {/* Phase 76 — evening day summary card. Auto-appears after
+            7 PM IST (component's own gate) above TodaySummaryCard
+            during the active day. Hidden for admin / co_owner. Card
+            handles its own dismiss + share + work_sessions stamp. */}
+        {checkedIn && !dayDone && (
+          <DaySummaryCard />
+        )}
 
         {/* Phase 34Z.61 — today's load at a glance. Owner directive:
             "When checking in the today page, somebody should show

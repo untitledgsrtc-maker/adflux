@@ -95,10 +95,13 @@ export default function useDaySummary({ dateISO } = {}) {
           .eq('work_date', targetDate)
           .maybeSingle(),
 
-        // 2) lead_activities counts grouped client-side
+        // 2) lead_activities counts grouped client-side.
+        // Phase 76.4 guardian fix: column is `created_by` (Phase 12
+        // schema), not `user_id` — the latter does not exist on this
+        // table and the query was silently returning 0 rows.
         supabase.from('lead_activities')
           .select('id, activity_type, outcome')
-          .eq('user_id', profile.id)
+          .eq('created_by', profile.id)
           .gte('created_at', startISO)
           .lte('created_at', endISO),
 

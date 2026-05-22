@@ -54,6 +54,11 @@ import { logCallAudit } from '../../utils/callAudit'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { Modal, ActionButton } from '../../components/v2/primitives'
+// Phase 76 — surface the GPS-off banner inside lead detail so the
+// rep sees the same blocker on both /work and /leads/:id. Additive
+// only; no productive button is gated this phase.
+import GpsOffBanner from '../../components/work/GpsOffBanner'
+import useGpsLock from '../../hooks/useGpsLock'
 
 const ACTIVITY_ICON = {
   call:          Phone,
@@ -125,6 +130,12 @@ export default function LeadDetailV2() {
   // rest of the app uses (admin || co_owner). If sales_manager is
   // ever added as a real role, do it once in useAuth.js, not here.
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+
+  // Phase 76 — GPS toggle awareness for the banner mount below.
+  // Hook is cheap (single probe + visibilitychange listener); fine
+  // to call here even before lead loads. Admin / co_owner skip the
+  // banner via the same role check the card uses.
+  const { gpsOn, requestEnable, isNative: gpsIsNative } = useGpsLock()
 
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
@@ -612,6 +623,13 @@ export default function LeadDetailV2() {
         <ArrowLeft size={14} strokeWidth={1.8} />
         <span>Back to leads</span>
       </button>
+
+      {/* Phase 76 — GPS-off banner. Hidden for admin / co_owner (they
+          don't punch in the field, they audit). Mirrors the WorkV2
+          mount so the rep sees the same blocker on both surfaces. */}
+      {!isPrivileged && gpsOn === false && (
+        <GpsOffBanner onEnable={requestEnable} isNative={gpsIsNative} />
+      )}
 
       {/* Phase 34B — soft auto-Lost suggestion. Trigger sets
           auto_lost_suggested=true after AUTO_LOST_THRESHOLD non-

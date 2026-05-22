@@ -33,12 +33,19 @@ export default function GpsOffBanner({ onEnable, isNative, compact = false }) {
         color:         'var(--v2-ink-0, #f1f5f9)',
       }}
     >
-      <AlertTriangle
-        size={20}
-        strokeWidth={1.6}
-        color="var(--v2-rose, #EF4444)"
-        style={{ flexShrink: 0 }}
-      />
+      {/* Guardian fix (§7) — Lucide icons must inherit color from
+          parent, not take a `color` prop. The icon wrapper below
+          provides the rose tint; the icon picks it up via
+          currentColor. */}
+      <span
+        style={{
+          display:    'inline-flex',
+          flexShrink: 0,
+          color:      'var(--v2-rose, #EF4444)',
+        }}
+      >
+        <AlertTriangle size={20} strokeWidth={1.6} />
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
