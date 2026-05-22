@@ -28,6 +28,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import { formatCurrency } from '../../utils/formatters'
+// Phase 82 — date filter + per-rep follow-up/quote/payment KPIs.
+import { PeriodPicker } from '../../components/v2/PeriodPicker'
+import { presetToday } from '../../utils/period'
 
 export default function TeamDashboardV2() {
   const navigate = useNavigate()
@@ -75,15 +78,38 @@ export default function TeamDashboardV2() {
   const [pipelineToday, setPipelineToday] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Phase 82 — date filter. Initially today; PeriodPicker can flip
+  // to any month / quick preset / custom range. All KPIs honour
+  // this window (calls / voice / new leads / pipeline + the new
+  // follow-up / quote-chase / payment-chase counts).
+  const [period, setPeriod] = useState(() => presetToday())
+  // Phase 82 — new per-rep maps:
+  //   followUpsByUser    {user_id: {pending, done}}
+  //   quoteChaseByUser   {user_id: count of status='sent' quotes
+  //                         created_by rep AND updated >3d ago}
+  //   paymentChaseByUser {user_id: count of status='won' quotes
+  //                         created_by rep with balance > 0}
+  const [followUpsByUser,    setFollowUpsByUser]    = useState({})
+  const [quoteChaseByUser,   setQuoteChaseByUser]   = useState({})
+  const [paymentChaseByUser, setPaymentChaseByUser] = useState({})
 
   useEffect(() => {
     if (!isPrivileged) return
     async function load() {
       setLoading(true); setError('')
-      const today = new Date().toISOString().slice(0, 10)
-      const startOfDay = `${today}T00:00:00`
+      // Phase 82 — query window comes from PeriodPicker. Default
+      // `presetToday()` ⇒ startIso = today, endIso = tomorrow
+      // (exclusive). The legacy variables below are kept so the rest
+      // of the function reads the same as before.
+      const startOfDay = `${period.startIso}T00:00:00`
+      const endOfDay   = `${period.endIso}T00:00:00`
+      // work_sessions row is per-date; for multi-day ranges fall
+      // back to the period start (admin can still see the day card).
+      // Single-day periods (today/yesterday) work identically to
+      // the pre-Phase-82 code path.
+      const today = period.startIso
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -103,10 +129,12 @@ export default function TeamDashboardV2() {
           .eq('work_date', today),
         supabase.from('call_logs')
           .select('user_id', { count: 'exact' })
-          .gte('call_at', startOfDay),
+          .gte('call_at', startOfDay)
+          .lt ('call_at', endOfDay),
         supabase.from('leads')
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', startOfDay),
+          .gte('created_at', startOfDay)
+          .lt ('created_at', endOfDay),
         // Phase 18 — only count won quotes for "pipeline added today",
         // not every quote created. Drafts/sent/lost shouldn't inflate the
         // headline number. Owner saw ₹2.7Cr because every quote created
@@ -114,26 +142,51 @@ export default function TeamDashboardV2() {
         supabase.from('quotes')
           .select('total_amount, status')
           .eq('status', 'won')
-          .gte('created_at', startOfDay),
+          .gte('created_at', startOfDay)
+          .lt ('created_at', endOfDay),
         // Phase 31E — voice_logs counted per rep for today.
         supabase.from('voice_logs')
           .select('user_id')
-          .gte('created_at', startOfDay),
+          .gte('created_at', startOfDay)
+          .lt ('created_at', endOfDay),
         // Phase 34U — pull every GPS ping captured today; we'll pick
-        // the latest per user client-side. Cheaper than N round-trips
-        // (one per rep), and the per-day per-rep set is small (10-h
-        // shift × 1 ping / 5 min = ~120 rows / rep max).
+        // the latest per user client-side.
         supabase.from('gps_pings')
           .select('user_id, lat, lng, captured_at, accuracy_m')
           .gte('captured_at', startOfDay)
+          .lt ('captured_at', endOfDay)
           .order('captured_at', { ascending: false }),
-        // Phase 73 (21 May 2026) — pull each rep's daily_targets row
-        // (Phase 49 table, NOT users.daily_targets JSONB). TC reps have
-        // min_calls=50 here while users.daily_targets fallback was 20,
-        // causing the TC card to show /20 instead of /50.
+        // Phase 73 — daily_targets row per user (active).
         supabase.from('daily_targets')
           .select('user_id, min_calls, min_qualified_weekly')
           .is('effective_to', null),
+
+        // Phase 82 — follow_ups in the window, grouped client-side
+        // by assigned_to into pending + done counts. Owner: "daily
+        // followup / done".
+        supabase.from('follow_ups')
+          .select('assigned_to, is_done, follow_up_date, done_at')
+          .gte('follow_up_date', period.startIso)
+          .lt ('follow_up_date', period.endIso),
+        // Phase 82 — quote-chase: status='sent' quotes whose latest
+        // touch is stale. Owner: "daily quote followup". Fetched as
+        // a broad list; we filter client-side to status='sent' AND
+        // updated_at > 3d ago. (DB has no last_chase_at column.)
+        supabase.from('quotes')
+          .select('id, created_by, status, updated_at, total_amount')
+          .eq('status', 'sent'),
+        // Phase 82 — payment-chase: status='won' quotes. Joined to
+        // payments client-side to compute (total_amount − received)
+        // and count rows where balance > 0. Owner: "daily payment
+        // follow up".
+        supabase.from('quotes')
+          .select('id, created_by, status, total_amount')
+          .eq('status', 'won'),
+        // Phase 82 — sum approved payments per quote_id. Joins
+        // with the won-quotes list above to produce per-rep
+        // unsettled-quote counts.
+        supabase.from('payments')
+          .select('quote_id, amount_received, approval_status'),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
@@ -173,6 +226,57 @@ export default function TeamDashboardV2() {
       setNewLeadsToday(newLeadsRes.count || 0)
       setPipelineToday((pipelineRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0))
 
+      // Phase 82 — tally follow-ups per assigned_to in this window.
+      //   pending = is_done=false
+      //   done    = is_done=true (regardless of done_at; the
+      //             period filter already constrained follow_up_date
+      //             to the window so all rows here belong to it)
+      const fuMap = {}
+      ;(fuRes.data || []).forEach((r) => {
+        if (!r.assigned_to) return
+        const e = fuMap[r.assigned_to] || { pending: 0, done: 0 }
+        if (r.is_done) e.done += 1
+        else           e.pending += 1
+        fuMap[r.assigned_to] = e
+      })
+      setFollowUpsByUser(fuMap)
+
+      // Phase 82 — quote-chase: status='sent' quotes whose latest
+      // updated_at is older than 3 days from period.endIso. These
+      // are the "you sent it, nobody chased — go follow up" quotes.
+      const threeDaysMs = 3 * 24 * 60 * 60 * 1000
+      const cutoff      = new Date(period.endIso).getTime() - threeDaysMs
+      const qcMap = {}
+      ;(quoteSentRes.data || []).forEach((q) => {
+        if (!q.created_by) return
+        const stamp = q.updated_at ? new Date(q.updated_at).getTime() : 0
+        if (stamp > 0 && stamp < cutoff) {
+          qcMap[q.created_by] = (qcMap[q.created_by] || 0) + 1
+        }
+      })
+      setQuoteChaseByUser(qcMap)
+
+      // Phase 82 — payment-chase: status='won' quotes whose summed
+      // approved payments < total_amount. Index payments by
+      // quote_id, then iterate won quotes counting unsettled ones
+      // per created_by.
+      const paidByQuote = {}
+      ;(paymentsRes.data || []).forEach((p) => {
+        if (!p.quote_id) return
+        if (p.approval_status && p.approval_status !== 'approved') return
+        paidByQuote[p.quote_id] = (paidByQuote[p.quote_id] || 0) + (Number(p.amount_received) || 0)
+      })
+      const pcMap = {}
+      ;(quoteWonRes.data || []).forEach((q) => {
+        if (!q.created_by) return
+        const total = Number(q.total_amount) || 0
+        const paid  = paidByQuote[q.id] || 0
+        if (total > 0 && paid < total) {
+          pcMap[q.created_by] = (pcMap[q.created_by] || 0) + 1
+        }
+      })
+      setPaymentChaseByUser(pcMap)
+
       // Phase 62.9 — load push subscriptions per rep. Used to render
       // the "Push on/off" + "Online" status pills below the KPI row.
       // Last-seen-at acts as a proxy for whether the device has been
@@ -198,7 +302,9 @@ export default function TeamDashboardV2() {
       setLoading(false)
     }
     load()
-  }, [isPrivileged])
+    // Phase 82 — re-run on period change so PeriodPicker drives the
+    // whole grid (calls, voice, follow-ups, chase counts, pipeline).
+  }, [isPrivileged, period.startIso, period.endIso])
 
   // Phase 70.2 (22 May 2026) — initialize Leaflet map once + subscribe
   // to Supabase Realtime for gps_pings INSERT. Owner directive: "live
@@ -449,7 +555,11 @@ export default function TeamDashboardV2() {
           </div>
           <div className="lead-page-title">Team Dashboard</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Phase 82 — date filter at top of /team-dashboard. All
+              KPIs (calls, voice, new leads, pipeline, follow-ups,
+              quote-chase, payment-chase) reload when this changes. */}
+          <PeriodPicker period={period} onChange={setPeriod} />
           <button className="lead-btn lead-btn-primary" onClick={() => navigate('/leads')}>
             <UsersIcon size={14} /> Reassign queue
           </button>
@@ -591,6 +701,41 @@ export default function TeamDashboardV2() {
                   <div className="lbl">Voice</div>
                 </div>
               </div>
+              {/* Phase 82 — three new KPI tiles per rep card:
+                    F-up   pending/done follow_ups in the window
+                    Quote  status='sent' & >3d no update (chase me)
+                    Pay    status='won' with unsettled balance
+                  Color rules:
+                    F-up   green if no pending, amber if 1-3, rose 4+
+                    Quote  amber if any, rose if 5+
+                    Pay    amber if any, rose if 3+
+              */}
+              {(() => {
+                const fu        = followUpsByUser[r.id] || { pending: 0, done: 0 }
+                const fuPending = fu.pending
+                const fuDone    = fu.done
+                const fuCls     = fuPending === 0 ? 'suc' : fuPending <= 3 ? 'warn' : 'dng'
+                const qChase    = quoteChaseByUser[r.id] || 0
+                const qCls      = qChase === 0 ? '' : qChase >= 5 ? 'dng' : 'warn'
+                const pChase    = paymentChaseByUser[r.id] || 0
+                const pCls      = pChase === 0 ? '' : pChase >= 3 ? 'dng' : 'warn'
+                return (
+                  <div className="lead-rep-kpis" style={{ marginTop: 6 }}>
+                    <div className="lead-rep-kpi">
+                      <div className={`num ${fuCls}`}>{fuDone}/{fuDone + fuPending}</div>
+                      <div className="lbl">F-up</div>
+                    </div>
+                    <div className="lead-rep-kpi">
+                      <div className={`num ${qCls}`}>{qChase}</div>
+                      <div className="lbl">Quote chase</div>
+                    </div>
+                    <div className="lead-rep-kpi">
+                      <div className={`num ${pCls}`}>{pChase}</div>
+                      <div className="lbl">Pay chase</div>
+                    </div>
+                  </div>
+                )
+              })()}
               {/* Phase 62.9 (20 May 2026) — GPS / Online / Push status
                   pills per rep. Color-banded so admin spots any rep
                   with a broken signal at-a-glance. Green = healthy,
