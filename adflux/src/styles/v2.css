@@ -2299,13 +2299,16 @@
   padding: 14px 16px !important;
 }
 .gm-style-iw {
-  background: transparent !important;
+  /* Phase 89.7 — owner reported yellow polyline bleeding through
+     the popup (transparent inner layer). All 3 chrome layers now
+     paint solid navy so nothing behind the popup shows. */
+  background: #0c1224 !important;
   color: #f5f7fb !important;
   max-width: 280px !important;
   overflow: visible !important;
 }
 .gm-style-iw-d {
-  background: transparent !important;
+  background: #0c1224 !important;
   overflow: visible !important;
 }
 .gm-style-iw-tc::after {
