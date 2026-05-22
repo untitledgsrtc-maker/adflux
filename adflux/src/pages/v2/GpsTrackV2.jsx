@@ -396,43 +396,70 @@ export default function GpsTrackV2() {
       }
 
       // Phase 70.8 (22 May 2026) — owner directive: punched meetings
-      // show on the day-track map with a blue pin + lead name. Click
-      // the lead name in the popup → navigate to /leads/:id. Activity
-      // types meeting + site_visit count.
+      // show on the day-track map with a blue pin + lead name.
+      //
+      // Phase 84.2 (23 May 2026) — owner reported "did 3 meetings but
+      // map shows only 1 pin". Root cause: the old filter required
+      // `a.lead?.id`. Meetings logged from a voice note + meetings
+      // saved without a linked lead were dropped entirely. New rule:
+      // require GPS coords only. Unlinked meetings render with a
+      // grey pin + "(no lead)" caption so admin sees the activity
+      // count match the timeline.
       const meetingActs = showMeetings
         ? (activities || []).filter(a =>
             (a.activity_type === 'meeting' || a.activity_type === 'site_visit')
             && Number.isFinite(Number(a.gps_lat))
             && Number.isFinite(Number(a.gps_lng))
-            && a.lead?.id
           )
         : []
       for (const a of meetingActs) {
+        const hasLead  = !!a.lead?.id
+        const pinColor = hasLead ? '#3B82F6' : '#94A3B8'
         const m = new google.maps.Marker({
           position: { lat: Number(a.gps_lat), lng: Number(a.gps_lng) },
           map,
-          icon: pinIcon('#3B82F6'),
+          icon: pinIcon(pinColor),
         })
-        const leadName = a.lead.company || a.lead.name || 'Lead'
-        const leadHref = `/leads/${a.lead.id}`
+        const leadName  = hasLead ? (a.lead.company || a.lead.name || 'Lead') : '(unlinked meeting)'
+        const leadHref  = hasLead ? `/leads/${a.lead.id}` : null
+        const timeLabel = new Date(a.created_at).toLocaleTimeString('en-IN', {
+          hour: '2-digit', minute: '2-digit',
+          timeZone: 'Asia/Kolkata',
+        })
+        const typeChip  = a.activity_type === 'site_visit' ? 'Site visit' : 'Meeting'
+        const outcomeChip = a.outcome
+          ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:${a.outcome==='positive'?'#dcfce7':a.outcome==='negative'?'#fee2e2':'#f1f5f9'};color:${a.outcome==='positive'?'#166534':a.outcome==='negative'?'#991b1b':'#475569'};">${a.outcome}</span>`
+          : ''
+
+        const linkHtml = hasLead
+          ? `<a href="${leadHref}" data-lead-id="${a.lead.id}" style="color:#0f172a;font-weight:700;font-size:14px;text-decoration:none;border-bottom:2px solid #FFE600;padding-bottom:2px;display:inline-block;">${leadName}</a>`
+          : `<span style="color:#64748b;font-weight:600;font-size:13px;">${leadName}</span>`
+
+        const noteHtml = a.notes
+          ? `<div style="margin-top:8px;font-size:11px;color:#475569;line-height:1.4;max-width:240px;">${(a.notes || '').replace(/</g, '&lt;')}</div>`
+          : ''
+
         const iw = new google.maps.InfoWindow({
           content:
-            `<div style="font-family: inherit; min-width: 160px;">` +
-            `<a href="${leadHref}" data-lead-id="${a.lead.id}" style="color: #FFE600; font-weight: 600; text-decoration: underline; font-size: 14px;">` +
-            `${leadName}` +
-            `</a></div>`,
+            `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;padding:2px 4px 4px;min-width:200px;max-width:260px;">`
+          + `<div style="font-size:9.5px;color:#64748b;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:6px;">${typeChip} · ${timeLabel} IST${outcomeChip}</div>`
+          + linkHtml
+          + noteHtml
+          + `</div>`,
         })
-        // Intercept the link click so we use React Router navigation
-        // (avoids full-page reload).
-        iw.addListener('domready', () => {
-          const link = document.querySelector(`a[data-lead-id="${a.lead.id}"]`)
-          if (link) {
-            link.addEventListener('click', (ev) => {
-              ev.preventDefault()
-              navigate(leadHref)
-            })
-          }
-        })
+        if (hasLead) {
+          // Intercept the link click so we use React Router navigation
+          // (avoids full-page reload).
+          iw.addListener('domready', () => {
+            const link = document.querySelector(`a[data-lead-id="${a.lead.id}"]`)
+            if (link) {
+              link.addEventListener('click', (ev) => {
+                ev.preventDefault()
+                navigate(leadHref)
+              })
+            }
+          })
+        }
         m.addListener('click', () => iw.open({ anchor: m, map }))
       }
 
@@ -575,7 +602,7 @@ export default function GpsTrackV2() {
             {[
               { key: 'all',      label: 'All' },
               { key: 'route',    label: 'Route only' },
-              { key: 'meetings', label: `Meetings · ${activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && a.lead?.id).length}` },
+              { key: 'meetings', label: `Meetings · ${activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng).length}` },
             ].map(opt => (
               <button
                 key={opt.key}
@@ -597,6 +624,31 @@ export default function GpsTrackV2() {
               </button>
             ))}
           </div>
+          {/* Phase 84.2 — explain when KPI counts diverge from map pins.
+              If counters.meetings > meetings-with-GPS coords, there's
+              at least one meeting logged without a captured location.
+              Banner saves the admin from thinking pins are missing. */}
+          {(() => {
+            const meetingTotalToday = activities.filter(a => a.activity_type === 'meeting' || a.activity_type === 'site_visit').length
+            const meetingWithGps    = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng).length
+            const noGpsCount        = meetingTotalToday - meetingWithGps
+            if (noGpsCount <= 0) return null
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px', marginBottom: 10,
+                background: 'var(--warning-soft, rgba(245,158,11,.12))',
+                border: '1px solid var(--warning, #F59E0B)',
+                borderRadius: 8,
+                fontSize: 12, color: 'var(--warning, #F59E0B)',
+              }}>
+                <span>
+                  <b>{noGpsCount}</b> meeting{noGpsCount === 1 ? '' : 's'} logged without GPS. Map shows {meetingWithGps} of {meetingTotalToday} on the map; the rest appear only in the activity timeline below.
+                </span>
+              </div>
+            )
+          })()}
+
           <div
             ref={containerRef}
             style={{
