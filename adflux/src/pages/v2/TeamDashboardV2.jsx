@@ -207,25 +207,42 @@ export default function TeamDashboardV2() {
   // refresh every 5 min". With Realtime, dots actually refresh on
   // every new ping (~5-min cadence on rep side); admin sees live
   // movement as it happens. No polling required.
+  //
+  // Phase 70.2 fix (22 May 2026 same-day) — depend on `loading` AND
+  // `isPrivileged`. The container ref doesn't attach until the
+  // loading=false branch of the JSX renders. Initial run with
+  // loading=true bailed (ref.current was null) and tile fetch never
+  // fired. Re-runs when loading flips false so the map mounts as soon
+  // as the container is in the DOM. Includes a 50ms timeout so layout
+  // settles + invalidateSize after attach to force tile load.
   useEffect(() => {
     if (!isPrivileged) return
-    if (!mapContainerRef.current) return
+    if (loading) return
     if (mapRef.current) return  // already mounted
 
-    // Default centre: Vadodara. Adjusts to fit reps as markers land.
-    const map = L.map(mapContainerRef.current).setView([22.3072, 73.1812], 12)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(map)
-    mapRef.current = map
+    const t = setTimeout(() => {
+      if (!mapContainerRef.current) return
+      if (mapRef.current) return
+      // Default centre: Vadodara. Adjusts to fit reps as markers land.
+      const map = L.map(mapContainerRef.current).setView([22.3072, 73.1812], 12)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(map)
+      mapRef.current = map
+      // Force tile recalc once container is in flow.
+      setTimeout(() => { try { map.invalidateSize() } catch { /* */ } }, 100)
+    }, 50)
 
     return () => {
-      try { map.remove() } catch { /* swallow */ }
-      mapRef.current = null
-      markersRef.current = {}
+      clearTimeout(t)
+      if (mapRef.current) {
+        try { mapRef.current.remove() } catch { /* swallow */ }
+        mapRef.current = null
+        markersRef.current = {}
+      }
     }
-  }, [isPrivileged])
+  }, [isPrivileged, loading])
 
   // Phase 70.2 — Render / update markers whenever latestPingByUser
   // changes. New rep ping → new marker; updated ping → move marker.
