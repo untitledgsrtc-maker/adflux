@@ -63,13 +63,12 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
     else                          setTarget('Working')
   }, [lead?.stage])
 
-  // Phase 31N — Nurture is reachable ONLY from QuoteSent or already-
-  // in-Nurture (rep can edit revisit_date). Hide it from the dropdown
-  // for other current stages so reps can't park leads that haven't
-  // had a quote sent yet — owner spec.
+  // Phase 72.1 (21 May 2026) — owner directive: Nurture must be
+  // available from ANY stage, not just QuoteSent. Reps need to park
+  // a New / Working lead in Nurture too (e.g. "customer says callback
+  // in 2 weeks" before any quote). Phase 31N restriction dropped.
   function isStageAvailable(s) {
-    if (s !== 'Nurture') return true
-    return lead?.stage === 'QuoteSent' || lead?.stage === 'Nurture'
+    return true
   }
 
   // Phase 31N — when user picks Nurture, pre-fill revisit_date with

@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { useLeads, STAGE_GROUPS as ALL_STAGE_GROUPS } from '../../hooks/useLeads'
+import { useLeads, STAGE_GROUPS as ALL_STAGE_GROUPS, LOST_REASONS } from '../../hooks/useLeads'
 import { formatCurrency, formatRelative } from '../../utils/formatters'
 import {
   StageChip, HeatDot, SegChip, LeadAvatar,
@@ -75,6 +75,10 @@ export default function LeadsV2() {
   // lead_activities (latest outcome per lead).
   const [outcomeFilter, setOutcomeFilter] = useState('all')
   const [leadOutcomeMap, setLeadOutcomeMap] = useState({})
+  // Phase 72.4 (21 May 2026) — owner asked for "Price problem" filter.
+  // Filters to leads whose lost_reason='Price' (lost deals only, not
+  // negotiating). Matches LOST_REASONS enum in useLeads.js.
+  const [lostReasonFilter, setLostReasonFilter] = useState('all')
   // Phase 34Z.13 — unified DateRangeFilter (Phase 34Z.11's two raw
   // <input type=date> replaced). Default preset = This month per owner.
   const [dateRange, setDateRange] = useState(() => presetToRange('this_month'))
@@ -215,6 +219,8 @@ export default function LeadsV2() {
       if (repFilter      !== 'all' && l.assigned?.id !== repFilter)  return false
       // Phase 46.1 — outcome filter (latest activity outcome).
       if (outcomeFilter  !== 'all' && (leadOutcomeMap[l.id] || '') !== outcomeFilter) return false
+      // Phase 72.4 — lost-reason filter ("Price problem" etc.).
+      if (lostReasonFilter !== 'all' && l.lost_reason !== lostReasonFilter) return false
       if (fromIso || toIso) {
         const created = (l.created_at || '').slice(0, 10)
         if (fromIso && created < fromIso) return false
@@ -229,7 +235,7 @@ export default function LeadsV2() {
         (l.industry || '').toLowerCase().includes(q)
       )
     })
-  }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, leadOutcomeMap, dateFrom, dateTo])
+  }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, leadOutcomeMap, lostReasonFilter, dateFrom, dateTo])
 
   // Phase 62.8 — paginated slice. Filter computes the full set; the
   // table only renders one page worth. Reset to page 1 whenever the
@@ -238,7 +244,7 @@ export default function LeadsV2() {
   useEffect(() => {
     if (page > totalPages) setPage(1)
   }, [filtered.length, pageSize, totalPages, page])
-  useEffect(() => { setPage(1) }, [search, stageFilter, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, dateFrom, dateTo, queueIds])
+  useEffect(() => { setPage(1) }, [search, stageFilter, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, lostReasonFilter, dateFrom, dateTo, queueIds])
   useEffect(() => { localStorage.setItem('leads_page_size', String(pageSize)) }, [pageSize])
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize
@@ -390,9 +396,24 @@ export default function LeadsV2() {
         { value: 'negative', label: 'Lost' },
       ],
     })
+    // Phase 72.4 — lost-reason filter ("Price problem", "Timing", etc.).
+    // Owner directive: "Price problem leads filter option is not available".
+    fields.push({
+      key: 'lost_reason',
+      label: 'Lost reason',
+      value: lostReasonFilter,
+      onChange: setLostReasonFilter,
+      defaultValue: 'all',
+      dotColor: 'var(--danger, #EF4444)',
+      options: [
+        { value: 'all', label: 'Any reason' },
+        { value: 'Price', label: 'Price problem' },
+        ...LOST_REASONS.filter(r => r !== 'Price').map(r => ({ value: r, label: r })),
+      ],
+    })
     return fields
   }, [
-    segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter,
+    segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, lostReasonFilter,
     distinctSources, distinctCities, distinctIndustries, distinctReps,
     isPrivileged,
   ])
@@ -467,6 +488,8 @@ export default function LeadsV2() {
     cityFilter !== 'all' ||
     industryFilter !== 'all' ||
     repFilter !== 'all' ||
+    outcomeFilter !== 'all' ||
+    lostReasonFilter !== 'all' ||
     (dateRange?.preset && dateRange.preset !== 'all')
 
   return (
@@ -735,6 +758,8 @@ export default function LeadsV2() {
               setCityFilter('all')
               setIndustryFilter('all')
               setRepFilter('all')
+              setOutcomeFilter('all')          // Phase 72.4 — was missing
+              setLostReasonFilter('all')       // Phase 72.4 — new
               setDateRange(presetToRange('all'))
             }}
           >
@@ -798,6 +823,7 @@ export default function LeadsV2() {
               onClick={() => {
                 setStageFilter('all'); setSegmentFilter('all'); setSourceFilter('all')
                 setCityFilter('all'); setIndustryFilter('all'); setRepFilter('all')
+                setOutcomeFilter('all'); setLostReasonFilter('all')  // Phase 72.4
                 setSearch(''); setQueueIds(null)
               }}
               style={{ marginTop: 16 }}
