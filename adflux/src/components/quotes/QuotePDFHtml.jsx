@@ -719,14 +719,21 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
     }
   })
 
+  // Phase 81.3.2: allow th text to wrap. table-layout:fixed truncates
+  // any cell content that overflows; "OFFERED/SCREEN" + "SLOTS/DAY"
+  // need two lines in the narrow numeric cols.
   const tableTh = {
     background:    INK,
     color:         '#fff',
-    padding:       '8px 10px',
+    padding:       '6px 8px',
     textAlign:     'left',
     fontWeight:    600,
-    fontSize:      10,
+    fontSize:      9.5,
     letterSpacing: '0.04em',
+    lineHeight:    1.15,
+    whiteSpace:    'normal',
+    wordBreak:     'break-word',
+    verticalAlign: 'middle',
   }
   const tableTd  = { padding: '8px 10px', borderBottom: `1px solid ${BORDER}`, fontSize: 10.5, color: INK, verticalAlign: 'top' }
   const tdNum    = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
@@ -761,25 +768,25 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
           <div style={sectionTitle}>Client Details</div>
           <div style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr',
-            gap: '10px 28px', padding: '10px 14px',
+            gap: '14px 28px', padding: '14px 16px',
             background: SOFT, border: `1px solid ${BORDER}`,
             borderRadius: 8, marginBottom: 14,
           }}>
             <div>
-              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Client</div>
-              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_name || '—'}</div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Client</div>
+              <div style={{ color: INK, fontSize: 14, fontWeight: 700 }}>{quote?.client_name || '—'}</div>
             </div>
             <div>
-              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Company</div>
-              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_company || '—'}</div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Company</div>
+              <div style={{ color: INK, fontSize: 14, fontWeight: 700 }}>{quote?.client_company || '—'}</div>
             </div>
             <div>
-              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Phone</div>
-              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_phone || '—'}</div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Phone</div>
+              <div style={{ color: INK, fontSize: 14, fontWeight: 700 }}>{quote?.client_phone || '—'}</div>
             </div>
             <div>
-              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>Email</div>
-              <div style={{ color: INK, fontSize: 11, fontWeight: 600 }}>{quote?.client_email || '—'}</div>
+              <div style={{ color: MUTED, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Email</div>
+              <div style={{ color: INK, fontSize: 14, fontWeight: 700 }}>{quote?.client_email || '—'}</div>
             </div>
           </div>
 
@@ -845,16 +852,16 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
       <div style={sectionTitle}>Location Breakdown{!isFirst ? ' (cont.)' : ''}</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10.5, tableLayout: 'fixed' }}>
         <colgroup>
-          <col style={{ width: 24 }} />
-          <col style={{ width: 158 }} />
+          <col style={{ width: 22 }} />
+          <col style={{ width: 130 }} />
+          <col style={{ width: 44 }} />
+          <col style={{ width: 56 }} />
+          <col style={{ width: 58 }} />
           <col style={{ width: 38 }} />
-          <col style={{ width: 46 }} />
-          <col style={{ width: 46 }} />
-          <col style={{ width: 36 }} />
-          <col style={{ width: 50 }} />
+          <col style={{ width: 56 }} />
           <col style={{ width: 64 }} />
-          <col style={{ width: 92 }} />
-          <col style={{ width: 92 }} />
+          <col style={{ width: 78 }} />
+          <col style={{ width: 80 }} />
         </colgroup>
         <thead>
           <tr>
@@ -911,30 +918,42 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
       {/* Totals + bank — last page only */}
       {isLast && (
         <>
-          <div style={{ marginLeft: 'auto', width: '60%', borderTop: `1px solid ${BORDER}`, paddingTop: 8, marginBottom: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 11 }}>
-              <span style={{ color: MUTED }}>Subtotal</span>
-              <span style={{ color: INK, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(subtotal)}</span>
+          {/* Phase 81.3.2 — totals block. Was 60% width left-floated
+              which produced ragged alignment with the table's
+              rightmost column. Now: full-width, two columns where the
+              right column matches the table's "Total" column width
+              for clean right-alignment. */}
+          <div style={{
+            marginTop:    4,
+            marginBottom: 10,
+            display:      'flex',
+            justifyContent: 'flex-end',
+          }}>
+            <div style={{ width: 320 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12, borderBottom: `1px solid ${BORDER}` }}>
+                <span style={{ color: MUTED }}>Subtotal</span>
+                <span style={{ color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(subtotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12, borderBottom: `1px solid ${BORDER}` }}>
+                <span style={{ color: MUTED }}>{gstRate > 0 ? `GST (${Math.round(gstRate * 100)}%)` : 'No GST'}</span>
+                <span style={{ color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{gstRate > 0 ? formatCurrency(gstAmount) : '—'}</span>
+              </div>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '10px 14px', marginTop: 6, background: YELLOW,
+                borderRadius: 6, fontSize: 15, fontWeight: 800, color: INK,
+              }}>
+                <span>Grand Total</span>
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(totalAmount)}</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 11 }}>
-              <span style={{ color: MUTED }}>{gstRate > 0 ? `GST (${Math.round(gstRate * 100)}%)` : 'No GST'}</span>
-              <span style={{ color: INK, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{gstRate > 0 ? formatCurrency(gstAmount) : '—'}</span>
-            </div>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              padding: '8px 12px', marginTop: 4, background: YELLOW,
-              borderRadius: 6, fontSize: 14, fontWeight: 700, color: INK,
-            }}>
-              <span>Grand Total</span>
-              <span>{formatCurrency(totalAmount)}</span>
-            </div>
-            <div style={{
-              marginTop: 6, padding: '6px 10px',
-              background: SOFT, border: `1px dashed ${BORDER}`,
-              borderRadius: 6, fontSize: 10, color: INK,
-            }}>
-              <b>Total in Words:</b> {inWords}
-            </div>
+          </div>
+          <div style={{
+            marginTop: 4, padding: '8px 12px',
+            background: SOFT, border: `1px dashed ${BORDER}`,
+            borderRadius: 6, fontSize: 10.5, color: INK,
+          }}>
+            <b>Total in Words:</b> {inWords}
           </div>
 
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER}`, fontSize: 10, color: MUTED }}>
