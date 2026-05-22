@@ -30,6 +30,10 @@ import {
   StageChip, HeatDot, HeatPicker, SegChip, LeadAvatar, Pill,
 } from '../../components/leads/LeadShared'
 import V2Hero from '../../components/v2/V2Hero'
+// Phase 83 — evening day summary card. Additive only; same pattern
+// as WorkV2 mount from Phase 76.4. Card has its own 7 PM IST gate +
+// role gate so admin / co_owner don't see it.
+import DaySummaryCard from '../../components/work/DaySummaryCard'
 // Phase 43.1 — parity with WorkV2 + LeadDetailV2 call chain. Tel-tap
 // audit + post-call outcome capture + auto-refresh.
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
@@ -508,6 +512,11 @@ export default function TelecallerV2() {
     : 0
   return (
     <div className="lead-root">
+      {/* Phase 83 — evening day summary card. Auto-shows after 7 PM
+          IST. Mounted above V2Hero so it's the first thing the TC
+          sees when finishing the day. */}
+      <DaySummaryCard />
+
       {(queueOpen > 0 || callsToday > 0) && (
         <V2Hero
           eyebrow={`Telecaller · ${profile?.name || 'You'}`}

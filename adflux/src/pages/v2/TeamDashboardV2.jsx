@@ -48,7 +48,14 @@ export default function TeamDashboardV2() {
 
   const [reps, setReps] = useState([])
   const [sessions, setSessions] = useState([])
-  const [callsByUser, setCallsByUser] = useState({})
+  // Phase 83 — split calls KPI into total + connected. owner caught
+  // Rima showing 336 calls on /team-dashboard (Phase 82): that was
+  // the raw call_logs row count — every tel-tap, including no-answer
+  // rows from Phase 54 F2 audit defaults. The X/target ratio should
+  // only count CONNECTED (outcome='connected'). Total stays visible
+  // as a smaller secondary number.
+  const [callsByUser, setCallsByUser] = useState({})           // total per rep (any outcome)
+  const [connectedByUser, setConnectedByUser] = useState({})   // outcome='connected' per rep
   // Phase 31E — owner reported (9 May 2026) Voice Logs hero stat showed
   // "0 · counts coming · live". The voice_logs table has been live
   // since Phase 20 — placeholder copy was just stale. Wire actual
@@ -127,8 +134,14 @@ export default function TeamDashboardV2() {
         supabase.from('work_sessions')
           .select('user_id, check_in_at, daily_counters')
           .eq('work_date', today),
+        // Phase 83 — fetch outcome so we can split TOTAL vs
+        // CONNECTED per rep. Outcome enum: 'connected', 'no_answer',
+        // 'busy', 'wrong_number', 'callback_requested',
+        // 'not_interested', 'sales_ready', 'already_client'. Anything
+        // other than 'connected' means no human conversation, so the
+        // KPI ratio uses connected-only.
         supabase.from('call_logs')
-          .select('user_id', { count: 'exact' })
+          .select('user_id, outcome')
           .gte('call_at', startOfDay)
           .lt ('call_at', endOfDay),
         supabase.from('leads')
@@ -193,13 +206,18 @@ export default function TeamDashboardV2() {
       }
       setReps(repsRes.data || [])
       setSessions(sesRes.data || [])
-      // Build calls-by-user map. PostgREST count with select returns
-      // an array of rows so we count per user_id.
+      // Build calls-by-user map. Phase 83 — split total + connected.
       const byUser = {}
+      const connByUser = {}
       ;(callsRes.data || []).forEach(r => {
+        if (!r.user_id) return
         byUser[r.user_id] = (byUser[r.user_id] || 0) + 1
+        if (r.outcome === 'connected') {
+          connByUser[r.user_id] = (connByUser[r.user_id] || 0) + 1
+        }
       })
       setCallsByUser(byUser)
+      setConnectedByUser(connByUser)
       // Phase 31E — same shape as callsByUser: row-per-log, count by user_id.
       const voiceMap = {}
       ;(voiceRes.data || []).forEach(r => {
@@ -639,13 +657,18 @@ export default function TeamDashboardV2() {
           const isTC = r.team_role === 'telecaller'
           const policy = policyByUser[r.id]
           const usersJsonbTargets = r.daily_targets || { meetings: 5, calls: 20, new_leads: 10 }
-          const callsHere = callsByUser[r.id] || 0
+          const callsHere = callsByUser[r.id] || 0           // total tel-taps
+          const connHere  = connectedByUser[r.id] || 0       // outcome='connected' only
           const callsTarget = policy?.min_calls
             ? Number(policy.min_calls)
             : (isTC ? 50 : (usersJsonbTargets.calls || 20))
           const meetingsTarget = isTC ? 0 : (usersJsonbTargets.meetings || 5)
+          // Phase 83 — KPI ratio uses CONNECTED vs target (owner:
+          // "in kpi we must count connected calls only"). Total is
+          // still shown as a small subscript so admin can read the
+          // connect rate at a glance.
           const callPct = callsTarget > 0
-            ? Math.round((callsHere / callsTarget) * 100)
+            ? Math.round((connHere / callsTarget) * 100)
             : 0
           const cls = callPct >= 80 ? '' : callPct >= 50 ? 'warn' : 'dng'
           return (
@@ -687,11 +710,16 @@ export default function TeamDashboardV2() {
                     <div className="lbl">Meet</div>
                   </div>
                 )}
-                <div className="lead-rep-kpi">
+                <div className="lead-rep-kpi" title="Connected / target · total tel-taps">
                   <div className={`num ${callPct >= 80 ? 'suc' : callPct >= 50 ? '' : 'dng'}`}>
-                    {callsHere}/{callsTarget}
+                    {connHere}/{callsTarget}
                   </div>
-                  <div className="lbl">Calls</div>
+                  <div className="lbl">
+                    Calls
+                    {' '}<span style={{ color: 'var(--v2-ink-2, #94a3b8)', fontSize: 9 }}>
+                      · {callsHere} total
+                    </span>
+                  </div>
                 </div>
                 <div className="lead-rep-kpi">
                   {/* Phase 31E — wired to voiceByUser instead of literal 0. */}
