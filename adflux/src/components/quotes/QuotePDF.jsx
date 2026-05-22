@@ -188,48 +188,11 @@ const S = StyleSheet.create({
   // each tile is (531 - 24) / 5 = 101.4pt wide. Height 76pt keeps a
   // ~4:3 ratio so most phone-shot photos crop cleanly. The yellow
   // label bar sits underneath and carries the city name.
-  galleryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 20,
-  },
-  galleryItem: {
-    width: 101,
-    border: '0.5pt solid ' + BORDER,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  galleryImg: {
-    width: 101,
-    height: 76,
-    objectFit: 'cover',
-  },
-  galleryPlaceholder: {
-    width: 101,
-    height: 76,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  galleryPlaceholderText: {
-    fontSize: 20,
-    fontFamily: 'Roboto', fontWeight: 'bold',
-    color: LGRAY,
-  },
-  galleryLabel: {
-    backgroundColor: YELLOW,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-  },
-  galleryLabelText: {
-    fontSize: 7,
-    fontFamily: 'Roboto', fontWeight: 'bold',
-    color: DARK,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
+  // Phase 81 — old inline gallery styles (galleryGrid / galleryItem /
+  // galleryImg / galleryPlaceholder / galleryPlaceholderText /
+  // galleryLabel / galleryLabelText) removed when the photo gallery
+  // moved to dedicated per-city pages. See photoPage / photoFull /
+  // photoCaptionStrip below for the replacement.
 
   // ── LOCATION TABLE ──────────────────────────
   tableSection: { marginBottom: 20 },
@@ -387,6 +350,72 @@ const S = StyleSheet.create({
   },
   footerBottomText: { fontSize: 7, color: LGRAY },
   footerBottomHighlight: { fontSize: 7, color: YELLOW },
+
+  // ── Phase 81 — letterhead band (top of page 1) ─────────────────
+  // Renders companies.letterhead_url full-width when present.
+  // Replaces the hand-built UA badge headerBand for Private LED PDFs.
+  letterheadBand: {
+    width:  '100%',
+    height: 110,           // ~14% of A4 height — enough for letterhead
+    objectFit: 'cover',
+  },
+
+  // ── Phase 81 — per-city photo page ─────────────────────────────
+  // One photo per page (only cities with photo_url). A4 portrait,
+  // full-bleed photo with a bottom caption strip naming the city.
+  photoPage: {
+    backgroundColor: WHITE,
+    fontFamily: 'Roboto',
+    position: 'relative',
+  },
+  photoFull: {
+    width:     '100%',
+    height:    '85%',      // leave room for caption strip
+    objectFit: 'cover',
+  },
+  photoCaptionStrip: {
+    backgroundColor:    DARK,
+    paddingHorizontal:  32,
+    paddingVertical:    14,
+    flexDirection:      'row',
+    justifyContent:     'space-between',
+    alignItems:         'center',
+    position:           'absolute',
+    bottom:             0,
+    left:               0,
+    right:              0,
+  },
+  photoCaptionLeft: { flexDirection: 'column', gap: 2 },
+  photoCaptionCity: {
+    fontSize:     16,
+    fontFamily:   'Roboto',
+    fontWeight:   'bold',
+    color:        WHITE,
+    letterSpacing: 0.5,
+  },
+  photoCaptionStation: { fontSize: 10, color: LGRAY },
+  photoCaptionRight: { flexDirection: 'column', gap: 2, alignItems: 'flex-end' },
+  photoCaptionGrade: {
+    fontSize:    10,
+    color:       YELLOW,
+    fontFamily:  'Roboto',
+    fontWeight:  'bold',
+  },
+  photoCaptionQuoteRef: { fontSize: 8, color: LGRAY },
+  photoCaptionIndex: { fontSize: 8, color: LGRAY },
+
+  // ── Phase 81 — thank-you page ──────────────────────────────────
+  // Last page. Renders companies.thank_you_url full-A4 if present.
+  // If admin hasn't uploaded one, the page is simply skipped.
+  thankYouPage: {
+    backgroundColor: WHITE,
+    fontFamily:      'Roboto',
+  },
+  thankYouImg: {
+    width:     '100%',
+    height:    '100%',
+    objectFit: 'cover',
+  },
 })
 
 // ── Network marketing constants ─────────────────────────────────────
@@ -460,7 +489,7 @@ function stationLabel(c) {
 }
 
 // ── Document ─────────────────────────────────────────────────────────────────
-function QuoteDocument({ quote, cities, company }) {
+function QuoteDocument({ quote, cities, company, letterheadDataUrl, thankYouDataUrl }) {
   // Phase 11 — company is REQUIRED.
   //   Previous code had a hardcoded "Untitled Adflux Pvt. Ltd." fallback
   //   when company was null. That fallback was a money/legal bug: a
@@ -538,23 +567,31 @@ function QuoteDocument({ quote, cities, company }) {
     <Document>
       <Page size="A4" style={S.page}>
 
-        {/* ── TOP HEADER BAND ── */}
-        <View style={S.headerBand}>
-          <View style={S.headerLeft}>
-            <View style={S.uaBadge}>
-              <Text style={S.uaBadgeText}>UA</Text>
+        {/* ── TOP HEADER ──
+            Phase 81 — render the admin-uploaded letterhead band when
+            present. Falls back to the hand-built UA badge layout if
+            no letterhead has been uploaded yet so old setups keep
+            working. */}
+        {letterheadDataUrl ? (
+          <Image src={letterheadDataUrl} style={S.letterheadBand} />
+        ) : (
+          <View style={S.headerBand}>
+            <View style={S.headerLeft}>
+              <View style={S.uaBadge}>
+                <Text style={S.uaBadgeText}>UA</Text>
+              </View>
+              <View style={S.brandBlock}>
+                <Text style={S.brandName}>UNTITLED ADVERTISING</Text>
+                <Text style={S.brandSub}>UNTITLED ADFLUX PRIVATE LIMITED</Text>
+                <Text style={S.brandNetwork}>GSRTC LED Screen Network — Gujarat</Text>
+              </View>
             </View>
-            <View style={S.brandBlock}>
-              <Text style={S.brandName}>UNTITLED ADVERTISING</Text>
-              <Text style={S.brandSub}>UNTITLED ADFLUX PRIVATE LIMITED</Text>
-              <Text style={S.brandNetwork}>GSRTC LED Screen Network — Gujarat</Text>
+            <View style={S.headerRight}>
+              <Text style={S.headerWebsite}>{co.website || 'untitledad.in'}</Text>
+              <Text style={S.headerEmail}>{co.email || 'hello@untitledad.in'}</Text>
             </View>
           </View>
-          <View style={S.headerRight}>
-            <Text style={S.headerWebsite}>{co.website || 'untitledad.in'}</Text>
-            <Text style={S.headerEmail}>{co.email || 'hello@untitledad.in'}</Text>
-          </View>
-        </View>
+        )}
 
         {/* ── STATS BAR ── Network-wide marketing stats, not quote-specific.
             These are the pitch for the whole GSRTC fleet; the quote's own
@@ -647,38 +684,11 @@ function QuoteDocument({ quote, cities, company }) {
             </View>
           )}
 
-          {/* Location Photo Gallery
-              Only rendered if at least one city has a photo_url. A gallery
-              made entirely of placeholders would be noise — skipping the
-              section is cleaner than padding the PDF with gray boxes.
-              photo_url is enriched from the master `cities` table in the
-              download/upload helpers below, because quote_cities rows
-              don't carry it directly. */}
-          {cities.some(c => c.photo_url) && (
-            <>
-              <View style={S.sectionBar}>
-                <Text style={S.sectionTitle}>Location Photo Gallery</Text>
-              </View>
-              <View style={S.galleryGrid}>
-                {cities.map((c, i) => (
-                  <View key={c.id || `gal-${i}`} style={S.galleryItem} wrap={false}>
-                    {c.photo_url ? (
-                      <Image src={c.photo_url} style={S.galleryImg} />
-                    ) : (
-                      <View style={S.galleryPlaceholder}>
-                        <Text style={S.galleryPlaceholderText}>
-                          {(c.city_name || '?').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={S.galleryLabel}>
-                      <Text style={S.galleryLabelText}>{c.city_name}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
+          {/* Phase 81 — Location photo gallery moved to dedicated
+              per-city pages after this one. Owner directive 22 May
+              2026: "1st page quote / 2nd page photo / last page
+              thanks". One photo per page, full-bleed, captioned at
+              bottom. See the photoPage <Page> blocks below. */}
 
           {/* Location Table */}
           <View style={S.sectionBar}>
@@ -865,6 +875,53 @@ function QuoteDocument({ quote, cities, company }) {
         </View>
 
       </Page>
+
+      {/* Phase 81 — per-city photo pages.
+          Owner directive 22 May 2026: "photo will be attched
+          individually along with pdf". One A4 page per city that
+          has a photo_url; cities without photos are skipped (no
+          blank pages). Photo is full-bleed top 85 % of the page;
+          a dark caption strip names the city + station + grade +
+          quote ref so a printed page on its own still identifies
+          the campaign. */}
+      {cities
+        .filter(c => c.photo_url)
+        .map((c, i, arr) => (
+          <Page
+            size="A4"
+            style={S.photoPage}
+            key={`photo-${c.id || i}`}
+          >
+            <Image src={c.photo_url} style={S.photoFull} />
+            <View style={S.photoCaptionStrip}>
+              <View style={S.photoCaptionLeft}>
+                <Text style={S.photoCaptionCity}>{c.city_name}</Text>
+                <Text style={S.photoCaptionStation}>{stationLabel(c)}</Text>
+              </View>
+              <View style={S.photoCaptionRight}>
+                {c.grade && (
+                  <Text style={S.photoCaptionGrade}>Grade {c.grade}</Text>
+                )}
+                <Text style={S.photoCaptionQuoteRef}>
+                  {quote.quote_number}
+                </Text>
+                <Text style={S.photoCaptionIndex}>
+                  Location {i + 1} of {arr.length}
+                </Text>
+              </View>
+            </View>
+          </Page>
+        ))}
+
+      {/* Phase 81 — admin-uploaded thank-you page (companies.
+          thank_you_url, segment='PRIVATE'). Skipped silently when
+          null. Full-A4 cover so the asset can carry its own brand
+          treatment without competing with header/footer chrome. */}
+      {thankYouDataUrl && (
+        <Page size="A4" style={S.thankYouPage}>
+          <Image src={thankYouDataUrl} style={S.thankYouImg} />
+        </Page>
+      )}
     </Document>
   )
 }
@@ -981,6 +1038,23 @@ async function fetchCompanyForQuote(quote) {
   return data || null
 }
 
+/**
+ * Phase 81 — resolve a company row's letterhead + thank-you URLs to
+ * data URLs in parallel. Same trick as enrichCitiesWithPhotos: real
+ * fetch happens in the browser (with CORS / mime checks) and the
+ * resulting base64 data URL is what we hand to @react-pdf's Image
+ * component. Avoids the renderer's own headless fetch silently
+ * blanking the image.
+ */
+async function enrichCompanyAssets(company) {
+  if (!company) return { letterheadDataUrl: null, thankYouDataUrl: null }
+  const [letterheadDataUrl, thankYouDataUrl] = await Promise.all([
+    company.letterhead_url ? urlToDataUrl(company.letterhead_url) : null,
+    company.thank_you_url  ? urlToDataUrl(company.thank_you_url)  : null,
+  ])
+  return { letterheadDataUrl, thankYouDataUrl }
+}
+
 export async function downloadQuotePDF(quote, cities = []) {
   // Phase 34Z.24 — ensure font registry is populated and the TTFs
   // are fetched before the renderer kicks off. Without this the
@@ -991,7 +1065,16 @@ export async function downloadQuotePDF(quote, cities = []) {
     enrichCitiesWithPhotos(cities),
     fetchCompanyForQuote(quote),
   ])
-  const blob = await pdf(<QuoteDocument quote={quote} cities={enriched} company={company} />).toBlob()
+  const { letterheadDataUrl, thankYouDataUrl } = await enrichCompanyAssets(company)
+  const blob = await pdf(
+    <QuoteDocument
+      quote={quote}
+      cities={enriched}
+      company={company}
+      letterheadDataUrl={letterheadDataUrl}
+      thankYouDataUrl={thankYouDataUrl}
+    />
+  ).toBlob()
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
@@ -1026,7 +1109,16 @@ export async function uploadQuotePDF(quote, cities = []) {
     enrichCitiesWithPhotos(cities),
     fetchCompanyForQuote(quote),
   ])
-  const blob = await pdf(<QuoteDocument quote={quote} cities={enriched} company={company} />).toBlob()
+  const { letterheadDataUrl, thankYouDataUrl } = await enrichCompanyAssets(company)
+  const blob = await pdf(
+    <QuoteDocument
+      quote={quote}
+      cities={enriched}
+      company={company}
+      letterheadDataUrl={letterheadDataUrl}
+      thankYouDataUrl={thankYouDataUrl}
+    />
+  ).toBlob()
   const ts   = Date.now()
   const safeNumber = (quote.quote_number || 'quote').replace(/[^A-Za-z0-9_-]/g, '_')
   const path = `${safeNumber}/${ts}.pdf`
