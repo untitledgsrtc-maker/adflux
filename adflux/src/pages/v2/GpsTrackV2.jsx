@@ -105,7 +105,7 @@ export default function GpsTrackV2() {
         // date. created_at filtered to the IST day window so the
         // timeline matches the chosen date.
         supabase.from('lead_activities')
-          .select('id, created_at, activity_type, outcome, notes, next_action, lead:lead_id(id, name, company)')
+          .select('id, created_at, activity_type, outcome, notes, next_action, gps_lat, gps_lng, lead:lead_id(id, name, company)')
           .eq('created_by', userId)
           .gte('created_at', start)
           .lte('created_at', end)
@@ -379,6 +379,52 @@ export default function GpsTrackV2() {
         m2.addListener('click', () => iw2.open({ anchor: m2, map }))
       }
 
+      // Phase 70.8 (22 May 2026) — owner directive: punched meetings
+      // show on the day-track map with a blue pin + lead name. Click
+      // the lead name in the popup → navigate to /leads/:id. Activity
+      // types meeting + site_visit count.
+      const meetingActs = (activities || []).filter(a =>
+        (a.activity_type === 'meeting' || a.activity_type === 'site_visit')
+        && Number.isFinite(Number(a.gps_lat))
+        && Number.isFinite(Number(a.gps_lng))
+        && a.lead?.id
+      )
+      for (const a of meetingActs) {
+        const m = new google.maps.Marker({
+          position: { lat: Number(a.gps_lat), lng: Number(a.gps_lng) },
+          map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: '#3B82F6',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          },
+        })
+        const leadName = a.lead.company || a.lead.name || 'Lead'
+        const leadHref = `/leads/${a.lead.id}`
+        const iw = new google.maps.InfoWindow({
+          content:
+            `<div style="font-family: inherit; min-width: 160px;">` +
+            `<a href="${leadHref}" data-lead-id="${a.lead.id}" style="color: #FFE600; font-weight: 600; text-decoration: underline; font-size: 14px;">` +
+            `${leadName}` +
+            `</a></div>`,
+        })
+        // Intercept the link click so we use React Router navigation
+        // (avoids full-page reload).
+        iw.addListener('domready', () => {
+          const link = document.querySelector(`a[data-lead-id="${a.lead.id}"]`)
+          if (link) {
+            link.addEventListener('click', (ev) => {
+              ev.preventDefault()
+              navigate(leadHref)
+            })
+          }
+        })
+        m.addListener('click', () => iw.open({ anchor: m, map }))
+      }
+
       // Numbered stop markers — Google Maps Marker with custom label.
       for (const s of stops) {
         const m = new google.maps.Marker({
@@ -418,7 +464,7 @@ export default function GpsTrackV2() {
     return () => {
       mapRef.current = null
     }
-  }, [loading, pings])
+  }, [loading, pings, activities])
 
   if (!isPrivileged) {
     return (
