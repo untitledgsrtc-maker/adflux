@@ -77,11 +77,16 @@ export default function ManagerDashboardV2() {
         }
 
         // 2. Today's calls per rep + connected count.
+        // Phase 76.2.2 (2026-05-23) — only calls with
+        // duration_seconds >= 10 count toward the KPI. Mirrors the
+        // filter on /telecaller, /work (useDaySummary), and
+        // /team-dashboard. NULLs excluded by Postgres .gte.
         const { data: callRows } = await supabase
           .from('call_logs')
           .select('user_id, outcome')
           .in('user_id', repIds)
           .gte('created_at', startUtc)
+          .gte('duration_seconds', 10)
 
         // 3. Today's meetings per rep (lead_activities activity_type='meeting').
         const { data: meetRows } = await supabase

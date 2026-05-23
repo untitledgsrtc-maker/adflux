@@ -106,11 +106,18 @@ export default function useDaySummary({ dateISO } = {}) {
           .lte('created_at', endISO),
 
         // 3) call_logs count
+        // Phase 76.2.2 (2026-05-23) — owner directive: only count
+        // calls with duration_seconds >= 10s. Excludes misdials,
+        // ringing-hangups, immediate-cuts. Applies to sales reps on
+        // /work + TC reps on /telecaller (this hook feeds
+        // DaySummaryCard, mounted on both). NULL durations excluded
+        // until Phase 65 60-second auto-patch fills the field.
         supabase.from('call_logs')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', profile.id)
           .gte('call_at', startISO)
-          .lte('call_at', endISO),
+          .lte('call_at', endISO)
+          .gte('duration_seconds', 10),
 
         // 4) leads created by this rep today
         supabase.from('leads')
