@@ -258,10 +258,18 @@ export default function TeamDashboardV2() {
         // 'not_interested', 'sales_ready', 'already_client'. Anything
         // other than 'connected' means no human conversation, so the
         // KPI ratio uses connected-only.
+        // Phase 76.2.2 (2026-05-23) — owner directive: only count
+        // calls with duration_seconds >= 10 toward the daily KPI.
+        // Excludes misdials / ringing-hangups / immediate-cuts so the
+        // /team-dashboard per-rep count matches what the rep sees on
+        // their own /telecaller or /work hero. NULL durations also
+        // excluded (Postgres .gte semantics) until Phase 65 60-second
+        // auto-patch fills the field.
         supabase.from('call_logs')
           .select('user_id, outcome')
           .gte('call_at', startOfDay)
-          .lt ('call_at', endOfDay),
+          .lt ('call_at', endOfDay)
+          .gte('duration_seconds', 10),
         supabase.from('leads')
           .select('id', { count: 'exact', head: true })
           .gte('created_at', startOfDay)

@@ -143,19 +143,30 @@ export default function TelecallerV2() {
         .not('stage', 'in', '("Won","Lost","QuoteSent","Negotiating","MeetingScheduled")')
         .order('created_at', { ascending: false })
         .limit(50),
+      // Phase 76.2.2 (2026-05-23) — owner directive: a "call today"
+      // only counts when duration_seconds >= 10. Excludes misdials,
+      // ringing-hangups, immediate-cuts. NULL durations also excluded
+      // (Postgres comparison semantics) — that's intentional: until
+      // the Phase 65 60-second auto-patch fills duration, the call
+      // doesn't count toward the KPI yet. Counter bumps within 60s
+      // of finishing a real connected call.
       supabase
         .from('call_logs')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id)
-        .gte('call_at', startOfDay),
+        .gte('call_at', startOfDay)
+        .gte('duration_seconds', 10),
       // Phase 43.2 prep — connected-rate KPI. Count tel-tap rows that
       // came back with outcome='connected' (vs no-answer/busy/etc).
+      // Phase 76.2.2 — same 10s floor applied here so the ratio stays
+      // meaningful (connected/total both gated to "real" calls).
       supabase
         .from('call_logs')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id)
         .eq('outcome', 'connected')
-        .gte('call_at', startOfDay),
+        .gte('call_at', startOfDay)
+        .gte('duration_seconds', 10),
       supabase
         .from('leads')
         .select('id', { count: 'exact', head: true })
