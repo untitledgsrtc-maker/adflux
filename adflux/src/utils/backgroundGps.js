@@ -87,8 +87,15 @@ export async function startBackgroundGps(userId, opts = {}) {
         // Foreground-service notification (Android 8+ requirement
         // for long-running background work). Keeps the watcher
         // alive when the phone is locked / app backgrounded.
-        backgroundMessage: 'Tracking your route for TA/DA log.',
-        backgroundTitle:   'Untitled OS — route tracking',
+        //
+        // Owner directive 2026-05-23: notification text annoying.
+        // Android REQUIRES a persistent notification — we can't
+        // hide it without losing background tracking. Stripped to
+        // single short line. Phone-side: user can long-press the
+        // notification → "Minimize" / "Silent" / "Hide on lock
+        // screen" per Android's standard channel controls.
+        backgroundMessage: 'Active',
+        backgroundTitle:   'Untitled OS',
         requestPermissions,
         // Don't surface stale cached fixes — they break the polyline.
         stale: false,
