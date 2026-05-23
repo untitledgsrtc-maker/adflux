@@ -34,7 +34,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  ArrowLeft, Edit3, Phone, Mail, Shield,
+  ArrowLeft, Edit3, Mail, Shield,
   Wallet, Gift, Coins, Calendar,
   AlertCircle, ChevronRight, Settings, Loader2,
 } from 'lucide-react'
@@ -306,8 +306,12 @@ export default function RepProfileV2() {
         quotesWonRes, incentivePayoutsRes, salaryPayoutsRes,
         taPendingRes, taApprovedMonthRes, leavesAllRes,
       ] = await Promise.all([
+        // Phase 90 hotfix — drop phone + join_date from users select.
+        // Schema: users has no phone column (clients table has phone).
+        // join_date lives on staff_incentive_profiles, not users.
+        // Pulling those threw "column users.phone does not exist".
         supabase.from('users')
-          .select('id, name, email, phone, role, team_role, manager_id, segment_access, city, is_active, profile_image_url, join_date, manager:manager_id(id, name)')
+          .select('id, name, email, role, team_role, manager_id, segment_access, city, is_active, profile_image_url, manager:manager_id(id, name)')
           .eq('id', userId)
           .maybeSingle(),
         supabase.from('daily_targets')
@@ -346,10 +350,11 @@ export default function RepProfileV2() {
           .eq('status', 'won')
           .eq('created_by', userId)
           .gte('updated_at', monthStart),
-        // Incentive payouts (last 12)
+        // Incentive payouts (last 12). Phase 90 hotfix — column is
+        // `staff_id` not `user_id` (legacy migration name).
         supabase.from('incentive_payouts')
           .select('id, month_year, amount_paid, paid_date, note')
-          .eq('user_id', userId)
+          .eq('staff_id', userId)
           .order('paid_date', { ascending: false })
           .limit(12),
         // Salary payouts (last 12)
@@ -361,16 +366,22 @@ export default function RepProfileV2() {
         // TA pending count
         supabase.from('ta_da_requests').select('id', { count: 'exact', head: true })
           .eq('user_id', userId).eq('status', 'pending'),
-        // TA approved this month
+        // TA approved this month. Phase 90 hotfix — column is
+        // `claim_amount`, not `approved_amount`. Once approved, the
+        // claim_amount is what gets paid out (admin can edit it
+        // before approving, see TaPayoutsAdminV2 flow).
         supabase.from('ta_da_requests')
-          .select('approved_amount')
+          .select('claim_amount, claim_date')
           .eq('user_id', userId).eq('status', 'approved')
-          .gte('created_at', monthStart),
-        // Leaves this calendar year — minimal columns
+          .gte('claim_date', monthStartYmd),
+        // Leaves this calendar year. Phase 90 hotfix — leaves table
+        // has `leave_date` (one row per day), not `from_date`/`days`.
+        // Phase 36.10 added `is_paid_request` + `is_half_day`. Use
+        // row count for total days; half-day counts as 0.5.
         supabase.from('leaves')
-          .select('id, status, leave_type, is_paid_request, days, from_date')
+          .select('id, status, leave_type, is_paid_request, is_half_day, leave_date')
           .eq('user_id', userId)
-          .gte('from_date', `${monthYm.slice(0, 4)}-01-01`),
+          .gte('leave_date', `${monthYm.slice(0, 4)}-01-01`),
       ])
 
       if (userRes.error) throw userRes.error
@@ -410,30 +421,39 @@ export default function RepProfileV2() {
 
       // TA summary
       const taApproved = (taApprovedMonthRes.data || [])
-        .reduce((s, r) => s + safeNum(r.approved_amount), 0)
+        .reduce((s, r) => s + safeNum(r.claim_amount), 0)
       setTaSummary({
         pending: taPendingRes.count ?? 0,
         approvedMonth: taApproved,
       })
 
-      // Leaves summary
+      // Leaves summary. Each row = one day (or half-day). Sum days
+      // with the half-day discount applied.
+      function dayValue(row) {
+        return row.is_half_day ? 0.5 : 1
+      }
       const leaves = leavesAllRes.data || []
       const usedDays = leaves
         .filter(l => l.status === 'approved')
-        .reduce((s, r) => s + safeNum(r.days), 0)
+        .reduce((s, r) => s + dayValue(r), 0)
       const paidDays = leaves
         .filter(l => l.status === 'approved' && l.is_paid_request)
-        .reduce((s, r) => s + safeNum(r.days), 0)
+        .reduce((s, r) => s + dayValue(r), 0)
       const unpaidDays = usedDays - paidDays
       const pendingLeaves = leaves.filter(l => l.status === 'pending').length
       setLeavesSummary({
         used: usedDays, paid: paidDays, unpaid: unpaidDays, pending: pendingLeaves,
       })
 
-      // Salary forecast via RPC
-      const { data: salaryRes } = await supabase.rpc('compute_monthly_salary', {
-        p_user_id: userId, p_month_year: monthYm,
+      // Salary forecast via RPC. Phase 36.10 signature:
+      // compute_monthly_salary(p_user_id uuid, p_year int, p_month int).
+      const [yStr, mStr] = monthYm.split('-')
+      const { data: salaryRes, error: salaryErr } = await supabase.rpc('compute_monthly_salary', {
+        p_user_id: userId,
+        p_year:    Number(yStr),
+        p_month:   Number(mStr),
       })
+      if (salaryErr) console.warn('[RepProfileV2] salary RPC:', salaryErr.message)
       setSalary(salaryRes || null)
     } catch (e) {
       console.error('[RepProfileV2] load failed:', e)
@@ -530,22 +550,10 @@ export default function RepProfileV2() {
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: 10,
         }}>
-          {user.phone && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-              <Phone size={14} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />
-              {user.phone}
-            </div>
-          )}
           {user.email && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
               <Mail size={14} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />
               {user.email}
-            </div>
-          )}
-          {user.join_date && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-              <Calendar size={14} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />
-              Joined {new Date(user.join_date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
