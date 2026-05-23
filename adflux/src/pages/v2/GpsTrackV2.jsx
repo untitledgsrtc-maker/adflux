@@ -79,6 +79,13 @@ export default function GpsTrackV2() {
   // turn off gps put it in activity log also". Same data feeds
   // Phase 76 DaySummaryCard.
   const [gpsOffEvents, setGpsOffEvents] = useState([])
+  // Phase 76.2.2 (2026-05-23) — live call_logs count for this rep+day
+  // with the 10s duration floor. Replaces the stale
+  // work_sessions.daily_counters.calls value which is bumped by the
+  // Phase 32M trigger on EVERY lead_activities INSERT (call OR
+  // whatsapp, no duration filter). Owner audit found Rima's KPI
+  // showing 746 while actual >=10s calls today = 145.
+  const [callCountToday, setCallCountToday] = useState(0)
   const mapRef     = useRef(null)
   const containerRef = useRef(null)
   // Phase 70.10 — view-mode toggle: all (route + stops + meetings),
@@ -96,7 +103,7 @@ export default function GpsTrackV2() {
     ;(async () => {
       const start = `${targetDate}T00:00:00`
       const end   = `${targetDate}T23:59:59`
-      const [userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes] = await Promise.all([
+      const [userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callCountRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
         supabase.from('gps_pings')
           .select('id, captured_at, lat, lng, accuracy_m, source')
@@ -136,6 +143,15 @@ export default function GpsTrackV2() {
           .gte('toggled_off_at', start)
           .lte('toggled_off_at', end)
           .order('toggled_off_at', { ascending: false }),
+        // Phase 76.2.2 — live call_logs count with 10s floor. Replaces
+        // the broken daily_counters.calls JSONB (bumped on every
+        // lead_activities call/whatsapp insert without duration check).
+        supabase.from('call_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('call_at', start)
+          .lte('call_at', end)
+          .gte('duration_seconds', 10),
       ])
       if (cancelled) return
       if (userRes.error)  { setError(userRes.error.message);  setLoading(false); return }
@@ -146,6 +162,7 @@ export default function GpsTrackV2() {
       setActivities(actsRes.data || [])
       setVoiceLogs(voiceRes.data || [])
       setGpsOffEvents(gpsOffRes?.data || [])
+      setCallCountToday(callCountRes?.count || 0)
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -737,6 +754,7 @@ export default function GpsTrackV2() {
           activities={activities}
           voiceLogs={voiceLogs}
           gpsOffEvents={gpsOffEvents}
+          callCountToday={callCountToday}
           navigate={navigate}
         />
       )}
@@ -748,7 +766,7 @@ export default function GpsTrackV2() {
    stays readable. Renders three stacked sections: today's counters
    from work_sessions.daily_counters, the lead-activities timeline
    (scoped to this rep + this day), and voice logs filed today. */
-function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], navigate }) {
+function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], callCountToday = 0, navigate }) {
   const counters = session?.daily_counters || {}
   const checkIn  = session?.check_in_at
   const checkOut = session?.check_out_at
@@ -770,7 +788,14 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], nav
               non-meeting taps — owner reported KPI=3 with only 1
               location pin. The blue-pin count is the truth. */}
           <RepDayStat label="Meetings" value={activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng).length} />
-          <RepDayStat label="Calls"     value={counters.calls || 0} />
+          {/* Phase 76.2.2 — Calls KPI now reads from a live call_logs
+              count with duration_seconds >= 10 floor. The legacy
+              `counters.calls` JSONB was bumped by the Phase 32M
+              trigger on every lead_activities INSERT (call OR
+              whatsapp, no duration check), which inflated the count
+              by 4-5x. Owner audit found Rima KPI=746 vs SQL ground
+              truth 145 real calls today. */}
+          <RepDayStat label="Calls"     value={callCountToday || 0} />
           <RepDayStat label="New leads" value={counters.new_leads || 0} />
           <RepDayStat label="Voice notes" value={voiceLogs.length} />
         </div>
