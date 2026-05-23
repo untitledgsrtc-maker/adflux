@@ -15,4 +15,15 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TrackingPlugin.class);
         super.onCreate(savedInstanceState);
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Phase 76.2.2 — bump force-stop heartbeat from the Activity
+        // lifecycle every time the user brings the app to foreground.
+        // JS-side setInterval (60s) pauses when the WebView is
+        // backgrounded, so without this hook a multi-minute idle
+        // would falsely flag as force_stop on next foreground.
+        TrackingPlugin.bumpHeartbeatFromActivity(this);
+    }
 }

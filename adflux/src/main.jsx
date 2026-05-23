@@ -27,17 +27,11 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 initAuth()
 
 // Phase 76.2 — initialise native tracking plugin (Android only).
-// Web bundle: no-op. Subscribes to gpsStateChanged + networkState
-// Changed + forceStopDetected from native, writes Phase 76.1 event
-// tables in Supabase. getUserId callback pulls the current auth
-// user lazily so it picks up sign-in transitions.
+// Web bundle: no-op. Phase 76.2.2 (Tier A/B): init no longer takes
+// a callback — the shim caches the user id internally and listens
+// to auth state changes, so sign-in transitions are handled there.
 import('./utils/nativeTracking').then(({ initNativeTracking }) => {
-  initNativeTracking(async () => {
-    try {
-      const { data } = await (await import('./lib/supabase')).supabase.auth.getUser()
-      return data?.user?.id || null
-    } catch { return null }
-  })
+  initNativeTracking().catch(e => console.warn('[main] tracking init failed:', e?.message || e))
 }).catch(() => { /* web build / dynamic import disabled */ })
 
 // Phase 87.7 — native dialer auto-launch on Capacitor APK.
