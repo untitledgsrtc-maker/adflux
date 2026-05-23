@@ -1006,22 +1006,23 @@ export default function TeamDashboardV2() {
       <div className="lead-team-grid">
         {reps.map(r => {
           const sess = sessionByUser.get(r.id)
-          // Phase 84 — 4-state status badge.
-          // Was: isLive = !!check_in_at (anyone who tapped check-in
-          // today, regardless of subsequent activity → misleading
-          // green "in field" pill on reps who went dark 10 h ago).
+          // Phase 84 + 88.7 — status driven by check-in, not ping age.
+          // Owner directive 23 May 2026: 'kirti has checked in but
+          // its not shoijn in fiedl' — Phase 84's 90-min ping gate
+          // flipped sales reps to 'idle' once GPS background pings
+          // stopped (app backgrounded, network drop, screen off), even
+          // though they were actively working. Owner perspective:
+          // rep checked in + not checked out = in field. Period.
+          //
+          // Ping freshness now drives ONLY the map pin colour band
+          // (Phase 87.6 green/amber/red ring). Status pill drops the
+          // ping-age gate entirely.
+          //
           // New rule:
           //   • DONE       check_out_at set OR auto_checked_out
           //   • OFF        no check_in_at today
-          //   • IN FIELD   check_in_at set AND GPS ping ≤ 90 min
-          //   • IDLE       check_in_at set AND GPS ping > 90 min OR
-          //                no ping today
-          //   (Phase 84 tune: 30 min → 90 min so long meetings, lunch,
-          //    or desk-bound TC reps don't flip to amber too fast.)
-          const _ping     = latestPingByUser[r.id]
-          const _pingMins = _ping
-            ? Math.floor((Date.now() - new Date(_ping.captured_at).getTime()) / 60000)
-            : Infinity
+          //   • IN FIELD   check_in_at set, not checked out
+          //   (IDLE state retired — was misleading.)
           let statusKind, statusLabel
           if (sess?.check_out_at || sess?.auto_checked_out) {
             statusKind  = 'done'
@@ -1029,12 +1030,9 @@ export default function TeamDashboardV2() {
           } else if (!sess?.check_in_at) {
             statusKind  = 'off'
             statusLabel = 'off'
-          } else if (_pingMins <= 90) {
+          } else {
             statusKind  = 'in_field'
             statusLabel = 'in field'
-          } else {
-            statusKind  = 'idle'
-            statusLabel = 'idle'
           }
           const isLive = statusKind === 'in_field'
           const counters = sess?.daily_counters || {}
