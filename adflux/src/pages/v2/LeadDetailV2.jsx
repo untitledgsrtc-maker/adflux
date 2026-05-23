@@ -131,6 +131,25 @@ export default function LeadDetailV2() {
   // ever added as a real role, do it once in useAuth.js, not here.
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
 
+  // Phase 76.2.2 (2026-05-23) — owner directive: sales, telecaller,
+  // and their heads (sales_manager team_role) MUST be able to
+  // reassign leads. DB RLS already permits this; UI was over-gating.
+  //
+  // canReassign(lead) — true when the viewer is allowed to flip
+  // leads.assigned_to / telecaller_id on this lead:
+  //   - admin / co_owner          → always
+  //   - sales_manager team_role   → if any team member is assigned
+  //                                 (DB RLS leads_manager_team handles it)
+  //   - sales / agency / telecaller → if THEY are currently the
+  //                                   assigned_to or telecaller_id
+  function canReassign(l) {
+    if (!l || !profile) return false
+    if (isPrivileged) return true
+    if (profile.team_role === 'sales_manager') return true
+    return l.assigned_to === profile.id
+        || l.telecaller_id === profile.id
+  }
+
   // Phase 76 — GPS toggle awareness for the banner mount below.
   // Hook is cheap (single probe + visibilitychange listener); fine
   // to call here even before lead loads. Admin / co_owner skip the
@@ -1706,7 +1725,7 @@ export default function LeadDetailV2() {
           <div className="lead-card">
             <div className="lead-card-head">
               <div className="lead-card-title">Ownership</div>
-              {isPrivileged && (
+              {canReassign(lead) && (
                 <span className="lead-card-link" onClick={() => setActiveModal('reassign')}>
                   <UsersIcon size={11} /> Reassign
                 </span>

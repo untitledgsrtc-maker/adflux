@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 76.2.2 (2026-05-23) — explicit network security config.
+  Without this file Android < 28 defaults to allowing cleartext
+  HTTP across the board. We never want cleartext from this app.
+
+  All app traffic is HTTPS:
+    *.supabase.co               Supabase REST + Realtime + Storage
+    *.supabase.in               (custom-domain fallback if used)
+    app.untitledad.in           web entry (used only as a deep-link
+                                target, not for HTTP from app)
+    *.googleapis.com            Maps JS + Roads + Directions
+    *.gstatic.com               Maps tiles
+    *.firebaseio.com            FCM transport
+    *.googleusercontent.com     storage CDN for icons / pics
+
+  Anything else: blocked. If a future feature needs a new domain,
+  add it explicitly here — do not relax the default.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

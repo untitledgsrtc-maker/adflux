@@ -7,4 +7,12 @@
 -->
 <resources>
     <color name="notification_color">#FFE600</color>
+    <!-- AppTheme palette referenced by styles.xml. Brand tokens
+         per src/styles/tokens.css. Without these AAPT2 errors on
+         "@color/colorPrimary not found"; relying on appcompat
+         inheritance is brittle. Added 2026-05-23 in Phase 76.2.2
+         pre-bundle audit. -->
+    <color name="colorPrimary">#0F172A</color>
+    <color name="colorPrimaryDark">#0A0E1A</color>
+    <color name="colorAccent">#FFE600</color>
 </resources>

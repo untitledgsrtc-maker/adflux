@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="false">
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -40,13 +44,16 @@
              which the OS matches against the JS-created channel. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="untitled_default" />
+            android:value="untitled_default"
+        />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_stat_notification" />
+            android:resource="@drawable/ic_stat_notification"
+        />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/notification_color" />
+            android:resource="@color/notification_color"
+        />
     </application>
 
     <!-- Permissions -->
@@ -67,13 +74,18 @@
          call_logs.duration_seconds after a tel-tap call ends.
          WARNING: Google Play Store flags READ_CALL_LOG heavily;
          distribute APK by sideload (WhatsApp / direct download)
-         instead of through the Play Store. -->
+         instead of through the Play Store.
+         Phase 76.2.2 (2026-05-23) — READ_PHONE_STATE removed.
+         CallLogPlugin only touches CallLog.Calls content URI; it
+         never reads phone state. Permission was unused. -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
-    <!-- Phase 56d — Push notifications via FCM. -->
+    <!-- Phase 56d — Push notifications via FCM.
+         Phase 76.2.2 (2026-05-23) — RECEIVE_BOOT_COMPLETED removed.
+         No BootReceiver is registered anywhere in the manifest, and
+         FCM does not require this permission to receive push after
+         reboot. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Phase 56 — File access for offer-letter / quote PDFs the

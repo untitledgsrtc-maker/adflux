@@ -525,15 +525,26 @@ export default function PushDebugV2() {
 
         {/* Actions */}
         <div style={{ marginTop: 18, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            onClick={handleEnable}
-            disabled={loading}
-            className="lead-btn lead-btn-primary"
-            style={{ flex: 1, minWidth: 160 }}
-          >
-            <Bell size={14} />
-            <span style={{ marginLeft: 6 }}>Enable on this device</span>
-          </button>
+          {/* Phase 76.2.2 audit (2026-05-23) — "Enable on this device"
+              uses the Web Notifications API + service-worker push.
+              On Capacitor APK the WebView's web-notifications stack
+              returns "denied" even when the Android system-level
+              POST_NOTIFICATIONS permission is granted, because the
+              Web API is a separate channel from the native FCM
+              channel @capacitor/push-notifications uses. Native
+              builds auto-enroll via the FCM plugin at app startup;
+              this button only matters on the browser PWA path. */}
+          {!Capacitor.isNativePlatform() && (
+            <button
+              onClick={handleEnable}
+              disabled={loading}
+              className="lead-btn lead-btn-primary"
+              style={{ flex: 1, minWidth: 160 }}
+            >
+              <Bell size={14} />
+              <span style={{ marginLeft: 6 }}>Enable on this device</span>
+            </button>
+          )}
           <button
             onClick={handleSendTest}
             disabled={testing || subRows.length === 0}

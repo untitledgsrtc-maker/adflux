@@ -34,6 +34,12 @@ import V2Hero from '../../components/v2/V2Hero'
 // as WorkV2 mount from Phase 76.4. Card has its own 7 PM IST gate +
 // role gate so admin / co_owner don't see it.
 import DaySummaryCard from '../../components/work/DaySummaryCard'
+// Phase 89.11 (2026-05-23) — mount RepMapPanel on /telecaller so
+// Renuka + any TC who does the occasional field visit sees their
+// own meeting pins + GPS track. Defaults collapsed so the page
+// continues to lead with the Next-Call hero; TC reps who never
+// step out keep their existing vertical density.
+import RepMapPanel from '../../components/leads/RepMapPanel'
 // Phase 43.1 — parity with WorkV2 + LeadDetailV2 call chain. Tel-tap
 // audit + post-call outcome capture + auto-refresh.
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
@@ -865,6 +871,13 @@ export default function TelecallerV2() {
           })}
         </div>
       )}
+
+      {/* Phase 89.11 — RepMapPanel. Same component as WorkV2 mounts.
+          Collapsed by default so it doesn't push the queue below
+          the fold. TC reps who never visit clients leave it
+          collapsed; Renuka / TC leads who do site visits get the
+          same Google Maps + meeting pins admin sees. */}
+      {profile?.id && <div style={{ marginBottom: 16 }}><RepMapPanel userId={profile.id} /></div>}
 
       {/* Phase 47.3 — Top hot leads card. Renders only when there's
           at least one hot-marked lead in this rep's queue. Rep gets

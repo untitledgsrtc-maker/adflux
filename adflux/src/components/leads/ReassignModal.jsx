@@ -40,6 +40,36 @@ export default function ReassignModal({ lead, onClose, onSaved }) {
     }
     setSaving(true)
     setError('')
+
+    const targetName = reps.find(r => r.id === target)?.name || 'a teammate'
+    const fromName = lead.assigned?.name || 'previous rep'
+    const note = reason.trim()
+      ? `Reassigned: ${fromName} → ${targetName}. ${reason.trim()}`
+      : `Reassigned: ${fromName} → ${targetName}.`
+
+    // Phase 76.2.2 (2026-05-23) — order matters under RLS. If we
+    // UPDATE leads.assigned_to FIRST, the OLD owner loses RLS access
+    // to the lead, and the follow-up activity INSERT is denied
+    // (lead_activities_via_lead policy checks SELECT on leads). Owner
+    // report: "in lead ressinement history not there".
+    //
+    // Insert the timeline row FIRST while the current user still
+    // owns the lead, THEN flip assigned_to. If the UPDATE then
+    // fails (rare — RLS already passed the SELECT in the picker),
+    // we have a stale activity row but the rep sees the failure
+    // clearly via the error banner.
+    const { error: actErr } = await supabase.from('lead_activities').insert([{
+      lead_id:       lead.id,
+      activity_type: 'status_change',
+      notes:         note,
+      created_by:    profile.id,
+    }])
+    if (actErr) {
+      // Non-fatal — proceed with the reassign so owner workflow doesn't
+      // stall on a missing timeline entry. Toast surfaces it for retry.
+      toastError(actErr, 'Could not write timeline entry. Reassign still attempted.')
+    }
+
     const { error: err } = await supabase
       .from('leads')
       .update({ assigned_to: target })
@@ -50,22 +80,7 @@ export default function ReassignModal({ lead, onClose, onSaved }) {
       setError('Reassign failed: ' + err.message)
       return
     }
-    const targetName = reps.find(r => r.id === target)?.name || 'a teammate'
-    const note = reason.trim()
-      ? `Reassigned to ${targetName}. ${reason.trim()}`
-      : `Reassigned to ${targetName}.`
-    // Phase 34b — was unchecked. If this insert fails, the lead is
-    // reassigned but the timeline has no record of who/when. Surface
-    // via toast (non-blocking) so the rep can re-add the note.
-    const { error: actErr } = await supabase.from('lead_activities').insert([{
-      lead_id:       lead.id,
-      activity_type: 'status_change',
-      notes:         note,
-      created_by:    profile.id,
-    }])
-    if (actErr) {
-      toastError(actErr, 'Reassigned, but the timeline note could not be saved.')
-    }
+
     setSaving(false)
     onSaved?.()
     onClose?.()

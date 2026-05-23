@@ -7,8 +7,12 @@ android {
         applicationId "in.untitledad.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Phase 76.2.2 (2026-05-23) — bumped from 1/1.0 so sideload
+        // installs OVERWRITE the previous APK instead of demanding a
+        // manual uninstall first. Pattern: phase × 1000 + revision.
+        // Increment versionCode on every release.
+        versionCode 76202
+        versionName "0.76.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +20,51 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Phase 76.2.2 (2026-05-23) — packagingOptions glob block dropped
+    // 2026-05-23 evening — `**/* *.png` glob untested on AGP 8.13,
+    // and the prebuild-check script already catches source-tree dups
+    // before cap sync. Redundant safety net with non-zero failure
+    // risk = remove. If a dup still gets through somehow, Gradle
+    // will fail mergeResources visibly, not silently package it.
+
+    // Phase 76.2.2 audit close (item 2.2) — release signing scaffold.
+    // ACTIVATE before the first signed release APK by:
+    //   1. Generate keystore: keytool -genkey -v -keystore
+    //      ~/untitledad-release.jks -keyalg RSA -keysize 2048
+    //      -validity 10000 -alias untitledad
+    //   2. Add to android/keystore.properties (gitignored):
+    //        storeFile=/Users/apple/untitledad-release.jks
+    //        storePassword=...
+    //        keyAlias=untitledad
+    //        keyPassword=...
+    //   3. Uncomment the signingConfigs + signingConfig assignment
+    //      block below.
+    //   4. Add the release SHA-1 (from `keytool -list -v -keystore
+    //      ~/untitledad-release.jks -alias untitledad`) to Google
+    //      Cloud Console → Credentials → Android key restrictions.
+    //
+    // signingConfigs {
+    //     release {
+    //         def kp = new Properties()
+    //         def kpFile = rootProject.file('keystore.properties')
+    //         if (kpFile.exists()) {
+    //             kp.load(new FileInputStream(kpFile))
+    //             storeFile     file(kp['storeFile'])
+    //             storePassword kp['storePassword']
+    //             keyAlias      kp['keyAlias']
+    //             keyPassword   kp['keyPassword']
+    //         }
+    //     }
+    // }
     buildTypes {
         release {
+            // Phase 76.2.2 audit close (item 2.3) — minify deferred
+            // until APK size becomes a problem. R8 keep rules are
+            // already in proguard-rules.pro so flipping this to
+            // `true` won't strip Capacitor plugin classes.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // signingConfig signingConfigs.release  // uncomment with scaffold above
         }
     }
 }

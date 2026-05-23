@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 76.2.2 (2026-05-23) — adaptive icon background flipped from
+  white to brand yellow so the launcher tile fills with the same
+  colour as the source icon PNG (resources/icon.png).
+-->
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#FFE600</color>
 </resources>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 76.2.2 (2026-05-23) — Android auto-backup exclude list.
+  Used together with android:allowBackup="false" on the application
+  tag (manifest). If allowBackup is ever flipped back to true, these
+  excludes still keep sensitive state out of Google Drive backups.
+
+  Excluded:
+    SharedPreferences "untitled_tracking"  — heartbeat timestamp
+                                              (low value, also leaks
+                                              app activity windows)
+    WebView local storage                  — Supabase JWT session,
+                                              GPS cache, call queue
+    Capacitor Preferences                  — offline tracking event
+                                              queue
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="untitled_tracking.xml" />
+    <exclude domain="sharedpref" path="CapacitorStorage.xml" />
+    <exclude domain="database" path="webview.db" />
+    <exclude domain="database" path="webviewCookiesChromium.db" />
+    <exclude domain="file" path="app_webview/" />
+    <exclude domain="file" path="app_textures/" />
+</full-backup-content>

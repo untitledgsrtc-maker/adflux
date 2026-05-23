@@ -53,6 +53,11 @@ public class TrackingPlugin extends Plugin {
 
     private BroadcastReceiver gpsReceiver;
     private ConnectivityManager.NetworkCallback networkCallback;
+    // Phase 76.2.2 audit fix — track last-emitted online state so
+    // onCapabilitiesChanged only fires the event on actual flips,
+    // not on every Wi-Fi RSSI tick or captive-portal probe. Boxed
+    // Boolean so the first event after load() always emits.
+    private Boolean lastEmittedOnline = null;
 
     @Override
     public void load() {
@@ -167,7 +172,16 @@ public class TrackingPlugin extends Plugin {
                 emit(validated);
             }
 
-            private void emit(boolean online) {
+            private synchronized void emit(boolean online) {
+                // Phase 76.2.2 audit — flip-only emission. Wi-Fi
+                // capability changes fire continuously during
+                // normal operation; without this guard the JS shim
+                // would write a network_off_events row on every
+                // RSSI tick.
+                if (lastEmittedOnline != null && lastEmittedOnline == online) {
+                    return;
+                }
+                lastEmittedOnline = online;
                 Log.d(TAG, "networkStateChanged online=" + online);
                 JSObject payload = new JSObject();
                 payload.put("online", online);
@@ -234,6 +248,16 @@ public class TrackingPlugin extends Plugin {
     }
 
     // ─── 5. Polling API for JS ──────────────────────────────────
+    // Owner-locked decision (2026-05-23 audit) — "GPS on" deliberately
+    // includes BOTH hardware GPS_PROVIDER and NETWORK_PROVIDER
+    // (cell-tower / Wi-Fi geolocation). Reps in Vadodara frequently
+    // run Battery Saving mode on long workdays; that mode shuts
+    // hardware GPS but leaves NETWORK_PROVIDER active. Treating that
+    // as "GPS off" would generate false alarms in gps_off_events
+    // every time a rep enables battery saver. The accuracy hit
+    // (cell-tower ~300-1000m vs hardware ~5-20m) is acceptable for
+    // attendance / route reconstruction at our zoom levels. Do NOT
+    // drop NETWORK_PROVIDER without owner re-approval.
     @PluginMethod
     public void isGpsOn(PluginCall call) {
         Context ctx = getContext();

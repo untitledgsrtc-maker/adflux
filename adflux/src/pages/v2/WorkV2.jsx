@@ -36,7 +36,12 @@ import { useAuthStore } from '../../store/authStore'
 import { Pill, HeatPicker } from '../../components/leads/LeadShared'
 import TodayTasksPanel from '../../components/leads/TodayTasksPanel'
 import TodaySummaryCard from '../../components/leads/TodaySummaryCard'
-import MeetingsMapPanel from '../../components/leads/MeetingsMapPanel'
+// Phase 89.11 (2026-05-23) — swapped Leaflet-tiled MeetingsMapPanel
+// for Google-Maps-tiled RepMapPanel so reps see the same map style
+// as admin TeamDashboard + their own meeting pins + GPS track.
+// MeetingsMapPanel.jsx kept on disk for one cycle in case rollback
+// needed; deletion landed in a follow-up sweep.
+import RepMapPanel from '../../components/leads/RepMapPanel'
 // Phase 35 PR 2.7 — RepDayTools no longer mounted on /work (owner
 // asked to drop overnight/leave/test push from the Today panel).
 // Import kept (no-op) so the file's import-graph footprint doesn't
@@ -968,7 +973,7 @@ export default function WorkV2() {
               // tel: + activity log + modal.
               onCallLead={quickLogCall}
             />
-            <MeetingsMapPanel userId={profile.id} />
+            <RepMapPanel userId={profile.id} />
             <EveningReportBlock
               evening={evening}
               setEvening={setEvening}

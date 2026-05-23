@@ -27,12 +27,16 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 initAuth()
 
 // Phase 76.2 — initialise native tracking plugin (Android only).
-// Web bundle: no-op. Phase 76.2.2 (Tier A/B): init no longer takes
-// a callback — the shim caches the user id internally and listens
-// to auth state changes, so sign-in transitions are handled there.
-import('./utils/nativeTracking').then(({ initNativeTracking }) => {
-  initNativeTracking().catch(e => console.warn('[main] tracking init failed:', e?.message || e))
-}).catch(() => { /* web build / dynamic import disabled */ })
+// Web bundle: skipped entirely. Phase 76.2.2 (Tier A/B): init no
+// longer takes a callback — the shim caches the user id internally
+// and listens to auth state changes. Phase 76.2.2 audit fix — gate
+// the dynamic import on `window.Capacitor.isNativePlatform()` so
+// the browser build never downloads the ~7KB nativeTracking chunk.
+if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
+  import('./utils/nativeTracking').then(({ initNativeTracking }) => {
+    initNativeTracking().catch(e => console.warn('[main] tracking init failed:', e?.message || e))
+  }).catch(() => { /* dynamic import disabled */ })
+}
 
 // Phase 87.7 — native dialer auto-launch on Capacitor APK.
 // Owner directive 22 May 2026: tap any tel:<number> link inside the

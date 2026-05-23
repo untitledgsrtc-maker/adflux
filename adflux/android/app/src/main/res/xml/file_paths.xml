@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase 76.2.2 (2026-05-23) — tightened FileProvider exposure.
+  Was: path="." on both — exposed entire external + cache dirs.
+  Now: only the specific subdirs the app actually writes into
+       (PDF downloads, photo cache, share-intent staging area).
+-->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
-    <cache-path name="my_cache_images" path="." />
+    <!-- Capacitor + html2canvas-generated PDFs land here for the
+         WhatsApp-share intent. -->
+    <external-path name="external_files" path="Download/" />
+    <external-path name="external_pictures" path="Pictures/" />
+    <!-- Photo capture cache (city site photos, offer-letter pic). -->
+    <cache-path name="cache_files" path="capture/" />
+    <cache-path name="cache_images" path="images/" />
+    <!-- Capacitor internal share-intent staging. -->
+    <files-path name="capacitor_files" path="capacitor_share/" />
 </paths>

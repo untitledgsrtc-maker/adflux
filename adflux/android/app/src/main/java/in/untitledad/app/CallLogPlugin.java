@@ -104,6 +104,13 @@ public class CallLogPlugin extends Plugin {
 
         long upperBound = sinceTimestamp + (long) windowMinutes * 60_000L;
 
+        // Phase 76.2.2 audit fix — null-guard plugin context. During
+        // Activity teardown getContext() can be null and the next
+        // line would NPE.
+        if (getContext() == null) {
+            call.reject("Plugin context unavailable");
+            return;
+        }
         ContentResolver resolver = getContext().getContentResolver();
         Uri uri = CallLog.Calls.CONTENT_URI;
         String[] projection = new String[] {
@@ -226,6 +233,11 @@ public class CallLogPlugin extends Plugin {
         if (limit == null || limit <= 0) limit = 100;
         if (limit > 500) limit = 500;
 
+        // Phase 76.2.2 audit fix — null-guard plugin context.
+        if (getContext() == null) {
+            call.reject("Plugin context unavailable");
+            return;
+        }
         ContentResolver resolver = getContext().getContentResolver();
         Uri uri = CallLog.Calls.CONTENT_URI;
         String[] projection = new String[] {

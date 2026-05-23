@@ -30,15 +30,30 @@ fail=0
 
 echo "${ylw}=== Pre-build sanity check ===${clr}"
 
-# 1. macOS duplicate files in android/ res/
-dups=$(find android/app/src/main/res -type f -name "* *" 2>/dev/null || true)
+# 1. macOS duplicate files anywhere Gradle / Capacitor reads
+#    res/    → Gradle mergeResources hard-fails on these
+#    dist/   → Vite output, cap sync copies into assets/public
+#    public/ → static, also lands in assets/public
+#    android/app/src/main/assets/public/ → already-synced; clean stale
+dup_paths=(
+  android/app/src/main/res
+  android/app/src/main/assets
+  dist
+  public
+)
+dups=""
+for p in "${dup_paths[@]}"; do
+  [[ -d "$p" ]] || continue
+  found=$(find "$p" -type f -name "* *" 2>/dev/null || true)
+  [[ -n "$found" ]] && dups="${dups}${found}"$'\n'
+done
 if [[ -n "$dups" ]]; then
-  echo "${red}FAIL — duplicate space-named files in res/ (delete + retry):${clr}"
+  echo "${red}FAIL — macOS Finder duplicate files found:${clr}"
   echo "$dups"
-  echo "Run:  find android/app/src/main/res -type f -name '* *' -delete"
+  echo "Run:  find . \\( -path ./node_modules -prune \\) -o -type f -name '* *' -delete"
   fail=1
 else
-  echo "${grn}OK — no duplicate res/ files${clr}"
+  echo "${grn}OK — no duplicate space-named files${clr}"
 fi
 
 # 2. JDK version
