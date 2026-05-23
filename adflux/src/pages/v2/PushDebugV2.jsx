@@ -558,6 +558,38 @@ export default function PushDebugV2() {
               Unsubscribe on this device
             </button>
           )}
+          {/* Phase 76.2 diag — owner ran APK install but Phase 76.2
+              event tables stayed empty. This button calls the plugin
+              directly + toasts the result. Tells us instantly:
+                "GPS plugin OK · enabled=true/false"  → plugin works
+                "GPS plugin NOT REACHABLE — ..."       → plugin missing
+                                                          from native side
+              No persistence; pure diagnostic. */}
+          <button
+            onClick={async () => {
+              try {
+                const { Capacitor, registerPlugin } = await import('@capacitor/core')
+                if (!Capacitor.isNativePlatform()) {
+                  toastError(new Error('Web'), 'Web build — plugin only runs on APK.')
+                  return
+                }
+                const Tracking = registerPlugin('UntitledTracking')
+                if (!Tracking?.isGpsOn) {
+                  toastError(new Error('No method'), 'GPS plugin NOT REACHABLE — isGpsOn missing.')
+                  return
+                }
+                const r = await Tracking.isGpsOn()
+                toastSuccess(`GPS plugin OK · enabled=${r?.enabled}`)
+                // Also fire a manual heartbeat ping
+                await Tracking.bumpHeartbeat?.()
+              } catch (e) {
+                toastError(e, 'GPS plugin call failed: ' + (e?.message || 'unknown'))
+              }
+            }}
+            className="lead-btn lead-btn-sm"
+          >
+            Test GPS plugin
+          </button>
         </div>
 
         {/* Phase 65 (20 May 2026) — Call log scan diagnostic.
