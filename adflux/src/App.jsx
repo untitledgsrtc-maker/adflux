@@ -34,6 +34,8 @@ import LeavesAdminV2     from './pages/v2/LeavesAdminV2'
 import SalaryAdminV2     from './pages/v2/SalaryAdminV2'
 // Phase 38 — People module (Team + Incentives + Salary + Leaves tabs).
 import PeopleV2          from './pages/v2/PeopleV2'
+// Phase 90 (2026-05-23) — admin rep profile drill-down.
+import RepProfileV2      from './pages/v2/RepProfileV2'
 // Phase 33H — admin TA Payouts (GPS-driven travel allowance).
 import TaPayoutsAdminV2  from './pages/v2/TaPayoutsAdminV2'
 import ClientsV2          from './pages/v2/ClientsV2'
@@ -277,6 +279,11 @@ export default function App() {
           {/* Phase 38 — People (consolidated). Old routes above stay
               as deep-links; sidebar uses /people. */}
           <Route path="/people"                    element={<RequirePrivileged><PeopleV2 /></RequirePrivileged>} />
+          {/* Phase 90 (2026-05-23) — rep profile drill-down. Specific
+              before parameterized would matter only if /people/new
+              existed; it doesn't, so /people/:userId catches all
+              non-empty subpaths. Admin / co_owner only. */}
+          <Route path="/people/:userId"            element={<RequirePrivileged><RepProfileV2 /></RequirePrivileged>} />
           {/* Phase 8C — unified Master page (Attachments / Signers / Media / Documents) */}
           <Route path="/master"                    element={<RequirePrivileged><MasterV2 /></RequirePrivileged>} />
           {/* Phase 35 PR 1 — primitives demo. Page handles role gate

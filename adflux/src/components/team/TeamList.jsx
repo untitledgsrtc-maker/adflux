@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown, ChevronUp, MoreVertical,
-  Edit2, UserX, UserCheck, Mail, Trash2,
+  Edit2, UserX, UserCheck, Mail, Trash2, UserCircle,
 } from 'lucide-react'
 import { initials } from '../../utils/formatters'
 import { MemberStatsCard } from './MemberStatsCard'
@@ -35,6 +36,7 @@ function ConfirmDialog({ title, body, variant = 'danger', onConfirm, onCancel, l
 }
 
 function MemberCard({ member, settings, onDeactivate, onReactivate, onEdit }) {
+  const navigate = useNavigate()
   const { deleteMember } = useTeam()
   const [expanded, setExpanded]   = useState(false)
   const [menuOpen, setMenuOpen]   = useState(false)
@@ -140,6 +142,18 @@ function MemberCard({ member, settings, onDeactivate, onReactivate, onEdit }) {
                   zIndex: 10,
                   overflow: 'hidden',
                 }}>
+                  {/* Phase 90 — drill into rep profile page. */}
+                  <button
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      width: '100%', padding: '10px 14px',
+                      background: 'none', border: 'none',
+                      color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+                    }}
+                    onClick={() => { setMenuOpen(false); navigate(`/people/${member.id}`) }}
+                  >
+                    <UserCircle size={14} /> View profile
+                  </button>
                   <button
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
