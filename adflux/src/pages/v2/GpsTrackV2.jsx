@@ -79,13 +79,17 @@ export default function GpsTrackV2() {
   // turn off gps put it in activity log also". Same data feeds
   // Phase 76 DaySummaryCard.
   const [gpsOffEvents, setGpsOffEvents] = useState([])
-  // Phase 76.2.2 (2026-05-23) — live call_logs count for this rep+day
-  // with the 10s duration floor. Replaces the stale
-  // work_sessions.daily_counters.calls value which is bumped by the
-  // Phase 32M trigger on EVERY lead_activities INSERT (call OR
-  // whatsapp, no duration filter). Owner audit found Rima's KPI
-  // showing 746 while actual >=10s calls today = 145.
-  const [callCountToday, setCallCountToday] = useState(0)
+  // Phase 76.2.2 (2026-05-23) — live call_logs breakdown for this
+  // rep+day. Owner directive: show total / missed (0 or null) /
+  // short (1-9s) / qualified (>=10s) as separate KPI buckets so
+  // admin can see WHY Rima's qualified count is 145 (because 374
+  // misdials + 31 shorts get filtered). Replaces the stale
+  // work_sessions.daily_counters.calls JSONB which the Phase 32M
+  // trigger bumps on every lead_activities call/whatsapp insert
+  // without any duration filter.
+  const [callBreakdown, setCallBreakdown] = useState({
+    total: 0, missed: 0, short: 0, qualified: 0, connectedQualified: 0,
+  })
   const mapRef     = useRef(null)
   const containerRef = useRef(null)
   // Phase 70.10 — view-mode toggle: all (route + stops + meetings),
@@ -103,7 +107,7 @@ export default function GpsTrackV2() {
     ;(async () => {
       const start = `${targetDate}T00:00:00`
       const end   = `${targetDate}T23:59:59`
-      const [userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callCountRes] = await Promise.all([
+      const [userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
         supabase.from('gps_pings')
           .select('id, captured_at, lat, lng, accuracy_m, source')
@@ -143,15 +147,18 @@ export default function GpsTrackV2() {
           .gte('toggled_off_at', start)
           .lte('toggled_off_at', end)
           .order('toggled_off_at', { ascending: false }),
-        // Phase 76.2.2 — live call_logs count with 10s floor. Replaces
-        // the broken daily_counters.calls JSONB (bumped on every
-        // lead_activities call/whatsapp insert without duration check).
+        // Phase 76.2.2 — fetch every call_logs row for this rep+day
+        // (duration + outcome) so we can bucket client-side into
+        // total / missed / short / qualified. Per-row select, not
+        // count(), because we need durations. Cap at 2000 (no rep
+        // should physically dial 2000 numbers in one day — sanity
+        // limit, raise if owner hits ceiling).
         supabase.from('call_logs')
-          .select('id', { count: 'exact', head: true })
+          .select('id, duration_seconds, outcome')
           .eq('user_id', userId)
           .gte('call_at', start)
           .lte('call_at', end)
-          .gte('duration_seconds', 10),
+          .limit(2000),
       ])
       if (cancelled) return
       if (userRes.error)  { setError(userRes.error.message);  setLoading(false); return }
@@ -162,7 +169,26 @@ export default function GpsTrackV2() {
       setActivities(actsRes.data || [])
       setVoiceLogs(voiceRes.data || [])
       setGpsOffEvents(gpsOffRes?.data || [])
-      setCallCountToday(callCountRes?.count || 0)
+      // Phase 76.2.2 — bucket the call rows. NULL duration goes to
+      // missed (likely Phase 65 hasn't patched yet; treat as not-yet-
+      // qualified). Zero duration also missed (no ring picked up).
+      // 1-9s shorts (rep cut early). >=10s qualified. Connected
+      // means rep saved the outcome modal with positive/neutral/
+      // negative — a real conversation.
+      const rows = callRowsRes?.data || []
+      const breakdown = {
+        total: rows.length, missed: 0, short: 0, qualified: 0, connectedQualified: 0,
+      }
+      for (const r of rows) {
+        const d = r.duration_seconds
+        if (d == null || d === 0) breakdown.missed += 1
+        else if (d < 10) breakdown.short += 1
+        else {
+          breakdown.qualified += 1
+          if (r.outcome === 'connected') breakdown.connectedQualified += 1
+        }
+      }
+      setCallBreakdown(breakdown)
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -754,7 +780,7 @@ export default function GpsTrackV2() {
           activities={activities}
           voiceLogs={voiceLogs}
           gpsOffEvents={gpsOffEvents}
-          callCountToday={callCountToday}
+          callBreakdown={callBreakdown}
           navigate={navigate}
         />
       )}
@@ -766,7 +792,7 @@ export default function GpsTrackV2() {
    stays readable. Renders three stacked sections: today's counters
    from work_sessions.daily_counters, the lead-activities timeline
    (scoped to this rep + this day), and voice logs filed today. */
-function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], callCountToday = 0, navigate }) {
+function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], callBreakdown = { total: 0, missed: 0, short: 0, qualified: 0, connectedQualified: 0 }, navigate }) {
   const counters = session?.daily_counters || {}
   const checkIn  = session?.check_in_at
   const checkOut = session?.check_out_at
@@ -788,16 +814,46 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
               non-meeting taps — owner reported KPI=3 with only 1
               location pin. The blue-pin count is the truth. */}
           <RepDayStat label="Meetings" value={activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng).length} />
-          {/* Phase 76.2.2 — Calls KPI now reads from a live call_logs
-              count with duration_seconds >= 10 floor. The legacy
-              `counters.calls` JSONB was bumped by the Phase 32M
-              trigger on every lead_activities INSERT (call OR
-              whatsapp, no duration check), which inflated the count
-              by 4-5x. Owner audit found Rima KPI=746 vs SQL ground
-              truth 145 real calls today. */}
-          <RepDayStat label="Calls"     value={callCountToday || 0} />
+          {/* Phase 76.2.2 — single Qualified KPI in the strip (matches
+              the 10s rule applied everywhere else). Full breakdown
+              rendered as its own card below the strip so admin can
+              see WHY qualified count is lower than total (misdials +
+              shorts get filtered). */}
+          <RepDayStat label="Qualified calls" value={callBreakdown.qualified || 0} tone={callBreakdown.qualified > 0 ? 'success' : ''} />
           <RepDayStat label="New leads" value={counters.new_leads || 0} />
           <RepDayStat label="Voice notes" value={voiceLogs.length} />
+        </div>
+      )}
+
+      {/* Phase 76.2.2 — Call breakdown card. Owner directive
+          2026-05-23: KPI = qualified (>=10s) but admin should also
+          see total / missed / short so the gap is explainable.
+          Connected-qualified is "real conversation" (rep saved
+          PostCallOutcomeModal with positive/neutral/negative). */}
+      {callBreakdown.total > 0 && (
+        <div className="lead-card">
+          <div className="lead-card-head">
+            <div>
+              <div className="lead-card-title">Call breakdown — today</div>
+              <div className="lead-card-sub">
+                Qualified call = duration ≥ 10 sec. KPI shown above counts qualified only.
+              </div>
+            </div>
+          </div>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: 10, padding: 16,
+          }}>
+            <RepDayStat label="Total tel-taps"   value={callBreakdown.total} />
+            <RepDayStat label="Missed / no answer" value={callBreakdown.missed}
+                        tone={callBreakdown.missed > 0 ? 'danger' : ''} />
+            <RepDayStat label="Below 10 sec"      value={callBreakdown.short}
+                        tone={callBreakdown.short > 0 ? 'warn' : ''} />
+            <RepDayStat label="Qualified (≥10s)"  value={callBreakdown.qualified}
+                        tone={callBreakdown.qualified > 0 ? 'success' : ''} />
+            <RepDayStat label="Connected of qualified" value={callBreakdown.connectedQualified}
+                        tone={callBreakdown.connectedQualified > 0 ? 'success' : ''} />
+          </div>
         </div>
       )}
 
@@ -997,7 +1053,13 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
 }
 
 function RepDayStat({ label, value, tone }) {
-  const color = tone === 'warn' ? 'var(--warning)' : 'var(--text)'
+  // Phase 76.2.2 — extended tone palette for the call breakdown card.
+  // success = green (good outcome), danger = red (bad bucket), warn
+  // = amber (caution). All read from design-system tokens.
+  const color = tone === 'warn'    ? 'var(--warning)'
+              : tone === 'success' ? 'var(--success)'
+              : tone === 'danger'  ? 'var(--danger)'
+              : 'var(--text)'
   return (
     <div style={{
       background: 'var(--surface)',
