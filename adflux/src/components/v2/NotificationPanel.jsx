@@ -25,11 +25,51 @@ import { supabase } from '../../lib/supabase'
 const KIND_ICON  = { approval: CheckSquare, followup: Calendar, sla: AlertTriangle, dueAction: Clock }
 const KIND_TINT  = { approval: '#FBBF24', followup: '#60A5FA', sla: '#F87171', dueAction: '#C084FC' }
 
+// Phase 93.8c (25 May 2026) — bell items are recomputed live from
+// source tables every open. No `notifications` table to mark-read
+// against. Dismissal tracked per-device in localStorage so a "Mark
+// all read" tap survives reload but resets if rep clears storage.
+// Stable kind:id key; an SLA whose due date changes gets a fresh
+// item id from the source table view, so a re-handoff re-surfaces.
+const DISMISS_KEY = 'untitled_notif_dismissed_v1'
+function loadDismissed() {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch { return new Set() }
+}
+function saveDismissed(set) {
+  try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...set])) } catch {}
+}
+function dismissKey(it) { return `${it.kind}:${it.id}` }
+
+// Phase 93.8d — group items that share a lead so a noisy queue
+// collapses into one row per lead with "+N more" badge. Extract
+// lead id from the route URL since each item already routes to
+// /leads/:id (or doesn't, in which case it stays standalone).
+function groupKey(it) {
+  const m = (it.to || '').match(/\/leads\/([0-9a-fA-F-]+)/)
+  return m ? `lead:${m[1]}` : `solo:${it.kind}:${it.id}`
+}
+function groupItems(list) {
+  const map = new Map()
+  for (const it of list) {
+    const key = groupKey(it)
+    if (!map.has(key)) {
+      map.set(key, { key, items: [] })
+    }
+    map.get(key).items.push(it)
+  }
+  return [...map.values()]
+}
+
 export default function NotificationPanel() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState(null)
   const wrapRef = useRef(null)
+  // Phase 93.8c — per-device dismissed set persisted to localStorage.
+  const [dismissed, setDismissed] = useState(() => loadDismissed())
 
   async function fetchAll() {
     const todayIso = new Date().toISOString().slice(0, 10)
@@ -172,11 +212,35 @@ export default function NotificationPanel() {
     }
   }, [open])
 
-  const count = items?.length || 0
+  // Phase 93.8c+d — filter through dismissed set, then group by lead.
+  // visibleItems = raw items minus dismissed
+  // groups = visibleItems grouped by lead (or standalone for non-lead)
+  const visibleItems = useMemo(
+    () => (items || []).filter(it => !dismissed.has(dismissKey(it))),
+    [items, dismissed],
+  )
+  const groups = useMemo(() => groupItems(visibleItems), [visibleItems])
+  const count = groups.length
 
   function pick(item) {
     setOpen(false)
     navigate(item.to)
+  }
+
+  function markAllRead() {
+    if (!items || items.length === 0) return
+    const next = new Set(dismissed)
+    items.forEach(it => next.add(dismissKey(it)))
+    setDismissed(next)
+    saveDismissed(next)
+  }
+
+  function dismissOne(it, e) {
+    e?.stopPropagation?.()
+    const next = new Set(dismissed)
+    next.add(dismissKey(it))
+    setDismissed(next)
+    saveDismissed(next)
   }
 
   return (
@@ -222,14 +286,42 @@ export default function NotificationPanel() {
             borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))',
           }}>
             <div style={{ fontWeight: 600, fontSize: 14 }}>Notifications</div>
-            <button onClick={() => setOpen(false)} aria-label="Close"
-              style={{ background: 'none', border: 0, color: 'var(--text-muted)', cursor: 'pointer' }}>
-              <X size={14} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Phase 93.8c — Mark all read clears every visible item
+                  from the bell badge for this device. SLA / due rows
+                  re-surface only if the underlying source row changes
+                  (e.g. new handoff_sla_due_at, new follow-up). */}
+              {visibleItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllRead}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--border, #334155)',
+                    color: 'var(--text-muted, #94a3b8)',
+                    fontSize: 11, fontWeight: 600,
+                    padding: '5px 10px', borderRadius: 8,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    minHeight: 28,
+                  }}
+                >
+                  Mark all read
+                </button>
+              )}
+              <button onClick={() => setOpen(false)} aria-label="Close"
+                style={{
+                  background: 'none', border: 0,
+                  color: 'var(--text-muted)', cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 28, height: 28, padding: 0,
+                }}>
+                <X size={14} />
+              </button>
+            </div>
           </div>
           {items === null ? (
             <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)' }}>Loading…</div>
-          ) : items.length === 0 ? (
+          ) : groups.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
               {/* Phase 34Z.88 — Unicode ✓ → Lucide per §7 (Lucide only). */}
               <div style={{
@@ -241,12 +333,17 @@ export default function NotificationPanel() {
               All clear — nothing pending right now.
             </div>
           ) : (
-            items.map((it, i) => {
+            groups.map((g, i) => {
+              // Phase 93.8d — display the most-urgent item in this
+              // lead group (SLA > approval > followup > dueAction —
+              // already pre-sorted). "+N more" badge surfaces dupes.
+              const it = g.items[0]
+              const extra = g.items.length - 1
               const Icon = KIND_ICON[it.kind] || Bell
               const tint = KIND_TINT[it.kind] || '#FBBF24'
               return (
                 <div
-                  key={`${it.kind}-${it.id}`}
+                  key={g.key}
                   onClick={() => pick(it)}
                   style={{
                     display: 'flex', alignItems: 'flex-start', gap: 10,
@@ -264,10 +361,26 @@ export default function NotificationPanel() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
                       fontSize: 13, fontWeight: 500,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {it.title}
+                      <span style={{
+                        overflow: 'hidden', textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap', flex: 1, minWidth: 0,
+                      }}>
+                        {it.title}
+                      </span>
+                      {extra > 0 && (
+                        <span style={{
+                          flexShrink: 0,
+                          fontSize: 10, fontWeight: 700,
+                          color: 'var(--danger, #EF4444)',
+                          background: 'var(--danger-soft, rgba(239,68,68,0.12))',
+                          padding: '2px 7px', borderRadius: 999,
+                        }}>
+                          +{extra} more
+                        </span>
+                      )}
                     </div>
                     <div style={{
                       fontSize: 11, color: 'var(--text-muted)',
@@ -276,6 +389,30 @@ export default function NotificationPanel() {
                       {it.sub}
                     </div>
                   </div>
+                  {/* Phase 93.8c — per-row dismiss. Stops propagation
+                      so the click doesn't navigate. Marks every item
+                      in the group as dismissed in one go. */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const next = new Set(dismissed)
+                      g.items.forEach(x => next.add(dismissKey(x)))
+                      setDismissed(next)
+                      saveDismissed(next)
+                    }}
+                    title="Dismiss"
+                    aria-label="Dismiss this notification"
+                    style={{
+                      background: 'none', border: 0, padding: 0,
+                      color: 'var(--text-muted, #94a3b8)',
+                      cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 28, height: 28, marginTop: 0, flexShrink: 0,
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
                   <ArrowRight size={12} style={{ color: 'var(--text-muted)', marginTop: 8, flexShrink: 0 }} />
                 </div>
               )
