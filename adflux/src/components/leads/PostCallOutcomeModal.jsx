@@ -441,11 +441,23 @@ export default function PostCallOutcomeModal({
         callLogPatch.outcome = 'callback_requested'
       }
       if (Object.keys(callLogPatch).length > 0) {
+        // Phase 93.2c (24 May 2026) — restrict patch to outgoing rows.
+        // Bug: when rep returned a missed-inbound call within the 10-
+        // minute cutoff, this UPDATE also patched the missed-inbound
+        // row to outcome='connected', creating impossible direction=
+        // 'missed' + outcome='connected' combos that overstated
+        // qualified-call counts on TeamDashboard / TC hero. The 93.1
+        // hotfix masked the symptom at read-time; this one fixes the
+        // root cause at write-time.
+        //
+        // .or() preserves legacy tel-tap audit rows where direction=
+        // NULL (callAudit.js doesn't set direction on insert).
         supabase.from('call_logs')
           .update(callLogPatch)
           .eq('user_id', profile.id)
           .eq('lead_id', lead.id)
           .gte('call_at', cutoff)
+          .or('direction.is.null,direction.eq.outgoing')
           .then(({ error }) => {
             if (error) console.warn('[call-log-patch] update failed:', error.message)
           })
