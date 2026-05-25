@@ -60,6 +60,22 @@ export default function LeadsV2() {
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+
+  // Phase 93.10 (25 May 2026) — owner: sales / TC / sales_manager
+  // need bulk reassign on the leads LIST page, not just on the lead
+  // detail page. Matches the canReassign rule shipped on LeadDetailV2:
+  //   - admin / co_owner      → always
+  //   - sales_manager         → always (DB RLS leads_manager_team)
+  //   - sales / agency / TC   → only when self is assigned_to or
+  //                             telecaller_id (RLS will reject otherwise)
+  // Per-row check used to decide whether to render the checkbox.
+  function canReassign(l) {
+    if (!l || !profile) return false
+    if (isPrivileged) return true
+    if (profile.team_role === 'sales_manager') return true
+    return l.assigned_to === profile.id
+        || l.telecaller_id === profile.id
+  }
   const { leads, loading, error, fetchLeads, reassignBulk, stageBulk, deleteBulk, applyRealtimeChange } = useLeads()
 
   /* ─── Filter state ─── */
@@ -837,7 +853,10 @@ export default function LeadsV2() {
           <table className="lead-table">
             <thead>
               <tr>
-                {isPrivileged && (
+                {/* Phase 93.10 — header checkbox shows if ANY row in
+                    the current filtered view can be reassigned. Same
+                    rule as the per-row checkboxes below. */}
+                {filtered.some(canReassign) && (
                   <th style={{ width: 32 }}>
                     <input
                       type="checkbox"
@@ -895,15 +914,21 @@ export default function LeadsV2() {
                     navigate(`/leads/${l.id}`)
                   }}
                 >
-                  {isPrivileged && (
+                  {/* Phase 93.10 — per-row checkbox now shown to every
+                      role that can reassign this lead. Sales / TC see
+                      checkbox only on rows they own. Admin / co_owner /
+                      sales_manager see all. */}
+                  {filtered.some(canReassign) && (
                     <td onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(l.id)}
-                        onChange={() => toggleSelected(l.id)}
-                        style={{ cursor: 'pointer' }}
-                        aria-label={`Select ${l.name}`}
-                      />
+                      {canReassign(l) ? (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(l.id)}
+                          onChange={() => toggleSelected(l.id)}
+                          style={{ cursor: 'pointer' }}
+                          aria-label={`Select ${l.name}`}
+                        />
+                      ) : null}
                     </td>
                   )}
                   {/* Phase 33F (C4) — heat dot moved INTO the name cell
@@ -1169,7 +1194,11 @@ export default function LeadsV2() {
           confirms before nuking. RLS gates server-side so
           non-privileged users (sales / agency) can only nuke their
           own rows even if they reach this bar via DOM tampering. */}
-      {selected.size > 0 && isPrivileged && (
+      {/* Phase 93.10 — bulk bar now shows for any role that can
+          reassign at least one of the selected leads. Move-stage +
+          Delete actions stay gated to isPrivileged (sales / TC must
+          go through stage modal on the lead detail). */}
+      {selected.size > 0 && (
         <div
           style={{
             position: 'sticky', bottom: 12, marginTop: 16,
@@ -1186,56 +1215,55 @@ export default function LeadsV2() {
           <button className="lead-btn lead-btn-sm lead-btn-primary" onClick={() => setReassignOpen(true)}>
             <UsersIcon size={12} /> Reassign
           </button>
-          <select
-            className="lead-inp"
-            style={{ height: 36, padding: '0 10px', fontSize: 12, width: 'auto' }}
-            defaultValue=""
-            onChange={async (e) => {
-              const stage = e.target.value
-              e.target.value = ''
-              if (!stage) return
-              // Phase 34e — replaced browser confirm() with inline
-              // dialog so the look matches the rest of the app.
-              const ok = await confirmDialog({
-                title: 'Move stage?',
-                message: `Move ${selected.size} lead${selected.size === 1 ? '' : 's'} to ${stage}?`,
-                confirmLabel: 'Move',
-              })
-              if (!ok) return
-              const { error: err } = await stageBulk(Array.from(selected), stage)
-              if (err) { toastError(err, 'Bulk stage change failed.'); return }
-              setSelected(new Set())
-            }}
-          >
-            <option value="" disabled>Move stage…</option>
-            <option value="New">New</option>
-            {/* Phase 31P — 'Working' DB value, 'Follow-up' rep label. */}
-            <option value="Working">Follow-up</option>
-            <option value="QuoteSent">Quote Sent</option>
-            <option value="Nurture">Nurture</option>
-            <option value="Won">Won</option>
-            <option value="Lost">Lost</option>
-          </select>
-          <button
-            className="lead-btn lead-btn-sm"
-            style={{ borderColor: 'var(--red, #EF4444)', color: 'var(--red, #EF4444)' }}
-            onClick={async () => {
-              // Phase 34e — replaced browser confirm() + alert() with
-              // inline dialog + toast.
-              const ok = await confirmDialog({
-                title: 'Delete leads?',
-                message: `Delete ${selected.size} lead${selected.size === 1 ? '' : 's'} permanently? This cannot be undone.`,
-                confirmLabel: 'Delete',
-                danger: true,
-              })
-              if (!ok) return
-              const { error: err } = await deleteBulk(Array.from(selected))
-              if (err) { toastError(err, 'Bulk delete failed.'); return }
-              setSelected(new Set())
-            }}
-          >
-            <X size={12} /> Delete
-          </button>
+          {isPrivileged && (
+            <>
+              <select
+                className="lead-inp"
+                style={{ height: 36, padding: '0 10px', fontSize: 12, width: 'auto' }}
+                defaultValue=""
+                onChange={async (e) => {
+                  const stage = e.target.value
+                  e.target.value = ''
+                  if (!stage) return
+                  const ok = await confirmDialog({
+                    title: 'Move stage?',
+                    message: `Move ${selected.size} lead${selected.size === 1 ? '' : 's'} to ${stage}?`,
+                    confirmLabel: 'Move',
+                  })
+                  if (!ok) return
+                  const { error: err } = await stageBulk(Array.from(selected), stage)
+                  if (err) { toastError(err, 'Bulk stage change failed.'); return }
+                  setSelected(new Set())
+                }}
+              >
+                <option value="" disabled>Move stage…</option>
+                <option value="New">New</option>
+                <option value="Working">Follow-up</option>
+                <option value="QuoteSent">Quote Sent</option>
+                <option value="Nurture">Nurture</option>
+                <option value="Won">Won</option>
+                <option value="Lost">Lost</option>
+              </select>
+              <button
+                className="lead-btn lead-btn-sm"
+                style={{ borderColor: 'var(--red, #EF4444)', color: 'var(--red, #EF4444)' }}
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: 'Delete leads?',
+                    message: `Delete ${selected.size} lead${selected.size === 1 ? '' : 's'} permanently? This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    danger: true,
+                  })
+                  if (!ok) return
+                  const { error: err } = await deleteBulk(Array.from(selected))
+                  if (err) { toastError(err, 'Bulk delete failed.'); return }
+                  setSelected(new Set())
+                }}
+              >
+                <X size={12} /> Delete
+              </button>
+            </>
+          )}
           <button className="lead-btn lead-btn-sm" onClick={() => setSelected(new Set())}>
             Cancel
           </button>
