@@ -159,6 +159,26 @@ export default function DaySummaryCard({
       } catch (e) {
         console.warn('[DaySummaryCard] stamp failed:', e?.message || e)
       }
+      // Phase 92a (24 May 2026) — auto-checkout on summary share.
+      // Owner directive: "share = end of day, no separate tap." If
+      // parent supplied onCheckOut AND the rep hasn't already checked
+      // out, fire the same checkout flow the manual button uses. That
+      // captures GPS + writes check_out_at + invokes parent load() so
+      // session.check_out_at updates and the manual button auto-hides
+      // (UI flips to "Checked out · day closed").
+      //
+      // Best-effort: errors swallowed — the share already succeeded;
+      // failed checkout would just leave the manual button visible
+      // for the rep to tap as fallback.
+      if (onCheckOut && !checkedOut && !checkOutBusy) {
+        try {
+          // Phase 92c — tag the audit row so admin can split manual
+          // taps from share-chained closes from cron auto-closes.
+          await onCheckOut('auto_share')
+        } catch (e) {
+          console.warn('[DaySummaryCard] auto-checkout on share failed:', e?.message || e)
+        }
+      }
     } finally {
       setSending(false)
     }
@@ -442,7 +462,7 @@ export default function DaySummaryCard({
             <>
               <button
                 type="button"
-                onClick={onCheckOut}
+                onClick={() => onCheckOut('manual')}
                 disabled={checkOutBusy}
                 style={{
                   marginTop:    10,

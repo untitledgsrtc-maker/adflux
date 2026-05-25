@@ -704,7 +704,15 @@ export default function WorkV2() {
     load()
   }
 
-  async function doCheckOut() {
+  // Phase 92c — accept source param so SQL audit can split manual vs
+  // share-chained vs cron-stamped checkouts. Defaults to 'manual' so
+  // existing call sites keep working.
+  async function doCheckOut(source = 'manual') {
+    // Guard against accidental React event-as-source (button onClick
+    // passes the SyntheticEvent as first arg if not wrapped). Anything
+    // that isn't one of the enum values gets normalized to 'manual'.
+    const safeSource = (source === 'manual' || source === 'auto_share' || source === 'auto_cron')
+      ? source : 'manual'
     setBusy(true); setError('')
     const gps = await captureGps()
     const { error: err } = await supabase
@@ -718,6 +726,17 @@ export default function WorkV2() {
       .eq('work_date', TODAY())
     setBusy(false)
     if (err) { setError(err.message); return }
+    // Phase 92c — best-effort source stamp. Separate write so a stale
+    // DB (Phase 92c SQL not run yet) doesn't break checkout. If the
+    // column doesn't exist, PostgREST 400s and we swallow it; the
+    // primary checkout already landed above.
+    try {
+      await supabase
+        .from('work_sessions')
+        .update({ check_out_source: safeSource })
+        .eq('user_id', profile.id)
+        .eq('work_date', TODAY())
+    } catch {}
     logGpsPing(profile.id, gps, 'checkout')
     load()
   }
