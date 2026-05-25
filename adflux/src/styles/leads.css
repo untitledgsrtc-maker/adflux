@@ -608,14 +608,25 @@
     display: grid;
     grid-template-columns: auto 1fr;
     grid-template-rows: auto auto;
-    column-gap: 12px;
+    column-gap: 10px;
     row-gap: 6px;
     align-items: center;
-    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    /* Phase 93.14.1 — tokens-on-scale per §6 UI checklist:
+       radius 14 (--radius-lg) + padding 10/14 lands on the
+       6/10/14/20 scale. Background intentionally NOT set here so
+       the .lead-row-green/yellow/red tints (defined above) still
+       paint the card. .lead-row-default gets the surface fallback
+       just below. */
+    border-radius: var(--radius-lg, 14px);
     margin-bottom: 10px;
-    padding: 10px 12px;
+    padding: 10px 14px;
+  }
+  /* Phase 93.14.1 — default rows need a card surface on mobile so
+     they don't blend into page bg. The tinted variants already
+     paint themselves via .lead-row-green/yellow/red. */
+  .lead-table tr.lead-row.lead-row-default {
+    background: var(--surface);
   }
   .lead-table tr.lead-row > td {
     padding: 0;
