@@ -227,6 +227,23 @@ export default function NotificationPanel() {
     navigate(item.to)
   }
 
+  // Phase 93.13 (25 May 2026) — owner: "if i click on notofcatoon
+  // its not remove from notofication". Tapping a row now dismisses
+  // every item in that lead-group BEFORE navigating, so the same
+  // row doesn't surface on next bell open. Matches the per-row X
+  // behaviour. Auto-dismissal is per-device (localStorage) — if
+  // the rep opens the app on another phone the row still shows
+  // until they tap there too.
+  function pickGroup(group) {
+    if (!group?.items?.length) return
+    const next = new Set(dismissed)
+    group.items.forEach(x => next.add(dismissKey(x)))
+    setDismissed(next)
+    saveDismissed(next)
+    setOpen(false)
+    navigate(group.items[0].to)
+  }
+
   function markAllRead() {
     if (!items || items.length === 0) return
     const next = new Set(dismissed)
@@ -344,7 +361,7 @@ export default function NotificationPanel() {
               return (
                 <div
                   key={g.key}
-                  onClick={() => pick(it)}
+                  onClick={() => pickGroup(g)}
                   style={{
                     display: 'flex', alignItems: 'flex-start', gap: 10,
                     padding: '10px 14px', cursor: 'pointer',
