@@ -614,7 +614,10 @@ export default function TelecallerV2() {
         <div className="tc-hero" style={{ marginBottom: 16 }}>
           <div className="tc-hero-head">
             <div className="tc-big-av">
-              {(nextCall.name || '?').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()}
+              {/* Phase 92b — single initial (was 2). Matches WorkV2
+                  NextActionCard avatar so /work + /telecaller feel
+                  like the same product. */}
+              {(nextCall.name || '?').trim().slice(0, 1).toUpperCase()}
               <span className="heat" style={{ background: heatColor(nextCall.heat) }} />
             </div>
             <div>
