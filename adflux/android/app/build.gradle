@@ -15,8 +15,13 @@ android {
         // preview / missed calls / nearby leads / auto-checkout on
         // share / TC avatar polish / 20:00 IST hard-close cron /
         // in-app evening banner).
-        versionCode 93000
-        versionName "0.93.0"
+        // Phase 94a (2026-05-24) — switched to live-update mode.
+        // After this APK lands, JSX/CSS changes deploy via Vercel +
+        // propagate to APK users at next cold-start. No more APK
+        // rebuilds for web changes. Native changes (Java, plugins,
+        // splash resources) still require rebuild.
+        versionCode 94000
+        versionName "0.94.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -1,14 +1,8 @@
 {
-  "_comment": "Phase 94a (24 May 2026) — live-update mode active. APK shell loads https://app.untitledad.in at cold-start; web changes propagate via Vercel deploy without APK rebuild. Native code changes (Java / AndroidManifest / new Capacitor plugin / splash resource) STILL need rebuild. To roll back to bundled mode, copy capacitor.config.bundled.json contents over this file + rebuild.",
+  "_comment": "Phase 94a rollback config (24 May 2026) — restores bundled mode (Phase 88.2 baseline). To use: copy this file's contents over capacitor.config.json, then run `npx cap sync android` + rebuild APK + bump versionCode. Bundled mode ships JS on-device for 5-10x faster app open at the cost of needing an APK rebuild per JS change.",
   "appId": "in.untitledad.app",
   "appName": "Untitled OS",
   "webDir": "dist",
-  "server": {
-    "url": "https://app.untitledad.in",
-    "cleartext": false,
-    "androidScheme": "https",
-    "errorPath": "/"
-  },
   "android": {
     "allowMixedContent": false,
     "captureInput": true,
