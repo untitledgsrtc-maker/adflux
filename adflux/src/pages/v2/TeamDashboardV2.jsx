@@ -1161,6 +1161,20 @@ export default function TeamDashboardV2() {
                   </div>
                   <div className="lbl">Voice</div>
                 </div>
+                {/* Phase 93.5 (25 May 2026) — TC-only: Overdue F-up
+                    tile in row 1 beside Voice (owner directive).
+                    Row 2 now holds only F-up + Connect rate. Non-TC
+                    rows unaffected — row 1 stays as Meet/Calls/Voice. */}
+                {isTC && (() => {
+                  const overdueFu = overdueFuByUser[r.id] || 0
+                  const odCls = overdueFu === 0 ? '' : overdueFu >= 5 ? 'dng' : 'warn'
+                  return (
+                    <div className="lead-rep-kpi" title="Follow-ups past due date">
+                      <div className={`num ${odCls}`}>{overdueFu}</div>
+                      <div className="lbl">Overdue F-up</div>
+                    </div>
+                  )
+                })()}
               </div>
               {/* Phase 82 — three new KPI tiles per rep card:
                     F-up   pending/done follow_ups in the window
@@ -1180,13 +1194,12 @@ export default function TeamDashboardV2() {
                 const qCls      = qChase === 0 ? '' : qChase >= 5 ? 'dng' : 'warn'
                 const pChase    = paymentChaseByUser[r.id] || 0
                 const pCls      = pChase === 0 ? '' : pChase >= 3 ? 'dng' : 'warn'
-                // Phase 93.4 — TC tiles. TCs don't deal with quotes /
-                // payments; replace those two slots with Overdue F-up +
-                // Connect rate (the two metrics they actually care
-                // about + admin needs to see). isTC computed above for
-                // the calls-target branch.
-                const overdueFu = overdueFuByUser[r.id] || 0
-                const odCls     = overdueFu === 0 ? '' : overdueFu >= 5 ? 'dng' : 'warn'
+                // Phase 93.5 — TC tiles. Phase 93.4 split Quote/Pay
+                // chase → Overdue F-up + Connect rate for TCs. Phase
+                // 93.5 (owner directive 25 May 2026) moved Overdue
+                // F-up to row 1 beside Voice. Row 2 now holds F-up +
+                // Connect rate only. Non-TC rows keep F-up + Quote
+                // chase + Pay chase.
                 const connectRate = callsHere > 0
                   ? Math.round((connHere / callsHere) * 100)
                   : 0
@@ -1200,16 +1213,10 @@ export default function TeamDashboardV2() {
                       <div className="lbl">F-up</div>
                     </div>
                     {isTC ? (
-                      <>
-                        <div className="lead-rep-kpi">
-                          <div className={`num ${odCls}`}>{overdueFu}</div>
-                          <div className="lbl">Overdue F-up</div>
-                        </div>
-                        <div className="lead-rep-kpi">
-                          <div className={`num ${crCls}`}>{callsHere > 0 ? `${connectRate}%` : '—'}</div>
-                          <div className="lbl">Connect rate</div>
-                        </div>
-                      </>
+                      <div className="lead-rep-kpi">
+                        <div className={`num ${crCls}`}>{callsHere > 0 ? `${connectRate}%` : '—'}</div>
+                        <div className="lbl">Connect rate</div>
+                      </div>
                     ) : (
                       <>
                         <div className="lead-rep-kpi">
