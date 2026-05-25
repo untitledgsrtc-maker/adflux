@@ -27,7 +27,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
-import { istTodayISO } from '../utils/istDate'
+import { istTodayISO, istTodayPlusDays } from '../utils/istDate'
 
 /**
  * Convert a YYYY-MM-DD IST date into UTC ISO strings bracketing the
@@ -81,12 +81,19 @@ export default function useDaySummary({ dateISO } = {}) {
     setLoading(true)
     setError('')
     const { startISO, endISO } = istDayBracketUTC(targetDate)
+    // Phase 91a — tomorrow preview. Anchored to IST regardless of
+    // device clock (istTodayPlusDays guarantees that). Only needed
+    // when targetDate is "today" — historical dates don't show a
+    // tomorrow preview.
+    const tomorrowISO = istTodayPlusDays(1)
+    const isToday = targetDate === istTodayISO()
 
     try {
       const [
         wsRes, actRes, callRes, leadRes, fuTotalRes, fuDoneRes,
         qSentRes, qWonRes, voiceRes, pingsRes,
         gpsOffRes, netOffRes, forceStopRes, daRes, dtRes,
+        tomFuRes, tomWsRes,
       ] = await Promise.all([
         // 1) Today's work_sessions row
         supabase.from('work_sessions')
@@ -207,6 +214,26 @@ export default function useDaySummary({ dateISO } = {}) {
           .eq('user_id', profile.id)
           .is('effective_to', null)
           .maybeSingle(),
+
+        // Phase 91a — tomorrow preview queries. Only run when
+        // targetDate is today; otherwise return empty placeholders
+        // (cheap unconditional dispatch is fine since both are
+        // .head:true counts and one is a single-row select).
+        isToday
+          ? supabase.from('follow_ups')
+              .select('id', { count: 'exact', head: true })
+              .eq('assigned_to', profile.id)
+              .eq('follow_up_date', tomorrowISO)
+              .eq('is_done', false)
+          : Promise.resolve({ count: 0, data: null, error: null }),
+
+        isToday
+          ? supabase.from('work_sessions')
+              .select('planned_meetings')
+              .eq('user_id', profile.id)
+              .eq('work_date', tomorrowISO)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ])
 
       // Tally activity types client-side.
@@ -245,6 +272,19 @@ export default function useDaySummary({ dateISO } = {}) {
         km_traveled:                daRes?.data?.km_traveled ?? 0,
       }
 
+      // Phase 91a — tomorrow preview. Follow-ups count + non-empty
+      // planned_meetings rows on tomorrow's work_sessions row (if rep
+      // already drafted it). Both safely degrade to 0 when there is no
+      // data.
+      const tomorrowMeetings = Array.isArray(tomWsRes?.data?.planned_meetings)
+        ? tomWsRes.data.planned_meetings.filter(m => m && (m.client || m.time || m.location)).length
+        : 0
+      const tomorrow = {
+        dateISO:    isToday ? tomorrowISO : null,
+        followUps:  tomFuRes?.count || 0,
+        meetings:   tomorrowMeetings,
+      }
+
       setData({
         repName: profile.name,
         role,
@@ -268,6 +308,7 @@ export default function useDaySummary({ dateISO } = {}) {
           qualified,
         },
         tracking,
+        tomorrow,
         sentAt:    ws?.evening_summary_sent_at || null,
         checkedIn: !!ws?.check_in_at,
       })

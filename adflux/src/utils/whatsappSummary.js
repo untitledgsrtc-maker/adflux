@@ -134,6 +134,20 @@ export function formatDaySummaryText(d) {
   if (t.km_traveled != null) {
     lines.push(`• KM traveled:   ${Number(t.km_traveled).toFixed(1)} km`)
   }
+
+  // Phase 91a — Tomorrow preview. Only emit when at least one of
+  // (follow-ups due, planned meetings drafted) is non-zero. Lets the
+  // group see what's lined up for the next day at a glance.
+  const tom = d.tomorrow || {}
+  const tomFu = Number(tom.followUps) || 0
+  const tomMt = Number(tom.meetings) || 0
+  if (tomFu > 0 || tomMt > 0) {
+    lines.push('')
+    lines.push('📅 *TOMORROW*')
+    if (tomFu > 0) lines.push(`• Follow-ups due:  ${tomFu}`)
+    if (tomMt > 0) lines.push(`• Planned meetings: ${tomMt}`)
+  }
+
   lines.push('')
   lines.push('— Sent from Untitled OS')
   return lines.join('\n')

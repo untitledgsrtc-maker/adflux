@@ -24,7 +24,7 @@ import React, { useMemo, useState } from 'react'
 import {
   ClipboardList, Phone, Users, Map as MapIcon,
   Mic, BadgeCheck, Wifi, WifiOff, AlertTriangle, Send,
-  X, ChevronRight, Activity, Satellite, LogOut,
+  X, ChevronRight, Activity, Satellite, LogOut, Calendar,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -356,6 +356,39 @@ export default function DaySummaryCard({
               label="KM traveled"
               value={`${Number(t.km_traveled).toFixed(1)} km`}
             />
+          )}
+
+          {/* Phase 91a — Tomorrow preview. Exception-rendered: only
+              shows when at least one of (follow-ups due tomorrow,
+              planned meetings drafted for tomorrow) is non-zero. Lets
+              the rep see their next-day load before sleeping without
+              opening /follow-ups or scrolling /leads. */}
+          {data?.tomorrow && (data.tomorrow.followUps > 0 || data.tomorrow.meetings > 0) && (
+            <>
+              <div
+                style={{
+                  fontSize: 11, fontWeight: 600, letterSpacing: 0.6,
+                  color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase',
+                  margin: '12px 0 4px',
+                }}
+              >
+                Tomorrow
+              </div>
+              {data.tomorrow.followUps > 0 && (
+                <Row
+                  icon={<BadgeCheck size={14} strokeWidth={1.6} />}
+                  label="Follow-ups due"
+                  value={data.tomorrow.followUps}
+                />
+              )}
+              {data.tomorrow.meetings > 0 && (
+                <Row
+                  icon={<Calendar size={14} strokeWidth={1.6} />}
+                  label="Planned meetings"
+                  value={data.tomorrow.meetings}
+                />
+              )}
+            </>
           )}
 
           {/* CTA */}
