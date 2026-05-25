@@ -46,6 +46,26 @@ import { summariseTrack, cleanTrack, detectStops } from '../../utils/gpsDistance
 const isAutoCheckinRow = (a) =>
   (a?.notes || '').startsWith("I'm here · auto-check-in")
 
+// Phase 93.7 (25 May 2026) — owner directive: "only unique meeting
+// can be count in KPI, revisit dont count in KPi". Second/third
+// visit to the SAME lead on the same day adds 0 to the KPI.
+// Walk-ins (lead_id NULL) each count as unique (no lead to dedupe).
+// Map pins still render every visit — only the headline count is
+// dedupe'd.
+const uniqueMeetingCount = (activities, requireGps = false) => {
+  if (!Array.isArray(activities)) return 0
+  const seen = new Set()
+  for (const a of activities) {
+    if (a.activity_type !== 'meeting' && a.activity_type !== 'site_visit') continue
+    if (isAutoCheckinRow(a)) continue
+    if (requireGps && (!a.gps_lat || !a.gps_lng)) continue
+    // Walk-ins keyed by activity id so each is unique.
+    const key = a.lead_id || `walkin_${a.id}`
+    seen.add(key)
+  }
+  return seen.size
+}
+
 // Phase 70.7 (22 May 2026) — dark Google Maps style that matches the
 // v2 chrome but keeps road network legible. Previous palette had
 // roads only ~30% lighter than ground; new palette lifts roads to
@@ -758,7 +778,7 @@ export default function GpsTrackV2() {
             {[
               { key: 'all',      label: 'All' },
               { key: 'route',    label: 'Route only' },
-              { key: 'meetings', label: `Meetings · ${activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && !isAutoCheckinRow(a)).length}` },
+              { key: 'meetings', label: `Meetings · ${uniqueMeetingCount(activities, true)}` },
             ].map(opt => (
               <button
                 key={opt.key}
@@ -872,7 +892,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
               also bumped on check-in / interval pings / other
               non-meeting taps — owner reported KPI=3 with only 1
               location pin. The blue-pin count is the truth. */}
-          <RepDayStat label="Meetings" value={activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && !isAutoCheckinRow(a)).length} />
+          <RepDayStat label="Meetings" value={uniqueMeetingCount(activities, true)} />
           {/* Phase 76.2.2 — single Qualified KPI in the strip (matches
               the 10s rule applied everywhere else). Full breakdown
               rendered as its own card below the strip so admin can
