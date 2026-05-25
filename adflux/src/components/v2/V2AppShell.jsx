@@ -485,31 +485,35 @@ export function V2AppShell() {
 
           <div className="v2d-topbar-spacer" />
 
-          <GlobalSearchBar />
+          {/* Phase 93.12 (25 May 2026) — owner: "fix bell icon at right
+              side at top just like web". On mobile, GlobalSearchBar +
+              Ask AI + New Quote each eat 180-240px which forced the
+              bell to flex-wrap to a second row. Hide those on mobile
+              so the bell + avatar anchor cleanly on the right. Admin
+              + sales still get full topbar on tablet/desktop. */}
+          {!isMobile && <GlobalSearchBar />}
 
-          {/* Phase 1.5 — Co-Pilot trigger. Click or ⌘K opens the AI
-              modal for NL queries ('how much did Sondarva close last
-              month?'). The literal lookup lives in GlobalSearchBar
-              just above. */}
-          <button
-            className="v2d-search"
-            onClick={() => setCopilotOpen(true)}
-            style={{ cursor: 'pointer', textAlign: 'left', minWidth: 180, maxWidth: 240 }}
-            type="button"
-          >
-            <Sparkles size={14} style={{ color: '#c084fc' }} />
-            <span style={{ flex: 1, color: 'var(--v2-ink-2)', fontSize: 13 }}>
-              Ask AI…
-            </span>
-            <span style={{
-              fontFamily: 'inherit', fontSize: 10,
-              background: 'rgba(255,255,255,.06)',
-              padding: '2px 6px', borderRadius: 6,
-              color: 'var(--v2-ink-2)',
-            }}>
-              ⌘K
-            </span>
-          </button>
+          {!isMobile && (
+            <button
+              className="v2d-search"
+              onClick={() => setCopilotOpen(true)}
+              style={{ cursor: 'pointer', textAlign: 'left', minWidth: 180, maxWidth: 240 }}
+              type="button"
+            >
+              <Sparkles size={14} style={{ color: '#c084fc' }} />
+              <span style={{ flex: 1, color: 'var(--v2-ink-2)', fontSize: 13 }}>
+                Ask AI…
+              </span>
+              <span style={{
+                fontFamily: 'inherit', fontSize: 10,
+                background: 'rgba(255,255,255,.06)',
+                padding: '2px 6px', borderRadius: 6,
+                color: 'var(--v2-ink-2)',
+              }}>
+                ⌘K
+              </span>
+            </button>
+          )}
 
           {/* Phase 93.9 (25 May 2026) — owner: TC sees "New Quote"
               ONLY on /quotes/* pages, not everywhere. Quotes are
@@ -518,8 +522,11 @@ export function V2AppShell() {
               button on /telecaller + every other page = noise.
               Now: admin / co_owner always; everyone else only on
               /quotes/* (so a TC who navigates to /quotes can still
-              create one if needed — same path as sales). */}
-          {(isPrivileged
+              create one if needed — same path as sales).
+              Phase 93.12 — also hide on mobile so the bell anchors
+              cleanly top-right. Privileged users can still navigate
+              to /quotes/new via sidebar or direct link. */}
+          {!isMobile && (isPrivileged
             || location.pathname.startsWith('/quotes')
           ) && (
             <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
