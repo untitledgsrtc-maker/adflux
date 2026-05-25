@@ -90,11 +90,16 @@ export function formatDaySummaryText(d) {
   if (!isTC) {
     lines.push(`• Meetings:    ${a.meetings ?? 0}/${p.meetings ?? 0}`)
   }
-  lines.push(`• Calls:       ${a.calls ?? 0}/${p.calls ?? 0}`)
-  lines.push(`• New leads:   ${a.leads ?? 0}/${p.leads ?? 0}`)
-  lines.push(`• Follow-ups:  ${a.follow_ups_done ?? 0}/${a.follow_ups_total ?? 0}`)
+  // Phase 90.5 — label clarity. "Calls" here = qualified count
+  // (duration_seconds >= 10s, per Phase 76.2.2 KPI rule). "Qualified"
+  // historically meant outcome='positive' on lead_activities, which
+  // overloaded the word. Rename TC row to "Positive talks" so the
+  // two numbers don't share a name.
+  lines.push(`• Calls (≥10s): ${a.calls ?? 0}/${p.calls ?? 0}`)
+  lines.push(`• New leads:    ${a.leads ?? 0}/${p.leads ?? 0}`)
+  lines.push(`• Follow-ups:   ${a.follow_ups_done ?? 0}/${a.follow_ups_total ?? 0}`)
   if (isTC) {
-    lines.push(`• Qualified:   ${a.qualified ?? 0}`)
+    lines.push(`• Positive talks: ${a.qualified ?? 0}`)
   }
   lines.push(`• Quotes sent: ${a.quotes_sent ?? 0}`)
   lines.push('')
