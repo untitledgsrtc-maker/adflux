@@ -919,7 +919,7 @@ export default function LeadsV2() {
                       checkbox only on rows they own. Admin / co_owner /
                       sales_manager see all. */}
                   {filtered.some(canReassign) && (
-                    <td onClick={(e) => e.stopPropagation()}>
+                    <td className="td-check" onClick={(e) => e.stopPropagation()}>
                       {canReassign(l) ? (
                         <input
                           type="checkbox"
@@ -937,7 +937,7 @@ export default function LeadsV2() {
                       red/yellow smear. Heat dot first (rep's lead
                       "temperature"), then a thin divider, then the
                       days-dot (how stale). */}
-                  <td>
+                  <td className="td-lead">
                     <div className="name-cell" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <HeatDot heat={l.heat} />
                       <span style={{

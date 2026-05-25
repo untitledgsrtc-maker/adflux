@@ -592,13 +592,18 @@
 .days-dot-yellow { background: var(--warning, #F59E0B); box-shadow: 0 0 0 2px rgba(245, 158, 11, .15); }
 .days-dot-red    { background: var(--danger,  #EF4444); box-shadow: 0 0 0 2px rgba(239,  68,  68, .15); }
 
-/* ─── Phase 93.14 (25 May 2026) — mobile /leads compact cards ───────
+/* ─── Phase 93.14 + 93.16 — mobile /leads compact cards ─────────────
    Owner: "in app or mobile view not loomg good ... cant we do small
    box of lead?" Desktop table forced horizontal swipe on phones to
    reach Phone column. Below 720px, restyle each <tr> as a stacked
    card so all the essential info is visible without scroll.
-   Hide low-priority columns (Segment / Source / Assigned / Last /
-   Value) on mobile. Keep Lead + Phone + Stage. Desktop unchanged.
+
+   Phase 93.16 (25 May 2026) — owner reported overlap: cells stacked
+   on top of each other. Cause: original :has() selectors hit Android
+   Chrome browsers without :has() support. Rewritten with explicit
+   class selectors (.td-check on checkbox, .td-lead on name, .mono
+   on phone, all added in JSX). Universal hide + selective show is
+   the safe path.
 */
 @media (max-width: 720px) {
   .lead-table thead { display: none; }
@@ -612,51 +617,59 @@
     row-gap: 6px;
     align-items: center;
     border: 1px solid var(--border);
-    /* Phase 93.14.1 — tokens-on-scale per §6 UI checklist:
-       radius 14 (--radius-lg) + padding 10/14 lands on the
-       6/10/14/20 scale. Background intentionally NOT set here so
-       the .lead-row-green/yellow/red tints (defined above) still
-       paint the card. .lead-row-default gets the surface fallback
-       just below. */
+    /* tokens-on-scale per §6 UI checklist: radius 14 (--radius-lg)
+       + padding 10/14 lands on the 6/10/14/20 scale. Background
+       intentionally NOT set here so .lead-row-green/yellow/red
+       tints paint through. */
     border-radius: var(--radius-lg, 14px);
     margin-bottom: 10px;
     padding: 10px 14px;
   }
-  /* Phase 93.14.1 — default rows need a card surface on mobile so
-     they don't blend into page bg. The tinted variants already
-     paint themselves via .lead-row-green/yellow/red. */
+  /* Default rows need a card surface on mobile so they don't blend
+     into page bg. The tinted variants paint themselves via
+     .lead-row-green/yellow/red. */
   .lead-table tr.lead-row.lead-row-default {
     background: var(--surface);
   }
+
+  /* Universal hide: every <td> child of a mobile card is hidden by
+     default. Three selectors below explicitly turn back on the
+     three we want: checkbox, lead name, phone. */
   .lead-table tr.lead-row > td {
+    display: none;
     padding: 0;
     border: 0;
+  }
+  .lead-table tr.lead-row > td.td-check,
+  .lead-table tr.lead-row > td.td-lead,
+  .lead-table tr.lead-row > td.mono {
     display: block;
   }
-  /* Lead cell (with name + heat + days dot) spans the right column
-     of row 1. Checkbox (if present) sits in the left column row 1. */
-  .lead-table tr.lead-row > td:has(.name-cell) {
-    grid-column: 2 / 3;
-    grid-row: 1;
-  }
-  .lead-table tr.lead-row > td:has(input[type="checkbox"]) {
+
+  /* Grid placement. Checkbox top-left, name top-right, phone full
+     width on row 2. */
+  .lead-table tr.lead-row > td.td-check {
     grid-column: 1;
     grid-row: 1;
   }
-  /* Phone fills both columns of row 2, flex so Call link sits right. */
+  .lead-table tr.lead-row > td.td-lead {
+    grid-column: 2 / 3;
+    grid-row: 1;
+    min-width: 0;
+  }
   .lead-table tr.lead-row > td.mono {
     grid-column: 1 / -1;
     grid-row: 2;
     font-size: 13px;
     color: var(--text);
   }
-  /* Hide low-priority columns. Stage chip shows on lead-detail
-     instead; Segment / Source / Assigned / Last / Value belong on
-     desktop only (admin's bird's-eye view). */
-  .lead-table tr.lead-row > td:not(.mono):not(:has(.name-cell)):not(:has(input[type="checkbox"])) {
-    display: none;
+  /* When the checkbox td is absent (filtered.some(canReassign) was
+     false for this rep), the lead td auto-flows into col 1. Force
+     it back to span both cols so the layout doesn't collapse. */
+  .lead-table tr.lead-row:not(:has(> td.td-check)) > td.td-lead {
+    grid-column: 1 / -1;
   }
-  /* Bump tap-target on call icon link inside the card. */
+
   .lead-table tr.lead-row .name-cell .name { font-size: 14px; font-weight: 600; }
   .lead-table tr.lead-row .name-cell .company { font-size: 12px; }
 }
