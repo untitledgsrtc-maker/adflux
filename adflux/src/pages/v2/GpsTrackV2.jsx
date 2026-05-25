@@ -33,6 +33,19 @@ import { formatDate } from '../../utils/formatters'
 // gpsDistance.js so /work uses the same filter rules.
 import { summariseTrack, cleanTrack, detectStops } from '../../utils/gpsDistance'
 
+// Phase 93.6 (25 May 2026) — "I'm here · auto-check-in" companion
+// rows are auto-stamped by LogMeetingModal whenever a rep saves a
+// meeting from the lead detail page. They share activity_type=
+// 'meeting' + GPS coords with the real meeting row, so a naive
+// filter doubles every meeting count. Owner reported Kirti = 3
+// real meetings → KPI showed 6.
+//
+// Helper excludes these companion rows from any meeting-count or
+// map-pin reckoning so the visible total matches what the rep
+// actually logged.
+const isAutoCheckinRow = (a) =>
+  (a?.notes || '').startsWith("I'm here · auto-check-in")
+
 // Phase 70.7 (22 May 2026) — dark Google Maps style that matches the
 // v2 chrome but keeps road network legible. Previous palette had
 // roads only ~30% lighter than ground; new palette lifts roads to
@@ -493,6 +506,7 @@ export default function GpsTrackV2() {
             (a.activity_type === 'meeting' || a.activity_type === 'site_visit')
             && Number.isFinite(Number(a.gps_lat))
             && Number.isFinite(Number(a.gps_lng))
+            && !isAutoCheckinRow(a) // Phase 93.6 — drop companion rows
           )
         : []
       for (const a of meetingActs) {
@@ -744,7 +758,7 @@ export default function GpsTrackV2() {
             {[
               { key: 'all',      label: 'All' },
               { key: 'route',    label: 'Route only' },
-              { key: 'meetings', label: `Meetings · ${activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng).length}` },
+              { key: 'meetings', label: `Meetings · ${activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && !isAutoCheckinRow(a)).length}` },
             ].map(opt => (
               <button
                 key={opt.key}
@@ -771,8 +785,8 @@ export default function GpsTrackV2() {
               at least one meeting logged without a captured location.
               Banner saves the admin from thinking pins are missing. */}
           {(() => {
-            const meetingTotalToday = activities.filter(a => a.activity_type === 'meeting' || a.activity_type === 'site_visit').length
-            const meetingWithGps    = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng).length
+            const meetingTotalToday = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && !isAutoCheckinRow(a)).length
+            const meetingWithGps    = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && !isAutoCheckinRow(a)).length
             const noGpsCount        = meetingTotalToday - meetingWithGps
             if (noGpsCount <= 0) return null
             return (
@@ -858,7 +872,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
               also bumped on check-in / interval pings / other
               non-meeting taps — owner reported KPI=3 with only 1
               location pin. The blue-pin count is the truth. */}
-          <RepDayStat label="Meetings" value={activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng).length} />
+          <RepDayStat label="Meetings" value={activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && !isAutoCheckinRow(a)).length} />
           {/* Phase 76.2.2 — single Qualified KPI in the strip (matches
               the 10s rule applied everywhere else). Full breakdown
               rendered as its own card below the strip so admin can
