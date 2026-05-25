@@ -570,7 +570,8 @@ export default function TelecallerV2() {
           <div className="lead-page-title">{profile?.name || 'Telecaller'}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Pill tone="blue">{callsToday} call{callsToday !== 1 ? 's' : ''} · today</Pill>
+          {/* Phase 93.11 — owner: "1 call today" pill repeated the
+              CALLS TODAY tile below. Dropped — single source of truth. */}
           <button className="lead-btn lead-btn-primary" onClick={() => navigate('/leads/new')}>
             <Plus size={14} /> New Lead
           </button>
@@ -805,29 +806,36 @@ export default function TelecallerV2() {
           approved: 50 calls/day · 30% connect · 5 qualified/week
           · 0 SLA breaches. */}
       <div className="lead-stat-strip">
+        {/* Phase 93.11 — all 4 KPI tiles clickable. Each drills to
+            the page where the underlying data lives so admin / TC
+            can investigate without navigating manually. */}
         <Stat
           label="Calls today"
           num={`${callsToday}/${callTarget}`}
           meta={`${callTargetPct}% of target`}
           dotColor={callsToday >= callTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
+          onClick={() => navigate('/follow-ups')}
         />
         <Stat
           label={`Connect rate · ≥${connectTarget}%`}
           num={`${connectRatePct}%`}
           meta={`${connectedToday} of ${callsToday} connected`}
           dotColor={connectRatePct >= connectTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-amber, #F59E0B)'}
+          onClick={() => navigate('/follow-ups')}
         />
         <Stat
           label={`Qualified this week · ≥${qualifiedWeeklyTarget}`}
           num={`${qualifiedThisWeek}/${qualifiedWeeklyTarget}`}
           meta="handed off to sales"
           dotColor={qualifiedThisWeek >= qualifiedWeeklyTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
+          onClick={() => navigate('/leads?stage=Working')}
         />
         <Stat
           label="SLA breaches"
           num={slaBreachCount}
           meta={slaBreachCount === 0 ? 'all on time' : '24h cutoff missed'}
           dotColor={slaBreachCount === 0 ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
+          onClick={() => navigate('/leads')}
         />
       </div>
 
@@ -1139,9 +1147,21 @@ export default function TelecallerV2() {
 }
 
 /* ─── Sub-components ─── */
-function Stat({ label, num, meta, dotColor }) {
+function Stat({ label, num, meta, dotColor, onClick }) {
+  // Phase 93.11 — clickable KPI tiles. Owner: "calles today n all 4
+  // tab must be clickable". onClick drills to a relevant page; if
+  // omitted, tile is static (no cursor/hover change).
+  const baseStyle = dotColor ? { borderLeft: `3px solid ${dotColor}` } : {}
+  const clickStyle = onClick ? { cursor: 'pointer' } : {}
   return (
-    <div className="lead-stat-card" style={dotColor ? { borderLeft: `3px solid ${dotColor}` } : undefined}>
+    <div
+      className="lead-stat-card"
+      style={{ ...baseStyle, ...clickStyle }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick() } : undefined}
+    >
       <div className="lead-stat-eyebrow">{label}</div>
       <div className="lead-stat-num">{num}</div>
       {meta ? <div className="lead-stat-meta">{meta}</div> : null}
