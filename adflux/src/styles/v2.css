@@ -1204,11 +1204,17 @@
   .v2d-hero-grid--5col { grid-template-columns: 1fr; }
 }
 
-/* Extra-narrow: topbar wraps and sidebar vanishes */
+/* Extra-narrow: topbar single-row, sidebar vanishes */
 @media (max-width: 860px) {
   /* Phase 34N — keep safe-area-inset on the narrowest breakpoint too. */
+  /* Phase 93.15 (25 May 2026) — owner: bell still wrapped to second
+     row on mobile despite Phase 93.12 hiding the bulky search bar.
+     Root cause was `flex-wrap: wrap` on this rule which let the bell
+     drop below the crumb when the kicker + greeting + hamburger
+     together exceeded the viewport. Switch to nowrap + shrink the
+     crumb so the bell anchors top-right. */
   .v2d-topbar {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     padding-top: max(12px, env(safe-area-inset-top));
     padding-right: max(14px, env(safe-area-inset-right));
     padding-bottom: 12px;
@@ -1216,6 +1222,26 @@
     gap: 10px;
   }
   .v2d-topbar > div:first-child { order: -1; }
+  /* Phase 93.15 — crumb takes available middle space but shrinks
+     gracefully so the bell next to it stays on the same row. */
+  .v2d-crumb {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .v2d-crumb-kicker {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .v2d-crumb-t {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /* Slightly smaller title on the narrowest screens so the bell
+       has guaranteed breathing room. */
+    font-size: 18px;
+  }
   .v2d-search, .v2d-period { display: none; }
   /* Phase 31G — same orphan-avatar fix as the earlier 860px block. */
   .v2d-me { display: none; }
