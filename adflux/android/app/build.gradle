@@ -11,8 +11,12 @@ android {
         // installs OVERWRITE the previous APK instead of demanding a
         // manual uninstall first. Pattern: phase × 1000 + revision.
         // Increment versionCode on every release.
-        versionCode 76202
-        versionName "0.76.2"
+        // Phase 93 (2026-05-24) — bundle for 91 + 92 + 93 (tomorrow
+        // preview / missed calls / nearby leads / auto-checkout on
+        // share / TC avatar polish / 20:00 IST hard-close cron /
+        // in-app evening banner).
+        versionCode 93000
+        versionName "0.93.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
