@@ -1166,27 +1166,32 @@ export default function TeamDashboardV2() {
                   </div>
                 )
               })()}
-              {/* Phase 62.9 (20 May 2026) — GPS / Online / Push status
+              {/* Phase 62.9 (20 May 2026) + Phase 90.2 (2026-05-25
+                  threshold relax) — GPS / Online / Push status
                   pills per rep. Color-banded so admin spots any rep
                   with a broken signal at-a-glance. Green = healthy,
                   red = OFF / stale.
-                    GPS    — fresh ping in last 30 min
-                    Online — push_subscriptions.last_seen_at < 3h ago
+                    GPS    — any ping today (≤ 12h stale)
+                    Online — push_subscriptions.last_seen_at < 24h ago
                     Push   — push_subscriptions row exists
-                  Rule of thumb: if all three are red, the rep's
-                  phone is likely off or out of signal area. */}
+                  Phase 90.2 — owner: "rep checked in + all signals
+                  wired but pills show OFF". Old thresholds (30 min
+                  GPS + 3h Online) flipped to red on every lunch /
+                  long meeting / sleep mode. Relaxed to day-scale
+                  windows so green = "still alive today", red =
+                  "phone genuinely dark". */}
               {(() => {
                 const ping = latestPingByUser[r.id]
                 const pingMins = ping
                   ? Math.floor((Date.now() - new Date(ping.captured_at).getTime()) / 60000)
                   : Infinity
-                const gpsOn = pingMins <= 30
+                const gpsOn = pingMins <= 720         // 12h (was 30 min)
                 const push = pushByUser[r.id]
                 const pushOn = !!push?.has_sub
                 const lastSeenMins = push?.last_seen_at
                   ? Math.floor((Date.now() - new Date(push.last_seen_at).getTime()) / 60000)
                   : Infinity
-                const onlineOk = lastSeenMins <= 180   // 3h
+                const onlineOk = lastSeenMins <= 1440 // 24h (was 3h)
                 const pill = (label, ok) => (
                   <span
                     style={{

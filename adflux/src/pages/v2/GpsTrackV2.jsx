@@ -88,8 +88,12 @@ export default function GpsTrackV2() {
   // trigger bumps on every lead_activities call/whatsapp insert
   // without any duration filter.
   const [callBreakdown, setCallBreakdown] = useState({
-    total: 0, missed: 0, short: 0, qualified: 0, connectedQualified: 0,
+    total: 0, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0,
   })
+  // Phase 90.2 — full call rows for the per-call history table.
+  // Owner: "i cant see my called of that particular person, should
+  // we get it in dashboard when we open that perosn traking page?".
+  const [callRows, setCallRows] = useState([])
   const mapRef     = useRef(null)
   const containerRef = useRef(null)
   // Phase 70.10 — view-mode toggle: all (route + stops + meetings),
@@ -147,17 +151,16 @@ export default function GpsTrackV2() {
           .gte('toggled_off_at', start)
           .lte('toggled_off_at', end)
           .order('toggled_off_at', { ascending: false }),
-        // Phase 76.2.2 — fetch every call_logs row for this rep+day
-        // (duration + outcome) so we can bucket client-side into
-        // total / missed / short / qualified. Per-row select, not
-        // count(), because we need durations. Cap at 2000 (no rep
-        // should physically dial 2000 numbers in one day — sanity
-        // limit, raise if owner hits ceiling).
+        // Phase 76.2.2 + Phase 90.2 — fetch every call_logs row for
+        // this rep+day. Need duration + outcome + direction +
+        // client_phone + lead embed for the per-call history table
+        // below. Cap at 2000 (sanity limit).
         supabase.from('call_logs')
-          .select('id, duration_seconds, outcome')
+          .select('id, call_at, duration_seconds, outcome, direction, client_phone, notes, lead:lead_id(id, name, company)')
           .eq('user_id', userId)
           .gte('call_at', start)
           .lte('call_at', end)
+          .order('call_at', { ascending: false })
           .limit(2000),
       ])
       if (cancelled) return
@@ -176,19 +179,34 @@ export default function GpsTrackV2() {
       // means rep saved the outcome modal with positive/neutral/
       // negative — a real conversation.
       const rows = callRowsRes?.data || []
+      // Phase 90.2 — split missed (incoming/no-pickup) from no-answer
+      // (outgoing/no-connect). Uses Phase 56l `direction` column.
+      // Buckets:
+      //   missed       direction='missed'        (inbound rep didn't pick)
+      //   noAnswer     direction='outgoing' AND (duration=0 or NULL)
+      //                  AND outcome NOT 'connected' (rep called, no pickup)
+      //   short        direction='outgoing' AND 0 < duration < 10
+      //   qualified    duration >= 10
+      //   connectedQualified  qualified AND outcome='connected'
       const breakdown = {
-        total: rows.length, missed: 0, short: 0, qualified: 0, connectedQualified: 0,
+        total: rows.length, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0,
       }
       for (const r of rows) {
         const d = r.duration_seconds
-        if (d == null || d === 0) breakdown.missed += 1
-        else if (d < 10) breakdown.short += 1
-        else {
+        const dir = r.direction || 'outgoing'
+        if (dir === 'missed') {
+          breakdown.missed += 1
+        } else if (d == null || d === 0) {
+          breakdown.noAnswer += 1
+        } else if (d < 10) {
+          breakdown.short += 1
+        } else {
           breakdown.qualified += 1
           if (r.outcome === 'connected') breakdown.connectedQualified += 1
         }
       }
       setCallBreakdown(breakdown)
+      setCallRows(rows)
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -638,8 +656,29 @@ export default function GpsTrackV2() {
               {user?.city ? ` · ${user.city}` : ''}
             </span>
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
             {formatDate(targetDate)}
+            {/* Phase 90.2 — date picker. Owner: "when we enter in
+                traking of person not showing date filter inside".
+                Lets admin scroll back through past days without
+                touching the URL. Capped at 90 days back to keep
+                queries fast. */}
+            <input
+              type="date"
+              value={targetDate}
+              max={new Date().toISOString().slice(0, 10)}
+              min={new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+              onChange={(e) => {
+                const next = e.target.value
+                if (next) navigate(`/admin/gps/${userId}/${next}`)
+              }}
+              style={{
+                background: 'var(--surface)', color: 'var(--text)',
+                border: '1px solid var(--border)', borderRadius: 8,
+                padding: '4px 8px', fontSize: 12, fontFamily: 'inherit',
+                colorScheme: 'dark',
+              }}
+            />
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -781,6 +820,7 @@ export default function GpsTrackV2() {
           voiceLogs={voiceLogs}
           gpsOffEvents={gpsOffEvents}
           callBreakdown={callBreakdown}
+          callRows={callRows}
           navigate={navigate}
         />
       )}
@@ -792,7 +832,7 @@ export default function GpsTrackV2() {
    stays readable. Renders three stacked sections: today's counters
    from work_sessions.daily_counters, the lead-activities timeline
    (scoped to this rep + this day), and voice logs filed today. */
-function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], callBreakdown = { total: 0, missed: 0, short: 0, qualified: 0, connectedQualified: 0 }, navigate }) {
+function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], callBreakdown = { total: 0, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0 }, callRows = [], navigate }) {
   const counters = session?.daily_counters || {}
   const checkIn  = session?.check_in_at
   const checkOut = session?.check_out_at
@@ -845,14 +885,105 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
             gap: 10, padding: 16,
           }}>
             <RepDayStat label="Total tel-taps"   value={callBreakdown.total} />
-            <RepDayStat label="Missed / no answer" value={callBreakdown.missed}
+            {/* Phase 90.2 — split missed (inbound, rep didn't pick)
+                from no-answer (rep called, no pickup). Was one
+                combined tile. */}
+            <RepDayStat label="Missed (inbound)" value={callBreakdown.missed}
                         tone={callBreakdown.missed > 0 ? 'danger' : ''} />
+            <RepDayStat label="No answer (outbound)" value={callBreakdown.noAnswer}
+                        tone={callBreakdown.noAnswer > 0 ? 'danger' : ''} />
             <RepDayStat label="Below 10 sec"      value={callBreakdown.short}
                         tone={callBreakdown.short > 0 ? 'warn' : ''} />
             <RepDayStat label="Qualified (≥10s)"  value={callBreakdown.qualified}
                         tone={callBreakdown.qualified > 0 ? 'success' : ''} />
             <RepDayStat label="Connected of qualified" value={callBreakdown.connectedQualified}
                         tone={callBreakdown.connectedQualified > 0 ? 'success' : ''} />
+          </div>
+        </div>
+      )}
+
+      {/* Phase 90.2 — Per-call history table. Owner: "i cant see my
+          called of that particular person, should we get it in
+          dashboard when we open that perosn traking page?". Lists
+          every call_logs row for this rep+day. Sortable by time
+          (newest first). Click row → /leads/<lead_id> if linked. */}
+      {callRows.length > 0 && (
+        <div className="lead-card">
+          <div className="lead-card-head">
+            <div>
+              <div className="lead-card-title">Call history · {callRows.length}</div>
+              <div className="lead-card-sub">
+                Every tel-tap + inbound + missed call on this day.
+              </div>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{
+              width: '100%', borderCollapse: 'collapse', fontSize: 12.5,
+            }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  {['Time', 'Direction', 'Lead / phone', 'Duration', 'Outcome', 'Note'].map(h => (
+                    <th key={h} style={{
+                      textAlign: 'left', padding: '10px 12px',
+                      fontSize: 10, letterSpacing: '.12em',
+                      textTransform: 'uppercase', color: 'var(--text-muted)',
+                      fontWeight: 700,
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {callRows.map((c) => {
+                  const dir = c.direction || 'outgoing'
+                  const dirColor = dir === 'missed'   ? 'var(--danger)'
+                                 : dir === 'incoming' ? 'var(--blue)'
+                                 : 'var(--text-muted)'
+                  const d = c.duration_seconds
+                  const durStr = d == null ? '—'
+                                : d === 0    ? '0s'
+                                : d < 60     ? `${d}s`
+                                : `${Math.floor(d/60)}m ${d%60}s`
+                  const qualified = d != null && d >= 10
+                  return (
+                    <tr
+                      key={c.id}
+                      onClick={() => c.lead?.id && navigate(`/leads/${c.lead.id}`)}
+                      style={{
+                        borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.04))',
+                        cursor: c.lead?.id ? 'pointer' : 'default',
+                      }}
+                    >
+                      <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
+                        {new Date(c.call_at).toLocaleTimeString('en-IN', {
+                          hour: '2-digit', minute: '2-digit', hour12: false,
+                          timeZone: 'Asia/Kolkata',
+                        })}
+                      </td>
+                      <td style={{ padding: '8px 12px', color: dirColor, textTransform: 'capitalize', fontWeight: 600 }}>
+                        {dir}
+                      </td>
+                      <td style={{ padding: '8px 12px' }}>
+                        {c.lead?.company || c.lead?.name || c.client_phone || '—'}
+                      </td>
+                      <td style={{
+                        padding: '8px 12px', whiteSpace: 'nowrap',
+                        color: qualified ? 'var(--success)' : 'var(--text-muted)',
+                        fontWeight: qualified ? 600 : 400,
+                      }}>
+                        {durStr}
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
+                        {c.outcome || '—'}
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text-subtle)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.notes || ''}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
