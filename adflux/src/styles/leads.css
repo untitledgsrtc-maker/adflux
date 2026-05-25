@@ -592,6 +592,64 @@
 .days-dot-yellow { background: var(--warning, #F59E0B); box-shadow: 0 0 0 2px rgba(245, 158, 11, .15); }
 .days-dot-red    { background: var(--danger,  #EF4444); box-shadow: 0 0 0 2px rgba(239,  68,  68, .15); }
 
+/* ─── Phase 93.14 (25 May 2026) — mobile /leads compact cards ───────
+   Owner: "in app or mobile view not loomg good ... cant we do small
+   box of lead?" Desktop table forced horizontal swipe on phones to
+   reach Phone column. Below 720px, restyle each <tr> as a stacked
+   card so all the essential info is visible without scroll.
+   Hide low-priority columns (Segment / Source / Assigned / Last /
+   Value) on mobile. Keep Lead + Phone + Stage. Desktop unchanged.
+*/
+@media (max-width: 720px) {
+  .lead-table thead { display: none; }
+  .lead-table,
+  .lead-table tbody { display: block; width: 100%; }
+  .lead-table tr.lead-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    row-gap: 6px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+  }
+  .lead-table tr.lead-row > td {
+    padding: 0;
+    border: 0;
+    display: block;
+  }
+  /* Lead cell (with name + heat + days dot) spans the right column
+     of row 1. Checkbox (if present) sits in the left column row 1. */
+  .lead-table tr.lead-row > td:has(.name-cell) {
+    grid-column: 2 / 3;
+    grid-row: 1;
+  }
+  .lead-table tr.lead-row > td:has(input[type="checkbox"]) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  /* Phone fills both columns of row 2, flex so Call link sits right. */
+  .lead-table tr.lead-row > td.mono {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-size: 13px;
+    color: var(--text);
+  }
+  /* Hide low-priority columns. Stage chip shows on lead-detail
+     instead; Segment / Source / Assigned / Last / Value belong on
+     desktop only (admin's bird's-eye view). */
+  .lead-table tr.lead-row > td:not(.mono):not(:has(.name-cell)):not(:has(input[type="checkbox"])) {
+    display: none;
+  }
+  /* Bump tap-target on call icon link inside the card. */
+  .lead-table tr.lead-row .name-cell .name { font-size: 14px; font-weight: 600; }
+  .lead-table tr.lead-row .name-cell .company { font-size: 12px; }
+}
+
 /* Phase 33A — global toast strip for /work. */
 .m-toast {
   position: fixed;
