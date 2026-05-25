@@ -20,8 +20,13 @@ android {
         // propagate to APK users at next cold-start. No more APK
         // rebuilds for web changes. Native changes (Java, plugins,
         // splash resources) still require rebuild.
-        versionCode 94000
-        versionName "0.94.0"
+        // Phase 94b (2026-05-25) — regenerate launcher icons from
+        // resources/icon.png (the patterned yellow UA mark). May 23
+        // generator pass had read from stale assets/ folder; this
+        // pass syncs the assets/ source + regenerates all mipmap
+        // variants + adaptive icon XML.
+        versionCode 94100
+        versionName "0.94.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
