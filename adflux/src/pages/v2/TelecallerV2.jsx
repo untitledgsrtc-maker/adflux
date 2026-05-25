@@ -34,6 +34,7 @@ import V2Hero from '../../components/v2/V2Hero'
 // as WorkV2 mount from Phase 76.4. Card has its own 7 PM IST gate +
 // role gate so admin / co_owner don't see it.
 import DaySummaryCard from '../../components/work/DaySummaryCard'
+import MissedCallsCard from '../../components/work/MissedCallsCard'
 // Phase 89.11 (2026-05-23) — mount RepMapPanel on /telecaller so
 // Renuka + any TC who does the occasional field visit sees their
 // own meeting pins + GPS track. Defaults collapsed so the page
@@ -881,6 +882,19 @@ export default function TelecallerV2() {
             )
           })}
         </div>
+      )}
+
+      {/* Phase 91b — Missed-call rescue. Highest leverage for TC role
+          since connect-rate is the metric they're paid on. Same card
+          + same quickLogCall chain as /work. Exception-rendered (no
+          card when 0 missed in 24h). refreshKey bumped via callsToday
+          so a save on PostCallOutcomeModal forces a refetch. */}
+      {profile?.id && (
+        <MissedCallsCard
+          userId={profile.id}
+          onCallLead={quickLogCall}
+          refreshKey={callsToday}
+        />
       )}
 
       {/* Phase 89.11 — RepMapPanel. Same component as WorkV2 mounts.

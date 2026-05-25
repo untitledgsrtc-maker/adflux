@@ -67,6 +67,7 @@ import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../compone
 // deferred to Phase 76.4b pending owner sign-off).
 import DaySummaryCard from '../../components/work/DaySummaryCard'
 import GpsOffBanner from '../../components/work/GpsOffBanner'
+import MissedCallsCard from '../../components/work/MissedCallsCard'
 import useGpsLock from '../../hooks/useGpsLock'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
@@ -926,6 +927,20 @@ export default function WorkV2() {
               </span>
             </div>
           </div>
+        )}
+
+        {/* Phase 91b — Missed-call rescue. Exception-rendered (no
+            card when zero missed in 24h). Callback button reuses the
+            same quickLogCall chain the Next-up card uses, so the
+            outcome modal + WhatsApp prompt fire identically. The
+            refreshKey nudges the card to refetch on every call save
+            (daily_counters.calls increments). */}
+        {checkedIn && !dayDone && (
+          <MissedCallsCard
+            userId={profile?.id}
+            onCallLead={quickLogCall}
+            refreshKey={session?.daily_counters?.calls || 0}
+          />
         )}
 
         {/* Phase 35.0 pass 4 — StickyPrimaryCta now only renders here
