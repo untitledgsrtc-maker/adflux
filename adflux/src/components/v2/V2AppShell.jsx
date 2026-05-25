@@ -305,13 +305,20 @@ export function V2AppShell() {
   // (18 May 2026): "main point is i want map route accurate with
   // runs" — denser pings = polyline that follows roads instead of
   // straight-line jumps between sparse points.
+  // Phase 93.3 (24 May 2026) — telecallers + agency don't move; skip
+  // the background watcher for those roles. check-in / check-out
+  // still fires foreground pings via WorkV2.doCheckIn / doCheckOut,
+  // giving start/end anchors without the background battery drain or
+  // wasted Google Maps API quota (snap-to-roads).
   useEffect(() => {
     if (!profile?.id) return
+    const role = (profile?.role || '').toLowerCase()
+    if (role === 'telecaller' || role === 'agency') return
     startBackgroundGps(profile.id).catch((e) =>
       console.warn('[v2-shell] bg-gps start failed:', e?.message || e)
     )
     return () => { stopBackgroundGps().catch(() => {}) }
-  }, [profile?.id])
+  }, [profile?.id, profile?.role])
 
   // Phase 56d — register for FCM on the Android wrapper. Idempotent +
   // native-only. Web app continues to use the VAPID web push path

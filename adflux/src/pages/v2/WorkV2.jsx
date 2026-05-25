@@ -400,6 +400,13 @@ export default function WorkV2() {
   useEffect(() => {
     if (!profile?.id) return
     if (profile?.role === 'agency') return
+    // Phase 93.3 (24 May 2026) — telecallers don't move; tracking them
+    // every 5 min wastes Google Maps API quota (snap-to-roads) + DB
+    // storage with no value. Owner directive: "TC = check-in + check-
+    // out pings only, nothing else." The check-in/checkout pings
+    // still fire (doCheckIn/doCheckOut both call logGpsPing), giving
+    // start/end location anchors without the interval drip.
+    if (profile?.role === 'telecaller') return
     if (!session?.check_in_at) return
     if (session?.evening_report_submitted_at) return
     if (!navigator.geolocation) return
