@@ -68,6 +68,7 @@ import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../compone
 import DaySummaryCard from '../../components/work/DaySummaryCard'
 import GpsOffBanner from '../../components/work/GpsOffBanner'
 import MissedCallsCard from '../../components/work/MissedCallsCard'
+import NearbyLeadsCard from '../../components/work/NearbyLeadsCard'
 import useGpsLock from '../../hooks/useGpsLock'
 
 const TODAY = () => new Date().toISOString().slice(0, 10)
@@ -998,6 +999,15 @@ export default function WorkV2() {
               onCallLead={quickLogCall}
             />
             <RepMapPanel userId={profile.id} />
+            {/* Phase 91c — Nearby leads (within 2km of current GPS).
+                /work only — TC doesn't move. Exception-rendered (no
+                card when 0 results or GPS denied). Directions opens
+                Google Maps URL scheme; Call reuses quickLogCall. */}
+            <NearbyLeadsCard
+              userId={profile.id}
+              onCallLead={quickLogCall}
+              refreshKey={session?.daily_counters?.meetings || 0}
+            />
             <EveningReportBlock
               evening={evening}
               setEvening={setEvening}
