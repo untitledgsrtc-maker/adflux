@@ -511,8 +511,15 @@ export function V2AppShell() {
             </span>
           </button>
 
+          {/* Phase 93.9 (25 May 2026) — owner: TC sees "New Quote"
+              ONLY on /quotes/* pages, not everywhere. Quotes are
+              created by sales / admin / co_owner. TC qualifies leads
+              + hands off. The blanket isTelecaller clause showed the
+              button on /telecaller + every other page = noise.
+              Now: admin / co_owner always; everyone else only on
+              /quotes/* (so a TC who navigates to /quotes can still
+              create one if needed — same path as sales). */}
           {(isPrivileged
-            || isTelecaller
             || location.pathname.startsWith('/quotes')
           ) && (
             <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
