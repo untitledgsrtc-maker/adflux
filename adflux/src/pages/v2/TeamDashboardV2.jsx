@@ -265,11 +265,19 @@ export default function TeamDashboardV2() {
         // their own /telecaller or /work hero. NULL durations also
         // excluded (Postgres .gte semantics) until Phase 65 60-second
         // auto-patch fills the field.
+        // Phase 93.1 — also exclude direction='missed' so the count
+        // matches GpsTrack's "qualified" bucket. Missed-inbound rows
+        // are not outbound qualified calls; previous query counted any
+        // duration_seconds≥10 regardless of direction and overstated
+        // by the count of missed-inbound rows whose duration somehow
+        // landed ≥10 (legacy patch paths). Use .or() so legacy rows
+        // with direction=NULL (pre-Phase-56l) still count.
         supabase.from('call_logs')
           .select('user_id, outcome')
           .gte('call_at', startOfDay)
           .lt ('call_at', endOfDay)
-          .gte('duration_seconds', 10),
+          .gte('duration_seconds', 10)
+          .or('direction.is.null,direction.neq.missed'),
         supabase.from('leads')
           .select('id', { count: 'exact', head: true })
           .gte('created_at', startOfDay)

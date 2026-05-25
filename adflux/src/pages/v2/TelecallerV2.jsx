@@ -152,23 +152,30 @@ export default function TelecallerV2() {
       // the Phase 65 60-second auto-patch fills duration, the call
       // doesn't count toward the KPI yet. Counter bumps within 60s
       // of finishing a real connected call.
+      // Phase 93.1 — also exclude direction='missed' so the count
+      // matches GpsTrack's "qualified" bucket. Was overstating by
+      // any missed-inbound row whose duration somehow landed ≥10.
+      // .or() preserves NULL-direction rows (pre-Phase-56l).
       supabase
         .from('call_logs')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id)
         .gte('call_at', startOfDay)
-        .gte('duration_seconds', 10),
+        .gte('duration_seconds', 10)
+        .or('direction.is.null,direction.neq.missed'),
       // Phase 43.2 prep — connected-rate KPI. Count tel-tap rows that
       // came back with outcome='connected' (vs no-answer/busy/etc).
       // Phase 76.2.2 — same 10s floor applied here so the ratio stays
       // meaningful (connected/total both gated to "real" calls).
+      // Phase 93.1 — same direction!='missed' guard.
       supabase
         .from('call_logs')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id)
         .eq('outcome', 'connected')
         .gte('call_at', startOfDay)
-        .gte('duration_seconds', 10),
+        .gte('duration_seconds', 10)
+        .or('direction.is.null,direction.neq.missed'),
       supabase
         .from('leads')
         .select('id', { count: 'exact', head: true })

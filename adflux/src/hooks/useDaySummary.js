@@ -119,12 +119,17 @@ export default function useDaySummary({ dateISO } = {}) {
         // /work + TC reps on /telecaller (this hook feeds
         // DaySummaryCard, mounted on both). NULL durations excluded
         // until Phase 65 60-second auto-patch fills the field.
+        // Phase 93.1 — also exclude direction='missed' so the count
+        // matches GpsTrack's "qualified" bucket. Was overstating by
+        // any missed-inbound row whose duration somehow landed ≥10
+        // (legacy patch paths). .or() preserves NULL-direction rows.
         supabase.from('call_logs')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', profile.id)
           .gte('call_at', startISO)
           .lte('call_at', endISO)
-          .gte('duration_seconds', 10),
+          .gte('duration_seconds', 10)
+          .or('direction.is.null,direction.neq.missed'),
 
         // 4) leads created by this rep today
         supabase.from('leads')

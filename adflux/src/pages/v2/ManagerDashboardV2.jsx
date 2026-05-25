@@ -81,12 +81,16 @@ export default function ManagerDashboardV2() {
         // duration_seconds >= 10 count toward the KPI. Mirrors the
         // filter on /telecaller, /work (useDaySummary), and
         // /team-dashboard. NULLs excluded by Postgres .gte.
+        // Phase 93.1 — also exclude direction='missed' (inbound
+        // unanswered) so the count matches GpsTrack's qualified
+        // bucket. .or() preserves legacy rows where direction=NULL.
         const { data: callRows } = await supabase
           .from('call_logs')
           .select('user_id, outcome')
           .in('user_id', repIds)
           .gte('created_at', startUtc)
           .gte('duration_seconds', 10)
+          .or('direction.is.null,direction.neq.missed')
 
         // 3. Today's meetings per rep (lead_activities activity_type='meeting').
         const { data: meetRows } = await supabase
