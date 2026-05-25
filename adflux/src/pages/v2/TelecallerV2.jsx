@@ -34,6 +34,7 @@ import V2Hero from '../../components/v2/V2Hero'
 // as WorkV2 mount from Phase 76.4. Card has its own 7 PM IST gate +
 // role gate so admin / co_owner don't see it.
 import DaySummaryCard from '../../components/work/DaySummaryCard'
+import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 import MissedCallsCard from '../../components/work/MissedCallsCard'
 // Phase 89.11 (2026-05-23) — mount RepMapPanel on /telecaller so
 // Renuka + any TC who does the occasional field visit sees their
@@ -530,6 +531,11 @@ export default function TelecallerV2() {
     : 0
   return (
     <div className="lead-root">
+      {/* Phase 93 — evening wrap-up nag banner. Tap = smooth-scroll
+          to DaySummaryCard below. Sits above DaySummaryCard so it
+          can't be missed on first scroll. */}
+      <EveningWrapBanner />
+
       {/* Phase 83 — evening day summary card. Auto-shows after 7 PM
           IST. Mounted above V2Hero so it's the first thing the TC
           sees when finishing the day. */}

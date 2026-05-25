@@ -205,6 +205,7 @@ export default function DaySummaryCard({
 
   return (
     <div
+      id="day-summary-card"
       style={{
         background:    'var(--v2-bg-1, #1e293b)',
         border:        '1px solid var(--v2-line, #334155)',
@@ -212,6 +213,7 @@ export default function DaySummaryCard({
         padding:       16,
         marginBottom:  14,
         position:      'relative',
+        scrollMarginTop: 80,
       }}
     >
       <button
