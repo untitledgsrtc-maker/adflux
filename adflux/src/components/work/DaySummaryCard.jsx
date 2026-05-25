@@ -24,7 +24,7 @@ import React, { useMemo, useState } from 'react'
 import {
   ClipboardList, Phone, Users, Map as MapIcon,
   Mic, BadgeCheck, Wifi, WifiOff, AlertTriangle, Send,
-  X, ChevronRight, Activity, Satellite,
+  X, ChevronRight, Activity, Satellite, LogOut,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -97,7 +97,19 @@ function Row({ icon, label, value, tone }) {
  *                                    point)
  * @param {() => void} [props.onClose] — fires when rep taps X
  */
-export default function DaySummaryCard({ forceShow = false, onClose }) {
+export default function DaySummaryCard({
+  forceShow = false,
+  onClose,
+  // Phase 90.4 — evening check-out wired into the card. Owner
+  // directive: "Option B — show only evening — after showimg
+  // today report at 7 pm". Card already auto-mounts at 19:00 IST,
+  // so adding the Check Out CTA inside it gives the evening-only
+  // visibility without adding a separate time gate. Parent passes
+  // doCheckOut + current state.
+  onCheckOut,
+  checkedOut = false,
+  checkOutBusy = false,
+}) {
   const profile = useAuthStore(s => s.profile)
   const { data, loading, refresh } = useDaySummary()
   const [sending, setSending] = useState(false)
@@ -384,6 +396,61 @@ export default function DaySummaryCard({ forceShow = false, onClose }) {
               Last shared {new Date(data.sentAt).toLocaleTimeString('en-IN', {
                 hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata',
               })} IST
+            </div>
+          )}
+
+          {/* Phase 90.4 — Check Out CTA below Share. Only shows when
+              parent flagged the rep as still checked-in (checkedOut
+              prop false) AND wired the onCheckOut handler. Hidden
+              once stamped so the same card serves as a "day done"
+              confirmation. Ghost styling so it doesn't compete
+              with Share for visual weight. */}
+          {onCheckOut && !checkedOut && (
+            <>
+              <button
+                type="button"
+                onClick={onCheckOut}
+                disabled={checkOutBusy}
+                style={{
+                  marginTop:    10,
+                  width:        '100%',
+                  display:      'inline-flex',
+                  alignItems:   'center',
+                  justifyContent: 'center',
+                  gap:          8,
+                  padding:      '11px 16px',
+                  background:   'transparent',
+                  color:        'var(--v2-ink-0, var(--text))',
+                  fontWeight:   600,
+                  fontSize:     13.5,
+                  border:       '1px solid var(--v2-line, var(--border))',
+                  borderRadius: 10,
+                  cursor:       checkOutBusy ? 'wait' : 'pointer',
+                  opacity:      checkOutBusy ? 0.7 : 1,
+                  fontFamily:   'inherit',
+                }}
+              >
+                <LogOut size={16} strokeWidth={1.6} />
+                {checkOutBusy ? 'Capturing GPS…' : 'Check out — end day'}
+              </button>
+              <div style={{
+                marginTop: 4, fontSize: 10.5,
+                color: 'var(--v2-ink-2, var(--text-subtle))', textAlign: 'center',
+              }}>
+                Stamps your end-of-day GPS + closes the work session.
+              </div>
+            </>
+          )}
+          {checkedOut && (
+            <div style={{
+              marginTop: 10, padding: '8px 12px',
+              background: 'var(--success-soft, rgba(16,185,129,0.10))',
+              border: '1px solid var(--success, #10B981)',
+              borderRadius: 10,
+              fontSize: 12, color: 'var(--success, #10B981)',
+              textAlign: 'center', fontWeight: 600,
+            }}>
+              Checked out · day closed
             </div>
           )}
         </>

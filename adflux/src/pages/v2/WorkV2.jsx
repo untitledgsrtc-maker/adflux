@@ -881,9 +881,18 @@ export default function WorkV2() {
         {/* Phase 76 — evening day summary card. Auto-appears after
             7 PM IST (component's own gate) above TodaySummaryCard
             during the active day. Hidden for admin / co_owner. Card
-            handles its own dismiss + share + work_sessions stamp. */}
+            handles its own dismiss + share + work_sessions stamp.
+            Phase 90.4 — Check Out CTA wired into card so rep can
+            end day in one tap after seeing evening summary. Owner
+            picked Option B (evening-only visibility); card's 19:00
+            IST gate already enforces that, no extra time check
+            needed here. */}
         {checkedIn && !dayDone && (
-          <DaySummaryCard />
+          <DaySummaryCard
+            onCheckOut={doCheckOut}
+            checkedOut={!!session?.check_out_at}
+            checkOutBusy={busy}
+          />
         )}
 
         {/* Phase 34Z.61 — today's load at a glance. Owner directive:
