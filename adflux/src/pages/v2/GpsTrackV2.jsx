@@ -17,7 +17,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, MapPin } from 'lucide-react'
+import { ArrowLeft, MapPin, ChevronDown, ChevronUp } from 'lucide-react'
 // Phase 32K (10 May 2026) — owner reported map STILL failed after
 // Phase 32A's CDN failover ("Map library failed to load: undefined").
 // Both unpkg and cdnjs were failing for him — likely network /
@@ -836,6 +836,11 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
   const counters = session?.daily_counters || {}
   const checkIn  = session?.check_in_at
   const checkOut = session?.check_out_at
+  // Phase 90.3 — owner: "i need hid and open opron — if i arrow
+  // down only open call history". Collapsed by default; click
+  // header → toggle. Saves vertical space (39+ rows pushed timeline
+  // below the fold).
+  const [callHistOpen, setCallHistOpen] = useState(false)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
       {/* Counters strip */}
@@ -905,18 +910,35 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
       {/* Phase 90.2 — Per-call history table. Owner: "i cant see my
           called of that particular person, should we get it in
           dashboard when we open that perosn traking page?". Lists
-          every call_logs row for this rep+day. Sortable by time
-          (newest first). Click row → /leads/<lead_id> if linked. */}
+          every call_logs row for this rep+day.
+          Phase 90.3 — collapsible. Header is a button; chevron
+          toggles. Closed by default to keep page short. */}
       {callRows.length > 0 && (
         <div className="lead-card">
-          <div className="lead-card-head">
+          <button
+            type="button"
+            onClick={() => setCallHistOpen(o => !o)}
+            className="lead-card-head"
+            style={{
+              width: '100%', background: 'transparent', border: 'none',
+              cursor: 'pointer', display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', padding: '14px 16px',
+              color: 'inherit', textAlign: 'left', fontFamily: 'inherit',
+            }}
+          >
             <div>
               <div className="lead-card-title">Call history · {callRows.length}</div>
               <div className="lead-card-sub">
-                Every tel-tap + inbound + missed call on this day.
+                {callHistOpen
+                  ? 'Tap to hide'
+                  : 'Tap to show every tel-tap + inbound + missed call on this day'}
               </div>
             </div>
-          </div>
+            {callHistOpen
+              ? <ChevronUp size={18} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />
+              : <ChevronDown size={18} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />}
+          </button>
+          {callHistOpen && (
           <div style={{ overflowX: 'auto' }}>
             <table style={{
               width: '100%', borderCollapse: 'collapse', fontSize: 12.5,
@@ -985,6 +1007,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
 
