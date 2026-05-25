@@ -208,6 +208,12 @@ export default function TeamDashboardV2() {
   const [followUpsByUser,    setFollowUpsByUser]    = useState({})
   const [quoteChaseByUser,   setQuoteChaseByUser]   = useState({})
   const [paymentChaseByUser, setPaymentChaseByUser] = useState({})
+  // Phase 93.4 (24 May 2026) — owner: "telecaller blank box put
+  // overdue past followup". TCs don't deal with quotes/payments, so
+  // the Quote Chase + Pay Chase tiles render 0 for them. Replace
+  // those with a meaningful metric: count of follow_ups whose
+  // follow_up_date is in the past AND not done.
+  const [overdueFuByUser,    setOverdueFuByUser]    = useState({})
   // Phase 89.10 — flag that flips true once the Google Map mounts.
   // Marker render effects depend on mapRef.current + map.__google
   // both being non-null; refs don't trigger React re-runs, so
@@ -234,7 +240,7 @@ export default function TeamDashboardV2() {
       // the pre-Phase-82 code path.
       const today = period.startIso
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, actGeoRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -334,6 +340,14 @@ export default function TeamDashboardV2() {
         // unsettled-quote counts.
         supabase.from('payments')
           .select('quote_id, amount_received, approval_status'),
+        // Phase 93.4 — overdue follow-ups (not gated by period filter;
+        // overdue is always-now). Pulled separately from fuRes which
+        // is window-gated. Pending only.
+        supabase.from('follow_ups')
+          .select('assigned_to')
+          .lt('follow_up_date', today)
+          .eq('is_done', false),
+
         // Phase 89.1 + 89.6 + 89.8 + 89.9 — geo-tagged meeting /
         // site_visit activities as permanent pins on the live
         // field map. Owner directive 23 May 2026.
@@ -450,6 +464,15 @@ export default function TeamDashboardV2() {
         }
       })
       setPaymentChaseByUser(pcMap)
+
+      // Phase 93.4 — overdue follow-ups (per assigned_to). Used to
+      // replace empty Quote Chase tile for TC reps.
+      const odMap = {}
+      ;(overdueFuRes?.data || []).forEach((r) => {
+        if (!r.assigned_to) return
+        odMap[r.assigned_to] = (odMap[r.assigned_to] || 0) + 1
+      })
+      setOverdueFuByUser(odMap)
 
       // Phase 62.9 — load push subscriptions per rep. Used to render
       // the "Push on/off" + "Online" status pills below the KPI row.
@@ -1157,20 +1180,48 @@ export default function TeamDashboardV2() {
                 const qCls      = qChase === 0 ? '' : qChase >= 5 ? 'dng' : 'warn'
                 const pChase    = paymentChaseByUser[r.id] || 0
                 const pCls      = pChase === 0 ? '' : pChase >= 3 ? 'dng' : 'warn'
+                // Phase 93.4 — TC tiles. TCs don't deal with quotes /
+                // payments; replace those two slots with Overdue F-up +
+                // Connect rate (the two metrics they actually care
+                // about + admin needs to see). isTC computed above for
+                // the calls-target branch.
+                const overdueFu = overdueFuByUser[r.id] || 0
+                const odCls     = overdueFu === 0 ? '' : overdueFu >= 5 ? 'dng' : 'warn'
+                const connectRate = callsHere > 0
+                  ? Math.round((connHere / callsHere) * 100)
+                  : 0
+                const crCls = callsHere === 0 ? '' :
+                              connectRate >= 30 ? 'suc' :
+                              connectRate >= 15 ? 'warn' : 'dng'
                 return (
                   <div className="lead-rep-kpis" style={{ marginTop: 6 }}>
                     <div className="lead-rep-kpi">
                       <div className={`num ${fuCls}`}>{fuDone}/{fuDone + fuPending}</div>
                       <div className="lbl">F-up</div>
                     </div>
-                    <div className="lead-rep-kpi">
-                      <div className={`num ${qCls}`}>{qChase}</div>
-                      <div className="lbl">Quote chase</div>
-                    </div>
-                    <div className="lead-rep-kpi">
-                      <div className={`num ${pCls}`}>{pChase}</div>
-                      <div className="lbl">Pay chase</div>
-                    </div>
+                    {isTC ? (
+                      <>
+                        <div className="lead-rep-kpi">
+                          <div className={`num ${odCls}`}>{overdueFu}</div>
+                          <div className="lbl">Overdue F-up</div>
+                        </div>
+                        <div className="lead-rep-kpi">
+                          <div className={`num ${crCls}`}>{callsHere > 0 ? `${connectRate}%` : '—'}</div>
+                          <div className="lbl">Connect rate</div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="lead-rep-kpi">
+                          <div className={`num ${qCls}`}>{qChase}</div>
+                          <div className="lbl">Quote chase</div>
+                        </div>
+                        <div className="lead-rep-kpi">
+                          <div className={`num ${pCls}`}>{pChase}</div>
+                          <div className="lbl">Pay chase</div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )
               })()}
