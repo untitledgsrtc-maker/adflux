@@ -956,7 +956,7 @@ export default function LeadsV2() {
                     </div>
                   </td>
                   <td
-                    className="mono"
+                    className="td-phone mono"
                     style={{ fontSize: 12, color: 'var(--text-muted)' }}
                     onClick={(e) => e.stopPropagation()}
                   >

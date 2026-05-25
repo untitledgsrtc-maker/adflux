@@ -642,7 +642,7 @@
   }
   .lead-table tr.lead-row > td.td-check,
   .lead-table tr.lead-row > td.td-lead,
-  .lead-table tr.lead-row > td.mono {
+  .lead-table tr.lead-row > td.td-phone {
     display: block;
   }
 
@@ -657,7 +657,7 @@
     grid-row: 1;
     min-width: 0;
   }
-  .lead-table tr.lead-row > td.mono {
+  .lead-table tr.lead-row > td.td-phone {
     grid-column: 1 / -1;
     grid-row: 2;
     font-size: 13px;
