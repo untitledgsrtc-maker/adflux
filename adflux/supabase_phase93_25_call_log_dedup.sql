@@ -88,18 +88,22 @@ END $$;
 
 
 -- ─── 3. Prevent future regressions ───────────────────────────────────
--- Partial unique index on (user_id, client_phone, call_at-rounded-
--- to-minute) where client_phone IS NOT NULL. Catches any future
+-- Partial unique index on (user_id, client_phone, minute-bucket of
+-- call_at) where client_phone IS NOT NULL. Catches any future
 -- duplicate insert at the DB level even if the JS-side dedup misses.
 --
--- Indexed expression must be IMMUTABLE; date_trunc('minute', ...) IS
--- IMMUTABLE so this is index-safe.
+-- NOTE: cannot use DATE_TRUNC('minute', call_at) — Postgres marks it
+-- STABLE (not IMMUTABLE) for timestamptz inputs and rejects it in
+-- index expressions (ERROR 42P17). FLOOR(EXTRACT(EPOCH FROM call_at)
+-- / 60) is IMMUTABLE for timestamptz because EXTRACT(EPOCH FROM tstz)
+-- returns the UTC epoch regardless of session TimeZone. Same bucket
+-- semantic, different expression.
 DROP INDEX IF EXISTS call_logs_user_phone_minute_uq;
 CREATE UNIQUE INDEX call_logs_user_phone_minute_uq
   ON public.call_logs (
     user_id,
     client_phone,
-    DATE_TRUNC('minute', call_at)
+    (FLOOR(EXTRACT(EPOCH FROM call_at) / 60))
   )
   WHERE client_phone IS NOT NULL;
 
