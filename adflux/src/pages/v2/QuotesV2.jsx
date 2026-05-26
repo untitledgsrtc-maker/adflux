@@ -827,7 +827,11 @@ function TotalCard({ label, value, kind, warn }) {
     >
       <div
         style={{
-          fontSize: 10,
+          /* Phase 93.27 (26 May 2026) — label was 10px fixed. On
+             narrow APK viewports (~360px CSS width) 3 cols × ~110px
+             clipped "TOTAL AMOUNT" to "TOTAL A...". clamp scales down
+             on small screens, holds 10px on desktop. */
+          fontSize: 'clamp(8px, 2.5vw, 10px)',
           letterSpacing: '.14em',
           textTransform: 'uppercase',
           fontWeight: 700,
@@ -844,8 +848,11 @@ function TotalCard({ label, value, kind, warn }) {
           fontFamily: 'var(--v2-display)',
           /* Phase 34Z.40 — full Indian-locale numbers can hit 10+
              chars (₹1,01,03,750). Smaller font keeps them readable
-             without truncation. Display-700 still per §3.2. */
-          fontSize: 17,
+             without truncation. Display-700 still per §3.2.
+             Phase 93.27 — was 17px fixed. APK 360px viewport cut
+             "₹15,340" to "₹15,...". clamp scales 12px → 17px so
+             the full number fits across all phone widths. */
+          fontSize: 'clamp(12px, 4vw, 17px)',
           fontWeight: 700,
           color: warn ? 'var(--v2-amber)' : 'var(--v2-ink-0)',
           lineHeight: 1.1,
