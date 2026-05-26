@@ -1409,3 +1409,71 @@ e0bb9ea  Phase 87.7: native dialer auto-launch
   / `regained_at` / `relaunched_at` (NOT `went_offline_at` etc).
   Schema-grep before writing inserts.
 
+
+---
+
+## 38 · Phase 94a — REVERTED to live-update mode (2026-05-24)
+
+**Phase 88.2 bundled mode was reversed ONE DAY LATER.** Owner felt
+the redistribute-per-fix cost immediately. `capacitor.config.json`
+restored to `server.url: https://app.untitledad.in`. Active mode
+since 24 May 2026 is **LIVE-UPDATE**, not bundled.
+
+### Current state of capacitor configs (post-Phase 94a)
+
+| File | Mode | Status |
+|---|---|---|
+| `capacitor.config.json` | **LIVE-UPDATE** (server.url to app.untitledad.in) | ACTIVE |
+| `capacitor.config.bundled.json` | Bundled (webDir-only) | Rollback only |
+| `capacitor.config.live-update.json` | Live-update (stale Phase 88.2 rollback) | Misleading filename — IGNORE |
+
+### How it works now
+
+- APK shell loads `https://app.untitledad.in` at cold start.
+- Every Vercel deploy from `untitled-os` branch propagates to reps
+  on next app open. No APK rebuild per JS fix.
+- Cold start ~5-10s (vs 2s bundled).
+- Native plugins (Geolocation, Phase 76.2 UntitledTracking,
+  PushNotifications, App.openUrl) compiled into APK shell — work
+  identically regardless of where JS loads from.
+
+### When APK rebuild IS required (rare)
+
+Only for native-side changes:
+- New Capacitor plugin added.
+- `android/.../*.java` or `.kt` source change.
+- `AndroidManifest.xml` permission addition.
+- Splash resource swap.
+- `versionCode` bump for Play Store (not used today).
+
+For JS / CSS / React changes — push to Vercel, done.
+
+### Long-run reasoning (locked 2026-05-26)
+
+Owner ships 10-30 commits/week. Bundled redistribute cycle = ~30
+min per release × multiple releases/week = hours/week burned, +
+WhatsApp distribute = partial rollout (reps skip, install late,
+end up on mixed versions = unreproducible bug reports). Live-
+update sacrifices 3-5s of cold start (negligible — open app 5x/
+day = 15s/day across team) for instant fix propagation.
+
+**Bundled wins only if:** shipping to Play Store, reps go offline
+often, OR iteration cadence drops to monthly. None apply here.
+
+### Do NOT recommend bundled mode again unless
+
+1. Owner explicitly asks for offline-first behaviour.
+2. Owner decides to ship to Play Store.
+3. `app.untitledad.in` becomes unreliable.
+
+Reverting to bundled would burn another day of work (config swap,
+APK rebuild, redistribute, smoke) for negative ROI at current
+cadence.
+
+### Foot-gun caught this session (26 May 2026)
+
+- ❌ Don't quote §37 / Phase 88.2 status as "current mode = bundled".
+  §37 documents the day Phase 88.2 shipped but Phase 94a (this
+  section) reversed it. Read `capacitor.config.json` line 2
+  before answering any "is APK bundled or live-update" question.
+
