@@ -426,7 +426,14 @@ export default function QuoteDetail() {
                 if (quote?.media_type === 'OTHER_MEDIA') {
                   navigate('/quotes/new/private/other-media', { state: { editingId: id } })
                 } else {
-                  navigate(`/quotes/new/private?editOf=${id}`)
+                  // Phase 93.28 — ALSO pass editingId via state so the
+                  // wizard prefill survives Capacitor APK navigation.
+                  // Owner reported "detail-page Edit opens blank form
+                  // on APK; web prefills fine." Query string kept for
+                  // bookmark compatibility.
+                  navigate(`/quotes/new/private?editOf=${id}`, {
+                    state: { editingId: id },
+                  })
                 }
               }}
               title="Edit this quote"
@@ -720,7 +727,9 @@ export default function QuoteDetail() {
               and is available for every status except 'lost'. */}
           {quote.status === 'won' && (
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button className="btn btn-y btn-sm" onClick={() => navigate(`/quotes/new?renewalOf=${id}`)}>
+              <button className="btn btn-y btn-sm" onClick={() => navigate(`/quotes/new?renewalOf=${id}`, {
+                state: { renewalOf: id },
+              })}>
                 Create Renewal Quote
               </button>
             </div>

@@ -16,8 +16,15 @@ import { WizardShell } from '../../components/quotes/QuoteWizard/WizardShell'
 export default function CreateQuoteV2() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
-  const renewalOf = searchParams.get('renewalOf')
-  const editOf    = searchParams.get('editOf')
+  // Phase 93.28 (26 May 2026) — read editOf from BOTH router state
+  // AND query string. State-first because owner reported Capacitor
+  // APK shows blank form when only the ?editOf= query string is
+  // used. Query string fallback preserves URL-bookmark
+  // compatibility. Same for renewalOf.
+  const renewalOf =
+    location.state?.renewalOf || searchParams.get('renewalOf')
+  const editOf =
+    location.state?.editingId || searchParams.get('editOf')
   // ClientsV2's "New quote" button hands us a prefill payload via
   // router state. We pass it through to the wizard so Step1Client
   // starts with the client fields already populated.

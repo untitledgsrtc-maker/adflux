@@ -65,7 +65,15 @@ export default function QuotesV2() {
       // Phase 32C — was '/quotes/new?editOf=' but that's the segment
       // chooser, which silently drops editOf. Use the actual Private
       // LED wizard route. Same bug fix applied in QuoteDetail.jsx.
-      navigate(`/quotes/new/private?editOf=${q.id}`)
+      // Phase 93.28 (26 May 2026) — ALSO pass editingId via state so
+      // the wizard prefill survives Capacitor APK navigation. Owner
+      // reported "card Edit opens blank form on APK; web prefills
+      // fine." Same fix shape as the Govt + OTHER_MEDIA branches
+      // above (state-based). Query string kept for URL-bookmark
+      // compatibility; CreateQuoteV2 reads state-first.
+      navigate(`/quotes/new/private?editOf=${q.id}`, {
+        state: { editingId: q.id },
+      })
     }
   }
   // Phase 74 (21 May 2026) — owner directive: team can delete any
