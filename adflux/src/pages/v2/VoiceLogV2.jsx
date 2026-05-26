@@ -21,7 +21,7 @@
 // optionally moves the lead stage if Claude suggested one.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, Mic, Square, Loader2, CheckCircle2,
   AlertTriangle, ChevronRight, RefreshCw, MapPin,
@@ -48,9 +48,14 @@ const STAGE_OPTIONS = [
 export default function VoiceLogV2() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
+  const location = useLocation()
   const profile = useAuthStore(s => s.profile)
 
-  const initialLeadId = params.get('lead') || null
+  // Phase 93.29 — state-first read for the lead-context param.
+  // Capacitor APK doesn't read query strings reliably during
+  // programmatic navigate(). LeadDetailV2's Voice button now also
+  // passes the lead id via router state.
+  const initialLeadId = location.state?.lead || params.get('lead') || null
 
   /* ─── Phase state ─── */
   const [phase, setPhase] = useState('pick') // pick | listening | sending | confirm | done | error

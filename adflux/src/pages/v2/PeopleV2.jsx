@@ -24,7 +24,7 @@
 // and bounce to /dashboard.
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { Users, Gift, Wallet, Clock as ClockIcon, MapPin, UserCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -63,7 +63,13 @@ export default function PeopleV2() {
   const isAdmin  = ['admin', 'co_owner'].includes(profile?.role)
 
   const [params, setParams] = useSearchParams()
-  const requested = params.get('tab') || 'team'
+  const location = useLocation()
+  // Phase 93.29 (26 May 2026) — read tab from router state first, query
+  // string fallback. Owner directive: harden every URL-param route
+  // against Capacitor APK plumbing flakiness. Same pattern as 93.28
+  // editOf/renewalOf. setParams round-trip (internal use) still works
+  // because that goes through useSearchParams' history.replaceState.
+  const requested = location.state?.tab || params.get('tab') || 'team'
   const active = useMemo(
     () => TABS.find(t => t.key === requested) || TABS[0],
     [requested]

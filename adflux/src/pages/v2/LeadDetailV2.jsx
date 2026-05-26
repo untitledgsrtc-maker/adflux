@@ -1145,7 +1145,7 @@ export default function LeadDetailV2() {
                 Note moved into the More drawer below. */}
             <button
               className="lead-btn lead-btn-sm"
-              onClick={() => navigate(`/voice?lead=${lead.id}`)}
+              onClick={() => navigate(`/voice?lead=${lead.id}`, { state: { lead: lead.id } })}
               title="Voice log (Gujarati / Hindi / English)"
             >
               <Mic size={13} /> <span>Voice</span>

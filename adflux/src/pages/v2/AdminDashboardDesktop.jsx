@@ -1107,8 +1107,8 @@ export default function AdminDashboardDesktop() {
                 leaves={state.pendingLeaves}
                 ta={state.pendingTa}
                 onPayments={() => navigate('/pending-approvals')}
-                onLeaves={() => navigate('/people?tab=leaves')}
-                onTa={() => navigate('/people?tab=ta')}
+                onLeaves={() => navigate('/people?tab=leaves', { state: { tab: 'leaves' } })}
+                onTa={() => navigate('/people?tab=ta', { state: { tab: 'ta' } })}
               />
               <RepsInFieldCard
                 rows={state.liveReps}

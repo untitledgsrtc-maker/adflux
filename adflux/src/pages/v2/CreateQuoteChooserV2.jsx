@@ -51,7 +51,11 @@ export default function CreateQuoteChooserV2() {
   // Renders a brief loader while resolving. If the source quote
   // doesn't exist or fails RLS, falls through to the 4-card chooser
   // (rep can still pick manually).
-  const renewalOfId = searchParams.get('renewalOf')
+  // Phase 93.29 — state-first read for renewalOf. RenewalToolsV2 +
+  // QuoteDetail.jsx already pass renewalOf via router state per
+  // Phase 93.28; this falls back to ?renewalOf= for any external
+  // deep link or older code path.
+  const renewalOfId = location.state?.renewalOf || searchParams.get('renewalOf')
   const [renewalResolving, setRenewalResolving] = useState(!!renewalOfId)
 
   useEffect(() => {
