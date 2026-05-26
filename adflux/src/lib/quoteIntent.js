@@ -30,9 +30,17 @@ let pendingEditOf = null
 let pendingRenewalOf = null
 let pendingTs = 0
 
-// 5-minute hard expiry. Belt-and-suspenders in case visibilitychange
-// doesn't fire (some Android WebViews).
-const TTL_MS = 5 * 60 * 1000
+// 3-second hard expiry. Tight window — must be longer than worst-case
+// wizard mount time (navigate → React commit → CreateQuoteV2 render
+// → consume*) but short enough to prevent leak into a later "New
+// Quote" click. APK render is typically <100ms; 3s leaves 30× safety
+// margin without spilling intent into the next user action.
+//
+// Previously 5 minutes — owner pushback: "make sure dont patch so
+// other function disturbed". A long-lived in-memory intent could
+// silently prefill a fresh New-Quote click if the user clicked Edit
+// + canceled + later opened New Quote.
+const TTL_MS = 3000
 
 function isExpired() {
   return pendingTs && (Date.now() - pendingTs) > TTL_MS
@@ -76,14 +84,7 @@ export function consumePendingRenewalOf() {
   return id
 }
 
-// Clear on backgrounding so stale intent doesn't leak into the next
-// foreground session.
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      pendingEditOf = null
-      pendingRenewalOf = null
-      pendingTs = 0
-    }
-  })
-}
+// Phase 93.30 — dropped the visibilitychange-clear handler. With
+// 3-second TTL the auto-clear was redundant and risked cancelling a
+// legitimate edit-flow if the user briefly switched apps between tap
+// and wizard render. TTL alone covers the leak case.
