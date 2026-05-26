@@ -87,25 +87,31 @@ BEGIN
 END $$;
 
 
--- ─── 3. Prevent future regressions ───────────────────────────────────
--- Partial unique index on (user_id, client_phone, minute-bucket of
--- call_at) where client_phone IS NOT NULL. Catches any future
--- duplicate insert at the DB level even if the JS-side dedup misses.
+-- ─── 3. (REMOVED) DB-level unique index for future regressions ──────
 --
--- NOTE: cannot use DATE_TRUNC('minute', call_at) — Postgres marks it
--- STABLE (not IMMUTABLE) for timestamptz inputs and rejects it in
--- index expressions (ERROR 42P17). FLOOR(EXTRACT(EPOCH FROM call_at)
--- / 60) is IMMUTABLE for timestamptz because EXTRACT(EPOCH FROM tstz)
--- returns the UTC epoch regardless of session TimeZone. Same bucket
--- semantic, different expression.
+-- Phase 93.25.2 — dropped the unique index step. Both DATE_TRUNC and
+-- FLOOR(EXTRACT(EPOCH FROM ...)) are marked STABLE (not IMMUTABLE) in
+-- this Supabase Postgres version for timestamptz inputs. Postgres
+-- rejects STABLE functions in index expressions with ERROR 42P17.
+--
+-- A custom IMMUTABLE wrapper function would work but it would lie to
+-- the optimizer (and any future Postgres upgrade could surface
+-- subtle issues). Not worth the maintenance debt.
+--
+-- The dedup is still protected:
+--   • JS-side: callAudit.cleanPhoneForAudit (Phase 93.25 part A)
+--     normalises phone to 10 digits BEFORE insert, so the dedup
+--     window query in callHistoryIngest now matches the audit row.
+--   • DB-side: steps 1 + 2 above cleaned all historical dupes.
+--   • If a regression sneaks in despite (a), it'll show up on
+--     /telecaller call history immediately and we'll re-run this
+--     dedup script. The defensive index was nice-to-have, not
+--     essential.
+--
+-- A drop is included for any environment that installed the index
+-- via a prior 93.25 / 93.25.1 attempt — keep idempotent re-runs
+-- clean.
 DROP INDEX IF EXISTS call_logs_user_phone_minute_uq;
-CREATE UNIQUE INDEX call_logs_user_phone_minute_uq
-  ON public.call_logs (
-    user_id,
-    client_phone,
-    (FLOOR(EXTRACT(EPOCH FROM call_at) / 60))
-  )
-  WHERE client_phone IS NOT NULL;
 
 
 NOTIFY pgrst, 'reload schema';
@@ -127,10 +133,7 @@ SELECT
      HAVING count(*) > 1
    ) dup_check)
     AS remaining_per_minute_dupes_should_be_zero,
-  -- New unique index installed.
-  (SELECT count(*) FROM pg_indexes
-    WHERE indexname = 'call_logs_user_phone_minute_uq')
-    AS unique_index_present,
+  -- Phase 93.25.2 — unique index step removed; not part of VERIFY.
   -- Total call_logs surviving (for owner reference).
   (SELECT count(*) FROM public.call_logs)
     AS total_call_logs_after_cleanup;
