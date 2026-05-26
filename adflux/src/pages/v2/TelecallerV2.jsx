@@ -157,18 +157,21 @@ export default function TelecallerV2() {
       // matches GpsTrack's "qualified" bucket. Was overstating by
       // any missed-inbound row whose duration somehow landed ≥10.
       // .or() preserves NULL-direction rows (pre-Phase-56l).
+      // Phase 93.24 — lead-tied calls only. See TeamDashboardV2 note.
       supabase
         .from('call_logs')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id)
         .gte('call_at', startOfDay)
         .gte('duration_seconds', 10)
-        .or('direction.is.null,direction.neq.missed'),
+        .or('direction.is.null,direction.neq.missed')
+        .not('lead_id', 'is', null),
       // Phase 43.2 prep — connected-rate KPI. Count tel-tap rows that
       // came back with outcome='connected' (vs no-answer/busy/etc).
       // Phase 76.2.2 — same 10s floor applied here so the ratio stays
       // meaningful (connected/total both gated to "real" calls).
       // Phase 93.1 — same direction!='missed' guard.
+      // Phase 93.24 — lead-tied calls only.
       supabase
         .from('call_logs')
         .select('id', { count: 'exact', head: true })
@@ -176,7 +179,8 @@ export default function TelecallerV2() {
         .eq('outcome', 'connected')
         .gte('call_at', startOfDay)
         .gte('duration_seconds', 10)
-        .or('direction.is.null,direction.neq.missed'),
+        .or('direction.is.null,direction.neq.missed')
+        .not('lead_id', 'is', null),
       supabase
         .from('leads')
         .select('id', { count: 'exact', head: true })

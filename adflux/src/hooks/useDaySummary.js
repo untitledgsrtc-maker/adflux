@@ -123,13 +123,17 @@ export default function useDaySummary({ dateISO } = {}) {
         // matches GpsTrack's "qualified" bucket. Was overstating by
         // any missed-inbound row whose duration somehow landed ≥10
         // (legacy patch paths). .or() preserves NULL-direction rows.
+        // Phase 93.24 — lead-tied calls only. KPI semantic = "calls
+        // to clients today", not "every tel-tap captured by native
+        // dialer ingest".
         supabase.from('call_logs')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', profile.id)
           .gte('call_at', startISO)
           .lte('call_at', endISO)
           .gte('duration_seconds', 10)
-          .or('direction.is.null,direction.neq.missed'),
+          .or('direction.is.null,direction.neq.missed')
+          .not('lead_id', 'is', null),
 
         // 4) leads created by this rep today
         supabase.from('leads')

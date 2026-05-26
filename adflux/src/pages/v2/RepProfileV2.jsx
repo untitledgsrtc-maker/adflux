@@ -319,18 +319,22 @@ export default function RepProfileV2() {
           .eq('user_id', userId)
           .is('effective_to', null)
           .maybeSingle(),
-        // Calls today (>=10s qualified)
+        // Phase 93.24 — all 3 buckets filter to lead-tied calls only.
+        // Calls today (>=10s qualified, lead-tied)
         supabase.from('call_logs').select('id, outcome, duration_seconds', { count: 'exact' })
           .eq('user_id', userId).gte('call_at', dayStart).lte('call_at', dayEnd)
-          .gte('duration_seconds', 10),
-        // Calls this week (>=10s)
+          .gte('duration_seconds', 10)
+          .not('lead_id', 'is', null),
+        // Calls this week (>=10s, lead-tied)
         supabase.from('call_logs').select('id', { count: 'exact', head: true })
           .eq('user_id', userId).gte('call_at', weekStart)
-          .gte('duration_seconds', 10),
-        // Calls this month (>=10s)
+          .gte('duration_seconds', 10)
+          .not('lead_id', 'is', null),
+        // Calls this month (>=10s, lead-tied)
         supabase.from('call_logs').select('id', { count: 'exact', head: true })
           .eq('user_id', userId).gte('call_at', monthStart)
-          .gte('duration_seconds', 10),
+          .gte('duration_seconds', 10)
+          .not('lead_id', 'is', null),
         // Activities this month (meetings + site_visit + qualifications)
         supabase.from('lead_activities')
           .select('activity_type, created_at')

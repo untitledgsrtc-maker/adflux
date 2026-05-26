@@ -84,6 +84,7 @@ export default function ManagerDashboardV2() {
         // Phase 93.1 — also exclude direction='missed' (inbound
         // unanswered) so the count matches GpsTrack's qualified
         // bucket. .or() preserves legacy rows where direction=NULL.
+        // Phase 93.24 — lead-tied calls only.
         const { data: callRows } = await supabase
           .from('call_logs')
           .select('user_id, outcome')
@@ -91,6 +92,7 @@ export default function ManagerDashboardV2() {
           .gte('created_at', startUtc)
           .gte('duration_seconds', 10)
           .or('direction.is.null,direction.neq.missed')
+          .not('lead_id', 'is', null)
 
         // 3. Today's meetings per rep (lead_activities activity_type='meeting').
         const { data: meetRows } = await supabase

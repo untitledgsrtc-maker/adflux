@@ -284,12 +284,20 @@ export default function TeamDashboardV2() {
         // by the count of missed-inbound rows whose duration somehow
         // landed ≥10 (legacy patch paths). Use .or() so legacy rows
         // with direction=NULL (pre-Phase-56l) still count.
+        // Phase 93.24 (26 May 2026) — owner: "we count all calles in
+        // teleicaller and field sales but actuall it shudl be lead
+        // calles only. ex. nikhil has done 0 calles to client but its
+        // showing 46 calls". callHistoryIngest writes EVERY native
+        // outgoing call to call_logs, with lead_id NULL when the
+        // phone doesn't match any lead. Filter to lead-tied calls
+        // only so the KPI reflects sales activity, not personal calls.
         supabase.from('call_logs')
           .select('user_id, outcome')
           .gte('call_at', startOfDay)
           .lt ('call_at', endOfDay)
           .gte('duration_seconds', 10)
-          .or('direction.is.null,direction.neq.missed'),
+          .or('direction.is.null,direction.neq.missed')
+          .not('lead_id', 'is', null),
         supabase.from('leads')
           .select('id', { count: 'exact', head: true })
           .gte('created_at', startOfDay)
