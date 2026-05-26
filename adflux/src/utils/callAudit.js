@@ -48,13 +48,27 @@
 //   window.location.href = `tel:+${phone}`   // user gesture
 //   logCallAudit(supabase, { userId, leadId, phone })  // no await
 
+// Phase 93.25 (26 May 2026) — normalize phone to the same 10-digit
+// form callHistoryIngest uses so the dedup window matches. Owner
+// reported call history showing every call twice — the audit row
+// stored "+919879018219" while the ingest dedup looked up
+// "9879018219", so the .eq('client_phone', cleaned) check missed
+// the audit row and ingest wrote a fresh duplicate. Same helper
+// shape as callHistoryIngest.cleanPhone (last 10 digits).
+function cleanPhoneForAudit(raw) {
+  if (!raw) return null
+  const digits = String(raw).replace(/[^0-9]/g, '')
+  if (digits.length >= 10) return digits.slice(-10)
+  return digits || null
+}
+
 export function logCallAudit(supabase, { userId, leadId, phone }) {
   if (!supabase || !userId) return
   try {
     supabase.from('call_logs').insert([{
       user_id:      userId,
       lead_id:      leadId || null,
-      client_phone: phone || null,
+      client_phone: cleanPhoneForAudit(phone),
       outcome:      'no_answer',
       notes:        'tel-tap audit (Phase 35.0 pass 6, Phase 54 F2 default)',
     }]).then(({ error }) => {
