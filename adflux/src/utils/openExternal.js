@@ -3,30 +3,27 @@
 // Phase 93.19 (26 May 2026) — Capacitor-aware launchers for external
 // URL schemes (tel:, whatsapp:, mailto:).
 //
-// Owner reported: "in web if we call, outcome popup coming instantly,
-// then we fill outcome [and] auto come WhatsApp. but in app it's not
-// working." Root cause: WorkV2 + TelecallerV2 used the web pattern
-// `window.location.href = 'tel:+...'` which on Capacitor APK webview
-// tries to navigate the webview to a tel: URL — webview can't handle
-// it, navigation fails, and the JS chain that opens the
-// PostCallOutcomeModal 1.5s later silently breaks.
+// Phase 93.19.1 (26 May 2026) — STATIC import of @capacitor/app.
 //
-// Same trap for `window.open('whatsapp://...', '_blank')`.
+// Owner reported after 93.19 ship: "if i call lead out come not
+// come. in web working so perfect." Root cause: dynamic
+// `await import('@capacitor/app')` is a Vite code-split chunk. On
+// live-update APK mode the chunk fetches from app.untitledad.in on
+// first call, adding 100-2000ms latency. Two things go wrong:
+//   1. The user-gesture context is lost across the await — Android
+//      sometimes drops the OS intent if it doesn't fire promptly.
+//   2. The PostCallOutcomeModal setTimeout(1500) timer races against
+//      the chunk-load + insert chain; if the WebView backgrounds
+//      before the modal state flip, the modal never opens.
 //
-// Capacitor's @capacitor/app plugin provides App.openUrl which
-// dispatches a native intent. Native dialer / WhatsApp opens cleanly
-// + webview is unaffected + JS execution continues so the modal
-// timer fires on schedule.
+// Static import: App is bound at module load. App.openUrl fires
+// SYNCHRONOUSLY on the user gesture. No async dance.
 //
-// On web (mobile Chrome / desktop), fall back to the standard
-// browser behaviour — Chrome intercepts tel: + whatsapp: at the OS
-// level and routes them via system handlers.
-//
-// PostCallOutcomeModal chain (tel: → 1.5s → modal → save) per §28
-// is preserved: dialPhone resolves fast on native (App.openUrl is a
-// fire-and-forget intent that returns quickly) and synchronously on
-// web (window.location.href). The setTimeout queued after the
-// dialPhone call still fires on schedule.
+// Web cost: @capacitor/app is ~2 kB gzipped. App.openUrl is gated
+// behind isNative() so it never runs in a browser anyway — the
+// import is dead-weight on web but trivially small.
+
+import { App } from '@capacitor/app'
 
 function isNative() {
   try {
@@ -41,19 +38,18 @@ function isNative() {
  * Accepts any format; strips non-digits + ensures + prefix.
  *
  * @param {string} phone
- * @returns {Promise<void>}
  */
-export async function dialPhone(phone) {
+export function dialPhone(phone) {
   if (!phone) return
   const digits = String(phone).replace(/[^\d+]/g, '')
   const url = digits.startsWith('+') ? `tel:${digits}` : `tel:+${digits}`
   if (isNative()) {
     try {
-      const { App } = await import('@capacitor/app')
-      await App.openUrl({ url })
+      // Fire-and-forget. App.openUrl returns a Promise (we ignore it
+      // — the OS intent dispatches immediately on the user gesture).
+      App.openUrl({ url })
       return
     } catch (e) {
-      // Fall through to web fallback — worst-case browser default
       console.warn('[openExternal] dialPhone Capacitor App.openUrl failed:', e?.message || e)
     }
   }
@@ -67,14 +63,12 @@ export async function dialPhone(phone) {
  * in a new tab so the current page state is preserved.
  *
  * @param {string} url
- * @returns {Promise<void>}
  */
-export async function openExternalUrl(url) {
+export function openExternalUrl(url) {
   if (!url) return
   if (isNative()) {
     try {
-      const { App } = await import('@capacitor/app')
-      await App.openUrl({ url })
+      App.openUrl({ url })
       return
     } catch (e) {
       console.warn('[openExternal] openExternalUrl Capacitor App.openUrl failed:', e?.message || e)
