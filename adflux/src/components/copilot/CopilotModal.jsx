@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom'
 import { Sparkles, X, Loader2, ArrowRight, MessageCircle, Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { openExternalUrl } from '../../utils/openExternal'
 
 const SUGGESTED_QUERIES = [
   { gu: 'આજે કોને check-in નથી કર્યું?',     en: 'Who hasn\'t checked in today?' },
@@ -198,7 +199,7 @@ export default function CopilotModal({ open, onClose }) {
                           navigate(c.path)
                           onClose()
                         } else if (c.kind === 'whatsapp' && c.phone && c.message) {
-                          window.open(`https://wa.me/${c.phone}?text=${encodeURIComponent(c.message)}`, '_blank')
+                          openExternalUrl(`https://wa.me/${c.phone}?text=${encodeURIComponent(c.message)}`)
                         }
                       }}
                       style={{

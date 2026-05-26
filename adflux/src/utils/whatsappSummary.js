@@ -17,6 +17,8 @@
 // this content is plain text routed to WhatsApp, not in-app UI,
 // so the ban does not apply. Owner explicitly chose Option X.
 
+import { openExternalUrl } from './openExternal'
+
 /**
  * Pluralize seconds → "Xh Ym" or "Ym Ns" form.
  */
@@ -187,8 +189,10 @@ export function openWhatsAppShare(text) {
   const url = isMobile
     ? `whatsapp://send?text=${encoded}`
     : `https://wa.me/?text=${encoded}`
-  // Open in a new context so the current page state is preserved.
-  window.open(url, '_blank')
+  // Phase 93.19 — openExternalUrl routes via Capacitor App.openUrl on
+  // native APK (otherwise webview tries to navigate to whatsapp://
+  // and breaks the JS chain), falls back to window.open on web.
+  openExternalUrl(url)
 }
 
 export default { formatDaySummaryText, openWhatsAppShare }

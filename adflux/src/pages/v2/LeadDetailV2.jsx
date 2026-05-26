@@ -51,6 +51,7 @@ import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { logCallAudit } from '../../utils/callAudit'
+import { openExternalUrl } from '../../utils/openExternal'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { Modal, ActionButton } from '../../components/v2/primitives'
@@ -1103,7 +1104,7 @@ export default function LeadDetailV2() {
                 pressTimer = setTimeout(() => {
                   longPressed = true
                   fireAndForgetLog('whatsapp', `WhatsApp blank → ${lead.phone}`)
-                  window.open(`https://wa.me/${phone}`, '_blank', 'noopener,noreferrer')
+                  openExternalUrl(`https://wa.me/${phone}`)
                 }, 500)
               }
               const cancel = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null } }

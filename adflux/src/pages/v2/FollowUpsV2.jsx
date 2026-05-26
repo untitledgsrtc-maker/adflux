@@ -34,6 +34,7 @@ import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import V2Hero from '../../components/v2/V2Hero'
 import { logCallAudit } from '../../utils/callAudit'
+import { dialPhone, openExternalUrl } from '../../utils/openExternal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { toastError } from '../../components/v2/Toast'
@@ -271,7 +272,7 @@ export default function FollowUpsV2() {
     const e164  = clean.length === 10 ? `91${clean}` : clean
     const greet = row.note ? `Hi ${rowName(row) || ''}, following up on: ${row.note}` : `Hi ${rowName(row) || ''}`
     const url   = `https://wa.me/${e164}?text=${encodeURIComponent(greet)}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    openExternalUrl(url)
   }
 
   // Phase 34Z.63 — Call now fires the same chain as WorkV2 +
@@ -299,12 +300,12 @@ export default function FollowUpsV2() {
       logFollowUpActivity(row, 'call')
       // Phase 35.0 pass 6 — call-tap audit (lead-less path).
       logCallAudit(supabase, { userId: profile?.id, leadId: null, phone })
-      window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
+      dialPhone(phone)
       return
     }
     setCallLead(leadObj || { id: leadId, phone, name: rowName(row) })
     // Fire dialer on the gesture, queue activity insert + modal.
-    window.location.href = `tel:${String(phone).replace(/\s/g, '')}`
+    dialPhone(phone)
     // Phase 35.0 pass 6 — call-tap audit (modal-chain path).
     logCallAudit(supabase, { userId: profile?.id, leadId, phone })
     // Phase 34Z.69 — fix #5: hardened error path. The earlier
@@ -365,7 +366,7 @@ export default function FollowUpsV2() {
     logNurtureActivity(lead, 'call')
     // Phase 35.0 pass 6 — call-tap audit for nurture-row Call.
     logCallAudit(supabase, { userId: profile?.id, leadId: lead.id, phone: lead.phone })
-    window.location.href = `tel:${String(lead.phone).replace(/\s/g, '')}`
+    dialPhone(lead.phone)
   }
   function nurtureWhatsApp(lead) {
     if (!lead.phone) {
@@ -377,7 +378,7 @@ export default function FollowUpsV2() {
     const e164  = clean.length === 10 ? `91${clean}` : clean
     const greet = `Hi ${lead.name || ''}, just checking back in as we discussed.`
     const url   = `https://wa.me/${e164}?text=${encodeURIComponent(greet)}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    openExternalUrl(url)
   }
   async function reactivate(lead) {
     setBusyId(lead.id)

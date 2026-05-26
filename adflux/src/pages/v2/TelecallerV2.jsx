@@ -46,6 +46,7 @@ import RepMapPanel from '../../components/leads/RepMapPanel'
 // audit + post-call outcome capture + auto-refresh.
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import { logCallAudit } from '../../utils/callAudit'
+import { dialPhone } from '../../utils/openExternal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
 // Phase 47.1 — WhatsApp 1-click send.
@@ -355,7 +356,7 @@ export default function TelecallerV2() {
       return
     }
     setCallLead(lead)
-    window.location.href = `tel:+${phone}`
+    dialPhone(phone)
     logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
     setTimeout(async () => {
       const { data: actRow, error: insErr } = await supabase

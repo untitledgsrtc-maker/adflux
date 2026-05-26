@@ -1,4 +1,5 @@
 import { formatCurrency } from './formatters'
+import { openExternalUrl } from './openExternal'
 
 /**
  * Shorten a URL for WhatsApp.
@@ -227,7 +228,9 @@ export function openWhatsApp(phone, message) {
     ? `https://wa.me/${clean}?text=${encoded}`
     : `https://wa.me/?text=${encoded}`
 
-  window.open(url, '_blank')
+  // Phase 93.19 — openExternalUrl routes via Capacitor App.openUrl
+  // on native APK, falls back to window.open on web.
+  openExternalUrl(url)
 }
 
 // --- internal helpers ------------------------------------------------
