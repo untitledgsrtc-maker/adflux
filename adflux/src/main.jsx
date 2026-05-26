@@ -67,7 +67,19 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       const href = link.getAttribute('href')
       if (!href) return
       event.preventDefault()
-      event.stopPropagation()
+      // Phase 93.21 (26 May 2026) — DROPPED `event.stopPropagation()`.
+      // Owner reported APK Call buttons (LeadDetailV2 hero / in-card /
+      // more-drawer) opened the dialer but never triggered the
+      // PostCallOutcomeModal 1.5s afterwards. Root cause: this listener
+      // runs in CAPTURE phase with `useCapture=true`. stopPropagation()
+      // killed the event BEFORE React's delegated bubble-phase listener
+      // saw it, so the <a onClick={fireAndForgetLog('call', ...)}>
+      // handler never fired → quickLog never inserted → modal never
+      // scheduled. Web was unaffected because the isNative() check at
+      // the top exits before reaching this branch. Drop stopPropagation;
+      // preventDefault alone suppresses the WebView's tel:-URL
+      // navigation. React's onClick still fires + PostCallOutcomeModal
+      // chain on APK now matches web.
       // Lazy-load @capacitor/app only on native. Falls back to a plain
       // navigation if the plugin isn't available so worst-case the
       // user still gets the browser-default behaviour.
