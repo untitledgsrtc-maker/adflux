@@ -1931,7 +1931,7 @@ function SegmentToggle({ value, onChange }) {
               padding: '6px 14px', fontSize: 12, fontWeight: 600,
               border: 'none', borderRadius: 999, cursor: 'pointer',
               background: on ? 'var(--v2-yellow, #FFE600)' : 'transparent',
-              color:      on ? '#0a0e1a' : 'var(--v2-ink-2)',
+              color:      on ? 'var(--accent-fg, #0F172A)' : 'var(--v2-ink-2)',
               fontFamily: 'inherit',
             }}
           >
