@@ -256,7 +256,13 @@ export default function TeamDashboardV2() {
           .eq('is_active', true)
           .order('name'),
         supabase.from('work_sessions')
-          .select('user_id, check_in_at, daily_counters')
+          // Phase 93.23 (26 May 2026) — added check_out_at +
+          // auto_checked_out + check_out_source. Without these the
+          // status logic at line ~1066 always read undefined and
+          // fell through to 'in field' regardless of whether the
+          // rep was checked out (Phase 92c auto_cron at 20:00 IST
+          // stamped check_out_at correctly; dashboard never saw it).
+          .select('user_id, check_in_at, check_out_at, auto_checked_out, check_out_source, daily_counters')
           .eq('work_date', today),
         // Phase 83 — fetch outcome so we can split TOTAL vs
         // CONNECTED per rep. Outcome enum: 'connected', 'no_answer',
