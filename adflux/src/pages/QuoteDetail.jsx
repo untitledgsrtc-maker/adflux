@@ -424,19 +424,14 @@ export default function QuoteDetail() {
                 // no edit context and assumed nothing happened.
                 // Fixed: navigate directly to the wizard route by
                 // media_type. Same pattern OTHER_MEDIA already uses.
+                // Phase 94 — path-param route. id lives in the URL
+                // path itself; useParams() reads it deterministically
+                // on every WebView. Replaces the query-string +
+                // router-state + in-memory fallback stack.
                 if (quote?.media_type === 'OTHER_MEDIA') {
-                  setPendingEditOf(id)
-                  navigate('/quotes/new/private/other-media', { state: { editingId: id } })
+                  navigate(`/quotes/edit/${id}/other-media`)
                 } else {
-                  // Phase 93.30 — triple-layer delivery (in-memory +
-                  // router state + query string). APK Capacitor
-                  // WebView drops router state across navigate +
-                  // races useSearchParams on first render; in-memory
-                  // store guarantees consumer sees the id.
-                  setPendingEditOf(id)
-                  navigate(`/quotes/new/private?editOf=${id}`, {
-                    state: { editingId: id },
-                  })
+                  navigate(`/quotes/edit/${id}`)
                 }
               }}
               title="Edit this quote"
@@ -730,10 +725,7 @@ export default function QuoteDetail() {
               and is available for every status except 'lost'. */}
           {quote.status === 'won' && (
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button className="btn btn-y btn-sm" onClick={() => {
-                setPendingRenewalOf(id)
-                navigate(`/quotes/new?renewalOf=${id}`, { state: { renewalOf: id } })
-              }}>
+              <button className="btn btn-y btn-sm" onClick={() => navigate(`/quotes/renew/${id}`)}>
                 Create Renewal Quote
               </button>
             </div>

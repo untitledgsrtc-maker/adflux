@@ -186,6 +186,12 @@ export default function App() {
           <Route path="/v2/dashboard" element={<DashboardV2 />} />
           {/* Shared — admin + sales */}
           <Route path="/quotes"                    element={<QuotesV2 />} />
+          {/* Phase 94 (26 May 2026) — path-param edit / renew routes.
+              MUST be registered BEFORE /quotes/:id so React Router
+              matches the more-specific path first. */}
+          <Route path="/quotes/edit/:id"              element={<CreateQuoteV2 />} />
+          <Route path="/quotes/edit/:id/other-media"  element={<CreateQuoteOtherMediaV2 />} />
+          <Route path="/quotes/renew/:id"             element={<CreateQuoteV2 />} />
           <Route path="/quotes/:id"                element={<QuoteDetail />} />
           {/* Quote chooser — Step 0 of new-quote flow. Sales reps
               with a single segment scope skip directly to the right

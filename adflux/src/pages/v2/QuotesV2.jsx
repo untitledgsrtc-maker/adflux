@@ -11,6 +11,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react'
+// Phase 94 — path-param routing replaces the quoteIntent fallback.
+// Import retained for any future producer that still needs the
+// in-memory channel (e.g. external bookmark hand-offs). Currently
+// unused by the active editQuote handler.
+// eslint-disable-next-line no-unused-vars
 import { setPendingEditOf } from '../../lib/quoteIntent'
 import { useQuotes } from '../../hooks/useQuotes'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
@@ -61,22 +66,16 @@ export default function QuotesV2() {
         : '/quotes/new/government/gsrtc-led'
       navigate(path, { state: { editingId: q.id } })
     } else if (q.media_type === 'OTHER_MEDIA') {
-      navigate('/quotes/new/private/other-media', { state: { editingId: q.id } })
+      // Phase 94 — path-param route. Reliable on every WebView; no
+      // state/query/in-memory fallback needed for new clicks.
+      navigate(`/quotes/edit/${q.id}/other-media`)
     } else {
-      // Phase 32C — was '/quotes/new?editOf=' but that's the segment
-      // chooser, which silently drops editOf. Use the actual Private
-      // LED wizard route. Same bug fix applied in QuoteDetail.jsx.
-      // Phase 93.30 (26 May 2026) — triple-layer delivery for the
-      // editingId: in-memory store + router state + query string.
-      // Owner reported on APK: card Edit needed double-tap to prefill,
-      // detail Edit never prefilled. Capacitor WebView drops router
-      // state and races useSearchParams on the first navigation. The
-      // in-memory store guarantees the consumer (CreateQuoteV2) sees
-      // the id regardless of router behavior.
-      setPendingEditOf(q.id)
-      navigate(`/quotes/new/private?editOf=${q.id}`, {
-        state: { editingId: q.id },
-      })
+      // Phase 94 — path-param route. Replaces the
+      // `/quotes/new/private?editOf=ID` query-string pattern which
+      // proved unreliable on Capacitor APK across 5 patch attempts
+      // (phases 93.28 → 93.30.2). useParams() reads the id from the
+      // URL path deterministically.
+      navigate(`/quotes/edit/${q.id}`)
     }
   }
   // Phase 74 (21 May 2026) — owner directive: team can delete any

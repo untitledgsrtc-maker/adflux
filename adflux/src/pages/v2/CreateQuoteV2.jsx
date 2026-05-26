@@ -1,52 +1,72 @@
 // src/pages/v2/CreateQuoteV2.jsx
 //
 // v2 shell around the existing WizardShell. The wizard itself is a
-// complex multi-step state machine (store, draft persistence, rate-table
-// calculator, GST toggle, cross-step validation). Rebuilding it would
-// be a separate Phase-3 project — for now we just give it a v2 page
-// wrapper so it sits cleanly inside V2AppShell.
+// complex multi-step state machine (store, draft persistence, rate-
+// table calculator, GST toggle, cross-step validation). Rebuilding
+// it would be a separate Phase-3 project — for now we just give it a
+// v2 page wrapper so it sits cleanly inside V2AppShell.
 //
-// renewalOf / editOf query params are preserved — the "Create Renewal"
-// button on RenewalTools and the "Edit" action on QuoteDetail both
-// rely on them.
+// Phase 94 (26 May 2026) — PERMANENT FIX for the APK Edit / Renew
+// blank-form bug.
+//
+// Background: phases 93.28 / 93.29 / 93.30 / 93.30.1 / 93.30.2 each
+// tried a different fallback layer (router state, query string, in-
+// memory module variable) to deliver the editingId from the producer
+// (Edit button) to this consumer. Capacitor WebView is hostile to
+// all three:
+//   • Router state — dropped across history.pushState.
+//   • Query string — useSearchParams races on first render.
+//   • In-memory variable — sensitive to double-render consume order.
+//
+// Permanent solution: move the id into the URL PATH itself
+// (`/quotes/edit/:id`). React Router's useParams() reads path
+// segments deterministically — no race, no hostile WebView quirk.
+//
+// The state / query / in-memory layers are RETAINED as a deep-link
+// fallback so any external bookmark or URL-share with `?editOf=` /
+// `?renewalOf=` still works, but they are no longer load-bearing.
 
 import { useState } from 'react'
-import { useSearchParams, useLocation } from 'react-router-dom'
+import { useSearchParams, useLocation, useParams } from 'react-router-dom'
 import { WizardShell } from '../../components/quotes/QuoteWizard/WizardShell'
 import { consumePendingEditOf, consumePendingRenewalOf } from '../../lib/quoteIntent'
 
 export default function CreateQuoteV2() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
-  // Phase 93.30 / 93.30.2 — triple-layer read with in-memory store
-  // as the most-reliable layer. Capacitor APK WebView drops router
-  // state across navigate + races useSearchParams on first render;
-  // the in-memory store (set by producer just before navigate)
-  // survives all of that.
-  //
-  // CRITICAL: consume*() must run ONCE per component lifetime, not
-  // on every render. Phase 93.30 placed consume in the render body
-  // which caused the value to be returned on render 1 and cleared,
-  // then null on render 2 — WizardShell's useEffect [editOf] saw
-  // editOf change id → null and returned early without prefill.
-  // useState lazy init guarantees consume runs once on mount only.
+  const params = useParams()
+
+  // Phase 94 — primary path: detect mode from URL pathname.
+  //   /quotes/edit/<id>   → editOf  = <id>
+  //   /quotes/renew/<id>  → renewalOf = <id>
+  //   /quotes/new/private → new quote (both null)
+  const path = location.pathname || ''
+  const isEditPath   = path.startsWith('/quotes/edit/')
+  const isRenewPath  = path.startsWith('/quotes/renew/')
+  const routeId      = params.id || null
+
+  // Legacy fallback snapshots — only used when the path doesn't carry
+  // the id (e.g. URL bookmark to /quotes/new/private?editOf=…). Kept
+  // for backwards compatibility with deep links shared before Phase 94.
   const [intentEditOf]    = useState(() => consumePendingEditOf())
   const [intentRenewalOf] = useState(() => consumePendingRenewalOf())
 
-  // Order: state → query → in-memory snapshot. State + query handle
-  // web perfectly; in-memory covers the APK first-render race.
+  const editOf =
+    (isEditPath && routeId)                 // Phase 94 path param (primary)
+    || location.state?.editingId            // Phase 93.28 router state
+    || searchParams.get('editOf')           // Phase 32C query string
+    || intentEditOf                         // Phase 93.30 in-memory
+
   const renewalOf =
-    location.state?.renewalOf
+    (isRenewPath && routeId)                // Phase 94 path param (primary)
+    || location.state?.renewalOf
     || searchParams.get('renewalOf')
     || intentRenewalOf
-  const editOf =
-    location.state?.editingId
-    || searchParams.get('editOf')
-    || intentEditOf
+
   // ClientsV2's "New quote" button hands us a prefill payload via
   // router state. We pass it through to the wizard so Step1Client
   // starts with the client fields already populated.
-  const prefill   = location.state?.prefill || null
+  const prefill = location.state?.prefill || null
 
   return (
     <div className="v2d-wiz">

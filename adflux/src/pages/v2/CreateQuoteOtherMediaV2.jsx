@@ -19,7 +19,7 @@
 // @react-pdf/renderer to mirror the Private LED quote PDF visually.
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Loader2, Save, Send, Newspaper,
 } from 'lucide-react'
@@ -44,13 +44,18 @@ const EMPTY_LINE = () => ({
 export default function CreateQuoteOtherMediaV2() {
   const navigate = useNavigate()
   const location = useLocation()
+  const params   = useParams()
   const profile  = useAuthStore(s => s.profile)
   const prefill  = location.state?.prefill || {}
   const leadId   = prefill.lead_id || null
 
   // Phase 29b — owner spec: every quote should be editable. Detail
   // page Edit on an Other Media draft routes here with editingId set.
-  const editingId = location.state?.editingId || null
+  // Phase 94 — primary source is the URL path /quotes/edit/:id/other-media.
+  // Router-state fallback retained for backwards compatibility with any
+  // pre-Phase-94 deep link.
+  const isEditPath = (location.pathname || '').startsWith('/quotes/edit/')
+  const editingId  = (isEditPath && params.id) || location.state?.editingId || null
 
   const [client, setClient] = useState({
     name:    prefill.client_name    || '',

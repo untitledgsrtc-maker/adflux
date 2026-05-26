@@ -204,10 +204,7 @@ export default function RenewalToolsV2() {
                       <td>
                         <button
                           className="v2d-btn v2d-btn--primary v2d-btn--sm"
-                          onClick={() => {
-                            setPendingRenewalOf(q.id)
-                            navigate(`/quotes/new?renewalOf=${q.id}`, { state: { renewalOf: q.id } })
-                          }}
+                          onClick={() => navigate(`/quotes/renew/${q.id}`)}
                         >
                           <Plus size={13} /><span>Renew</span>
                         </button>
@@ -242,10 +239,7 @@ export default function RenewalToolsV2() {
                   )}
                   <button
                     className="v2d-btn v2d-btn--primary v2d-rt-card-cta"
-                    onClick={() => {
-                      setPendingRenewalOf(q.id)
-                      navigate(`/quotes/new?renewalOf=${q.id}`, { state: { renewalOf: q.id } })
-                    }}
+                    onClick={() => navigate(`/quotes/renew/${q.id}`)}
                   >
                     <Plus size={13} /><span>Create Renewal</span>
                     <ArrowUpRight size={13} />
