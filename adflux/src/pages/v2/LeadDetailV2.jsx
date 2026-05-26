@@ -743,8 +743,13 @@ export default function LeadDetailV2() {
       )}
 
       {/* Phase 33D.6 — Stop chasing toggle. Sets cadence_paused so
-          stage-change triggers + 30-day nurture cycles skip this lead. */}
-      {(lead.stage === 'Lost' || lead.stage === 'Nurture') && (
+          stage-change triggers + 30-day nurture cycles skip this lead.
+          Phase 93.20 (26 May 2026) — Lost dropped from gate per owner
+          directive: "lost lead we dont want to auto follow up in 30
+          days, only nurture lead need auto follow up in 30 days".
+          Backend (Phase 76.3 trigger) already wipes lost_nurture
+          follow_ups on stage→Lost; banner showing on Lost was lying. */}
+      {lead.stage === 'Nurture' && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 12px', marginBottom: 10,
@@ -1955,68 +1960,11 @@ export default function LeadDetailV2() {
         </Modal>
       )}
 
-      {/* Phase 62.0 (20 May 2026) — mobile-only sticky bottom CTA.
-          Keeps Call · WhatsApp · Log outcome within thumb-reach when
-          the rep is reading the activity timeline lower down the
-          page. Hidden ≥720px via CSS (lead-mobile-sticky-bar).
-          Uses the same handlers as the in-card action grid — Call
-          fires fireAndForgetLog + tel: handoff; WhatsApp opens
-          wa.me; Outcome opens PostCallOutcomeModal. */}
-      <div className="lead-mobile-sticky-bar">
-        {lead.phone && !lead.do_not_call ? (
-          <a
-            href={`tel:+${cleanPhone(lead.phone)}`}
-            className="lead-mobile-sticky-btn is-primary"
-            onClick={() => fireAndForgetLog('call', `Call → ${lead.phone}`)}
-            aria-label="Call lead"
-          >
-            <Phone size={16} strokeWidth={1.8} />
-            <span>Call</span>
-          </a>
-        ) : (
-          <button
-            type="button"
-            className="lead-mobile-sticky-btn is-primary"
-            disabled
-            aria-label="Call disabled"
-          >
-            <Phone size={16} strokeWidth={1.8} />
-            <span>{lead.do_not_call ? 'DNC' : 'No phone'}</span>
-          </button>
-        )}
-        {lead.phone && !lead.wa_opt_out ? (
-          <a
-            href={`https://wa.me/${cleanPhone(lead.phone)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="lead-mobile-sticky-btn"
-            onClick={() => fireAndForgetLog('whatsapp', `WhatsApp → ${lead.phone}`)}
-            aria-label="WhatsApp"
-          >
-            <MessageCircle size={16} strokeWidth={1.8} />
-            <span>WhatsApp</span>
-          </a>
-        ) : (
-          <button
-            type="button"
-            className="lead-mobile-sticky-btn"
-            disabled
-            aria-label="WhatsApp disabled"
-          >
-            <MessageCircle size={16} strokeWidth={1.8} />
-            <span>{lead.wa_opt_out ? 'Opt-out' : 'No phone'}</span>
-          </button>
-        )}
-        <button
-          type="button"
-          className="lead-mobile-sticky-btn"
-          onClick={() => setPostCallOpen(true)}
-          aria-label="Log outcome"
-        >
-          <ClipboardCheck size={16} strokeWidth={1.8} />
-          <span>Outcome</span>
-        </button>
-      </div>
+      {/* Phase 93.20 (26 May 2026) — removed Phase 62.0 mobile sticky
+          bottom CTA (Call · WhatsApp · Outcome). Owner reported it
+          duplicated the in-card action grid above + clipped the
+          Meeting/Voice action row. The in-card Call + WhatsApp +
+          Log outcome buttons already cover the thumb-reach case. */}
     </div>
   )
 }
