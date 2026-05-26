@@ -29,6 +29,7 @@ import { PaymentModal } from '../components/payments/PaymentModal'
 import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
 import IncentiveForecastCard from '../components/quotes/IncentiveForecastCard'
+import { setPendingEditOf, setPendingRenewalOf } from '../lib/quoteIntent'
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
@@ -424,13 +425,15 @@ export default function QuoteDetail() {
                 // Fixed: navigate directly to the wizard route by
                 // media_type. Same pattern OTHER_MEDIA already uses.
                 if (quote?.media_type === 'OTHER_MEDIA') {
+                  setPendingEditOf(id)
                   navigate('/quotes/new/private/other-media', { state: { editingId: id } })
                 } else {
-                  // Phase 93.28 — ALSO pass editingId via state so the
-                  // wizard prefill survives Capacitor APK navigation.
-                  // Owner reported "detail-page Edit opens blank form
-                  // on APK; web prefills fine." Query string kept for
-                  // bookmark compatibility.
+                  // Phase 93.30 — triple-layer delivery (in-memory +
+                  // router state + query string). APK Capacitor
+                  // WebView drops router state across navigate +
+                  // races useSearchParams on first render; in-memory
+                  // store guarantees consumer sees the id.
+                  setPendingEditOf(id)
                   navigate(`/quotes/new/private?editOf=${id}`, {
                     state: { editingId: id },
                   })
@@ -727,9 +730,10 @@ export default function QuoteDetail() {
               and is available for every status except 'lost'. */}
           {quote.status === 'won' && (
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button className="btn btn-y btn-sm" onClick={() => navigate(`/quotes/new?renewalOf=${id}`, {
-                state: { renewalOf: id },
-              })}>
+              <button className="btn btn-y btn-sm" onClick={() => {
+                setPendingRenewalOf(id)
+                navigate(`/quotes/new?renewalOf=${id}`, { state: { renewalOf: id } })
+              }}>
                 Create Renewal Quote
               </button>
             </div>

@@ -12,19 +12,28 @@
 
 import { useSearchParams, useLocation } from 'react-router-dom'
 import { WizardShell } from '../../components/quotes/QuoteWizard/WizardShell'
+import { consumePendingEditOf, consumePendingRenewalOf } from '../../lib/quoteIntent'
 
 export default function CreateQuoteV2() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
-  // Phase 93.28 (26 May 2026) — read editOf from BOTH router state
-  // AND query string. State-first because owner reported Capacitor
-  // APK shows blank form when only the ?editOf= query string is
-  // used. Query string fallback preserves URL-bookmark
-  // compatibility. Same for renewalOf.
+  // Phase 93.30 (26 May 2026) — triple-layer read with in-memory
+  // store as the most-reliable layer. Capacitor APK WebView drops
+  // router state across navigate + races useSearchParams on first
+  // render; the in-memory store (set by the producer just before
+  // navigate) survives all of that.
+  //
+  // Order: state → query → in-memory. State + query handle web
+  // perfectly and double as the URL bookmark path. In-memory only
+  // fires when both upstream layers miss (APK first-render case).
   const renewalOf =
-    location.state?.renewalOf || searchParams.get('renewalOf')
+    location.state?.renewalOf
+    || searchParams.get('renewalOf')
+    || consumePendingRenewalOf()
   const editOf =
-    location.state?.editingId || searchParams.get('editOf')
+    location.state?.editingId
+    || searchParams.get('editOf')
+    || consumePendingEditOf()
   // ClientsV2's "New quote" button hands us a prefill payload via
   // router state. We pass it through to the wizard so Step1Client
   // starts with the client fields already populated.

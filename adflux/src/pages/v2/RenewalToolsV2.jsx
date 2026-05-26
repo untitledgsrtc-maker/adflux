@@ -13,6 +13,7 @@ import { Plus, Calendar, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { formatDate, formatCurrency, todayISO, addDaysISO } from '../../utils/formatters'
+import { setPendingRenewalOf } from '../../lib/quoteIntent'
 import V2Hero from '../../components/v2/V2Hero'
 
 export default function RenewalToolsV2() {
@@ -203,9 +204,10 @@ export default function RenewalToolsV2() {
                       <td>
                         <button
                           className="v2d-btn v2d-btn--primary v2d-btn--sm"
-                          onClick={() => navigate(`/quotes/new?renewalOf=${q.id}`, {
-                            state: { renewalOf: q.id },
-                          })}
+                          onClick={() => {
+                            setPendingRenewalOf(q.id)
+                            navigate(`/quotes/new?renewalOf=${q.id}`, { state: { renewalOf: q.id } })
+                          }}
                         >
                           <Plus size={13} /><span>Renew</span>
                         </button>
@@ -240,9 +242,10 @@ export default function RenewalToolsV2() {
                   )}
                   <button
                     className="v2d-btn v2d-btn--primary v2d-rt-card-cta"
-                    onClick={() => navigate(`/quotes/new?renewalOf=${q.id}`, {
-                      state: { renewalOf: q.id },
-                    })}
+                    onClick={() => {
+                      setPendingRenewalOf(q.id)
+                      navigate(`/quotes/new?renewalOf=${q.id}`, { state: { renewalOf: q.id } })
+                    }}
                   >
                     <Plus size={13} /><span>Create Renewal</span>
                     <ArrowUpRight size={13} />

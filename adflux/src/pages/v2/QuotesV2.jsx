@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react'
+import { setPendingEditOf } from '../../lib/quoteIntent'
 import { useQuotes } from '../../hooks/useQuotes'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
@@ -65,12 +66,14 @@ export default function QuotesV2() {
       // Phase 32C — was '/quotes/new?editOf=' but that's the segment
       // chooser, which silently drops editOf. Use the actual Private
       // LED wizard route. Same bug fix applied in QuoteDetail.jsx.
-      // Phase 93.28 (26 May 2026) — ALSO pass editingId via state so
-      // the wizard prefill survives Capacitor APK navigation. Owner
-      // reported "card Edit opens blank form on APK; web prefills
-      // fine." Same fix shape as the Govt + OTHER_MEDIA branches
-      // above (state-based). Query string kept for URL-bookmark
-      // compatibility; CreateQuoteV2 reads state-first.
+      // Phase 93.30 (26 May 2026) — triple-layer delivery for the
+      // editingId: in-memory store + router state + query string.
+      // Owner reported on APK: card Edit needed double-tap to prefill,
+      // detail Edit never prefilled. Capacitor WebView drops router
+      // state and races useSearchParams on the first navigation. The
+      // in-memory store guarantees the consumer (CreateQuoteV2) sees
+      // the id regardless of router behavior.
+      setPendingEditOf(q.id)
       navigate(`/quotes/new/private?editOf=${q.id}`, {
         state: { editingId: q.id },
       })
