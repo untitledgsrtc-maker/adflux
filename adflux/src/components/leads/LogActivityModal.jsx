@@ -149,38 +149,52 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
 
   // Phase 30G — auto-capture GPS silently on mount. Owner saw the
   // Capture GPS button and asked why it wasn't already done.
+  // Phase 93.17 — via shared resilient helper.
   useEffect(() => {
     if (!navigator.geolocation) return
+    let cancelled = false
     setGpsBusy(true)
-    navigator.geolocation.getCurrentPosition(
-      pos => {
+    ;(async () => {
+      const { captureGps } = await import('../../utils/captureGps')
+      const result = await captureGps({
+        userId: profile?.id,
+        lowAccuracyTimeout: 5000,
+        highAccuracyTimeout: 20000,
+      })
+      if (cancelled) return
+      if (result.coords) {
         setGps({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          acc: Math.round(pos.coords.accuracy),
+          lat: result.coords.lat,
+          lng: result.coords.lng,
+          acc: result.coords.accuracy,
         })
-        setGpsBusy(false)
-      },
-      _err => { setGpsBusy(false) }, // silent fail; user can hit Refresh
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
-    )
+      }
+      setGpsBusy(false)
+    })()
+    return () => { cancelled = true }
   }, [])
 
-  function refreshGps() {
+  // Phase 93.17 — manual refresh. skipLowAccuracy so user gets a
+  // fresh high-accuracy reading on tap.
+  async function refreshGps() {
     if (!navigator.geolocation || gpsBusy) return
     setGpsBusy(true); setError('')
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setGps({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          acc: Math.round(pos.coords.accuracy),
-        })
-        setGpsBusy(false)
-      },
-      err => { setGpsBusy(false); setError(err.message || 'Could not capture GPS.') },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    )
+    const { captureGps } = await import('../../utils/captureGps')
+    const result = await captureGps({
+      userId: profile?.id,
+      skipLowAccuracy: true,
+      highAccuracyTimeout: 20000,
+    })
+    if (result.coords) {
+      setGps({
+        lat: result.coords.lat,
+        lng: result.coords.lng,
+        acc: result.coords.accuracy,
+      })
+    } else if (result.error) {
+      setError(`${result.error} — tap Refresh again to retry.`)
+    }
+    setGpsBusy(false)
   }
 
   function applyTemplate(text) {

@@ -206,26 +206,38 @@ export default function LeadDetailV2() {
   // local activity save.
   const [linkedQuotes, setLinkedQuotes] = useState([])
   const [openFollowUps, setOpenFollowUps] = useState([])
+  // Phase 93.17 (26 May 2026) — resilient GPS capture via shared
+  // helper. Was: raw navigator.geolocation with 8s timeout + high-
+  // accuracy → "Could not capture GPS: Timeout expired" on weak
+  // signal (Kirti's 25 May screenshot). Now: skip low-accuracy
+  // (I'm here needs a fresh fix), 20s high-accuracy, fallback to
+  // last gps_pings row within 10 min, retry button on dead-end.
   async function imHere() {
     if (!navigator.geolocation) {
       setError('GPS not available on this device.')
       return
     }
     setError('')
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const g = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          acc: Math.round(pos.coords.accuracy),
-          startedAt: Date.now(),
-        }
-        setHereGps(g)
-        setHereCountdown(600)  // 10 minutes in seconds
-      },
-      (e) => setError('Could not capture GPS: ' + (e.message || 'denied')),
-      { enableHighAccuracy: true, timeout: 8000 }
-    )
+    const { captureGps } = await import('../../utils/captureGps')
+    const result = await captureGps({
+      userId: profile?.id,
+      skipLowAccuracy: true,
+      highAccuracyTimeout: 20000,
+    })
+    if (result.error) {
+      setError(`Could not capture GPS: ${result.error} — tap "I'm here" again to retry.`)
+      return
+    }
+    const g = {
+      lat: result.coords.lat,
+      lng: result.coords.lng,
+      acc: result.coords.accuracy,
+      startedAt: Date.now(),
+      source: result.source,                  // 'high' | 'fallback'
+      fallbackAgeMin: result.fallbackAgeMin,  // when source='fallback'
+    }
+    setHereGps(g)
+    setHereCountdown(600)  // 10 minutes in seconds
   }
   // Phase 65 (20 May 2026) — idempotency guard on saveHereMeeting.
   // Owner reported "meeting log inserted 2 times" — the countdown

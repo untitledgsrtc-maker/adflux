@@ -125,21 +125,27 @@ export default function LeadFormV2() {
   // Phase 34Z.20 — auto-capture GPS on mount.
   useEffect(() => { refreshGps() }, [])
 
-  function refreshGps() {
+  // Phase 93.17 (26 May 2026) — resilient capture via shared helper.
+  // Low-accuracy first (cell tower, usually <1s) → high-accuracy if
+  // that fails → gps_pings fallback if both fail. Silent on dead-end:
+  // form save still allowed without GPS.
+  async function refreshGps() {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return
     setGpsBusy(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGps({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          acc: Math.round(pos.coords.accuracy || 0) || null,
-        })
-        setGpsBusy(false)
-      },
-      () => { setGpsBusy(false) },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
-    )
+    const { captureGps } = await import('../../utils/captureGps')
+    const result = await captureGps({
+      userId: profile?.id,
+      lowAccuracyTimeout: 8000,
+      highAccuracyTimeout: 20000,
+    })
+    if (result.coords) {
+      setGps({
+        lat: result.coords.lat,
+        lng: result.coords.lng,
+        acc: result.coords.accuracy,
+      })
+    }
+    setGpsBusy(false)
   }
 
   async function handleSave(openAfter = false) {

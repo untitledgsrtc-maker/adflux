@@ -120,21 +120,30 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
   // milestone — without GPS, fake-logging from home is trivial. We
   // capture but don't BLOCK on it; if denied, the meeting still saves
   // with no GPS and admin can see the missing pin in the audit map.
+  // Phase 93.17 — resilient capture (low-accuracy → high-accuracy →
+  // last gps_pings within 10 min).
   useEffect(() => {
     if (!navigator.geolocation) return
+    let cancelled = false
     setGpsBusy(true)
-    navigator.geolocation.getCurrentPosition(
-      pos => {
+    ;(async () => {
+      const { captureGps } = await import('../../utils/captureGps')
+      const result = await captureGps({
+        userId: profile?.id,
+        lowAccuracyTimeout: 8000,
+        highAccuracyTimeout: 20000,
+      })
+      if (cancelled) return
+      if (result.coords) {
         setGps({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          acc: Math.round(pos.coords.accuracy),
+          lat: result.coords.lat,
+          lng: result.coords.lng,
+          acc: result.coords.accuracy,
         })
-        setGpsBusy(false)
-      },
-      _err => { setGpsBusy(false) },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
-    )
+      }
+      setGpsBusy(false)
+    })()
+    return () => { cancelled = true }
   }, [])
 
   // Phase 34.10 — debounced phone-first dedup. As the rep types the
@@ -164,21 +173,29 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
     return () => { cancelled = true; clearTimeout(t) }
   }, [phone])
 
-  function refreshGps() {
+  // Phase 93.17 — manual refresh button. Owner directive 26 May 2026
+  // adds retry path. Uses skipLowAccuracy=true so the user gets a
+  // genuinely fresh fix (they tapped refresh to upgrade the auto-
+  // capture). Fallback still allowed.
+  async function refreshGps() {
     if (!navigator.geolocation || gpsBusy) return
     setGpsBusy(true); setError('')
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setGps({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          acc: Math.round(pos.coords.accuracy),
-        })
-        setGpsBusy(false)
-      },
-      err => { setGpsBusy(false); setError(err.message || 'Could not capture GPS.') },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
+    const { captureGps } = await import('../../utils/captureGps')
+    const result = await captureGps({
+      userId: profile?.id,
+      skipLowAccuracy: true,
+      highAccuracyTimeout: 20000,
+    })
+    if (result.coords) {
+      setGps({
+        lat: result.coords.lat,
+        lng: result.coords.lng,
+        acc: result.coords.accuracy,
+      })
+    } else if (result.error) {
+      setError(`${result.error} — tap Refresh again to retry.`)
+    }
+    setGpsBusy(false)
   }
 
   // Phase 35Z (14 May 2026) — surface validation errors via toast in
