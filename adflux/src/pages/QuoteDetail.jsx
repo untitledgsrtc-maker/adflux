@@ -195,38 +195,18 @@ export default function QuoteDetail() {
       }
     }
 
-    // Sales-with-payment gate: payment lands as approval_status='pending'.
-    // We DON'T flip the quote to 'won' here — admin's approval flow
-    // (approvePayment) does that atomically when the payment is
-    // approved. Otherwise the quote would show Won while its payment
-    // still sits in admin's pending queue. Campaign dates are still
-    // saved so admin doesn't have to re-enter them on approval.
+    // Phase 93.18 (26 May 2026) — owner restored spec:
+    //   "sales person can mark won anytime without payment.
+    //    incentive only triggered after full payment received.
+    //    team can partial payment also."
     //
-    // Sales-WITHOUT-payment falls through to the win-now path below —
-    // there's no payment to approve, so the quote just flips to Won.
-    // Incentive still doesn't credit until a final approved payment
-    // lands (DB trigger gates monthly_sales_data on that).
-    if (!isAdmin && hasPayment) {
-      if (paymentData.campaign_start_date || paymentData.campaign_end_date) {
-        const { error: dateErr } = await updateQuoteStatus(quote.id, quote.status, {
-          campaign_start_date: paymentData.campaign_start_date,
-          campaign_end_date:   paymentData.campaign_end_date,
-        })
-        if (dateErr) {
-          setUpdatingStatus(false)
-          setError(`Campaign dates could not be saved: ${dateErr.message}`)
-          return
-        }
-      }
-      setUpdatingStatus(false)
-      setStatusMsg('Payment submitted for admin approval. Quote will be marked Won once approved.')
-      fetchPayments()
-      fetchQuoteById(id)
-      setTimeout(() => setStatusMsg(''), 4500)
-      return
-    }
-
-    // Admin path (or sales who skipped the payment): flip to Won now.
+    // The previous gate held sales-with-partial-payment quotes at
+    // 'sent' until admin approved + the payment crossed the total.
+    // That conflated two cycles: deal closure (status='won') and
+    // money received (incentive credit). Owner's flow keeps them
+    // separate. Mark Won ALWAYS flips status to 'won'. Payment
+    // cycle is separate — admin approval gates incentive credit
+    // via the existing DB trigger on payments.is_final_payment.
     const updates = {
       status: 'won',
       campaign_start_date: paymentData.campaign_start_date,
@@ -237,7 +217,9 @@ export default function QuoteDetail() {
     if (err) {
       setError(err.message)
     } else {
-      setStatusMsg('Quote marked as Won!')
+      setStatusMsg(hasPayment && !isAdmin
+        ? 'Quote marked Won · payment submitted for admin approval'
+        : 'Quote marked as Won!')
       fetchPayments()
       fetchQuoteById(id)
       setTimeout(() => setStatusMsg(''), 3000)
