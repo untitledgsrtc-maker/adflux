@@ -38,6 +38,12 @@ import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import { startBackgroundGps, stopBackgroundGps } from '../../utils/backgroundGps'
 import { registerNativePush, deregisterNativePush } from '../../utils/nativePush'
 import { startCallHistoryPoller, stopCallHistoryPoller } from '../../utils/callHistoryIngest'
+// Phase 96.0 (2026-05-27) — cold-start backfill of LocalNotification
+// alarms. Covers follow-ups created before this APK was installed
+// (rep installs new APK, old follow-ups never had alarms scheduled).
+// Native-only via Capacitor.isNativePlatform() guard inside helper.
+import { scheduleManyFollowUpAlarms } from '../../utils/scheduleFollowUpAlarm'
+import { supabase } from '../../lib/supabase'
 import NativeOnboarding from '../native/NativeOnboarding'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
@@ -329,6 +335,53 @@ export function V2AppShell() {
       console.warn('[v2-shell] fcm register failed:', e?.message || e)
     )
     return () => { deregisterNativePush().catch(() => {}) }
+  }, [profile?.id])
+
+  // Phase 96.0 (2026-05-27) — backfill AlarmManager alarms for any
+  // open follow-ups assigned to this rep in the next 7 days. Covers
+  // two scenarios:
+  //   (a) Rep installs new APK with the LocalNotifications path
+  //       — old follow-ups created on the pre-96 APK never had an
+  //       on-device alarm scheduled. Without backfill they'd only
+  //       fire via FCM (which is the broken path).
+  //   (b) OS update / clear-app-data wipes scheduled alarms but
+  //       leaves DB rows intact.
+  // Helper is native-only; web returns immediately. Runs once per
+  // login per session.
+  useEffect(() => {
+    if (!profile?.id) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const today = new Date()
+        const sevenDays = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+        // Bound the query to a small window so we don't dump 100s of
+        // alarms onto the device on first launch.
+        const { data, error } = await supabase
+          .from('follow_ups')
+          .select('id, lead_id, follow_up_date, follow_up_time, note, leads(name, contact_name)')
+          .eq('assigned_to', profile.id)
+          .eq('is_done', false)
+          .gte('follow_up_date', today.toISOString().slice(0, 10))
+          .lte('follow_up_date', sevenDays.toISOString().slice(0, 10))
+          .limit(100)
+        if (error || cancelled) return
+        // Map embed → flat lead_name. Helper accepts either shape but
+        // explicit flat is cleaner.
+        const rows = (data || []).map(fu => ({
+          id:             fu.id,
+          lead_id:        fu.lead_id,
+          lead_name:      fu.leads?.name || fu.leads?.contact_name || 'Lead',
+          follow_up_date: fu.follow_up_date,
+          follow_up_time: fu.follow_up_time || null,
+          note:           fu.note,
+        }))
+        await scheduleManyFollowUpAlarms(rows)
+      } catch (e) {
+        console.warn('[phase96] backfill failed:', e?.message || e)
+      }
+    })()
+    return () => { cancelled = true }
   }, [profile?.id])
 
   // Phase 56l — periodic scan of the Android system call log so

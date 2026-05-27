@@ -31,6 +31,11 @@ import { toastError, toastSuccess } from '../v2/Toast'
 // Phase 56c — auto-fetch real call duration from Android CallLog
 // after the modal save. No-op on web.
 import { fetchAndPatchCallDuration } from '../../utils/callLogReader'
+// Phase 96.0 (2026-05-27) — schedule an AlarmManager-backed
+// LocalNotification on the device when the rep saves a follow-up.
+// OEM-immune (Vivo / Xiaomi / Realme can't kill an AlarmManager).
+// Web no-op via Capacitor.isNativePlatform() guard inside helper.
+import { scheduleFollowUpAlarm } from '../../utils/scheduleFollowUpAlarm'
 
 // Phase 34Z.53 — client-side intent parser. When the rep speaks
 // (Whisper transcript appended to the notes field), scan for outcome
@@ -554,9 +559,31 @@ export default function PostCallOutcomeModal({
         // follow_ups.follow_up_time is a `time` column. HH:MM accepted.
         fuRow.follow_up_time = customTime
       }
-      const { error: fuErr } = await supabase.from('follow_ups').insert([fuRow])
+      // Phase 96.0 — capture inserted id so we can schedule the
+      // on-device alarm. Use plain .select('id') (no FK embed) +
+      // array unwrap to dodge the .single() APK race (Phase 95.8
+      // foot-gun: FK-embed + RLS combos return wrapped array on
+      // Capacitor WebView). Bare insert+select has no FK embed
+      // so this is purely defensive.
+      const fuInsertRes = await supabase.from('follow_ups').insert([fuRow]).select('id')
+      const fuErr = fuInsertRes.error
+      const fuId  = Array.isArray(fuInsertRes.data)
+        ? fuInsertRes.data[0]?.id
+        : fuInsertRes.data?.id
       if (fuErr) {
         toastError(fuErr, 'Follow-up scheduled but DB write failed: ' + fuErr.message)
+      } else if (fuId) {
+        // Fire-and-forget AlarmManager schedule. Helper is native-only;
+        // web/SSR path returns immediately. Failure here is a UX
+        // degradation (rep still gets FCM push as backup) — log only.
+        scheduleFollowUpAlarm({
+          id:             fuId,
+          lead_id:        lead.id,
+          lead_name:      lead?.name || lead?.contact_name || 'Lead',
+          follow_up_date: customDate,
+          follow_up_time: customTime || null,
+          note:           fuRow.note,
+        }).catch((e) => console.warn('[phase96] alarm schedule failed:', e?.message || e))
       }
       // Nurture pseudo-action also flips the lead to Nurture stage.
       if (nextAction === 'nurture_30d' && lead.stage !== 'Won' && lead.stage !== 'Lost') {

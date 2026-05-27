@@ -3,6 +3,10 @@ import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 import { todayISO } from '../utils/formatters'
+// Phase 96.0 (2026-05-27) — wire each mutation to keep the on-device
+// AlarmManager alarm in sync with the DB row. Cancel on done,
+// reschedule on update, schedule on create. Web no-op via guard.
+import { scheduleFollowUpAlarm, cancelFollowUpAlarm } from '../utils/scheduleFollowUpAlarm'
 
 export function useFollowUps(quoteId = null) {
   const [followUps, setFollowUps] = useState([])
@@ -73,6 +77,9 @@ export function useFollowUps(quoteId = null) {
 
     if (!err) {
       setFollowUps(prev => prev.map(f => f.id === id ? data : f))
+      // Phase 96.0 — cancel the AlarmManager schedule so the stale
+      // reminder doesn't fire tomorrow morning. Fire-and-forget.
+      cancelFollowUpAlarm(id).catch(() => {})
     }
     return { data, error: err }
   }
@@ -92,7 +99,24 @@ export function useFollowUps(quoteId = null) {
       .single()
 
     if (!err) {
-      setFollowUps(prev => prev.map(f => f.id === id ? data : f))
+      // Phase 95.8 defensive unwrap — FK embed + RLS combo can return
+      // wrapped array on Capacitor APK. .single() works on web but
+      // the safer pattern is to read the row defensively.
+      const row = Array.isArray(data) ? data[0] : data
+      if (row) {
+        setFollowUps(prev => prev.map(f => f.id === id ? row : f))
+        // Phase 96.0 — replace the on-device alarm. scheduleFollowUpAlarm
+        // is cancel-then-schedule so the old time is dropped and the
+        // new time is armed in one call.
+        scheduleFollowUpAlarm({
+          id:             row.id,
+          lead_id:        row.lead_id,
+          lead_name:      row?.quotes?.client_name || 'Lead',
+          follow_up_date: row.follow_up_date,
+          follow_up_time: row.follow_up_time || null,
+          note:           row.note,
+        }).catch(() => {})
+      }
     }
     return { data, error: err }
   }
@@ -112,7 +136,20 @@ export function useFollowUps(quoteId = null) {
       .single()
 
     if (!err) {
-      setFollowUps(prev => [data, ...prev])
+      const row = Array.isArray(data) ? data[0] : data
+      if (row) {
+        setFollowUps(prev => [row, ...prev])
+        // Phase 96.0 — schedule on-device alarm. Helper handles
+        // past-date skip + native-only guard internally.
+        scheduleFollowUpAlarm({
+          id:             row.id,
+          lead_id:        row.lead_id,
+          lead_name:      row?.quotes?.client_name || 'Lead',
+          follow_up_date: row.follow_up_date,
+          follow_up_time: row.follow_up_time || null,
+          note:           row.note,
+        }).catch(() => {})
+      }
     }
     return { data, error: err }
   }

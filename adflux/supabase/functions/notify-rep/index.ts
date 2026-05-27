@@ -246,47 +246,46 @@ async function sendFcm(
   payload: { title: string; body: string; url: string; tag: string },
 ): Promise<{ ok: boolean; status: number; errorCode?: string; errorMsg?: string }> {
   const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`
+  // Phase 96.0 (2026-05-27) — DATA-ONLY FCM payload.
+  //
+  // Why dropped the top-level `notification` field:
+  //   When `notification` is present, FCM auto-displays in the system
+  //   tray ONLY when the app is backgrounded. In foreground it
+  //   delivers to `pushNotificationReceived` but does NOT pop the
+  //   tray (FCM design). Reps run the app foreground all day = most
+  //   pushes invisible. Phase 56h.2 toast was a partial workaround
+  //   (in-app only). Now: client-side `pushNotificationReceived` in
+  //   nativePush.js schedules a LocalNotification on every receive,
+  //   regardless of FG/BG state. App owns the tray 100%.
+  //
+  // Why data-only also helps Vivo / Xiaomi:
+  //   OEM battery savers throttle FCM's auto-display step more
+  //   aggressively than data-only delivery. priority='high' + data-
+  //   only data wakes the app's FCM service, app immediately calls
+  //   LocalNotifications.schedule(), AlarmManager pops the tray.
+  //   Result: same speed for all OEMs, no auto-display batching.
+  //
+  // The android.notification block is GONE for the same reason —
+  // it only mattered when FCM was auto-displaying. The channel id +
+  // small icon are now applied by the client when scheduling the
+  // LocalNotification (see nativePush.js pushNotificationReceived
+  // handler + scheduleFollowUpAlarm.js).
   const body = {
     message: {
       token: fcmToken,
-      notification: {
+      data: {
         title: payload.title,
         body:  payload.body,
-      },
-      data: {
-        url: payload.url,
-        tag: payload.tag,
+        url:   payload.url,
+        tag:   payload.tag,
       },
       android: {
-        // Phase 56h.1 (19 May 2026) — `priority: 'high'` bypasses
-        // Android Doze so the device wakes for delivery instead of
-        // batching the push for hours.
+        // Phase 56h.1 — `priority: 'high'` bypasses Android Doze so
+        // the device wakes for delivery instead of batching. For
+        // data-only messages priority=high is REQUIRED — without
+        // it, Android caps data-only delivery at a few per day per
+        // app for battery reasons.
         priority: 'high',
-        notification: {
-          // tag dedupes notifications on the device — re-sending
-          // same tag replaces the existing one in the tray.
-          tag: payload.tag,
-          // Heads-up banner + sound + vibration.
-          notification_priority: 'PRIORITY_HIGH',
-          default_sound: true,
-          default_vibrate_timings: true,
-          // Phase 56h.2 (19 May 2026) — route the notification to
-          // the high-importance channel created in
-          // src/utils/nativePush.js → CHANNEL_ID + declared as the
-          // default in AndroidManifest meta-data. Without this,
-          // OEMs that don't honor message-level priority (Samsung
-          // One UI, Xiaomi MIUI, Realme ColorOS) fall back to the
-          // auto-generated low-importance "Miscellaneous" channel
-          // and the rep never hears the alert.
-          channel_id: 'untitled_default',
-          // Small icon name (without the @drawable/ prefix or
-          // extension). Resolves against the monochrome vector at
-          // android/app/src/main/res/drawable/ic_stat_notification.xml
-          // declared as the FCM default in AndroidManifest. Setting
-          // it here makes the icon explicit in every push — belt +
-          // suspenders for OEMs that ignore the manifest default.
-          icon: 'ic_stat_notification',
-        },
       },
     },
   }

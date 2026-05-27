@@ -28,11 +28,23 @@
 
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
+// Phase 96.0 (2026-05-27) — LocalNotifications path. Used for two
+// things: (a) on FCM receipt in foreground/background, immediately
+// schedule a tray notification so it shows regardless of app state
+// (FCM auto-display only fires when backgrounded with `notification`
+// payload; data-only FCM never auto-displays); (b) AlarmManager-
+// scheduled follow-up reminders via scheduleFollowUpAlarm.js (OEM-
+// immune — bypasses FCM entirely for known-time events). Both paths
+// use the same `untitled_default` channel so the rep sees one
+// unified Untitled OS notifications preference in system settings.
+import { LocalNotifications } from '@capacitor/local-notifications'
 import { supabase } from '../lib/supabase'
 import { pushToast } from '../components/v2/Toast'
 
 let registered      = false   // module-level guard
 let channelEnsured  = false   // notification channel idempotency guard
+let localChannelEnsured = false   // Phase 96.0 — LocalNotifications channel guard
+let localListenersBound = false   // Phase 96.0 — tap listener idempotency
 let activeUser      = null
 
 // Phase 56h.2 (19 May 2026) — high-importance channel ID. MUST match
@@ -91,6 +103,88 @@ async function ensureChannel() {
 }
 
 /**
+ * Phase 96.0 — mirror the FCM channel on the LocalNotifications side.
+ * Both plugins live in the SAME `NotificationManager` system table on
+ * Android — channel ids must match exactly. Calling createChannel
+ * with the same id from both plugins is safe (Android dedupes by id;
+ * the first creator wins for user-visible properties).
+ *
+ * Idempotent. Web no-op via Capacitor.isNativePlatform().
+ */
+async function ensureLocalChannel() {
+  if (localChannelEnsured) return
+  if (!Capacitor.isNativePlatform()) return
+  if (Capacitor.getPlatform() !== 'android') {
+    localChannelEnsured = true
+    return
+  }
+  try {
+    await LocalNotifications.createChannel({
+      id:          CHANNEL_ID,
+      name:        'Untitled OS',
+      description: 'Lead alerts, follow-up reminders, and smart tasks.',
+      importance:  5,        // IMPORTANCE_HIGH
+      visibility:  1,        // VISIBILITY_PUBLIC
+      sound:       'default',
+      vibration:   true,
+      lights:      true,
+      lightColor:  '#FFE600',
+    })
+    localChannelEnsured = true
+  } catch (e) {
+    console.warn('[localnotif] createChannel failed:', e?.message || e)
+  }
+}
+
+/**
+ * Phase 96.0 — wire the tap handler for LocalNotifications. Tap on
+ * AlarmManager-scheduled follow-up OR on FCM-receipt-routed local
+ * notification both flow through this listener. Mirror nativePush
+ * `pushNotificationActionPerformed` behaviour: extract `url` from
+ * extra payload, hard-navigate via window.location (listener fires
+ * outside the React tree).
+ *
+ * Also request explicit permission for LocalNotifications. On Android
+ * 13+ POST_NOTIFICATIONS is a runtime permission; FCM register()
+ * usually triggers the OS prompt already, but LocalNotifications
+ * needs its own permission check for the scheduled-alarm path. Safe
+ * to call multiple times (plugin returns current state if already
+ * granted).
+ */
+async function ensureLocalListeners() {
+  if (localListenersBound) return
+  if (!Capacitor.isNativePlatform()) return
+
+  try {
+    const perm = await LocalNotifications.checkPermissions()
+    if (perm?.display !== 'granted') {
+      await LocalNotifications.requestPermissions()
+    }
+  } catch (e) {
+    console.warn('[localnotif] permission check failed:', e?.message || e)
+  }
+
+  try {
+    await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+      try {
+        const data = action?.notification?.extra || {}
+        const path = data.url
+        if (path && typeof path === 'string' && path.startsWith('/')) {
+          // Same pattern as PushNotifications tap path — listener
+          // fires outside React tree, use window.location.
+          window.location.assign(path)
+        }
+      } catch (e) {
+        console.warn('[localnotif] tap navigation failed:', e?.message || e)
+      }
+    })
+    localListenersBound = true
+  } catch (e) {
+    console.warn('[localnotif] addListener failed:', e?.message || e)
+  }
+}
+
+/**
  * Register the device for FCM, listen for the token, persist it to
  * Supabase against the current user. Idempotent + native-only.
  *
@@ -114,6 +208,12 @@ export async function registerNativePush(userId) {
   // ignores duplicate createChannel calls.
   await ensureChannel()
 
+  // Phase 96.0 — mirror the channel + bind tap listener for the
+  // LocalNotifications path (foreground FCM-receipt + AlarmManager-
+  // scheduled follow-ups). Both safe to call repeatedly.
+  await ensureLocalChannel()
+  await ensureLocalListeners()
+
   // Register listeners BEFORE calling register() so the first
   // token event isn't missed.
   await PushNotifications.addListener('registration', async (token) => {
@@ -135,15 +235,52 @@ export async function registerNativePush(userId) {
     // a console.info, so reps saw nothing when a push arrived while
     // the app was open. Now we surface an in-app toast with the
     // same title + body so the rep gets feedback either way.
-    const title = notification?.title || 'Untitled OS'
-    const body  = notification?.body  || ''
-    // Compose into a single line for the toast — Toast renders one
-    // string, not title+body separately.
+    //
+    // Phase 96.0 — toast is in-app only. To pop the SYSTEM TRAY too
+    // (which is what reps actually want), schedule a LocalNotification
+    // immediately on receipt. Works for both data-only and notification
+    // FCM payloads. With Phase 96.0 Edge Function switched to data-
+    // only, this is the ONLY path that creates the tray entry — FCM
+    // never auto-displays for data-only.
+    //
+    // FCM v1 data-only places fields under `notification.data`. FCM
+    // v1 notification messages also put title/body at the top level.
+    // Read from both with data winning when both exist (data-only is
+    // the canonical post-96.0 shape).
+    const data  = notification?.data || {}
+    const title = data.title || notification?.title || 'Untitled OS'
+    const body  = data.body  || notification?.body  || ''
+    const url   = data.url   || '/'
+    const tag   = data.tag   || 'untitled'
+
+    // In-app toast (foreground feedback). Keep as-is — owner uses it
+    // to confirm the app is alive even when system tray is suppressed.
     const msg = body ? `${title} — ${body}` : title
     try {
       pushToast(msg, 'info')
     } catch (e) {
       console.warn('[fcm] toast failed:', e?.message || e)
+    }
+
+    // Phase 96.0 — fire-and-forget local schedule so the tray pops.
+    // Random id in the lower half of the 31-bit range so we don't
+    // collide with scheduleFollowUpAlarm.js's deterministic ids in
+    // the upper half (2_000_000_001+). See alarmIdFromUuid comment
+    // in scheduleFollowUpAlarm.js for the partition.
+    try {
+      LocalNotifications.schedule({
+        notifications: [{
+          id: Math.floor(Math.random() * 2_000_000_000) + 1,
+          title,
+          body,
+          channelId: CHANNEL_ID,
+          smallIcon: 'ic_stat_notification',
+          extra: { url, tag },
+          // No `schedule:` → fires immediately. AlarmManager bypass.
+        }],
+      }).catch((e) => console.warn('[localnotif] foreground schedule failed:', e?.message || e))
+    } catch (e) {
+      console.warn('[localnotif] foreground schedule threw:', e?.message || e)
     }
   })
 
