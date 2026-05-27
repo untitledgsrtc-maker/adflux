@@ -68,6 +68,28 @@ export default function CreateQuoteV2() {
   // starts with the client fields already populated.
   const prefill = location.state?.prefill || null
 
+  // Phase 95.7-debug — one-shot diagnostic log for the persistent
+  // Edit-blank bug on APK. Logs the path detection result so we can
+  // see EXACTLY which fallback layer (if any) supplied the id, and
+  // what URL we're on. Remove after the bug is closed.
+  if (typeof console !== 'undefined') {
+    console.log('[EDIT-DEBUG] CreateQuoteV2 mount', JSON.stringify({
+      pathname: path,
+      search: location.search || '',
+      isEditPath,
+      isRenewPath,
+      routeId,
+      stateEditingId: location.state?.editingId || null,
+      stateRenewalOf: location.state?.renewalOf || null,
+      queryEditOf: searchParams.get('editOf') || null,
+      queryRenewalOf: searchParams.get('renewalOf') || null,
+      intentEditOf,
+      intentRenewalOf,
+      resolvedEditOf: editOf || null,
+      resolvedRenewalOf: renewalOf || null,
+    }))
+  }
+
   return (
     <div className="v2d-wiz">
       <WizardShell renewalOf={renewalOf} editOf={editOf} prefill={prefill} />

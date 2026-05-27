@@ -68,11 +68,23 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
 
     async function loadBaseQuote() {
       const id = editOf || renewalOf
+      // Phase 95.7-debug — log the fetch attempt + result.
+      console.log('[EDIT-DEBUG] WizardShell loadBaseQuote fetch', JSON.stringify({
+        editOf,
+        renewalOf,
+        idUsed: id,
+      }))
       const { data: baseQuote, error: err } = await supabase
         .from('quotes')
         .select('*, quote_cities(*)')
         .eq('id', id)
         .single()
+      console.log('[EDIT-DEBUG] WizardShell fetch result', JSON.stringify({
+        ok: !err && !!baseQuote,
+        errMessage: err?.message || null,
+        gotClientName: baseQuote?.client_name || null,
+        gotCityCount: baseQuote?.quote_cities?.length || 0,
+      }))
 
       if (!err && baseQuote) {
         if (editOf) {
