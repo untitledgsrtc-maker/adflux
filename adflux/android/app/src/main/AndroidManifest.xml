@@ -91,4 +91,62 @@
     <!-- Phase 56 — File access for offer-letter / quote PDFs the
          rep downloads on device. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <!-- Phase 95.1 (27 May 2026) — package-visibility queries.
+         Android 11+ (API 30) introduced strict intent-visibility
+         rules: an app cannot resolve an Intent unless it explicitly
+         declares which schemes / packages it queries. Without this
+         block, App.openUrl({ url: 'tel:...' }) and 'whatsapp://...'
+         silently fail on modern Android — no error, no dialer, no
+         WhatsApp. Owner reported "till yesterday everything worked,
+         now Call+WhatsApp buttons do nothing on APK". Root cause:
+         no queries declared in manifest. The intent resolved on
+         older devices that didn't enforce visibility, failed silently
+         on newer devices.
+
+         REBUILD REQUIRED. Native manifest change → APK rebuild +
+         redistribute. JS live-update alone won't fix this. -->
+    <queries>
+        <!-- Telephone dialer (tel: scheme) -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tel" />
+        </intent>
+        <!-- WhatsApp deep links -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https"
+                  android:host="wa.me" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https"
+                  android:host="api.whatsapp.com" />
+        </intent>
+        <!-- Email handler (mailto:) -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <!-- Generic HTTPS — for any browser-routed link we open via
+             App.openUrl (e.g. Maps links, share URLs). Most apps
+             register HTTPS handlers so this catches anything. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <!-- Explicit WhatsApp packages (consumer + business) so the
+             OS surfaces them as targets even when scheme intents
+             don't cover their custom paths. -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
 </manifest>
