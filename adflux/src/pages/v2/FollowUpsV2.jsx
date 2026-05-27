@@ -332,7 +332,22 @@ export default function FollowUpsV2() {
         // Don't block the outcome modal — open it with no
         // pendingActivityId so it does a fresh insert on save.
         setPendingActivityId(null)
-        setError('Call logged in fallback mode: ' + (err?.message || err))
+        // Phase 95.0 (27 May 2026) — silent on PG duplicate-key
+        // (23505) from Phase 68.2's uniq_lead_activities_dedupe_min
+        // constraint. The constraint is correct (rep tapped Call
+        // twice within 60s on same lead = real dupe), but the red
+        // banner reading "Call logged in fallback mode: duplicate
+        // key value violates unique constraint…" terrified users
+        // into thinking the whole app was broken. The FIRST tap DID
+        // log + modal still opens for outcome capture. Suppress the
+        // duplicate-key error specifically. Show banner only for
+        // other unexpected errors (RLS, network, schema drift).
+        const isDupKey =
+          err?.code === '23505'
+          || /duplicate key/i.test(err?.message || '')
+        if (!isDupKey) {
+          setError('Call logged in fallback mode: ' + (err?.message || err))
+        }
       } finally {
         // Always open the modal so the rep can capture the outcome.
         setTimeout(() => setPostCallOpen(true), 1500)
