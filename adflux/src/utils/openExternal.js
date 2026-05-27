@@ -42,28 +42,27 @@ function isNative() {
  *
  * @param {string} phone
  */
+// Phase 95.5 / 95.6 — India dial-code normaliser. Bare 10-digit
+// numbers get `+91` prepended; already-E.164 strings dial as-is.
+// Exported so main.jsx's <a href="tel:"> interceptor can re-normalise
+// any raw `tel:` href produced by JSX without dialPhone (e.g.
+// TodayTasksPanel.jsx, LeadsV2.jsx). Returns empty string when phone
+// is falsy.
+export function buildTelUrl(phone) {
+  if (!phone) return ''
+  // Strip the `tel:` prefix if a caller passes a full URL.
+  const stripped = String(phone).replace(/^tel:/i, '')
+  const cleaned = stripped.replace(/[^\d+]/g, '')
+  if (!cleaned) return ''
+  if (cleaned.startsWith('+')) return `tel:${cleaned}`
+  if (cleaned.length === 10) return `tel:+91${cleaned}`
+  if (cleaned.length === 12 && cleaned.startsWith('91')) return `tel:+${cleaned}`
+  return `tel:+${cleaned}`
+}
+
 export function dialPhone(phone) {
-  if (!phone) return
-  const cleaned = String(phone).replace(/[^\d+]/g, '')
-  // Phase 95.5 (27 May 2026) — India dial-code normaliser. Owner
-  // logcat showed `tel:+9687621676` (no country code) — only `+`
-  // got prepended to bare 10-digit numbers, so the dialer couldn't
-  // route. Detection:
-  //   • starts with `+`        → already E.164, dial as-is
-  //   • bare 10 digits         → assume India, prepend `+91`
-  //   • starts with `91` + 10  → 12-digit India number sans `+`,
-  //                              add the missing `+`
-  //   • anything else          → prepend bare `+` (legacy behavior)
-  let url
-  if (cleaned.startsWith('+')) {
-    url = `tel:${cleaned}`
-  } else if (cleaned.length === 10) {
-    url = `tel:+91${cleaned}`
-  } else if (cleaned.length === 12 && cleaned.startsWith('91')) {
-    url = `tel:+${cleaned}`
-  } else {
-    url = `tel:+${cleaned}`
-  }
+  const url = buildTelUrl(phone)
+  if (!url) return
   if (isNative()) {
     try {
       // Fire-and-forget. App.openUrl returns a Promise (we ignore it

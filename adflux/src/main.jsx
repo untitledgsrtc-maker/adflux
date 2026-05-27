@@ -85,12 +85,20 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       // openUrl() method; that API lives on app-launcher. Phase 87.7
       // shipped with the wrong plugin, which is why the global tel:
       // interceptor silently no-op'd on Capacitor 8 APK builds.
-      // Lazy-load app-launcher only on native; web bundle still
-      // pays nothing (this whole block is gated by isNativePlatform
-      // above). Falls back to plain navigation if the plugin fails
-      // to load.
-      import('@capacitor/app-launcher')
-        .then(({ AppLauncher }) => AppLauncher.openUrl({ url: href }))
+      //
+      // Phase 95.6 (27 May 2026) — also re-normalise the tel: URL
+      // through buildTelUrl so bare 10-digit hrefs from JSX
+      // (TodayTasksPanel, LeadsV2 row Call) get `+91` prepended.
+      // Owner logcat showed `tel:7383585222` reaching AppLauncher
+      // without country code → call didn't connect.
+      Promise.all([
+        import('@capacitor/app-launcher'),
+        import('./utils/openExternal'),
+      ])
+        .then(([{ AppLauncher }, { buildTelUrl }]) => {
+          const normalized = buildTelUrl(href) || href
+          return AppLauncher.openUrl({ url: normalized })
+        })
         .catch(() => { window.location.href = href })
     } catch {
       /* swallow — never break a click event */
