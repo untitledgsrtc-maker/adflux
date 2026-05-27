@@ -232,6 +232,28 @@ export default function QuoteDetail() {
     if (!quote) return
     setPdfLoading(true)
     try {
+      // Phase 95.10 (27 May 2026) — APK download path. Capacitor
+      // WebView doesn't register a DownloadListener for blob: URLs,
+      // so the standard `URL.createObjectURL + anchor.click()`
+      // pattern silently does nothing on the installed APK. Owner
+      // reported "pdf download not working in app" — confirmed
+      // root cause vs web (which uses Chrome's native download
+      // handler).
+      //
+      // Workaround: on native, upload the PDF to Supabase storage
+      // (returns the branded app.untitledad.in/pdf/REF?t=... URL
+      // from Phase 85.1) and open it via AppLauncher. The system
+      // browser then handles the download via its standard
+      // download manager. Web path unchanged — local blob download
+      // as before.
+      const isNative = typeof window !== 'undefined'
+        && window?.Capacitor?.isNativePlatform?.()
+      if (isNative) {
+        const url = await uploadQuotePDF(quote, cities)
+        if (!url) throw new Error('PDF upload returned no URL')
+        openExternalUrl(url)
+        return
+      }
       // Phase 15 — Other Media quotes get the ENIL-style invoice PDF.
       // Everything else (private LED, govt) keeps the existing PDF.
       if (quote.media_type === 'OTHER_MEDIA') {
