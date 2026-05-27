@@ -3,27 +3,30 @@
 // Phase 93.19 (26 May 2026) — Capacitor-aware launchers for external
 // URL schemes (tel:, whatsapp:, mailto:).
 //
-// Phase 93.19.1 (26 May 2026) — STATIC import of @capacitor/app.
+// Phase 95.4 (27 May 2026) — SWITCHED FROM @capacitor/app to
+// @capacitor/app-launcher. Codex audit caught it: @capacitor/app
+// in Capacitor 8 has NO openUrl() method. That API lives on
+// @capacitor/app-launcher (separate plugin). Phases 93.19 → 95.3
+// silently no-op'd because App.openUrl is undefined; try/catch
+// swallowed the TypeError and the fallback window.location.href=tel:
+// then failed inside the Capacitor WebView. Net result: Call +
+// WhatsApp buttons did nothing on APK even after manifest <queries>
+// shipped.
 //
-// Owner reported after 93.19 ship: "if i call lead out come not
-// come. in web working so perfect." Root cause: dynamic
-// `await import('@capacitor/app')` is a Vite code-split chunk. On
-// live-update APK mode the chunk fetches from app.untitledad.in on
-// first call, adding 100-2000ms latency. Two things go wrong:
-//   1. The user-gesture context is lost across the await — Android
-//      sometimes drops the OS intent if it doesn't fire promptly.
-//   2. The PostCallOutcomeModal setTimeout(1500) timer races against
-//      the chunk-load + insert chain; if the WebView backgrounds
-//      before the modal state flip, the modal never opens.
+// Reference:
+//   • @capacitor/app v8 docs — exitApp / getInfo / getLaunchUrl /
+//     getState / minimizeApp / lifecycle listeners. No openUrl.
+//   • @capacitor/app-launcher v8 docs — openUrl({ url }) →
+//     Promise<{ completed: boolean }>. completed=false when no
+//     handler (manifest queries gap or no app installed).
 //
-// Static import: App is bound at module load. App.openUrl fires
-// SYNCHRONOUSLY on the user gesture. No async dance.
-//
-// Web cost: @capacitor/app is ~2 kB gzipped. App.openUrl is gated
-// behind isNative() so it never runs in a browser anyway — the
-// import is dead-weight on web but trivially small.
+// Static import keeps the user-gesture context sync per the
+// Phase 93.19.1 reasoning. AppLauncher.openUrl returns a Promise
+// (fire-and-forget — we don't await) but the underlying native
+// intent dispatch happens before the Promise resolves, on the
+// same call frame as the click.
 
-import { App } from '@capacitor/app'
+import { AppLauncher } from '@capacitor/app-launcher'
 
 function isNative() {
   try {
@@ -47,10 +50,10 @@ export function dialPhone(phone) {
     try {
       // Fire-and-forget. App.openUrl returns a Promise (we ignore it
       // — the OS intent dispatches immediately on the user gesture).
-      App.openUrl({ url })
+      AppLauncher.openUrl({ url })
       return
     } catch (e) {
-      console.warn('[openExternal] dialPhone Capacitor App.openUrl failed:', e?.message || e)
+      console.warn('[openExternal] dialPhone Capacitor AppLauncher.openUrl failed:', e?.message || e)
     }
   }
   // Web — Chrome / Safari intercepts tel: scheme + routes to dialer.
@@ -68,10 +71,10 @@ export function openExternalUrl(url) {
   if (!url) return
   if (isNative()) {
     try {
-      App.openUrl({ url })
+      AppLauncher.openUrl({ url })
       return
     } catch (e) {
-      console.warn('[openExternal] openExternalUrl Capacitor App.openUrl failed:', e?.message || e)
+      console.warn('[openExternal] openExternalUrl Capacitor AppLauncher.openUrl failed:', e?.message || e)
     }
   }
   // Web — open in new context so current page state is preserved.

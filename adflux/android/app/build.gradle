@@ -30,8 +30,14 @@ android {
         // intents on Android 11+ (API 30) which enforces strict
         // intent visibility. Before this rebuild, Call + WhatsApp
         // buttons silently did nothing on modern phones.
-        versionCode 95100
-        versionName "0.95.1"
+        // Phase 95.4 (2026-05-27) — codex audit caught REAL root cause:
+        // @capacitor/app v8 has NO openUrl() method. Migrated to
+        // @capacitor/app-launcher@^8 which is the correct plugin.
+        // 95.1 queries block stays — required for AppLauncher to
+        // resolve handlers post-Android-11. APK rebuild required to
+        // bundle the new native plugin.
+        versionCode 95200
+        versionName "0.95.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

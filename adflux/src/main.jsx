@@ -80,11 +80,17 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       // preventDefault alone suppresses the WebView's tel:-URL
       // navigation. React's onClick still fires + PostCallOutcomeModal
       // chain on APK now matches web.
-      // Lazy-load @capacitor/app only on native. Falls back to a plain
-      // navigation if the plugin isn't available so worst-case the
-      // user still gets the browser-default behaviour.
-      import('@capacitor/app')
-        .then(({ App }) => App.openUrl({ url: href }))
+      // Phase 95.4 (27 May 2026) — switched from @capacitor/app to
+      // @capacitor/app-launcher. Capacitor 8's App plugin has no
+      // openUrl() method; that API lives on app-launcher. Phase 87.7
+      // shipped with the wrong plugin, which is why the global tel:
+      // interceptor silently no-op'd on Capacitor 8 APK builds.
+      // Lazy-load app-launcher only on native; web bundle still
+      // pays nothing (this whole block is gated by isNativePlatform
+      // above). Falls back to plain navigation if the plugin fails
+      // to load.
+      import('@capacitor/app-launcher')
+        .then(({ AppLauncher }) => AppLauncher.openUrl({ url: href }))
         .catch(() => { window.location.href = href })
     } catch {
       /* swallow — never break a click event */
