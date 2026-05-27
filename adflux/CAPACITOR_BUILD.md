@@ -154,3 +154,101 @@ npx cap sync android
 
 Then read the plugin's README for any AndroidManifest changes (most
 add their own permissions automatically; some need an Activity entry).
+
+
+---
+
+## APK rebuild flow (locked 2026-05-27)
+
+Live-update mode (Phase 94a) means JS / CSS / React changes flow via
+Vercel deploy → APK fetches on next cold start. **Only rebuild APK
+when native code changes:**
+
+- `android/app/src/main/AndroidManifest.xml` (permissions, queries)
+- `android/app/src/main/java/in/untitledad/app/*.java` (plugins,
+  MainActivity)
+- `android/app/build.gradle` (versionCode, signing, dependencies)
+- New `@capacitor/X` package install
+- `capacitor.config.json` change
+
+### Sideload-distribute path (current — 2026-05-27)
+
+`signingConfigs.release` scaffold in `android/app/build.gradle` is
+commented out. Release builds produce `app-release-unsigned.apk`
+which Android refuses to install. Workaround: build debug APK
+(debug-keystore-signed) and sideload via WhatsApp.
+
+```bash
+cd ~/Documents/untitled-os2/Untitled/adflux
+git push origin untitled-os                 # 1. Land changes
+npm run build                                # 2. Build web bundle
+npx cap sync android                         # 3. Copy dist/ + manifest into android/
+cd android
+./gradlew assembleDebug                      # 4. Debug-signed APK
+ls -la app/build/outputs/apk/debug/          # 5. Confirm app-debug.apk exists
+```
+
+Output: `~/Documents/untitled-os2/Untitled/adflux/android/app/build/outputs/apk/debug/app-debug.apk`
+
+Distribute by dragging APK from Finder into WhatsApp chat with reps.
+Each rep taps notification → Install. versionCode bump forces in-place
+upgrade (no uninstall needed) when signature matches.
+
+### versionCode pattern
+
+`phase × 1000 + revision`. Last rebuild: Phase 95.1 = `95100` (vname
+`0.95.1`). Bump on every release. Without bump, Android may silently
+skip install.
+
+### Signature mismatch trap
+
+If owner previously installed a **release-signed** APK (e.g. via the
+Phase 76.2.2 keystore setup if it was ever activated), then sideloads
+a **debug-signed** APK with higher versionCode, Android refuses the
+install — signatures must match across upgrades.
+
+Symptom: tap APK in WhatsApp → "Install" greys out OR install completes
+silently but version stays at previous number.
+
+Fix: uninstall existing app first (Settings → Apps → Untitled OS →
+Uninstall), then install the debug APK. Login state is lost — rep
+re-authenticates once.
+
+### Activate release signing (future, for Play Store)
+
+Per build.gradle comments (lines 44-72):
+
+1. Generate keystore: `keytool -genkey -v -keystore ~/untitledad-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias untitledad`
+2. Create `android/keystore.properties` (gitignored):
+   ```
+   storeFile=/Users/apple/untitledad-release.jks
+   storePassword=...
+   keyAlias=untitledad
+   keyPassword=...
+   ```
+3. Uncomment `signingConfigs { release { ... } }` + `signingConfig signingConfigs.release` blocks in `android/app/build.gradle`
+4. Add release SHA-1 (from `keytool -list -v -keystore ~/untitledad-release.jks -alias untitledad`) to Google Cloud Console → Credentials → Android key restrictions
+5. `./gradlew assembleRelease` produces signed `app-release.apk`
+
+Until then: debug-signed APKs for sideload only. Not Play Store.
+
+### Phase 95.1 — manifest queries (already shipped)
+
+Android 11+ requires `<queries>` block declaring which intents the
+app can resolve. Manifest now has explicit entries for `tel:`,
+`whatsapp://`, `wa.me` HTTPS, `mailto:`, generic HTTPS, and
+`com.whatsapp` / `com.whatsapp.w4b` packages.
+
+Without this block, `App.openUrl({ url: 'tel:...' })` and
+`window.open('whatsapp://...')` silently fail on modern Android.
+
+### Known APK debug-session gotchas
+
+- chrome://inspect drops phone to "Offline / Pending authentication"
+  if USB connection drops mid-session. Re-authorize: phone Settings →
+  Developer options → Revoke USB authorizations → replug → accept popup.
+- Charge-only USB-C cables won't enable debugging. Use data-capable
+  cable (Apple cable or USB-IF certified).
+- Phone must be in "File transfer / Android Auto" USB mode, not
+  "Charging only".
+

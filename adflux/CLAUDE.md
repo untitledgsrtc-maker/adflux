@@ -1477,3 +1477,146 @@ cadence.
   section) reversed it. Read `capacitor.config.json` line 2
   before answering any "is APK bundled or live-update" question.
 
+
+
+---
+
+## 39 · Phase 94 — 95.3 + APK pause (2026-05-27)
+
+### Phase 94 — path-param edit/renew routes (PERMANENT)
+
+Five prior phases (93.28 → 93.30.2) tried router state, query string, in-memory module fallback to deliver `editingId` from quote Edit/Renew buttons to `CreateQuoteV2`. Each shipped, each failed on Capacitor APK first-render. Owner directive: "dont patch make sure its permenet solution".
+
+**Architectural fix:** moved id into the URL **path** itself. React Router's `useParams()` reads path segments deterministically — no race, no WebView quirk possible.
+
+3 new routes (registered BEFORE `/quotes/:id` per CLAUDE.md §10):
+
+```
+/quotes/edit/:id              → CreateQuoteV2 (edit mode)
+/quotes/edit/:id/other-media  → CreateQuoteOtherMediaV2 (edit mode)
+/quotes/renew/:id             → CreateQuoteV2 (renew mode)
+```
+
+Wizards detect mode via `location.pathname.startsWith('/quotes/edit/')` / `/quotes/renew/`. Backwards-compat: state/query/in-memory fallback chain retained for pre-Phase-94 deep links.
+
+Files: `App.jsx`, `CreateQuoteV2.jsx`, `CreateQuoteOtherMediaV2.jsx`, `QuotesV2.jsx` (§28 frozen, 1-line nav swap), `QuoteDetail.jsx`, `RenewalToolsV2.jsx`. Commit `6314160`.
+
+### Phase 95.0 — fallback-mode banner silenced
+
+Owner saw red banner on /follow-ups: `"Call logged in fallback mode: duplicate key value violates unique constraint uniq_lead_activities_dedupe_min"`. Constraint from Phase 68.2 (21 May) is correct — blocks same-minute duplicate call activity. The 1st tap logged ✅, modal opened ✅; 2nd tap within 60s hit the constraint and showed the alarming banner. Owner thought everything broken.
+
+Fix: detect Postgres dup-key (`err.code === '23505'` OR message regex) in FollowUpsV2.openCall catch block — suppress banner for that case only. All other errors still surface. Commit `7fdc05d`.
+
+### Phase 95.1 — AndroidManifest `<queries>` block (NATIVE)
+
+Owner reported on /follow-ups APK: Call + WhatsApp buttons do nothing. "Till yesterday evening everything was working fine."
+
+Root cause: Android 11+ (API 30) requires `<queries>` declarations for intent visibility. Manifest had ZERO queries. `App.openUrl({ url: 'tel:...' })` silently failed — no error, no fallback, button did nothing.
+
+Fix: `<queries>` block at manifest root declaring:
+- `tel:` (ACTION_DIAL + ACTION_VIEW)
+- `whatsapp://` + `wa.me` HTTPS + `api.whatsapp.com` HTTPS
+- `mailto:` (ACTION_SENDTO)
+- Generic HTTPS
+- Explicit `com.whatsapp` + `com.whatsapp.w4b` packages
+
+versionCode 94100 → 95100, versionName 0.94.1 → 0.95.1. Native = APK rebuild required. Commits `de52c92` + `b1354d5` + `9a352f6` (`MainActivity.onResume` protected→public).
+
+### Phase 95.2 — route external launches through openExternalUrl
+
+8 sites still bypassing Phase 93.19 `openExternalUrl()` helper. All swapped:
+- WhatsAppPromptModal / WhatsAppSendModal — WhatsApp template send
+- LeadDetailV2 §28 — follow-up WA template (1 line)
+- QuoteDetail — Gmail email button (dropped mailto: fallback branch)
+- GovtProposalDetailV2 — Gmail + 2 PDF preview sites
+- MasterV2 — admin file preview
+
+Web behaviour byte-identical. APK now opens system handlers (WhatsApp app, system PDF viewer, etc) instead of WebView-inline blank tabs. Commit `9a0a42d`.
+
+### Phase 95.3 — preserve branded WhatsApp share URL
+
+Owner: "we made custom url for quote send via whatsapp but now there is different url". Phase 85.1 `uploadQuotePDFHtml` returns `https://app.untitledad.in/pdf/<ref>?t=<token>`. QuoteDetail then ran `shortenUrl()` on top, overwriting with `is.gd/xyz`. Owner saw is.gd instead of branded.
+
+Fix: `if (pdfUrl && !/^https?:\/\/[^/]*untitledad\.in\/pdf\//.test(pdfUrl))` gate around shortenUrl call. Govt flow (raw Supabase signed URL) untouched. 2 sites in QuoteDetail. Commit `67cbed3`.
+
+**Root cause was incomplete Phase 85.1 ship:** function return contract changed but callers weren't audited. Blast-radius miss per §35. Documented as foot-gun.
+
+### APK rebuild attempt (27 May 2026)
+
+Built debug-signed APK (`app-debug.apk` 9 MB) for sideload distribution since release scaffold's signingConfig is still commented out. Owner installed on test phone. Reported **still same issues**.
+
+Possible causes (none verified — USB chrome://inspect kept dropping "Pending authentication"):
+1. Android signature mismatch refused install of v0.95.1 over v0.94.1 (release-signed → debug-signed)
+2. Phone still running v0.94.1 (Settings → Apps → Untitled OS → version check pending)
+3. Live-update mode pulled new JS but APK shell still has old manifest (rebuild didn't actually update)
+4. Real code bug I haven't seen yet
+
+### Owner directive 27 May 2026: APK paused
+
+Owner: "i have eciode whatever have build in web app you just store in respective document". 
+
+**Web is the canonical surface.** PWA via `app.untitledad.in` works perfectly across all flows. APK has unresolved hardware-specific bugs after 5+ patch iterations + native rebuild attempt.
+
+Reps continue using whatever APK they have installed (v0.94.1 likely). Web push notifications work via the same FCM flow per `nativePush.js` paths that gate on `Capacitor.isNativePlatform()` — Chrome Android has native FCM via service worker.
+
+**APK work pauses until:**
+- USB chrome://inspect debug session completes (find actual root cause, no more guessing)
+- OR owner explicitly resumes
+
+**Don't ship more native fixes blind.** §35 blast-radius rule applies harder than ever.
+
+### Built but not shipped (as of 2026-05-27)
+
+| Item | What | Action |
+|---|---|---|
+| `supabase_phase64_profile_autosync.sql` (20 May) | Auto-sync `staff_incentive_profiles.monthly_salary` from `designations.default_monthly_salary` | Untracked; idempotent + backfill; owner-approve before applying |
+| `supabase_phase63_staging_reset.sql` (20 May) | Destructive wipe of staging DB preserving admin/co_owner | Untracked, intentionally — owner-only manual use |
+| `docs/AUDIT_2026_05_26_DEEP.md` | Yesterday's read-only deep audit | Untracked |
+| `docs/PNL_MODULE_BRIEF_FOR_ACCOUNTS.md` | P&L module spec | Untracked plan, no code |
+| `_design_reference/newsalesui/` | Design mockups | Untracked reference |
+
+### Stack on origin (`untitled-os` branch) as of 27 May 14:18 IST
+
+```
+9a352f6  Phase 95.1.1: MainActivity onResume protected→public
+b1354d5  Phase 95.1: versionCode 94100 → 95100
+de52c92  Phase 95.1: AndroidManifest <queries> block
+9a0a42d  Phase 95.2: route external-URL launches via openExternalUrl
+7fdc05d  Phase 95.0: silent on dup-key error in FollowUpsV2 openCall
+6314160  Phase 94: path-param edit/renew routes — PERMANENT APK prefill fix
+67cbed3  Phase 95.3: preserve branded app.untitledad.in/pdf URL in WhatsApp+Email
+bba2700  Phase 93.30.2: useState lazy init for quoteIntent consume
+1b7aab2  Phase 93.30.1: tighten quoteIntent TTL 5min → 3sec + drop vis-clear
+9987677  Phase 93.30: in-memory quoteIntent — 3rd-layer APK delivery channel
+846d10d  Phase 93.29: harden every URL-param route for APK
+5b3f965  Phase 93.22: audit cleanup F1+F2+F3
+c129f2c  Phase 93.23: TeamDashboard SELECT missing check_out_at
+b531cc4  Phase 93.24: lead-tied call counters
+ba8483b  Phase 93.27: TotalCard responsive font — fix APK truncation
+6f967df  Phase 93.25 + 93.26: call_logs dedup + native-dialer stage advance
+```
+
+### Foot-guns added 2026-05-27 (don't repeat)
+
+- ❌ **Native fix shipped without device verification.** Phase 95.1 manifest queries followed Android docs but owner reports still broken on device. Without USB chrome://inspect or device-side console access, "should work per docs" is a guess.
+- ❌ **Function-contract change without caller audit.** Phase 85.1 changed `uploadQuotePDFHtml` return to branded URL but QuoteDetail callers still ran `shortenUrl()` on top — 11 days of silent regression until owner caught it. CLAUDE.md §35 blast-radius rule applies; future contract changes MUST grep all callers.
+- ❌ **Patch chain on hardware-specific bug.** Phases 93.28 → 93.30.2 (five patches) tried fallback after fallback. Phase 94 path-param redesign was the architecturally correct first move. Future hardware-specific bugs: redesign once, don't patch five times.
+
+### Sales module FROZEN status (unchanged)
+
+§28 + §29 + §31 contracts intact across Phase 94 → 95.3:
+- PostCallOutcomeModal tel:→1.5s→modal chain preserved on every caller
+- `useAutoRefresh` mounts unchanged
+- Lead stages / cadence types / activity_type enums unchanged
+- Push enrollment in V2AppShell only
+- No new emoji, hex, off-scale radius, role, push enrollment outside V2AppShell
+
+Sales-module-guardian PASS on every commit touching frozen files this sprint.
+
+### Next session opening move
+
+1. Read §39 to recover today's state.
+2. If owner says resume APK debug: get chrome://inspect actually working OR ship in-app self-test diagnostic (Path B from owner conversation).
+3. If owner says ship Phase 64 SQL: commit + walk owner through Supabase Studio paste.
+4. If owner says move on: pick from the deferred backlog (P&L module, govt invoice template, TDS columns, telecaller team-lead dashboard).
+
