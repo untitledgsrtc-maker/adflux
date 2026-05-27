@@ -299,7 +299,14 @@ export default function QuoteDetail() {
     // link so WhatsApp shows a clean preview card instead of a wrapped
     // spammy-looking blob. Shortener failures fall back to the original
     // URL inside shortenUrl — never blocks the send.
-    if (pdfUrl) {
+    //
+    // Phase 95.3 (27 May 2026) — skip the shortener when uploadQuotePDF
+    // already returned the branded share URL (Phase 85.1 path:
+    // app.untitledad.in/pdf/<ref>?t=<token>). Owner spec: "we made
+    // custom url for quote send via whatsapp but now there is different
+    // url" — the further-shortened is.gd / cleanuri link was burying
+    // the branded URL.
+    if (pdfUrl && !/^https?:\/\/[^/]*untitledad\.in\/pdf\//.test(pdfUrl)) {
       try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
     }
     openWhatsApp(quote.client_phone, buildWhatsAppMessage(quote, cities, { pdfUrl }))
@@ -322,7 +329,9 @@ export default function QuoteDetail() {
     } finally {
       setPdfLoading(false)
     }
-    if (pdfUrl) {
+    // Phase 95.3 — preserve branded app.untitledad.in/pdf/<ref>?t=…
+    // URL; only shorten raw Supabase fallback URLs.
+    if (pdfUrl && !/^https?:\/\/[^/]*untitledad\.in\/pdf\//.test(pdfUrl)) {
       try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
     }
     const to      = (quote.client_email || '').trim()
