@@ -82,7 +82,14 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
       console.log('[EDIT-DEBUG] WizardShell fetch result', JSON.stringify({
         ok: !err && !!baseQuote,
         errMessage: err?.message || null,
-        gotClientName: baseQuote?.client_name || null,
+        errCode: err?.code || null,
+        errDetails: err?.details || null,
+        baseQuoteKeys: baseQuote ? Object.keys(baseQuote) : null,
+        baseQuoteId: baseQuote?.id || null,
+        baseQuoteClientName: baseQuote?.client_name === undefined ? 'UNDEFINED' :
+                             baseQuote?.client_name === null ? 'NULL' :
+                             baseQuote?.client_name,
+        baseQuoteStatus: baseQuote?.status || null,
         gotCityCount: baseQuote?.quote_cities?.length || 0,
       }))
 
