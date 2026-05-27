@@ -79,12 +79,18 @@ export function PaymentModal({
   // Pair of paranoia guards with the matching WonPaymentModal handler
   // where a `>=` comparison against `Number(... || 0)` was DEFINITELY
   // the spurious auto-tick vector.
+  // Phase 95.11 (27 May 2026) — auto-tick is_final_payment is now
+  // a TWO-WAY toggle, mirroring Phase 95.9 in WonPaymentModal.
+  // Original logic only set is_final=true when entered matched
+  // balance; never UN-set when amount changed. Owner reported a
+  // partial payment row landed in admin queue with FINAL badge —
+  // likely a stale form state where amount=balance fired the tick,
+  // then user reduced the amount but is_final stayed true.
   useEffect(() => {
     const entered = parseFloat(form.amount_received) || 0
     const total = Number(quote?.total_amount) || 0
-    if (total > 0 && entered > 0 && Math.abs(entered - balance) < 1) {
-      setForm(f => ({ ...f, is_final_payment: true }))
-    }
+    const covers = total > 0 && entered > 0 && Math.abs(entered - balance) < 1
+    setForm(f => (f.is_final_payment === covers ? f : { ...f, is_final_payment: covers }))
   }, [form.amount_received, balance, quote?.total_amount])
 
   function set(field, value) {
