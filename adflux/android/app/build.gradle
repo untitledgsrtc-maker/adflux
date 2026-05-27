@@ -36,8 +36,14 @@ android {
         // 95.1 queries block stays — required for AppLauncher to
         // resolve handlers post-Android-11. APK rebuild required to
         // bundle the new native plugin.
-        versionCode 95200
-        versionName "0.95.2"
+        // Phase 96.0 (2026-05-27) — universal LocalNotifications for
+        // OEM-immune push delivery. Adds @capacitor/local-notifications
+        // plugin (new native classloader entry). Drops FCM `notification`
+        // payload; client schedules LocalNotifications on every receive
+        // so tray pops regardless of FG/BG. Bypasses FCM entirely for
+        // follow-up reminders via AlarmManager. APK rebuild required.
+        versionCode 96000
+        versionName "0.96.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
