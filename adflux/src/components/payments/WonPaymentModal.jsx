@@ -116,12 +116,19 @@ export function WonPaymentModal({
     // Auto-tick "final payment" when the cumulative received covers the
     // full quote. CRITICAL guard: require total > 0 to avoid the
     // "0 + amt >= 0" false positive on stale-store hydration races.
+    //
+    // Phase 95.9 (27 May 2026) — also UN-tick is_final when amount
+    // drops below total. Owner reported partial payments going to
+    // admin marked is_final_payment=true (3 rows hit this in 24h:
+    // ₹1670 of ₹7670 + ₹20000 of ₹99000, both auto-rejected). Root
+    // cause: initial state set is_final=true based on hasExisting
+    // Payment + remainingBalance, then rep typed a smaller amount
+    // but is_final never re-evaluated downward.
     if (k === 'amount_received') {
       const amt = Number(v) || 0
       const total = Number(quote.total_amount) || 0
-      if (total > 0 && amt + Number(totalPaid || 0) >= total) {
-        updated.is_final = true
-      }
+      const covers = total > 0 && amt + Number(totalPaid || 0) >= total
+      updated.is_final = covers
     }
     setForm(updated)
   }
