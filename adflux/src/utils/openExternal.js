@@ -44,8 +44,26 @@ function isNative() {
  */
 export function dialPhone(phone) {
   if (!phone) return
-  const digits = String(phone).replace(/[^\d+]/g, '')
-  const url = digits.startsWith('+') ? `tel:${digits}` : `tel:+${digits}`
+  const cleaned = String(phone).replace(/[^\d+]/g, '')
+  // Phase 95.5 (27 May 2026) — India dial-code normaliser. Owner
+  // logcat showed `tel:+9687621676` (no country code) — only `+`
+  // got prepended to bare 10-digit numbers, so the dialer couldn't
+  // route. Detection:
+  //   • starts with `+`        → already E.164, dial as-is
+  //   • bare 10 digits         → assume India, prepend `+91`
+  //   • starts with `91` + 10  → 12-digit India number sans `+`,
+  //                              add the missing `+`
+  //   • anything else          → prepend bare `+` (legacy behavior)
+  let url
+  if (cleaned.startsWith('+')) {
+    url = `tel:${cleaned}`
+  } else if (cleaned.length === 10) {
+    url = `tel:+91${cleaned}`
+  } else if (cleaned.length === 12 && cleaned.startsWith('91')) {
+    url = `tel:+${cleaned}`
+  } else {
+    url = `tel:+${cleaned}`
+  }
   if (isNative()) {
     try {
       // Fire-and-forget. App.openUrl returns a Promise (we ignore it
