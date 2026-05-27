@@ -1620,3 +1620,131 @@ Sales-module-guardian PASS on every commit touching frozen files this sprint.
 3. If owner says ship Phase 64 SQL: commit + walk owner through Supabase Studio paste.
 4. If owner says move on: pick from the deferred backlog (P&L module, govt invoice template, TDS columns, telecaller team-lead dashboard).
 
+
+---
+
+## 40 · Change-impact workflow (2026-05-27, OWNER DIRECTIVE)
+
+Owner directive 2026-05-27 evening: "I want this project future-proof, not patch-based. Whenever we change one thing, Claude must check: surrounding code, same workflow in other modules, all roles affected, frontend + backend + RLS together, mobile + desktop behavior, similar functions in other modules."
+
+This section is THE workflow Claude must follow for every future change. Higher priority than ship-speed. Supersedes §15 + §35 where they overlap.
+
+### Pre-implementation 12-question gate
+
+Before writing a single line of code, answer all 12 in writing:
+
+1. What module is touched?
+2. What similar / parallel modules must be checked? (See module-consistency-auditor scope.)
+3. Which roles are affected? (admin / co_owner / sales / agency / telecaller / sales_manager / hr / accounts / office_staff)
+4. Which frontend screens / routes / buttons are affected?
+5. Which backend tables / RLS policies / SQL functions / triggers are affected?
+6. Does it touch the §28 frozen sales module?
+7. Does it touch quote flow, lead flow, payment flow, push flow, or PDF flow?
+8. Does it need SQL paste in Supabase Studio?
+9. Does it need an Edge Function deploy?
+10. Does it need an APK rebuild?
+11. What regression tests must run?
+12. What owner manual steps are needed (after my work ends)?
+
+If any answer is "I don't know" → stop. Run the relevant audit agent first.
+
+### Required output table (every fix)
+
+Every implementation must produce this table before commit:
+
+| Change | Direct File(s) | Similar Modules Checked | Roles Checked | DB/RLS Checked | Mobile/Desktop Checked | Agent Required | Regression Tests |
+|---|---|---|---|---|---|---|---|
+
+Empty cells = audit gap. Fill them or explicitly mark `N/A: <reason>`.
+
+### Mandatory 3-surface verification
+
+Every change must produce this table:
+
+| Surface | Must Test | Risk | Result |
+|---|---|---|---|
+| Desktop web | (specific clicks/pages) | (what breaks if skipped) | PASS / N/A:<reason> / BLOCKED:<reason> |
+| Mobile web | | | |
+| Android APK | | | |
+
+No change is "complete" until all 3 rows are marked PASS, N/A with reason, or BLOCKED with reason. "Untested" or empty is not allowed.
+
+### Mandatory testing triggers (no N/A allowed)
+
+**Android APK testing MANDATORY** if change touches any of:
+- push / notification / follow-up alarm
+- `public/sw.js` (service worker)
+- `capacitor.config*.json`
+- `android/app/src/main/AndroidManifest.xml`
+- `android/app/build.gradle`
+- `src/utils/nativePush.js`
+- `src/utils/scheduleFollowUpAlarm.js`
+- `src/utils/pushNotifications.js`
+- `src/components/v2/V2AppShell.jsx`
+- `src/components/leads/PostCallOutcomeModal.jsx`
+
+**Desktop web testing MANDATORY** if change touches any of:
+- master-data tables / admin pages
+- dashboards (AdminDashboardDesktop, TeamDashboardV2, ManagerDashboardV2)
+- approvals (PendingApprovalsV2)
+- master screens (MasterV2 tabs)
+- PDF renderers (QuotePDFHtml, OtherMediaQuotePDF, GovtProposalDetailV2)
+- admin flows (HRV2, PeopleV2, LeavesAdminV2, SalaryAdminV2, TaPayoutsAdminV2)
+
+**Mobile web testing MANDATORY** if change touches any of:
+- sales flow (WorkV2, LeadDetailV2, LeadFormV2, LeadsV2)
+- telecaller flow (TelecallerV2)
+- work page / lead detail / follow-ups
+- call buttons / WhatsApp buttons
+- route guards (RequireAuth, RequirePrivileged, RequireManager, RequireGovtAccess)
+
+If a mobile-web-mandatory change also runs inside APK (most rep-facing changes do), Android APK is ALSO mandatory — not optional.
+
+### Pre-push release gate
+
+Before any `git push origin <branch>`:
+1. Invoke `release-manager` agent.
+2. Read the checklist it produces.
+3. Fix any items marked FAIL / WARN.
+4. Owner manually runs the push.
+
+### Agent fleet (active as of Phase 97.0, 2026-05-27)
+
+`.claude/agents/` directory:
+
+| Agent | Location | Read-only | When to use |
+|---|---|---|---|
+| sales-module-guardian | workspace `/Users/apple/Documents/untitled-os2/.claude/agents/` | YES | Before any commit touching §28 frozen sales surface |
+| code-reviewer | repo `Untitled/adflux/.claude/agents/` | YES | Before every commit — generic CLAUDE.md compliance |
+| explorer | repo | YES | During work — fast "where is X" lookups |
+| test-runner | repo | YES | Before commit, AFTER code-reviewer — runs check scripts |
+| security-rls-auditor (Phase 97.0) | repo | YES | Before any commit touching SQL / Edge Functions / RLS-adjacent code OR before SQL Studio paste |
+| android-push-auditor (Phase 97.0) | repo | YES | Before any commit touching push / native / Capacitor / sw.js OR before APK rebuild |
+| release-manager (Phase 97.0) | repo | YES | Before any `git push` — produces deployment checklist |
+| role-workflow-impact-auditor (Phase 97.0) | repo | YES | Before any change touching auth / routes / role guards / nav / cross-role pages |
+| module-consistency-auditor (Phase 97.0) | repo | YES | After any change with parallel modules (4 quote wizards, 3 PDF renderers, dashboard variants, etc.) |
+
+All Phase 97.0 agents are READ-ONLY: no Edit, no Write, no SQL execution, no APK build, no git commit, no git push. They report only. Owner is the gate-keeper.
+
+### Where the workflow supersedes older rules
+
+- §15 (pre-commit verification) — Phase 97.0 expands it: now requires audit-agent fan-out + 3-surface table.
+- §35 (blast-radius rule) — Phase 97.0 strengthens it: module-consistency-auditor now formalizes parallel-module check.
+- §3 (module-not-patch directive) — same intent, now backed by the 12-question gate.
+
+### Foot-guns Phase 97.0 closes
+
+- Shipping a fix that works on web but fails on APK (Phase 95.x repeated this 5 times). 3-surface mandate makes the test impossible to skip.
+- Touching one quote wizard and forgetting the other 3. module-consistency-auditor catches.
+- Native change without versionCode bump. release-manager catches.
+- SQL migration without idempotency. security-rls-auditor catches.
+- Role bypass via direct URL. role-workflow-impact-auditor catches.
+
+### When NOT to use the workflow
+
+- Read-only audit passes (already in workflow output mode).
+- Comment-only edits (still go through code-reviewer, but skip the 3-surface table — mark all N/A:comment).
+- Documentation appends to CLAUDE.md itself.
+
+For everything else: the 12-question + table + 3-surface gate runs.
+
