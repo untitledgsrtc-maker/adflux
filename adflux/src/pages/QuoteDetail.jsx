@@ -30,6 +30,7 @@ import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
 import IncentiveForecastCard from '../components/quotes/IncentiveForecastCard'
 import { setPendingEditOf, setPendingRenewalOf } from '../lib/quoteIntent'
+import { openExternalUrl } from '../utils/openExternal'
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
@@ -339,14 +340,13 @@ export default function QuoteDetail() {
       `&su=${encodeURIComponent(subject)}` +
       `&body=${encodeURIComponent(body)}`
 
-    const win = window.open(gmailHref, '_blank', 'noopener')
-    if (!win) {
-      const mailtoHref =
-        `mailto:${encodeURIComponent(to)}` +
-        `?subject=${encodeURIComponent(subject)}` +
-        `&body=${encodeURIComponent(body)}`
-      window.location.href = mailtoHref
-    }
+    // Phase 95.2 — openExternalUrl routes via Capacitor App.openUrl on
+    // APK (manifest <queries> in Phase 95.1 lets the OS resolve both
+    // Gmail HTTPS and mailto: schemes), falls back to window.open on
+    // web. window.open returning null was the original popup-blocker
+    // detection; on APK the openExternalUrl helper handles the
+    // fallback uniformly so we drop the dual-branch.
+    openExternalUrl(gmailHref)
     // Phase 30C — record the touch in the lead's activity timeline.
     logQuoteTouch('email', `Email · proposal ${quote.quote_number || quote.ref_number || ''}${pdfUrl ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
   }

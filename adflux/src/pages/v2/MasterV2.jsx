@@ -28,6 +28,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { uploadAttachment, getSignedUrl, slugifyLabel } from '../../utils/proposalPdf'
+import { openExternalUrl } from '../../utils/openExternal'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 
@@ -301,7 +302,9 @@ function AttachmentsTab() {
     if (!path) return
     try {
       const url = await getSignedUrl(path, 600)
-      window.open(url, '_blank', 'noopener')
+      // Phase 95.2 — openExternalUrl on APK routes via Capacitor App
+      // .openUrl so signed URL opens in system browser / PDF viewer.
+      openExternalUrl(url)
     } catch (e) {
       setStatusError(`Could not open file: ${e?.message || e}`)
     }

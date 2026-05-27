@@ -16,6 +16,7 @@ import {
   Mail,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { openExternalUrl } from '../../utils/openExternal'
 import { GovtProposalRenderer } from '../../components/govt/GovtProposalRenderer'
 import { useAuth } from '../../hooks/useAuth'
 import { useAuthStore } from '../../store/authStore'
@@ -902,16 +903,11 @@ export default function GovtProposalDetailV2() {
       `&su=${encodeURIComponent(subject)}` +
       `&body=${encodeURIComponent(body)}`
 
-    const win = window.open(gmailHref, '_blank', 'noopener')
-    if (!win) {
-      // Popup blocker bounced us — fall back to mailto: which uses
-      // the OS-default handler.
-      const mailtoHref =
-        `mailto:${encodeURIComponent(to)}` +
-        `?subject=${encodeURIComponent(subject)}` +
-        `&body=${encodeURIComponent(body)}`
-      window.location.href = mailtoHref
-    }
+    // Phase 95.2 — openExternalUrl routes via Capacitor App.openUrl
+    // on APK + falls back to window.open on web. Gmail HTTPS and
+    // mailto: schemes are both declared in the manifest <queries>
+    // block (Phase 95.1) so the OS resolves them cleanly.
+    openExternalUrl(gmailHref)
     // Phase 30C — record the touch in the lead's activity timeline.
     logQuoteTouch('email', `Email · proposal ${refLine}${pdfLinkAdded ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
   }
@@ -1079,7 +1075,9 @@ export default function GovtProposalDetailV2() {
     }
     if (path.startsWith('http')) {
       // Old data: a pasted URL, not a storage path. Open as-is.
-      window.open(path, '_blank', 'noopener')
+      // Phase 95.2 — openExternalUrl on APK opens via system browser
+      // / PDF viewer, not inline WebView.
+      openExternalUrl(path)
       return
     }
     try {
@@ -1096,11 +1094,10 @@ export default function GovtProposalDetailV2() {
         return
       }
       setSignedUrls(prev => ({ ...prev, [path]: url }))
-      const win = window.open(url, '_blank', 'noopener')
-      if (!win) {
-        // Pop-up blocker — fall back to direct navigation in current tab.
-        window.location.href = url
-      }
+      // Phase 95.2 — openExternalUrl handles popup-blocker on web +
+      // routes via Capacitor App.openUrl on APK so PDF opens in system
+      // viewer instead of WebView-inline blank tab.
+      openExternalUrl(url)
     } catch (e) {
       // Phase 11h — Supabase returns 400 "Bad Request" when the file
       // at that path doesn't exist (RLS denial would be 403). The

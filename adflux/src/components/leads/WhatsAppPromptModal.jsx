@@ -21,6 +21,7 @@
 import { useEffect, useState } from 'react'
 import { X, MessageCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { openExternalUrl } from '../../utils/openExternal'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -80,7 +81,11 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
       return
     }
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(body)}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    // Phase 95.2 — openExternalUrl routes via Capacitor App.openUrl
+    // on native (manifest <queries> in Phase 95.1 lets the OS resolve
+    // wa.me HTTPS to the WhatsApp app), falls back to window.open on
+    // web.
+    openExternalUrl(url)
     onClose?.()
   }
 

@@ -334,7 +334,10 @@ export default function LeadDetailV2() {
       .replace(/\{rep\}/g,     profile?.name || 'Sales Team')
       .replace(/\{city\}/g,    lead.city    || 'your city')
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(filled)}`
-    window.open(url, '_blank')
+    // Phase 95.2 — openExternalUrl routes via Capacitor App.openUrl
+    // on APK so WhatsApp app opens instead of WebView-inline blank
+    // tab. Web fallback unchanged.
+    openExternalUrl(url)
     fireAndForgetLog('whatsapp', `Follow-up template sent (${data.name})`)
   }
 

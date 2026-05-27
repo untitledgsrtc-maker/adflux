@@ -22,6 +22,7 @@ import { X, MessageSquare, Send, Loader2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { pushToast } from '../v2/Toast'
+import { openExternalUrl } from '../../utils/openExternal'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -103,8 +104,10 @@ export default function WhatsAppSendModal({ open, lead, onClose, onSent }) {
     sendingRef.current = true
     setSending(true)
     // Open wa.me on user gesture FIRST so iOS Safari hands off.
+    // Phase 95.2 — openExternalUrl routes via Capacitor App.openUrl
+    // on native + falls back to window.open on web.
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(body)}`
-    window.open(url, '_blank', 'noopener')
+    openExternalUrl(url)
     // Then log audit (fire-and-forget; failure doesn't block send).
     supabase.from('lead_activities').insert([{
       lead_id:       lead.id,
