@@ -17,7 +17,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         // Phase 76.2.2 — bump force-stop heartbeat from the Activity
         // lifecycle every time the user brings the app to foreground.
