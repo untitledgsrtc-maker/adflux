@@ -68,17 +68,26 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
 
     async function loadBaseQuote() {
       const id = editOf || renewalOf
+      // Phase 95.8 (27 May 2026) — defensive Array unwrap. Logcat
+      // evidence showed supabase.single() intermittently returns the
+      // row WRAPPED IN AN ARRAY ([{...row...}]) on APK — 4 out of 5
+      // taps. PostgREST + embed quirk on this Supabase version. Using
+      // .limit(1) + manual array access bypasses the .single()
+      // unwrap-or-fail path entirely.
       // Phase 95.7-debug — log the fetch attempt + result.
       console.log('[EDIT-DEBUG] WizardShell loadBaseQuote fetch', JSON.stringify({
         editOf,
         renewalOf,
         idUsed: id,
       }))
-      const { data: baseQuote, error: err } = await supabase
+      const { data: rawData, error: err } = await supabase
         .from('quotes')
         .select('*, quote_cities(*)')
         .eq('id', id)
-        .single()
+        .limit(1)
+      // Unwrap array → first row. Already-object responses pass
+      // through unchanged.
+      const baseQuote = Array.isArray(rawData) ? rawData[0] : rawData
       console.log('[EDIT-DEBUG] WizardShell fetch result', JSON.stringify({
         ok: !err && !!baseQuote,
         errMessage: err?.message || null,
