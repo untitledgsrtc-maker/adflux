@@ -1,0 +1,198 @@
+-- supabase_phase97_a400_fu_due_unique_tag.sql
+--
+-- Phase 97.A400 — fix F-A400.
+--
+-- ROOT CAUSE
+-- ──────────
+-- supabase_phase93_8_notification_cleanup.sql:113 passed the constant
+-- string 'followup_due' as the `tag` arg to enqueue_push(). After
+-- Phase 97.5 (F-407) the APK layer derives a deterministic Android
+-- notification id from `tag` via djb2 hash. Constant tag → constant
+-- id → second due-time push collapses onto the first in the system
+-- tray instead of stacking as two reminders. One rep silently loses
+-- one reminder when two follow_ups come due within the same 5-min
+-- cron window.
+--
+-- FIX
+-- ───
+-- Re-create public.push_followup_due_reminders() with per-row unique
+-- tag:
+--
+--   'fu-due-' || r.id::text
+--
+-- Distinct namespace from Phase 34Z.55 follow_ups CREATE trigger
+-- ('fu-<id>'). Owner decision 2026-05-28:
+--   • 'fu-<id>'      = follow-up CREATED notification (Phase 34Z.55)
+--   • 'fu-due-<id>'  = follow-up DUE reminder (this phase)
+-- Two reasons:
+--   1. Different notification events. Keeping them on separate ids
+--      means a due reminder doesn't replace a still-visible creation
+--      notification in the tray.
+--   2. Avoids cross-event collisions in djb2 hash space.
+--
+-- IDEMPOTENCY
+-- ───────────
+-- `CREATE OR REPLACE FUNCTION` only. No table change. No new column.
+-- No cron change (the */5 * * * * schedule from Phase 93.8 keeps
+-- calling this same function name; the body just emits a different
+-- tag string downstream).
+--
+-- SCOPE
+-- ─────
+-- This migration closes F-A400 only. It does NOT touch:
+--   • F-105 — enqueue_push() role gate (deferred to Batch A2)
+--   • clear_handoff_sla_on_activity / trg_clear_handoff_sla (Phase
+--     93.8a — untouched)
+--   • cron.job 'untitled-followup-due-reminders' (untouched)
+--   • follow_ups.reminder_sent_at column (untouched)
+--   • Edge Function notify-rep (untouched — receives `data.tag` and
+--     forwards to FCM byte-identical)
+--   • src/utils/nativePush.js Phase 97.5 djb2 derivation (unchanged —
+--     it now sees unique tags per row)
+
+
+CREATE OR REPLACE FUNCTION public.push_followup_due_reminders()
+RETURNS int
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_today_ist     date;
+  v_now_ist       timestamp;
+  v_window_lower  timestamp;
+  v_window_upper  timestamp;
+  v_count         int := 0;
+  r               record;
+BEGIN
+  v_now_ist      := (now() AT TIME ZONE 'Asia/Kolkata')::timestamp;
+  v_today_ist    := v_now_ist::date;
+  v_window_lower := v_now_ist - interval '5 minutes';
+  v_window_upper := v_now_ist;
+
+  FOR r IN
+    SELECT fu.id, fu.assigned_to, fu.lead_id, fu.note, fu.follow_up_time,
+           l.name AS lead_name, l.company AS lead_company
+      FROM public.follow_ups fu
+      LEFT JOIN public.leads l ON l.id = fu.lead_id
+     WHERE fu.is_done           = false
+       AND fu.reminder_sent_at  IS NULL
+       AND fu.follow_up_date    = v_today_ist
+       AND fu.follow_up_time    IS NOT NULL
+       AND (v_today_ist::timestamp + fu.follow_up_time::interval) >= v_window_lower
+       AND (v_today_ist::timestamp + fu.follow_up_time::interval) <= v_window_upper
+       AND fu.assigned_to       IS NOT NULL
+  LOOP
+    PERFORM public.enqueue_push(
+      r.assigned_to,
+      'Follow-up due now',
+      COALESCE(r.lead_name, r.lead_company, 'Lead')
+        || ' · ' || to_char(r.follow_up_time, 'HH24:MI')
+        || COALESCE(' · ' || r.note, ''),
+      CASE WHEN r.lead_id IS NOT NULL
+           THEN '/leads/' || r.lead_id::text
+           ELSE '/follow-ups'
+      END,
+      'fu-due-' || r.id::text   -- Phase 97.A400 (F-A400) — was 'followup_due'
+    );
+    UPDATE public.follow_ups SET reminder_sent_at = now() WHERE id = r.id;
+    v_count := v_count + 1;
+  END LOOP;
+  RETURN v_count;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.push_followup_due_reminders() TO authenticated;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ───────────── VERIFY ─────────────
+-- Run all 3 in Supabase Studio after applying. Each must return the
+-- expected value. If any fails, ROLLBACK (see block below).
+--
+-- 1. Tag format is now per-row unique (1 row, tag_fixed must be true):
+--
+--    SELECT pg_get_functiondef(oid) ~ 'fu-due-.*r\.id::text' AS tag_fixed
+--      FROM pg_proc
+--     WHERE proname = 'push_followup_due_reminders'
+--     LIMIT 1;
+--
+-- 2. Function + cron + grant all still in place (single row, all 1):
+--
+--    SELECT
+--      (SELECT count(*) FROM pg_proc
+--        WHERE proname = 'push_followup_due_reminders')         AS fn_present,
+--      (SELECT count(*) FROM cron.job
+--        WHERE jobname = 'untitled-followup-due-reminders')     AS cron_present,
+--      (SELECT count(*) FROM information_schema.routine_privileges
+--        WHERE routine_name = 'push_followup_due_reminders'
+--          AND grantee      = 'authenticated'
+--          AND privilege_type = 'EXECUTE')                       AS grant_present;
+--    -- Expected: fn_present=1, cron_present=1, grant_present=1
+--
+-- 3. PostgREST schema reload landed (any SELECT works after the
+--    NOTIFY; this just confirms session health):
+--
+--    SELECT 1;   -- returns 1
+
+
+-- ───────────── ROLLBACK ─────────────
+-- Re-apply ONLY if a real regression appears (e.g. APK tray entries
+-- stacking incorrectly for transport retries on the same follow_up).
+-- Restores the Phase 93.8e constant 'followup_due' literal byte-
+-- identical. Pair the rollback with an alternative fix plan if you
+-- run it — leaving the constant in place re-opens F-A400.
+--
+--   CREATE OR REPLACE FUNCTION public.push_followup_due_reminders()
+--   RETURNS int
+--   LANGUAGE plpgsql
+--   SECURITY DEFINER
+--   SET search_path = public, extensions
+--   AS $$
+--   DECLARE
+--     v_today_ist     date;
+--     v_now_ist       timestamp;
+--     v_window_lower  timestamp;
+--     v_window_upper  timestamp;
+--     v_count         int := 0;
+--     r               record;
+--   BEGIN
+--     v_now_ist      := (now() AT TIME ZONE 'Asia/Kolkata')::timestamp;
+--     v_today_ist    := v_now_ist::date;
+--     v_window_lower := v_now_ist - interval '5 minutes';
+--     v_window_upper := v_now_ist;
+--
+--     FOR r IN
+--       SELECT fu.id, fu.assigned_to, fu.lead_id, fu.note, fu.follow_up_time,
+--              l.name AS lead_name, l.company AS lead_company
+--         FROM public.follow_ups fu
+--         LEFT JOIN public.leads l ON l.id = fu.lead_id
+--        WHERE fu.is_done           = false
+--          AND fu.reminder_sent_at  IS NULL
+--          AND fu.follow_up_date    = v_today_ist
+--          AND fu.follow_up_time    IS NOT NULL
+--          AND (v_today_ist::timestamp + fu.follow_up_time::interval) >= v_window_lower
+--          AND (v_today_ist::timestamp + fu.follow_up_time::interval) <= v_window_upper
+--          AND fu.assigned_to       IS NOT NULL
+--     LOOP
+--       PERFORM public.enqueue_push(
+--         r.assigned_to,
+--         'Follow-up due now',
+--         COALESCE(r.lead_name, r.lead_company, 'Lead')
+--           || ' · ' || to_char(r.follow_up_time, 'HH24:MI')
+--           || COALESCE(' · ' || r.note, ''),
+--         CASE WHEN r.lead_id IS NOT NULL
+--              THEN '/leads/' || r.lead_id::text
+--              ELSE '/follow-ups'
+--         END,
+--         'followup_due'
+--       );
+--       UPDATE public.follow_ups SET reminder_sent_at = now() WHERE id = r.id;
+--       v_count := v_count + 1;
+--     END LOOP;
+--     RETURN v_count;
+--   END;
+--   $$;
+--   GRANT EXECUTE ON FUNCTION public.push_followup_due_reminders() TO authenticated;
+--   NOTIFY pgrst, 'reload schema';
