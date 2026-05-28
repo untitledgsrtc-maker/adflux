@@ -14,11 +14,16 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle2, XCircle, ExternalLink, RefreshCw, Inbox,
+  AlertTriangle, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { useAuthStore } from '../../store/authStore'
 import { fetchPendingApprovals } from '../../hooks/usePayments'
+// Phase 97.10 (2026-05-28, F-300 + F-301) — swap browser
+// confirm/prompt/alert dialogs for in-app primitives + Lucide icon.
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { toastError } from '../../components/v2/Toast'
 
 export default function PendingApprovalsV2() {
   const profile = useAuthStore(s => s.profile)
@@ -30,6 +35,10 @@ export default function PendingApprovalsV2() {
   // The "you're all caught up" empty state was indistinguishable from
   // a silent RLS / network failure; this fixes that.
   const [fetchErr, setFetchErr] = useState('')
+  // Phase 97.10 (F-300) — reject reason modal state (replaces native prompt).
+  const [rejectingRow, setRejectingRow] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectErr, setRejectErr]       = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -66,10 +75,21 @@ export default function PendingApprovalsV2() {
   }, [load, profile?.id])
 
   async function approve(row) {
-    if (!window.confirm(
-      `Approve payment of ${formatCurrency(row.amount_received)} for ${row.quotes?.client_name || 'this quote'}?` +
-      (row.is_final_payment ? '\n\nThis is a FINAL payment — the quote will be marked Won and incentive credited.' : '')
-    )) return
+    // Phase 97.10 (F-300) — confirmDialog replaces window.confirm.
+    // Final-payment warning preserved as a single message line (dialog
+    // body is plain text, so the \n\n separator from the old prompt
+    // becomes a sentence break instead of a paragraph break).
+    const clientLabel = row.quotes?.client_name || 'this quote'
+    const finalNote = row.is_final_payment
+      ? ' This is a FINAL payment — the quote will be marked Won and incentive credited.'
+      : ''
+    const ok = await confirmDialog({
+      title: 'Approve payment?',
+      message: `Approve ${formatCurrency(row.amount_received)} for ${clientLabel}.${finalNote}`,
+      confirmLabel: 'Approve',
+      cancelLabel: 'Cancel',
+    })
+    if (!ok) return
 
     setActingId(row.id)
     const { error: updateErr } = await supabase
@@ -87,30 +107,49 @@ export default function PendingApprovalsV2() {
     }
 
     setActingId(null)
-    if (updateErr) alert('Approve failed: ' + updateErr.message)
+    // Phase 97.10 (F-300) — toast replaces alert().
+    if (updateErr) toastError(updateErr, 'Approve failed: ' + updateErr.message)
   }
 
-  async function reject(row) {
-    const reason = window.prompt(
-      `Reject payment of ${formatCurrency(row.amount_received)}?\n\n` +
-      `Please enter a reason — the sales person will see this on their dashboard.`
-    )
-    if (reason === null) return
-    if (!reason.trim()) { alert('A reason is required to reject.'); return }
+  // Phase 97.10 (F-300) — reject is now a 2-step flow: row click opens
+  // the in-app reason modal; modal Submit calls submitReject() which
+  // does the actual DB write. Replaces window.prompt + alert pair.
+  function openReject(row) {
+    setRejectingRow(row)
+    setRejectReason('')
+    setRejectErr('')
+  }
 
-    setActingId(row.id)
+  function closeReject() {
+    setRejectingRow(null)
+    setRejectReason('')
+    setRejectErr('')
+  }
+
+  async function submitReject() {
+    if (!rejectingRow) return
+    const reason = rejectReason.trim()
+    if (!reason) {
+      setRejectErr('A reason is required to reject.')
+      return
+    }
+    setActingId(rejectingRow.id)
     const { error: err } = await supabase
       .from('payments')
       .update({
         approval_status:   'rejected',
         approved_by:       profile.id,
         decided_at:        new Date().toISOString(),
-        rejection_reason:  reason.trim(),
+        rejection_reason:  reason,
         sales_notified_at: null,
       })
-      .eq('id', row.id)
+      .eq('id', rejectingRow.id)
     setActingId(null)
-    if (err) alert('Reject failed: ' + err.message)
+    if (err) {
+      toastError(err, 'Reject failed: ' + err.message)
+      return
+    }
+    closeReject()
   }
 
   return (
@@ -137,9 +176,14 @@ export default function PendingApprovalsV2() {
           padding: '10px 14px',
           margin: '12px 0',
           fontSize: '.82rem',
-          color: '#ef9a9a',
+          color: 'var(--danger)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
         }}>
-          ⚠ {fetchErr}
+          {/* Phase 97.10 (F-301) — Lucide icon replaces ⚠. */}
+          <AlertTriangle size={14} strokeWidth={1.8} />
+          <span>{fetchErr}</span>
         </div>
       )}
 
@@ -200,7 +244,7 @@ export default function PendingApprovalsV2() {
                 <div className="v2d-pa-actions">
                   <button
                     className="v2d-btn v2d-btn--danger"
-                    onClick={() => reject(row)}
+                    onClick={() => openReject(row)}
                     disabled={busy}
                   >
                     <XCircle size={14} /><span>Reject</span>
@@ -216,6 +260,136 @@ export default function PendingApprovalsV2() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Phase 97.10 (F-300) — Reject reason modal. Replaces
+          window.prompt(). z-index 10000 matches ConfirmDialog tier
+          (CLAUDE.md §29). Submit disabled when busy or reason empty;
+          inline error shown under textarea instead of an alert(). */}
+      {rejectingRow && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget && actingId !== rejectingRow.id) closeReject() }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10000,
+            background: 'rgba(5, 8, 16, 0.62)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16,
+            fontFamily: 'var(--v2-sans, "DM Sans", system-ui, sans-serif)',
+          }}
+        >
+          <div
+            style={{
+              width: 'min(440px, 100%)',
+              background: 'var(--v2-bg-1, #111a2e)',
+              borderRadius: 'var(--v2-r, 14px)',
+              border: '1px solid var(--v2-line, #1f2b47)',
+              boxShadow: 'var(--v2-shadow-pop, 0 10px 30px rgba(0,0,0,.45))',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '14px 16px',
+              borderBottom: '1px solid var(--v2-line, #1f2b47)',
+            }}>
+              <div style={{
+                color: 'var(--v2-ink-0, #f5f7fb)',
+                fontSize: 15, fontWeight: 600,
+              }}>
+                Reject payment
+              </div>
+              <button
+                type="button"
+                onClick={closeReject}
+                disabled={actingId === rejectingRow.id}
+                aria-label="Cancel"
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'var(--v2-ink-1, #a9b3c7)', padding: 4, display: 'flex',
+                }}
+              >
+                <X size={16} strokeWidth={1.6} />
+              </button>
+            </div>
+
+            <div style={{
+              padding: '14px 16px 4px',
+              color: 'var(--v2-ink-1, #a9b3c7)',
+              fontSize: 13, lineHeight: 1.5,
+            }}>
+              Reject {formatCurrency(rejectingRow.amount_received)} for{' '}
+              <strong style={{ color: 'var(--v2-ink-0, #f5f7fb)' }}>
+                {rejectingRow.quotes?.client_name || 'this quote'}
+              </strong>?
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>
+                Enter a reason — the sales person will see this on their dashboard.
+              </div>
+            </div>
+
+            <div style={{ padding: '8px 16px 4px' }}>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => {
+                  setRejectReason(e.target.value)
+                  if (rejectErr) setRejectErr('')
+                }}
+                disabled={actingId === rejectingRow.id}
+                autoFocus
+                rows={3}
+                placeholder="e.g. Reference number doesn't match the bank statement"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius, 10px)',
+                  border: rejectErr
+                    ? '1px solid var(--danger)'
+                    : '1px solid var(--v2-line, #334155)',
+                  background: 'var(--v2-bg-2, #0f172a)',
+                  color: 'var(--v2-ink-0, #f5f7fb)',
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                  resize: 'vertical',
+                  outline: 'none',
+                }}
+              />
+              {rejectErr && (
+                <div style={{
+                  marginTop: 6,
+                  fontSize: 12,
+                  color: 'var(--danger)',
+                }}>
+                  {rejectErr}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              display: 'flex', justifyContent: 'flex-end', gap: 8,
+              padding: '14px 16px',
+            }}>
+              <button
+                type="button"
+                onClick={closeReject}
+                disabled={actingId === rejectingRow.id}
+                className="v2d-btn"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitReject}
+                disabled={actingId === rejectingRow.id || !rejectReason.trim()}
+                className="v2d-btn v2d-btn--danger"
+              >
+                {actingId === rejectingRow.id ? '…' : 'Reject'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
