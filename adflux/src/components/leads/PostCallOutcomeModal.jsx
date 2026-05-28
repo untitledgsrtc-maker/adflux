@@ -435,6 +435,29 @@ export default function PostCallOutcomeModal({
     ;(async () => {
       try {
 
+    // Phase 97.3.1 (2026-05-28) — capture closing follow-up ids
+    // BEFORE the stage advance below. Reason: trg_z_close_followups_
+    // on_terminal fires AFTER UPDATE OF stage and flips ALL open
+    // follow_ups on this lead to is_done=true at DB level. The Phase
+    // 34Z.62 SELECT later (with .eq('is_done', false)) then finds 0
+    // rows + the alarm cancel never fires + the in-AlarmManager alarm
+    // for the just-closed follow_up survives + pops phantom hours
+    // later. Capture here while is_done is still false.
+    let earlyClosingIds = []
+    if (profile?.id && lead.id) {
+      const todayEarly = istTodayISO()
+      const { data: ids, error: earlySelErr } = await supabase.from('follow_ups')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('assigned_to', profile.id)
+        .eq('is_done', false)
+        .lte('follow_up_date', todayEarly)
+      if (earlySelErr) {
+        console.warn('[phase-97.3.1] early SELECT failed; alarm cancel may miss:', earlySelErr.message)
+      }
+      earlyClosingIds = Array.isArray(ids) ? ids : []
+    }
+
     // Phase 47.8 — patch most recent call_logs row for this user +
     // lead in the last 10 minutes with the picked call language.
     // Phase 54 F2 — same patch also writes the real outcome back to
@@ -534,42 +557,33 @@ export default function PostCallOutcomeModal({
     if (profile?.id && lead.id) {
       // Phase 49.1 — IST today (was UTC slice; before 18:30 IST that's
       // yesterday, so today's open follow_ups missed the close query).
+      // Phase 97.3.1 — UPDATE is now idempotent: trg_z_close_followups_
+      // on_terminal already closed these rows above (if stage flipped
+      // to Lost/Won) but the UPDATE still fires safely. The ids we
+      // need for alarm cancel were captured BEFORE the stage advance
+      // in earlyClosingIds.
       const today = istTodayISO()
-      // Phase B1/F-401 — capture ids BEFORE the UPDATE so the fan-out
-      // alarm cancel can fire ONLY IF the UPDATE succeeds. Safer than
-      // cancel-then-update: UPDATE failure with alarm already cancelled
-      // = missed reminder (worse than the phantom alarm we're fixing).
-      const { data: closingIds, error: selectErr } = await supabase.from('follow_ups')
-        .select('id')
-        .eq('lead_id', lead.id)
-        .eq('assigned_to', profile.id)
-        .eq('is_done', false)
-        .lte('follow_up_date', today)
-      if (selectErr) {
-        // Transient DB error on the SELECT silently skips alarm cancel.
-        // UPDATE still proceeds below — phantom alarm at worst. Log so
-        // we know about it. Save chain unblocked.
-        console.warn('[phase-b1/F-401] SELECT failed; alarm cancel skipped:', selectErr.message)
-      }
       const { error: closeErr } = await supabase.from('follow_ups')
         .update({ is_done: true, done_at: new Date().toISOString() })
         .eq('lead_id', lead.id)
         .eq('assigned_to', profile.id)
         .eq('is_done', false)
         .lte('follow_up_date', today)
-      if (!closeErr && Array.isArray(closingIds) && closingIds.length > 0) {
-        // Fan-out cancel after successful UPDATE. allSettled so one
-        // cancel failure doesn't block the save chain or affect others.
-        // Failures logged but never bubble — alarm row in AlarmManager
-        // is independent of DB row, so stale cancel of an already-fired
-        // alarm is benign.
+      if (closeErr) {
+        console.warn('[phase-97.3.1] follow_ups UPDATE failed:', closeErr.message)
+      }
+      if (earlyClosingIds.length > 0) {
+        // Fan-out cancel using ids captured BEFORE stage advance.
+        // allSettled so one cancel failure doesn't block the chain.
+        // Failures logged but never bubble — stale cancel of an
+        // already-fired alarm in AlarmManager is benign.
         Promise.allSettled(
-          closingIds.map(r => cancelFollowUpAlarm(r.id))
+          earlyClosingIds.map(r => cancelFollowUpAlarm(r.id))
         ).then(results => {
           results.forEach((res, i) => {
             if (res.status === 'rejected') {
-              console.warn('[phase-b1/F-401] cancel failed for',
-                closingIds[i]?.id, res.reason?.message || res.reason)
+              console.warn('[phase-97.3.1] cancel failed for',
+                earlyClosingIds[i]?.id, res.reason?.message || res.reason)
             }
           })
         })
