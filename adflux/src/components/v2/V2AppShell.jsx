@@ -374,7 +374,12 @@ export function V2AppShell() {
         // well below Android 12+ exact-alarm cap of 500/app.
         const { data, error } = await supabase
           .from('follow_ups')
-          .select('id, lead_id, follow_up_date, follow_up_time, note, leads(name, contact_name)')
+          // Phase 98.F — drop nonexistent leads.contact_name. The
+          // 400 it caused returned empty `data`, so scheduleManyFollowUp
+          // Alarms received [] → APK cold-start backfill armed zero
+          // alarms. Phase 96.0 was silently dead in production. The
+          // L390 fallback chain stays robust on missing name.
+          .select('id, lead_id, follow_up_date, follow_up_time, note, leads(name)')
           .eq('assigned_to', profile.id)
           .eq('is_done', false)
           .gte('follow_up_date', todayIst)
@@ -387,7 +392,7 @@ export function V2AppShell() {
         const rows = (data || []).map(fu => ({
           id:             fu.id,
           lead_id:        fu.lead_id,
-          lead_name:      fu.leads?.name || fu.leads?.contact_name || 'Lead',
+          lead_name:      fu.leads?.name || 'Lead',
           follow_up_date: fu.follow_up_date,
           follow_up_time: fu.follow_up_time || null,
           note:           fu.note,

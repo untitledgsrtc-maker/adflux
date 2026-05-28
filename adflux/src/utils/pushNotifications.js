@@ -99,8 +99,12 @@ export async function subscribeForPush(userId) {
     const { data: { session } } = await supabase.auth.getSession()
     const at = session?.access_token
     if (!at) {
+      // Phase 98.F — no session means no server row could be written.
+      // Returning sub here let ensurePushOnLogin report 'ok', so the
+      // enrollment chip never lit — server stayed dark to the rep
+      // until next page mount. Return null so the chip surfaces.
       console.warn('subscribeForPush: no auth session yet')
-      return sub
+      return null
     }
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
     const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -137,10 +141,18 @@ export async function subscribeForPush(userId) {
       },
     )
     if (!resp.ok) {
+      // Phase 98.F — server upsert failed (503 / 403 / RLS / schema
+      // / etc). Even if a prior session left a row, today's touch
+      // didn't land. Return null so ensurePushOnLogin reports
+      // 'no-subscription' and the chip lights for the rep to
+      // self-diagnose via /push-debug.
       console.warn('subscribeForPush insert failed:', resp.status, await resp.text())
+      return null
     }
   } catch (e) {
+    // Phase 98.F — network throw uses the same posture as non-2xx.
     console.warn('subscribeForPush insert threw:', e)
+    return null
   }
 
   return sub
