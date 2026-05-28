@@ -303,9 +303,23 @@ export default function PostCallOutcomeModal({
   // "call back in 2 hours". Only fires if rep hasn't manually picked.
   // The call_back_2h chip's own auto-snap then fills customDate=today
   // and customTime=now+2h IST.
+  //
+  // Phase 97.6 (2026-05-28) — outcome='negative' (Lost) forces
+  // nextAction='none'. Lost lead = no future contact needed.
+  // The Next action card is hidden in the render block below when
+  // outcome === 'negative' so the rep doesn't even see the chips.
   // (nextActionTouchedRef declared above with the other touched refs.)
   useEffect(() => {
-    if (!open || nextActionTouchedRef.current) return
+    if (!open) return
+    if (outcome === 'negative') {
+      // Force nextAction='none' on Lost — overrides any prior manual
+      // pick because the Next action card is about to be hidden. Save
+      // chain then skips the follow_up insert (handleSave checks
+      // `nextAction !== 'none' && customDate`).
+      setNextAction('none')
+      return
+    }
+    if (nextActionTouchedRef.current) return
     if (outcome === 'neutral' || outcome === 'callback') {
       setNextAction('call_back_2h')
     }
@@ -864,7 +878,35 @@ export default function PostCallOutcomeModal({
             </div>
           </div>
 
-          {/* Next action chooser */}
+          {/* Phase 97.6 (2026-05-28) — Lost outcome hides the Next
+              action card entirely. Lead is dead; no follow-up needed.
+              Banner replaces the card so the rep sees explicit
+              confirmation + a single Save action. The smart-default
+              useEffect above sets nextAction='none' which makes
+              handleSave skip the follow_up insert. */}
+          {outcome === 'negative' ? (
+            <div className="lead-card" style={{ marginBottom: 14 }}>
+              <div className="lead-card-pad" style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '14px 16px',
+                background: 'var(--danger-soft, rgba(239,68,68,0.12))',
+                border: '1px solid var(--danger, #EF4444)',
+                borderRadius: 'var(--radius, 10px)',
+                color: 'var(--text)',
+              }}>
+                <span style={{ color: 'var(--danger, #EF4444)', flex: '0 0 auto', display: 'inline-flex' }}>
+                  <X size={18} strokeWidth={1.6} />
+                </span>
+                <div style={{ fontSize: 13, lineHeight: 1.4 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>Marked Lost</div>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    Stage flips to Lost + open follow-ups close. No next-action needed.
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+          /* Next action chooser */
           <div className="lead-card" style={{ marginBottom: 14 }}>
             <div className="lead-card-head"><div className="lead-card-title">Next action</div></div>
             <div className="lead-card-pad">
@@ -997,6 +1039,7 @@ export default function PostCallOutcomeModal({
               )}
             </div>
           </div>
+          )}
         </div>
 
         <div className="lead-modal-foot">
