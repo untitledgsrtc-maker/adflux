@@ -62,6 +62,7 @@ import { useLeadTasks } from '../../hooks/useLeadTasks'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { logCallAudit } from '../../utils/callAudit'
 import { dialPhone } from '../../utils/openExternal'
+import { istTodayISO, istTodayPlusDays } from '../../utils/istDate'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
 // Phase 76 — evening day summary + GPS-off banner. Both are additive
 // mounts; no productive flow is gated in this phase (button-blocking
@@ -195,6 +196,23 @@ export default function WorkV2() {
   // the ring read from profile.daily_targets JSONB which is unmaintained
   // for most reps. Default 20 calls/day if no policy row.
   const [policyMinCalls, setPolicyMinCalls] = useState(null)
+
+  // Phase 98.G (2026-05-28) — truthful "calls today" KPI source.
+  // Replaces session.daily_counters.calls JSONB read which inflates
+  // for two confirmed reasons:
+  //   1. quickLogCall inserts BOTH a call_logs row AND a
+  //      lead_activities row. Phase 32M trg_call_log_bump_counter
+  //      AND trg_lead_activity_bump_counter each fire bump_daily_
+  //      counter('calls', 1) → 2× bump per app-initiated call.
+  //   2. Phase 56l CallHistoryPoller backfills yesterday's device
+  //      CallLog into call_logs today. bump_daily_counter uses
+  //      Postgres current_date (UTC) and ignores NEW.call_at, so
+  //      those late-imports inflate today's counter.
+  // Today for Dixita: 243 call_logs + 19 lead_activities = 262
+  // counter, but actual `call_at`-today rows = 71, qualified ≥10s
+  // = 35. This state holds the 35, surfaced in counters.calls below.
+  // Mirrors Phase 83 admin direction (call_logs direct read).
+  const [qualifiedCallsToday, setQualifiedCallsToday] = useState(0)
 
   /* Morning plan draft */
   const [plannedMeetings, setPlannedMeetings] = useState([
@@ -481,13 +499,46 @@ export default function WorkV2() {
     return () => { cancelled = true }
   }, [profile?.id])
 
+  // Phase 98.G — qualified calls today (all directions, duration
+  // ≥10s, anchored by call_at IST). Re-fetches whenever the existing
+  // daily_counters.calls bump signal fires — piggybacks on the
+  // current trigger so we get a fresh count after each new call
+  // without a dedicated Supabase Realtime channel.
+  useEffect(() => {
+    if (!profile?.id) return
+    let cancelled = false
+    ;(async () => {
+      const todayIst    = istTodayISO()
+      const tomorrowIst = istTodayPlusDays(1)
+      const { count } = await supabase
+        .from('call_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .gte('duration_seconds', 10)
+        .gte('call_at', `${todayIst}T00:00:00+05:30`)
+        .lt('call_at',  `${tomorrowIst}T00:00:00+05:30`)
+      if (!cancelled) setQualifiedCallsToday(count || 0)
+    })()
+    return () => { cancelled = true }
+  }, [profile?.id, session?.daily_counters?.calls])
+
   const targets = useMemo(() => {
     const base = profile?.daily_targets || { meetings: 5, calls: 20, new_leads: 10 }
     // DB policy wins; JSONB fallback is the last-resort default.
     if (policyMinCalls != null) return { ...base, calls: policyMinCalls }
     return base
   }, [profile, policyMinCalls])
-  const counters = session?.daily_counters || { meetings: 0, calls: 0, new_leads: 0 }
+  // Phase 98.G — meetings + new_leads keep their JSONB source
+  // (Phase 32M triggers + client-side bumps still trusted). calls
+  // override comes from direct call_logs count above. The spread
+  // order matters: JSONB last → still wins for fields we trust,
+  // then calls gets explicitly overridden by qualifiedCallsToday.
+  const counters = {
+    meetings:  0,
+    new_leads: 0,
+    ...(session?.daily_counters || {}),
+    calls: qualifiedCallsToday,
+  }
 
   /* Submit morning plan */
   async function submitPlan() {
