@@ -47,6 +47,22 @@ let localChannelEnsured = false   // Phase 96.0 — LocalNotifications channel g
 let localListenersBound = false   // Phase 96.0 — tap listener idempotency
 let activeUser      = null
 
+// Phase B1/F-407 (2026-05-28) — derive LocalNotification id from a
+// stable key in the FCM payload so Xiaomi/MIUI's double-fire of
+// `pushNotificationReceived` produces ONE tray entry (Android
+// replaces by id). Falls back to random when no stable key.
+//
+// Partition: 1..1_999_999_999 (FCM-receipt). Follow-up alarms use
+// 2_000_000_001..2_147_483_647 (see scheduleFollowUpAlarm.js).
+// No overlap = no cross-namespace collision.
+function fcmIdFromStableKey(s) {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) | 0   // djb2 32-bit truncated
+  }
+  return ((h >>> 0) % 1_999_999_999) + 1
+}
+
 // Phase 56h.2 (19 May 2026) — high-importance channel ID. MUST match
 // the AndroidManifest meta-data
 // `com.google.firebase.messaging.default_notification_channel_id`
@@ -263,14 +279,34 @@ export async function registerNativePush(userId) {
     }
 
     // Phase 96.0 — fire-and-forget local schedule so the tray pops.
-    // Random id in the lower half of the 31-bit range so we don't
-    // collide with scheduleFollowUpAlarm.js's deterministic ids in
-    // the upper half (2_000_000_001+). See alarmIdFromUuid comment
-    // in scheduleFollowUpAlarm.js for the partition.
+    // Phase B1/F-407 — derive id from stable key so OEM double-fire
+    // (Xiaomi/MIUI, Vivo FunTouch) produces ONE tray entry instead
+    // of two duplicate notifications. Stable-key chain:
+    //   data.tag           — always set by current SQL triggers
+    //                        (Phase 34Z.55 task-<id> / fu-<id>,
+    //                         Phase 34Z.61 morning push, Phase 76
+    //                         GPS off, etc.)
+    //   data.follow_up_id  — future-proofing if Edge Function adds
+    //   data.lead_id       — future-proofing
+    //   data.notification_id — future-proofing
+    //   data.url           — semantic fallback (could collide if
+    //                        same URL pushed twice on purpose, but
+    //                        rare)
+    //   random fallback    — if no stable key, behave like Phase 96.0
+    const stableKey =
+      data.tag ||
+      data.follow_up_id ||
+      data.lead_id ||
+      data.notification_id ||
+      data.url ||
+      null
+    const notifId = stableKey
+      ? fcmIdFromStableKey(String(stableKey))
+      : (Math.floor(Math.random() * 1_999_999_999) + 1)
     try {
       LocalNotifications.schedule({
         notifications: [{
-          id: Math.floor(Math.random() * 2_000_000_000) + 1,
+          id: notifId,
           title,
           body,
           channelId: CHANNEL_ID,
