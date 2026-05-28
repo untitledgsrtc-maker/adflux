@@ -42,8 +42,18 @@ import { startCallHistoryPoller, stopCallHistoryPoller } from '../../utils/callH
 // alarms. Covers follow-ups created before this APK was installed
 // (rep installs new APK, old follow-ups never had alarms scheduled).
 // Native-only via Capacitor.isNativePlatform() guard inside helper.
+//
+// Phase B1/F-406 (2026-05-28) — backfill date window now uses IST
+// helpers (was UTC slice — at 21:30 IST that returned tomorrow's
+// UTC date and scheduled the wrong alarms). Limit raised 100 → 200
+// (Android 12+ caps exact alarms at 500/app; 200 = safe margin).
+// Manager-pollution concern already mitigated by .eq('assigned_to',
+// profile.id) — that filter limits to caller's own follow-ups
+// regardless of RLS scope, so Renuka (sales_manager) backfills
+// only her own alarms, not Dhara/Rima's.
 import { scheduleManyFollowUpAlarms } from '../../utils/scheduleFollowUpAlarm'
 import { supabase } from '../../lib/supabase'
+import { istTodayISO, istTodayPlusDays } from '../../utils/istDate'
 import NativeOnboarding from '../native/NativeOnboarding'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
@@ -353,18 +363,24 @@ export function V2AppShell() {
     let cancelled = false
     ;(async () => {
       try {
-        const today = new Date()
-        const sevenDays = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+        // Phase B1/F-406 — IST helpers replace UTC slice. At 21:30 IST
+        // `new Date().toISOString().slice(0,10)` returns tomorrow's
+        // UTC date which would skip today's pending follow-ups + arm
+        // tomorrow's alarms with stale data.
+        const todayIst    = istTodayISO()
+        const sevenDaysIst = istTodayPlusDays(7)
         // Bound the query to a small window so we don't dump 100s of
-        // alarms onto the device on first launch.
+        // alarms onto the device on first launch. Limit 200 keeps us
+        // well below Android 12+ exact-alarm cap of 500/app.
         const { data, error } = await supabase
           .from('follow_ups')
           .select('id, lead_id, follow_up_date, follow_up_time, note, leads(name, contact_name)')
           .eq('assigned_to', profile.id)
           .eq('is_done', false)
-          .gte('follow_up_date', today.toISOString().slice(0, 10))
-          .lte('follow_up_date', sevenDays.toISOString().slice(0, 10))
-          .limit(100)
+          .gte('follow_up_date', todayIst)
+          .lte('follow_up_date', sevenDaysIst)
+          .order('follow_up_date', { ascending: true })
+          .limit(200)
         if (error || cancelled) return
         // Map embed → flat lead_name. Helper accepts either shape but
         // explicit flat is cleaner.
