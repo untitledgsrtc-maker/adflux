@@ -27,12 +27,27 @@ export function haversineKm(a, b) {
   return 2 * R * Math.asin(Math.sqrt(x))
 }
 
-// Filtering rules — kept in sync with GpsTrackV2's `stats` memo.
-// Tweak in ONE place from now on.
-export const MIN_SEG_KM       = 0.03           // 30 m — drift floor
-export const MAX_SEG_KM_PER_S = 200 / 3600     // 200 km/h ceiling
-export const MAX_DAILY_KM     = 600            // sanity cap
-export const MAX_ACC_M        = 100            // accuracy filter
+// Filtering rules — MUST MATCH the server-side `compute_daily_ta`
+// thresholds in `supabase_phase68_ta_fixes.sql:69-90`. Server is
+// the source of truth for `daily_ta.km_traveled`, which is what
+// TaPayoutsAdminV2 reads and what reps get paid out. Client-side
+// display of km on /admin/gps/<rep>/<date> + RepMapPanel must
+// agree with that payout number so reps don't argue "the map
+// says X but my TA shows Y".
+//
+// Phase 98.D (2026-05-28) aligned the 3 movement thresholds to
+// Phase 68 server values:
+//   accuracy    100m -> 50m
+//   segment    0.03km -> 0.10km
+//   speed     200km/h -> 120km/h
+// MAX_DAILY_KM stays 600 (matches server cap line 145 of phase68).
+//
+// If a future migration changes the server thresholds, these 4
+// constants MUST move in the same commit.
+export const MIN_SEG_KM       = 0.10           // 100 m — drift floor (server: phase68 line 83)
+export const MAX_SEG_KM_PER_S = 120 / 3600     // 120 km/h ceiling   (server: phase68 line 89)
+export const MAX_DAILY_KM     = 600            // sanity cap         (server: phase68 line 145)
+export const MAX_ACC_M        = 50             // accuracy filter    (server: phase68 line 75)
 
 // Input: pings array sorted by captured_at ASC, each with
 // { lat, lng, captured_at, accuracy_m }.
