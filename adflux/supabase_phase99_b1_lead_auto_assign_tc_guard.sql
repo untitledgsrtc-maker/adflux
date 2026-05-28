@@ -1,0 +1,197 @@
+-- supabase_phase99_b1_lead_auto_assign_tc_guard.sql
+--
+-- Phase 99.B.1 — TC-intent guard on lead_auto_assign().
+--
+-- BACKGROUND
+-- ──────────
+-- Phase 34 added `trg_leads_auto_assign` (BEFORE INSERT on
+-- public.leads) which round-robins `NEW.assigned_to` whenever it
+-- arrives NULL. The picker pool is `team_role IN ('sales',
+-- 'telecaller', 'agency')`. Function definition (Phase 34 line
+-- 172-181):
+--
+--   IF NEW.assigned_to IS NULL THEN
+--     NEW.assigned_to := public.assign_lead_round_robin(NEW.segment);
+--   END IF;
+--   RETURN NEW;
+--
+-- Phase 99.B (committed companion JS in adflux/src/pages/v2/
+-- LeadUploadV2.jsx) introduces an explicit "Default telecaller"
+-- dropdown for admin Excel imports. The intended payload when
+-- admin picks a TC but no sales owner is:
+--
+--   assigned_to   = NULL
+--   telecaller_id = <TC uuid>
+--
+-- Without this guard, `trg_leads_auto_assign` fires BEFORE INSERT,
+-- sees `assigned_to IS NULL`, and overwrites with a round-robin
+-- pick. The lead then lands with BOTH columns populated — the
+-- TC-only intent is silently overridden, and the customer may get
+-- contacted by two reps. The same bug Phase 99.A repaired (107
+-- leads in the wrong column) would re-emerge in a different
+-- guise.
+--
+-- FIX
+-- ───
+-- Add a single early-return: if the caller already populated
+-- `telecaller_id`, treat the routing as decided and skip the
+-- round-robin. Existing call paths that leave both columns NULL
+-- (raw signup forms, blank manual creates) keep the round-robin
+-- behaviour. Existing call paths that set `assigned_to`
+-- explicitly (sales rep manual create — see LeadFormV2 line 82,
+-- which defaults assigned_to=self for non-privileged users)
+-- already bypass the round-robin via the original
+-- `IS NULL` check; this commit does NOT change that path.
+--
+-- DECISIONS (locked with owner before drafting)
+-- ─────────────────────────────────────────────
+--   * Guard ONLY on `telecaller_id IS NOT NULL` — NOT on
+--     `import_id IS NOT NULL`. Excel imports without admin TC pick
+--     still need round-robin assignment.
+--   * Do NOT modify `assign_lead_round_robin()` — the picker
+--     stays as Phase 34 designed it. Pool still includes
+--     telecallers (TC can be a sales-side owner for raw inbound
+--     where no admin steering exists).
+--   * Behaviour matrix after this commit:
+--       (a) assigned_to set, telecaller_id ANY        → no-op
+--       (b) assigned_to NULL, telecaller_id NULL      → round-robin
+--       (c) assigned_to NULL, telecaller_id NOT NULL  → no-op (NEW)
+--
+-- IDEMPOTENCY
+-- ───────────
+-- CREATE OR REPLACE FUNCTION. NOTIFY pgrst. No table mutation,
+-- no trigger DDL change (trigger binding untouched — only the
+-- function body is replaced).
+--
+-- SCOPE — UNTOUCHED
+-- ─────────────────
+--   * trg_leads_auto_assign trigger DDL — binding intact.
+--   * assign_lead_round_robin(text) helper — unchanged.
+--   * RLS policies on leads / users / lead_imports — unchanged.
+--   * GRANT / REVOKE — unchanged.
+--   * Phase 34Z.55 push triggers on follow_ups / lead_tasks —
+--     unrelated.
+--   * Phase 98.E2 IST follow-up push trigger — unrelated.
+--   * Phase 98.H + 98.H1 daily counter triggers — unrelated.
+--   * Phase 99.A column repair UPDATE — already committed.
+--   * Phase 99.B form fix in LeadUploadV2.jsx — companion JS,
+--     pending commit on owner approval.
+
+
+-- ────────────────────────────────────────────────────────────────
+-- 1. CREATE OR REPLACE lead_auto_assign() with telecaller_id guard
+-- ────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.lead_auto_assign()
+RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  -- Phase 99.B.1 (2026-05-29) — TC-intent guard. If the inserting
+  -- code path explicitly set telecaller_id, routing has already
+  -- been decided; skip round-robin so assigned_to stays NULL.
+  -- Without this guard, LeadUploadV2's new "Default telecaller"
+  -- pick (Phase 99.B) would get a phantom sales rep stamped on
+  -- every TC-only import.
+  IF NEW.telecaller_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Phase 34 — original behaviour for paths that leave both
+  -- columns NULL: round-robin assignment by segment.
+  IF NEW.assigned_to IS NULL THEN
+    NEW.assigned_to := public.assign_lead_round_robin(NEW.segment);
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ───────────── VERIFY ─────────────
+-- Paste each query separately. Studio shows last result on
+-- multi-statement so single-at-a-time is required.
+--
+-- V1 — function body now has the TC guard:
+--
+--   SELECT pg_get_functiondef(oid) ILIKE '%NEW.telecaller_id IS NOT NULL%' AS has_tc_guard,
+--          pg_get_functiondef(oid) ILIKE '%assign_lead_round_robin%'      AS round_robin_intact
+--     FROM pg_proc
+--    WHERE proname = 'lead_auto_assign';
+--
+--   Expected: 1 row, both booleans true.
+--
+-- V2 — trigger binding still resolves to the patched function:
+--
+--   SELECT t.tgname, c.relname AS table_name, p.proname AS function
+--     FROM pg_trigger t
+--     JOIN pg_class c ON c.oid = t.tgrelid
+--     JOIN pg_proc  p ON p.oid = t.tgfoid
+--    WHERE t.tgname = 'trg_leads_auto_assign'
+--      AND NOT t.tgisinternal;
+--
+--   Expected: 1 row, table_name='leads', function='lead_auto_assign'.
+--
+-- V3 — assign_lead_round_robin still exists + unchanged:
+--
+--   SELECT pg_get_function_arguments(oid) AS args,
+--          pg_get_function_result(oid)    AS returns
+--     FROM pg_proc
+--    WHERE proname = 'assign_lead_round_robin';
+--
+--   Expected: 1 row, args='p_segment text', returns='uuid'.
+--
+-- V4 — schema reload landed:
+--
+--   SELECT 1;
+--
+--   Expected: 1.
+--
+-- LIVE SMOKE (manual, post-paste — runs the 3 paths):
+--
+--   Path A — TC-only intent (the bug we're fixing):
+--     1. Open LeadUploadV2 in browser, pick Dhara as Default
+--        telecaller, leave Default sales owner blank.
+--     2. Upload a 1-row test Excel.
+--     3. After import, run:
+--          SELECT id, telecaller_id, assigned_to
+--            FROM public.leads
+--           WHERE name = '<test row name>';
+--     4. Expected: telecaller_id = Dhara_uuid, assigned_to = NULL.
+--
+--   Path B — Sales-only intent:
+--     1. Pick Mayur as Default sales owner, leave TC blank.
+--     2. Upload 1-row test Excel.
+--     3. Expected: assigned_to = Mayur_uuid, telecaller_id = NULL.
+--        Trigger no-op'd because assigned_to was already set.
+--
+--   Path C — Neither picked (original round-robin path):
+--     1. Leave both dropdowns blank.
+--     2. Upload 1-row test Excel.
+--     3. Expected: assigned_to = <round-robin pick>,
+--                  telecaller_id = NULL.
+--        Trigger fired round-robin as before.
+
+
+-- ───────────── ROLLBACK ─────────────
+-- Re-apply ONLY if a real regression appears. Restores Phase 34
+-- byte-identical function body (no TC guard). Re-opens the
+-- bug where TC-only imports get a phantom assigned_to stamped
+-- via round-robin.
+--
+-- Strip the leading "-- " from each line below to execute.
+--
+-- CREATE OR REPLACE FUNCTION public.lead_auto_assign()
+-- RETURNS trigger
+-- LANGUAGE plpgsql AS $$
+-- BEGIN
+--   IF NEW.assigned_to IS NULL THEN
+--     NEW.assigned_to := public.assign_lead_round_robin(NEW.segment);
+--   END IF;
+--   RETURN NEW;
+-- END;
+-- $$;
+--
+-- NOTIFY pgrst, 'reload schema';
