@@ -94,6 +94,20 @@ function RequirePrivileged({ children }) {
   return children
 }
 
+/* Phase 87.5b (2026-05-28) — narrow guard for the HR sign-off
+   surface on /people/:userId. Admin / co_owner / hr only. HR
+   was previously bounced from RepProfileV2 because the route was
+   RequirePrivileged (admin + co_owner). This guard widens by ONE
+   role (hr) for this route ONLY — global RequirePrivileged stays
+   admin + co_owner. */
+function RequireHROrPrivileged({ children }) {
+  const { isPrivileged, profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  const isHR = profile?.role === 'hr'
+  if (!isPrivileged && !isHR) return <Navigate to="/quotes" replace />
+  return children
+}
+
 /* Phase 61 (19 May 2026) — Manager guard. Gates `/manager` route to
    team leads (team_role='sales_manager') and admins. Non-managers
    bounce to their role's home via RootRedirect. */
@@ -294,7 +308,7 @@ export default function App() {
               before parameterized would matter only if /people/new
               existed; it doesn't, so /people/:userId catches all
               non-empty subpaths. Admin / co_owner only. */}
-          <Route path="/people/:userId"            element={<RequirePrivileged><RepProfileV2 /></RequirePrivileged>} />
+          <Route path="/people/:userId"            element={<RequireHROrPrivileged><RepProfileV2 /></RequireHROrPrivileged>} />
           {/* Phase 8C — unified Master page (Attachments / Signers / Media / Documents) */}
           <Route path="/master"                    element={<RequirePrivileged><MasterV2 /></RequirePrivileged>} />
           {/* Phase 35 PR 1 — primitives demo.

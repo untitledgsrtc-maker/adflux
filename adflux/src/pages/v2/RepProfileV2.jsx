@@ -37,10 +37,12 @@ import {
   ArrowLeft, Edit3, Mail, Shield,
   Wallet, Gift, Coins, Calendar,
   AlertCircle, ChevronRight, Settings, Loader2,
+  CheckCircle2, Clock,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { pushToast, toastError } from '../../components/v2/Toast'
+import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { TeamMemberModal } from '../../components/team/TeamMemberModal'
 import { SalaryPayoutModal } from '../../components/incentives/SalaryPayoutModal'
 import { IncentivePayoutModal } from '../../components/incentives/IncentivePayoutModal'
@@ -253,6 +255,16 @@ export default function RepProfileV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
   const isAdmin = ['admin', 'co_owner'].includes(profile?.role)
+  // Phase 87.5b — HR sign-off helpers. HR can accept but cannot
+  // unaccept; admin / co_owner can do both. canViewPage gates the
+  // entire route (Phase 90's original isAdmin-only gate widens to
+  // admin / co_owner / hr to match the RequireHROrPrivileged route
+  // guard added in App.jsx). Without this widening, HR would pass
+  // the route guard but bounce off the in-page useEffect redirect.
+  const isHR         = profile?.role === 'hr'
+  const canViewPage  = isAdmin || isHR
+  const canAccept    = isAdmin || isHR
+  const canUnaccept  = isAdmin
 
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
@@ -271,6 +283,9 @@ export default function RepProfileV2() {
   const [taSummary, setTaSummary] = useState({ pending: 0, approvedMonth: 0 })
   const [leavesSummary, setLeavesSummary] = useState({ used: 0, paid: 0, unpaid: 0, pending: 0 })
 
+  // Phase 87.5b — HR sign-off action busy flag.
+  const [acceptBusy, setAcceptBusy] = useState(false)
+
   // Edit-modal toggles
   const [editProfileOpen, setEditProfileOpen]   = useState(false)
   const [editTargetsOpen, setEditTargetsOpen]   = useState(false)
@@ -279,8 +294,11 @@ export default function RepProfileV2() {
 
   // Role gate
   useEffect(() => {
-    if (profile && !isAdmin) navigate('/dashboard', { replace: true })
-  }, [profile, isAdmin, navigate])
+    // Phase 87.5b — widened from `!isAdmin` to `!canViewPage` so the
+    // HR role can land here without the in-page useEffect bouncing
+    // them to /dashboard.
+    if (profile && !canViewPage) navigate('/dashboard', { replace: true })
+  }, [profile, canViewPage, navigate])
 
   const monthYm = istCurrentMonthYM()
   const monthLabel = istCurrentMonthLabel()
@@ -289,8 +307,61 @@ export default function RepProfileV2() {
   const monthStartYmd = `${monthYm}-01`
 
   // ─── Load everything ─────────────────────────────────────────────
+  // Phase 87.5b — HR sign-off actions. Both RPCs check role at DB
+  // level (SECURITY DEFINER + get_my_role() gate). Client gate is
+  // UX-only; the RPC is the enforcement boundary.
+  async function handleAccept() {
+    if (!user?.id) return
+    if (!canAccept) return
+    const ok = await confirmDialog({
+      title: 'Accept this rep’s profile?',
+      message: `Mark ${user.name || 'this rep'} as HR-accepted. This is a one-time sign-off; admin can reverse it later if needed.`,
+      confirmLabel: 'Accept',
+      cancelLabel: 'Cancel',
+    })
+    if (!ok) return
+    setAcceptBusy(true)
+    const { error: rpcErr } = await supabase.rpc('accept_user_profile', {
+      p_user_id: user.id,
+      p_note: null,
+    })
+    setAcceptBusy(false)
+    if (rpcErr) {
+      toastError(rpcErr, 'Could not accept profile.')
+      return
+    }
+    toastSuccess('Profile accepted.')
+    loadAll()
+  }
+
+  async function handleUnaccept() {
+    if (!user?.id) return
+    if (!canUnaccept) return
+    const ok = await confirmDialog({
+      title: 'Reverse HR acceptance?',
+      message: `Clear the HR-accepted sign-off for ${user.name || 'this rep'}. Use this if it was marked accepted by mistake.`,
+      confirmLabel: 'Reverse',
+      cancelLabel: 'Cancel',
+      danger: true,
+    })
+    if (!ok) return
+    setAcceptBusy(true)
+    const { error: rpcErr } = await supabase.rpc('unaccept_user_profile', {
+      p_user_id: user.id,
+    })
+    setAcceptBusy(false)
+    if (rpcErr) {
+      toastError(rpcErr, 'Could not reverse acceptance.')
+      return
+    }
+    toastSuccess('Acceptance reversed.')
+    loadAll()
+  }
+
   async function loadAll() {
-    if (!userId || !isAdmin) return
+    // Phase 87.5b — widened from `!isAdmin` to `!canViewPage` so HR
+    // gets the data fetch instead of an early return.
+    if (!userId || !canViewPage) return
     setLoading(true)
     setError('')
     try {
@@ -310,8 +381,11 @@ export default function RepProfileV2() {
         // Schema: users has no phone column (clients table has phone).
         // join_date lives on staff_incentive_profiles, not users.
         // Pulling those threw "column users.phone does not exist".
+        // Phase 87.5b — extend with hr_accepted_at, hr_accepted_by,
+        // hr_acceptance_note + joined acceptor name for the HR
+        // sign-off section.
         supabase.from('users')
-          .select('id, name, email, role, team_role, manager_id, segment_access, city, is_active, profile_image_url, manager:manager_id(id, name)')
+          .select('id, name, email, role, team_role, manager_id, segment_access, city, is_active, profile_image_url, manager:manager_id(id, name), hr_accepted_at, hr_accepted_by, hr_acceptance_note, hr_accepter:hr_accepted_by(id, name)')
           .eq('id', userId)
           .maybeSingle(),
         supabase.from('daily_targets')
@@ -470,7 +544,9 @@ export default function RepProfileV2() {
   useEffect(() => {
     loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, isAdmin])
+    // Phase 87.5b — deps updated from `isAdmin` to `canViewPage` so
+    // the effect re-runs when an HR session hydrates.
+  }, [userId, canViewPage])
 
   // Derived month-paid totals from payout history
   const monthPaidIncentive = useMemo(() =>
@@ -482,7 +558,9 @@ export default function RepProfileV2() {
                  .reduce((s, p) => s + safeNum(p.amount_paid), 0),
     [salaryPayouts, monthYm])
 
-  if (!isAdmin) return null
+  // Phase 87.5b — widened from `!isAdmin` to `!canViewPage` so HR
+  // doesn't get a blank null render.
+  if (!canViewPage) return null
 
   if (loading) {
     return (
@@ -567,6 +645,89 @@ export default function RepProfileV2() {
             {user.is_active ? 'Active' : 'Inactive'}
           </div>
         </div>
+      </SectionCard>
+
+      {/* ─── 1b. HR Acceptance (Phase 87.5b) ──────────────────────── */}
+      <SectionCard
+        title="HR acceptance"
+        sub={user.hr_accepted_at
+          ? `Signed off on ${new Date(user.hr_accepted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}${user.hr_accepter?.name ? ` by ${user.hr_accepter.name}` : ''}`
+          : 'Not yet signed off by HR — informational only, does not block the rep’s workflow.'}
+        action={
+          user.hr_accepted_at
+            ? (canUnaccept ? (
+                <button
+                  onClick={handleUnaccept}
+                  disabled={acceptBusy}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--danger, #EF4444)',
+                    color: 'var(--danger, #EF4444)',
+                    borderRadius: 10,
+                    padding: '8px 12px', cursor: acceptBusy ? 'wait' : 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    fontFamily: 'inherit', fontSize: 13,
+                  }}
+                >
+                  {acceptBusy && <Loader2 size={13} className="spin" />}
+                  Reverse acceptance
+                </button>
+              ) : null)
+            : (canAccept ? (
+                <button
+                  onClick={handleAccept}
+                  disabled={acceptBusy}
+                  style={{
+                    background: 'var(--v2-yellow, #FFE600)',
+                    border: '1px solid var(--v2-yellow, #FFE600)',
+                    color: 'var(--accent-fg, #0f172a)',
+                    borderRadius: 10,
+                    padding: '8px 14px', cursor: acceptBusy ? 'wait' : 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
+                  }}
+                >
+                  {acceptBusy ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} strokeWidth={1.8} />}
+                  Accept profile
+                </button>
+              ) : null)
+        }
+      >
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '8px 14px',
+          borderRadius: 999,
+          fontSize: 12, fontWeight: 600,
+          background: user.hr_accepted_at
+            ? 'var(--success-soft, rgba(16,185,129,0.12))'
+            : 'var(--warning-soft, rgba(245,158,11,0.12))',
+          color: user.hr_accepted_at
+            ? 'var(--success, #10B981)'
+            : 'var(--warning, #F59E0B)',
+          border: `1px solid ${user.hr_accepted_at ? 'var(--success, #10B981)' : 'var(--warning, #F59E0B)'}`,
+        }}>
+          {user.hr_accepted_at
+            ? <CheckCircle2 size={14} strokeWidth={1.8} />
+            : <Clock size={14} strokeWidth={1.8} />}
+          {user.hr_accepted_at ? 'Accepted by HR' : 'Pending HR acceptance'}
+        </div>
+        {user.hr_acceptance_note && (
+          <div style={{
+            marginTop: 10,
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: 'var(--v2-bg-2, var(--surface-2))',
+            border: '1px solid var(--v2-line, var(--border))',
+            fontSize: 12.5, lineHeight: 1.5,
+            color: 'var(--v2-ink-1, var(--text))',
+            whiteSpace: 'pre-wrap',
+          }}>
+            <span style={{ color: 'var(--v2-ink-2, var(--text-muted))', fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4, fontWeight: 600 }}>
+              HR note
+            </span>
+            {user.hr_acceptance_note}
+          </div>
+        )}
       </SectionCard>
 
       {/* ─── 2. KPI targets ────────────────────────────────────────── */}

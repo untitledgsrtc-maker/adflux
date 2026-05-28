@@ -131,6 +131,16 @@ export default function MyOfferV2() {
         day: '2-digit', month: 'short', year: 'numeric',
       })
     : '—'
+  // Phase 87.5b (2026-05-28) — surface HR sign-off status. Reads
+  // profile.hr_accepted_at from authStore (column added in
+  // supabase_phase87_5b_hr_acceptance.sql + auto-picked by the
+  // existing users.select('*') in authStore.fetchProfile). Does NOT
+  // block daily work — chip is informational only.
+  const hrAcceptedDate = profile?.hr_accepted_at
+    ? new Date(profile.hr_accepted_at).toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      })
+    : null
 
   return (
     <div className="v2d-offer">
@@ -142,6 +152,35 @@ export default function MyOfferV2() {
           <div className="v2d-page-sub">
             Accepted on {acceptedDate} · on file with HR
           </div>
+          {/* Phase 87.5b — HR sign-off status chip. Informational
+              only; does NOT gate any rep workflow. */}
+          {hrAcceptedDate ? (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              marginTop: 8,
+              padding: '4px 10px',
+              borderRadius: 999,
+              fontSize: 11.5, fontWeight: 600,
+              background: 'var(--success-soft, rgba(16,185,129,0.12))',
+              color: 'var(--success, #10B981)',
+              border: '1px solid var(--success, #10B981)',
+            }}>
+              Accepted by HR · {hrAcceptedDate}
+            </span>
+          ) : (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              marginTop: 8,
+              padding: '4px 10px',
+              borderRadius: 999,
+              fontSize: 11.5, fontWeight: 600,
+              background: 'var(--warning-soft, rgba(245,158,11,0.12))',
+              color: 'var(--warning, #F59E0B)',
+              border: '1px solid var(--warning, #F59E0B)',
+            }}>
+              Pending HR acceptance
+            </span>
+          )}
         </div>
         <div style={{ display: 'inline-flex', gap: 8 }}>
           {/* Phase 34Z.71 — request leave from the offer page so reps
