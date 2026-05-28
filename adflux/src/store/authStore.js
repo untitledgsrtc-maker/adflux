@@ -11,7 +11,7 @@ export const useAuthStore = create((set, get) => ({
   setLoading: (loading) => set({ loading }),
 
   fetchProfile: async (userId) => {
-    // Try by ID first
+    // Try by ID first — happy path. auth.uid() matches public.users.id.
     const { data, error } = await supabase
       .from('users')
       .select('*')
@@ -23,30 +23,49 @@ export const useAuthStore = create((set, get) => ({
       return data
     }
 
-    // Fallback: try matching by email from auth session
-    // This handles cases where the users table email differs slightly
+    // Phase 97.D (2026-05-28, F-002) — read-only fallback. The legacy
+    // code path here used to SILENTLY UPDATE the users row's primary
+    // key + email to match auth.uid() whenever a case-insensitive
+    // email lookup found a different row. That was:
+    //   (a) a profile-hijack vector before Phase 97.1 column-pin RLS
+    //       (any rep could trigger a rewrite of another rep's PK);
+    //   (b) silently broken after Phase 97.1 (RLS denied the UPDATE
+    //       but the JS proceeded as if it succeeded, leaving the
+    //       session inconsistent — every subsequent query 42501).
+    // Both modes are footguns. D-warn: keep the email match for
+    // diagnostics + logging only. NEVER write. Admin runs the audit
+    // query (CLAUDE.md §40 mismatch SELECT) + repairs manually.
     const { data: { user: authUser } } = await supabase.auth.getUser()
     if (authUser?.email) {
+      // .maybeSingle() returns null instead of erroring on 0 rows.
       const { data: byEmail } = await supabase
         .from('users')
-        .select('*')
+        .select('id, email, name, role, team_role')
         .ilike('email', authUser.email)
-        .single()
+        .maybeSingle()
 
       if (byEmail) {
-        // Fix the ID mismatch silently — update the users table id to match auth
-        await supabase
-          .from('users')
-          .update({ id: userId, email: authUser.email })
-          .eq('id', byEmail.id)
-
-        const fixed = { ...byEmail, id: userId, email: authUser.email }
-        set({ profile: fixed, loading: false })
-        return fixed
+        // Email matched but the row's PK differs from auth.uid().
+        // Log the diagnostic so admin can pin down the bad row.
+        // Do NOT mutate. Do NOT set a fake profile. Return null.
+        console.error(
+          '[authStore] F-002 mismatch: auth.uid does not match users.id ' +
+          'for the email-matched row. Admin must repair via Supabase Studio.',
+          {
+            auth_uid: userId,
+            users_id: byEmail.id,
+            email: authUser.email,
+            name: byEmail.name,
+            role: byEmail.role,
+            team_role: byEmail.team_role,
+          }
+        )
+        set({ loading: false })
+        return null
       }
     }
 
-    console.error('fetchProfile: no matching user found', error)
+    console.error('[authStore] no matching user found', error)
     set({ loading: false })
     return null
   },
