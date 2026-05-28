@@ -33,6 +33,7 @@ import { setPendingEditOf, setPendingRenewalOf } from '../lib/quoteIntent'
 import { openExternalUrl } from '../utils/openExternal'
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
+import { confirmDialog } from '../components/v2/ConfirmDialog'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
 import { FollowUpList } from '../components/followups/FollowUpList'
 import { formatCurrency, formatDate, formatPhone, todayISO } from '../utils/formatters'
@@ -491,7 +492,21 @@ export default function QuoteDetail() {
               className="btn btn-sec btn-sm"
               style={{ borderColor: 'var(--red)', color: 'var(--red)' }}
               onClick={async () => {
-                if (!confirm('DELETE this draft quote permanently? This cannot be undone.')) return
+                // Phase 97.9 (2026-05-28, F-204) — swap browser
+                // confirm() for the in-app ConfirmDialog so APK +
+                // iOS PWA get a proper modal instead of stock chrome.
+                // Render-time gate (status==='draft') + Phase 11b DB
+                // trigger + Phase 74 role rules still apply BEFORE
+                // this prompt, so the dialog is the final accident
+                // brake — not a security gate.
+                const ok = await confirmDialog({
+                  title: 'Delete draft quote?',
+                  message: 'This will permanently remove the draft. This cannot be undone.',
+                  confirmLabel: 'Delete',
+                  cancelLabel: 'Cancel',
+                  danger: true,
+                })
+                if (!ok) return
                 const { error: delErr } = await supabase
                   .from('quotes').delete().eq('id', id)
                 if (delErr) {
