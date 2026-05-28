@@ -1,0 +1,141 @@
+-- supabase_phase98_h1_drop_old_bump_overload.sql
+--
+-- Phase 98.H1 — drop the Phase 12 3-arg overload of
+-- public.bump_daily_counter.
+--
+-- BACKGROUND
+-- ──────────
+-- Phase 98.H added a NEW 4-arg variant of bump_daily_counter:
+--   public.bump_daily_counter(uuid, text, int, date DEFAULT NULL)
+-- with an IST-anchored default so existing meetings + new_leads
+-- callers transparently switched from `current_date` UTC to IST.
+-- That migration was a single CREATE OR REPLACE FUNCTION
+-- statement.
+--
+-- Postgres function overloads are keyed by full signature (name
+-- + arg types). CREATE OR REPLACE FUNCTION with a NEW signature
+-- creates a SEPARATE overload — it does NOT replace prior
+-- overloads with the same name but different arity. So the
+-- Phase 12 3-arg function:
+--   public.bump_daily_counter(uuid, text, int)
+-- stayed live after 98.H. PostgREST V1 query confirmed both
+-- overloads coexisting on 2026-05-28.
+--
+-- Resolution rules:
+--   * call_log_bump_counter (Phase 98.H body) calls 4-arg
+--     explicitly → routes to new IST-aware version. ✓
+--   * lead_activity_bump_counter (Phase 98.H body) call branch
+--     calls 4-arg explicitly → IST-aware. ✓
+--   * lead_activity_bump_counter meeting branch calls
+--     bump_daily_counter(..., 'meetings', 1) — 3 args → still
+--     resolved to the OLD 3-arg overload → UTC current_date. ❌
+--   * lead_after_insert_bump_counter (Phase 12, untouched) calls
+--     bump_daily_counter(..., 'new_leads', 1) — 3 args → also
+--     resolved to the OLD overload. ❌
+--
+-- Net: calls counter fixed by 98.H, meetings + new_leads
+-- counters continued to drift on the IST 00:00–05:30 boundary
+-- because the 3-arg overload survived.
+--
+-- FIX
+-- ───
+-- Drop the 3-arg overload. All callers fall through to the
+-- 4-arg overload with `p_for_date = NULL` → resolves to
+-- (now() AT TIME ZONE 'Asia/Kolkata')::date inside the function
+-- body. Meeting + new_leads counters now IST-anchored too.
+--
+-- The production database was already patched ad-hoc earlier
+-- on 2026-05-28 (owner ran the DROP manually after V1
+-- surfaced both overloads). This file is the missing
+-- repo-history record so a fresh DB clone replaying every
+-- migration from Phase 12 onward ends in the same state as
+-- production.
+--
+-- IDEMPOTENCY
+-- ───────────
+-- DROP FUNCTION IF EXISTS. Re-running is safe. Already-dropped
+-- function = no-op. NOTIFY pgrst at end.
+--
+-- SCOPE
+-- ─────
+-- This migration drops ONE overload. It does NOT touch:
+--   * The Phase 98.H 4-arg bump_daily_counter — stays.
+--   * call_log_bump_counter — Phase 98.H body untouched.
+--   * lead_activity_bump_counter — Phase 98.H body untouched.
+--   * lead_after_insert_bump_counter — Phase 12 body untouched
+--     (it now calls the surviving 4-arg overload).
+--   * touch_updated_at — unrelated.
+--   * Any trigger DDL — bindings stay intact.
+--   * RLS policies, GRANTs, REVOKEs — no change.
+--   * work_sessions table data — no row mutation.
+
+
+DROP FUNCTION IF EXISTS public.bump_daily_counter(uuid, text, integer);
+
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ───────────── VERIFY ─────────────
+-- Run after applying. Only the 4-arg overload should remain.
+--
+--   SELECT pg_get_function_arguments(oid)
+--     FROM pg_proc
+--    WHERE proname = 'bump_daily_counter';
+--
+--   -- Expected: 1 row, signature:
+--   --   p_user_id uuid, p_counter text, p_amount integer,
+--   --   p_for_date date DEFAULT NULL::date
+--
+-- If TWO rows return → DROP didn't take. Look for a residual
+-- dependency blocking it:
+--
+--   SELECT dep.deptype,
+--          pg_describe_object(dep.classid, dep.objid, dep.objsubid)
+--            AS dependent
+--     FROM pg_depend dep
+--     JOIN pg_proc p ON p.oid = dep.refobjid
+--    WHERE p.proname = 'bump_daily_counter'
+--      AND pg_get_function_arguments(p.oid) =
+--          'p_user_id uuid, p_counter text, p_amount integer';
+--
+-- Schema reload check:
+--
+--   SELECT 1;
+--   -- Expected: 1.
+
+
+-- ───────────── ROLLBACK ─────────────
+-- Re-apply ONLY if a real regression appears. Re-creates the
+-- Phase 12 3-arg overload with UTC `current_date` bucketing.
+-- Re-opens the IST 00:00–05:30 drift on meeting + new_leads
+-- counters: bumps during that 5.5-hour window land in
+-- yesterday's UTC date row instead of today's IST date row.
+--
+-- Strip the leading "-- " from each line below to execute.
+--
+-- CREATE OR REPLACE FUNCTION public.bump_daily_counter(
+--   p_user_id uuid, p_counter text, p_amount int
+-- ) RETURNS void
+-- LANGUAGE plpgsql AS $$
+-- BEGIN
+--   INSERT INTO public.work_sessions (user_id, work_date, daily_counters)
+--   VALUES (
+--     p_user_id, current_date,
+--     jsonb_build_object(p_counter, p_amount)
+--   )
+--   ON CONFLICT (user_id, work_date) DO UPDATE SET
+--     daily_counters = jsonb_set(
+--       COALESCE(public.work_sessions.daily_counters, '{}'::jsonb),
+--       ARRAY[p_counter],
+--       to_jsonb(
+--         COALESCE((public.work_sessions.daily_counters ->> p_counter)::int, 0)
+--         + p_amount
+--       ),
+--       true
+--     ),
+--     updated_at = now();
+-- END;
+-- $$;
+--
+-- NOTIFY pgrst, 'reload schema';
