@@ -26,8 +26,15 @@ import { useAuth } from '../../hooks/useAuth'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import {
-  todayISO, initials, formatRelative, formatCompact,
+  initials, formatRelative, formatCompact,
 } from '../../utils/formatters'
+// Phase 98.E1 (F-D003) — admin "today" KPIs anchor to IST, not UTC.
+// `todayISO()` from formatters returned `new Date().toISOString().slice(0,10)`
+// which is UTC and rolls over at IST 05:30. After 18:30 IST the admin
+// dashboard was showing wrong "today collected" / today-rep-strip
+// counts. `istTodayISO()` uses Intl.DateTimeFormat with timeZone
+// Asia/Kolkata — stable across the IST workday.
+import { istTodayISO } from '../../utils/istDate'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 // Phase 12 rev3 — widgets folded in from the retired CockpitV2 page.
@@ -97,7 +104,7 @@ export default function AdminDashboardDesktop() {
   /* eslint-disable-next-line */ }, [period, segmentFilter])
 
   async function load(activePeriod, activeSegment = 'all') {
-    const today = todayISO()
+    const today = istTodayISO()
     const p = activePeriod || thisMonth()
     // All three are consumed below: startIso/endIso for row-level time
     // filters (payments, quote timestamps), monthKeys for anything that
@@ -110,7 +117,7 @@ export default function AdminDashboardDesktop() {
     // team. We pull these alongside the existing 8 queries so the
     // per-rep activity strip + missed-targets banner can render
     // without an extra round-trip.
-    const todayDate = todayISO()
+    const todayDate = istTodayISO()
 
     // Phase 41.2 — Sprint 2 add: 3 new queries for Action Queue +
     // Reps-in-field cards. All counts only (head: true), so cheap.
@@ -1540,7 +1547,7 @@ function LiabilityPanel({ data }) {
 }
 
 function ActiveCampaignsPanel({ rows, onOpen }) {
-  const today = todayISO()
+  const today = istTodayISO()
   return (
     <section className="v2d-panel" style={{ marginBottom: 22 }}>
       <div className="v2d-panel-h">
