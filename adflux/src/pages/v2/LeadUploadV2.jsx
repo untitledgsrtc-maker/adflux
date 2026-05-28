@@ -145,7 +145,17 @@ export default function LeadUploadV2() {
   const [headers, setHeaders]           = useState([])
   const [columnMap, setColumnMap]       = useState({})
   const [defaultSegment, setDefaultSegment] = useState('PRIVATE')
-  const [defaultAssignee, setDefaultAssignee] = useState('')
+  const [defaultSalesAssignee, setDefaultSalesAssignee] = useState('')
+  // Phase 99.B (2026-05-29) — TC pick now has its own state. Was
+  // lumped into a single `defaultAssignee` that wrote to
+  // `leads.assigned_to` regardless of selected user's role. 107
+  // TC-meant leads landed in the wrong column over 5 days and
+  // /telecaller stayed empty for Dhara + Rima. Phase 99.A migration
+  // repaired the data; this form fix prevents recurrence by
+  // splitting the single dropdown into explicit Sales + Telecaller
+  // picks. Admin TC pick overrides Cronberry Remarks parse
+  // (Decision 3 from /telecaller routing repair memo).
+  const [defaultTelecallerAssignee, setDefaultTelecallerAssignee] = useState('')
   const [cutoffDays, setCutoffDays]     = useState(90)
   const [staleAsLost, setStaleAsLost]   = useState(true)
   const [users, setUsers]               = useState([])
@@ -197,7 +207,11 @@ export default function LeadUploadV2() {
   useEffect(() => {
     supabase
       .from('users')
-      .select('id, name, team_role, is_active')
+      // Phase 99.B — added `role` so the new "Default telecaller"
+      // dropdown's `u.role === 'telecaller'` filter actually resolves.
+      // Without `role` in the SELECT the filter would always evaluate
+      // undefined === 'telecaller' and the dropdown would show empty.
+      .select('id, name, role, team_role, is_active')
       .eq('is_active', true)
       .order('name')
       .then(({ data }) => setUsers(data || []))
@@ -270,7 +284,7 @@ export default function LeadUploadV2() {
         file_name: file?.name || 'unknown',
         uploaded_by: profile.id,
         total_rows: rows.length,
-        default_assignee_id: defaultAssignee || null,
+        default_assignee_id: defaultSalesAssignee || null,
         default_segment: defaultSegment,
         status: 'processing',
       }])
@@ -347,8 +361,13 @@ export default function LeadUploadV2() {
           stage,
           lost_reason,
           nurture_revisit_date: isNurture ? ninetyDaysOut.toISOString().slice(0, 10) : null,
-          assigned_to: defaultAssignee || null,
-          telecaller_id: telecaller?.id || null,
+          // Phase 99.B — split sources. Sales-owner pick writes to
+          // assigned_to. TC pick writes to telecaller_id. Admin
+          // explicit TC pick overrides Cronberry Remarks parse
+          // result (`telecaller?.id`) per Decision 3 in the
+          // /telecaller routing repair memo.
+          assigned_to:   defaultSalesAssignee || null,
+          telecaller_id: defaultTelecallerAssignee || telecaller?.id || null,
           notes_legacy_telecaller: parsed?.telecallerName && !telecaller ? parsed.telecallerName : null,
           notes: parsed?.statusText || remarks,
           last_contact_at: parsed?.timestamp || null,
@@ -529,17 +548,44 @@ export default function LeadUploadV2() {
                   <option value="GOVERNMENT">GOVERNMENT</option>
                 </select>
               </div>
-              <div className="fg">
-                <label>Default assignee</label>
-                <select value={defaultAssignee} onChange={e => setDefaultAssignee(e.target.value)} style={{ width: '100%' }}>
-                  <option value="">— unassigned —</option>
-                  {/* Phase 27 — telecallers can also own raw imported leads
-                      (the inside-sales caller works the queue first). Office
-                      staff stays excluded — they don't work leads. */}
-                  {users.filter(u => ['sales','agency','sales_manager','telecaller'].includes(u.team_role)).map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
+              <div className="fg" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Phase 99.B — split single "Default assignee" into
+                    two explicit dropdowns. Pre-99.B the single
+                    dropdown listed all 4 role buckets and wrote the
+                    pick to leads.assigned_to regardless, so admin
+                    picking a TC routed the lead to the wrong
+                    column. Phase 99.A repaired 107 affected rows
+                    on 2026-05-29. */}
+                <div>
+                  <label>Default sales owner</label>
+                  <select
+                    value={defaultSalesAssignee}
+                    onChange={e => setDefaultSalesAssignee(e.target.value)}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">— unassigned —</option>
+                    {users
+                      .filter(u => ['sales','agency','sales_manager'].includes(u.team_role))
+                      .map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label>Default telecaller</label>
+                  <select
+                    value={defaultTelecallerAssignee}
+                    onChange={e => setDefaultTelecallerAssignee(e.target.value)}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">— unassigned —</option>
+                    {users
+                      .filter(u => u.role === 'telecaller')
+                      .map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                  </select>
+                </div>
               </div>
               <div className="fg">
                 <label>Cutoff days for active leads</label>
