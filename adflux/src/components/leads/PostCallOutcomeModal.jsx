@@ -35,7 +35,14 @@ import { fetchAndPatchCallDuration } from '../../utils/callLogReader'
 // LocalNotification on the device when the rep saves a follow-up.
 // OEM-immune (Vivo / Xiaomi / Realme can't kill an AlarmManager).
 // Web no-op via Capacitor.isNativePlatform() guard inside helper.
-import { scheduleFollowUpAlarm } from '../../utils/scheduleFollowUpAlarm'
+//
+// Phase B1/F-401 (2026-05-28) — also cancel alarms for follow-ups
+// that get bulk-closed via Phase 34Z.62 close-prior-followups path.
+// Cancel AFTER the UPDATE succeeds (not before): if UPDATE fails,
+// row stays open + alarm stays armed = consistent. Cancel-first +
+// UPDATE-fail would erase the alarm but leave the row open =
+// missed reminder (worse than phantom).
+import { scheduleFollowUpAlarm, cancelFollowUpAlarm } from '../../utils/scheduleFollowUpAlarm'
 
 // Phase 34Z.53 — client-side intent parser. When the rep speaks
 // (Whisper transcript appended to the notes field), scan for outcome
@@ -528,12 +535,45 @@ export default function PostCallOutcomeModal({
       // Phase 49.1 — IST today (was UTC slice; before 18:30 IST that's
       // yesterday, so today's open follow_ups missed the close query).
       const today = istTodayISO()
-      await supabase.from('follow_ups')
+      // Phase B1/F-401 — capture ids BEFORE the UPDATE so the fan-out
+      // alarm cancel can fire ONLY IF the UPDATE succeeds. Safer than
+      // cancel-then-update: UPDATE failure with alarm already cancelled
+      // = missed reminder (worse than the phantom alarm we're fixing).
+      const { data: closingIds, error: selectErr } = await supabase.from('follow_ups')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('assigned_to', profile.id)
+        .eq('is_done', false)
+        .lte('follow_up_date', today)
+      if (selectErr) {
+        // Transient DB error on the SELECT silently skips alarm cancel.
+        // UPDATE still proceeds below — phantom alarm at worst. Log so
+        // we know about it. Save chain unblocked.
+        console.warn('[phase-b1/F-401] SELECT failed; alarm cancel skipped:', selectErr.message)
+      }
+      const { error: closeErr } = await supabase.from('follow_ups')
         .update({ is_done: true, done_at: new Date().toISOString() })
         .eq('lead_id', lead.id)
         .eq('assigned_to', profile.id)
         .eq('is_done', false)
         .lte('follow_up_date', today)
+      if (!closeErr && Array.isArray(closingIds) && closingIds.length > 0) {
+        // Fan-out cancel after successful UPDATE. allSettled so one
+        // cancel failure doesn't block the save chain or affect others.
+        // Failures logged but never bubble — alarm row in AlarmManager
+        // is independent of DB row, so stale cancel of an already-fired
+        // alarm is benign.
+        Promise.allSettled(
+          closingIds.map(r => cancelFollowUpAlarm(r.id))
+        ).then(results => {
+          results.forEach((res, i) => {
+            if (res.status === 'rejected') {
+              console.warn('[phase-b1/F-401] cancel failed for',
+                closingIds[i]?.id, res.reason?.message || res.reason)
+            }
+          })
+        })
+      }
     }
 
     // 3. Next-action: insert a follow_ups row dated to customDate.
