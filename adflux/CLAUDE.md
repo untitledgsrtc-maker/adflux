@@ -184,7 +184,7 @@ Skipping any of these is the kind of thing the owner will catch and call out.
 - Filename: `supabase_phase{N}_{purpose}.sql`. Owner pastes into Supabase Studio manually.
 - After schema changes: `NOTIFY pgrst, 'reload schema';` at end of file.
 - RLS uses `public.get_my_role()` and `manager_id` chains. Don't bypass.
-- Roles in use: `admin`, `co_owner`, `sales`, `agency`, `telecaller`. **No `owner` role** (DB constraint dropped it). Don't reintroduce.
+- Roles in use: `admin`, `co_owner`, `sales`, `agency`, `telecaller` (plus `hr`, `accounts`, `office_staff`, `staff` per Phase 26b / Phase 50 designations). **No `owner` role** — `users_role_check` CHECK constraint enforces this as of Phase 97.E (commit `bbdce46`, 28 May 2026; closes audit finding F-001b). Don't reintroduce.
 - **Three-layer access control:**
   1. Segment scope on `users.segment_access` — applies only to roles `sales` and `telecaller`. Everyone else = `ALL`.
   2. Operational data (creative jobs, attendance, leads) — segment-blind for non-sales roles.
@@ -1747,4 +1747,89 @@ All Phase 97.0 agents are READ-ONLY: no Edit, no Write, no SQL execution, no APK
 - Documentation appends to CLAUDE.md itself.
 
 For everything else: the 12-question + table + 3-surface gate runs.
+
+
+---
+
+## 41 · Phase 97.x security / RLS / push / role + Phase 87.5b HR sign-off (2026-05-28)
+
+Full-day sprint closed **17 audit findings + 1 UX simplification + 1 module-finishing batch (Phase 87.5b)** on `untitled-os` between ~12:00 and ~17:00 IST. 17 commits total. All shipped end-to-end (DB + JS + verify + smoke).
+
+### What shipped (chronological)
+
+| Phase | What | Finding | SHA |
+|---|---|---|---|
+| 97.1 | `users_self_update_avatar` RLS column-pin (7 cols) — closes privilege-escalation via PostgREST | F-100 | (early) |
+| 97.2 | 10 SECURITY DEFINER RPCs gated by `_assert_self_or_admin` helper | F-101 / F-102 / F-104 / F-108 | (early) |
+| 97.3 | PostCallOutcomeModal — cancel scheduled follow-up alarms on Lost / Won save | F-401 | `abc530e` |
+| 97.4 | APK follow-up backfill IST date window — fix V2AppShell cold-start backfill that pulled stale tomorrow rows | F-406 | `5db25f0` |
+| 97.5 | `nativePush.js` — djb2 deterministic id per `data.tag` so FCM retries replace in-tray instead of stacking | F-407 | `2f0669f` |
+| 97.3.1 | Hotfix race vs `trg_z_close_followups_on_terminal` — capture `earlyClosingIds` BEFORE stage advance so alarm-cancel SELECT doesn't miss rows | F-401 (race) | `6af328b` |
+| 97.6 | PostCallOutcomeModal — Lost outcome skips next-action prompt (auto-forces `nextAction='none'` + red "Marked Lost" banner) | UX | `ac0aec7` |
+| 97.7 | `/push-debug` route stays open for rep self-enroll; admin-only Send-test-push + Registered devices gated inside PushDebugV2. `/primitives-demo` route guarded with `RequirePrivileged`. | F-003 / F-208 | `56eb232` |
+| 97.8 | Remove `'owner'` role literal from `HRNewUserV2` `.in()` filter + `MasterV2` `TEAM_ROLES` array | F-001a | `9e6d64d` |
+| 97.9 | QuoteDetail draft-delete confirm — `window.confirm()` → `confirmDialog` | F-204 | `ae0f318` |
+| 97.10 | PendingApprovalsV2 — `window.confirm/prompt/alert` → `confirmDialog` + custom reject-reason inline modal + `toastError`; `⚠` Unicode → Lucide `AlertTriangle`; hex `#ef9a9a` → `var(--danger)` | F-300 / F-301 | `350dc32` |
+| 97.A400 | `push_followup_due_reminders()` — constant tag `'followup_due'` → per-row unique `'fu-due-' || r.id::text`. Two due reminders in the same 5-min window no longer collapse to one tray entry. | F-A400 | `edcea93` |
+| 97.A2 | `REVOKE EXECUTE ON FUNCTION public.enqueue_push(...) FROM PUBLIC, anon, authenticated` — closes any-rep-to-any-rep spam push via direct RPC. All 10 internal callers (3 triggers + 4 cron + 2 SECDEF helpers + 1 followup digest) keep working via DEFINER ownership. | F-105 | `c628b84` |
+| 97.E | DROP + RE-CREATE `users_role_check` + `users_team_role_check` without `'owner'`. DB now matches §8 documented role universe + Phase 97.8 frontend literal purge. | F-001b | `bbdce46` |
+| 97.D | `authStore.fetchProfile` — remove silent `users.id` overwrite by email fallback. Replace with read-only `.maybeSingle()` diagnostic + `console.error` + `null` return. Preserves Phase 97.1 lockdown. | F-002 | `c4111b1` |
+| 87.5b | HR sign-off on rep profile bundle. 3 new `users` cols (`hr_accepted_at`, `hr_accepted_by`, `hr_acceptance_note`). 2 SECURITY DEFINER RPCs (`accept_user_profile`, `unaccept_user_profile`). `RequireHROrPrivileged` route guard for `/people/:userId`. Status chip on `/my-offer`. Accept / Reverse buttons on RepProfileV2 with `confirmDialog` + `toastSuccess` + `toastError`. Phase 97.1 column-pin extended from 7 → 10 explicit pins. | (module finish) | `2989cd3` |
+| 87.5b.1 | Hotfix the 87.5b RPC role check — added `IS NULL OR NOT IN (...)` short-circuit so JWT-less callers can't slip past via Postgres 3-valued logic. Also corrected VERIFY regex from `IS NOT DISTINCT FROM` to `IS DISTINCT FROM` (matches Postgres's normalized rendering). | (security hotfix) | `0bde4c7` |
+
+### New DB columns
+
+- `users.hr_accepted_at timestamptz` (Phase 87.5b)
+- `users.hr_accepted_by uuid REFERENCES users(id)` (Phase 87.5b)
+- `users.hr_acceptance_note text` (Phase 87.5b)
+
+### New RPCs
+
+- `public.accept_user_profile(p_user_id uuid, p_note text)` — SECDEF, gated `admin / co_owner / hr`, COALESCE keeps earliest acceptance metadata on re-call. NULL-role guarded (Phase 87.5b.1).
+- `public.unaccept_user_profile(p_user_id uuid)` — SECDEF, gated `admin / co_owner` only. HR cannot reverse. NULL-role guarded (Phase 87.5b.1).
+
+### New route guard
+
+- `RequireHROrPrivileged({children})` in `App.jsx` — admin / co_owner / hr. Used ONLY on `/people/:userId`. Global `RequirePrivileged` (admin + co_owner) unchanged for all other routes.
+
+### Frozen file touches (all guardian-cleared PASS)
+
+| File | What | Risk |
+|---|---|---|
+| `src/components/leads/PostCallOutcomeModal.jsx` | Phase 97.3 + 97.3.1 + 97.6: alarm cancel chain + Lost UX | None — additive |
+| `src/components/v2/V2AppShell.jsx` | Phase 97.4: cold-start backfill IST window | None — additive |
+| `src/utils/nativePush.js` | Phase 97.5: djb2 deterministic id | None — additive |
+| `src/pages/v2/MyOfferV2.jsx` | Phase 87.5b: status chip (additive only) | None |
+
+### Documented elsewhere
+
+- Push pipeline 11-caller map for `enqueue_push` lives in `supabase_phase97_a2_enqueue_push_revoke.sql` header.
+- F-001b live audit results (A1/A2/A3/A4) live in `supabase_phase97_e_users_role_owner_purge.sql` header.
+- Phase 87.5b RPC role model (accept = admin/co_owner/hr; unaccept = admin/co_owner only) lives in `supabase_phase87_5b_hr_acceptance.sql` header.
+
+### Backlog after Phase 87.5b.1 close
+
+- **Phase 76.2** — Android tracking plugin (GPS toggle receiver + network watcher + heartbeat + manifest perms + APK rebuild). Owner-deferred 22 May 2026.
+- **Sprint 3** — P&L module port (spec only).
+- **Sprint 4** — Receipts/TDS upgrade for govt deals.
+- **Govt invoice template** — post-WON automation.
+- **Phase 42.2** — Renuka team-lead frontend dashboard.
+- Phase 39 — single-payout-flow vs two-flow decision (parked).
+
+### Foot-guns added 2026-05-28 (don't repeat)
+
+- ❌ Role check via `NOT IN (...)` without NULL short-circuit. Postgres 3VL evaluates `NULL NOT IN (...)` to NULL → `IF NULL THEN` skips → role gate bypassed under JWT-less contexts. Always use `IF X IS NULL OR X NOT IN (...) THEN ...`.
+- ❌ VERIFY regex `IS NOT DISTINCT FROM` — Postgres normalizes column-immutability clauses to `NOT (X IS DISTINCT FROM Y)` in `pg_get_expr()`. Pattern should match `IS DISTINCT FROM` (substring of both forms).
+- ❌ `pushToast({message, tone: 'success'})` — Toast.jsx signature is positional `pushToast(message, type='info')`. Object form renders `[object Object]` + falls back to info tint. Use `toastSuccess('...')` helper instead.
+- ❌ In-page `isAdmin` self-gate inside a page mounted under a wider route guard. When the route widens (e.g. RequirePrivileged → RequireHROrPrivileged), every `isAdmin` check inside the page must widen to match or HR bounces. Use a `canViewPage` boolean as single source of truth.
+
+### Smoke test list (for future audits)
+
+Sales-side: PostCallOutcomeModal Lost flow (banner + skip next-action), follow-up alarm cancel after stage change, push dedup on same tag, APK follow-up backfill IST window, push-debug self-enroll for sales rep.
+
+HR-side: /people/:userId access as hr, Accept button visible + Reverse absent, RPC role gate via DevTools (sales rep → 42501 on accept_user_profile + 23514 on direct UPDATE).
+
+Admin-side: PendingApprovalsV2 approve + reject flow with in-app modals, QuoteDetail draft delete confirm, primitives-demo route bounce for non-admin.
+
+DB-side: F-100 via DevTools `users.update({role:'admin'})` → 42501, F-105 via `rpc('enqueue_push',...)` → 42501, F-A400 via 2 follow_ups in same 5-min cron window → 2 distinct tray entries.
 
