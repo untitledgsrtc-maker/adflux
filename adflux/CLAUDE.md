@@ -1833,3 +1833,125 @@ Admin-side: PendingApprovalsV2 approve + reject flow with in-app modals, QuoteDe
 
 DB-side: F-100 via DevTools `users.update({role:'admin'})` → 42501, F-105 via `rpc('enqueue_push',...)` → 42501, F-A400 via 2 follow_ups in same 5-min cron window → 2 distinct tray entries.
 
+
+---
+
+## 42 · Phase 98 — runtime parity audit + 3 fixes (2026-05-28 evening)
+
+Full cross-role parity audit run after Phase 97.x close. Method:
+1. Static code map (5 parallel Explore agents — sales / TC / admin / GPS / push surfaces).
+2. RLS + role-filter enumeration via pg_policy introspection.
+3. Owner-runnable SQL parity queries in Supabase Studio.
+4. UI state matrix across every dashboard.
+
+10 candidate findings raised. Runtime-classified into:
+
+- **Confirmed bugs (4)**: F-D010 quiet-hours, B-001 12 admin policies, B-002 hr_offers, F-D005 KM threshold.
+- **NOT REPRODUCED (2)**: F-D001 (Supabase DB session = Asia/Kolkata so no-TZ string still works), F-G7 (push_failures view exists in DB; SQL file just not in repo).
+- **STATIC RISK (5)**: F-D002 / F-D008 / B-003 (no `sales_manager` user exists today — Phase 42 dashboard dormant), F-D003 (admin todayCollected UTC — time-window-only bug fires 00:00–05:30 IST), F-D004 (followup-CREATE trigger CURRENT_DATE — IST evening edge case).
+- **Owner rejected (1)**: B-001 — see Phase 98.B section below.
+
+### What shipped (Phase 98)
+
+| Phase | Finding | Layer | SHA |
+|---|---|---|---|
+| 98.A | F-D010 quiet-hours wrap on `tg_push_on_lead_assign` + `tg_push_on_payment_approved` + `tg_push_on_quote_won` (3 of 5 push triggers were firing 24×7) | SQL — CREATE OR REPLACE × 3 functions; trigger DDL untouched | `5fc8d98` |
+| 98.C | B-002 widen `hr_offers_sales_own` (renamed `hr_offers_self_read`) to admit sales / telecaller / agency / co_owner / hr on own-row only (`converted_user_id = auth.uid()`) | SQL — DROP + CREATE policy | `1a319b7` |
+| 98.D | F-D005 align `src/utils/gpsDistance.js` thresholds with Phase 68 server `compute_daily_ta` (acc 100→50, seg 0.03→0.10, speed 200/3600→120/3600, daily cap 600 unchanged). Runtime-verified: 1.51 km client = 1.51 km server on Dixita 2026-05-28 | JS — utility constants only, function bodies byte-identical | `e37dcfb` |
+| docs | §41 Phase 97 record | docs | `7921c60` (earlier same day) |
+
+### Phase 98.B — REJECTED by owner directive (D4 decision)
+
+B-001 was a confirmed RLS gap: 12 admin policies use singular `(get_my_role() = 'admin'::text)` → co_owner gets 0 rows from those tables (`leads`, `lead_activities`, `call_logs`, `work_sessions`, `clients`, `holidays`, `media_types`, `incentive_payouts`, `hr_offers`, `hr_offer_templates`, `lead_imports`, `ai_runs`). Initial recommendation (FIX-B) was to widen all 12 to `IN ('admin', 'co_owner')`.
+
+**Owner D4 directive (2026-05-28):**
+
+> "Vishal should NOT have full admin parity. He should stay government-scoped. He can see only Government P&L when the P&L module is built. He should not see private-side admin data, private leads, private calls, private work sessions, private clients, private HR data, or private P&L."
+
+The 12 admin policies are kept **as-is, intentionally**. Co_owner does NOT automatically equal full admin in this project. Today the only active co_owner (Vishal, `id=5e6690aa-7fce-4503-9101-28520930fd51`) also carries `team_role='government_partner'`, which the project relies on to scope him to GOVERNMENT-segment data via the existing govt_partner policies:
+
+- `leads_govt_partner_read` — Vishal sees only `segment='GOVERNMENT'` leads.
+- `leads_govt_partner_write` — same scope on write.
+- `work_sessions_govt_partner` — Vishal sees sales/telecaller/agency reps' sessions but only via the govt-partner gate.
+- `lead_activities_via_lead` — Vishal sees activities only on leads he can SELECT (govt-segment chain).
+
+**B-001 reclassified as NOT-A-BUG.** Do not widen the 12 admin policies. Do not stage a Phase 98.B SQL file. If a different co_owner is ever added without `team_role='government_partner'`, revisit — but the current design depends on this pairing being the default.
+
+### Vishal / co_owner + government_partner doctrine
+
+- `role = 'co_owner'` alone does NOT grant full admin parity.
+- `team_role = 'government_partner'` (paired with `role='co_owner'`) scopes the user to GOVERNMENT-segment data.
+- Existing govt_partner RLS policies (`leads_govt_partner_*`, `work_sessions_govt_partner`, etc.) carry the access — admin policies stay singular `'admin'`.
+- Existing GOVERNMENT-only signer flag (`signing_authority` per §4) overlaps Vishal's role — he co-signs govt proposals.
+
+### Future P&L module (Sprint 3) — Vishal-scope rule
+
+When the P&L module ships (`quote_pnl`, `monthly_admin_expenses`, `PnLLanding`, `PnLSummary`, `QuotePnL`, `AdminExpenses` per docs/UNTITLED_OS_v2_ARCHITECTURE.md §7.5 + §8.2):
+
+- Brijesh (`role='admin'`) → sees BOTH segments' P&L.
+- Vishal (`role='co_owner'`, `team_role='government_partner'`) → sees **GOVERNMENT-segment P&L only**.
+- Sales / telecaller / agency / others → no P&L visibility (per §8 directive #3).
+- HR / accounts → revenue figures yes; P&L no (per §8 directive #3).
+
+RLS pattern for the new tables MUST mirror the existing govt_partner gate:
+
+```
+-- Hypothetical: pnl_summary_admin_full (Brijesh)
+CREATE POLICY pnl_summary_admin_full ON public.pnl_summary
+  FOR SELECT
+  USING (get_my_role() = 'admin');
+
+-- Hypothetical: pnl_summary_govt_partner (Vishal)
+CREATE POLICY pnl_summary_govt_partner ON public.pnl_summary
+  FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM users u
+             WHERE u.id = auth.uid()
+               AND u.team_role = 'government_partner')
+    AND segment = 'GOVERNMENT'
+  );
+```
+
+Do NOT add co_owner to the admin clause. The scope is segmented, not role-tiered.
+
+### Static risks parked (not fixed)
+
+The 5 static risks (F-D002, F-D008, F-D003, F-D004, B-003) plus the 21 stale `'owner'` literal cleanup all stay parked. Owner directive: "do not change app code on static risks; only fix when a real user surface or report demands it."
+
+If/when the project adds a real `sales_manager` user (Jubin / Renuka are documented intent but no live row exists as of 2026-05-28), revisit:
+- F-D002 (`lead_activities` `user_id` → `created_by`)
+- F-D008 (`call_logs` `created_at` → `call_at`)
+- B-003 (no manager-read policy on quotes / payments / follow_ups / gps_pings / daily_performance / daily_ta — manager would under-see team rollups)
+
+### Foot-guns added today (don't repeat)
+
+- ❌ Mid-pack realization: assuming `sales_manager` users exist. Several findings collapsed to STATIC RISK because no manager row is live. Always run Section 0 (find test users) BEFORE building the per-user parity matrix.
+- ❌ Treating co_owner as automatic admin. The 12 admin policies were intentional from Phase 5. Phase 5 hardcoded singular `'admin'`; later admin-write policies (`fu_admin_all`, `gps_pings_admin_all`, `dp_admin`, `ta_admin_all`) DO include co_owner. Mixed convention — confusing but consistent with the documented role model when paired with team_role gates.
+- ❌ Asserting KM ground-truth before owner sanity-checks the figure. Owner's gut-feel 2.3 km was actually GPS-spike inflation (speed cap = 200 km/h let through false 50-km jumps); real movement = 1.51 km. Always present multiple threshold variants when the dispute is "rep says X, server says Y".
+- ❌ Trusting the comment over the code. Phase 68 SQL header claimed "thresholds aligned with client `gpsDistance.js`" — but the actual constants didn't match. Always read the constants, not the doc.
+- ❌ Counting client-side haversine without applying the speed cap in SQL replay. Result was 117× server (1.51 vs 178 km) because GPS jumps weren't filtered. The speed cap is the bug-fixer; MIN_SEG_KM is secondary.
+
+### Smoke checklist (after each Phase 98 commit)
+
+98.A — owner reproduced "Dhara 23:21 IST push" complaint pre-fix. Post-fix: re-run via admin Reassign at 22:00+ IST → no push fires.
+98.C — sign in as Dhara (TC) / Vishal (co_owner) / any agency rep / any HR-role user → `/my-offer` renders offer card if hr_offers row exists with their auth.uid().
+98.D — open `/admin/gps/<rep>/<date>` map → KM display matches `daily_ta.km_traveled` for that rep+date.
+
+### Phase 98 commit log on origin
+
+```
+e37dcfb Phase 98.D: align map KM thresholds with server TA rules
+1a319b7 Phase 98.C: widen hr_offers self-read to 5 roles (B-002)
+5fc8d98 Phase 98.A: quiet-hours gate on 3 push triggers (F-D010)
+```
+
+### Backlog after Phase 98
+
+- Static risks (5) — parked per directive.
+- 21 stale `'owner'` literal cleanup — pure hygiene, parked.
+- Sprint 3 P&L (must use Vishal-scope rule documented above).
+- Sprint 4 TDS columns.
+- Govt invoice template.
+- Renuka / Jubin team-lead dashboard (Phase 42.2) — blocked on live sales_manager users.
+- Phase 76.2 Android plugin — owner-deferred 22 May.
+
