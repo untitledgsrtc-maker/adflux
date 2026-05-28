@@ -242,7 +242,12 @@ export default function App() {
           {/* Phase 34Z.55 — push notification diagnostics + test send.
               Surfaces all six gates (Notification API, Push API, VAPID,
               SW, permission, subscription) so owner can diagnose why
-              push isn't arriving without reading the console. */}
+              push isn't arriving without reading the console.
+              Phase 97.7 (2026-05-28, F-003) — route stays open so reps
+              can self-enroll via the V2AppShell push-enrollment chip
+              and the NotificationPanel diagnostic link. Privileged
+              tooling (Send test push, registered devices list) is
+              gated inside PushDebugV2 itself. */}
           <Route path="/push-debug"                element={<PushDebugV2 />} />
           <Route path="/telecaller"                element={<TelecallerV2 />} />
           <Route path="/voice"                     element={<VoiceLogV2 />} />
@@ -292,9 +297,11 @@ export default function App() {
           <Route path="/people/:userId"            element={<RequirePrivileged><RepProfileV2 /></RequirePrivileged>} />
           {/* Phase 8C — unified Master page (Attachments / Signers / Media / Documents) */}
           <Route path="/master"                    element={<RequirePrivileged><MasterV2 /></RequirePrivileged>} />
-          {/* Phase 35 PR 1 — primitives demo. Page handles role gate
-              internally (Banner "Admin only" for non-privileged). */}
-          <Route path="/primitives-demo"           element={<PrimitivesDemoV2 />} />
+          {/* Phase 35 PR 1 — primitives demo.
+              Phase 97 C1 (2026-05-28, F-208) — moved internal page
+              role banner to route-level RequirePrivileged guard.
+              Cheaper than mounting the page for non-admins. */}
+          <Route path="/primitives-demo"           element={<RequirePrivileged><PrimitivesDemoV2 /></RequirePrivileged>} />
           <Route path="/settings"                  element={<SettingsV2 />} />
         </Route>
 

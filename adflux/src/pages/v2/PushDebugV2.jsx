@@ -88,6 +88,12 @@ export default function PushDebugV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
 
+  // Phase 97.7 (2026-05-28, F-003) — Send test push + registered
+  // devices listing are privileged-only. Route stays open so reps
+  // can self-enroll (Enable + permission + SW + subscription gates)
+  // and view their own 6-gate status. Admin tooling is gated below.
+  const isPrivileged = profile?.role === 'admin' || profile?.role === 'co_owner'
+
   const [hasNotificationApi, setHasNotificationApi] = useState(false)
   const [hasPushApi,         setHasPushApi]         = useState(false)
   const [permission,         setPermission]         = useState('default')
@@ -545,16 +551,21 @@ export default function PushDebugV2() {
               <span style={{ marginLeft: 6 }}>Enable on this device</span>
             </button>
           )}
-          <button
-            onClick={handleSendTest}
-            disabled={testing || subRows.length === 0}
-            className="lead-btn"
-            style={{ flex: 1, minWidth: 160 }}
-            title={subRows.length === 0 ? 'Subscribe first' : 'Fire a test push'}
-          >
-            <Send size={14} />
-            <span style={{ marginLeft: 6 }}>{testing ? 'Sending…' : 'Send test push'}</span>
-          </button>
+          {/* Phase 97.7 (F-003) — Send test push is admin-only.
+              Reps verify by tapping Enable + seeing the 6 gates go
+              green; admin runs the live OS-level test send. */}
+          {isPrivileged && (
+            <button
+              onClick={handleSendTest}
+              disabled={testing || subRows.length === 0}
+              className="lead-btn"
+              style={{ flex: 1, minWidth: 160 }}
+              title={subRows.length === 0 ? 'Subscribe first' : 'Fire a test push'}
+            >
+              <Send size={14} />
+              <span style={{ marginLeft: 6 }}>{testing ? 'Sending…' : 'Send test push'}</span>
+            </button>
+          )}
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={reload} disabled={loading} className="lead-btn lead-btn-sm">
@@ -701,8 +712,13 @@ export default function PushDebugV2() {
           </div>
         )}
 
-        {/* Existing subscriptions */}
-        {subRows.length > 0 && (
+        {/* Existing subscriptions
+            Phase 97.7 (F-003) — endpoint fragments are raw push
+            subscription identifiers (the device-level "FCM-style"
+            token for Web Push). Hidden from non-privileged users;
+            admins still see the rep's registered devices for
+            diagnostics. */}
+        {isPrivileged && subRows.length > 0 && (
           <div style={{ marginTop: 24 }}>
             <div className="lead-card-title" style={{ marginBottom: 8 }}>
               Your registered devices
