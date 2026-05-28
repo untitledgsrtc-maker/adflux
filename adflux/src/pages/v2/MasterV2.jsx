@@ -2988,8 +2988,10 @@ const AUTH_ROLES = [
   { v: 'accounts',      label: 'Accounts' },
   { v: 'staff',         label: 'Staff' },
 ]
+// Phase 97.8 (2026-05-28, F-001a) — 'owner' dropped. DB CHECK
+// constraint (§8) doesn't allow the role; UI dropdown must match.
 const TEAM_ROLES = [
-  'admin', 'owner', 'government_partner', 'sales_manager', 'sales',
+  'admin', 'government_partner', 'sales_manager', 'sales',
   'telecaller', 'creative_lead', 'designer', 'video_editor',
   'ops_execution', 'accounts', 'hr', 'admin_staff', 'office_boy', 'agency',
 ]

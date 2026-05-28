@@ -87,7 +87,11 @@ export default function HRNewUserV2() {
     async function load() {
       const [desRes, mgrRes] = await Promise.all([
         supabase.from('designations').select('*').eq('is_active', true).order('display_order'),
-        supabase.from('users').select('id, name, team_role').in('team_role', ['sales_manager', 'admin', 'owner']).eq('is_active', true).order('name'),
+        // Phase 97.8 (2026-05-28, F-001a) — 'owner' role dropped
+        // from the DB CHECK constraint (§8); literal removed here
+        // so the filter array matches reality. No behavior change
+        // (zero rows ever matched 'owner' anyway).
+        supabase.from('users').select('id, name, team_role').in('team_role', ['sales_manager', 'admin']).eq('is_active', true).order('name'),
       ])
       if (cancelled) return
       setDesignations(desRes.data || [])
