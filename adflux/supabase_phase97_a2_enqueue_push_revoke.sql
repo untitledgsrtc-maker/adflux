@@ -1,0 +1,140 @@
+-- supabase_phase97_a2_enqueue_push_revoke.sql
+--
+-- Phase 97.A2 — close F-105 enqueue_push abuse vector.
+--
+-- ROOT CAUSE
+-- ──────────
+-- public.enqueue_push(uuid, text, text, text, text) was defined in
+-- Phase 33W (SECURITY DEFINER, owner=postgres) and granted
+--   GRANT EXECUTE ON FUNCTION ... TO authenticated;
+-- Re-defined in Phase 34Z.69 (5s timeout + push_log audit) and
+-- re-granted the same way. PostgREST exposes any function with
+-- EXECUTE on `authenticated` as an RPC. Therefore any signed-in
+-- rep can call:
+--
+--   await supabase.rpc('enqueue_push', {
+--     p_user_id: '<any-rep-uuid>',
+--     p_title:   'fake admin message',
+--     p_body:    'spam',
+--     p_url:     '/work',
+--     p_tag:     'attack'
+--   })
+--
+-- → arbitrary push to any other rep's phone. The Edge Function
+-- /notify-rep is invoked via service-role inside enqueue_push, so
+-- the spam pipeline runs without further check. This is F-105 from
+-- the 2026-05-27 production-readiness audit (Critical).
+--
+-- FIX
+-- ───
+-- Remove EXECUTE from any role PostgREST can map to. The function
+-- body is NOT changed. Triggers + cron + internal helpers all run
+-- under SECURITY DEFINER (owner=postgres), so postgres's implicit
+-- EXECUTE on its own functions keeps them working.
+--
+--   REVOKE EXECUTE ON FUNCTION public.enqueue_push(uuid, text, text, text, text)
+--     FROM PUBLIC, anon, authenticated;
+--
+-- PUBLIC is included for defense-in-depth (Postgres default-grants
+-- EXECUTE on functions to PUBLIC unless `default_privileges` is
+-- changed). anon covers the JWT-less PostgREST tier. authenticated
+-- covers logged-in reps. Postgres role (function owner) retains
+-- full access via ownership, not via grant.
+--
+-- 11 CALLER MAP (all PRESERVED post-revoke)
+-- ──────────────────────────────────────────
+-- All 10 legitimate call sites run inside SECURITY DEFINER bodies
+-- owned by postgres. Privilege check at inner PERFORM happens
+-- against the DEFINER role, which is postgres. Postgres has
+-- ownership → keeps EXECUTE access regardless of explicit grants.
+--
+--  # | Caller                              | Type                | Source
+-- ---|-------------------------------------|---------------------|-------
+--  1 | tg_push_on_lead_assign()            | TRIGGER (SECDEF)    | 33W:103
+--  2 | tg_push_on_payment_approved()       | TRIGGER (SECDEF)    | 33W:137
+--  3 | tg_push_on_quote_won()              | TRIGGER (SECDEF)    | 33W:175
+--  4 | push_daily_reminders()              | CRON   (SECDEF)     | 33W:203
+--  5 | tg_push_on_lead_task_insert()       | TRIGGER (SECDEF)    | 34Z.55:37 / 61.4:42
+--  6 | tg_push_on_followup_due()           | TRIGGER (SECDEF)    | 34Z.55:91 / 61.4:87
+--  7 | push_morning_checkin()              | CRON   (SECDEF)     | 34Z.61:22
+--  8 | push_followup_digest(text)          | CRON   (SECDEF)     | 34Z.84:29
+--  9 | enqueue_attendance_reminder(...)    | INTERNAL (SECDEF;   | 60:279 / 61.4:138
+--    |                                     |  already REVOKE PUBLIC)
+-- 10 | push_followup_due_reminders()       | CRON   (SECDEF)     | 93.8:71 → 97.A400
+--
+-- 11 | PostgREST rpc('enqueue_push', ...)  | EXTERNAL (BLOCKED   | abuse vector
+--    |                                     |  by this revoke)
+--
+-- ZERO JS / Edge / API callers (verified via grep across src/, api/,
+-- supabase/functions/). Edge Function /notify-rep is CALLED BY
+-- enqueue_push, not the reverse.
+--
+-- IDEMPOTENCY
+-- ───────────
+-- REVOKE is idempotent (re-revoking a non-existent grant is a no-op).
+-- No table change. No column change. No function body change. Pure
+-- privilege flip.
+--
+-- SCOPE
+-- ─────
+-- This migration closes F-105 only. It does NOT touch:
+--   • enqueue_push() function body — byte-identical to Phase 34Z.69
+--   • Any of the 10 caller functions / triggers / cron jobs
+--   • Phase 97.2 _assert_self_or_admin() RPC gates
+--   • Phase 97.A400 push_followup_due_reminders() tag fix
+--   • Edge Function notify-rep — receives HTTP from inside
+--     enqueue_push, untouched
+
+REVOKE EXECUTE ON FUNCTION public.enqueue_push(uuid, text, text, text, text)
+  FROM PUBLIC, anon, authenticated;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ───────────── VERIFY ─────────────
+-- Run all 3 in Supabase Studio after applying. If any fails, ROLLBACK
+-- (see block below). Note: queries 1 + 2 introspect privileges in
+-- different views to triangulate.
+--
+-- 1. No EXECUTE grants remain for PostgREST-mappable roles (0 rows
+--    expected):
+--
+--    SELECT grantee, privilege_type
+--      FROM information_schema.routine_privileges
+--     WHERE routine_schema = 'public'
+--       AND routine_name   = 'enqueue_push'
+--       AND grantee        IN ('PUBLIC', 'anon', 'authenticated')
+--       AND privilege_type = 'EXECUTE';
+--    -- Expected: zero rows.
+--
+-- 2. Function still present + still SECURITY DEFINER + still owned
+--    by postgres (single row, all three checks):
+--
+--    SELECT
+--      proname                                    AS fn_name,
+--      prosecdef                                  AS is_secdef,
+--      pg_get_userbyid(proowner)                  AS owner_role
+--      FROM pg_proc
+--     WHERE proname = 'enqueue_push'
+--       AND pronargs = 5
+--     LIMIT 1;
+--    -- Expected: fn_name=enqueue_push, is_secdef=true, owner_role=postgres
+--
+-- 3. PostgREST schema reload landed (any SELECT works after NOTIFY;
+--    this confirms session health):
+--
+--    SELECT 1;   -- returns 1
+
+
+-- ───────────── ROLLBACK ─────────────
+-- Re-apply ONLY if a real regression is observed (e.g. cron / trigger
+-- pushes silently stop firing — which should NOT happen given the
+-- SECURITY DEFINER model, but documenting the path anyway). Restores
+-- Phase 33W / 34Z.69 grant to authenticated.
+--
+-- Note: leaving the rollback in place re-opens F-105. Pair with an
+-- alternative gate plan if you run it.
+--
+--   GRANT EXECUTE ON FUNCTION public.enqueue_push(uuid, text, text, text, text)
+--     TO authenticated;
+--   NOTIFY pgrst, 'reload schema';
