@@ -129,6 +129,24 @@ function RequireGovtAccess({ children }) {
   return children
 }
 
+/* Phase 100.D (2026-05-29) — agency exclusion from lead surface.
+   Owner directive: agency role is external commission partner per
+   Phase 11g + 101.A/B/C — they create quotes, see their commission
+   ledger, sign their own govt proposals. They do NOT participate in
+   the rep-facing lead workflow (LeadsV2 / LeadFormV2 / LeadDetailV2).
+   Pre-Phase 100.D the lead routes were only RequireAuth-gated, so
+   agency could deep-link them. Phase 100.B widened the reassign
+   picker fetch which made the lead surface visually more functional
+   for agency than intended (F-R200 from Phase 100.B audit).
+   Redirects to /dashboard → DashboardV2 switcher → AgencyHomeView
+   (Phase 101.B). */
+function RequireNonAgency({ children }) {
+  const { isAgency, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (isAgency) return <Navigate to="/dashboard" replace />
+  return children
+}
+
 function RootRedirect() {
   const { user, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
@@ -243,12 +261,12 @@ export default function App() {
               /leads/:id, otherwise React Router matches /:id with
               id="new" and the lead-detail loader sends "new" to a
               uuid column ("invalid input syntax for type uuid: new"). */}
-          <Route path="/leads"                     element={<LeadsV2 />} />
+          <Route path="/leads"                     element={<RequireNonAgency><LeadsV2 /></RequireNonAgency>} />
           <Route path="/lead-dashboard"            element={<LeadDashboardV2 />} />
           <Route path="/team-dashboard"            element={<RequirePrivileged><TeamDashboardV2 /></RequirePrivileged>} />
           <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
-          <Route path="/leads/new"                 element={<LeadFormV2 />} />
-          <Route path="/leads/:id"                 element={<LeadDetailV2 />} />
+          <Route path="/leads/new"                 element={<RequireNonAgency><LeadFormV2 /></RequireNonAgency>} />
+          <Route path="/leads/:id"                 element={<RequireNonAgency><LeadDetailV2 /></RequireNonAgency>} />
           <Route path="/work"                      element={<WorkV2 />} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
               direct reports + today's metrics. Sales head + TC head
