@@ -108,12 +108,22 @@ export async function fetchAndPatchCallDuration({
   // can overwrite freely. This eliminates the race between the timer
   // and the modal save.
   const cutoff = new Date(telTapMs - 60 * 60_000).toISOString()
+  // Phase 102.B (2026-05-29) — only patch duration onto rows that
+  // already represent a real conversation. PostCallOutcomeModal flips
+  // the row's outcome to 'connected' / 'callback_requested' right
+  // before this helper runs; if the rep skipped the modal (or picked
+  // a non-connected outcome that we don't yet map), the audit row
+  // stays at outcome='no_answer' and Android's `duration` is ring
+  // time, not talk time. Writing ring time over a no_answer row makes
+  // it look connected on LeadCallHistory + inflates WorkV2 qualified
+  // count. The `.in('outcome', [...])` filter suppresses that write.
   const callLogsQuery = supabase
     .from('call_logs')
     .update({ duration_seconds: duration })
     .eq('user_id', userId)
     .eq('lead_id', leadId)
     .gte('call_at', cutoff)
+    .in('outcome', ['connected', 'callback_requested'])
     .order('call_at', { ascending: false })
     .limit(1)
   const callLogsPromise = onlyIfMissing

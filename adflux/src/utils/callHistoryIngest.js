@@ -49,9 +49,31 @@ const DEFAULT_LOOKBACK_MS = 7 * 24 * 60 * 60_000  // 7 days on first scan
 const POLL_INTERVAL_MS    = 5  * 60_000   // re-scan every 5 min while foregrounded
 const DEDUPE_WINDOW_SEC   = 60            // call_logs row within 60s = same call
 
+// Phase 102.B (2026-05-29) — outcomes where Android `duration` is ring
+// time, not talk time. OEMs (Vivo / OPPO / Realme) commonly return
+// 5-40s on MISSED type even though the call was never answered.
+// Writing that as duration_seconds makes the row look "connected" on
+// LeadCallHistory and inflates WorkV2 qualified-calls count.
+const NO_TALK_OUTCOMES = ['missed', 'no_answer', 'busy', 'wrong_number', 'rejected']
+
+// Phase 102.B helper. Zero-floors duration for outcomes where Android's
+// raw value cannot represent talk time. Single source of truth for
+// every ingest write path in this file.
+function safeDuration(durationSeconds, outcome) {
+  if (NO_TALK_OUTCOMES.includes(outcome)) return 0
+  return Number(durationSeconds) || 0
+}
+
 let activeUserId = null
 let pollTimer    = null
 let visListener  = null
+// Phase 102.B — in-memory mutex. setInterval(POLL_INTERVAL_MS) and
+// visibilitychange can fire near-simultaneously when the rep
+// backgrounds + foregrounds the app. Without this flag, two runScan
+// invocations race past the dedupe SELECT (rows uncommitted between
+// the lookup and the INSERT) and both insert — owner screenshot
+// 2026-05-29 shows identical 12:36 / 12:04 rows.
+let scanInFlight = false
 
 /**
  * Start periodic scanning. Native-only. Idempotent.
@@ -167,48 +189,59 @@ export async function forceIngestRecentCalls(userId, lookbackMs = 7 * 24 * 60 * 
 /**
  * One scan pass. Reads last-scan timestamp from Preferences, queries
  * the plugin for everything since then, processes each row.
+ *
+ * Phase 102.B — guarded by `scanInFlight` mutex. Concurrent invocations
+ * (setInterval + visibilitychange firing in the same tick) bail
+ * immediately so the next-row dedupe SELECT can't race ahead of an
+ * in-flight INSERT.
  */
 async function runScan(userId) {
-  // Resolve lookback start.
-  let sinceMs
+  if (scanInFlight) return
+  scanInFlight = true
   try {
-    const { value } = await Preferences.get({ key: STORE_KEY(userId) })
-    sinceMs = value ? Number(value) : (Date.now() - DEFAULT_LOOKBACK_MS)
-    if (!Number.isFinite(sinceMs)) sinceMs = Date.now() - DEFAULT_LOOKBACK_MS
-  } catch {
-    sinceMs = Date.now() - DEFAULT_LOOKBACK_MS
-  }
-
-  let calls = []
-  try {
-    const res = await CallLogReader.scanRecentCalls({
-      sinceTimestamp: sinceMs,
-      limit: 200,
-    })
-    calls = Array.isArray(res?.calls) ? res.calls : []
-  } catch (e) {
-    // Permission denied → swallow. NativeOnboarding handled the prompt.
-    console.warn('[call-history] scan failed:', e?.message || e)
-    return
-  }
-
-  if (calls.length === 0) {
-    await updateScanTimestamp(userId, Date.now())
-    return
-  }
-
-  // Process oldest-first so dedupe checks see a stable order.
-  calls.sort((a, b) => Number(a.date) - Number(b.date))
-
-  for (const c of calls) {
+    // Resolve lookback start.
+    let sinceMs
     try {
-      await ingestOne(userId, c)
-    } catch (e) {
-      console.warn('[call-history] ingest failed for', c?.number, e?.message || e)
+      const { value } = await Preferences.get({ key: STORE_KEY(userId) })
+      sinceMs = value ? Number(value) : (Date.now() - DEFAULT_LOOKBACK_MS)
+      if (!Number.isFinite(sinceMs)) sinceMs = Date.now() - DEFAULT_LOOKBACK_MS
+    } catch {
+      sinceMs = Date.now() - DEFAULT_LOOKBACK_MS
     }
-  }
 
-  await updateScanTimestamp(userId, Date.now())
+    let calls = []
+    try {
+      const res = await CallLogReader.scanRecentCalls({
+        sinceTimestamp: sinceMs,
+        limit: 200,
+      })
+      calls = Array.isArray(res?.calls) ? res.calls : []
+    } catch (e) {
+      // Permission denied → swallow. NativeOnboarding handled the prompt.
+      console.warn('[call-history] scan failed:', e?.message || e)
+      return
+    }
+
+    if (calls.length === 0) {
+      await updateScanTimestamp(userId, Date.now())
+      return
+    }
+
+    // Process oldest-first so dedupe checks see a stable order.
+    calls.sort((a, b) => Number(a.date) - Number(b.date))
+
+    for (const c of calls) {
+      try {
+        await ingestOne(userId, c)
+      } catch (e) {
+        console.warn('[call-history] ingest failed for', c?.number, e?.message || e)
+      }
+    }
+
+    await updateScanTimestamp(userId, Date.now())
+  } finally {
+    scanInFlight = false
+  }
 }
 
 async function ingestOne(userId, raw) {
@@ -232,11 +265,13 @@ async function ingestOne(userId, raw) {
   // Dedupe: existing call_logs row within DEDUPE_WINDOW_SEC of this
   // timestamp + same phone + same user = already captured (the tel-tap
   // audit row for outgoing, or a prior scan pass for inbound).
+  // Phase 102.B — also fetch `outcome` so the duration backfill below
+  // can suppress ring-time on missed / no_answer rows.
   const dupeLower = new Date(dateMs - DEDUPE_WINDOW_SEC * 1000).toISOString()
   const dupeUpper = new Date(dateMs + DEDUPE_WINDOW_SEC * 1000).toISOString()
   const { data: existing } = await supabase
     .from('call_logs')
-    .select('id, direction, duration_seconds')
+    .select('id, direction, duration_seconds, outcome')
     .eq('user_id', userId)
     .eq('client_phone', cleaned)
     .gte('call_at', dupeLower)
@@ -252,9 +287,14 @@ async function ingestOne(userId, raw) {
       // Unlikely (audit always outgoing) but defensive.
       patch.direction = direction
     }
+    // Phase 102.B — gate duration backfill on the EXISTING row's
+    // outcome. If the audit row is still 'no_answer' (rep never saved
+    // the modal or call genuinely didn't connect), Android's ring-time
+    // would render as talk time. Suppress to 0.
+    const dur = safeDuration(durationSeconds, existing.outcome)
     if ((existing.duration_seconds == null || existing.duration_seconds === 0)
-        && durationSeconds > 0) {
-      patch.duration_seconds = durationSeconds
+        && dur > 0) {
+      patch.duration_seconds = dur
     }
     if (Object.keys(patch).length > 0) {
       await supabase.from('call_logs').update(patch).eq('id', existing.id)
@@ -299,12 +339,14 @@ async function ingestOne(userId, raw) {
                   : `Outgoing call (${durationSeconds}s)`
 
   // Insert the call_logs row.
+  // Phase 102.B — safeDuration zero-floors ring-time on
+  // missed/no_answer/busy/wrong_number/rejected outcomes.
   const { error: clErr } = await supabase.from('call_logs').insert([{
     user_id:          userId,
     lead_id:          leadId,
     client_phone:     cleaned,
     call_at:          callAtIso,
-    duration_seconds: durationSeconds,
+    duration_seconds: safeDuration(durationSeconds, outcome),
     outcome,
     direction,
     notes:            noteLabel + ' (Phase 56l scan)',

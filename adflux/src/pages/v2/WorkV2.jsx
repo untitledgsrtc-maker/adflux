@@ -510,11 +510,21 @@ export default function WorkV2() {
     ;(async () => {
       const todayIst    = istTodayISO()
       const tomorrowIst = istTodayPlusDays(1)
+      // Phase 102.B (2026-05-29) — match TelecallerV2:167+182 +
+      // TeamDashboardV2:299 + ManagerDashboardV2:94 guard chain.
+      // Without these guards, Android-reported ring time on missed
+      // calls (Vivo / OPPO commonly 5-40s) passed the
+      // .gte(duration_seconds, 10) gate and inflated qualified count.
+      // Phase 102.B SQL backfill zeroes historical non-talk durations
+      // so this guard chain matches siblings byte-identically — no
+      // extra outcome filter needed.
       const { count } = await supabase
         .from('call_logs')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id)
         .gte('duration_seconds', 10)
+        .or('direction.is.null,direction.neq.missed')
+        .not('lead_id', 'is', null)
         .gte('call_at', `${todayIst}T00:00:00+05:30`)
         .lt('call_at',  `${tomorrowIst}T00:00:00+05:30`)
       if (!cancelled) setQualifiedCallsToday(count || 0)

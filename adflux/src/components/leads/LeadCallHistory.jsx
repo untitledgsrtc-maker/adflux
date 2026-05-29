@@ -151,8 +151,37 @@ export default function LeadCallHistory({ leadId }) {
 }
 
 /* ─── Merge logic ─────────────────────────────────────────────── */
-function mergeRows(callLogs, activities, userMap) {
+
+// Phase 102.B (2026-05-29) — display-side dedupe for the per-minute
+// dup race documented in callHistoryIngest.js. When two scans race
+// past the dedupe SELECT (or an old-schema audit row carries NULL
+// phone), the DB ends up with two near-identical rows for the same
+// call. Pick the best per (user_id, client_phone, minute) bucket.
+// Priority: direction set > duration > notes. Rows with no phone or
+// no call_at can't be deduped → kept as-is.
+function dedupeCallLogs(rows) {
+  const score = (x) => (
+    (x.direction ? 4 : 0)
+    + (Number(x.duration_seconds || 0) > 0 ? 2 : 0)
+    + (x.notes ? 1 : 0)
+  )
+  const groups = new Map()
+  for (const r of rows) {
+    if (!r.client_phone || !r.call_at) {
+      groups.set(`solo-${r.id}`, r)
+      continue
+    }
+    const minute = Math.floor(new Date(r.call_at).getTime() / 60_000)
+    const key = `${r.user_id}|${r.client_phone}|${minute}`
+    const prev = groups.get(key)
+    if (!prev || score(r) > score(prev)) groups.set(key, r)
+  }
+  return Array.from(groups.values())
+}
+
+function mergeRows(callLogsRaw, activities, userMap) {
   // Merge by (timestamp within 60s). Prefer call_logs (has direction).
+  const callLogs = dedupeCallLogs(callLogsRaw)
   const merged = []
   const used   = new Set()
 
@@ -292,9 +321,13 @@ function formatDate(ms) {
     + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 function formatDuration(sec) {
+  // Phase 102.B (2026-05-29) — zero / null both render as em-dash so
+  // missed / no_answer rows don't look like real connected calls.
+  // safeDuration in callHistoryIngest.js + the outcome filter in
+  // callLogReader.js write 0 here when the call never connected.
   if (sec == null) return '—'
   const s = Number(sec)
-  if (!Number.isFinite(s) || s <= 0) return '0 sec'
+  if (!Number.isFinite(s) || s <= 0) return '—'
   if (s < 60) return `${s} sec`
   const m = Math.floor(s / 60)
   const r = s % 60
