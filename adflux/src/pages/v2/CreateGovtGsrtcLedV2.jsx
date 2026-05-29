@@ -57,7 +57,12 @@ export default function CreateGovtGsrtcLedV2() {
     client_phone:   prefill.client_phone   || '',
     client_email:   prefill.client_email   || '',
     proposal_date: new Date().toISOString().slice(0, 10),
-    signer_user_id: null,
+    // Phase 101.C.JSX — agency seeds from profile.default_signer_user_id
+    // (Phase 101.C SQL column). Non-agency starts blank. Edit-mode
+    // useEffect below overrides with saved q.signer_user_id (owner C-5).
+    signer_user_id: profile?.role === 'agency'
+      ? (profile?.default_signer_user_id || null)
+      : null,
     selected_station_ids: undefined,    // step seeds with all 20
     gsrtc_campaign_months: 1,
   })
@@ -136,7 +141,11 @@ export default function CreateGovtGsrtcLedV2() {
     const validators = [validateStep1, validateStep2, validateStep3Gsrtc, validateStep4Gsrtc]
     const v = validators[step - 1]
     if (v) {
-      const err = v(data)
+      // Phase 101.C.JSX — Step 2 needs role context for the agency-
+      // without-default error copy.
+      const err = step === 2
+        ? v(data, { isAgency: profile?.role === 'agency' })
+        : v(data)
       if (err) { setError(err); return }
     }
     setStep(s => Math.min(s + 1, STEPS.length))
@@ -338,7 +347,18 @@ export default function CreateGovtGsrtcLedV2() {
         </div>
       )}
       {step === 1 && <Step1Client     data={data} onChange={update} />}
-      {step === 2 && <Step2DateSigner data={data} onChange={update} />}
+      {step === 2 && (
+        <Step2DateSigner
+          data={data}
+          onChange={update}
+          agencyLocked={profile?.role === 'agency'}
+          agencyLockedReason={
+            profile?.role === 'agency'
+              ? (data.signer_user_id ? 'admin' : 'unassigned')
+              : null
+          }
+        />
+      )}
       {step === 3 && <Step3Stations   data={data} onChange={update} />}
       {step === 4 && <Step4Months     data={data} onChange={update} />}
       {step === 5 && <Step5ReviewGsrtc data={data} />}

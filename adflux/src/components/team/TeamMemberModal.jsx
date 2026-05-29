@@ -1,6 +1,6 @@
 // src/components/team/TeamMemberModal.jsx
 // Admin creates team member with password — no email invite, no session switch
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase, supabaseSignup } from '../../lib/supabase'
 import { useTeam } from '../../hooks/useTeam'
@@ -67,15 +67,53 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     agency_commission_percent: member?.agency_commission_percent != null
       ? String(member.agency_commission_percent)
       : '5.00',
+    // Phase 101.C.JSX — agency default proposal signer. Reads
+    // users.default_signer_user_id (Phase 101.C SQL column, FK to
+    // users.id with validation trigger). Used only when role='agency'.
+    // Empty string = unassigned; admin must pick from signers list.
+    default_signer_user_id: member?.default_signer_user_id || '',
   })
   const [errors, setErrors]           = useState({})
   const [saving, setSaving]           = useState(false)
   const [serverError, setServerError] = useState('')
+  // Phase 101.C.JSX — signers list for agency Default Proposal Signer
+  // dropdown. Inline-fetched here (avoids importing useSigners which
+  // mounts an effect we'd then ignore for non-agency edits). Fetched
+  // lazily — only when form.role === 'agency' OR member's existing role
+  // is agency on edit-open.
+  const [signers, setSigners] = useState([])
+  const [signersLoading, setSignersLoading] = useState(false)
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => ({ ...e, [field]: '' }))
   }
+
+  // Phase 101.C.JSX — lazy-fetch signers when agency role selected.
+  // Single query; cached for the modal lifetime. Re-fires when admin
+  // flips role to agency mid-edit (rare).
+  useEffect(() => {
+    if (form.role !== 'agency') return
+    if (signers.length > 0) return
+    let cancelled = false
+    setSignersLoading(true)
+    supabase
+      .from('users')
+      .select('id, name, role, signature_title, signing_authority, is_active')
+      .eq('signing_authority', true)
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data, error: err }) => {
+        if (cancelled) return
+        setSignersLoading(false)
+        if (err) {
+          console.warn('[TeamMemberModal] signers load failed:', err.message)
+          return
+        }
+        setSigners(data || [])
+      })
+    return () => { cancelled = true }
+  }, [form.role, signers.length])
 
   function validate() {
     const errs = {}
@@ -170,6 +208,11 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       }
       if (form.role === 'agency') {
         baseInsert.agency_commission_percent = Number(form.agency_commission_percent)
+        // Phase 101.C.JSX — persist default proposal signer when set.
+        // Empty string = NULL (admin chose to leave unassigned). DB
+        // validation trigger (Phase 101.C SQL) rejects writes to
+        // inactive / non-signing-authority targets.
+        baseInsert.default_signer_user_id = form.default_signer_user_id || null
       }
       const { error: userError } = await supabase
         .from('users')
@@ -224,6 +267,9 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       }
       if (form.role === 'agency') {
         updatePayload.agency_commission_percent = Number(form.agency_commission_percent)
+        // Phase 101.C.JSX — persist default proposal signer on edit.
+        // Empty string = NULL (admin cleared the assignment).
+        updatePayload.default_signer_user_id = form.default_signer_user_id || null
       }
       const { error } = await updateMember(member.id, updatePayload)
       if (error) {
@@ -332,7 +378,9 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
 
           {/* Phase 101.A2 — agency = commission-only partner. Show
               Commission % input instead of Monthly Salary. Available
-              in both add and edit modes (admin can adjust % later). */}
+              in both add and edit modes (admin can adjust % later).
+              Phase 101.C.JSX — Default Proposal Signer field added
+              below Commission. */}
           {form.role === 'agency' && (
             <>
               <div style={{ borderTop: '1px solid var(--brd)', margin: '16px 0 14px', paddingTop: 14, fontSize: '.72rem', fontWeight: 700, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.1em' }}>
@@ -354,6 +402,36 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
                   onChange={e => set('agency_commission_percent', e.target.value)}
                   style={errors.agency_commission_percent ? { borderColor: 'var(--red)' } : {}}
                 />
+              </Field>
+
+              {/* Phase 101.C.JSX — Default proposal signer. Required
+                  for the agency to be able to ship govt proposals;
+                  Step 2 of the Auto Hood + GSRTC LED wizards locks
+                  this value in place when present, blocks Next when
+                  unset. Backed by users.default_signer_user_id +
+                  validate_default_signer trigger (Phase 101.C SQL). */}
+              <Field
+                label="Default proposal signer"
+                hint={
+                  signersLoading
+                    ? 'Loading signers…'
+                    : signers.length === 0
+                      ? 'No active signers found. Promote a user on Master → Signers first.'
+                      : 'Locks govt proposal Step 2 to this signer when the agency creates an Auto Hood / GSRTC LED quote.'
+                }
+              >
+                <select
+                  value={form.default_signer_user_id}
+                  onChange={e => set('default_signer_user_id', e.target.value)}
+                  disabled={signersLoading || signers.length === 0}
+                >
+                  <option value="">— unassigned (agency cannot ship govt yet) —</option>
+                  {signers.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}{s.signature_title ? ` (${s.signature_title})` : ''}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </>
           )}

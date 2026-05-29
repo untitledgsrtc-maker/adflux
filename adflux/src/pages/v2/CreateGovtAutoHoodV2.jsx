@@ -59,7 +59,13 @@ export default function CreateGovtAutoHoodV2() {
     client_email:   prefill.client_email   || '',
     // date + signer
     proposal_date: new Date().toISOString().slice(0, 10),
-    signer_user_id: null,
+    // Phase 101.C.JSX — agency seeds from profile.default_signer_user_id
+    // (Phase 101.C SQL column). Non-agency starts blank (free pick in
+    // Step 2). Edit-mode useEffect below overrides with q.signer_user_id
+    // so saved value wins (owner C-5).
+    signer_user_id: profile?.role === 'agency'
+      ? (profile?.default_signer_user_id || null)
+      : null,
     // quantity
     auto_total_quantity: null,
     // Phase 34H — campaign duration in months. Multiplied into the
@@ -133,7 +139,11 @@ export default function CreateGovtAutoHoodV2() {
     const validators = [validateStep1, validateStep2, validateStep3, validateStep4]
     const v = validators[step - 1]
     if (v) {
-      const err = v(data)
+      // Phase 101.C.JSX — Step 2 needs role context for the agency-
+      // without-default error copy. Other validators ignore the opts.
+      const err = step === 2
+        ? v(data, { isAgency: profile?.role === 'agency' })
+        : v(data)
       if (err) { setError(err); return }
     }
     setStep(s => Math.min(s + 1, STEPS.length))
@@ -342,7 +352,18 @@ export default function CreateGovtAutoHoodV2() {
         </div>
       )}
       {step === 1 && <Step1Client       data={data} onChange={update} />}
-      {step === 2 && <Step2DateSigner   data={data} onChange={update} />}
+      {step === 2 && (
+        <Step2DateSigner
+          data={data}
+          onChange={update}
+          agencyLocked={profile?.role === 'agency'}
+          agencyLockedReason={
+            profile?.role === 'agency'
+              ? (data.signer_user_id ? 'admin' : 'unassigned')
+              : null
+          }
+        />
+      )}
       {step === 3 && <Step3Quantity     data={data} onChange={update} />}
       {step === 4 && <Step4Districts    data={data} onChange={update} />}
       {step === 5 && <Step5Review       data={data} />}
