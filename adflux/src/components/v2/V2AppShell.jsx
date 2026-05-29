@@ -573,7 +573,13 @@ export function V2AppShell() {
               + sales still get full topbar on tablet/desktop. */}
           {!isMobile && <GlobalSearchBar />}
 
-          {!isMobile && (
+          {/* Phase 101.B.2 — Ask AI hidden for agency. Co-Pilot
+              (run_select RPC) is SECURITY INVOKER but exposes
+              cross-module search surface that's noisy for a
+              commission-only partner. Owner directive 2026-05-29:
+              "remove that ai search bar — it's showing other media
+              also". Other roles unchanged. */}
+          {!isMobile && !isAgency && (
             <button
               className="v2d-search"
               onClick={() => setCopilotOpen(true)}
