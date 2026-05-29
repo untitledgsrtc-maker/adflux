@@ -66,37 +66,34 @@ export function useLeads() {
     return { data }
   }, [])
 
-  // Phase 99.C — role-aware bulk reassign. Caller may pass either
-  // a UUID string (legacy — writes assigned_to AND clears
-  // telecaller_id to enforce mutual exclusivity, matching the
-  // Phase 99.A repair intent) OR a target-user object (with
-  // `role`) so we can pin to the correct column. Backwards-compat
-  // preserved at the signature level so the existing LeadsV2 bulk
-  // picker keeps compiling — but existing TC-owned leads
-  // reassigned via the legacy UUID path WILL have telecaller_id
-  // nulled. Same mutual-exclusivity enforcement the single-lead
-  // ReassignModal applies. LeadsV2 may be migrated later to pass
-  // the full target-user object so TC bulk routing works too.
-  const reassignBulk = useCallback(async (ids, targetUser) => {
+  // Phase 100.B — RPC-backed bulk reassign. Drops the prior direct
+  // UPDATE path (silently RLS-denied for non-admin even on their own
+  // leads). Calls public.reassign_leads_bulk which enforces:
+  //   • non-admin daily cap 5
+  //   • non-admin bulk cap 20
+  //   • lane-aware routing (TC vs sales column, Phase 99.C pattern)
+  //   • cross-team reason gate (≥3 chars)
+  //   • sales→TC stage gate (New/Working/Nurture only)
+  //   • government_partner segment guard (W11)
+  //   • Won/Lost block for non-admin
+  // Returns {total, succeeded, failed, failures:[{lead_id,reason}]}.
+  // Caller (LeadsV2) decides how to render partial-failure list.
+  const reassignBulk = useCallback(async (ids, target_user_id, reason) => {
     if (!ids?.length) return { error: { message: 'No leads selected.' } }
-    const targetId = typeof targetUser === 'string' ? targetUser : targetUser?.id
-    if (!targetId) return { error: { message: 'No target rep selected.' } }
-    const isTC = typeof targetUser === 'object' && targetUser?.role === 'telecaller'
-    const patch = isTC
-      ? { telecaller_id: targetId, assigned_to: null }
-      : { assigned_to: targetId, telecaller_id: null }
-    const { error: err } = await supabase
-      .from('leads')
-      .update(patch)
-      .in('id', ids)
-
+    if (!target_user_id) return { error: { message: 'No target rep selected.' } }
+    const { data, error: err } = await supabase.rpc('reassign_leads_bulk', {
+      p_lead_ids:  ids,
+      p_new_owner: target_user_id,
+      p_reason:    reason || null,
+    })
     if (err) {
-      console.error('[useLeads] bulk reassign failed:', err)
+      console.error('[useLeads] bulk reassign RPC failed:', err)
       return { error: err }
     }
-    // Cheap path: refetch to pull joined assignee names.
+    // Refetch so joined assignee names refresh (RPC only flips the
+    // columns; PostgREST embed won't auto-update local cache).
     await fetchLeads()
-    return { data: { count: ids.length } }
+    return { data }
   }, [fetchLeads])
 
   // Phase 31A.5 — bulk stage change. Owner sales-exec analysis (8 May 2026):

@@ -31,6 +31,66 @@ import {
   Plus, Search, X, Upload, Users as UsersIcon, AlertTriangle,
   Sparkles, ArrowRight,
 } from 'lucide-react'
+// Phase 100.B — inline lane helpers + RPC humanizer below the
+// imports. Mirror the SQL logic from Phase 100.A so the picker UX
+// matches what reassign_lead / reassign_leads_bulk enforce. Per
+// owner override 2026-05-29: "no new utility file" — duplicated
+// here and in ReassignModal.jsx by design.
+
+function callerLane(profile) {
+  if (!profile) return 'other'
+  if (profile.role === 'telecaller' && profile.team_role === 'sales_manager') return 'sales'
+  if (profile.role === 'telecaller')                                          return 'tc'
+  if (['sales', 'agency'].includes(profile.role))                             return 'sales'
+  if (['admin', 'co_owner'].includes(profile.role))                           return 'admin'
+  return 'other'
+}
+
+function targetLane(rep) {
+  if (!rep) return 'other'
+  if (rep.role === 'telecaller' && rep.team_role === 'sales_manager') return 'sales'
+  if (rep.role === 'telecaller')                                      return 'tc'
+  if (['sales', 'agency'].includes(rep.role))                         return 'sales'
+  if (['admin', 'co_owner'].includes(rep.role))                       return 'admin'
+  return 'other'
+}
+
+function eligibleTargets(reps, profile) {
+  if (!profile) return []
+  return (reps || []).filter(r => r.id !== profile.id)
+}
+
+function isCrossTeam(profile, rep) {
+  if (!profile || !rep) return false
+  const c = callerLane(profile)
+  const t = targetLane(rep)
+  return (c === 'tc' && t === 'sales') || (c === 'sales' && t === 'tc')
+}
+
+function humanizeReason(s) {
+  if (!s) return 'Reassign failed.'
+  if (s.includes('daily reassign limit reached')) return 'Daily limit reached (5 reassigns/day).'
+  if (s.includes('bulk cap 20'))                   return 'Bulk cap is 20. Reduce your selection.'
+  if (s.includes('auth.uid()'))                    return 'Session expired. Reload and sign back in.'
+  switch (s) {
+    case 'cannot reassign to self':                          return 'Cannot pick yourself.'
+    case 'target not found':                                 return 'Target user not found.'
+    case 'target not active':                                return 'Target rep is inactive.'
+    case 'cannot reassign to admin':                         return 'Cannot reassign to admin. Pick a rep or telecaller.'
+    case 'lead not found':                                   return 'Lead not found.'
+    case 'not lead owner':                                   return "You don't own this lead. Ask admin to move it."
+    case 'cannot reassign closed lead':                      return 'Won / Lost leads cannot be reassigned. Reopen first.'
+    case 'target segment access mismatch':                   return "Target doesn't have access to this segment."
+    case 'sales→TC only allowed on New/Working/Nurture stages':
+                                                             return 'Can only send back to telecaller on New / Follow-up / Nurture.'
+    case 'reason required for cross-team reassign':          return 'Reason required (≥3 chars) for cross-team reassign.'
+    case 'role not allowed to reassign':                     return "Your role can't reassign leads."
+    case 'target role not eligible':                         return "Target rep can't own leads."
+    case 'government_partner caller cannot touch non-GOVERNMENT leads':
+                                                             return 'Government Partner can only reassign GOVERNMENT leads.'
+    default:                                                 return s
+  }
+}
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { useLeads, STAGE_GROUPS as ALL_STAGE_GROUPS, LOST_REASONS } from '../../hooks/useLeads'
@@ -71,6 +131,10 @@ export default function LeadsV2() {
   // Per-row check used to decide whether to render the checkbox.
   function canReassign(l) {
     if (!l || !profile) return false
+    // Phase 100.B — non-admin cannot reassign Won/Lost (RPC blocks
+    // it server-side; hide the checkbox so UX doesn't dangle). Admin
+    // and co_owner can still flip closed leads if needed.
+    if (['Won', 'Lost'].includes(l.stage) && !isPrivileged) return false
     if (isPrivileged) return true
     if (profile.team_role === 'sales_manager') return true
     return l.assigned_to === profile.id
@@ -122,6 +186,12 @@ export default function LeadsV2() {
   const [reassignBusy, setReassignBusy] = useState(false)
   const [reassignErr, setReassignErr] = useState('')
   const [assignableUsers, setAssignableUsers] = useState([])
+  // Phase 100.B — bulk reason (applies to the whole batch per owner
+  // override) + inline partial-failure list. failures = null means
+  // no submit yet; [] means all succeeded; [{lead_id,reason},…]
+  // means at least one failed (modal stays open + renders the list).
+  const [reassignReason, setReassignReason] = useState('')
+  const [reassignFailures, setReassignFailures] = useState(null)
 
   useEffect(() => { fetchLeads() /* eslint-disable-next-line */ }, [fetchLeads, location.key])
 
@@ -164,20 +234,27 @@ export default function LeadsV2() {
     return () => { supabase.removeChannel(ch) }
   }, [applyRealtimeChange])
 
-  // Privileged-user reassign target list. Sales / agency can't reassign,
-  // so we skip the query entirely for them.
+  // Phase 93.10 → 100.B — reassign target list. Phase 93.10 widened
+  // the bulk-bar to sales / TC / sales_manager but left this fetch
+  // gated to isPrivileged, which produced an empty picker for non-
+  // admin reps. Phase 100.B widens the fetch to any signed-in user
+  // (sales / TC need it for their own-lead reassign rows) AND adds
+  // `role` to the SELECT so the inline targetLane() helper can
+  // classify TC vs sales targets for cross-team detection. RPC
+  // enforces the actual write rules; this query just feeds the
+  // picker. Result list is ~20 rows in steady state, cheap.
   useEffect(() => {
-    if (!isPrivileged) return
+    if (!profile?.id) return
     supabase
       .from('users')
-      .select('id, name, team_role, city, is_active')
+      .select('id, name, role, team_role, city, is_active')
       .in('team_role', ['sales', 'agency', 'sales_manager', 'telecaller'])
       .eq('is_active', true)
       .order('name')
       .then(({ data, error: err }) => {
         if (!err) setAssignableUsers(data || [])
       })
-  }, [isPrivileged])
+  }, [profile?.id])
 
   /* ─── Derived: distinct dropdown values ─── */
   const distinctSources = useMemo(() => {
@@ -478,21 +555,61 @@ export default function LeadsV2() {
     else setSelected(new Set(filtered.map(l => l.id)))
   }
 
+  // Phase 100.B — closing helper resets every modal-scoped piece of
+  // state so the next open isn't pre-populated with stale target /
+  // reason / error / failure list.
+  function closeReassignModal() {
+    setReassignOpen(false)
+    setReassignTarget('')
+    setReassignReason('')
+    setReassignErr('')
+    setReassignFailures(null)
+  }
+
   async function handleReassign() {
     if (!reassignTarget) {
       setReassignErr('Pick a person to reassign to.')
       return
     }
-    setReassignBusy(true)
-    setReassignErr('')
-    const { error: err } = await reassignBulk(Array.from(selected), reassignTarget)
-    setReassignBusy(false)
-    if (err) {
-      setReassignErr(err.message || 'Reassign failed.')
+    // Phase 100.B — cross-team reason gate. Lane comparison is
+    // caller (profile) vs picked target rep; if cross-team the
+    // RPC requires a reason ≥3 chars (per Phase 100.A SQL).
+    const targetRep = assignableUsers.find(r => r.id === reassignTarget)
+    if (isCrossTeam(profile, targetRep) && reassignReason.trim().length < 3) {
+      setReassignErr('Reason required (≥3 chars) for cross-team reassign.')
       return
     }
-    setReassignOpen(false)
-    setReassignTarget('')
+
+    setReassignBusy(true)
+    setReassignErr('')
+    setReassignFailures(null)
+
+    const { data, error: err } = await reassignBulk(
+      Array.from(selected),
+      reassignTarget,
+      reassignReason.trim() || null
+    )
+    setReassignBusy(false)
+
+    if (err) {
+      setReassignErr(humanizeReason(err.message))
+      return
+    }
+
+    // Phase 100.B — RPC returns {total, succeeded, failed, failures}.
+    // Partial failure: keep modal open, render inline list so rep
+    // sees exactly which leads didn't move and why. Successful leads
+    // drop out of the selection so a second submit only re-tries the
+    // failed ones.
+    if (data?.failed > 0) {
+      const fails = data.failures || []
+      setReassignFailures(fails)
+      setSelected(new Set(fails.map(f => f.lead_id)))
+      return
+    }
+
+    // All succeeded.
+    closeReassignModal()
     setSelected(new Set())
   }
 
@@ -1285,11 +1402,21 @@ export default function LeadsV2() {
       )}
 
       {/* ─── Reassign modal ─── */}
-      {reassignOpen && (
+      {reassignOpen && (() => {
+        // Phase 100.B — picker derivation: filter to eligible reps
+        // (self-exclude), classify the picked target's lane, decide
+        // whether reason is required.
+        const targets   = eligibleTargets(assignableUsers, profile)
+        const targetRep = targets.find(r => r.id === reassignTarget) || null
+        const cross     = isCrossTeam(profile, targetRep)
+        // Lead-id → name map so failure list can show "Lead X:
+        // reason" instead of raw UUIDs.
+        const leadNameById = (id) => leads.find(l => l.id === id)?.name || id.slice(0, 8)
+        return (
         <div
           className="lead-modal-back"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !reassignBusy) setReassignOpen(false)
+            if (e.target === e.currentTarget && !reassignBusy) closeReassignModal()
           }}
         >
           <div className="lead-modal">
@@ -1300,7 +1427,7 @@ export default function LeadsV2() {
               </div>
               <button
                 className="lead-btn lead-btn-sm"
-                onClick={() => setReassignOpen(false)}
+                onClick={closeReassignModal}
                 disabled={reassignBusy}
                 aria-label="Close"
               >
@@ -1317,12 +1444,47 @@ export default function LeadsV2() {
                   disabled={reassignBusy}
                 >
                   <option value="">— pick a person —</option>
-                  {assignableUsers.map(u => (
+                  {targets.map(u => (
                     <option key={u.id} value={u.id}>
                       {u.name} {u.city ? `· ${u.city}` : ''} {u.team_role ? `· ${u.team_role}` : ''}
                     </option>
                   ))}
                 </select>
+                {/* Phase 100.B — cross-team flag so rep sees why the
+                    reason is required before they tab to it. */}
+                {cross && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '4px 10px', borderRadius: 999,
+                      background: 'var(--warning-soft, rgba(245,158,11,0.14))',
+                      border: '1px solid var(--warning, #F59E0B)',
+                      color: 'var(--warning, #F59E0B)',
+                      fontSize: 11, fontWeight: 600,
+                      letterSpacing: '.04em',
+                    }}
+                  >
+                    <AlertTriangle size={14} />
+                    Cross-team move · reason required
+                  </div>
+                )}
+              </div>
+              {/* Phase 100.B — reason textarea. Applies to the whole
+                  batch per owner override. Required when cross-team
+                  (RPC enforces ≥3 chars; pre-validated in handler). */}
+              <div>
+                <label className="lead-fld-label">
+                  Reason {cross ? <span style={{ color: 'var(--danger)' }}>(required)</span> : '(optional)'}
+                </label>
+                <textarea
+                  className="lead-inp"
+                  rows={2}
+                  value={reassignReason}
+                  onChange={e => setReassignReason(e.target.value)}
+                  placeholder={cross ? 'Why send this to the other team?' : 'Why this reassign?'}
+                  disabled={reassignBusy}
+                />
               </div>
               {reassignErr && (
                 <div
@@ -1336,22 +1498,56 @@ export default function LeadsV2() {
                   {reassignErr}
                 </div>
               )}
+              {/* Phase 100.B — inline partial-failure list. Stays
+                  inside the modal per owner override (no toast, no
+                  separate UI). Lists every lead the RPC rejected
+                  with a humanized reason; the surviving selection
+                  is the failed set, so a second submit re-tries
+                  only the failures. */}
+              {reassignFailures && reassignFailures.length > 0 && (
+                <div
+                  style={{
+                    background: 'var(--warning-soft, rgba(245,158,11,0.14))',
+                    border: '1px solid var(--warning, #F59E0B)',
+                    color: 'var(--text)',
+                    borderRadius: 10, padding: '10px 14px', fontSize: 13,
+                  }}
+                >
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    fontWeight: 700, color: 'var(--warning, #F59E0B)',
+                    marginBottom: 8,
+                  }}>
+                    <AlertTriangle size={14} />
+                    {reassignFailures.length} lead{reassignFailures.length === 1 ? '' : 's'} could not be reassigned
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {reassignFailures.map(f => (
+                      <li key={f.lead_id} style={{ fontSize: 12 }}>
+                        <b>{leadNameById(f.lead_id)}</b>
+                        <span style={{ color: 'var(--text-muted)' }}> — {humanizeReason(f.reason)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
             <div className="lead-modal-foot">
-              <button className="lead-btn" onClick={() => setReassignOpen(false)} disabled={reassignBusy}>
-                Cancel
+              <button className="lead-btn" onClick={closeReassignModal} disabled={reassignBusy}>
+                {reassignFailures ? 'Close' : 'Cancel'}
               </button>
               <button
                 className="lead-btn lead-btn-primary"
                 onClick={handleReassign}
                 disabled={reassignBusy || !reassignTarget}
               >
-                {reassignBusy ? 'Reassigning…' : 'Reassign'}
+                {reassignBusy ? 'Reassigning…' : reassignFailures ? 'Retry failed' : 'Reassign'}
               </button>
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

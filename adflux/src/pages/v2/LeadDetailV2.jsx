@@ -145,6 +145,11 @@ export default function LeadDetailV2() {
   //                                   assigned_to or telecaller_id
   function canReassign(l) {
     if (!l || !profile) return false
+    // Phase 100.B — non-admin cannot reassign Won/Lost. RPC enforces
+    // server-side; hide the link so the rep doesn't tap into a sure
+    // failure. Admin / co_owner can still flip closed leads if a
+    // mis-classification needs to be undone.
+    if (['Won', 'Lost'].includes(l.stage) && !isPrivileged) return false
     if (isPrivileged) return true
     if (profile.team_role === 'sales_manager') return true
     return l.assigned_to === profile.id
