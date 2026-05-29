@@ -523,7 +523,21 @@ export function V2AppShell() {
           <div className="v2d-nav-spacer" />
           <div className="v2d-nav-foot">
             <div className="v2d-side-me" title={user?.email || ''}>
-              <div className="v2d-side-me-av">{initials(profile?.name || 'U')}</div>
+              {/* Phase 101.B.3 — render uploaded profile pic if set
+                  (Phase 87.5 ProfilePicUploader path). Falls back to
+                  initials so anyone without a photo still sees a
+                  recognizable mark. */}
+              <div className="v2d-side-me-av">
+                {profile?.profile_image_url ? (
+                  <img
+                    src={profile.profile_image_url}
+                    alt={profile?.name || 'User'}
+                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
+                  initials(profile?.name || 'U')
+                )}
+              </div>
               <div className="v2d-side-me-text">
                 <div className="v2d-side-me-name">{profile?.name || 'User'}</div>
                 <div className="v2d-side-me-mail">{user?.email || '—'}</div>
@@ -655,7 +669,20 @@ export function V2AppShell() {
             style={{ cursor: 'pointer' }}
             title="More options"
           >
-            <div className="v2d-me-av">{initials(profile?.name || 'U')}</div>
+            {/* Phase 101.B.3 — uploaded profile pic in topbar avatar.
+                Phase 87.5 ProfilePicUploader writes users.profile_image_url
+                + refreshes authStore.profile inline. */}
+            <div className="v2d-me-av">
+              {profile?.profile_image_url ? (
+                <img
+                  src={profile.profile_image_url}
+                  alt={profile?.name || 'User'}
+                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                initials(profile?.name || 'U')
+              )}
+            </div>
             <div>
               <div className="v2d-me-name">{profile?.name || 'User'}</div>
               <div className="v2d-me-role">{
@@ -789,7 +816,21 @@ export function V2AppShell() {
               <div className="v2d-nav-spacer" />
               <div className="v2d-nav-foot">
                 <div className="v2d-side-me" title={user?.email || ''}>
-                  <div className="v2d-side-me-av">{initials(profile?.name || 'U')}</div>
+                  {/* Phase 101.B.3 — render uploaded profile pic if set
+                  (Phase 87.5 ProfilePicUploader path). Falls back to
+                  initials so anyone without a photo still sees a
+                  recognizable mark. */}
+              <div className="v2d-side-me-av">
+                {profile?.profile_image_url ? (
+                  <img
+                    src={profile.profile_image_url}
+                    alt={profile?.name || 'User'}
+                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
+                  initials(profile?.name || 'U')
+                )}
+              </div>
                   <div className="v2d-side-me-text">
                     <div className="v2d-side-me-name">{profile?.name || 'User'}</div>
                     <div className="v2d-side-me-mail">{user?.email || '—'}</div>
