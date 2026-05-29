@@ -1,6 +1,7 @@
 // src/components/agency/AgencyEarningsView.jsx
 //
 // Phase 101.A2 (2026-05-29) — agency commission ledger.
+// Phase 101.A3 (2026-05-29) — Paid state derivation + Paid/Outstanding totals.
 //
 // Mounted by MyPerformanceV2 when `profile?.role === 'agency'`.
 // Replaces the score / variable / TA / salary widgets with a
@@ -17,14 +18,16 @@
 //   - quotes has no `won_at` column today — use quotes.updated_at as the
 //     Won-date proxy (same convention as TeamDashboardV2 / IncentiveDashboard,
 //     and as documented in CLAUDE.md §33 foot-gun #3)
+//   - agency_commission_payouts (Phase 101.A3 SQL) — per-quote payout
+//     ledger; aggregate paid total + is_full_payment flag drive Paid state
 //
 // State derivation:
 //   - Pending  : quote.status IN (draft, sent, negotiating)
-//   - Earned   : quote.status = 'won' AND no approved payment yet
-//   - Payable  : quote.status = 'won' AND ≥1 approved payment received
+//   - Paid     : quote.status = 'won' AND (sum(payouts) >= commission OR
+//                                          any payout.is_full_payment = true)
+//   - Payable  : quote.status = 'won' AND ≥1 approved payment AND NOT Paid
+//   - Earned   : quote.status = 'won' AND no approved payment AND NOT Paid
 //   - Lost     : quote.status = 'lost'
-//   - (Paid    : deferred to Phase 101.A3 / A2 next sprint when the
-//                agency_commission_payouts table ships)
 //
 // Brand: reuses .v2d-perf / .v2d-page-head / .v2d-panel / .v2d-stat /
 // .v2d-tab-pill / .staff-table classes — all verified present in
@@ -55,6 +58,9 @@ const STATE_TONE = {
   Pending: { bg: 'var(--v2-bg-2)',          fg: 'var(--v2-ink-2)',     bd: 'var(--v2-line)' },
   Earned:  { bg: 'var(--accent-soft)',      fg: 'var(--accent-fg)',    bd: 'var(--accent)' },
   Payable: { bg: 'var(--success-soft)',     fg: 'var(--success)',      bd: 'var(--success)' },
+  // Phase 101.A3 — Paid uses the same success tone as Payable; chip
+  // text reads "Paid" so the rep can tell the cleared rows apart.
+  Paid:    { bg: 'var(--success-soft)',     fg: 'var(--success)',      bd: 'var(--success)' },
   Lost:    { bg: 'var(--danger-soft)',      fg: 'var(--danger)',       bd: 'var(--danger)' },
 }
 
@@ -100,6 +106,10 @@ export default function AgencyEarningsView({ refreshKey }) {
   const [pct, setPct] = useState(null)
   const [quotes, setQuotes] = useState([])
   const [paymentsByQuote, setPaymentsByQuote] = useState({})
+  // Phase 101.A3 — rep's own payout history per quote, used for the
+  // Paid state + Paid/Outstanding totals. Aggregated as
+  // { quote_id: { paid: number, hasFull: boolean, lastPaid: dateStr } }.
+  const [paidByQuote, setPaidByQuote] = useState({})
   const [period, setPeriod] = useState('this_month')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -146,34 +156,66 @@ export default function AgencyEarningsView({ refreshKey }) {
       const list = quotesRes.data || []
       setQuotes(list)
 
-      // Third shot: latest approved payment per quote, for Payable
-      // status derivation. Skip the call entirely if no quotes.
+      // Third + fourth shot in parallel: approved client payments
+      // (Payable trigger) + own commission payouts (Phase 101.A3
+      // Paid state). Skip entirely if no quotes.
       if (list.length === 0) {
         setPaymentsByQuote({})
+        setPaidByQuote({})
         setLoading(false)
         return
       }
 
       const ids = list.map(q => q.id)
-      const { data: pays, error: payErr } = await supabase
-        .from('payments')
-        .select('quote_id, payment_date, approval_status')
-        .in('quote_id', ids)
-        .eq('approval_status', 'approved')
-        .order('payment_date', { ascending: false })
+      const [paysRes, payoutsRes] = await Promise.all([
+        supabase
+          .from('payments')
+          .select('quote_id, payment_date, approval_status')
+          .in('quote_id', ids)
+          .eq('approval_status', 'approved')
+          .order('payment_date', { ascending: false }),
+        // RLS doctrine: acp_self_read scopes by auth.uid(); the
+        // explicit user_id eq is for query shape so Postgrest plans
+        // a tight index hit on idx_acp_user_quote.
+        supabase
+          .from('agency_commission_payouts')
+          .select('quote_id, amount_paid, is_full_payment, paid_date')
+          .eq('user_id', profile.id)
+          .in('quote_id', ids)
+          .order('paid_date', { ascending: false }),
+      ])
       if (cancelled) return
-      if (payErr) {
+
+      if (paysRes.error) {
         // Non-fatal — Payable chip just won't fire. Surface as warning.
-        console.warn('[AgencyEarningsView] payments load failed:', payErr.message)
+        console.warn('[AgencyEarningsView] payments load failed:', paysRes.error.message)
         setPaymentsByQuote({})
-        setLoading(false)
-        return
+      } else {
+        const byQ = {}
+        for (const p of (paysRes.data || [])) {
+          if (!(p.quote_id in byQ)) byQ[p.quote_id] = p.payment_date
+        }
+        setPaymentsByQuote(byQ)
       }
-      const byQ = {}
-      for (const p of (pays || [])) {
-        if (!(p.quote_id in byQ)) byQ[p.quote_id] = p.payment_date
+
+      if (payoutsRes.error) {
+        // Non-fatal — Paid chip just won't fire; rows that are fully
+        // paid keep showing Payable/Earned. Surface as warning.
+        console.warn('[AgencyEarningsView] payouts load failed:', payoutsRes.error.message)
+        setPaidByQuote({})
+      } else {
+        const pbq = {}
+        for (const p of (payoutsRes.data || [])) {
+          const k = p.quote_id
+          if (!pbq[k]) pbq[k] = { paid: 0, hasFull: false, lastPaid: null }
+          pbq[k].paid += Number(p.amount_paid || 0)
+          if (p.is_full_payment) pbq[k].hasFull = true
+          if (!pbq[k].lastPaid || p.paid_date > pbq[k].lastPaid) {
+            pbq[k].lastPaid = p.paid_date
+          }
+        }
+        setPaidByQuote(pbq)
       }
-      setPaymentsByQuote(byQ)
       setLoading(false)
     }
     load()
@@ -194,9 +236,14 @@ export default function AgencyEarningsView({ refreshKey }) {
         const commission = (baseAmt * (pct || 0)) / 100
         const wonAt = q.status === 'won' ? q.updated_at : null
         const lastPay = paymentsByQuote[q.id] || null
+        // Phase 101.A3 — payout aggregate for Paid state derivation.
+        const payout = paidByQuote[q.id] || { paid: 0, hasFull: false, lastPaid: null }
+        // Float-safety: paid >= commission - 0.01 also counts as Paid.
+        const isPaid = q.status === 'won' && (payout.hasFull || payout.paid >= commission - 0.01)
         let state
         if (q.status === 'lost')                                       state = 'Lost'
         else if (['draft', 'sent', 'negotiating'].includes(q.status))  state = 'Pending'
+        else if (q.status === 'won' && isPaid)                         state = 'Paid'
         else if (q.status === 'won' && lastPay)                        state = 'Payable'
         else if (q.status === 'won')                                   state = 'Earned'
         else                                                           state = 'Pending'
@@ -207,9 +254,11 @@ export default function AgencyEarningsView({ refreshKey }) {
           base:         baseAmt,
           pct,
           commission,
+          paid_amount:  payout.paid,
           state,
           won_at:       wonAt,
           last_payment: lastPay,
+          last_payout:  payout.lastPaid,
         }
       })
       .filter(r => {
@@ -222,17 +271,30 @@ export default function AgencyEarningsView({ refreshKey }) {
         if (period === 'fy')         return new Date(anchor) >= fyStart
         return true
       })
-  }, [quotes, paymentsByQuote, pct, period])
+  }, [quotes, paymentsByQuote, paidByQuote, pct, period])
 
   const totals = useMemo(() => {
     let earned = 0, payable = 0, pending = 0
-    let earnedCnt = 0, payableCnt = 0
+    let earnedCnt = 0, payableCnt = 0, paidCnt = 0
+    // Phase 101.A3 — Paid total = sum of payouts actually received.
+    // Outstanding = commission earned minus payouts, summed only on
+    // Won rows (Earned / Payable / Paid). Pending + Lost rows excluded.
+    let totalPaid = 0, outstanding = 0
     for (const r of rows) {
       if (r.state === 'Earned')  { earned  += r.commission; earnedCnt++ }
       if (r.state === 'Payable') { payable += r.commission; payableCnt++ }
+      if (r.state === 'Paid')    { paidCnt++ }
       if (r.state === 'Pending') { pending += r.commission }
+      if (['Earned', 'Payable', 'Paid'].includes(r.state)) {
+        totalPaid   += Number(r.paid_amount || 0)
+        outstanding += Math.max(0, r.commission - Number(r.paid_amount || 0))
+      }
     }
-    return { earned, payable, pending, earnedCnt, payableCnt }
+    return {
+      earned, payable, pending,
+      earnedCnt, payableCnt, paidCnt,
+      totalPaid, outstanding,
+    }
   }, [rows])
 
   if (loading) {
@@ -287,8 +349,14 @@ export default function AgencyEarningsView({ refreshKey }) {
         </div>
       )}
 
-      {/* 4 KPI tiles — reuse .v2d-hr-stats + .v2d-stat brand surfaces */}
-      <div className="v2d-hr-stats">
+      {/* 6 KPI tiles — Phase 101.A3 adds Paid + Outstanding. Replaces
+          .v2d-hr-stats (fixed 4-col) with an inline auto-fit grid so the
+          extra tiles don't leave dead slots on the second row. */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        gap: 10, marginBottom: 18,
+      }}>
         <div className="v2d-panel v2d-stat">
           <div className="v2d-stat-l">Earned</div>
           <div className="v2d-stat-v v2d-stat-v--accent">{formatCurrency(totals.earned)}</div>
@@ -298,12 +366,20 @@ export default function AgencyEarningsView({ refreshKey }) {
           <div className="v2d-stat-v v2d-stat-v--ok">{formatCurrency(totals.payable)}</div>
         </div>
         <div className="v2d-panel v2d-stat">
+          <div className="v2d-stat-l">Paid</div>
+          <div className="v2d-stat-v v2d-stat-v--ok">{formatCurrency(totals.totalPaid)}</div>
+        </div>
+        <div className="v2d-panel v2d-stat">
+          <div className="v2d-stat-l">Outstanding</div>
+          <div className="v2d-stat-v v2d-stat-v--muted">{formatCurrency(totals.outstanding)}</div>
+        </div>
+        <div className="v2d-panel v2d-stat">
           <div className="v2d-stat-l">Pending</div>
           <div className="v2d-stat-v v2d-stat-v--muted">{formatCurrency(totals.pending)}</div>
         </div>
         <div className="v2d-panel v2d-stat">
           <div className="v2d-stat-l">Won quotes</div>
-          <div className="v2d-stat-v">{totals.earnedCnt + totals.payableCnt}</div>
+          <div className="v2d-stat-v">{totals.earnedCnt + totals.payableCnt + totals.paidCnt}</div>
         </div>
       </div>
 
@@ -350,6 +426,8 @@ export default function AgencyEarningsView({ refreshKey }) {
                 <th style={{ textAlign: 'right' }}>Base (excl. GST)</th>
                 <th style={{ textAlign: 'right' }}>Rate</th>
                 <th style={{ textAlign: 'right' }}>Commission</th>
+                {/* Phase 101.A3 — Paid column */}
+                <th style={{ textAlign: 'right' }}>Paid</th>
                 <th>Status</th>
                 <th>Last payment</th>
               </tr>
@@ -375,6 +453,15 @@ export default function AgencyEarningsView({ refreshKey }) {
                   </td>
                   <td className="tabular-nums" style={{ textAlign: 'right', fontWeight: 700 }}>
                     {formatCurrency(r.commission)}
+                  </td>
+                  {/* Phase 101.A3 — Paid column. Success tint when any
+                      payout is logged so the rep sees the cleared rows. */}
+                  <td className="tabular-nums" style={{
+                    textAlign: 'right',
+                    color: r.paid_amount > 0 ? 'var(--success)' : 'var(--v2-ink-2)',
+                    fontWeight: r.paid_amount > 0 ? 600 : 400,
+                  }}>
+                    {r.paid_amount > 0 ? formatCurrency(r.paid_amount) : '—'}
                   </td>
                   <td><StateChip state={r.state} /></td>
                   <td className="tabular-nums">

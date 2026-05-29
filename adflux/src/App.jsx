@@ -38,6 +38,8 @@ import PeopleV2          from './pages/v2/PeopleV2'
 import RepProfileV2      from './pages/v2/RepProfileV2'
 // Phase 33H — admin TA Payouts (GPS-driven travel allowance).
 import TaPayoutsAdminV2  from './pages/v2/TaPayoutsAdminV2'
+// Phase 101.A3 JSX — agency commission payout admin page.
+import AgencyCommissionAdminV2 from './pages/v2/AgencyCommissionAdminV2'
 import ClientsV2          from './pages/v2/ClientsV2'
 // ── Phase 12 — M1 Sales/Lead module ─────────────────────────────────
 import LeadsV2             from './pages/v2/LeadsV2'
@@ -325,6 +327,10 @@ export default function App() {
           {/* Phase 36 — Salary Sheet. Per-rep monthly breakdown with
               auto leave deduction. Admin / co_owner only. */}
           <Route path="/admin/salary"              element={<RequirePrivileged><SalaryAdminV2 /></RequirePrivileged>} />
+          {/* Phase 101.A3 JSX — agency commission payout admin
+              surface. Backed by Phase 101.A3 SQL agency_commission_
+              payouts table. admin+co_owner per acp_admin_all RLS. */}
+          <Route path="/admin/agency-commission"   element={<RequirePrivileged><AgencyCommissionAdminV2 /></RequirePrivileged>} />
           {/* Phase 38 — People (consolidated). Old routes above stay
               as deep-links; sidebar uses /people. */}
           <Route path="/people"                    element={<RequirePrivileged><PeopleV2 /></RequirePrivileged>} />

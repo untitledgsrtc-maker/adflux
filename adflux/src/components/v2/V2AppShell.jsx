@@ -93,6 +93,12 @@ const ADMIN_NAV = [
   // (/team, /incentives, /admin/leaves, /admin/salary, /admin/ta-
   // payouts) still work as deep-links.
   { to: '/people',            label: 'People',         icon: Users },
+  // Phase 101.A3 JSX (2026-05-29) — agency commission payout ledger.
+  // Standalone admin page distinct from People → Salary (which is rep
+  // payroll). Backed by Phase 101.A3 SQL agency_commission_payouts
+  // table. Wallet icon matches AgencyOfferView commission rate pill
+  // (Phase 101.A2) for visual continuity.
+  { to: '/admin/agency-commission', label: 'Agency Payouts', icon: Wallet },
   { to: '/hr',                label: 'HR',             icon: UserCircle2 },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
 ]
