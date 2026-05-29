@@ -66,11 +66,28 @@ export function useLeads() {
     return { data }
   }, [])
 
-  const reassignBulk = useCallback(async (ids, assignedTo) => {
+  // Phase 99.C — role-aware bulk reassign. Caller may pass either
+  // a UUID string (legacy — writes assigned_to AND clears
+  // telecaller_id to enforce mutual exclusivity, matching the
+  // Phase 99.A repair intent) OR a target-user object (with
+  // `role`) so we can pin to the correct column. Backwards-compat
+  // preserved at the signature level so the existing LeadsV2 bulk
+  // picker keeps compiling — but existing TC-owned leads
+  // reassigned via the legacy UUID path WILL have telecaller_id
+  // nulled. Same mutual-exclusivity enforcement the single-lead
+  // ReassignModal applies. LeadsV2 may be migrated later to pass
+  // the full target-user object so TC bulk routing works too.
+  const reassignBulk = useCallback(async (ids, targetUser) => {
     if (!ids?.length) return { error: { message: 'No leads selected.' } }
+    const targetId = typeof targetUser === 'string' ? targetUser : targetUser?.id
+    if (!targetId) return { error: { message: 'No target rep selected.' } }
+    const isTC = typeof targetUser === 'object' && targetUser?.role === 'telecaller'
+    const patch = isTC
+      ? { telecaller_id: targetId, assigned_to: null }
+      : { assigned_to: targetId, telecaller_id: null }
     const { error: err } = await supabase
       .from('leads')
-      .update({ assigned_to: assignedTo })
+      .update(patch)
       .in('id', ids)
 
     if (err) {

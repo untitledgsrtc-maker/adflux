@@ -26,7 +26,12 @@ export default function ReassignModal({ lead, onClose, onSaved }) {
   useEffect(() => {
     supabase
       .from('users')
-      .select('id, name, team_role, city, is_active')
+      // Phase 99.C — `role` added so the write path can detect
+      // telecaller vs sales/agency target and pin the new owner
+      // to the correct column instead of always writing
+      // assigned_to. Without this the modal kept producing the
+      // split state that Phase 99.A had to repair.
+      .select('id, name, role, team_role, city, is_active')
       .in('team_role', ['sales', 'agency', 'sales_manager', 'telecaller'])
       .eq('is_active', true)
       .order('name')
@@ -70,9 +75,22 @@ export default function ReassignModal({ lead, onClose, onSaved }) {
       toastError(actErr, 'Could not write timeline entry. Reassign still attempted.')
     }
 
+    // Phase 99.C — role-aware reassign. Picking a TC writes to
+    // telecaller_id and clears assigned_to (mirrors Phase 99.B
+    // form-fix intent so /telecaller queue actually receives the
+    // lead). Picking a sales / agency / sales_manager writes to
+    // assigned_to and clears telecaller_id. Avoids the split
+    // ownership state that produced 107 mis-columned leads
+    // before Phase 99.A.
+    const targetUser = reps.find(r => r.id === target)
+    const isTC = targetUser?.role === 'telecaller'
+    const patch = isTC
+      ? { telecaller_id: target, assigned_to: null }
+      : { assigned_to: target, telecaller_id: null }
+
     const { error: err } = await supabase
       .from('leads')
-      .update({ assigned_to: target })
+      .update(patch)
       .eq('id', lead.id)
 
     if (err) {

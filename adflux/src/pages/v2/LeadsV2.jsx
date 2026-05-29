@@ -1059,6 +1059,20 @@ export default function LeadsV2() {
                             <LeadAvatar name={l.assigned.name} userId={l.assigned.id} />
                             <span style={{ fontSize: 12 }}>{l.assigned.name}</span>
                           </>
+                        ) : l.telecaller?.name ? (
+                          /* Phase 99.C — telecaller fallback. Phase 99.B + 99.B.1
+                             route TC-only imports to telecaller_id only (assigned_to
+                             stays NULL by design). Without this fallback /leads
+                             admin table rendered "Unassigned" for every TC-owned
+                             lead — Yogi Petrol Pump + Yesha Hospital screenshot
+                             2026-05-29. useLeads.SELECT_COLUMNS already embeds the
+                             `telecaller:telecaller_id(id, name, team_role)` join, so
+                             zero query change is needed. */
+                          <>
+                            <LeadAvatar name={l.telecaller.name} userId={l.telecaller.id} />
+                            <span style={{ fontSize: 12 }}>{l.telecaller.name}</span>
+                            <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>· TC</span>
+                          </>
                         ) : (
                           <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Unassigned</span>
                         )}

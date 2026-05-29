@@ -64,7 +64,12 @@ export function AiBriefingCard() {
       // Pending approvals (count + sum)
       supabase.from('payments').select('amount_received').eq('approval_status', 'pending'),
       // Hot-idle leads (heat=hot, last_contact_at > 7 days OR null, not Won/Lost)
-      supabase.from('leads').select('id, name, last_contact_at, assigned_to, users:assigned_to(name)').eq('heat', 'hot').not('stage', 'in', '("Won","Lost")').or(`last_contact_at.is.null,last_contact_at.lt.${new Date(Date.now() - 7*86400000).toISOString()}`).limit(5),
+      // Phase 99.C — telecaller embed added so TC-owned hot leads
+      // (Phase 99.B + 99.B.1 — assigned_to stays NULL on TC-only
+      // imports) surface the owner name correctly. Without the
+      // embed the cockpit text read "last touch by unassigned"
+      // for every TC-owned hot lead.
+      supabase.from('leads').select('id, name, last_contact_at, assigned_to, users:assigned_to(name), telecaller_id, tc:telecaller_id(name)').eq('heat', 'hot').not('stage', 'in', '("Won","Lost")').or(`last_contact_at.is.null,last_contact_at.lt.${new Date(Date.now() - 7*86400000).toISOString()}`).limit(5),
       // Yesterday recap — payments collected
       supabase.from('payments').select('amount_received').eq('approval_status', 'approved').gte('payment_date', yIso).lte('payment_date', yIso),
       // Yesterday recap — quotes sent (status moved to sent yesterday)
@@ -118,7 +123,8 @@ export function AiBriefingCard() {
   if (data.staleHot.length > 0) {
     const top = data.staleHot[0]
     items.push({
-      text:  `${top.name} stale · last touch by ${top.users?.name || 'unassigned'}${data.staleHot.length > 1 ? ` (+${data.staleHot.length - 1} more)` : ''}`,
+      // Phase 99.C — telecaller fallback for owner-name resolution.
+      text:  `${top.name} stale · last touch by ${top.users?.name || top.tc?.name || 'unassigned'}${data.staleHot.length > 1 ? ` (+${data.staleHot.length - 1} more)` : ''}`,
       chip:  { tone: 'amber', label: 'Follow up' },
       meta:  `${data.staleHot.length} hot idle`,
       route: `/leads/${top.id}`,

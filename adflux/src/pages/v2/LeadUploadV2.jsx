@@ -299,10 +299,14 @@ export default function LeadUploadV2() {
 
     const importId = importRow.id
 
-    let imported = 0
-    let skipped  = 0
-    let dupes    = 0
-    const errors = []
+    let imported     = 0
+    let skipped      = 0
+    // Phase 99.C — phone-less Excel rows are skipped separately so
+    // the result summary can surface them as "Skipped — missing
+    // phone: N" instead of folding into the generic skipped count.
+    let skippedPhone = 0
+    let dupes        = 0
+    const errors    = []
     const cutoffMs = cutoffDays > 0 ? Date.now() - cutoffDays * 24 * 60 * 60 * 1000 : null
 
     // Phone-based dedup against existing leads (created_by = me).
@@ -321,7 +325,12 @@ export default function LeadUploadV2() {
         const name = String(r[columnMap.name] || '').trim()
         if (!name) { skipped++; continue }
         const phone = columnMap.phone !== undefined ? cleanMobile(r[columnMap.phone]) : null
-        if (phone && existingPhones.has(phone)) { dupes++; continue }
+        // Phase 99.C — block phone-less Excel rows. Telecallers
+        // can't call without a number; the row is unactionable.
+        // Counted separately from generic `skipped` so the result
+        // summary surfaces "Skipped — missing phone: N" explicitly.
+        if (!phone) { skippedPhone++; continue }
+        if (existingPhones.has(phone)) { dupes++; continue }
         const email = columnMap.email !== undefined ? String(r[columnMap.email] || '').trim() || null : null
         const company = columnMap.company !== undefined ? String(r[columnMap.company] || '').trim() || null : null
         const city = columnMap.city !== undefined ? String(r[columnMap.city] || '').trim() || null : null
@@ -425,7 +434,8 @@ export default function LeadUploadV2() {
 
     setProgress({ done: rows.length, total: rows.length })
     setImporting(false)
-    setResult({ imported, skipped, dupes, errors })
+    // Phase 99.C — surface skippedPhone separately in the result.
+    setResult({ imported, skipped, skippedPhone, dupes, errors })
 
     // Phase 34a — summary toast so the rep sees the outcome even if
     // they scroll past the result panel.
@@ -716,6 +726,16 @@ export default function LeadUploadV2() {
               <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: 'var(--v2-ink-2)' }}>{result.skipped}</div>
               <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Skipped</div>
             </div>
+            {/* Phase 99.C — phone-less rows surfaced as their own
+                tile so admin sees the count without digging. Warning
+                tint (not error) because the rows are user-correctable
+                via Excel cleanup, not a system fault. */}
+            {result.skippedPhone > 0 && (
+              <div>
+                <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: 'var(--warning, #F59E0B)' }}>{result.skippedPhone}</div>
+                <div style={{ fontSize: 11, color: 'var(--warning, #F59E0B)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Missing phone</div>
+              </div>
+            )}
             <div>
               <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: '#f87171' }}>{result.errors.length}</div>
               <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Errors</div>
