@@ -457,15 +457,20 @@ export default function PostCallOutcomeModal({
     // rows + the alarm cancel never fires + the in-AlarmManager alarm
     // for the just-closed follow_up survives + pops phantom hours
     // later. Capture here while is_done is still false.
+    //
+    // Phase 102.A (2026-05-29) — widen the SELECT to match the wider
+    // close UPDATE below. Drops the prior `assigned_to = me` and
+    // `follow_up_date <= today` filters so the alarm-cancel fan-out
+    // covers EVERY open follow_up on the lead (cadence-spawned,
+    // future-dated, reassigned). RLS still gates what the UPDATE
+    // can actually flip; the SELECT runs against the same RLS so
+    // ids returned here are exactly the ids the UPDATE will close.
     let earlyClosingIds = []
     if (profile?.id && lead.id) {
-      const todayEarly = istTodayISO()
       const { data: ids, error: earlySelErr } = await supabase.from('follow_ups')
         .select('id')
         .eq('lead_id', lead.id)
-        .eq('assigned_to', profile.id)
         .eq('is_done', false)
-        .lte('follow_up_date', todayEarly)
       if (earlySelErr) {
         console.warn('[phase-97.3.1] early SELECT failed; alarm cancel may miss:', earlySelErr.message)
       }
@@ -564,25 +569,37 @@ export default function PostCallOutcomeModal({
     // Phase 34Z.62 — close the follow-up row that prompted this call.
     // Owner reported the home-page summary count stayed put after a
     // successful outcome because the OLD follow_up never flipped to
-    // is_done. Mark every open follow_up on this lead assigned to
-    // this rep with follow_up_date <= today as done. The follow-up
-    // count on TodaySummaryCard recomputes via realtime + auto-
-    // refresh, so the rep sees the number drop immediately.
+    // is_done. Mark every open follow_up on this lead as done so the
+    // follow-up count on TodaySummaryCard / FollowUpsV2 / TelecallerV2
+    // recomputes via realtime + auto-refresh.
+    //
+    // Phase 102.A (2026-05-29) — widen the UPDATE to cover all open
+    // follow_ups on the lead. Drops the prior `assigned_to = me` and
+    // `follow_up_date <= today` filters because (a) cadence triggers
+    // (Phase 33D.6 trg_followup_after_done) spawn future-dated rows
+    // owned by the same rep that were never closed, and (b) auto-
+    // assign / reassign can drift `assigned_to` to a different rep
+    // after a cadence row was spawned, leaving orphan opens.
+    //
+    // RLS still gates which rows actually flip:
+    //   • fu_admin_all       — admin / co_owner full UPDATE
+    //   • fu_sales_own       — sales rep on quote-linked follow_ups
+    //   • (fu_telecaller_own — proposed; deferred to separate paste
+    //                          if telecaller path silently fails)
+    //
+    // After this UPDATE, the new-FU INSERT at line ~636 lands a fresh
+    // is_done=false row for the just-picked next-action. Order is
+    // preserved: close all → insert one new.
     if (profile?.id && lead.id) {
-      // Phase 49.1 — IST today (was UTC slice; before 18:30 IST that's
-      // yesterday, so today's open follow_ups missed the close query).
-      // Phase 97.3.1 — UPDATE is now idempotent: trg_z_close_followups_
+      // Phase 97.3.1 — UPDATE is idempotent: trg_z_close_followups_
       // on_terminal already closed these rows above (if stage flipped
       // to Lost/Won) but the UPDATE still fires safely. The ids we
       // need for alarm cancel were captured BEFORE the stage advance
       // in earlyClosingIds.
-      const today = istTodayISO()
       const { error: closeErr } = await supabase.from('follow_ups')
         .update({ is_done: true, done_at: new Date().toISOString() })
         .eq('lead_id', lead.id)
-        .eq('assigned_to', profile.id)
         .eq('is_done', false)
-        .lte('follow_up_date', today)
       if (closeErr) {
         console.warn('[phase-97.3.1] follow_ups UPDATE failed:', closeErr.message)
       }
