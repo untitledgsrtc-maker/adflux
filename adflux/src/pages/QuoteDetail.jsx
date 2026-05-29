@@ -288,7 +288,13 @@ export default function QuoteDetail() {
           const base64 = btoa(binary)
           const safeRef = String(quote.ref_number || quote.id || 'quote')
             .replace(/[^A-Za-z0-9_-]/g, '_')
-          const fileName = `quote-${safeRef}.pdf`
+          // Phase 102.I.1 (2026-05-29 night) — write to pdfs/ subfolder
+          // so file_paths.xml `cache_pdfs` <cache-path path="pdfs/">
+          // covers it for FileProvider. Earlier 102.I wrote to cache
+          // root which failed with "Failed to find configured root"
+          // because Phase 76.2.2 tightened cache exposure to just
+          // capture/ + images/ subfolders.
+          const fileName = `pdfs/quote-${safeRef}.pdf`
           await Filesystem.writeFile({
             path:      fileName,
             data:      base64,

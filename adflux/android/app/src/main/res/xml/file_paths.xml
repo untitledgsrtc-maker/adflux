@@ -13,6 +13,11 @@
     <!-- Photo capture cache (city site photos, offer-letter pic). -->
     <cache-path name="cache_files" path="capture/" />
     <cache-path name="cache_images" path="images/" />
+    <!-- Phase 102.I (2026-05-29) — quote PDF cache for in-app share
+         sheet. PDFs land in cache/pdfs/ via Filesystem.writeFile,
+         then Share grants URI permission to the chosen recipient
+         (e.g. WhatsApp) so it can attach the file. -->
+    <cache-path name="cache_pdfs" path="pdfs/" />
     <!-- Capacitor internal share-intent staging. -->
     <files-path name="capacitor_files" path="capacitor_share/" />
 </paths>

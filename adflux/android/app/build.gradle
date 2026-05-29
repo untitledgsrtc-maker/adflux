@@ -56,8 +56,14 @@ android {
         // @capacitor/filesystem native plugins for in-app PDF share
         // sheet (rep taps Download → save → Share → WhatsApp attaches
         // PDF file). Native plugin addition = APK rebuild required.
-        versionCode 96003
-        versionName "0.96.3"
+        // Phase 102.I.1 (2026-05-29 night) — file_paths.xml cache_pdfs
+        // entry + write to pdfs/ subfolder. Earlier 102.I wrote to
+        // cache root which FileProvider rejected per Phase 76.2.2
+        // restrictive exposure. Manifest meta-data unchanged; only
+        // res/xml/file_paths.xml and the JS write path adjusted, so
+        // rebuild required because file_paths.xml is bundled in res.
+        versionCode 96004
+        versionName "0.96.4"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
