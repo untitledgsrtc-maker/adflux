@@ -228,6 +228,24 @@ function AttachmentsTab() {
 
   // Default file upload for a master row. Storage path uses the
   // _master/ prefix per the convention in supabase_phase8c migration.
+  //
+  // Phase 101.E (2026-05-29) — owner-reported bug: "Replace default"
+  // re-uploading at same deterministic path silently broke Phase 11
+  // snapshot doctrine. CacheControl 3600s served stale CDN content
+  // for up to 1h; even after expiry, any existing quote_attachments
+  // row pointing at the same path served the new bytes (snapshot
+  // broken). NEW quotes that hadn't snapshotted yet ALSO saw stale
+  // content via CDN cache.
+  //
+  // Fix: timestamp-suffix the path so each upload creates a NEW
+  // storage object. attachment_templates.default_file_url flips to
+  // the new path. Existing quote_attachments rows that snapshotted
+  // the OLD path keep serving the OLD file (snapshot intact). New
+  // quotes auto-link the new path on GovtProposalDetailV2 runtime
+  // merge (L957). Storage accumulates files — acceptable, master
+  // attachments are infrequent. Old files are NOT deleted to
+  // preserve sent-proposal snapshots; manual cleanup later if owner
+  // wants storage hygiene.
   async function handleDefaultFileUpload(idx, file) {
     const r = rows[idx]
     if (!r?.id || !file) return
@@ -236,7 +254,11 @@ function AttachmentsTab() {
     try {
       const slug = slugifyLabel(r.label)
       const ext = (file.name.split('.').pop() || 'pdf').toLowerCase()
-      const path = `_master/${filter.segment}/${filter.media_type}/${String(r.display_order).padStart(2, '0')}-${slug}.${ext}`
+      // Phase 101.E — append YYYYMMDDTHHmmss timestamp so each upload
+      // gets a unique storage object. Strips dashes / colons / dots
+      // from ISO string for a clean filename.
+      const stamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15)
+      const path = `_master/${filter.segment}/${filter.media_type}/${String(r.display_order).padStart(2, '0')}-${slug}-${stamp}.${ext}`
 
       const { error: upErr } = await supabase.storage
         .from('quote-attachments')
