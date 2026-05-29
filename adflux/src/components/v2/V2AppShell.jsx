@@ -36,6 +36,7 @@ import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import { startBackgroundGps, stopBackgroundGps } from '../../utils/backgroundGps'
+import { setActiveProfile as setTrackingProfile, runForegroundProbe } from '../../utils/nativeTracking'
 import { registerNativePush, deregisterNativePush } from '../../utils/nativePush'
 import { startCallHistoryPoller, stopCallHistoryPoller } from '../../utils/callHistoryIngest'
 // Phase 96.0 (2026-05-27) — cold-start backfill of LocalNotification
@@ -347,6 +348,27 @@ export function V2AppShell() {
     )
     return () => { stopBackgroundGps().catch(() => {}) }
   }, [profile?.id, profile?.role])
+
+  // Phase 102.H.1 (2026-05-29) — populate role gate on the
+  // UntitledTracking JS shim + run a one-shot foreground GPS state
+  // probe. main.jsx fires initNativeTracking() before auth resolves,
+  // so the in-flight `gpsStateChanged` listener only catches Location
+  // toggles after launch. When phone Location is OFF at app start,
+  // no broadcast = no event = admin's TeamDashboardV2 GPS pill stays
+  // falsely green. setTrackingProfile + runForegroundProbe close
+  // that gap. Role-gated inside the util (field sales only); the
+  // shim no-ops for TC / agency / sales_manager / admin / co_owner /
+  // HR / accounts / office_staff. Web build is a no-op as well.
+  useEffect(() => {
+    if (!profile?.id) return
+    setTrackingProfile({
+      role:     profile?.role,
+      teamRole: profile?.team_role,
+    })
+    runForegroundProbe().catch((e) =>
+      console.warn('[v2-shell] tracking probe failed:', e?.message || e)
+    )
+  }, [profile?.id, profile?.role, profile?.team_role])
 
   // Phase 56d — register for FCM on the Android wrapper. Idempotent +
   // native-only. Web app continues to use the VAPID web push path

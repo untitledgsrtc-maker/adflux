@@ -35,6 +35,33 @@ let openGpsOffRowId = null
 let openNetOffRowId = null
 let listenerHandles = []
 let authSub = null
+// Phase 102.H.1 (2026-05-29) — role gate for GPS event writes.
+// Owner directive: gps_off_events must only be written for field
+// sales (role='sales' AND team_role !== 'sales_manager'). TC,
+// agency, sales_manager, admin, co_owner, HR, accounts, office_staff
+// must NOT generate rows even when their phone Location toggles.
+// cachedRole / cachedTeamRole are populated by V2AppShell calling
+// setActiveProfile after the auth store resolves the user's profile.
+// Until then, both stay null and isFieldSales() returns false, so
+// transition events and the foreground probe both no-op.
+let cachedRole = null
+let cachedTeamRole = null
+let foregroundProbeDone = false
+
+function isFieldSales() {
+  return cachedRole === 'sales' && cachedTeamRole !== 'sales_manager'
+}
+
+/**
+ * Phase 102.H.1 — populate role + team_role for the gate. Called
+ * by V2AppShell once the auth store has the profile. Safe to call
+ * repeatedly; only the latest values matter.
+ */
+export function setActiveProfile({ role, teamRole } = {}) {
+  cachedRole = role || null
+  cachedTeamRole = teamRole || null
+  console.debug('[tracking] setActiveProfile role=' + cachedRole + ' teamRole=' + cachedTeamRole)
+}
 
 /**
  * Bootstrap once at app start. Idempotent — safe to call multiple
@@ -144,6 +171,12 @@ export async function initNativeTracking() {
 
 async function handleGpsStateChanged({ enabled, atMs }) {
   console.debug('[tracking] gpsStateChanged enabled=' + enabled)
+  // Phase 102.H.1 — role gate. TC / agency / sales_manager / admin
+  // / HR are office work; their phone Location state is not tracked.
+  if (!isFieldSales()) {
+    console.debug('[tracking] gps transition ignored — not field sales')
+    return
+  }
   const userId = await safeUserId()
   if (!userId) {
     console.warn('[tracking] no userId — queueing gps event')
@@ -187,13 +220,14 @@ async function handleForceStopDetected({ lastSeenMs, relaunchMs, gapMs }) {
 
 // ─── Supabase writers (return inserted row or null on error) ──
 
-async function insertGpsOff(userId, atMs) {
+async function insertGpsOff(userId, atMs, source = 'native_receiver') {
   try {
     const { data, error } = await supabase
       .from('gps_off_events')
       .insert([{
         user_id: userId,
         toggled_off_at: new Date(atMs).toISOString(),
+        source,
       }])
       .select()
       .single()
@@ -375,6 +409,83 @@ async function safeUserId() {
   return cachedUserId
 }
 
+/**
+ * Phase 102.H.1 (2026-05-29) — foreground probe of current GPS state.
+ *
+ * The MODE_CHANGED_ACTION broadcast (TrackingPlugin.java:102) only
+ * fires when the user toggles Location AFTER the receiver is
+ * registered. If the phone Location was already OFF when the app
+ * launched, no broadcast = no event = admin's TeamDashboardV2 GPS
+ * pill stays falsely green.
+ *
+ * This probe asks the existing isGpsOn() plugin method
+ * (TrackingPlugin.java:262) for the current state. If OFF, inserts
+ * a row with source='foreground_probe' (Phase 76.1 schema enum
+ * value designed for this case). Idempotent via openGpsOffRowId
+ * recovery + foregroundProbeDone latch.
+ *
+ * Role-gated: only field sales (role='sales' AND team_role !==
+ * 'sales_manager'). Call after V2AppShell has populated profile via
+ * setActiveProfile().
+ *
+ * Web build: Capacitor.isNativePlatform() is false → no-op.
+ */
+export async function runForegroundProbe() {
+  if (!Capacitor.isNativePlatform()) return
+  if (foregroundProbeDone) return
+  if (!isFieldSales()) {
+    console.debug('[tracking] foreground probe skipped — not field sales')
+    return
+  }
+  if (!initialised) {
+    console.debug('[tracking] foreground probe deferred — init not complete')
+    return
+  }
+
+  // Already have an open row from a prior cycle? Recovery path at
+  // line 71-99 set openGpsOffRowId on init. Don't double-insert.
+  // Latch flips here because the open row IS the truth state; no
+  // further probe needed this session.
+  if (openGpsOffRowId) {
+    console.debug('[tracking] foreground probe — open row already tracked, skip')
+    foregroundProbeDone = true
+    return
+  }
+
+  let enabled = true
+  try {
+    const res = await Tracking.isGpsOn?.()
+    if (res && typeof res.enabled === 'boolean') enabled = res.enabled
+  } catch (e) {
+    // Phase 102.H.1 (role-workflow F-R201) — don't latch on plugin
+    // error; the next V2AppShell effect re-fire OR the next manual
+    // call can retry. Returning without latch keeps the probe alive.
+    console.warn('[tracking] foreground probe — isGpsOn() failed:', e?.message || e)
+    return
+  }
+  if (enabled) {
+    console.debug('[tracking] foreground probe — gps already on, no row needed')
+    foregroundProbeDone = true
+    return
+  }
+
+  const userId = await safeUserId()
+  if (!userId) {
+    console.warn('[tracking] foreground probe — no userId; queueing')
+    await enqueue({ type: 'gps', enabled: false, atMs: Date.now() })
+    // Don't latch — drainQueue on next init will replay this.
+    return
+  }
+  console.debug('[tracking] foreground probe — gps off, inserting row')
+  const inserted = await insertGpsOff(userId, Date.now(), 'foreground_probe')
+  if (inserted?.id) {
+    openGpsOffRowId = inserted.id
+    foregroundProbeDone = true
+  }
+  // Insert failed → not latched. enqueue path inside insertGpsOff
+  // already stashed the event; drainQueue will retry.
+}
+
 export async function teardownNativeTracking() {
   if (heartbeatId) {
     clearInterval(heartbeatId)
@@ -387,4 +498,14 @@ export async function teardownNativeTracking() {
   try { authSub?.data?.subscription?.unsubscribe?.() } catch { /* */ }
   authSub = null
   initialised = false
+  // Phase 102.H.1 — reset gate so a fresh login re-probes.
+  // Also clear cachedUserId / openGpsOffRowId / openNetOffRowId so a
+  // user-swap on the same device cannot accidentally close another
+  // user's row via stale module state (guardian P2).
+  cachedRole = null
+  cachedTeamRole = null
+  foregroundProbeDone = false
+  cachedUserId = null
+  openGpsOffRowId = null
+  openNetOffRowId = null
 }

@@ -170,6 +170,13 @@ export default function TeamDashboardV2() {
   // admin can spot any rep with a broken signal at-a-glance.
   // pushByUser maps user_id → {has_sub, last_seen_at}.
   const [pushByUser, setPushByUser] = useState({})
+  // Phase 102.H.2 (2026-05-29) — gpsOffByUser maps user_id → true
+  // when the rep's phone reported an OPEN gps_off_events row
+  // (toggled_on_at IS NULL). Used to flip the GPS pill to OFF
+  // immediately when the phone reports Location toggled off,
+  // bypassing the ping-freshness threshold (which only sees stale
+  // last-ping, not real-time off state).
+  const [gpsOffByUser, setGpsOffByUser] = useState({})
   // Phase 70.2 (22 May 2026) — live admin map. mapRef holds the
   // Leaflet instance; markersRef indexes Leaflet circle markers by
   // user_id so Realtime INSERT events can move existing markers
@@ -508,6 +515,24 @@ export default function TeamDashboardV2() {
       } catch (e) {
         // Defensive — RLS hiccup shouldn't break the page render.
         console.warn('[team-dashboard] push load failed:', e?.message || e)
+      }
+
+      // Phase 102.H.2 (2026-05-29) — load OPEN gps_off_events per rep.
+      // Rep's APK shim writes a row when phone Location toggles off
+      // (or on foreground probe at app launch via Phase 102.H.1) and
+      // closes it (sets toggled_on_at) when Location toggles back on.
+      // An open row = phone is currently reporting GPS OFF. Used to
+      // override the ping-freshness GPS pill below.
+      try {
+        const { data: gpsRows } = await supabase
+          .from('gps_off_events')
+          .select('user_id')
+          .is('toggled_on_at', null)
+        const gm = {}
+        ;(gpsRows || []).forEach((r) => { gm[r.user_id] = true })
+        setGpsOffByUser(gm)
+      } catch (e) {
+        console.warn('[team-dashboard] gps_off load failed:', e?.message || e)
       }
 
       // Phase 89.1 + 89.8 — geo-tagged lead activities populate
@@ -1247,25 +1272,37 @@ export default function TeamDashboardV2() {
                 )
               })()}
               {/* Phase 62.9 (20 May 2026) + Phase 90.2 (2026-05-25
-                  threshold relax) — GPS / Online / Push status
-                  pills per rep. Color-banded so admin spots any rep
-                  with a broken signal at-a-glance. Green = healthy,
-                  red = OFF / stale.
-                    GPS    — any ping today (≤ 12h stale)
+                  threshold relax) + Phase 102.H.2 (2026-05-29 — open
+                  gps_off_event override + 60min stale threshold).
+                  GPS / Online / Push status pills per rep. Color-
+                  banded so admin spots any rep with a broken signal
+                  at-a-glance. Green = healthy, red = OFF / stale.
+                    GPS    — no open gps_off_event AND ping in last
+                              60 min (was ≤ 12h)
                     Online — push_subscriptions.last_seen_at < 24h ago
                     Push   — push_subscriptions row exists
-                  Phase 90.2 — owner: "rep checked in + all signals
-                  wired but pills show OFF". Old thresholds (30 min
-                  GPS + 3h Online) flipped to red on every lunch /
-                  long meeting / sleep mode. Relaxed to day-scale
-                  windows so green = "still alive today", red =
-                  "phone genuinely dark". */}
+                  Phase 102.H.2 — owner reported pill stayed green
+                  when rep's phone Location was off 13 min. The
+                  Phase 90.2 12h window was too loose. Phase 102.H.1
+                  shim writes a foreground_probe row when phone is
+                  off at launch + a native_receiver row on toggle;
+                  open row trumps ping freshness here. */}
               {(() => {
                 const ping = latestPingByUser[r.id]
                 const pingMins = ping
                   ? Math.floor((Date.now() - new Date(ping.captured_at).getTime()) / 60000)
                   : Infinity
-                const gpsOn = pingMins <= 720         // 12h (was 30 min)
+                // Phase 102.H.2 (2026-05-29) — open gps_off_events row
+                // from the rep's phone overrides ping freshness. If
+                // phone reported Location off, pill is RED immediately
+                // regardless of how recent the last ping was. Ping
+                // threshold also tightened 720 → 60 min so reps with
+                // no phone-reported off-event but stale pings still
+                // surface as OFF after an hour of darkness. TA/DA
+                // payable unchanged — Phase 68 compute_daily_ta does
+                // NOT join gps_off_events; this is display-only.
+                const hasOpenGpsOff = !!gpsOffByUser[r.id]
+                const gpsOn = !hasOpenGpsOff && pingMins <= 60
                 const push = pushByUser[r.id]
                 const pushOn = !!push?.has_sub
                 const lastSeenMins = push?.last_seen_at
