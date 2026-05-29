@@ -668,18 +668,37 @@ export function V2AppShell() {
             <div className="more-drawer" onClick={(e) => e.stopPropagation()}>
               <div className="more-drawer-handle" />
               <div className="more-drawer-head">More</div>
-              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/follow-ups') }}>
-                <ClockIcon size={18} /> <span>Follow-ups</span>
-              </button>
+              {/* Phase 101.B.1 — agency drawer trimmed: no Follow-ups,
+                  no Clients, no Score. Agency uses Home + Quotes +
+                  Earnings + Offer (sidebar / bottom-nav already cover).
+                  Other roles unchanged. */}
+              {!isAgency && (
+                <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/follow-ups') }}>
+                  <ClockIcon size={18} /> <span>Follow-ups</span>
+                </button>
+              )}
               <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/quotes') }}>
                 <FileText size={18} /> <span>Quotes</span>
               </button>
-              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/clients') }}>
-                <Users size={18} /> <span>Clients</span>
-              </button>
-              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-performance') }}>
-                <TrendingUp size={18} /> <span>Score</span>
-              </button>
+              {!isAgency && (
+                <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/clients') }}>
+                  <Users size={18} /> <span>Clients</span>
+                </button>
+              )}
+              {isAgency ? (
+                <>
+                  <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-performance') }}>
+                    <TrendingUp size={18} /> <span>My Earnings</span>
+                  </button>
+                  <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-offer') }}>
+                    <FileText size={18} /> <span>My Offer</span>
+                  </button>
+                </>
+              ) : (
+                <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-performance') }}>
+                  <TrendingUp size={18} /> <span>Score</span>
+                </button>
+              )}
               <button className="more-drawer-link" onClick={() => { setMoreOpen(false); signOut(); navigate('/login') }}>
                 <LogOut size={18} /> <span>Log out</span>
               </button>

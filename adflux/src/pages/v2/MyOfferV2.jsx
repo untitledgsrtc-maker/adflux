@@ -371,6 +371,10 @@ function KV({ label, value }) {
 // from authStore.profile (Phase 101.A1 column auto-picked by the existing
 // users.select('*') in authStore.fetchProfile). Inline component per
 // CLAUDE.md §28 "smallest frozen-file diff" + matches local KV pattern.
+// Phase 101.B.1 — ProfilePicUploader (Phase 87.5) added back. Was on
+// MyOfferV2 baseline; the Phase 101.A2 agency branch bypassed it.
+// Agency reps need to upload their avatar for topbar + map pin same
+// as sales / TC reps.
 function AgencyOfferView({ profile }) {
   const pct = profile?.agency_commission_percent != null
     ? Number(profile.agency_commission_percent)
@@ -387,6 +391,16 @@ function AgencyOfferView({ profile }) {
           </div>
         </div>
       </div>
+
+      {/* Phase 101.B.1 — profile picture upload (Phase 87.5 component).
+          Sits between page header and commission hero so the avatar
+          shows near the rep's name for visual association — same
+          position MyOfferV2 baseline uses. */}
+      {profile?.id && (
+        <div style={{ marginBottom: 18 }}>
+          <ProfilePicUploader />
+        </div>
+      )}
 
       {/* Hero — single commission rate panel reuses v2d-offer-hero shell */}
       <div className="v2d-panel v2d-offer-hero">
