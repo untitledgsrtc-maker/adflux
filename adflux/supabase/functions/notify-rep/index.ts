@@ -270,9 +270,38 @@ async function sendFcm(
   // small icon are now applied by the client when scheduling the
   // LocalNotification (see nativePush.js pushNotificationReceived
   // handler + scheduleFollowUpAlarm.js).
+  // Phase 102.G (2026-05-29) — HYBRID payload: notification + data.
+  //
+  // Phase 96.0 went data-only on the bet that pushNotificationReceived
+  // would schedule a LocalNotification on every receipt. That works
+  // when the app is alive (foreground or recently backgrounded). It
+  // FAILS when the app is killed by aggressive OEM battery savers
+  // (Vivo / OPPO / Realme / Xiaomi / Samsung), which is the default
+  // state for reps after the phone has been idle a few minutes.
+  // Owner-tested 2026-05-29 night: enqueue_push silent unless app open.
+  //
+  // Hybrid payload behavior on Android:
+  //   • App foreground → Android does NOT auto-display the
+  //     `notification` field; entire message is delivered to the app's
+  //     pushNotificationReceived handler with title/body/data. Client
+  //     schedules a LocalNotification → tray pops once. Same as data-
+  //     only behavior pre-102.G.
+  //   • App background-alive or killed → Android FCM service auto-
+  //     displays the `notification` field in the tray WITHOUT needing
+  //     to wake the JS layer. This is the OEM-immune path. data
+  //     payload is delivered only when the user taps the tray entry.
+  //
+  // android.notification.channel_id binds to the high-importance
+  // channel `untitled_default` created at app startup so the OS
+  // honors heads-up + sound + vibration (no Android-8+ silent
+  // fallback to "Miscellaneous").
   const body = {
     message: {
       token: fcmToken,
+      notification: {
+        title: payload.title,
+        body:  payload.body,
+      },
       data: {
         title: payload.title,
         body:  payload.body,
@@ -284,8 +313,15 @@ async function sendFcm(
         // the device wakes for delivery instead of batching. For
         // data-only messages priority=high is REQUIRED — without
         // it, Android caps data-only delivery at a few per day per
-        // app for battery reasons.
+        // app for battery reasons. Phase 102.G keeps it for the same
+        // reason on the notification-field path.
         priority: 'high',
+        notification: {
+          channel_id: 'untitled_default',
+          icon:       'ic_stat_notify',
+          color:      '#FFE600',
+          tag:        payload.tag,
+        },
       },
     },
   }
