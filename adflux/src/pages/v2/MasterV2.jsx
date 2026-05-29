@@ -1085,7 +1085,13 @@ function SignersTab() {
       supabase
         .from('users')
         .select('id, name, email, role')
-        .eq('role', 'sales')
+        // Phase 101.C.1 — widen promote-signer candidates from sales-only
+        // to sales + agency so admin can promote an agency partner
+        // (e.g. Hamesh) via UI instead of needing a SQL UPDATE.
+        // signing_authority flag is what gates Step 2 dropdown; Master
+        // tab's existing role IN ('admin','co_owner','agency') signers
+        // list already accommodates agency display.
+        .in('role', ['sales', 'agency'])
         .order('name'),
     ])
     if (signersRes.error) setStatusError(signersRes.error.message)
