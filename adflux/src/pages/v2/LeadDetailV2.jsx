@@ -679,10 +679,14 @@ export default function LeadDetailV2() {
         <span>Back to leads</span>
       </button>
 
-      {/* Phase 76 — GPS-off banner. Hidden for admin / co_owner (they
-          don't punch in the field, they audit). Mirrors the WorkV2
-          mount so the rep sees the same blocker on both surfaces. */}
-      {!isPrivileged && gpsOn === false && (
+      {/* Phase 76 — GPS-off banner. Mirrors WorkV2 mount.
+          Phase 102.D (2026-05-29) — banner is field-rep only. TC role
+          (Rima / Dhara / Renuka) is office work; agency role doesn't
+          have GPS tracking; admin / co_owner audit. Narrowed gate from
+          `!isPrivileged` to positive `role==='sales'` + excludes
+          team_role='sales_manager' (Renuka pairs sales_manager +
+          telecaller; she's office). */}
+      {(profile?.role === 'sales' && profile?.team_role !== 'sales_manager') && gpsOn === false && (
         <GpsOffBanner onEnable={requestEnable} isNative={gpsIsNative} />
       )}
 

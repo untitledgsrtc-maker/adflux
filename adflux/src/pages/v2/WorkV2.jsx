@@ -910,8 +910,12 @@ export default function WorkV2() {
             morning plan is meaningless). Hidden while we don't yet
             know (gpsOn === null) so the page doesn't flash a banner
             during initial probe. Additive only; no productive button
-            is gated in this phase. */}
-        {gpsOn === false && (
+            is gated in this phase.
+            Phase 102.D (2026-05-29) — gate by role. WorkV2 is the
+            sales rep landing but TC + admin can navigate here via
+            sidebar; banner is for field reps only. Mirrors the
+            LeadDetailV2:685 doctrine. */}
+        {(profile?.role === 'sales' && profile?.team_role !== 'sales_manager') && gpsOn === false && (
           <GpsOffBanner onEnable={requestEnable} isNative={gpsIsNative} />
         )}
 
