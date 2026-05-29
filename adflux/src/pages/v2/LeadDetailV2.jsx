@@ -491,7 +491,22 @@ export default function LeadDetailV2() {
       console.warn('[lead] linked load failed:', e?.message || e)
     }
   }
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [id])
+  // Phase 99.D (2026-05-29) — wait for authStore to hydrate before
+  // the first lead fetch. Pre-99.D, a push-tap cold-start could
+  // fire load() before the Supabase session was applied to the
+  // supabase-js client; the query then ran anon → RLS silently
+  // denied → "Lead not found or RLS denied." banner stuck. Rima
+  // hit this 2026-05-29 morning on a Phase 34Z.55 follow-up push
+  // (lead owned via telecaller_id, RLS policy + auth row both
+  // healthy, race condition only). WorkV2.jsx:400 +
+  // TelecallerV2.jsx:254 already use this gated pattern; this
+  // brings LeadDetailV2 into line. The dep on profile?.id re-fires
+  // the effect the moment auth lands.
+  useEffect(() => {
+    if (!profile?.id) return
+    load()
+    /* eslint-disable-next-line */
+  }, [id, profile?.id])
   // Phase 34Z.59 — owner reported saves not reflecting until tab
   // switch. Refetch the lead + its timeline on every tab-resume /
   // window-focus so a return from tel: / wa.me: / Log meeting modal
