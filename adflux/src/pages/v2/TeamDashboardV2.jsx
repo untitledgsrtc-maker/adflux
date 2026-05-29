@@ -20,7 +20,7 @@
 //   • Calls from call_logs count grouped by user_id today
 //   • Won today value from quotes status='won' + payments today (rough)
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users as UsersIcon, MapPin, Mic, Loader2 } from 'lucide-react'
 import { Loader } from '@googlemaps/js-api-loader'
@@ -177,6 +177,23 @@ export default function TeamDashboardV2() {
   // bypassing the ping-freshness threshold (which only sees stale
   // last-ping, not real-time off state).
   const [gpsOffByUser, setGpsOffByUser] = useState({})
+
+  // Phase 102.J (2026-05-29) — extracted gpsOff loader so the realtime
+  // subscription (below) can refetch on every gps_off_events change
+  // without re-running the whole page-load effect.
+  const loadGpsOff = useCallback(async () => {
+    try {
+      const { data: gpsRows } = await supabase
+        .from('gps_off_events')
+        .select('user_id')
+        .is('toggled_on_at', null)
+      const gm = {}
+      ;(gpsRows || []).forEach((r) => { gm[r.user_id] = true })
+      setGpsOffByUser(gm)
+    } catch (e) {
+      console.warn('[team-dashboard] gps_off load failed:', e?.message || e)
+    }
+  }, [])
   // Phase 70.2 (22 May 2026) — live admin map. mapRef holds the
   // Leaflet instance; markersRef indexes Leaflet circle markers by
   // user_id so Realtime INSERT events can move existing markers
@@ -523,17 +540,9 @@ export default function TeamDashboardV2() {
       // closes it (sets toggled_on_at) when Location toggles back on.
       // An open row = phone is currently reporting GPS OFF. Used to
       // override the ping-freshness GPS pill below.
-      try {
-        const { data: gpsRows } = await supabase
-          .from('gps_off_events')
-          .select('user_id')
-          .is('toggled_on_at', null)
-        const gm = {}
-        ;(gpsRows || []).forEach((r) => { gm[r.user_id] = true })
-        setGpsOffByUser(gm)
-      } catch (e) {
-        console.warn('[team-dashboard] gps_off load failed:', e?.message || e)
-      }
+      // Phase 102.J — body extracted to loadGpsOff useCallback so the
+      // realtime subscription below can refetch independently.
+      await loadGpsOff()
 
       // Phase 89.1 + 89.8 — geo-tagged lead activities populate
       // pins on the field map. Coerced to numbers + filtered to
@@ -943,6 +952,26 @@ export default function TeamDashboardV2() {
       try { supabase.removeChannel(channel) } catch { /* */ }
     }
   }, [isPrivileged])
+
+  // Phase 102.J (2026-05-29) — Supabase Realtime subscription on
+  // gps_off_events INSERT + UPDATE. When a rep's phone toggles
+  // Location, nativeTracking writes a row server-side; this channel
+  // pushes to every admin browser within ~1s and refetches
+  // gpsOffByUser so the GPS pill flips RED / GREEN live without a
+  // page reload. SQL prerequisite (paste-once):
+  //   ALTER PUBLICATION supabase_realtime ADD TABLE public.gps_off_events;
+  useEffect(() => {
+    if (!isPrivileged) return
+    const ch = supabase
+      .channel('team-gps-off-events')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'gps_off_events' },
+        () => { loadGpsOff() },
+      )
+      .subscribe()
+    return () => { try { supabase.removeChannel(ch) } catch { /* */ } }
+  }, [isPrivileged, loadGpsOff])
 
   const sessionByUser = useMemo(() => {
     const m = new Map()
