@@ -191,6 +191,15 @@ export default function ProposedIncentiveCard({ compact = false }) {
     return () => { cancelled = true }
   }, [profile?.id, refreshKey])
 
+  // Phase 101.A2 hotfix (Phase 101.A2.1) — agency = commission-only
+  // partner; no incentive slab, no forecast. Defense early-return
+  // AFTER hooks (rules-of-hooks). Mount path is V2AppShell.jsx:707
+  // which gates on !isPrivileged only; this stops the purple
+  // "Proposed Incentive / Forecast is flat" banner from rendering
+  // on /my-performance + /my-offer + every other rep page for
+  // agency users. Frozen V2AppShell stays untouched.
+  if (profile?.role === 'agency') return null
+
   if (!data) {
     // Skeleton — same height as the real card so layout doesn't jump.
     if (compact) {

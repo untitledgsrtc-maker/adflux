@@ -117,9 +117,14 @@ export default function AgencyEarningsView({ refreshKey }) {
           .select('agency_commission_percent')
           .eq('id', profile.id)
           .maybeSingle(),
+        // Phase 101.A2 hotfix (Phase 101.A2.1) — drop `ref_number`
+        // from SELECT. Column does not exist on quotes per Phase 33N
+        // (supabase_phase33n_ref_number_fix.sql header), only referenced
+        // as defensive `|| q.ref_number` fallback in QuotesV2 list render
+        // — JS undefined is harmless there but PostgREST 400s on SELECT.
         supabase
           .from('quotes')
-          .select('id, quote_number, ref_number, client_name, client_company, subtotal, status, updated_at, created_at')
+          .select('id, quote_number, client_name, client_company, subtotal, status, updated_at, created_at')
           .eq('created_by', profile.id)
           .order('updated_at', { ascending: false })
           .limit(1000),
@@ -197,7 +202,7 @@ export default function AgencyEarningsView({ refreshKey }) {
         else                                                           state = 'Pending'
         return {
           id:           q.id,
-          quote_number: q.quote_number || q.ref_number || '—',
+          quote_number: q.quote_number || '—',
           client:       q.client_company || q.client_name || '—',
           base:         baseAmt,
           pct,
