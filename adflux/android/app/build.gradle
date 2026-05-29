@@ -42,8 +42,18 @@ android {
         // payload; client schedules LocalNotifications on every receive
         // so tray pops regardless of FG/BG. Bypasses FCM entirely for
         // follow-up reminders via AlarmManager. APK rebuild required.
-        versionCode 96000
-        versionName "0.96.0"
+        // Phase 102.D (2026-05-29) — version bump only. Carries 8 days
+        // of post-96 web changes via live-update (Phase 97/98/99/100/
+        // 101/102 JSX + SQL). NO native / plugin / manifest change.
+        // Same signing cert (debug keystore from same Mac) so install-
+        // over-existing-APK works without uninstall.
+        // Phase 102.E (2026-05-29) — bump again to bundle rep status
+        // pills (GPS / ONLINE / PUSH on /work bottom) into APK
+        // fallback assets. Live-update would propagate same JS via
+        // Vercel but bundling gives defensive coverage if server.url
+        // unreachable on first cold-start.
+        versionCode 96002
+        versionName "0.96.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
