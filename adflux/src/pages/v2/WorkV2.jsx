@@ -50,6 +50,7 @@ import RepMapPanel from '../../components/leads/RepMapPanel'
 import RepDayTools from '../../components/leads/RepDayTools'
 import { pushToast } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
+import RepStatusPills from '../../components/v2/RepStatusPills'
 import LogMeetingModal from '../../components/leads/LogMeetingModal'
 // Phase 34Z.51 — bring the LeadDetailV2 call-outcome flow to the
 // /work Next-up smart-task card. Tapping Call on the card now inserts
@@ -1167,6 +1168,14 @@ export default function WorkV2() {
           <CheckCircle2 size={16} strokeWidth={2} />
           <span>{toast}</span>
         </div>
+      )}
+
+      {/* Phase 102.E (2026-05-29) — bottom-of-page rep status pills
+          (GPS / ONLINE / PUSH). Sales-only, gated by same predicate
+          as the Phase 102.D GpsOffBanner mount — TC + agency + admin
+          + co_owner + sales_manager + HR all excluded. */}
+      {(profile?.role === 'sales' && profile?.team_role !== 'sales_manager') && (
+        <RepStatusPills gpsOn={gpsOn} />
       )}
 
       {/* Phase 34Z.51 — voice-driven outcome capture for the Next-up
