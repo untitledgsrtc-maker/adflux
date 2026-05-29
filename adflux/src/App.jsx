@@ -166,7 +166,13 @@ function RootRedirect() {
   if (teamRole === 'sales_manager')               return <Navigate to="/manager" replace />
   if (teamRole === 'telecaller')                  return <Navigate to="/telecaller" replace />
   if (teamRole === 'sales' || role === 'sales')   return <Navigate to="/work" replace />
-  if (teamRole === 'agency' || role === 'agency') return <Navigate to="/quotes" replace />
+  // Phase 101.B — agency now lands on /dashboard (DashboardV2
+  // switcher routes them to AgencyHomeView). Was /quotes per
+  // Phase 32F; the Home dashboard gives them KPI overview +
+  // commission summary in one place. Phase 101.A2 work
+  // (AgencyEarningsView ledger + AgencyOfferView) reachable via
+  // bottom-nav Earnings + Offer tabs.
+  if (teamRole === 'agency' || role === 'agency') return <Navigate to="/dashboard" replace />
   return <Navigate to="/dashboard" replace />
 }
 

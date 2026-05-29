@@ -132,7 +132,13 @@ const SALES_NAV = [
 // Kept: Quotes (where they spend most of their time), My Performance
 // (so they can see their commission earnings), My Offer (their %
 // scheme).
+// Phase 101.B (2026-05-29) — Home added as first entry. Routes to
+// /dashboard which DashboardV2 switcher branches to AgencyHomeView
+// for role='agency'. Phase 101.A2 work (AgencyEarningsView ledger
+// at /my-performance + AgencyOfferView at /my-offer) preserved as
+// the next two entries.
 const AGENCY_NAV = [
+  { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/my-performance',    label: 'My Earnings',    icon: TrendingUp },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },

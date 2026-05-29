@@ -23,11 +23,17 @@ import { useIsDesktop } from '../../hooks/useIsDesktop'
 import SalesDashboardV2 from './SalesDashboard'
 import SalesDashboardDesktop from './SalesDashboardDesktop'
 import AdminDashboardDesktop from './AdminDashboardDesktop'
+// Phase 101.B — agency Home dashboard. Commission-only partner
+// gets KPI grid (Commission Earned / Won Base / Payable / Quotes
+// Sent / Pending / Outstanding) + Active Campaigns + FAB BottomNav.
+// Mirrors SalesDashboard mobile pattern with agency-specific data.
+import AgencyHomeView from '../../components/agency/AgencyHomeView'
 
 export default function DashboardV2() {
   // Privileged set (admin / owner / co_owner) all get the admin
-  // dashboard. Sales reps get the sales dashboard.
-  const { isPrivileged, loading } = useAuth()
+  // dashboard. Sales reps get the sales dashboard. Agency gets
+  // their own commission-focused Home (Phase 101.B).
+  const { isPrivileged, isAgency, loading } = useAuth()
   const isDesktop = useIsDesktop()
 
   if (loading) {
@@ -39,5 +45,8 @@ export default function DashboardV2() {
   }
 
   if (isPrivileged) return <AdminDashboardDesktop />
+  // Phase 101.B — agency branch. Same /dashboard URL, role-aware
+  // switch matches the admin/sales pattern above.
+  if (isAgency) return <AgencyHomeView />
   return isDesktop ? <SalesDashboardDesktop /> : <SalesDashboardV2 />
 }
