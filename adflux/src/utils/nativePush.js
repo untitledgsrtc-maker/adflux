@@ -233,11 +233,37 @@ export async function registerNativePush(userId) {
   // Register listeners BEFORE calling register() so the first
   // token event isn't missed.
   await PushNotifications.addListener('registration', async (token) => {
-    try {
-      await saveFcmToken(activeUser, token.value)
-    } catch (e) {
-      console.warn('[fcm] save token failed:', e?.message || e)
+    // Phase 102.F (2026-05-29) — defer saveFcmToken until the supabase
+    // session is verifiably restored. The FCM `registration` event
+    // can fire faster than the session-restore-from-Capacitor-
+    // Preferences round-trip on some Android OEMs (logged 333ms gap
+    // on a Sparkstar phone). When `auth.uid()` is NULL server-side,
+    // RLS policy `ps_self` WITH CHECK denies the upsert silently and
+    // the rep's token never lands in push_subscriptions. Poll for
+    // session every 1s up to 10 tries (10s budget) before giving up.
+    let attempts = 0
+    const trySave = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user?.id) {
+          try {
+            await saveFcmToken(session.user.id, token.value)
+          } catch (e) {
+            console.warn('[fcm] save token failed:', e?.message || e)
+          }
+          return
+        }
+      } catch (e) {
+        console.warn('[fcm] getSession failed during defer:', e?.message || e)
+      }
+      attempts++
+      if (attempts >= 10) {
+        console.warn('[fcm] gave up waiting for session after 10s; token discarded')
+        return
+      }
+      setTimeout(trySave, 1000)
     }
+    trySave()
   })
 
   await PushNotifications.addListener('registrationError', (err) => {
