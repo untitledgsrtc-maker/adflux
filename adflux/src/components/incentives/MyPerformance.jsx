@@ -99,6 +99,12 @@ export function MyPerformance() {
     load()
   }, [profile?.id])
 
+  // Phase 101.A2 — agency = commission-only partner; no incentive
+  // slab, no monthly_sales_data math. Defense early-return AFTER
+  // hooks so the slab card never renders even if a future caller
+  // mounts this without the MyPerformanceV2 top-level branch.
+  if (profile?.role === 'agency') return null
+
   if (loading) {
     return (
       <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 32 }}>

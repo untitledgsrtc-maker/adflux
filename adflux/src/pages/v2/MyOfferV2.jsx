@@ -45,6 +45,16 @@ export default function MyOfferV2() {
     return () => { cancelled = true }
   }, [fetchMyOffer])
 
+  // Phase 101.A2 — agency = commission-only partner. No salary slab,
+  // no TA/DA, no leave panel. Renders AgencyOfferView (defined below
+  // this file) with commission % from users.agency_commission_percent.
+  // Branch sits AFTER hooks (rules-of-hooks) but BEFORE the loading /
+  // error / empty / offer-loaded chain. Non-agency rendering below is
+  // byte-identical to baseline per CLAUDE.md §28 sales-frozen contract.
+  if (profile?.role === 'agency') {
+    return <AgencyOfferView profile={profile} />
+  }
+
   /* ─── Loading / error / empty states ─── */
   if (loading) {
     return (
@@ -353,6 +363,93 @@ function KV({ label, value }) {
     <div className="v2d-kv">
       <div className="v2d-kv-l">{label}</div>
       <div className="v2d-kv-v">{value || '—'}</div>
+    </div>
+  )
+}
+
+// Phase 101.A2 — agency-only offer view. Reads users.agency_commission_percent
+// from authStore.profile (Phase 101.A1 column auto-picked by the existing
+// users.select('*') in authStore.fetchProfile). Inline component per
+// CLAUDE.md §28 "smallest frozen-file diff" + matches local KV pattern.
+function AgencyOfferView({ profile }) {
+  const pct = profile?.agency_commission_percent != null
+    ? Number(profile.agency_commission_percent)
+    : 5.00
+  return (
+    <div className="v2d-offer">
+      <div className="v2d-page-head">
+        <div>
+          <div className="v2d-page-kicker">Partner agreement</div>
+          <h1 className="v2d-page-title">My Offer</h1>
+          <div className="v2d-page-sub">
+            Commission-only partner. No salary, no incentive slab,
+            no TA / DA, no leave roster.
+          </div>
+        </div>
+      </div>
+
+      {/* Hero — single commission rate panel reuses v2d-offer-hero shell */}
+      <div className="v2d-panel v2d-offer-hero">
+        <div className="v2d-offer-hero-l">
+          <div className="v2d-offer-hero-ic">
+            <FileText size={22} />
+          </div>
+          <div>
+            <div className="v2d-offer-hero-role">
+              Agency Partner
+            </div>
+            <div className="v2d-offer-hero-sub">
+              {profile?.name || ''}{profile?.city ? ` · ${profile.city}` : ''}
+            </div>
+          </div>
+        </div>
+        <div className="v2d-offer-hero-r">
+          <div className="v2d-offer-hero-k">Commission rate</div>
+          <div className="v2d-offer-hero-v">
+            {pct.toFixed(2)}<sub>%</sub>
+          </div>
+        </div>
+      </div>
+
+      {/* How it's paid — single info panel; no incentive slab, no TA/DA */}
+      <div className="v2d-panel" style={{ marginTop: 18 }}>
+        <div className="v2d-panel-h">
+          <div>
+            <div className="v2d-panel-t">How commission is paid</div>
+            <div className="v2d-panel-s">Per Won quote, settled by accounts</div>
+          </div>
+        </div>
+        <div className="v2d-kvgrid">
+          <KV
+            label="Commission base"
+            value="Quote subtotal (GST-excluded)"
+          />
+          <KV
+            label="Formula"
+            value={`base × ${pct.toFixed(2)}%`}
+          />
+          <KV
+            label="Earned"
+            value="When quote moves to Won"
+          />
+          <KV
+            label="Payable"
+            value="After first approved payment is received"
+          />
+          <KV
+            label="Treatment"
+            value="Accounting expense — paid by Untitled Advertising"
+          />
+        </div>
+      </div>
+
+      <div style={{
+        marginTop: 18, fontSize: 12, color: 'var(--v2-ink-2)',
+        lineHeight: 1.6,
+      }}>
+        See your commission ledger on <b>My Earnings</b>: Won quotes,
+        base amount, status, and last payment date.
+      </div>
     </div>
   )
 }

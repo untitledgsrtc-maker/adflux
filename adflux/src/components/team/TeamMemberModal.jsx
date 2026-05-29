@@ -10,9 +10,12 @@ import { useTeam } from '../../hooks/useTeam'
 // added so admin can register the inside-sales caller and back-office
 // people (accounts / HR / ops) without forcing them into a sales role.
 // users_role_check constraint extended in supabase_phase26b_extra_roles.sql.
+// Phase 101.A2 — agency relabel: commission-only partner. Salary
+// fields hidden; Commission % field shown; staff_incentive_profiles
+// upsert skipped. Backend rules in supabase_phase101_a1_agency_split.sql.
 const ROLES = [
   { value: 'sales',        label: 'Sales' },
-  { value: 'agency',       label: 'Agency (sales-like)' },
+  { value: 'agency',       label: 'Agency (commission-only partner)' },
   { value: 'telecaller',   label: 'Telecaller' },
   { value: 'office_staff', label: 'Office staff (back office)' },
   { value: 'admin',        label: 'Admin' },
@@ -59,6 +62,11 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     // column (Phase 4b). Defaults to 'ALL' for new members.
     segment_access: member?.segment_access || 'ALL',
     monthly_salary: member?.staff_incentive_profiles?.[0]?.monthly_salary?.toString() || '',
+    // Phase 101.A2 — agency commission %. Reads users.agency_commission_percent
+    // (Phase 101.A1 column, default 5.00). Used only when role='agency'.
+    agency_commission_percent: member?.agency_commission_percent != null
+      ? String(member.agency_commission_percent)
+      : '5.00',
   })
   const [errors, setErrors]           = useState({})
   const [saving, setSaving]           = useState(false)
@@ -77,10 +85,21 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     if (mode === 'add') {
       if (!form.password) errs.password = 'Password is required'
       else if (form.password.length < 6) errs.password = 'Minimum 6 characters'
-      // Phase 11g (rev) — owner spec: agency members can have 0
-      // salary (commission-only). Accept "0" as a valid salary; only
-      // empty / negative is invalid. For SALES role we still warn the
-      // admin on empty since 0-salary sales is unusual but allow it.
+    }
+    // Phase 101.A2 — split salary vs commission validation by role.
+    // Agency = commission-only, validate commission % (0..100). All
+    // other roles validate Monthly Salary in add mode per Phase 11g.
+    if (form.role === 'agency') {
+      const pct = Number(form.agency_commission_percent)
+      if (form.agency_commission_percent === '' || form.agency_commission_percent === null) {
+        errs.agency_commission_percent = 'Commission % is required'
+      } else if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        errs.agency_commission_percent = 'Enter a number between 0 and 100'
+      }
+    } else if (mode === 'add') {
+      // Phase 11g (rev) — owner spec: salary may be 0 (commission-only
+      // for a non-agency rep is allowed; admin chooses). Empty /
+      // negative is invalid.
       if (form.monthly_salary === '' || form.monthly_salary === null) {
         errs.monthly_salary = 'Salary is required (enter 0 for commission-only)'
       } else if (Number(form.monthly_salary) < 0 || Number.isNaN(Number(form.monthly_salary))) {
@@ -127,25 +146,34 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       try { await supabaseSignup.auth.signOut() } catch (_) { /* ignore */ }
 
       // Insert into users table
+      // Phase 101.A2 — agency carries agency_commission_percent
+      // (Phase 101.A1 column) instead of monthly_salary. Other roles
+      // do not write that field — DEFAULT 5.00 only applies to
+      // agency rows since downstream reads only consult the column
+      // when role='agency'.
+      const baseInsert = {
+        id:        userId,
+        name:      form.name.trim(),
+        email:     form.email.trim().toLowerCase(),
+        role:      form.role,
+        // Phase 27 — mirror role into team_role. The Reassign +
+        // Default Assignee dropdowns + AI briefing all filter on
+        // team_role; without this, telecallers and office_staff
+        // created via the modal are invisible to those queries.
+        team_role: form.role,
+        designation: form.designation.trim() || null,
+        // Phase 11j — admin always 'ALL' regardless of dropdown
+        // (admin must see/manage everything). Other roles get the
+        // selected scope.
+        segment_access: ROLES_WITHOUT_SEGMENT.has(form.role) ? 'ALL' : form.segment_access,
+        is_active: true,
+      }
+      if (form.role === 'agency') {
+        baseInsert.agency_commission_percent = Number(form.agency_commission_percent)
+      }
       const { error: userError } = await supabase
         .from('users')
-        .insert([{
-          id:        userId,
-          name:      form.name.trim(),
-          email:     form.email.trim().toLowerCase(),
-          role:      form.role,
-          // Phase 27 — mirror role into team_role. The Reassign +
-          // Default Assignee dropdowns + AI briefing all filter on
-          // team_role; without this, telecallers and office_staff
-          // created via the modal are invisible to those queries.
-          team_role: form.role,
-          designation: form.designation.trim() || null,
-          // Phase 11j — admin always 'ALL' regardless of dropdown
-          // (admin must see/manage everything). Other roles get the
-          // selected scope.
-          segment_access: ROLES_WITHOUT_SEGMENT.has(form.role) ? 'ALL' : form.segment_access,
-          is_active: true,
-        }])
+        .insert([baseInsert])
 
       if (userError) {
         setServerError(userError.message || 'Failed to save user profile')
@@ -153,26 +181,37 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         return
       }
 
-      // Upsert the incentive profile. The DB trigger
-      // `auto_create_incentive_profile` has already inserted a row
-      // with monthly_salary=0 using the incentive_settings defaults.
-      // We upsert on user_id so the correct salary from the form
-      // replaces the trigger's placeholder. We intentionally DO NOT
-      // pass rate/multiplier/bonus here so whatever the trigger read
-      // from incentive_settings stays in place (admin-configured
-      // defaults, not the old hard-coded 5 / 0.05 / 0.02 / 10000).
-      await supabase.from('staff_incentive_profiles').upsert(
-        {
-          user_id:        userId,
-          monthly_salary: Number(form.monthly_salary),
-          join_date:      new Date().toISOString().split('T')[0],
-          is_active:      true,
-        },
-        { onConflict: 'user_id' }
-      )
+      // Phase 101.A2 — agency = commission-only. Skip incentive
+      // profile upsert entirely. Phase 101.A1 trigger
+      // auto_create_incentive_profile now excludes role='agency'
+      // so there's no placeholder row to overwrite either.
+      if (form.role !== 'agency') {
+        // Upsert the incentive profile. The DB trigger
+        // `auto_create_incentive_profile` has already inserted a row
+        // with monthly_salary=0 using the incentive_settings defaults.
+        // We upsert on user_id so the correct salary from the form
+        // replaces the trigger's placeholder. We intentionally DO NOT
+        // pass rate/multiplier/bonus here so whatever the trigger read
+        // from incentive_settings stays in place (admin-configured
+        // defaults, not the old hard-coded 5 / 0.05 / 0.02 / 10000).
+        await supabase.from('staff_incentive_profiles').upsert(
+          {
+            user_id:        userId,
+            monthly_salary: Number(form.monthly_salary),
+            join_date:      new Date().toISOString().split('T')[0],
+            is_active:      true,
+          },
+          { onConflict: 'user_id' }
+        )
+      }
 
     } else {
-      const { error } = await updateMember(member.id, {
+      // Phase 101.A2 — edit mode: persist agency_commission_percent
+      // when role is (or becomes) 'agency'. If admin flips an existing
+      // sales user to agency, the Phase 101.A1
+      // users_agency_deactivate_incentive trigger fires server-side
+      // to deactivate the staff_incentive_profiles row.
+      const updatePayload = {
         name: form.name.trim(),
         role: form.role,
         // Phase 27 — mirror role into team_role on edit too. If admin
@@ -182,7 +221,11 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         designation: form.designation.trim() || null,
         // Phase 11j — admin can change a rep's segment scope from edit.
         segment_access: ROLES_WITHOUT_SEGMENT.has(form.role) ? 'ALL' : form.segment_access,
-      })
+      }
+      if (form.role === 'agency') {
+        updatePayload.agency_commission_percent = Number(form.agency_commission_percent)
+      }
+      const { error } = await updateMember(member.id, updatePayload)
       if (error) {
         setServerError(error.message || 'Failed to update member')
         setSaving(false)
@@ -287,7 +330,39 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
             </Field>
           )}
 
-          {mode === 'add' && (
+          {/* Phase 101.A2 — agency = commission-only partner. Show
+              Commission % input instead of Monthly Salary. Available
+              in both add and edit modes (admin can adjust % later). */}
+          {form.role === 'agency' && (
+            <>
+              <div style={{ borderTop: '1px solid var(--brd)', margin: '16px 0 14px', paddingTop: 14, fontSize: '.72rem', fontWeight: 700, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.1em' }}>
+                Commission
+              </div>
+              <Field
+                label="Commission %"
+                required
+                error={errors.agency_commission_percent}
+                hint="Paid on Won quote base amount (GST-excluded). Default 5.00%. No salary, no incentive slab, no TA/DA."
+              >
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.10"
+                  placeholder="e.g. 5.00"
+                  value={form.agency_commission_percent}
+                  onChange={e => set('agency_commission_percent', e.target.value)}
+                  style={errors.agency_commission_percent ? { borderColor: 'var(--red)' } : {}}
+                />
+              </Field>
+            </>
+          )}
+
+          {/* Phase 101.A2 — Monthly Salary / Incentive Profile only for
+              non-agency roles. Hidden in edit mode too when role flipped
+              to agency, so admin stops accidentally setting a salary on
+              a commission-only partner. */}
+          {mode === 'add' && form.role !== 'agency' && (
             <>
               <div style={{ borderTop: '1px solid var(--brd)', margin: '16px 0 14px', paddingTop: 14, fontSize: '.72rem', fontWeight: 700, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.1em' }}>
                 Incentive Profile

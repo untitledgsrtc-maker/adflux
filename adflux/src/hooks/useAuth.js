@@ -87,6 +87,12 @@ export function useAuth() {
     // the distinction matters (e.g., agency-specific reporting).
     isAgency:     profile?.role === 'agency',
     isSalesLike:  profile?.role === 'sales' || profile?.role === 'agency',
+    // Phase 101.A2 — distinguish quote-ownership widening (isSalesLike,
+    // kept) from salary/KPI/payroll surfaces (isCommissionedRep, NEW).
+    // Agency = commission-only partner per Phase 101.A1; UI uses this
+    // flag to early-return on salary widgets and route to
+    // AgencyEarningsView / AgencyOfferView.
+    isCommissionedRep: profile?.role === 'agency',
 
     // Full-access set used by sidebar gating + master-data pages
     isPrivileged: ['admin','co_owner'].includes(profile?.role),

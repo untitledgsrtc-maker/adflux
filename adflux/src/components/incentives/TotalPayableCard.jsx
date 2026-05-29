@@ -144,6 +144,14 @@ export default function TotalPayableCard() {
     return () => { cancelled = true }
   }, [profile?.id, settings?.id])
 
+  // Phase 101.A2 — agency = commission-only partner; no salary, no
+  // base/variable/incentive/TA/DA math. Defense early-return AFTER
+  // hooks so the grand-total card never renders even if a future
+  // caller mounts this without the MyPerformanceV2 top-level
+  // branch. Phase 101.A1 RPC already returns ok=false + zeros for
+  // agency callers; this is belt-and-braces.
+  if (profile?.role === 'agency') return null
+
   if (loading) {
     return (
       <div style={cardStyle}>

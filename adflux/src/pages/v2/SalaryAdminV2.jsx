@@ -78,7 +78,8 @@ export default function SalaryAdminV2({ embedded = false }) {
     const [usersRes, polRes, payRes, taRes] = await Promise.all([
       supabase.from('users')
         .select('id, name, role')
-        .in('role', ['sales', 'agency', 'telecaller', 'admin', 'co_owner'])
+        // Phase 101.A2 — agency dropped (commission-only, no salary).
+        .in('role', ['sales', 'telecaller', 'admin', 'co_owner'])
         .eq('is_active', true)
         .order('name', { ascending: true }),
       supabase.from('salary_policy')

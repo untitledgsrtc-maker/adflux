@@ -94,7 +94,8 @@ export default function LeavesAdminV2({ embedded = false }) {
     const [uRes, lRes] = await Promise.all([
       supabase.from('users')
         .select('id, name, role')
-        .in('role', ['sales', 'agency', 'telecaller', 'admin', 'co_owner'])
+        // Phase 101.A2 — agency dropped (no leave/payroll, commission-only).
+        .in('role', ['sales', 'telecaller', 'admin', 'co_owner'])
         .order('name', { ascending: true }),
       supabase.from('leaves')
         .select('id, user_id, leave_date, leave_type, reason, status, is_half_day, is_paid_request, created_at')

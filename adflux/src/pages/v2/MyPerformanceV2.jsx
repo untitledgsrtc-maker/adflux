@@ -16,7 +16,9 @@ import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCa
 import TcWeeklyTiles from '../../components/incentives/TcWeeklyTiles'
 import { MyPerformance } from '../../components/incentives/MyPerformance'
 import TotalPayableCard from '../../components/incentives/TotalPayableCard'
+import AgencyEarningsView from '../../components/agency/AgencyEarningsView'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import { useAuthStore } from '../../store/authStore'
 import '../../styles/incentives.css'
 
 export default function MyPerformanceV2() {
@@ -26,6 +28,18 @@ export default function MyPerformanceV2() {
   // reflecting on the dashboard until a tab switch.
   const [refreshKey, setRefreshKey] = useState(0)
   useAutoRefresh(() => setRefreshKey(k => k + 1))
+
+  // Phase 101.A2 — agency = commission-only partner. Routes to
+  // dedicated AgencyEarningsView ledger instead of the score /
+  // variable / TA / salary cards. Same /my-performance URL preserved
+  // (sidebar label already says "My Earnings" for agency via Phase
+  // 11g AGENCY_NAV — V2AppShell.jsx:135-139). Non-agency rendering
+  // below is byte-identical to baseline; useAutoRefresh mount
+  // preserved per CLAUDE.md §28 sales-frozen contract.
+  const profile = useAuthStore(s => s.profile)
+  if (profile?.role === 'agency') {
+    return <AgencyEarningsView refreshKey={refreshKey} />
+  }
 
   return (
     <div className="v2d-perf">

@@ -40,10 +40,13 @@ export default function IncentiveForecastCard({ quote }) {
   const [monthly, setMonthly] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Only sales/agency/telecaller see the forecaster. Admin / co-owner
+  // Only sales / telecaller see the forecaster. Admin / co-owner
   // already see broader liability dashboards elsewhere.
+  // Phase 101.A2 — agency dropped (commission-only; their commission
+  // = quote.subtotal × users.agency_commission_percent, shown in the
+  // AgencyEarningsView ledger, not in the incentive slab forecaster).
   const role = profile?.role || profile?.team_role
-  const isRep = role === 'sales' || role === 'agency' || role === 'telecaller'
+  const isRep = role === 'sales' || role === 'telecaller'
 
   useEffect(() => {
     if (!isRep || !profile?.id) {

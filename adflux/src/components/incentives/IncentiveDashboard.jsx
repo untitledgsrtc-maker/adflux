@@ -81,7 +81,14 @@ export function IncentiveDashboard() {
 
   // Merge profiles with member info (profiles join users already from fetchProfiles)
   // Flatten: each profile has users embedded
-  const salesProfiles = profiles.filter(p => p.users?.is_active)
+  // Phase 101.A2 — exclude agency rows. Agency = commission-only;
+  // their earnings render in AgencyEarningsView, not in the incentive
+  // slab/streak grid. Phase 101.A1 already set is_active=false on
+  // existing agency staff_incentive_profiles; this filter is the
+  // belt-and-braces guard for any historical row that slips through.
+  const salesProfiles = profiles.filter(p =>
+    p.users?.is_active && p.users?.role !== 'agency'
+  )
 
   // Summary for selected month
   const monthData = monthlySales.filter(m => m.month_year === selectedMonth)

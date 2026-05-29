@@ -160,7 +160,8 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     ;(async () => {
       const { data } = await supabase.from('users')
         .select('id, name, role')
-        .in('role', ['sales', 'agency', 'telecaller'])
+        // Phase 101.A2 — agency dropped (no TA/DA, commission-only).
+        .in('role', ['sales', 'telecaller'])
         .order('name', { ascending: true })
       setUsers(data || [])
       // Auto-select first rep so the page isn't empty on first visit.

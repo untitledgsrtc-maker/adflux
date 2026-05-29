@@ -39,7 +39,8 @@ export default function IncentiveMiniPill() {
   const [loading, setLoading] = useState(true)
 
   const role = profile?.role || profile?.team_role
-  const isRep = role === 'sales' || role === 'agency' || role === 'telecaller'
+  // Phase 101.A2 — agency dropped (commission-only, separate forecast UI).
+  const isRep = role === 'sales' || role === 'telecaller'
 
   useEffect(() => {
     if (!isRep || !profile?.id) { setLoading(false); return }

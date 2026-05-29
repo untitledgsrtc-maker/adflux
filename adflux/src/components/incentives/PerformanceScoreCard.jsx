@@ -118,6 +118,12 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader })
     return () => { cancelled = true }
   }, [userId])
 
+  // Phase 101.A2 — agency = commission-only partner; no salary, no
+  // KPI score. Defense early-return AFTER hooks (rules-of-hooks) so
+  // the score grid never renders even if a future caller mounts
+  // this card without the MyPerformanceV2 top-level branch.
+  if (profile?.role === 'agency') return null
+
   if (loading) {
     return (
       <div className="lead-card lead-card-pad" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}>
