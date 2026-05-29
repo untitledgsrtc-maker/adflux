@@ -60,7 +60,9 @@ function isFieldSales() {
 export function setActiveProfile({ role, teamRole } = {}) {
   cachedRole = role || null
   cachedTeamRole = teamRole || null
-  console.debug('[tracking] setActiveProfile role=' + cachedRole + ' teamRole=' + cachedTeamRole)
+  // Phase 102.H.1 instrumentation — console.warn so logcat shows
+  // this fire (Vite strips console.debug in production).
+  console.warn('[probe] setActiveProfile role=' + cachedRole + ' teamRole=' + cachedTeamRole)
 }
 
 /**
@@ -431,23 +433,29 @@ async function safeUserId() {
  * Web build: Capacitor.isNativePlatform() is false → no-op.
  */
 export async function runForegroundProbe() {
-  if (!Capacitor.isNativePlatform()) return
-  if (foregroundProbeDone) return
+  // Phase 102.H.1 instrumentation (2026-05-29 night) — Vite production
+  // strips console.debug; use console.warn so logcat shows each
+  // branch decision. Will revert to debug in Phase 102.H.1.1 once
+  // probe is verified end-to-end on a real rep phone.
+  if (!Capacitor.isNativePlatform()) {
+    console.warn('[probe] skip — not native platform')
+    return
+  }
+  if (foregroundProbeDone) {
+    console.warn('[probe] skip — already done this session')
+    return
+  }
   if (!isFieldSales()) {
-    console.debug('[tracking] foreground probe skipped — not field sales')
+    console.warn('[probe] skip — not field sales (cachedRole=' + cachedRole + ' cachedTeamRole=' + cachedTeamRole + ')')
     return
   }
   if (!initialised) {
-    console.debug('[tracking] foreground probe deferred — init not complete')
+    console.warn('[probe] skip — init not complete')
     return
   }
 
-  // Already have an open row from a prior cycle? Recovery path at
-  // line 71-99 set openGpsOffRowId on init. Don't double-insert.
-  // Latch flips here because the open row IS the truth state; no
-  // further probe needed this session.
   if (openGpsOffRowId) {
-    console.debug('[tracking] foreground probe — open row already tracked, skip')
+    console.warn('[probe] skip — open row already tracked id=' + openGpsOffRowId)
     foregroundProbeDone = true
     return
   }
@@ -456,34 +464,32 @@ export async function runForegroundProbe() {
   try {
     const res = await Tracking.isGpsOn?.()
     if (res && typeof res.enabled === 'boolean') enabled = res.enabled
+    console.warn('[probe] isGpsOn returned enabled=' + enabled)
   } catch (e) {
-    // Phase 102.H.1 (role-workflow F-R201) — don't latch on plugin
-    // error; the next V2AppShell effect re-fire OR the next manual
-    // call can retry. Returning without latch keeps the probe alive.
-    console.warn('[tracking] foreground probe — isGpsOn() failed:', e?.message || e)
+    console.warn('[probe] isGpsOn() failed:', e?.message || e)
     return
   }
   if (enabled) {
-    console.debug('[tracking] foreground probe — gps already on, no row needed')
+    console.warn('[probe] gps already on, no row needed')
     foregroundProbeDone = true
     return
   }
 
   const userId = await safeUserId()
   if (!userId) {
-    console.warn('[tracking] foreground probe — no userId; queueing')
+    console.warn('[probe] no userId; queueing')
     await enqueue({ type: 'gps', enabled: false, atMs: Date.now() })
-    // Don't latch — drainQueue on next init will replay this.
     return
   }
-  console.debug('[tracking] foreground probe — gps off, inserting row')
+  console.warn('[probe] gps off + sales rep + userId=' + userId + ' — inserting row')
   const inserted = await insertGpsOff(userId, Date.now(), 'foreground_probe')
   if (inserted?.id) {
     openGpsOffRowId = inserted.id
     foregroundProbeDone = true
+    console.warn('[probe] insert success id=' + inserted.id)
+  } else {
+    console.warn('[probe] insert FAILED — see [tracking] gps_off insert error above')
   }
-  // Insert failed → not latched. enqueue path inside insertGpsOff
-  // already stashed the event; drainQueue will retry.
 }
 
 export async function teardownNativeTracking() {
