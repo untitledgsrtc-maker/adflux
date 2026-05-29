@@ -52,8 +52,12 @@ android {
         // fallback assets. Live-update would propagate same JS via
         // Vercel but bundling gives defensive coverage if server.url
         // unreachable on first cold-start.
-        versionCode 96002
-        versionName "0.96.2"
+        // Phase 102.I (2026-05-29 night) — adds @capacitor/share +
+        // @capacitor/filesystem native plugins for in-app PDF share
+        // sheet (rep taps Download → save → Share → WhatsApp attaches
+        // PDF file). Native plugin addition = APK rebuild required.
+        versionCode 96003
+        versionName "0.96.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

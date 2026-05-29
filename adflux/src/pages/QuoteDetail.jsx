@@ -31,6 +31,10 @@ import { PaymentSummary } from '../components/payments/PaymentSummary'
 import IncentiveForecastCard from '../components/quotes/IncentiveForecastCard'
 import { setPendingEditOf, setPendingRenewalOf } from '../lib/quoteIntent'
 import { openExternalUrl } from '../utils/openExternal'
+// Phase 102.I (2026-05-29) — native PDF share via Capacitor Share + Filesystem.
+// Lazy-imported on demand inside handleDownloadPDF so the web bundle
+// doesn't pay the plugin size cost. Web build falls through to the
+// existing blob-download path.
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
 import { confirmDialog } from '../components/v2/ConfirmDialog'
@@ -250,9 +254,69 @@ export default function QuoteDetail() {
       const isNative = typeof window !== 'undefined'
         && window?.Capacitor?.isNativePlatform?.()
       if (isNative) {
+        // Phase 102.I (2026-05-29) — replaces the Phase 95.10 external-
+        // browser open. New flow:
+        //   1. uploadQuotePDF returns the branded
+        //      app.untitledad.in/pdf/REF?t=... URL.
+        //   2. Fetch the PDF bytes, save to Capacitor Filesystem cache.
+        //   3. Invoke Share with files=[fileUri]. Android shows the
+        //      system share sheet; rep picks WhatsApp and the PDF
+        //      attaches as a real file (not just a link).
+        // Fallback: any step throws → revert to AppLauncher open URL
+        // (Phase 95.10 behaviour) so rep still gets the PDF somehow.
         const url = await uploadQuotePDF(quote, cities)
         if (!url) throw new Error('PDF upload returned no URL')
-        openExternalUrl(url)
+        try {
+          const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+            import('@capacitor/filesystem'),
+            import('@capacitor/share'),
+          ])
+          const res = await fetch(url)
+          if (!res.ok) throw new Error('PDF fetch failed: ' + res.status)
+          const blob = await res.blob()
+          // ArrayBuffer → base64 (Filesystem.writeFile expects base64
+          // when no encoding is given).
+          const buf = await blob.arrayBuffer()
+          const bytes = new Uint8Array(buf)
+          let binary = ''
+          const chunkSize = 0x8000
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(
+              null, bytes.subarray(i, i + chunkSize),
+            )
+          }
+          const base64 = btoa(binary)
+          const safeRef = String(quote.ref_number || quote.id || 'quote')
+            .replace(/[^A-Za-z0-9_-]/g, '_')
+          const fileName = `quote-${safeRef}.pdf`
+          await Filesystem.writeFile({
+            path:      fileName,
+            data:      base64,
+            directory: Directory.Cache,
+            recursive: true,
+          })
+          const uriRes = await Filesystem.getUri({
+            path:      fileName,
+            directory: Directory.Cache,
+          })
+          await Share.share({
+            title:       `Quote ${quote.ref_number || ''}`.trim(),
+            text:        `Quote ${quote.ref_number || ''}`.trim(),
+            files:       [uriRes.uri],
+            dialogTitle: 'Share quote PDF',
+          })
+        } catch (shareErr) {
+          // User cancelled (typically thrown as 'Share canceled') OR
+          // plugin/IO error → fall back to opening URL in system browser
+          // so the rep can still get the PDF.
+          const msg = shareErr?.message || String(shareErr)
+          if (/cancel/i.test(msg)) {
+            // User dismissed the share sheet — silent.
+            return
+          }
+          console.warn('[handleDownloadPDF] share failed, falling back:', msg)
+          openExternalUrl(url)
+        }
         return
       }
       // Phase 15 — Other Media quotes get the ENIL-style invoice PDF.
