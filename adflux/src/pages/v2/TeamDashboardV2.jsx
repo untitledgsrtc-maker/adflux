@@ -734,7 +734,19 @@ export default function TeamDashboardV2() {
     const bounds = new google.maps.LatLngBounds()
     let anyPinned = false
 
+    // Phase 103.D.3 — the live field map shows WORKING reps only:
+    // checked in today AND not checked out. A signed-in-but-not-checked-
+    // in rep still pings (more so since the 103.D.1 watcher re-arm made
+    // pings reliable), but the map should reflect who's actually on the
+    // clock — not every phone that's online.
+    const checkedInIds = new Set(
+      (sessions || [])
+        .filter(s => s.check_in_at && !s.check_out_at && !s.auto_checked_out)
+        .map(s => s.user_id)
+    )
+
     for (const r of reps) {
+      if (!checkedInIds.has(r.id)) continue
       const ping = latestPingByUser[r.id]
       if (!ping || !ping.lat || !ping.lng) continue
       const ageMs = ping.captured_at
@@ -827,7 +839,7 @@ export default function TeamDashboardV2() {
         map.__teamDashboardFitDone = true
       } catch { /* swallow */ }
     }
-  }, [latestPingByUser, reps, iconBump, mapReady])
+  }, [latestPingByUser, reps, iconBump, mapReady, sessions])
 
   // Phase 89.1 — Lead pins from geo-tagged activities. Blue
   // map pins where the team met clients in the selected period.
