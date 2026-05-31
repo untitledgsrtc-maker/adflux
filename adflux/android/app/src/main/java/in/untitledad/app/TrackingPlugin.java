@@ -1,11 +1,13 @@
 package in.untitledad.app;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -13,6 +15,7 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.os.Build;
 import android.util.Log;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -306,6 +309,26 @@ public class TrackingPlugin extends Plugin {
     public void startTracking(PluginCall call) {
         Context ctx = getContext();
         if (ctx == null) { call.reject("Plugin context null"); return; }
+        // Phase 103.D.3 Step 1 hotfix — DO NOT start a location foreground
+        // service without location permission. On Android 14+ the service
+        // cannot legally call startForeground() (location type needs the
+        // permission), so it bails without promoting and Android kills the
+        // process with ForegroundServiceDidNotStartInTimeException (owner
+        // crash 2026-05-31). Gating here (native) means even an early/stale
+        // JS call — e.g. on cold start before the rep taps Allow — can't
+        // crash the app; it just no-ops until permission exists.
+        boolean fineGranted = ContextCompat.checkSelfPermission(
+                ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean coarseGranted = ContextCompat.checkSelfPermission(
+                ctx, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        if (!fineGranted && !coarseGranted) {
+            Log.w(TAG, "startTracking skipped — location permission not granted");
+            JSObject ret = new JSObject();
+            ret.put("ok", false);
+            ret.put("reason", "no_location_permission");
+            call.resolve(ret);
+            return;
+        }
         try {
             Intent svc = new Intent(ctx, LocationTrackingService.class);
             if (Build.VERSION.SDK_INT >= 26) {

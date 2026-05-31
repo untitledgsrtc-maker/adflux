@@ -107,6 +107,17 @@ export async function probeGpsState() {
 export async function startNativeLocationTracking() {
   if (!Capacitor.isNativePlatform()) return
   try {
+    // Only start once location permission is granted. The native side
+    // (TrackingPlugin) ALSO guards this, but skipping the call here
+    // avoids even reaching native on cold start before the rep taps
+    // Allow. Android 14+ crashes if a location foreground service is
+    // started without permission (owner crash 2026-05-31).
+    const { Geolocation } = await import('@capacitor/geolocation')
+    const perm = await Geolocation.checkPermissions()
+    if (perm?.location !== 'granted' && perm?.coarseLocation !== 'granted') {
+      console.warn('[tracking] location not granted — skip native service start')
+      return
+    }
     await Tracking.startTracking?.()
     console.warn('[tracking] native location service start requested')
   } catch (e) {

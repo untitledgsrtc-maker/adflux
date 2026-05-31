@@ -77,15 +77,20 @@ public class LocationTrackingService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "onStartCommand");
-        // Android 14+ refuses to start a location-typed foreground
-        // service without the permission already granted — so bail
-        // cleanly if it's missing rather than crash.
-        if (!hasLocationPermission()) {
-            Log.e(TAG, "no location permission — stopping service");
+        // CRITICAL (Android 12+): a service started via
+        // startForegroundService() MUST call startForeground() within
+        // ~5 seconds or the OS kills the process
+        // (ForegroundServiceDidNotStartInTimeException — owner crash
+        // 2026-05-31). So promote FIRST, before any other check, so the
+        // deadline can never be missed. TrackingPlugin already refuses
+        // to start this service without location permission, so the
+        // location-typed startForeground below succeeds.
+        boolean promoted = startInForeground();
+        if (!promoted || !hasLocationPermission()) {
+            Log.e(TAG, "cannot run (promoted=" + promoted + ") — stopping");
             stopSelf();
             return START_NOT_STICKY;
         }
-        startInForeground();
         startLocationUpdates();
         return START_STICKY;
     }
@@ -132,7 +137,7 @@ public class LocationTrackingService extends Service {
         }
     }
 
-    private void startInForeground() {
+    private boolean startInForeground() {
         createChannel();
         Notification notif = buildNotification("Location active");
         try {
@@ -142,8 +147,10 @@ public class LocationTrackingService extends Service {
                 startForeground(NOTIF_ID, notif);
             }
             Log.d(TAG, "startForeground OK");
+            return true;
         } catch (Throwable t) {
             Log.e(TAG, "startForeground failed: " + t.getMessage());
+            return false;
         }
     }
 
