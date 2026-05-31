@@ -46,6 +46,15 @@ import { summariseTrack, cleanTrack, detectStops } from '../../utils/gpsDistance
 const isAutoCheckinRow = (a) =>
   (a?.notes || '').startsWith("I'm here · auto-check-in")
 
+// Phase 103.E.2 — scheduled FUTURE meetings (PostCallOutcomeModal logs
+// "Meeting scheduled · <date>" as activity_type='meeting') are booked
+// appointments, NOT done meetings. Exclude from every done-meeting
+// reckoning, same as auto-check-in companion rows. The server-side
+// counter (lead_activity_bump_counter / recompute_daily_meetings) does
+// the same — keep these in lockstep.
+const isScheduledMeetingRow = (a) =>
+  (a?.notes || '').startsWith('Meeting scheduled')
+
 // Phase 93.7 (25 May 2026) — owner directive: "only unique meeting
 // can be count in KPI, revisit dont count in KPi". Second/third
 // visit to the SAME lead on the same day adds 0 to the KPI.
@@ -58,6 +67,7 @@ const uniqueMeetingCount = (activities, requireGps = false) => {
   for (const a of activities) {
     if (a.activity_type !== 'meeting' && a.activity_type !== 'site_visit') continue
     if (isAutoCheckinRow(a)) continue
+    if (isScheduledMeetingRow(a)) continue
     if (requireGps && (!a.gps_lat || !a.gps_lng)) continue
     // Walk-ins keyed by activity id so each is unique.
     const key = a.lead_id || `walkin_${a.id}`
@@ -826,8 +836,8 @@ export default function GpsTrackV2() {
               at least one meeting logged without a captured location.
               Banner saves the admin from thinking pins are missing. */}
           {(() => {
-            const meetingTotalToday = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && !isAutoCheckinRow(a)).length
-            const meetingWithGps    = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && !isAutoCheckinRow(a)).length
+            const meetingTotalToday = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && !isAutoCheckinRow(a) && !isScheduledMeetingRow(a)).length
+            const meetingWithGps    = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && !isAutoCheckinRow(a) && !isScheduledMeetingRow(a)).length
             const noGpsCount        = meetingTotalToday - meetingWithGps
             if (noGpsCount <= 0) return null
             return (
