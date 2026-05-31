@@ -95,6 +95,26 @@ serve(async (req) => {
   const userId = subs?.[0]?.user_id
   if (!userId) return json({ ok: false, error: 'unknown device' }, 401)
 
+  // Phase 103.D.8 — STOP SIGNAL (the "GPS keeps fetching after checkout"
+  // fix). If the rep is already checked out for today (manual OR the 8 PM
+  // auto-checkout cron), the native foreground service must stop. The JS
+  // layer can't relay checkout when the app is fully closed, so the
+  // server tells the device here: we DON'T insert the ping (no
+  // post-checkout km inflating TA) and return stop:true. The native
+  // LocationTrackingService reads that and calls stopSelf — no hardcoded
+  // clock, works at ANY checkout time (her 10:02 PM case included).
+  // work_sessions.work_date is the IST calendar day.
+  const istToday = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10)
+  const { data: ses } = await sb
+    .from('work_sessions')
+    .select('check_out_at')
+    .eq('user_id', userId)
+    .eq('work_date', istToday)
+    .maybeSingle()
+  if (ses?.check_out_at) {
+    return json({ ok: true, stop: true, reason: 'checked-out' })
+  }
+
   const { error: insErr } = await sb.from('gps_pings').insert([{
     user_id: userId,
     lat: lat.toFixed(7),

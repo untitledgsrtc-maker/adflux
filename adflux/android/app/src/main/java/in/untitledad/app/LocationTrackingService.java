@@ -23,6 +23,8 @@ import androidx.core.content.ContextCompat;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -242,7 +244,19 @@ public class LocationTrackingService extends Service {
                     os.flush();
                     os.close();
                     int code = conn.getResponseCode();
-                    Log.d(TAG, "ping POST -> " + code);
+                    String resp = readResponse(conn, code);
+                    Log.d(TAG, "ping POST -> " + code + " " + resp);
+                    // Phase 103.D.8 — server STOP signal. When the rep is
+                    // checked out for the day, ingest-gps writes NO ping and
+                    // returns {"ok":true,"stop":true}. Stop the foreground
+                    // service so it isn't tracking after the workday. This is
+                    // the ONLY stop path that works with the app fully closed
+                    // (the JS layer is dead, so it can't relay checkout). No
+                    // hardcoded clock — fires at whatever time checkout lands.
+                    if (resp != null && resp.contains("\"stop\":true")) {
+                        Log.d(TAG, "server: checked-out -> stopSelf");
+                        stopSelf();
+                    }
                 } catch (Throwable t) {
                     Log.w(TAG, "ping POST failed: " + t.getMessage());
                 } finally {
@@ -250,6 +264,27 @@ public class LocationTrackingService extends Service {
                 }
             }
         }).start();
+    }
+
+    // Phase 103.D.8 — read the small JSON response so postPing can see the
+    // server's stop signal. Uses the error stream for >=400 so the signal
+    // is never missed on a non-2xx. Best-effort: null on any failure.
+    private String readResponse(HttpURLConnection conn, int code) {
+        java.io.InputStream is = null;
+        try {
+            is = (code >= 200 && code < 400) ? conn.getInputStream() : conn.getErrorStream();
+            if (is == null) return null;
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+            br.close();
+            return sb.toString();
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            try { if (is != null) is.close(); } catch (Throwable ignored) {}
+        }
     }
 
     @Override

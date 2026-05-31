@@ -69,8 +69,9 @@ android {
         // Step 2 (96007) — service POSTs each fix to the ingest-gps Edge
         // (native write while app closed) + setTrackingContext.
         // 96008 — production notification text (drop the debug fix-count).
-        versionCode 96008
-        versionName "0.96.8"
+        // 96009 — Phase 103.D.8 stop-after-checkout (server stop signal).
+        versionCode 96009
+        versionName "0.96.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
