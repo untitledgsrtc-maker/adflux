@@ -8,6 +8,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.location.Location;
@@ -19,9 +20,13 @@ import android.os.IBinder;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import org.json.JSONObject;
 
 /**
  * Phase 103.D.3 — native foreground location service.
@@ -163,12 +168,10 @@ public class LocationTrackingService extends Service {
         listener = new LocationListener() {
             @Override
             public void onLocationChanged(Location loc) {
-                // STEP 1 — log only (no server write yet; Step 2 POSTs
-                // to gps_pings). Also stamp the foreground notification
-                // with the fix count + time so the service can be
-                // verified alive WHILE THE APP IS CLOSED without adb:
-                // pull down the notification shade — the time advances
-                // every ~2 min if the service survived close.
+                // Phase 103.D.3 Step 2 — log + stamp the notification (so
+                // survival is visible without adb) AND POST the fix to
+                // the ingest-gps Edge so it lands in gps_pings even with
+                // the app closed.
                 fixCount++;
                 String t = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
                 Log.d(TAG, "FIX #" + fixCount + " lat=" + loc.getLatitude()
@@ -176,6 +179,8 @@ public class LocationTrackingService extends Service {
                         + " acc=" + loc.getAccuracy()
                         + " provider=" + loc.getProvider());
                 updateNotification("Location active · " + fixCount + " fixes · last " + t);
+                Integer acc = loc.hasAccuracy() ? Math.round(loc.getAccuracy()) : null;
+                postPing(loc.getLatitude(), loc.getLongitude(), acc);
             }
             @Override public void onProviderEnabled(String p)  { Log.d(TAG, "provider enabled " + p); }
             @Override public void onProviderDisabled(String p) { Log.d(TAG, "provider disabled " + p); }
@@ -197,6 +202,53 @@ public class LocationTrackingService extends Service {
         } catch (Throwable t) {
             Log.e(TAG, "requestLocationUpdates failed: " + t.getMessage());
         }
+    }
+
+    // Phase 103.D.3 Step 2 — POST one fix to the ingest-gps Edge on a
+    // background thread (never the main thread → no NetworkOnMainThread
+    // exception). Reads the endpoint + device token from SharedPreferences
+    // (written by TrackingPlugin.setTrackingContext from JS). If unset
+    // (not configured yet), this is a no-op and the service stays
+    // log-only. Errors are swallowed — a failed POST never crashes the
+    // service. The Edge maps the token → user and writes gps_pings.
+    private void postPing(final double lat, final double lng, final Integer accuracy) {
+        SharedPreferences prefs = getSharedPreferences("untitled_tracking", Context.MODE_PRIVATE);
+        final String url = prefs.getString("ingest_url", null);
+        final String token = prefs.getString("ingest_token", null);
+        if (url == null || token == null) {
+            return; // not configured — log-only
+        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection conn = null;
+                try {
+                    JSONObject payload = new JSONObject();
+                    payload.put("token", token);
+                    payload.put("lat", lat);
+                    payload.put("lng", lng);
+                    if (accuracy != null) payload.put("accuracy_m", (int) accuracy);
+                    byte[] out = payload.toString().getBytes("UTF-8");
+
+                    conn = (HttpURLConnection) new URL(url).openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setRequestProperty("content-type", "application/json");
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(15000);
+                    conn.setDoOutput(true);
+                    OutputStream os = conn.getOutputStream();
+                    os.write(out);
+                    os.flush();
+                    os.close();
+                    int code = conn.getResponseCode();
+                    Log.d(TAG, "ping POST -> " + code);
+                } catch (Throwable t) {
+                    Log.w(TAG, "ping POST failed: " + t.getMessage());
+                } finally {
+                    if (conn != null) conn.disconnect();
+                }
+            }
+        }).start();
     }
 
     @Override

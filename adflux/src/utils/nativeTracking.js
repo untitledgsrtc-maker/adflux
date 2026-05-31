@@ -64,6 +64,16 @@ export function setActiveProfile({ role, teamRole } = {}) {
   // Phase 102.H.1 instrumentation — console.warn so logcat shows
   // this fire (Vite strips console.debug in production).
   console.warn('[probe] setActiveProfile role=' + cachedRole + ' teamRole=' + cachedTeamRole)
+  // Phase 103.D.3 Step 2/3 — start the native background location
+  // service for FIELD SALES only (TC / agency / admin / sales_manager
+  // excluded per spec), once the role is known (init runs before the
+  // role resolves, so this — not init — is the start trigger).
+  // Permission + ingest-context are checked inside start. Old GPS path
+  // keeps running as the live backup (both write; the 100m min-segment
+  // filter keeps km accurate).
+  if (isFieldSales()) {
+    startNativeLocationTracking().catch(() => {})
+  }
 }
 
 /**
@@ -118,10 +128,45 @@ export async function startNativeLocationTracking() {
       console.warn('[tracking] location not granted — skip native service start')
       return
     }
+    // Phase 103.D.3 Step 2 — hand the service its write context (ingest
+    // Edge URL + this device's FCM token) BEFORE starting, so it can
+    // POST pings while the app is closed.
+    await setNativeTrackingContext()
     await Tracking.startTracking?.()
     console.warn('[tracking] native location service start requested')
   } catch (e) {
     console.warn('[tracking] startTracking failed:', e?.message || e)
+  }
+}
+
+// Phase 103.D.3 Step 2 — tell the native service where to POST + which
+// device token to authenticate with. The token is THIS device's FCM
+// token (push_subscriptions); the ingest-gps Edge maps it to user_id.
+async function setNativeTrackingContext() {
+  try {
+    const base = import.meta.env.VITE_SUPABASE_URL
+    if (!base) return
+    const url = `${base}/functions/v1/ingest-gps`
+
+    let uid = cachedUserId
+    if (!uid) {
+      try { const { data } = await supabase.auth.getUser(); uid = data?.user?.id || null } catch { /* */ }
+    }
+    let token = null
+    if (uid) {
+      const { data } = await supabase
+        .from('push_subscriptions')
+        .select('fcm_token')
+        .eq('user_id', uid)
+        .not('fcm_token', 'is', null)
+        .order('last_seen_at', { ascending: false })
+        .limit(1)
+      token = data?.[0]?.fcm_token || null
+    }
+    await Tracking.setTrackingContext?.({ url, token })
+    console.warn('[tracking] ingest context set (haveToken=' + !!token + ')')
+  } catch (e) {
+    console.warn('[tracking] setTrackingContext failed:', e?.message || e)
   }
 }
 
@@ -236,13 +281,9 @@ export async function initNativeTracking() {
     console.error('[tracking] forceStopDetected subscribe failed:', e?.message || e)
   }
 
-  // ─── Phase 103.D.3 STEP 1 — start the native foreground location
-  // service (LOG-ONLY; writes nothing). Ungated for this test step so
-  // it runs on the owner's device. Step 3 will gate it to field sales
-  // and tie start/stop to check-in / checkout. Safe broad-start now:
-  // logcat-only, no server write, no existing function touched.
-  startNativeLocationTracking().catch(() => {})
-
+  // Phase 103.D.3 Step 2 — the native location service is started from
+  // setActiveProfile() (field-sales-gated), once V2AppShell provides the
+  // role. NOT started here: init runs before the role/profile resolves.
   console.debug('[tracking] init complete')
 }
 

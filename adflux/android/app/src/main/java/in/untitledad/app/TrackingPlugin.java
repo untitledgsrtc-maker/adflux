@@ -362,6 +362,32 @@ public class TrackingPlugin extends Plugin {
         }
     }
 
+    // Phase 103.D.3 Step 2 — JS hands the LocationTrackingService its
+    // server write context: the ingest-gps Edge URL + this device's FCM
+    // token (the device key the Edge maps to user_id). Stored in
+    // SharedPreferences; the service reads it per fix. Passing empty/null
+    // clears it (service falls back to log-only).
+    @PluginMethod
+    public void setTrackingContext(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) { call.reject("Plugin context null"); return; }
+        String url = call.getString("url");
+        String token = call.getString("token");
+        try {
+            SharedPreferences prefs = ctx.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
+            SharedPreferences.Editor ed = prefs.edit();
+            if (url != null && !url.isEmpty()) ed.putString("ingest_url", url); else ed.remove("ingest_url");
+            if (token != null && !token.isEmpty()) ed.putString("ingest_token", token); else ed.remove("ingest_token");
+            ed.apply();
+            Log.d(TAG, "setTrackingContext stored (url=" + (url != null) + " token=" + (token != null) + ")");
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Throwable t) {
+            call.reject("setTrackingContext failed: " + t.getMessage());
+        }
+    }
+
     // ─── Cleanup ────────────────────────────────────────────────
     private void unregisterReceivers() {
         Context ctx = getContext();
