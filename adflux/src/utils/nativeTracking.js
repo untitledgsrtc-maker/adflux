@@ -234,6 +234,18 @@ async function insertGpsOff(userId, atMs, source = 'native_receiver') {
       .select()
       .single()
     if (error) {
+      // Phase 103.A.1 (2026-05-31) — partial unique index
+      // uniq_open_gps_off_per_user rejects a 2nd open row per user.
+      // Android fires MODE_CHANGED 2-3x per single Location toggle
+      // (gps provider + network provider + OEM extras), so the first
+      // insert wins and the rest hit 23505. That's NOT an error — GPS
+      // is already flagged off. Swallow it + DO NOT enqueue (enqueue
+      // would replay the duplicate). The 102.L.1 ping trigger closes
+      // whichever open row exists.
+      if (error.code === '23505') {
+        console.debug('[tracking] gps_off dup ignored (already open)')
+        return null
+      }
       console.warn('[tracking] gps_off insert error:', error.message)
       await enqueue({ type: 'gps', enabled: false, atMs })
       return null
@@ -273,6 +285,14 @@ async function insertNetOff(userId, atMs) {
       .select()
       .single()
     if (error) {
+      // Phase 103.A.1 — same dedup as gps_off: partial unique index
+      // uniq_open_net_off_per_user rejects a 2nd open row. The network
+      // callback can fire repeatedly on flaky connectivity; 23505 means
+      // "already flagged offline", no-op, don't enqueue.
+      if (error.code === '23505') {
+        console.debug('[tracking] net_off dup ignored (already open)')
+        return null
+      }
       console.warn('[tracking] net_off insert error:', error.message)
       await enqueue({ type: 'network', online: false, atMs })
       return null
