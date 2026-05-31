@@ -42,9 +42,20 @@ export function haversineKm(a, b) {
 //   speed     200km/h -> 120km/h
 // MAX_DAILY_KM stays 600 (matches server cap line 145 of phase68).
 //
+// Phase 103.D.6 (2026-05-31) — drift floor 100m -> 10m. The 100m floor
+// was tuned for the OLD sparse 5-min pings; the new native foreground
+// service (Phase 103.D.3) writes a fix every ~20s, so real city/slow
+// driving makes <100m segments that the 100m floor was wrongly dropping
+// (Dixita's 10.7km Google drive came out 3.6 / 7.0). CALIBRATED against
+// that exact drive: with accuracy<=50m + speed<=120km/h, summing
+// segments >=10m gives 10.79km vs Google 10.7 (raw-no-floor = 41.6 =
+// pure jitter; 10m floor cleanly separates jitter from real movement).
+// Server compute_daily_ta moves to 10m in the SAME change
+// (supabase_phase103_d6_daily_ta_seg10.sql).
+//
 // If a future migration changes the server thresholds, these 4
 // constants MUST move in the same commit.
-export const MIN_SEG_KM       = 0.10           // 100 m — drift floor (server: phase68 line 83)
+export const MIN_SEG_KM       = 0.010          // 10 m — drift floor (server: phase103_d6)
 export const MAX_SEG_KM_PER_S = 120 / 3600     // 120 km/h ceiling   (server: phase68 line 89)
 export const MAX_DAILY_KM     = 600            // sanity cap         (server: phase68 line 145)
 export const MAX_ACC_M        = 50             // accuracy filter    (server: phase68 line 75)

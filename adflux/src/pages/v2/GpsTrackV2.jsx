@@ -90,6 +90,32 @@ const DARK_MAP_STYLE = [
   { featureType: 'water',               elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
 ]
 
+// Phase 103.D.6 — fetch ALL of the day's pings, paged past the
+// PostgREST 1000-row cap. The native foreground service (Phase 103.D.3)
+// writes ~1 fix/20s → a full workday is ~1,400-1,900 pings, so a single
+// request silently truncated the track to the morning (Dixita 10.7km
+// drive showed 3.6km). Pages of 1000 via .range() until a short page.
+// Returns { data, error } so it slots into the existing Promise.all.
+async function fetchAllPings(userId, start, end) {
+  const PAGE = 1000
+  let all = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await supabase.from('gps_pings')
+      .select('id, captured_at, lat, lng, accuracy_m, source')
+      .eq('user_id', userId)
+      .gte('captured_at', start)
+      .lte('captured_at', end)
+      .order('captured_at', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) return { data: null, error }
+    all = all.concat(data || [])
+    if (!data || data.length < PAGE) break
+    from += PAGE
+  }
+  return { data: all, error: null }
+}
+
 export default function GpsTrackV2() {
   const navigate = useNavigate()
   const { userId, date } = useParams()
@@ -146,12 +172,7 @@ export default function GpsTrackV2() {
       const end   = `${targetDate}T23:59:59`
       const [userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
-        supabase.from('gps_pings')
-          .select('id, captured_at, lat, lng, accuracy_m, source')
-          .eq('user_id', userId)
-          .gte('captured_at', start)
-          .lte('captured_at', end)
-          .order('captured_at', { ascending: true }),
+        fetchAllPings(userId, start, end),  // Phase 103.D.6 — paged past 1000-row cap
         // Phase 32E — work_sessions row gives check-in/out times,
         // morning plan, counters. One row per (user_id, work_date).
         supabase.from('work_sessions')
