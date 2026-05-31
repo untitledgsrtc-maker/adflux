@@ -168,7 +168,11 @@ const TELECALLER_NAV = [
   // who hit the URL directly still render — just not surfaced in
   // the TC nav anymore.
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
-  { to: '/telecaller',        label: 'Call Queue',     icon: Phone },
+  // Phase 104 — owner directive: telecaller landing reframed as a
+  // "Today" hub (incentive + day stats + queue), mirroring the sales
+  // /work Today page. Route unchanged (/telecaller); just the label +
+  // icon flip to Today/Sun so it reads as the daily command center.
+  { to: '/telecaller',        label: 'Today',          icon: Sun },
   { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
@@ -241,7 +245,9 @@ const MOBILE_NAV_SALES = [
 const MOBILE_NAV_TELECALLER = [
   // Phase 61.1 (19 May 2026) — /work dropped; /follow-ups in its
   // place. TC daily flow doesn't include the Plan-A morning page.
-  { to: '/telecaller',        label: 'Queue',          icon: Phone },
+  // Phase 104 — telecaller landing reframed as "Today" hub (see
+  // TELECALLER_NAV note). Bottom-tab label + icon match.
+  { to: '/telecaller',        label: 'Today',          icon: Sun },
   { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   // Phase 43.1 — /voice swap to /quotes (more useful daily for

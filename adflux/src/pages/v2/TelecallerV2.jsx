@@ -22,6 +22,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Phone, ArrowRight, MapPin, Clock, Plus, Sparkles, Loader2,
+  MessageSquare, ChevronRight, ChevronDown, FileText,
+  PhoneCall, CheckCircle2, Users, ArrowUpRight, AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -51,7 +53,9 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
 // Phase 47.1 — WhatsApp 1-click send.
 import WhatsAppSendModal from '../../components/leads/WhatsAppSendModal'
-import { MessageSquare, ChevronRight, ChevronDown, FileText } from 'lucide-react'
+// Phase 104 — incentive forecast card, reused from the sales /work Today
+// page so the TC Today hub leads with the same purple incentive card.
+import ProposedIncentiveCard from '../../components/incentives/ProposedIncentiveCard'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -543,6 +547,11 @@ export default function TelecallerV2() {
     : 0
   return (
     <div className="lead-root">
+      {/* Phase 104 — TC Today hub leads with the incentive forecast card
+          (same ProposedIncentiveCard + top position as the sales /work
+          Today page). Self-fetching; reads the TC's own incentive. */}
+      <ProposedIncentiveCard />
+
       {/* Phase 93 — evening wrap-up nag banner. Tap = smooth-scroll
           to DaySummaryCard below. Sits above DaySummaryCard so it
           can't be missed on first scroll. */}
@@ -560,10 +569,10 @@ export default function TelecallerV2() {
           label={`call${callsToday === 1 ? '' : 's'} today · target ${callTarget}`}
           percent={callTargetPct}
           footerStats={[
+            // Phase 104 — hero footer trimmed to connect-rate only; the
+            // qualified / in-queue / hand-offs stats moved into the Today
+            // tile grid below (sales-style), so they aren't shown twice.
             { label: `${connectRatePct}% connected`, value: connectedToday, tint: connectRatePct >= 30 ? 'var(--v2-green, #10B981)' : 'var(--v2-amber, #F59E0B)' },
-            { label: 'qualified',                    value: qualifiedToday, tint: 'var(--v2-blue, #3B82F6)' },
-            { label: 'in queue',                     value: queueOpen,      tint: 'var(--accent, #FFE600)' },
-            { label: 'handoffs',                     value: handoffs.length, tint: handoffs.length > 0 ? 'var(--v2-amber, #F59E0B)' : 'var(--v2-ink-2, #94a3b8)' },
           ]}
           accent={callTargetPct >= 100}
         />
@@ -810,38 +819,62 @@ export default function TelecallerV2() {
           target compare + color (red below, green hit). Owner-
           approved: 50 calls/day · 30% connect · 5 qualified/week
           · 0 SLA breaches. */}
-      <div className="lead-stat-strip">
-        {/* Phase 93.11 — all 4 KPI tiles clickable. Each drills to
-            the page where the underlying data lives so admin / TC
-            can investigate without navigating manually. */}
-        <Stat
-          label="Calls today"
-          num={`${callsToday}/${callTarget}`}
-          meta={`${callTargetPct}% of target`}
-          dotColor={callsToday >= callTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
-          onClick={() => navigate('/follow-ups')}
-        />
-        <Stat
-          label={`Connect rate · ≥${connectTarget}%`}
-          num={`${connectRatePct}%`}
-          meta={`${connectedToday} of ${callsToday} connected`}
-          dotColor={connectRatePct >= connectTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-amber, #F59E0B)'}
-          onClick={() => navigate('/follow-ups')}
-        />
-        <Stat
-          label={`Qualified this week · ≥${qualifiedWeeklyTarget}`}
-          num={`${qualifiedThisWeek}/${qualifiedWeeklyTarget}`}
-          meta="handed off to sales"
-          dotColor={qualifiedThisWeek >= qualifiedWeeklyTarget ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
-          onClick={() => navigate('/leads?stage=Working')}
-        />
-        <Stat
-          label="SLA breaches"
-          num={slaBreachCount}
-          meta={slaBreachCount === 0 ? 'all on time' : '24h cutoff missed'}
-          dotColor={slaBreachCount === 0 ? 'var(--v2-green, #10B981)' : 'var(--v2-rose, #EF4444)'}
-          onClick={() => navigate('/leads')}
-        />
+      {/* Phase 104 — Today tile grid. SAME UI as the sales
+          TodaySummaryCard (m-card · 3-col · icon + Space-Grotesk number +
+          9px label · tint bg/border · 78px min · greyed at 0). 6 TC
+          metrics: the qualified / in-queue / hand-offs that moved off the
+          hero footer + callbacks + connected + SLA. */}
+      <div className="m-card" style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
+        padding: 10, marginBottom: 16,
+      }}>
+        {[
+          { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks', n: callbacks.length,  to: '/follow-ups' },
+          { icon: PhoneCall,     tint: 'var(--success, #10B981)', label: 'Connected', n: connectedToday,    to: null },
+          { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Qualified', n: qualifiedThisWeek, to: '/leads?stage=Working' },
+          { icon: Users,         tint: 'var(--accent, #FFE600)',  label: 'In queue',  n: queueOpen,         to: '/leads' },
+          { icon: ArrowUpRight,  tint: 'var(--warning, #F59E0B)', label: 'Hand-offs', n: handoffs.length,   to: '/leads' },
+          { icon: AlertTriangle, tint: 'var(--danger, #EF4444)',  label: 'SLA',       n: slaBreachCount,    to: '/leads' },
+        ].map((c) => {
+          const Icon = c.icon
+          const empty = !c.n
+          const clickable = !!c.to && !empty
+          return (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => { if (c.to) navigate(c.to) }}
+              disabled={empty}
+              style={{
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 4,
+                padding: '12px 6px', borderRadius: 12,
+                background: `${c.tint}14`, border: `1px solid ${c.tint}33`,
+                cursor: clickable ? 'pointer' : 'default',
+                opacity: empty ? 0.5 : 1,
+                fontFamily: 'inherit', color: 'inherit', minHeight: 78,
+              }}
+              title={c.label}
+            >
+              <Icon size={14} strokeWidth={1.6} style={{ color: c.tint }} />
+              <div style={{
+                fontFamily: 'var(--font-display, "Space Grotesk")',
+                fontSize: 22, fontWeight: 700, color: 'var(--text)', lineHeight: 1,
+              }}>
+                {c.n}
+              </div>
+              <div style={{
+                fontSize: 9, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '.08em',
+                color: 'var(--text-muted)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                maxWidth: '100%',
+              }}>
+                {c.label}
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Phase 43.3 — upcoming callbacks panel. Shows the rep's open
@@ -1152,27 +1185,9 @@ export default function TelecallerV2() {
 }
 
 /* ─── Sub-components ─── */
-function Stat({ label, num, meta, dotColor, onClick }) {
-  // Phase 93.11 — clickable KPI tiles. Owner: "calles today n all 4
-  // tab must be clickable". onClick drills to a relevant page; if
-  // omitted, tile is static (no cursor/hover change).
-  const baseStyle = dotColor ? { borderLeft: `3px solid ${dotColor}` } : {}
-  const clickStyle = onClick ? { cursor: 'pointer' } : {}
-  return (
-    <div
-      className="lead-stat-card"
-      style={{ ...baseStyle, ...clickStyle }}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick() } : undefined}
-    >
-      <div className="lead-stat-eyebrow">{label}</div>
-      <div className="lead-stat-num">{num}</div>
-      {meta ? <div className="lead-stat-meta">{meta}</div> : null}
-    </div>
-  )
-}
+// Phase 104 — the <Stat> KPI-strip card was removed when the Today tile
+// grid (sales-style m-card tiles) replaced the lead-stat-strip. Deleted
+// to avoid dead code.
 
 function heatColor(heat) {
   if (heat === 'hot')  return 'var(--danger)'
