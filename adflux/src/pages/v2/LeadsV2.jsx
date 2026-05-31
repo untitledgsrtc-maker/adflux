@@ -392,7 +392,13 @@ export default function LeadsV2() {
     let value = 0, wonCount = 0, lostCount = 0
     leads.forEach(l => {
       counts[l.stage] = (counts[l.stage] || 0) + 1
-      value += Number(l.expected_value) || 0
+      // Phase 106 — pipeline = OPEN deals only. Won (closed revenue) +
+      // Lost (dead) must NOT inflate the Team-pipeline figure — owner
+      // caught the 163 Lost leads being summed into it. Matches the
+      // already-correct logic in LeadDashboardV2 (filter !Won/!Lost).
+      if (!['Won', 'Lost'].includes(l.stage)) {
+        value += Number(l.expected_value) || 0
+      }
       if (l.stage === 'Won')  wonCount++
       if (l.stage === 'Lost') lostCount++
     })
