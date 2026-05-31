@@ -75,6 +75,40 @@ const TABS = [
 // single shared map STATUS_COLOR_VARS in utils/constants.js so brand
 // changes propagate automatically. Import is at the top of the file.
 
+// Phase 103.D.8 — write the quote PDF to the Capacitor cache and return
+// a shareable file:// uri, so the APK WhatsApp path can attach a REAL
+// PDF instead of a wa.me text link (owner: "cant we attach pdf along
+// with whatsapp template?"). Mirrors the inline native block in
+// handleDownloadPDF, kept as a separate helper so that working download
+// path stays untouched. Throws on any failure → caller falls back to the
+// link flow. Native-only (callers gate on Capacitor.isNativePlatform).
+async function writeQuotePdfToCache(quote, cities) {
+  const url = await uploadQuotePDF(quote, cities)
+  if (!url) throw new Error('PDF upload returned no URL')
+  const { Filesystem, Directory } = await import('@capacitor/filesystem')
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('PDF fetch failed: ' + res.status)
+  const blob = await res.blob()
+  const buf = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize))
+  }
+  const base64 = btoa(binary)
+  // quote_number first (the UA-2026-NNNN ref) — same as handleDownloadPDF.
+  const safeRef = String(quote.quote_number || quote.ref_number || quote.id || 'quote')
+    .replace(/[^A-Za-z0-9_-]/g, '_')
+  // pdfs/ subfolder is the FileProvider-exposed cache path (102.I.1).
+  const fileName = `pdfs/quote-${safeRef}.pdf`
+  await Filesystem.writeFile({
+    path: fileName, data: base64, directory: Directory.Cache, recursive: true,
+  })
+  const uriRes = await Filesystem.getUri({ path: fileName, directory: Directory.Cache })
+  return uriRes.uri
+}
+
 export default function QuoteDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -355,6 +389,35 @@ export default function QuoteDetail() {
 
   async function handleWhatsApp() {
     if (!quote) return
+    // Phase 103.D.8 — APK: attach the actual PDF via the system share
+    // sheet (rep taps WhatsApp), with the proposal text as the caption.
+    // wa.me deep-links can't carry a file, so this is the only way to
+    // send the PDF itself. On any failure (or on web), fall through to
+    // the wa.me text-link flow below.
+    const isNative = typeof window !== 'undefined'
+      && window?.Capacitor?.isNativePlatform?.()
+    if (isNative) {
+      setPdfLoading(true)
+      try {
+        const uri = await writeQuotePdfToCache(quote, cities)
+        const { Share } = await import('@capacitor/share')
+        await Share.share({
+          title:       `Quote ${quote.quote_number || quote.ref_number || ''}`.trim(),
+          text:        buildWhatsAppMessage(quote, cities, {}), // caption, no link — file attached
+          files:       [uri],
+          dialogTitle: 'Send proposal',
+        })
+        logQuoteTouch('whatsapp', `WhatsApp · proposal ${quote.quote_number || quote.ref_number || ''} · PDF attached`)
+        return
+      } catch (shareErr) {
+        const msg = shareErr?.message || String(shareErr)
+        if (/cancel/i.test(msg)) return // rep dismissed the share sheet — silent
+        console.warn('[handleWhatsApp] native PDF share failed, falling back to link:', msg)
+        // fall through to the wa.me link flow
+      } finally {
+        setPdfLoading(false)
+      }
+    }
     // Upload PDF first so the WhatsApp message carries a public URL
     // the client can tap to download. wa.me can't attach files, so
     // this shortlink is the only way to get the PDF to them.
