@@ -68,8 +68,9 @@ android {
         // a cold-start startTracking() can't crash Android 14+.
         // Step 2 (96007) — service POSTs each fix to the ingest-gps Edge
         // (native write while app closed) + setTrackingContext.
-        versionCode 96007
-        versionName "0.96.7"
+        // 96008 — production notification text (drop the debug fix-count).
+        versionCode 96008
+        versionName "0.96.8"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

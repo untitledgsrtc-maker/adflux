@@ -144,7 +144,10 @@ public class LocationTrackingService extends Service {
 
     private boolean startInForeground() {
         createChannel();
-        Notification notif = buildNotification("Location active");
+        // Production text — Android requires a persistent notification for
+        // a foreground location service. Keep it plain + honest (reps see
+        // it all day). The debug "N fixes · last HH:MM" counter is gone.
+        Notification notif = buildNotification("Sharing your location with the office");
         try {
             if (Build.VERSION.SDK_INT >= 29) {
                 startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
@@ -168,17 +171,15 @@ public class LocationTrackingService extends Service {
         listener = new LocationListener() {
             @Override
             public void onLocationChanged(Location loc) {
-                // Phase 103.D.3 Step 2 — log + stamp the notification (so
-                // survival is visible without adb) AND POST the fix to
-                // the ingest-gps Edge so it lands in gps_pings even with
-                // the app closed.
+                // Phase 103.D.3 — log the fix + POST it to the ingest-gps
+                // Edge so it lands in gps_pings even with the app closed.
+                // The foreground notification stays the static production
+                // line (no per-fix counter — that was a debug aid).
                 fixCount++;
-                String t = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
                 Log.d(TAG, "FIX #" + fixCount + " lat=" + loc.getLatitude()
                         + " lng=" + loc.getLongitude()
                         + " acc=" + loc.getAccuracy()
                         + " provider=" + loc.getProvider());
-                updateNotification("Location active · " + fixCount + " fixes · last " + t);
                 Integer acc = loc.hasAccuracy() ? Math.round(loc.getAccuracy()) : null;
                 postPing(loc.getLatitude(), loc.getLongitude(), acc);
             }
