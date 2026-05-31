@@ -62,8 +62,10 @@ android {
         // restrictive exposure. Manifest meta-data unchanged; only
         // res/xml/file_paths.xml and the JS write path adjusted, so
         // rebuild required because file_paths.xml is bundled in res.
-        versionCode 96004
-        versionName "0.96.4"
+        // Phase 103.D.3 Step 1 — native foreground LocationTrackingService
+        // (log-only). New native code → APK rebuild required.
+        versionCode 96005
+        versionName "0.96.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

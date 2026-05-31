@@ -54,6 +54,16 @@
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color"
         />
+
+        <!-- Phase 103.D.3 — native foreground location service. Survives
+             app-close to keep writing pings (Step 2+). Step 1 is log-only.
+             Permissions (FOREGROUND_SERVICE / FOREGROUND_SERVICE_LOCATION /
+             ACCESS_*_LOCATION) already declared above. -->
+        <service
+            android:name=".LocationTrackingService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location" />
     </application>
 
     <!-- Permissions -->

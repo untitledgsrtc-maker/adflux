@@ -292,6 +292,53 @@ public class TrackingPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    // ─── 6. Phase 103.D.3 — native foreground location service ──────
+    // STEP 1: start/stop LocationTrackingService (log-only for now —
+    // proves the service survives app-close before any server write is
+    // added in Step 2). startForegroundService on 26+. NOTE: this MUST
+    // be called while the app is in the foreground (Step 1 calls it on
+    // app open). On Android 12+ a background startForegroundService
+    // throws ForegroundServiceStartNotAllowedException — the service's
+    // own try/catch swallows it so there's no crash, but do NOT move
+    // this call to a background trigger in a later step without adding
+    // an Android-12 background-start guard.
+    @PluginMethod
+    public void startTracking(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) { call.reject("Plugin context null"); return; }
+        try {
+            Intent svc = new Intent(ctx, LocationTrackingService.class);
+            if (Build.VERSION.SDK_INT >= 26) {
+                ctx.startForegroundService(svc);
+            } else {
+                ctx.startService(svc);
+            }
+            Log.d(TAG, "startTracking — service start requested");
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Throwable t) {
+            Log.e(TAG, "startTracking failed: " + t.getMessage());
+            call.reject("startTracking failed: " + t.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void stopTracking(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) { call.reject("Plugin context null"); return; }
+        try {
+            ctx.stopService(new Intent(ctx, LocationTrackingService.class));
+            Log.d(TAG, "stopTracking — service stop requested");
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Throwable t) {
+            Log.e(TAG, "stopTracking failed: " + t.getMessage());
+            call.reject("stopTracking failed: " + t.getMessage());
+        }
+    }
+
     // ─── Cleanup ────────────────────────────────────────────────
     private void unregisterReceivers() {
         Context ctx = getContext();

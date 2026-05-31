@@ -99,6 +99,32 @@ export async function probeGpsState() {
 }
 
 /**
+ * Phase 103.D.3 — start / stop the native foreground LocationTracking
+ * service. STEP 1 is LOG-ONLY (the service writes nothing to the
+ * server yet — it just proves it survives app-close, visible in
+ * logcat). No-op on web.
+ */
+export async function startNativeLocationTracking() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    await Tracking.startTracking?.()
+    console.warn('[tracking] native location service start requested')
+  } catch (e) {
+    console.warn('[tracking] startTracking failed:', e?.message || e)
+  }
+}
+
+export async function stopNativeLocationTracking() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    await Tracking.stopTracking?.()
+    console.warn('[tracking] native location service stop requested')
+  } catch (e) {
+    console.warn('[tracking] stopTracking failed:', e?.message || e)
+  }
+}
+
+/**
  * Bootstrap once at app start. Idempotent — safe to call multiple
  * times. No-op on web.
  */
@@ -198,6 +224,13 @@ export async function initNativeTracking() {
   } catch (e) {
     console.error('[tracking] forceStopDetected subscribe failed:', e?.message || e)
   }
+
+  // ─── Phase 103.D.3 STEP 1 — start the native foreground location
+  // service (LOG-ONLY; writes nothing). Ungated for this test step so
+  // it runs on the owner's device. Step 3 will gate it to field sales
+  // and tie start/stop to check-in / checkout. Safe broad-start now:
+  // logcat-only, no server write, no existing function touched.
+  startNativeLocationTracking().catch(() => {})
 
   console.debug('[tracking] init complete')
 }
