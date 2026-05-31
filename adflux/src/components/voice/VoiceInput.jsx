@@ -29,6 +29,11 @@ export default function VoiceInput({
   rows = 3,
   languageHint = 'gu',
   disabled = false,
+  // Phase 107 — mic-only mode: hide the text input, keep just the mic
+  // button + the transcript confirm strip. Used by PostCallOutcomeModal
+  // ("what did they say" → only the voice icon). Default false so the
+  // other consumers (LogMeeting/LogActivity/LeadForm) are unchanged.
+  compact = false,
 }) {
   const [state, setState] = useState('idle')   // idle | recording | sending | confirm | error
   const [transcript, setTranscript] = useState('')
@@ -175,15 +180,17 @@ export default function VoiceInput({
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
-        <InputComp
-          {...inputProps}
-          className="lead-inp"
-          value={value || ''}
-          onChange={e => onChange?.(e.target.value)}
-          placeholder={placeholder}
-          disabled={disabled || state === 'recording' || state === 'sending'}
-          style={{ flex: 1 }}
-        />
+        {!compact && (
+          <InputComp
+            {...inputProps}
+            className="lead-inp"
+            value={value || ''}
+            onChange={e => onChange?.(e.target.value)}
+            placeholder={placeholder}
+            disabled={disabled || state === 'recording' || state === 'sending'}
+            style={{ flex: 1 }}
+          />
+        )}
         <button
           type="button"
           onClick={state === 'recording' ? stopRecording : startRecording}

@@ -244,16 +244,9 @@ const NEXT_ACTIONS = [
   { value: 'none',               label: 'No next action',      days: 0, hidden: true },
 ]
 
-// Language toggle for the voice transcriber. 'auto' (default) sends an
-// empty hint to voice-process, which makes Whisper genuinely auto-
-// detect — fixes the Phase 34Z.49 default 'gu' that was biasing English
-// and Hindi speech into Gujarati script.
-const VOICE_LANGS = [
-  { value: 'auto', label: 'Auto', hint: '' },
-  { value: 'gu',   label: 'ગુ',    hint: 'gu' },
-  { value: 'hi',   label: 'हि',    hint: 'hi' },
-  { value: 'en',   label: 'En',   hint: 'en' },
-]
+// Phase 107 — the VOICE_LANGS toggle was removed (owner shrank the
+// "what did they say" section to a mic-only icon). VoiceInput now
+// auto-detects the spoken language (languageHint="").
 
 export default function PostCallOutcomeModal({
   open,
@@ -283,9 +276,7 @@ export default function PostCallOutcomeModal({
   // (Previously declared after, which worked at runtime but was a
   // linter/reader hazard.)
   const nextActionTouchedRef = useRef(false)
-  // Language toggle for the voice mic. 'auto' is the new default
-  // (Phase 34Z.49 hardcoded 'gu' which was biasing English/Hindi).
-  const [voiceLang, setVoiceLang] = useState('auto')
+  // Phase 107 — voiceLang toggle removed; VoiceInput auto-detects.
   // Phase 107 #7 — lost reason, captured when the Lost outcome is picked.
   // Saved to leads.lost_reason (the LeadsV2 "Price problem" filter reads
   // it). Replaces the removed "Call language (optional)" analytics section.
@@ -299,7 +290,6 @@ export default function PostCallOutcomeModal({
       setNotes('')
       setCustomDate(addDays(null, 1))
       setCustomTime('')
-      setVoiceLang('auto')
       setLostReason('')
       dateTouchedRef.current = false
       timeTouchedRef.current = false
@@ -825,61 +815,22 @@ export default function PostCallOutcomeModal({
             </div>
           </div>
 
-          {/* Voice notes */}
+          {/* Phase 107 — owner: shrink "what did they say" to just the
+              voice-mic icon. No big textarea, no language toggle, no helper.
+              The transcript still fills the outcome/next-action chips +
+              notes via handleVoiceNotes; VoiceInput's confirm strip shows
+              what was captured. Language auto-detects (Whisper). */}
           <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              gap: 8, marginBottom: 6, flexWrap: 'wrap',
-            }}>
-              <label className="lead-fld-label" style={{ margin: 0 }}>
-                What did they say? (voice or type)
-              </label>
-              {/* Phase 34Z.53 — language toggle. Default Auto so Whisper
-                  detects the spoken language. Earlier 'gu' default was
-                  forcing Gujarati script on English/Hindi speech. */}
-              <div style={{ display: 'inline-flex', gap: 4 }}>
-                {VOICE_LANGS.map(l => {
-                  const on = voiceLang === l.value
-                  return (
-                    <button
-                      key={l.value}
-                      type="button"
-                      onClick={() => setVoiceLang(l.value)}
-                      disabled={saving}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: 999,
-                        border: `1px solid ${on ? 'var(--v2-yellow, var(--accent, #FFE600))' : 'var(--border-strong, var(--v2-line))'}`,
-                        background: on
-                          ? 'var(--accent-soft, rgba(255,230,0,0.14))'
-                          : 'var(--v2-bg-2, var(--surface-2))',
-                        color: 'var(--text)',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        fontSize: 11,
-                        lineHeight: 1.2,
-                      }}
-                      title={`Voice transcribe as ${l.label}`}
-                    >
-                      {l.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+            <label className="lead-fld-label" style={{ margin: 0, display: 'block', marginBottom: 6 }}>
+              What did they say?
+            </label>
             <VoiceInput
-              multiline
-              rows={3}
+              compact
               value={notes}
               onChange={handleVoiceNotes}
-              placeholder="Speak: 'after 3 days follow up' / 'મીટિંગ આવતી કાલે' / 'lost, not interested'"
               disabled={saving}
-              languageHint={VOICE_LANGS.find(l => l.value === voiceLang)?.hint || ''}
+              languageHint=""
             />
-            <div style={{ fontSize: 10, color: 'var(--text-subtle)', marginTop: 6, lineHeight: 1.4 }}>
-              Say outcome + next action — chips fill in automatically.
-              Examples: "good, follow up in 3 days" · "meeting tomorrow" · "lost, not interested".
-            </div>
           </div>
 
           {/* Phase 107 #3 — "Call language (optional)" section removed per
