@@ -1517,6 +1517,17 @@ export default function LeadDetailV2() {
               <div className="lead-card-title">Lead details</div>
             </div>
             <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+              {/* Phase 107 #2 — Company + Name are now inline-editable
+                  (owner: "after open lead I can't edit name/company").
+                  Same InlineField pattern as the other fields;
+                  onLeadFieldSaved merges into lead state so the hero title
+                  above updates live. */}
+              <FieldCell label="Company">
+                <InlineField value={lead.company} field="company" leadId={lead.id} onSaved={onLeadFieldSaved} />
+              </FieldCell>
+              <FieldCell label="Contact name">
+                <InlineField value={lead.name} field="name" leadId={lead.id} onSaved={onLeadFieldSaved} />
+              </FieldCell>
               {/* Phase 32P — the inline-edit field opens edit mode on
                   click, which blocks the obvious "tap to call" / "tap
                   to email" affordance. Small action icon next to each
