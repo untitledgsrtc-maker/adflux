@@ -185,10 +185,20 @@ export default function TeamDashboardV2() {
     try {
       const { data: gpsRows } = await supabase
         .from('gps_off_events')
-        .select('user_id')
+        .select('user_id, toggled_off_at')
         .is('toggled_on_at', null)
+      // Phase 102.L (2026-05-31) — store the LATEST open off-event
+      // timestamp per user (not a bare boolean). The pill compares it
+      // against the last ping: a ping NEWER than the off-event proves
+      // GPS came back, so the unclosed row is stale (close event leaked
+      // when app was backgrounded). Confirmed live: Dixita had 3 open
+      // rows from 23 May while pinging 31 May — the boolean veto kept
+      // her pill red for 8 days.
       const gm = {}
-      ;(gpsRows || []).forEach((r) => { gm[r.user_id] = true })
+      ;(gpsRows || []).forEach((r) => {
+        const t = new Date(r.toggled_off_at).getTime()
+        if (!gm[r.user_id] || t > gm[r.user_id]) gm[r.user_id] = t
+      })
       setGpsOffByUser(gm)
     } catch (e) {
       console.warn('[team-dashboard] gps_off load failed:', e?.message || e)
@@ -1321,17 +1331,23 @@ export default function TeamDashboardV2() {
                 const pingMins = ping
                   ? Math.floor((Date.now() - new Date(ping.captured_at).getTime()) / 60000)
                   : Infinity
-                // Phase 102.H.2 (2026-05-29) — open gps_off_events row
-                // from the rep's phone overrides ping freshness. If
-                // phone reported Location off, pill is RED immediately
-                // regardless of how recent the last ping was. Ping
-                // threshold also tightened 720 → 60 min so reps with
-                // no phone-reported off-event but stale pings still
-                // surface as OFF after an hour of darkness. TA/DA
-                // payable unchanged — Phase 68 compute_daily_ta does
-                // NOT join gps_off_events; this is display-only.
-                const hasOpenGpsOff = !!gpsOffByUser[r.id]
-                const gpsOn = !hasOpenGpsOff && pingMins <= 60
+                // Phase 102.L (2026-05-31) — TIMESTAMP comparison, not
+                // boolean veto. A ping NEWER than the open off-event
+                // proves GPS is back on (the ping itself requires GPS),
+                // so the unclosed row is stale (close event leaked when
+                // the app was backgrounded — confirmed: Dixita had 3
+                // open rows from 23 May while pinging 31 May).
+                //   GPS ON  = fresh ping (≤60 min) AND ping newer than
+                //             the latest open off-event.
+                //   GPS OFF = no ping in 60 min, OR the off-event is
+                //             newer than the last ping (genuinely went
+                //             off after last movement).
+                // Self-heals leaked rows. TA/DA payable unchanged —
+                // Phase 68 compute_daily_ta does NOT join gps_off_events;
+                // this is display-only.
+                const offAtMs    = gpsOffByUser[r.id] || 0   // ms epoch or 0
+                const lastPingMs = ping ? new Date(ping.captured_at).getTime() : 0
+                const gpsOn = pingMins <= 60 && lastPingMs > offAtMs
                 const push = pushByUser[r.id]
                 const pushOn = !!push?.has_sub
                 const lastSeenMins = push?.last_seen_at
