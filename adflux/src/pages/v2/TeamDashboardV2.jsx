@@ -30,6 +30,7 @@ import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import { formatCurrency } from '../../utils/formatters'
 // Phase 82 — date filter + per-rep follow-up/quote/payment KPIs.
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
+import AdminPushModal from '../../components/v2/AdminPushModal'
 import { presetToday } from '../../utils/period'
 
 // Phase 87.6 — avatar marker helpers. Owner directive 24 May 2026:
@@ -144,6 +145,9 @@ export default function TeamDashboardV2() {
 
   const [reps, setReps] = useState([])
   const [sessions, setSessions] = useState([])
+  // Phase 103.E — admin compose-push target ({ id, name }) or null.
+  // Set by clicking a rep card's Push pill; opens AdminPushModal.
+  const [pushTarget, setPushTarget] = useState(null)
   // Phase 83 — split calls KPI into total + connected. owner caught
   // Rima showing 336 calls on /team-dashboard (Phase 82): that was
   // the raw call_logs row count — every tel-tap, including no-answer
@@ -1354,8 +1358,11 @@ export default function TeamDashboardV2() {
                   ? Math.floor((Date.now() - new Date(push.last_seen_at).getTime()) / 60000)
                   : Infinity
                 const onlineOk = lastSeenMins <= 1440 // 24h (was 3h)
-                const pill = (label, ok) => (
+                const pill = (label, ok, onClick) => (
                   <span
+                    onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
+                    role={onClick ? 'button' : undefined}
+                    title={onClick ? `Send a push notification to ${r.name}` : undefined}
                     style={{
                       display:      'inline-flex',
                       alignItems:   'center',
@@ -1369,6 +1376,7 @@ export default function TeamDashboardV2() {
                       border:       `1px solid ${ok ? 'var(--success, #10B981)' : 'var(--danger, #EF4444)'}`,
                       background:   ok ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.14)',
                       color:        ok ? 'var(--success, #10B981)' : 'var(--danger, #EF4444)',
+                      cursor:       onClick ? 'pointer' : 'default',
                     }}
                   >
                     <span style={{
@@ -1391,7 +1399,7 @@ export default function TeamDashboardV2() {
                   >
                     {pill('GPS',    gpsOn)}
                     {pill('Online', onlineOk)}
-                    {pill('Push',   pushOn)}
+                    {pill('Push',   pushOn, () => setPushTarget({ id: r.id, name: r.name }))}
                   </div>
                 )
               })()}
@@ -1475,6 +1483,8 @@ export default function TeamDashboardV2() {
           Voice logging is deployed. Reps record from any lead detail page or <b style={{ color: 'var(--text)' }}>/voice</b>. Whisper transcribes, Claude classifies (call/whatsapp/meeting · positive/neutral/negative), and the result lands as a lead activity. A roll-up of recent voice logs across the whole team will surface here once usage builds up.
         </div>
       </div>
+      {/* Phase 103.E — admin compose-push to a rep (opened from the Push pill) */}
+      <AdminPushModal target={pushTarget} onClose={() => setPushTarget(null)} />
     </div>
   )
 }
