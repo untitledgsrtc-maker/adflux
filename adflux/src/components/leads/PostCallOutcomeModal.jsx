@@ -106,11 +106,17 @@ function parseCallIntent(rawText) {
   if (days === null && /next week|aglhe hafte|agla hafta|આવત(ા|ી)\s?અઠવાડિ|अगले हफ्ते/.test(text)) {
     days = 7
   }
-  // "next month" / "ek mahine" / "આવતા મહિને" / "nurture"
-  if (days === null && /next month|aagla mahina|agle maheene|આવત(ા|ી)\s?મહિને|अगले महीने|nurture/.test(text)) {
+  // "next month" / "ek mahine" / "આવતા મહિને"
+  if (days === null && /next month|aagla mahina|agle maheene|આવત(ા|ી)\s?મહિને|अगले महीने/.test(text)) {
     days = 30
   }
   if (days !== null) out.days = days
+
+  // Phase 107 — explicit "nurture" maps to the Nurture OUTCOME (park the
+  // lead + auto 30-day re-pitch via the stage trigger), NOT a custom
+  // 30-day follow-up. The outcome→default effect then forces nextAction
+  // ='none', so no manual follow_up is inserted (the trigger owns it).
+  if (/\bnurture\b/.test(text)) out.outcome = 'nurture'
 
   // Time of day -----------------------------------------------------
   // English: "at 3 pm", "at 11:30", "3 o'clock"
@@ -153,14 +159,11 @@ function parseCallIntent(rawText) {
     out.nextAction = 'meeting'
   } else if (days === 1) {
     out.nextAction = 'follow_up_tomorrow'
-  } else if (days === 3) {
-    out.nextAction = 'follow_up_3d'
-  } else if (days === 7) {
-    out.nextAction = 'follow_up_7d'
-  } else if (days === 30) {
-    out.nextAction = 'nurture_30d'
   } else if (days !== null && days > 0) {
-    // Custom days — keep the date but don't pick a preset chip.
+    // Phase 107 — the 3d / 7d / 30d preset chips were removed. Any parsed
+    // day count other than 1 keeps its date via the custom-date path
+    // (no preset chip). The "nurture" keyword routes to the Nurture
+    // OUTCOME above instead of a day count.
     out.nextAction = 'follow_up_custom'
   }
 
@@ -213,6 +216,12 @@ const OUTCOMES = [
   // generic Maybe = "not sure yet"). When picked, auto-fills
   // next_action = call_back_2h with today's date + now+2h.
   { value: 'callback', label: 'Call later', sub: 'Wants a callback',       tone: 'warn' },
+  // Phase 107 — Nurture: a Lost-style outcome that PARKS the lead in
+  // Nurture (not dead). The stage→Nurture cadence trigger
+  // (lead_stage_change_cadence) auto-spawns the 30-day re-pitch follow-up,
+  // so the modal forces nextAction='none' (no double insert). Blue (info)
+  // tone keeps it visually distinct from the red Lost tile.
+  { value: 'nurture',  label: 'Nurture',     sub: 'Re-pitch in 30 days',    tone: 'info' },
   { value: 'negative', label: 'Lost',       sub: 'Politely refused',       tone: 'danger' },
 ]
 
@@ -223,14 +232,16 @@ const NEXT_ACTIONS = [
   // customDate=today (IST) and customTime=now+2h (IST).
   { value: 'call_back_2h',       label: 'Call back in 2 hours', days: 0, hours: 2 },
   { value: 'follow_up_tomorrow', label: 'Follow up tomorrow', days: 1 },
-  { value: 'follow_up_3d',       label: 'Follow up in 3 days', days: 3 },
-  { value: 'follow_up_7d',       label: 'Follow up next week', days: 7 },
-  { value: 'nurture_30d',        label: 'Nurture · 30 days',   days: 30 },
   // Phase 34Z.53 — meeting now carries a date (default tomorrow). Date
   // input below the chips lets the rep pick any date for any chip.
   { value: 'meeting',            label: 'Schedule a meeting',  days: 1 },
   { value: 'follow_up_custom',   label: 'Pick custom date…',   days: null },
-  { value: 'none',               label: 'No next action',      days: 0 },
+  // Phase 107 #6 — owner trimmed "Follow up in 3 days", "Follow up next
+  // week", and "Nurture · 30 days" from the visible chips (Nurture is now
+  // an OUTCOME). 'none' is KEPT but hidden:true (filtered from the chip
+  // grid) because Lost + Nurture force it so the save skips a manual
+  // follow_up — their cadence triggers own the follow-up.
+  { value: 'none',               label: 'No next action',      days: 0, hidden: true },
 ]
 
 // Language toggle for the voice transcriber. 'auto' (default) sends an
@@ -254,13 +265,13 @@ export default function PostCallOutcomeModal({
 }) {
   const profile = useAuthStore(s => s.profile)
   const [outcome, setOutcome] = useState('')
-  const [nextAction, setNextAction] = useState('follow_up_3d')
+  const [nextAction, setNextAction] = useState('follow_up_tomorrow')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   // Phase 34Z.53 — custom date picker drives the follow_ups row date.
   // Defaults to the preset offset for the selected chip; rep can edit
   // freely. Once edited manually, chip selection no longer overrides.
-  const [customDate, setCustomDate] = useState(addDays(null, 3))
+  const [customDate, setCustomDate] = useState(addDays(null, 1))
   // Phase 34Z.60 — optional time of day. Owner asked for a time picker
   // alongside the date so "meet at 11 AM tomorrow" is one tap. Empty
   // string means "no time set" — follow_ups.follow_up_time stays null.
@@ -275,21 +286,21 @@ export default function PostCallOutcomeModal({
   // Language toggle for the voice mic. 'auto' is the new default
   // (Phase 34Z.49 hardcoded 'gu' which was biasing English/Hindi).
   const [voiceLang, setVoiceLang] = useState('auto')
-  // Phase 47.8 — call language (what language the CUSTOMER spoke).
-  // Distinct from voiceLang above which controls the rep's speech
-  // transcriber. Used for analytics on which language converts best.
-  const [callLanguage, setCallLanguage] = useState('')  // '' = unset
+  // Phase 107 #7 — lost reason, captured when the Lost outcome is picked.
+  // Saved to leads.lost_reason (the LeadsV2 "Price problem" filter reads
+  // it). Replaces the removed "Call language (optional)" analytics section.
+  const [lostReason, setLostReason] = useState('')  // '' = unset
 
   // Reset state every time the modal opens for a fresh call.
   useEffect(() => {
     if (open) {
       setOutcome('')
-      setNextAction('follow_up_3d')
+      setNextAction('follow_up_tomorrow')
       setNotes('')
-      setCustomDate(addDays(null, 3))
+      setCustomDate(addDays(null, 1))
       setCustomTime('')
       setVoiceLang('auto')
-      setCallLanguage('')
+      setLostReason('')
       dateTouchedRef.current = false
       timeTouchedRef.current = false
       // Phase 45.1 — reset smart-default tracker so each fresh modal
@@ -311,11 +322,13 @@ export default function PostCallOutcomeModal({
   // (nextActionTouchedRef declared above with the other touched refs.)
   useEffect(() => {
     if (!open) return
-    if (outcome === 'negative') {
-      // Force nextAction='none' on Lost — overrides any prior manual
-      // pick because the Next action card is about to be hidden. Save
-      // chain then skips the follow_up insert (handleSave checks
-      // `nextAction !== 'none' && customDate`).
+    if (outcome === 'negative' || outcome === 'nurture') {
+      // Force nextAction='none' on Lost AND Nurture — both hide the Next
+      // action card, so override any prior manual pick. Lost = dead, no
+      // follow-up. Nurture = the stage→Nurture cadence trigger
+      // (lead_stage_change_cadence) spawns the 30-day re-pitch follow-up,
+      // so a modal insert would DOUBLE it. Save chain skips the follow_up
+      // insert (handleSave checks `nextAction !== 'none' && customDate`).
       setNextAction('none')
       return
     }
@@ -404,10 +417,16 @@ export default function PostCallOutcomeModal({
     // 1. Patch the previously-inserted activity row with outcome + notes.
     //    Falls back to a fresh insert when pendingActivityId is missing
     //    (e.g. rep opened the modal manually instead of via tel:).
+    // Phase 107 — Nurture is a UI-only outcome. lead_activities.outcome
+    // CHECK allows positive/neutral/negative/callback (Phase 45.3), NOT
+    // 'nurture'. Save it as 'neutral' (no heat change — correct for a
+    // nurture); the real signal is stage→Nurture + the cadence trigger's
+    // 30-day follow-up. The timeline note still reads "Call · Nurture".
+    const savedOutcome = outcome === 'nurture' ? 'neutral' : outcome
     let activityError = null
     if (pendingActivityId) {
       const { error } = await supabase.from('lead_activities').update({
-        outcome,
+        outcome: savedOutcome,
         notes: [`Call · ${OUTCOMES.find(o => o.value === outcome)?.label || outcome}`, notes.trim() || null]
           .filter(Boolean).join(' — '),
       }).eq('id', pendingActivityId)
@@ -416,7 +435,7 @@ export default function PostCallOutcomeModal({
       const { error } = await supabase.from('lead_activities').insert([{
         lead_id: lead.id,
         activity_type: 'call',
-        outcome,
+        outcome: savedOutcome,
         notes: [`Call · ${OUTCOMES.find(o => o.value === outcome)?.label || outcome}`, notes.trim() || null]
           .filter(Boolean).join(' — '),
         created_by: profile?.id,
@@ -487,9 +506,10 @@ export default function PostCallOutcomeModal({
     if (profile?.id && lead?.id) {
       const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
       const callLogPatch = {}
-      if (callLanguage) callLogPatch.language = callLanguage
       // Map lead_activities outcome → call_logs outcome enum.
-      if (outcome === 'positive' || outcome === 'neutral' || outcome === 'negative') {
+      // Phase 107 — Nurture is a connected call too (the rep spoke to them).
+      // (The "Call language" analytics write was removed in Phase 107 #3.)
+      if (outcome === 'positive' || outcome === 'neutral' || outcome === 'negative' || outcome === 'nurture') {
         callLogPatch.outcome = 'connected'
       } else if (outcome === 'callback') {
         callLogPatch.outcome = 'callback_requested'
@@ -559,9 +579,18 @@ export default function PostCallOutcomeModal({
         qualified_at: lead.qualified_at || new Date().toISOString(),
       }).eq('id', lead.id)
       if (stageErr) toastError(stageErr, 'Stage auto-advance failed (lead saved).')
+    } else if (outcome === 'nurture' && !['Nurture', 'Won', 'Lost'].includes(lead.stage)) {
+      // Phase 107 — park the lead in Nurture. The stage→Nurture cadence
+      // trigger (lead_stage_change_cadence) auto-spawns the 30-day re-pitch
+      // follow-up, so the modal forces nextAction='none' (no double).
+      const { error: stageErr } = await supabase.from('leads').update({
+        stage: 'Nurture',
+      }).eq('id', lead.id)
+      if (stageErr) toastError(stageErr, 'Stage → Nurture failed (lead saved).')
     } else if (outcome === 'negative' && lead.stage !== 'Lost' && lead.stage !== 'Won') {
       const { error: stageErr } = await supabase.from('leads').update({
         stage: 'Lost',
+        lost_reason: lostReason || null,   // Phase 107 #7 — capture the reason
       }).eq('id', lead.id)
       if (stageErr) toastError(stageErr, 'Stage auto-flip to Lost failed (lead saved).')
     }
@@ -670,13 +699,10 @@ export default function PostCallOutcomeModal({
           note:           fuRow.note,
         }).catch((e) => console.warn('[phase96] alarm schedule failed:', e?.message || e))
       }
-      // Nurture pseudo-action also flips the lead to Nurture stage.
-      if (nextAction === 'nurture_30d' && lead.stage !== 'Won' && lead.stage !== 'Lost') {
-        await supabase.from('leads').update({
-          stage: 'Nurture',
-          revisit_date: customDate,
-        }).eq('id', lead.id)
-      }
+      // Phase 107 — the old `nurture_30d` pseudo-action stage flip was
+      // removed. The Nurture OUTCOME now owns stage→Nurture (in the
+      // handleSave stage block) + the stage→Nurture cadence trigger spawns
+      // the 30-day re-pitch follow-up. This stale block double-wrote both.
       // Phase 34Z.60 — when nextAction is 'meeting', also insert a
       // separate lead_activities row of type 'meeting'. Without this
       // the timeline only shows the originating 'call' row and the
@@ -766,10 +792,12 @@ export default function PostCallOutcomeModal({
                   const tint =
                     o.tone === 'success' ? 'var(--tint-success, rgba(16,185,129,0.14))'
                     : o.tone === 'warn'   ? 'var(--tint-warning, rgba(245,158,11,0.14))'
+                    : o.tone === 'info'   ? 'var(--tint-blue, rgba(59,130,246,0.14))'
                     :                       'var(--tint-danger, rgba(239,68,68,0.14))'
                   const bd =
                     o.tone === 'success' ? 'var(--success, #10B981)'
                     : o.tone === 'warn'   ? 'var(--warning, #F59E0B)'
+                    : o.tone === 'info'   ? 'var(--blue, #3B82F6)'
                     :                       'var(--danger, #EF4444)'
                   return (
                     <button
@@ -854,46 +882,8 @@ export default function PostCallOutcomeModal({
             </div>
           </div>
 
-          {/* Phase 47.8 — call language tag (what the CUSTOMER spoke).
-              Optional. Skipping leaves the call_logs row's language
-              column as NULL. Used for analytics only — admin can later
-              see "Hindi calls convert 23%, English 14%". */}
-          <div className="lead-card" style={{ marginBottom: 12 }}>
-            <div className="lead-card-head"><div className="lead-card-title">Call language <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 400 }}>(optional)</span></div></div>
-            <div className="lead-card-pad" style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
-              {[
-                { v: '',   label: '— skip —' },
-                { v: 'gu', label: 'Gujarati' },
-                { v: 'hi', label: 'Hindi' },
-                { v: 'en', label: 'English' },
-              ].map(l => {
-                const on = callLanguage === l.v
-                return (
-                  <button
-                    key={l.v}
-                    type="button"
-                    onClick={() => setCallLanguage(l.v)}
-                    disabled={saving}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 999,
-                      border: `1px solid ${on ? 'var(--v2-yellow, var(--accent, #FFE600))' : 'var(--border-strong, var(--v2-line))'}`,
-                      background: on
-                        ? 'var(--accent-soft, rgba(255,230,0,0.14))'
-                        : 'var(--v2-bg-2, var(--surface-2))',
-                      color: on ? 'var(--v2-yellow, var(--accent))' : 'var(--text)',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {l.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          {/* Phase 107 #3 — "Call language (optional)" section removed per
+              owner (redundant with the voice transcribe toggle above). */}
 
           {/* Phase 97.6 (2026-05-28) — Lost outcome hides the Next
               action card entirely. Lead is dead; no follow-up needed.
@@ -921,6 +911,67 @@ export default function PostCallOutcomeModal({
                   </div>
                 </div>
               </div>
+              {/* Phase 107 #7 — lost reason → leads.lost_reason (the LeadsV2
+                  "Price problem" filter reads it). Tap again to clear. */}
+              <div className="lead-card-pad" style={{ paddingTop: 0 }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em',
+                }}>
+                  Reason <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span>
+                </div>
+                <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[
+                    { v: 'Price',        label: 'Price' },
+                    { v: 'NoNeed',       label: 'No need' },
+                    { v: 'WrongContact', label: 'Wrong contact' },
+                    { v: 'NoResponse',   label: 'No response' },
+                  ].map(r => {
+                    const on = lostReason === r.v
+                    return (
+                      <button
+                        key={r.v}
+                        type="button"
+                        onClick={() => setLostReason(on ? '' : r.v)}
+                        disabled={saving}
+                        style={{
+                          padding: '6px 12px', borderRadius: 999,
+                          border: `1px solid ${on ? 'var(--danger, #EF4444)' : 'var(--border-strong, var(--v2-line))'}`,
+                          background: on ? 'var(--danger-soft, rgba(239,68,68,0.12))' : 'var(--v2-bg-2, var(--surface-2))',
+                          color: on ? 'var(--danger, #EF4444)' : 'var(--text)',
+                          cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                        }}
+                      >
+                        {r.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : outcome === 'nurture' ? (
+            /* Phase 107 #4 — Nurture parks the lead; the stage→Nurture
+               cadence trigger auto-spawns the 30-day re-pitch. Next-action
+               card hidden (like Lost) so no conflicting manual follow-up. */
+            <div className="lead-card" style={{ marginBottom: 14 }}>
+              <div className="lead-card-pad" style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '14px 16px',
+                background: 'var(--tint-blue, rgba(59,130,246,0.12))',
+                border: '1px solid var(--blue, #3B82F6)',
+                borderRadius: 'var(--radius, 10px)',
+                color: 'var(--text)',
+              }}>
+                <span style={{ color: 'var(--blue, #3B82F6)', flex: '0 0 auto', display: 'inline-flex' }}>
+                  <Calendar size={18} strokeWidth={1.6} />
+                </span>
+                <div style={{ fontSize: 13, lineHeight: 1.4 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>Parked in Nurture</div>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    Stage → Nurture. Auto re-pitch follow-up in 30 days — no action needed now.
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
           /* Next action chooser */
@@ -928,7 +979,7 @@ export default function PostCallOutcomeModal({
             <div className="lead-card-head"><div className="lead-card-title">Next action</div></div>
             <div className="lead-card-pad">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {NEXT_ACTIONS.map(n => {
+                {NEXT_ACTIONS.filter(n => !n.hidden).map(n => {
                   const on = nextAction === n.value
                   const icon = n.value === 'meeting' ? Calendar
                              : n.value === 'none'    ? null
