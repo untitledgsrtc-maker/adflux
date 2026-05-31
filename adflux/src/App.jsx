@@ -49,6 +49,7 @@ import LeadDetailV2        from './pages/v2/LeadDetailV2'
 import LeadFormV2          from './pages/v2/LeadFormV2'
 import LeadUploadV2        from './pages/v2/LeadUploadV2'
 import WorkV2              from './pages/v2/WorkV2'
+import MessagesV2          from './pages/v2/MessagesV2'
 import PushDebugV2         from './pages/v2/PushDebugV2'
 import TelecallerV2        from './pages/v2/TelecallerV2'
 import VoiceLogV2          from './pages/v2/VoiceLogV2'
@@ -305,6 +306,8 @@ export default function App() {
           {/* Sales-only */}
           <Route path="/my-performance"            element={<MyPerformanceV2 />} />
           <Route path="/my-offer"                  element={<MyOfferV2 />} />
+          {/* Phase 103.F — rep's saved admin messages (push tap target) */}
+          <Route path="/messages"                  element={<MessagesV2 />} />
 
           {/* Admin / owner / co_owner master pages */}
           <Route path="/cities"                    element={<RequirePrivileged><CitiesV2 /></RequirePrivileged>} />

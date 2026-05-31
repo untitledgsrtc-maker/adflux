@@ -37,11 +37,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Send, BellRing, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/authStore'
 
 const TITLE_MAX = 60
 const BODY_MAX  = 160
 
 export default function AdminPushModal({ target, onClose }) {
+  const profile = useAuthStore(s => s.profile)
   const [title, setTitle]     = useState('')
   const [body, setBody]       = useState('')
   const [sending, setSending] = useState(false)
@@ -75,48 +77,56 @@ export default function AdminPushModal({ target, onClose }) {
     if (!canSend) return
     setSending(true)
     setResult(null)
+    const cleanTitle = title.trim()
+    const cleanBody  = body.trim()
     try {
-      // Unique tag per send so multiple admin messages stack in the
-      // tray instead of replacing each other (Phase 97.5 / A400 lesson:
-      // a constant tag collapses to one entry).
+      // 1) PERSIST first — this is the durable record the rep re-reads
+      //    on /messages. It must succeed even if the push later fails
+      //    (e.g. rep has no device). If this fails, nothing was saved.
+      const { error: insErr } = await supabase.from('admin_messages').insert([{
+        recipient_id: target.id,
+        sender_id:    profile?.id || null,
+        title:        cleanTitle,
+        body:         cleanBody || null,
+        url:          '/messages',
+      }])
+      if (insErr) {
+        setResult({ ok: false, msg: `Could not save the message. ${insErr.message}` })
+        return
+      }
+
+      // 2) Best-effort push on top. The message is already saved, so a
+      //    push failure is NOT a failure of the action — the rep will
+      //    still see it in the app / bell. Unique tag per send so
+      //    messages stack in the tray (Phase 97.5/A400 lesson).
       const tag = `admin-msg-${Date.now()}`
-      const { data, error } = await supabase.functions.invoke('notify-rep', {
-        body: {
-          user_id: target.id,
-          title: title.trim(),
-          body: body.trim(),
-          url: '/work',
-          tag,
-          require_interaction: true,
-        },
-      })
-
-      if (error) {
-        setResult({ ok: false, msg: `Failed to send. ${error.message || 'Edge function error.'}` })
-        return
+      let pushNote = ''
+      try {
+        const { data, error } = await supabase.functions.invoke('notify-rep', {
+          body: {
+            user_id: target.id,
+            title: cleanTitle,
+            body: cleanBody,
+            url: '/messages',
+            tag,
+            require_interaction: true,
+          },
+        })
+        if (error || data?.error) {
+          pushNote = ' Push not sent right now — they will see it in the app.'
+        } else {
+          const sent = Number(data?.sent || 0)
+          pushNote = sent > 0
+            ? ` Pushed to ${sent} device${sent === 1 ? '' : 's'}.`
+            : ' No device to notify right now — they will see it in the app.'
+        }
+      } catch {
+        pushNote = ' Push not sent right now — they will see it in the app.'
       }
-      if (data?.error) {
-        setResult({ ok: false, msg: `Failed to send. ${data.error}` })
-        return
-      }
 
-      const sent    = Number(data?.sent || 0)
-      const failed  = Array.isArray(data?.errors) ? data.errors.length : 0
-
-      if (sent > 0) {
-        let msg = `Sent to ${sent} device${sent === 1 ? '' : 's'}.`
-        if (failed > 0) msg += ` ${failed} device${failed === 1 ? '' : 's'} could not be reached.`
-        setResult({ ok: true, msg })
-      } else {
-        const reason = data?.reason === 'no subscriptions'
-          ? `${target.name || 'This rep'} has no registered device. They need to open the app and turn on notifications.`
-          : (failed > 0
-              ? `Push service rejected all ${failed} device${failed === 1 ? '' : 's'} (token expired or invalid).`
-              : 'No device received it.')
-        setResult({ ok: false, msg: `Not sent — ${reason}` })
-      }
+      setResult({ ok: true, msg: `Saved to ${target.name || 'the rep'}'s Messages.${pushNote}` })
     } catch (e) {
-      setResult({ ok: false, msg: `Failed to send. ${e?.message || e}` })
+      setResult({ ok: false, msg: `Failed. ${e?.message || e}` })
     } finally {
       setSending(false)
     }
