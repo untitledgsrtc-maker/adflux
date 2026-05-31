@@ -18,12 +18,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Bell, X, AlertTriangle, Clock, CheckSquare, Calendar, ArrowRight, CheckCircle2,
+  Bell, X, AlertTriangle, Clock, CheckSquare, Calendar, ArrowRight, CheckCircle2, MessageSquare,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/authStore'
 
-const KIND_ICON  = { approval: CheckSquare, followup: Calendar, sla: AlertTriangle, dueAction: Clock }
-const KIND_TINT  = { approval: '#FBBF24', followup: '#60A5FA', sla: '#F87171', dueAction: '#C084FC' }
+// Phase 103.F.1 — `message` = an admin push saved to admin_messages
+// (the rep can re-read it). Brand-yellow tint so it stands out as a
+// direct message from the office vs the system alerts.
+const KIND_ICON  = { message: MessageSquare, approval: CheckSquare, followup: Calendar, sla: AlertTriangle, dueAction: Clock }
+const KIND_TINT  = { message: '#FFE600', approval: '#FBBF24', followup: '#60A5FA', sla: '#F87171', dueAction: '#C084FC' }
 
 // Phase 93.8c (25 May 2026) — bell items are recomputed live from
 // source tables every open. No `notifications` table to mark-read
@@ -65,6 +69,7 @@ function groupItems(list) {
 
 export default function NotificationPanel() {
   const navigate = useNavigate()
+  const profile = useAuthStore(s => s.profile)
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState(null)
   const wrapRef = useRef(null)
@@ -74,7 +79,20 @@ export default function NotificationPanel() {
   async function fetchAll() {
     const todayIso = new Date().toISOString().slice(0, 10)
     const nowIso   = new Date().toISOString()
-    const [apRes, fuRes, slaRes, naRes] = await Promise.all([
+    // Phase 103.F.1 — admin_messages (UNREAD only) for THIS rep. Must
+    // filter recipient_id = own uid: the am_recipient_read RLS lets an
+    // admin read ALL messages, which would flood an admin's bell with
+    // every rep's messages. Skip the query until profile.id is known.
+    const msgQuery = profile?.id
+      ? supabase.from('admin_messages')
+          .select('id, title, body, created_at')
+          .eq('recipient_id', profile.id)
+          .is('read_at', null)
+          .order('created_at', { ascending: false })
+          .limit(15)
+      : Promise.resolve({ data: [] })
+
+    const [apRes, fuRes, slaRes, naRes, msgRes] = await Promise.all([
       supabase.from('payments')
         // ref_number was never a real column on quotes (Phase 33N
         // confirmed; CLAUDE.md §4 ref formats are stored in
@@ -115,6 +133,7 @@ export default function NotificationPanel() {
         .eq('next_action_date', todayIso)
         .order('created_at', { ascending: false })
         .limit(15),
+      msgQuery,
     ])
 
     const list = []
@@ -181,14 +200,25 @@ export default function NotificationPanel() {
         ts: r.next_action_date,
       })
     })
-    // Sort: SLA first (red), then approvals, follow-ups, due actions.
-    const order = { sla: 0, approval: 1, followup: 2, dueAction: 3 }
+    ;(msgRes.data || []).forEach(r => {
+      list.push({
+        kind: 'message', id: r.id,
+        title: r.title,
+        sub: r.body || 'Message from the office',
+        to: '/messages',
+        ts: r.created_at,
+      })
+    })
+    // Sort: admin messages first (direct from the office), then SLA
+    // (red), approvals, follow-ups, due actions.
+    const order = { message: 0, sla: 1, approval: 2, followup: 3, dueAction: 4 }
     list.sort((a, b) => order[a.kind] - order[b.kind])
     setItems(list)
   }
 
-  // Initial fetch + refresh every 60s while open.
-  useEffect(() => { fetchAll() }, [])
+  // Initial fetch + refetch once profile.id resolves (so the admin_
+  // messages query, which needs the uid, runs after auth is ready).
+  useEffect(() => { fetchAll() }, [profile?.id])
   useEffect(() => {
     if (!open) return
     const t = setInterval(fetchAll, 60_000)
