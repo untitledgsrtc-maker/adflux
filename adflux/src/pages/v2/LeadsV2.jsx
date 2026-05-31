@@ -1073,8 +1073,11 @@ export default function LeadsV2() {
                         title={days === null ? 'No contact yet' : `Last contact: ${days}d ago`}
                       />
                       <div>
-                        <div className="name">{l.name}</div>
-                        <div className="company">{l.company || '—'}</div>
+                        {/* Phase 107 — company is the primary (bigger) line,
+                            contact name the secondary. Falls back to the name
+                            when the lead has no company. */}
+                        <div className="name">{l.company || l.name || '—'}</div>
+                        <div className="company">{l.company ? (l.name || '') : ''}</div>
                       </div>
                     </div>
                   </td>
