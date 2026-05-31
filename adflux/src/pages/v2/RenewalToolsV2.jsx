@@ -15,12 +15,16 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Calendar, ArrowUpRight, X } from 'lucide-react'
+import { Plus, Calendar, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { formatDate, formatCurrency, todayISO, addDaysISO } from '../../utils/formatters'
 import { setPendingRenewalOf } from '../../lib/quoteIntent'
 import V2Hero from '../../components/v2/V2Hero'
+// Phase 105.1 — branded date-range picker (same one LeadsV2 uses) instead
+// of raw native <input type="date"> (which rendered the off-brand white OS
+// calendar). Owner flagged the brand violation.
+import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
 
 export default function RenewalToolsV2() {
   const navigate = useNavigate()
@@ -32,8 +36,8 @@ export default function RenewalToolsV2() {
   const [tab, setTab] = useState('renewing')        // 'renewing' | 'expired'
   const [expired, setExpired] = useState([])
   const [expiredLoading, setExpiredLoading] = useState(false)
-  const [expFrom, setExpFrom] = useState('')        // YYYY-MM-DD — filter on expiry date
-  const [expTo, setExpTo] = useState('')
+  // Default 'all time' = every expired campaign; presets narrow by expiry date.
+  const [expRange, setExpRange] = useState(() => presetToRange('all'))
 
   const today = todayISO()
   const future60 = addDaysISO(60)
@@ -49,7 +53,7 @@ export default function RenewalToolsV2() {
   useEffect(() => {
     if (tab === 'expired' && profile?.id) loadExpired()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, expFrom, expTo, profile?.id, isPrivileged])
+  }, [tab, expRange, profile?.id, isPrivileged])
 
   async function load() {
     setLoading(true)
@@ -99,8 +103,11 @@ export default function RenewalToolsV2() {
       .select('id, quote_number, client_name, campaign_start_date, campaign_end_date, campaign_months, created_by, total_amount')
       .eq('status', 'won')
       .lt('campaign_end_date', today)
-    if (expFrom) q = q.gte('campaign_end_date', expFrom)
-    if (expTo)   q = q.lte('campaign_end_date', expTo)
+    // Narrow by expiry date when a non-'all' preset/range is active.
+    if (expRange?.preset && expRange.preset !== 'all') {
+      if (expRange.from) q = q.gte('campaign_end_date', expRange.from)
+      if (expRange.to)   q = q.lte('campaign_end_date', expRange.to)
+    }
     q = q.order('campaign_end_date', { ascending: false })   // most recently expired first
 
     if (!isPrivileged) q = q.eq('created_by', profile.id)
@@ -181,12 +188,6 @@ export default function RenewalToolsV2() {
     color: tab === k ? 'var(--accent-fg, #0f172a)' : 'var(--text-muted, #94a3b8)',
     fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
   })
-  const dateInput = {
-    background: 'var(--surface-2, #334155)',
-    border: '1px solid var(--border, #334155)',
-    borderRadius: 10, color: 'var(--text, #f1f5f9)',
-    fontSize: 12, padding: '7px 10px', fontFamily: 'inherit',
-  }
 
   return (
     <div className="v2d-rt">
@@ -346,31 +347,15 @@ export default function RenewalToolsV2() {
       ) : (
         /* ── Phase 105 — Expired tab ── */
         <>
-          {/* Date filter on expiry date */}
-          <div className="v2d-panel" style={{
+          {/* Phase 105.1 — branded DateRangeFilter (filters by expiry date) */}
+          <div style={{
             display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
-            padding: 14, marginBottom: 16,
+            marginBottom: 16,
           }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)', fontWeight: 600 }}>
-              Expired between
+              Expired in
             </span>
-            <input type="date" value={expFrom} max={today}
-              onChange={e => setExpFrom(e.target.value)} style={dateInput} />
-            <span style={{ color: 'var(--text-subtle, #64748b)' }}>→</span>
-            <input type="date" value={expTo} max={today}
-              onChange={e => setExpTo(e.target.value)} style={dateInput} />
-            {(expFrom || expTo) && (
-              <button type="button"
-                onClick={() => { setExpFrom(''); setExpTo('') }}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  background: 'transparent', border: '1px solid var(--border, #334155)',
-                  borderRadius: 10, color: 'var(--text-muted, #94a3b8)',
-                  fontSize: 12, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit',
-                }}>
-                <X size={13} /> Clear
-              </button>
-            )}
+            <DateRangeFilter value={expRange} onChange={setExpRange} />
             <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted, #94a3b8)', fontWeight: 600 }}>
               {expired.length} expired
             </span>
@@ -383,7 +368,7 @@ export default function RenewalToolsV2() {
               <div className="v2d-empty-ic"><Calendar size={22} /></div>
               <div className="v2d-empty-t">No expired campaigns</div>
               <div className="v2d-empty-s">
-                {(expFrom || expTo)
+                {(expRange?.preset && expRange.preset !== 'all')
                   ? 'No won campaigns expired in this date range.'
                   : (isAdmin ? 'No won campaign has reached its end date yet.'
                              : 'None of your won campaigns have ended yet.')}
