@@ -26,6 +26,18 @@ import V2Hero from '../../components/v2/V2Hero'
 // calendar). Owner flagged the brand violation.
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
 
+// Phase 108 — media_type → card label + unit word for the Active tab.
+const MEDIA = {
+  AUTO_HOOD:   { label: 'Auto-rickshaw', unit: 'units' },
+  GSRTC_LED:   { label: 'GSRTC',         unit: 'stations' },
+  HOARDING:    { label: 'Hoarding',      unit: 'sites' },
+  LED_OTHER:   { label: 'LED',           unit: 'units' },
+  MALL:        { label: 'Mall',          unit: 'sites' },
+  CINEMA:      { label: 'Cinema',        unit: 'screens' },
+  DIGITAL:     { label: 'Digital',       unit: 'spots' },
+  OTHER_MEDIA: { label: 'Other media',   unit: 'units' },
+}
+
 export default function RenewalToolsV2() {
   const navigate = useNavigate()
   const { profile, isAdmin, isPrivileged } = useAuth()
@@ -38,6 +50,10 @@ export default function RenewalToolsV2() {
   const [expiredLoading, setExpiredLoading] = useState(false)
   // Default 'all time' = every expired campaign; presets narrow by expiry date.
   const [expRange, setExpRange] = useState(() => presetToRange('all'))
+
+  // Phase 108 — Active campaigns tab (won, currently running or starting soon).
+  const [active, setActive] = useState([])
+  const [activeLoading, setActiveLoading] = useState(false)
 
   const today = todayISO()
   const future60 = addDaysISO(60)
@@ -54,6 +70,12 @@ export default function RenewalToolsV2() {
     if (tab === 'expired' && profile?.id) loadExpired()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, expRange, profile?.id, isPrivileged])
+
+  // Phase 108 — load active campaigns when its tab opens.
+  useEffect(() => {
+    if (tab === 'active' && profile?.id) loadActive()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, profile?.id, isPrivileged])
 
   async function load() {
     setLoading(true)
@@ -135,6 +157,77 @@ export default function RenewalToolsV2() {
 
     setExpired(rows)
     setExpiredLoading(false)
+  }
+
+  // Phase 108 — won campaigns running now or starting within 14 days.
+  // Same privilege scope + two-query name merge. Unit counts come from
+  // quote_cities (one extra query, merged client-side).
+  async function loadActive() {
+    setActiveLoading(true)
+    let q = supabase
+      .from('quotes')
+      .select('id, quote_number, client_name, media_type, campaign_start_date, campaign_end_date, created_by, total_amount')
+      .eq('status', 'won')
+      .not('campaign_start_date', 'is', null)
+      .lte('campaign_start_date', addDaysISO(14))
+      .gte('campaign_end_date', today)
+      .order('campaign_end_date', { ascending: true })
+    if (!isPrivileged) q = q.eq('created_by', profile.id)
+
+    const { data: qRows, error: qErr } = await q
+    if (qErr) {
+      console.warn('[renewal-tools] active query failed:', qErr.message)
+      setActive([])
+      setActiveLoading(false)
+      return
+    }
+    let rows = qRows || []
+
+    // Unit counts (number of quote_cities rows per campaign).
+    if (rows.length > 0) {
+      const ids = rows.map(r => r.id)
+      const { data: cities } = await supabase
+        .from('quote_cities')
+        .select('quote_id')
+        .in('quote_id', ids)
+      const cnt = {}
+      ;(cities || []).forEach(c => { cnt[c.quote_id] = (cnt[c.quote_id] || 0) + 1 })
+      rows = rows.map(r => ({ ...r, unit_count: cnt[r.id] || 0 }))
+    }
+
+    if (isPrivileged && rows.length > 0) {
+      const uids = Array.from(new Set(rows.map(r => r.created_by).filter(Boolean)))
+      if (uids.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name')
+          .in('id', uids)
+        const byId = Object.fromEntries((users || []).map(u => [u.id, u.name]))
+        rows = rows.map(r => ({ ...r, users: { name: byId[r.created_by] || '—' } }))
+      }
+    }
+
+    setActive(rows)
+    setActiveLoading(false)
+  }
+
+  // Phase 108 — campaign status + progress for a won campaign.
+  //   SOON   = not started yet (start > today)
+  //   ENDING = running, <= 7 days left   (rose)
+  //   LIVE   = running, > 7 days left     (green)
+  function campaignStatus(q) {
+    const dEnd   = daysRemaining(q.campaign_end_date)
+    const dStart = q.campaign_start_date ? daysRemaining(q.campaign_start_date) : 0
+    let pct = 0
+    if (q.campaign_start_date && q.campaign_end_date) {
+      const s = new Date(q.campaign_start_date).getTime()
+      const e = new Date(q.campaign_end_date).getTime()
+      const n = new Date(today).getTime()
+      pct = e > s ? Math.max(0, Math.min(100, Math.round(((n - s) / (e - s)) * 100))) : 0
+    }
+    if (dStart > 0) return { key: 'SOON',   tone: 'var(--warning, #F59E0B)', soft: 'var(--warning-soft, rgba(245,158,11,0.12))', pct: 0, daysLeft: dEnd }
+    if (dEnd <= 7)  return { key: 'ENDING', tone: 'var(--danger, #EF4444)',  soft: 'var(--danger-soft, rgba(239,68,68,0.12))',   pct,    daysLeft: dEnd }
+    return { key: 'LIVE', tone: 'var(--success, #10B981)', soft: 'var(--success-soft, rgba(16,185,129,0.12))', pct, daysLeft: dEnd }
   }
 
   function daysRemaining(endDate) {
@@ -223,6 +316,9 @@ export default function RenewalToolsV2() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <button type="button" style={tabBtn('renewing')} onClick={() => setTab('renewing')}>
           Renewing · 60d
+        </button>
+        <button type="button" style={tabBtn('active')} onClick={() => setTab('active')}>
+          Active
         </button>
         <button type="button" style={tabBtn('expired')} onClick={() => setTab('expired')}>
           Expired
@@ -344,7 +440,7 @@ export default function RenewalToolsV2() {
             </>
           )}
         </>
-      ) : (
+      ) : tab === 'expired' ? (
         /* ── Phase 105 — Expired tab ── */
         <>
           {/* Phase 105.1 — branded DateRangeFilter (filters by expiry date) */}
@@ -446,6 +542,82 @@ export default function RenewalToolsV2() {
                 ))}
               </div>
             </>
+          )}
+        </>
+      ) : (
+        /* ── Phase 108 — Active campaigns tab ── */
+        <>
+          {activeLoading ? (
+            <div className="v2d-loading"><div className="v2d-spinner" />Loading…</div>
+          ) : active.length === 0 ? (
+            <div className="v2d-panel v2d-empty-card">
+              <div className="v2d-empty-ic"><Calendar size={22} /></div>
+              <div className="v2d-empty-t">No active campaigns</div>
+              <div className="v2d-empty-s">
+                {isAdmin
+                  ? 'No won campaign is running right now.'
+                  : 'None of your campaigns are running right now.'}
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+              gap: 12,
+            }}>
+              {active.map(q => {
+                const st = campaignStatus(q)
+                const media = MEDIA[q.media_type] || { label: q.media_type || 'Campaign', unit: 'units' }
+                return (
+                  <div key={q.id} className="v2d-panel" style={{
+                    padding: 16, display: 'flex', flexDirection: 'column', gap: 8,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, letterSpacing: '.08em',
+                        textTransform: 'uppercase', padding: '3px 8px', borderRadius: 999,
+                        color: st.tone, background: st.soft,
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                      }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 999, background: st.tone }} />
+                        {st.key}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)' }}>
+                        {st.key === 'SOON'
+                          ? `starts in ${Math.abs(daysRemaining(q.campaign_start_date))}d`
+                          : `${st.daysLeft}d left`}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontSize: 11, fontWeight: 700, letterSpacing: '.06em',
+                      textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)',
+                    }}>
+                      {media.label}{q.unit_count ? ` · ${q.unit_count} ${media.unit}` : ''}
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text, #f1f5f9)' }}>
+                      {q.client_name}
+                    </div>
+                    {isAdmin && (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)' }}>
+                        {q.users?.name || '—'}
+                      </div>
+                    )}
+                    <div style={{
+                      fontFamily: 'var(--font-display, "Space Grotesk")',
+                      fontSize: 20, fontWeight: 700, color: 'var(--text, #f1f5f9)',
+                    }}>
+                      {q.total_amount ? formatCurrency(q.total_amount) : '—'}
+                    </div>
+                    <div style={{
+                      height: 4, borderRadius: 999, marginTop: 2, overflow: 'hidden',
+                      background: 'var(--surface-3, #475569)',
+                    }}>
+                      <div style={{ height: '100%', width: `${st.pct}%`, background: st.tone, borderRadius: 999 }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </>
       )}
