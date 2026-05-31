@@ -286,7 +286,11 @@ export default function QuoteDetail() {
             )
           }
           const base64 = btoa(binary)
-          const safeRef = String(quote.ref_number || quote.id || 'quote')
+          // Phase 103.D.7 — quote_number first (the UA-2026-NNNN ref). New
+          // quotes store the ref in quote_number; ref_number is null, so
+          // this used to fall back to quote.id (the UUID) → an ugly
+          // "quote-<uuid>.pdf" share filename. Desktop already used the ref.
+          const safeRef = String(quote.quote_number || quote.ref_number || quote.id || 'quote')
             .replace(/[^A-Za-z0-9_-]/g, '_')
           // Phase 102.I.1 (2026-05-29 night) — write to pdfs/ subfolder
           // so file_paths.xml `cache_pdfs` <cache-path path="pdfs/">

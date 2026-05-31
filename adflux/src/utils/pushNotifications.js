@@ -29,6 +29,7 @@
 //      missed-followup / new-lead / payment-received events fire.
 
 import { supabase } from '../lib/supabase'
+import { Capacitor } from '@capacitor/core'
 
 function urlBase64ToUint8Array(b64) {
   const padding = '='.repeat((4 - b64.length % 4) % 4)
@@ -166,6 +167,12 @@ export async function subscribeForPush(userId) {
 // "no push" — the prior silent-return made it impossible to tell why.
 export async function ensurePushOnLogin(userId) {
   if (!userId) return 'no-user'
+  // Phase 103.D.7 — on the Capacitor APK the WebView has no web-push
+  // (serviceWorker / PushManager), so this used to return 'unsupported'
+  // → a false "browser does not support push" warning. The device
+  // actually enrolls via NATIVE FCM (nativePush.js, registered at app
+  // start). Report 'native' so callers don't warn; native push works.
+  if (Capacitor.isNativePlatform()) return 'native'
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     return 'unsupported'
   }
