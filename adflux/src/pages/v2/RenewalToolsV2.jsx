@@ -1,15 +1,21 @@
 // src/pages/v2/RenewalToolsV2.jsx
 //
-// Shared admin + sales page. Admin sees every won quote ending in the
-// next 60 days; sales sees only their own. The 3-bucket colour code
-// (<7 red, <30 amber, else green) is preserved because the user's team
-// uses it at a glance — breaking the convention would be noise.
+// Shared admin + sales page. Admin sees every won quote; sales sees only
+// their own. Two tabs:
+//   • Renewing — won quotes ending in the next 60 days. The 3-bucket
+//     colour code (<7 red, <30 amber, else green) is preserved because
+//     the team uses it at a glance.
+//   • Expired (Phase 105) — won quotes whose campaign_end_date is already
+//     in the past (renewal lapsed). Owner: "which campaign won and
+//     expired the duration, ALL campaign must show + date filter." No
+//     upper bound by default; an optional date filter on the expiry date
+//     narrows the range. Newest-expired first.
 //
 // Rendered inside V2AppShell so this file only paints the body.
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Calendar, ArrowUpRight } from 'lucide-react'
+import { Plus, Calendar, ArrowUpRight, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { formatDate, formatCurrency, todayISO, addDaysISO } from '../../utils/formatters'
@@ -22,6 +28,13 @@ export default function RenewalToolsV2() {
   const [quotes, setQuotes] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Phase 105 — Expired Campaigns tab.
+  const [tab, setTab] = useState('renewing')        // 'renewing' | 'expired'
+  const [expired, setExpired] = useState([])
+  const [expiredLoading, setExpiredLoading] = useState(false)
+  const [expFrom, setExpFrom] = useState('')        // YYYY-MM-DD — filter on expiry date
+  const [expTo, setExpTo] = useState('')
+
   const today = todayISO()
   const future60 = addDaysISO(60)
 
@@ -30,16 +43,18 @@ export default function RenewalToolsV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, isAdmin, isPrivileged])
 
+  // Phase 105 — load expired list when its tab is active (or its filter
+  // changes). Kept separate from the renewing load so the renewing path
+  // is byte-unchanged.
+  useEffect(() => {
+    if (tab === 'expired' && profile?.id) loadExpired()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, expFrom, expTo, profile?.id, isPrivileged])
+
   async function load() {
     setLoading(true)
-    // Phase 62.5 (20 May 2026) — owner reported /renewal-tools showed
-    // "Nothing due" while SQL confirmed 46 won quotes ending in 60d.
-    // Root cause: the `users(name)` PostgREST FK embed silently
-    // returns null under some RLS/schema-cache combos (documented
-    // §26 Sprint A + §36.6 "users(name) embed bypassed with two-
-    // query merge"). When the embed null-payloads, supabase-js
-    // returns an empty result. Fix: drop the embed, fetch user
-    // names separately, merge client-side.
+    // Phase 62.5 — drop the users(name) FK embed (null-payloads under some
+    // RLS/cache combos), fetch names in a second query + merge.
     let q = supabase
       .from('quotes')
       .select('id, quote_number, client_name, campaign_end_date, created_by, total_amount')
@@ -48,10 +63,6 @@ export default function RenewalToolsV2() {
       .lte('campaign_end_date', future60)
       .order('campaign_end_date', { ascending: true })
 
-    // Phase 34Z.87 — co_owner should see every rep's renewal list,
-    // not just rows they personally created. /leads + /quotes admin
-    // views already use isPrivileged for the same reason. Earlier
-    // `!isAdmin` filter falsely scoped co_owners to their own quotes.
     if (!isPrivileged) q = q.eq('created_by', profile.id)
 
     const { data: qRows, error: qErr } = await q
@@ -62,9 +73,6 @@ export default function RenewalToolsV2() {
       return
     }
 
-    // Phase 62.5 — fetch the seller names in a second query + merge.
-    // Only fire when admin/co_owner because non-admins only see their
-    // own row (created_by = self) and the name is already on profile.
     let rows = qRows || []
     if (isPrivileged && rows.length > 0) {
       const ids = Array.from(new Set(rows.map(r => r.created_by).filter(Boolean)))
@@ -82,10 +90,65 @@ export default function RenewalToolsV2() {
     setLoading(false)
   }
 
+  // Phase 105 — expired campaigns: won, campaign_end_date < today. Same
+  // privilege scope + two-query name merge as `load`.
+  async function loadExpired() {
+    setExpiredLoading(true)
+    let q = supabase
+      .from('quotes')
+      .select('id, quote_number, client_name, campaign_start_date, campaign_end_date, campaign_months, created_by, total_amount')
+      .eq('status', 'won')
+      .lt('campaign_end_date', today)
+    if (expFrom) q = q.gte('campaign_end_date', expFrom)
+    if (expTo)   q = q.lte('campaign_end_date', expTo)
+    q = q.order('campaign_end_date', { ascending: false })   // most recently expired first
+
+    if (!isPrivileged) q = q.eq('created_by', profile.id)
+
+    const { data: qRows, error: qErr } = await q
+    if (qErr) {
+      console.warn('[renewal-tools] expired query failed:', qErr.message)
+      setExpired([])
+      setExpiredLoading(false)
+      return
+    }
+
+    let rows = qRows || []
+    if (isPrivileged && rows.length > 0) {
+      const ids = Array.from(new Set(rows.map(r => r.created_by).filter(Boolean)))
+      if (ids.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name')
+          .in('id', ids)
+        const byId = Object.fromEntries((users || []).map(u => [u.id, u.name]))
+        rows = rows.map(r => ({ ...r, users: { name: byId[r.created_by] || '—' } }))
+      }
+    }
+
+    setExpired(rows)
+    setExpiredLoading(false)
+  }
+
   function daysRemaining(endDate) {
     const end = new Date(endDate)
     const now = new Date(today)
     return Math.ceil((end - now) / (1000 * 60 * 60 * 24))
+  }
+
+  // Phase 105 — positive whole days since a past end date.
+  function daysAgo(endDate) {
+    return Math.max(0, -daysRemaining(endDate))
+  }
+
+  // Phase 105 — campaign duration label: "1 Apr 26 → 30 Jun 26" when both
+  // dates exist, else fall back to the stored month count.
+  function durationLabel(q) {
+    if (q.campaign_start_date && q.campaign_end_date) {
+      return `${formatDate(q.campaign_start_date)} → ${formatDate(q.campaign_end_date)}`
+    }
+    if (q.campaign_months) return `${q.campaign_months} mo`
+    return q.campaign_end_date ? `ends ${formatDate(q.campaign_end_date)}` : '—'
   }
 
   function bucketFor(days) {
@@ -110,9 +173,24 @@ export default function RenewalToolsV2() {
     ? Math.round((bucketStats.cool / totalRenewing) * 100)
     : 100
 
+  const tabBtn = (k) => ({
+    padding: '8px 16px',
+    borderRadius: 999,
+    border: `1px solid ${tab === k ? 'var(--accent, #FFE600)' : 'var(--border, #334155)'}`,
+    background: tab === k ? 'var(--accent, #FFE600)' : 'transparent',
+    color: tab === k ? 'var(--accent-fg, #0f172a)' : 'var(--text-muted, #94a3b8)',
+    fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+  })
+  const dateInput = {
+    background: 'var(--surface-2, #334155)',
+    border: '1px solid var(--border, #334155)',
+    borderRadius: 10, color: 'var(--text, #f1f5f9)',
+    fontSize: 12, padding: '7px 10px', fontFamily: 'inherit',
+  }
+
   return (
     <div className="v2d-rt">
-      {totalRenewing > 0 && (
+      {tab === 'renewing' && totalRenewing > 0 && (
         <V2Hero
           eyebrow={isAdmin ? 'Renewals · 60 days' : 'Your renewals'}
           value={String(totalRenewing)}
@@ -131,123 +209,259 @@ export default function RenewalToolsV2() {
           <div className="v2d-page-kicker">Keep revenue recurring</div>
           <h1 className="v2d-page-title">Renewal Tools</h1>
           <div className="v2d-page-sub">
-            {isAdmin
-              ? 'Campaigns ending in the next 60 days across all reps.'
-              : 'Your campaigns ending in the next 60 days.'}
+            {tab === 'expired'
+              ? (isAdmin ? 'Won campaigns whose duration has ended — across all reps.'
+                         : 'Your won campaigns whose duration has ended.')
+              : (isAdmin ? 'Campaigns ending in the next 60 days across all reps.'
+                         : 'Your campaigns ending in the next 60 days.')}
           </div>
         </div>
       </div>
 
-      {/* Bucket KPIs */}
-      <div className="v2d-rt-kpis">
-        <div className="v2d-panel v2d-rt-kpi v2d-rt-kpi--hot">
-          <div className="v2d-rt-kpi-l">Under 7 days</div>
-          <div className="v2d-rt-kpi-v">{bucketStats.hot}</div>
-          <div className="v2d-rt-kpi-s">call today</div>
-        </div>
-        <div className="v2d-panel v2d-rt-kpi v2d-rt-kpi--warm">
-          <div className="v2d-rt-kpi-l">7 – 30 days</div>
-          <div className="v2d-rt-kpi-v">{bucketStats.warm}</div>
-          <div className="v2d-rt-kpi-s">start renewal convo</div>
-        </div>
-        <div className="v2d-panel v2d-rt-kpi v2d-rt-kpi--cool">
-          <div className="v2d-rt-kpi-l">30 – 60 days</div>
-          <div className="v2d-rt-kpi-v">{bucketStats.cool}</div>
-          <div className="v2d-rt-kpi-s">queue up</div>
-        </div>
+      {/* Phase 105 — tab toggle */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button type="button" style={tabBtn('renewing')} onClick={() => setTab('renewing')}>
+          Renewing · 60d
+        </button>
+        <button type="button" style={tabBtn('expired')} onClick={() => setTab('expired')}>
+          Expired
+        </button>
       </div>
 
-      {loading ? (
-        <div className="v2d-loading"><div className="v2d-spinner" />Loading…</div>
-      ) : quotes.length === 0 ? (
-        <div className="v2d-panel v2d-empty-card">
-          <div className="v2d-empty-ic"><Calendar size={22} /></div>
-          <div className="v2d-empty-t">Nothing due</div>
-          <div className="v2d-empty-s">
-            {isAdmin
-              ? 'No campaigns ending in the next 60 days.'
-              : 'None of your clients have campaigns ending in the next 60 days.'}
-          </div>
-        </div>
-      ) : (
+      {tab === 'renewing' ? (
         <>
-          {/* Desktop table */}
-          <div className="v2d-panel v2d-table-wrap">
-            <table className="v2d-qt">
-              <thead>
-                <tr>
-                  <th>Quote #</th>
-                  <th>Client</th>
-                  {isAdmin && <th>Sales Person</th>}
-                  <th>Value</th>
-                  <th>End Date</th>
-                  <th>Remaining</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
+          {/* Bucket KPIs */}
+          <div className="v2d-rt-kpis">
+            <div className="v2d-panel v2d-rt-kpi v2d-rt-kpi--hot">
+              <div className="v2d-rt-kpi-l">Under 7 days</div>
+              <div className="v2d-rt-kpi-v">{bucketStats.hot}</div>
+              <div className="v2d-rt-kpi-s">call today</div>
+            </div>
+            <div className="v2d-panel v2d-rt-kpi v2d-rt-kpi--warm">
+              <div className="v2d-rt-kpi-l">7 – 30 days</div>
+              <div className="v2d-rt-kpi-v">{bucketStats.warm}</div>
+              <div className="v2d-rt-kpi-s">start renewal convo</div>
+            </div>
+            <div className="v2d-panel v2d-rt-kpi v2d-rt-kpi--cool">
+              <div className="v2d-rt-kpi-l">30 – 60 days</div>
+              <div className="v2d-rt-kpi-v">{bucketStats.cool}</div>
+              <div className="v2d-rt-kpi-s">queue up</div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="v2d-loading"><div className="v2d-spinner" />Loading…</div>
+          ) : quotes.length === 0 ? (
+            <div className="v2d-panel v2d-empty-card">
+              <div className="v2d-empty-ic"><Calendar size={22} /></div>
+              <div className="v2d-empty-t">Nothing due</div>
+              <div className="v2d-empty-s">
+                {isAdmin
+                  ? 'No campaigns ending in the next 60 days.'
+                  : 'None of your clients have campaigns ending in the next 60 days.'}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="v2d-panel v2d-table-wrap">
+                <table className="v2d-qt">
+                  <thead>
+                    <tr>
+                      <th>Quote #</th>
+                      <th>Client</th>
+                      {isAdmin && <th>Sales Person</th>}
+                      <th>Value</th>
+                      <th>End Date</th>
+                      <th>Remaining</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quotes.map(q => {
+                      const days = daysRemaining(q.campaign_end_date)
+                      const bucket = bucketFor(days)
+                      return (
+                        <tr key={q.id}>
+                          <td><strong>{q.quote_number}</strong></td>
+                          <td>{q.client_name}</td>
+                          {isAdmin && <td className="v2d-muted">{q.users?.name || '—'}</td>}
+                          <td>{q.total_amount ? formatCurrency(q.total_amount) : '—'}</td>
+                          <td>{formatDate(q.campaign_end_date)}</td>
+                          <td>
+                            <span className={`v2d-rt-days v2d-rt-days--${bucket}`}>
+                              {days} day{days !== 1 ? 's' : ''}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              className="v2d-btn v2d-btn--primary v2d-btn--sm"
+                              onClick={() => navigate(`/quotes/renew/${q.id}`)}
+                            >
+                              <Plus size={13} /><span>Renew</span>
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="v2d-rt-list">
                 {quotes.map(q => {
                   const days = daysRemaining(q.campaign_end_date)
                   const bucket = bucketFor(days)
                   return (
-                    <tr key={q.id}>
-                      <td><strong>{q.quote_number}</strong></td>
-                      <td>{q.client_name}</td>
-                      {isAdmin && <td className="v2d-muted">{q.users?.name || '—'}</td>}
-                      <td>{q.total_amount ? formatCurrency(q.total_amount) : '—'}</td>
-                      <td>{formatDate(q.campaign_end_date)}</td>
-                      <td>
+                    <div key={q.id} className="v2d-panel v2d-rt-card">
+                      <div className="v2d-rt-card-top">
+                        <div className="v2d-rt-card-client">{q.client_name}</div>
                         <span className={`v2d-rt-days v2d-rt-days--${bucket}`}>
-                          {days} day{days !== 1 ? 's' : ''}
+                          {days}d
                         </span>
-                      </td>
-                      <td>
-                        <button
-                          className="v2d-btn v2d-btn--primary v2d-btn--sm"
-                          onClick={() => navigate(`/quotes/renew/${q.id}`)}
-                        >
-                          <Plus size={13} /><span>Renew</span>
-                        </button>
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="v2d-rt-card-meta">
+                        <span>{q.quote_number}</span>
+                        <span>· Ends {formatDate(q.campaign_end_date)}</span>
+                        {q.total_amount && <span>· {formatCurrency(q.total_amount)}</span>}
+                      </div>
+                      {isAdmin && (
+                        <div className="v2d-rt-card-sub">Rep: {q.users?.name || '—'}</div>
+                      )}
+                      <button
+                        className="v2d-btn v2d-btn--primary v2d-rt-card-cta"
+                        onClick={() => navigate(`/quotes/renew/${q.id}`)}
+                      >
+                        <Plus size={13} /><span>Create Renewal</span>
+                        <ArrowUpRight size={13} />
+                      </button>
+                    </div>
                   )
                 })}
-              </tbody>
-            </table>
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        /* ── Phase 105 — Expired tab ── */
+        <>
+          {/* Date filter on expiry date */}
+          <div className="v2d-panel" style={{
+            display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
+            padding: 14, marginBottom: 16,
+          }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)', fontWeight: 600 }}>
+              Expired between
+            </span>
+            <input type="date" value={expFrom} max={today}
+              onChange={e => setExpFrom(e.target.value)} style={dateInput} />
+            <span style={{ color: 'var(--text-subtle, #64748b)' }}>→</span>
+            <input type="date" value={expTo} max={today}
+              onChange={e => setExpTo(e.target.value)} style={dateInput} />
+            {(expFrom || expTo) && (
+              <button type="button"
+                onClick={() => { setExpFrom(''); setExpTo('') }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  background: 'transparent', border: '1px solid var(--border, #334155)',
+                  borderRadius: 10, color: 'var(--text-muted, #94a3b8)',
+                  fontSize: 12, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                <X size={13} /> Clear
+              </button>
+            )}
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted, #94a3b8)', fontWeight: 600 }}>
+              {expired.length} expired
+            </span>
           </div>
 
-          {/* Mobile cards */}
-          <div className="v2d-rt-list">
-            {quotes.map(q => {
-              const days = daysRemaining(q.campaign_end_date)
-              const bucket = bucketFor(days)
-              return (
-                <div key={q.id} className="v2d-panel v2d-rt-card">
-                  <div className="v2d-rt-card-top">
-                    <div className="v2d-rt-card-client">{q.client_name}</div>
-                    <span className={`v2d-rt-days v2d-rt-days--${bucket}`}>
-                      {days}d
-                    </span>
+          {expiredLoading ? (
+            <div className="v2d-loading"><div className="v2d-spinner" />Loading…</div>
+          ) : expired.length === 0 ? (
+            <div className="v2d-panel v2d-empty-card">
+              <div className="v2d-empty-ic"><Calendar size={22} /></div>
+              <div className="v2d-empty-t">No expired campaigns</div>
+              <div className="v2d-empty-s">
+                {(expFrom || expTo)
+                  ? 'No won campaigns expired in this date range.'
+                  : (isAdmin ? 'No won campaign has reached its end date yet.'
+                             : 'None of your won campaigns have ended yet.')}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="v2d-panel v2d-table-wrap">
+                <table className="v2d-qt">
+                  <thead>
+                    <tr>
+                      <th>Quote #</th>
+                      <th>Client</th>
+                      {isAdmin && <th>Sales Person</th>}
+                      <th>Value</th>
+                      <th>Duration</th>
+                      <th>Expired</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expired.map(q => (
+                      <tr key={q.id}>
+                        <td><strong>{q.quote_number}</strong></td>
+                        <td>{q.client_name}</td>
+                        {isAdmin && <td className="v2d-muted">{q.users?.name || '—'}</td>}
+                        <td>{q.total_amount ? formatCurrency(q.total_amount) : '—'}</td>
+                        <td className="v2d-muted">{durationLabel(q)}</td>
+                        <td>
+                          <span className="v2d-rt-days v2d-rt-days--hot">
+                            {daysAgo(q.campaign_end_date)} day{daysAgo(q.campaign_end_date) !== 1 ? 's' : ''} ago
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="v2d-btn v2d-btn--primary v2d-btn--sm"
+                            onClick={() => navigate(`/quotes/renew/${q.id}`)}
+                          >
+                            <Plus size={13} /><span>Renew</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="v2d-rt-list">
+                {expired.map(q => (
+                  <div key={q.id} className="v2d-panel v2d-rt-card">
+                    <div className="v2d-rt-card-top">
+                      <div className="v2d-rt-card-client">{q.client_name}</div>
+                      <span className="v2d-rt-days v2d-rt-days--hot">
+                        {daysAgo(q.campaign_end_date)}d ago
+                      </span>
+                    </div>
+                    <div className="v2d-rt-card-meta">
+                      <span>{q.quote_number}</span>
+                      <span>· {durationLabel(q)}</span>
+                      {q.total_amount && <span>· {formatCurrency(q.total_amount)}</span>}
+                    </div>
+                    {isAdmin && (
+                      <div className="v2d-rt-card-sub">Rep: {q.users?.name || '—'}</div>
+                    )}
+                    <button
+                      className="v2d-btn v2d-btn--primary v2d-rt-card-cta"
+                      onClick={() => navigate(`/quotes/renew/${q.id}`)}
+                    >
+                      <Plus size={13} /><span>Create Renewal</span>
+                      <ArrowUpRight size={13} />
+                    </button>
                   </div>
-                  <div className="v2d-rt-card-meta">
-                    <span>{q.quote_number}</span>
-                    <span>· Ends {formatDate(q.campaign_end_date)}</span>
-                    {q.total_amount && <span>· {formatCurrency(q.total_amount)}</span>}
-                  </div>
-                  {isAdmin && (
-                    <div className="v2d-rt-card-sub">Rep: {q.users?.name || '—'}</div>
-                  )}
-                  <button
-                    className="v2d-btn v2d-btn--primary v2d-rt-card-cta"
-                    onClick={() => navigate(`/quotes/renew/${q.id}`)}
-                  >
-                    <Plus size={13} /><span>Create Renewal</span>
-                    <ArrowUpRight size={13} />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
