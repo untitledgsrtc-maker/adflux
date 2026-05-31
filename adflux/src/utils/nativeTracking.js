@@ -23,6 +23,7 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
+import { rearmBackgroundGps } from './backgroundGps'
 
 const Tracking = registerPlugin('UntitledTracking')
 
@@ -188,9 +189,20 @@ async function handleGpsStateChanged({ enabled, atMs }) {
   if (!enabled) {
     const inserted = await insertGpsOff(userId, atMs)
     if (inserted?.id) openGpsOffRowId = inserted.id
-  } else if (openGpsOffRowId) {
-    await closeGpsOff(openGpsOffRowId, atMs)
-    openGpsOffRowId = null
+  } else {
+    // GPS came back ON.
+    if (openGpsOffRowId) {
+      await closeGpsOff(openGpsOffRowId, atMs)
+      openGpsOffRowId = null
+    }
+    // Phase 103.D.1 — re-arm the background watcher. If GPS was OFF
+    // when the watcher last (re)started, addWatcher errored and never
+    // recovered → no movement pings → km under-counts. Now that GPS is
+    // back, re-add the watcher so pings resume immediately. Debounced
+    // inside backgroundGps against the 2-3x MODE_CHANGED multi-fire,
+    // so the duplicate on-broadcasts collapse to one re-arm.
+    rearmBackgroundGps(userId).catch((e) =>
+      console.warn('[tracking] bg-gps re-arm failed:', e?.message || e))
   }
 }
 
