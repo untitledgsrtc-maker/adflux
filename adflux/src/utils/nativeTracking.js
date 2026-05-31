@@ -67,6 +67,38 @@ export function setActiveProfile({ role, teamRole } = {}) {
 }
 
 /**
+ * Phase 103.D.2 (2026-05-31) — pure, read-only probe of the device's
+ * REAL Location switch state. Unlike runForegroundProbe (which WRITES a
+ * gps_off_events row + is role-gated + latched once per session), this
+ * just asks the native TrackingPlugin.isGpsOn()
+ * (LocationManager.isLocationEnabled) and returns the answer. No write,
+ * no role gate, no latch — safe to call on any poll.
+ *
+ * Why it exists: the rep's GPS pill used the web geolocation permission
+ * state, which stays 'granted' even after the user switches Location
+ * OFF in system settings → pill showed GPS ON while Location was OFF
+ * (owner screenshot 2026-05-31, Samsung, Location toggle off + app pill
+ * green). Only the native LocationManager check distinguishes
+ * "permission granted" from "Location switch on". RepStatusPills polls
+ * this so the pill reflects the actual switch.
+ *
+ * @returns {Promise<boolean|null>} true / false on the Android wrapper;
+ *   null on web or if the plugin call is unavailable (caller then falls
+ *   back to its own web source).
+ */
+export async function probeGpsState() {
+  if (!Capacitor.isNativePlatform()) return null
+  try {
+    const res = await Tracking.isGpsOn?.()
+    if (res && typeof res.enabled === 'boolean') return res.enabled
+    return null
+  } catch (e) {
+    console.warn('[probe] probeGpsState failed:', e?.message || e)
+    return null
+  }
+}
+
+/**
  * Bootstrap once at app start. Idempotent — safe to call multiple
  * times. No-op on web.
  */

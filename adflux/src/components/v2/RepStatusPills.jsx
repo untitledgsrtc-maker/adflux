@@ -9,12 +9,17 @@
 // the same predicate as the GPS-off banner in Phase 102.D).
 //
 // Sources:
-//   - GPS    : `gpsOn` prop from useGpsLock() in the parent (device
-//              probe). NOTE: full GPS pill parity with the admin
-//              TeamDashboard rides Phase 103.D (native background
-//              service) — pre-103.D the rep's device knows its GPS
-//              state but the admin only sees pings, which stop when
-//              the app backgrounds. Left on the device probe for now.
+//   - GPS    : Phase 103.D.2 (2026-05-31) — on the Android wrapper,
+//              reads the REAL Location switch via the native
+//              TrackingPlugin.isGpsOn() (LocationManager), polled every
+//              30s + re-probed on app resume. The old `gpsOn` prop (web
+//              geolocation permission) reported 'granted' even after the
+//              user switched Location OFF, so the pill showed GPS ON
+//              while Location was OFF (owner screenshot 2026-05-31:
+//              Samsung Location toggle off, app pill green). The native
+//              switch check is the only reliable source on the APK. On
+//              web (probe returns null) the pill falls back to the
+//              `gpsOn` prop, so web behavior is unchanged.
 //   - ONLINE : navigator.onLine + online/offline window listeners.
 //              (Admin ONLINE parity also rides 103.D.)
 //   - PUSH   : Phase 103.A (2026-05-31) — switched from the web
@@ -34,6 +39,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { probeGpsState } from '../../utils/nativeTracking'
 
 export default function RepStatusPills({ gpsOn }) {
   const profile = useAuthStore(s => s.profile)
@@ -41,6 +47,9 @@ export default function RepStatusPills({ gpsOn }) {
     typeof navigator !== 'undefined' ? navigator.onLine : true
   )
   const [pushOn, setPushOn] = useState(null)
+  // Phase 103.D.2 — native Location-switch state. null = web / unknown
+  // (fall back to the gpsOn prop); boolean = the real Android switch.
+  const [nativeGps, setNativeGps] = useState(null)
 
   // navigator.onLine state — listen for connectivity flips.
   useEffect(() => {
@@ -83,13 +92,48 @@ export default function RepStatusPills({ gpsOn }) {
     return () => { cancelled = true; clearInterval(interval) }
   }, [profile?.id])
 
+  // Phase 103.D.2 — GPS pill from the native Location switch. Polls
+  // every 30s + re-probes the instant the app resumes (rep flips
+  // Location in settings, returns to the app → pill flips immediately).
+  // probeGpsState() returns null on web, so this is a no-op there and
+  // the pill keeps using the gpsOn prop.
+  useEffect(() => {
+    let cancelled = false
+    let resumeHandle = null
+    const probe = async () => {
+      const v = await probeGpsState()
+      if (!cancelled) setNativeGps(v)
+    }
+    probe()
+    const interval = setInterval(probe, 30000)
+    // Re-probe on app resume (Capacitor). Lazy import keeps the web
+    // bundle from hard-depending on the native plugin; on web the
+    // listener is harmless / absent.
+    ;(async () => {
+      try {
+        const { App } = await import('@capacitor/app')
+        const h = await App.addListener('resume', probe)
+        if (cancelled) h.remove(); else resumeHandle = h
+      } catch { /* web — @capacitor/app resume not available; ignore */ }
+    })()
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      if (resumeHandle) resumeHandle.remove()
+    }
+  }, [])
+
+  // Native switch is ground truth on the APK; fall back to the prop on
+  // web (where probeGpsState returns null).
+  const gpsStatus = nativeGps != null ? nativeGps : gpsOn
+
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap', gap: 8,
       justifyContent: 'center',
       padding: '16px 12px 24px',
     }}>
-      <Pill label="GPS"    status={gpsOn} />
+      <Pill label="GPS"    status={gpsStatus} />
       <Pill label="ONLINE" status={online} />
       <Pill label="PUSH"   status={pushOn} />
     </div>
