@@ -52,6 +52,7 @@ import WorkV2              from './pages/v2/WorkV2'
 import MessagesV2          from './pages/v2/MessagesV2'
 import PushDebugV2         from './pages/v2/PushDebugV2'
 import TelecallerV2        from './pages/v2/TelecallerV2'
+import ErrorBoundary       from './components/v2/ErrorBoundary'
 import VoiceLogV2          from './pages/v2/VoiceLogV2'
 import FollowUpsV2         from './pages/v2/FollowUpsV2'
 import EveningVoiceV2      from './pages/v2/EveningVoiceV2'
@@ -290,7 +291,7 @@ export default function App() {
               tooling (Send test push, registered devices list) is
               gated inside PushDebugV2 itself. */}
           <Route path="/push-debug"                element={<PushDebugV2 />} />
-          <Route path="/telecaller"                element={<TelecallerV2 />} />
+          <Route path="/telecaller"                element={<ErrorBoundary label="Telecaller Today"><TelecallerV2 /></ErrorBoundary>} />
           <Route path="/voice"                     element={<VoiceLogV2 />} />
           <Route path="/voice/evening"             element={<EveningVoiceV2 />} />
           {/* Phase 31K — dedicated follow-ups list. Sales sees their own;

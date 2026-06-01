@@ -221,6 +221,12 @@ export default function ProposedIncentiveCard({ compact = false }) {
 
   const { earned, pending, forecast } = data
 
+  // Phase 104.1 — defensive: if the incentive payload is incomplete (e.g.
+  // calculateIncentive returned nothing for a rep with no
+  // staff_incentive_profile), hide the card instead of crashing the whole
+  // page. This was a white-screen suspect on the TC Today hub (Phase 104).
+  if (!earned || !pending || !forecast) return null
+
   const fmt = (n) => new Intl.NumberFormat('en-IN').format(n)
   const panes = {
     earned: {
@@ -240,7 +246,7 @@ export default function ProposedIncentiveCard({ compact = false }) {
       sub: (() => {
         const open = forecast.openPipeline || 0
         const won  = forecast.wonUnsettledTotal || 0
-        const stalePart = forecast.wonAge.stale > 0 ? ` · ₹${fmt(forecast.wonAge.staleValue)} stale` : ''
+        const stalePart = forecast.wonAge?.stale > 0 ? ` · ₹${fmt(forecast.wonAge.staleValue)} stale` : ''
         if (open === 0 && won === 0) return 'Forecast is flat — send quotes to build your open pipeline.'
         if (won === 0)  return `Incremental on ₹${fmt(open)} open pipeline if every non-lost quote closes this month.`
         if (open === 0) return `₹${fmt(won)} from won quotes still collecting${stalePart}.`
