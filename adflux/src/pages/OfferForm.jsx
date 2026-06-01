@@ -121,9 +121,28 @@ export default function OfferForm() {
   const [submitting, setSub]  = useState(false)
   const [submitErr, setSE]    = useState('')
 
+  // Phase 109.4 — PAN + Aadhaar card image files (required on submit).
+  const [panFile, setPanFile]         = useState(null)
+  const [aadhaarFile, setAadhaarFile] = useState(null)
+
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => ({ ...e, [field]: '' }))
+  }
+
+  // Validate + stash a card image. JPG/PNG/PDF, max 5 MB.
+  function pickCard(kind, file) {
+    const setFile = kind === 'pan' ? setPanFile : setAadhaarFile
+    const errKey  = kind === 'pan' ? 'pan_card' : 'aadhaar_card'
+    if (!file) { setFile(null); return }
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'].includes(file.type)) {
+      setErrors(e => ({ ...e, [errKey]: 'JPG, PNG or PDF only' })); setFile(null); return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors(e => ({ ...e, [errKey]: 'Max 5 MB' })); setFile(null); return
+    }
+    setErrors(e => ({ ...e, [errKey]: '' }))
+    setFile(file)
   }
 
   // Load the offer via the public RPC.
@@ -236,6 +255,9 @@ export default function OfferForm() {
     if (form.aadhaar_number && !/^\d{12}$/.test(form.aadhaar_number.replace(/\D/g, ''))) {
       errs.aadhaar_number = 'Aadhaar must be 12 digits'
     }
+    // Phase 109.4 — both card images are required.
+    if (!panFile)     errs.pan_card     = 'Attach your PAN card'
+    if (!aadhaarFile) errs.aadhaar_card = 'Attach your Aadhaar card'
     if (!form.accepted) {
       errs.accepted = 'You must accept the terms to submit'
     }
@@ -257,6 +279,22 @@ export default function OfferForm() {
     setSE('')
 
     try {
+      // 0. Phase 109.4 — upload the two card images FIRST (required), so a
+      // failed upload aborts before we generate/submit anything. Path is
+      // scoped to the invite token; the hr-offer-pii bucket is private.
+      const cardTs = Date.now()
+      const uploadCard = async (file, kind) => {
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+        const p = `${token}/${kind}/${cardTs}.${ext}`
+        const { error } = await supabase.storage
+          .from('hr-offer-pii')
+          .upload(p, file, { contentType: file.type, upsert: false })
+        if (error) throw new Error(`${kind === 'pan' ? 'PAN' : 'Aadhaar'} card upload failed: ${error.message}`)
+        return p
+      }
+      const panCardPath     = await uploadCard(panFile, 'pan')
+      const aadhaarCardPath = await uploadCard(aadhaarFile, 'aadhaar')
+
       // 1. Build the merged offer for PDF generation
       const mergedOffer = {
         ...offer,
@@ -304,6 +342,8 @@ export default function OfferForm() {
         p_emergency_contact_phone:  form.emergency_contact_phone.replace(/\D/g, ''),
         p_emergency_contact_rel:    form.emergency_contact_rel.trim(),
         p_offer_pdf_url:            pdfUrl,
+        p_pan_card_path:            panCardPath,
+        p_aadhaar_card_path:        aadhaarCardPath,
       })
       if (rpcErr) throw new Error(rpcErr.message || 'Submission failed')
 
@@ -459,6 +499,20 @@ export default function OfferForm() {
           </Field>
           <Field label="Aadhaar Number" required error={errors.aadhaar_number} hint="12 digits">
             <input inputMode="numeric" value={form.aadhaar_number} onChange={e => set('aadhaar_number', e.target.value)} className={errors.aadhaar_number ? 'field-error' : ''} />
+          </Field>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="PAN Card (photo / PDF)" required error={errors.pan_card} hint="JPG, PNG or PDF · max 5 MB">
+            <input type="file" accept="image/jpeg,image/png,application/pdf"
+              onChange={e => pickCard('pan', e.target.files?.[0] || null)}
+              className={errors.pan_card ? 'field-error' : ''} />
+            {panFile && <div style={{ fontSize: '.78rem', color: 'var(--gray)', marginTop: 4 }}>{panFile.name}</div>}
+          </Field>
+          <Field label="Aadhaar Card (photo / PDF)" required error={errors.aadhaar_card} hint="JPG, PNG or PDF · max 5 MB">
+            <input type="file" accept="image/jpeg,image/png,application/pdf"
+              onChange={e => pickCard('aadhaar', e.target.files?.[0] || null)}
+              className={errors.aadhaar_card ? 'field-error' : ''} />
+            {aadhaarFile && <div style={{ fontSize: '.78rem', color: 'var(--gray)', marginTop: 4 }}>{aadhaarFile.name}</div>}
           </Field>
         </div>
 

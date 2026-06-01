@@ -23,6 +23,7 @@ const OFFER_COLS = `
   bank_account_number, bank_name, bank_ifsc,
   emergency_contact_name, emergency_contact_phone, emergency_contact_rel,
   accepted_terms_at, offer_pdf_url,
+  pan_card_path, aadhaar_card_path,
   converted_user_id, converted_at,
   created_by, created_at, updated_at
 `

@@ -23,6 +23,24 @@ import { supabase, supabaseSignup } from '../../lib/supabase'
 import { useOffers, buildOfferUrl, STATUS_META } from '../../hooks/useOffers'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { formatCurrency } from '../../utils/formatters'
+import { toastError } from '../v2/Toast'
+
+// Phase 109.4 — open a private PAN/Aadhaar card via a short-lived signed
+// URL (the hr-offer-pii bucket is NOT public; staff-only SELECT RLS gates
+// who can mint the URL).
+const cardLinkStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  background: 'none', border: 0, padding: 0, cursor: 'pointer',
+  font: 'inherit', color: 'var(--accent, #FFE600)',
+}
+async function viewCard(path) {
+  if (!path) return
+  const { data, error } = await supabase.storage
+    .from('hr-offer-pii')
+    .createSignedUrl(path, 600)
+  if (error || !data?.signedUrl) { toastError(error, 'Could not open the card.'); return }
+  window.open(data.signedUrl, '_blank', 'noopener')
+}
 
 function Row({ label, value }) {
   if (!value) return null
@@ -293,6 +311,20 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
                 <Row label="Qualification"    value={offer.qualification} />
                 <Row label="PAN"              value={offer.pan_number} />
                 <Row label="Aadhaar"          value={offer.aadhaar_number} />
+                {offer.pan_card_path && (
+                  <Row label="PAN Card" value={
+                    <button type="button" onClick={() => viewCard(offer.pan_card_path)} style={cardLinkStyle}>
+                      <Download size={14} /> View PAN card
+                    </button>
+                  } />
+                )}
+                {offer.aadhaar_card_path && (
+                  <Row label="Aadhaar Card" value={
+                    <button type="button" onClick={() => viewCard(offer.aadhaar_card_path)} style={cardLinkStyle}>
+                      <Download size={14} /> View Aadhaar card
+                    </button>
+                  } />
+                )}
               </Section>
 
               <Section title="Address">
