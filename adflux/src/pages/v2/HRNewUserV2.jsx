@@ -255,10 +255,12 @@ export default function HRNewUserV2() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/people')}
+              // Phase 109 — HR can't reach /people (admin-only). Send the
+              // HR role to the HR home; admin/co_owner keep the roster.
+              onClick={() => navigate(profile?.role === 'hr' ? '/hr' : '/people')}
               style={ghostBtn}
             >
-              View team
+              {profile?.role === 'hr' ? 'Done' : 'View team'}
             </button>
           </div>
         </div>

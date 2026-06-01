@@ -198,7 +198,9 @@ export default function ProposedIncentiveCard({ compact = false }) {
   // "Proposed Incentive / Forecast is flat" banner from rendering
   // on /my-performance + /my-offer + every other rep page for
   // agency users. Frozen V2AppShell stays untouched.
-  if (profile?.role === 'agency') return null
+  // Phase 32F agency; Phase 109 hr. Neither earns sales incentive, so the
+  // "Forecast is flat — send quotes" card is noise on their pages.
+  if (['agency', 'hr'].includes(profile?.role)) return null
 
   if (!data) {
     // Skeleton — same height as the real card so layout doesn't jump.

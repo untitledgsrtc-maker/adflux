@@ -195,6 +195,10 @@ function RootRedirect() {
   // (AgencyEarningsView ledger + AgencyOfferView) reachable via
   // bottom-nav Earnings + Offer tabs.
   if (teamRole === 'agency' || role === 'agency') return <Navigate to="/dashboard" replace />
+  // Phase 109 — HR lands on the HR home (offer roster + add member).
+  // Without this, hr falls through to /dashboard → an empty sales view
+  // it can't use.
+  if (role === 'hr')                              return <Navigate to="/hr" replace />
   return <Navigate to="/dashboard" replace />
 }
 
@@ -317,9 +321,12 @@ export default function App() {
           <Route path="/team"                      element={<RequirePrivileged><TeamV2 /></RequirePrivileged>} />
           <Route path="/incentives"                element={<RequirePrivileged><IncentivesV2 /></RequirePrivileged>} />
           <Route path="/pending-approvals"         element={<RequirePrivileged><PendingApprovalsV2 /></RequirePrivileged>} />
-          <Route path="/hr"                        element={<RequirePrivileged><HRV2 /></RequirePrivileged>} />
-          <Route path="/hr/new-user"               element={<RequirePrivileged><HRNewUserV2 /></RequirePrivileged>} />
-          <Route path="/hr/offer/:userId"          element={<RequirePrivileged><HROfferLetterV2 /></RequirePrivileged>} />
+          {/* Phase 109 — HR login. These 3 routes admit role='hr' as well
+              as admin/co_owner via RequireHROrPrivileged. Every OTHER
+              admin route stays RequirePrivileged (admin+co_owner only). */}
+          <Route path="/hr"                        element={<RequireHROrPrivileged><HRV2 /></RequireHROrPrivileged>} />
+          <Route path="/hr/new-user"               element={<RequireHROrPrivileged><HRNewUserV2 /></RequireHROrPrivileged>} />
+          <Route path="/hr/offer/:userId"          element={<RequireHROrPrivileged><HROfferLetterV2 /></RequireHROrPrivileged>} />
           {/* Phase 33G.8 — admin Leaves CRUD. Excluded days for the
               monthly performance score now come from a real table
               instead of the work_sessions.is_off_day proxy. */}

@@ -59,7 +59,7 @@ import NativeOnboarding from '../native/NativeOnboarding'
 import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
-  TrendingUp, UserCircle2, Contact2, MapPin, Tv, FileBox,
+  TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
   Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -213,6 +213,15 @@ const MANAGER_NAV = [
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
+]
+
+// Phase 109 (1 Jun 2026) — HR login. Minimal nav: the offer/roster
+// home + the onboarding form. Both routes guarded by
+// RequireHROrPrivileged in App.jsx. Same 2 items serve desktop
+// sidebar AND mobile bottom-nav (HR_NAV reused in both picks below).
+const HR_NAV = [
+  { to: '/hr',                label: 'HR Home',        icon: UserCircle2 },
+  { to: '/hr/new-user',       label: 'Add Member',     icon: UserPlus },
 ]
 
 const MOBILE_NAV_ADMIN = [
@@ -481,9 +490,11 @@ export function V2AppShell() {
   // instead of TELECALLER_NAV.
   const isTelecaller = profile?.team_role === 'telecaller'
   const isAgency     = profile?.role === 'agency'
+  const isHR         = profile?.role === 'hr'   // Phase 109 — HR login
   const nav =
     isPrivileged   ? ADMIN_NAV :
     isManager      ? MANAGER_NAV :
+    isHR           ? HR_NAV :
     isTelecaller   ? TELECALLER_NAV :
     isAgency       ? AGENCY_NAV :
                      SALES_NAV
@@ -494,6 +505,7 @@ export function V2AppShell() {
   const mobileNav =
     isPrivileged   ? MOBILE_NAV_ADMIN :
     isManager      ? MOBILE_NAV_MANAGER :
+    isHR           ? HR_NAV :
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES
@@ -533,6 +545,7 @@ export function V2AppShell() {
             <div className="v2d-brand-t">Untitled OS</div>
             <div className="v2d-brand-s">{
               isPrivileged ? 'Admin'
+              : isHR ? 'HR'
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
               : 'Sales'
@@ -721,6 +734,7 @@ export function V2AppShell() {
               <div className="v2d-me-name">{profile?.name || 'User'}</div>
               <div className="v2d-me-role">{
                 isPrivileged ? 'Admin'
+                : isHR ? 'HR'
                 : isTelecaller ? 'Telecaller'
                 : isAgency ? 'Agency'
                 : 'Sales'
@@ -817,6 +831,7 @@ export function V2AppShell() {
                   <div className="v2d-brand-t">Untitled OS</div>
                   <div className="v2d-brand-s">{
               isPrivileged ? 'Admin'
+              : isHR ? 'HR'
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
               : 'Sales'
