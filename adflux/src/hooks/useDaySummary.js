@@ -294,7 +294,7 @@ export default function useDaySummary({ dateISO } = {}) {
         meetings:   tomorrowMeetings,
       }
 
-      setData({
+      const _summary = {
         repName: profile.name,
         role,
         dateISO: targetDate,
@@ -320,10 +320,16 @@ export default function useDaySummary({ dateISO } = {}) {
         tomorrow,
         sentAt:    ws?.evening_summary_sent_at || null,
         checkedIn: !!ws?.check_in_at,
-      })
+      }
+      setData(_summary)
+      // Phase 109.2 — return the assembled object so a caller (the
+      // share button) can build the WhatsApp text from THIS fetch
+      // instead of stale React state.
+      return _summary
     } catch (e) {
       console.warn('[useDaySummary] load failed:', e?.message || e)
       setError(e?.message || 'Load failed')
+      return null
     } finally {
       setLoading(false)
     }

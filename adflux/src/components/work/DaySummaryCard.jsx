@@ -143,7 +143,12 @@ export default function DaySummaryCard({
     if (!data) return
     setSending(true)
     try {
-      const text = formatDaySummaryText(data)
+      // Phase 109.2 — refetch BEFORE building the message so the share
+      // never sends a stale snapshot (daily_ta + counters grow through
+      // the day; the old code shared load-time state, forcing a reshare).
+      // Falls back to current state if the refetch fails.
+      const fresh = await refresh()
+      const text = formatDaySummaryText(fresh || data)
       openWhatsAppShare(text)
       // Stamp the work_sessions row so server-side auto-send (Phase 77)
       // doesn't double-fire. Best-effort — don't block the share if
