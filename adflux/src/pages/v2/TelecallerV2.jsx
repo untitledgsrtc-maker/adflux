@@ -53,9 +53,6 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
 // Phase 47.1 — WhatsApp 1-click send.
 import WhatsAppSendModal from '../../components/leads/WhatsAppSendModal'
-// Phase 104 — incentive forecast card, reused from the sales /work Today
-// page so the TC Today hub leads with the same purple incentive card.
-import ProposedIncentiveCard from '../../components/incentives/ProposedIncentiveCard'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -547,10 +544,12 @@ export default function TelecallerV2() {
     : 0
   return (
     <div className="lead-root">
-      {/* Phase 104 — TC Today hub leads with the incentive forecast card
-          (same ProposedIncentiveCard + top position as the sales /work
-          Today page). Self-fetching; reads the TC's own incentive. */}
-      <ProposedIncentiveCard />
+      {/* Phase 104.2 — incentive forecast card is rendered ONCE by
+          V2AppShell (mounts it above <Outlet/> for every non-privileged
+          role, incl. TC). Phase 104's body-mount here was a SECOND
+          instance sharing realtime topic `incentive-<userId>` →
+          "cannot add postgres_changes after subscribe()" crash. Do NOT
+          re-add — the shell already shows it at top, same as /work. */}
 
       {/* Phase 93 — evening wrap-up nag banner. Tap = smooth-scroll
           to DaySummaryCard below. Sits above DaySummaryCard so it
