@@ -11,9 +11,10 @@
 // already wired to the Vercel /api/shorten endpoint so the link
 // previews clean in WhatsApp.
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X, Copy, Check, MessageSquare } from 'lucide-react'
 import { useOffers, buildOfferUrl } from '../../hooks/useOffers'
+import { supabase } from '../../lib/supabase'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { formatCurrency } from '../../utils/formatters'
 
@@ -42,6 +43,7 @@ export function SendOfferModal({ onClose, onCreated }) {
   // defaults so a "just send it" admin gets sensible values without
   // touching them.
   const [form, setForm] = useState({
+    designation_id:              '',
     candidate_name:              '',
     candidate_email:             '',
     position:                    'Sales Person',
@@ -65,13 +67,49 @@ export function SendOfferModal({ onClose, onCreated }) {
   const [shortenLoading, setShortenLoading] = useState(false)
   const [copiedKey, setCopiedKey] = useState(null)
 
+  // Phase 109.1 — active designations so HR can send an offer for ANY
+  // role, not only sales. Mirrors the HRNewUserV2 designation picker.
+  const [designations, setDesignations] = useState([])
+  useEffect(() => {
+    let alive = true
+    supabase.from('designations')
+      .select('id, name, default_monthly_salary, has_incentive')
+      .eq('is_active', true)
+      .order('display_order')
+      .then(({ data }) => { if (alive && data) setDesignations(data) })
+    return () => { alive = false }
+  }, [])
+
+  const picked = useMemo(
+    () => designations.find(d => d.id === form.designation_id) || null,
+    [designations, form.designation_id],
+  )
+  // Until a role is picked, keep the sales-shaped layout (incentive
+  // shown) so the modal never looks half-empty on first open.
+  const hasIncentive = picked ? !!picked.has_incentive : true
+
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => ({ ...e, [field]: '' }))
   }
 
+  // On designation pick → snap position + salary from the master row.
+  function pickDesignation(id) {
+    const d = designations.find(x => x.id === id)
+    setForm(f => ({
+      ...f,
+      designation_id: id,
+      position: d ? d.name : f.position,
+      fixed_salary_monthly: d && d.default_monthly_salary
+        ? String(d.default_monthly_salary)
+        : f.fixed_salary_monthly,
+    }))
+    setErrors(e => ({ ...e, designation_id: '', position: '' }))
+  }
+
   function validate() {
     const errs = {}
+    if (!form.designation_id)         errs.designation_id  = 'Pick a designation'
     if (!form.candidate_name.trim())  errs.candidate_name  = 'Name is required'
     if (!form.candidate_email.trim()) errs.candidate_email = 'Email is required'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.candidate_email))
@@ -79,12 +117,15 @@ export function SendOfferModal({ onClose, onCreated }) {
     if (!form.fixed_salary_monthly || Number(form.fixed_salary_monthly) <= 0)
       errs.fixed_salary_monthly = 'Enter a monthly salary'
     if (!form.joining_date) errs.joining_date = 'Pick a joining date'
-    if (!form.incentive_sales_multiplier || Number(form.incentive_sales_multiplier) <= 0)
-      errs.incentive_sales_multiplier = 'Required'
-    if (form.incentive_new_client_rate === '' || Number(form.incentive_new_client_rate) < 0)
-      errs.incentive_new_client_rate = 'Required'
-    if (form.incentive_renewal_rate === '' || Number(form.incentive_renewal_rate) < 0)
-      errs.incentive_renewal_rate = 'Required'
+    // Incentive fields only apply to roles that earn incentive.
+    if (hasIncentive) {
+      if (!form.incentive_sales_multiplier || Number(form.incentive_sales_multiplier) <= 0)
+        errs.incentive_sales_multiplier = 'Required'
+      if (form.incentive_new_client_rate === '' || Number(form.incentive_new_client_rate) < 0)
+        errs.incentive_new_client_rate = 'Required'
+      if (form.incentive_renewal_rate === '' || Number(form.incentive_renewal_rate) < 0)
+        errs.incentive_renewal_rate = 'Required'
+    }
     return errs
   }
 
@@ -97,14 +138,16 @@ export function SendOfferModal({ onClose, onCreated }) {
     const { data, error } = await createOffer({
       candidate_name:              form.candidate_name.trim(),
       candidate_email:             form.candidate_email.trim().toLowerCase(),
-      position:                    form.position.trim() || 'Sales Person',
+      position:                    form.position.trim() || picked?.name || 'Sales Person',
       territory:                   form.territory.trim() || null,
       joining_date:                form.joining_date,
       fixed_salary_monthly:        Number(form.fixed_salary_monthly),
-      incentive_sales_multiplier:  Number(form.incentive_sales_multiplier),
-      incentive_new_client_rate:   Number(form.incentive_new_client_rate),
-      incentive_renewal_rate:      Number(form.incentive_renewal_rate),
-      incentive_flat_bonus:        Number(form.incentive_flat_bonus || 0),
+      // Flat-salary roles carry zero incentive so the record never
+      // implies a commission the role doesn't earn.
+      incentive_sales_multiplier:  hasIncentive ? Number(form.incentive_sales_multiplier) : 0,
+      incentive_new_client_rate:   hasIncentive ? Number(form.incentive_new_client_rate) : 0,
+      incentive_renewal_rate:      hasIncentive ? Number(form.incentive_renewal_rate) : 0,
+      incentive_flat_bonus:        hasIncentive ? Number(form.incentive_flat_bonus || 0) : 0,
       // Legacy free-text is no longer collected — left null so the
       // PDF generator falls through to the structured block.
       incentive_text:              null,
@@ -276,11 +319,17 @@ export function SendOfferModal({ onClose, onCreated }) {
             />
           </Field>
 
-          <Field label="Position">
-            <input
-              value={form.position}
-              onChange={e => set('position', e.target.value)}
-            />
+          <Field label="Designation" required error={errors.designation_id}
+            hint="Salary auto-fills from the role. Commission shows only for roles that earn it.">
+            <select
+              value={form.designation_id}
+              onChange={e => pickDesignation(e.target.value)}
+            >
+              <option value="">— Pick a designation —</option>
+              {designations.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
           </Field>
 
           <Field label="Territory" hint="e.g. Vadodara + Anand + Kheda">
@@ -309,10 +358,10 @@ export function SendOfferModal({ onClose, onCreated }) {
           </div>
 
           {/* ── Structured incentive block ─────────────────
-              Numbers go straight onto the offer PDF AND into
-              staff_incentive_profiles when the candidate is
-              later converted to a user. Same shape as the Team
-              profile editor so nothing has to be re-entered. */}
+              Phase 109.1 — shown ONLY for roles that earn incentive
+              (designations.has_incentive). Flat-salary roles (HR,
+              Accounts, Office Boy, creative/ops) skip it entirely. */}
+          {hasIncentive && (
           <div style={{
             padding: 14, borderRadius: 10,
             border: '1px dashed var(--brd)',
@@ -391,6 +440,7 @@ export function SendOfferModal({ onClose, onCreated }) {
               </div>
             )}
           </div>
+          )}
 
           <Field label="Place (for acceptance)">
             <input
