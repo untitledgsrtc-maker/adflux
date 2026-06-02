@@ -81,6 +81,11 @@ export default function useDaySummary({ dateISO } = {}) {
     setLoading(true)
     setError('')
     const { startISO, endISO } = istDayBracketUTC(targetDate)
+    // Quote ₹ figures are MONTH-TO-DATE (owner 2026-06-02: "quote sent/won
+    // with amount, this month"). Month start = 1st of targetDate's month at
+    // IST midnight (UTC+5:30 → previous-day 18:30Z).
+    const [_qy, _qm] = targetDate.split('-').map(Number)
+    const monthStartISO = new Date(Date.UTC(_qy, _qm - 1, 1, -5, -30, 0)).toISOString()
     // Phase 91a — tomorrow preview. Anchored to IST regardless of
     // device clock (istTodayPlusDays guarantees that). Only needed
     // when targetDate is "today" — historical dates don't show a
@@ -156,22 +161,21 @@ export default function useDaySummary({ dateISO } = {}) {
           .gte('done_at', startISO)
           .lte('done_at', endISO),
 
-        // 6a) quotes created by rep today (sent count)
+        // 6a) quotes created by rep THIS MONTH (sent) — rows for count + ₹.
         supabase.from('quotes')
-          .select('id', { count: 'exact', head: true })
+          .select('total_amount')
           .eq('created_by', profile.id)
-          .gte('created_at', startISO)
+          .gte('created_at', monthStartISO)
           .lte('created_at', endISO),
 
-        // 6b) quotes won today. Schema has no dedicated `won_at`
-        // column — the codebase uses `updated_at` as the proxy for
-        // "when status flipped to won" (same pattern as
+        // 6b) quotes WON this month — rows for count + ₹. No `won_at`
+        // column; `updated_at` is the won-flip proxy (same pattern as
         // AdminDashboardDesktop:385 / SalesDashboard:575).
         supabase.from('quotes')
-          .select('id', { count: 'exact', head: true })
+          .select('total_amount')
           .eq('created_by', profile.id)
           .eq('status', 'won')
-          .gte('updated_at', startISO)
+          .gte('updated_at', monthStartISO)
           .lte('updated_at', endISO),
 
         // 7) voice_logs count
@@ -319,8 +323,11 @@ export default function useDaySummary({ dateISO } = {}) {
           site_visits,
           whatsapp_sent,
           voice_notes:       voiceRes.count || 0,
-          quotes_sent:       qSentRes.count || 0,
-          quotes_won:        qWonRes.count || 0,
+          // Phase 110b (2026-06-02) — quotes are MONTH-TO-DATE now, with ₹.
+          quotes_sent:        (qSentRes.data || []).length,
+          quotes_sent_amount: (qSentRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0),
+          quotes_won:         (qWonRes.data || []).length,
+          quotes_won_amount:  (qWonRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0),
           qualified,
         },
         tracking,

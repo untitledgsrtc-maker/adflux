@@ -23,7 +23,7 @@
 import React, { useMemo, useState } from 'react'
 import {
   ClipboardList, Phone, Users, Map as MapIcon,
-  Mic, BadgeCheck, Wifi, WifiOff, AlertTriangle, Send,
+  BadgeCheck, Wifi, WifiOff, AlertTriangle, Send,
   X, ChevronRight, Activity, Satellite, LogOut, Calendar,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -31,6 +31,7 @@ import { useAuthStore } from '../../store/authStore'
 import { istTodayISO } from '../../utils/istDate'
 import useDaySummary from '../../hooks/useDaySummary'
 import { formatDaySummaryText, openWhatsAppShare } from '../../utils/whatsappSummary'
+import { formatCurrency } from '../../utils/formatters'
 
 function fmt(seconds) {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return '0m'
@@ -304,8 +305,8 @@ export default function DaySummaryCard({
           )}
           <Row
             icon={<ChevronRight size={14} strokeWidth={1.6} />}
-            label="Quotes sent"
-            value={a.quotes_sent || 0}
+            label="Quotes sent · month"
+            value={`${a.quotes_sent || 0} · ${formatCurrency(a.quotes_sent_amount || 0)}`}
           />
 
           {/* ACTIVITY */}
@@ -331,14 +332,9 @@ export default function DaySummaryCard({
             value={a.whatsapp_sent || 0}
           />
           <Row
-            icon={<Mic size={14} strokeWidth={1.6} />}
-            label="Voice notes"
-            value={a.voice_notes || 0}
-          />
-          <Row
             icon={<BadgeCheck size={14} strokeWidth={1.6} />}
-            label="Quotes won"
-            value={a.quotes_won || 0}
+            label="Quotes won · month"
+            value={`${a.quotes_won || 0} · ${formatCurrency(a.quotes_won_amount || 0)}`}
             tone={(a.quotes_won || 0) > 0 ? 'success' : undefined}
           />
 

@@ -18,6 +18,7 @@
 // so the ban does not apply. Owner explicitly chose Option X.
 
 import { openExternalUrl } from './openExternal'
+import { formatCurrency } from './formatters'
 
 /**
  * Pluralize seconds → "Xh Ym" or "Ym Ns" form.
@@ -103,7 +104,7 @@ export function formatDaySummaryText(d) {
   if (isTC) {
     lines.push(`• Positive talks: ${a.qualified ?? 0}`)
   }
-  lines.push(`• Quotes sent: ${a.quotes_sent ?? 0}`)
+  lines.push(`• Quotes sent: ${a.quotes_sent ?? 0} · ${formatCurrency(a.quotes_sent_amount || 0)} (this month)`)
   lines.push('')
 
   // ACTIVITY
@@ -112,8 +113,7 @@ export function formatDaySummaryText(d) {
     lines.push(`• Site visits:   ${a.site_visits ?? 0}`)
   }
   lines.push(`• WhatsApp sent: ${a.whatsapp_sent ?? 0}`)
-  lines.push(`• Voice notes:   ${a.voice_notes ?? 0}`)
-  lines.push(`• Quotes won:    ${a.quotes_won ?? 0}`)
+  lines.push(`• Quotes won:    ${a.quotes_won ?? 0} · ${formatCurrency(a.quotes_won_amount || 0)} (this month)`)
   lines.push('')
 
   // TRACKING INTEGRITY
