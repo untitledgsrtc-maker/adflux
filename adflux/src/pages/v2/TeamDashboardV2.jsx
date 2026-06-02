@@ -1369,7 +1369,13 @@ export default function TeamDashboardV2() {
                 const lastSeenMins = push?.last_seen_at
                   ? Math.floor((Date.now() - new Date(push.last_seen_at).getTime()) / 60000)
                   : Infinity
-                const onlineOk = lastSeenMins <= 1440 // 24h (was 3h)
+                // Phase 110c (2026-06-02) — a CHECKED-OUT rep is not "online".
+                // Mirror the live-count rule (~line 1017) so the ONLINE pill
+                // agrees with the "done" badge. Owner: a rep who ended the day
+                // must not read ONLINE while a stale push-heartbeat lingers.
+                const _sess = sessionByUser.get(r.id)
+                const _checkedOut = !!(_sess?.check_out_at || _sess?.auto_checked_out)
+                const onlineOk = lastSeenMins <= 1440 && !_checkedOut // 24h + not checked out
                 const pill = (label, ok, onClick) => (
                   <span
                     onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}

@@ -128,7 +128,7 @@ export default function AdminDashboardDesktop() {
     // stationary reps visible.
     const liveCutoffIso = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
-    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes, hotLeadsRes, briefLogRes, sourceAttribRes] = await Promise.all([
+    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes, hotLeadsRes, briefLogRes, sourceAttribRes, wsCheckedOutRes] = await Promise.all([
       // Use `*` to be tolerant of schema drift — earlier we enumerated
       // columns including `ref_number`, and a single missing column
       // would silently return an empty array (not throw), which made
@@ -225,6 +225,13 @@ export default function AdminDashboardDesktop() {
           .gte('created_at', cutoff)
           .limit(20000)
       })(),
+      // Phase 110c (2026-06-02) — reps who CHECKED OUT today, to drop them
+      // from "Reps in field right now" (a finished rep keeps a fresh
+      // last-ping but is not in the field). Mirrors the TeamDashboard
+      // live-count rule (check_out_at / auto_checked_out).
+      supabase.from('work_sessions')
+        .select('user_id, check_out_at, auto_checked_out')
+        .eq('work_date', todayDate),
     ])
 
     const allQuotes    = quotesRes.data       || []
@@ -240,9 +247,16 @@ export default function AdminDashboardDesktop() {
     // Phase 41.2 — Sprint 2 derived values.
     const pendingLeavesCount = pendingLeavesRes.count ?? 0
     const pendingTaCount     = pendingTaRes.count     ?? 0
-    // Reps in field = distinct user_id with a ping in last 30 min.
+    // Reps in field = distinct user_id with a ping in last 30 min,
+    // MINUS anyone who has checked out today (Phase 110c).
+    const checkedOutToday = new Set(
+      (wsCheckedOutRes.data || [])
+        .filter(w => w.check_out_at || w.auto_checked_out)
+        .map(w => w.user_id)
+    )
     const liveRepsById = new Map()
     for (const ping of (liveGpsRes.data || [])) {
+      if (checkedOutToday.has(ping.user_id)) continue
       if (!liveRepsById.has(ping.user_id)) liveRepsById.set(ping.user_id, ping)
     }
     const liveReps = Array.from(liveRepsById.entries()).map(([user_id, ping]) => ({
