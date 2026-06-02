@@ -108,6 +108,11 @@ export default function TelecallerV2() {
   // ref + amount + status + age on the hero so TC can answer "did
   // we already quote them?" without leaving the page.
   const [lastQuote, setLastQuote] = useState(null)
+  // Phase 110 — manual checkout for telecallers (was missing entirely;
+  // TC could only be closed by the 8 PM cron). Mirrors WorkV2's flow,
+  // minus GPS (TC is desk-based).
+  const [tcSession, setTcSession]     = useState(null)
+  const [checkingOut, setCheckingOut] = useState(false)
 
   // Phase 71 (21 May 2026) — `silent` flag skips the full-page
   // spinner during background refreshes. Owner reported: "when we do
@@ -250,9 +255,50 @@ export default function TelecallerV2() {
     }).length
     setSlaBreachCount(breached)
     setCallbacks(callbacksRes?.data || [])
+    // Phase 110 — today's work_session drives the manual-checkout state
+    // on the DaySummaryCard (checked-out? busy?).
+    const { data: wsRow } = await supabase
+      .from('work_sessions')
+      .select('check_out_at')
+      .eq('user_id', profile.id)
+      .eq('work_date', todayDateISO)
+      .maybeSingle()
+    setTcSession(wsRow || null)
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
+
+  // Phase 110 — manual end-of-day checkout for telecallers. Stamps
+  // check_out_at on today's session; the 8 PM cron still auto-closes
+  // anyone who forgets. No GPS (TC is desk-based). check_out_source is a
+  // best-effort second write so a DB without the Phase 92c column can't
+  // break the primary checkout (mirrors WorkV2.doCheckOut).
+  async function doCheckOut(source = 'manual') {
+    if (checkingOut) return
+    // Mirror WorkV2: DaySummaryCard passes 'manual' (button) or
+    // 'auto_share' (share-chained). Normalize anything else (e.g. a
+    // React event object) to 'manual' so the audit source is accurate.
+    const safeSource = (source === 'manual' || source === 'auto_share' || source === 'auto_cron')
+      ? source : 'manual'
+    setCheckingOut(true)
+    const today = istTodayISO()
+    const { error } = await supabase
+      .from('work_sessions')
+      .update({ check_out_at: new Date().toISOString() })
+      .eq('user_id', profile.id)
+      .eq('work_date', today)
+    if (!error) {
+      try {
+        await supabase.from('work_sessions')
+          .update({ check_out_source: safeSource })
+          .eq('user_id', profile.id)
+          .eq('work_date', today)
+      } catch (_) { /* column may not exist yet — primary checkout already landed */ }
+    }
+    setCheckingOut(false)
+    if (error) { pushToast('Could not check out — try again.', 'danger'); return }
+    load(true)
+  }
   // Phase 43.1 — match sales-frozen contract: auto-refresh queue.
   // Phase 65 — 20s poll so call counters + connect-rate update
   // without waiting for tab-resume.
@@ -559,7 +605,11 @@ export default function TelecallerV2() {
       {/* Phase 83 — evening day summary card. Auto-shows after 7 PM
           IST. Mounted above V2Hero so it's the first thing the TC
           sees when finishing the day. */}
-      <DaySummaryCard />
+      <DaySummaryCard
+        onCheckOut={doCheckOut}
+        checkedOut={!!tcSession?.check_out_at}
+        checkOutBusy={checkingOut}
+      />
 
       {(queueOpen > 0 || callsToday > 0) && (
         <V2Hero
