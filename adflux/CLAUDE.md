@@ -2333,3 +2333,76 @@ work. "It only changes one line in WorkV2" is exactly the move this rule forbids
   note** (query count, latency, bundle delta) — not just "looks fine."
 - Don't advise `git push` until verified (§35).
 
+
+---
+
+## 46 · Campaign / WhatsApp module — PARKED, resume tomorrow (2026-06-02)
+
+Full design + the token-free build shipped today. Parked on the edigiexpert
+token. Resume per the plan below.
+
+### Reference docs (read first on resume)
+- `_design_reference/CAMPAIGN_MODULE_STRUCTURE.md` — the spec (REVISE-accepted).
+  Has the **★ MVP C2 table list**, the **★ 4 P0 contracts**, §13 security
+  must-haves, §4B future-proofing, revised phase order, locked owner decisions.
+- `_design_reference/campaign_module_mockup.html` — 8-tab visual mockup.
+
+### Verdict + owner-locked decisions (do NOT re-litigate)
+Re-audit verdict = **REVISE** (was overbuilt). MVP = receive + chat + QR.
+LOCKED: TC-first YES · duplicate = **attach to existing open lead** (never create
+dup) · broadcast NO in MVP · chatbot NO · segments NO · agency access NO · QR raw
+scans NO (messaged only) · Vishal = GOVERNMENT-only · Justdial = email parser later.
+
+### The 4 P0 contracts (MUST honor before any inbound→leads write)
+- **P0-1 Dedup:** normalize phone with existing `cleanPhone` (91+10); call
+  `find_open_lead_id_by_phone()` first; attach if found; NEVER let
+  `trg_leads_block_dup_phone` throw in the webhook path; never reassign a lead.
+- **P0-2 Routing:** always set ONE owner col (default `telecaller_id`, TC-first) +
+  `segment` (default PRIVATE); never both-NULL (Phase 99 round-robin landmine).
+- **P0-3 Activity:** bot/automation writes `activity_type='whatsapp'` ONLY — never
+  meeting/site_visit/call (would inflate `compute_daily_score` → incentive, §33).
+- **P0-4 Stage:** only New|Working|QuoteSent|Nurture|Won|Lost.
+
+### What SHIPPED today (token-free, additive, all guardian/security-audited)
+| Phase | What | Commit | State |
+|---|---|---|---|
+| C2 | 7 foundation tables + `leads.campaign_id` + whatsapp_templates cols | `cf0e5eb` (`supabase_campaign_c2_foundation.sql`) | **SQL RUN by owner — live.** 0 triggers on leads (verified). |
+| C8 | QR & Locations page (`CampaignQrV2.jsx`) — make/print board QRs, token-free | `0c75906` | **pushed + live** |
+| — | Campaigns page (`CampaignsV2.jsx`) — name + routing | `dcf2b5f` | committed; **push may be pending** — verify `git log origin/untitled-os..HEAD` |
+| — | Board→campaign attach (campaign_id picker on QR page) | `dc730f5` | committed; **push pending** |
+
+New dep: `qrcode.react@4.2.0` (lazy-loaded — rep bundles untouched). Nav: one
+admin **Campaigns** entry → `/campaigns` (→ `/campaigns/qr` one click in). Frozen
+V2AppShell touched additively (guardian PASS both times).
+
+### BLOCKED on (the only thing stopping the rest)
+The **edigiexpert token** + 4 more values. Owner must get from edigiexpert (they own
+the WABAs): (1) permanent System User access token, (2) App Secret, (3) campaign
+number's phone_number_id, (4) WABA id, (5) confirm payment method. Owner also must
+pick THE campaign number (2 live: 95815 78261 / 98982 73686). Full owner-facing
+guide was given in chat 2 Jun (the copy-paste request to edigiexpert).
+
+### RESUME PLAN (tomorrow)
+1. Confirm the pending commits are pushed (`git push origin untitled-os`).
+2. Owner picks the campaign number + has the 5 values from edigiexpert.
+3. Walk owner click-by-click: put the secrets into **Supabase → Project Settings
+   → Edge Functions → Secrets** (use DISTINCT names so the existing daily-brief
+   `META_WABA_*` secrets aren't clobbered — pick the campaign number first to know
+   if it's the same number daily-brief uses).
+4. Build **C4** = receive-only webhook (`api/wa/webhook` — inline raw-body HMAC +
+   `(provider,event_id)` idempotency + 200-fast async; NO lead write yet). Verify
+   against a real Meta test payload on a preview deploy FIRST.
+5. Build **C4.5** = inbound→`leads` with the 4 P0 contracts (highest risk —
+   guardian + security gate).
+6. Build **C5** = inbox (reply in 24h window) + notifications via a DEFINER trigger
+   (NOT direct `rpc('enqueue_push')` — it's REVOKED from authenticated, Phase 97.A2).
+7. Then **C8 location_id** (FK board→lead), then later: auto-reply (C7), Meta
+   ingest (C9), Justdial (C10). Broadcast/Segments/Chatbot = V3.
+
+### Do NOT (per §45 + owner)
+- Do NOT build empty Integrations/inbox shells just to "make progress" — placeholder
+  screens add live-app risk for zero value. Owner explicitly fine with parking.
+- Do NOT ship webhook/intake code untested at the live app — verify on preview +
+  a real Meta test payload before it touches a live lead.
+- Do NOT touch any existing flow/file or add load to a hot path (§45).
+
