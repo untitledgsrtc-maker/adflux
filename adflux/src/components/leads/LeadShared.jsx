@@ -171,16 +171,30 @@ export function SegChip({ segment }) {
    Color scheme indexed by `userId.charCodeAt(0) % 6 + 1`, or
    passed in explicitly via `colorIndex` for cases where the design
    pre-assigned a slot. */
-export function LeadAvatar({ name, userId, colorIndex }) {
+export function LeadAvatar({ name, userId, colorIndex, imageUrl }) {
   const idx = colorIndex
     ? colorIndex
     : userId
       ? (String(userId).charCodeAt(0) % 6) + 1
       : (String(name || '').charCodeAt(0) % 6) + 1
   const safeName = name || '?'
+  // Phase 109.8 — optional profile pic. Initials render as the base; when
+  // an imageUrl is supplied it overlays (clipped to the circle). On a
+  // broken/empty image the onError hides it so the initials show through.
+  // Backwards-compatible: callers that pass no imageUrl get the exact
+  // initials-only badge as before (frozen pages unchanged).
   return (
-    <span className={`lead-avatar av-${idx}`}>
+    <span className={`lead-avatar av-${idx}`} style={{ position: 'relative', overflow: 'hidden' }}>
       {initialsHelper(safeName)}
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt={safeName}
+          loading="lazy"
+          onError={(e) => { e.currentTarget.style.display = 'none' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      )}
     </span>
   )
 }

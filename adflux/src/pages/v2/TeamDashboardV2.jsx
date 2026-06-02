@@ -1198,7 +1198,7 @@ export default function TeamDashboardV2() {
               title={`Open ${r.name}'s full day`}
             >
               <div className="lead-rep-head">
-                <LeadAvatar name={r.name} userId={r.id} />
+                <LeadAvatar name={r.name} userId={r.id} imageUrl={r.profile_image_url} />
                 <div>
                   <div className="lead-rep-name">{r.name}</div>
                   <div className="lead-rep-meta">
