@@ -48,6 +48,7 @@ import TeamDashboardV2     from './pages/v2/TeamDashboardV2'
 import LeadDetailV2        from './pages/v2/LeadDetailV2'
 import LeadFormV2          from './pages/v2/LeadFormV2'
 import LeadUploadV2        from './pages/v2/LeadUploadV2'
+import CampaignQrV2        from './pages/v2/CampaignQrV2'
 import WorkV2              from './pages/v2/WorkV2'
 import MessagesV2          from './pages/v2/MessagesV2'
 import PushDebugV2         from './pages/v2/PushDebugV2'
@@ -273,6 +274,8 @@ export default function App() {
           <Route path="/lead-dashboard"            element={<LeadDashboardV2 />} />
           <Route path="/team-dashboard"            element={<RequirePrivileged><TeamDashboardV2 /></RequirePrivileged>} />
           <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
+          {/* Phase C8 — Campaign QR & Locations (admin, token-free). */}
+          <Route path="/campaigns/qr"              element={<RequirePrivileged><CampaignQrV2 /></RequirePrivileged>} />
           <Route path="/leads/new"                 element={<RequireNonAgency><LeadFormV2 /></RequireNonAgency>} />
           <Route path="/leads/:id"                 element={<RequireNonAgency><LeadDetailV2 /></RequireNonAgency>} />
           <Route path="/work"                      element={<WorkV2 />} />

@@ -60,7 +60,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
-  Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet,
+  Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, QrCode,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -102,6 +102,8 @@ const ADMIN_NAV = [
   { to: '/admin/agency-commission', label: 'Agency Payouts', icon: Wallet },
   { to: '/hr',                label: 'HR',             icon: UserCircle2 },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
+  // Phase C8 (Campaign module) — QR & Locations admin page. Token-free.
+  { to: '/campaigns/qr',      label: 'Campaign QR',    icon: QrCode },
 ]
 
 const SALES_NAV = [
