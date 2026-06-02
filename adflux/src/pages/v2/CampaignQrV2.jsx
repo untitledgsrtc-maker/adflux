@@ -40,6 +40,7 @@ export default function CampaignQrV2() {
   const [tablesMissing, setTablesMissing] = useState(false)
   const [boards, setBoards] = useState([])
   const [accounts, setAccounts] = useState([])
+  const [campaigns, setCampaigns] = useState([])
   const [saving, setSaving] = useState(false)
 
   const [number, setNumber] = useState('')
@@ -47,6 +48,7 @@ export default function CampaignQrV2() {
   const [city, setCity] = useState('')
   const [code, setCode] = useState('')
   const [message, setMessage] = useState('')
+  const [campaignId, setCampaignId] = useState('')
   const [codeEdited, setCodeEdited] = useState(false)
   const [msgEdited, setMsgEdited] = useState(false)
   const previewRef = useRef(null)
@@ -71,6 +73,9 @@ export default function CampaignQrV2() {
       const list = (accs || []).filter((a) => a.is_active !== false)
       setAccounts(list)
       if (!number && list[0]?.display_number) setNumber(list[0].display_number)
+      const { data: camps } = await supabase
+        .from('campaigns').select('id, name').eq('is_active', true).order('name')
+      setCampaigns(camps || [])
     } catch (err) {
       toastError(err, 'Could not load boards.')
     } finally {
@@ -114,7 +119,7 @@ export default function CampaignQrV2() {
     try {
       const { error } = await supabase.from('campaign_locations').insert({
         code: code.trim(), label: label.trim(), city: city.trim() || null,
-        qr_text: waUrl, is_active: true,
+        qr_text: waUrl, campaign_id: campaignId || null, is_active: true,
       })
       if (error) {
         if (error.code === '23505') { toastError(error, 'That code already exists — pick a different one.'); return }
@@ -184,6 +189,15 @@ export default function CampaignQrV2() {
               <label style={lbl}>Board / location name</label>
               <input style={inp} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ring Road" />
             </div>
+            {campaigns.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <label style={lbl}>Campaign (optional)</label>
+                <select style={inp} value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
+                  <option value="">— none —</option>
+                  {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
               <div>
                 <label style={lbl}>Code (auto, editable)</label>
