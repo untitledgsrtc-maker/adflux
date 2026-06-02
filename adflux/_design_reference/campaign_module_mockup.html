@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Campaign Module — mockup (proposal v2)</title>
+<meta name="viewport" content="width=1280, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e1a; --bg-1:#0f1525; --bg-2:#141b2d; --bg-3:#1c2540;
+    --line:#1f2a44; --line-2:#2a3556;
+    --ink-0:#f1f5f9; --ink-1:#cdd5e2; --ink-2:#8b95ad;
+    --yellow:#FFE600; --yellow-soft:rgba(255,230,0,0.14);
+    --green:#10B981; --green-soft:rgba(16,185,129,0.14);
+    --blue:#3B82F6;  --blue-soft:rgba(59,130,246,0.14);
+    --amber:#F59E0B; --amber-soft:rgba(245,158,11,0.14);
+    --rose:#EF4444;  --rose-soft:rgba(239,68,68,0.14);
+    --display:'Space Grotesk', system-ui, sans-serif;
+    --sans:'DM Sans', system-ui, sans-serif;
+    --mono:'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--ink-1);font-family:var(--sans);font-size:14px;line-height:1.5;}
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 28px 80px;}
+
+  /* topbar with notification bell */
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(10,14,26,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);}
+  .topbar-in{max-width:1280px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;color:var(--ink-0);font-size:15px;}
+  .brand .logo{width:26px;height:26px;border-radius:7px;background:var(--yellow);color:#0a0e1a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
+  .top-right{display:flex;align-items:center;gap:14px;}
+  .bell{position:relative;cursor:pointer;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--bg-2);display:flex;align-items:center;justify-content:center;}
+  .bell .badge{position:absolute;top:-5px;right:-5px;background:var(--rose);color:#fff;font-size:10px;font-weight:700;font-family:var(--mono);min-width:18px;height:18px;border-radius:999px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--bg);}
+  .me{width:34px;height:34px;border-radius:999px;background:var(--bg-3);color:var(--ink-0);display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--display);font-size:13px;}
+
+  /* notification dropdown */
+  .notif{position:absolute;top:56px;right:28px;width:360px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.5);z-index:60;overflow:hidden;display:none;}
+  .notif.open{display:block;}
+  .notif-h{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .notif-h .t{font-family:var(--display);font-weight:600;color:var(--ink-0);font-size:14px;}
+  .notif-h .clr{font-size:11px;color:var(--ink-2);cursor:pointer;}
+  .ni{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:11px;cursor:pointer;}
+  .ni:hover{background:rgba(255,255,255,.02);}
+  .ni:last-child{border-bottom:none;}
+  .ni .ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .ni .ic.wa{background:var(--green-soft);color:var(--green);}
+  .ni .ic.lead{background:var(--blue-soft);color:var(--blue);}
+  .ni .ic.bc{background:var(--yellow-soft);color:var(--yellow);}
+  .ni .nt{font-size:13px;color:var(--ink-0);font-weight:600;}
+  .ni .nd{font-size:12px;color:var(--ink-2);margin-top:1px;}
+  .ni .ntime{font-size:10px;color:var(--ink-2);font-family:var(--mono);margin-top:3px;}
+  .ni .unread{width:7px;height:7px;border-radius:999px;background:var(--yellow);flex-shrink:0;align-self:center;}
+
+  /* page head */
+  .pagehead{padding:30px 0 0;}
+  .kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);font-weight:600;}
+  h1.title{font-family:var(--display);font-size:30px;font-weight:700;margin:6px 0 4px;color:var(--ink-0);letter-spacing:-.01em;}
+  .sub{font-size:13px;color:var(--ink-2);max-width:740px;}
+
+  /* sub-tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:24px 0 22px;flex-wrap:wrap;}
+  .tab{padding:11px 16px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:8px;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;}
+  .tab:hover{color:var(--ink-1);}
+  .tab.active{color:var(--yellow);border-bottom-color:var(--yellow);}
+  .tab .count{font-family:var(--mono);font-size:10px;background:var(--bg-2);border:1px solid var(--line);padding:2px 6px;border-radius:999px;color:var(--ink-2);}
+  .tab.active .count{background:var(--yellow-soft);border-color:transparent;color:var(--yellow);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* summary cards */
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .card{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:18px 20px;}
+  .card .lbl{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.10em;font-weight:600;}
+  .card .val{font-family:var(--display);font-size:26px;font-weight:700;color:var(--ink-0);margin-top:6px;}
+  .card .delta{font-size:11px;color:var(--green);margin-top:4px;}
+
+  /* filter row */
+  .filters{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .filt{display:flex;flex-direction:column;gap:4px;}
+  .filt label{font-size:10px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.10em;font-weight:600;}
+  .filt input, .filt select{height:36px;padding:0 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--ink-0);font-family:inherit;font-size:13px;outline:none;min-width:150px;}
+  .spacer{flex:1;}
+  .btn-y{background:var(--yellow);color:#0a0e1a;padding:0 14px;height:36px;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink-1);padding:0 12px;height:36px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+
+  /* panel + table */
+  .panel{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{padding:12px 16px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);border-bottom:1px solid var(--line);background:rgba(255,255,255,.02);white-space:nowrap;}
+  thead th.num{text-align:right;}
+  tbody td{padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody td.num{text-align:right;font-family:var(--mono);font-weight:500;}
+  tbody tr:hover{background:rgba(255,255,255,.015);}
+  tbody tr:last-child td{border-bottom:none;}
+  .name{font-weight:600;color:var(--ink-0);}
+  .role{font-size:10px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+
+  /* chips */
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+  .chip-g{background:var(--green-soft);color:var(--green);}
+  .chip-a{background:var(--amber-soft);color:var(--amber);}
+  .chip-r{background:var(--rose-soft);color:var(--rose);}
+  .chip-b{background:var(--blue-soft);color:var(--blue);}
+  .chip-y{background:var(--yellow-soft);color:var(--yellow);}
+  .src{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ink-1);}
+  .dot{width:7px;height:7px;border-radius:999px;display:inline-block;}
+  .tcpill{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-1);background:var(--bg-2);border:1px solid var(--line);padding:3px 8px;border-radius:999px;}
+  .tcpill .av{width:18px;height:18px;border-radius:999px;background:var(--blue-soft);color:var(--blue);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+
+  .btn-mini{background:var(--yellow);color:#0a0e1a;padding:5px 10px;font-size:11px;font-weight:700;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+  .btn-mini.ghost{background:transparent;border:1px solid var(--line);color:var(--ink-1);}
+
+  /* ===== broadcast funnel (AiSensy-style) ===== */
+  .funnel{display:flex;gap:0;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:18px;}
+  .f-stat{flex:1;padding:16px 18px;border-right:1px solid var(--line);}
+  .f-stat:last-child{border-right:none;}
+  .f-stat .pct{font-family:var(--display);font-size:22px;font-weight:700;color:var(--ink-0);}
+  .f-stat .cnt{font-size:11px;color:var(--ink-2);font-family:var(--mono);}
+  .f-stat .lbl{font-size:11px;color:var(--ink-1);margin-top:6px;display:flex;align-items:center;gap:5px;font-weight:600;}
+  .f-stat.sent .pct{color:var(--blue);}
+  .f-stat.deliv .pct{color:var(--ink-0);}
+  .f-stat.read .pct{color:var(--green);}
+  .f-stat.repl .pct{color:var(--yellow);}
+  .f-stat.fail .pct{color:var(--rose);}
+
+  .bcards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+  .bc{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:16px 18px;}
+  .bc .k{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600;}
+  .bc .v{font-family:var(--display);font-size:18px;font-weight:700;color:var(--ink-0);margin-top:6px;}
+  .bc .v.y{color:var(--yellow);}
+
+  .chartbox{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px;}
+  .chartbox .ct{font-family:var(--display);font-size:14px;font-weight:600;color:var(--ink-0);margin-bottom:14px;}
+
+  .tmplprev{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:18px;}
+  .tmplprev .ct{font-family:var(--display);font-size:14px;font-weight:600;color:var(--ink-0);margin-bottom:14px;}
+  .wa-card{max-width:300px;background:#0b1f17;border:1px solid rgba(16,185,129,.25);border-radius:12px;overflow:hidden;}
+  .wa-img{height:130px;background:linear-gradient(135deg,#f59e0b,#ec4899 60%,#1c2540);display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--display);font-weight:700;font-size:15px;text-shadow:0 1px 4px rgba(0,0,0,.4);}
+  .wa-body{padding:12px 14px;font-size:12px;color:var(--ink-0);line-height:1.55;}
+  .wa-body .btnrow{margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;color:var(--green);font-weight:600;text-align:center;}
+
+  /* composer for broadcast */
+  .compose{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+  .field span{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600;}
+  .field input,.field select{height:38px;padding:0 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--ink-0);font-family:inherit;font-size:13px;outline:none;}
+  .estimate{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;}
+  .estimate .er{display:flex;justify-content:space-between;padding:5px 0;}
+  .estimate .er b{color:var(--ink-0);font-family:var(--mono);}
+  .warnbox{font-size:11px;color:var(--amber);background:var(--amber-soft);border:1px solid rgba(245,158,11,.3);padding:10px 12px;border-radius:8px;margin-top:12px;line-height:1.5;}
+
+  /* INBOX */
+  .inbox{display:grid;grid-template-columns:320px 1fr;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:600px;}
+  .thread-list{border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .tl-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .tl-head .t{font-family:var(--display);font-size:14px;font-weight:600;color:var(--ink-0);}
+  .tl-filter{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:6px;}
+  .tl-filter select{flex:1;height:32px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--ink-1);font-size:11px;padding:0 8px;}
+  .thread{padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px;}
+  .thread:hover{background:rgba(255,255,255,.02);}
+  .thread.sel{background:rgba(255,230,0,.05);border-left:3px solid var(--yellow);padding-left:11px;}
+  .avatar{width:38px;height:38px;border-radius:999px;background:var(--bg-3);color:var(--ink-0);font-family:var(--display);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .avatar.g{background:var(--green-soft);color:var(--green);}
+  .avatar.b{background:var(--blue-soft);color:var(--blue);}
+  .avatar.y{background:var(--yellow-soft);color:var(--yellow);}
+  .th-body{flex:1;min-width:0;}
+  .th-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .th-name{font-weight:600;color:var(--ink-0);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .th-time{font-size:10px;color:var(--ink-2);font-family:var(--mono);white-space:nowrap;}
+  .th-msg{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+  .th-meta{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;}
+  .th-src{font-size:9px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;}
+
+  .conv{display:flex;flex-direction:column;}
+  .conv-head{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .conv-head .who{display:flex;align-items:center;gap:11px;}
+  .conv-head .who .nm{font-family:var(--display);font-weight:600;color:var(--ink-0);font-size:15px;}
+  .conv-head .who .meta{font-size:11px;color:var(--ink-2);margin-top:2px;display:flex;gap:8px;align-items:center;}
+  .conv-actions{display:flex;gap:8px;align-items:center;}
+  .conv-body{flex:1;padding:22px 18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
+  .day-sep{text-align:center;font-size:10px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.1em;margin:4px 0;}
+  .bubble{max-width:74%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5;}
+  .bubble .stamp{font-size:9px;color:var(--ink-2);margin-top:5px;font-family:var(--mono);}
+  .in{align-self:flex-start;background:var(--bg-3);color:var(--ink-0);border-bottom-left-radius:4px;}
+  .out{align-self:flex-end;background:var(--green-soft);color:var(--ink-0);border:1px solid rgba(16,185,129,.3);border-bottom-right-radius:4px;}
+  .sys{align-self:center;max-width:84%;background:var(--bg-2);border:1px dashed var(--line-2);color:var(--ink-2);font-size:11px;text-align:center;border-radius:10px;padding:8px 14px;}
+  .sys b{color:var(--ink-1);}
+  .tag-auto{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);font-weight:700;}
+  .window-bar{padding:8px 18px;font-size:11px;display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);}
+  .window-bar.open{background:var(--green-soft);color:var(--green);}
+  .window-bar.closed{background:var(--amber-soft);color:var(--amber);}
+  .canned{display:flex;gap:8px;padding:10px 18px 0;flex-wrap:wrap;}
+  .canned .c{font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;color:var(--ink-1);cursor:pointer;background:var(--bg-2);}
+  .composer-bar{padding:12px 18px 16px;display:flex;gap:10px;align-items:flex-end;}
+  .composer-bar textarea{flex:1;min-height:42px;max-height:120px;padding:11px 14px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;color:var(--ink-0);font-family:inherit;font-size:13px;outline:none;resize:none;}
+  .send{width:44px;height:44px;border-radius:12px;background:var(--yellow);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+  /* integrations */
+  .int-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .int{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:20px;}
+  .int .ihead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .int .iname{font-family:var(--display);font-size:16px;font-weight:600;color:var(--ink-0);}
+  .int .idesc{font-size:12px;color:var(--ink-2);margin-bottom:14px;min-height:34px;}
+  .int .irow{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line);font-size:12px;gap:8px;}
+  .int .irow .k{color:var(--ink-2);}
+  .int .irow .v{color:var(--ink-0);font-family:var(--mono);font-size:12px;}
+  .mini-select{height:28px;background:var(--bg-2);border:1px solid var(--line);border-radius:7px;color:var(--ink-0);font-size:11px;padding:0 8px;font-family:var(--sans);}
+
+  /* modal */
+  .modal-shadow{margin-top:30px;background:rgba(0,0,0,.4);border:1px dashed var(--line-2);border-radius:14px;padding:24px;}
+  .ms-cap{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;text-align:center;}
+  .modal{max-width:520px;margin:0 auto;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  .modal-h{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .modal-h .t{font-family:var(--display);font-size:16px;font-weight:600;color:var(--ink-0);}
+  .modal-h .x{color:var(--ink-2);font-size:18px;cursor:pointer;}
+  .modal-b{padding:18px 20px;display:flex;flex-direction:column;gap:14px;}
+  .modal label{display:flex;flex-direction:column;gap:6px;}
+  .modal label span{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600;}
+  .modal input,.modal select{height:38px;padding:0 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--ink-0);font-family:inherit;font-size:13px;outline:none;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .radio-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .radio-row .r{flex:1;min-width:120px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;cursor:pointer;color:var(--ink-1);}
+  .radio-row .r.on{border-color:var(--yellow);background:var(--yellow-soft);color:var(--ink-0);}
+  .radio-row .r .rt{font-weight:600;color:var(--ink-0);}
+  .radio-row .r .rd{font-size:10px;color:var(--ink-2);margin-top:2px;}
+  .modal-f{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;}
+
+  /* floating push/toast demo */
+  .toast{position:fixed;right:24px;bottom:24px;width:330px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.55);padding:14px 16px;display:flex;gap:12px;z-index:90;}
+  .toast .ic{width:38px;height:38px;border-radius:10px;background:var(--green-soft);color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .toast .tt{font-size:13px;font-weight:700;color:var(--ink-0);}
+  .toast .td{font-size:12px;color:var(--ink-1);margin-top:2px;}
+  .toast .tmeta{font-size:10px;color:var(--ink-2);margin-top:5px;font-family:var(--mono);}
+  .toast .x{position:absolute;top:8px;right:10px;color:var(--ink-2);cursor:pointer;font-size:14px;}
+
+  .footer-note{margin-top:40px;padding:18px 22px;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;font-size:12px;color:var(--ink-2);line-height:1.7;}
+  .footer-note b{color:var(--ink-0);}
+  .footer-note .ok{color:var(--green);}
+
+  /* faux QR + locations */
+  .qr{width:46px;height:46px;border-radius:6px;background:#fff;padding:3px;flex-shrink:0;}
+  .qr.big{width:120px;height:120px;border-radius:10px;padding:8px;}
+  .qr svg{width:100%;height:100%;}
+  .loc-callout{display:flex;gap:18px;align-items:center;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:20px;}
+  .loc-callout .txt{flex:1;}
+  .loc-callout .url{font-family:var(--mono);font-size:12px;color:var(--ink-1);background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:10px;word-break:break-all;}
+  .loc-callout .url b{color:var(--yellow);}
+  .bar-row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:12px;}
+  .bar-row .bl{width:130px;color:var(--ink-1);}
+  .bar-row .bt{flex:1;height:10px;background:var(--bg-2);border-radius:999px;overflow:hidden;}
+  .bar-row .bf{height:100%;background:var(--blue);border-radius:999px;}
+  .bar-row .bv{width:46px;text-align:right;font-family:var(--mono);color:var(--ink-2);}
+
+  /* chatbot node canvas */
+  .botwrap{display:flex;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg-1);min-height:600px;}
+  .bot-rail{width:54px;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 0;background:var(--bg-2);flex-shrink:0;}
+  .bot-rail .ri{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--bg-1);display:flex;align-items:center;justify-content:center;color:var(--ink-2);cursor:pointer;}
+  .bot-rail .ri:hover{color:var(--ink-0);border-color:var(--line-2);}
+  .bot-rail .ri.on{color:#0a0e1a;background:var(--yellow);border-color:transparent;}
+  .canvas{flex:1;position:relative;overflow:auto;background-color:var(--bg);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:22px 22px;}
+  .canvas-inner{position:relative;width:680px;height:580px;}
+  .wires{position:absolute;left:0;top:0;z-index:1;pointer-events:none;}
+  .node{position:absolute;background:var(--bg-1);border:1px solid var(--line-2);border-radius:12px;width:190px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:2;}
+  .node .nh{padding:9px 12px;border-bottom:1px solid var(--line);font-size:12px;font-weight:700;color:var(--ink-0);display:flex;align-items:center;gap:7px;}
+  .node .nh .nd2{width:8px;height:8px;border-radius:3px;flex-shrink:0;}
+  .node .nb{padding:10px 12px;font-size:11.5px;color:var(--ink-1);line-height:1.45;}
+  .node .opt{display:flex;align-items:center;gap:8px;margin-top:7px;background:var(--bg-2);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:11px;color:var(--ink-0);position:relative;}
+  .node .opt .port{position:absolute;right:-7px;top:50%;transform:translateY(-50%);width:11px;height:11px;border-radius:999px;background:var(--bg-3);border:2px solid var(--line-2);}
+  .node.start .nh .nd2{background:var(--green);} .node.start .nh{color:var(--green);}
+  .node.bot .nh .nd2{background:var(--blue);} .node.bot .nh{color:var(--blue);}
+  .node.act .nh .nd2{background:var(--ink-2);}
+  .node.human{border-color:var(--yellow);} .node.human .nh{color:var(--yellow);} .node.human .nh .nd2{background:var(--yellow);}
+  .node.sel{border-color:var(--yellow);box-shadow:0 0 0 2px var(--yellow-soft),0 10px 28px rgba(0,0,0,.5);}
+  /* properties panel */
+  .bot-props{width:296px;border-left:1px solid var(--line);background:var(--bg-1);padding:18px;overflow:auto;flex-shrink:0;}
+  .bot-props .ph{font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink-0);display:flex;align-items:center;gap:8px;}
+  .bot-props .psub{font-size:11px;color:var(--ink-2);margin:3px 0 14px;}
+  .bot-props .plabel{font-size:10px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin:16px 0 6px;}
+  .bot-props textarea{width:100%;min-height:66px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--ink-0);font-family:inherit;font-size:12px;padding:9px 11px;outline:none;resize:none;}
+  .bot-props .btnitem{display:flex;align-items:center;justify-content:space-between;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--ink-0);margin-bottom:6px;}
+  .bot-props .btnitem .h{color:var(--ink-2);cursor:grab;}
+  .bot-props .addbtn{font-size:11px;color:var(--yellow);cursor:pointer;margin-top:2px;font-weight:600;}
+  .bot-props .toggle{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink-1);padding:10px 0;border-top:1px solid var(--line);margin-top:6px;}
+  .sw{width:34px;height:20px;border-radius:999px;background:var(--green);position:relative;flex-shrink:0;}
+  .sw::after{content:"";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:999px;background:#fff;}
+  .sw.off{background:var(--bg-3);} .sw.off::after{right:auto;left:2px;}
+
+  /* integration detail + checklist + templates */
+  .panel-h{padding:14px 18px;border-bottom:1px solid var(--line);font-family:var(--display);font-weight:600;color:var(--ink-0);font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .panel-b{padding:8px 18px 14px;}
+  .trow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .trow:last-child{border-bottom:none;}
+  .trow .tk{color:var(--ink-1);display:flex;align-items:center;gap:9px;}
+  .trow .tv{font-family:var(--mono);font-size:12px;color:var(--ink-0);text-align:right;}
+  .indent1{padding-left:22px;} .indent2{padding-left:44px;}
+  .tdot{width:7px;height:7px;border-radius:999px;background:var(--line-2);flex-shrink:0;}
+  .ck{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .ck.done{background:var(--green-soft);color:var(--green);}
+  .ck.wait{background:var(--amber-soft);color:var(--amber);}
+
+  /* segments + billing */
+  .seg-count{font-family:var(--display);font-size:28px;font-weight:700;color:var(--yellow);margin-top:4px;}
+  .rule-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .rule-row select{height:36px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--ink-0);font-size:13px;padding:0 10px;font-family:inherit;}
+  .rule-and{font-size:10px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.1em;margin:8px 0 8px 4px;}
+  .bill-strip{display:flex;align-items:center;gap:22px;background:var(--bg-1);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:6px;flex-wrap:wrap;}
+  .bill-strip .bnum{font-family:var(--display);font-weight:700;color:var(--ink-0);font-size:18px;}
+  .bill-strip .bk{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;}
+  svg{display:block;}
+</style>
+</head>
+<body>
+
+<!-- ===== TOPBAR with notification bell ===== -->
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand"><span class="logo">U</span> Untitled OS</div>
+    <div class="top-right">
+      <div class="bell" id="bell">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#cdd5e2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span class="badge">3</span>
+      </div>
+      <div class="me">B</div>
+    </div>
+  </div>
+</div>
+
+<!-- notification dropdown (toggled by bell) -->
+<div class="notif" id="notif">
+  <div class="notif-h"><span class="t">Notifications</span><span class="clr">Mark all read</span></div>
+  <div class="ni">
+    <div class="ic wa"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
+    <div style="flex:1"><div class="nt">New WhatsApp · Rajesh Patel</div><div class="nd">"Rate kya hai 100 autos ka?"</div><div class="ntime">2 min ago · assigned to you (Dhara)</div></div>
+    <span class="unread"></span>
+  </div>
+  <div class="ni">
+    <div class="ic lead"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg></div>
+    <div style="flex:1"><div class="nt">New lead · Meta Auto Hood</div><div class="nd">Ankit Desai · Ahmedabad · auto-reply sent</div><div class="ntime">5 min ago</div></div>
+    <span class="unread"></span>
+  </div>
+  <div class="ni">
+    <div class="ic bc"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path></svg></div>
+    <div style="flex:1"><div class="nt">Broadcast finished · Diwali Offer</div><div class="nd">2,310 sent · 1,520 read · 96 replied</div><div class="ntime">1 hr ago</div></div>
+    <span class="unread"></span>
+  </div>
+  <div style="padding:11px 16px;text-align:center;font-size:12px;color:var(--ink-2)">Each of these also fires a <b style="color:var(--ink-1)">phone push notification</b>.</div>
+</div>
+
+<div class="wrap">
+
+  <!-- HEAD -->
+  <div class="pagehead">
+    <div class="kicker">Lead capture · WhatsApp · Broadcast · Auto-reply · Routing</div>
+    <h1 class="title">Campaigns</h1>
+    <div class="sub">Leads from Meta, Justdial, WhatsApp or manual upload land here, get an instant WhatsApp reply, route to the right rep, and stay in one conversation. Send bulk broadcasts, watch the sent&rarr;read&rarr;replied funnel, and get push + in-app alerts on every message. <b style="color:var(--ink-1)">Visual proposal only &mdash; nothing built yet.</b></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" data-v="campaigns">Campaigns <span class="count">5</span></button>
+    <button class="tab" data-v="inbox">Inbox <span class="count">12</span></button>
+    <button class="tab" data-v="broadcast">Broadcast <span class="count">3</span></button>
+    <button class="tab" data-v="segments">Segments <span class="count">4</span></button>
+    <button class="tab" data-v="qr">QR &amp; Locations <span class="count">20</span></button>
+    <button class="tab" data-v="chatbot">Chatbot <span class="count">1</span></button>
+    <button class="tab" data-v="integrations">Integrations <span class="count">3</span></button>
+  </div>
+
+  <!-- ================= CAMPAIGNS ================= -->
+  <div class="view active" id="campaigns">
+    <div class="summary">
+      <div class="card"><div class="lbl">Leads this month</div><div class="val">352</div><div class="delta">+18% vs last month</div></div>
+      <div class="card"><div class="lbl">Auto-replies sent</div><div class="val">318</div><div class="delta" style="color:var(--ink-2)">90% of leads reached</div></div>
+      <div class="card"><div class="lbl">Reply rate</div><div class="val">64%</div><div class="delta">customers who wrote back</div></div>
+      <div class="card"><div class="lbl">Won this month</div><div class="val" style="color:var(--yellow)">&#8377;18.4 L</div><div class="delta">21 deals from campaigns</div></div>
+    </div>
+    <div class="filters">
+      <div class="filt"><label>Source</label><select><option>All sources</option><option>Meta</option><option>Justdial</option><option>WhatsApp</option><option>Manual</option></select></div>
+      <div class="filt"><label>Status</label><select><option>Active</option><option>Paused</option><option>All</option></select></div>
+      <div class="filt"><label>Search</label><input placeholder="Campaign name…"></div>
+      <div class="spacer"></div>
+      <button class="btn-ghost">Export CSV</button>
+      <button class="btn-y" id="newBtn">+ New campaign</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>Campaign</th><th>Source</th><th>Number</th><th>Telecaller</th><th class="num">Leads</th><th class="num">Replied</th><th class="num">Quotes</th><th class="num">Won</th><th class="num">Conv%</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><div class="name">Auto Hood · Ahmedabad</div><div class="role">created 12 May</div></td><td><span class="src"><span class="dot" style="background:var(--blue)"></span>Meta</span></td><td><span style="font-family:var(--mono);font-size:11px">95815 78261</span></td><td><span class="tcpill"><span class="av">D</span>Dhara</span></td><td class="num">142</td><td class="num">96</td><td class="num">31</td><td class="num">7</td><td class="num" style="color:var(--green)">4.9%</td><td><button class="btn-mini ghost">View</button></td></tr>
+          <tr><td><div class="name">Hoarding · Vadodara</div><div class="role">created 09 May</div></td><td><span class="src"><span class="dot" style="background:var(--amber)"></span>Justdial</span></td><td><span style="font-family:var(--mono);font-size:11px">98982 73686</span></td><td><span class="tcpill"><span class="av">R</span>Rima</span></td><td class="num">88</td><td class="num">51</td><td class="num">19</td><td class="num">5</td><td class="num" style="color:var(--green)">5.7%</td><td><button class="btn-mini ghost">View</button></td></tr>
+          <tr><td><div class="name">GSRTC LED · Surat</div><div class="role">created 02 May</div></td><td><span class="src"><span class="dot" style="background:var(--blue)"></span>Meta</span></td><td><span style="font-family:var(--mono);font-size:11px">95815 78261</span></td><td><span class="tcpill"><span class="av">D</span>Dhara</span></td><td class="num">64</td><td class="num">40</td><td class="num">12</td><td class="num">2</td><td class="num" style="color:var(--amber)">3.1%</td><td><button class="btn-mini ghost">View</button></td></tr>
+          <tr><td><div class="name">Walk-in enquiries</div><div class="role">always on</div></td><td><span class="src"><span class="dot" style="background:var(--green)"></span>WhatsApp</span></td><td><span style="font-family:var(--mono);font-size:11px">98982 73686</span></td><td><span class="tcpill"><span class="av">R</span>Rima</span></td><td class="num">37</td><td class="num">37</td><td class="num">9</td><td class="num">3</td><td class="num" style="color:var(--green)">8.1%</td><td><button class="btn-mini ghost">View</button></td></tr>
+          <tr><td><div class="name">Referrals</div><div class="role">manual upload</div></td><td><span class="src"><span class="dot" style="background:var(--ink-2)"></span>Manual</span></td><td><span style="color:var(--ink-2)">&mdash;</span></td><td><span class="tcpill" style="color:var(--ink-2)">round-robin</span></td><td class="num">21</td><td class="num" style="color:var(--ink-2)">&mdash;</td><td class="num">8</td><td class="num">4</td><td class="num" style="color:var(--green)">19%</td><td><button class="btn-mini ghost">View</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--ink-2);margin-top:14px;line-height:1.6">Manual / Excel upload keeps working exactly as today &mdash; shows up here as the &ldquo;Manual&rdquo; source. No existing lead / telecaller / sales / quote / payroll flow changes.</div>
+  </div>
+
+  <!-- ================= INBOX ================= -->
+  <div class="view" id="inbox">
+    <div class="inbox">
+      <div class="thread-list">
+        <div class="tl-head"><span class="t">Conversations</span><span class="chip chip-y">12 open</span></div>
+        <div class="tl-filter">
+          <select><option>All numbers</option><option>95815 78261</option><option>98982 73686</option></select>
+          <select><option>All reps</option><option>Mine (Dhara)</option><option>Rima</option></select>
+        </div>
+        <div class="thread sel"><div class="avatar y">RP</div><div class="th-body"><div class="th-top"><span class="th-name">Rajesh Patel</span><span class="th-time">2m</span></div><div class="th-msg">Rate kya hai 100 autos ka?</div><div class="th-meta"><span class="chip chip-g">Open</span><span class="tcpill"><span class="av">D</span>Dhara</span></div></div></div>
+        <div class="thread"><div class="avatar g">MS</div><div class="th-body"><div class="th-top"><span class="th-name">Meena Shah</span><span class="th-time">18m</span></div><div class="th-msg">ok thik hai, proposal mokalo</div><div class="th-meta"><span class="chip chip-g">Open</span><span class="tcpill"><span class="av">R</span>Rima</span></div></div></div>
+        <div class="thread"><div class="avatar b">KI</div><div class="th-body"><div class="th-top"><span class="th-name">Kiran Industries</span><span class="th-time">1h</span></div><div class="th-msg">Send me the proposal for LED</div><div class="th-meta"><span class="chip chip-b">Bot</span><span class="tcpill"><span class="av">N</span>Nikhil</span></div></div></div>
+        <div class="thread"><div class="avatar">SP</div><div class="th-body"><div class="th-top"><span class="th-name">Suresh Panchal</span><span class="th-time">26h</span></div><div class="th-msg">You: following up…</div><div class="th-meta"><span class="chip chip-a">Needs template</span></div></div></div>
+      </div>
+      <div class="conv">
+        <div class="conv-head">
+          <div class="who"><div class="avatar y">RP</div><div><div class="nm">Rajesh Patel</div><div class="meta"><span style="font-family:var(--mono)">+91 99250 41122</span> · <span class="chip chip-r" style="font-size:9px">Hot</span> · via +91 95815 78261</div></div></div>
+          <div class="conv-actions">
+            <span class="tcpill">Assigned: <span class="av">D</span>Dhara <span style="color:var(--ink-2)">▾</span></span>
+            <button class="btn-ghost">Open lead</button>
+            <button class="btn-y">Create quote</button>
+          </div>
+        </div>
+        <div class="conv-body">
+          <div class="day-sep">Today</div>
+          <div class="sys">Lead from <b>Meta · Auto Hood Ahmedabad</b> at 11:02 · routed to Dhara (TC) · you got a push</div>
+          <div class="bubble in">Saw your ad. Interested in auto hood branding in Ahmedabad.<div class="stamp">11:02</div></div>
+          <div class="bubble out"><div class="tag-auto">Auto-reply · utility template</div>Hi Rajesh, thanks for your enquiry with Untitled Advertising. A team member will reach out shortly. Reply here anytime.<div class="stamp">11:02 · delivered ✓✓</div></div>
+          <div class="bubble in">Rate kya hai 100 autos ka?<div class="stamp">11:04</div></div>
+        </div>
+        <div class="window-bar open">Window OPEN · 23h 56m left · type freely (free)</div>
+        <div class="canned"><span class="c">Rate card + PDF</span><span class="c">Ask city + duration</span><span class="c">Book a call</span><span class="c">Reassign</span></div>
+        <div class="composer-bar">
+          <textarea placeholder="Type a reply…">100 auto hoods in Ahmedabad — ₹1,250/auto/month, 3-month minimum. Sharing rate card now.</textarea>
+          <button class="send"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a0e1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--ink-2);margin-top:12px">Every inbound message &rarr; <b style="color:var(--ink-1)">in-app notification + phone push</b> to the assigned rep. Reassign a chat to another telecaller from the header dropdown.</div>
+  </div>
+
+  <!-- ================= BROADCAST ================= -->
+  <div class="view" id="broadcast">
+    <div class="filters" style="margin-bottom:18px">
+      <div class="filt"><label>Broadcast</label><select><option>Diwali Offer — Hoardings (sent)</option><option>Auto Hood monsoon push (sent)</option><option>+ New broadcast</option></select></div>
+      <div class="spacer"></div>
+      <span class="chip chip-a" style="height:fit-content;align-self:center" title="WhatsApp messaging tier — business-initiated sends per 24h">Tier 1 · 1K/24h</span>
+      <span class="chip chip-g" style="height:fit-content;align-self:center">Status: SENT</span>
+      <button class="btn-y" id="newBcBtn">+ New broadcast</button>
+    </div>
+
+    <!-- billing strip -->
+    <div class="bill-strip">
+      <div><div class="bk">Messaging balance</div><div class="bnum">&#8377; 4,200</div></div>
+      <div><div class="bk">&asymp; marketing msgs left</div><div class="bnum">~3,500</div></div>
+      <div><div class="bk">Spent this month</div><div class="bnum">&#8377; 5,575</div></div>
+      <div class="spacer"></div>
+      <button class="btn-y">Top up</button>
+    </div>
+    <div style="font-size:11px;color:var(--ink-2);margin-bottom:18px">Top-up opens Meta / edigiexpert billing &mdash; we never store your card. The module only shows balance + estimated cost.</div>
+
+    <!-- funnel like AiSensy -->
+    <div class="funnel">
+      <div class="f-stat"><div class="pct">100%</div><div class="cnt">2,400</div><div class="lbl">Audience</div></div>
+      <div class="f-stat sent"><div class="pct">96%</div><div class="cnt">2,310</div><div class="lbl">Sent</div></div>
+      <div class="f-stat deliv"><div class="pct">91%</div><div class="cnt">2,180</div><div class="lbl">Delivered</div></div>
+      <div class="f-stat read"><div class="pct">63%</div><div class="cnt">1,520</div><div class="lbl">Read</div></div>
+      <div class="f-stat"><div class="pct">9%</div><div class="cnt">210</div><div class="lbl">Clicked</div></div>
+      <div class="f-stat repl"><div class="pct">4%</div><div class="cnt">96</div><div class="lbl">Replied</div></div>
+      <div class="f-stat fail"><div class="pct">4%</div><div class="cnt">90</div><div class="lbl">Failed</div></div>
+    </div>
+
+    <div class="bcards">
+      <div class="bc"><div class="k">Campaign type</div><div class="v">BROADCAST</div></div>
+      <div class="bc"><div class="k">Message type</div><div class="v">TEMPLATE (IMAGE)</div></div>
+      <div class="bc"><div class="k">Audience</div><div class="v">2,400</div></div>
+      <div class="bc"><div class="k">Credit usage</div><div class="v y">&#8377; 3,612</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px">
+      <div class="chartbox">
+        <div class="ct">Messages per day</div>
+        <svg width="100%" height="180" viewBox="0 0 560 180" preserveAspectRatio="none">
+          <line x1="30" y1="150" x2="550" y2="150" stroke="#1f2a44"/>
+          <line x1="30" y1="100" x2="550" y2="100" stroke="#141b2d"/>
+          <line x1="30" y1="50" x2="550" y2="50" stroke="#141b2d"/>
+          <polyline fill="none" stroke="#3B82F6" stroke-width="2" points="30,30 70,120 110,142 160,148 240,150 340,150 450,150 550,150"/>
+          <polyline fill="none" stroke="#10B981" stroke-width="2" points="30,60 70,128 110,145 160,149 240,150 340,150 450,150 550,150"/>
+          <polyline fill="none" stroke="#EF4444" stroke-width="2" points="30,120 70,146 110,149 160,150 240,150 340,150 450,150 550,150"/>
+          <text x="30" y="168" fill="#8b95ad" font-size="10" font-family="monospace">day 1</text>
+          <text x="270" y="168" fill="#8b95ad" font-size="10" font-family="monospace">day 4</text>
+          <text x="520" y="168" fill="#8b95ad" font-size="10" font-family="monospace">day 7</text>
+        </svg>
+        <div style="display:flex;gap:16px;font-size:10px;color:var(--ink-2);margin-top:8px;font-family:var(--mono)">
+          <span style="color:var(--blue)">— sent</span><span style="color:var(--green)">— read</span><span style="color:var(--rose)">— failed</span>
+        </div>
+      </div>
+      <div class="tmplprev">
+        <div class="ct">Template sent</div>
+        <div class="wa-card">
+          <div class="wa-img">DIWALI OFFER · OOH</div>
+          <div class="wa-body">Hi {name}, this Diwali light up your brand. Special rates on hoardings &amp; auto hoods across Gujarat. Reply <b>HI</b> to get the rate card.
+            <div class="btnrow">View rate card</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--ink-2);margin-top:12px">Template: <b style="color:var(--ink-1)">diwali_offer_img</b> · MARKETING · approved</div>
+      </div>
+    </div>
+
+    <div class="warnbox" style="margin-top:16px">Marketing broadcasts bill at the marketing rate, need a payment method on the WABA, need recipient opt-in, and a large cold blast can lower your number's quality rating. Sending to people who already enquired (warm) is safer + cheaper.</div>
+
+    <!-- new-broadcast composer -->
+    <div class="modal-shadow" id="bcCompose">
+      <div class="ms-cap">— what &ldquo;+ New broadcast&rdquo; opens —</div>
+      <div class="modal" style="max-width:560px">
+        <div class="modal-h"><span class="t">New broadcast</span><span class="x">&times;</span></div>
+        <div class="modal-b">
+          <label><span>Template (approved only)</span><select><option>diwali_offer_img &mdash; Marketing &mdash; Approved</option><option>followup_nudge &mdash; Utility &mdash; Approved</option><option>+ create &amp; submit new template</option></select></label>
+          <label><span>Audience</span><select><option>Saved segment: All clients (opted-in) &mdash; 3,200</option><option>Saved segment: Opened Diwali blast &mdash; 1,500</option><option>Saved segment: Hot leads Ahmedabad &mdash; 210</option><option>&mdash; Upload CSV (phone + optional name) &mdash;</option></select></label>
+          <div style="font-size:11px;color:var(--ink-2);margin-top:-4px">CSV: one phone column (10-digit or +91), optional name/variable columns map to the template. Failed + opted-out are still auto-suppressed. Use your own contacts only &mdash; cold lists burn the number.</div>
+          <div class="estimate">
+            <div class="er"><span>In segment</span><b>3,200</b></div>
+            <div class="er"><span>Minus failed + opted-out (auto-suppressed)</span><b style="color:var(--rose)">&minus; 1,000</b></div>
+            <div class="er"><span>Will receive</span><b style="color:var(--green)">2,200</b></div>
+            <div class="er" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span>Est. cost (marketing rate)</span><b>&#8377; 1,760</b></div>
+          </div>
+          <div class="warnbox" style="margin-top:0">Tier 1 sends 1,000/24h &mdash; 2,200 will go out over ~3 days, or tier-up first. Best open rates 10 AM&ndash;7 PM.</div>
+          <label><span>Send</span><select><option>Now</option><option>Schedule for later…</option></select></label>
+        </div>
+        <div class="modal-f"><button class="btn-ghost">Cancel</button><button class="btn-y">Send broadcast</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SEGMENTS ================= -->
+  <div class="view" id="segments">
+    <div style="font-size:13px;color:var(--ink-2);max-width:700px;margin-bottom:18px">Build an audience once from your CRM + past-broadcast results, then reuse it for any broadcast. Rules stack. Failed + opted-out numbers are <b style="color:var(--ink-1)">auto-suppressed from every send</b>, so you never waste credits on dead numbers or message someone who said stop.</div>
+
+    <div class="panel" style="padding:18px 20px;margin-bottom:18px">
+      <div style="font-family:var(--display);font-size:14px;font-weight:600;color:var(--ink-0);margin-bottom:14px">Build a segment</div>
+      <div class="rule-row"><select><option>Lead stage</option></select><select><option>is not</option><option>is</option></select><select><option>Lost</option><option>Won</option><option>New</option><option>Working</option><option>QuoteSent</option><option>Nurture</option></select></div>
+      <div class="rule-and">and</div>
+      <div class="rule-row"><select><option>Has open follow-up</option></select><select><option>is</option></select><select><option>Yes</option><option>No</option></select></div>
+      <div class="rule-and">and</div>
+      <div class="rule-row"><select><option>Heat</option></select><select><option>is</option></select><select><option>Any</option><option>Hot</option><option>Warm</option><option>Cold</option></select></div>
+      <div class="rule-and">and</div>
+      <div class="rule-row"><select><option>Source</option></select><select><option>is</option></select><select><option>Any</option><option>Meta</option><option>Justdial</option><option>WhatsApp QR</option><option>Client (CRM)</option></select></div>
+      <div class="rule-and">and</div>
+      <div class="rule-row"><select><option>City</option></select><select><option>is</option></select><select><option>Any</option><option>Ahmedabad</option><option>Surat</option><option>Vadodara</option><option>Rajkot</option></select></div>
+      <div class="rule-and">and</div>
+      <div class="rule-row"><select><option>Last broadcast</option></select><select><option>was</option></select><select><option>Any</option><option>Opened (read)</option><option>Not opened</option><option>Replied</option><option>Failed</option></select></div>
+      <div class="rule-and">and</div>
+      <div class="rule-row"><select><option>Opted-in</option></select><select><option>is</option></select><select><option>Yes</option></select></div>
+      <div style="font-size:12px;color:var(--yellow);font-weight:600;cursor:pointer;margin-top:12px">+ Add rule</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;border-top:1px solid var(--line);padding-top:14px;flex-wrap:wrap;gap:12px">
+        <div><div style="font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em">Matches</div><div class="seg-count">500 <span style="font-size:14px;color:var(--ink-2);font-weight:400">contacts</span></div><div style="font-size:11px;color:var(--ink-2);margin-top:2px">from 5,000 leads &middot; 3,000 Lost excluded &middot; 1,500 with no open follow-up excluded</div></div>
+        <div style="display:flex;gap:10px"><button class="btn-ghost">Preview list</button><button class="btn-y">Save segment</button></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h">Saved segments</div>
+      <table>
+        <thead><tr><th>Segment</th><th>Built from</th><th class="num">Contacts</th><th>Last used</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="name">In active follow-up (not Lost)</td><td>stage &ne; Lost &middot; has open follow-up</td><td class="num">500</td><td>today</td><td><button class="btn-mini">Broadcast</button></td></tr>
+          <tr><td class="name">Opened Diwali blast</td><td>read last broadcast</td><td class="num">1,500</td><td>2 days ago</td><td><button class="btn-mini">Broadcast</button></td></tr>
+          <tr><td class="name">All clients (opted-in)</td><td>source = Client &middot; opted-in</td><td class="num">3,200</td><td>&mdash;</td><td><button class="btn-mini">Broadcast</button></td></tr>
+          <tr><td class="name">Hot leads &middot; Ahmedabad</td><td>heat = hot &middot; city = AHM</td><td class="num">210</td><td>5 days ago</td><td><button class="btn-mini">Broadcast</button></td></tr>
+          <tr><td class="name" style="color:var(--rose)">Suppressed (never send)</td><td>failed OR opted-out</td><td class="num">1,000</td><td>auto-excluded</td><td><span class="chip chip-r">Always excluded</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--ink-2);margin-top:12px">Your example: 5,000 leads &rarr; exclude 3,000 Lost (save the money) &rarr; keep only the 500 in active follow-up &rarr; broadcast to those 500. And after a blast: 1,500 opened &rarr; save &ldquo;opened&rdquo; &rarr; next blast hits only them; failed numbers auto-drop into the suppressed list.</div>
+  </div>
+
+  <!-- ================= QR & LOCATIONS ================= -->
+  <div class="view" id="qr">
+    <div class="loc-callout">
+      <div class="qr big"><svg viewBox="0 0 40 40" fill="#0a0e1a"><rect x="2" y="2" width="11" height="11"/><rect x="5" y="5" width="5" height="5" fill="#fff"/><rect x="27" y="2" width="11" height="11"/><rect x="30" y="5" width="5" height="5" fill="#fff"/><rect x="2" y="27" width="11" height="11"/><rect x="5" y="30" width="5" height="5" fill="#fff"/><rect x="17" y="4" width="3" height="3"/><rect x="22" y="8" width="3" height="3"/><rect x="17" y="17" width="3" height="3"/><rect x="24" y="20" width="3" height="3"/><rect x="31" y="17" width="3" height="3"/><rect x="18" y="28" width="3" height="3"/><rect x="25" y="32" width="3" height="3"/><rect x="32" y="28" width="3" height="3"/></svg></div>
+      <div class="txt">
+        <div style="font-family:var(--display);font-size:16px;font-weight:600;color:var(--ink-0)">Each board gets its own QR</div>
+        <div style="font-size:12px;color:var(--ink-2);margin-top:4px">Print it on the hoarding. Scan opens WhatsApp with a hidden location tag pre-filled. When they send, we know exactly which board pulled the lead, which city, and route it to that city&rsquo;s telecaller automatically.</div>
+        <div class="url">https://wa.me/919898273686?text=Hi, saw your screen at Ring Road Ahmedabad <b>[RR-AHM-01]</b></div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink-0)">Your boards &middot; 20</div>
+      <button class="btn-y" id="newQrBtn">+ New QR</button>
+    </div>
+
+    <div class="summary">
+      <div class="card"><div class="lbl">Total scans</div><div class="val">1,240</div><div class="delta">last 30 days</div></div>
+      <div class="card"><div class="lbl">Scanned &amp; messaged</div><div class="val">410</div><div class="delta" style="color:var(--ink-2)">33% sent the message</div></div>
+      <div class="card"><div class="lbl">Leads created</div><div class="val">372</div><div class="delta">auto-routed by city</div></div>
+      <div class="card"><div class="lbl">Top board</div><div class="val" style="font-size:18px;color:var(--yellow)">Ring Road, AHM</div><div class="delta">96 leads</div></div>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead><tr><th>QR</th><th>Board location</th><th>City</th><th class="num">Scans</th><th class="num">Messaged</th><th class="num">Leads</th><th class="num">Quotes</th><th class="num">Conv%</th><th>Telecaller</th></tr></thead>
+        <tbody>
+          <tr><td><div class="qr"><svg viewBox="0 0 40 40" fill="#0a0e1a"><rect x="2" y="2" width="11" height="11"/><rect x="5" y="5" width="5" height="5" fill="#fff"/><rect x="27" y="2" width="11" height="11"/><rect x="30" y="5" width="5" height="5" fill="#fff"/><rect x="2" y="27" width="11" height="11"/><rect x="5" y="30" width="5" height="5" fill="#fff"/><rect x="17" y="4" width="3" height="3"/><rect x="22" y="8" width="3" height="3"/><rect x="17" y="17" width="3" height="3"/><rect x="24" y="20" width="3" height="3"/><rect x="31" y="17" width="3" height="3"/><rect x="18" y="28" width="3" height="3"/></svg></div></td><td><div class="name">Ring Road</div><div class="role">RR-AHM-01</div></td><td>Ahmedabad</td><td class="num">312</td><td class="num">104</td><td class="num">96</td><td class="num">18</td><td class="num" style="color:var(--green)">5.8%</td><td><span class="tcpill"><span class="av">D</span>Dhara</span></td></tr>
+          <tr><td><div class="qr"><svg viewBox="0 0 40 40" fill="#0a0e1a"><rect x="2" y="2" width="11" height="11"/><rect x="5" y="5" width="5" height="5" fill="#fff"/><rect x="27" y="2" width="11" height="11"/><rect x="30" y="5" width="5" height="5" fill="#fff"/><rect x="2" y="27" width="11" height="11"/><rect x="5" y="30" width="5" height="5" fill="#fff"/><rect x="18" y="5" width="3" height="3"/><rect x="23" y="9" width="3" height="3"/><rect x="17" y="18" width="3" height="3"/><rect x="25" y="21" width="3" height="3"/><rect x="31" y="18" width="3" height="3"/><rect x="19" y="29" width="3" height="3"/></svg></div></td><td><div class="name">SG Highway</div><div class="role">SG-AHM-02</div></td><td>Ahmedabad</td><td class="num">268</td><td class="num">88</td><td class="num">80</td><td class="num">14</td><td class="num" style="color:var(--green)">5.2%</td><td><span class="tcpill"><span class="av">D</span>Dhara</span></td></tr>
+          <tr><td><div class="qr"><svg viewBox="0 0 40 40" fill="#0a0e1a"><rect x="2" y="2" width="11" height="11"/><rect x="5" y="5" width="5" height="5" fill="#fff"/><rect x="27" y="2" width="11" height="11"/><rect x="30" y="5" width="5" height="5" fill="#fff"/><rect x="2" y="27" width="11" height="11"/><rect x="5" y="30" width="5" height="5" fill="#fff"/><rect x="17" y="4" width="3" height="3"/><rect x="22" y="8" width="3" height="3"/><rect x="18" y="17" width="3" height="3"/><rect x="24" y="22" width="3" height="3"/><rect x="31" y="19" width="3" height="3"/><rect x="18" y="30" width="3" height="3"/></svg></div></td><td><div class="name">Alkapuri</div><div class="role">AL-VAD-01</div></td><td>Vadodara</td><td class="num">154</td><td class="num">51</td><td class="num">47</td><td class="num">9</td><td class="num" style="color:var(--green)">5.8%</td><td><span class="tcpill"><span class="av">R</span>Rima</span></td></tr>
+          <tr><td><div class="qr"><svg viewBox="0 0 40 40" fill="#0a0e1a"><rect x="2" y="2" width="11" height="11"/><rect x="5" y="5" width="5" height="5" fill="#fff"/><rect x="27" y="2" width="11" height="11"/><rect x="30" y="5" width="5" height="5" fill="#fff"/><rect x="2" y="27" width="11" height="11"/><rect x="5" y="30" width="5" height="5" fill="#fff"/><rect x="18" y="4" width="3" height="3"/><rect x="22" y="9" width="3" height="3"/><rect x="17" y="18" width="3" height="3"/><rect x="25" y="20" width="3" height="3"/><rect x="31" y="17" width="3" height="3"/><rect x="19" y="28" width="3" height="3"/></svg></div></td><td><div class="name">Ghod Dod Road</div><div class="role">GD-SUR-01</div></td><td>Surat</td><td class="num">188</td><td class="num">60</td><td class="num">55</td><td class="num">11</td><td class="num" style="color:var(--green)">5.9%</td><td><span class="tcpill"><span class="av">D</span>Dhara</span></td></tr>
+          <tr><td><div class="qr"><svg viewBox="0 0 40 40" fill="#0a0e1a"><rect x="2" y="2" width="11" height="11"/><rect x="5" y="5" width="5" height="5" fill="#fff"/><rect x="27" y="2" width="11" height="11"/><rect x="30" y="5" width="5" height="5" fill="#fff"/><rect x="2" y="27" width="11" height="11"/><rect x="5" y="30" width="5" height="5" fill="#fff"/><rect x="17" y="5" width="3" height="3"/><rect x="23" y="8" width="3" height="3"/><rect x="18" y="17" width="3" height="3"/><rect x="24" y="21" width="3" height="3"/><rect x="31" y="18" width="3" height="3"/><rect x="18" y="29" width="3" height="3"/></svg></div></td><td><div class="name">Adajan</div><div class="role">AD-SUR-02</div></td><td>Surat</td><td class="num">97</td><td class="num">28</td><td class="num">25</td><td class="num">4</td><td class="num" style="color:var(--amber)">4.1%</td><td><span class="tcpill"><span class="av">D</span>Dhara</span></td></tr>
+          <tr><td><div class="qr"><svg viewBox="0 0 40 40" fill="#0a0e1a"><rect x="2" y="2" width="11" height="11"/><rect x="5" y="5" width="5" height="5" fill="#fff"/><rect x="27" y="2" width="11" height="11"/><rect x="30" y="5" width="5" height="5" fill="#fff"/><rect x="2" y="27" width="11" height="11"/><rect x="5" y="30" width="5" height="5" fill="#fff"/><rect x="18" y="4" width="3" height="3"/><rect x="22" y="9" width="3" height="3"/><rect x="17" y="17" width="3" height="3"/><rect x="25" y="22" width="3" height="3"/><rect x="31" y="19" width="3" height="3"/><rect x="19" y="30" width="3" height="3"/></svg></div></td><td><div class="name">Kalawad Road</div><div class="role">KW-RAJ-01</div></td><td>Rajkot</td><td class="num">80</td><td class="num">22</td><td class="num">19</td><td class="num">3</td><td class="num" style="color:var(--amber)">3.8%</td><td><span class="tcpill"><span class="av">R</span>Rima</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--ink-2);margin-top:12px">+ 14 more boards · <span style="color:var(--rose)">2 boards with 0 scans in 30 days</span> &mdash; flagged for re-shoot or drop.</div>
+
+    <div class="panel" style="margin-top:20px;padding:18px 20px">
+      <div style="font-family:var(--display);font-size:14px;font-weight:600;color:var(--ink-0);margin-bottom:12px">Scans by city</div>
+      <div class="bar-row"><div class="bl">Ahmedabad</div><div class="bt"><div class="bf" style="width:100%"></div></div><div class="bv">580</div></div>
+      <div class="bar-row"><div class="bl">Surat</div><div class="bt"><div class="bf" style="width:49%"></div></div><div class="bv">285</div></div>
+      <div class="bar-row"><div class="bl">Vadodara</div><div class="bt"><div class="bf" style="width:47%"></div></div><div class="bv">275</div></div>
+      <div class="bar-row"><div class="bl">Rajkot</div><div class="bt"><div class="bf" style="width:17%"></div></div><div class="bv">100</div></div>
+    </div>
+
+    <!-- create-QR form -->
+    <div class="modal-shadow" id="qrCreate">
+      <div class="ms-cap">— what &ldquo;+ New QR&rdquo; opens —</div>
+      <div class="modal" style="max-width:580px">
+        <div class="modal-h"><span class="t">New board QR</span><span class="x">&times;</span></div>
+        <div class="modal-b" style="display:grid;grid-template-columns:1fr 160px;gap:20px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label><span>Board / location name</span><input value="Ring Road"></label>
+            <label><span>City</span><select><option>Ahmedabad</option><option>Surat</option><option>Vadodara</option><option>Rajkot</option><option>+ type a new city…</option></select></label>
+            <label><span>Location code (auto, editable)</span><input value="RR-AHM-01"></label>
+            <label><span>WhatsApp number it points to</span><select><option>+91 98982 73686</option><option>+91 95815 78261</option></select></label>
+            <label><span>Leads from this board route to</span><select><option>Dhara (Ahmedabad TC)</option><option>Rima</option><option>Round-robin</option></select></label>
+            <div>
+              <div style="font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:6px">Pre-filled message</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--ink-1);background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px">Hi, saw your screen at <b style="color:var(--yellow)">Ring Road Ahmedabad [RR-AHM-01]</b></div>
+            </div>
+          </div>
+          <div style="text-align:center">
+            <div class="qr big" style="margin:0 auto"><svg viewBox="0 0 40 40" fill="#0a0e1a"><rect x="2" y="2" width="11" height="11"/><rect x="5" y="5" width="5" height="5" fill="#fff"/><rect x="27" y="2" width="11" height="11"/><rect x="30" y="5" width="5" height="5" fill="#fff"/><rect x="2" y="27" width="11" height="11"/><rect x="5" y="30" width="5" height="5" fill="#fff"/><rect x="17" y="4" width="3" height="3"/><rect x="22" y="8" width="3" height="3"/><rect x="17" y="17" width="3" height="3"/><rect x="24" y="20" width="3" height="3"/><rect x="31" y="17" width="3" height="3"/><rect x="18" y="28" width="3" height="3"/><rect x="25" y="32" width="3" height="3"/><rect x="32" y="28" width="3" height="3"/></svg></div>
+            <div style="font-size:11px;color:var(--ink-2);margin-top:10px">Live preview</div>
+            <button class="btn-ghost" style="margin-top:12px;width:100%">Download PNG</button>
+            <button class="btn-ghost" style="margin-top:8px;width:100%">Download PDF (print)</button>
+          </div>
+        </div>
+        <div class="modal-f"><button class="btn-ghost">Cancel</button><button class="btn-y">Save board</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= CHATBOT (node canvas) ================= -->
+  <div class="view" id="chatbot">
+    <div class="filters" style="margin-bottom:14px">
+      <div class="filt"><label>Bot for campaign</label><select><option>Auto Hood · Ahmedabad</option><option>Hoarding · Vadodara</option><option>Walk-in enquiries</option></select></div>
+      <div class="spacer"></div>
+      <button class="btn-ghost">Test bot</button>
+      <button class="btn-y">Publish</button>
+    </div>
+
+    <div class="botwrap">
+      <!-- block rail -->
+      <div class="bot-rail">
+        <div class="ri on" title="Message"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
+        <div class="ri" title="Buttons"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="5" rx="2"></rect><rect x="3" y="14" width="18" height="5" rx="2"></rect></svg></div>
+        <div class="ri" title="Condition"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h5l3-7 3 14 3-7h4"></path></svg></div>
+        <div class="ri" title="Action"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7z"></path></svg></div>
+        <div class="ri" title="Handoff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg></div>
+        <div class="ri" title="API"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6"></path><path d="M8 6l-6 6 6 6"></path></svg></div>
+      </div>
+
+      <!-- canvas -->
+      <div class="canvas">
+        <div class="canvas-inner">
+          <svg class="wires" width="680" height="580" viewBox="0 0 680 580" fill="none">
+            <path d="M204,282 C220,282 214,178 232,178" stroke="#2a3556" stroke-width="2"/>
+            <path d="M420,250 C452,250 452,66 478,66" stroke="#2a3556" stroke-width="2"/>
+            <path d="M420,285 C452,285 452,182 478,182" stroke="#2a3556" stroke-width="2"/>
+            <path d="M420,320 C452,320 452,298 478,298" stroke="#2a3556" stroke-width="2"/>
+            <path d="M420,355 C456,360 456,450 478,450" stroke="#2a3556" stroke-width="2"/>
+          </svg>
+
+          <!-- Start -->
+          <div class="node start" style="left:14px;top:236px">
+            <div class="nh"><span class="nd2"></span>Start</div>
+            <div class="nb">QR scan or message in.
+              <div class="opt" style="font-family:var(--mono)">tag&nbsp;<b style="color:var(--green)">[RR-AHM-01]</b><span class="port"></span></div>
+            </div>
+          </div>
+
+          <!-- Greeting (selected) -->
+          <div class="node bot sel" style="left:232px;top:128px">
+            <div class="nh"><span class="nd2"></span>Greeting</div>
+            <div class="nb">&ldquo;Thanks for scanning our Ring Road, Ahmedabad board! What are you looking for?&rdquo;
+              <div class="opt">Rates<span class="port"></span></div>
+              <div class="opt">Site photos<span class="port"></span></div>
+              <div class="opt">Get a quote<span class="port"></span></div>
+              <div class="opt">Talk to a person<span class="port"></span></div>
+            </div>
+          </div>
+
+          <!-- Send rate card -->
+          <div class="node act" style="left:478px;top:34px">
+            <div class="nh"><span class="nd2"></span>Send rate card</div>
+            <div class="nb">Rate-card PDF for Auto Hood + ask duration.</div>
+          </div>
+
+          <!-- Send photos -->
+          <div class="node act" style="left:478px;top:150px">
+            <div class="nh"><span class="nd2"></span>Send photos</div>
+            <div class="nb">Board photos for this location.</div>
+          </div>
+
+          <!-- Qualify -->
+          <div class="node bot" style="left:478px;top:266px">
+            <div class="nh"><span class="nd2"></span>Qualify &amp; create lead</div>
+            <div class="nb">Collect city · budget · duration &rarr; create lead, assign city&rsquo;s TC.</div>
+          </div>
+
+          <!-- Handoff -->
+          <div class="node human" style="left:478px;top:418px">
+            <div class="nh"><span class="nd2"></span>Human handoff</div>
+            <div class="nb">On &ldquo;talk to a person&rdquo; or 2 misses &rarr; assign TC + push. Bot stops.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- properties panel for selected node -->
+      <div class="bot-props">
+        <div class="ph"><span style="width:9px;height:9px;border-radius:3px;background:var(--blue);display:inline-block"></span>Greeting</div>
+        <div class="psub">Message block · location-aware</div>
+
+        <div class="plabel">Message</div>
+        <textarea>Thanks for scanning our {board_location} board! What are you looking for?</textarea>
+
+        <div class="plabel">Buttons</div>
+        <div class="btnitem"><span>Rates</span><span class="h">⋮⋮</span></div>
+        <div class="btnitem"><span>Site photos</span><span class="h">⋮⋮</span></div>
+        <div class="btnitem"><span>Get a quote</span><span class="h">⋮⋮</span></div>
+        <div class="btnitem"><span>Talk to a person</span><span class="h">⋮⋮</span></div>
+        <div class="addbtn">+ Add button</div>
+
+        <div class="plabel" style="margin-bottom:0">Rules</div>
+        <div class="toggle"><span>Use QR location tag</span><span class="sw"></span></div>
+        <div class="toggle"><span>No match &rarr; human after 2 tries</span><span class="sw"></span></div>
+        <div class="toggle"><span>&ldquo;stop&rdquo; &rarr; opt-out</span><span class="sw"></span></div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--ink-2);margin-top:12px">Drag a block from the left, drop it on the canvas, connect the dots, edit the selected block on the right. Rule-based today; an <b style="color:var(--ink-1)">AI block</b> (trained on your rate docs) drops in here later. The full transcript shows on the lead&rsquo;s Conversation tab.</div>
+  </div>
+
+  <!-- ================= INTEGRATIONS ================= -->
+  <div class="view" id="integrations">
+    <div class="int-grid">
+      <div class="int">
+        <div class="ihead"><span class="iname">WhatsApp Business</span><span class="chip chip-g">Connected</span></div>
+        <div class="idesc">Sends auto-replies + broadcasts, powers the inbox. Your live numbers.</div>
+        <div class="irow"><span class="k">+91 95815 78261</span><span style="display:flex;gap:8px;align-items:center"><span class="v" style="color:var(--green)">High</span><select class="mini-select"><option>Leads → Dhara</option><option>Leads → Rima</option><option>Round-robin</option></select></span></div>
+        <div class="irow"><span class="k">+91 98982 73686</span><span style="display:flex;gap:8px;align-items:center"><span class="v" style="color:var(--green)">High</span><select class="mini-select"><option>Leads → Rima</option><option>Leads → Dhara</option><option>Round-robin</option></select></span></div>
+        <div class="irow"><span class="k">Business</span><span class="v">Verified · Approved</span></div>
+        <div class="irow"><span class="k">Billing (templates)</span><span class="v" style="color:var(--amber)">add payment method</span></div>
+        <div style="margin-top:14px"><button class="btn-ghost">Manage numbers &amp; templates</button></div>
+      </div>
+      <div class="int">
+        <div class="ihead"><span class="iname">Meta Lead Ads</span><span class="chip chip-a">Needs check</span></div>
+        <div class="idesc">Auto-pulls Facebook &amp; Instagram lead-form leads. Separate Meta permission from WhatsApp.</div>
+        <div class="irow"><span class="k">leads_retrieval</span><span class="v" style="color:var(--amber)">not confirmed</span></div>
+        <div class="irow"><span class="k">Page subscription</span><span class="v">—</span></div>
+        <div class="irow"><span class="k">Webhook</span><span class="v">—</span></div>
+        <div style="margin-top:14px"><button class="btn-ghost">Check &amp; connect</button></div>
+      </div>
+      <div class="int">
+        <div class="ihead"><span class="iname">Justdial</span><span class="chip chip-b">Email parser</span></div>
+        <div class="idesc">No public API. Forward Justdial lead emails to this address — they auto-become leads.</div>
+        <div class="irow"><span class="k">Parser address</span><span class="v" style="font-size:11px">jd-leads@in.untitledad.in</span></div>
+        <div class="irow"><span class="k">Last parsed</span><span class="v">—</span></div>
+        <div class="irow"><span class="k">RM webhook</span><span class="v">ask account mgr</span></div>
+        <div style="margin-top:14px"><button class="btn-ghost">Set up forwarding</button></div>
+      </div>
+    </div>
+
+    <!-- WhatsApp connection — how Meta actually structures it -->
+    <div class="panel" style="margin-top:20px">
+      <div class="panel-h">WhatsApp connection · Meta structure <span class="chip chip-g">Live</span></div>
+      <div class="panel-b">
+        <div class="trow"><span class="tk"><span class="tdot" style="background:var(--green)"></span>Meta Business &middot; Untitled Advertising</span><span class="tv" style="color:var(--green)">Verified &middot; Approved</span></div>
+        <div class="trow indent1"><span class="tk"><span class="tdot"></span>WABA &middot; UNTITLED ADVERTISING</span><span class="tv">ID 1220989013&hellip; &middot; owned by edigiexpert</span></div>
+        <div class="trow indent2"><span class="tk">+91 95815 78261</span><span class="tv">Connected &middot; High &middot; Tier 1 (1K/24h)</span></div>
+        <div class="trow indent2"><span class="tk">+91 98982 73686</span><span class="tv">Connected &middot; High &middot; Tier 1 (1K/24h)</span></div>
+        <div class="trow indent1"><span class="tk"><span class="tdot"></span>+ 2 more WABAs</span><span class="tv">owned by edigiexpert</span></div>
+        <div class="trow"><span class="tk">Access token (System User &middot; permanent)</span><span class="tv" style="color:var(--amber)">get from edigiexpert</span></div>
+        <div class="trow"><span class="tk">App Secret (webhook signature)</span><span class="tv" style="color:var(--amber)">not set</span></div>
+        <div class="trow"><span class="tk">Webhook callback &middot; field: messages</span><span class="tv">app.untitledad.in/api/wa/webhook</span></div>
+        <div class="trow"><span class="tk">Payment method</span><span class="tv" style="color:var(--amber)">add for templates/broadcast</span></div>
+      </div>
+    </div>
+
+    <!-- go-live checklist (the real gates) -->
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-h">Go-live checklist</div>
+      <div class="panel-b">
+        <div class="trow"><span class="tk"><span class="ck done"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>Business verified</span></div>
+        <div class="trow"><span class="tk"><span class="ck done"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>2 numbers connected &middot; quality High</span></div>
+        <div class="trow"><span class="tk"><span class="ck done"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>Webhook endpoint (receive + delivery status)</span></div>
+        <div class="trow"><span class="tk"><span class="ck wait"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg></span>Permanent token from edigiexpert <span style="color:var(--ink-2);font-size:11px">&mdash; blocks everything else</span></span></div>
+        <div class="trow"><span class="tk"><span class="ck wait"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg></span>Payment method <span style="color:var(--ink-2);font-size:11px">&mdash; for templates + broadcast</span></span></div>
+        <div class="trow"><span class="tk"><span class="ck wait"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg></span>At least one approved template</span></div>
+        <div class="trow"><span class="tk"><span class="ck wait"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg></span>Tier-up <span style="color:var(--ink-2);font-size:11px">&mdash; only if sending more than 1,000/day</span></span></div>
+      </div>
+    </div>
+
+    <!-- message templates (Meta categories + approval) -->
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-h">Message templates <button class="btn-mini">+ New template</button></div>
+      <table>
+        <thead><tr><th>Template</th><th>Category</th><th>Lang</th><th>Status</th><th>Used in</th></tr></thead>
+        <tbody>
+          <tr><td><span style="font-family:var(--mono);font-size:12px">lead_first_reply</span></td><td><span class="chip chip-b">Utility</span></td><td>en</td><td><span class="chip chip-g">Approved</span></td><td>Auto-reply</td></tr>
+          <tr><td><span style="font-family:var(--mono);font-size:12px">board_qr_welcome</span></td><td><span class="chip chip-b">Utility</span></td><td>en · gu</td><td><span class="chip chip-g">Approved</span></td><td>QR greeting</td></tr>
+          <tr><td><span style="font-family:var(--mono);font-size:12px">followup_nudge</span></td><td><span class="chip chip-b">Utility</span></td><td>en</td><td><span class="chip chip-g">Approved</span></td><td>Re-open chat (after 24h)</td></tr>
+          <tr><td><span style="font-family:var(--mono);font-size:12px">diwali_offer_img</span></td><td><span class="chip chip-a">Marketing</span></td><td>en</td><td><span class="chip chip-a">Pending</span></td><td>Broadcast</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== NEW CAMPAIGN modal preview ===== -->
+  <div class="modal-shadow" id="modalNew">
+    <div class="ms-cap">— what &ldquo;+ New campaign&rdquo; opens —</div>
+    <div class="modal">
+      <div class="modal-h"><span class="t">New campaign</span><span class="x">&times;</span></div>
+      <div class="modal-b">
+        <label><span>Campaign name</span><input value="Meta · Auto Hood · Ahmedabad"></label>
+        <div class="grid2">
+          <label><span>Source</span><select><option>Meta Lead Ads</option><option>Justdial</option><option>WhatsApp</option><option>Manual</option></select></label>
+          <label><span>WhatsApp number (replies from)</span><select><option>+91 95815 78261</option><option>+91 98982 73686</option></select></label>
+        </div>
+        <label><span>Auto-reply template</span><select><option>Lead first reply (utility) — approved</option><option>+ create new template</option></select></label>
+        <label><span>Who gets these leads?</span></label>
+        <div class="radio-row">
+          <div class="r on"><div class="rt">Telecaller</div><div class="rd">assign a TC ↓</div></div>
+          <div class="r"><div class="rt">Round-robin</div><div class="rd">spread across team</div></div>
+          <div class="r"><div class="rt">Fixed sales rep</div><div class="rd">pick one</div></div>
+        </div>
+        <label><span>Assign telecaller</span><select><option>Dhara</option><option>Rima</option></select></label>
+      </div>
+      <div class="modal-f"><button class="btn-ghost">Cancel</button><button class="btn-y">Create campaign</button></div>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div class="footer-note">
+    <b>This is a mockup, not a working screen.</b> Buttons don&rsquo;t do anything. It shows every screen so you can react before any code is written.<br><br>
+    <b class="ok">In this version:</b> bulk Broadcast tab with the full sent&rarr;delivered&rarr;read&rarr;clicked&rarr;replied&rarr;failed funnel + credit usage + per-day chart + template preview (same data AiSensy shows); notification bell + in-app + phone push on every inbound; assign a telecaller per WhatsApp number AND per campaign; reassign a chat from the inbox.<br><br>
+    <b class="ok">Safe by design:</b> separate layer beside the current app. New leads flow into your existing leads table the same way Excel upload already does — leads / telecaller / sales / quote / agency / payroll / TA-DA / APK / proposal flows are <b>not touched</b>.<br><br>
+    <b>Already real:</b> 2 WhatsApp numbers connected, business verified + approved, quality High. <b>Still to confirm:</b> WhatsApp token access (WABAs owned by &ldquo;edigiexpert&rdquo;), a payment method for broadcasts/templates, your number tiered up for big sends, and whether your Meta <i>App</i> has the separate Lead Ads permission.
+  </div>
+</div>
+
+<!-- floating push/in-app toast demo -->
+<div class="toast" id="toast">
+  <span class="x" id="toastX">&times;</span>
+  <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
+  <div><div class="tt">New WhatsApp message</div><div class="td">Rajesh Patel: "Rate kya hai 100 autos ka?"</div><div class="tmeta">in-app toast + phone push · tap to open chat</div></div>
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
+      document.querySelectorAll('.view').forEach(function(x){x.classList.remove('active');});
+      t.classList.add('active');
+      document.getElementById(t.getAttribute('data-v')).classList.add('active');
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  });
+  var bell=document.getElementById('bell'),notif=document.getElementById('notif');
+  bell.addEventListener('click',function(e){e.stopPropagation();notif.classList.toggle('open');});
+  document.addEventListener('click',function(){notif.classList.remove('open');});
+  notif.addEventListener('click',function(e){e.stopPropagation();});
+  function goTab(v){var t=document.querySelector('.tab[data-v="'+v+'"]');if(t)t.click();}
+  var nb=document.getElementById('newBtn');if(nb)nb.addEventListener('click',function(){document.getElementById('modalNew').scrollIntoView({behavior:'smooth'});});
+  var nbc=document.getElementById('newBcBtn');if(nbc)nbc.addEventListener('click',function(){var c=document.getElementById('bcCompose');if(c)c.scrollIntoView({behavior:'smooth'});});
+  var nq=document.getElementById('newQrBtn');if(nq)nq.addEventListener('click',function(){var c=document.getElementById('qrCreate');if(c)c.scrollIntoView({behavior:'smooth'});});
+  var tx=document.getElementById('toastX');if(tx)tx.addEventListener('click',function(){document.getElementById('toast').style.display='none';});
+</script>
+</body>
+</html>

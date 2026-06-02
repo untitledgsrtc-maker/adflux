@@ -2280,3 +2280,56 @@ Vercel) over anything needing SQL paste or APK rebuild. Per owner's
 standing rule: never ship a change that risks the current flow for
 reps who are actively using the app.
 
+
+---
+
+## 45 · OWNER HARD RULE — live app is untouchable: no regression, no slowdown (2026-06-02)
+
+Owner directive, 2 Jun 2026 (verbatim intent): *"don't touch existing flow or
+code — our team already has the app with them, so if any change or slowdown
+happens it will cost me a lot."*
+
+This is THE governing rule for the Campaign module and every future module. It
+adds an explicit **PERFORMANCE** dimension on top of §28 (frozen sales), §35
+(blast-radius), and §40 (change-impact). Higher priority than any feature.
+
+### The rule
+1. **The live app is in daily use by ~22 people; their incentive math depends on
+   it.** A regression OR a slowdown to any existing flow is a hard failure and
+   costs the owner real money.
+2. **New work is ADDITIVE only** — new tables, new routes, new endpoints, new
+   Edge functions. New modules attach BESIDE the live system, never inside it.
+3. **The only allowed change to existing data** is an additive nullable column
+   that NO existing code reads/writes (e.g. `leads.campaign_id`) — and even that
+   gets a `sales-module-guardian` PASS first (frozen pages `SELECT *`).
+4. **Off-limits without explicit owner approval + guardian PASS:** every existing
+   flow/file — leads CRUD, LeadUploadV2, WorkV2, TelecallerV2, LeadDetailV2,
+   LeadsV2, FollowUpsV2, QuotesV2, quote wizards, payments / payroll / TA-DA,
+   proposal renderers, dashboards, push-pipeline internals, all existing triggers
+   + RLS, the §28 frozen surface.
+
+### No-slowdown guarantee (the new, explicit part)
+A change must add **ZERO latency** to existing hot paths (leads list, /work,
+/telecaller, lead detail, every save flow):
+- New triggers go on NEW tables. Anything that must touch `leads` /
+  `lead_activities` must be proven non-blocking + guardian'd — never a new
+  synchronous trigger on a hot save path.
+- No new RLS subqueries or joins on existing high-volume tables.
+- Inbound webhooks reply 200-fast, process async — never block.
+- Realtime / polling subscribe to NEW tables only.
+- Don't enlarge a hot query's `SELECT`/join set, don't add a round-trip to an
+  existing save, don't ship a bundle-size regression to a rep-facing page.
+
+### Hard stop
+If a feature CANNOT be built without editing a live flow/file OR adding load to a
+hot path → **STOP, tell the owner, get explicit approval + guardian + a
+before/after perf check.** Never quietly tweak a live file to make the new thing
+work. "It only changes one line in WorkV2" is exactly the move this rule forbids.
+
+### Enforcement (every commit near the live app)
+- `sales-module-guardian` PASS (correctness + frozen contracts).
+- §40 3-surface table (desktop / mobile / APK) where applicable.
+- For anything touching a hot path or a shared table: a **before/after perf
+  note** (query count, latency, bundle delta) — not just "looks fine."
+- Don't advise `git push` until verified (§35).
+
