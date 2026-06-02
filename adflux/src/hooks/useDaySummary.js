@@ -107,7 +107,7 @@ export default function useDaySummary({ dateISO } = {}) {
         // schema), not `user_id` — the latter does not exist on this
         // table and the query was silently returning 0 rows.
         supabase.from('lead_activities')
-          .select('id, activity_type, outcome')
+          .select('id, activity_type, outcome, notes')
           .eq('created_by', profile.id)
           .gte('created_at', startISO)
           .lte('created_at', endISO),
@@ -249,8 +249,15 @@ export default function useDaySummary({ dateISO } = {}) {
       let meetings = 0, site_visits = 0, whatsapp_sent = 0, qualified = 0
       ;(actRes.data || []).forEach(r => {
         const t = (r.activity_type || '').toLowerCase()
-        if (t === 'meeting')    meetings      += 1
-        if (t === 'site_visit') site_visits   += 1
+        // Phase 110 — apply the CLAUDE.md §33 "done meeting" exclusions so
+        // the evening report's count matches the dashboard counter. A
+        // SCHEDULED (future) meeting or an auto-check-in companion row is
+        // NOT a completed meeting/visit and must not inflate the tally.
+        const note = r.notes || ''
+        const isScheduled  = note.startsWith('Meeting scheduled')
+        const isAutoCheckin = note.startsWith("I'm here")
+        if (t === 'meeting'    && !isScheduled && !isAutoCheckin) meetings    += 1
+        if (t === 'site_visit' && !isScheduled && !isAutoCheckin) site_visits += 1
         if (t === 'whatsapp')   whatsapp_sent += 1
         // "qualified" = positive-outcome call/meeting (rough proxy)
         if (r.outcome === 'positive') qualified += 1
