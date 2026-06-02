@@ -402,6 +402,17 @@ export default function PostCallOutcomeModal({
       toastError(new Error('Pick an outcome'), 'Tap Good / Maybe / Lost first.')
       return
     }
+    // Phase 110 — block a follow-up scheduled in the PAST. The date input
+    // already pins min=today (no past dates); this catches a past TIME
+    // picked for today. Compares the absolute IST instant to now, so it's
+    // timezone-correct. Future times + the auto-future chips pass through.
+    if (nextAction !== 'none' && customDate && customTime) {
+      const dueMs = new Date(`${customDate}T${customTime}:00+05:30`).getTime()
+      if (Number.isFinite(dueMs) && dueMs <= Date.now()) {
+        toastError(new Error('past time'), 'Pick a future time — that time has already passed.')
+        return
+      }
+    }
     setSaving(true)
 
     // 1. Patch the previously-inserted activity row with outcome + notes.
