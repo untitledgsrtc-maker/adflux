@@ -990,7 +990,14 @@ export default function WorkV2() {
             picked Option B (evening-only visibility); card's 19:00
             IST gate already enforces that, no extra time check
             needed here. */}
-        {checkedIn && !dayDone && (
+        {/* Phase 110 (#4) — dropped the `!dayDone` gate. The 8 PM cron
+            auto-close stamps evening_report_submitted_at (=dayDone) to
+            pass the evening-before-checkout trigger, which was hiding the
+            share card after auto-checkout. Owner: rep must be able to
+            share today's report even after (auto-)checkout. The card's
+            own 19:00 IST + dismiss gates still apply, and its checkout CTA
+            self-hides once checkedOut — only Share remains. */}
+        {checkedIn && (
           <DaySummaryCard
             onCheckOut={doCheckOut}
             checkedOut={!!session?.check_out_at}
