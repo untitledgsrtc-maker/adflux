@@ -1955,3 +1955,328 @@ e37dcfb Phase 98.D: align map KM thresholds with server TA rules
 - Renuka / Jubin team-lead dashboard (Phase 42.2) — blocked on live sales_manager users.
 - Phase 76.2 Android plugin — owner-deferred 22 May.
 
+
+---
+
+## 43 · Phase 109 — HR login turned on + Send Offer designation + day-summary stale-share + KM/background-GPS diagnosis (2026-06-01)
+
+Owner: "i want to give HR login ... she can send offer as per
+designation, and convert user into team. detailed module we will
+create later." Then a KM-mismatch + stale-report report.
+
+### Phase 109 — HR login (SHIPPED + verified)
+
+The HR pages already existed (HRV2 `/hr`, HRNewUserV2 `/hr/new-user`,
+HROfferLetterV2 `/hr/offer/:userId`); `hr` role + the "HR" designation
+were already seeded (Phase 50). Phase 109 only WIRED ACCESS.
+
+| Commit | What |
+|---|---|
+| `b96e7d6` | Phase 109 — HR login. **PUSHED + SQL run + verified** (Riya `roya@untitledad.in` logged in, lands on HR Home). |
+| `da6d30d` | Phase 109.1 — Send Offer designation dropdown. **committed, push pending** as of EOD. |
+| `f3c58cd` | Phase 109.2 — day-summary share refetch (stale-share fix). **committed, push pending.** |
+
+**SQL `supabase_phase109_hr_login.sql` (owner ran it):**
+- `admin_create_user` RPC widened to accept `hr` callers, BUT an `hr`
+  caller cannot mint `admin`/`co_owner` (privilege ceiling). NULL-role
+  short-circuit present (the §41 3VL foot-gun).
+- hr-only RLS: `sip_hr_write` (staff_incentive_profiles) + `dt_hr_write`
+  (daily_targets) + `hr_offers_hr_all`. The sip/dt write policies are
+  scoped so hr CANNOT read/edit/delete an admin/co_owner row (mirrors
+  the mint ceiling — HR can't touch the owner's salary).
+- Additive only: admin/co_owner/govt-partner policies untouched (§42
+  Phase 98.B doctrine preserved). **Supersedes phase66 caller-check** —
+  if phase66 is ever re-run, re-run phase109 after it.
+
+**Frontend (`b96e7d6`):** App.jsx — `/hr`, `/hr/new-user`,
+`/hr/offer/:userId` → `RequireHROrPrivileged` (was admin/co_owner only);
+RootRedirect lands `role='hr'` on `/hr`. V2AppShell — `HR_NAV` (HR Home +
+Add Member) on desktop + mobile + `isHR` role label (3 sites). HRNewUserV2
+success "Done" → `/hr` for hr (was `/people` → bounce).
+ProposedIncentiveCard — hides for `hr` (was leaking the sales "send
+quotes" card onto HR pages, same as agency).
+
+3 audits ran pre-commit: sales-module-guardian PASS (V2AppShell nav
+additive), security/RLS PASS (mint ceiling + doctrine), role-workflow
+PASS after fixing the RootRedirect landing + the incentive-card leak.
+
+### Phase 109.1 — Send Offer designation dropdown (`da6d30d`)
+
+Owner: "hr cant send offer to other roles, we just getting sales option."
+`SendOfferModal` was sales-shaped (POSITION default "Sales Person" +
+REQUIRED commission block). Now: free-text POSITION → designation
+dropdown (reads `designations` master); position + salary auto-fill;
+commission block shows + is required ONLY for `has_incentive=true` roles
+(Sales/Telecaller); flat-salary roles record zero incentive. Single file,
+HR-admin only, no SQL.
+
+**Owner-accepted caveat (DO NOT forget):** the offer-letter PDF
+(`OfferLetterPDF.jsx`) is STILL sales-only — `resolveLevel()` maps only
+L1/L2/L3 sales tiers; the body is commission annexures / realised
+billings / cluster revenue. BOTH offer entry points (SendOfferModal +
+`/hr/offer/:userId`) feed this one sales PDF. So an offer SENT for a
+non-sales role reads sales-style. Owner chose "dropdown only, today";
+per-role letter templates = deferred "Two letter types" module.
+
+### Phase 109.2 — day-summary share stale-fix (`f3c58cd`)
+
+Owner: "when we share report, newly fetched data not coming — once we
+share, new data fetched and we need to reshare." `DaySummaryCard.handleShare`
+built the WhatsApp text from mount-time React state; daily_ta + counters
+grow through the day → first share stale. Fix: `useDaySummary.refresh()`
+now RETURNS the assembled object; `handleShare` awaits it and builds from
+that (falls back to state on refetch error). Purely fetch-timing — no
+KM/threshold/checkout-chain change. Guardian PASS.
+
+### KM 3-way mismatch — DIAGNOSED, root cause is on-device (NOT code)
+
+Owner: kirti kotak 1-Jun showed GPS map **62.2 km**, TA claim **56 km**,
+day-summary report **36 km**. Reconciliation:
+- **Report 36 = stale share** (the daily_ta value at an early share). Phase
+  109.2 fixes it — report now reads current daily_ta (= TA number).
+- **TA 56 = `daily_ta.km_traveled`** — server `compute_daily_ta`
+  (canonical = `supabase_phase103_d6_daily_ta_seg10.sql`; acc≤50m, seg≥10m,
+  speed≤120, ×₹3/km bike). Live-incremental (recomputes on every ping).
+- **Map 62.2 = client `gpsDistance.js::summariseTrack`** (BATCH, same
+  thresholds) BUT has an **accuracy-fallback compute_daily_ta lacks**: if
+  >50% of pings fail the 50m accuracy cap it counts ALL pings → inflates on
+  weak-GPS days. That's the 56-vs-62 gap.
+- **The real problem dwarfs both:** kirti was out 9:04am→8:00pm (~11h) but
+  GPS uptime was **only 3h 35m** → ~7h had no pings. The app only captures
+  location reliably while foreground. So NEITHER number counts the dark
+  hours.
+
+**Background-GPS code ALREADY EXISTS + is fix-iterated** —
+`src/utils/backgroundGps.js` (`@capacitor-community/background-geolocation`
+`addWatcher` + watchdog + re-arm, Phases 103.D.1/.D.3), started in
+V2AppShell:361 on login (native-only). `LocationTrackingService.java` is a
+LOG-ONLY diagnostic (writes nothing). So this is NOT a code gap.
+
+**kirti's phone confirmed running current APK v0.96.9** (plugin compiled
+in). So the 3h35m gap is a **device-settings** problem, not old-APK and not
+code. The two Samsung killers (owner checking 2 Jun):
+1. **Location permission must be "Allow all the time"** (not "while using
+   the app") — Android 11+ gives zero background location otherwise.
+2. **Battery = Unrestricted** — Samsung "Optimized" kills the foreground
+   service on screen-lock.
+Plus sanity-check the persistent "tracking location" notification appears
+when backgrounded.
+
+**Next session (2 Jun) opening move:** get owner's answer on kirti's
+Location-permission mode + battery setting.
+- If flipping them closes the map gap → the fix is an **onboarding prompt
+  that forces "Allow all the time" + battery-unrestricted** (native, needs
+  APK rebuild + device test — do NOT ship blind, §39).
+- Do NOT write more background-GPS capture code — it exists and works when
+  the OS lets it run.
+- The 56-vs-62 calibration (accuracy-fallback) is secondary noise; don't
+  touch the frozen `compute_daily_ta` financial trigger without owner
+  sign-off + real-ping evidence (§42 lesson: the higher number was GPS
+  noise last time).
+
+### Push pending as of EOD 1 Jun
+
+`da6d30d` (109.1) + `f3c58cd` (109.2) committed, NOT on origin
+(origin HEAD = `b96e7d6`). Owner to run:
+`cd ~/Documents/untitled-os2/Untitled/adflux && git push origin untitled-os`
+JS-only, no SQL, no APK rebuild.
+
+**RESOLVED 2 Jun:** all of the above + the Phase 110 batch + Phase 111
+are now on origin. See §44 push-state table. Nothing pending.
+
+
+---
+
+## 44 · DETAILED CURRENT FLOW — how the live app actually works (2026-06-02)
+
+Owner asked for the current end-to-end flow documented so future
+sessions treat these as KNOWN CONTRACTS and don't re-derive (or
+break) them. **This whole app is in daily use by the real team
+right now** — every flow below is live on `app.untitledad.in`.
+Doc-only section; no code/schema touched to write it. Each flow
+below was verified against live code on 2 Jun 2026, not recalled
+from memory.
+
+### 44.0 · Push state after this session (all on origin, HEAD = `69c9d9a`)
+
+```
+69c9d9a Phase 111: deterministic quote WhatsApp share — render + stable link
+6f47adb Phase 110 #5: score counts only real calls (DB fn; owner ran + backfilled)
+8bde434 Phase 110 #4: share today's report stays available after auto-checkout
+824cc19 Phase 110 #3: manual checkout for telecallers
+20d55f1 Phase 110 #2: evening report meeting count applies §33 exclusions
+d0415ba Phase 110 #1: block past follow-up time on outcome save
+dd2cc5a Phase 109.9: restore the type box in "What did they say?"
+9986988 Phase 109.8: rep profile pic on Team Dashboard cards (LeadAvatar imageUrl)
+1420173 Phase 109.6/.7 + 109.3: team_role guard + backfill + HR email rename SQL
+69cf1ed Phase 109.5: convert-to-user via idempotent admin_create_user
+```
+SQL already run by owner: phase109 HR-login, phase109_4 offer PII,
+phase109_7 team_role guard, phase110 score real-calls (+ backfill).
+No APK rebuild needed for any of it (live-update mode, §38).
+
+### 44.1 · Roles + landing (RootRedirect)
+
+`admin` → /dashboard · `co_owner` (Vishal, govt-scoped §42) →
+/dashboard · `sales` → /work · `telecaller` → /telecaller ·
+`agency` → /work · `hr` (Riya) → /hr · `sales_manager` (none live
+yet) → manager dash. Route guards: RequireAuth, RequirePrivileged
+(admin+co_owner), RequireHROrPrivileged (+hr, only /people/:id +
+/hr*), RequireManager, RequireGovtAccess.
+
+### 44.2 · Sales rep daily flow (`/work`, mobile-first, §28 FROZEN)
+
+1. Open → if not checked in, **Start day** (plan numbers from
+   work_sessions.planned_* or daily_targets fallback). doCheckIn
+   logs a GPS ping.
+2. Checked-in view = V2Hero (target ring + KPIs) · NextActionCard
+   (the ONE next thing) · stale-leads banner (3+ days no contact)
+   · TodayTasksPanel (today's follow-ups) · RepMapPanel (where
+   you've been) · NearbyLeadsCard · MissedCallsCard · GpsOffBanner
+   (red if Location off).
+3. Rep taps a lead → tel: dialer → **call→outcome chain** (44.4).
+4. Log a field meeting → LogMeetingModal (phone-first dedup,
+   optimistic save Phase 88.1).
+5. Background GPS pings feed daily_ta km (44.7).
+6. Evening → DaySummaryCard (44.6) → share WhatsApp report.
+7. Card mount gates: line 1000 `{checkedIn && (` — DaySummaryCard
+   shows even after dayDone (Phase 110 #4). All OTHER /work cards
+   keep `{checkedIn && !dayDone && (` (hide once day wrapped).
+
+### 44.3 · Telecaller daily flow (`/telecaller`, §28 FROZEN)
+
+Mirror of /work for phone-only reps. V2Hero shows X/target calls +
+connect-rate ring. quickLogCall = same tel:→audit→modal chain as
+/work (44.4). No field-meeting / map. Upcoming-callbacks panel
+(open follow_ups next 48h). Manual checkout via DaySummaryCard
+(Phase 110 #3 — TC had no checkout button before). MEET KPI hidden
+for role=telecaller AND team_role=sales_manager (Renuka).
+
+### 44.4 · Call → outcome chain (PostCallOutcomeModal, §28 FROZEN — do NOT alter)
+
+The single most-protected flow. Byte-contract:
+```
+user taps Call → tel: link fires (real dialer, user gesture)
+   → 1.5s timer
+   → logCallAudit writes call_logs row
+   → lead_activities row inserted (activity_type='call', outcome=null)
+   → PostCallOutcomeModal opens
+rep picks outcome (Good/Maybe/Call later/Lost) + next action
+   (call-back 2h / tomorrow / 3d / 7d / nurture / meeting / custom / none)
+   + optional voice/typed note ("What did they say?" — type box
+     restored Phase 109.9)
+Save:
+   → activity row PATCHED with outcome
+   → old open follow_up for (lead,rep) CLOSED
+   → new follow_up SPAWNED for next action (+ schedules native alarm)
+   → any open smart_task for (lead,rep) CLOSED
+   → load()/realtime refresh → queue advances to next lead
+```
+**Phase 110 #1 guard:** if next-action uses a custom date+time that
+is already in the PAST (IST), Save is blocked with a toast — stops
+reps booking a follow-up for a time that already went by. Lost
+outcome auto-forces nextAction='none' + skips the prompt (Phase
+97.6). Lost/Won cancels any scheduled alarm (Phase 97.3).
+
+### 44.5 · Checkout flow (manual + auto + share-after)
+
+`doCheckOut(source='manual')` on both WorkV2 + TelecallerV2.
+`check_out_source` enum = **`manual` | `auto_share` | `auto_cron`**
+(anything else normalized to `manual` by `safeSource` guard).
+- **Manual:** rep taps Check out on DaySummaryCard → source
+  `manual`.
+- **Share-chained:** sharing the evening report can checkout →
+  source `auto_share`.
+- **Evening cron:** ~8pm stamps the evening-report timestamp
+  (→ `dayDone`) and auto-checks-out reps still on the clock →
+  source `auto_cron`.
+Phase 110 #4: after ANY checkout the rep can still reopen /work and
+share today's report (DaySummaryCard no longer hidden by dayDone).
+
+### 44.6 · Evening day-summary / WhatsApp report flow
+
+DaySummaryCard appears ≥19:00 IST (hour gate). Shows plan vs actual
+(meetings / site-visits / calls / qualified) + km. Tap **Share to
+your group** → WhatsApp opens with formatted text (emoji format
+owner-approved §33). 
+- **Phase 109.2:** `useDaySummary.refresh()` RETURNS the freshly
+  assembled object; `handleShare` awaits it and builds the message
+  from THAT (not stale mount-time state). Fixed "first share shows
+  old numbers, have to re-share."
+- **Phase 110 #2:** meeting/site-visit tally in the card applies
+  the §33 done-meeting exclusions (`notes` NOT LIKE 'Meeting
+  scheduled%' / "I'm here · auto-check-in%"), so the report count
+  matches the dashboard + GPS-track count.
+
+### 44.7 · TA / km flow (financial — ₹3/km, FROZEN trigger)
+
+GPS pings → `compute_daily_ta` (live-incremental, recompute every
+ping). Canonical = `supabase_phase103_d6_daily_ta_seg10.sql`:
+acc ≤50m, segment ≥10m, speed ≤120km/h, daily cap 600km. Client
+`gpsDistance.js::summariseTrack` (map display) uses the same
+thresholds (Phase 98.D) BUT has an accuracy-fallback that can
+inflate on weak-GPS days → small map-vs-TA gap is expected noise.
+**KNOWN-OPEN (device, not code):** reps lose km when phone GPS is
+off / app backgrounded without "Allow all the time" + battery
+Unrestricted (kirti: 3h35m tracked of 11h, §43). Background-GPS
+code EXISTS + works when OS allows. Do NOT touch the frozen
+compute_daily_ta without owner sign-off + real-ping evidence.
+
+### 44.8 · Score → incentive flow
+
+`compute_daily_score` (SECURITY DEFINER, AFTER-INSERT trigger on
+lead_activities) → daily_performance.score_pct → feeds monthly
+incentive. Telecaller branch counts activity_type='call';
+sales/agency branch counts 'meeting'. Sunday/holiday/approved-leave
+excluded.
+- **Phase 110 #5:** the TC `call` count now only counts a call that
+  REALLY happened — `outcome IS NOT NULL` OR a matching call_logs
+  row with `duration_seconds >= 10` and direction ≠ 'missed'. A
+  tapped-but-not-dialed call no longer earns score → no inflated
+  incentive. Sales meeting branch byte-unchanged. Live phase97.2
+  security gates (`_assert_self_or_admin` + `pg_temp`) preserved.
+- **KNOWN-OPEN (§33):** the meeting branch does NOT yet apply the
+  scheduled/auto-checkin exclusions, so scores on days with
+  scheduled or auto-check-in meetings may be slightly inflated.
+  Counter + report are clean; the score function is not. Separate,
+  un-started task — do NOT assume scores are clean.
+
+### 44.9 · Quote → PDF → WhatsApp share flow (Phase 111, money flow)
+
+Rep opens a quote → taps WhatsApp. Cascade in
+`QuoteDetail.handleWhatsApp`:
+```
+native (APK)? → Share the PDF file directly
+else → uploadQuotePDFHtml() renders + uploads + returns a link
+   render (captureToCanvas): awaits document.fonts.ready + every
+     <img> load (5s cap) BEFORE html2canvas → letterhead first page
+     always paints (Phase 111 — killed the intermittent blank page)
+   link (uploadQuotePDFHtml): REUSES the quote's latest non-expired
+     pdf_share_tokens row, mints a new one only if none exists →
+     SAME branded link every send (Phase 111). Returns
+     https://app.untitledad.in/pdf/<ref>?t=<token>
+   on upload failure → downloadQuotePDF() local fallback
+branded-link gate (Phase 95.3): skip is.gd shortener when the URL
+   is already .../pdf/ — so the rep sees the branded link, not is.gd
+→ openWhatsApp(quote.client_phone, template + link)
+```
+Net: every tap → client's WhatsApp + template + same branded link
++ correctly-rendered PDF. `pdf_share_tokens` RLS lets the sending
+rep (self) + admin read their own token → reuse works.
+
+### 44.10 · What is FROZEN vs safe to touch
+
+FROZEN (guardian audit before ANY commit, even styling): all §28 +
+§29 + §31 + §33 contracts — WorkV2, TelecallerV2, LeadDetailV2,
+PostCallOutcomeModal + the call→outcome chain, useAutoRefresh
+mounts, push enrollment (V2AppShell only), lead stages / cadence /
+activity_type enums, compute_daily_score / compute_daily_ta /
+meeting-KPI exclusions, the 9:30 IST morning push, the z-index
+landscape. `QuotePDFHtml.jsx` is NOT frozen but is a money flow —
+treat with the same care (parse-check + explain before push).
+
+When the team is mid-shift, prefer web-only JS fixes (instant via
+Vercel) over anything needing SQL paste or APK rebuild. Per owner's
+standing rule: never ship a change that risks the current flow for
+reps who are actively using the app.
+
