@@ -825,11 +825,11 @@ export default function PostCallOutcomeModal({
               What did they say?
             </label>
             <VoiceInput
-              compact
               value={notes}
               onChange={handleVoiceNotes}
               disabled={saving}
               languageHint=""
+              placeholder="Type or speak what they said…"
             />
           </div>
 
