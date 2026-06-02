@@ -1174,6 +1174,26 @@ async function captureToCanvas(jsx, { fixedHeight = null, scale = 2 } = {}) {
     requestAnimationFrame(() => requestAnimationFrame(resolve))
   })
 
+  // Phase 110 — wait for fonts + ALL images (esp. the full-page
+  // letterhead background) to actually load before html2canvas snapshots.
+  // The old 2-rAF wait (~32ms) raced the letterhead image fetch on a
+  // cold/slow network → html2canvas captured a BLANK first page
+  // intermittently. Now deterministic. Each image has a 5s safety cap so
+  // a broken/slow asset can never hang the render (worst case = same as
+  // before, just delayed). Purely additive — only improves the output.
+  try { await (document.fonts && document.fonts.ready) } catch { /* ignore */ }
+  const imgs = Array.from(wrapper.querySelectorAll('img'))
+  await Promise.all(imgs.map((img) => (
+    (img.complete && img.naturalWidth > 0)
+      ? Promise.resolve()
+      : new Promise((res) => {
+          const done = () => res()
+          img.addEventListener('load',  done, { once: true })
+          img.addEventListener('error', done, { once: true })
+          setTimeout(done, 5000)
+        })
+  )))
+
   let canvas
   try {
     canvas = await html2canvas(wrapper, {
@@ -1380,35 +1400,49 @@ export async function uploadQuotePDFHtml(quote, cities = []) {
   // previews where the /api/pdf route isn't wired up to a domain.
   if (quote?.id && typeof window !== 'undefined' && /(^|\.)untitledad\.in$/i.test(window.location.hostname)) {
     try {
-      // Generate random token. crypto.getRandomValues is available
-      // in every modern browser + every Capacitor WebView.
-      const bytes = new Uint8Array(32)
-      crypto.getRandomValues(bytes)
-      const token = btoa(String.fromCharCode(...bytes))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '')
-      const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()  // +90 days
-
-      // Get current user id for created_by (best-effort).
-      const { data: { user } } = await supabase.auth.getUser()
-      const createdBy = user?.id || null
-
-      const { error: tErr } = await supabase
+      // Phase 110 — REUSE the quote's latest still-valid token so the
+      // share link is STABLE across sends. The old code minted a NEW
+      // token every send → the ?t= changed each tap (and any insert
+      // hiccup silently dropped to the public URL → is.gd). Reuse means
+      // the same branded link every time; we only insert on the first
+      // send (or after the 90-day expiry).
+      let token = null
+      const { data: existing } = await supabase
         .from('pdf_share_tokens')
-        .insert([{
-          quote_id:   quote.id,
-          token,
-          expires_at: expiresAt,
-          created_by: createdBy,
-        }])
+        .select('token')
+        .eq('quote_id', quote.id)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      token = existing?.token || null
 
-      if (!tErr) {
+      if (!token) {
+        // No live token yet — mint one. crypto.getRandomValues is
+        // available in every modern browser + Capacitor WebView.
+        const bytes = new Uint8Array(32)
+        crypto.getRandomValues(bytes)
+        token = btoa(String.fromCharCode(...bytes))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '')
+        const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()  // +90 days
+        const { data: { user } } = await supabase.auth.getUser()
+        const createdBy = user?.id || null
+        const { error: tErr } = await supabase
+          .from('pdf_share_tokens')
+          .insert([{ quote_id: quote.id, token, expires_at: expiresAt, created_by: createdBy }])
+        if (tErr) {
+          // Insert failed (RLS hiccup, etc.) — fall through to public URL
+          // so the rep can still share. Logged for triage.
+          console.warn('[pdf-share-token] insert failed:', tErr.message)
+          token = null
+        }
+      }
+
+      if (token) {
         return `https://${window.location.hostname}/pdf/${safeNumber}?t=${token}`
       }
-      // Token insert failed (RLS hiccup, etc.) — fall through to
-      // public URL so the rep can still share. Logged for triage.
-      console.warn('[pdf-share-token] insert failed:', tErr.message)
     } catch (tokenErr) {
       console.warn('[pdf-share-token] generation failed:', tokenErr?.message)
     }
