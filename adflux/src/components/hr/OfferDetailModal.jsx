@@ -19,7 +19,7 @@
 
 import { useState } from 'react'
 import { X, Download, UserPlus, Copy, Check, MessageSquare } from 'lucide-react'
-import { supabase, supabaseSignup } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useOffers, buildOfferUrl, STATUS_META } from '../../hooks/useOffers'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { formatCurrency } from '../../utils/formatters'
@@ -117,47 +117,39 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
     setConverting(true)
     setConvertErr('')
 
-    // Auth user on the ISOLATED signup client so the admin session
-    // is not replaced — matches TeamMemberModal exactly.
     const email = (offer.candidate_email || '').trim().toLowerCase()
     const name  = offer.full_legal_name || offer.candidate_name
 
-    const { data: authData, error: authErr } = await supabaseSignup.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
+    // Phase 109.5 — create the user via the idempotent admin_create_user
+    // RPC instead of client signUp. signUp threw "User already registered"
+    // whenever the auth user already existed — e.g. a prior convert that
+    // created the auth user but failed before flipping the offer status,
+    // leaving the offer stuck on 'accepted' and impossible to retry. The
+    // RPC REUSES an existing auth user by email AND writes the
+    // public.users row server-side (past the client INSERT RLS), so
+    // convert is now safely re-runnable and self-heals a half-done one.
+    // (admin_create_user keeps the admin's session — no signUp/signOut.)
+    const { data: created, error: rpcErr } = await supabase.rpc('admin_create_user', {
+      p_email:            email,
+      p_password:         password,
+      p_name:             name,
+      p_role:             'sales',
+      p_team_role:        'sales',
+      p_designation:      offer.position || null,
+      p_signature_mobile: offer.mobile || null,
+      p_city:             offer.city || null,
+      p_segment_access:   'PRIVATE',
     })
 
-    if (authErr) {
-      setConvertErr(authErr.message || 'Failed to create auth user')
+    if (rpcErr) {
+      setConvertErr(rpcErr.message || 'Failed to create user')
       setConverting(false)
       return
     }
 
-    const userId = authData.user?.id
+    const userId = created?.id
     if (!userId) {
       setConvertErr('User creation failed — no user ID returned')
-      setConverting(false)
-      return
-    }
-
-    try { await supabaseSignup.auth.signOut() } catch (_) { /* ignore */ }
-
-    // Insert into users. The trigger auto_create_incentive_profile
-    // synchronously inserts a staff_incentive_profiles row with the
-    // incentive_settings defaults — we overwrite it immediately
-    // below so the promised numbers from the offer letter are what
-    // actually go into production.
-    const { error: insErr } = await supabase.from('users').insert([{
-      id:        userId,
-      name,
-      email,
-      role:      'sales',
-      is_active: true,
-    }])
-
-    if (insErr) {
-      setConvertErr(insErr.message || 'Failed to insert user row')
       setConverting(false)
       return
     }
