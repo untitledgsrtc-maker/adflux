@@ -252,6 +252,11 @@ export default function TeamDashboardV2() {
   // those with a meaningful metric: count of follow_ups whose
   // follow_up_date is in the past AND not done.
   const [overdueFuByUser,    setOverdueFuByUser]    = useState({})
+  // Phase 112.3 (2026-06-04) — telecaller-card fill: positive-outcome
+  // calls today + open callbacks due in the next 2 days. Shown only on
+  // TC cards (fill the 2 cells freed by hiding Meet + Quote/Pay-chase).
+  const [qualifiedByUser,    setQualifiedByUser]    = useState({})
+  const [callbacksDueByUser, setCallbacksDueByUser] = useState({})
   // Phase 89.10 — flag that flips true once the Google Map mounts.
   // Marker render effects depend on mapRef.current + map.__google
   // both being non-null; refs don't trigger React re-runs, so
@@ -277,8 +282,15 @@ export default function TeamDashboardV2() {
       // Single-day periods (today/yesterday) work identically to
       // the pre-Phase-82 code path.
       const today = period.startIso
+      // Phase 112.3 — callbacks-due window = today .. today+2 (date-only).
+      // UTC add avoids IST drift when bumping a plain Y-M-D string.
+      const cbEnd = (() => {
+        const d = new Date(`${period.startIso}T00:00:00Z`)
+        d.setUTCDate(d.getUTCDate() + 2)
+        return d.toISOString().slice(0, 10)
+      })()
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes, qualifiedRes, callbacksRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -422,6 +434,23 @@ export default function TeamDashboardV2() {
           .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
           .order('created_at', { ascending: false })
           .limit(500),
+
+        // Phase 112.3 — TC "Qualified today": positive-outcome calls in
+        // the period, grouped client-side by created_by. Read only on
+        // TC cards.
+        supabase.from('lead_activities')
+          .select('created_by')
+          .eq('activity_type', 'call')
+          .eq('outcome', 'positive')
+          .gte('created_at', startOfDay)
+          .lt ('created_at', endOfDay),
+        // Phase 112.3 — TC "Callbacks due": open follow_ups due in the
+        // next 2 days, grouped by assigned_to. Read only on TC cards.
+        supabase.from('follow_ups')
+          .select('assigned_to')
+          .eq('is_done', false)
+          .gte('follow_up_date', today)
+          .lte('follow_up_date', cbEnd),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
@@ -525,6 +554,23 @@ export default function TeamDashboardV2() {
         odMap[r.assigned_to] = (odMap[r.assigned_to] || 0) + 1
       })
       setOverdueFuByUser(odMap)
+
+      // Phase 112.3 — TC qualified (positive calls today) per created_by.
+      const qualMap = {}
+      ;(qualifiedRes?.data || []).forEach((a) => {
+        if (!a.created_by) return
+        qualMap[a.created_by] = (qualMap[a.created_by] || 0) + 1
+      })
+      setQualifiedByUser(qualMap)
+
+      // Phase 112.3 — TC callbacks due (open follow_ups next 2 days) per
+      // assigned_to.
+      const cbMap = {}
+      ;(callbacksRes?.data || []).forEach((r) => {
+        if (!r.assigned_to) return
+        cbMap[r.assigned_to] = (cbMap[r.assigned_to] || 0) + 1
+      })
+      setCallbacksDueByUser(cbMap)
 
       // Phase 62.9 — load push subscriptions per rep. Used to render
       // the "Push on/off" + "Online" status pills below the KPI row.
@@ -1005,21 +1051,24 @@ export default function TeamDashboardV2() {
     return m
   }, [sessions])
 
-  // Phase 84 — "live" matches the new 4-state badge:
-  //   checked-in + GPS ping within 90 min + not checked-out.
-  // 90 min covers a rep on a long meeting / lunch / desk-bound TC
-  // without flipping to "idle" too aggressively.
+  // Phase 112.2 (2026-06-04) — "Reps active now" now matches the card
+  // pill rule EXACTLY: checked-in + not checked-out. The old 90-min
+  // GPS-ping gate (Phase 84) was REMOVED from the card pill in Phase
+  // 88.7 (owner directive: "checked in + not checked out = in field,
+  // period") but left here, so the hero under-counted vs the green
+  // "in field" cards (8 cards in field, hero said 3 — the 5 diff had
+  // GPS off / no recent ping). GPS freshness still shows on each card's
+  // GPS pill + the map ring colour; it no longer hides reps from the
+  // headcount. Now `live` == number of green "in field" cards, and the
+  // "X not checked-in" subtitle is finally truthful.
   const live = useMemo(() => {
-    const now = Date.now()
     return reps.filter(r => {
       const s = sessionByUser.get(r.id)
       if (!s?.check_in_at) return false
       if (s.check_out_at || s.auto_checked_out) return false
-      const p = latestPingByUser[r.id]
-      if (!p?.captured_at) return false
-      return (now - new Date(p.captured_at).getTime()) / 60000 <= 90
+      return true
     }).length
-  }, [reps, sessionByUser, latestPingByUser])
+  }, [reps, sessionByUser])
 
   const totalCallsToday = useMemo(() => {
     return Object.values(callsByUser).reduce((s, n) => s + n, 0)
@@ -1261,6 +1310,17 @@ export default function TeamDashboardV2() {
                     </div>
                   )
                 })()}
+                {/* Phase 112.3 — TC-only: Qualified (positive calls
+                    today) fills the cell freed by the hidden Meet tile. */}
+                {isTC && (() => {
+                  const q = qualifiedByUser[r.id] || 0
+                  return (
+                    <div className="lead-rep-kpi" title="Positive-outcome calls today">
+                      <div className={`num ${q > 0 ? 'suc' : ''}`}>{q}</div>
+                      <div className="lbl">Qualified</div>
+                    </div>
+                  )
+                })()}
               </div>
               {/* Phase 82 — three new KPI tiles per rep card:
                     F-up   pending/done follow_ups in the window
@@ -1299,10 +1359,21 @@ export default function TeamDashboardV2() {
                       <div className="lbl">Today F-up</div>
                     </div>
                     {isTC ? (
-                      <div className="lead-rep-kpi">
-                        <div className={`num ${crCls}`}>{callsHere > 0 ? `${connectRate}%` : '—'}</div>
-                        <div className="lbl">Connect rate</div>
-                      </div>
+                      <>
+                        <div className="lead-rep-kpi">
+                          <div className={`num ${crCls}`}>{callsHere > 0 ? `${connectRate}%` : '—'}</div>
+                          <div className="lbl">Connect rate</div>
+                        </div>
+                        {/* Phase 112.3 — TC-only: Callbacks due (open
+                            follow_ups next 2 days) fills the cell freed
+                            by Quote/Pay-chase not applying to TCs. */}
+                        <div className="lead-rep-kpi" title="Open callbacks due in the next 2 days">
+                          <div className={`num ${(callbacksDueByUser[r.id] || 0) > 0 ? 'acc' : ''}`}>
+                            {callbacksDueByUser[r.id] || 0}
+                          </div>
+                          <div className="lbl">Callbacks due</div>
+                        </div>
+                      </>
                     ) : (
                       <>
                         <div className="lead-rep-kpi">
