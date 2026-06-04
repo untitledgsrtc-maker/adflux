@@ -262,6 +262,9 @@ export default function TeamDashboardV2() {
   // "total quote this month / won this month" visible per employee.
   const [monthQuotesByUser,  setMonthQuotesByUser]  = useState({})
   const [monthWonByUser,     setMonthWonByUser]     = useState({})
+  // Phase 112.7 — ₹ value alongside the counts, for the header capsules.
+  const [monthQuoteAmtByUser, setMonthQuoteAmtByUser] = useState({})
+  const [monthWonAmtByUser,   setMonthWonAmtByUser]   = useState({})
   // Phase 89.10 — flag that flips true once the Google Map mounts.
   // Marker render effects depend on mapRef.current + map.__google
   // both being non-null; refs don't trigger React re-runs, so
@@ -462,16 +465,16 @@ export default function TeamDashboardV2() {
           .gte('follow_up_date', today)
           .lte('follow_up_date', cbEnd),
 
-        // Phase 112.5 — quotes CREATED this calendar month, per
-        // created_by (count = "quotes this month").
+        // Phase 112.5/.7 — quotes CREATED this calendar month, per
+        // created_by (count + total value).
         supabase.from('quotes')
-          .select('created_by')
+          .select('created_by, total_amount')
           .gte('created_at', monthStartIso)
           .lt ('created_at', monthEndIso),
-        // Phase 112.5 — quotes WON this calendar month, per created_by.
-        // won-date proxied by updated_at (quotes has no won_at — §33).
+        // Phase 112.5/.7 — quotes WON this calendar month, per created_by
+        // (count + value). won-date proxied by updated_at (no won_at, §33).
         supabase.from('quotes')
-          .select('created_by')
+          .select('created_by, total_amount')
           .eq('status', 'won')
           .gte('updated_at', monthStartIso)
           .lt ('updated_at', monthEndIso),
@@ -596,20 +599,24 @@ export default function TeamDashboardV2() {
       })
       setCallbacksDueByUser(cbMap)
 
-      // Phase 112.5 — per-rep monthly quote counts.
-      const mqMap = {}
+      // Phase 112.5/.7 — per-rep monthly quote count + ₹ value.
+      const mqMap = {}, mqAmt = {}
       ;(monthQuotesRes?.data || []).forEach((q) => {
         if (!q.created_by) return
         mqMap[q.created_by] = (mqMap[q.created_by] || 0) + 1
+        mqAmt[q.created_by] = (mqAmt[q.created_by] || 0) + (Number(q.total_amount) || 0)
       })
       setMonthQuotesByUser(mqMap)
+      setMonthQuoteAmtByUser(mqAmt)
 
-      const mwMap = {}
+      const mwMap = {}, mwAmt = {}
       ;(monthWonRes?.data || []).forEach((q) => {
         if (!q.created_by) return
         mwMap[q.created_by] = (mwMap[q.created_by] || 0) + 1
+        mwAmt[q.created_by] = (mwAmt[q.created_by] || 0) + (Number(q.total_amount) || 0)
       })
       setMonthWonByUser(mwMap)
+      setMonthWonAmtByUser(mwAmt)
 
       // Phase 62.9 — load push subscriptions per rep. Used to render
       // the "Push on/off" + "Online" status pills below the KPI row.
@@ -1301,6 +1308,41 @@ export default function TeamDashboardV2() {
                     {r.team_role}{r.city ? ` · ${r.city}` : ''}
                   </div>
                 </div>
+                {/* Phase 112.7 — month quote / won VALUE capsules at the
+                    marked spot (right of name, left of the status pill).
+                    Compact ₹ in the pill; full ₹ on hover. */}
+                {(() => {
+                  const mq  = monthQuotesByUser[r.id]   || 0
+                  const mqA = monthQuoteAmtByUser[r.id] || 0
+                  const mw  = monthWonByUser[r.id]      || 0
+                  const mwA = monthWonAmtByUser[r.id]   || 0
+                  const chip = (color, bg) => ({
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '3px 9px', borderRadius: 999,
+                    fontSize: 10.5, fontWeight: 600, whiteSpace: 'nowrap',
+                    border: `1px solid ${color}`, background: bg, color,
+                  })
+                  return (
+                    <div style={{
+                      marginLeft: 'auto', display: 'flex', gap: 6,
+                      alignItems: 'center', flexWrap: 'wrap',
+                      justifyContent: 'flex-end',
+                    }}>
+                      <span
+                        style={chip('var(--blue, #3B82F6)', 'rgba(59,130,246,0.12)')}
+                        title={`${mq} quote${mq === 1 ? '' : 's'} this month · ${formatCurrency(mqA)}`}
+                      >
+                        {mq} quote{mq === 1 ? '' : 's'} · {formatLakh(mqA)}
+                      </span>
+                      <span
+                        style={chip('var(--success, #10B981)', 'rgba(16,185,129,0.12)')}
+                        title={`${mw} won this month · ${formatCurrency(mwA)}`}
+                      >
+                        {mw} won · {formatLakh(mwA)}
+                      </span>
+                    </div>
+                  )
+                })()}
                 <div className="lead-rep-status">
                   {statusKind === 'in_field' && (
                     <Pill tone="success" title="Checked in + GPS ping within last 90 min">
@@ -1550,24 +1592,6 @@ export default function TeamDashboardV2() {
                   (was call-% → stuck at 0 for field reps), calls for TC. */}
               <div className="lead-rep-progress">
                 <span className={barCls} style={{ width: `${Math.min(barPct, 100)}%` }} />
-              </div>
-              {/* Phase 112.5 — per-rep monthly quote production (this
-                  calendar month, independent of the date filter). */}
-              <div style={{
-                display: 'flex', gap: 14, alignItems: 'center',
-                padding: '6px 0 0', fontSize: 11.5,
-                color: 'var(--text-muted, #94a3b8)',
-              }}>
-                <span title="Quotes created this calendar month">
-                  Quotes this month:{' '}
-                  <b style={{ color: 'var(--text, #f1f5f9)' }}>{monthQuotesByUser[r.id] || 0}</b>
-                </span>
-                <span title="Quotes won this calendar month">
-                  Won:{' '}
-                  <b style={{ color: (monthWonByUser[r.id] || 0) > 0 ? 'var(--success, #10B981)' : 'var(--text, #f1f5f9)' }}>
-                    {monthWonByUser[r.id] || 0}
-                  </b>
-                </span>
               </div>
               <div className="lead-rep-foot">
                 <MapPin size={11} />
