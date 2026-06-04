@@ -29,6 +29,13 @@ import { Loader } from '@googlemaps/js-api-loader'
 import { MapPin, ChevronDown, ChevronUp, Calendar, AlertCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { istTodayISO } from '../../utils/istDate'
+// Phase 112 (2026-06-04) — same filtered-km helpers the admin
+// /admin/gps map uses (gpsDistance.js comment line 34 always
+// intended RepMapPanel to use these). summariseTrack = the
+// accuracy/drift/speed-filtered km; cleanTrack = the cleaned
+// polyline. Pure functions, already used by GpsTrackV2 +
+// TaDaRequestPanel. No money/score/save path touched.
+import { summariseTrack, cleanTrack } from '../../utils/gpsDistance'
 
 // ─── Constants ────────────────────────────────────────────────────
 // Vadodara HQ fallback when rep has zero pins + zero meetings.
@@ -93,7 +100,11 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
   const [meetings, setMeetings] = useState([])  // { id, lat, lng, ts, outcome, kind, lead_id, company, name }
-  const [trackPts, setTrackPts] = useState([])  // [{ lat, lng, t }]
+  // Phase 112 — raw pings in state; trackPts (polyline) + trackKm
+  // (header) DERIVE from these via the same gpsDistance.js helpers
+  // the admin map uses, so the rep sees the identical filtered
+  // number + cleaned line, not a raw jitter sum.
+  const [rawPings, setRawPings] = useState([])  // [{ lat, lng, captured_at, accuracy_m }]
   const [mapReady, setMapReady] = useState(false)
 
   const mapElRef    = useRef(null)
@@ -115,25 +126,39 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
       try {
         const fromIso = dayStartIso(dateYmd)
         const toIso   = dayEndIso(dateYmd)
-        const [actRes, pingRes] = await Promise.all([
-          supabase.from('lead_activities')
-            .select('id, created_at, activity_type, outcome, gps_lat, gps_lng, lead:lead_id(id, name, company)')
-            .eq('created_by', userId)
-            .in('activity_type', ['meeting', 'site_visit'])
-            .gte('created_at', fromIso)
-            .lte('created_at', toIso)
-            .order('created_at', { ascending: true }),
-          supabase.from('gps_pings')
-            .select('lat, lng, captured_at')
+        // Meeting pins — lead_activities (single query).
+        const actRes = await supabase.from('lead_activities')
+          .select('id, created_at, activity_type, outcome, gps_lat, gps_lng, lead:lead_id(id, name, company)')
+          .eq('created_by', userId)
+          .in('activity_type', ['meeting', 'site_visit'])
+          .gte('created_at', fromIso)
+          .lte('created_at', toIso)
+          .order('created_at', { ascending: true })
+        if (cancelled) return
+        if (actRes.error) throw actRes.error
+
+        // GPS track — paginate ALL pings (1000/page) exactly like the
+        // admin /admin/gps map, so a long field day (>2000 pings) isn't
+        // truncated. accuracy_m selected so summariseTrack's accuracy
+        // filter matches the admin number.
+        const PAGE = 1000
+        let pFrom = 0
+        const allPings = []
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { data, error } = await supabase.from('gps_pings')
+            .select('id, lat, lng, captured_at, accuracy_m')
             .eq('user_id', userId)
             .gte('captured_at', fromIso)
             .lte('captured_at', toIso)
             .order('captured_at', { ascending: true })
-            .limit(2000),
-        ])
-        if (cancelled) return
-        if (actRes.error) throw actRes.error
-        if (pingRes.error) throw pingRes.error
+            .range(pFrom, pFrom + PAGE - 1)
+          if (cancelled) return
+          if (error) throw error
+          if (data && data.length) allPings.push(...data)
+          if (!data || data.length < PAGE) break
+          pFrom += PAGE
+        }
 
         const ms = (actRes.data || [])
           .filter(a => a.gps_lat != null && a.gps_lng != null
@@ -152,11 +177,13 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
           }))
         setMeetings(ms)
 
-        const pts = (pingRes.data || [])
-          .filter(p => p.lat != null && p.lng != null)
-          .map(p => ({ lat: Number(p.lat), lng: Number(p.lng), t: p.captured_at }))
-          .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
-        setTrackPts(pts)
+        // Keep finite lat/lng raw pings; summariseTrack + cleanTrack
+        // apply the accuracy / drift / speed filters downstream.
+        const rawRows = allPings.filter(p =>
+          p.lat != null && p.lng != null
+          && Number.isFinite(Number(p.lat))
+          && Number.isFinite(Number(p.lng)))
+        setRawPings(rawRows)
       } catch (e) {
         if (!cancelled) setError(e?.message || 'Failed to load map data')
       } finally {
@@ -165,6 +192,22 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
     })()
     return () => { cancelled = true }
   }, [userId, dateYmd])
+
+  // ─── Derive cleaned polyline + filtered km (SAME as admin map) ──
+  // trackPts = cleanTrack(rawPings): drops accuracy outliers + drift
+  //   + speed spikes so the line follows real movement (matches
+  //   /admin/gps), instead of zig-zagging through GPS jitter.
+  // trackKm  = summariseTrack(rawPings).km: the accuracy/drift/speed-
+  //   filtered km (Phase 98.D thresholds, compute_daily_ta-aligned),
+  //   so the rep's number == the admin map number. Pure derive — no
+  //   money/score/save path touched.
+  const trackPts = useMemo(
+    () => cleanTrack(rawPings).map(p => ({
+      lat: Number(p.lat), lng: Number(p.lng), t: p.captured_at,
+    })),
+    [rawPings],
+  )
+  const trackKm = useMemo(() => Number(summariseTrack(rawPings).km), [rawPings])
 
   // ─── Mount Google Maps once (when card opens, container in DOM) ─
   useEffect(() => {
@@ -354,23 +397,8 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
   }, [meetings, trackPts, mapReady])
 
   // ─── Counts for header chip ───────────────────────────────────
+  // trackKm is derived above (summariseTrack — same as admin map).
   const meetingCount = meetings.length
-  const trackKm = useMemo(() => {
-    if (trackPts.length < 2) return 0
-    // Crude great-circle sum so we don't need to wait for Roads API.
-    const R = 6371
-    let km = 0
-    for (let i = 1; i < trackPts.length; i++) {
-      const a = trackPts[i - 1], b = trackPts[i]
-      const dLat = (b.lat - a.lat) * Math.PI / 180
-      const dLng = (b.lng - a.lng) * Math.PI / 180
-      const la1 = a.lat * Math.PI / 180
-      const la2 = b.lat * Math.PI / 180
-      const x = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2
-      km += 2 * R * Math.asin(Math.sqrt(x))
-    }
-    return km
-  }, [trackPts])
 
   const isToday = dateYmd === istTodayISO()
   const headerLabel = isToday ? 'Today on the map' : `Map · ${dateYmd}`
@@ -433,7 +461,7 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
           </span>
           <span style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', marginTop: 2, display: 'block' }}>
             {loading ? 'Loading…' : (
-              meetingCount > 0 || trackPts.length > 0
+              meetingCount > 0 || rawPings.length > 0
                 ? `${meetingCount} meeting${meetingCount === 1 ? '' : 's'} · ${trackKm.toFixed(1)} km`
                 : 'No activity yet'
             )}
@@ -507,7 +535,7 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
           )}
 
           {/* Empty hint */}
-          {!loading && !error && meetingCount === 0 && trackPts.length === 0 && (
+          {!loading && !error && meetingCount === 0 && rawPings.length === 0 && (
             <div style={{
               padding: '14px 16px',
               borderTop: '1px solid var(--v2-line)',
