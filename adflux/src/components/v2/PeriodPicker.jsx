@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
 import {
-  monthPeriod, rangePeriod, thisMonth, shiftMonth, isFutureMonth,
+  monthPeriod, rangePeriod, thisMonth, shiftPeriod, canShiftNext,
   presetToday, presetYesterday, presetLastNDays,
   presetThisMonth, presetLastMonth, presetThisQuarter,
 } from '../../utils/period'
@@ -59,7 +59,7 @@ export function PeriodPicker({ period, onChange }) {
     pick(rangePeriod(draftStart, draftEnd))
   }
 
-  const canGoNext = !isFutureMonth(shiftMonth(period, +1))
+  const canGoNext = canShiftNext(period)
 
   return (
     <div
@@ -70,8 +70,9 @@ export function PeriodPicker({ period, onChange }) {
       aria-label="Period"
     >
       <button
-        aria-label="Previous month"
-        onClick={() => onChange(shiftMonth(period, -1))}
+        aria-label="Previous period"
+        title="Previous period"
+        onClick={() => onChange(shiftPeriod(period, -1))}
       >
         <ChevronLeft size={14} />
       </button>
@@ -89,10 +90,10 @@ export function PeriodPicker({ period, onChange }) {
       </button>
 
       <button
-        aria-label="Next month"
-        onClick={() => onChange(shiftMonth(period, +1))}
+        aria-label="Next period"
+        onClick={() => onChange(shiftPeriod(period, +1))}
         disabled={!canGoNext}
-        title={canGoNext ? 'Next month' : 'Already at current month'}
+        title={canGoNext ? 'Next period' : 'Already at the latest period'}
       >
         <ChevronRight size={14} />
       </button>

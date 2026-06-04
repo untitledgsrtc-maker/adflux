@@ -127,6 +127,35 @@ export function isFutureMonth(period) {
   return period.startIso > now.startIso
 }
 
+// Phase 112.6 (2026-06-04) — span-aware step for the PeriodPicker
+// arrows. Month periods step by a whole month (admin/sales month
+// dashboards — IDENTICAL to the old shiftMonth behaviour). Range
+// periods step by their OWN length, so a single-day "Today" view
+// steps day-by-day (the Team dashboard default) and "Last 7 days"
+// steps by 7-day blocks — instead of every arrow jumping to a whole
+// month regardless of the current view.
+export function shiftPeriod(period, delta) {
+  if (period.kind === 'month') return shiftMonth(period, delta)
+  const [sy, sm, sd] = period.startIso.split('-').map(Number)
+  const [ey, em, ed] = period.endIso.split('-').map(Number)   // exclusive
+  const startMs   = new Date(sy, sm - 1, sd).getTime()
+  const endExclMs = new Date(ey, em - 1, ed).getTime()
+  const spanDays  = Math.max(1, Math.round((endExclMs - startMs) / 86400000))
+  const ns = new Date(sy, sm - 1, sd + delta * spanDays)                              // new start
+  const ne = new Date(ns.getFullYear(), ns.getMonth(), ns.getDate() + spanDays - 1)   // new end (inclusive)
+  return rangePeriod(isoDate(ns), isoDate(ne))
+}
+
+// Can the picker step FORWARD without entering a fully-future window?
+// Replaces the month-only isFutureMonth check on the next-arrow so a
+// day/range view also stops at today. Month view: next month's start
+// > today → disabled (same as before). Day view: tomorrow > today →
+// disabled.
+export function canShiftNext(period) {
+  const next = shiftPeriod(period, +1)
+  return next.startIso <= isoDate(new Date())
+}
+
 // Presets — all return period objects ready to drop into setPeriod.
 export function presetToday() {
   const today = isoDate(new Date())
