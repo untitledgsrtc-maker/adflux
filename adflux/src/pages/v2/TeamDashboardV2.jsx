@@ -1026,9 +1026,6 @@ export default function TeamDashboardV2() {
   }, [callsByUser])
 
   // Phase 31E — total voice logs across the team, today.
-  const totalVoiceToday = useMemo(() => {
-    return Object.values(voiceByUser).reduce((s, n) => s + n, 0)
-  }, [voiceByUser])
 
   if (!isPrivileged) {
     return (
@@ -1104,7 +1101,6 @@ export default function TeamDashboardV2() {
         <div className="lead-hero-stats">
           <HeroStat label="Reps active now"   value={`${live} / ${reps.length}`}   delta={`${reps.length - live} not checked-in`} down={live < reps.length} />
           <HeroStat label="Calls today"       value={totalCallsToday}             delta="from call_logs"                          up={totalCallsToday > 0} />
-          <HeroStat label="Voice logs"        value={totalVoiceToday}              delta={totalVoiceToday > 0 ? 'recorded today' : 'none yet today'}  acc />
           <HeroStat label="New leads added"   value={newLeadsToday}                delta="today"                                   up={newLeadsToday > 0} />
           <HeroStat label="Won today"         value={formatLakh(pipelineToday)}    delta="status=won"                              up={pipelineToday > 0} />
         </div>
@@ -1248,18 +1244,14 @@ export default function TeamDashboardV2() {
                     </span>
                   </div>
                 </div>
-                <div className="lead-rep-kpi">
-                  {/* Phase 31E — wired to voiceByUser instead of literal 0. */}
-                  <div className={`num ${(voiceByUser[r.id] || 0) > 0 ? 'acc' : ''}`}>
-                    {voiceByUser[r.id] || 0}
-                  </div>
-                  <div className="lbl">Voice</div>
-                </div>
-                {/* Phase 93.5 (25 May 2026) — TC-only: Overdue F-up
-                    tile in row 1 beside Voice (owner directive).
-                    Row 2 now holds only F-up + Connect rate. Non-TC
-                    rows unaffected — row 1 stays as Meet/Calls/Voice. */}
-                {isTC && (() => {
+                {/* Phase 112.1 (2026-06-04) — Voice tile dropped per
+                    owner directive ("i dont need voice in dashboard").
+                    Overdue F-up now shows for ALL reps (was TC-only,
+                    Phase 93.5), so row 1 = Meet · Calls · Overdue F-up
+                    (sales) / Calls · Overdue F-up (TC, Meet hidden).
+                    overdueFuByUser is computed role-agnostically above
+                    — no new query. */}
+                {(() => {
                   const overdueFu = overdueFuByUser[r.id] || 0
                   const odCls = overdueFu === 0 ? '' : overdueFu >= 5 ? 'dng' : 'warn'
                   return (
@@ -1304,7 +1296,7 @@ export default function TeamDashboardV2() {
                   <div className="lead-rep-kpis" style={{ marginTop: 6 }}>
                     <div className="lead-rep-kpi">
                       <div className={`num ${fuCls}`}>{fuDone}/{fuDone + fuPending}</div>
-                      <div className="lbl">F-up</div>
+                      <div className="lbl">Today F-up</div>
                     </div>
                     {isTC ? (
                       <div className="lead-rep-kpi">
