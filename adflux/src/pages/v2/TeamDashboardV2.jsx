@@ -1233,7 +1233,19 @@ export default function TeamDashboardV2() {
           const callPct = callsTarget > 0
             ? Math.round((connHere / callsTarget) * 100)
             : 0
-          const cls = callPct >= 80 ? '' : callPct >= 50 ? 'warn' : 'dng'
+          // Phase 112.4 (2026-06-04) — role-aware "work line" + 2nd tile.
+          // Field sales don't make calls, so the call-% progress bar sat
+          // at 0 ("not going ahead") and the Calls tile read 0/20. Sales
+          // now tracks LEADS (2nd tile) + MEETINGS (the bar) — their real
+          // day. TC keeps Calls + call-% bar (calls ARE their job).
+          const leadsHere    = Number(counters.new_leads || 0)
+          const leadsTarget  = isTC ? 0 : (usersJsonbTargets.new_leads || 10)
+          const meetingsHere = Number(counters.meetings || 0)
+          const meetPct = meetingsTarget > 0
+            ? Math.round((meetingsHere / meetingsTarget) * 100)
+            : 0
+          const barPct = isTC ? callPct : meetPct
+          const barCls = barPct >= 80 ? '' : barPct >= 50 ? 'warn' : 'dng'
           return (
             <div
               className={`lead-rep-card ${isLive ? 'live' : ''}`}
@@ -1282,17 +1294,28 @@ export default function TeamDashboardV2() {
                     <div className="lbl">Meet</div>
                   </div>
                 )}
-                <div className="lead-rep-kpi" title="Connected / target · total tel-taps">
-                  <div className={`num ${callPct >= 80 ? 'suc' : callPct >= 50 ? '' : 'dng'}`}>
-                    {connHere}/{callsTarget}
+                {/* Phase 112.4 — TC: Calls (connected/target · total).
+                    Sales: Leads today / target (field reps don't call). */}
+                {isTC ? (
+                  <div className="lead-rep-kpi" title="Connected / target · total tel-taps">
+                    <div className={`num ${callPct >= 80 ? 'suc' : callPct >= 50 ? '' : 'dng'}`}>
+                      {connHere}/{callsTarget}
+                    </div>
+                    <div className="lbl">
+                      Calls
+                      {' '}<span style={{ color: 'var(--v2-ink-2, #94a3b8)', fontSize: 9 }}>
+                        · {callsHere} total
+                      </span>
+                    </div>
                   </div>
-                  <div className="lbl">
-                    Calls
-                    {' '}<span style={{ color: 'var(--v2-ink-2, #94a3b8)', fontSize: 9 }}>
-                      · {callsHere} total
-                    </span>
+                ) : (
+                  <div className="lead-rep-kpi" title="New leads added today / target">
+                    <div className={`num ${leadsHere >= leadsTarget ? 'suc' : leadsHere === 0 ? 'dng' : ''}`}>
+                      {leadsHere}/{leadsTarget}
+                    </div>
+                    <div className="lbl">Leads</div>
                   </div>
-                </div>
+                )}
                 {/* Phase 112.1 (2026-06-04) — Voice tile dropped per
                     owner directive ("i dont need voice in dashboard").
                     Overdue F-up now shows for ALL reps (was TC-only,
@@ -1484,8 +1507,10 @@ export default function TeamDashboardV2() {
                   </div>
                 )
               })()}
+              {/* Phase 112.4 — "work line" = meetings progress for sales
+                  (was call-% → stuck at 0 for field reps), calls for TC. */}
               <div className="lead-rep-progress">
-                <span className={cls} style={{ width: `${Math.min(callPct, 100)}%` }} />
+                <span className={barCls} style={{ width: `${Math.min(barPct, 100)}%` }} />
               </div>
               <div className="lead-rep-foot">
                 <MapPin size={11} />
