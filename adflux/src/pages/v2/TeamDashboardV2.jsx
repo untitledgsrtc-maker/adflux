@@ -31,7 +31,7 @@ import { formatCurrency } from '../../utils/formatters'
 // Phase 82 — date filter + per-rep follow-up/quote/payment KPIs.
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import AdminPushModal from '../../components/v2/AdminPushModal'
-import { presetToday } from '../../utils/period'
+import { presetToday, thisMonth } from '../../utils/period'
 
 // Phase 87.6 — avatar marker helpers. Owner directive 24 May 2026:
 // reference Pimpri-Chinchwad map pin with profile pic. Renders the
@@ -257,6 +257,11 @@ export default function TeamDashboardV2() {
   // TC cards (fill the 2 cells freed by hiding Meet + Quote/Pay-chase).
   const [qualifiedByUser,    setQualifiedByUser]    = useState({})
   const [callbacksDueByUser, setCallbacksDueByUser] = useState({})
+  // Phase 112.5 (2026-06-04) — per-rep monthly quote production, this
+  // CALENDAR month (independent of the date filter above). Owner wants
+  // "total quote this month / won this month" visible per employee.
+  const [monthQuotesByUser,  setMonthQuotesByUser]  = useState({})
+  const [monthWonByUser,     setMonthWonByUser]     = useState({})
   // Phase 89.10 — flag that flips true once the Google Map mounts.
   // Marker render effects depend on mapRef.current + map.__google
   // both being non-null; refs don't trigger React re-runs, so
@@ -289,8 +294,13 @@ export default function TeamDashboardV2() {
         d.setUTCDate(d.getUTCDate() + 2)
         return d.toISOString().slice(0, 10)
       })()
+      // Phase 112.5 — current calendar month window for the per-rep
+      // "quotes this month / won this month" line. Independent of the
+      // date filter (always the live month).
+      const monthStartIso = thisMonth().startIso
+      const monthEndIso   = thisMonth().endIso
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes, qualifiedRes, callbacksRes] = await Promise.all([
+      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes, qualifiedRes, callbacksRes, monthQuotesRes, monthWonRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -451,6 +461,20 @@ export default function TeamDashboardV2() {
           .eq('is_done', false)
           .gte('follow_up_date', today)
           .lte('follow_up_date', cbEnd),
+
+        // Phase 112.5 — quotes CREATED this calendar month, per
+        // created_by (count = "quotes this month").
+        supabase.from('quotes')
+          .select('created_by')
+          .gte('created_at', monthStartIso)
+          .lt ('created_at', monthEndIso),
+        // Phase 112.5 — quotes WON this calendar month, per created_by.
+        // won-date proxied by updated_at (quotes has no won_at — §33).
+        supabase.from('quotes')
+          .select('created_by')
+          .eq('status', 'won')
+          .gte('updated_at', monthStartIso)
+          .lt ('updated_at', monthEndIso),
       ])
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
@@ -571,6 +595,21 @@ export default function TeamDashboardV2() {
         cbMap[r.assigned_to] = (cbMap[r.assigned_to] || 0) + 1
       })
       setCallbacksDueByUser(cbMap)
+
+      // Phase 112.5 — per-rep monthly quote counts.
+      const mqMap = {}
+      ;(monthQuotesRes?.data || []).forEach((q) => {
+        if (!q.created_by) return
+        mqMap[q.created_by] = (mqMap[q.created_by] || 0) + 1
+      })
+      setMonthQuotesByUser(mqMap)
+
+      const mwMap = {}
+      ;(monthWonRes?.data || []).forEach((q) => {
+        if (!q.created_by) return
+        mwMap[q.created_by] = (mwMap[q.created_by] || 0) + 1
+      })
+      setMonthWonByUser(mwMap)
 
       // Phase 62.9 — load push subscriptions per rep. Used to render
       // the "Push on/off" + "Online" status pills below the KPI row.
@@ -1511,6 +1550,24 @@ export default function TeamDashboardV2() {
                   (was call-% → stuck at 0 for field reps), calls for TC. */}
               <div className="lead-rep-progress">
                 <span className={barCls} style={{ width: `${Math.min(barPct, 100)}%` }} />
+              </div>
+              {/* Phase 112.5 — per-rep monthly quote production (this
+                  calendar month, independent of the date filter). */}
+              <div style={{
+                display: 'flex', gap: 14, alignItems: 'center',
+                padding: '6px 0 0', fontSize: 11.5,
+                color: 'var(--text-muted, #94a3b8)',
+              }}>
+                <span title="Quotes created this calendar month">
+                  Quotes this month:{' '}
+                  <b style={{ color: 'var(--text, #f1f5f9)' }}>{monthQuotesByUser[r.id] || 0}</b>
+                </span>
+                <span title="Quotes won this calendar month">
+                  Won:{' '}
+                  <b style={{ color: (monthWonByUser[r.id] || 0) > 0 ? 'var(--success, #10B981)' : 'var(--text, #f1f5f9)' }}>
+                    {monthWonByUser[r.id] || 0}
+                  </b>
+                </span>
               </div>
               <div className="lead-rep-foot">
                 <MapPin size={11} />
