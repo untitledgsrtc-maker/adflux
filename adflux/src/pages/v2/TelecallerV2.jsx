@@ -46,6 +46,7 @@ import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 // audit + post-call outcome capture + auto-refresh.
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import { logCallAudit } from '../../utils/callAudit'
+import { markCallStart } from '../../utils/callTimer'
 import { dialPhone } from '../../utils/openExternal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
@@ -449,6 +450,7 @@ export default function TelecallerV2() {
     setCallLead(lead)
     dialPhone(phone)
     logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
+    markCallStart(lead.id)   // Phase 116 — arm the time-away duration fallback
     setTimeout(async () => {
       const { data: actRow, error: insErr } = await supabase
         .from('lead_activities')

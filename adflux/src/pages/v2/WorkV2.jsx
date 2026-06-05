@@ -62,6 +62,7 @@ import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { useLeadTasks } from '../../hooks/useLeadTasks'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { logCallAudit } from '../../utils/callAudit'
+import { markCallStart } from '../../utils/callTimer'
 import { dialPhone } from '../../utils/openExternal'
 import { istTodayISO, istTodayPlusDays } from '../../utils/istDate'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
@@ -677,6 +678,7 @@ export default function WorkV2() {
     // lead_activities row. Helper swallows errors; never blocks the
     // dialer hand-off.
     logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
+    markCallStart(lead.id)   // Phase 116 — arm the time-away duration fallback
     setTimeout(async () => {
       const { data: actRow, error: insErr } = await supabase
         .from('lead_activities')

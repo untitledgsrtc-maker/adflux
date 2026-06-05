@@ -76,25 +76,39 @@ export async function lookupCall({ phone, sinceMs, windowMinutes = 60 }) {
  */
 export async function fetchAndPatchCallDuration({
   userId, leadId, phone, telTapMs, activityId, onlyIfMissing = false,
+  fallbackSeconds = null,
 }) {
-  if (!Capacitor.isNativePlatform()) return null
-  if (!userId || !leadId || !phone || !telTapMs) return null
+  if (!userId || !leadId) return null
 
-  // Phase 56i — the Java plugin's `sinceTimestamp + windowMinutes`
-  // window is FORWARD-looking. The call we want already ended before
-  // the modal save fired, so we need to point the window 60 min
-  // BACKWARD from now. Shift the lower bound back by one hour; the
-  // plugin's default 60-min window then yields [now-60min, now]
-  // which catches the just-finished call. Previous behaviour
-  // (sinceMs = telTapMs = Date.now()) queried [now, now+60min] and
-  // never matched anything — that's why duration_seconds stayed
-  // NULL for every rep call.
-  const lookbackMs = telTapMs - 60 * 60_000
-  const result = await lookupCall({ phone, sinceMs: lookbackMs })
-  if (!result || !result.found) return null
+  // 1. Device CallLog — PRIMARY source (native build + granted
+  //    READ_CALL_LOG). Phase 56i — the Java plugin's
+  //    `sinceTimestamp + windowMinutes` window is FORWARD-looking and
+  //    the call already ended before the modal save fired, so point the
+  //    window 60 min BACKWARD: lookbackMs = telTapMs - 1h yields
+  //    [now-60min, now], catching the just-finished call. (The old
+  //    sinceMs = Date.now() queried [now, now+60min] and never matched
+  //    — that's why duration_seconds stayed NULL.)
+  let duration = null
+  if (Capacitor.isNativePlatform() && phone && telTapMs) {
+    const lookbackMs = telTapMs - 60 * 60_000
+    const result = await lookupCall({ phone, sinceMs: lookbackMs })
+    if (result && result.found) {
+      const d = Number(result.durationSeconds)
+      if (Number.isFinite(d) && d >= 0) duration = d
+    }
+  }
 
-  const duration = Number(result.durationSeconds) || 0
-  if (duration < 0) return null
+  // 2. Phase 116 — in-app "time away from app" fallback (callTimer.js).
+  //    Used ONLY when the device read produced nothing (web/PWA, no
+  //    permission, plugin missing, or number-match miss). Device
+  //    duration ALWAYS wins. Capped [5, 1800]s: under 5s = misdial,
+  //    over 30 min = app left open / distraction.
+  if (duration === null && fallbackSeconds != null) {
+    const fb = Math.round(Number(fallbackSeconds))
+    if (Number.isFinite(fb) && fb >= 5 && fb <= 1800) duration = fb
+  }
+
+  if (duration === null) return null // nothing reliable to write
 
   // Phase 56j — patch BOTH tables in parallel.
   //   • call_logs: audit row written by callAudit at tel-tap time.
@@ -107,7 +121,7 @@ export async function fetchAndPatchCallDuration({
   // pass onlyIfMissing=false (default) — it has the freshest read and
   // can overwrite freely. This eliminates the race between the timer
   // and the modal save.
-  const cutoff = new Date(telTapMs - 60 * 60_000).toISOString()
+  const cutoff = new Date((Number(telTapMs) || Date.now()) - 60 * 60_000).toISOString()
   // Phase 102.B (2026-05-29) — only patch duration onto rows that
   // already represent a real conversation. PostCallOutcomeModal flips
   // the row's outcome to 'connected' / 'callback_requested' right

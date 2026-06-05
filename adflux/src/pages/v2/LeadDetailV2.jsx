@@ -51,6 +51,7 @@ import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { logCallAudit } from '../../utils/callAudit'
+import { markCallStart } from '../../utils/callTimer'
 import { openExternalUrl } from '../../utils/openExternal'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
@@ -387,6 +388,7 @@ export default function LeadDetailV2() {
     // — never blocks the modal chain.
     if (activityType === 'call') {
       logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
+      markCallStart(lead.id)   // Phase 116 — arm the time-away duration fallback
     }
     // Phase 34Z.49 — capture the inserted row id so the post-call
     // outcome modal can patch outcome onto the SAME row instead of

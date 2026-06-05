@@ -31,6 +31,7 @@ import { toastError, toastSuccess } from '../v2/Toast'
 // Phase 56c — auto-fetch real call duration from Android CallLog
 // after the modal save. No-op on web.
 import { fetchAndPatchCallDuration } from '../../utils/callLogReader'
+import { getCallElapsed } from '../../utils/callTimer'
 // Phase 96.0 (2026-05-27) — schedule an AlarmManager-backed
 // LocalNotification on the device when the rep saves a follow-up.
 // OEM-immune (Vivo / Xiaomi / Realme can't kill an AlarmManager).
@@ -570,6 +571,10 @@ export default function PostCallOutcomeModal({
           phone:      lead.phone,
           telTapMs:   Date.now(),
           activityId: pendingActivityId || null,
+          // Phase 116 — in-app time-away fallback (callTimer). Used only
+          // if the device CallLog read finds nothing; capped + connected-
+          // only inside fetchAndPatchCallDuration.
+          fallbackSeconds: getCallElapsed(lead.id),
         }).then((dur) => {
           if (dur != null) console.info('[call-log] patched duration', dur, 's')
         }).catch(() => { /* swallowed; permission deny is normal */ })
