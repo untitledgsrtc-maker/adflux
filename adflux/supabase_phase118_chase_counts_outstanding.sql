@@ -14,6 +14,12 @@
 -- Existing callers that read quote_chase / pay_chase are unaffected
 -- (extra column is ignored by positional/by-name reads).
 
+-- Phase 118 — adding the 3rd OUT column (pay_outstanding) CHANGES the
+-- return type, so CREATE OR REPLACE alone errors 42P13. DROP first.
+-- Safe: callers resolve the RPC at call time; REVOKE/GRANT re-applied
+-- below; nothing depends on the old signature.
+DROP FUNCTION IF EXISTS public.my_chase_counts();
+
 CREATE OR REPLACE FUNCTION public.my_chase_counts()
 RETURNS TABLE(quote_chase int, pay_chase int, pay_outstanding numeric)
 LANGUAGE sql
