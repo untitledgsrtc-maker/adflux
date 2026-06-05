@@ -28,7 +28,7 @@
 // On save success, calls onSaved(newLeadId) so the parent can navigate
 // to the lead if they want, or just close and refresh counters.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, MapPin, Loader2, Building2, Camera } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -108,6 +108,15 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
   const [gps, setGps]         = useState(null)   // {lat, lng, acc}
   const [gpsBusy, setGpsBusy] = useState(false)
   const [saving, setSaving]   = useState(false)
+  // Phase 113.2 (5 Jun 2026) — SYNCHRONOUS re-entrancy latch. The
+  // `saving` STATE guard alone can't stop ghost-clicks: a single Save
+  // on the WebView fired handleSave 5x within 84ms (kirti, 5 Jun —
+  // 5 duplicate "KN University" leads), and React state doesn't flip
+  // until a re-render, so all 5 calls read saving=false and each
+  // created a new lead. savingRef flips NOW (before the first await),
+  // so re-entrant calls 2..n bail. Same pattern as Phase 68.2's
+  // WhatsAppSendModal fix.
+  const savingRef = useRef(false)
   const [error, setError]     = useState('')
   // Phase 33D.5 — post-save WhatsApp prompt. After successful save we
   // stash the new lead row here and render WhatsAppPromptModal on top.
@@ -207,7 +216,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
   }
 
   async function handleSave() {
-    if (saving) return
+    if (savingRef.current || saving) return
     setError('')
     if (!company.trim()) { fail('Company / shop name is required.'); return }
     if (!contact.trim()) { fail('Person name is required — who did you meet?'); return }
@@ -230,6 +239,12 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
       return
     }
     const oc = OUTCOMES.find(o => o.value === outcome)
+    // Phase 113.2 — latch synchronously, AFTER validation, BEFORE the
+    // first await (findLeadByPhone below). Validation-fail returns
+    // above never reach here, so a failed save never locks the button.
+    // Re-entrant ghost-clicks that slip past the state guard bail here.
+    if (savingRef.current) return
+    savingRef.current = true
     setSaving(true)
 
     // Phase 33D.6 — duplicate check by phone. If the rep just walked
@@ -255,6 +270,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
       // background + close modal immediately so the rep perceives
       // the save as instant. On error, toastError surfaces async.
       setSaving(false)
+      savingRef.current = false   // Phase 113.2 — release latch
       onSaved?.(dup.id)
       setSavedLead({ id: dup.id, name: dup.name, company: dup.company, phone, segment: 'PRIVATE' })
       ;(async () => {
@@ -310,6 +326,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
 
     if (leadErr) {
       setSaving(false)
+      savingRef.current = false   // Phase 113.2 — release latch
       setError('Could not create lead: ' + leadErr.message)
       return
     }
@@ -344,6 +361,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
     // (both await) to ~200ms (lead RTT only). Failure path toasts
     // async; rep can re-log from the lead detail timeline.
     setSaving(false)
+    savingRef.current = false   // Phase 113.2 — release latch
     // Phase 35 PR 2.5 — skip the WhatsApp prompt; fire onSaved with
     // the new lead id + close. Parent (WorkV2) navigates to the lead
     // detail page so the rep lands on the row they just created
