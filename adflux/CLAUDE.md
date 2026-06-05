@@ -2406,3 +2406,122 @@ guide was given in chat 2 Jun (the copy-paste request to edigiexpert).
   a real Meta test payload before it touches a live lead.
 - Do NOT touch any existing flow/file or add load to a hot path (§45).
 
+
+---
+
+## 47 · Phase 113 — duplicate-lead ghost-click bug CLOSED + score/counter fixes (2026-06-05)
+
+Owner reported a rep card showing "5 meetings / 6 leads" when the rep did
+1 meeting. Root-caused to a re-entrancy bug + two stored-counter / score
+drifts. Full future-proof shipped. Owner directive throughout: "full
+futureproof solution, not a patch; app is live for my team, other
+functions must not be affected" (§45).
+
+### The disease — WebView ghost-click re-entrancy (the dup-lead root cause)
+A single Save tap on the Capacitor WebView fires the modal's `handleSave`
+**multiple times within one event-loop tick** (kirti: 5 lead inserts in
+**84ms** — confirmed from `created_at`). The guard was React STATE
+(`if (saving) return`); state doesn't flip until a re-render, so all N
+calls read `saving=false` and each creates a lead. The Phase 68.2
+same-minute unique index can't catch it (each dup lead has a DIFFERENT new
+`lead_id`); the lead-dedup can't collapse it (different leads).
+
+### FROZEN CONTRACT (NEW) — every save modal that inserts leads/activities
+MUST use the **synchronous `useRef` latch**, not just `if (saving) return`:
+```
+const savingRef = useRef(false)
+async function handleSave() {
+  if (savingRef.current || saving) return          // top guard
+  ...synchronous validation (return = no latch set, no lock-up)...
+  // before the FIRST await that leads to an insert:
+  if (savingRef.current) return; savingRef.current = true   // re-check ONLY
+  setSaving(true)                                  // needed if an await
+  ...                                              // precedes this point
+  // release on EVERY exit path after the set:
+  setSaving(false); savingRef.current = false
+}
+```
+Already applied (guardian PASS each): `LogMeetingModal` (Phase 113.2,
+`df046ea`), `PostCallOutcomeModal` + `LeadFormV2` (Phase 113.4, `ab10a2a`).
+`WhatsAppSendModal` already had it (Phase 68.2, `sendingRef`). The latch
+is the proven pattern — reuse it; do NOT rely on the `saving` state guard
+alone for any new insert modal.
+
+### Counter drift — `new_leads` (the "6") — FIXED + future-proofed
+`daily_counters.new_leads` is bumped +1 on lead INSERT
+(`trg_lead_after_insert_bump_counter`, phase12) but was NEVER decremented
+on DELETE → drift (same class Phase 103.E.1 fixed for meetings and
+explicitly flagged new_leads as next, its line 41). Phase 113.3
+(`01a3491`, `supabase_phase113_3_new_leads_counter_delete_heal.sql`, RUN +
+trigger confirmed 5 Jun) adds `recompute_daily_new_leads` + an AFTER
+DELETE trigger on `leads` + a 7-day one-time heal. Counter now self-heals
+on any deletion, forever. **Dashboards read this STORED counter; the SCORE
+does NOT (it counts live) — so the drift was display-only, no incentive
+impact.**
+- STILL OPEN (same latent gap, flagged again): the **`calls`** counter has
+  the identical delete-drift (also flagged by 103.E.1). Not fixed yet —
+  its qualified-vs-all-calls semantics must be confirmed before a
+  recompute, to avoid setting it wrong. Next-session candidate.
+
+### Score / incentive fixes (Phase 113, `d0a0923`,
+`supabase_phase113_score_target_and_meeting_fix.sql`)
+ONE `CREATE OR REPLACE compute_daily_score`, function-only (owner chose NO
+backfill — past scores unchanged, today self-corrects on next activity):
+- **#1 TC calls-target**: was read from the dead `users.daily_targets`
+  JSONB (`'calls'=20`, Phase 32m seed); now reads the `daily_targets`
+  TABLE `min_calls` (the 50 every screen shows). `NULLIF(min_calls,0)→
+  COALESCE(.,50)`, NO JSONB fallback (so a TC with no table row gets 50 on
+  both screen + score). A TC was scoring 100% at 20 calls while the ring
+  showed 40% → incentive inflated ~2.5×. Security gates + Phase 110
+  call-count gate byte-preserved.
+- **#2 sales meeting branch**: applies the §33 done-meeting exclusions
+  (`notes NOT LIKE 'Meeting scheduled%'` / `'I''m here · auto-check-in%'`)
+  — closes the §44.8 KNOWN-OPEN; score now in 4-surface lockstep with the
+  counter + GPS-track + evening report. **VERIFY whether the owner has run
+  this SQL** — it's pushed but the Studio paste is manual.
+
+### Notification bell recency cap (Phase 113.1, `e10b44b`)
+`NotificationPanel` re-derived from source tables every open with NO lower
+time bound on overdue follow-ups + breached SLAs → old open items
+re-surfaced on every app launch ("old notification auto visible on open").
+Added a **7-day floor** to those two queries. Admin messages (unread-only)
++ today's due-actions already bounded — untouched. JS-only, live.
+
+### One-time data heals (manual, EXECUTED 5 Jun)
+- kirti `KN University` 5 dup leads → 1. **READ-FIRST flipped the keeper**:
+  one "duplicate" (`e574f3dc`) had grown a real quote + 4 follow-ups +
+  QuoteSent → KEEP it, not the oldest. The original heal file kept the
+  wrong one; corrected as Phase 113.2.1 (`18af447`). Lesson: a "duplicate"
+  can grow real work — NEVER blind-delete by age; check quotes first.
+- Abhinav `sure cure` 2 dup leads → 1 (both Lost, 0 quotes, kept older).
+- Fleet scan (`source='Field Meeting'`, same rep+phone+minute, >1) found
+  only those two bursts. Clean.
+
+### Foot-guns added 2026-06-05 (don't repeat)
+- ❌ `if (saving) return` (React state) as the ONLY guard on an insert
+  modal — can't stop same-tick ghost-clicks. Use the `savingRef` latch.
+- ❌ Pasting a long multi-statement SQL block into Studio in one go — the
+  clipboard truncated a UUID mid-token twice. Run section-by-section;
+  inline UUID lists on ONE line; avoid `BEGIN…COMMIT` wrappers that lose
+  the tail.
+- ❌ `git commit --amend` on a commit the owner ALREADY pushed — creates a
+  non-fast-forward divergence. If it's pushed, land a follow-up commit
+  (did this: 113.2.1), never force-push the owner's branch.
+- ❌ Blind-deleting "duplicate" leads by age — one may carry a quote/work.
+  Read-first (quotes/payments/activities per id) before any lead delete.
+- ❌ Assuming a dashboard count is a live query — many tiles read the
+  STORED `daily_counters` JSONB, which drifts. Check insert-bump +
+  delete-heal before trusting/healing a counter.
+
+### State on origin (HEAD = `ab10a2a`, all pushed 5 Jun)
+```
+ab10a2a Phase 113.4: re-entrancy latch + loader on all save modals
+01a3491 Phase 113.3: new_leads counter delete-heal (mirror 103.E.1)  [SQL RUN]
+18af447 Phase 113.2.1: correct heal-record SQL (keeper = e574f3dc)
+df046ea Phase 113.2: LogMeetingModal latch + kirti heal
+e10b44b Phase 113.1: NotificationPanel 7-day recency cap
+d0a0923 Phase 113: compute_daily_score TC target + meeting exclusions  [SQL: confirm run]
+```
+Pending: confirm the Phase 113 score SQL was run in Studio; the `calls`
+counter delete-heal (sibling of 113.3) when its semantics are confirmed.
+
