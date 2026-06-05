@@ -23,7 +23,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Phone, ArrowRight, MapPin, Clock, Plus, Loader2,
   MessageSquare, ChevronRight, ChevronDown, FileText,
-  PhoneCall, CheckCircle2, Users,
+  PhoneCall, CheckCircle2, Users, Receipt,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -100,6 +100,10 @@ export default function TelecallerV2() {
   const [qualifiedWeeklyTarget, setQualifiedWeeklyTarget] = useState(5)
   const [qualifiedThisWeek, setQualifiedThisWeek] = useState(0)
   const [slaBreachCount, setSlaBreachCount] = useState(0)
+  // Phase 113.13 — quote-chase + pay-chase (parity with the sales card).
+  // TCs close their own deals on the phone, so these now apply.
+  const [quoteChase, setQuoteChase] = useState(0)
+  const [payChase, setPayChase] = useState(0)
   // Phase 43.3 — upcoming callbacks (this rep's open follow_ups due
   // in the next 48 hours, joined to the lead for name + phone).
   const [callbacks, setCallbacks] = useState([])
@@ -271,6 +275,20 @@ export default function TelecallerV2() {
       .eq('work_date', todayDateISO)
       .maybeSingle()
     setTcSession(wsRow || null)
+
+    // Phase 113.13 — quote-chase + pay-chase (parity with the sales card).
+    // Computed by the my_chase_counts() RPC (SECURITY DEFINER) so it works
+    // for a telecaller too: a TC can't read the payments table directly
+    // (payments_sales_read_own is sales-only), so an inline query would
+    // over-count pay-chase. The RPC reads server-side, scoped to the caller's
+    // own quotes, and returns ONLY the two counts (no financial data).
+    ;(async () => {
+      const { data } = await supabase.rpc('my_chase_counts')
+      const row = Array.isArray(data) ? data[0] : data
+      setQuoteChase(row?.quote_chase || 0)
+      setPayChase(row?.pay_chase || 0)
+    })().catch(() => {})
+
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
@@ -882,17 +900,19 @@ export default function TelecallerV2() {
           metrics: the qualified / in-queue / hand-offs that moved off the
           hero footer + callbacks + connected + SLA. */}
       <div className="m-card" style={{
-        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6,
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
         padding: 10, marginBottom: 16,
       }}>
         {[
-          // Phase 113.12 — dropped Hand-offs + SLA tiles: telecallers close
-          // on the phone (no field-sales hand-off), so those hand-off metrics
-          // are meaningless. 4 tiles in a 2x2 grid.
-          { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks', n: callbacks.length,  to: '/follow-ups' },
-          { icon: PhoneCall,     tint: 'var(--success, #10B981)', label: 'Connected', n: connectedToday,    to: null },
-          { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Qualified', n: qualifiedThisWeek, to: '/leads?stage=working' },
-          { icon: Users,         tint: 'var(--accent, #FFE600)',  label: 'In queue',  n: queueOpen,         to: '/leads' },
+          // Phase 113.13 — 6 tiles (3x2): Callbacks / Connected / Qualified /
+          // In queue / Quote chase / Pay chase. (Hand-offs + SLA dropped in
+          // 113.12; Quote/Pay chase added — TCs close their own deals.)
+          { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks',   n: callbacks.length,  to: '/follow-ups' },
+          { icon: PhoneCall,     tint: 'var(--success, #10B981)', label: 'Connected',   n: connectedToday,    to: null },
+          { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Qualified',   n: qualifiedThisWeek, to: '/leads?stage=working' },
+          { icon: Users,         tint: 'var(--accent, #FFE600)',  label: 'In queue',    n: queueOpen,         to: '/leads' },
+          { icon: FileText,      tint: 'var(--blue, #3B82F6)',    label: 'Quote chase', n: quoteChase,        to: '/quotes' },
+          { icon: Receipt,       tint: 'var(--danger, #EF4444)',  label: 'Pay chase',   n: payChase,          to: '/quotes' },
         ].map((c) => {
           const Icon = c.icon
           const empty = !c.n
