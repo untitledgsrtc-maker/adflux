@@ -2679,23 +2679,34 @@ Default `true` keeps `WorkV2` (no-arg) byte-unchanged.
 notifications) mounted on a SHARED page prompts EVERY role, even when
 the visible UI it feeds is role-gated. Gate the hook, not just the UI.
 
-### TC call-count = 50 contract (TelecallerV2)
+### TC call-count = 50 contract (TelecallerV2) — RULE IS >=10s, DO NOT LOOSEN
 
-A "call today" toward the 50 target now counts when
-`outcome IN ('connected','callback_requested') OR duration_seconds>=10`
-(was duration-only). Device call-log duration often never patches in
-(stays NULL) — those connected calls (Yash, Vishal Tea Center) were
-silently dropped, so reps fell short despite connecting. **Outcome is
-the source of truth; the 10s floor is only a fallback for un-modal'd
-tel-taps.** `connectedToday` mirrors the same outcome set (10s floor
-removed) so the connect-rate can never read "5 calls / 0% connected"
-on a NULL-duration day; numerator stays ⊆ the callsToday denominator.
-NOTE: this is `call_logs`, NOT `lead_activities` — the §33 meeting-KPI
-exclusions do not apply here.
+Phase 114 first tried `outcome IN ('connected','callback_requested')
+OR duration_seconds>=10`. **Phase 114.1 REVERTED it.** Owner caught it
+same day: Rima's hero jumped to **183 calls / 183 "connected" (100%)**
+while the day-summary still read the true **49/50**. Why 183 is fake:
+the post-call modal marks almost EVERY call "connected," and duration
+capture is broken (NULL/short on most rows), so OR-ing the outcome in
+counts every tapped-through call regardless of length. "100% connected"
+is the tell — nobody connects 100%.
 
-**Foot-gun:** never gate a "did it happen" counter on
-`duration_seconds` alone — device-reported call duration is unreliable
-(NULL on many Androids). Gate on the rep-entered outcome first.
+**The owner's rule is firm and frozen: a call counts toward the 50
+target ONLY at `duration_seconds >= 10`.** Never gate this on `outcome`
+— outcome is rep-entered and effectively always "connected," so it
+can't filter anything. `connectedToday` likewise stays
+`outcome='connected' AND duration_seconds>=10`.
+
+**The REAL open problem** (Yash 47s showing "—", Vishal): duration
+CAPTURE is broken — a genuine 47s call saves `duration_seconds=NULL`
+to call_logs, so it fails the >=10s gate and the rep falls short. The
+fix is to make the Phase 65 `fetchAndPatchCallDuration` device-call-log
+read RELIABLE (or another capture path), NOT to loosen the count. This
+is unsolved and separate. The 49 itself is suspect-low for the same
+capture reason — but the answer is fix capture, not count by outcome.
+
+**Foot-gun:** do NOT "fix" an undercount by widening the WHERE clause
+to a field that's always-true (outcome) — you trade an undercount for a
+meaningless 100%. Fix the broken INPUT (duration capture) instead.
 
 ### Follow-up hero relabel (FollowUpsV2)
 
