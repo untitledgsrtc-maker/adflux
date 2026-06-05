@@ -254,7 +254,7 @@ export default function GpsTrackV2() {
       //   connectedQualified  qualified AND outcome='connected'
       const breakdown = {
         total: rows.length, missed: 0, noAnswer: 0, short: 0,
-        qualified: 0, connectedQualified: 0, qualifiedOther: 0,
+        qualified: 0, connectedQualified: 0, qualifiedOther: 0, unverifiedConnected: 0,
       }
       for (const r of rows) {
         const d = r.duration_seconds
@@ -278,6 +278,16 @@ export default function GpsTrackV2() {
           } else {
             breakdown.qualifiedOther += 1
           }
+        }
+        // Phase 120 — fraud signal. A lead call the rep MARKED 'connected'
+        // but with no >=10s proof (NULL/short duration) = claimed a
+        // conversation the data can't back (Kirti-style fake logging).
+        // Counted independently of the duration buckets above. Post-116 a
+        // real call gets a timer duration, so a NULL here means no real
+        // call happened.
+        if (r.lead?.id && r.outcome === 'connected'
+            && (r.duration_seconds == null || r.duration_seconds < 10)) {
+          breakdown.unverifiedConnected += 1
         }
       }
       setCallBreakdown(breakdown)
@@ -1096,6 +1106,8 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
                         tone={callBreakdown.connectedQualified > 0 ? 'success' : ''} />
             <RepDayStat label="Other ≥10s (non-lead)" value={callBreakdown.qualifiedOther || 0}
                         tone={callBreakdown.qualifiedOther > 0 ? 'warn' : ''} />
+            <RepDayStat label="Unverified connected" value={callBreakdown.unverifiedConnected || 0}
+                        tone={callBreakdown.unverifiedConnected > 0 ? 'danger' : ''} />
           </div>
         </div>
       )}
