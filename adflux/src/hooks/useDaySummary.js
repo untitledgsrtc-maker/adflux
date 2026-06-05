@@ -98,6 +98,7 @@ export default function useDaySummary({ dateISO } = {}) {
         wsRes, actRes, callRes, leadRes, fuTotalRes, fuDoneRes,
         qSentRes, qWonRes, voiceRes, pingsRes,
         gpsOffRes, netOffRes, forceStopRes, daRes, dtRes,
+        overdueRes, quotesTodayRes, renewalRes, callLeadsRes, chaseRes,
         tomFuRes, tomWsRes,
       ] = await Promise.all([
         // 1) Today's work_sessions row
@@ -112,7 +113,7 @@ export default function useDaySummary({ dateISO } = {}) {
         // schema), not `user_id` — the latter does not exist on this
         // table and the query was silently returning 0 rows.
         supabase.from('lead_activities')
-          .select('id, activity_type, outcome, notes')
+          .select('id, lead_id, activity_type, outcome, notes')
           .eq('created_by', profile.id)
           .gte('created_at', startISO)
           .lte('created_at', endISO),
@@ -153,9 +154,11 @@ export default function useDaySummary({ dateISO } = {}) {
           .eq('assigned_to', profile.id)
           .eq('follow_up_date', targetDate),
 
-        // 5b) follow_ups done by rep today
+        // 5b) follow_ups done by rep today — Phase 118: return lead_id
+        // rows (not just a count) so we can gate "real follow-ups" on a
+        // real call + qualify. data.length = the old done count.
         supabase.from('follow_ups')
-          .select('id', { count: 'exact', head: true })
+          .select('id, lead_id')
           .eq('assigned_to', profile.id)
           .eq('is_done', true)
           .gte('done_at', startISO)
@@ -228,6 +231,45 @@ export default function useDaySummary({ dateISO } = {}) {
           .is('effective_to', null)
           .maybeSingle(),
 
+        // Phase 118 — overdue follow-ups (date < target, still open).
+        supabase.from('follow_ups')
+          .select('id', { count: 'exact', head: true })
+          .eq('assigned_to', profile.id)
+          .eq('is_done', false)
+          .lt('follow_up_date', targetDate),
+
+        // Phase 118 — quotes the rep SENT today (daily, for the score;
+        // the PLAN-vs-ACTUAL "Quotes sent" line stays month-to-date).
+        supabase.from('quotes')
+          .select('id', { count: 'exact', head: true })
+          .eq('created_by', profile.id)
+          .gte('created_at', startISO)
+          .lte('created_at', endISO),
+
+        // Phase 118 — renewals: won quotes whose campaign ends within 30
+        // days (same source as RenewalReminderBanner).
+        supabase.from('quotes')
+          .select('id', { count: 'exact', head: true })
+          .eq('created_by', profile.id)
+          .eq('status', 'won')
+          .gte('campaign_end_date', targetDate)
+          .lte('campaign_end_date', istTodayPlusDays(30)),
+
+        // Phase 118 — lead_ids the rep had a REAL (>=10s) call to today.
+        // Gates "real follow-ups" (done + actually called + qualified).
+        supabase.from('call_logs')
+          .select('lead_id')
+          .eq('user_id', profile.id)
+          .gte('call_at', startISO)
+          .lte('call_at', endISO)
+          .gte('duration_seconds', 10)
+          .not('lead_id', 'is', null),
+
+        // Phase 118 — quote outstanding (count + ₹) via the self-scoped
+        // SECURITY DEFINER RPC (sales-only payments RLS forbids a client
+        // join). Line stays hidden when 0.
+        supabase.rpc('my_chase_counts'),
+
         // Phase 91a — tomorrow preview queries. Only run when
         // targetDate is today; otherwise return empty placeholders
         // (cheap unconditional dispatch is fine since both are
@@ -275,10 +317,73 @@ export default function useDaySummary({ dateISO } = {}) {
       const isTC = role === 'telecaller'
       const planMeetings = Array.isArray(ws?.planned_meetings)
         ? ws.planned_meetings.filter(m => m && (m.client || m.time)).length
-        : (isTC ? 0 : 5)
+        : (isTC ? 0 : 3)   // Phase 118 — owner default 3 (was 5)
       const planCalls = ws?.planned_calls
         ?? (dt?.min_calls ?? (isTC ? 50 : 20))
       const planLeads = ws?.planned_leads ?? 10
+
+      // ─── Phase 118 — Sales Day Summary extras ──────────────────────
+      // Real follow-ups: marked done today AND the lead got a real
+      // (>=10s) call today AND a positive outcome today. A done flag with
+      // no real call doesn't count (owner: "only if they really call and
+      // qualified").
+      const calledLeadIds = new Set(
+        (callLeadsRes.data || []).map(r => r.lead_id).filter(Boolean))
+      const qualifiedLeadIds = new Set(
+        (actRes.data || [])
+          .filter(r => r.outcome === 'positive' && r.lead_id)
+          .map(r => r.lead_id))
+      const doneFu = fuDoneRes.data || []
+      const followUpsReal = doneFu.filter(f =>
+        f.lead_id && calledLeadIds.has(f.lead_id) && qualifiedLeadIds.has(f.lead_id)).length
+
+      // Revisit tiers: for each lead met today (real, non-scheduled,
+      // non-auto-checkin meeting/visit), what visit number is it over the
+      // lead's lifetime. One follow-up query, only when meetings exist.
+      const todayMeetLeadIds = [...new Set(
+        (actRes.data || [])
+          .filter(r => ['meeting', 'site_visit'].includes((r.activity_type || '').toLowerCase())
+            && r.lead_id
+            && !(r.notes || '').startsWith('Meeting scheduled')
+            && !(r.notes || '').startsWith("I'm here"))
+          .map(r => r.lead_id))]
+      const revisitTiers = {}
+      if (todayMeetLeadIds.length > 0) {
+        const { data: priorMeets } = await supabase.from('lead_activities')
+          .select('lead_id, notes')
+          .in('lead_id', todayMeetLeadIds)
+          .in('activity_type', ['meeting', 'site_visit'])
+          .lt('created_at', startISO)
+          .limit(1000)   // Phase 118 — cap (scoped to today's met-leads, tiny in practice; NULL-notes kept via client filter)
+        const priorCount = {}
+        ;(priorMeets || []).forEach(r => {
+          const n = r.notes || ''
+          if (n.startsWith('Meeting scheduled') || n.startsWith("I'm here")) return
+          priorCount[r.lead_id] = (priorCount[r.lead_id] || 0) + 1
+        })
+        todayMeetLeadIds.forEach(lid => {
+          const nth = (priorCount[lid] || 0) + 1
+          if (nth >= 2) revisitTiers[nth] = (revisitTiers[nth] || 0) + 1
+        })
+      }
+
+      // Quote outstanding (won, not fully paid) from the self-scoped RPC.
+      const chase = (chaseRes?.data && chaseRes.data[0]) || {}
+      const quoteOutstandingCount = Number(chase.pay_chase || 0)
+      const quoteOutstandingAmount = Number(chase.pay_outstanding || 0)
+
+      // Weighted DAY SCORE — message-only, NOT salary. Meetings 50 /
+      // real follow-ups 20 / new leads 15 / quotes today 15. Each line =
+      // min(1, actual/target) × weight.
+      const pctOf = (a, t) => (t > 0 ? Math.min(1, a / t) : (a > 0 ? 1 : 0))
+      const fuAssigned = fuTotalRes.count || 0
+      const quotesToday = quotesTodayRes.count || 0
+      const dayScore = Math.round(
+        pctOf(meetings, planMeetings) * 50 +
+        pctOf(followUpsReal, fuAssigned) * 20 +
+        pctOf(leadRes.count || 0, planLeads) * 15 +
+        pctOf(quotesToday, 1) * 15
+      )
 
       const tracking = {
         gps_uptime_seconds:         computeUptimeSeconds(pingsRes.data),
@@ -319,7 +424,7 @@ export default function useDaySummary({ dateISO } = {}) {
           calls:             callRes.count || 0,
           leads:             leadRes.count || 0,
           follow_ups_total:  fuTotalRes.count || 0,
-          follow_ups_done:   fuDoneRes.count || 0,
+          follow_ups_done:   fuDoneRes.data?.length || 0,   // Phase 118 — 5b is now a row-fetch (no .count)
           site_visits,
           whatsapp_sent,
           voice_notes:       voiceRes.count || 0,
@@ -329,6 +434,15 @@ export default function useDaySummary({ dateISO } = {}) {
           quotes_won:         (qWonRes.data || []).length,
           quotes_won_amount:  (qWonRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0),
           qualified,
+          // Phase 118 — Sales Day Summary extras.
+          follow_ups_real:          followUpsReal,
+          overdue_follow_ups:       overdueRes.count || 0,
+          quotes_today:             quotesToday,
+          renewal_due:              renewalRes.count || 0,
+          quote_outstanding_count:  quoteOutstandingCount,
+          quote_outstanding_amount: quoteOutstandingAmount,
+          revisit_tiers:            revisitTiers,
+          day_score:                dayScore,
         },
         tracking,
         tomorrow,
