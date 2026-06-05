@@ -2783,3 +2783,39 @@ fix duration CAPTURE (Phase 116), not loosen the gate.
 - Phase 116 is **only fully testable on the APK** (the dialer hand-off /
   visibilitychange can't be simulated in-sandbox or on desktop web).
 
+---
+
+## 50 · PARKED — APK rebuild owes two native features (do NOT forget) (2026-06-05)
+
+The Capacitor APK runs **live-update**: it loads the Vercel bundle, so
+**JS/CSS/SQL changes reach it with NO rebuild**. A rebuild is needed ONLY
+for native plugins / Capacitor config / permissions / icons.
+
+**Two native features are CODED in JS but NOT in the installed APK because
+the rebuild was parked:**
+
+1. **WhatsApp quote PDF attach** (Phase 103.D.8, `QuoteDetail.jsx`
+   `handleWhatsApp`). The code calls `Share.share({ files:[pdf] })` via
+   **`@capacitor/share`** (in package.json v8) to attach the real PDF.
+   The installed APK predates the plugin → no native bridge → it throws →
+   falls back to the **wa.me text-link** (PDF as a shortlink, NOT
+   attached). Owner's recurring complaint: "PDF not attaching when a rep
+   shares a quote on WhatsApp." **This is the parked item.** Fix = an APK
+   rebuild (`npx cap sync` + build) so `@capacitor/share` lands natively.
+   NOT fixable by a Vercel deploy.
+
+2. **Phase 76.2 tracking plugin** (`TrackingPlugin.java` / `CallLogReader`)
+   — also native, also needs the rebuild. Tasks #23/#41 pending. Until
+   then `useGpsLock` / device duration-capture fall back to web probes —
+   which is WHY Phase 116 added the visibilitychange timer fallback (so
+   duration works even on a plugin-less APK).
+
+**So when the owner asks "do we need to rebuild the APK?":** for routine
+JS feature work, NO. But the PDF-attach + tracking plugin are REAL parked
+debts that a rebuild settles — both land together on the next build. Do
+NOT answer "no rebuild ever needed" without naming these two.
+
+**Why parked:** owner's deliberate deferral (tied to the Phase 76.2 plugin
+work + release-signing). Confirm with owner before rebuilding — it's a
+deliberate park, not an oversight.
+
