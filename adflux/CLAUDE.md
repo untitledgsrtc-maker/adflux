@@ -2574,3 +2574,75 @@ call rows. Root-caused (read-only agent) + fixed, guardian PASS, §45-verified.
   rep) even without a modal save would touch the FROZEN follow_up close/spawn
   chain (§28) → guardian + owner sign-off. Parked deliberately.
 
+### 47.2 · Telecaller module cleanup — Phase 113.6 → 113.10 (2026-06-05, all on origin, guardian PASS)
+
+Owner audited the TC Today page (`/telecaller`, `TelecallerV2.jsx`) + flagged 7
+items. Full read-only audit first (general-purpose agent), then fixed in 5
+guarded commits. Plus the callbacks-window fix that started it.
+
+- **113.6 (`f8b8071`) — "Callbacks due" window.** The admin TC card's
+  callbacks count was `follow_up_date today..today+2` (counted TOMORROW's
+  callbacks as "due" → Rima showed 104). Now `<= today` (due today + overdue).
+  Diagnosed live: 101 of Rima's 104 were scheduled for tomorrow; real
+  due-today = 3. `TeamDashboardV2`, admin read-side.
+- **113.7 (`15af7f4`) — declutter.** Removed from the TC page: the round
+  initial avatar (`.tc-big-av`, + dead `heatColor`), the **Missed-call
+  rescue** card (`MissedCallsCard` — its "N in 24h" was a render CAP not a
+  count, and padded by the tel-tap audit `no_answer` rows so it never showed
+  real missed calls), and **"Today on the map"** (`RepMapPanel` — N/A for a
+  phone rep). BOTH components stay mounted on WorkV2 — only the TC mounts +
+  imports were removed. Don't delete the component files.
+- **113.8 (`28afaac`) — call chain fix (FROZEN, guardian-critical).** Owner #5
+  "call → outcome → WhatsApp popup not coming." TWO causes: (a) the outcome
+  modal failed to open on a same-minute RE-tap — the `lead_activities` insert
+  hit the Phase 68.2 dedupe index (23505) and the old code toasted + returned.
+  Now on a dup-key error it fetches the existing call row for (lead, rep), sets
+  `pendingActivityId`, and still opens the modal at +1.5s. (b) the
+  WhatsApp-after-outcome prompt NEVER existed on TC (only `/work`) → added
+  `WhatsAppPromptModal` + `waPrompt` + the `onSaved` WA branch (skip on
+  meeting next-action or `wa_opt_out`, pure boolean check — no toast
+  side-effect). Mirrors WorkV2. My Phase 113.5 latch was confirmed NOT the
+  cause (latch isn't on the modal-open path; WorkV2 has the same latch + works).
+- **113.9 (`bc3d87e`) — accordions.** The 3 list sections (Upcoming callbacks
+  / Pending hand-offs / Call queue) are now `<details className="lead-card
+  tc-accordion" open>` with the title in `<summary className="lead-card-head">`
+  + a rotating Lucide `ChevronDown` — same as the follow-ups page. Hand-offs +
+  Call queue, previously a cramped 2-col grid, now stack full-width. New
+  `.tc-accordion` CSS in `leads.css` hides the native marker + rotates the
+  chevron; the title `div:first-child` takes `margin-right:auto` so an optional
+  "View all" link + chevron group right. Layout only — every Call button +
+  HeatPicker + StageChip preserved. "View all" got `stopPropagation +
+  preventDefault` so it navigates without toggling.
+- **113.10 (`a552d7f`) — KPI tile drill-down.** Owner #3 "tiles land on leads,
+  not the data." Root cause: `LeadsV2` (frozen, shared by ALL roles) ignored
+  URL params entirely, so `/leads?stage=Working` did nothing. Added ONE
+  additive `useEffect` reading `?stage=<group key>` (new|working|quote_sent|
+  nurture|won|lost) → `setStageFilter`. No/invalid param = no-op; keyed on
+  `location.search` so it never fights a manual chip click; client-side filter
+  over already-RLS-scoped rows (no bypass). TC Qualified tile → `?stage=working`
+  (was the dead capital-W `Working`). The pure-stat (Connected) + operational
+  (In queue / Hand-offs / SLA) tiles aren't a single stage → they open the
+  leads list as before.
+
+### NEW contracts / patterns from this batch
+- **`<details className="… tc-accordion">` accordion** is the TC declutter
+  pattern (CSS in `leads.css`). Reusable for any collapsible card.
+- **`/leads?stage=<group key>` deep-link** now works (LeadsV2 113.10). Any
+  page can link to a pre-filtered leads list with a valid STAGE_GROUPS key.
+- The TC **WhatsApp-after-outcome** prompt now matches `/work` (both use
+  `WhatsAppPromptModal` on `onSaved`).
+
+### Foot-guns added 2026-06-05 (TC batch)
+- ❌ A dashboard "N in 24h" / "N due" badge that's a render-CAP or a forward
+  window reads as a real total to the owner. State the window; cap honestly.
+- ❌ A `call_logs.outcome='no_answer'` query for "missed calls" is padded by
+  the tel-tap audit rows (every Call tap writes one). Don't surface it as
+  "missed calls."
+- ❌ Unicode `▾`/`▴` as an accordion chevron — §7 Lucide-only. Use
+  `ChevronDown` (rotates via CSS).
+- ❌ A KPI tile linking to `/leads?stage=…` assuming it filters — LeadsV2
+  ignored URL params until 113.10, and the value must be a STAGE_GROUPS KEY
+  (`working`), not the DB stage name (`Working`).
+- ❌ Using a toast-firing guard (`blockedByWaOptOut`) as a silent boolean
+  gate — it surfaces a stray toast. Use the pure field check (`wa_opt_out`).
+
