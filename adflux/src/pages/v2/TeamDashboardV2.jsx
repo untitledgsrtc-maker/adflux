@@ -290,13 +290,6 @@ export default function TeamDashboardV2() {
       // Single-day periods (today/yesterday) work identically to
       // the pre-Phase-82 code path.
       const today = period.startIso
-      // Phase 112.3 — callbacks-due window = today .. today+2 (date-only).
-      // UTC add avoids IST drift when bumping a plain Y-M-D string.
-      const cbEnd = (() => {
-        const d = new Date(`${period.startIso}T00:00:00Z`)
-        d.setUTCDate(d.getUTCDate() + 2)
-        return d.toISOString().slice(0, 10)
-      })()
       // Phase 112.5 — current calendar month window for the per-rep
       // "quotes this month / won this month" line. Independent of the
       // date filter (always the live month).
@@ -457,13 +450,16 @@ export default function TeamDashboardV2() {
           .eq('outcome', 'positive')
           .gte('created_at', startOfDay)
           .lt ('created_at', endOfDay),
-        // Phase 112.3 — TC "Callbacks due": open follow_ups due in the
-        // next 2 days, grouped by assigned_to. Read only on TC cards.
+        // Phase 112.3 + 113.6 — TC "Callbacks due": open callbacks that are
+        // actually DUE — follow_up_date <= today (today + overdue), NOT a
+        // forward window. The old today..today+2 window counted TOMORROW's
+        // callbacks as "due", which massively inflated it (Rima: 101 of 104
+        // were scheduled for tomorrow; real due-today was 3). Grouped by
+        // assigned_to, counted DISTINCT lead (Phase 113.5). Read only on TC.
         supabase.from('follow_ups')
           .select('assigned_to, lead_id, id')
           .eq('is_done', false)
-          .gte('follow_up_date', today)
-          .lte('follow_up_date', cbEnd),
+          .lte('follow_up_date', today),
 
         // Phase 112.5/.7 — quotes CREATED this calendar month, per
         // created_by (count + total value).
