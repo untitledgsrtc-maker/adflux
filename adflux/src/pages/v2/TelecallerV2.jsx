@@ -37,13 +37,11 @@ import V2Hero from '../../components/v2/V2Hero'
 // role gate so admin / co_owner don't see it.
 import DaySummaryCard from '../../components/work/DaySummaryCard'
 import EveningWrapBanner from '../../components/work/EveningWrapBanner'
-import MissedCallsCard from '../../components/work/MissedCallsCard'
-// Phase 89.11 (2026-05-23) — mount RepMapPanel on /telecaller so
-// Renuka + any TC who does the occasional field visit sees their
-// own meeting pins + GPS track. Defaults collapsed so the page
-// continues to lead with the Next-Call hero; TC reps who never
-// step out keep their existing vertical density.
-import RepMapPanel from '../../components/leads/RepMapPanel'
+// Phase 113.7 — MissedCallsCard + RepMapPanel mounts removed from the TC
+// Today page per owner (declutter). Missed-call rescue was padded by the
+// tel-tap audit rows (every Call tap logs a no_answer call_logs row); the
+// field map is N/A for a phone rep. Both components stay in use on WorkV2 —
+// only the TC imports + mounts are dropped.
 // Phase 43.1 — parity with WorkV2 + LeadDetailV2 call chain. Tel-tap
 // audit + post-call outcome capture + auto-refresh.
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
@@ -701,13 +699,8 @@ export default function TelecallerV2() {
       {nextCall ? (
         <div className="tc-hero" style={{ marginBottom: 16 }}>
           <div className="tc-hero-head">
-            <div className="tc-big-av">
-              {/* Phase 92b — single initial (was 2). Matches WorkV2
-                  NextActionCard avatar so /work + /telecaller feel
-                  like the same product. */}
-              {(nextCall.name || '?').trim().slice(0, 1).toUpperCase()}
-              <span className="heat" style={{ background: heatColor(nextCall.heat) }} />
-            </div>
+            {/* Phase 113.7 — round initial avatar removed per owner
+                (cleaner card, less "badge" clutter). */}
             <div>
               <div className="tc-hero-name">{nextCall.name}</div>
               <div className="tc-hero-co">
@@ -1006,25 +999,11 @@ export default function TelecallerV2() {
         </div>
       )}
 
-      {/* Phase 91b — Missed-call rescue. Highest leverage for TC role
-          since connect-rate is the metric they're paid on. Same card
-          + same quickLogCall chain as /work. Exception-rendered (no
-          card when 0 missed in 24h). refreshKey bumped via callsToday
-          so a save on PostCallOutcomeModal forces a refetch. */}
-      {profile?.id && (
-        <MissedCallsCard
-          userId={profile.id}
-          onCallLead={quickLogCall}
-          refreshKey={callsToday}
-        />
-      )}
-
-      {/* Phase 89.11 — RepMapPanel. Same component as WorkV2 mounts.
-          Collapsed by default so it doesn't push the queue below
-          the fold. TC reps who never visit clients leave it
-          collapsed; Renuka / TC leads who do site visits get the
-          same Google Maps + meeting pins admin sees. */}
-      {profile?.id && <div style={{ marginBottom: 16 }}><RepMapPanel userId={profile.id} /></div>}
+      {/* Phase 113.7 — Missed-call rescue + "Today on the map" removed from
+          the TC page (owner declutter). Missed-call rescue was padded by
+          tel-tap audit rows (every Call tap writes a no_answer call_logs
+          row, so it never reflected real missed calls); the field map is
+          irrelevant to a phone rep. Both components remain on WorkV2. */}
 
       {/* Phase 47.3 — Top hot leads card. Renders only when there's
           at least one hot-marked lead in this rep's queue. Rep gets
@@ -1249,11 +1228,8 @@ export default function TelecallerV2() {
 // grid (sales-style m-card tiles) replaced the lead-stat-strip. Deleted
 // to avoid dead code.
 
-function heatColor(heat) {
-  if (heat === 'hot')  return 'var(--danger)'
-  if (heat === 'warm') return 'var(--warning)'
-  return 'var(--text-subtle)'
-}
+// Phase 113.7 — heatColor() removed; its only caller (the hero round
+// avatar) was dropped in the declutter.
 function hotWarmCount(leads) {
   const hot  = leads.filter(l => l.heat === 'hot').length
   const warm = leads.filter(l => l.heat === 'warm').length
