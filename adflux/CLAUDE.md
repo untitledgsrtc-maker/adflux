@@ -2716,3 +2716,70 @@ this-week combined. He chose RELABEL over recount: eyebrow
 count/query touched. (If a true today-only count is ever wanted, it's
 a separate change to the bucket math.)
 
+---
+
+## 49 · Phase 115–116 — TC "Worked" rename + call-duration timer fallback (2026-06-05)
+
+Came out of an owner data-integrity probe on Rima's TC console. Three
+live SQL diagnostics (read-only) established the truth before any code:
+- 221 distinct taps today (dup-check 221=221 → no ghost dups; Phase 113
+  dedup holding), but only **62 ≥10s** and **82 connected**.
+- Week: **992 taps / 275 ≥10s / 480 connected** / 222 "qualified" / 130
+  in Working. My Performance numbers matched these exactly → **the page
+  is real live data, not mock**.
+
+### Phase 115 (`abec1a5`) — "Qualified" was a lie, renamed to "Worked"
+
+`leads.sales_ready_at` is auto-stamped on the **New→Working** transition
+(phase34 `lead_set_handoff_sla` trigger) = **first contact**, NOT a real
+qualification. So "Qualified this week = 222" was just "leads dialled
+this week," always cleared the 5/week gate, and its tile click
+(`/leads?stage=working` = 130 current snapshot) never matched the 222
+weekly-cumulative number. Owner chose: **rename to "Worked", drop it as
+a gate.** Done in `TcWeeklyTiles.jsx` (gate now quotes-only) +
+`TelecallerV2.jsx` tile (label + `to:null`). SAFE because the Tc weekly
+gate is **display-only** — real pay reads `compute_monthly_salary`
+ungated (Phase 53b promotion never shipped). Zero pay change.
+
+### Phase 116 (`21959e2`) — call-duration timer fallback
+
+Root cause of "rep connected but didn't finish 50": **~43% of CONNECTED
+calls save NULL duration** (480 connected vs 275 ≥10s this week). The
+device `call_logs.duration_seconds` comes from `callLogReader.
+fetchAndPatchCallDuration` reading the Android CallLog — unreliable
+(no READ_CALL_LOG permission / plugin missing / number-match miss / web).
+NULL fails the ≥10s gate.
+
+Fix = in-app **time-away-from-app** timer as a FALLBACK only:
+- `src/utils/callTimer.js` (new): `markCallStart(leadId)` arms a one-shot
+  `visibilitychange` listener; dialer backgrounds the WebView, return →
+  seconds-away ≈ call duration. `getCallElapsed(leadId)` returns+clears.
+- `fetchAndPatchCallDuration({..., fallbackSeconds})`: **device duration
+  ALWAYS wins**; fallback used only when device read is null AND value in
+  **[5,1800]s**. The existing `.in('outcome',['connected',
+  'callback_requested'])` filter means a no_answer row can NEVER receive
+  a timer duration → the count cannot be inflated.
+- `markCallStart(lead.id)` wired after `logCallAudit` at all 3 tap sites
+  (TelecallerV2, WorkV2, LeadDetailV2); modal `handleSave` passes
+  `getCallElapsed(lead.id)`. Guardian PASS.
+
+### THE FROZEN RULE this re-confirmed (do not violate again)
+
+A TC "call toward 50" counts ONLY at **`duration_seconds >= 10`**. NEVER
+gate the count on `outcome` — the post-call modal marks ~every call
+"connected" (Rima 100% connected), so outcome filters nothing. Phase 114
+tried `outcome IN (connected,callback) OR ≥10s` and inflated Rima to 183
+/ 100%; reverted in 114.1. The ONLY honest way to raise the count is to
+fix duration CAPTURE (Phase 116), not loosen the gate.
+
+### Still open (owner-aware)
+
+- `compute_daily_score` (the salary score) still counts a 'call' on
+  `outcome IS NOT NULL OR ≥10s` — looser than the ≥10s counter, so the
+  score can read ~100% while real ≥10s = 62. Tightening it to ≥10s was
+  deliberately deferred until Phase 116 duration-capture proves accurate
+  on the APK (else we'd cut pay for a capture bug). Revisit after the APK
+  smoke test shows the ≥10s count climbing toward the connected count.
+- Phase 116 is **only fully testable on the APK** (the dialer hand-off /
+  visibilitychange can't be simulated in-sandbox or on desktop web).
+
