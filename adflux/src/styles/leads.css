@@ -172,6 +172,22 @@
 .lead-card-link  { font-size: 13px; font-weight: 600; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .lead-card-link:hover { color: var(--accent); }
 
+/* Phase 113.9 — TC Today collapsible section accordions (a <details> with a
+   <summary className="lead-card-head">). Hides the native disclosure marker
+   and rotates a chevron. Like the follow-ups page. */
+details.tc-accordion > summary.lead-card-head {
+  list-style: none; cursor: pointer; justify-content: flex-start; gap: 10px;
+}
+/* Title takes the slack so the optional "View all" link + chevron group at
+   the right edge (handles both the 2-child and 3-child summaries). */
+details.tc-accordion > summary.lead-card-head > div:first-child { margin-right: auto; }
+details.tc-accordion > summary.lead-card-head::-webkit-details-marker { display: none; }
+.tc-acc-chev {
+  font-size: 14px; line-height: 1;
+  color: var(--text-muted); flex-shrink: 0; transition: transform .15s;
+}
+details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: rotate(180deg); }
+
 /* ─── Buttons (lead-scoped) ─── */
 .lead-btn {
   display: inline-flex; align-items: center; gap: 6px;

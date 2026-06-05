@@ -957,13 +957,14 @@ export default function TelecallerV2() {
           button that fires the same quickLogCall chain. Empty when
           nothing scheduled, so doesn't take space unnecessarily. */}
       {callbacks.length > 0 && (
-        <div className="lead-card" style={{ marginBottom: 16 }}>
-          <div className="lead-card-head">
+        <details className="lead-card tc-accordion" open style={{ marginBottom: 16 }}>
+          <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Upcoming callbacks</div>
               <div className="lead-card-sub">{callbacks.length} scheduled · next 48 hours</div>
             </div>
-          </div>
+            <ChevronDown size={16} strokeWidth={1.6} className="tc-acc-chev" />
+          </summary>
           {callbacks.map((cb) => {
             const lead = cb.leads || {}
             const dateLabel = cb.follow_up_date ? formatDate(cb.follow_up_date) : 'today'
@@ -1018,7 +1019,7 @@ export default function TelecallerV2() {
               </div>
             )
           })}
-        </div>
+        </details>
       )}
 
       {/* Phase 113.7 — Missed-call rescue + "Today on the map" removed from
@@ -1104,18 +1105,20 @@ export default function TelecallerV2() {
         </div>
       )}
 
-      {/* Two-col: hand-offs + queue */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 16, marginTop: 4 }}>
+      {/* Phase 113.9 — hand-offs + queue stacked as collapsible accordions
+          (owner declutter, like the follow-ups page). Was a 2-col grid. */}
+      <div style={{ marginTop: 4 }}>
         {/* Pending hand-offs */}
-        <div className="lead-card">
-          <div className="lead-card-head">
+        <details className="lead-card tc-accordion" open style={{ marginBottom: 16 }}>
+          <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Pending hand-offs</div>
               <div className="lead-card-sub">
                 {handoffs.length} awaiting sales · {handoffs.filter(h => slaPill(h.handoff_sla_due_at)?.tone === 'danger').length} SLA overdue
               </div>
             </div>
-          </div>
+            <ChevronDown size={16} strokeWidth={1.6} className="tc-acc-chev" />
+          </summary>
           {handoffs.length === 0 ? (
             <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
               No pending hand-offs.
@@ -1156,19 +1159,20 @@ export default function TelecallerV2() {
               )
             })
           )}
-        </div>
+        </details>
 
         {/* Call queue */}
-        <div className="lead-card">
-          <div className="lead-card-head">
+        <details className="lead-card tc-accordion" open style={{ marginBottom: 16 }}>
+          <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Call queue</div>
               <div className="lead-card-sub">{leads.length} in queue · sorted by heat</div>
             </div>
-            <span className="lead-card-link" onClick={() => navigate('/leads')}>
+            <span className="lead-card-link" onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate('/leads') }}>
               View all <ArrowRight size={11} />
             </span>
-          </div>
+            <ChevronDown size={16} strokeWidth={1.6} className="tc-acc-chev" />
+          </summary>
           {sortedQueue.length === 0 ? (
             <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
               Queue empty.
@@ -1207,7 +1211,7 @@ export default function TelecallerV2() {
               </div>
             ))
           )}
-        </div>
+        </details>
       </div>
 
       {/* Phase 43.1 — PostCallOutcomeModal chain. Sales reps already
