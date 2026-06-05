@@ -897,6 +897,120 @@ export default function GpsTrackV2() {
    stays readable. Renders three stacked sections: today's counters
    from work_sessions.daily_counters, the lead-activities timeline
    (scoped to this rep + this day), and voice logs filed today. */
+// Phase 117 — one collapsible call-history table for a given set of rows.
+// Used twice: "Lead calls" (rows tied to a saved lead) and "Unknown
+// numbers" (rows the rep dialled with no lead_id). In the unknown group
+// the number renders as a tap-to-call tel: link so the owner can reach
+// out / decide to add it as a lead.
+function CallHistorySection({ title, sub, rows, navigate, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+  if (!rows || rows.length === 0) return null
+  return (
+    <div className="lead-card">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="lead-card-head"
+        style={{
+          width: '100%', background: 'transparent', border: 'none',
+          cursor: 'pointer', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', padding: '14px 16px',
+          color: 'inherit', textAlign: 'left', fontFamily: 'inherit',
+        }}
+      >
+        <div>
+          <div className="lead-card-title">{title}</div>
+          <div className="lead-card-sub">{open ? 'Tap to hide' : sub}</div>
+        </div>
+        {open
+          ? <ChevronUp size={18} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />
+          : <ChevronDown size={18} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />}
+      </button>
+      {open && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['Time', 'Direction', 'Lead / phone', 'Duration', 'Outcome', 'Note'].map(h => (
+                  <th key={h} style={{
+                    textAlign: 'left', padding: '10px 12px',
+                    fontSize: 10, letterSpacing: '.12em',
+                    textTransform: 'uppercase', color: 'var(--text-muted)',
+                    fontWeight: 700,
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => {
+                const dir = c.direction || 'outgoing'
+                const dirColor = dir === 'missed'   ? 'var(--danger)'
+                               : dir === 'incoming' ? 'var(--blue)'
+                               : 'var(--text-muted)'
+                const d = c.duration_seconds
+                const durStr = d == null ? '—'
+                              : d === 0    ? '0s'
+                              : d < 60     ? `${d}s`
+                              : `${Math.floor(d/60)}m ${d%60}s`
+                const qualified = d != null && d >= 10
+                const isTapAudit = (c.notes || '').startsWith('tel-tap audit')
+                  && (c.duration_seconds == null || c.duration_seconds === 0)
+                const hasLead = !!c.lead?.id
+                const dialable = (c.client_phone || '').replace(/[^0-9+]/g, '')
+                return (
+                  <tr
+                    key={c.id}
+                    onClick={() => hasLead && navigate(`/leads/${c.lead.id}`)}
+                    style={{
+                      borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.04))',
+                      cursor: hasLead ? 'pointer' : 'default',
+                      opacity: isTapAudit ? 0.45 : 1,
+                    }}
+                  >
+                    <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
+                      {new Date(c.call_at).toLocaleTimeString('en-IN', {
+                        hour: '2-digit', minute: '2-digit', hour12: false,
+                        timeZone: 'Asia/Kolkata',
+                      })}
+                    </td>
+                    <td style={{ padding: '8px 12px', color: dirColor, textTransform: 'capitalize', fontWeight: 600 }}>
+                      {dir}
+                    </td>
+                    <td style={{ padding: '8px 12px' }}>
+                      {hasLead
+                        ? (c.lead.company || c.lead.name || '—')
+                        : (dialable
+                            ? <a
+                                href={`tel:${dialable}`}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ color: 'var(--blue)', textDecoration: 'none', fontWeight: 600 }}
+                              >{c.client_phone}</a>
+                            : '—')}
+                    </td>
+                    <td style={{
+                      padding: '8px 12px', whiteSpace: 'nowrap',
+                      color: qualified ? 'var(--success)' : 'var(--text-muted)',
+                      fontWeight: qualified ? 600 : 400,
+                    }}>
+                      {durStr}
+                    </td>
+                    <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
+                      {c.outcome || '—'}
+                    </td>
+                    <td style={{ padding: '8px 12px', color: 'var(--text-subtle)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.notes || ''}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], callBreakdown = { total: 0, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0 }, callRows = [], navigate }) {
   const counters = session?.daily_counters || {}
   const checkIn  = session?.check_in_at
@@ -905,7 +1019,8 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
   // down only open call history". Collapsed by default; click
   // header → toggle. Saves vertical space (39+ rows pushed timeline
   // below the fold).
-  const [callHistOpen, setCallHistOpen] = useState(false)
+  // Phase 117 — call-history open state moved into CallHistorySection
+  // (one per group: Lead calls + Unknown numbers).
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
       {/* Counters strip */}
@@ -978,110 +1093,31 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
           every call_logs row for this rep+day.
           Phase 90.3 — collapsible. Header is a button; chevron
           toggles. Closed by default to keep page short. */}
-      {callRows.length > 0 && (
-        <div className="lead-card">
-          <button
-            type="button"
-            onClick={() => setCallHistOpen(o => !o)}
-            className="lead-card-head"
-            style={{
-              width: '100%', background: 'transparent', border: 'none',
-              cursor: 'pointer', display: 'flex', alignItems: 'center',
-              justifyContent: 'space-between', padding: '14px 16px',
-              color: 'inherit', textAlign: 'left', fontFamily: 'inherit',
-            }}
-          >
-            <div>
-              <div className="lead-card-title">Call history · {callRows.length}</div>
-              <div className="lead-card-sub">
-                {callHistOpen
-                  ? 'Tap to hide'
-                  : 'Tap to show every tel-tap + inbound + missed call on this day'}
-              </div>
-            </div>
-            {callHistOpen
-              ? <ChevronUp size={18} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />
-              : <ChevronDown size={18} strokeWidth={1.6} style={{ color: 'var(--text-muted)' }} />}
-          </button>
-          {callHistOpen && (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{
-              width: '100%', borderCollapse: 'collapse', fontSize: 12.5,
-            }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {['Time', 'Direction', 'Lead / phone', 'Duration', 'Outcome', 'Note'].map(h => (
-                    <th key={h} style={{
-                      textAlign: 'left', padding: '10px 12px',
-                      fontSize: 10, letterSpacing: '.12em',
-                      textTransform: 'uppercase', color: 'var(--text-muted)',
-                      fontWeight: 700,
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {callRows.map((c) => {
-                  const dir = c.direction || 'outgoing'
-                  const dirColor = dir === 'missed'   ? 'var(--danger)'
-                                 : dir === 'incoming' ? 'var(--blue)'
-                                 : 'var(--text-muted)'
-                  const d = c.duration_seconds
-                  const durStr = d == null ? '—'
-                                : d === 0    ? '0s'
-                                : d < 60     ? `${d}s`
-                                : `${Math.floor(d/60)}m ${d%60}s`
-                  const qualified = d != null && d >= 10
-                  // Phase 113.5 — grey the tel-tap audit rows that were never
-                  // upgraded to a real call (0s / no duration). They're the
-                  // anti-fraud "rep tapped Call" proof, not phantom calls — so
-                  // they read as muted, not as connected calls.
-                  const isTapAudit = (c.notes || '').startsWith('tel-tap audit')
-                    && (c.duration_seconds == null || c.duration_seconds === 0)
-                  return (
-                    <tr
-                      key={c.id}
-                      onClick={() => c.lead?.id && navigate(`/leads/${c.lead.id}`)}
-                      style={{
-                        borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.04))',
-                        cursor: c.lead?.id ? 'pointer' : 'default',
-                        opacity: isTapAudit ? 0.45 : 1,
-                      }}
-                    >
-                      <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
-                        {new Date(c.call_at).toLocaleTimeString('en-IN', {
-                          hour: '2-digit', minute: '2-digit', hour12: false,
-                          timeZone: 'Asia/Kolkata',
-                        })}
-                      </td>
-                      <td style={{ padding: '8px 12px', color: dirColor, textTransform: 'capitalize', fontWeight: 600 }}>
-                        {dir}
-                      </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        {c.lead?.company || c.lead?.name || c.client_phone || '—'}
-                      </td>
-                      <td style={{
-                        padding: '8px 12px', whiteSpace: 'nowrap',
-                        color: qualified ? 'var(--success)' : 'var(--text-muted)',
-                        fontWeight: qualified ? 600 : 400,
-                      }}>
-                        {durStr}
-                      </td>
-                      <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>
-                        {c.outcome || '—'}
-                      </td>
-                      <td style={{ padding: '8px 12px', color: 'var(--text-subtle)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {c.notes || ''}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          )}
-        </div>
-      )}
+      {callRows.length > 0 && (() => {
+        // Phase 117 — split the day's calls into (1) calls tied to a saved
+        // lead and (2) unknown numbers the rep dialled that aren't in the
+        // system, so the owner can chase / add the unknowns. The unknown
+        // section defaults open and its numbers are tap-to-call links.
+        const leadCalls    = callRows.filter(c => c.lead?.id)
+        const unknownCalls = callRows.filter(c => !c.lead?.id)
+        return (
+          <>
+            <CallHistorySection
+              title={`Lead calls · ${leadCalls.length}`}
+              sub="Tap to show calls tied to a saved lead"
+              rows={leadCalls}
+              navigate={navigate}
+            />
+            <CallHistorySection
+              title={`Unknown numbers · ${unknownCalls.length}`}
+              sub="Numbers dialled but NOT saved as leads — tap a number to call"
+              rows={unknownCalls}
+              navigate={navigate}
+              defaultOpen
+            />
+          </>
+        )
+      })()}
 
       {/* Activity timeline — Phase 84.5 merges gps_off_events inline. */}
       {(() => {
