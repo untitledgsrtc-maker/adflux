@@ -538,11 +538,26 @@ export default function GpsTrackV2() {
         anchor:         new google.maps.Point(0, 0),
         labelOrigin:    new google.maps.Point(0, -20),
       })
+      // Phase 121 — round dot for check-in / check-out / stops, so the
+      // teardrop PIN is reserved for MEETINGS only (owner: "i am unable
+      // to find which is lead pin or checkin/checkout"). Meetings now pop
+      // as the only teardrops on the map. scale = circle radius (px);
+      // labelOrigin centred so a stop number sits inside the dot.
+      const circleIcon = (color, scale = 8) => ({
+        path:           google.maps.SymbolPath.CIRCLE,
+        fillColor:      color,
+        fillOpacity:    1,
+        strokeColor:    '#0f172a',
+        strokeWeight:   1.5,
+        scale,
+        anchor:         new google.maps.Point(0, 0),
+        labelOrigin:    new google.maps.Point(0, 0),
+      })
       if (first) {
         const m1 = new google.maps.Marker({
           position: { lat: Number(first.lat), lng: Number(first.lng) },
           map,
-          icon: pinIcon('#10B981'),
+          icon: circleIcon('#10B981'),   // Phase 121 — check-in = round dot
         })
         const iw1 = new google.maps.InfoWindow({
           // Phase 89.5 — light text for dark InfoWindow chrome.
@@ -554,7 +569,7 @@ export default function GpsTrackV2() {
         const m2 = new google.maps.Marker({
           position: { lat: Number(last.lat), lng: Number(last.lng) },
           map,
-          icon: pinIcon('#EF4444'),
+          icon: circleIcon('#EF4444'),   // Phase 121 — check-out = round dot
         })
         const iw2 = new google.maps.InfoWindow({
           // Phase 89.5 — light text for dark InfoWindow chrome.
@@ -679,9 +694,9 @@ export default function GpsTrackV2() {
             text: String(s.id),
             color: '#ffffff',
             fontWeight: '700',
-            fontSize: '13px',
+            fontSize: '12px',
           },
-          icon: pinIcon('#F59E0B'),
+          icon: circleIcon('#64748b', 11),   // Phase 121 — stop = round slate dot (number inside)
         })
         const iw = new google.maps.InfoWindow({
           // Phase 89.5 — light text for dark InfoWindow chrome.
@@ -891,7 +906,9 @@ export default function GpsTrackV2() {
           }}>
             <span><span style={{ color: '#10B981' }}>●</span> Check-in {stats.first ? new Date(stats.first).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
             <span><span style={{ color: '#EF4444' }}>●</span> Check-out {stats.last ? new Date(stats.last).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+            <span><span style={{ color: '#64748b' }}>●</span> Stop (parked ≥10 min)</span>
             <span><span style={{ color: '#F59E0B' }}>●</span> Interval pings (every ~5 min while /work was open)</span>
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Teardrop pin = meeting (colour = outcome)</span>
           </div>
         </>
       )}
