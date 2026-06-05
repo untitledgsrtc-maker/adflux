@@ -70,8 +70,10 @@ android {
         // (native write while app closed) + setTrackingContext.
         // 96008 — production notification text (drop the debug fix-count).
         // 96009 — Phase 103.D.8 stop-after-checkout (server stop signal).
-        versionCode 96009
-        versionName "0.96.9"
+        // 96010 — Phase 121.2 rebuild: @capacitor/share (WhatsApp PDF
+        //         attach) + Phase 76.2 tracking plugin land natively.
+        versionCode 96010
+        versionName "0.96.10"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
