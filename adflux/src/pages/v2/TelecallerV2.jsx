@@ -51,6 +51,8 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
 // Phase 47.1 — WhatsApp 1-click send.
 import WhatsAppSendModal from '../../components/leads/WhatsAppSendModal'
+// Phase 113.8 — post-call WhatsApp follow-up prompt (parity with /work).
+import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -104,6 +106,8 @@ export default function TelecallerV2() {
   // Phase 47.1 — WhatsApp send modal state.
   const [waLead, setWaLead] = useState(null)
   const [waOpen, setWaOpen] = useState(false)
+  // Phase 113.8 — post-call WhatsApp prompt state (mirror of WorkV2).
+  const [waPrompt, setWaPrompt] = useState(null)
   // Phase 47.2 — call scripts master + collapsible script panel.
   const [scripts, setScripts] = useState([])
   const [scriptOpen, setScriptOpen] = useState(false)
@@ -431,6 +435,24 @@ export default function TelecallerV2() {
         .select('id')
         .single()
       if (insErr) {
+        // Phase 113.8 — a same-minute re-tap collides with the Phase 68.2
+        // dedupe index (23505): the FIRST tap already logged this call.
+        // Don't kill the outcome modal — find that existing row + open the
+        // modal on it so the rep can still log the outcome.
+        if (insErr.code === '23505' || /duplicate key|uniq_lead_activities/i.test(insErr.message || '')) {
+          const { data: existing } = await supabase
+            .from('lead_activities')
+            .select('id')
+            .eq('lead_id', lead.id)
+            .eq('created_by', profile.id)
+            .eq('activity_type', 'call')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          setPendingActivityId(existing?.id || null)
+          setTimeout(() => setPostCallOpen(true), 1500)
+          return
+        }
         pushToast(`Could not log call: ${insErr.message}`, 'danger')
         return
       }
@@ -1200,16 +1222,40 @@ export default function TelecallerV2() {
           setPostCallOpen(false)
           setPendingActivityId(null)
         }}
-        onSaved={() => {
+        onSaved={async ({ nextAction } = {}) => {
           setPostCallOpen(false)
           setPendingActivityId(null)
           load(true)  // Phase 71 — silent refresh, preserve scroll
+          // Phase 113.8 — parity with /work: prompt a WhatsApp follow-up
+          // after the outcome. Skip when the next action is a meeting
+          // (onLogMeeting routes to lead detail) or the lead is WA opt-out.
+          if (nextAction === 'meeting') return
+          // Pure check (no toast side-effect) — blockedByWaOptOut() toasts,
+          // which would surface a stray "opted out" message after save.
+          if (callLead?.id && !callLead?.wa_opt_out) {
+            const { data } = await supabase
+              .from('leads').select('stage').eq('id', callLead.id).maybeSingle()
+            setTimeout(() => {
+              setWaPrompt({ stage: data?.stage || callLead?.stage || 'post_call' })
+            }, 200)
+          }
         }}
         onLogMeeting={() => {
           // Telecaller doesn't run LogMeetingModal directly — route
           // them to the lead detail where the meeting flow lives.
           if (callLead?.id) navigate(`/leads/${callLead.id}`)
         }}
+      />
+
+      {/* Phase 113.8 — post-call WhatsApp follow-up prompt (parity with
+          /work). Opens after the outcome modal saves; rep sends or skips.
+          WA opt-out leads are filtered out in onSaved above. */}
+      <WhatsAppPromptModal
+        open={!!waPrompt}
+        stage={waPrompt?.stage}
+        lead={callLead}
+        profile={profile}
+        onClose={() => setWaPrompt(null)}
       />
 
       {/* Phase 47.1 — WhatsApp 1-click send modal. */}
