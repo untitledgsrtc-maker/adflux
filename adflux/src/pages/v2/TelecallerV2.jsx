@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Phone, ArrowRight, MapPin, Clock, Plus, Sparkles, Loader2,
+  Phone, ArrowRight, MapPin, Clock, Plus, Loader2,
   MessageSquare, ChevronRight, ChevronDown, FileText,
   PhoneCall, CheckCircle2, Users, ArrowUpRight, AlertTriangle,
 } from 'lucide-react'
@@ -672,27 +672,9 @@ export default function TelecallerV2() {
         </div>
       </div>
 
-      {/* Slim AI briefing — only renders if there's a hottest idle lead */}
-      {nextCall && (
-        <div className="lead-ai-card" style={{ padding: '14px 18px', marginBottom: 16, gridTemplateColumns: '36px 1fr auto' }}>
-          <div className="lead-ai-icon" style={{ width: 36, height: 36 }}>
-            <Sparkles size={16} />
-          </div>
-          <div>
-            <div className="lead-ai-eyebrow">
-              <span className="pulse" /> AI · queue
-            </div>
-            <p className="lead-ai-recap" style={{ fontSize: 13, margin: 0 }}>
-              <b>{nextCall.name}</b>{nextCall.company ? ` · ${nextCall.company}` : ''}
-              {' '}is your top call —{' '}
-              {nextCall.last_contact_at
-                ? `${formatRelative(nextCall.last_contact_at)} since last touch`
-                : 'no contact attempt logged yet'}.
-            </p>
-          </div>
-          <div />
-        </div>
-      )}
+      {/* Phase 113.11 — "AI · queue" briefing card removed per owner (not
+          needed now; the hero already names the top call). Re-add later if
+          wanted. */}
 
       {/* Phase 47.6 — stale lead alert banner. Renders only when
           ≥1 lead has had no contact for 3+ days. Click → scroll
@@ -957,7 +939,7 @@ export default function TelecallerV2() {
           button that fires the same quickLogCall chain. Empty when
           nothing scheduled, so doesn't take space unnecessarily. */}
       {callbacks.length > 0 && (
-        <details className="lead-card tc-accordion" open style={{ marginBottom: 16 }}>
+        <details className="lead-card tc-accordion" style={{ marginBottom: 16 }}>
           <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Upcoming callbacks</div>
@@ -1109,7 +1091,7 @@ export default function TelecallerV2() {
           (owner declutter, like the follow-ups page). Was a 2-col grid. */}
       <div style={{ marginTop: 4 }}>
         {/* Pending hand-offs */}
-        <details className="lead-card tc-accordion" open style={{ marginBottom: 16 }}>
+        <details className="lead-card tc-accordion" style={{ marginBottom: 16 }}>
           <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Pending hand-offs</div>
@@ -1162,7 +1144,7 @@ export default function TelecallerV2() {
         </details>
 
         {/* Call queue */}
-        <details className="lead-card tc-accordion" open style={{ marginBottom: 16 }}>
+        <details className="lead-card tc-accordion" style={{ marginBottom: 16 }}>
           <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Call queue</div>
