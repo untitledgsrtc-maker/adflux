@@ -557,7 +557,7 @@ export default function GpsTrackV2() {
         const m1 = new google.maps.Marker({
           position: { lat: Number(first.lat), lng: Number(first.lng) },
           map,
-          icon: circleIcon('#10B981'),   // Phase 121 — check-in = round dot
+          icon: circleIcon('#10B981', 12),   // Phase 121 — check-in = round dot (bigger than stop)
         })
         const iw1 = new google.maps.InfoWindow({
           // Phase 89.5 — light text for dark InfoWindow chrome.
@@ -569,7 +569,7 @@ export default function GpsTrackV2() {
         const m2 = new google.maps.Marker({
           position: { lat: Number(last.lat), lng: Number(last.lng) },
           map,
-          icon: circleIcon('#EF4444'),   // Phase 121 — check-out = round dot
+          icon: circleIcon('#EF4444', 12),   // Phase 121 — check-out = round dot (bigger than stop)
         })
         const iw2 = new google.maps.InfoWindow({
           // Phase 89.5 — light text for dark InfoWindow chrome.
@@ -696,7 +696,7 @@ export default function GpsTrackV2() {
             fontWeight: '700',
             fontSize: '12px',
           },
-          icon: circleIcon('#64748b', 11),   // Phase 121 — stop = round slate dot (number inside)
+          icon: circleIcon('#64748b', 9),   // Phase 121 — stop = round slate dot (smaller than check-in/out)
         })
         const iw = new google.maps.InfoWindow({
           // Phase 89.5 — light text for dark InfoWindow chrome.
@@ -1082,9 +1082,9 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
               rendered as its own card below the strip so admin can
               see WHY qualified count is lower than total (misdials +
               shorts get filtered). */}
-          <RepDayStat label="Qualified calls" value={callBreakdown.qualified || 0} tone={callBreakdown.qualified > 0 ? 'success' : ''} />
           <RepDayStat label="New leads" value={counters.new_leads || 0} />
-          <RepDayStat label="Voice notes" value={voiceLogs.length} />
+          {/* Phase 121.1 — dropped "Qualified calls" (repeats in the Call
+              breakdown below) + "Voice notes" (redundant) per owner. */}
         </div>
       )}
 
@@ -1155,7 +1155,6 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
               sub="Numbers dialled but NOT saved as leads — tap a number to call"
               rows={unknownCalls}
               navigate={navigate}
-              defaultOpen
             />
           </>
         )
