@@ -253,7 +253,8 @@ export default function GpsTrackV2() {
       //   qualified    duration >= 10
       //   connectedQualified  qualified AND outcome='connected'
       const breakdown = {
-        total: rows.length, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0,
+        total: rows.length, missed: 0, noAnswer: 0, short: 0,
+        qualified: 0, connectedQualified: 0, qualifiedOther: 0,
       }
       for (const r of rows) {
         const d = r.duration_seconds
@@ -265,8 +266,18 @@ export default function GpsTrackV2() {
         } else if (d < 10) {
           breakdown.short += 1
         } else {
-          breakdown.qualified += 1
-          if (r.outcome === 'connected') breakdown.connectedQualified += 1
+          // Phase 119 — a >=10s call only counts as QUALIFIED WORK when
+          // it's tied to a lead. Unknown numbers (lead_id NULL — the
+          // rep's personal / device-scanned calls) go to qualifiedOther:
+          // they stay visible but never inflate the work KPI. Mayur
+          // 52->3, Abhinav 16->0, kirti 8->0. Matches useDaySummary,
+          // which already counts lead-tied calls only.
+          if (r.lead?.id) {
+            breakdown.qualified += 1
+            if (r.outcome === 'connected') breakdown.connectedQualified += 1
+          } else {
+            breakdown.qualifiedOther += 1
+          }
         }
       }
       setCallBreakdown(breakdown)
@@ -1061,7 +1072,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
             <div>
               <div className="lead-card-title">Call breakdown — today</div>
               <div className="lead-card-sub">
-                Qualified call = duration ≥ 10 sec. KPI shown above counts qualified only.
+                Qualified = lead call ≥ 10 sec. "Other ≥10s" = real calls to numbers not saved as leads (not counted as work).
               </div>
             </div>
           </div>
@@ -1079,10 +1090,12 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
                         tone={callBreakdown.noAnswer > 0 ? 'danger' : ''} />
             <RepDayStat label="Below 10 sec"      value={callBreakdown.short}
                         tone={callBreakdown.short > 0 ? 'warn' : ''} />
-            <RepDayStat label="Qualified (≥10s)"  value={callBreakdown.qualified}
+            <RepDayStat label="Qualified (lead ≥10s)"  value={callBreakdown.qualified}
                         tone={callBreakdown.qualified > 0 ? 'success' : ''} />
             <RepDayStat label="Connected of qualified" value={callBreakdown.connectedQualified}
                         tone={callBreakdown.connectedQualified > 0 ? 'success' : ''} />
+            <RepDayStat label="Other ≥10s (non-lead)" value={callBreakdown.qualifiedOther || 0}
+                        tone={callBreakdown.qualifiedOther > 0 ? 'warn' : ''} />
           </div>
         </div>
       )}
