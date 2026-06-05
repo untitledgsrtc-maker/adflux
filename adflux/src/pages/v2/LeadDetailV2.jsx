@@ -132,6 +132,13 @@ export default function LeadDetailV2() {
   // ever added as a real role, do it once in useAuth.js, not here.
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
 
+  // Phase 114 — "field sales" gate. Only sales reps who actually go to
+  // site need GPS. Drives (a) the GPS-off banner, (b) skipping the
+  // useGpsLock probe so telecallers/admin don't get an OS "turn on
+  // location" prompt on every lead open, (c) the "I'm here" check-in.
+  // Matches the banner's original inline condition (Phase 102.D).
+  const isFieldSales = profile?.role === 'sales' && profile?.team_role !== 'sales_manager'
+
   // Phase 76.2.2 (2026-05-23) — owner directive: sales, telecaller,
   // and their heads (sales_manager team_role) MUST be able to
   // reassign leads. DB RLS already permits this; UI was over-gating.
@@ -160,7 +167,7 @@ export default function LeadDetailV2() {
   // Hook is cheap (single probe + visibilitychange listener); fine
   // to call here even before lead loads. Admin / co_owner skip the
   // banner via the same role check the card uses.
-  const { gpsOn, requestEnable, isNative: gpsIsNative } = useGpsLock()
+  const { gpsOn, requestEnable, isNative: gpsIsNative } = useGpsLock(isFieldSales)
 
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
@@ -686,7 +693,7 @@ export default function LeadDetailV2() {
           `!isPrivileged` to positive `role==='sales'` + excludes
           team_role='sales_manager' (Renuka pairs sales_manager +
           telecaller; she's office). */}
-      {(profile?.role === 'sales' && profile?.team_role !== 'sales_manager') && gpsOn === false && (
+      {isFieldSales && gpsOn === false && (
         <GpsOffBanner onEnable={requestEnable} isNative={gpsIsNative} />
       )}
 
@@ -1407,7 +1414,7 @@ export default function LeadDetailV2() {
               </button>
             </div>
           )}
-          {!hereGps && lead.phone && (
+          {!hereGps && lead.phone && isFieldSales && (
             <button
               className="lead-btn lead-btn-sm"
               onClick={imHere}

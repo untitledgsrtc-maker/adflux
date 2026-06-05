@@ -60,12 +60,17 @@ async function probeWebGps() {
  *   isNative: boolean,
  * }}
  */
-export default function useGpsLock() {
+export default function useGpsLock(enabled = true) {
   const [gpsOn, setGpsOn] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isNative] = useState(() => Capacitor?.isNativePlatform?.() || false)
 
   const refresh = useCallback(async () => {
+    // Phase 114 — when disabled (non-field-sales roles), never probe.
+    // The web/PWA fallback (probeWebGps -> getCurrentPosition) would
+    // otherwise pop the OS "turn on location" prompt for telecallers /
+    // admin who have no GPS workflow. Stay null + idle.
+    if (!enabled) { setGpsOn(null); setLoading(false); return }
     setLoading(true)
     try {
       const plug = readNativePlugin()
@@ -80,7 +85,7 @@ export default function useGpsLock() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [enabled])
 
   /**
    * Trigger the system "Turn on Location" dialog. On native, the
@@ -91,6 +96,7 @@ export default function useGpsLock() {
    * Settings. Returns true if GPS appears on after the request.
    */
   const requestEnable = useCallback(async () => {
+    if (!enabled) return false
     const plug = readNativePlugin()
     if (plug && typeof plug.requestEnableGps === 'function') {
       try {
@@ -105,9 +111,10 @@ export default function useGpsLock() {
     }
     await refresh()
     return !!gpsOn
-  }, [refresh, gpsOn])
+  }, [refresh, gpsOn, enabled])
 
   useEffect(() => {
+    if (!enabled) return
     refresh()
     // Re-probe when the app becomes visible (tab resume).
     const onVisible = () => {
@@ -135,7 +142,7 @@ export default function useGpsLock() {
       window.removeEventListener('focus', onVisible)
       try { listenerHandle && listenerHandle.remove && listenerHandle.remove() } catch {}
     }
-  }, [refresh])
+  }, [refresh, enabled])
 
   return { gpsOn, loading, requestEnable, refresh, isNative }
 }

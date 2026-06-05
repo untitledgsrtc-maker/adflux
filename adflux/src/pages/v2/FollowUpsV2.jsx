@@ -479,7 +479,7 @@ export default function FollowUpsV2() {
         const pct = grandTotal === 0 ? 100 : Math.round(((grandTotal - overdueCount) / grandTotal) * 100)
         return (
           <V2Hero
-            eyebrow="Today"
+            eyebrow="Total"
             value={String(total + nurtureTotal)}
             label={
               grandTotal === 0
@@ -489,7 +489,7 @@ export default function FollowUpsV2() {
             percent={grandTotal > 0 ? pct : undefined}
             footerStats={grandTotal > 0 ? [
               { label: 'overdue',   value: overdueCount,                tint: '#FF6F61' },
-              { label: 'due today', value: total - overdueCount,        tint: 'var(--accent, #FFE600)' },
+              { label: 'upcoming',  value: total - overdueCount,        tint: 'var(--accent, #FFE600)' },
             ] : undefined}
             accent={grandTotal > 0 && overdueCount === 0}
           />
