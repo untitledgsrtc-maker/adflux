@@ -906,7 +906,7 @@ export default function TelecallerV2() {
         {[
           { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks', n: callbacks.length,  to: '/follow-ups' },
           { icon: PhoneCall,     tint: 'var(--success, #10B981)', label: 'Connected', n: connectedToday,    to: null },
-          { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Qualified', n: qualifiedThisWeek, to: '/leads?stage=Working' },
+          { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Qualified', n: qualifiedThisWeek, to: '/leads?stage=working' },
           { icon: Users,         tint: 'var(--accent, #FFE600)',  label: 'In queue',  n: queueOpen,         to: '/leads' },
           { icon: ArrowUpRight,  tint: 'var(--warning, #F59E0B)', label: 'Hand-offs', n: handoffs.length,   to: '/leads' },
           { icon: AlertTriangle, tint: 'var(--danger, #EF4444)',  label: 'SLA',       n: slaBreachCount,    to: '/leads' },

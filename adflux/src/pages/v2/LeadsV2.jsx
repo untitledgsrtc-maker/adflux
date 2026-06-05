@@ -195,6 +195,17 @@ export default function LeadsV2() {
 
   useEffect(() => { fetchLeads() /* eslint-disable-next-line */ }, [fetchLeads, location.key])
 
+  // Phase 113.10 — deep-link the stage filter from the URL (?stage=<group key>:
+  // new | working | quote_sent | nurture | won | lost). Lets the telecaller
+  // dashboard KPI tiles drill into a real filtered list. Additive: no/invalid
+  // param leaves stageFilter unchanged, so existing behaviour + manual chip
+  // clicks are untouched (the effect only re-runs when the URL itself changes).
+  useEffect(() => {
+    const s = new URLSearchParams(location.search).get('stage')
+    if (s && ALL_STAGE_GROUPS.some(g => g.key === s)) setStageFilter(s)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search])
+
   // Phase 46.1 — latest call outcome per lead. One query: pull
   // lead_activities with outcome set, ordered desc, dedup client-
   // side (first hit per lead = latest). Cap 5000 to keep payload
