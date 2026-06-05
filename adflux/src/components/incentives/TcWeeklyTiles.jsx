@@ -8,13 +8,16 @@
 // Data: single fetch of `tc_weekly_stats(p_user_id)` RPC (Phase 53
 // SQL). Owner triage:
 //   • Connect rate     — observability only (Q2 no)
-//   • Qualified weekly — score-math gate (Q3 yes)
+//   • Worked weekly    — Phase 115: observability only. Was "Qualified"
+//                        but it counted first-contact (sales_ready_at on
+//                        the first call), not a real qualification, so it
+//                        always cleared (e.g. 222/5) and gated nothing.
 //   • Quotes weekly    — score-math gate (Q4 yes)
 //
 // Gate semantics (UI-first, no RPC change yet):
+//   Phase 115 — quotes-only now (qualified→"Worked" dropped from gate).
 //   variable_after_gate = variable_earned
-//     × min(1, qualified_count / qualified_target)
-//     × min(1, quotes_count    / quotes_target)
+//     × min(1, quotes_count / quotes_target)
 //
 // The displayed banner tells the rep when the gate is biting and
 // by how much. /people Salary tab still surfaces the un-gated
@@ -81,17 +84,17 @@ export default function TcWeeklyTiles() {
   const totalCalls      = Number(data.total_calls      || 0)
   const connectedCount  = Number(data.connected_count  || 0)
 
-  const qualifiedHit = qualifiedCount >= qualifiedTarget
   const quotesHit    = quotesCount    >= quotesTarget
   const connectHit   = connectPct     >= connectTargetPct
 
-  // Gate factor — both must hit for full variable. Connect rate
-  // does NOT participate (owner Q2 no).
-  const qualifiedFactor = qualifiedTarget > 0
-    ? Math.min(1, qualifiedCount / qualifiedTarget) : 1
+  // Phase 115 — gate is now QUOTES-ONLY. "Worked this week" (ex-
+  // "Qualified") was first-contact and always cleared, so owner dropped
+  // it from the gate. Connect rate + worked are observability only.
+  // (Still display-only here — real pay reads compute_monthly_salary,
+  // ungated; Phase 53b promotion never shipped.)
   const quotesFactor    = quotesTarget > 0
     ? Math.min(1, quotesCount / quotesTarget)       : 1
-  const gateFactor = qualifiedFactor * quotesFactor
+  const gateFactor = quotesFactor
   const gatePct    = Math.round(gateFactor * 100)
   const gateBiting = gatePct < 100
 
@@ -124,14 +127,11 @@ export default function TcWeeklyTiles() {
         />
         <Tile
           icon={<CheckCircle2 size={14} strokeWidth={1.6} />}
-          label="Qualified this week"
+          label="Worked this week"
           value={`${qualifiedCount}`}
-          target={`/ ${qualifiedTarget}`}
-          hit={qualifiedHit}
-          gates
-          sub={qualifiedHit
-            ? 'Target hit — gate clear'
-            : `${qualifiedTarget - qualifiedCount} more to clear gate`}
+          target=""
+          hit={false}
+          sub="Leads first contacted — observability, not a gate"
         />
         <Tile
           icon={<FileText size={14} strokeWidth={1.6} />}
@@ -162,9 +162,9 @@ export default function TcWeeklyTiles() {
               Weekly gate is reducing variable salary to {gatePct}%.
             </div>
             <div style={{ color: 'var(--text-muted)', lineHeight: 1.45 }}>
-              Variable salary scales with weekly qualified handoffs and quotes
-              alongside daily calls. Hit both weekly targets to unlock 100% of
-              variable. Connect rate is observability only and does not gate.
+              Variable salary scales with your weekly quotes alongside daily
+              calls. Hit the weekly quotes target to unlock 100% of variable.
+              Connect rate + leads worked are observability only and don't gate.
             </div>
           </div>
         </div>

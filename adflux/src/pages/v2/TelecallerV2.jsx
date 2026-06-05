@@ -918,7 +918,7 @@ export default function TelecallerV2() {
           // 113.12; Quote/Pay chase added — TCs close their own deals.)
           { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks',   n: callbacks.length,  to: '/follow-ups' },
           { icon: PhoneCall,     tint: 'var(--success, #10B981)', label: 'Connected',   n: connectedToday,    to: null },
-          { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Qualified',   n: qualifiedThisWeek, to: '/leads?stage=working' },
+          { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Worked',      n: qualifiedThisWeek, to: null },
           { icon: Users,         tint: 'var(--accent, #FFE600)',  label: 'In queue',    n: queueOpen,         to: '/leads' },
           { icon: FileText,      tint: 'var(--blue, #3B82F6)',    label: 'Quote chase', n: quoteChase,        to: '/quotes' },
           { icon: Receipt,       tint: 'var(--danger, #EF4444)',  label: 'Pay chase',   n: payChase,          to: '/quotes' },
