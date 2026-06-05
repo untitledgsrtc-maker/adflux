@@ -79,6 +79,19 @@ export default function NotificationPanel() {
   async function fetchAll() {
     const todayIso = new Date().toISOString().slice(0, 10)
     const nowIso   = new Date().toISOString()
+    // Phase 113.1 (5 Jun 2026) — recency floor. Owner: "when sales
+    // person opens app, old notification auto visible." The bell
+    // recomputes live from source tables every open (no notifications
+    // table), and two sources had NO lower bound — an overdue follow-up
+    // or a breached SLA that's still open re-surfaced on EVERY launch,
+    // forever, even after the rep tapped it (per-device localStorage
+    // dismissal resets on a new phone / cleared storage). Cap both to
+    // the last 7 days so the bell stops nagging about stale items; they
+    // still live on /follow-ups and the lead page. Admin messages
+    // (unread-only) and today's due-actions are already bounded —
+    // untouched.
+    const sinceIso   = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
+    const sinceTsIso = new Date(Date.now() - 7 * 86400000).toISOString()
     // Phase 103.F.1 — admin_messages (UNREAD only) for THIS rep. Must
     // filter recipient_id = own uid: the am_recipient_read RLS lets an
     // admin read ALL messages, which would flood an admin's bell with
@@ -118,12 +131,14 @@ export default function NotificationPanel() {
         .select('id, quote_id, lead_id, follow_up_date, follow_up_time, note, quotes(quote_number, client_company, client_name, segment, lead_id), lead:lead_id(id, name, company)')
         .eq('is_done', false)
         .lte('follow_up_date', todayIso)
+        .gte('follow_up_date', sinceIso)   // Phase 113.1 — last 7 days only
         .order('follow_up_date', { ascending: true })
         .limit(15),
       supabase.from('leads')
         .select('id, name, company, handoff_sla_due_at, stage')
         .not('stage', 'in', '(Won,Lost)')
         .lt('handoff_sla_due_at', nowIso)
+        .gte('handoff_sla_due_at', sinceTsIso)   // Phase 113.1 — last 7 days only
         .order('handoff_sla_due_at', { ascending: true })
         .limit(15),
       supabase.from('lead_activities')
