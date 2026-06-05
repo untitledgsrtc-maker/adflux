@@ -186,6 +186,9 @@ export default function WorkV2() {
   const [postCallOpen, setPostCallOpen] = useState(false)
   const [pendingActivityId, setPendingActivityId] = useState(null)
   const [callLead, setCallLead] = useState(null)
+  // Phase 113.5 — synchronous re-entrancy latch on the Call button (see
+  // TelecallerV2). Stops a WebView ghost-click double-firing quickLogCall.
+  const callingRef = useRef(false)
   const [waPrompt, setWaPrompt] = useState(null)
   // Phase 34Z.54 — track which smart-task row triggered the call so
   // we can close it from the outcome modal's onSaved callback. Owner
@@ -653,12 +656,17 @@ export default function WorkV2() {
   // the insert keeps the user-gesture intact so iOS Safari hands off
   // to the dialer reliably (same trick LeadDetailV2 uses).
   async function quickLogCall(lead, taskId = null) {
+    if (callingRef.current) return   // Phase 113.5 — re-entrancy latch (ghost-click)
     if (!lead?.id || !profile?.id) return
     const phone = cleanPhone(lead.phone)
     if (!phone) {
       pushToast('No phone on this lead — tap Open and add the mobile number first.', 'danger')
       return
     }
+    // Phase 113.5 — latch after validation, before dial/audit/insert.
+    // Auto-release in 2.5s (covers the ghost-click burst + dialer hand-off).
+    callingRef.current = true
+    setTimeout(() => { callingRef.current = false }, 2500)
     setCallLead(lead)
     setCallTaskId(taskId)
     // Fire the dialer immediately on the user gesture, then queue the

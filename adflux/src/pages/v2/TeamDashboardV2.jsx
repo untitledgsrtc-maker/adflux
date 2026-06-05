@@ -460,7 +460,7 @@ export default function TeamDashboardV2() {
         // Phase 112.3 — TC "Callbacks due": open follow_ups due in the
         // next 2 days, grouped by assigned_to. Read only on TC cards.
         supabase.from('follow_ups')
-          .select('assigned_to')
+          .select('assigned_to, lead_id, id')
           .eq('is_done', false)
           .gte('follow_up_date', today)
           .lte('follow_up_date', cbEnd),
@@ -592,11 +592,19 @@ export default function TeamDashboardV2() {
 
       // Phase 112.3 — TC callbacks due (open follow_ups next 2 days) per
       // assigned_to.
-      const cbMap = {}
+      // Phase 113.5 — count DISTINCT lead per rep, not raw follow_up rows.
+      // One lead can stack many open callbacks (every "call back later"
+      // spawns a fresh follow_up without closing the old one), so counting
+      // rows inflated the number badly (Rima showed 95). One lead = one
+      // callback due.
+      const cbSets = {}
       ;(callbacksRes?.data || []).forEach((r) => {
         if (!r.assigned_to) return
-        cbMap[r.assigned_to] = (cbMap[r.assigned_to] || 0) + 1
+        if (!cbSets[r.assigned_to]) cbSets[r.assigned_to] = new Set()
+        cbSets[r.assigned_to].add(r.lead_id || r.id)
       })
+      const cbMap = {}
+      Object.keys(cbSets).forEach((k) => { cbMap[k] = cbSets[k].size })
       setCallbacksDueByUser(cbMap)
 
       // Phase 112.5/.7 — per-rep monthly quote count + ₹ value.

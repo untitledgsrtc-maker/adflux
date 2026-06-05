@@ -18,7 +18,7 @@
 //   • Qualified today = leads where qualified_at OR sales_ready_at today
 //   • Pending hand-offs = leads I qualified, now SalesReady, sorted by SLA
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Phone, ArrowRight, MapPin, Clock, Plus, Sparkles, Loader2,
@@ -87,6 +87,11 @@ export default function TelecallerV2() {
   const [loading, setLoading] = useState(true)
   // Phase 43.1 — PostCallOutcomeModal chain state (mirror of WorkV2).
   const [callLead, setCallLead] = useState(null)
+  // Phase 113.5 — synchronous re-entrancy latch on the Call button. A
+  // WebView ghost-click fired quickLogCall twice in one tick → 2 call_logs
+  // + 2 lead_activities (the §47 dup-lead disease, on calls). callingRef
+  // flips before the dial/audit so the second tap bails.
+  const callingRef = useRef(false)
   const [postCallOpen, setPostCallOpen] = useState(false)
   const [pendingActivityId, setPendingActivityId] = useState(null)
   // Phase 43.2 + Phase 49 — daily/weekly TC policy targets.
@@ -398,6 +403,7 @@ export default function TelecallerV2() {
   // tel: link fires immediately on user gesture (iOS Safari requirement),
   // then logCallAudit + lead_activities insert + open modal 1.5s later.
   async function quickLogCall(lead) {
+    if (callingRef.current) return   // Phase 113.5 — re-entrancy latch (ghost-click)
     if (!lead?.id || !profile?.id) return
     // Phase 47.5 — DNC gate. Block call entirely if flagged.
     if (blockedByDNC(lead)) return
@@ -406,6 +412,11 @@ export default function TelecallerV2() {
       pushToast('No phone on this lead — open the lead and add the mobile number first.', 'danger')
       return
     }
+    // Phase 113.5 — latch after validation, before the side effects (dial +
+    // audit + activity insert). Auto-release in 2.5s: covers the ghost-click
+    // burst + the dialer hand-off; the rep can dial the next lead after.
+    callingRef.current = true
+    setTimeout(() => { callingRef.current = false }, 2500)
     setCallLead(lead)
     dialPhone(phone)
     logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })

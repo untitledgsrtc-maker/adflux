@@ -1032,6 +1032,12 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
                                 : d < 60     ? `${d}s`
                                 : `${Math.floor(d/60)}m ${d%60}s`
                   const qualified = d != null && d >= 10
+                  // Phase 113.5 — grey the tel-tap audit rows that were never
+                  // upgraded to a real call (0s / no duration). They're the
+                  // anti-fraud "rep tapped Call" proof, not phantom calls — so
+                  // they read as muted, not as connected calls.
+                  const isTapAudit = (c.notes || '').startsWith('tel-tap audit')
+                    && (c.duration_seconds == null || c.duration_seconds === 0)
                   return (
                     <tr
                       key={c.id}
@@ -1039,6 +1045,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
                       style={{
                         borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.04))',
                         cursor: c.lead?.id ? 'pointer' : 'default',
+                        opacity: isTapAudit ? 0.45 : 1,
                       }}
                     >
                       <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
