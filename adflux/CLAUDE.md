@@ -2646,3 +2646,62 @@ guarded commits. Plus the callbacks-window fix that started it.
 - ❌ Using a toast-firing guard (`blockedByWaOptOut`) as a silent boolean
   gate — it surfaces a stray toast. Use the pure field check (`wa_opt_out`).
 
+---
+
+## 48 · Phase 114 — TC GPS-prompt source + call-count contract + follow-up relabel (2026-06-05)
+
+Commit `6af964f` (untitled-os). 4 files, no SQL, no APK rebuild
+(pure JS — reaches the APK's live-loaded bundle too). Guardian PASS
+(lone flag was a stale comment, fixed in the same commit).
+
+### Why a TC "turn on GPS" prompt fires even in office (root cause)
+
+Owner report: "tc is in office only but still they get gps turn on
+notification." Background GPS (`startBackgroundGps`, V2AppShell:362)
+is already role-gated off for TC — that was NOT the source. The real
+source: **`useGpsLock()` on `LeadDetailV2` (shared sales+TC page) ran
+UNCONDITIONALLY** (hooks can't be conditional). Its mount-effect calls
+`refresh()`, which on web/PWA — or on an APK that predates the Phase
+76.2 native plugin (still unshipped) — falls back to `probeWebGps()`
+→ `navigator.geolocation.getCurrentPosition()` → the OS "turn on
+location" prompt. The red `GpsOffBanner` was already sales-only
+(Phase 102.D), but the **hook underneath it was never gated** — so the
+prompt fired with nothing visible on screen.
+
+Fix: `useGpsLock(enabled = true)` — when false, refresh no-ops
+(`gpsOn=null`), `requestEnable` returns false, the effect early-returns
+before subscribing. `LeadDetailV2` computes
+`isFieldSales = role==='sales' && team_role!=='sales_manager'` and
+passes it to the hook + the banner (DRY swap) + the "I'm here" button.
+Default `true` keeps `WorkV2` (no-arg) byte-unchanged.
+
+**Foot-gun:** any hook that probes a device sensor (GPS, camera, mic,
+notifications) mounted on a SHARED page prompts EVERY role, even when
+the visible UI it feeds is role-gated. Gate the hook, not just the UI.
+
+### TC call-count = 50 contract (TelecallerV2)
+
+A "call today" toward the 50 target now counts when
+`outcome IN ('connected','callback_requested') OR duration_seconds>=10`
+(was duration-only). Device call-log duration often never patches in
+(stays NULL) — those connected calls (Yash, Vishal Tea Center) were
+silently dropped, so reps fell short despite connecting. **Outcome is
+the source of truth; the 10s floor is only a fallback for un-modal'd
+tel-taps.** `connectedToday` mirrors the same outcome set (10s floor
+removed) so the connect-rate can never read "5 calls / 0% connected"
+on a NULL-duration day; numerator stays ⊆ the callsToday denominator.
+NOTE: this is `call_logs`, NOT `lead_activities` — the §33 meeting-KPI
+exclusions do not apply here.
+
+**Foot-gun:** never gate a "did it happen" counter on
+`duration_seconds` alone — device-reported call duration is unreliable
+(NULL on many Androids). Gate on the rep-entered outcome first.
+
+### Follow-up hero relabel (FollowUpsV2)
+
+Owner: the "121 due today" headline was actually today + tomorrow +
+this-week combined. He chose RELABEL over recount: eyebrow
+`Today`→`Total`, footerStat `due today`→`upcoming`. Label-only, no
+count/query touched. (If a true today-only count is ever wanted, it's
+a separate change to the bucket math.)
+
