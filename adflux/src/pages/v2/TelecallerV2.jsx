@@ -23,7 +23,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Phone, ArrowRight, MapPin, Clock, Plus, Loader2,
   MessageSquare, ChevronRight, ChevronDown, FileText,
-  PhoneCall, CheckCircle2, Users, ArrowUpRight, AlertTriangle,
+  PhoneCall, CheckCircle2, Users,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -882,16 +882,17 @@ export default function TelecallerV2() {
           metrics: the qualified / in-queue / hand-offs that moved off the
           hero footer + callbacks + connected + SLA. */}
       <div className="m-card" style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
+        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6,
         padding: 10, marginBottom: 16,
       }}>
         {[
+          // Phase 113.12 — dropped Hand-offs + SLA tiles: telecallers close
+          // on the phone (no field-sales hand-off), so those hand-off metrics
+          // are meaningless. 4 tiles in a 2x2 grid.
           { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks', n: callbacks.length,  to: '/follow-ups' },
           { icon: PhoneCall,     tint: 'var(--success, #10B981)', label: 'Connected', n: connectedToday,    to: null },
           { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Qualified', n: qualifiedThisWeek, to: '/leads?stage=working' },
           { icon: Users,         tint: 'var(--accent, #FFE600)',  label: 'In queue',  n: queueOpen,         to: '/leads' },
-          { icon: ArrowUpRight,  tint: 'var(--warning, #F59E0B)', label: 'Hand-offs', n: handoffs.length,   to: '/leads' },
-          { icon: AlertTriangle, tint: 'var(--danger, #EF4444)',  label: 'SLA',       n: slaBreachCount,    to: '/leads' },
         ].map((c) => {
           const Icon = c.icon
           const empty = !c.n
@@ -1087,61 +1088,12 @@ export default function TelecallerV2() {
         </div>
       )}
 
-      {/* Phase 113.9 — hand-offs + queue stacked as collapsible accordions
-          (owner declutter, like the follow-ups page). Was a 2-col grid. */}
+      {/* Phase 113.12 — "Pending hand-offs" section removed per owner:
+          telecallers work + CLOSE leads on the phone themselves (no field-
+          sales hand-off step). sales_ready_at is stamped on the first
+          New->Working call, so the list was really "leads in progress",
+          mislabeled as hand-offs awaiting sales. Call queue stays. */}
       <div style={{ marginTop: 4 }}>
-        {/* Pending hand-offs */}
-        <details className="lead-card tc-accordion" style={{ marginBottom: 16 }}>
-          <summary className="lead-card-head">
-            <div>
-              <div className="lead-card-title">Pending hand-offs</div>
-              <div className="lead-card-sub">
-                {handoffs.length} awaiting sales · {handoffs.filter(h => slaPill(h.handoff_sla_due_at)?.tone === 'danger').length} SLA overdue
-              </div>
-            </div>
-            <ChevronDown size={16} strokeWidth={1.6} className="tc-acc-chev" />
-          </summary>
-          {handoffs.length === 0 ? (
-            <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-              No pending hand-offs.
-            </div>
-          ) : (
-            handoffs.map((h) => {
-              const pill = slaPill(h.handoff_sla_due_at) || { tone: '', label: '—' }
-              return (
-                <div
-                  key={h.id}
-                  onClick={() => navigate(`/leads/${h.id}`)}
-                  style={{
-                    padding: '12px 18px',
-                    borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))',
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto auto',
-                    gap: 10,
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 500 }}>{h.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{h.company || '—'}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                    {h.assigned?.name ? (
-                      <>
-                        <LeadAvatar name={h.assigned.name} userId={h.assigned.id} />
-                        <span>{h.assigned.name}</span>
-                      </>
-                    ) : (
-                      <span style={{ color: 'var(--text-subtle)' }}>Unassigned</span>
-                    )}
-                  </div>
-                  <Pill tone={pill.tone}>{pill.label}</Pill>
-                </div>
-              )
-            })
-          )}
-        </details>
 
         {/* Call queue */}
         <details className="lead-card tc-accordion" style={{ marginBottom: 16 }}>
