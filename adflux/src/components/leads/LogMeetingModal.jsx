@@ -640,9 +640,9 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
             disabled={saving}
           >
             {saving
-              ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+              ? <Loader2 size={14} strokeWidth={1.6} style={{ animation: 'spin 1s linear infinite' }} />
               : null}
-            <span>Save meeting</span>
+            <span>{saving ? 'Creating…' : 'Save meeting'}</span>
           </button>
         </div>
       </div>

@@ -261,6 +261,11 @@ export default function PostCallOutcomeModal({
   const [nextAction, setNextAction] = useState('follow_up_tomorrow')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  // Phase 113.4 — synchronous re-entrancy latch. The `saving` STATE guard
+  // can't stop WebView ghost-clicks that fire handleSave several times in
+  // one event-loop tick (state flips after a render). savingRef flips
+  // before the activity write so re-entrant calls bail — no duplicate rows.
+  const savingRef = useRef(false)
   // Phase 34Z.53 — custom date picker drives the follow_ups row date.
   // Defaults to the preset offset for the selected chip; rep can edit
   // freely. Once edited manually, chip selection no longer overrides.
@@ -397,7 +402,7 @@ export default function PostCallOutcomeModal({
   }
 
   async function handleSave() {
-    if (saving) return
+    if (savingRef.current || saving) return
     if (!outcome) {
       toastError(new Error('Pick an outcome'), 'Tap Good / Maybe / Lost first.')
       return
@@ -413,6 +418,11 @@ export default function PostCallOutcomeModal({
         return
       }
     }
+    // Phase 113.4 — latch synchronously before the first write. The
+    // validation above is synchronous (no await), so a ghost-click burst
+    // already bails at the top guard the moment this is set — no re-check
+    // needed here. Released on both exits below.
+    savingRef.current = true
     setSaving(true)
 
     // 1. Patch the previously-inserted activity row with outcome + notes.
@@ -445,6 +455,7 @@ export default function PostCallOutcomeModal({
     }
     if (activityError) {
       setSaving(false)
+      savingRef.current = false   // Phase 113.4 — release latch
       toastError(activityError, 'Could not save call outcome.')
       return
     }
@@ -458,6 +469,7 @@ export default function PostCallOutcomeModal({
     // (4-5 sequential awaits) to ~200ms (single activity round-
     // trip). Errors toast async; the chain contract still holds.
     setSaving(false)
+    savingRef.current = false   // Phase 113.4 — release latch
     toastSuccess('Call outcome saved.')
     onSaved?.({ outcome, nextAction })
     if (nextAction === 'meeting') {

@@ -13,7 +13,7 @@
 // Stage defaults to 'New' so it lands in Open bucket.
 // Heat defaults to 'cold' (manual rep judgment per spec §6).
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera, MapPin } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -86,6 +86,11 @@ export default function LeadFormV2() {
   const [reps, setReps] = useState([])
   const [telecallers, setTelecallers] = useState([])
   const [saving, setSaving] = useState(false)
+  // Phase 113.4 — synchronous re-entrancy latch. The `saving` STATE guard
+  // can't stop WebView ghost-clicks that fire handleSave several times in
+  // one event-loop tick (state flips after a render). savingRef flips
+  // before the leads insert so re-entrant calls bail — no duplicate leads.
+  const savingRef = useRef(false)
   const [error, setError]   = useState('')
   // Phase 33D.6 — duplicate phone warning
   const [dupLead, setDupLead] = useState(null)
@@ -154,7 +159,7 @@ export default function LeadFormV2() {
     // batches state updates, so a second tap while the previous
     // save's `setSaving(true)` is still pending sneaks through.
     // Guard at the top of the handler closes that window.
-    if (saving) return
+    if (savingRef.current || saving) return
     setError('')
     if (!form.name.trim()) {
       setError('Person name is required.')
@@ -204,6 +209,12 @@ export default function LeadFormV2() {
       setError('Pick an outcome — Good / Maybe / Lost.')
       return
     }
+    // Phase 113.4 — latch here: after validation, before the leads insert.
+    // findLeadByPhone above is the first await, so re-check the ref (a
+    // ghost-click that passed the top guard before this point bails now).
+    // Released on every exit below.
+    if (savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     const payload = {
       name:          form.name.trim(),
@@ -240,6 +251,7 @@ export default function LeadFormV2() {
       .single()
     if (err) {
       setSaving(false)
+      savingRef.current = false   // Phase 113.4 — release latch
       setError('Save failed: ' + err.message)
       return
     }
@@ -267,11 +279,13 @@ export default function LeadFormV2() {
       }])
       if (actErr) {
         setSaving(false)
+        savingRef.current = false   // Phase 113.4 — release latch
         setError(`Lead saved, but meeting log failed: ${actErr.message}.`)
         return
       }
     }
     setSaving(false)
+    savingRef.current = false   // Phase 113.4 — release latch
     navigate(openAfter ? `/leads/${data.id}` : (meetingMode ? '/work' : '/leads'))
   }
 
