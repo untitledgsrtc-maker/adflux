@@ -2522,6 +2522,55 @@ df046ea Phase 113.2: LogMeetingModal latch + kirti heal
 e10b44b Phase 113.1: NotificationPanel 7-day recency cap
 d0a0923 Phase 113: compute_daily_score TC target + meeting exclusions  [SQL: confirm run]
 ```
-Pending: confirm the Phase 113 score SQL was run in Studio; the `calls`
-counter delete-heal (sibling of 113.3) when its semantics are confirmed.
+Phase 113 score SQL — CONFIRMED RUN 5 Jun (proconfig shows `search_path=
+public, pg_temp`; the VERIFY `pg_temp_hardening=false` was a pg_get_functiondef
+quoting artifact, not a missing gate). All Phase 113.x on origin + applied.
+
+### 47.1 · Phase 113.5 — telecaller call bugs (2026-06-05, `4681e42`, pushed + SQL run)
+
+Owner reported 3 call bugs on Rima (TC): "95 callbacks due but she called
+them", "tap-but-no-dial still logs (solved before, back again)", duplicate
+call rows. Root-caused (read-only agent) + fixed, guardian PASS, §45-verified.
+
+- **Call-button latch (EXTENDS the §47 latch contract to calls):**
+  `quickLogCall` in `TelecallerV2.jsx` + `WorkV2.jsx` got the synchronous
+  `callingRef` latch (top guard + set-after-validation + 2.5s auto-release).
+  A WebView ghost-click was double-firing → 2 `call_logs` (+ double dial).
+  **NEW CONTRACT: the call button is now part of the save-modal latch family
+  — any new path that inserts call_logs / call activities on a tap MUST latch
+  it.** (lead_activities 'call' dups were already blocked by Phase 68.2.)
+- **"Tap logs without dialing" is INTENTIONAL** — `logCallAudit` (Phase 35.0)
+  writes a `call_logs` row on the tel-tap as the anti-fraud "rep tapped Call"
+  proof (`outcome='no_answer'`, 0s, note `'tel-tap audit…'`). It does NOT
+  count as a call or score (the ≥10s / outcome-non-null gates exclude it).
+  Phase 113.5 greys these rows (`opacity 0.45`, `GpsTrackV2` call history)
+  so they read as unconfirmed, not phantom calls. Do NOT "fix" the row-on-tap
+  away — it's the audit trail.
+- **`call_logs` dedup (`supabase_phase113_5_call_logs_dedup_trigger.sql`,
+  RUN + trigger `trg_call_logs_dedupe` confirmed):** a BEFORE INSERT trigger
+  skips EXACT duplicates (same user+phone+direction+duration+IST-minute) —
+  kills the scan-vs-scan race. **Used a trigger, NOT a unique index, to
+  sidestep the 42P17 STABLE-function blocker that killed Phase 93.25.2's
+  index** (date_trunc on timestamptz is STABLE → illegal in an index
+  expression, legal in a trigger body). Audit-vs-scan reconciliation
+  preserved (different durations → not deduped). + 30-day cleanup. §45-safe:
+  both call_logs writers (callAudit, callHistoryIngest) destructure only
+  `error`, no `.select()/.single()`, and a BEFORE-trigger NULL is a silent
+  skip (not an error) → writers see nothing; a skipped dup also doesn't fire
+  the AFTER-INSERT calls-counter bump → counter gets MORE accurate.
+- **Callbacks-due count (`TeamDashboardV2`):** was counting raw open
+  follow_up rows; one lead stacks many open callbacks (every "call back
+  later" spawns a new follow_up without closing the old). Now counts DISTINCT
+  lead per rep → Rima's 95 → real number. Read-side admin only.
+
+### Still open (next-session, owner-aware)
+- **`calls` counter delete-heal** (sibling of 113.3) — same delete-drift
+  remains on `daily_counters.calls`; needs its qualified-vs-all semantics
+  confirmed before a recompute. (113.5's dedup trigger reduces dup-driven
+  inflation but doesn't add a delete-heal.)
+- **Callback auto-close on next call** — the deeper cure for the "95": a
+  callback follow_up only closes on a PostCallOutcomeModal SAVE. Closing the
+  old open callback when a NEW call activity is logged for the same (lead,
+  rep) even without a modal save would touch the FROZEN follow_up close/spawn
+  chain (§28) → guardian + owner sign-off. Parked deliberately.
 
