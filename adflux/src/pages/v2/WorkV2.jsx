@@ -1086,7 +1086,11 @@ export default function WorkV2() {
           />
         )}
 
-        {checkedIn && !dayDone && (
+        {/* Phase 123 — owner: the sales team found NEXT UP (smart task)
+            + TODAY'S TASKS confusing on /work. Hidden for SALES only
+            (their tasks live in the FOLLOW-UPS tab). Agency / managers /
+            any other /work user keep it. */}
+        {checkedIn && !dayDone && profile?.role !== 'sales' && (
           <NextActionSurface
             session={session}
             smartTasks={smartTasks}
@@ -1107,15 +1111,18 @@ export default function WorkV2() {
                 /work. nextUpSmartId is null when the active pick is
                 a meeting / plan task (those don't appear in this list
                 anyway). */}
-            <TodayTasksPanel
-              userId={profile.id}
-              limit={3}
-              excludeTaskId={nextUpSmartId}
-              // Phase 34Z.70 — fix #16: wire the same outcome modal
-              // chain that the Next-up card uses. Tap Phone icon →
-              // tel: + activity log + modal.
-              onCallLead={quickLogCall}
-            />
+            {/* Phase 123 — TODAY'S TASKS hidden for SALES (owner: confusing;
+                their tasks live in the FOLLOW-UPS tab). Other roles keep it. */}
+            {profile?.role !== 'sales' && (
+              <TodayTasksPanel
+                userId={profile.id}
+                limit={3}
+                excludeTaskId={nextUpSmartId}
+                // Phase 34Z.70 — fix #16: same outcome-modal chain as the
+                // Next-up card. Tap Phone → tel: + activity log + modal.
+                onCallLead={quickLogCall}
+              />
+            )}
             <RepMapPanel userId={profile.id} />
             {/* Phase 91c — Nearby leads (within 2km of current GPS).
                 /work only — TC doesn't move. Exception-rendered (no
