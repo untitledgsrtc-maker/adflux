@@ -1516,18 +1516,18 @@ export default function TeamDashboardV2() {
                       <>
                         <div
                           className="lead-rep-kpi"
-                          title="Sent quotes going stale — tap for this rep's quote-sent leads"
+                          title="Sent quotes going stale — tap for this rep's sent quotes"
                           style={{ cursor: 'pointer' }}
-                          onClick={(e) => { e.stopPropagation(); navigate(`/leads?rep=${r.id}&stage=quote_sent`) }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/quotes?rep=${r.id}&status=sent`) }}
                         >
                           <div className={`num ${qCls}`}>{qChase}</div>
                           <div className="lbl">Quote chase</div>
                         </div>
                         <div
                           className="lead-rep-kpi"
-                          title="Won quotes not fully paid — tap for this rep's won leads"
+                          title="Won quotes not fully paid — tap for this rep's won quotes"
                           style={{ cursor: 'pointer' }}
-                          onClick={(e) => { e.stopPropagation(); navigate(`/leads?rep=${r.id}&stage=won`) }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/quotes?rep=${r.id}&status=won`) }}
                         >
                           <div className={`num ${pCls}`}>{pChase}</div>
                           <div className="lbl">Pay chase</div>

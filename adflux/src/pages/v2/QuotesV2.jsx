@@ -9,7 +9,7 @@
 // The only thing we change is the chrome.
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react'
 // Phase 94 — path-param routing replaces the quoteIntent fallback.
 // Import retained for any future producer that still needs the
@@ -45,6 +45,7 @@ function computeBalance(q) {
 /* ─── Component ────────────────────────────────────── */
 export default function QuotesV2() {
   const navigate = useNavigate()
+  const location = useLocation()
   const profile = useAuthStore(s => s.profile)
   // Privileged set (admin / owner / co_owner) gets the full admin UI
   // (sales-rep filter column, all-rows view). Phase 5 added the new
@@ -148,6 +149,20 @@ export default function QuotesV2() {
   useEffect(() => {
     setSearchDraft(filters.search || '')
   }, [filters.search])
+
+  // Phase 122.2 — deep-link rep + status from the URL
+  // (?rep=<user id>&status=<sent|won|...>): the team-dashboard Quote-
+  // chase / Pay-chase tiles drill here filtered to this rep + status.
+  // repFilter is admin-only (created_by-based, line ~193). Additive —
+  // absent params leave the current filters untouched.
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search)
+    const rid = sp.get('rep')
+    const st  = sp.get('status')
+    if (rid) setRepFilter(rid)
+    if (st && QUOTE_STATUSES.includes(st)) setFilters({ status: st })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search])
 
   function handleSearchKeyDown(e) {
     if (e.key === 'Enter') setFilters({ search: searchDraft })
