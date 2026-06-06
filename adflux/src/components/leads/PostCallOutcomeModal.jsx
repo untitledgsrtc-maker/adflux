@@ -540,15 +540,25 @@ export default function PostCallOutcomeModal({
         //
         // .or() preserves legacy tel-tap audit rows where direction=
         // NULL (callAudit.js doesn't set direction on insert).
-        supabase.from('call_logs')
+        // Phase 120 — AWAIT this outcome flip BEFORE the duration patch
+        // (fetchAndPatchCallDuration) runs below. Root cause of the
+        // call_logs-duration gap: the duration patch only writes onto a
+        // row whose outcome is already 'connected'/'callback_requested'
+        // (Phase 102.B). This flip used to be fire-and-forget and RACED
+        // the duration patch; on the fallback path (no device CallLog
+        // read → no await) the duration write fired first, saw the row
+        // still at 'no_answer' (tel-tap default), and skipped — so the
+        // duration landed in lead_activities only and call_logs stayed
+        // NULL (TC console + 50-count undercount). Awaiting here is free:
+        // we're already inside the Phase 88.1 background IIFE, after the
+        // modal closed, so it adds zero perceived save latency.
+        const { error: clOutErr } = await supabase.from('call_logs')
           .update(callLogPatch)
           .eq('user_id', profile.id)
           .eq('lead_id', lead.id)
           .gte('call_at', cutoff)
           .or('direction.is.null,direction.eq.outgoing')
-          .then(({ error }) => {
-            if (error) console.warn('[call-log-patch] update failed:', error.message)
-          })
+        if (clOutErr) console.warn('[call-log-patch] update failed:', clOutErr.message)
       }
 
       // Phase 56c — Android wrapper only. Ask the native CallLog
