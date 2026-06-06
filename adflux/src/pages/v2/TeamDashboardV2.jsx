@@ -1433,7 +1433,12 @@ export default function TeamDashboardV2() {
                 {isTC && (() => {
                   const q = qualifiedByUser[r.id] || 0
                   return (
-                    <div className="lead-rep-kpi" title="Positive-outcome calls today">
+                    <div
+                      className="lead-rep-kpi"
+                      title="Positive-outcome calls today — tap for this rep's working leads"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/leads?rep=${r.id}&stage=working`) }}
+                    >
                       <div className={`num ${q > 0 ? 'suc' : ''}`}>{q}</div>
                       <div className="lbl">Qualified</div>
                     </div>
@@ -1483,14 +1488,24 @@ export default function TeamDashboardV2() {
                     </div>
                     {isTC ? (
                       <>
-                        <div className="lead-rep-kpi">
+                        <div
+                          className="lead-rep-kpi"
+                          title="Tap for this rep's full call breakdown"
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/admin/gps/${r.id}`) }}
+                        >
                           <div className={`num ${crCls}`}>{callsHere > 0 ? `${connectRate}%` : '—'}</div>
                           <div className="lbl">Connect rate</div>
                         </div>
                         {/* Phase 112.3 — TC-only: Callbacks due (open
                             follow_ups next 2 days) fills the cell freed
                             by Quote/Pay-chase not applying to TCs. */}
-                        <div className="lead-rep-kpi" title="Open callbacks due in the next 2 days">
+                        <div
+                          className="lead-rep-kpi"
+                          title="Open callbacks due in next 2 days — tap for this rep's follow-ups"
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/follow-ups?rep=${r.id}`) }}
+                        >
                           <div className={`num ${(callbacksDueByUser[r.id] || 0) > 0 ? 'acc' : ''}`}>
                             {callbacksDueByUser[r.id] || 0}
                           </div>
@@ -1499,11 +1514,21 @@ export default function TeamDashboardV2() {
                       </>
                     ) : (
                       <>
-                        <div className="lead-rep-kpi">
+                        <div
+                          className="lead-rep-kpi"
+                          title="Sent quotes going stale — tap for this rep's quote-sent leads"
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/leads?rep=${r.id}&stage=quote_sent`) }}
+                        >
                           <div className={`num ${qCls}`}>{qChase}</div>
                           <div className="lbl">Quote chase</div>
                         </div>
-                        <div className="lead-rep-kpi">
+                        <div
+                          className="lead-rep-kpi"
+                          title="Won quotes not fully paid — tap for this rep's won leads"
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/leads?rep=${r.id}&stage=won`) }}
+                        >
                           <div className={`num ${pCls}`}>{pChase}</div>
                           <div className="lbl">Pay chase</div>
                         </div>
