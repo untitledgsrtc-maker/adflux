@@ -74,6 +74,10 @@ export default function FollowUpsV2() {
   // note starts with "Meeting" (Phase 34Z.60 prefix).
   const [searchParams, setSearchParams] = useSearchParams()
   const filterParam = searchParams.get('filter') || ''
+  // Phase 122 — admin drill: ?rep=<user id> filters the (admin-wide)
+  // follow-up + nurture lists to one rep. No-op for non-admins, who are
+  // already scoped to their own assigned_to.
+  const repParam = searchParams.get('rep') || ''
 
   const load = useCallback(async () => {
     if (!profile?.id) return
@@ -107,6 +111,8 @@ export default function FollowUpsV2() {
       .order('follow_up_time', { ascending: true, nullsFirst: false })
     if (!isPrivileged) {
       q = q.eq('assigned_to', profile.id)
+    } else if (repParam) {
+      q = q.eq('assigned_to', repParam)   // Phase 122 — admin drill into one rep
     }
 
     // Phase 31S — Nurture leads where revisit_date is within the
@@ -125,6 +131,8 @@ export default function FollowUpsV2() {
       .limit(50)
     if (!isPrivileged) {
       nq = nq.eq('assigned_to', profile.id)
+    } else if (repParam) {
+      nq = nq.eq('assigned_to', repParam)   // Phase 122 — admin drill into one rep
     }
 
     const [fuRes, nuRes] = await Promise.all([q, nq])
@@ -133,7 +141,7 @@ export default function FollowUpsV2() {
     setRows(fuRes.data || [])
     setNurtureRows(nuRes.data || [])
     setLoading(false)
-  }, [profile?.id, isPrivileged])
+  }, [profile?.id, isPrivileged, repParam])
 
   useEffect(() => { load() }, [load])
   // Phase 34Z.59 — refetch on tab-resume so completed follow-ups

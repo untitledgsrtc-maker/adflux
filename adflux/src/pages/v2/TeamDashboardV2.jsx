@@ -1394,7 +1394,12 @@ export default function TeamDashboardV2() {
                     </div>
                   </div>
                 ) : (
-                  <div className="lead-rep-kpi" title="New leads added today / target">
+                  <div
+                    className="lead-rep-kpi"
+                    title="New leads / target — tap to open this rep's leads"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/leads?rep=${r.id}`) }}
+                  >
                     <div className={`num ${leadsHere >= leadsTarget ? 'suc' : leadsHere === 0 ? 'dng' : ''}`}>
                       {leadsHere}/{leadsTarget}
                     </div>
@@ -1412,7 +1417,12 @@ export default function TeamDashboardV2() {
                   const overdueFu = overdueFuByUser[r.id] || 0
                   const odCls = overdueFu === 0 ? '' : overdueFu >= 5 ? 'dng' : 'warn'
                   return (
-                    <div className="lead-rep-kpi" title="Follow-ups past due date">
+                    <div
+                      className="lead-rep-kpi"
+                      title="Follow-ups past due — tap to open this rep's follow-ups"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/follow-ups?rep=${r.id}`) }}
+                    >
                       <div className={`num ${odCls}`}>{overdueFu}</div>
                       <div className="lbl">Overdue F-up</div>
                     </div>
@@ -1462,7 +1472,12 @@ export default function TeamDashboardV2() {
                               connectRate >= 15 ? 'warn' : 'dng'
                 return (
                   <div className="lead-rep-kpis" style={{ marginTop: 6 }}>
-                    <div className="lead-rep-kpi">
+                    <div
+                      className="lead-rep-kpi"
+                      title="Tap to open this rep's follow-ups"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/follow-ups?rep=${r.id}`) }}
+                    >
                       <div className={`num ${fuCls}`}>{fuDone}/{fuDone + fuPending}</div>
                       <div className="lbl">Today F-up</div>
                     </div>

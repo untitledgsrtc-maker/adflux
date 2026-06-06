@@ -206,6 +206,16 @@ export default function LeadsV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search])
 
+  // Phase 122 — deep-link the REP filter from the URL (?rep=<user id>):
+  // the team-dashboard KPI tiles drill into a rep's filtered leads.
+  // Additive — absent param leaves repFilter unchanged. Combines with
+  // ?stage= (e.g. ?rep=<id>&stage=working).
+  useEffect(() => {
+    const rid = new URLSearchParams(location.search).get('rep')
+    if (rid) setRepFilter(rid)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search])
+
   // Phase 46.1 — latest call outcome per lead. One query: pull
   // lead_activities with outcome set, ordered desc, dedup client-
   // side (first hit per lead = latest). Cap 5000 to keep payload
