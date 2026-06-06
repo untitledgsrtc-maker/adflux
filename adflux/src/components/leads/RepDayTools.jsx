@@ -20,6 +20,7 @@ import {
   AlertTriangle, Hotel, CalendarPlus, X, Check, BellRing, BellOff,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { buildLeaveDates } from '../../utils/leaveDates'
 import { useAuthStore } from '../../store/authStore'
 import {
   sendPushToRep, registerServiceWorker, subscribeForPush,
@@ -169,6 +170,7 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
   // the admin LeavesAdminV2 checkbox. Salary RPC counts it as 0.5 day
   // against the annual paid quota.
   const [fHalfDay, setFHalfDay] = useState(false)
+  const [fEndDate, setFEndDate] = useState('')  // Phase 121 — optional range end; blank = single day
   // Phase 36.10 — rep chooses Paid or Unpaid. Paid option only
   // enabled when tenure ≥ 9 months from staff_incentive_profiles
   // .join_date. Default Paid when eligible, else forced to Unpaid.
@@ -193,28 +195,43 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
   const [err, setErr] = useState('')
 
   async function submit() {
-    if (!fDate) { setErr('Pick a date.'); return }
+    if (!fDate) { setErr('Pick a start date.'); return }
+    // Phase 121 — expand (start..end) into one request row per WORKING
+    // day (Sundays skipped). Blank end → single day = the old behaviour.
+    const dates = buildLeaveDates(fDate, fEndDate)
+    if (dates.length === 0) {
+      setErr('No working days in that range (Sundays are skipped).')
+      return
+    }
+    const isRange = dates.length > 1
     setSaving(true); setErr('')
-    const { error } = await supabase.from('leaves').insert({
-      user_id: userId,
-      leave_date: fDate,
-      leave_type: fType,
-      reason: (fReason || '').trim() || null,
-      status: 'pending',
-      is_half_day: fHalfDay,
-      // Phase 36.10 — paid/unpaid choice. Server-side
-      // eligible_for_paid_leave() is the policy source of truth; the
-      // UI just nudges the rep. If tenure < 9 months, client forces
-      // false; server can still validate via RLS / trigger if needed
-      // in a future phase.
-      is_paid_request: paidEligible ? fIsPaid : false,
-      created_by: userId,
-    })
+    let saved = 0, collided = 0, hardErr = null
+    for (const d of dates) {
+      const { error } = await supabase.from('leaves').insert({
+        user_id: userId,
+        leave_date: d,
+        leave_type: fType,
+        reason: (fReason || '').trim() || null,
+        status: 'pending',
+        // Half-day only applies to a single day; ignored on a range.
+        is_half_day: isRange ? false : fHalfDay,
+        // Phase 36.10 — paid/unpaid choice. Server-side
+        // eligible_for_paid_leave() is the policy source of truth; the
+        // UI just nudges the rep. If tenure < 9 months, client forces false.
+        is_paid_request: paidEligible ? fIsPaid : false,
+        created_by: userId,
+      })
+      if (!error) { saved++; continue }
+      if (error.code === '23505') { collided++; continue }
+      hardErr = error; break
+    }
     setSaving(false)
-    if (error) {
-      setErr(error.code === '23505'
-        ? 'You already have a leave on that date.'
-        : (error.message || 'Submit failed.'))
+    if (hardErr) {
+      setErr(hardErr.message || 'Submit failed.')
+      return
+    }
+    if (saved === 0) {
+      setErr('You already have leave on those dates.')
       return
     }
     onSaved()
@@ -256,12 +273,30 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
 
         <div>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-            Date
+            Start date
           </label>
           <input
             type="date"
             value={fDate}
             onChange={e => setFDate(e.target.value)}
+            style={{
+              width: '100%', marginTop: 4,
+              padding: '10px 12px', borderRadius: 10,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              color: 'var(--text)', fontSize: 14,
+            }}
+          />
+        </div>
+        {/* Phase 121 — optional range end. Blank = single day. */}
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+            End date (optional)
+          </label>
+          <input
+            type="date"
+            value={fEndDate}
+            min={fDate}
+            onChange={e => setFEndDate(e.target.value)}
             style={{
               width: '100%', marginTop: 4,
               padding: '10px 12px', borderRadius: 10,
@@ -314,15 +349,17 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
         }}>
           <input
             type="checkbox"
-            checked={fHalfDay}
+            checked={fHalfDay && !fEndDate}
+            disabled={!!fEndDate}
             onChange={e => setFHalfDay(e.target.checked)}
             style={{
               width: 18, height: 18,
               accentColor: 'var(--accent, #FFE600)',
-              cursor: 'pointer',
+              cursor: fEndDate ? 'not-allowed' : 'pointer',
+              opacity: fEndDate ? 0.45 : 1,
             }}
           />
-          <span>Half-day only (counts as 0.5)</span>
+          <span>Half-day only (counts as 0.5){fEndDate ? ' · single day only' : ''}</span>
         </label>
 
         {/* Phase 36.10 — Paid / Unpaid toggle. Paid disabled when

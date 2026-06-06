@@ -26,7 +26,8 @@ import { Users, Plus, Trash2, Calendar, AlertTriangle, Check, X as XIcon } from 
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
-import { toastError } from '../../components/v2/Toast'
+import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { buildLeaveDates } from '../../utils/leaveDates'
 
 const LEAVE_TYPES = [
   { key: 'sick',         label: 'Sick'        },
@@ -83,6 +84,11 @@ export default function LeavesAdminV2({ embedded = false }) {
   // Phase 36 — half-day support. When true the leave row is saved
   // with is_half_day=true and the salary RPC counts it as 0.5.
   const [fHalfDay, setFHalfDay] = useState(false)
+  // Phase 121 — optional range end (blank → single day) + paid/unpaid
+  // choice. fPaid writes the existing is_paid_request column; the salary
+  // RPC already splits paid vs unpaid (Phase 36.10). No schema change.
+  const [fEndDate, setFEndDate] = useState('')
+  const [fPaid, setFPaid] = useState(true)
 
   async function load() {
     setLoading(true)
@@ -119,47 +125,63 @@ export default function LeavesAdminV2({ embedded = false }) {
 
   async function handleSave() {
     if (!fUser)  { setErr('Pick a team member.'); return }
-    if (!fDate)  { setErr('Pick a date.'); return }
-    setErr('')
-    setSaving(true)
-    const { error } = await supabase.from('leaves').insert({
-      user_id:    fUser,
-      leave_date: fDate,
-      leave_type: fType,
-      reason:     (fReason || '').trim() || null,
-      status:     'approved',
-      // Phase 36 — half-day. Column added in
-      // supabase_phase36_salary_policy.sql. Defaults false at DB,
-      // so existing inserts elsewhere stay compatible.
-      is_half_day: fHalfDay,
-      created_by: profile?.id,
-    })
-    setSaving(false)
-    if (error) {
-      // Most likely cause: unique (user_id, leave_date) collision.
-      if (error.code === '23505') {
-        setErr('That rep already has a leave row for that date. Delete it first if you want to change the type.')
-      } else {
-        setErr(error.message || 'Save failed.')
-      }
+    if (!fDate)  { setErr('Pick a start date.'); return }
+    // Phase 121 — expand the (start..end) range into one row per WORKING
+    // day (Sundays skipped). Blank/<= start end → single day = the old
+    // behaviour. Each date is its own leaves row (unique user+date), so
+    // the salary RPC counts them exactly as before — no schema/calc change.
+    const dates = buildLeaveDates(fDate, fEndDate)
+    if (dates.length === 0) {
+      setErr('No working days in that range (Sundays are skipped).')
       return
     }
-    // Recompute that rep's daily score so the change is visible
-    // immediately in /my-performance. Best-effort — function returns
-    // void and we don't surface errors here.
-    try {
-      await supabase.rpc('compute_daily_score', {
-        p_user_id: fUser, p_date: fDate,
+    const isRange = dates.length > 1
+    setErr('')
+    setSaving(true)
+    // One row per date. A single date colliding with an existing leave
+    // (unique user+date) skips THAT day, not the whole range.
+    let saved = 0, collided = 0, hardErr = null
+    for (const d of dates) {
+      const { error } = await supabase.from('leaves').insert({
+        user_id:     fUser,
+        leave_date:  d,
+        leave_type:  fType,
+        reason:      (fReason || '').trim() || null,
+        status:      'approved',
+        // Half-day only applies to a single day; ignored on a range.
+        is_half_day: isRange ? false : fHalfDay,
+        // Phase 121 — paid/unpaid. Salary RPC already respects it (36.10).
+        is_paid_request: fPaid,
+        created_by:  profile?.id,
       })
+      if (!error) { saved++; continue }
+      if (error.code === '23505') { collided++; continue }
+      hardErr = error; break
+    }
+    setSaving(false)
+    if (hardErr) { setErr(hardErr.message || 'Save failed.'); return }
+    if (saved === 0) {
+      setErr('Those dates already have leave rows for this rep.')
+      return
+    }
+    // Recompute each saved day's score so /my-performance reflects it.
+    try {
+      for (const d of dates) {
+        await supabase.rpc('compute_daily_score', { p_user_id: fUser, p_date: d })
+      }
     } catch (_) { /* ignore */ }
-    // Phase 33J — reset every form field so admin can immediately
-    // add another leave without manually clearing. Keep fDate at
-    // today since "approve another day for the same rep" is rare.
+    toastSuccess(
+      `Saved ${saved} day${saved > 1 ? 's' : ''}${fPaid ? '' : ' (unpaid)'}` +
+      (collided ? ` · ${collided} already had leave` : '')
+    )
+    // Reset for the next entry.
     setFUser('')
     setFDate(todayISO())
+    setFEndDate('')
     setFType('personal')
     setFReason('')
     setFHalfDay(false)
+    setFPaid(true)
     load()
   }
 
@@ -285,13 +307,36 @@ export default function LeavesAdminV2({ embedded = false }) {
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Date *</label>
+            <label style={labelStyle}>Start date *</label>
             <input
               type="date"
               value={fDate}
               onChange={e => setFDate(e.target.value)}
               style={inputStyle}
             />
+          </div>
+          {/* Phase 121 — optional range end. Blank = single day. */}
+          <div>
+            <label style={labelStyle}>End date (optional)</label>
+            <input
+              type="date"
+              value={fEndDate}
+              min={fDate}
+              onChange={e => setFEndDate(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+          {/* Phase 121 — paid vs unpaid (writes is_paid_request). */}
+          <div>
+            <label style={labelStyle}>Pay</label>
+            <select
+              value={fPaid ? 'paid' : 'unpaid'}
+              onChange={e => setFPaid(e.target.value === 'paid')}
+              style={inputStyle}
+            >
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
           </div>
           <div>
             <label style={labelStyle}>Type</label>
@@ -326,11 +371,12 @@ export default function LeavesAdminV2({ embedded = false }) {
             }}>
               <input
                 type="checkbox"
-                checked={fHalfDay}
+                checked={fHalfDay && !fEndDate}
+                disabled={!!fEndDate}
                 onChange={e => setFHalfDay(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: 'var(--accent, #FFE600)', cursor: 'pointer' }}
+                style={{ width: 16, height: 16, accentColor: 'var(--accent, #FFE600)', cursor: fEndDate ? 'not-allowed' : 'pointer', opacity: fEndDate ? 0.45 : 1 }}
               />
-              <span>Half-day (0.5)</span>
+              <span>Half-day (0.5){fEndDate ? ' · single day only' : ''}</span>
             </label>
           </div>
           <button
