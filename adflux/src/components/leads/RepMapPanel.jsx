@@ -97,6 +97,11 @@ function dayEndIso(ymd) {
 export default function RepMapPanel({ userId, defaultCollapsed = true }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [dateYmd, setDateYmd] = useState(() => istTodayISO())
+  // Phase 125 — view-mode filter (mirrors the admin /admin/gps toggle).
+  // 'all' is the DEFAULT and renders exactly as before (route + meeting
+  // pins) so existing reps see zero change; 'route' hides the pins,
+  // 'meetings' hides the route line.
+  const [viewMode, setViewMode] = useState('all')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
   const [meetings, setMeetings] = useState([])  // { id, lat, lng, ts, outcome, kind, lead_id, company, name }
@@ -234,6 +239,11 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
   // mid-day before the first ping rolls up).
   const displayKm = taKm != null ? Number(taKm) : trackKm
 
+  // Phase 125 — gate the two map layers by view mode. Both true in the
+  // default 'all' mode → identical to pre-Phase-125 render.
+  const showRoute    = viewMode === 'all' || viewMode === 'route'
+  const showMeetings = viewMode === 'all' || viewMode === 'meetings'
+
   // ─── Mount Google Maps once (when card opens, container in DOM) ─
   useEffect(() => {
     if (collapsed) return
@@ -298,6 +308,7 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
     polylineRef.current = null
     startMarkerRef.current = null
     endMarkerRef.current = null
+    if (!showRoute) return       // Phase 125 — 'meetings' view hides the route
     if (!trackPts.length) return
     polylineRef.current = new google.maps.Polyline({
       path: trackPts.map(p => ({ lat: p.lat, lng: p.lng })),
@@ -337,7 +348,7 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
       title: 'Latest position',
       zIndex: 2,
     })
-  }, [trackPts, mapReady])
+  }, [trackPts, mapReady, showRoute])
 
   // ─── Render meeting pins ──────────────────────────────────────
   useEffect(() => {
@@ -345,6 +356,14 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
     if (!map) return
     const google = map.__google
     if (!google) return
+    // Phase 125 — 'route' view hides meeting pins: clear all + bail.
+    if (!showMeetings) {
+      for (const id of Object.keys(markersRef.current)) {
+        try { markersRef.current[id].setMap(null) } catch { /* */ }
+        delete markersRef.current[id]
+      }
+      return
+    }
     const seen = new Set()
     for (const m of meetings) {
       seen.add(m.id)
@@ -419,7 +438,7 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
         }
       } catch { /* */ }
     }
-  }, [meetings, trackPts, mapReady])
+  }, [meetings, trackPts, mapReady, showMeetings])
 
   // ─── Counts for header chip ───────────────────────────────────
   // trackKm is derived above (summariseTrack — same as admin map).
@@ -528,6 +547,42 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
               <Loader2 size={14} strokeWidth={1.6} className="spin"
                 style={{ color: 'var(--v2-yellow, #FFE600)' }} />
             )}
+          </div>
+
+          {/* Phase 125 — view-mode toggle (mirrors admin /admin/gps).
+              Default 'all' = route + pins (unchanged). Lets the rep focus
+              on just their route or just their meetings. */}
+          <div style={{
+            display: 'flex', gap: 6,
+            padding: '10px 16px', borderBottom: '1px solid var(--v2-line)',
+          }}>
+            {[
+              { key: 'all',      label: 'All' },
+              { key: 'route',    label: 'Route only' },
+              { key: 'meetings', label: `Meetings · ${meetingCount}` },
+            ].map(opt => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setViewMode(opt.key)}
+                style={{
+                  flex: 1,
+                  background: viewMode === opt.key
+                    ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-bg-2)',
+                  color: viewMode === opt.key
+                    ? 'var(--accent-fg, #0f172a)' : 'var(--v2-ink-1)',
+                  border: '1px solid var(--v2-line)',
+                  borderRadius: 10,
+                  padding: '6px 8px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
 
           {/* Map container */}
