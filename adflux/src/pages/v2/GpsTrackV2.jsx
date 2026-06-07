@@ -163,6 +163,13 @@ export default function GpsTrackV2() {
   // Owner: "i cant see my called of that particular person, should
   // we get it in dashboard when we open that perosn traking page?".
   const [callRows, setCallRows] = useState([])
+  // Phase 124 — server daily_ta.km_traveled = the TA-PAID km (compute_daily_ta
+  // per-ping trigger; the SAME number the evening report + the payout use).
+  // Shown as the headline DISTANCE so the admin sees exactly what the rep is
+  // paid. The client summariseTrack (stats) still drives the route line + the
+  // ping / low-accuracy diagnostics, but no longer the headline number — it
+  // diverged on weak-GPS days (rep saw 51 km, admin 33, payout 32.6).
+  const [taKm, setTaKm] = useState(null)
   const mapRef     = useRef(null)
   const containerRef = useRef(null)
   // Phase 70.10 — view-mode toggle: all (route + stops + meetings),
@@ -297,6 +304,25 @@ export default function GpsTrackV2() {
     return () => { cancelled = true }
   }, [userId, targetDate])
 
+  // Phase 124 — fetch the authoritative km (server daily_ta.km_traveled) for
+  // the headline. Same filter as useDaySummary: user_id + ta_date. Separate
+  // effect so it never blocks the ping/map load; maybeSingle → null when the
+  // day has no daily_ta row (headline falls back to the client km below).
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    ;(async () => {
+      const { data, error: e } = await supabase.from('daily_ta')
+        .select('km_traveled')
+        .eq('user_id', userId)
+        .eq('ta_date', targetDate)
+        .maybeSingle()
+      if (cancelled) return
+      if (!e) setTaKm(data?.km_traveled ?? null)
+    })()
+    return () => { cancelled = true }
+  }, [userId, targetDate])
+
   // Total km driven, computed via filtered Haversine sum.
   //
   // Phase 34I — owner reported Kevin's 13 May actual 200-300 km drive
@@ -333,6 +359,11 @@ export default function GpsTrackV2() {
       last:  pings[pings.length - 1]?.captured_at,
     }
   }, [pings])
+
+  // Phase 124 — the headline DISTANCE = the server daily_ta km (TA-paid),
+  // falling back to the client filtered km only when daily_ta has no row
+  // for this date. stats.km / stats.pings / kmRaw stay for the diagnostics.
+  const displayKm = taKm != null ? Number(taKm).toFixed(1) : stats.km
 
   // Render the Leaflet map once pings load. Phase 32K — direct L
   // import; no CDN wrap, no failover, no error path needed.
@@ -787,7 +818,7 @@ export default function GpsTrackV2() {
             Distance
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, color: 'var(--accent, #FFE600)' }}>
-            {stats.km} <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>km</span>
+            {displayKm} <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>km</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
             {stats.pings} pings

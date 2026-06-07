@@ -105,6 +105,12 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
   // the admin map uses, so the rep sees the identical filtered
   // number + cleaned line, not a raw jitter sum.
   const [rawPings, setRawPings] = useState([])  // [{ lat, lng, captured_at, accuracy_m }]
+  // Phase 124 — server daily_ta.km_traveled (the TA-PAID km). The client
+  // summariseTrack recompute can diverge from this on weak-GPS days (the
+  // accuracy-fallback counts noisy pings → rep saw 51 km while the admin
+  // track + the report + the payout all read ~33). Show the server number;
+  // summariseTrack now drives the route LINE only, never the km label.
+  const [taKm, setTaKm] = useState(null)
   const [mapReady, setMapReady] = useState(false)
 
   const mapElRef    = useRef(null)
@@ -121,6 +127,7 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
     let cancelled = false
     setLoading(true)
     setError('')
+    setTaKm(null)
     fitDoneRef.current = false
     ;(async () => {
       try {
@@ -184,6 +191,19 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
           && Number.isFinite(Number(p.lat))
           && Number.isFinite(Number(p.lng)))
         setRawPings(rawRows)
+
+        // Phase 124 — the authoritative km = server daily_ta.km_traveled
+        // (compute_daily_ta, the per-ping AFTER-INSERT trigger; the SAME
+        // number the evening report + the TA payout use). Same filter as
+        // useDaySummary: user_id + ta_date. maybeSingle → null when the
+        // day has no daily_ta row yet (falls back to the client km below).
+        const taRes = await supabase.from('daily_ta')
+          .select('km_traveled')
+          .eq('user_id', userId)
+          .eq('ta_date', dateYmd)
+          .maybeSingle()
+        if (cancelled) return
+        if (!taRes.error) setTaKm(taRes.data?.km_traveled ?? null)
       } catch (e) {
         if (!cancelled) setError(e?.message || 'Failed to load map data')
       } finally {
@@ -208,6 +228,11 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
     [rawPings],
   )
   const trackKm = useMemo(() => Number(summariseTrack(rawPings).km), [rawPings])
+  // Phase 124 — the km the rep SEES = the server daily_ta number (TA-paid),
+  // not the client recompute. Fall back to the client filtered km only when
+  // daily_ta has no row yet for this date (so the chip never shows blank
+  // mid-day before the first ping rolls up).
+  const displayKm = taKm != null ? Number(taKm) : trackKm
 
   // ─── Mount Google Maps once (when card opens, container in DOM) ─
   useEffect(() => {
@@ -462,7 +487,7 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
           <span style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', marginTop: 2, display: 'block' }}>
             {loading ? 'Loading…' : (
               meetingCount > 0 || rawPings.length > 0
-                ? `${meetingCount} meeting${meetingCount === 1 ? '' : 's'} · ${trackKm.toFixed(1)} km`
+                ? `${meetingCount} meeting${meetingCount === 1 ? '' : 's'} · ${displayKm.toFixed(1)} km`
                 : 'No activity yet'
             )}
           </span>
