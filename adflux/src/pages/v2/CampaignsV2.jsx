@@ -122,7 +122,10 @@ export default function CampaignsV2() {
           <Megaphone size={22} />
           <h1 style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 700, color: 'var(--v2-ink-0,#f1f5f9)', margin: 0 }}>Campaigns</h1>
         </div>
-        <button style={btnG} onClick={() => navigate('/campaigns/qr')}><QrCode size={16} /> QR &amp; Locations</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button style={btnG} onClick={() => navigate('/campaigns/inbox')}><Inbox size={16} /> Inbox</button>
+          <button style={btnG} onClick={() => navigate('/campaigns/qr')}><QrCode size={16} /> QR &amp; Locations</button>
+        </div>
       </div>
       <p style={{ fontSize: 13, color: 'var(--v2-ink-2,#6a7590)', margin: '0 0 20px', maxWidth: 720 }}>
         A campaign names a source + offer and sets which telecaller its leads go to. Group your QR boards under it. Once the WhatsApp connection is live, every lead from this campaign is stamped here and routed automatically.
