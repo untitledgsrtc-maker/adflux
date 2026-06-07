@@ -20,10 +20,11 @@
 // (/work, /telecaller, lead detail) are byte-unchanged.
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
-import { Plus, Download, Loader2, AlertTriangle, MapPin, RefreshCw, X } from 'lucide-react'
+import { Plus, Download, Loader2, AlertTriangle, MapPin, RefreshCw, X, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
 import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 
 const QRCodeCanvas = lazy(() => import('qrcode.react').then((m) => ({ default: m.QRCodeCanvas })))
 
@@ -203,6 +204,19 @@ export default function CampaignQrV2() {
     }
   }
 
+  async function deleteBoard(board) {
+    const ok = await confirmDialog({
+      title: 'Delete this QR board?',
+      message: `Delete "${board.label || board.code}" (${board.code})? Its QR + scan history are removed. This can't be undone.`,
+      confirmLabel: 'Delete', danger: true,
+    })
+    if (!ok) return
+    const { error } = await supabase.from('campaign_locations').delete().eq('id', board.id)
+    if (error) { toastError(error, 'Could not delete the board.'); return }
+    toastSuccess('Board deleted.')
+    load()
+  }
+
   const newBtn = (
     <button type="button" style={btnY} onClick={() => setShowModal(true)}><Plus size={14} strokeWidth={1.6} /> New QR</button>
   )
@@ -288,8 +302,11 @@ export default function CampaignQrV2() {
                           <span style={tcPill}><span style={tcAv}>{tc.charAt(0).toUpperCase()}</span>{tc}</span>
                         ) : <span style={{ color: 'var(--v2-ink-2)', fontSize: 12 }}>—</span>}
                       </td>
-                      <td style={{ ...td, textAlign: 'right' }}>
+                      <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <BoardDownload board={b} qr={qrValue(b.code)} />
+                        <button type="button" title="Delete board" onClick={() => deleteBoard(b)} style={{ ...btnG, height: 30, fontSize: 12, padding: '0 8px', marginLeft: 6, color: 'var(--v2-rose, #f87171)' }}>
+                          <Trash2 size={13} strokeWidth={1.6} />
+                        </button>
                       </td>
                     </tr>
                   )
