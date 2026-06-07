@@ -2947,3 +2947,89 @@ phase is **126+** — do NOT reuse 117–125.
   RUN (confirmed earlier this session).
 - No outstanding SQL paste for Phase 117–125.
 
+
+---
+
+## 53 · Campaign module — RECEIVE SIDE COMPLETE + PROVEN LIVE (2026-06-07)
+
+The WhatsApp **receive** pipeline is built, gate-verified, and proven on
+production with a signed self-test. Token-free, additive, ZERO live-app
+touch (proved by `git diff --stat`: 5 files, all new/campaign, no
+WorkV2/Telecaller/leads-page/etc). Resumes §46 (was PARKED at "test the
+webhook"). Build order C2 → C4 → C4-store → C4.5 → C5 → C8 — receive side
+DONE; **outbound (reply/auto-reply) still 🔒 on the edigiexpert token**.
+
+### Proven pipeline (live on app.untitledad.in)
+```
+WhatsApp msg → api/wa/webhook (HMAC verify) → C4-store (whatsapp_conversations
++ whatsapp_messages) → C4.5 trigger (lead, 4 P0 contracts) → C5 inbox view
+```
+Self-test row 7 Jun: `trigger_present 1 · converted 1 · newest_wa_lead
+"WhatsApp lead"`. The inbox shows the converted chat with a "linked lead" tag.
+
+### Commits (all on origin, all guardian + security PASS)
+```
+a4a7550 C4.5  inbound chat → lead (SQL; guardian 8/8 + security 8/8) [SQL RUN 7 Jun]
+099fc98 C5    inbox (read-only) — CampaignInboxV2 + /campaigns/inbox route
+f29b6af C4-store fix — partial-index upserts fail 42P10 → select+insert
+53cb2a0 C4-test  scripts/test-wa-webhook.sh (signed-curl self-test, ?debug=1)
+eee5711 C4-store webhook persists conversation + message to campaign tables
+(earlier: aff51c5 C4 receive-only webhook · cf0e5eb C2 tables · C8 QR pages)
+```
+
+### The frozen contracts that made it §45-safe (do NOT regress)
+- **C4-store**: writes ONLY to whatsapp_accounts/conversations/messages via
+  the service role; runs AFTER the HMAC gate; best-effort try/catch → never
+  blocks the 200. **PostgREST `.upsert(onConflict)` CANNOT target a PARTIAL
+  unique index** (whatsapp_accounts.phone_number_id + whatsapp_messages.wamid
+  are `WHERE … IS NOT NULL` partial) → it throws 42P10. Use SELECT-then-INSERT
+  + ignore 23505. Conversations index is non-partial → upsert OK. (Foot-gun
+  that cost the "store:ok but no rows" debug round.)
+- **C4.5** (`supabase_campaign_c45_inbound_to_lead.sql`): AFTER-INSERT trigger
+  on whatsapp_conversations (NEW table) → `campaign_conversation_ensure_lead()`
+  SECURITY DEFINER, search_path-hardened, DOUBLE EXCEPTION-wrapped (a chat can
+  NEVER break the store). The 4 P0 contracts:
+  - P0-1 dedup: `find_open_lead_id_by_phone()` FIRST → attach (never insert a
+    colliding phone, never reassign).
+  - P0-2 routing: owner = campaign.default_telecaller_id ?? whatsapp_accounts
+    .default_telecaller_id. **THE ROUND-ROBIN LANDMINE:** `leads_auto_assign`
+    fills `assigned_to` whenever NULL, IGNORING telecaller_id → a TC-first lead
+    with assigned_to NULL gets hijacked by a random rep. So C4.5 sets **BOTH
+    telecaller_id AND assigned_to = the same owner** (TC queue reads
+    telecaller_id; non-NULL assigned_to is the supported self-assign that
+    skips the round-robin). No owner configured → queue inbound_leads 'error',
+    create NO lead (never a NULL-owner lead). Live round-robin UNTOUCHED.
+  - P0-3: writes NO lead_activities → can't touch compute_daily_score / §33.
+  - P0-4: stage 'New' only. cadence_paused=true → no follow-up/push cascade.
+- **C5** `CampaignInboxV2` (`/campaigns/inbox`, RequirePrivileged): READ-ONLY,
+  reads conversations+messages (RLS wa_conv_admin/wa_msg_admin). Reply composer
+  is a LOCKED placeholder (outbound = token).
+
+### Test tooling
+`scripts/test-wa-webhook.sh` — signed-curl self-test (prompts for
+CAMPAIGN_APP_SECRET, posts a real-shaped Meta inbound with valid HMAC to the
+live webhook). `?debug=1` echoes the store result (HMAC-gated; Meta never
+sends it). Use it to validate the webhook without the fiddly Meta test number.
+The Meta TEST number can't be cold-texted — it only messages pre-registered
+recipients; the real campaign needs the real number + the edigiexpert token.
+
+### Routing config (required before real leads convert)
+A whatsapp_accounts row needs `default_telecaller_id` set, else C4.5
+error-queues (no NULL-owner lead). Set it per account/campaign (the
+CampaignsV2 page sets campaign.default_telecaller_id; the account one is
+SQL/admin for now).
+
+### Test-data note (staging)
+The 7 Jun self-tests left a `SELFTEST_PNID` whatsapp_accounts row + 4 fake
+conversations (919812345678 / 919900112233 / 919933445566 / 919955667788) +
+1 converted test lead (source='WhatsApp', "WhatsApp lead"). Scoped cleanup
+available; delete before real go-live so the TC queue isn't cluttered.
+
+### What's LEFT (do NOT assume built)
+- **Outbound reply** (C5 send) + **auto-reply** (C7) — need the edigiexpert
+  permanent token + App Secret + the real number's phone_number_id/WABA.
+- **C8 location_id** (QR board → lead attribution) — minor, not wired yet.
+- Meta Lead Ads (C9), Justdial parser, Broadcast/Segments/Chatbot — V3.
+- Real number (919581578261) still on AiSensy — OTP-migrate to the owner's
+  own "Waba" app (App ID 1443324144491532) for full control.
+
