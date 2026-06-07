@@ -315,9 +315,21 @@ export default function useDaySummary({ dateISO } = {}) {
       const dt = dtRes?.data || null
       const role = (profile.role || '').toLowerCase()
       const isTC = role === 'telecaller'
-      const planMeetings = Array.isArray(ws?.planned_meetings)
+      // Phase 122 — align the report's meeting TARGET with the admin card +
+      // the pay score (compute_daily_score), both of which use the real
+      // target: users.daily_targets.meetings || 5. The old code used the
+      // morning-planner COUNT, which is 0 when the rep didn't pre-plan any
+      // meetings → pctOf() returned 100% → the report's DAY SCORE over-
+      // counted meetings (Abhinav: 4/0 = full 50, report 81; the pay score
+      // correctly used 4/5 = 80%). Now: use the rep's morning plan if they
+      // entered one (count > 0), else fall back to the target. TC = 0 (no
+      // field meetings). DISPLAY-ONLY — the pay score is untouched.
+      const morningMeetingCount = Array.isArray(ws?.planned_meetings)
         ? ws.planned_meetings.filter(m => m && (m.client || m.time)).length
-        : (isTC ? 0 : 3)   // Phase 118 — owner default 3 (was 5)
+        : 0
+      const planMeetings = morningMeetingCount > 0
+        ? morningMeetingCount
+        : (isTC ? 0 : ((profile?.daily_targets?.meetings) || 5))
       const planCalls = ws?.planned_calls
         ?? (dt?.min_calls ?? (isTC ? 50 : 20))
       const planLeads = ws?.planned_leads ?? 10
