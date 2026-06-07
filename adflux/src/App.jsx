@@ -49,6 +49,7 @@ import LeadDetailV2        from './pages/v2/LeadDetailV2'
 import LeadFormV2          from './pages/v2/LeadFormV2'
 import LeadUploadV2        from './pages/v2/LeadUploadV2'
 import CampaignQrV2        from './pages/v2/CampaignQrV2'
+import CampaignClientQrV2  from './pages/v2/CampaignClientQrV2'
 import CampaignInboxV2     from './pages/v2/CampaignInboxV2'
 import CampaignsV2         from './pages/v2/CampaignsV2'
 import WorkV2              from './pages/v2/WorkV2'
@@ -278,6 +279,7 @@ export default function App() {
           <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
           {/* Campaign module (admin, token-free). Specific /campaigns/* before /campaigns. */}
           <Route path="/campaigns/qr"              element={<RequirePrivileged><CampaignQrV2 /></RequirePrivileged>} />
+          <Route path="/campaigns/clients"         element={<RequirePrivileged><CampaignClientQrV2 /></RequirePrivileged>} />
           <Route path="/campaigns/inbox"           element={<RequirePrivileged><CampaignInboxV2 /></RequirePrivileged>} />
           <Route path="/campaigns"                 element={<RequirePrivileged><CampaignsV2 /></RequirePrivileged>} />
           <Route path="/leads/new"                 element={<RequireNonAgency><LeadFormV2 /></RequireNonAgency>} />

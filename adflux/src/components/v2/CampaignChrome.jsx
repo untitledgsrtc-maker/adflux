@@ -17,6 +17,7 @@ const TABS = [
   { key: 'campaigns', label: 'Campaigns',       to: '/campaigns' },
   { key: 'inbox',     label: 'Inbox',           to: '/campaigns/inbox' },
   { key: 'qr',        label: 'QR & Locations',  to: '/campaigns/qr' },
+  { key: 'clients',   label: 'Client QRs',      to: '/campaigns/clients' },
   { key: 'broadcast', label: 'Broadcast',  soon: true },
   { key: 'segments',  label: 'Segments',   soon: true },
   { key: 'chatbot',   label: 'Chatbot',    soon: true },

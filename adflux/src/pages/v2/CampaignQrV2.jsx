@@ -65,10 +65,18 @@ export default function CampaignQrV2() {
   async function load() {
     setLoading(true)
     try {
-      const { data: locs, error: e1 } = await supabase
-        .from('campaign_locations')
-        .select('id, code, label, city, qr_text, campaign_id, is_active, created_at')
-        .order('created_at', { ascending: false })
+      const COLS = 'id, code, label, city, qr_text, campaign_id, is_active, created_at'
+      // own boards only — client QRs live in the Client QRs tab.
+      let locsRes = await supabase.from('campaign_locations').select(COLS)
+        .is('client_name', null).order('created_at', { ascending: false })
+      // client_name column not added yet (client-QR SQL unrun) → keep this
+      // page working by retrying without the filter (§45 — never break boards).
+      if (locsRes.error && /client_name/i.test(locsRes.error.message || '')) {
+        locsRes = await supabase.from('campaign_locations').select(COLS)
+          .order('created_at', { ascending: false })
+      }
+      const locs = locsRes.data
+      const e1 = locsRes.error
       if (e1) {
         if (e1.code === '42P01' || /does not exist|schema cache/i.test(e1.message || '')) {
           setTablesMissing(true); setLoading(false); return
