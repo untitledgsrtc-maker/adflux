@@ -6,14 +6,18 @@
 //   GET  → Meta webhook verification handshake (echoes hub.challenge when
 //          the verify token matches).
 //   POST → inbound message / status events. Verifies the Meta
-//          X-Hub-Signature-256 HMAC against the App Secret, then writes a
-//          PII-stripped audit row to `webhook_event_log` and replies 200.
+//          X-Hub-Signature-256 HMAC against the App Secret, writes a
+//          PII-stripped audit row to `webhook_event_log`, THEN (C4-store)
+//          persists the conversation + inbound message to the new campaign
+//          tables, and replies 200.
 //
 // What it deliberately does NOT do (yet)
-//   NO lead write, NO conversation/message store, NO reply. That is C4.5 /
-//   C5. This file only proves the pipe: Meta → us, signature valid,
-//   idempotent-ish audit. Keeping the first deploy lead-free means it can
-//   run on production with zero risk to a live lead (CLAUDE.md §45 + §46).
+//   NO lead write, NO auto-reply, NO outbound send. Lead creation is C4.5
+//   (guarded: P0-1 dedup + P0-2 routing); reply is C5 (needs the token).
+//   C4-store writes ONLY to new Phase-C2 tables (whatsapp_accounts /
+//   whatsapp_conversations / whatsapp_messages) — zero touch to `leads` or
+//   any live/§28 table, so it runs on production with zero risk to a live
+//   lead or hot path (CLAUDE.md §45 + §46).
 //
 // Isolation (CLAUDE.md §45 — live app is untouchable)
 //   • Brand-new endpoint. No existing code calls it.
@@ -75,6 +79,105 @@ async function logEvents(rows) {
 // are short enums in practice, but never let a verified payload bloat a row).
 function clip(s) {
   return String(s ?? '?').slice(0, 40)
+}
+
+// Pull the human-readable text out of a Meta inbound message across the
+// common types. Media (image/doc/audio) carries no text → null body, the
+// `type` column still records what arrived.
+function messageBody(m) {
+  return (
+    m.text?.body ??
+    m.button?.text ??
+    m.interactive?.button_reply?.title ??
+    m.interactive?.list_reply?.title ??
+    null
+  )
+}
+
+// ── C4-store ──────────────────────────────────────────────────────────────
+// Persist the conversation + inbound message to the NEW campaign tables
+// (whatsapp_accounts / whatsapp_conversations / whatsapp_messages). This is
+// the data layer the Inbox (C5) reads. It writes ONLY to new Phase-C2 tables
+// via the service role — zero touch to `leads` or any live/§28 table. Lead
+// creation is C4.5 (separate, guarded). Best-effort: any failure is swallowed
+// so the 200 to Meta is never blocked (a dropped message is re-sent by Meta;
+// the wamid UNIQUE makes the retry idempotent).
+async function storeInbound(payload) {
+  if (!SUPABASE_URL || !SERVICE_KEY) return
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  // Defensive cap on total messages stored per request — mirrors the
+  // webhook_event_log 500-row clamp (§13 #4 DoS guard). Only a valid-HMAC
+  // sender (Meta) reaches here and Meta batches modestly, but never let one
+  // verified payload fan out into hundreds of serial writes.
+  let stored = 0
+  const STORE_CAP = 200
+  for (const entry of payload.entry || []) {
+    for (const change of entry.changes || []) {
+      const v = change.value || {}
+      const meta = v.metadata || {}
+      const phoneNumberId = meta.phone_number_id || null
+      const inbound = v.messages || []
+      if (!phoneNumberId || inbound.length === 0) continue
+
+      // Resolve (or self-provision) the receiving account by phone_number_id.
+      // ignoreDuplicates → NEVER overwrites an existing row (so an owner-set
+      // default_telecaller_id used by C4.5 routing is preserved). The
+      // auto-created row carries NO default_telecaller_id, so C4.5 will
+      // error-queue rather than mint a NULL-owner lead (P0-2 safe).
+      await admin.from('whatsapp_accounts').upsert(
+        { provider: 'cloud_api', phone_number_id: phoneNumberId, display_number: meta.display_phone_number || null },
+        { onConflict: 'phone_number_id', ignoreDuplicates: true },
+      )
+      const { data: acct } = await admin.from('whatsapp_accounts')
+        .select('id').eq('phone_number_id', phoneNumberId).maybeSingle()
+      const accountId = acct?.id
+      if (!accountId) continue
+
+      const nowIso = new Date().toISOString()
+      const windowIso = new Date(Date.now() + 24 * 3600 * 1000).toISOString()
+
+      for (const m of inbound) {
+        if (stored >= STORE_CAP) return
+        const customerWaId = m.from
+        if (!customerWaId) continue
+        stored++
+
+        // Upsert the conversation (one per account+customer); refresh the 24h
+        // reply window on every inbound. The partial object updates ONLY these
+        // columns on conflict — lead_id / assigned_to / campaign_id (set by
+        // C4.5 later) are NOT in the object, so they survive.
+        const { data: conv } = await admin.from('whatsapp_conversations').upsert(
+          {
+            whatsapp_account_id: accountId,
+            customer_wa_id: customerWaId,
+            last_inbound_at: nowIso,
+            window_expires_at: windowIso,
+            status: 'open',
+            updated_at: nowIso,
+          },
+          { onConflict: 'whatsapp_account_id,customer_wa_id' },
+        ).select('id').maybeSingle()
+        const convId = conv?.id
+        if (!convId) continue
+
+        // Insert the message; wamid UNIQUE → idempotent on Meta retries.
+        const atIso = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : nowIso
+        await admin.from('whatsapp_messages').upsert(
+          {
+            conversation_id: convId,
+            wamid: m.id || null,
+            direction: 'in',
+            type: m.type || 'text',
+            body: messageBody(m),
+            at: atIso,
+          },
+          { onConflict: 'wamid', ignoreDuplicates: true },
+        )
+      }
+    }
+  }
 }
 
 export default async function handler(req, res) {
@@ -181,6 +284,15 @@ export default async function handler(req, res) {
   // Bound worst-case insert size. Only a valid-HMAC sender (Meta) reaches
   // here and Meta batches modestly, but cap defensively all the same.
   if (rows.length > 500) rows.length = 500
+
+  // C4-store — persist the conversation + inbound message to the new campaign
+  // tables (the Inbox/C5 data layer). Best-effort; a failure never blocks the
+  // 200 to Meta (Meta re-sends; the wamid UNIQUE keeps the retry idempotent).
+  try {
+    await storeInbound(payload)
+  } catch {
+    try { console.error('[wa/webhook] store failed') } catch { /* noop */ }
+  }
 
   await logEvents(rows)
   return res.status(200).json({ received: true, count: rows.length })
