@@ -16,8 +16,9 @@
 // downloads when an admin opens this page.
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
-import { QrCode, Plus, Download, Loader2, AlertTriangle, MapPin, RefreshCw } from 'lucide-react'
+import { Plus, Download, Loader2, AlertTriangle, MapPin, RefreshCw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import CampaignChrome from '../../components/v2/CampaignChrome'
 import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
 
 // lazy chunk — keeps the QR lib OFF every rep bundle
@@ -135,23 +136,19 @@ export default function CampaignQrV2() {
     }
   }
 
-  const panel = { background: 'var(--v2-bg-1,#0f1525)', border: '1px solid var(--v2-line,#1f2a44)', borderRadius: 14, padding: 20 }
+  const panel = { background: 'var(--v2-bg-1,#0f1525)', border: '1px solid var(--v2-line,#1f2b47)', borderRadius: 14, padding: 20 }
   const lbl = { fontSize: 11, color: 'var(--v2-ink-2,#6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
-  const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-2,#141b2d)', border: '1px solid var(--v2-line,#1f2a44)', borderRadius: 10, color: 'var(--v2-ink-0,#f1f5f9)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
+  const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-2,#1a2742)', border: '1px solid var(--v2-line,#1f2b47)', borderRadius: 10, color: 'var(--v2-ink-0,#f5f7fb)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
   const btnY = { background: 'var(--v2-yellow,#FFE600)', color: '#0b1220', border: 'none', borderRadius: 10, height: 38, padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
-  const btnG = { background: 'transparent', color: 'var(--v2-ink-1,#a9b3c7)', border: '1px solid var(--v2-line,#1f2a44)', borderRadius: 10, height: 38, padding: '0 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
+  const btnG = { background: 'transparent', color: 'var(--v2-ink-1,#a9b3c7)', border: '1px solid var(--v2-line,#1f2b47)', borderRadius: 10, height: 38, padding: '0 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
   const spin = { animation: 'spin 1s linear infinite' }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 80px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <QrCode size={22} />
-        <h1 style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 700, color: 'var(--v2-ink-0,#f1f5f9)', margin: 0 }}>Campaign QR &amp; Locations</h1>
-      </div>
-      <p style={{ fontSize: 13, color: 'var(--v2-ink-2,#6a7590)', margin: '0 0 20px', maxWidth: 700 }}>
-        Make a QR for each board. Print it on the hoarding — a scan opens WhatsApp on your number with a hidden location tag, so when the lead chats you know which board pulled it. Works today, no setup needed.
-      </p>
-
+    <CampaignChrome
+      active="qr"
+      title="QR & Locations"
+      sub="Make a QR for each board. Print it on the hoarding — a scan opens WhatsApp on your number with a hidden location tag, so when the lead chats you know which board pulled it. Works today, no setup needed."
+    >
       {tablesMissing && (
         <div style={{ ...panel, borderColor: 'var(--v2-amber,#F59E0B)', background: 'rgba(245,158,11,0.12)', marginBottom: 18, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <AlertTriangle size={18} style={{ color: 'var(--v2-amber,#F59E0B)', flexShrink: 0, marginTop: 1 }} />
@@ -237,7 +234,7 @@ export default function CampaignQrV2() {
 
       {!loading && !tablesMissing && (
         <div style={{ ...panel, marginTop: 18, padding: 0 }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--v2-line,#1f2a44)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--v2-line,#1f2b47)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0)' }}>Saved boards · {boards.length}</span>
             <button style={btnG} onClick={load}><RefreshCw size={14} /> Refresh</button>
           </div>
@@ -254,7 +251,7 @@ export default function CampaignQrV2() {
       )}
 
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
+    </CampaignChrome>
   )
 }
 
@@ -266,7 +263,7 @@ function BoardCard({ board, btnG }) {
     const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `qr-${board.code}.png`; a.click()
   }
   return (
-    <div style={{ border: '1px solid var(--v2-line,#1f2a44)', borderRadius: 14, padding: 14, textAlign: 'center', background: 'var(--v2-bg-2,#141b2d)' }}>
+    <div style={{ border: '1px solid var(--v2-line,#1f2b47)', borderRadius: 14, padding: 14, textAlign: 'center', background: 'var(--v2-bg-2,#1a2742)' }}>
       <div ref={ref} style={{ background: 'white', borderRadius: 10, padding: 10, display: 'inline-block' }}>
         {board.qr_text ? (
           <Suspense fallback={<div style={{ width: 120, height: 120 }} />}>
@@ -274,7 +271,7 @@ function BoardCard({ board, btnG }) {
           </Suspense>
         ) : <div style={{ width: 120, height: 120 }} />}
       </div>
-      <div style={{ fontWeight: 600, color: 'var(--v2-ink-0,#f1f5f9)', fontSize: 13, marginTop: 10 }}>{board.label || board.code}</div>
+      <div style={{ fontWeight: 600, color: 'var(--v2-ink-0,#f5f7fb)', fontSize: 13, marginTop: 10 }}>{board.label || board.code}</div>
       <div style={{ fontSize: 11, color: 'var(--v2-ink-2,#6a7590)', fontFamily: 'inherit' }}>{board.code}{board.city ? ` · ${board.city}` : ''}</div>
       <button style={{ ...btnG, marginTop: 10, height: 30, fontSize: 12, width: '100%', justifyContent: 'center' }} onClick={dl}><Download size={14} /> PNG</button>
     </div>
