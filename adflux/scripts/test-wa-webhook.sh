@@ -17,7 +17,18 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-SECRET="${CAMPAIGN_APP_SECRET:?Set CAMPAIGN_APP_SECRET to the value you put in Vercel}"
+# Secret: prefer the env var; otherwise PROMPT for it (hidden input) so you
+# never have to edit the command line — just run the script and paste.
+SECRET="${CAMPAIGN_APP_SECRET:-}"
+if [ -z "$SECRET" ]; then
+  printf 'Paste your CAMPAIGN_APP_SECRET (copied from Vercel), then press Enter: '
+  read -r -s SECRET
+  printf '\n'
+fi
+if [ -z "$SECRET" ] || [ "$SECRET" = "PASTE_YOUR_COPIED_VALUE" ] || [ "$SECRET" = "REAL_SECRET" ]; then
+  echo "No real secret entered (you pasted the placeholder). Copy the actual value from Vercel and try again." >&2
+  exit 1
+fi
 URL="${URL:-https://app.untitledad.in/api/wa/webhook}"
 FROM="${FROM:-919812345678}"
 TEXT="${TEXT:-hi from the webhook self-test}"
