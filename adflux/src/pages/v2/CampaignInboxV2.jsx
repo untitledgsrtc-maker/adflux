@@ -11,10 +11,10 @@
 // wa_msg_admin + RequirePrivileged route). Touches NO existing flow / frozen
 // table / hot path (§45) — new page, reads new tables only.
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Loader2, AlertTriangle, RefreshCw, MessageSquare, Lock, ArrowLeft,
+  Loader2, AlertTriangle, RefreshCw, MessageSquare, Lock, ArrowLeft, Send,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
@@ -84,6 +84,9 @@ export default function CampaignInboxV2() {
   const [selId, setSelId] = useState(null)
   const [msgs, setMsgs] = useState([])
   const [msgLoading, setMsgLoading] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const sendingRef = useRef(false)   // §47 synchronous latch — no double-send on a WebView ghost-click
 
   const loadThreads = useCallback(async () => {
     setLoading(true)
@@ -141,6 +144,39 @@ export default function CampaignInboxV2() {
 
   const sel = threads.find((t) => t.id === selId) || null
   const openCount = threads.filter((t) => windowOpen(t.window_expires_at)).length
+
+  // Send a free-form reply (only reachable when the 24h window is open). The
+  // server (api/wa/send) re-checks the window + role, so this is just the UX.
+  async function sendReply() {
+    const text = draft.trim()
+    if (!text || !sel) return
+    if (sendingRef.current || sending) return   // §47 latch — same-tick ghost-click guard
+    sendingRef.current = true
+    setSending(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (!jwt) { toastError(new Error('Session expired'), 'Please sign in again.'); return }
+      const resp = await fetch('/api/wa/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ conversation_id: sel.id, text }),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        toastError(new Error(data?.detail || data?.error || `Send failed (${resp.status})`), 'Could not send.')
+        return
+      }
+      setDraft('')
+      setPreviews((p) => ({ ...p, [sel.id]: text }))
+      loadMsgs(sel.id)            // reload to show the just-sent row from the DB
+    } catch (e) {
+      toastError(e, 'Could not send.')
+    } finally {
+      setSending(false)
+      sendingRef.current = false
+    }
+  }
 
   const refreshBtn = (
     <button type="button" onClick={loadThreads} title="Refresh" style={btnGhost}>
@@ -353,16 +389,42 @@ export default function CampaignInboxV2() {
                   : '24h window CLOSED · needs an approved template'}
               </div>
 
-              {/* composer — LOCKED until the token lands */}
-              <div style={{
-                padding: '12px 16px', borderTop: '1px solid var(--v2-line)',
-                display: 'flex', alignItems: 'center', gap: 10, background: 'var(--v2-bg-2)',
-              }}>
-                <Lock size={16} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }} />
-                <span style={{ fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)' }}>
-                  Replying needs the live number (edigiexpert token). Receiving + reading works now.
-                </span>
-              </div>
+              {/* composer — free-form text, allowed only inside the 24h window */}
+              {windowOpen(sel.window_expires_at) ? (
+                <div style={{ padding: '10px 12px', borderTop: '1px solid var(--v2-line)', display: 'flex', alignItems: 'flex-end', gap: 8, background: 'var(--v2-bg-2)' }}>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
+                    placeholder="Type a reply…"
+                    rows={1}
+                    style={{
+                      flex: 1, resize: 'none', maxHeight: 120, minHeight: 38, padding: '9px 12px',
+                      background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line)', borderRadius: 10,
+                      color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, fontFamily: 'inherit', outline: 'none',
+                    }}
+                  />
+                  <button
+                    type="button" onClick={sendReply} disabled={sending || !draft.trim()}
+                    style={{
+                      flexShrink: 0, height: 38, padding: '0 14px', borderRadius: 10, border: 'none',
+                      background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0f172a)',
+                      fontWeight: 700, fontSize: 13, cursor: (sending || !draft.trim()) ? 'default' : 'pointer',
+                      opacity: (sending || !draft.trim()) ? 0.55 : 1, display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    {sending ? <Loader2 size={15} strokeWidth={1.6} className="spin" /> : <Send size={15} strokeWidth={1.6} />}
+                    Send
+                  </button>
+                </div>
+              ) : (
+                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--v2-line)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--v2-bg-2)' }}>
+                  <Lock size={16} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)' }}>
+                    24h window closed — re-opening needs an approved template (coming with broadcast).
+                  </span>
+                </div>
+              )}
             </>
           )}
         </div>
