@@ -94,6 +94,16 @@ function messageBody(m) {
   )
 }
 
+// C8 — pull the QR board code from a pre-filled scan message, e.g.
+// "Hi, saw your screen at MG Road [RR-AHM-01]". The first [bracketed] token
+// of letters/digits/hyphens, uppercased for the case-insensitive
+// campaign_locations lookup. null when none (a manually-typed message).
+function extractCampaignCode(body) {
+  if (!body) return null
+  const m = String(body).match(/\[([A-Za-z0-9][A-Za-z0-9-]{0,39})\]/)
+  return m ? m[1].toUpperCase() : null
+}
+
 // ── C4-store ──────────────────────────────────────────────────────────────
 // Persist the conversation + inbound message to the NEW campaign tables
 // (whatsapp_accounts / whatsapp_conversations / whatsapp_messages). This is
@@ -152,18 +162,34 @@ async function storeInbound(payload) {
         if (!customerWaId) continue
 
         // Conversation: the (account, customer) UNIQUE index is NOT partial →
-        // upsert(onConflict) is valid here. The partial object updates ONLY
-        // these columns on conflict — lead_id / assigned_to / campaign_id (set
-        // by C4.5 later) are NOT in the object, so they survive.
+        // upsert(onConflict) is valid here. This object updates ONLY these
+        // columns on conflict — lead_id / assigned_to (set by C4.5 later) are
+        // NOT in it, so they survive.
+        const convRow = {
+          whatsapp_account_id: accountId,
+          customer_wa_id: customerWaId,
+          last_inbound_at: nowIso,
+          window_expires_at: windowIso,
+          status: 'open',
+          updated_at: nowIso,
+        }
+        // C8 — QR board attribution. The QR pre-fills "[CODE]" in the scan
+        // text; match campaign_locations → stamp campaign_id + location_id so
+        // C4.5 routes by that campaign + tags the lead with the board. Only
+        // set when a code matches (so a later non-coded message can't blank an
+        // already-attributed conversation).
+        const code = extractCampaignCode(messageBody(m))
+        if (code) {
+          const { data: loc } = await admin.from('campaign_locations')
+            .select('id, campaign_id').ilike('code', code).maybeSingle()
+          if (loc?.id) {
+            convRow.campaign_id = loc.campaign_id
+            convRow.location_id = loc.id
+          }
+        }
+
         const conv = await admin.from('whatsapp_conversations').upsert(
-          {
-            whatsapp_account_id: accountId,
-            customer_wa_id: customerWaId,
-            last_inbound_at: nowIso,
-            window_expires_at: windowIso,
-            status: 'open',
-            updated_at: nowIso,
-          },
+          convRow,
           { onConflict: 'whatsapp_account_id,customer_wa_id' },
         ).select('id').maybeSingle()
         if (conv.error) return { ok: false, error: 'conversation: ' + conv.error.message, stored }
