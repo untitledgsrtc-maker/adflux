@@ -2785,7 +2785,19 @@ fix duration CAPTURE (Phase 116), not loosen the gate.
 
 ---
 
-## 50 · PARKED — APK rebuild owes two native features (do NOT forget) (2026-06-05)
+## 50 · ~~PARKED~~ RESOLVED — APK rebuild shipped 96010 (2026-06-05; closed 2026-06-07)
+
+> **UPDATE 2026-06-07 — DEBT SETTLED.** Phase 121.2 (`72cd3cc`) rebuilt the
+> APK to **versionCode 96010** and the owner confirmed it is **out to reps +
+> working fine** (7 Jun 2026). So both native debts below — the
+> `@capacitor/share` PDF-attach AND the Phase 76.2 tracking plugin
+> (`TrackingPlugin.java` / `CallLogReader`) — are now **compiled into the
+> installed APK on reps' devices**. The "PDF not attaching" complaint should
+> be gone; the device GPS-toggle / network / heartbeat / call-duration
+> capture now run natively (no more web-probe fallback gap). Tasks #23/#41
+> can close. If a rep still reports a missing PDF attach or dark GPS, it's a
+> NEW bug on 96010, not this parked debt. The original parked note is kept
+> below for history.
 
 The Capacitor APK runs **live-update**: it loads the Vercel bundle, so
 **JS/CSS/SQL changes reach it with NO rebuild**. A rebuild is needed ONLY
@@ -2818,4 +2830,120 @@ NOT answer "no rebuild ever needed" without naming these two.
 **Why parked:** owner's deliberate deferral (tied to the Phase 76.2 plugin
 work + release-signing). Confirm with owner before rebuilding — it's a
 deliberate park, not an oversight.
+
+
+---
+
+## 51 · Phase 122 / 124 / 125 — km single-source + report meeting target + rep route toggle (2026-06-07)
+
+Owner audited Abhinav + kirti day-summary reports vs the admin dashboard.
+Three findings, all shipped JS-only (no SQL, no APK rebuild), all
+display-only, sales-module-guardian PASS, §45-safe (additive, no hot-path
+load). On origin: `4744cea` (122) · `5242119` (124) · `694dc53` (125).
+
+### KM SINGLE-SOURCE CONTRACT (NEW — freeze this, it's a repeat foot-gun)
+
+Three surfaces showed three different km for the SAME rep-day (kirti 6 Jun):
+rep "Today on the map" **51.0**, admin /admin/gps **33.1**, evening report +
+TA payout **32.6**. Root cause: the rep map AND the admin track both
+RE-COMPUTE km client-side via `gpsDistance.js::summariseTrack`, whose
+accuracy-fallback ("if >50% of pings fail the 50m accuracy filter, count
+ALL pings") inflates on weak-GPS days (kirti: 881 of 1773 pings
+low-accuracy, on the 50% knife-edge → the rep's ping set tipped the
+fallback ON → 51; the admin's full set landed just under → 33).
+
+**THE RULE (Phase 124):** `daily_ta.km_traveled` (server `compute_daily_ta`,
+the per-ping AFTER-INSERT trigger `tg_ta_on_ping` — **live, NOT nightly**;
+the nightly cron `recompute_all_ta_today` is only a backstop) is the ONE
+source of truth for km. It is what the TA payout pays. Every DISPLAY of km
+MUST read `daily_ta.km_traveled` (filter: `user_id` + `ta_date`), falling
+back to the client `summariseTrack` km ONLY when daily_ta has no row for
+that (user, date). `summariseTrack` / `cleanTrack` may ONLY drive the route
+POLYLINE + the ping/low-accuracy diagnostics — NEVER the headline km.
+- Applied to `RepMapPanel.jsx` (the rep chip) + `GpsTrackV2.jsx` (admin
+  DISTANCE) in Phase 124. The report (`useDaySummary`) already read it.
+- The "daily_ta only rolls up nightly" comment in `TaDaRequestPanel.jsx` +
+  `MeetingsMapPanel.jsx` is STALE (pre-34Z.67) — daily_ta is live per-ping.
+- Do NOT "fix" a km mismatch by tuning the client `summariseTrack`
+  accuracy-fallback threshold — show `daily_ta` instead. Any NEW km display
+  reads `daily_ta.km_traveled`, never a fresh client recompute.
+
+### Report meeting target (Phase 122)
+
+The evening WhatsApp report's client-side `dayScore` (useDaySummary) read
+the meeting target from the **morning-planner array COUNT** (`work_sessions
+.planned_meetings`), which is **0** when the rep didn't pre-plan meetings →
+`pctOf(4, 0)` returns 100% → meetings got the full 50/100 → Abhinav's report
+read 81 instead of ~71. The admin card AND the pay score
+(`compute_daily_score`) both correctly use the real target
+`users.daily_targets.meetings || 5` (Abhinav 4/5 = 80%).
+- **The PAY score was never wrong** — only the report's DISPLAY score.
+- Fix: `planMeetings` now uses the rep's morning plan IF they entered one
+  (count > 0), else falls back to `(profile?.daily_targets?.meetings) || 5`
+  for sales / 0 for TC — matching the card + pay score.
+- Quote-scope mismatch (report line "Quotes sent: N (this month)" vs the
+  score's TODAY-only quote slice) — owner chose LEAVE IT (the "this month"
+  label already disambiguates). Do not relabel.
+
+### Rep route toggle (Phase 125)
+
+`RepMapPanel` ("Today on the map", frozen /work + /telecaller) gained the
+admin-style **All / Route only / Meetings** segmented toggle. `viewMode`
+default `'all'` → `showRoute` + `showMeetings` both true → both render
+effects byte-identical to before (every rep uses this card daily, so the
+default MUST not change). 'route' hides meeting pins, 'meetings' hides the
+route line. Pure client view-state over already-fetched data — no new query.
+Mirrors the `GpsTrackV2` viewMode pattern. Reusable if another map needs it.
+
+
+---
+
+## 52 · CLAUDE.md backfill — undocumented Phase 117–123 + PHASE-NUMBER COLLISION (2026-06-07)
+
+CLAUDE.md jumped from §49 (Phase 115/116) → §50 (APK parked) → §51
+(Phase 122/124/125), skipping ~15 shipped commits. This section backfills
+them. **All are on origin (`untitled-os`) + live.**
+
+### ⚠️ PHASE-NUMBER COLLISION — disambiguate by SHA, not number
+
+Numbers **117 / 118 / 119 / 120 / 121 / 122 were REUSED across two
+batches**. There are TWO Phase 117s, TWO 119s, etc. — completely different
+work. When someone says "Phase 119", ask which one or check the SHA. The
+git log order (newest first) is the truth. Going forward, the next new
+phase is **126+** — do NOT reuse 117–125.
+
+### BATCH A — day-summary / day-track / admin call-history (prior session, between the §49 and §50 doc commits)
+
+| SHA | Phase | What |
+|---|---|---|
+| `9178224` | 117 | Admin day-track call-history split into **"Lead calls · N"** + **"Unknown numbers · N"** (`GpsTrackV2`, new `CallHistorySection`). Unknown rows = `tel:` one-tap. §33 exclusions byte-intact. |
+| `03c28ca` | 118 | **Redesigned Sales Day Summary** — 4-tier scorecard + new lines (the `useDaySummary` / `whatsappSummary` shape §51 Phase 122 later tuned). SQL touched the chase/score counts. |
+| `5a4548a` | 118.1 | `DROP FUNCTION before recreate` (42P13 return-type-change fix). |
+| `a523bda` | 119 | Admin **QUALIFIED = lead calls only** (+ "Other ≥10s" non-lead stat) on the day-track call breakdown. |
+| `ffc7d0a` | 120 | Fraud flag **"Unverified connected"** on the day-track (connected-outcome rows with no duration proof). |
+| `9e7df76` | 119[sic→121] | Day-track **map dots** — round dots for check-in/out/stops, **teardrop = meeting only** (commit mislabeled 119; it's the 121 day-track series). |
+| `0496b99` | 121.1 | Day-track polish — dropped dup KPIs (Qualified/Voice), Unknown section starts collapsed, bigger check-in/out dots. |
+| `72cd3cc` | 121.2 | **APK rebuild** — versionCode `96009→96010` carrying the §50 PDF-attach (`@capacitor/share`) + tracking-plugin native code. **CONFIRMED out to reps + working fine (owner 7 Jun 2026) → §50 parked debt SETTLED.** |
+
+### BATCH B — team-dashboard KPI drill-downs + smart-task hide + campaign + this session's data-integrity bug-hunt
+
+| SHA | Phase | What |
+|---|---|---|
+| `2c17dfc` | 122 | **Team-dashboard KPI drill-downs** — admin dashboard tiles become clickable. (Different Phase 122 from §51's meeting-target fix `4744cea`.) |
+| `c5af8a7` | 122.1 | Wired the remaining 5 KPI tiles to their drill-downs. |
+| `0418e96` | 122.2 | **Quote-chase + Pay-chase** dashboard tiles land on the quotes list. SQL `supabase_phase118_chase_counts_outstanding.sql` backs these counts — **confirm run state**. |
+| `d77721e` | 123 | **Hide NEXT UP (smart task) + TODAY'S TASKS on sales /work** (role='sales' only — owner: "confusing for the team"; their tasks live in the FOLLOW-UPS tab). Agency/managers keep both. Pure render gate; call chain byte-intact. Guardian PASS. |
+| `aff51c5` | C4 | **WhatsApp Cloud API receive-only webhook** (`api/wa/webhook.js`) — campaign module §46. Raw-body HMAC verify + verify-token GET handshake + PII-stripped `webhook_event_log`. NO lead write yet (that's C4.5). Env: `CAMPAIGN_WEBHOOK_VERIFY_TOKEN` + `CAMPAIGN_APP_SECRET` (in Vercel). Parked at "subscribe Meta `messages` + test the test number". |
+| `260a4cc` | 117 | **Close orphaned quote-chase follow-ups on quote delete** (`quote_after_delete_rollback_lead` also closes open `quote_chase` follow_ups when the QuoteSent→Working demotion fires). SQL `supabase_phase117_close_orphan_quote_chase.sql` **RUN**. (Different Phase 117 from `9178224`.) |
+| `86fed75` | 119 | **Every deal = a lead** — `quote_before_insert_ensure_lead()` BEFORE-INSERT auto-attaches/creates a lead for an orphan quote (EXCEPTION-wrapped so a quote save can NEVER break; `cadence_paused=true` → no chase). SQL `supabase_phase119_every_deal_a_lead.sql` **RUN**. (Different Phase 119 from `a523bda`.) |
+| `8a92c02` | 120 | **Call-duration race fix** — PostCallOutcomeModal awaits the call_logs outcome-patch so the duration write wins the race (`call_logs` was undercounting vs `lead_activities`). SQL `supabase_phase120_callduration_reconcile_backfill.sql` (heal) **RUN**. No pay impact (score reads activities). (Different Phase 120 from `ffc7d0a`.) |
+| `8c7ce7b` | 121 | **Leave date-range + paid/unpaid** on the admin Leaves tab + rep request form. New `src/utils/leaveDates.js` (`buildLeaveDates`: skip Sundays, cap 60, local-date math). One `leaves` row per working day. No schema/salary change. (Different Phase 121 from the day-track series.) |
+
+### SQL run-state — ALL CONFIRMED RUN (owner-verified 2026-06-07)
+- `supabase_phase118_chase_counts_outstanding.sql` (`my_chase_counts()` RPC,
+  feeds the TC hero + day-summary chase lines) — **RUN** (owner checked
+  `pg_proc` → function present, 7 Jun).
+- phase117 orphan quote-chase, phase119 every-deal, phase120 callduration —
+  RUN (confirmed earlier this session).
+- No outstanding SQL paste for Phase 117–125.
 
