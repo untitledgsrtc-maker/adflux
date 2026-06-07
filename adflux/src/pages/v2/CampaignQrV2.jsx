@@ -44,6 +44,9 @@ export default function CampaignQrV2() {
   const [accounts, setAccounts] = useState([])
   const [campaigns, setCampaigns] = useState([])
   const [leadsByBoard, setLeadsByBoard] = useState({})
+  const [quotesByBoard, setQuotesByBoard] = useState({})
+  const [messagedByBoard, setMessagedByBoard] = useState({})
+  const [scansByBoard, setScansByBoard] = useState({})
   const [tcByCampaign, setTcByCampaign] = useState({})
   const [saving, setSaving] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -83,12 +86,38 @@ export default function CampaignQrV2() {
         .from('campaigns').select('id, name, default_telecaller_id').eq('is_active', true).order('name')
       setCampaigns(camps || [])
 
-      // Real leads per board (leads.location_id, stamped by C8) — read-only.
-      const { data: ld } = await supabase
-        .from('leads').select('location_id').not('location_id', 'is', null)
-      const lb = {}
-      ;(ld || []).forEach((r) => { if (r.location_id) lb[r.location_id] = (lb[r.location_id] || 0) + 1 })
+      // Real per-board analytics — all SCOPED to the boards in view (bounded;
+      // read-only on live tables). leads (by location_id) + the quotes off
+      // those leads + the WhatsApp conversations carrying the board code + the
+      // QR scans.
+      const boardIds = (locs || []).map((b) => b.id)
+      const lb = {}, leadToBoard = {}, qb = {}, mb = {}, sb = {}
+      if (boardIds.length) {
+        const { data: ld } = await supabase
+          .from('leads').select('id, location_id').in('location_id', boardIds)
+        ;(ld || []).forEach((r) => {
+          if (!r.location_id) return
+          lb[r.location_id] = (lb[r.location_id] || 0) + 1
+          leadToBoard[r.id] = r.location_id
+        })
+
+        const leadIds = Object.keys(leadToBoard)
+        if (leadIds.length) {
+          const { data: qs } = await supabase.from('quotes').select('lead_id').in('lead_id', leadIds)
+          ;(qs || []).forEach((q) => { const b = leadToBoard[q.lead_id]; if (b) qb[b] = (qb[b] || 0) + 1 })
+        }
+
+        const { data: convs } = await supabase
+          .from('whatsapp_conversations').select('location_id').in('location_id', boardIds)
+        ;(convs || []).forEach((c) => { if (c.location_id) mb[c.location_id] = (mb[c.location_id] || 0) + 1 })
+
+        const { data: scans } = await supabase.from('qr_scans').select('location_id').in('location_id', boardIds)
+        ;(scans || []).forEach((s) => { if (s.location_id) sb[s.location_id] = (sb[s.location_id] || 0) + 1 })
+      }
       setLeadsByBoard(lb)
+      setQuotesByBoard(qb)
+      setMessagedByBoard(mb)
+      setScansByBoard(sb)
 
       // board → campaign → telecaller name.
       const tcIds = [...new Set((camps || []).map((c) => c.default_telecaller_id).filter(Boolean))]
@@ -125,6 +154,12 @@ export default function CampaignQrV2() {
     () => (waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}` : ''),
     [waNumber, message]
   )
+  // The QR encodes a TRACKABLE redirect (/api/q/<CODE>): a scan hits it, we log
+  // a qr_scans row, then it 302s to the board's wa.me link (stored as qr_text).
+  // So the QR VALUE is the redirect URL; the saved qr_text stays the wa.me link
+  // (the bounce target the endpoint reads).
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.untitledad.in'
+  const qrValue = (c) => (c ? `${origin}/api/q/${encodeURIComponent(c)}` : '')
 
   const leadsByCity = useMemo(() => {
     const m = {}
@@ -216,31 +251,45 @@ export default function CampaignQrV2() {
                   <th style={{ ...th, width: 48 }}></th>
                   <th style={th}>Board</th>
                   <th style={th}>City</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Scans</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Messaged</th>
                   <th style={{ ...th, textAlign: 'right' }}>Leads</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Quotes</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Conv%</th>
                   <th style={th}>Telecaller</th>
                   <th style={{ ...th, textAlign: 'right' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {boards.map((b) => {
+                  const scans = scansByBoard[b.id] || 0
+                  const messaged = messagedByBoard[b.id] || 0
                   const leads = leadsByBoard[b.id] || 0
+                  const quotes = quotesByBoard[b.id] || 0
+                  const conv = leads ? Math.round((quotes / leads) * 100) : null
                   const tc = b.campaign_id ? tcByCampaign[b.campaign_id] : null
                   return (
                     <tr key={b.id} className="qr-row">
-                      <td style={{ ...td, padding: '8px 16px' }}><BoardThumb qr={b.qr_text} /></td>
+                      <td style={{ ...td, padding: '8px 16px' }}><BoardThumb qr={qrValue(b.code)} /></td>
                       <td style={td}>
                         <div style={{ fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>{b.label || b.code}</div>
                         <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', letterSpacing: '.04em', marginTop: 2 }}>{b.code}</div>
                       </td>
                       <td style={td}>{b.city || <span style={{ color: 'var(--v2-ink-2)' }}>—</span>}</td>
-                      <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 700, color: leads ? 'var(--v2-ink-0)' : 'var(--v2-ink-2)' }}>{leads}</td>
+                      <td style={numTd(scans)}>{scans}</td>
+                      <td style={numTd(messaged)}>{messaged}</td>
+                      <td style={numTd(leads)}>{leads}</td>
+                      <td style={numTd(quotes)}>{quotes}</td>
+                      <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 700, color: conv == null ? 'var(--v2-ink-2, #6a7590)' : conv >= 5 ? 'var(--v2-green, #22c55e)' : 'var(--v2-amber, #F59E0B)' }}>
+                        {conv == null ? '—' : `${conv}%`}
+                      </td>
                       <td style={td}>
                         {tc ? (
                           <span style={tcPill}><span style={tcAv}>{tc.charAt(0).toUpperCase()}</span>{tc}</span>
                         ) : <span style={{ color: 'var(--v2-ink-2)', fontSize: 12 }}>—</span>}
                       </td>
                       <td style={{ ...td, textAlign: 'right' }}>
-                        <BoardDownload board={b} />
+                        <BoardDownload board={b} qr={qrValue(b.code)} />
                       </td>
                     </tr>
                   )
@@ -334,12 +383,12 @@ export default function CampaignQrV2() {
                 <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 10 }}>Live preview</div>
                 <div ref={previewRef} style={{ background: 'white', borderRadius: 10, padding: 14, display: 'inline-block' }}>
                   {waUrl ? (
-                    <Suspense fallback={<div style={{ width: 180, height: 180 }} />}><QRCodeCanvas value={waUrl} size={180} /></Suspense>
+                    <Suspense fallback={<div style={{ width: 180, height: 180 }} />}><QRCodeCanvas value={qrValue(code)} size={180} /></Suspense>
                   ) : (
                     <div style={{ width: 180, height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--v2-ink-2, #6a7590)', fontSize: 12 }}>Enter a number</div>
                   )}
                 </div>
-                <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', marginTop: 8, wordBreak: 'break-all' }}>{waUrl || '—'}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', marginTop: 8, wordBreak: 'break-all' }}>{waUrl ? qrValue(code) : '—'}</div>
               </div>
             </div>
           </div>
@@ -360,7 +409,7 @@ function BoardThumb({ qr }) {
   )
 }
 
-function BoardDownload({ board }) {
+function BoardDownload({ board, qr }) {
   const ref = useRef(null)
   function dl() {
     const c = ref.current?.querySelector('canvas')
@@ -370,7 +419,7 @@ function BoardDownload({ board }) {
   return (
     <>
       <span ref={ref} style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
-        {board.qr_text && <Suspense fallback={null}><QRCodeCanvas value={board.qr_text} size={256} /></Suspense>}
+        {qr && <Suspense fallback={null}><QRCodeCanvas value={qr} size={256} /></Suspense>}
       </span>
       <button type="button" style={{ ...btnG, height: 30, fontSize: 12, padding: '0 10px' }} onClick={dl}><Download size={13} strokeWidth={1.6} /> PNG</button>
     </>
@@ -386,6 +435,7 @@ const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg,
 const btnG = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 38, padding: '0 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
 const th = { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2, #6a7590)', borderBottom: '1px solid var(--v2-line, #1f2b47)', whiteSpace: 'nowrap', background: 'rgba(255,255,255,.02)' }
 const td = { padding: '12px 16px', borderBottom: '1px solid var(--v2-line, #1f2b47)', fontSize: 13, color: 'var(--v2-ink-1, #a9b3c7)', verticalAlign: 'middle', position: 'relative' }
+const numTd = (n) => ({ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 700, color: n ? 'var(--v2-ink-0, #f5f7fb)' : 'var(--v2-ink-2, #6a7590)' })
 const tcPill = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--v2-ink-1, #a9b3c7)', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', padding: '3px 9px', borderRadius: 999 }
 const tcAv = { width: 18, height: 18, borderRadius: 999, background: 'var(--v2-blue-soft, rgba(96,165,250,0.16))', color: 'var(--v2-blue, #60a5fa)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px', overflowY: 'auto' }
