@@ -29,7 +29,7 @@ function fmtPhone(waId) {
 }
 // Avatar = last 2 digits, tinted by a stable hash (mockup's colourful pills).
 const AV_TINTS = [
-  { bg: 'var(--v2-yellow-soft, rgba(255,230,0,0.14))', fg: 'var(--v2-yellow, #FFE600)' },
+  { bg: 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', fg: 'var(--v2-yellow, #FFE600)' },
   { bg: 'var(--v2-green-soft, rgba(34,197,94,0.14))', fg: 'var(--v2-green, #22c55e)' },
   { bg: 'var(--v2-blue-soft, rgba(59,130,246,0.14))',  fg: 'var(--v2-blue, #60a5fa)' },
 ]
@@ -384,7 +384,7 @@ const chipBase = {
 const chipG = { ...chipBase, background: 'var(--v2-green-soft, rgba(34,197,94,0.14))', color: 'var(--v2-green, #22c55e)' }
 const chipA = { ...chipBase, background: 'var(--v2-amber-soft, rgba(245,158,11,0.14))', color: 'var(--v2-amber, #F59E0B)' }
 const chipB = { ...chipBase, background: 'var(--v2-blue-soft, rgba(59,130,246,0.14))', color: 'var(--v2-blue, #60a5fa)' }
-const chipY = { ...chipBase, background: 'var(--v2-yellow-soft, rgba(255,230,0,0.14))', color: 'var(--v2-yellow, #FFE600)' }
+const chipY = { ...chipBase, background: 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', color: 'var(--v2-yellow, #FFE600)' }
 const btnGhost = {
   display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer',
   background: 'var(--v2-bg-2)', color: 'var(--v2-ink-1, #a9b3c7)',
