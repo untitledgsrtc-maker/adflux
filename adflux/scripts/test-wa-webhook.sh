@@ -37,17 +37,20 @@ JSON
 HEX="$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')"
 SIG="sha256=${HEX}"
 
-echo "POST $URL"
+echo "POST $URL?debug=1"
 echo "  from=${FROM}  text=\"${TEXT}\""
 echo "  signature=${SIG:0:23}..."
 echo "---"
-curl -sS -X POST "$URL" \
+# ?debug=1 echoes the C4-store outcome back in the JSON (HMAC-gated; Meta
+# never sends it, so prod replies are unchanged).
+curl -sS -X POST "${URL}?debug=1" \
   -H 'Content-Type: application/json' \
   -H "X-Hub-Signature-256: ${SIG}" \
   --data "$BODY"
 echo
 echo "---"
-echo "Expected: {\"received\":true,\"count\":1}"
+echo "Expected: {\"received\":true,\"count\":1,\"store\":{\"ok\":true,\"stored\":1}}"
+echo "  store.ok=false → the error string says which write failed."
 echo "Then check Supabase:"
 echo "  select customer_wa_id, status from whatsapp_conversations order by created_at desc limit 3;"
 echo "  select direction, type, body from whatsapp_messages order by at desc limit 3;"

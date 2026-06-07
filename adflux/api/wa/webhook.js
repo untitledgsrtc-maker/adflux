@@ -103,7 +103,7 @@ function messageBody(m) {
 // so the 200 to Meta is never blocked (a dropped message is re-sent by Meta;
 // the wamid UNIQUE makes the retry idempotent).
 async function storeInbound(payload) {
-  if (!SUPABASE_URL || !SERVICE_KEY) return
+  if (!SUPABASE_URL || !SERVICE_KEY) return { ok: false, error: 'no supabase creds', stored: 0 }
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
@@ -122,16 +122,24 @@ async function storeInbound(payload) {
       if (!phoneNumberId || inbound.length === 0) continue
 
       // Resolve (or self-provision) the receiving account by phone_number_id.
-      // ignoreDuplicates → NEVER overwrites an existing row (so an owner-set
-      // default_telecaller_id used by C4.5 routing is preserved). The
-      // auto-created row carries NO default_telecaller_id, so C4.5 will
-      // error-queue rather than mint a NULL-owner lead (P0-2 safe).
-      await admin.from('whatsapp_accounts').upsert(
-        { provider: 'cloud_api', phone_number_id: phoneNumberId, display_number: meta.display_phone_number || null },
-        { onConflict: 'phone_number_id', ignoreDuplicates: true },
-      )
-      const { data: acct } = await admin.from('whatsapp_accounts')
-        .select('id').eq('phone_number_id', phoneNumberId).maybeSingle()
+      // The phone_number_id UNIQUE index is PARTIAL (`WHERE phone_number_id IS
+      // NOT NULL`) and PostgREST upsert can't target a partial index (Postgres
+      // 42P10) — so SELECT-then-INSERT, never .upsert(onConflict). The INSERT
+      // tolerates a concurrent-insert 23505 by re-selecting. Never overwrites
+      // an existing row → an owner-set default_telecaller_id (C4.5 routing) is
+      // preserved; the auto-created row has none → C4.5 safely error-queues.
+      let acct = (await admin.from('whatsapp_accounts')
+        .select('id').eq('phone_number_id', phoneNumberId).maybeSingle()).data
+      if (!acct) {
+        const ins = await admin.from('whatsapp_accounts')
+          .insert({ provider: 'cloud_api', phone_number_id: phoneNumberId, display_number: meta.display_phone_number || null })
+          .select('id').maybeSingle()
+        if (ins.error && ins.error.code !== '23505') {
+          return { ok: false, error: 'account insert: ' + ins.error.message, stored }
+        }
+        acct = ins.data
+          || (await admin.from('whatsapp_accounts').select('id').eq('phone_number_id', phoneNumberId).maybeSingle()).data
+      }
       const accountId = acct?.id
       if (!accountId) continue
 
@@ -139,16 +147,15 @@ async function storeInbound(payload) {
       const windowIso = new Date(Date.now() + 24 * 3600 * 1000).toISOString()
 
       for (const m of inbound) {
-        if (stored >= STORE_CAP) return
+        if (stored >= STORE_CAP) return { ok: true, stored }
         const customerWaId = m.from
         if (!customerWaId) continue
-        stored++
 
-        // Upsert the conversation (one per account+customer); refresh the 24h
-        // reply window on every inbound. The partial object updates ONLY these
-        // columns on conflict — lead_id / assigned_to / campaign_id (set by
-        // C4.5 later) are NOT in the object, so they survive.
-        const { data: conv } = await admin.from('whatsapp_conversations').upsert(
+        // Conversation: the (account, customer) UNIQUE index is NOT partial →
+        // upsert(onConflict) is valid here. The partial object updates ONLY
+        // these columns on conflict — lead_id / assigned_to / campaign_id (set
+        // by C4.5 later) are NOT in the object, so they survive.
+        const conv = await admin.from('whatsapp_conversations').upsert(
           {
             whatsapp_account_id: accountId,
             customer_wa_id: customerWaId,
@@ -159,25 +166,29 @@ async function storeInbound(payload) {
           },
           { onConflict: 'whatsapp_account_id,customer_wa_id' },
         ).select('id').maybeSingle()
-        const convId = conv?.id
+        if (conv.error) return { ok: false, error: 'conversation: ' + conv.error.message, stored }
+        const convId = conv.data?.id
         if (!convId) continue
 
-        // Insert the message; wamid UNIQUE → idempotent on Meta retries.
+        // Message: the wamid UNIQUE index is also PARTIAL → plain INSERT and
+        // tolerate the duplicate (23505) for Meta-retry idempotency, not upsert.
         const atIso = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : nowIso
-        await admin.from('whatsapp_messages').upsert(
-          {
-            conversation_id: convId,
-            wamid: m.id || null,
-            direction: 'in',
-            type: m.type || 'text',
-            body: messageBody(m),
-            at: atIso,
-          },
-          { onConflict: 'wamid', ignoreDuplicates: true },
-        )
+        const msg = await admin.from('whatsapp_messages').insert({
+          conversation_id: convId,
+          wamid: m.id || null,
+          direction: 'in',
+          type: m.type || 'text',
+          body: messageBody(m),
+          at: atIso,
+        })
+        if (msg.error && msg.error.code !== '23505') {
+          return { ok: false, error: 'message: ' + msg.error.message, stored }
+        }
+        stored++
       }
     }
   }
+  return { ok: true, stored }
 }
 
 export default async function handler(req, res) {
@@ -288,12 +299,19 @@ export default async function handler(req, res) {
   // C4-store — persist the conversation + inbound message to the new campaign
   // tables (the Inbox/C5 data layer). Best-effort; a failure never blocks the
   // 200 to Meta (Meta re-sends; the wamid UNIQUE keeps the retry idempotent).
+  let storeResult = null
   try {
-    await storeInbound(payload)
-  } catch {
+    storeResult = await storeInbound(payload)
+  } catch (e) {
+    storeResult = { ok: false, error: 'threw: ' + (e?.message || String(e)), stored: 0 }
     try { console.error('[wa/webhook] store failed') } catch { /* noop */ }
   }
 
   await logEvents(rows)
-  return res.status(200).json({ received: true, count: rows.length })
+  const out = { received: true, count: rows.length }
+  // ?debug=1 surfaces the store outcome in the reply — gated behind the HMAC
+  // (only a valid-signature caller reaches here) and Meta never sends it, so
+  // production replies are unchanged. Used by scripts/test-wa-webhook.sh.
+  if (req.query && req.query.debug === '1') out.store = storeResult
+  return res.status(200).json(out)
 }
