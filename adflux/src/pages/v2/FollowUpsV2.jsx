@@ -38,6 +38,8 @@ import { dialPhone, openExternalUrl } from '../../utils/openExternal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { toastError } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { istTodayISO } from '../../utils/istDate'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 const ADD_DAYS  = (iso, n) => {
@@ -210,6 +212,31 @@ export default function FollowUpsV2() {
   }, [nurtureRows])
 
   async function markDone(row) {
+    // Phase 128 — a follow-up can only be CLOSED BY HAND if the rep actually
+    // called the lead today (a call attempt counts — even no-answer). Blocks
+    // "clearing" a follow-up without doing the work. The normal flow (tap Call
+    // → call → the outcome chain auto-closes the follow-up) is a DIFFERENT
+    // function (openCall + PostCallOutcomeModal) and is untouched — this gate
+    // only fires on a manual Done tap with no call on record today.
+    const clean = String(rowPhone(row) || '').replace(/\D/g, '').slice(-10)
+    if (clean.length === 10) {
+      const { data: calls } = await supabase
+        .from('call_logs')
+        .select('client_phone')
+        .eq('user_id', profile?.id)
+        .gte('call_at', istTodayISO() + 'T00:00:00+05:30')
+      const called = (calls || []).some(
+        c => String(c.client_phone || '').replace(/\D/g, '').slice(-10) === clean
+      )
+      if (!called) {
+        await confirmDialog({
+          title: 'Call them first',
+          message: `You haven't called ${rowName(row) || 'this lead'} today. Tap Call and reach out first — then you can mark this follow-up done.`,
+          confirmLabel: 'OK',
+        })
+        return
+      }
+    }
     setBusyId(row.id)
     const { error: err } = await supabase
       .from('follow_ups')
