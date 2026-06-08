@@ -7,6 +7,8 @@ import { todayISO } from '../utils/formatters'
 // AlarmManager alarm in sync with the DB row. Cancel on done,
 // reschedule on update, schedule on create. Web no-op via guard.
 import { scheduleFollowUpAlarm, cancelFollowUpAlarm } from '../utils/scheduleFollowUpAlarm'
+import { confirmDialog } from '../components/v2/ConfirmDialog'
+import { istTodayISO } from '../utils/istDate'
 
 export function useFollowUps(quoteId = null) {
   const [followUps, setFollowUps] = useState([])
@@ -68,6 +70,30 @@ export function useFollowUps(quoteId = null) {
 
   // ─── Mark done ────────────────────────────────────────────────────
   const markDone = async (id) => {
+    // Phase 128 — same gate as FollowUpsV2.markDone: a follow-up can only be
+    // closed by hand if the rep actually called the lead today (a call attempt
+    // counts — even no-answer). Blocks "clearing" a follow-up without doing the
+    // work. The auto-close after a real call (PostCallOutcomeModal) is a
+    // different path and stays untouched. lead_id-less rows (no lead to verify)
+    // skip the gate.
+    const leadId = followUps.find(f => f.id === id)?.lead_id || null
+    if (leadId) {
+      const { data: calls } = await supabase
+        .from('call_logs')
+        .select('id')
+        .eq('user_id', profile?.id)
+        .eq('lead_id', leadId)
+        .gte('call_at', istTodayISO() + 'T00:00:00+05:30')
+        .limit(1)
+      if (!calls || calls.length === 0) {
+        await confirmDialog({
+          title: 'Call them first',
+          message: 'Call this lead first — then you can mark the follow-up done.',
+          confirmLabel: 'OK',
+        })
+        return { data: null, error: null }
+      }
+    }
     const { data, error: err } = await supabase
       .from('follow_ups')
       .update({ is_done: true, done_at: new Date().toISOString() })
