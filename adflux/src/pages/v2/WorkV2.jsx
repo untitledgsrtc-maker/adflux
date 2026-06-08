@@ -1237,7 +1237,9 @@ export default function WorkV2() {
             const { data } = await supabase
               .from('leads').select('stage').eq('id', callLead.id).maybeSingle()
             setTimeout(() => {
-              setWaPrompt({ stage: data?.stage || callLead.stage || 'post_call' })
+              // Phase 126.4 — carry the lead INTO waPrompt so the popup is
+              // self-contained (decoupled from callLead's lifecycle).
+              setWaPrompt({ stage: data?.stage || callLead.stage || 'post_call', lead: callLead })
             }, 200)
           }
         }}
@@ -1254,7 +1256,7 @@ export default function WorkV2() {
       <WhatsAppPromptModal
         open={!!waPrompt}
         stage={waPrompt?.stage}
-        lead={callLead}
+        lead={waPrompt?.lead}
         profile={profile}
         onClose={() => setWaPrompt(null)}
       />

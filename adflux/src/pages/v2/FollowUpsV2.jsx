@@ -656,7 +656,10 @@ export default function FollowUpsV2() {
             const { data } = await supabase
               .from('leads').select('stage').eq('id', lockedLead.id).maybeSingle()
             setTimeout(() => {
-              setWaPrompt({ stage: data?.stage || lockedLead.stage || 'post_call' })
+              // Phase 126.4 — carry the lead INTO waPrompt so the popup is
+              // self-contained. callLead is cleared just below (line ~662);
+              // the popup must NOT depend on it.
+              setWaPrompt({ stage: data?.stage || lockedLead.stage || 'post_call', lead: lockedLead })
             }, 200)
           }
           setCallLead(null)
@@ -673,7 +676,7 @@ export default function FollowUpsV2() {
       <WhatsAppPromptModal
         open={!!waPrompt}
         stage={waPrompt?.stage}
-        lead={callLead}
+        lead={waPrompt?.lead}
         profile={profile}
         onClose={() => setWaPrompt(null)}
       />
