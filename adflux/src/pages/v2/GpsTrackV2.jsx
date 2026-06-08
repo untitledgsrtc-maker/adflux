@@ -69,8 +69,13 @@ const uniqueMeetingCount = (activities, requireGps = false) => {
     if (isAutoCheckinRow(a)) continue
     if (isScheduledMeetingRow(a)) continue
     if (requireGps && (!a.gps_lat || !a.gps_lng)) continue
-    // Walk-ins keyed by activity id so each is unique.
-    const key = a.lead_id || `walkin_${a.id}`
+    // Phase 127 — the activities SELECT aliases the lead as
+    // lead:lead_id(...) → the row carries a.lead.id, NOT a flat
+    // a.lead_id. Reading only a.lead_id made EVERY meeting fall to the
+    // walk-in branch → the lead-dedup never ran → revisits inflated the
+    // headline (kirti showed 2 for one twice-visited lead). Read the
+    // nested id first, keep the flat + walk-in fallbacks.
+    const key = a.lead?.id || a.lead_id || `walkin_${a.id}`
     seen.add(key)
   }
   return seen.size
