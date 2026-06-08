@@ -292,7 +292,15 @@ export default function useDaySummary({ dateISO } = {}) {
       ])
 
       // Tally activity types client-side.
-      let meetings = 0, site_visits = 0, whatsapp_sent = 0, qualified = 0
+      let whatsapp_sent = 0, qualified = 0
+      // Phase 127.1 — dedupe meetings + site-visits BY LEAD (one company /
+      // lead per day = 1 visit), matching §33 + the live counter
+      // (recompute_daily_meetings) + the GPS-track + the pay score. The old
+      // code counted EACH row, so a lead visited twice the same day (kirti's
+      // Devam) read 2 on the report while every other screen read 1.
+      // COALESCE(lead_id, id) keeps walk-ins (no lead) each unique.
+      const meetingLeads = new Set()
+      const siteVisitLeads = new Set()
       ;(actRes.data || []).forEach(r => {
         const t = (r.activity_type || '').toLowerCase()
         // Phase 110 — apply the CLAUDE.md §33 "done meeting" exclusions so
@@ -302,12 +310,15 @@ export default function useDaySummary({ dateISO } = {}) {
         const note = r.notes || ''
         const isScheduled  = note.startsWith('Meeting scheduled')
         const isAutoCheckin = note.startsWith("I'm here")
-        if (t === 'meeting'    && !isScheduled && !isAutoCheckin) meetings    += 1
-        if (t === 'site_visit' && !isScheduled && !isAutoCheckin) site_visits += 1
+        const key = r.lead_id || `walkin_${r.id}`
+        if (t === 'meeting'    && !isScheduled && !isAutoCheckin) meetingLeads.add(key)
+        if (t === 'site_visit' && !isScheduled && !isAutoCheckin) siteVisitLeads.add(key)
         if (t === 'whatsapp')   whatsapp_sent += 1
         // "qualified" = positive-outcome call/meeting (rough proxy)
         if (r.outcome === 'positive') qualified += 1
       })
+      const meetings = meetingLeads.size
+      const site_visits = siteVisitLeads.size
 
       // PLAN — prefer the morning planner row, fall back to daily_targets,
       // then to the same defaults V2Hero / TeamDashboard use.
