@@ -3033,3 +3033,79 @@ available; delete before real go-live so the TC queue isn't cluttered.
 - Real number (919581578261) still on AiSensy — OTP-migrate to the owner's
   own "Waba" app (App ID 1443324144491532) for full control.
 
+
+---
+
+## 54 · Campaign module FULLY LIVE on real number 95815 78261 (2026-06-09)
+
+**Supersedes §46 "PARKED on edigiexpert token" + §53 "outbound LOCKED / real
+number on AiSensy".** Both are now WRONG — do NOT quote them. The campaign
+WhatsApp module is **end-to-end live**: receive + reply + routing all proven
+on production with the owner's OWN permanent token. No edigiexpert dependency.
+
+### What's live (proven 9 Jun on app.untitledad.in)
+- **Number:** 95815 78261 · `phone_number_id 122102627516008558` · WABA
+  `122098901360016777` (UNTITLED ADVERTISING, owned by the **edigiexpert**
+  business portfolio — it's the owner's). App "Waba" `1443324144491532`.
+- **Receive ✅** — text + media (media shows "[image]" placeholder; actual
+  photo NOT downloaded/rendered yet — later add). Lands in Campaigns → Inbox.
+- **Reply ✅** — composer sends inside the 24h window via `api/wa/send`.
+- **Routing ✅** — `whatsapp_accounts.default_telecaller_id = Rima` →
+  every NEW inbound chat auto-creates a lead in Rima's queue (C4.5).
+
+### The token (permanent, NOT edigiexpert-provided)
+A **System User token** named `campaign-api` on the edigiexpert Business
+Settings, with Full control of the WABA + the Waba app, perms
+`whatsapp_business_messaging` + `whatsapp_business_management`, **expiry
+Never**. Lives in **Vercel env `CAMPAIGN_WA_TOKEN`** (Production). Replaces the
+old 24h test-WABA temp token. `CAMPAIGN_APP_SECRET` (App Settings → Basic) and
+`CAMPAIGN_WEBHOOK_VERIFY_TOKEN` already set (Phase C4).
+
+### THE GOTCHA that cost the whole afternoon (do NOT repeat)
+The signed self-test (`scripts/test-wa-webhook.sh`) POSTs straight to our
+webhook — it proves the ENDPOINT but **bypasses Meta's actual delivery**, so
+it does NOT catch a missing field subscription. Real inbound only flowed after
+TWO Meta steps:
+1. **Subscribe the WABA to the app** — `scripts/subscribe-wa-waba.sh`
+   (POST `/{WABA_ID}/subscribed_apps` with the token). One-time, permanent.
+2. **Subscribe the `messages` webhook field** — Developers → Waba app →
+   WhatsApp → **Configuration → Webhook fields → `messages` = Subscribed.**
+   It was "Unsubscribed" (so was every field). THIS was why "delivered ✓✓ on
+   the phone but nothing in our inbox." If a future number receives nothing,
+   check this field FIRST.
+
+### Why "Add phone number" was the WRONG path
+The real number is already registered in its own WABA → "Add phone number"
+triggers a **migration** (needs matching display names + the source 2-step PIN
++ moves the number off its account). Avoided entirely: instead connect the
+existing WABA to the app via a System User token + `subscribed_apps`. Number
+stays put, no PIN, no migration. (If ever forced to migrate, that's the heavy
+path — get owner sign-off.)
+
+### Files added this session
+- `scripts/subscribe-wa-waba.sh` — WABA→app webhook subscription (one command).
+- `supabase_campaign_route_real_number_telecaller.sql` (`b345240`, **RUN 9
+  Jun**, VERIFY returned Rima·telecaller) — sets the account's
+  default_telecaller_id. Idempotent DO-block; the schema-check INSERT warning
+  is a false positive (guarded ELSE branch).
+
+### §45-safe — zero live-app touch
+Everything additive: new campaign tables only, the C4.5 trigger is on
+whatsapp_conversations (new table), a WhatsApp lead is a normal additive
+`leads` INSERT (cadence_paused=true → no follow-up/push cascade) landing in
+Rima's queue. No live-app file, RLS, function, or hot-path touched.
+
+### Still LEFT (none blocking go-live)
+- **Test-data cleanup** — inbox/leads still hold the self-test junk
+  (`SELFTEST_PNID` + synthetic 9198… numbers) + the owner's own-number test
+  chats (94282 73686 ×2, 98123 45678) + 1 fake "WhatsApp lead". Existing test
+  chats did NOT retro-create leads (trigger fired pre-routing). Clean before
+  real volume so Rima's queue isn't cluttered. Scoped read-first delete only.
+- **Payment method** — WABA shows none ("shared credit line"). First ~1,000
+  service conversations/month free; add a card (WhatsApp Manager → Billing)
+  before real volume.
+- **Media rendering** — download inbound photos from Meta's media API + store
+  + render (currently "[image]"). Later.
+- **Auto-reply (C7)**, **C8 location_id**, Meta Lead Ads (C9), Justdial,
+  Broadcast/Segments/Chatbot — V3, unchanged from §46.
+
