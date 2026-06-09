@@ -255,14 +255,16 @@ export default function useDaySummary({ dateISO } = {}) {
           .gte('campaign_end_date', targetDate)
           .lte('campaign_end_date', istTodayPlusDays(30)),
 
-        // Phase 118 — lead_ids the rep had a REAL (>=10s) call to today.
-        // Gates "real follow-ups" (done + actually called + qualified).
+        // Phase 128.3 — lead_ids the rep CALLED today (ANY attempt; a
+        // no-answer / tapped-Call counts — owner rule "called = dialed,
+        // pickup not required", matching the Phase 128 Done-gate). NO >=10s
+        // filter (that gates the calls-toward-50 metric, a different thing).
+        // Gates "real follow-ups" = done + the lead was actually called.
         supabase.from('call_logs')
           .select('lead_id')
           .eq('user_id', profile.id)
           .gte('call_at', startISO)
           .lte('call_at', endISO)
-          .gte('duration_seconds', 10)
           .not('lead_id', 'is', null),
 
         // Phase 118 — quote outstanding (count + ₹) via the self-scoped
@@ -352,13 +354,12 @@ export default function useDaySummary({ dateISO } = {}) {
       // qualified").
       const calledLeadIds = new Set(
         (callLeadsRes.data || []).map(r => r.lead_id).filter(Boolean))
-      const qualifiedLeadIds = new Set(
-        (actRes.data || [])
-          .filter(r => r.outcome === 'positive' && r.lead_id)
-          .map(r => r.lead_id))
       const doneFu = fuDoneRes.data || []
+      // Phase 128.3 — a follow-up counts as "real" when it was CLOSED and the
+      // rep CALLED the lead today (any attempt). Dropped the qualifiedLeadIds
+      // gate: a no-answer call still counts (owner: "called = follow-up done").
       const followUpsReal = doneFu.filter(f =>
-        f.lead_id && calledLeadIds.has(f.lead_id) && qualifiedLeadIds.has(f.lead_id)).length
+        f.lead_id && calledLeadIds.has(f.lead_id)).length
 
       // Revisit tiers: for each lead met today (real, non-scheduled,
       // non-auto-checkin meeting/visit), what visit number is it over the

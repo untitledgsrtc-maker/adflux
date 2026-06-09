@@ -130,7 +130,11 @@ export function formatDaySummaryText(d) {
     // TC — unchanged (Phase 90.5). "Calls" = qualified count (>=10s).
     lines.push(`• Calls (≥10s): ${a.calls ?? 0}/${p.calls ?? 0}`)
     lines.push(`• New leads:    ${a.leads ?? 0}/${p.leads ?? 0}`)
-    lines.push(`• Follow-ups:   ${a.follow_ups_done ?? 0}/${a.follow_ups_total ?? 0}`)
+    // Phase 128.3 — TC now uses the REAL follow-up count (closed + the lead
+    // was called), same as sales. Was follow_ups_done (raw closes), which a
+    // telecaller inflates past the due count via call-chain auto-closes
+    // (Rima 165/91). follow_ups_real is the honest "did the work" number.
+    lines.push(`• Follow-ups:   ${a.follow_ups_real ?? 0}/${a.follow_ups_total ?? 0}`)
     lines.push(`• Positive talks: ${a.qualified ?? 0}`)
   } else {
     // Phase 118 — Sales. No Calls line. 4-tier status emoji. Follow-ups

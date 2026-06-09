@@ -1281,7 +1281,7 @@ export default function TeamDashboardV2() {
           // still shown as a small subscript so admin can read the
           // connect rate at a glance.
           const callPct = callsTarget > 0
-            ? Math.round((connHere / callsTarget) * 100)
+            ? Math.round((callsHere / callsTarget) * 100)
             : 0
           // Phase 112.4 (2026-06-04) — role-aware "work line" + 2nd tile.
           // Field sales don't make calls, so the call-% progress bar sat
@@ -1382,14 +1382,19 @@ export default function TeamDashboardV2() {
                 {/* Phase 112.4 — TC: Calls (connected/target · total).
                     Sales: Leads today / target (field reps don't call). */}
                 {isTC ? (
-                  <div className="lead-rep-kpi" title="Connected / target · total tel-taps">
+                  <div className="lead-rep-kpi" title=">=10s calls / target · connected">
+                    {/* Phase 128.2 — owner rule (section-49): the calls-toward-50
+                        metric is >=10s calls (callsHere), NOT connected. Was
+                        showing connHere (connected) per the older Phase 83
+                        directive; aligned to the rep hero + the report (both
+                        already >=10s). Connected moves to the subtitle. */}
                     <div className={`num ${callPct >= 80 ? 'suc' : callPct >= 50 ? '' : 'dng'}`}>
-                      {connHere}/{callsTarget}
+                      {callsHere}/{callsTarget}
                     </div>
                     <div className="lbl">
                       Calls
                       {' '}<span style={{ color: 'var(--v2-ink-2, #94a3b8)', fontSize: 9 }}>
-                        · {callsHere} total
+                        · {connHere} connected
                       </span>
                     </div>
                   </div>
