@@ -43,6 +43,8 @@ const VERIFY_TOKEN = process.env.CAMPAIGN_WEBHOOK_VERIFY_TOKEN
 const APP_SECRET   = process.env.CAMPAIGN_APP_SECRET
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
+const WA_TOKEN     = process.env.CAMPAIGN_WA_TOKEN   // C7 auto-reply send (server-side only)
+const GRAPH        = 'https://graph.facebook.com/v21.0'
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -136,6 +138,7 @@ async function storeInbound(payload) {
   // verified payload fan out into hundreds of serial writes.
   let stored = 0
   const STORE_CAP = 200
+  const autoReplied = new Set()   // C7 — one auto-reply per conversation per webhook call
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       const v = change.value || {}
@@ -151,8 +154,10 @@ async function storeInbound(payload) {
       // tolerates a concurrent-insert 23505 by re-selecting. Never overwrites
       // an existing row → an owner-set default_telecaller_id (C4.5 routing) is
       // preserved; the auto-created row has none → C4.5 safely error-queues.
+      // select('*') so the C7 auto-reply config (auto_reply_text / _enabled)
+      // comes through when present, and never errors when the C7 SQL is unrun.
       let acct = (await admin.from('whatsapp_accounts')
-        .select('id').eq('phone_number_id', phoneNumberId).maybeSingle()).data
+        .select('*').eq('phone_number_id', phoneNumberId).maybeSingle()).data
       if (!acct) {
         const ins = await admin.from('whatsapp_accounts')
           .insert({ provider: 'cloud_api', phone_number_id: phoneNumberId, display_number: meta.display_phone_number || null })
@@ -161,7 +166,7 @@ async function storeInbound(payload) {
           return { ok: false, error: 'account insert: ' + ins.error.message, stored }
         }
         acct = ins.data
-          || (await admin.from('whatsapp_accounts').select('id').eq('phone_number_id', phoneNumberId).maybeSingle()).data
+          || (await admin.from('whatsapp_accounts').select('*').eq('phone_number_id', phoneNumberId).maybeSingle()).data
       }
       const accountId = acct?.id
       if (!accountId) continue
@@ -201,6 +206,13 @@ async function storeInbound(payload) {
           }
         }
 
+        // C7 — detect a NEW conversation (the customer's first-ever message)
+        // BEFORE the upsert creates it, so the auto-reply fires exactly once.
+        const preConv = await admin.from('whatsapp_conversations')
+          .select('id').eq('whatsapp_account_id', accountId)
+          .eq('customer_wa_id', customerWaId).maybeSingle()
+        const isNewConv = !preConv.data
+
         const conv = await admin.from('whatsapp_conversations').upsert(
           convRow,
           { onConflict: 'whatsapp_account_id,customer_wa_id' },
@@ -232,6 +244,32 @@ async function storeInbound(payload) {
           return { ok: false, error: 'message: ' + msg.error.message, stored }
         }
         stored++
+
+        // C7 — auto-reply once on a new customer's first message. Free-form is
+        // allowed (their inbound just opened the 24h service window) and free.
+        // Best-effort: a send failure NEVER affects the store or the 200 to Meta.
+        if (isNewConv && convId && !autoReplied.has(convId) && autoReplied.size < 25
+            && WA_TOKEN && acct && acct.auto_reply_enabled && acct.auto_reply_text) {
+          autoReplied.add(convId)
+          try {
+            const r = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp', to: customerWaId,
+                type: 'text', text: { body: acct.auto_reply_text },
+              }),
+            })
+            if (r.ok) {
+              const j = await r.json().catch(() => ({}))
+              await admin.from('whatsapp_messages').insert({
+                conversation_id: convId, wamid: j?.messages?.[0]?.id || null,
+                direction: 'out', type: 'text', body: acct.auto_reply_text,
+                status: 'sent', at: new Date().toISOString(),
+              })
+            }
+          } catch { /* best-effort — auto-reply must never break receive */ }
+        }
       }
     }
   }
