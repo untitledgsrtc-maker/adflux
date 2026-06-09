@@ -24,7 +24,10 @@ import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
-const FALLBACK = 'https://app.untitledad.in'
+// QR fallback = the campaign WhatsApp number — a scan must ALWAYS land in
+// WhatsApp, NEVER the app login. (Dynamic per-account lookup runs first; this
+// is the absolute last resort if no account row is configured.)
+const FALLBACK = 'https://wa.me/919581578261?text=Hi'
 
 // In-memory same-visitor dedup (resets on cold start — fine for a vanity count).
 const seen = new Map()
@@ -81,6 +84,27 @@ export default async function handler(req, res) {
   }
 
   if (!target) target = FALLBACK   // absolute last resort (no active number configured)
-  res.writeHead(302, { Location: target })
-  return res.end()
+
+  // Return a tiny redirect PAGE (not a bare 302). Embedded in-app browsers (the
+  // phone-camera preview, social-app cameras) don't always follow a 302 to a
+  // wa.me / app-launch URL — a meta-refresh + JS replace + a visible "Open
+  // WhatsApp" button covers every case. no-store stops a stale redirect from
+  // being cached. NEVER renders the app login.
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  res.statusCode = 200
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-store, max-age=0')
+  return res.end(
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta http-equiv="refresh" content="0;url=' + esc(target) + '">' +
+    '<title>Opening WhatsApp…</title>' +
+    '<script>location.replace(' + JSON.stringify(target) + ')</script>' +
+    '<style>html,body{height:100%}body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;' +
+    'background:#0b1220;color:#f5f7fb;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}' +
+    'a{background:#25D366;color:#0b1220;font-weight:700;padding:14px 24px;border-radius:12px;text-decoration:none;display:inline-block;margin-top:16px}</style>' +
+    '</head><body><div><div style="font-size:15px;opacity:.85">Opening WhatsApp…</div>' +
+    '<a href="' + esc(target) + '">Open WhatsApp</a></div></body></html>'
+  )
 }
