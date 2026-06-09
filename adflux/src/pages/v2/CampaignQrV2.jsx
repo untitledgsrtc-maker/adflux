@@ -181,6 +181,15 @@ export default function CampaignQrV2() {
   const maxCity = useMemo(() => Math.max(1, ...leadsByCity.map(([, n]) => n)), [leadsByCity])
   const deadBoards = useMemo(() => boards.filter((b) => !(leadsByBoard[b.id] > 0)).length, [boards, leadsByBoard])
 
+  // Summary totals (mockup's 4 KPI cards) — real numbers only.
+  const totals = useMemo(() => {
+    const sum = (m) => Object.values(m).reduce((a, b) => a + (b || 0), 0)
+    let top = null, topN = -1
+    boards.forEach((b) => { const n = leadsByBoard[b.id] || 0; if (n > topN) { topN = n; top = b } })
+    const topLabel = top && topN > 0 ? `${top.label || top.code}${top.city ? ` · ${top.city}` : ''}` : '—'
+    return { scans: sum(scansByBoard), messaged: sum(messagedByBoard), leads: sum(leadsByBoard), topLabel }
+  }, [boards, scansByBoard, messagedByBoard, leadsByBoard])
+
   function downloadFromRef(ref, fileCode) {
     const canvas = ref?.current?.querySelector('canvas')
     if (!canvas) { pushToast('QR not ready yet — try again.', 'info'); return }
@@ -249,6 +258,47 @@ export default function CampaignQrV2() {
       sub="A QR on each hoarding opens WhatsApp on your number with a hidden board tag — so when the lead chats, you know which board pulled it. Print it and go; no setup needed."
       right={newBtn}
     >
+      {/* hero callout — how a board QR works + a sample link (mockup loc-callout) */}
+      <div style={{ ...panel, display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: 10, flexShrink: 0 }}>
+          <Suspense fallback={<div style={{ width: 92, height: 92 }} />}>
+            <QRCodeCanvas value={`${origin}/api/q/RR-AHM-01`} size={92} />
+          </Suspense>
+        </div>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-ink-0)', fontSize: 16 }}>Each board gets its own QR</div>
+          <div style={{ fontSize: 13, color: 'var(--v2-ink-1)', margin: '6px 0 10px', lineHeight: 1.55 }}>
+            Print a board&rsquo;s QR on the hoarding. A scan opens WhatsApp on your number with a hidden tag &mdash; so when the lead chats you know exactly which board pulled them in, and it routes to the right telecaller.
+          </div>
+          <div style={{ display: 'inline-block', fontFamily: 'var(--v2-display)', fontSize: 12, background: 'var(--v2-bg-2)', border: '1px solid var(--v2-line)', borderRadius: 8, padding: '7px 11px', color: 'var(--v2-ink-1)', wordBreak: 'break-all' }}>
+            wa.me/919581578261?text=Hi, saw your screen at Ring Road{' '}
+            <span style={{ color: 'var(--v2-yellow, #FFE600)', fontWeight: 700 }}>[RR-AHM-01]</span>
+          </div>
+        </div>
+      </div>
+
+      {/* summary cards (mockup) — real numbers only */}
+      {!loading && boards.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
+          {[
+            { label: 'Total scans',        value: totals.scans,    accent: false },
+            { label: 'Scanned & messaged', value: totals.messaged, accent: false },
+            { label: 'Leads created',      value: totals.leads,    accent: true },
+            { label: 'Top board',          value: totals.topLabel, accent: false, text: true },
+          ].map((c) => (
+            <div key={c.label} style={{ ...panel, padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.07em', fontWeight: 600 }}>{c.label}</div>
+              <div style={{
+                fontFamily: 'var(--v2-display)', fontWeight: 700, marginTop: 6, lineHeight: 1.2, wordBreak: 'break-word',
+                color: c.accent ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-0)', fontSize: c.text ? 15 : 24,
+              }}>
+                {c.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* boards table */}
       <div style={{ ...panel, padding: 0, marginBottom: 18 }}>
         <div style={{ padding: '13px 18px', borderBottom: '1px solid var(--v2-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
