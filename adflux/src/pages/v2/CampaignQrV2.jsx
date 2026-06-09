@@ -44,6 +44,8 @@ export default function CampaignQrV2() {
   const [boards, setBoards] = useState([])
   const [accounts, setAccounts] = useState([])
   const [campaigns, setCampaigns] = useState([])
+  const [tcs, setTcs] = useState([])         // telecallers for the routing dropdown
+  const [tcById, setTcById] = useState({})   // telecaller id → name
   const [leadsByBoard, setLeadsByBoard] = useState({})
   const [quotesByBoard, setQuotesByBoard] = useState({})
   const [messagedByBoard, setMessagedByBoard] = useState({})
@@ -58,6 +60,7 @@ export default function CampaignQrV2() {
   const [code, setCode] = useState('')
   const [message, setMessage] = useState('')
   const [campaignId, setCampaignId] = useState('')
+  const [tcId, setTcId] = useState('')   // board → telecaller (mockup routing)
   const [codeEdited, setCodeEdited] = useState(false)
   const [msgEdited, setMsgEdited] = useState(false)
   const previewRef = useRef(null)
@@ -65,14 +68,15 @@ export default function CampaignQrV2() {
   async function load() {
     setLoading(true)
     try {
-      const COLS = 'id, code, label, city, qr_text, campaign_id, is_active, created_at'
-      // own boards only — client QRs live in the Client QRs tab.
-      let locsRes = await supabase.from('campaign_locations').select(COLS)
+      // '*' so new columns (default_telecaller_id) flow through, and a board
+      // load never breaks when the C8.1 SQL hasn't run yet. Own boards only —
+      // client QRs live in the Client QRs tab.
+      let locsRes = await supabase.from('campaign_locations').select('*')
         .is('client_name', null).order('created_at', { ascending: false })
       // client_name column not added yet (client-QR SQL unrun) → keep this
       // page working by retrying without the filter (§45 — never break boards).
       if (locsRes.error && /client_name/i.test(locsRes.error.message || '')) {
-        locsRes = await supabase.from('campaign_locations').select(COLS)
+        locsRes = await supabase.from('campaign_locations').select('*')
           .order('created_at', { ascending: false })
       }
       const locs = locsRes.data
@@ -94,6 +98,12 @@ export default function CampaignQrV2() {
       const { data: camps } = await supabase
         .from('campaigns').select('id, name, default_telecaller_id').eq('is_active', true).order('name')
       setCampaigns(camps || [])
+
+      // Telecallers — a board routes its leads straight to one (mockup model).
+      const { data: tcRows } = await supabase
+        .from('users').select('id, name').eq('role', 'telecaller').order('name')
+      setTcs(tcRows || [])
+      setTcById(Object.fromEntries((tcRows || []).map((u) => [u.id, u.name])))
 
       // Real per-board analytics — all SCOPED to the boards in view (bounded;
       // read-only on live tables). leads (by location_id) + the quotes off
@@ -203,10 +213,18 @@ export default function CampaignQrV2() {
     if (!code.trim()) { pushToast('Code is required.', 'danger'); return }
     setSaving(true)
     try {
-      const { error } = await supabase.from('campaign_locations').insert({
+      const row = {
         code: code.trim(), label: label.trim(), city: city.trim() || null,
         qr_text: waUrl, campaign_id: campaignId || null, is_active: true,
-      })
+      }
+      let { error } = await supabase.from('campaign_locations')
+        .insert({ ...row, default_telecaller_id: tcId || null })
+      // default_telecaller_id column not added yet → save without it + warn, so
+      // the board still works (it just won't route by board until the SQL runs).
+      if (error && /default_telecaller_id|column/i.test(error.message || '')) {
+        ;({ error } = await supabase.from('campaign_locations').insert(row))
+        if (!error) pushToast('Board saved. Run supabase_campaign_c8_1_board_telecaller.sql to enable telecaller routing.', 'info')
+      }
       if (error) {
         if (error.code === '23505') { toastError(error, 'That code already exists — pick a different one.'); return }
         throw error
@@ -231,6 +249,20 @@ export default function CampaignQrV2() {
     const { error } = await supabase.from('campaign_locations').delete().eq('id', board.id)
     if (error) { toastError(error, 'Could not delete the board.'); return }
     toastSuccess('Board deleted.')
+    load()
+  }
+
+  // Change which telecaller a board's leads route to (inline edit from the table).
+  async function reassignBoard(board, newTcId) {
+    const { error } = await supabase.from('campaign_locations')
+      .update({ default_telecaller_id: newTcId || null }).eq('id', board.id)
+    if (error) {
+      toastError(error, /default_telecaller_id|column/i.test(error.message || '')
+        ? 'Run supabase_campaign_c8_1_board_telecaller.sql first.'
+        : 'Could not change the telecaller.')
+      return
+    }
+    toastSuccess(newTcId ? `Board routed to ${tcById[newTcId] || 'telecaller'}.` : 'Board unassigned.')
     load()
   }
 
@@ -339,7 +371,8 @@ export default function CampaignQrV2() {
                   const leads = leadsByBoard[b.id] || 0
                   const quotes = quotesByBoard[b.id] || 0
                   const conv = leads ? Math.round((quotes / leads) * 100) : null
-                  const tc = b.campaign_id ? tcByCampaign[b.campaign_id] : null
+                  const tc = (b.default_telecaller_id && tcById[b.default_telecaller_id])
+                    || (b.campaign_id ? tcByCampaign[b.campaign_id] : null)
                   return (
                     <tr key={b.id} className="qr-row">
                       <td style={{ ...td, padding: '8px 16px' }}><BoardThumb qr={qrValue(b.code)} /></td>
@@ -356,9 +389,16 @@ export default function CampaignQrV2() {
                         {conv == null ? '—' : `${conv}%`}
                       </td>
                       <td style={td}>
-                        {tc ? (
-                          <span style={tcPill}><span style={tcAv}>{tc.charAt(0).toUpperCase()}</span>{tc}</span>
-                        ) : <span style={{ color: 'var(--v2-ink-2)', fontSize: 12 }}>—</span>}
+                        {/* inline edit — route this board's leads to a telecaller */}
+                        <select
+                          value={b.default_telecaller_id || ''}
+                          onChange={(e) => reassignBoard(b, e.target.value)}
+                          title="Route this board's leads to a telecaller"
+                          style={{ ...inp, height: 32, maxWidth: 158, fontSize: 12.5, padding: '0 8px' }}
+                        >
+                          <option value="">{tc ? `${tc} (via campaign)` : '— unassigned —'}</option>
+                          {tcs.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        </select>
                       </td>
                       <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <BoardDownload board={b} qr={qrValue(b.code)} />
@@ -430,15 +470,18 @@ export default function CampaignQrV2() {
                   <label style={lbl}>Board / location name</label>
                   <input style={inp} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ring Road" />
                 </div>
-                {campaigns.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    <label style={lbl}>Campaign (routes the lead)</label>
-                    <select style={inp} value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
-                      <option value="">— none —</option>
-                      {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                )}
+                <div style={{ marginTop: 12 }}>
+                  <label style={lbl}>Leads from this board route to</label>
+                  <select style={inp} value={tcId} onChange={(e) => setTcId(e.target.value)}>
+                    <option value="">— pick a telecaller —</option>
+                    {tcs.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                  {tcs.length === 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 5 }}>
+                      No telecallers found.
+                    </div>
+                  )}
+                </div>
                 <div style={{ marginTop: 12 }}>
                   <label style={lbl}>Code (auto, editable)</label>
                   <input style={inp} value={code} onChange={(e) => { setCode(e.target.value); setCodeEdited(true) }} />
