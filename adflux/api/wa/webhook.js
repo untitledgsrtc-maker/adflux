@@ -147,6 +147,14 @@ async function storeInbound(payload) {
       const inbound = v.messages || []
       if (!phoneNumberId || inbound.length === 0) continue
 
+      // C11 — capture each sender's WhatsApp profile name (value.contacts[]).
+      const nameByWa = {}
+      for (const c of (v.contacts || [])) {
+        if (c && c.wa_id && c.profile && c.profile.name) {
+          nameByWa[String(c.wa_id).replace(/\D/g, '')] = String(c.profile.name)
+        }
+      }
+
       // Resolve (or self-provision) the receiving account by phone_number_id.
       // The phone_number_id UNIQUE index is PARTIAL (`WHERE phone_number_id IS
       // NOT NULL`) and PostgREST upsert can't target a partial index (Postgres
@@ -178,6 +186,7 @@ async function storeInbound(payload) {
         if (stored >= STORE_CAP) return { ok: true, stored }
         const customerWaId = m.from
         if (!customerWaId) continue
+        const customerName = nameByWa[String(customerWaId).replace(/\D/g, '')] || null
 
         // Conversation: the (account, customer) UNIQUE index is NOT partial →
         // upsert(onConflict) is valid here. This object updates ONLY these
@@ -191,6 +200,7 @@ async function storeInbound(payload) {
           status: 'open',
           updated_at: nowIso,
         }
+        if (customerName) convRow.customer_name = customerName
         // C8 — QR board attribution. The QR pre-fills "[CODE]" in the scan
         // text; match campaign_locations → stamp campaign_id + location_id so
         // C4.5 routes by that campaign + tags the lead with the board. Only
@@ -213,10 +223,19 @@ async function storeInbound(payload) {
           .eq('customer_wa_id', customerWaId).maybeSingle()
         const isNewConv = !preConv.data
 
-        const conv = await admin.from('whatsapp_conversations').upsert(
+        let conv = await admin.from('whatsapp_conversations').upsert(
           convRow,
           { onConflict: 'whatsapp_account_id,customer_wa_id' },
         ).select('id').maybeSingle()
+        // C11 customer_name column not added yet → retry WITHOUT it so the
+        // conversation store never breaks on an optional column (§45).
+        if (conv.error && /customer_name|could not find|column/i.test(conv.error.message || '')) {
+          const { customer_name, ...rest } = convRow   // eslint-disable-line no-unused-vars
+          conv = await admin.from('whatsapp_conversations').upsert(
+            rest,
+            { onConflict: 'whatsapp_account_id,customer_wa_id' },
+          ).select('id').maybeSingle()
+        }
         if (conv.error) return { ok: false, error: 'conversation: ' + conv.error.message, stored }
         const convId = conv.data?.id
         if (!convId) continue

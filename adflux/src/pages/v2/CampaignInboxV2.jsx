@@ -111,7 +111,9 @@ export default function CampaignInboxV2() {
     if (!silent) setLoading(true)
     const { data, error } = await supabase
       .from('whatsapp_conversations')
-      .select('id, customer_wa_id, status, last_inbound_at, window_expires_at, lead_id, assigned_to, campaign_id')
+      // '*' so customer_name (C11) flows through and a missing column never
+      // breaks the inbox load before the SQL is run.
+      .select('*')
       .order('last_inbound_at', { ascending: false, nullsFirst: false })
       .limit(200)
     if (error) {
@@ -376,7 +378,7 @@ export default function CampaignInboxV2() {
                           fontSize: 13.5, fontWeight: 700, color: 'var(--v2-ink-0, #f5f7fb)',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}>
-                          {fmtPhone(t.customer_wa_id)}
+                          {t.customer_name || fmtPhone(t.customer_wa_id)}
                         </span>
                         <span style={{ fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }}>{relTime(t.last_inbound_at)}</span>
                       </span>
@@ -430,8 +432,11 @@ export default function CampaignInboxV2() {
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--v2-ink-0, #f5f7fb)' }}>
-                    {fmtPhone(sel.customer_wa_id)}
+                    {sel.customer_name || fmtPhone(sel.customer_wa_id)}
                   </span>
+                  {sel.customer_name && (
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--v2-ink-2, #6a7590)' }}>{fmtPhone(sel.customer_wa_id)}</span>
+                  )}
                   <span style={{ fontSize: 11.5, color: windowOpen(sel.window_expires_at) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2, #6a7590)' }}>
                     {windowOpen(sel.window_expires_at) ? `Window open · ${windowLeft(sel.window_expires_at)}` : 'Window closed — needs a template to re-open'}
                   </span>
