@@ -139,6 +139,24 @@ async function storeInbound(payload) {
   let stored = 0
   const STORE_CAP = 200
   const autoReplied = new Set()   // C7 — one auto-reply per conversation per webhook call
+  let botRules = null             // chatbot rules, lazy-loaded once per webhook call
+  async function getBotRules() {
+    if (botRules) return botRules
+    const { data } = await admin.from('campaign_bot_rules')
+      .select('keywords, reply, is_active, display_order').order('display_order', { ascending: true })
+    botRules = (data || []).filter((r) => r.is_active !== false)
+    return botRules
+  }
+  // Log a bot-sent outbound (tagged via_bot so it never counts as a human
+  // reply). Tolerant: retry without via_bot if the chatbot SQL isn't run yet.
+  async function logBotOut(cid, wamid, text) {
+    const row = { conversation_id: cid, wamid: wamid || null, direction: 'out', type: 'text', body: text, status: 'sent', at: new Date().toISOString(), via_bot: true }
+    const r = await admin.from('whatsapp_messages').insert(row)
+    if (r.error && /via_bot|could not find|column/i.test(r.error.message || '')) {
+      const { via_bot, ...rest } = row   // eslint-disable-line no-unused-vars
+      await admin.from('whatsapp_messages').insert(rest)
+    }
+  }
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       const v = change.value || {}
@@ -263,6 +281,7 @@ async function storeInbound(payload) {
           return { ok: false, error: 'message: ' + msg.error.message, stored }
         }
         stored++
+        let repliedThisMsg = false
 
         // C7 — auto-reply once on a new customer's first message. Free-form is
         // allowed (their inbound just opened the 24h service window) and free.
@@ -281,13 +300,35 @@ async function storeInbound(payload) {
             })
             if (r.ok) {
               const j = await r.json().catch(() => ({}))
-              await admin.from('whatsapp_messages').insert({
-                conversation_id: convId, wamid: j?.messages?.[0]?.id || null,
-                direction: 'out', type: 'text', body: acct.auto_reply_text,
-                status: 'sent', at: new Date().toISOString(),
-              })
+              await logBotOut(convId, j?.messages?.[0]?.id || null, acct.auto_reply_text)
+              repliedThisMsg = true
             }
           } catch { /* best-effort — auto-reply must never break receive */ }
+        }
+
+        // Chatbot — keyword auto-responder. Runs only when the bot is ON, this
+        // message wasn't just auto-replied, and NO human (telecaller) has yet
+        // replied in this chat → the bot pauses the moment a human takes over.
+        // Best-effort: a failure NEVER affects the store or the 200 to Meta.
+        if (!repliedThisMsg && convId && WA_TOKEN && acct && acct.bot_enabled) {
+          try {
+            const { data: humanOut } = await admin.from('whatsapp_messages')
+              .select('id').eq('conversation_id', convId).eq('direction', 'out')
+              .not('via_bot', 'is', true).limit(1)
+            if (!humanOut || !humanOut.length) {
+              const text = String(messageBody(m) || '').toLowerCase()
+              const rules = await getBotRules()
+              const hit = rules.find((rule) => (rule.keywords || []).some((k) => k && text.includes(String(k).toLowerCase())))
+              if (hit && hit.reply) {
+                const br = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ messaging_product: 'whatsapp', to: customerWaId, type: 'text', text: { body: hit.reply } }),
+                })
+                if (br.ok) { const bj = await br.json().catch(() => ({})); await logBotOut(convId, bj?.messages?.[0]?.id || null, hit.reply) }
+              }
+            }
+          } catch { /* best-effort — bot must never break receive */ }
         }
       }
     }

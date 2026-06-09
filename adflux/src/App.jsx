@@ -55,6 +55,7 @@ import CampaignsV2         from './pages/v2/CampaignsV2'
 import CampaignSegmentsV2  from './pages/v2/CampaignSegmentsV2'
 import CampaignBroadcastV2 from './pages/v2/CampaignBroadcastV2'
 import CampaignIntegrationsV2 from './pages/v2/CampaignIntegrationsV2'
+import CampaignChatbotV2   from './pages/v2/CampaignChatbotV2'
 import WorkV2              from './pages/v2/WorkV2'
 import MessagesV2          from './pages/v2/MessagesV2'
 import PushDebugV2         from './pages/v2/PushDebugV2'
@@ -287,6 +288,7 @@ export default function App() {
           <Route path="/campaigns/segments"        element={<RequirePrivileged><CampaignSegmentsV2 /></RequirePrivileged>} />
           <Route path="/campaigns/broadcast"       element={<RequirePrivileged><CampaignBroadcastV2 /></RequirePrivileged>} />
           <Route path="/campaigns/integrations"    element={<RequirePrivileged><CampaignIntegrationsV2 /></RequirePrivileged>} />
+          <Route path="/campaigns/chatbot"         element={<RequirePrivileged><CampaignChatbotV2 /></RequirePrivileged>} />
           <Route path="/campaigns"                 element={<RequirePrivileged><CampaignsV2 /></RequirePrivileged>} />
           <Route path="/leads/new"                 element={<RequireNonAgency><LeadFormV2 /></RequireNonAgency>} />
           <Route path="/leads/:id"                 element={<RequireNonAgency><LeadDetailV2 /></RequireNonAgency>} />

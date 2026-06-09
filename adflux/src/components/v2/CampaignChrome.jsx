@@ -23,7 +23,7 @@ const TABS = [
   { key: 'clients',   label: 'Client QRs',      to: '/campaigns/clients' },
   { key: 'broadcast', label: 'Broadcast',  to: '/campaigns/broadcast' },
   { key: 'segments',  label: 'Segments',   to: '/campaigns/segments' },
-  { key: 'chatbot',   label: 'Chatbot',    soon: true },
+  { key: 'chatbot',   label: 'Chatbot',    to: '/campaigns/chatbot' },
   { key: 'integrations', label: 'Integrations', to: '/campaigns/integrations' },
 ]
 
