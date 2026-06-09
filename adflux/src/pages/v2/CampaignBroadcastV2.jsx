@@ -70,6 +70,11 @@ export default function CampaignBroadcastV2() {
   const [progress, setProgress] = useState(null)   // { total, remaining }
   const sendRef = useRef(false)
 
+  // selected-broadcast funnel + billing strip
+  const [selBcId, setSelBcId] = useState(null)
+  const [selData, setSelData] = useState(null)     // { broadcast, funnel }
+  const [sentMonth, setSentMonth] = useState(0)
+
   const loadAux = useCallback(async () => {
     const { data: segs } = await supabase.from('campaign_segments')
       .select('id, name, contact_count').order('created_at', { ascending: false })
@@ -77,9 +82,33 @@ export default function CampaignBroadcastV2() {
     try {
       const r = await authedFetch('/api/wa/broadcast')
       const j = await r.json().catch(() => ({}))
-      if (r.ok) setBroadcasts(j.broadcasts || [])
+      if (r.ok) {
+        const list = j.broadcasts || []
+        setBroadcasts(list)
+        if (list.length) setSelBcId((prev) => prev || list[0].id)   // default = latest
+      }
     } catch { /* list is decorative */ }
+    // billing strip — messages actually sent this month
+    const ms = new Date(); ms.setDate(1); ms.setHours(0, 0, 0, 0)
+    const { count: sm } = await supabase.from('broadcast_recipients')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['sent', 'delivered', 'read']).gte('sent_at', ms.toISOString())
+    setSentMonth(sm || 0)
   }, [])
+
+  // load the selected broadcast's funnel
+  useEffect(() => {
+    if (!selBcId) { setSelData(null); return }
+    let alive = true
+    ;(async () => {
+      try {
+        const r = await authedFetch(`/api/wa/broadcast?id=${selBcId}`)
+        const j = await r.json().catch(() => ({}))
+        if (alive && r.ok) setSelData(j)
+      } catch { /* */ }
+    })()
+    return () => { alive = false }
+  }, [selBcId])
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -199,6 +228,54 @@ export default function CampaignBroadcastV2() {
         </div>
       </div>
 
+      {/* billing strip */}
+      <div style={billStrip}>
+        <div><div style={bk}>Sent this month</div><div style={bnum}>{sentMonth.toLocaleString('en-IN')}</div></div>
+        <div><div style={bk}>Est. spend (marketing)</div><div style={bnum}>{'₹'} {Math.round(sentMonth * 0.8).toLocaleString('en-IN')}</div></div>
+        <div style={{ flex: 1 }} />
+        <a href="https://business.facebook.com/billing_hub" target="_blank" rel="noreferrer" style={{ ...btnY, textDecoration: 'none' }}>Top up</a>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', margin: '6px 0 18px' }}>Balance + top-up live in WhatsApp Manager / Meta Billing — we never store your card. Est. spend = sent &times; ~{'₹'}0.80 marketing rate.</div>
+
+      {/* selected broadcast — funnel + cards + template preview */}
+      {selData && selData.broadcast && (() => {
+        const f = selData.funnel || {}
+        const total = (f.queued || 0) + (f.sending || 0) + (f.sent || 0) + (f.delivered || 0) + (f.read || 0) + (f.failed || 0)
+        const sent = (f.sending || 0) + (f.sent || 0) + (f.delivered || 0) + (f.read || 0)
+        const delivered = (f.delivered || 0) + (f.read || 0)
+        const read = (f.read || 0)
+        const failed = (f.failed || 0)
+        const bc = selData.broadcast
+        const tplBody = bodyOf(templates.find((t) => t.name === bc.template_name) || {})
+        return (
+          <>
+            <div style={funnelWrap}>
+              <FunnelStat pct={pct(total, total)} cnt={total} lbl="Audience" />
+              <FunnelStat pct={pct(sent, total)} cnt={sent} lbl="Sent" color="var(--v2-blue, #60a5fa)" />
+              <FunnelStat pct={pct(delivered, total)} cnt={delivered} lbl="Delivered" />
+              <FunnelStat pct={pct(read, total)} cnt={read} lbl="Read" color="var(--v2-green, #22c55e)" />
+              <FunnelStat pct={pct(failed, total)} cnt={failed} lbl="Failed" color="var(--v2-rose, #f87171)" last />
+            </div>
+            <div style={bcardsWrap}>
+              <BCard k="Campaign type" v="BROADCAST" />
+              <BCard k="Message type" v="TEMPLATE" />
+              <BCard k="Audience" v={total.toLocaleString('en-IN')} />
+              <BCard k="Est. credit usage" v={`${'₹'} ${Math.round(sent * 0.8).toLocaleString('en-IN')}`} y />
+            </div>
+            {tplBody && (
+              <div style={{ ...panel, marginBottom: 18 }}>
+                <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 14, marginBottom: 14 }}>Template sent</div>
+                <div style={waCard}>
+                  <div style={waImg}>{bc.template_name}</div>
+                  <div style={waBody}>{tplBody}</div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 12 }}>Template: <b style={{ color: 'var(--v2-ink-1)' }}>{bc.template_name}</b>{bc.segment_name ? ` · ${bc.segment_name}` : ''}</div>
+              </div>
+            )}
+          </>
+        )
+      })()}
+
       {/* broadcast composer — unlocks once a template is Approved */}
       {approvedCount > 0 && (
         <div style={{ ...panel, marginBottom: 18 }}>
@@ -262,7 +339,7 @@ export default function CampaignBroadcastV2() {
         <div style={{ ...panel, padding: 0, marginBottom: 18 }}>
           <div style={{ padding: '13px 18px', borderBottom: '1px solid var(--v2-line)', fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 14 }}>Recent broadcasts</div>
           {broadcasts.map((b) => (
-            <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--v2-line)', flexWrap: 'wrap' }}>
+            <div key={b.id} onClick={() => setSelBcId(b.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--v2-line)', flexWrap: 'wrap', cursor: 'pointer', background: b.id === selBcId ? 'rgba(255,230,0,.05)' : 'transparent' }}>
               <div style={{ flex: 1, minWidth: 150 }}>
                 <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 13 }}>{b.segment_name || 'Segment'} · {b.template_name}</div>
                 <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 1 }}>{fmtWhen(b.created_at)}</div>
@@ -363,3 +440,30 @@ const lbl = { fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'u
 const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
 const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', border: 'none', borderRadius: 10, height: 38, padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
 const btnG = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 38, padding: '0 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
+const billStrip = { display: 'flex', alignItems: 'center', gap: 22, background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 12, padding: '14px 18px', flexWrap: 'wrap' }
+const bk = { fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em' }
+const bnum = { fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-ink-0)', fontSize: 18 }
+const funnelWrap = { display: 'flex', gap: 0, background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, overflow: 'hidden', marginBottom: 18 }
+const bcardsWrap = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14, marginBottom: 18 }
+const waCard = { maxWidth: 300, background: '#0b1f17', border: '1px solid rgba(16,185,129,.25)', borderRadius: 12, overflow: 'hidden' }
+const waImg = { height: 110, background: 'linear-gradient(135deg,#f59e0b,#ec4899 60%,#1c2540)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 14, textShadow: '0 1px 4px rgba(0,0,0,.4)', textAlign: 'center', padding: '0 10px' }
+const waBody = { padding: '12px 14px', fontSize: 12, color: 'var(--v2-ink-0)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }
+
+function pct(x, total) { return total ? Math.round((x / total) * 100) : 0 }
+function FunnelStat({ pct: p, cnt, lbl, color, last }) {
+  return (
+    <div style={{ flex: 1, padding: '16px 18px', borderRight: last ? 'none' : '1px solid var(--v2-line)', minWidth: 90 }}>
+      <div style={{ fontFamily: 'var(--v2-display)', fontSize: 22, fontWeight: 700, color: color || 'var(--v2-ink-0)' }}>{p}%</div>
+      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{(cnt || 0).toLocaleString('en-IN')}</div>
+      <div style={{ fontSize: 11, color: 'var(--v2-ink-1)', marginTop: 6, fontWeight: 600 }}>{lbl}</div>
+    </div>
+  )
+}
+function BCard({ k, v, y }) {
+  return (
+    <div style={{ background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, padding: '16px 18px' }}>
+      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600 }}>{k}</div>
+      <div style={{ fontFamily: 'var(--v2-display)', fontSize: 18, fontWeight: 700, color: y ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-0)', marginTop: 6 }}>{v}</div>
+    </div>
+  )
+}

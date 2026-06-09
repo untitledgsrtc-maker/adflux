@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       const { data: bc } = await admin.from('campaign_broadcasts').select('*').eq('id', id).maybeSingle()
       if (!bc) return res.status(404).json({ error: 'not_found' })
       const { data: recips } = await admin.from('broadcast_recipients').select('status').eq('broadcast_id', id)
-      const funnel = { queued: 0, sent: 0, failed: 0 }
+      const funnel = { queued: 0, sending: 0, sent: 0, delivered: 0, read: 0, failed: 0 }
       ;(recips || []).forEach((r) => { funnel[r.status] = (funnel[r.status] || 0) + 1 })
       return res.status(200).json({ ok: true, broadcast: bc, funnel })
     }

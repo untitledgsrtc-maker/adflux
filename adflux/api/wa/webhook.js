@@ -162,6 +162,22 @@ async function storeInbound(payload) {
       const v = change.value || {}
       const meta = v.metadata || {}
       const phoneNumberId = meta.phone_number_id || null
+
+      // Delivery-status callbacks (sent/delivered/read/failed) — Meta sends
+      // these for OUTBOUND messages. Match the wamid to a broadcast recipient
+      // (the funnel) and/or an inbox message (the ✓✓ ticks). Best-effort;
+      // terminal 'read'/'failed' are never downgraded by a late callback.
+      for (const s of (v.statuses || [])) {
+        const swamid = s && s.id; const sstatus = s && s.status
+        if (!swamid || !sstatus) continue
+        try {
+          await admin.from('broadcast_recipients').update({ status: sstatus })
+            .eq('wamid', swamid).not('status', 'in', '(read,failed)')
+          await admin.from('whatsapp_messages').update({ status: sstatus })
+            .eq('wamid', swamid).not('status', 'in', '(read,failed)')
+        } catch { /* best-effort — status capture must never break receive */ }
+      }
+
       const inbound = v.messages || []
       if (!phoneNumberId || inbound.length === 0) continue
 
