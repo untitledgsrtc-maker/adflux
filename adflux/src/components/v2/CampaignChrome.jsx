@@ -24,6 +24,7 @@ const TABS = [
   { key: 'broadcast', label: 'Broadcast',  to: '/campaigns/broadcast' },
   { key: 'segments',  label: 'Segments',   to: '/campaigns/segments' },
   { key: 'chatbot',   label: 'Chatbot',    soon: true },
+  { key: 'integrations', label: 'Integrations', to: '/campaigns/integrations' },
 ]
 
 export default function CampaignChrome({ active, title = 'Campaigns', sub, right, children }) {
