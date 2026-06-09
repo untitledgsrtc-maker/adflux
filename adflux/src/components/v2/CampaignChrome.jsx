@@ -37,7 +37,7 @@ export default function CampaignChrome({ active, title = 'Campaigns', sub, right
             Lead capture · WhatsApp · QR · Routing
           </div>
           <h1 style={{
-            fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 28, fontWeight: 700,
+            fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 30, fontWeight: 700,
             margin: '6px 0 4px', color: 'var(--v2-ink-0, #f5f7fb)', letterSpacing: '-.01em',
           }}>
             {title}

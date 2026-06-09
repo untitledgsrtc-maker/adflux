@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Loader2, AlertTriangle, RefreshCw, MessageSquare, Lock, ArrowLeft, Send,
+  Loader2, AlertTriangle, RefreshCw, MessageSquare, Lock, ArrowLeft, Send, Check, CheckCheck,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
@@ -397,20 +397,32 @@ export default function CampaignInboxV2() {
                         )}
                         <div style={{ display: 'flex', justifyContent: out ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
                           <div style={{
-                            maxWidth: '76%', padding: '8px 11px', borderRadius: 10,
-                            background: out ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-bg-2)',
-                            color: out ? 'var(--accent-fg, #0f172a)' : 'var(--v2-ink-0, #f5f7fb)',
-                            border: out ? 'none' : '1px solid var(--v2-line)',
+                            // Mockup: outbound = WhatsApp-green tint with a chat-tail;
+                            // inbound = surface bubble. Both light text on dark.
+                            maxWidth: '76%', padding: '8px 11px',
+                            borderRadius: 10,
+                            borderBottomRightRadius: out ? 4 : 10,
+                            borderBottomLeftRadius: out ? 10 : 4,
+                            background: out ? 'var(--v2-green-soft, rgba(34,197,94,0.18))' : 'var(--v2-bg-2)',
+                            color: 'var(--v2-ink-0, #f5f7fb)',
+                            border: out ? '1px solid rgba(34,197,94,0.34)' : '1px solid var(--v2-line)',
                           }}>
                             <div style={{ fontSize: 13.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                               {m.body || <em style={{ opacity: 0.7 }}>[{m.type || 'media'}]</em>}
                             </div>
                             <div style={{
-                              fontSize: 10, marginTop: 3, textAlign: 'right',
-                              color: out ? 'var(--accent-fg, #0f172a)' : 'var(--v2-ink-2, #6a7590)',
-                              opacity: out ? 0.65 : 1,
+                              fontSize: 10, marginTop: 3, display: 'flex', alignItems: 'center',
+                              justifyContent: 'flex-end', gap: 4, color: 'var(--v2-ink-2, #6a7590)',
                             }}>
                               {msgTime(m.at)}
+                              {/* WhatsApp-style delivery ticks (outbound only): sent ✓, delivered ✓✓, read ✓✓ blue */}
+                              {out && (m.status === 'read' || m.status === 'delivered') && (
+                                <CheckCheck size={13} strokeWidth={1.6}
+                                  style={{ color: m.status === 'read' ? 'var(--v2-blue, #60a5fa)' : 'var(--v2-ink-2, #6a7590)' }} />
+                              )}
+                              {out && m.status === 'sent' && (
+                                <Check size={13} strokeWidth={1.6} />
+                              )}
                             </div>
                           </div>
                         </div>
