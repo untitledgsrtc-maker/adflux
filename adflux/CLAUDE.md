@@ -3109,3 +3109,48 @@ Rima's queue. No live-app file, RLS, function, or hot-path touched.
 - **Auto-reply (C7)**, **C8 location_id**, Meta Lead Ads (C9), Justdial,
   Broadcast/Segments/Chatbot — V3, unchanged from §46.
 
+
+---
+
+## 55 · Campaign C5 polish — alert push · auto-refresh · mockup-match · images · cleanup (2026-06-09)
+
+Same-day follow-on to §54. The receive+reply+routing module got the "useful
+end-to-end + matches the design" layer. All additive, new campaign pages /
+endpoints only (CampaignInboxV2/QrV2/ClientQrV2 + CampaignChrome are NOT in the
+§28 frozen list); the one live-table write is the inbox reassign (guardian PASS).
+
+### Shipped (commits on untitled-os)
+| What | Commit | Run/push |
+|---|---|---|
+| **Inbound alert → telecaller push** — AFTER UPDATE OF lead_id trigger on whatsapp_conversations → enqueue_push the lead's owner, quiet-hours gated, EXCEPTION-wrapped, pg_net async (zero webhook latency). `supabase_campaign_c5_push_on_inbound_lead.sql` | `bd1735a` | **SQL: confirm run** (VERIFY 1/t/t) |
+| **Inbox auto-refresh** — silent 7s poll (visible-tab) + focus refresh + scroll-to-newest. No more manual reload. | `026223d` | pushed |
+| **UI mockup-match** — inbox WhatsApp-green bubbles + ✓✓ ticks + tails; tab count pills; QR hero callout + 4 summary cards (real data); inbox reassign-TC dropdown + Create-quote + quick-reply chips | `6ce3427` `6db0b7f` `7870000` | pushed |
+| **Inbound photo rendering** — webhook captures media_id/mime (tolerant insert) + `api/wa/media` proxy (DB-gated, same-origin, 120/min, token server-side) + inbox `<img>`. `supabase_campaign_c5_media_columns.sql` | `b75cf20` | **push + SQL** |
+| **Self-test cleanup** (preview-first, scoped, read-first) `supabase_campaign_selftest_cleanup_v2.sql` | `611dc56` | **push + run when ready** |
+
+### Hard rules learned / re-confirmed
+- **enqueue_push from a campaign trigger** = DEFINER + `search_path=public,extensions`
+  + quiet-hours gate `is_push_allowed_now()` + EXCEPTION wrap. It's REVOKED from
+  authenticated (97.A2) but a DEFINER owned by postgres reaches it. pg_net is
+  async → no webhook latency. Mirror phase34z55 + phase98_a.
+- **Webhook media capture** uses a TOLERANT insert (retry without media_id/mime
+  on a column error) so the store can never break regardless of SQL timing —
+  composes with the 23505 dup-wamid tolerance. New `media.js` proxy gates on the
+  media_id existing in whatsapp_messages (capability gate; ids are opaque Meta
+  numerics) — stronger than the §34 same-origin-only precedent. No SSRF (fetched
+  host constant; meta.url is Meta-issued).
+- **Reassign writes leads** → sets BOTH telecaller_id + assigned_to = chosen TC
+  (the §53 P0-2 round-robin-safe contract); writes NO lead_activities (P0-3).
+  Guardian PASS. Any inbox action that writes leads/lead_activities needs the
+  guardian.
+- **UI fidelity:** the build does NOT fake the mockup's demo numbers (reply rate
+  / won ₹ / 1,240 scans) — it shows real counts; Broadcast/Segments/Chatbot stay
+  "soon" (V3). Matched the *look* (green bubbles, count pills, QR cards), not the
+  fake *content*.
+
+### Owner run-state to confirm next session
+- SQL still to RUN: `supabase_campaign_c5_push_on_inbound_lead.sql` (alert) +
+  `supabase_campaign_c5_media_columns.sql` (photos). Cleanup SQL = optional.
+- Push state: `b75cf20` + `611dc56` were unpushed at write time.
+- Payment method on the WABA still owner-side (volume only).
+
