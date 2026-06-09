@@ -11,10 +11,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Loader2, AlertTriangle, RefreshCw, Plus, CheckCircle2, Clock, XCircle, FileText, Send,
+  Megaphone, Users, FlaskConical,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 
 async function authedFetch(url, opts = {}) {
   const { data: { session } } = await supabase.auth.getSession()
@@ -38,6 +40,9 @@ function bodyOf(t) {
   const b = (t.components || []).find((c) => String(c.type).toUpperCase() === 'BODY')
   return b?.text || ''
 }
+function fmtWhen(iso) {
+  try { return new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) } catch { return '' }
+}
 
 const DEFAULT_BODY = 'Hi {{1}}, this is Untitled Advertising. We have new outdoor advertising availability — hoardings, LED, bus media — in your area. If you would like the current rate card, reply here or call us.'
 
@@ -54,6 +59,28 @@ export default function CampaignBroadcastV2() {
   const [submitting, setSubmitting] = useState(false)
   const submitRef = useRef(false)
 
+  // broadcast composer
+  const [segments, setSegments] = useState([])
+  const [broadcasts, setBroadcasts] = useState([])
+  const [segId, setSegId] = useState('')
+  const [tplName, setTplName] = useState('')
+  const [testTo, setTestTo] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [progress, setProgress] = useState(null)   // { total, remaining }
+  const sendRef = useRef(false)
+
+  const loadAux = useCallback(async () => {
+    const { data: segs } = await supabase.from('campaign_segments')
+      .select('id, name, contact_count').order('created_at', { ascending: false })
+    setSegments(segs || [])
+    try {
+      const r = await authedFetch('/api/wa/broadcast')
+      const j = await r.json().catch(() => ({}))
+      if (r.ok) setBroadcasts(j.broadcasts || [])
+    } catch { /* list is decorative */ }
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
@@ -68,7 +95,7 @@ export default function CampaignBroadcastV2() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(); loadAux() }, [load, loadAux])
 
   async function submit() {
     const nm = name.trim()
@@ -94,7 +121,62 @@ export default function CampaignBroadcastV2() {
     }
   }
 
+  async function sendTest() {
+    const selTpl = templates.find((t) => t.name === tplName)
+    if (!tplName) { toastError(new Error('tpl'), 'Pick an approved template first.'); return }
+    if (!testTo.trim()) { toastError(new Error('to'), 'Enter your own number to test.'); return }
+    setTesting(true)
+    try {
+      const r = await authedFetch('/api/wa/broadcast', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test', template_name: tplName, template_language: selTpl?.language || 'en', to: testTo.trim() }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { toastError(new Error(j?.detail || j?.error || 'failed'), 'Test send failed.'); return }
+      toastSuccess('Test sent — check that WhatsApp.')
+    } catch (e) { toastError(e, 'Test error.') } finally { setTesting(false) }
+  }
+
+  async function sendBroadcast() {
+    const selTpl = templates.find((t) => t.name === tplName)
+    const seg = segments.find((s) => s.id === segId)
+    if (!segId || !tplName) { toastError(new Error('pick'), 'Pick a segment + an approved template.'); return }
+    if (sendRef.current || sending) return
+    const ok = await confirmDialog({
+      title: 'Send broadcast?',
+      message: `Send template "${tplName}" to ${seg?.contact_count ?? 'the'} leads in "${seg?.name}"? These are real WhatsApp messages and may be billed. Send a test to yourself first if unsure.`,
+      confirmLabel: 'Send broadcast', cancelLabel: 'Cancel',
+    })
+    if (!ok) return
+    sendRef.current = true; setSending(true); setProgress(null)
+    try {
+      const cr = await authedFetch('/api/wa/broadcast', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', segment_id: segId, template_name: tplName, template_language: selTpl?.language || 'en' }),
+      })
+      const cj = await cr.json().catch(() => ({}))
+      if (!cr.ok) { toastError(new Error(cj?.detail || cj?.error || 'failed'), 'Could not queue the broadcast.'); return }
+      const bid = cj.broadcast_id; const total = cj.total || 0
+      setProgress({ total, remaining: total })
+      let guard = 0
+      while (guard++ < 1000) {
+        const sr = await authedFetch('/api/wa/broadcast', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'send_batch', broadcast_id: bid }),
+        })
+        const sj = await sr.json().catch(() => ({}))
+        if (!sr.ok) { toastError(new Error(sj?.detail || sj?.error || 'failed'), 'Send stopped mid-way — re-send to resume.'); break }
+        setProgress({ total, remaining: sj.remaining || 0 })
+        if (sj.done || (sj.remaining || 0) === 0) break
+      }
+      toastSuccess('Broadcast complete.')
+      loadAux()
+    } catch (e) { toastError(e, 'Broadcast error.') } finally { setSending(false); sendRef.current = false }
+  }
+
   const approvedCount = templates.filter((t) => String(t.status).toUpperCase() === 'APPROVED').length
+  const approvedList = templates.filter((t) => String(t.status).toUpperCase() === 'APPROVED')
+  const selTplBody = bodyOf(templates.find((t) => t.name === tplName) || {})
   const refreshBtn = (
     <button type="button" onClick={load} style={btnG}><RefreshCw size={14} strokeWidth={1.6} /> Refresh</button>
   )
@@ -116,6 +198,84 @@ export default function CampaignBroadcastV2() {
           {approvedCount > 0 ? <span style={{ color: 'var(--v2-green, #22c55e)' }}> — you have {approvedCount} approved.</span> : <span> (and a payment method is on the WABA).</span>}
         </div>
       </div>
+
+      {/* broadcast composer — unlocks once a template is Approved */}
+      {approvedCount > 0 && (
+        <div style={{ ...panel, marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <Megaphone size={16} strokeWidth={1.6} style={{ color: 'var(--v2-yellow, #FFE600)' }} />
+            <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-ink-0)', fontSize: 15 }}>Send a broadcast</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <div>
+              <label style={lbl}>Audience (saved segment)</label>
+              <select style={inp} value={segId} onChange={(e) => setSegId(e.target.value)}>
+                <option value="">Pick a segment…</option>
+                {segments.map((s) => <option key={s.id} value={s.id}>{s.name}{s.contact_count != null ? ` · ${s.contact_count}` : ''}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Template (approved)</label>
+              <select style={inp} value={tplName} onChange={(e) => setTplName(e.target.value)}>
+                <option value="">Pick a template…</option>
+                {approvedList.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
+              </select>
+            </div>
+          </div>
+          {selTplBody && (
+            <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--v2-green-soft, rgba(34,197,94,0.10))', border: '1px solid var(--v2-line)', fontSize: 12.5, color: 'var(--v2-ink-1)', whiteSpace: 'pre-wrap' }}>
+              <Users size={12} strokeWidth={1.6} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--v2-ink-2)' }} />{selTplBody}
+            </div>
+          )}
+          {segments.length === 0 && (
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--v2-amber, #F59E0B)' }}>No saved segments yet — build one on the Segments tab first.</div>
+          )}
+          <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div>
+              <label style={lbl}>Test to your number</label>
+              <input style={{ ...inp, width: 170 }} value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="9876543210" />
+            </div>
+            <button type="button" style={{ ...btnG, opacity: testing ? 0.6 : 1 }} onClick={sendTest} disabled={testing}>
+              {testing ? <Loader2 size={14} strokeWidth={1.6} className="spin" /> : <FlaskConical size={14} strokeWidth={1.6} />} Send test to me
+            </button>
+            <div style={{ flex: 1 }} />
+            <button type="button" style={{ ...btnY, opacity: (sending || !segId || !tplName) ? 0.6 : 1 }} onClick={sendBroadcast} disabled={sending || !segId || !tplName}>
+              {sending ? <Loader2 size={14} strokeWidth={1.6} className="spin" /> : <Send size={14} strokeWidth={1.6} />} Send broadcast
+            </button>
+          </div>
+          {progress && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--v2-ink-1)', marginBottom: 5 }}>Sent {progress.total - progress.remaining} of {progress.total}</div>
+              <div style={{ height: 6, borderRadius: 999, background: 'var(--v2-bg-2)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progress.total ? Math.round(((progress.total - progress.remaining) / progress.total) * 100) : 0}%`, background: 'var(--v2-green, #22c55e)', transition: 'width .3s' }} />
+              </div>
+            </div>
+          )}
+          <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', margin: '12px 0 0', lineHeight: 1.5 }}>
+            Marketing messages are billed per send (a payment method must be on the WABA). Send only to your own opted-in leads.
+          </p>
+        </div>
+      )}
+
+      {/* recent broadcasts */}
+      {broadcasts.length > 0 && (
+        <div style={{ ...panel, padding: 0, marginBottom: 18 }}>
+          <div style={{ padding: '13px 18px', borderBottom: '1px solid var(--v2-line)', fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 14 }}>Recent broadcasts</div>
+          {broadcasts.map((b) => (
+            <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--v2-line)', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 150 }}>
+                <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 13 }}>{b.segment_name || 'Segment'} · {b.template_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 1 }}>{fmtWhen(b.created_at)}</div>
+              </div>
+              <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-green, #22c55e)' }}>{b.sent}</span>
+              <span style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>sent</span>
+              {b.failed > 0 && <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-rose, #f87171)' }}>{b.failed} failed</span>}
+              <span style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>/ {b.total}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', padding: '2px 8px', borderRadius: 999, color: b.status === 'done' ? 'var(--v2-green, #22c55e)' : 'var(--v2-amber, #F59E0B)', background: b.status === 'done' ? 'var(--v2-green-soft, rgba(34,197,94,0.14))' : 'var(--v2-amber-soft, rgba(245,158,11,0.14))' }}>{b.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* templates */}
       <div style={{ ...panel, padding: 0 }}>
