@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Loader2, AlertTriangle, Inbox, X } from 'lucide-react'
+import { Plus, Loader2, AlertTriangle, Inbox, X, Search, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import CampaignChrome from '../../components/v2/CampaignChrome'
@@ -34,9 +34,15 @@ export default function CampaignsV2() {
   const [rows, setRows] = useState([])
   const [boardCounts, setBoardCounts] = useState({})
   const [leadsCount, setLeadsCount] = useState(null)
+  const [stats, setStats] = useState({})          // campaign_id → { leads, won }
   const [tcs, setTcs] = useState([])
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
+
+  // filters (mockup: source · status · search)
+  const [fSource, setFSource] = useState('')
+  const [fStatus, setFStatus] = useState('')
+  const [q, setQ] = useState('')
 
   const [name, setName] = useState('')
   const [source, setSource] = useState('whatsapp')
@@ -63,11 +69,20 @@ export default function CampaignsV2() {
       ;(locs || []).forEach((l) => { if (l.campaign_id) counts[l.campaign_id] = (counts[l.campaign_id] || 0) + 1 })
       setBoardCounts(counts)
 
-      // Leads captured by ANY campaign (read-only count — head:true, no rows).
-      const { count } = await supabase
-        .from('leads').select('id', { count: 'exact', head: true })
-        .not('campaign_id', 'is', null)
-      setLeadsCount(count ?? 0)
+      // Per-campaign funnel (read-only): leads + won, aggregated client-side
+      // from ONE bounded read of campaign-attached leads. No join on the hot
+      // leads path; campaign leads are a small subset (§45).
+      const { data: cLeads } = await supabase
+        .from('leads').select('campaign_id, stage')
+        .not('campaign_id', 'is', null).limit(10000)
+      const agg = {}
+      ;(cLeads || []).forEach((l) => {
+        const a = agg[l.campaign_id] || (agg[l.campaign_id] = { leads: 0, won: 0 })
+        a.leads++
+        if (l.stage === 'Won') a.won++
+      })
+      setStats(agg)
+      setLeadsCount((cLeads || []).length)
 
       const { data: us } = await supabase
         .from('users')
@@ -91,6 +106,34 @@ export default function CampaignsV2() {
 
   const totalBoards = useMemo(() => Object.values(boardCounts).reduce((a, b) => a + b, 0), [boardCounts])
   const activeCount = useMemo(() => rows.filter((r) => r.is_active).length, [rows])
+
+  const filtered = useMemo(() => rows.filter((r) => {
+    if (fSource && r.source_type !== fSource) return false
+    if (fStatus === 'active' && !r.is_active) return false
+    if (fStatus === 'paused' && r.is_active) return false
+    if (q.trim() && !`${r.name || ''}`.toLowerCase().includes(q.trim().toLowerCase())) return false
+    return true
+  }), [rows, fSource, fStatus, q])
+
+  function exportCsv() {
+    const head = ['Campaign', 'Source', 'Segment', 'Telecaller', 'Boards', 'Leads', 'Won', 'Conv %', 'Status', 'Created']
+    const lines = [head.join(',')]
+    filtered.forEach((c) => {
+      const st = stats[c.id] || { leads: 0, won: 0 }
+      const conv = st.leads ? Math.round((st.won / st.leads) * 100) : 0
+      const cells = [
+        c.name, srcOf(c.source_type).t.split(' (')[0], c.segment === 'GOVERNMENT' ? 'Govt' : 'Private',
+        (c.default_telecaller_id && tcName[c.default_telecaller_id]) || 'round-robin',
+        boardCounts[c.id] || 0, st.leads, st.won, `${conv}%`, c.is_active ? 'Active' : 'Paused', fmtDate(c.created_at),
+      ].map((v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s })
+      lines.push(cells.join(','))
+    })
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `campaigns-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+  }
 
   async function createCampaign() {
     if (!name.trim()) { pushToast('Enter a campaign name.', 'danger'); return }
@@ -184,17 +227,37 @@ export default function CampaignsV2() {
 
       {/* Campaigns table */}
       <div style={{ ...panel, padding: 0 }}>
-        <div style={{ padding: '13px 18px', borderBottom: '1px solid var(--v2-line)', fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 14 }}>
-          All campaigns{!loading && ` · ${rows.length}`}
+        <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--v2-line)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 14, marginRight: 'auto' }}>
+            All campaigns{!loading && ` · ${filtered.length}`}
+          </span>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} strokeWidth={1.6} style={{ position: 'absolute', left: 9, top: 10, color: 'var(--v2-ink-2)' }} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" style={{ ...inp, height: 34, width: 140, paddingLeft: 28 }} />
+          </div>
+          <select value={fSource} onChange={(e) => setFSource(e.target.value)} style={{ ...inp, height: 34, width: 'auto' }}>
+            <option value="">All sources</option>
+            {SOURCES.map((s) => <option key={s.v} value={s.v}>{s.t.split(' (')[0]}</option>)}
+          </select>
+          <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} style={{ ...inp, height: 34, width: 'auto' }}>
+            <option value="">All status</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+          </select>
+          <button type="button" onClick={exportCsv} style={btnGhost}><Download size={14} strokeWidth={1.6} /> Export</button>
         </div>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center' }}>
             <Loader2 size={20} strokeWidth={1.6} className="spin" style={{ color: 'var(--v2-yellow, #FFE600)' }} />
           </div>
-        ) : rows.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div style={{ padding: 44, textAlign: 'center', color: 'var(--v2-ink-2)', fontSize: 13 }}>
             <Inbox size={22} strokeWidth={1.6} style={{ opacity: 0.5 }} />
-            <div style={{ marginTop: 8 }}>No campaigns yet. Tap <b style={{ color: 'var(--v2-ink-1)' }}>New campaign</b> to make your first.</div>
+            <div style={{ marginTop: 8 }}>
+              {rows.length === 0
+                ? <>No campaigns yet. Tap <b style={{ color: 'var(--v2-ink-1)' }}>New campaign</b> to make your first.</>
+                : 'No campaigns match the filter.'}
+            </div>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -206,11 +269,14 @@ export default function CampaignsV2() {
                   <th style={th}>Segment</th>
                   <th style={th}>Telecaller</th>
                   <th style={{ ...th, textAlign: 'right' }}>Boards</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Leads</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Won</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Conv&nbsp;%</th>
                   <th style={th}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((c) => {
+                {filtered.map((c) => {
                   const s = srcOf(c.source_type)
                   const tn = c.default_telecaller_id ? (tcName[c.default_telecaller_id] || null) : null
                   return (
@@ -239,6 +305,15 @@ export default function CampaignsV2() {
                       </td>
                       <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>
                         {boardCounts[c.id] || 0}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>
+                        {(stats[c.id]?.leads) || 0}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 600, color: (stats[c.id]?.won) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2)' }}>
+                        {(stats[c.id]?.won) || 0}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', color: 'var(--v2-ink-1)' }}>
+                        {stats[c.id]?.leads ? Math.round((stats[c.id].won / stats[c.id].leads) * 100) : 0}%
                       </td>
                       <td style={td}>
                         <span style={{
@@ -290,6 +365,7 @@ const banner = { ...panel, borderColor: 'var(--v2-amber, #F59E0B)', background: 
 const lbl = { fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
 const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
 const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', border: 'none', borderRadius: 10, height: 38, padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
+const btnGhost = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 34, padding: '0 12px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }
 const th = { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2, #6a7590)', borderBottom: '1px solid var(--v2-line, #1f2b47)', whiteSpace: 'nowrap', background: 'rgba(255,255,255,.02)' }
 const td = { padding: '13px 16px', borderBottom: '1px solid var(--v2-line, #1f2b47)', fontSize: 13, color: 'var(--v2-ink-1, #a9b3c7)', verticalAlign: 'middle' }
 const tcPill = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--v2-ink-1, #a9b3c7)', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', padding: '3px 9px', borderRadius: 999 }
