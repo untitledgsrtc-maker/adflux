@@ -15,10 +15,19 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Loader2, AlertTriangle, RefreshCw, MessageSquare, Lock, ArrowLeft, Send, Check, CheckCheck,
+  ChevronDown, FileText,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
-import { toastError } from '../../components/v2/Toast'
+import { toastError, toastSuccess } from '../../components/v2/Toast'
+
+// Quick-reply chips (mockup) — label on the chip, fuller text in the box.
+const CANNED = [
+  { label: 'Greet',          text: 'Thanks for reaching out to Untitled Advertising! How can we help?' },
+  { label: 'Ask city + media', text: 'Could you share your city and which media you are looking for (hoarding / LED / etc.)?' },
+  { label: 'Rate card',      text: 'Sure — I will share our rate card shortly.' },
+  { label: 'Book a call',    text: 'Can we hop on a quick call to discuss? What time suits you?' },
+]
 
 // 919812345678 → +91 98123 45678 (best-effort; falls back to a bare +digits).
 function fmtPhone(waId) {
@@ -89,6 +98,10 @@ export default function CampaignInboxV2() {
   const sendingRef = useRef(false)   // §47 synchronous latch — no double-send on a WebView ghost-click
   const msgScrollRef = useRef(null)  // C5.1 — auto-scroll anchor for the message pane
   const prevMsgCount = useRef(0)
+  const [tcs, setTcs] = useState([])          // telecallers (reassign dropdown)
+  const [selLead, setSelLead] = useState(null) // selected conversation's lead row
+  const [reassignOpen, setReassignOpen] = useState(false)
+  const [reassigning, setReassigning] = useState(false)
 
   const loadThreads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -185,8 +198,28 @@ export default function CampaignInboxV2() {
     prevMsgCount.current = msgs.length
   }, [msgs])
 
+  // Telecallers — for the reassign dropdown (mount once).
+  useEffect(() => {
+    supabase.from('users').select('id, name').eq('role', 'telecaller').order('name')
+      .then(({ data }) => setTcs(data || []))
+  }, [])
+
   const sel = threads.find((t) => t.id === selId) || null
   const openCount = threads.filter((t) => windowOpen(t.window_expires_at)).length
+
+  // Load the selected conversation's lead (powers the assigned/reassign pill +
+  // Create quote). One small read per conversation-open; campaign admin page.
+  useEffect(() => {
+    setReassignOpen(false)
+    const leadId = sel?.lead_id
+    if (!leadId) { setSelLead(null); return }
+    let alive = true
+    supabase.from('leads')
+      .select('id, name, company, phone, email, notes, segment, telecaller_id, assigned_to')
+      .eq('id', leadId).maybeSingle()
+      .then(({ data }) => { if (alive) setSelLead(data || null) })
+    return () => { alive = false }
+  }, [sel?.lead_id])
 
   // Send a free-form reply (only reachable when the 24h window is open). The
   // server (api/wa/send) re-checks the window + role, so this is just the UX.
@@ -219,6 +252,46 @@ export default function CampaignInboxV2() {
       setSending(false)
       sendingRef.current = false
     }
+  }
+
+  // Reassign the lead to another telecaller (admin action). Sets BOTH owner
+  // columns (telecaller_id + assigned_to) to the chosen TC — the C4.5 contract,
+  // so the live round-robin can't hijack it — and syncs the conversation row.
+  async function reassignTo(tcId) {
+    if (!sel?.lead_id || !tcId || reassigning) return
+    setReassigning(true)
+    try {
+      const { error } = await supabase.from('leads')
+        .update({ telecaller_id: tcId, assigned_to: tcId })
+        .eq('id', sel.lead_id)
+      if (error) { toastError(error, 'Could not reassign.'); return }
+      await supabase.from('whatsapp_conversations').update({ assigned_to: tcId }).eq('id', sel.id)
+      setSelLead((p) => (p ? { ...p, telecaller_id: tcId, assigned_to: tcId } : p))
+      setThreads((ts) => ts.map((t) => (t.id === sel.id ? { ...t, assigned_to: tcId } : t)))
+      toastSuccess(`Reassigned to ${tcs.find((u) => u.id === tcId)?.name || 'telecaller'}.`)
+      setReassignOpen(false)
+    } catch (e) {
+      toastError(e, 'Could not reassign.')
+    } finally {
+      setReassigning(false)
+    }
+  }
+
+  // Open the new-quote wizard prefilled from this lead (mirrors LeadDetailV2:597).
+  function createQuote() {
+    if (!selLead) return
+    navigate('/quotes/new', {
+      state: { prefill: {
+        client_name:    selLead.name || '',
+        client_company: selLead.company || '',
+        client_phone:   selLead.phone || sel?.customer_wa_id || '',
+        client_email:   selLead.email || '',
+        client_address: '',
+        client_notes:   selLead.notes || '',
+        lead_id:        selLead.id,
+        segment:        selLead.segment || 'PRIVATE',
+      } },
+    })
   }
 
   const refreshBtn = (
@@ -360,9 +433,32 @@ export default function CampaignInboxV2() {
                   </span>
                 </span>
                 {sel.lead_id && (
-                  <button type="button" onClick={() => navigate(`/leads/${sel.lead_id}`)} style={btnGhost}>
-                    Open lead
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {/* assigned-to + reassign (mockup) */}
+                    <div style={{ position: 'relative' }}>
+                      <button type="button" onClick={() => setReassignOpen((o) => !o)} style={btnGhost} title="Reassign telecaller">
+                        {(() => {
+                          const owner = selLead?.telecaller_id || selLead?.assigned_to
+                          const nm = tcs.find((u) => u.id === owner)?.name
+                          return (<><span style={miniAv}>{(nm || '?').charAt(0).toUpperCase()}</span>{nm || 'Assign'}</>)
+                        })()}
+                        <ChevronDown size={14} strokeWidth={1.6} />
+                      </button>
+                      {reassignOpen && (
+                        <div style={reassignMenu}>
+                          {tcs.length === 0
+                            ? <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--v2-ink-2)' }}>No telecallers</div>
+                            : tcs.map((u) => (
+                              <button key={u.id} type="button" disabled={reassigning} onClick={() => reassignTo(u.id)} style={reassignItem}>
+                                <span style={miniAv}>{(u.name || '?').charAt(0).toUpperCase()}</span>{u.name}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => navigate(`/leads/${sel.lead_id}`)} style={btnGhost}>Open lead</button>
+                    <button type="button" onClick={createQuote} style={btnY}><FileText size={14} strokeWidth={1.6} /> Create quote</button>
+                  </div>
                 )}
               </div>
 
@@ -401,8 +497,8 @@ export default function CampaignInboxV2() {
                             // inbound = surface bubble. Both light text on dark.
                             maxWidth: '76%', padding: '8px 11px',
                             borderRadius: 10,
-                            borderBottomRightRadius: out ? 4 : 10,
-                            borderBottomLeftRadius: out ? 10 : 4,
+                            borderBottomRightRadius: out ? 6 : 10,
+                            borderBottomLeftRadius: out ? 10 : 6,
                             background: out ? 'var(--v2-green-soft, rgba(34,197,94,0.18))' : 'var(--v2-bg-2)',
                             color: 'var(--v2-ink-0, #f5f7fb)',
                             border: out ? '1px solid rgba(34,197,94,0.34)' : '1px solid var(--v2-line)',
@@ -446,31 +542,41 @@ export default function CampaignInboxV2() {
 
               {/* composer — free-form text, allowed only inside the 24h window */}
               {windowOpen(sel.window_expires_at) ? (
-                <div style={{ padding: '10px 12px', borderTop: '1px solid var(--v2-line)', display: 'flex', alignItems: 'flex-end', gap: 8, background: 'var(--v2-bg-2)' }}>
-                  <textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
-                    placeholder="Type a reply…"
-                    rows={1}
-                    style={{
-                      flex: 1, resize: 'none', maxHeight: 120, minHeight: 38, padding: '9px 12px',
-                      background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line)', borderRadius: 10,
-                      color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, fontFamily: 'inherit', outline: 'none',
-                    }}
-                  />
-                  <button
-                    type="button" onClick={sendReply} disabled={sending || !draft.trim()}
-                    style={{
-                      flexShrink: 0, height: 38, padding: '0 14px', borderRadius: 10, border: 'none',
-                      background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0f172a)',
-                      fontWeight: 700, fontSize: 13, cursor: (sending || !draft.trim()) ? 'default' : 'pointer',
-                      opacity: (sending || !draft.trim()) ? 0.55 : 1, display: 'inline-flex', alignItems: 'center', gap: 6,
-                    }}
-                  >
-                    {sending ? <Loader2 size={15} strokeWidth={1.6} className="spin" /> : <Send size={15} strokeWidth={1.6} />}
-                    Send
-                  </button>
+                <div style={{ padding: '10px 12px', borderTop: '1px solid var(--v2-line)', background: 'var(--v2-bg-2)' }}>
+                  {/* quick-reply chips (mockup) — click fills the box for editing */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {CANNED.map((c) => (
+                      <button key={c.label} type="button" onClick={() => setDraft(c.text)} style={chipReply} title={c.text}>
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+                    <textarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
+                      placeholder="Type a reply…"
+                      rows={1}
+                      style={{
+                        flex: 1, resize: 'none', maxHeight: 120, minHeight: 38, padding: '9px 12px',
+                        background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line)', borderRadius: 10,
+                        color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, fontFamily: 'inherit', outline: 'none',
+                      }}
+                    />
+                    <button
+                      type="button" onClick={sendReply} disabled={sending || !draft.trim()}
+                      style={{
+                        flexShrink: 0, height: 38, padding: '0 14px', borderRadius: 10, border: 'none',
+                        background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0f172a)',
+                        fontWeight: 700, fontSize: 13, cursor: (sending || !draft.trim()) ? 'default' : 'pointer',
+                        opacity: (sending || !draft.trim()) ? 0.55 : 1, display: 'inline-flex', alignItems: 'center', gap: 6,
+                      }}
+                    >
+                      {sending ? <Loader2 size={15} strokeWidth={1.6} className="spin" /> : <Send size={15} strokeWidth={1.6} />}
+                      Send
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div style={{ padding: '12px 16px', borderTop: '1px solid var(--v2-line)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--v2-bg-2)' }}>
@@ -510,4 +616,30 @@ const btnGhost = {
 const iconBtn = {
   background: 'transparent', border: 'none', cursor: 'pointer',
   color: 'var(--v2-ink-2, #6a7590)', display: 'flex', padding: 2,
+}
+const btnY = {
+  display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+  background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)',
+  border: 'none', borderRadius: 10, padding: '8px 12px',
+}
+const miniAv = {
+  width: 18, height: 18, borderRadius: 999, flexShrink: 0, marginRight: 2,
+  background: 'var(--v2-blue-soft, rgba(96,165,250,0.16))', color: 'var(--v2-blue, #60a5fa)',
+  fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+}
+const chipReply = {
+  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+  background: 'var(--v2-bg-1, #0f1525)', color: 'var(--v2-ink-1, #a9b3c7)',
+  border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 999, padding: '5px 11px',
+}
+const reassignMenu = {
+  position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100,
+  background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)',
+  borderRadius: 10, boxShadow: '0 12px 30px rgba(0,0,0,.4)', minWidth: 180, padding: 4,
+  maxHeight: 240, overflowY: 'auto',
+}
+const reassignItem = {
+  width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
+  padding: '8px 10px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  background: 'transparent', border: 'none', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)',
 }
