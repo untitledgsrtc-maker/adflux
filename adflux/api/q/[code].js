@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     return res.end()
   }
 
-  let target = FALLBACK
+  let target = ''
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -65,10 +65,22 @@ export default async function handler(req, res) {
         try { await admin.from('qr_scans').insert({ location_id: loc.id, ua_hash: uaHash }) } catch { /* best-effort */ }
       }
     }
+    // Unknown / deleted code, or a board with no wa link → open WhatsApp on the
+    // campaign number anyway (generic), NEVER the app login page. A QR scan must
+    // always land in WhatsApp, not a sign-in screen.
+    if (!target) {
+      const { data: acct } = await admin.from('whatsapp_accounts')
+        .select('display_number').eq('is_active', true)
+        .order('created_at', { ascending: true }).limit(1).maybeSingle()
+      const d = String(acct?.display_number || '').replace(/\D/g, '')
+      const wa = d.length === 10 ? '91' + d : d
+      if (wa.length >= 11) target = `https://wa.me/${wa}?text=${encodeURIComponent('Hi')}`
+    }
   } catch {
     /* lookup/log failed — still redirect to the resolved target / fallback */
   }
 
+  if (!target) target = FALLBACK   // absolute last resort (no active number configured)
   res.writeHead(302, { Location: target })
   return res.end()
 }
