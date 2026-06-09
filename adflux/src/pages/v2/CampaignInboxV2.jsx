@@ -87,26 +87,31 @@ export default function CampaignInboxV2() {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const sendingRef = useRef(false)   // §47 synchronous latch — no double-send on a WebView ghost-click
+  const msgScrollRef = useRef(null)  // C5.1 — auto-scroll anchor for the message pane
+  const prevMsgCount = useRef(0)
 
-  const loadThreads = useCallback(async () => {
-    setLoading(true)
+  const loadThreads = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     const { data, error } = await supabase
       .from('whatsapp_conversations')
       .select('id, customer_wa_id, status, last_inbound_at, window_expires_at, lead_id, assigned_to, campaign_id')
       .order('last_inbound_at', { ascending: false, nullsFirst: false })
       .limit(200)
     if (error) {
-      if (/relation .* does not exist|could not find the table/i.test(error.message || '')) {
-        setTablesMissing(true)
-      } else {
-        toastError(error, 'Could not load conversations.')
+      // On a silent poll, swallow transient errors (no spinner, no toast spam).
+      if (!silent) {
+        if (/relation .* does not exist|could not find the table/i.test(error.message || '')) {
+          setTablesMissing(true)
+        } else {
+          toastError(error, 'Could not load conversations.')
+        }
+        setLoading(false)
       }
-      setLoading(false)
       return
     }
     const rows = data || []
     setThreads(rows)
-    setLoading(false)
+    if (!silent) setLoading(false)
 
     // Best-effort last-message preview per thread (one query, newest first).
     if (rows.length) {
@@ -125,22 +130,60 @@ export default function CampaignInboxV2() {
     }
   }, [])
 
-  const loadMsgs = useCallback(async (convId) => {
+  const loadMsgs = useCallback(async (convId, silent = false) => {
     if (!convId) { setMsgs([]); return }
-    setMsgLoading(true)
+    if (!silent) setMsgLoading(true)
     const { data, error } = await supabase
       .from('whatsapp_messages')
       .select('id, direction, type, body, status, at')
       .eq('conversation_id', convId)
       .order('at', { ascending: true })
       .limit(500)
-    if (error) toastError(error, 'Could not load messages.')
-    setMsgs(data || [])
-    setMsgLoading(false)
+    // Don't blank the open conversation on a transient (silent) error.
+    if (error) { if (!silent) toastError(error, 'Could not load messages.') }
+    else setMsgs(data || [])
+    if (!silent) setMsgLoading(false)
   }, [])
 
   useEffect(() => { loadThreads() }, [loadThreads])
   useEffect(() => { loadMsgs(selId) }, [selId, loadMsgs])
+
+  // C5.1 — auto-refresh: poll while the tab is visible so new inbound /
+  // outbound messages appear WITHOUT a manual reload (silent = no spinner
+  // flash). §45-safe: reads campaign tables only, admin page, off the rep
+  // hot path. (A Supabase Realtime upgrade is a later option; polling needs
+  // no SQL + no publication change.)
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return
+      loadThreads(true)
+      if (selId) loadMsgs(selId, true)
+    }
+    const iv = setInterval(tick, 7000)
+    const onFocus = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onFocus)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(iv)
+      document.removeEventListener('visibilitychange', onFocus)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [loadThreads, loadMsgs, selId])
+
+  // Reset the scroll anchor when switching conversations.
+  useEffect(() => { prevMsgCount.current = 0 }, [selId])
+
+  // Auto-scroll to the newest message: on open, and when a new message
+  // arrives while already near the bottom (don't yank the view if the user
+  // scrolled up to read history).
+  useEffect(() => {
+    const el = msgScrollRef.current
+    if (el && msgs.length > prevMsgCount.current) {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 140
+      if (prevMsgCount.current === 0 || nearBottom) el.scrollTop = el.scrollHeight
+    }
+    prevMsgCount.current = msgs.length
+  }, [msgs])
 
   const sel = threads.find((t) => t.id === selId) || null
   const openCount = threads.filter((t) => windowOpen(t.window_expires_at)).length
@@ -324,7 +367,7 @@ export default function CampaignInboxV2() {
               </div>
 
               {/* messages */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', maxHeight: 500 }}>
+              <div ref={msgScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', maxHeight: 500 }}>
                 {msgLoading ? (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
                     <Loader2 size={18} strokeWidth={1.6} className="spin" style={{ color: 'var(--v2-yellow, #FFE600)' }} />
