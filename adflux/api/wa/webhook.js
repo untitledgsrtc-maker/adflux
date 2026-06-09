@@ -87,11 +87,24 @@ function clip(s) {
 function messageBody(m) {
   return (
     m.text?.body ??
+    m.image?.caption ??
+    m.video?.caption ??
+    m.document?.caption ??
+    m.document?.filename ??
     m.button?.text ??
     m.interactive?.button_reply?.title ??
     m.interactive?.list_reply?.title ??
     null
   )
+}
+
+// Media (image/video/audio/document/sticker) carries a Meta media id; capture
+// it + the mime so api/wa/media can fetch the bytes on demand for the Inbox.
+function mediaInfo(m) {
+  const o = m && m.type ? m[m.type] : null
+  return (o && typeof o === 'object' && o.id)
+    ? { id: String(o.id), mime: o.mime_type || null }
+    : { id: null, mime: null }
 }
 
 // C8 — pull the QR board code from a pre-filled scan message, e.g.
@@ -199,14 +212,22 @@ async function storeInbound(payload) {
         // Message: the wamid UNIQUE index is also PARTIAL → plain INSERT and
         // tolerate the duplicate (23505) for Meta-retry idempotency, not upsert.
         const atIso = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : nowIso
-        const msg = await admin.from('whatsapp_messages').insert({
+        const media = mediaInfo(m)
+        const baseRow = {
           conversation_id: convId,
           wamid: m.id || null,
           direction: 'in',
           type: m.type || 'text',
           body: messageBody(m),
           at: atIso,
-        })
+        }
+        let msg = await admin.from('whatsapp_messages')
+          .insert({ ...baseRow, media_id: media.id, media_mime: media.mime })
+        // media_id/media_mime columns not added yet → retry WITHOUT them so the
+        // store NEVER breaks regardless of when the C5 media SQL is run (§45).
+        if (msg.error && /media_id|media_mime|could not find|column/i.test(msg.error.message || '')) {
+          msg = await admin.from('whatsapp_messages').insert(baseRow)
+        }
         if (msg.error && msg.error.code !== '23505') {
           return { ok: false, error: 'message: ' + msg.error.message, stored }
         }

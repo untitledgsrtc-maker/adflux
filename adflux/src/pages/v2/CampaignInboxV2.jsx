@@ -82,6 +82,10 @@ function windowLeft(expiresIso) {
   const m = Math.floor((s % 3600) / 60)
   return `${h}h ${m}m left`
 }
+// An inbound photo we can render via the media proxy (api/wa/media).
+function isImageMsg(m) {
+  return !!m.media_id && (m.type === 'image' || m.type === 'sticker')
+}
 
 export default function CampaignInboxV2() {
   const navigate = useNavigate()
@@ -148,7 +152,7 @@ export default function CampaignInboxV2() {
     if (!silent) setMsgLoading(true)
     const { data, error } = await supabase
       .from('whatsapp_messages')
-      .select('id, direction, type, body, status, at')
+      .select('id, direction, type, body, status, at, media_id')
       .eq('conversation_id', convId)
       .order('at', { ascending: true })
       .limit(500)
@@ -504,7 +508,18 @@ export default function CampaignInboxV2() {
                             border: out ? '1px solid rgba(34,197,94,0.34)' : '1px solid var(--v2-line)',
                           }}>
                             <div style={{ fontSize: 13.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                              {m.body || <em style={{ opacity: 0.7 }}>[{m.type || 'media'}]</em>}
+                              {isImageMsg(m) && (
+                                <a href={`/api/wa/media?id=${encodeURIComponent(m.media_id)}`} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
+                                  <img
+                                    src={`/api/wa/media?id=${encodeURIComponent(m.media_id)}`}
+                                    alt={m.body || 'photo'} loading="lazy"
+                                    style={{ maxWidth: 220, maxHeight: 260, borderRadius: 8, display: 'block', marginBottom: m.body ? 6 : 0 }}
+                                  />
+                                </a>
+                              )}
+                              {m.body
+                                ? m.body
+                                : (!isImageMsg(m) && <em style={{ opacity: 0.7 }}>[{m.type || 'media'}]</em>)}
                             </div>
                             <div style={{
                               fontSize: 10, marginTop: 3, display: 'flex', alignItems: 'center',
