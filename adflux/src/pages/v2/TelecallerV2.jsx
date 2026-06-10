@@ -67,14 +67,8 @@ import { istTodayISO, istTodayPlusDays } from '../../utils/istDate'
 
 const HEAT_RANK = { hot: 0, warm: 1, cold: 2 }
 
-function slaPill(due) {
-  if (!due) return null
-  const ms = new Date(due).getTime() - Date.now()
-  const hours = ms / 3600 / 1000
-  if (hours < 0)  return { tone: 'danger',  label: `Overdue ${Math.abs(Math.round(hours))}h` }
-  if (hours <= 6) return { tone: 'warn',    label: `${Math.round(hours)}h left` }
-  return { tone: 'success', label: `${Math.round(hours)}h left` }
-}
+// Truth 2 — slaPill() removed with the dead hand-off query (its last
+// consumer); the hand-off/SLA tiles were dropped in 113.12.
 
 export default function TelecallerV2() {
   const navigate = useNavigate()
@@ -83,8 +77,9 @@ export default function TelecallerV2() {
   const [leads, setLeads] = useState([])
   const [callsToday, setCallsToday] = useState(0)
   const [connectedToday, setConnectedToday] = useState(0)
-  const [qualifiedToday, setQualifiedToday] = useState(0)
-  const [handoffs, setHandoffs] = useState([])
+  // Truth 2 — the TRUE active-queue size (head count, not the 50-row page).
+  const [queueCount, setQueueCount] = useState(0)
+  const [callbacksCount, setCallbacksCount] = useState(0)
   const [loading, setLoading] = useState(true)
   // Phase 43.1 — PostCallOutcomeModal chain state (mirror of WorkV2).
   const [callLead, setCallLead] = useState(null)
@@ -100,7 +95,6 @@ export default function TelecallerV2() {
   const [connectTarget, setConnectTarget] = useState(30)   // %
   const [qualifiedWeeklyTarget, setQualifiedWeeklyTarget] = useState(5)
   const [qualifiedThisWeek, setQualifiedThisWeek] = useState(0)
-  const [slaBreachCount, setSlaBreachCount] = useState(0)
   // Phase 113.13 — quote-chase + pay-chase (parity with the sales card).
   // TCs close their own deals on the phone, so these now apply.
   const [quoteChase, setQuoteChase] = useState(0)
@@ -142,6 +136,7 @@ export default function TelecallerV2() {
     // Phase 47.9 — IST today + today+2d via shared util.
     const todayDateISO = istTodayISO()
     const in2Days = istTodayPlusDays(2)
+    const weekAgoISO = istTodayPlusDays(-7)   // Truth 2 — overdue-callback window
 
     // Phase 49 — week-start anchor for weekly qualified count.
     // Monday 00:00 IST is the week boundary (Indian work week).
@@ -153,7 +148,7 @@ export default function TelecallerV2() {
       return t.toISOString().slice(0, 10)
     })()
 
-    const [leadsRes, callsRes, connectedRes, qualRes, handoffRes, targetRes, callbacksRes, qualifiedWeekRes] = await Promise.all([
+    const [leadsRes, queueCountRes, callsRes, connectedRes, targetRes, callbacksRes, callbacksCountRes, qualifiedWeekRes] = await Promise.all([
       supabase
         .from('leads')
         .select('*, assigned:assigned_to(id, name, city)')
@@ -162,8 +157,19 @@ export default function TelecallerV2() {
         // removed in Phase 30A). Active queue = anything not closed
         // or pending sales handoff.
         .not('stage', 'in', '("Won","Lost","QuoteSent","Negotiating","MeetingScheduled")')
-        .order('created_at', { ascending: false })
+        // Truth 2 (deep-audit P0) — was newest-created-first, so a book
+        // bigger than 50 silently hid its OLDEST-contacted leads (the ones
+        // most needing a call). Oldest contact first = the RIGHT 50 load;
+        // never-contacted leads come first (nullsFirst).
+        .order('last_contact_at', { ascending: true, nullsFirst: true })
         .limit(50),
+      // Truth 2 — the TRUE queue size for the "In queue" tile (the row
+      // query above is a 50-row page, not the total).
+      supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('telecaller_id', profile.id)
+        .not('stage', 'in', '("Won","Lost","QuoteSent","Negotiating","MeetingScheduled")'),
       // Phase 76.2.2 (2026-05-23) — owner directive: a "call today"
       // only counts when duration_seconds >= 10. Excludes misdials,
       // ringing-hangups, immediate-cuts. NULL durations also excluded
@@ -208,22 +214,10 @@ export default function TelecallerV2() {
         .gte('duration_seconds', 10)
         .or('direction.is.null,direction.neq.missed')
         .not('lead_id', 'is', null),
-      supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .eq('telecaller_id', profile.id)
-        .or(`sales_ready_at.gte.${startOfDay},qualified_at.gte.${startOfDay}`),
-      // Phase 30A — SalesReady stage removed. Telecaller hand-offs are
-      // now identified by `sales_ready_at` timestamp (the moment the
-      // telecaller flipped the lead to ready) on a still-active row.
-      supabase
-        .from('leads')
-        .select('*, assigned:assigned_to(id, name, city)')
-        .eq('telecaller_id', profile.id)
-        .not('sales_ready_at', 'is', null)
-        .not('stage', 'in', '(Won,Lost)')
-        .order('handoff_sla_due_at', { ascending: true, nullsFirst: false })
-        .limit(20),
+      // Truth 2 — the qualified-today + hand-offs queries were DEAD (their
+      // tiles dropped in 113.12; data was fetched on every 20s poll and
+      // never rendered). Removed — net query count unchanged (two real
+      // counts added above/below).
       // Phase 43.2 + Phase 49 — read this rep's full policy row:
       // min_calls + min_connect_pct + min_qualified_weekly.
       supabase
@@ -243,11 +237,23 @@ export default function TelecallerV2() {
         .select('id, follow_up_date, follow_up_time, note, lead_id, leads(id, name, phone, company, city, segment, stage, source, heat, last_contact_at, do_not_call, wa_opt_out)')
         .eq('assigned_to', profile.id)
         .eq('is_done', false)
-        .gte('follow_up_date', todayDateISO)
+        // Truth 2 (deep-audit P1) — was gte(today): a callback that slipped
+        // past midnight VANISHED from the page entirely. Window now opens
+        // 7 days back so overdue callbacks surface FIRST (date-asc sort),
+        // bounded so ancient junk doesn't flood the panel.
+        .gte('follow_up_date', weekAgoISO)
         .lte('follow_up_date', in2Days)
         .order('follow_up_date', { ascending: true })
         .order('follow_up_time', { ascending: true, nullsFirst: true })
-        .limit(10),
+        .limit(30),
+      // Truth 2 — true count for the Callbacks tile (the panel is a page).
+      supabase
+        .from('follow_ups')
+        .select('id', { count: 'exact', head: true })
+        .eq('assigned_to', profile.id)
+        .eq('is_done', false)
+        .gte('follow_up_date', weekAgoISO)
+        .lte('follow_up_date', in2Days),
       // Phase 49 — qualified handoffs THIS WEEK. Counts leads this
       // TC flipped to SalesReady (sales_ready_at) since Monday.
       supabase
@@ -258,24 +264,16 @@ export default function TelecallerV2() {
     ])
 
     setLeads(leadsRes.data || [])
+    setQueueCount(queueCountRes?.count || 0)
     setCallsToday(callsRes.count || 0)
     setConnectedToday(connectedRes.count || 0)
-    setQualifiedToday(qualRes.count || 0)
-    setHandoffs(handoffRes.data || [])
     setCallTarget(Number(targetRes?.data?.min_calls) || 50)
     // Phase 49 — connect-rate + weekly-qualified targets + counts.
     setConnectTarget(Number(targetRes?.data?.min_connect_pct) || 30)
     setQualifiedWeeklyTarget(Number(targetRes?.data?.min_qualified_weekly) || 5)
     setQualifiedThisWeek(qualifiedWeekRes?.count || 0)
-    // SLA breaches = handoffs with handoff_sla_due_at in the past
-    // and lead still not flipped (computed from existing handoffRes).
-    const nowMs = Date.now()
-    const breached = (handoffRes?.data || []).filter(h => {
-      if (!h.handoff_sla_due_at) return false
-      return new Date(h.handoff_sla_due_at).getTime() < nowMs
-    }).length
-    setSlaBreachCount(breached)
     setCallbacks(callbacksRes?.data || [])
+    setCallbacksCount(callbacksCountRes?.count || 0)
     // Phase 110 — today's work_session drives the manual-checkout state
     // on the DaySummaryCard (checked-out? busy?).
     const { data: wsRow } = await supabase
@@ -641,7 +639,8 @@ export default function TelecallerV2() {
   // (callsToday / callTarget × 100). Connect-rate joins the footer
   // stats so TC can read connect-quality at a glance. Qualified
   // count stays in footer.
-  const queueOpen = leads.length
+  // Truth 2 — true total (head count), not the 50-row page length.
+  const queueOpen = queueCount || leads.length
   const callTargetPct = callTarget > 0
     ? Math.round((callsToday / callTarget) * 100)
     : 0
@@ -918,7 +917,7 @@ export default function TelecallerV2() {
           // Phase 113.13 — 6 tiles (3x2): Callbacks / Connected / Qualified /
           // In queue / Quote chase / Pay chase. (Hand-offs + SLA dropped in
           // 113.12; Quote/Pay chase added — TCs close their own deals.)
-          { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks',   n: callbacks.length,  to: '/follow-ups' },
+          { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks',   n: callbacksCount || callbacks.length,  to: '/follow-ups' },
           { icon: PhoneCall,     tint: 'var(--success, #10B981)', label: 'Connected',   n: connectedToday,    to: null },
           { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Worked',      n: qualifiedThisWeek, to: null },
           { icon: Users,         tint: 'var(--accent, #FFE600)',  label: 'In queue',    n: queueOpen,         to: '/leads' },
@@ -975,7 +974,7 @@ export default function TelecallerV2() {
           <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Upcoming callbacks</div>
-              <div className="lead-card-sub">{callbacks.length} scheduled · next 48 hours</div>
+              <div className="lead-card-sub">{callbacksCount || callbacks.length} due · overdue + next 48 hours</div>
             </div>
             <ChevronDown size={16} strokeWidth={1.6} className="tc-acc-chev" />
           </summary>
@@ -1131,7 +1130,7 @@ export default function TelecallerV2() {
           <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Call queue</div>
-              <div className="lead-card-sub">{leads.length} in queue · sorted by heat</div>
+              <div className="lead-card-sub">showing {leads.length} of {queueOpen} · oldest contact first</div>
             </div>
             <span className="lead-card-link" onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate('/leads') }}>
               View all <ArrowRight size={11} />
@@ -1246,14 +1245,5 @@ export default function TelecallerV2() {
 // to avoid dead code.
 
 // Phase 113.7 — heatColor() removed; its only caller (the hero round
-// avatar) was dropped in the declutter.
-function hotWarmCount(leads) {
-  const hot  = leads.filter(l => l.heat === 'hot').length
-  const warm = leads.filter(l => l.heat === 'warm').length
-  return `${hot} hot · ${warm} warm`
-}
-function overdueCount(handoffs) {
-  const overdue = handoffs.filter(h => slaPill(h.handoff_sla_due_at)?.tone === 'danger').length
-  if (overdue === 0) return 'all on track'
-  return `${overdue} overdue`
-}
+// avatar) was dropped in the declutter. Truth 2 — hotWarmCount() +
+// overdueCount() removed (dead since their tiles dropped in 113.12).
