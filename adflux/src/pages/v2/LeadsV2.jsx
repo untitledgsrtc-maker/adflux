@@ -100,6 +100,8 @@ import {
 } from '../../components/leads/LeadShared'
 import { StageAgeChip } from '../../components/leads/StageAgeChip'
 import { toastError, pushToast } from '../../components/v2/Toast'
+import { logCallAudit } from '../../utils/callAudit'
+import { markCallStart } from '../../utils/callTimer'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import V2Hero from '../../components/v2/V2Hero'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
@@ -1115,14 +1117,21 @@ export default function LeadsV2() {
                           title="Call"
                           onClick={async () => {
                             // Phase 35Z (14 May 2026) — auto-log on /leads row
-                            // tap, same pattern as /follow-ups + lead detail.
+                            // tap. Truth 3e — was pre-stamping outcome:'neutral'
+                            // (a fake rep answer that skipped the audit trail).
+                            // Now matches every other tap site: tel-tap audit
+                            // row + duration timer armed + outcome left NULL
+                            // (unconfirmed until the rep logs it from the lead
+                            // page). No fake outcomes, calls reach call_logs.
                             try {
                               const { data: { user } } = await supabase.auth.getUser()
                               if (!user?.id) return
+                              logCallAudit(supabase, { userId: user.id, leadId: l.id, phone: l.phone })
+                              markCallStart(l.id)
                               supabase.from('lead_activities').insert([{
                                 lead_id: l.id,
                                 activity_type: 'call',
-                                outcome: 'neutral',
+                                outcome: null,
                                 notes: `Call from leads list · ${l.name || ''}`.trim(),
                                 created_by: user.id,
                               }]).then(() => {}, () => {})

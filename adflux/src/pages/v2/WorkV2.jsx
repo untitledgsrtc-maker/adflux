@@ -600,8 +600,12 @@ export default function WorkV2() {
       .from('work_sessions')
       .upsert(payload, { onConflict: 'user_id,work_date' })
     setBusy(false)
-    if (err) { setError(err.message); return }
+    // Truth 3d — report success so startDay can ABORT on failure. Before
+    // this, a failed plan save still chained into doCheckIn, which cleared
+    // the error and the rep saw the plan form again with no message.
+    if (err) { setError(err.message); return false }
     load()
+    return true
   }
 
   async function toggleTaskDone(taskId) {
@@ -736,7 +740,10 @@ export default function WorkV2() {
       setError('Please add your plan first — tap the mic and speak it, or fill at least one meeting / call target.')
       return
     }
-    await submitPlan()
+    // Truth 3d — abort check-in when the plan save failed (submitPlan set
+    // the error banner; chaining on cleared it + dead-ended silently).
+    const planOk = await submitPlan()
+    if (planOk === false) return
     setTimeout(() => { doCheckIn() }, 100)
   }
 
