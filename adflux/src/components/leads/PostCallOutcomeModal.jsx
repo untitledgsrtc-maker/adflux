@@ -658,7 +658,11 @@ export default function PostCallOutcomeModal({
         .eq('lead_id', lead.id)
         .eq('is_done', false)
       if (closeErr) {
+        // Truth 3b — was console.warn only (88.1 optimistic path): the old
+        // follow-up silently stayed open → duplicate task tomorrow. Surface
+        // it so the rep can re-save or mark it done by hand.
         console.warn('[phase-97.3.1] follow_ups UPDATE failed:', closeErr.message)
+        toastError(closeErr, 'Could not close the old follow-up — it may reappear; mark it done from Follow-ups.')
       }
       if (earlyClosingIds.length > 0) {
         // Fan-out cancel using ids captured BEFORE stage advance.
