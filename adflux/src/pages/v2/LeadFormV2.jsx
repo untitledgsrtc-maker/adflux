@@ -209,6 +209,21 @@ export default function LeadFormV2() {
       setError('Pick an outcome — Good / Maybe / Lost.')
       return
     }
+    // Truth 3c — replicate the Phase 84.4 hard GPS gate here. LogMeetingModal
+    // (still mounted on WorkV2 for the floating meeting button) has the gate;
+    // this SEPARATE meetingMode entry point was always GPS-optional, so a rep
+    // with Location off could log a score-counting meeting with no map pin.
+    // Owner directive 23 May 2026: "we have compulsory gps fetched while add
+    // meeting then why gps not punch?". Meeting mode ONLY — plain new-lead
+    // entry stays GPS-optional (93.17 contract).
+    if (meetingMode && gpsBusy) {
+      setError('GPS still locking — wait 2 seconds and try again.')
+      return
+    }
+    if (meetingMode && (!gps?.lat || !gps?.lng)) {
+      setError('GPS required to log a meeting. Tap "Refresh GPS" or turn on Location and retry.')
+      return
+    }
     // Phase 113.4 — latch here: after validation, before the leads insert.
     // findLeadByPhone above is the first await, so re-check the ref (a
     // ghost-click that passed the top guard before this point bails now).
