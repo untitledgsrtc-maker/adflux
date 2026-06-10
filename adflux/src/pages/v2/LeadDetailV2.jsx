@@ -261,6 +261,8 @@ export default function LeadDetailV2() {
   // can run twice → double INSERT. Ref guard ensures the actual
   // Supabase write fires AT MOST ONCE per hereGps session.
   const savingHereRef = useRef(false)
+  // Truth 3 — §47.1 latch for the quickLog call button (see quickLog).
+  const quickLogRef = useRef(false)
   async function saveHereMeeting() {
     if (savingHereRef.current) return
     if (!hereGps || !lead?.id || !profile?.id) return
@@ -387,6 +389,11 @@ export default function LeadDetailV2() {
     // alongside the rep-claimed lead_activities row. Fire-and-forget
     // — never blocks the modal chain.
     if (activityType === 'call') {
+      // Truth 3 — §47.1 call latch (LeadDetail was the one tap site that
+      // missed it): a WebView ghost-click double-fired audit + insert.
+      if (quickLogRef.current) return
+      quickLogRef.current = true
+      setTimeout(() => { quickLogRef.current = false }, 2500)  // 113.5 auto-release
       logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
       markCallStart(lead.id)   // Phase 116 — arm the time-away duration fallback
     }
@@ -405,7 +412,32 @@ export default function LeadDetailV2() {
       .select('id')
       .single()
     if (insErr) {
-      setError(`Could not log ${activityType}: ${insErr.message}`)
+      // Truth 3 — port of 113.8/95.0: a re-tap within 60s hits the Phase
+      // 68.2 dedupe index (23505). The FIRST tap DID log — suppress the
+      // scary banner, reuse the existing call row, and STILL open the
+      // outcome modal so the rep can capture what happened.
+      const isDupKey = insErr.code === '23505' || /duplicate key/i.test(insErr.message || '')
+      if (activityType === 'call') {
+        let existingId = null
+        if (isDupKey) {
+          const { data: ex } = await supabase
+            .from('lead_activities')
+            .select('id')
+            .eq('lead_id', lead.id)
+            .eq('created_by', profile.id)
+            .eq('activity_type', 'call')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          existingId = ex?.id || null
+        } else {
+          setError(`Could not log call: ${insErr.message}`)
+        }
+        setPendingActivityId(existingId)
+        setTimeout(() => setPostCallOpen(true), 1500)
+        return
+      }
+      if (!isDupKey) setError(`Could not log ${activityType}: ${insErr.message}`)
       return
     }
     // Phase 34Z.49 — replace the WhatsApp pop with a voice-driven
@@ -473,12 +505,26 @@ export default function LeadDetailV2() {
         .limit(200),
     ])
     if (leadRes.error || !leadRes.data) {
-      setError(leadRes.error?.message || 'Lead not found or RLS denied.')
-      setLead(null)
+      // Truth 3 — a FAILED SILENT poll (20s background refresh on flaky
+      // 4G) must never blank the page: the error view unmounted open
+      // outcome/meeting modals mid-entry, losing the rep's unsaved work.
+      // Keep the stale lead on silent refreshes; only a real (non-silent)
+      // load surfaces the error view.
+      if (silent) {
+        // Guardian P1 — even on a cold-start race (lead still null), a
+        // SILENT failure never sets the page-level error; the pending
+        // non-silent load owns the error view.
+        console.warn('[lead] silent refresh failed, keeping stale view:', leadRes.error?.message)
+      } else {
+        setError(leadRes.error?.message || 'Lead not found or RLS denied.')
+        setLead(null)
+      }
     } else {
       setLead(leadRes.data)
     }
-    setActivities(actRes.data || [])
+    // Same protection: don't wipe the timeline on a failed silent poll.
+    if (actRes.data) setActivities(actRes.data)
+    else if (!silent) setActivities([])
     setLoading(false)
 
     // Phase 62.1 — load linked quotes + open follow-ups for this
