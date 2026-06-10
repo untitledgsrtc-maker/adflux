@@ -409,9 +409,11 @@ export default function RepProfileV2() {
           .eq('user_id', userId).gte('call_at', monthStart)
           .gte('duration_seconds', 10)
           .not('lead_id', 'is', null),
-        // Activities this month (meetings + site_visit + qualifications)
+        // Activities this month (meetings + site_visit + qualifications).
+        // id + notes + lead_id needed for the §33 done-meeting contract
+        // (exclusions + unique-lead-per-day dedup) applied below.
         supabase.from('lead_activities')
-          .select('activity_type, created_at')
+          .select('id, activity_type, created_at, notes, lead_id')
           .eq('created_by', userId)
           .gte('created_at', monthStart),
         // Leads currently assigned (active stages)
@@ -481,13 +483,29 @@ export default function RepProfileV2() {
         pipelineMonth: (quotesWonRes.data || []).reduce((s, q) => s + safeNum(q.total_amount), 0),
       }))
 
-      // Activities — derive meetings / qualified counts from rows
+      // Activities — derive meetings via the §33 done-meeting contract
+      // (same as the dashboard/counter/report): meeting+site_visit MINUS
+      // scheduled-future + auto-check-in rows, deduped to ONE per lead
+      // per IST day (walk-ins without a lead each count once via id).
+      // This tile sits next to payout history — it must not inflate.
       const acts = actMonthRes.data || []
-      const meetingsMonth = acts.filter(a => a.activity_type === 'meeting' || a.activity_type === 'site_visit').length
-      const meetingsTodayCount = acts.filter(a =>
+      const isDoneMeeting = (a) =>
         (a.activity_type === 'meeting' || a.activity_type === 'site_visit')
-        && a.created_at >= dayStart && a.created_at <= dayEnd
-      ).length
+        && !(a.notes || '').startsWith('Meeting scheduled')
+        && !(a.notes || '').startsWith("I'm here · auto-check-in")
+      const istDayOf = (iso) => {
+        try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(iso)) }
+        catch { return String(iso).slice(0, 10) }
+      }
+      const uniqueDoneMeetings = (rows) => {
+        const seen = new Set()
+        rows.filter(isDoneMeeting).forEach((a) => seen.add(`${istDayOf(a.created_at)}|${a.lead_id || a.id}`))
+        return seen.size
+      }
+      const meetingsMonth = uniqueDoneMeetings(acts)
+      const meetingsTodayCount = uniqueDoneMeetings(
+        acts.filter(a => a.created_at >= dayStart && a.created_at <= dayEnd)
+      )
       setKpi(prev => ({ ...prev,
         meetingsToday: meetingsTodayCount,
         meetingsMonth,

@@ -47,6 +47,12 @@ export function PaymentModal({
   // perspective and pre-fill / validate against that figure.
   const effectiveOutstanding = Math.max(0, balance - pendingAmount)
 
+  // Money Truth — TDS breakdown shows only on GOVERNMENT quotes. Govt
+  // clients deduct TDS, so the GROSS milestone amount goes in Amount
+  // Received (closes the deal at quote total) and the withheld part is
+  // recorded here. Private flow renders byte-identical (field hidden).
+  const isGovt = quote?.segment === 'GOVERNMENT'
+
   const [form, setForm] = useState(() => initialPayment ? {
     amount_received:   initialPayment.amount_received ?? '',
     payment_mode:      initialPayment.payment_mode    ?? 'NEFT',
@@ -54,6 +60,7 @@ export function PaymentModal({
     reference_number:  initialPayment.reference_number ?? '',
     payment_notes:     initialPayment.payment_notes   ?? '',
     is_final_payment:  !!initialPayment.is_final_payment,
+    tds_amount:        initialPayment.tds_amount ?? '',
   } : {
     // Phase 34Z.44 — pre-fill amount with effective outstanding so
     // the rep sees what's actually owed before they type. Forces
@@ -64,6 +71,7 @@ export function PaymentModal({
     reference_number: '',
     payment_notes: '',
     is_final_payment: false,
+    tds_amount: '',
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -118,6 +126,13 @@ export function PaymentModal({
         `Only ${formatCurrency(effectiveOutstanding)} is left to collect — adjust this amount or wait for admin to approve/reject the pending one.`
     }
     if (!form.payment_date) errs.payment_date = 'Date is required'
+    // Money Truth — TDS is part of the gross, never more than it.
+    const tds = parseFloat(form.tds_amount)
+    if (form.tds_amount !== '' && (isNaN(tds) || tds < 0)) {
+      errs.tds_amount = 'Enter a valid TDS amount'
+    } else if (!isNaN(tds) && !isNaN(amt) && tds > amt) {
+      errs.tds_amount = 'TDS cannot exceed the amount received'
+    }
     return errs
   }
 
@@ -149,6 +164,8 @@ export function PaymentModal({
     const { error } = await onSave({
       ...form,
       amount_received: parseFloat(form.amount_received),
+      // gross stays in amount_received; TDS is the withheld breakdown
+      tds_amount: form.tds_amount === '' ? null : parseFloat(form.tds_amount),
     })
     setSaving(false)
     if (error) {
@@ -300,6 +317,33 @@ export function PaymentModal({
                   </span>
                 )}
               </div>
+
+              {/* TDS (Govt quotes only) — gross goes above; the withheld
+                  part is recorded here so the deal still closes at the
+                  quote total and TDS is on record for accounts. */}
+              {isGovt && (
+                <div className="form-group">
+                  <label className="form-label">TDS deducted (₹)</label>
+                  <input
+                    type="number"
+                    className={`form-input${errors.tds_amount ? ' input-error' : ''}`}
+                    value={form.tds_amount}
+                    onChange={e => set('tds_amount', e.target.value)}
+                    placeholder="e.g. 4% of the milestone"
+                    min="0"
+                    step="1"
+                  />
+                  {errors.tds_amount && (
+                    <span className="field-error">{errors.tds_amount}</span>
+                  )}
+                  <span className="pm-balance-preview">
+                    Enter the FULL milestone amount above (including TDS).
+                    {parseFloat(form.tds_amount) > 0 && enteredAmt > 0 && (
+                      <> Cash banked: {formatCurrency(Math.max(0, enteredAmt - (parseFloat(form.tds_amount) || 0)))}</>
+                    )}
+                  </span>
+                </div>
+              )}
 
               {/* Mode + Date row */}
               <div className="form-grid-2">
