@@ -53,7 +53,7 @@ export default function TodaySummaryCard({ userId, session }) {
       return d.toISOString().slice(0, 10)
     })()
 
-    const [fuRes, chaseRes, paymentRes, scheduledRes, renewalRes] = await Promise.all([
+    const [fuRes, chaseRes, paymentRes, scheduledRes, renewalRes, doneTodayRes] = await Promise.all([
       // 1. Pending follow-ups — lead_intro + nurture cadences, due
       //    today or earlier. Quote-chase + payment broken out below
       //    so they don't double-count here.
@@ -99,6 +99,15 @@ export default function TodaySummaryCard({ userId, session }) {
         .eq('status', 'won')
         .gte('campaign_end_date', today)
         .lte('campaign_end_date', sixtyDaysOut),
+
+      // 6. Truth 4 — follow-ups CLOSED today (head count). Lets the
+      //    "all done · N closed" state show on a fresh open too, not
+      //    only when the rep watched the list shrink this session.
+      supabase.from('follow_ups')
+        .select('id', { count: 'exact', head: true })
+        .eq('assigned_to', userId)
+        .eq('is_done', true)
+        .gte('done_at', `${today}T00:00:00+05:30`),
     ])
 
     // Compute payment-outstanding count client-side (Postgres can't
@@ -115,6 +124,8 @@ export default function TodaySummaryCard({ userId, session }) {
 
     const nextFollowUps = fuRes.data?.length || 0
     highMarkRef.current = Math.max(highMarkRef.current, nextFollowUps)
+    // Truth 4 — closed-today count feeds the fresh-mount done state.
+    highMarkRef.current = Math.max(highMarkRef.current, doneTodayRes?.count || 0)
     setCounts({
       followUps:         nextFollowUps,
       quoteChase:        chaseRes.data?.length || 0,
@@ -124,6 +135,7 @@ export default function TodaySummaryCard({ userId, session }) {
         : 0,
       scheduledMeetings: scheduledRes.data?.length || 0,
       renewal:           renewalRes.data?.length || 0,
+      doneToday:         doneTodayRes?.count || 0,
     })
   }, [userId, session?.planned_meetings])
 
@@ -225,13 +237,16 @@ export default function TodaySummaryCard({ userId, session }) {
     // Phase 87.3 — `meetingTile=true` flag marks tiles that get
     // hidden for TC users. Today + Scheduled both surface field-
     // meeting counts; TC doesn't do field meetings.
-    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Today',         n: counts.plannedMeetings,   to: '/work#day-status',          meetingTile: true },
+    // Truth 4 — was 'Today': read as today's DONE meetings next to the hero's
+    // 3/5, a contradiction. It counts the morning-PLANNER entries — say so.
+    { icon: Calendar,      tint: 'var(--accent, #FFE600)',  label: 'Planned',       n: counts.plannedMeetings,   to: '/work#day-status',          meetingTile: true },
     { icon: CalendarClock, tint: 'var(--blue, #3B82F6)',    label: 'Scheduled',     n: counts.scheduledMeetings, to: '/follow-ups?filter=meetings', meetingTile: true },
     { icon: Repeat,        tint: 'var(--success, #10B981)', label: 'Renewal',       n: counts.renewal,           to: '/renewal-tools' },
   ]
   const cells = isTC ? allCells.filter(c => !c.meetingTile) : allCells
 
   return (
+    <>
     <div className="m-card" style={{
       display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
       padding: 10,
@@ -281,5 +296,17 @@ export default function TodaySummaryCard({ userId, session }) {
         )
       })}
     </div>
+    {/* Truth 4 — done-today chip: pairs "what's left" (tiles) with "what
+        was done", so cleared tiles never read as a day of zero work. */}
+    {counts.doneToday > 0 && (
+      <div style={{
+        marginTop: 8, textAlign: 'center', fontSize: 11,
+        color: 'var(--success, #10B981)', fontWeight: 600,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+      }}>
+        <CheckCircle2 size={12} strokeWidth={2} /> {counts.doneToday} follow-up{counts.doneToday === 1 ? '' : 's'} closed today
+      </div>
+    )}
+    </>
   )
 }
