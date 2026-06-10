@@ -82,17 +82,22 @@ registerRoute(
   }),
 )
 
-// ─── RUNTIME CACHE — Supabase GET reads (stale-while-revalidate) ────
-// We only cache safe-to-stale GETs. Mutations (POST/PATCH/DELETE) are
-// never cached. The rep sees the last-known list when offline, then
-// the cache silently refreshes once network returns.
+// ─── RUNTIME CACHE — Supabase GET reads (network-first) ─────────────
+// Truth 6 (deep-audit root cause of "must reload to see new data"):
+// StaleWhileRevalidate served EVERY /rest/v1/ read from cache first —
+// the whole app was permanently one fetch behind. Every refresh path
+// (polls, realtime, focus) fired correctly but rendered stale bytes;
+// pages without a poll stayed old until a manual reload. NetworkFirst
+// = live data always when online (4s timeout), cache ONLY as the
+// offline fallback. Mutations still never cached.
 registerRoute(
   ({ url, request }) =>
     request.method === 'GET' &&
     url.host.endsWith('.supabase.co') &&
     url.pathname.startsWith('/rest/v1/'),
-  new StaleWhileRevalidate({
+  new NetworkFirst({
     cacheName: 'supabase-reads',
+    networkTimeoutSeconds: 4,
     plugins: [
       new CacheableResponsePlugin({ statuses: [200] }),
       new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 }),
