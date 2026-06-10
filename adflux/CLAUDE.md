@@ -3154,3 +3154,48 @@ endpoints only (CampaignInboxV2/QrV2/ClientQrV2 + CampaignChrome are NOT in the
 - Push state: `b75cf20` + `611dc56` were unpushed at write time.
 - Payment method on the WABA still owner-side (volume only).
 
+
+---
+
+## 56 · Sales/TC Truth sprint — state tracker (2026-06-10)
+
+Deep audit (4 read-only agents: sales flow 7/10 · TC 6/10 · follow-up engine
+4/10 · number-truth 6.5/10) → 5-batch fix sprint. Money Truth sprint shipped
+same day (money0-3 + 3.1 ALL RUN; shadow table showed gaps small: Rima 8.9,
+rest <=7 — score cutover PARKED, owner picks timing; Dixita/Kamina/Jignesh/
+"sales"/Hamesh scored 0.0 all week — owner to check who's real).
+
+### Done
+| Batch | Commit | SQL | What |
+|---|---|---|---|
+| Money 0-3 | `b4f7f7b` + `1c0c0cb` | ALL RUN | RepProfile §33 meetings · TDS columns+forms (Govt-only field, gross semantics) · calls delete-heal · migration register · shadow score (money3_1 gate fix: no-JWT Studio allowed) |
+| Truth 1 | `73a7dc5` | RUN | The 2 cadence P0s in followup_after_done: QuoteSent de-stage gate (seq-3 must be DUE) + zombie nurture stage-gates ('nurture' only while stage=Nurture, 'lost_nurture' only while Lost) + zombie heal + read-only diagnostic (list may include legit parks — owner reviews by hand) |
+| Truth 2 | `8b019d7` | none | TC page: queue order last_contact_at asc nullsFirst (the RIGHT 50) + true queue/callback head-counts + overdue-callback window -7d..+2d + dead queries/helpers removed (qualifiedToday, handoffs, slaPill etc — dead since 113.12) |
+
+### REMAINING batches (from the deep audit — file:line refs in audit outputs)
+**Batch 3 — sales side:** LeadDetailV2 quickLog missing callingRef latch +
+23505 dup-key kills modal (port FollowUpsV2:366-389 pattern; 3 tap sites
+:916,:1106,:1553) · silent-poll failure blanks page killing open modals
+(LeadDetailV2:630 — keep stale state + toast on silent loads) · GPS meeting
+gate DEAD on live path (gate only in unmounted LogMeetingModal; live path
+LeadFormV2 meetingMode saves gps null — replicate hard gate) · side-door
+calls bypass chain (LeadsV2:1114-1139 inserts outcome='neutral' directly;
+FollowUpsV2:285-296 pre-stamps) · startDay silent dead-end (WorkV2:739) ·
+88.1 follow-up-close silent fail (PCOM:660 console.warn → toast).
+**Batch 4 — push hygiene:** smart-task regen spam+snooze wipe (TodayTasks
+Panel:82 generate() on every focus; generate_lead_tasks DELETEs snoozed;
+push per new UUID; + no _assert_self_or_admin gate) · reassign orphans FUs
+(phase100_a:369 — transfer open follow_ups assigned_to) · alarm cancels
+missing on markDone/snooze/bulk (FollowUpsV2:241,263) · push_followup_due_
+reminders ungated by quiet hours (97_a400:54) · payment FUs (C8, lead_id
+NULL) never auto-close on full payment.
+**Batch 5 — periphery numbers:** ManagerDashboardV2:97 user_id→created_by
+(meetings always 0) + §33 contract · RepProfileV2:398 calls missing
+direction+lead_id guards · CockpitWidgets:456 + scorecard fn + daily-brief
+fn still on stored counter + dead 20-target (move to >=10s lead-tied + table
+target) · revenue label = 4 definitions (owner decision) · day-window
+anchors 3 variants (TelecallerV2:140 + TeamDashboardV2:286 no offset).
+**Parked:** TC weekly 3-definition mismatch (week-start + connect% defs) ·
+callTimer cross-call contamination + mid-call-glance truncation · callback
+auto-close-on-next-call (§47.1) · MeetingsMapPanel.jsx unmounted §51
+violation (delete or retrofit) · score ≥10s cutover (owner timing).
