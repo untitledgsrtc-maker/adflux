@@ -97,7 +97,33 @@ export default function MissedCallsCard({ userId, onCallLead, refreshKey }) {
       out.push(r)
       if (out.length >= LIMIT) break
     }
-    setRows(out)
+    // Truth 5 — owner: "missed-call rescue not gone even after they called."
+    // Nothing ever cleared an entry: a callback even made it STICKIER (the
+    // rescue tap writes a fresh no_answer audit row). Clear a lead once a
+    // REAL call (>=10s, the frozen §49 definition) exists at/after the
+    // listed row — >= on call_at because the Phase 65/116 duration patch
+    // lands on the SAME audit row, which then becomes its own proof. NOT
+    // any-row: that would self-clear on the tap alone (audit row written
+    // even if the dial was cancelled), hiding leads still needing rescue.
+    if (out.length > 0) {
+      const { data: later } = await supabase
+        .from('call_logs')
+        .select('lead_id, call_at')
+        .eq('user_id', userId)
+        .in('lead_id', out.map(r => r.lead.id))
+        .gte('call_at', sinceISO)
+        .gte('duration_seconds', 10)
+        .or('direction.is.null,direction.neq.missed')
+      const cleared = new Set((later || [])
+        .filter(l => {
+          const m = out.find(r => r.lead.id === l.lead_id)
+          return m && new Date(l.call_at) >= new Date(m.call_at)
+        })
+        .map(l => l.lead_id))
+      setRows(out.filter(r => !cleared.has(r.lead.id)))
+    } else {
+      setRows(out)
+    }
     setLoading(false)
   }, [userId])
 
