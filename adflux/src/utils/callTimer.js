@@ -77,11 +77,21 @@ export function markCallStart(leadId) {
     }
   }
 
-  // Drop any prior entry for this lead (a re-tap before saving).
+  // Drop any prior entry for this lead (a re-tap before saving) — but
+  // Phase 128.4: PRESERVE its recorded elapsed. Dhara 11 Jun: real 1m33s
+  // call recorded ~93s, then she re-tapped Call before saving — the drop
+  // threw the 93s away and the short second call failed the >=5s floor,
+  // so the row kept duration NULL. getCallElapsed now falls back to the
+  // prior call's time when the latest tap recorded nothing. PRUNE_MS
+  // (30 min) still bounds staleness; sequential DIFFERENT leads never
+  // cross-contaminate (keyed by leadId).
   const prev = pending.get(key)
   if (prev) { try { prev.cleanup && prev.cleanup() } catch { /* noop */ } }
 
-  const entry = { tapAt: now, elapsed: null, wentHidden: false, cleanup: null }
+  const entry = {
+    tapAt: now, elapsed: null, wentHidden: false, cleanup: null,
+    prevElapsed: prev ? (prev.elapsed ?? prev.prevElapsed ?? null) : null,
+  }
 
   // Web path: visibilitychange (works on PWA / desktop; unreliable on APK,
   // which the global native listener above covers).
@@ -115,5 +125,7 @@ export function getCallElapsed(leadId) {
   if (!entry) return null
   pending.delete(key)
   try { entry.cleanup && entry.cleanup() } catch { /* noop */ }
-  return entry.elapsed // seconds, or null if the app never backgrounded
+  // Phase 128.4 — latest tap wins; the prior same-lead call's recorded
+  // time is the fallback (a re-tap before saving used to discard it).
+  return entry.elapsed ?? entry.prevElapsed // seconds, or null
 }

@@ -518,7 +518,14 @@ export default function PostCallOutcomeModal({
     // what happened on the call). Combined patch = one round-trip.
     // Fire-and-forget; failure doesn't block save (analytics only).
     if (profile?.id && lead?.id) {
-      const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      // Phase 128.4 — cutoff 10 → 40 min. The Phase 126 aggressive dedup
+      // can merge a re-tap into a call_logs row up to ~30 min old (survivor
+      // keeps the OLDEST call_at); a 10-min window then matched 0 rows, the
+      // row stayed no_answer, and the duration patch was filtered out
+      // forever (Dhara 11 Jun: real 1m33s talk showed "—"). Guards intact:
+      // same user+lead, outgoing-only, fires only on this rep's explicit
+      // outcome save. The >=10s gate still solely decides the count (§49).
+      const cutoff = new Date(Date.now() - 40 * 60 * 1000).toISOString()
       const callLogPatch = {}
       // Map lead_activities outcome → call_logs outcome enum.
       // Phase 107 — Nurture is a connected call too (the rep spoke to them).
