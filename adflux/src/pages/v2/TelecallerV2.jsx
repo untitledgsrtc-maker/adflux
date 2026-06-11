@@ -247,13 +247,18 @@ export default function TelecallerV2() {
         .order('follow_up_time', { ascending: true, nullsFirst: true })
         .limit(30),
       // Truth 2 — true count for the Callbacks tile (the panel is a page).
+      // Phase 128.2 — tile counts what's actually DUE (today + overdue 7d),
+      // ONE PER LEAD — same definition as the admin TC card, so both read
+      // the same number. lead_id rows, deduped client-side (one lead can
+      // stack many open callbacks). The PANEL keeps showing +2d ahead.
       supabase
         .from('follow_ups')
-        .select('id', { count: 'exact', head: true })
+        .select('lead_id, id')
         .eq('assigned_to', profile.id)
         .eq('is_done', false)
         .gte('follow_up_date', weekAgoISO)
-        .lte('follow_up_date', in2Days),
+        .lte('follow_up_date', todayDateISO)
+        .limit(500),
       // Phase 49 — qualified handoffs THIS WEEK. Counts leads this
       // TC flipped to SalesReady (sales_ready_at) since Monday.
       supabase
@@ -273,7 +278,8 @@ export default function TelecallerV2() {
     setQualifiedWeeklyTarget(Number(targetRes?.data?.min_qualified_weekly) || 5)
     setQualifiedThisWeek(qualifiedWeekRes?.count || 0)
     setCallbacks(callbacksRes?.data || [])
-    setCallbacksCount(callbacksCountRes?.count || 0)
+    // Phase 128.2 — distinct leads with a DUE callback (today + overdue).
+    setCallbacksCount(new Set((callbacksCountRes?.data || []).map(r => r.lead_id || r.id)).size)
     // Phase 110 — today's work_session drives the manual-checkout state
     // on the DaySummaryCard (checked-out? busy?).
     const { data: wsRow } = await supabase
@@ -581,6 +587,16 @@ export default function TelecallerV2() {
     })
   }, [leads])
 
+  // Phase 128.2 — owner: "15 leads idle 3+ days but not able to click on
+  // it." Tapping the banner now filters the Call queue to just those
+  // leads; tap again to clear. Pure client view-state, no new query.
+  const [idleOnly, setIdleOnly] = useState(false)
+  const visibleQueue = useMemo(() => {
+    if (!idleOnly) return sortedQueue
+    const ids = new Set(staleLeads.map(l => l.id))
+    return sortedQueue.filter(l => ids.has(l.id))
+  }, [idleOnly, sortedQueue, staleLeads])
+
   // Phase 47.3 — top hot leads for this TC. Same source as the
   // queue but filtered to heat='hot' + sorted by last-touch
   // oldest-first. Surfaces "must-call NOW" leads above everything.
@@ -709,21 +725,28 @@ export default function TelecallerV2() {
           into the queue below. No push (notification fatigue);
           visible-when-open is enough. */}
       {staleLeads.length > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 14px', marginBottom: 14,
-          background: 'rgba(245,158,11,.10)',
-          border: '1px solid rgba(245,158,11,.35)',
-          borderRadius: 10,
-          fontSize: 13, color: 'var(--warning, #F59E0B)',
-        }}>
+        <div
+          role="button"
+          onClick={() => setIdleOnly(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 14px', marginBottom: 14,
+            background: idleOnly ? 'rgba(245,158,11,.22)' : 'rgba(245,158,11,.10)',
+            border: `1px solid rgba(245,158,11,${idleOnly ? '.65' : '.35'})`,
+            borderRadius: 10, cursor: 'pointer',
+            fontSize: 13, color: 'var(--warning, #F59E0B)',
+          }}
+        >
           <Clock size={14} />
           <div style={{ flex: 1 }}>
             <strong>{staleLeads.length} lead{staleLeads.length > 1 ? 's' : ''} idle 3+ days.</strong>{' '}
             <span style={{ color: 'var(--v2-ink-2)' }}>
-              Tap one in the queue below to call. Oldest at top.
+              {idleOnly
+                ? 'Showing only idle leads in the queue — tap to show all.'
+                : 'Tap here to see just them in the queue below.'}
             </span>
           </div>
+          <ChevronDown size={14} strokeWidth={1.6} style={{ transform: idleOnly ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
         </div>
       )}
 
@@ -917,7 +940,9 @@ export default function TelecallerV2() {
           // Phase 113.13 — 6 tiles (3x2): Callbacks / Connected / Qualified /
           // In queue / Quote chase / Pay chase. (Hand-offs + SLA dropped in
           // 113.12; Quote/Pay chase added — TCs close their own deals.)
-          { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks',   n: callbacksCount || callbacks.length,  to: '/follow-ups' },
+          // Phase 128.2 — count is DUE-only (today + overdue, one per lead);
+          // no || fallback: a real 0 must show 0, not the panel's row count.
+          { icon: Clock,         tint: 'var(--warning, #F59E0B)', label: 'Callbacks due', n: callbacksCount,  to: '/follow-ups' },
           { icon: PhoneCall,     tint: 'var(--success, #10B981)', label: 'Connected',   n: connectedToday,    to: null },
           { icon: CheckCircle2,  tint: 'var(--blue, #3B82F6)',    label: 'Worked',      n: qualifiedThisWeek, to: null },
           { icon: Users,         tint: 'var(--accent, #FFE600)',  label: 'In queue',    n: queueOpen,         to: '/leads' },
@@ -974,7 +999,7 @@ export default function TelecallerV2() {
           <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Upcoming callbacks</div>
-              <div className="lead-card-sub">{callbacksCount || callbacks.length} due · overdue + next 48 hours</div>
+              <div className="lead-card-sub">{callbacksCount} due (today + overdue) · list also shows next 48h</div>
             </div>
             <ChevronDown size={16} strokeWidth={1.6} className="tc-acc-chev" />
           </summary>
@@ -1130,19 +1155,23 @@ export default function TelecallerV2() {
           <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Call queue</div>
-              <div className="lead-card-sub">showing {leads.length} of {queueOpen} · oldest contact first</div>
+              <div className="lead-card-sub">
+                {idleOnly
+                  ? `idle 3+ days only · ${visibleQueue.length} leads`
+                  : `showing ${leads.length} of ${queueOpen} · oldest contact first`}
+              </div>
             </div>
             <span className="lead-card-link" onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate('/leads') }}>
               View all <ArrowRight size={11} />
             </span>
             <ChevronDown size={16} strokeWidth={1.6} className="tc-acc-chev" />
           </summary>
-          {sortedQueue.length === 0 ? (
+          {visibleQueue.length === 0 ? (
             <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-              Queue empty.
+              {idleOnly ? 'No idle leads in the loaded queue.' : 'Queue empty.'}
             </div>
           ) : (
-            sortedQueue.slice(0, 12).map((l, i) => (
+            visibleQueue.slice(0, 12).map((l, i) => (
               <div
                 key={l.id}
                 onClick={() => navigate(`/leads/${l.id}`)}

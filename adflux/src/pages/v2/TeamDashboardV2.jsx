@@ -290,6 +290,13 @@ export default function TeamDashboardV2() {
       // Single-day periods (today/yesterday) work identically to
       // the pre-Phase-82 code path.
       const today = period.startIso
+      // Phase 128.2 — callbacks-due overdue floor (-7d), matching the TC
+      // page's own window so admin + TC read the same number.
+      const cbFloor = (() => {
+        const d = new Date(`${today}T00:00:00`)
+        d.setDate(d.getDate() - 7)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      })()
       // Phase 112.5 — current calendar month window for the per-rep
       // "quotes this month / won this month" line. Independent of the
       // date filter (always the live month).
@@ -384,13 +391,17 @@ export default function TeamDashboardV2() {
           .select('user_id, min_calls, min_qualified_weekly')
           .is('effective_to', null),
 
-        // Phase 82 — follow_ups in the window, grouped client-side
-        // by assigned_to into pending + done counts. Owner: "daily
-        // followup / done".
+        // Phase 82 — follow_ups grouped client-side by assigned_to into
+        // pending + done counts. Owner: "daily followup / done".
+        // Phase 128.2 (TC truth pass) — axis swap to match the evening
+        // report: DONE = closed in the window (done_at, any due-date) so
+        // clearing overdue items finally shows as today's work; PENDING =
+        // still-open rows dated in the window. Old shape counted rows
+        // merely DATED in the window (a row done last week inflated done;
+        // 10 overdue cleared today showed nothing).
         supabase.from('follow_ups')
           .select('assigned_to, is_done, follow_up_date, done_at')
-          .gte('follow_up_date', period.startIso)
-          .lt ('follow_up_date', period.endIso),
+          .or(`and(is_done.eq.true,done_at.gte.${startOfDay},done_at.lt.${endOfDay}),and(is_done.eq.false,follow_up_date.gte.${period.startIso},follow_up_date.lt.${period.endIso})`),
         // Phase 82 — quote-chase: status='sent' quotes whose latest
         // touch is stale. Owner: "daily quote followup". Fetched as
         // a broad list; we filter client-side to status='sent' AND
@@ -456,9 +467,13 @@ export default function TeamDashboardV2() {
         // callbacks as "due", which massively inflated it (Rima: 101 of 104
         // were scheduled for tomorrow; real due-today was 3). Grouped by
         // assigned_to, counted DISTINCT lead (Phase 113.5). Read only on TC.
+        // Phase 128.2 — -7d floor so the count matches the TC page's own
+        // overdue window (one definition both sides; ancient overdue rows
+        // are a data-hygiene problem, not "due now").
         supabase.from('follow_ups')
           .select('assigned_to, lead_id, id')
           .eq('is_done', false)
+          .gte('follow_up_date', cbFloor)
           .lte('follow_up_date', today),
 
         // Phase 112.5/.7 — quotes CREATED this calendar month, per
@@ -1484,7 +1499,7 @@ export default function TeamDashboardV2() {
                   <div className="lead-rep-kpis" style={{ marginTop: 6 }}>
                     <div
                       className="lead-rep-kpi"
-                      title="Tap to open this rep's follow-ups"
+                      title="Follow-ups closed in this period / closed + still open due — matches the evening report"
                       style={{ cursor: 'pointer' }}
                       onClick={(e) => { e.stopPropagation(); navigate(`/follow-ups?rep=${r.id}`) }}
                     >
@@ -1502,12 +1517,11 @@ export default function TeamDashboardV2() {
                           <div className={`num ${crCls}`}>{callsHere > 0 ? `${connectRate}%` : '—'}</div>
                           <div className="lbl">Connect rate</div>
                         </div>
-                        {/* Phase 112.3 — TC-only: Callbacks due (open
-                            follow_ups next 2 days) fills the cell freed
-                            by Quote/Pay-chase not applying to TCs. */}
+                        {/* Phase 112.3 / 128.2 — TC-only: Callbacks due
+                            (today + overdue last 7d, one per lead). */}
                         <div
                           className="lead-rep-kpi"
-                          title="Open callbacks due in next 2 days — tap for this rep's follow-ups"
+                          title="Callbacks due — today + overdue (last 7 days), one per lead"
                           style={{ cursor: 'pointer' }}
                           onClick={(e) => { e.stopPropagation(); navigate(`/follow-ups?rep=${r.id}`) }}
                         >
