@@ -3199,3 +3199,87 @@ anchors 3 variants (TelecallerV2:140 + TeamDashboardV2:286 no offset).
 callTimer cross-call contamination + mid-call-glance truncation · callback
 auto-close-on-next-call (§47.1) · MeetingsMapPanel.jsx unmounted §51
 violation (delete or retrofit) · score ≥10s cutover (owner timing).
+
+---
+
+## 57 · Phase 128.2–.4 + Truth 3–6 — sales/TC truth batch 3 + staleness root cause (2026-06-11)
+
+All on origin (HEAD `480ee1f`) + SQL run. Continues §56's sprint; batch 3
+DONE, batches 4–5 still open.
+
+### THE BIG ONE — Truth 6 (`c7cbaff`): NetworkFirst on Supabase reads
+
+`public/sw.js` StaleWhileRevalidate on `/rest/v1/` served EVERY DB read
+from cache first → whole app permanently one fetch behind → the owner's
+"slow + must reload to see data, reps too". Now NetworkFirst (4s timeout,
+cache = offline fallback only). Everyone must close+reopen the app once
+post-deploy. Do NOT revert to StaleWhileRevalidate on /rest/v1/. Known
+still-open from the same probe: useAutoRefresh realtime channels have NO
+CHANNEL_ERROR/TIMED_OUT rejoin (die silently on 4G drops; focus-refresh
+is the safety net) · admin TeamDashboardV2/AdminDashboardDesktop are
+reload-only (no useAutoRefresh) · quotes/payments may be MISSING from
+supabase_realtime publication (verify pg_publication_tables) · /work idle
+≈8 q/min, TC ≈24 q/min (poll stacking) — batch 5+ candidates.
+
+### Truth 3a–e (batch 3, `0a042c0` `fda8d2b` `f279a75` `8e73449`)
+
+LeadDetail call latch + 23505 modal rescue + silent-poll keep-state ·
+PCOM follow-up-close failure now toasts · LeadFormV2 meetingMode hard GPS
+gate (84.4 parity; new-lead entry stays GPS-optional) · startDay aborts on
+failed plan save · /leads side-door call logs honestly (audit + timer +
+outcome NULL, was pre-stamped 'neutral').
+
+### Truth 4+5 (`aa8bdbc` `5f49d9b`)
+
+TodaySummaryCard 'Today'→'Planned' + done-today chip + fresh-open
+all-done state · MissedCallsCard clears once a >=10s call at/after the
+listed row exists (was never clearing; the rescue tap made it stickier).
+
+### Phase 128.2 (`4ac2c2e`) — ONE definition: callbacks-due + Today F-up
+
+Callbacks due = open FUs due today + overdue (-7d floor), ONE per lead —
+SAME on TC tile + admin card (tooltip was stale since 113.6). TC tile no
+|| fallback (real 0 shows 0); panel list still -7d..+2d (labeled). Admin
+"Today F-up" axis = closed-in-period (done_at) / closed + open-due —
+matches the evening report; PostgREST .or() two-arm query. Idle banner
+(47.6) now toggles an idle-only queue filter (visibleQueue memo; hero
+nextCall stays unfiltered).
+
+### Phase 128.3 (`84a367b`, SQL RUN, VERIFY t/1/0) — nurture/pause leak
+
+lead_stage_change_cadence: cancels now run BEFORE/regardless of the
+cadence_paused gate (pause was blocking cleanup, not just spawns);
+cancel_lead_cadence also closes legacy 33D.4 rows (cadence_type NULL +
+auto_generated + 'Auto-scheduled:%'); NEW trg_lead_pause_close_auto_
+followups (UPDATE OF cadence_paused) closes open AUTO rows on pause-ON
+(manual rep FUs excluded); heal closed existing zombies. Branch set
+byte-equivalent to 33D.6 (guardian-verified). KNOWN BEHAVIOR: Resume does
+NOT respawn the nurture cycle — owner asked "after 30 days will it show?";
+offered Resume→respawn-30d-check-in addition, AWAITING his yes/no.
+
+### Phase 128.4 (`480ee1f`) — duration capture (Dhara 1m33s = "—")
+
+3-part dead zone: (1) Phase 126 aggressive dedup merges re-taps into a
+row up to ~30 min old (survivor keeps OLDEST call_at) but PCOM's outcome
+flip only looked back 10 min → matched 0 → row stayed no_answer →
+permanently excluded from duration patch. Flip cutoff now 40 min (guards
+intact: same user+lead, outgoing, explicit save only). (2) callTimer
+re-tap dropped the prior recorded elapsed — now carried as prevElapsed
+fallback (latest tap wins). (3) Device CallLog read silent-fails when
+READ_CALL_LOG denied — owner to check Dhara's phone permission. §49
+frozen rule untouched (count = duration>=10s ONLY).
+
+### Phase-number note
+THREE more numbers burned by collisions: 128 (call-first Done gate, 8 Jun
+`0438e42`+`e6b69ef`) → this batch used 128.2–.4. Next free: **129**.
+
+### Open after this session
+1. Owner: Resume→respawn decision (above) + Dhara permission check +
+   close/reopen-app instruction to team.
+2. §56 batch 4 (push hygiene: smart-task regen spam, reassign orphans,
+   alarm cancels, quiet-hours on fu-due cron, payment FUs) + batch 5
+   (periphery numbers: ManagerDashboard created_by, CockpitWidgets/
+   scorecard/daily-brief stored-counter, revenue label, UTC anchors —
+   TodaySummaryCard.jsx:23 + FollowUpsV2.jsx:44 + GpsTrackV2.jsx:137).
+3. Realtime rejoin + admin auto-refresh + publication check (Truth 6
+   leftovers above).
