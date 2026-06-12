@@ -78,9 +78,20 @@ export default function TodayTasksPanel({ userId, limit = 10, excludeTaskId = nu
   // tasks before the panel renders.
   useEffect(() => {
     if (!userId) return
-    // mount call
-    try { generate?.() } catch {}
-    const onFocus = () => { try { generate?.() } catch {} }
+    // Phase 130 (batch 4) — throttle regen to once per 10 min. Every
+    // window-focus was a FULL regenerate (delete + fresh-UUID inserts →
+    // a per-task push per refocus = notification spam, and a snoozed
+    // task wiped on every glance at the app). Mount still generates
+    // when the throttle window has passed; the SQL-side fix makes the
+    // regen itself idempotent, this stops the hammering.
+    const fire = () => {
+      const now = Date.now()
+      if (now - (window.__leadTasksGenAt || 0) < 10 * 60 * 1000) return
+      window.__leadTasksGenAt = now
+      try { generate?.() } catch {}
+    }
+    fire() // mount call (throttled)
+    const onFocus = () => fire()
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   // eslint-disable-next-line react-hooks/exhaustive-deps

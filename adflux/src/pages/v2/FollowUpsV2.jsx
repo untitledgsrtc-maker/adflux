@@ -40,6 +40,11 @@ import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import { toastError } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { istTodayISO } from '../../utils/istDate'
+// Phase 130 (batch 4) — cancel/reschedule the native local alarm when a
+// follow-up is closed or snoozed here. Before this, only the outcome-modal
+// path cancelled alarms; a manual Done/Snooze left the old alarm armed →
+// phantom reminder fired for work already finished.
+import { scheduleFollowUpAlarm, cancelFollowUpAlarm } from '../../utils/scheduleFollowUpAlarm'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 const ADD_DAYS  = (iso, n) => {
@@ -244,6 +249,9 @@ export default function FollowUpsV2() {
       .eq('id', row.id)
     setBusyId(null)
     if (err) { setError(err.message); return }
+    // Phase 130 — kill the armed alarm for the closed row (fire-and-forget,
+    // native-only no-op on web; stale cancel is benign).
+    cancelFollowUpAlarm(row.id).catch(() => {})
     // Optimistic remove from local state — the realtime sync will
     // catch up but the rep shouldn't have to wait for it.
     setRows(prev => prev.filter(r => r.id !== row.id))
@@ -264,6 +272,11 @@ export default function FollowUpsV2() {
       .eq('id', row.id)
     setBusyId(null)
     if (err) { setError(err.message); return }
+    // Phase 130 — move the alarm WITH the date: cancel the old one and
+    // arm the new day (same time). Fire-and-forget, native-only.
+    cancelFollowUpAlarm(row.id)
+      .then(() => scheduleFollowUpAlarm({ ...row, follow_up_date: newDate }))
+      .catch(() => {})
     setRows(prev => prev.map(r => r.id === row.id ? { ...r, follow_up_date: newDate } : r))
   }
 
