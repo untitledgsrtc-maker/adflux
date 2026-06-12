@@ -506,21 +506,9 @@ export default function LeadsV2() {
      ActiveFilterChips row. Defaults match each filter's "all/any" state
      so chips only appear once the rep narrows something. */
   const filterFields = useMemo(() => {
-    const fields = [
-      {
-        key: 'segment',
-        label: 'Segment',
-        value: segmentFilter,
-        onChange: setSegmentFilter,
-        defaultValue: 'all',
-        dotColor: 'var(--accent, #FFE600)',
-        options: [
-          { value: 'all',        label: 'All' },
-          { value: 'PRIVATE',    label: 'Private' },
-          { value: 'GOVERNMENT', label: 'Govt' },
-        ],
-      },
-    ]
+    // Phase 142B — segment removed from the gear popover; it is now the
+    // prominent SegmentToggle pill in the filter bar (single control).
+    const fields = []
     if (distinctSources.length > 0) {
       fields.push({
         key: 'source',

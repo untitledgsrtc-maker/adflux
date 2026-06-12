@@ -400,21 +400,8 @@ export default function QuotesV2() {
             Rep. ActiveFilterChips below the row surfaces active
             filters as removable chips, matching LeadsV2. */}
         <FilterDrawer fields={[
-          {
-            key: 'segment',
-            label: 'Segment',
-            value: segmentFilter,
-            defaultValue: 'all',
-            options: [
-              { value: 'all',        label: 'All segments' },
-              { value: 'private',    label: 'Private' },
-              { value: 'government', label: 'Government' },
-            ],
-            onChange: (v) => {
-              setSegmentFilter(v)
-              if (v !== 'government') setMediaFilter('all')
-            },
-          },
+          // Phase 142B — segment moved to the prominent pill; only the
+          // govt media sub-filter stays in the gear popover.
           // Media sub-filter only shows when segment = government.
           ...(segmentFilter === 'government' ? [{
             key: 'media',
@@ -455,18 +442,7 @@ export default function QuotesV2() {
       {/* Phase 34Z.68 — chips below the filter row, one per active
           filter. Same pattern as LeadsV2. */}
       <ActiveFilterChips fields={[
-        {
-          key: 'segment', label: 'Segment',
-          value: segmentFilter, defaultValue: 'all',
-          options: [
-            { value: 'private',    label: 'Private' },
-            { value: 'government', label: 'Government' },
-          ],
-          onChange: (v) => {
-            setSegmentFilter(v)
-            if (v !== 'government') setMediaFilter('all')
-          },
-        },
+        // Phase 142B — segment chip dropped (the pill shows + clears it).
         ...(segmentFilter === 'government' ? [{
           key: 'media', label: 'Media',
           value: mediaFilter, defaultValue: 'all',
