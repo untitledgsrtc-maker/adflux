@@ -104,6 +104,7 @@ import { logCallAudit } from '../../utils/callAudit'
 import { markCallStart } from '../../utils/callTimer'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import V2Hero from '../../components/v2/V2Hero'
+import SegmentToggle from '../../components/v2/SegmentToggle'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
 import FilterDrawer, { ActiveFilterChips } from '../../components/v2/FilterDrawer'
 // Phase 44.1 — daily leads-collected bar chart at top of /leads.
@@ -986,6 +987,18 @@ export default function LeadsV2() {
             everything else folds into the gear popover so the default
             state is just [search] [tabs] [date] [⚙ count]. */}
         <DateRangeFilter value={dateRange} onChange={setDateRange} />
+
+        {/* Phase 142 — Private/Government segment pill (admin/co_owner +
+            ALL-access). Surfaces the existing segmentFilter as a prominent
+            toggle (was only in the gear popover). Single-segment reps don't
+            see it. Keys map to the l.segment DB values. */}
+        {(isPrivileged || (profile?.segment_access || 'ALL') === 'ALL') && (
+          <SegmentToggle
+            value={segmentFilter === 'PRIVATE' ? 'private' : segmentFilter === 'GOVERNMENT' ? 'government' : 'all'}
+            onChange={k => setSegmentFilter(k === 'private' ? 'PRIVATE' : k === 'government' ? 'GOVERNMENT' : 'all')}
+            style={{ marginBottom: 0 }}
+          />
+        )}
 
         <FilterDrawer fields={filterFields} />
 

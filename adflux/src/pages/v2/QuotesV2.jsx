@@ -28,6 +28,7 @@ import { supabase } from '../../lib/supabase'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
+import SegmentToggle from '../../components/v2/SegmentToggle'
 
 /* ─── Local helpers ────────────────────────────────── */
 function computeBalance(q) {
@@ -383,6 +384,17 @@ export default function QuotesV2() {
             dateTo:   next.to   || '',
           })}
         />
+
+        {/* Phase 142 — Private/Government segment pill (admin/co_owner +
+            ALL-access). Surfaces the existing segmentFilter as a prominent
+            toggle; it already uses the pill keys so it binds directly. */}
+        {(isAdmin || (profile?.segment_access || 'ALL') === 'ALL') && (
+          <SegmentToggle
+            value={segmentFilter}
+            onChange={setSegmentFilter}
+            style={{ marginBottom: 0 }}
+          />
+        )}
 
         {/* Phase 34Z.68 — gear-button popover for Segment / Media /
             Rep. ActiveFilterChips below the row surfaces active
