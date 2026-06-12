@@ -399,8 +399,13 @@ export default function TeamDashboardV2() {
         // still-open rows dated in the window. Old shape counted rows
         // merely DATED in the window (a row done last week inflated done;
         // 10 overdue cleared today showed nothing).
+        // Phase 133 — also pull done_note so the DONE count excludes
+        // system auto-closes (heals, cadence cancels, payment auto-close).
+        // A one-time heal stamps done_at=now() on backlog rows; without
+        // this they inflate "Today F-up done" (Rima read 241 — ~142 of
+        // them were the Phase 131 cleanup, not her work).
         supabase.from('follow_ups')
-          .select('assigned_to, is_done, follow_up_date, done_at')
+          .select('assigned_to, is_done, follow_up_date, done_at, done_note')
           .or(`and(is_done.eq.true,done_at.gte.${startOfDay},done_at.lt.${endOfDay}),and(is_done.eq.false,follow_up_date.gte.${period.startIso},follow_up_date.lt.${period.endIso})`),
         // Phase 82 — quote-chase: status='sent' quotes whose latest
         // touch is stale. Owner: "daily quote followup". Fetched as
@@ -538,11 +543,17 @@ export default function TeamDashboardV2() {
       //   done    = is_done=true (regardless of done_at; the
       //             period filter already constrained follow_up_date
       //             to the window so all rows here belong to it)
+      // Phase 133 — a row closed by a SYSTEM auto-close (heal, cadence
+      // cancel, pause-close, payment auto-close) is not rep work. Its
+      // done_note carries the marker; exclude it from the DONE count so
+      // "Today F-up done" = follow-ups the rep actually closed.
+      const isSystemClose = (note) =>
+        !!note && /^Auto-closed|^\[(healed|closed: auto|cancelled by stage|auto-skipped)/.test(note)
       const fuMap = {}
       ;(fuRes.data || []).forEach((r) => {
         if (!r.assigned_to) return
         const e = fuMap[r.assigned_to] || { pending: 0, done: 0 }
-        if (r.is_done) e.done += 1
+        if (r.is_done) { if (!isSystemClose(r.done_note)) e.done += 1 }
         else           e.pending += 1
         fuMap[r.assigned_to] = e
       })
