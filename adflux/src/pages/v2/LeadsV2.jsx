@@ -307,12 +307,21 @@ export default function LeadsV2() {
     return Array.from(s).sort()
   }, [leads])
   const distinctReps = useMemo(() => {
+    // Phase 137 — a lead's owner is assigned_to (sales/agency) OR
+    // telecaller_id (TC queue). Build the rep list from BOTH so a
+    // telecaller shows up + their full queue is reachable. Before this
+    // the admin rep filter only knew assigned_to → it undercounted every
+    // telecaller (Dhara: admin saw 115 of her real 383).
     const m = new Map()
     leads.forEach(l => {
-      if (l.assigned?.id) m.set(l.assigned.id, l.assigned.name)
+      if (l.assigned?.id)   m.set(l.assigned.id, l.assigned.name)
+      if (l.telecaller?.id) m.set(l.telecaller.id, l.telecaller.name)
     })
     return Array.from(m, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
   }, [leads])
+
+  // Phase 137 — owner match = either column (DRY helper for the 3 sites).
+  const isRepOwner = (l, id) => l.assigned?.id === id || l.telecaller?.id === id
 
   /* ─── Apply filters in memory ─── */
   const stagesInGroup = useMemo(() => {
@@ -343,7 +352,7 @@ export default function LeadsV2() {
       if (sourceFilter   !== 'all' && l.source   !== sourceFilter)   return false
       if (cityFilter     !== 'all' && l.city     !== cityFilter)     return false
       if (industryFilter !== 'all' && l.industry !== industryFilter) return false
-      if (repFilter      !== 'all' && l.assigned?.id !== repFilter)  return false
+      if (repFilter      !== 'all' && !isRepOwner(l, repFilter))      return false  // Phase 137
       // Phase 46.1 — outcome filter (latest activity outcome).
       if (outcomeFilter  !== 'all' && (leadOutcomeMap[l.id] || '') !== outcomeFilter) return false
       // Phase 72.4 — lost-reason filter ("Price problem" etc.).
@@ -459,7 +468,7 @@ export default function LeadsV2() {
       if (sourceFilter     !== 'all' && l.source     !== sourceFilter)     return false
       if (cityFilter       !== 'all' && l.city       !== cityFilter)       return false
       if (industryFilter   !== 'all' && l.industry   !== industryFilter)   return false
-      if (repFilter        !== 'all' && l.assigned?.id !== repFilter)      return false
+      if (repFilter        !== 'all' && !isRepOwner(l, repFilter))         return false  // Phase 137
       if (outcomeFilter    !== 'all' && (leadOutcomeMap[l.id] || '') !== outcomeFilter) return false
       if (lostReasonFilter !== 'all' && l.lost_reason !== lostReasonFilter) return false
       if (fromIso || toIso) {
@@ -857,7 +866,7 @@ export default function LeadsV2() {
             All ({leads.length})
           </button>
           {distinctReps.map(r => {
-            const count = leads.filter(l => l.assigned?.id === r.id).length
+            const count = leads.filter(l => isRepOwner(l, r.id)).length  // Phase 137
             const active = repFilter === r.id
             return (
               <button
