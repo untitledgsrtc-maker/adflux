@@ -3468,3 +3468,86 @@ scorecard/daily-brief stored-counter · revenue label (owner decision) ·
 3 UTC day-anchors → istTodayISO. Plus Truth 6 leftovers (realtime rejoin,
 admin auto-refresh, publication check). Plus the evening-report auto-close
 exclusion decision (twin of 133).
+
+---
+
+## 61 · Phase 133–138 — number-truth + follow-up integrity + duration-capture instrumentation (2026-06-12)
+
+Long owner-driven session. Owner increasingly frustrated ("you spoiled
+again", "don't patch, make it permanent"). Everything below shipped +
+guardian PASS + on origin. Theme: stop patching, find roots, instrument
+before native rebuilds.
+
+### Shipped (all pushed)
+| Phase | SHA | What |
+|---|---|---|
+| 133 | `b573b49` | TeamDashboardV2 "Today F-up" DONE excludes SYSTEM auto-closes (heals stamped done_at=now() inflated Rima to 241/243). `isSystemClose(done_note)` regex skips `^Auto-closed`/`^[healed`/`[closed: auto`/`[cancelled by stage`/`[auto-skipped`. |
+| 134 | `52f0fec` (SQL RUN) | Terminal-state FU leaks: NEW trg_quote_terminal_close_followups (quote→lost closes all its FUs incl payment; →won closes chase, KEEPS payment) + trg_lead_lost_close_payment_fu (lead→Lost closes its quotes' payment FUs, the lead-blind gap) + heal. Guardian P1: lost_nurture on Lost respawns via truth1 → heal DELETEs those (not is_done-close). |
+| 135 | `f6b5821` (SQL RUN) | "Lost means dead": BEFORE INSERT guard born-closes a MANUAL (cadence_type NULL) follow-up created on a Lost lead. Cadence spawns pass through (guardian P1). + heal. Owner option A — rep uses Nurture to keep chasing. |
+| 136 | `622208b` | LeadsV2 filter: default `presetToRange('all')` (was this_month — table was secretly June-locked → "filter not working") + NEW tabCounts memo so stage-tab badges reflect the active date/rep/search filter (were global 1002). |
+| 137 | `d58c633` | LeadsV2 admin rep filter undercounted TELECALLERS: a lead's owner = assigned_to OR telecaller_id; admin only matched assigned_to (Dhara: admin saw 115 of her real 383). New isRepOwner(l,id) at 4 sites (distinctReps, filtered, tabCounts, chip count). |
+| 138 | `b5555ae` (SQL RUN) | call_capture_log diagnostic table + callTimer/callLogReader instrumentation. INSTRUMENTATION, NOT a fix. |
+
+### THE BIG ONE — call-duration capture root cause (Phase 138 + the permanent plan)
+Owner: ~46% of connected calls save duration_seconds=0/NULL (kirti live:
+7 captured / 6 connected-but-0s / 16 taps). "Solved" 3x (Phase 65 device
+read · 116 away-timer · 128.4 re-tap), keeps regressing.
+
+**ROOT (deep read-only trace):** the away-timer fallback (116) **doesn't
+fire on the APK** — `dialPhone` → `AppLauncher.openUrl` fires an
+ACTION_VIEW intent that does NOT reliably background the Capacitor WebView,
+so neither `appStateChange` nor `visibilitychange` flips → the timer
+records null → the safety-net built to catch device-read misses catches
+nothing. Every prior fix patched the FALLBACK; the fallback's TRIGGER is
+broken. Secondary: the 60s auto-patch device read fires while a >60s call
+is still ongoing; the `.in('outcome',['connected','callback_requested'])`
+filter discards a device read on the auto60 path (outcome still no_answer).
+NOT number-format (the patch matches by user+lead+time, and CallLogPlugin
+uses PhoneNumberUtils.compare).
+
+**THE PERMANENT FIX (native, NOT yet built — needs APK rebuild):** read
+the device CallLog on **MainActivity.onResume** (the one signal Android
+GUARANTEES fires on return from the dialer; the call is over → duration is
+final), reconcile onto the open call row by user+lead+nearest-tap-time,
+DROP the outcome filter for that sweep, and make the away-timer also
+record on onResume as the no-permission backstop. A timer-only JS fix =
+another patch (inherits the background-signal fragility). Files: callLog
+Reader.js, callTimer.js, openExternal.js:dialPhone (the AppLauncher pivot),
+android CallLogPlugin.java, MainActivity.java:onResume (heartbeat already
+hooks it), TelecallerV2/WorkV2/LeadDetailV2 60s auto-patch sites.
+
+**THE PLAN (owner agreed — instrument first, no blind rebuild):**
+1. ✅ Phase 138 capture log shipped (live-update, no rebuild). Records per
+   call: device_permission/found/seconds, app_backgrounded + bg_signal,
+   timer_seconds, patch_path, final, counted. logCapture is fire-and-forget;
+   the permission check is INSIDE it (guardian P1 — off the patch hot path).
+2. ⏳ One day of real calls → run the diagnostic (in chat 12 Jun) →
+   `missed_app_didnt_bg` high confirms the root.
+3. ⏳ THEN the permanent native onResume fix + ONE APK rebuild, with proof.
+
+### Confirmed NON-bugs (label/definition, explained to owner)
+- "Follow-up STAGE" (leads in Working stage, LeadsV2 tab) ≠ "follow-up
+  TASKS" (open follow_ups rows, FollowUpsV2). Different tables, never
+  match. Owner offered a rename (Follow-up→Working) — PENDING his call.
+- "Done without calling" can't be reliably enforced until duration capture
+  works — the app can't tell a real call from a tel-tap when duration=0s.
+  Same root as the duration miss. Do NOT tighten the markDone gate to
+  ≥10s while capture is broken (would block honest reps whose duration
+  didn't capture — half of kirti's real calls).
+
+### Foot-guns added 2026-06-12
+- ❌ A one-time HEAL that stamps done_at=now() inflates "done today" dash
+  counts (133). Exclude system-close done_note markers from rep-work counts.
+- ❌ A HEAL that relocates stranded rows to their true owner can DUMP a
+  months-old backlog as fresh-overdue (131 surfaced 142). Warn + pair with
+  a stale-cleanup.
+- ❌ Admin rep filter / any rep rollup that matches assigned_to ONLY
+  undercounts telecallers (their leads are on telecaller_id). Match either.
+- ❌ Patching a FALLBACK whose TRIGGER is broken = infinite regression
+  (duration capture, 3x). Instrument → prove the trigger → fix the trigger.
+
+### Open
+1. Duration capture: tomorrow's log read → permanent native fix + APK rebuild.
+2. Owner decisions: Follow-up→Working rename? · evening-report auto-close
+   exclusion (twin of 133)?
+3. §56 batch 5 (periphery numbers) still the last sprint piece, un-started.
