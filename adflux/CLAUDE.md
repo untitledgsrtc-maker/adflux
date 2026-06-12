@@ -3351,3 +3351,52 @@ fn still on stored counter + dead 20-target · revenue label 4 definitions
 FollowUpsV2.jsx:44, GpsTrackV2.jsx:137 → istTodayISO).
 Truth 6 leftovers: realtime CHANNEL_ERROR rejoin · admin pages no
 auto-refresh · verify quotes/payments in supabase_realtime publication.
+
+---
+
+## 59 · Phase 131 + 132 — heal-surfaced backlog + 2 UX fixes (2026-06-12)
+
+### Phase 131 (`e3deadd`, SQL RUN, VERIFY intro_left=0 / quote_chase_kept=2)
+The Phase 130 §2 reassign HEAL ("move open follow_ups to each lead's
+current owner") did its job but SURFACED a 142-row backlog: auto
+"follow up with new lead" touches stranded on PREVIOUS owners (from past
+reassignments) landed on the current owners as overdue. A TC who clears
+daily saw ~140 overdue appear overnight. Confirmed read-only: 142/142 on
+reassigned-in leads (created_by ≠ telecaller_id), all auto_generated,
+136 NULL-cadence (legacy 33D.4) + 4 lead_intro + 2 quote_chase, oldest 2 Jun.
+
+Fix = one-time close of overdue auto INTRO rows only: `auto_generated=true
+AND follow_up_date < IST today AND (cadence_type IS NULL OR 'lead_intro')`.
+**EXCLUDES quote_chase** (live deal chases — real money, owner works them;
+also dodges the guardian-flagged followup_after_done seq-3→Nurture-park
+side-effect → ZERO stage changes) + nurture/lost_nurture (128.3/129
+managed). Rep-typed (auto_generated=false) untouched. Backlog can't
+re-form: the Phase 130 transfer trigger now moves FUs the moment a lead
+is reassigned (no more stranding).
+- **Foot-gun:** a one-time HEAL that "correctly" relocates stranded rows
+  to their true owner can DUMP a months-old backlog as fresh-overdue. Run
+  a BEFORE per-owner count, warn the owner, and pair the heal with a
+  cleanup of the stale rows it surfaces. follow_ups has NO updated_at →
+  can't prove "heal touched it today"; use created_by≠owner + age instead.
+
+### Phase 132 (`5a4de6b`, JS, guardian PASS both frozen)
+Two owner-reported follow-ups (he'd said yes before the 131 emergency):
+1. **LeadsV2 AI card removed.** The "/leads 5 SLA breaches on hand-offs"
+   card is a SEPARATE card from the dashboard AiBriefingCard dropped in
+   §41.5 — owner thought he'd removed it everywhere. Gated off via module
+   const `SHOW_LEADS_AI_CARD = false` (one-line re-enable; aiBriefing memo
+   + AIBriefingCard fn stay referenced inside the dead JSX → no dead-var).
+2. **FollowUpsV2 snooze → tomorrow.** Old math added 1 day to the FU's OWN
+   date, so an overdue (yesterday) row became TODAY-due → stayed on the
+   plate ("snooze did nothing"). Now base = MAX(today, its date) +1 → an
+   overdue/today row always lands tomorrow (leaves today); a future row
+   still pushes +1 from itself. Sun→Mon bump preserved. Built newDate from
+   LOCAL date parts (not `toISOString().slice(0,10)`, which shifts the day
+   back ~5.5h on an IST device — latent bug in the old code, now fixed).
+   Phase 130 alarm cancel/reschedule + Phase 128 Done gate untouched.
+
+### §56 sprint state — batches 1-4 DONE; batch 5 (last) still open
+ManagerDashboardV2 created_by · RepProfileV2 call guards · CockpitWidgets/
+scorecard/daily-brief stored-counter + dead 20-target · revenue label (owner
+decision) · 3 UTC day-anchors → istTodayISO. Plus Truth 6 leftovers (realtime
+rejoin, admin auto-refresh, publication check).
