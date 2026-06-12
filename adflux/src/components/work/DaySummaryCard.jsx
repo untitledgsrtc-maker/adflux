@@ -294,7 +294,7 @@ export default function DaySummaryCard({
           <Row
             icon={<BadgeCheck size={14} strokeWidth={1.6} />}
             label="Follow-ups"
-            value={`${a.follow_ups_done || 0}/${a.follow_ups_total || 0}`}
+            value={`${a.follow_ups_real || 0}/${a.follow_ups_total || 0}`}
           />
           {isTC && (
             <Row
