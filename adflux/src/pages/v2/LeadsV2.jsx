@@ -114,6 +114,13 @@ import LeadsCollectedChart from '../../components/leads/LeadsCollectedChart'
    so QuoteSent/Negotiating only appear under "All". */
 const VISIBLE_GROUPS = ALL_STAGE_GROUPS.filter(g => g.key !== 'in_progress')
 
+// Phase 132 — owner removed the /leads AI briefing card (the "5 SLA
+// breaches on hand-offs" panel). He thought it was the dashboard one
+// dropped in Phase 41.5; this is a SEPARATE card. Flag kept so it's a
+// one-line re-enable, and aiBriefing/AIBriefingCard stay referenced
+// (no dead-var) for that.
+const SHOW_LEADS_AI_CARD = false
+
 export default function LeadsV2() {
   const navigate = useNavigate()
   // Phase 34Z.43 — refresh leads list on every navigation back so
@@ -723,7 +730,8 @@ export default function LeadsV2() {
       />
 
       {/* ─── AI briefing card (real data, not mock) ─── */}
-      {leads.length > 0 && (
+      {/* Phase 132 — gated off per owner (SHOW_LEADS_AI_CARD=false). */}
+      {SHOW_LEADS_AI_CARD && leads.length > 0 && (
         <AIBriefingCard
           briefing={aiBriefing}
           onOpenQueue={() => {

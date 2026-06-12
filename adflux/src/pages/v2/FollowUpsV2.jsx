@@ -261,11 +261,21 @@ export default function FollowUpsV2() {
   // queue from accumulating overdue items when rep has a rough day.
   async function snooze(row) {
     setBusyId(row.id)
-    // Add 1 day, then push Sunday → Monday on the client too.
-    const d = new Date(row.follow_up_date + 'T00:00:00')
+    // Phase 132 — owner: snooze on an OVERDUE item did nothing visible.
+    // Old math added 1 day to the FU's OWN date, so a yesterday-due row
+    // became today-due → still on the plate. Now snooze = next workday
+    // from MAX(today, its date): an overdue/today row always lands on
+    // tomorrow (leaves today); a future row still pushes +1 from itself.
+    // Local-date parts (not toISOString, which would shift the day back
+    // ~5.5h on an IST device).
+    const todayIso = istTodayISO()
+    const base = (row.follow_up_date && row.follow_up_date > todayIso)
+      ? row.follow_up_date
+      : todayIso
+    const d = new Date(base + 'T00:00:00')
     d.setDate(d.getDate() + 1)
-    if (d.getDay() === 0) d.setDate(d.getDate() + 1)
-    const newDate = d.toISOString().slice(0, 10)
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1)  // Sun → Mon
+    const newDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const { error: err } = await supabase
       .from('follow_ups')
       .update({ follow_up_date: newDate })
