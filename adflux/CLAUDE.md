@@ -3283,3 +3283,71 @@ THREE more numbers burned by collisions: 128 (call-first Done gate, 8 Jun
    TodaySummaryCard.jsx:23 + FollowUpsV2.jsx:44 + GpsTrackV2.jsx:137).
 3. Realtime rejoin + admin auto-refresh + publication check (Truth 6
    leftovers above).
+
+---
+
+## 58 · Phase 129 + Phase 130 (batch 4 push hygiene) — 2026-06-11/12
+
+### Phase 129 (`66e5775`, SQL RUN, VERIFY t/1/0) — Resume → +30d nurture
+Owner: "only need if in nurture — follow up must see after 30 day only,
+not before." `lead_pause_close_auto_followups` (the 128.3 fn) gains a
+resume ELSIF: cadence_paused true→false AND stage='Nurture' AND owner
+non-null AND no open nurture FU → `spawn_nurture_followup(.., 'nurture')`
+which books `next_workday(today+30)` (never earlier). Strictly Nurture
+(Lost/Working resume to silence). Same trigger event as 128.3 (toggle
+click only); pause-ON close branch byte-equivalent; requires 128.3 first.
+
+### Phase 130 — batch 4 push hygiene (JS `b8de89d` + SQL `fddaf64`, RUN, VERIFY 1/1/0/0)
+JS (guardian PASS, frozen files):
+- FollowUpsV2 now imports the alarm utils — markDone CANCELS the native
+  alarm; snooze CANCELS + re-arms on the new date (was: phantom alarm
+  fired for finished/moved work; only the outcome-modal path cancelled).
+- TodayTasksPanel generate() throttled to once/10min via
+  `window.__leadTasksGenAt` (was: full regen on EVERY window focus →
+  per-task push spam + snoozed-task wipe). First mount always fires;
+  Done/realtime update the list, generate isn't the refresh path.
+
+SQL (`supabase_phase130_push_hygiene.sql`, guardian PASS — no P0):
+1. `generate_lead_tasks(p_user_id)`: snoozed rows SURVIVE (DELETE now
+   `status='open'` only, not `NOT IN(done,skipped)`); open rows keep
+   UUIDs via `ON CONFLICT (lead_id,kind,generated_for) DO NOTHING` → no
+   34Z.55 re-push; stale open tasks cleaned via cand-CTE mirror; Phase
+   97.2 `_assert_self_or_admin(p_user_id)` gate added. Rules 1-3
+   byte-preserved from 34z48.
+2. NEW `trg_lead_owner_change_transfer_fu` (AFTER UPDATE OF assigned_to,
+   telecaller_id on leads) — transfers OPEN follow_ups old owner→new
+   owner; EXCEPTION-wrapped; skips when new owner null / assignee still a
+   current owner; + one-time heal. Push-SILENT (34Z.55 tg_push_followup_
+   due fires on date/is_done only). Column-specific → regular lead saves
+   (stage/heat/notes) do NOT fire it (zero hot-path cost).
+3. `push_followup_due_reminders`: `is_push_allowed_now()` early-return
+   (98.A quiet-hours pattern); 97.A400 per-row 'fu-due-<id>' tag + window
+   math + reminder_sent_at stamping preserved. Quiet-dropped windows roll
+   into the 9:30 IST morning push.
+4. NEW `trg_payment_close_collection_fu` (AFTER INSERT OR UPDATE OF
+   approval_status, amount_received on payments) — when approved-or-NULL
+   paid >= total_amount, auto-closes open `note LIKE 'Payment collection%'`
+   FUs (phase33g creator; lead_id NULL); EXCEPTION-wrapped; + heal. Safe:
+   followup_after_done early-returns on lead_id NULL (truth1); 34Z.55
+   ignores is_done=true.
+
+VERIFY landed 1/1/0/0 (both triggers present, both heals cleared all
+orphan + already-paid rows). check-sql false-positives = pg_catalog
+aliases (p.oid/p.proname) + loop record (r.lead_name) — guardian-cleared.
+
+### Parked / known (owner-aware)
+- `_assert_self_or_admin` lacks the 87.5b.1 NULL short-circuit — documented
+  cron bypass (Phase 97.2 header), not a new regression. Backport is a
+  SEPARATE hardening file if owner wants Studio-call tightening too.
+- The reassign transfer is push-silent — new owner learns via the existing
+  reassign push + their morning digest, not a per-FU push. Owner-accept.
+
+### §56 sprint state
+Batches 1,2,3,4 DONE. **Batch 5 (last) remaining**: ManagerDashboardV2
+user_id→created_by (meetings always 0) + §33 contract · RepProfileV2:398
+calls direction+lead_id guards · CockpitWidgets/scorecard fn/daily-brief
+fn still on stored counter + dead 20-target · revenue label 4 definitions
+(owner decision) · UTC day-anchors 3 variants (TodaySummaryCard.jsx:23,
+FollowUpsV2.jsx:44, GpsTrackV2.jsx:137 → istTodayISO).
+Truth 6 leftovers: realtime CHANNEL_ERROR rejoin · admin pages no
+auto-refresh · verify quotes/payments in supabase_realtime publication.
