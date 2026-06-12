@@ -909,6 +909,20 @@ export default function LeadsV2() {
           )}
         </div>
 
+        {/* Phase 139 — clarity caption (owner option B). These tab counts
+            are LEADS sitting in a STAGE — NOT open follow-up tasks. The
+            Follow-ups tab counts task rows (a lead can have several, in any
+            stage), so the two never match by design. Stops the recurring
+            "Leads says 126, Follow-ups says 118" confusion. */}
+        <div style={{
+          fontSize: 11, color: 'var(--text-subtle, #64748b)',
+          margin: '2px 2px 10px', lineHeight: 1.4,
+        }}>
+          These counts are leads in each stage — not open follow-up tasks.
+          The Follow-ups tab counts tasks (a lead can have several), so the
+          numbers won&apos;t match.
+        </div>
+
         {/* Phase 32N — Queue mode pill. Visible only when the Open
             queue button has scoped the list to a subset of leads. Tap
             X to clear and restore full list. */}
