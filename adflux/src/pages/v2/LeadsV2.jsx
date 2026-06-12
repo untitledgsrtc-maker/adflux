@@ -169,8 +169,12 @@ export default function LeadsV2() {
   // negotiating). Matches LOST_REASONS enum in useLeads.js.
   const [lostReasonFilter, setLostReasonFilter] = useState('all')
   // Phase 34Z.13 — unified DateRangeFilter (Phase 34Z.11's two raw
-  // <input type=date> replaced). Default preset = This month per owner.
-  const [dateRange, setDateRange] = useState(() => presetToRange('this_month'))
+  // <input type=date> replaced).
+  // Phase 136 — default ALL (owner option 1). Was 'this_month', which
+  // secretly month-locked the table while the chart + tabs showed more
+  // → "filter not working". Now a cold load shows every lead; the date
+  // controls NARROW from there.
+  const [dateRange, setDateRange] = useState(() => presetToRange('all'))
   const dateFrom = dateRange?.from || ''
   const dateTo   = dateRange?.to   || ''
 
@@ -438,6 +442,51 @@ export default function LeadsV2() {
     })
     return { counts, groupCounts, total: leads.length, value, wonCount, lostCount }
   }, [leads])
+
+  /* ─── Phase 136 — stage-tab counts that match the table ───
+     The badges now reflect the ACTIVE filters (date / rep / search /
+     segment / source / city / industry / outcome / lost-reason) but NOT
+     the stage axis itself — so each stage tab shows exactly how many rows
+     clicking it reveals. Before this the badges were global (1002) while
+     the table was filtered → reads as "filter broken". */
+  const tabCounts = useMemo(() => {
+    const fromIso = dateFrom || null
+    const toIso   = dateTo   || null
+    const ql = (search || '').trim().toLowerCase()
+    const base = leads.filter(l => {
+      if (queueIds && !queueIds.has(l.id)) return false   // match filtered:340
+      if (segmentFilter    !== 'all' && l.segment    !== segmentFilter)    return false
+      if (sourceFilter     !== 'all' && l.source     !== sourceFilter)     return false
+      if (cityFilter       !== 'all' && l.city       !== cityFilter)       return false
+      if (industryFilter   !== 'all' && l.industry   !== industryFilter)   return false
+      if (repFilter        !== 'all' && l.assigned?.id !== repFilter)      return false
+      if (outcomeFilter    !== 'all' && (leadOutcomeMap[l.id] || '') !== outcomeFilter) return false
+      if (lostReasonFilter !== 'all' && l.lost_reason !== lostReasonFilter) return false
+      if (fromIso || toIso) {
+        const created = (l.created_at || '').slice(0, 10)
+        if (fromIso && created < fromIso) return false
+        if (toIso   && created > toIso)   return false
+      }
+      if (!ql) return true
+      return (l.name || '').toLowerCase().includes(ql)
+          || (l.company || '').toLowerCase().includes(ql)
+          || (l.phone || '').toLowerCase().includes(ql)
+          || (l.email || '').toLowerCase().includes(ql)
+          || (l.industry || '').toLowerCase().includes(ql)
+    })
+    const counts = {}
+    let won = 0, lost = 0
+    base.forEach(l => {
+      counts[l.stage] = (counts[l.stage] || 0) + 1
+      if (l.stage === 'Won')  won++
+      if (l.stage === 'Lost') lost++
+    })
+    const groupCounts = {}
+    ALL_STAGE_GROUPS.forEach(g => {
+      groupCounts[g.key] = g.stages.reduce((s, st) => s + (counts[st] || 0), 0)
+    })
+    return { total: base.length, groupCounts, wonCount: won, lostCount: lost }
+  }, [leads, queueIds, search, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, leadOutcomeMap, lostReasonFilter, dateFrom, dateTo])
   const winRate = useMemo(() => {
     const decided = totals.wonCount + totals.lostCount
     return decided === 0 ? null : Math.round((totals.wonCount / decided) * 100)
@@ -887,16 +936,16 @@ export default function LeadsV2() {
             onClick={() => setStageFilter('all')}
           >
             All
-            <span className="lead-filter-tab-badge">{totals.total}</span>
+            <span className="lead-filter-tab-badge">{tabCounts.total}</span>
           </span>
           {VISIBLE_GROUPS.map(g => {
             // Phase 34Z.13 — inline count badge per tab (owner: "move
-            // into tab pills as count badges"). Won uses the totals
-            // wonCount; Lost uses lostCount; the rest read from
-            // groupCounts keyed by tab.key.
-            const n = g.key === 'won'  ? totals.wonCount
-                    : g.key === 'lost' ? totals.lostCount
-                    : (totals.groupCounts[g.key] || 0)
+            // into tab pills as count badges").
+            // Phase 136 — badges read from tabCounts (filter-aware) so
+            // they match what the table shows.
+            const n = g.key === 'won'  ? tabCounts.wonCount
+                    : g.key === 'lost' ? tabCounts.lostCount
+                    : (tabCounts.groupCounts[g.key] || 0)
             return (
               <span
                 key={g.key}
