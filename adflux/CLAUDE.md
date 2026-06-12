@@ -3551,3 +3551,166 @@ hooks it), TelecallerV2/WorkV2/LeadDetailV2 60s auto-patch sites.
 2. Owner decisions: Follow-up→Working rename? · evening-report auto-close
    exclusion (twin of 133)?
 3. §56 batch 5 (periphery numbers) still the last sprint piece, un-started.
+
+
+---
+
+## 62 · ⏰ NEXT-SESSION MORNING REMINDER (owner asked, 12 Jun eve) — SURFACE FIRST
+
+Owner (12 Jun ~17:00): *"remind me tomorrow morning before we start any task."*
+He means the **call-duration capture** fix. When he opens the NEXT session
+(13 Jun+), LEAD with this BEFORE taking any new task:
+
+> "Before anything — the call-duration log has been collecting since Friday.
+>  Paste me the diagnostic and I'll read the real failure path, then build
+>  the permanent fix."
+
+Then have him run (admin, Supabase Studio — columns verified against
+`supabase_phase138_call_capture_log.sql`):
+
+```sql
+select patch_path, device_permission, device_read_found,
+       app_backgrounded, bg_signal,
+       count(*)                                      as attempts,
+       count(*) filter (where final_seconds is null) as saved_null,
+       count(*) filter (where counted)               as counted_ok
+from call_capture_log
+where created_at > now() - interval '3 days'
+group by 1,2,3,4,5
+order by attempts desc;
+```
+
+**What the data decides** (§61 root trace): if `app_backgrounded` is mostly
+FALSE / `bg_signal='none'` → the dialer hand-off isn't backgrounding the
+WebView → the permanent fix is a **device CallLog read on app-RESUME**
+(Android lifecycle fires regardless). JS-only (no rebuild) IF the resume
+signal reaches JS; needs a native MainActivity.onResume + dialPhone pivot
+(= ONE APK rebuild) if it doesn't. **Do NOT promise JS-only until the log
+is read.** Plan: read Sat eve → build over weekend → team tests Monday on
+the fixed version. Do NOT guess-patch a 4th time (owner: "make it
+permanent, don't patch").
+
+### Phase 139 shipped (`04bc4cc`, pushed 12 Jun) — closes the stage-vs-tasks confusion
+LeadsV2 clarity caption under the stage tabs: "These counts are leads in
+each stage — not open follow-up tasks…". Guardian PASS. Owner hit this 3×
+(Dhara/kirti/Rima) — the Leads "Follow-up" tab counts LEADS in the Working
+stage; the Follow-ups page counts open follow_up TASK rows. Different
+tables, never match (Rima: 126 stage / 118 tasks). NOT a bug — now labelled.
+
+### "Done without calling" — current live truth (for team smoke)
+FollowUpsV2.markDone gate (Phase 128, verified live 12 Jun): blocks Done
+when the rep has logged ZERO calls to that lead's phone today. Holes still
+open (ALL wait on the duration fix): (a) a tel-tap audit row counts as "a
+call" → tap-Call-without-talking → Done passes; (b) lead with no/bad phone
+→ gate skipped entirely. So tell the team to confirm the basic block
+("tap Done with no call → 'Call them first' popup"); do NOT claim the
+tap-without-talk case is closed yet. The airtight gate (= require a real
+≥10s call) ships WITH the duration fix.
+
+
+---
+
+## 63 · Phase 140 — Government proposal English language option (2026-06-12, `cece284`)
+
+Owner: "I want the 2 govt media proposals (Auto Hood + GSRTC LED) in
+English too. Default Gujarati; pick English if wanted. Same structure,
+only the language changes." Built additive + §45-safe (govt flow, NOT a
+§28 frozen file; sales-guardian not required). On origin after push.
+
+### What shipped
+- `quotes.proposal_language text DEFAULT 'gu'` (+ gu/en CHECK).
+  `supabase_phase140_proposal_language_english.sql` — also seeds 2 new
+  `proposal_templates` rows (AUTO_HOOD + GSRTC_LED, `language='en'`),
+  COPIED off the gu rows (inherit every column) with English subject +
+  body from the owner's Auto 2.docx / Gsrtc 2.docx. Idempotent.
+- `GovtProposalRenderer.jsx` threads a `lang` (from `template.language`)
+  through every helper via an `STR` gu/en label table + `numL` (digits) /
+  `fmtDateL` (date) / `formatRate(n,lang)`. Step-2 `Letter language`
+  select (shared `Step2DateSigner`, gu default). Both wizard parents
+  persist + restore `proposal_language`; both Step5 previews + the
+  `/proposal/:id` detail page fetch the template for the quote's language
+  (`|| 'gu'` fallback).
+
+### FROZEN CONTRACTS (do not break)
+1. **gu path is byte-frozen.** Every `STR.gu` value = the ORIGINAL
+   hardcoded Gujarati literal; `numL/fmtDateL/formatRate` gu branch =
+   the old `toGujaratiDigits/formatDateGujarati/formatRateGu`. Any future
+   renderer edit MUST keep the gu output identical (existing 50 proposals
+   + every Gujarati proposal depend on it). Verified byte-identical at ship.
+2. **gu + en templates move in LOCKSTEP.** Each (segment, media_type) has
+   ONE gu row + ONE en row in `proposal_templates`. A content change to a
+   Gujarati letter needs the English twin updated too (and vice-versa).
+   The renderer's `STR` table supplies the structural LABELS; the
+   `proposal_templates` row supplies the letter BODY + SUBJECT per language.
+   Both use the SAME `{{placeholders}}` (`{{rate_table}}` `{{signer_block}}`
+   `{{bidan_block}}` `{{districts_count}}` `{{months}}`).
+3. **Safe guard:** if `language='en'` is chosen before the en row exists,
+   the fetch returns null → renderer prints "Seed proposal_templates
+   first" (NOT a blank/wrong letter). So: run the Phase 140 SQL BEFORE the
+   code relies on English. After both, English works.
+
+### Agency-ships-govt = NOT a code bug (same session, separate)
+Owner "agency can't see signer in dropdown / can't ship govt." It's DATA
+setup, not a block: an agency user needs an admin-assigned
+`users.default_signer_user_id` (Team → Edit member → "Default Proposal
+Signer" → pick Brijesh/Vishal → Save). Until set, `Step2DateSigner` shows
+"Ask admin to assign your proposal signer." + disables Next
+(`CreateGovtAutoHoodV2:360` / `CreateGovtGsrtcLedV2:355`
+`agencyLockedReason='unassigned'`). The dropdown DOES list signers
+(`signing_authority=true`). No code change needed to let an agency ship
+govt — just assign the signer once.
+
+### Smoke (owner, after SQL + push)
+Run SQL first → push → on staging: create a Govt Auto Hood proposal, Step 2
+pick **English**, Step 5 preview renders the English letter (English labels,
+English digits, DD/MM/YYYY); create one with **Gujarati** (default) → looks
+exactly as before. Repeat for GSRTC. Open a saved English proposal at
+`/proposal/:id` → English. **The English VISUAL needs the owner's eyes —
+I verified parse + gu-byte-identity, not the rendered English output.**
+
+
+---
+
+## 64 · Phase 144 — every-deal-a-lead covers PHONE-LESS (govt) quotes — DO NOT re-add a phone gate (2026-06-12, `68b5295`, SQL RUN)
+
+Owner: "every direct quote creates a lead — now it's not showing." Worked
+for PRIVATE, never for GOVERNMENT. Root: the Phase 119 trigger
+`quote_before_insert_ensure_lead` REQUIRED a valid 10-digit phone before
+creating a lead. Govt proposals have NO contact phone (recipient = a
+department; the govt wizard Contact Phone is optional) → the phone gate
+silently skipped every govt quote. Confirmed live: every PRIVATE quote had
+a lead; every GOVERNMENT quote had `lead_id` NULL. SQL run 12 Jun →
+`fixable_orphans_left=0`, `govt_quotes_with_lead=98`.
+
+### The contract (permanent, root-cause)
+- `quote_before_insert_ensure_lead` (canonical = `supabase_phase144_*`):
+  dedup-by-phone runs ONLY when `client_phone` has ≥10 digits (private
+  unchanged); with NO phone it SKIPS dedup and STILL creates the lead.
+  `leads.phone` is nullable (phase12:110) so a phone-less lead is valid.
+  Govt leads named after `client_company` (the department); private after
+  `client_name` (unchanged).
+- **DO NOT re-introduce a phone requirement** in this function. A
+  phone-less govt lead is correct + intended. Re-adding
+  `client_phone IS NULL → RETURN NEW` brings the exact regression back
+  (govt quotes stop landing in the funnel).
+- Still SECURITY DEFINER + pg_temp + double EXCEPTION-wrap (a quote save
+  can NEVER fail on lead housekeeping); `find_open_lead_id_by_phone` only
+  called WITH a valid phone (dup-phone block can't fire); cadence_paused=
+  true (no chase); assigned_to=creator (round-robin can't hijack); segment
+  set from the quote (tags GOVERNMENT — consistent with §142 leads.segment).
+- Guardian PASS. The lead-creation trigger is a §28 frozen DB contract —
+  any future change to it needs sales-module-guardian before commit.
+
+### Why it's NOT a patch (owner standing rule §3/§39)
+ONE trigger governs every quote→lead path (Private LED, Other Media, Auto
+Hood, GSRTC, any future wizard). Fixed there, not per-wizard. No frontend
+touched. Backfill heals existing orphans. A new wizard can't forget it.
+
+### §142 leads.segment (same session, Batch A done) — open
+`leads.segment` column added + backfilled (997 PRIVATE / 8 GOVERNMENT / 0
+untagged, SQL run 12 Jun). Shared `SegmentToggle` component extracted to
+`src/components/v2/SegmentToggle.jsx`. Batch B (NOT built): wire the toggle
+into LeadsV2 + QuotesV2 (filter) + LeadFormV2 (Private/Govt picker on
+create) — all §28 frozen, guardian each. Dedupe the AdminDashboardDesktop
+local SegmentToggle to the shared one. Only `quotes` + (now) `leads` carry
+segment; other tables don't — the toggle is meaningless elsewhere.
