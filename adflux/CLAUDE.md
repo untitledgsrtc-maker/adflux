@@ -3400,3 +3400,71 @@ ManagerDashboardV2 created_by · RepProfileV2 call guards · CockpitWidgets/
 scorecard/daily-brief stored-counter + dead 20-target · revenue label (owner
 decision) · 3 UTC day-anchors → istTodayISO. Plus Truth 6 leftovers (realtime
 rejoin, admin auto-refresh, publication check).
+
+---
+
+## 60 · Phase 133 + 134 — dashboard done-count truth + terminal-FU leaks (2026-06-12)
+
+### Phase 133 (`b573b49`, JS, guardian PASS) — "Today F-up" excludes auto-closes
+Owner: "I don't understand follow-up logic" — admin Team Dashboard showed
+Rima 241/243, Dhara 112/134 done today. CAUSE: today's one-time heals
+(Phase 131 + 130 + 128.3) closed ~142 backlog follow_ups with done_at=now(),
+and the Phase 128.2 axis counts DONE = closed-in-period (done_at in window)
+→ the cleanup rows inflated every rep's "done today." Fix: TeamDashboardV2
+fuRes pulls `done_note`; the fuMap DONE branch skips system auto-closes via
+`isSystemClose(note)` = `/^Auto-closed|^\[(healed|closed: auto|cancelled by
+stage|auto-skipped)/`. So "Today F-up done" = what the REP actually closed.
+Regex live-tested (matches all 6 heal markers, never a real rep note).
+- **The two dashboard FU numbers, plain:** OVERDUE F-UP = open + past-date
+  (behind). TODAY F-UP X/Y = closed X of Y on today's plate (128.2 axis:
+  Y = closed-today + still-open-due).
+- KNOWN one-day twin: the rep's evening WhatsApp report (useDaySummary) has
+  the same auto-close inflation today; self-cleans tomorrow. Owner asked if
+  he wants the same exclusion there — DECISION PENDING (left as-is for now).
+
+### Phase 134 (`52f0fec`, SQL RUN + applied, guardian PASS) — terminal-FU leaks
+Owner: lost lead / lost quote / won+paid still show in follow-ups. Live
+counts were 1/0/0 (today's heals swept most). The Phase 76.3 intent is
+"a lead reaching Lost/Won carries ZERO open follow_ups" (trg_z_close_
+followups_on_terminal closes ALL lead-tied FUs on the lead transition;
+it even DELETEs lost_nurture). Two structural gaps remained:
+- **Payment-collection FUs are LEAD-BLIND** (Phase 33G spawns them with
+  quote_id only, lead_id NULL) → the terminal-close `WHERE lead_id=NEW.id`
+  can't reach them.
+- **Orphan quotes** (lead_id NULL, pre-Phase-119) won/lost don't propagate
+  to any lead (quote_status_propagate_to_lead bails on NULL lead_id) → the
+  quote's chase + payment FUs never close.
+
+Fix (additive, §45-safe — both triggers fire ONLY on a status/stage
+transition, NOT on normal quote/lead edits → zero hot-path latency; no
+push, no cadence/score touch; EXCEPTION-wrapped so a quote/lead save can
+never fail on FU housekeeping):
+- `trg_quote_terminal_close_followups` AFTER UPDATE OF status ON quotes:
+  →lost closes ALL its FUs (quote_id-keyed, orphan-safe); →won closes
+  chase only, KEEPS payment (collect until fully paid — owner default).
+- `trg_lead_lost_close_payment_fu` AFTER UPDATE OF stage ON leads: →Lost
+  closes the lead's quotes' payment-collection FUs (the lead-blind gap;
+  Won leaves them open to collect).
+- Heal: close drifted lead-tied FUs on Lost/Won + payment on lost deals +
+  chase on lost quotes.
+
+**GUARDIAN P1 (caught + fixed):** heal closing a `lost_nurture` row on a
+Lost lead via is_done would fire truth1 followup_after_done which RESPAWNS
+lost_nurture (+30d) while stage=Lost → re-leak. Fix: heal excludes
+lost_nurture-on-Lost from the is_done close, and DELETEs them instead
+(DELETE never fires AFTER-UPDATE-OF-is_done → no respawn; mirrors Phase
+76.3's own lost_nurture cleanup). The live triggers A/B don't touch
+lost_nurture (A is quote_id-keyed, B is payment-only) so no respawn there.
+- **Foot-gun:** closing an auto-cadence FU via is_done on a stage where
+  truth1 respawns that cadence (lost_nurture@Lost, nurture@Nurture) =
+  close→respawn re-leak. DELETE those, or close only after the stage no
+  longer matches the respawn gate.
+- **won+payment stays "until fully paid"** (owner's default; partial
+  payment keeps the collection reminder — correct, not a bug).
+
+### §56 sprint state — batches 1-4 DONE; batch 5 (last) open
+ManagerDashboardV2 created_by · RepProfileV2 call guards · CockpitWidgets/
+scorecard/daily-brief stored-counter · revenue label (owner decision) ·
+3 UTC day-anchors → istTodayISO. Plus Truth 6 leftovers (realtime rejoin,
+admin auto-refresh, publication check). Plus the evening-report auto-close
+exclusion decision (twin of 133).
