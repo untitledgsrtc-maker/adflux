@@ -57,6 +57,8 @@ export default function CreateGovtGsrtcLedV2() {
     client_phone:   prefill.client_phone   || '',
     client_email:   prefill.client_email   || '',
     proposal_date: new Date().toISOString().slice(0, 10),
+    // Phase 140 — letter language (gu default, en opt-in).
+    proposal_language: 'gu',
     // Phase 101.C.JSX — agency seeds from profile.default_signer_user_id
     // (Phase 101.C SQL column). Non-agency starts blank. Edit-mode
     // useEffect below overrides with saved q.signer_user_id (owner C-5).
@@ -123,6 +125,7 @@ export default function CreateGovtGsrtcLedV2() {
                           ? String(q.proposal_date).slice(0, 10)
                           : prev.proposal_date,
         signer_user_id: q.signer_user_id || null,
+        proposal_language: q.proposal_language || 'gu',
         selected_station_ids: stationIds,
         station_overrides:    overrides,
         gsrtc_campaign_months: Number(q.gsrtc_campaign_months || q.duration_months || 1),
@@ -198,6 +201,8 @@ export default function CreateGovtGsrtcLedV2() {
       gsrtc_campaign_months: months,
       recipient_block: recipientBlock,
       proposal_date:  data.proposal_date,
+      // Phase 140 — chosen letter language (default Gujarati).
+      proposal_language: data.proposal_language || 'gu',
       // Phase 29a — only stamp created_by on INSERT; on UPDATE we
       // leave it alone so RLS continues to match (created_by =
       // auth.uid()) and so the original creator stays attributed.

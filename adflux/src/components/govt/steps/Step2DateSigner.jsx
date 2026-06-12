@@ -63,6 +63,26 @@ export function Step2DateSigner({
         </div>
       )}
 
+      {/* Phase 140 — letter language. Default Gujarati; English is an
+          opt-in per proposal. Drives which proposal_templates row the
+          renderer uses + the renderer's own labels/digits/date. */}
+      <div className="govt-field-row">
+        <div className="govt-field">
+          <label className="govt-field__label">Letter language</label>
+          <select
+            className="govt-field__select"
+            value={data.proposal_language || 'gu'}
+            onChange={e => set('proposal_language', e.target.value)}
+          >
+            <option value="gu">ગુજરાતી (Gujarati) — default</option>
+            <option value="en">English</option>
+          </select>
+          <div className="govt-field__hint">
+            The whole letter prints in this language. Gujarati is the default.
+          </div>
+        </div>
+      </div>
+
       <div className="govt-field-row govt-field-row--2">
         <div className="govt-field">
           <label className="govt-field__label">Proposal date</label>

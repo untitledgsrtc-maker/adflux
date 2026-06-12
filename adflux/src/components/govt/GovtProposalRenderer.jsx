@@ -1,17 +1,28 @@
 // src/components/govt/GovtProposalRenderer.jsx
 //
-// Renders a Government proposal as a printable Gujarati letter.
+// Renders a Government proposal as a printable letter.
 // Used by both:
 //   - the wizard's Step 5 (live preview while creating)
 //   - the GovtProposalDetailV2 page (read-only view of saved proposal)
 //
 // Inputs:
 //   template          : row from proposal_templates (has subject_line +
-//                       body_html with {{placeholders}})
+//                       body_html with {{placeholders}} + a `language`
+//                       field — 'gu' (default) or 'en')
 //   data              : { recipient_block, date, quantity, months,
 //                          line_items, signer, etc. }
 //   media_type        : 'AUTO_HOOD' | 'GSRTC_LED' — chooses which
 //                       extra placeholders + which rate table format
+//
+// Phase 140 (2026-06-12) — LANGUAGE SWITCH. The letter was Gujarati-only:
+// every label, table header, the digits, and the date were hardcoded
+// Gujarati. Owner wants the same 2 govt media in English too (default
+// stays Gujarati). We thread a `lang` derived from template.language
+// through the whole renderer. When lang==='gu' the output is BYTE-
+// IDENTICAL to before (every gu branch is the original literal); when
+// 'en' the labels come from the STR table, digits stay English, and the
+// date prints DD/MM/YYYY. The body + subject themselves come from the
+// language-matched proposal_templates row (Phase 140 SQL seeds the en row).
 //
 // We render in HTML (not PDF) and rely on browser print + CSS @media
 // print rules in govt.css to produce a print/PDF copy. True
@@ -26,6 +37,85 @@ import {
 import { renderTemplate } from '../../utils/renderTemplate'
 
 const GST_PCT = 18
+
+// Phase 140 — per-language label table. gu values are the original
+// hardcoded literals (unchanged); en is the parallel English copy. The
+// owner-supplied English letters (Auto 2.docx / Gsrtc 2.docx) drive the
+// body + subject via the en proposal_templates row; THIS table covers
+// the structural labels the renderer itself produces.
+const STR = {
+  gu: {
+    to:              'પ્રતિ,',
+    subjectPrefix:   'વિષય: ',
+    refLabel:        'સંદર્ભ ક્રમાંક:',
+    dateLabel:       'તારીખ:',
+    yoursFaithfully: 'આપનો વિશ્વાસુ,',
+    mob:             'મો.',
+    enclosure:       'બિડાણ:',
+    autoHead:        ['વિગત', 'સાઇઝ', 'ઓટો રિક્ષાની સંખ્યા', 'CBC ભાવ (દર મહિને)', 'મહિના', 'કુલ રકમ'],
+    autoRows:        ['રિક્ષાની પાછળની બાજુ', 'રિક્ષાની ડાબી બાજુ', 'રિક્ષાની જમણી બાજુ'],
+    gst:             'GST 18%',
+    totalAmount:     'કુલ રકમ',
+    gsrtcInlineNote: 'GSRTC માન્ય રેટ ટેબલ — વિગતવાર યાદી પાછળના પાને દર્શાવેલ છે.',
+    districtTitle:   '*ગુજરાત – ઓટો રિક્ષા જિલ્લા પ્રમાણેનું લિસ્ટ*',
+    distHead:        ['ક્રમ', 'જિલ્લો', 'ઓટો રિક્ષાની સંખ્યા'],
+    total:           'કુલ',
+    gsrtcHead:       ['ક્રમ', 'બસ સ્ટેશન', 'કેટ.', 'સ્ક્રીન', 'દૈનિક', 'સ્પોટ ડ્યુ.', 'માસિક સ્પોટ', 'દિવસો'],
+    gsrtcSlotHead:   '૧ સ્લોટ (૧૦ સે.)<br/>નો ભાવ',
+    gsrtcMonthly:    'માસિક કુલ',
+    grandTotal:      'ગ્રાન્ડ ટોટલ',
+    sec:             'સે.',
+    bidanAuto:       ['CBC (પૂર્વે DAVP) મંજૂર દરપત્રકની નકલ', 'જિલ્લાવાર ઓટો રિક્ષાઓની યાદી', 'કંપની પ્રોફાઇલ'],
+    bidanGsrtc:      ['GSRTC ભાવ-પત્રકની નકલ', 'ભાવ-દરખાસ્તની નકલ', '૨૦ બસ ડેપો યાદી'],
+    companyFallback: 'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ',
+    gsrtcCaption:    (m) => `GSRTC માન્ય રેટ ટેબલ — ${m} માસ માટે કેમ્પેઇન`,
+    monthsTotal:     (m) => `${m} માસ કુલ`,
+  },
+  en: {
+    to:              'To,',
+    subjectPrefix:   'Subject: ',
+    refLabel:        'Ref No.:',
+    dateLabel:       'Date:',
+    yoursFaithfully: 'Yours faithfully,',
+    mob:             'Md.',
+    enclosure:       'Enclosure:',
+    autoHead:        ['Detail', 'Size', 'Number of Auto Rickshaws', 'DAVP Price (per month)', 'Months', 'Total Amount'],
+    autoRows:        ['Rear side of Rickshaw', 'Left side of Rickshaw', 'Right side of Rickshaw'],
+    gst:             'GST 18%',
+    totalAmount:     'Total Amount',
+    gsrtcInlineNote: 'GSRTC approved rate table — detailed list shown on the next page.',
+    districtTitle:   'Gujarat — District-wise Auto Rickshaw List',
+    distHead:        ['No.', 'District', 'Number of Auto Rickshaws'],
+    total:           'Total',
+    gsrtcHead:       ['No.', 'Bus Station', 'Cat.', 'Screens', 'Daily', 'Spot Dur.', 'Monthly Spots', 'Days'],
+    gsrtcSlotHead:   '1 slot (10 s)<br/>price',
+    gsrtcMonthly:    'Monthly Total',
+    grandTotal:      'Grand Total',
+    sec:             's',
+    bidanAuto:       ['Copy of CBC (formerly DAVP) approved rate list', 'District-wise auto rickshaw list', 'Company profile'],
+    bidanGsrtc:      ['Copy of GSRTC price list', 'Copy of our price proposal', 'List of 20 bus depots'],
+    companyFallback: 'Untitled Advertising',
+    gsrtcCaption:    (m) => `GSRTC approved rate table — campaign for ${m} month(s)`,
+    monthsTotal:     (m) => `${m} month total`,
+  },
+}
+
+// Phase 140 — digit + date + rate helpers that respect language. For gu
+// they reproduce the original Gujarati-digit behaviour; for en they keep
+// the value as-is (English digits, Indian-comma grouping from
+// formatINREnglish).
+const numL = (s, lang) => (lang === 'en' ? String(s) : toGujaratiDigits(String(s)))
+
+function fmtDateL(d, lang) {
+  const date = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(date.getTime())) return ''
+  if (lang === 'en') {
+    const dd = String(date.getDate()).padStart(2, '0')
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    return `${dd}/${mm}/${date.getFullYear()}`
+  }
+  return formatDateGujarati(date)
+}
 
 export function GovtProposalRenderer({
   template,
@@ -69,14 +159,17 @@ export function GovtProposalRenderer({
     )
   }
 
-  // Phase 18b — owner spec: "પ્રતિ," ALWAYS on its own line, followed by
-  // designation / department / building / address each on a separate line.
-  // Previously the wizard let reps type "પ્રતિ, મેનેજિંગ ડિરેક્ટર," all on one
-  // line and the renderer just preserved that — which doesn't match the
-  // formal Gujarati letter layout the owner showed as the reference.
-  // We now strip a leading "પ્રતિ," from the first stored line and prepend
-  // it as its own line so the output is always:
-  //   પ્રતિ,
+  // Phase 140 — language derived from the matched template row. Default
+  // 'gu' for every existing/Gujarati proposal → byte-identical output.
+  const lang = template.language === 'en' ? 'en' : 'gu'
+  const S = STR[lang]
+
+  // Phase 18b — owner spec: the salutation prefix ("પ્રતિ," / "To,") is
+  // ALWAYS on its own line, followed by designation / department /
+  // building / address each on a separate line. We strip a leading
+  // prefix from the first stored line and prepend it as its own line so
+  // the output is always:
+  //   પ્રતિ,  /  To,
   //   મેનેજિંગ ડિરેક્ટર,
   //   ગુજરાત લાઇવલિહૂડ પ્રોમોશન કંપની લિમિટેડ,
   //   …
@@ -84,15 +177,18 @@ export function GovtProposalRenderer({
     .split('\n')
     .map(l => l.trim())
     .filter(Boolean)
-  if (_recipLines.length && /^પ્રતિ[,\s]?/.test(_recipLines[0])) {
-    _recipLines[0] = _recipLines[0].replace(/^પ્રતિ[,\s]+/, '').trim()
+  // Phase 140 — strip the language-appropriate leading salutation.
+  const stripTestRe = lang === 'en' ? /^To[,\s]?/i : /^પ્રતિ[,\s]?/
+  const stripRe     = lang === 'en' ? /^To[,\s]+/i : /^પ્રતિ[,\s]+/
+  if (_recipLines.length && stripTestRe.test(_recipLines[0])) {
+    _recipLines[0] = _recipLines[0].replace(stripRe, '').trim()
     if (!_recipLines[0]) _recipLines.shift()
   }
   const recipientHtml =
-    '<div style="margin-bottom:2px;">પ્રતિ,</div>' +
+    `<div style="margin-bottom:2px;">${S.to}</div>` +
     _recipLines.map(l => `<div style="margin-bottom:2px;">${l}</div>`).join('')
 
-  const dateGu = formatDateGujarati(data.proposal_date || new Date())
+  const dateStr = fmtDateL(data.proposal_date || new Date(), lang)
 
   /* Build the per-media rate table HTML.
      Phase 11d (rev9) — GSRTC table moved to its own page (page 2),
@@ -105,9 +201,9 @@ export function GovtProposalRenderer({
      summary fits comfortably with the body copy). */
   const isGsrtc = mediaType === 'GSRTC_LED'
   const rateTableHtml = isGsrtc
-    ? `<p style="margin:8px 0;color:#111;"><em>GSRTC માન્ય રેટ ટેબલ — વિગતવાર યાદી પાછળના પાને દર્શાવેલ છે.</em></p>`
-    : renderAutoTable(data)
-  const gsrtcStationPageHtml = isGsrtc ? renderGsrtcTable(data) : ''
+    ? `<p style="margin:8px 0;color:#111;"><em>${S.gsrtcInlineNote}</em></p>`
+    : renderAutoTable(data, lang)
+  const gsrtcStationPageHtml = isGsrtc ? renderGsrtcTable(data, lang) : ''
 
   // Phase 11d (rev12) — compute letterhead URL FIRST so the signer
   // block (and other downstream code) can branch on whether
@@ -122,27 +218,27 @@ export function GovtProposalRenderer({
   // When letterhead is ON, the printed footer of the letterhead PNG
   // already shows company name + phone + address. Slim signer block
   // mode skips the duplicate company line + mobile.
-  const signerHtml = renderSignerBlock(signer, company, letterheadOn)
+  const signerHtml = renderSignerBlock(signer, company, letterheadOn, lang)
 
   // Phase 11d (rev15) — bidan moved OFF page 1 to keep cover letter
   // strictly within the letterhead's empty zone. It now lives at the
   // bottom of page 2 (with the district/station list). Owner spec:
   // "covering letter in 1 page A4 size, city or station in 2nd page".
-  const page2BidanHtml = renderBidanBlock(mediaType, data.bidan_items)
+  const page2BidanHtml = renderBidanBlock(mediaType, data.bidan_items, lang)
 
   const vars = {
     recipient:        recipientHtml,
-    date:             dateGu,
-    quantity:         toGujaratiDigits(formatINREnglish(data.auto_total_quantity || 0)),
-    districts_count:  toGujaratiDigits(String(data.line_items?.length || 0)),
+    date:             dateStr,
+    quantity:         numL(formatINREnglish(data.auto_total_quantity || 0), lang),
+    districts_count:  numL(String(data.line_items?.length || 0), lang),
     // Phase 34H — for AUTO_HOOD the months placeholder prefers
     // auto_campaign_months; GSRTC stays on gsrtc_campaign_months.
-    months:           toGujaratiDigits(String(
+    months:           numL(String(
                         mediaType === 'AUTO_HOOD'
                           ? (data.auto_campaign_months || 1)
                           : (data.gsrtc_campaign_months || 1)
-                      )),
-    selected_stations: toGujaratiDigits(String(data.line_items?.length || 0)),
+                      ), lang),
+    selected_stations: numL(String(data.line_items?.length || 0), lang),
     rate_table:       rateTableHtml,
     signer_block:     signerHtml,
     // Phase 11d (rev15) — bidan removed from cover letter, lives on
@@ -160,7 +256,7 @@ export function GovtProposalRenderer({
   // .govt-letter div. Each is min-height 1123px (one A4 page) via base
   // CSS, so the rasterizer in proposalPdf.js naturally pages them.
   const districtListHtml = mediaType === 'AUTO_HOOD'
-    ? renderDistrictListPage(data)
+    ? renderDistrictListPage(data, lang)
     : ''
 
   // Phase 10b — letterhead background.
@@ -227,13 +323,13 @@ export function GovtProposalRenderer({
     <>
       {/* Page 1 — cover letter */}
       <div className="govt-letter govt-letter--themed" style={coverStyle}>
-        {/* Phase 11d (rev7) — સંદર્ભ ક્રમાંક (reference number) line.
-            Owner spec docx includes "સંદર્ભ ક્રમાંક: UA/GOVT/2026/____
-            તારીખ: ____/____/૨૦૨૬" at the very top. Since the date
-            already lives on the right of the recipient block, we put
-            the quote number on the left of that same line so both
-            top-of-letter identifiers sit on one row. Falls back to
-            ref_number if quote_number is missing (legacy proposals). */}
+        {/* Phase 11d (rev7) — reference number line. Owner spec docx
+            includes "સંદર્ભ ક્રમાંક: UA/GOVT/2026/____  તારીખ: …" at the
+            very top. Since the date already lives on the right of the
+            recipient block, we put the quote number on the left of that
+            same line so both top-of-letter identifiers sit on one row.
+            Falls back to ref_number if quote_number is missing (legacy
+            proposals). Phase 140 — labels follow the letter language. */}
         {(data.quote_number || data.ref_number) && (
           <div style={{
             display: 'flex',
@@ -246,15 +342,15 @@ export function GovtProposalRenderer({
             borderBottom: '1px dashed #999',
           }}>
             <span>
-              <strong>સંદર્ભ ક્રમાંક:</strong> {data.quote_number || data.ref_number}
+              <strong>{S.refLabel}</strong> {data.quote_number || data.ref_number}
             </span>
             <span>
-              <strong>તારીખ:</strong> {dateGu}
+              <strong>{S.dateLabel}</strong> {dateStr}
             </span>
           </div>
         )}
         {/* Phase 11d (rev9) — date removed from this header. The
-            સંદર્ભ ક્રમાંક block above already shows date on the right.
+            reference-number block above already shows date on the right.
             Owner reported "2 time date" — duplicate render. */}
         <div className="govt-letter__head">
           <div
@@ -265,7 +361,7 @@ export function GovtProposalRenderer({
 
         <div
           className="govt-letter__subject"
-          dangerouslySetInnerHTML={{ __html: 'વિષય: ' + template.subject_line }}
+          dangerouslySetInnerHTML={{ __html: S.subjectPrefix + template.subject_line }}
         />
 
         <div
@@ -306,12 +402,17 @@ export function GovtProposalRenderer({
 
 /* ── helpers ────────────────────────────────────────────────────── */
 
-function renderSignerBlock(signer, company, letterheadOn = false) {
+function renderSignerBlock(signer, company, letterheadOn = false, lang = 'gu') {
   if (!signer) return ''
+  const S = STR[lang]
   const name   = signer.name || ''
   const title  = signer.signature_title || ''
-  const mobile = signer.signature_mobile ? `મો. ${signer.signature_mobile}` : ''
-  const companyLine = (company?.name_gu || company?.short_name || company?.name || 'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ')
+  const mobile = signer.signature_mobile ? `${S.mob} ${signer.signature_mobile}` : ''
+  // Phase 140 — English letters use the company's English name; Gujarati
+  // letters prefer name_gu (the original behaviour).
+  const companyLine = lang === 'en'
+    ? (company?.name || company?.short_name || S.companyFallback)
+    : (company?.name_gu || company?.short_name || company?.name || S.companyFallback)
 
   // Phase 11d (rev12) — letterhead-mode signer block originally hid
   // the mobile on the theory that the printed letterhead footer
@@ -325,7 +426,7 @@ function renderSignerBlock(signer, company, letterheadOn = false) {
   if (letterheadOn) {
     return [
       '<div class="govt-letter__signer" style="text-align:right;margin-top:18px;">',
-        'આપનો વિશ્વાસુ,<br/>',
+        `${S.yoursFaithfully}<br/>`,
         `${name}${title ? ` (${title})` : ''}`,
         mobile ? `<br/>${mobile}` : '',
       '</div>',
@@ -336,7 +437,7 @@ function renderSignerBlock(signer, company, letterheadOn = false) {
   // no printed footer to provide the company info.
   return [
     '<div class="govt-letter__signer" style="text-align:right;">',
-      'આપનો વિશ્વાસુ,<br/>',
+      `${S.yoursFaithfully}<br/>`,
       `${name}${title ? ` (${title})` : ''}<br/>`,
       companyLine,
     mobile ? `<br/>${mobile}` : '',
@@ -344,13 +445,14 @@ function renderSignerBlock(signer, company, letterheadOn = false) {
   ].join('')
 }
 
-function renderAutoTable(data) {
+function renderAutoTable(data, lang = 'gu') {
   // Renders ONLY the rate summary. The per-district allotment list
   // lives on a separate A4 page — see renderDistrictListPage.
   //
   // Phase 34H — adds a Months column. Rate is per-rickshaw per-month;
   // total = qty × rate × months. Legacy quotes with no months default
   // to 1 (single-month behaviour), so old PDFs render unchanged.
+  const S = STR[lang]
   const qty      = Number(data.auto_total_quantity || 0)
   const rate     = Number(data.unit_rate ?? 825)
   const months   = Math.max(1, Number(data.auto_campaign_months || 1))
@@ -358,12 +460,12 @@ function renderAutoTable(data) {
   const gst      = Math.round(subtotal * GST_PCT / 100)
   const total    = subtotal + gst
 
-  const rowQty    = toGujaratiDigits(formatINREnglish(qty))
-  const rowRate   = toGujaratiDigits(formatINREnglish(rate)) + '/-'
-  const rowMonths = toGujaratiDigits(String(months))
-  const rowSub    = toGujaratiDigits(formatINREnglish(subtotal)) + '/-'
-  const rowGst    = toGujaratiDigits(formatINREnglish(gst)) + '/-'
-  const rowTotal  = toGujaratiDigits(formatINREnglish(total)) + '/-'
+  const rowQty    = numL(formatINREnglish(qty), lang)
+  const rowRate   = numL(formatINREnglish(rate), lang) + '/-'
+  const rowMonths = numL(String(months), lang)
+  const rowSub    = numL(formatINREnglish(subtotal), lang) + '/-'
+  const rowGst    = numL(formatINREnglish(gst), lang) + '/-'
+  const rowTotal  = numL(formatINREnglish(total), lang) + '/-'
 
   // 6-column table header. The first row spans qty / rate / months /
   // subtotal across the 3 visual rows that describe the rickshaw
@@ -372,32 +474,33 @@ function renderAutoTable(data) {
   <table class="govt-letter__table">
     <thead>
       <tr>
-        <th>વિગત</th>
-        <th>સાઇઝ</th>
-        <th class="num">ઓટો રિક્ષાની સંખ્યા</th>
-        <th class="num">CBC ભાવ (દર મહિને)</th>
-        <th class="num">મહિના</th>
-        <th class="num">કુલ રકમ</th>
+        <th>${S.autoHead[0]}</th>
+        <th>${S.autoHead[1]}</th>
+        <th class="num">${S.autoHead[2]}</th>
+        <th class="num">${S.autoHead[3]}</th>
+        <th class="num">${S.autoHead[4]}</th>
+        <th class="num">${S.autoHead[5]}</th>
       </tr>
     </thead>
     <tbody>
-      <tr><td>રિક્ષાની પાછળની બાજુ</td><td>4' × 3'</td><td class="num" rowspan="3">${rowQty}</td><td class="num" rowspan="3">${rowRate}</td><td class="num" rowspan="3">${rowMonths}</td><td class="num" rowspan="3">${rowSub}</td></tr>
-      <tr><td>રિક્ષાની ડાબી બાજુ</td><td>2' × 2'</td></tr>
-      <tr><td>રિક્ષાની જમણી બાજુ</td><td>2' × 2'</td></tr>
-      <tr><td colspan="5">GST 18%</td><td class="num">${rowGst}</td></tr>
-      <tr><td colspan="5"><strong>કુલ રકમ</strong></td><td class="num"><strong>${rowTotal}</strong></td></tr>
+      <tr><td>${S.autoRows[0]}</td><td>4' × 3'</td><td class="num" rowspan="3">${rowQty}</td><td class="num" rowspan="3">${rowRate}</td><td class="num" rowspan="3">${rowMonths}</td><td class="num" rowspan="3">${rowSub}</td></tr>
+      <tr><td>${S.autoRows[1]}</td><td>2' × 2'</td></tr>
+      <tr><td>${S.autoRows[2]}</td><td>2' × 2'</td></tr>
+      <tr><td colspan="5">${S.gst}</td><td class="num">${rowGst}</td></tr>
+      <tr><td colspan="5"><strong>${S.totalAmount}</strong></td><td class="num"><strong>${rowTotal}</strong></td></tr>
     </tbody>
   </table>`
 }
 
 /* Phase 11d — Bidan (enclosure list) block.
-   Renders the standard "બિડાણ:" footer that closes a Gujarati govt
-   letter. Items are media-type-specific (different attachments are
-   relevant for AUTO_HOOD vs GSRTC_LED). Outputs raw HTML inserted via
-   {{bidan_block}} placeholder; styling lives in govt.css if needed.
-   Owner spec (4 May 2026 docx): bidan must appear at the END of every
-   letter when generating PDF or printing. */
-function renderBidanBlock(mediaType, dynamicItems) {
+   Renders the standard enclosure footer that closes the letter. Items
+   are media-type-specific (different attachments are relevant for
+   AUTO_HOOD vs GSRTC_LED). Outputs raw HTML inserted via {{bidan_block}}
+   placeholder; styling lives in govt.css if needed. Owner spec (4 May
+   2026 docx): bidan must appear at the END of every letter when
+   generating PDF or printing. Phase 140 — label + fallback items follow
+   the letter language. */
+function renderBidanBlock(mediaType, dynamicItems, lang = 'gu') {
   // Phase 11d (rev14) — collapsed to single comma-separated line.
   // The previous 6-line numbered list pushed the cover letter past
   // 860px (the available content height when letterhead background
@@ -405,17 +508,8 @@ function renderBidanBlock(mediaType, dynamicItems) {
   // shows the actual attachments anyway; this line is a quick
   // index. Single-line format saves ~100px and prevents bidan from
   // colliding with the letterhead's printed footer.
-  const fallback = mediaType === 'AUTO_HOOD'
-    ? [
-        'CBC (પૂર્વે DAVP) મંજૂર દરપત્રકની નકલ',
-        'જિલ્લાવાર ઓટો રિક્ષાઓની યાદી',
-        'કંપની પ્રોફાઇલ',
-      ]
-    : [
-        'GSRTC ભાવ-પત્રકની નકલ',
-        'ભાવ-દરખાસ્તની નકલ',
-        '૨૦ બસ ડેપો યાદી',
-      ]
+  const S = STR[lang]
+  const fallback = mediaType === 'AUTO_HOOD' ? S.bidanAuto : S.bidanGsrtc
 
   const items = (Array.isArray(dynamicItems) && dynamicItems.length > 0)
     ? dynamicItems
@@ -423,7 +517,7 @@ function renderBidanBlock(mediaType, dynamicItems) {
 
   return [
     '<p style="margin:10px 0 0;font-size:11.5px;line-height:1.5;">',
-      '<strong>બિડાણ:</strong> ',
+      `<strong>${S.enclosure}</strong> `,
       items.join(', '),
     '</p>',
   ].join('')
@@ -440,7 +534,7 @@ function renderBidanBlock(mediaType, dynamicItems) {
      • normalized live quotes          (description, allocated_qty)
      • raw wizard preview              (district_name_gu/en, allocated_qty)
 */
-function renderDistrictListPage(data) {
+function renderDistrictListPage(data, lang = 'gu') {
   // Phase 11d (rev 3) — compact table sized to fit 33 districts on a
   // single A4 page.
   //   Math: page height 1123px @ 96dpi, with 56px top+bottom padding
@@ -449,6 +543,7 @@ function renderDistrictListPage(data) {
   //   each. We use 19px rows (4px vertical padding × 11.5px font ×
   //   1.3 line-height) so the table comfortably fits with margin to
   //   spare. Centered, max-width 540 for printed look.
+  const S = STR[lang]
   const items = Array.isArray(data.line_items) ? data.line_items : []
   if (items.length === 0) return ''
 
@@ -467,45 +562,42 @@ function renderDistrictListPage(data) {
   const headStyle = cellStyle + 'background:#f5f5f5;font-weight:700;'
 
   const rowsHtml = items.map((it, i) => {
-    // Phase 11d (rev6) — Gujarati FIRST. The wizard saves English
-    // names into description/city_name, but the parent loader (govt
-    // detail page useEffect) joins auto_districts and surfaces
-    // district_name_gu. Owner spec: "AUTO LIST IN GUJRATI NOT
+    // Phase 11d (rev6) — Gujarati FIRST for the gu letter. The wizard
+    // saves English names into description/city_name, but the parent
+    // loader (govt detail page useEffect) joins auto_districts and
+    // surfaces district_name_gu. Owner spec: "AUTO LIST IN GUJRATI NOT
     // ENGLISH". Fall back to English forms only if no Gujarati is
-    // available (e.g., a custom district that's not in the master).
-    const name =
-      it.district_name_gu ||
-      it.district_name ||
-      it.description ||
-      it.city_name ||
-      it.district_name_en ||
-      '—'
+    // available. Phase 140 — for the English letter, prefer the English
+    // name (the reverse order).
+    const name = lang === 'en'
+      ? (it.district_name_en || it.description || it.city_name || it.district_name_gu || it.district_name || '—')
+      : (it.district_name_gu || it.district_name || it.description || it.city_name || it.district_name_en || '—')
     const qty = Number(it.allocated_qty ?? it.qty ?? it.quantity ?? 0)
     return `
       <tr>
-        <td style="${cellStyle}text-align:center;">${toGujaratiDigits(String(i + 1))}</td>
+        <td style="${cellStyle}text-align:center;">${numL(String(i + 1), lang)}</td>
         <td style="${cellStyle}">${name}</td>
-        <td style="${cellStyle}text-align:right;">${toGujaratiDigits(formatINREnglish(qty))}</td>
+        <td style="${cellStyle}text-align:right;">${numL(formatINREnglish(qty), lang)}</td>
       </tr>`
   }).join('')
 
   return `
   <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;text-align:center;color:#111;">
-    *ગુજરાત – ઓટો રિક્ષા જિલ્લા પ્રમાણેનું લિસ્ટ*
+    ${S.districtTitle}
   </h2>
   <table style="border-collapse:collapse;width:100%;max-width:540px;margin:0 auto;background:#fff;color:#111;">
     <thead>
       <tr>
-        <th style="${headStyle}width:50px;text-align:center;">ક્રમ</th>
-        <th style="${headStyle}text-align:left;">જિલ્લો</th>
-        <th style="${headStyle}width:140px;text-align:right;">ઓટો રિક્ષાની સંખ્યા</th>
+        <th style="${headStyle}width:50px;text-align:center;">${S.distHead[0]}</th>
+        <th style="${headStyle}text-align:left;">${S.distHead[1]}</th>
+        <th style="${headStyle}width:140px;text-align:right;">${S.distHead[2]}</th>
       </tr>
     </thead>
     <tbody>
       ${rowsHtml}
       <tr>
-        <td colspan="2" style="${cellStyle}font-weight:700;">કુલ</td>
-        <td style="${cellStyle}font-weight:700;text-align:right;">${toGujaratiDigits(formatINREnglish(totalQty))}</td>
+        <td colspan="2" style="${cellStyle}font-weight:700;">${S.total}</td>
+        <td style="${cellStyle}font-weight:700;text-align:right;">${numL(formatINREnglish(totalQty), lang)}</td>
       </tr>
     </tbody>
   </table>`
@@ -515,17 +607,19 @@ function renderDistrictListPage(data) {
 // column. The previous code used formatINREnglish which calls
 // .toFixed(0) → 2.75 became "3" for every row, making all stations
 // look identical. This formatter keeps up to 2 decimals when the
-// number isn't a whole rupee, drops them when it is.
-function formatRateGu(n) {
+// number isn't a whole rupee, drops them when it is. Phase 140 — gu
+// converts to Gujarati digits; en keeps English digits.
+function formatRate(n, lang = 'gu') {
   const num = Number(n)
-  if (!Number.isFinite(num)) return '૦'
+  if (!Number.isFinite(num)) return lang === 'en' ? '0' : '૦'
   // Whole numbers print without decimals (3 not 3.00).
   // Fractional rates print with 2 decimals (2.75, 2.50).
   const out = (num % 1 === 0) ? String(Math.round(num)) : num.toFixed(2)
-  return toGujaratiDigits(out)
+  return lang === 'en' ? out : toGujaratiDigits(out)
 }
 
-function renderGsrtcTable(data) {
+function renderGsrtcTable(data, lang = 'gu') {
+  const S = STR[lang]
   const months = Number(data.gsrtc_campaign_months || 1)
   const items  = data.line_items || []
   let subtotal = 0
@@ -546,7 +640,7 @@ function renderGsrtcTable(data) {
     const daily      = Number(it.daily_spots ?? 100)
     const baseDays   = Number(it.days ?? 30)
     // Phase 18b — owner directive: when campaign is 2 months, the
-    // "દિવસો" column should show 60 and "માસિક સ્પોટ" should aggregate
+    // "days" column should show 60 and "monthly spots" should aggregate
     // over the full campaign duration, not 1 month. Fix: multiply
     // base-days by `months` for everything in the row + totals.
     const days       = baseDays * months
@@ -559,28 +653,26 @@ function renderGsrtcTable(data) {
     totalScreens    += screens
     totalDaily      += daily * screens
     totalMonthly    += daily * days * screens
-    // Phase 11i — prefer Gujarati station name when available
+    // Phase 11i — prefer Gujarati station name for the gu letter
     // (joined from gsrtc_stations master in GovtProposalDetailV2.load).
-    // Falls back to English description for legacy items / wizard preview.
-    const stationName =
-      it.station_name_gu ||
-      it.description_gu ||
-      it.station_name_en ||
-      it.description ||
-      ''
+    // Falls back to English description for legacy items / wizard
+    // preview. Phase 140 — English letter prefers the English name.
+    const stationName = lang === 'en'
+      ? (it.station_name_en || it.description || it.station_name_gu || it.description_gu || '')
+      : (it.station_name_gu || it.description_gu || it.station_name_en || it.description || '')
     return `
       <tr>
-        <td style="${cellStyle}text-align:center;">${toGujaratiDigits(String(i + 1))}</td>
+        <td style="${cellStyle}text-align:center;">${numL(String(i + 1), lang)}</td>
         <td style="${cellStyle}">${stationName}</td>
         <td style="${cellStyle}text-align:center;">${it.category || ''}</td>
-        <td style="${numCell}">${toGujaratiDigits(String(screens))}</td>
-        <td style="${numCell}">${toGujaratiDigits(String(daily))}</td>
-        <td style="${numCell}">${toGujaratiDigits(String(dur))} સે.</td>
-        <td style="${numCell}">${toGujaratiDigits(String(daily * days))}</td>
-        <td style="${numCell}">${toGujaratiDigits(String(days))}</td>
-        <td style="${numCell}">${formatRateGu(rate)}</td>
-        <td style="${numCell}">${toGujaratiDigits(formatINREnglish(monthly))}</td>
-        <td style="${numCell}">${toGujaratiDigits(formatINREnglish(lineTotal))}</td>
+        <td style="${numCell}">${numL(String(screens), lang)}</td>
+        <td style="${numCell}">${numL(String(daily), lang)}</td>
+        <td style="${numCell}">${numL(String(dur), lang)} ${S.sec}</td>
+        <td style="${numCell}">${numL(String(daily * days), lang)}</td>
+        <td style="${numCell}">${numL(String(days), lang)}</td>
+        <td style="${numCell}">${formatRate(rate, lang)}</td>
+        <td style="${numCell}">${numL(formatINREnglish(monthly), lang)}</td>
+        <td style="${numCell}">${numL(formatINREnglish(lineTotal), lang)}</td>
       </tr>`
   }).join('')
 
@@ -589,42 +681,42 @@ function renderGsrtcTable(data) {
 
   return `
   <p style="margin:8px 0 4px;color:#111;font-size:12px;">
-    <em>GSRTC માન્ય રેટ ટેબલ — ${toGujaratiDigits(String(months))} માસ માટે કેમ્પેઇન</em>
+    <em>${S.gsrtcCaption(numL(String(months), lang))}</em>
   </p>
   <table style="border-collapse:collapse;width:100%;background:#fff;color:#111;table-layout:fixed;">
     <thead>
       <tr>
-        <th style="${headStyle}width:32px;">ક્રમ</th>
-        <th style="${headStyle}text-align:left;">બસ સ્ટેશન</th>
-        <th style="${headStyle}width:42px;">કેટ.</th>
-        <th style="${headStyle}width:46px;">સ્ક્રીન</th>
-        <th style="${headStyle}width:42px;">દૈનિક</th>
-        <th style="${headStyle}width:54px;">સ્પોટ ડ્યુ.</th>
-        <th style="${headStyle}width:60px;">માસિક સ્પોટ</th>
-        <th style="${headStyle}width:42px;">દિવસો</th>
-        <th style="${headStyle}width:96px;line-height:1.2;font-size:10px;white-space:nowrap;">૧ સ્લોટ (૧૦ સે.)<br/>નો ભાવ</th>
-        <th style="${headStyle}width:74px;">માસિક કુલ</th>
-        <th style="${headStyle}width:80px;">${toGujaratiDigits(String(months))} માસ કુલ</th>
+        <th style="${headStyle}width:32px;">${S.gsrtcHead[0]}</th>
+        <th style="${headStyle}text-align:left;">${S.gsrtcHead[1]}</th>
+        <th style="${headStyle}width:42px;">${S.gsrtcHead[2]}</th>
+        <th style="${headStyle}width:46px;">${S.gsrtcHead[3]}</th>
+        <th style="${headStyle}width:42px;">${S.gsrtcHead[4]}</th>
+        <th style="${headStyle}width:54px;">${S.gsrtcHead[5]}</th>
+        <th style="${headStyle}width:60px;">${S.gsrtcHead[6]}</th>
+        <th style="${headStyle}width:42px;">${S.gsrtcHead[7]}</th>
+        <th style="${headStyle}width:96px;line-height:1.2;font-size:10px;white-space:nowrap;">${S.gsrtcSlotHead}</th>
+        <th style="${headStyle}width:74px;">${S.gsrtcMonthly}</th>
+        <th style="${headStyle}width:80px;">${S.monthsTotal(numL(String(months), lang))}</th>
       </tr>
     </thead>
     <tbody>
       ${rowsHtml}
       <tr>
-        <td colspan="3" style="${cellStyle}font-weight:700;text-align:right;">કુલ</td>
-        <td style="${numCell}font-weight:700;">${toGujaratiDigits(String(totalScreens))}</td>
-        <td style="${numCell}">${toGujaratiDigits(String(totalDaily))}</td>
+        <td colspan="3" style="${cellStyle}font-weight:700;text-align:right;">${S.total}</td>
+        <td style="${numCell}font-weight:700;">${numL(String(totalScreens), lang)}</td>
+        <td style="${numCell}">${numL(String(totalDaily), lang)}</td>
         <td style="${cellStyle}"></td>
-        <td style="${numCell}">${toGujaratiDigits(String(totalMonthly))}</td>
+        <td style="${numCell}">${numL(String(totalMonthly), lang)}</td>
         <td colspan="3" style="${cellStyle}"></td>
-        <td style="${numCell}font-weight:700;">${toGujaratiDigits(formatINREnglish(subtotal))}</td>
+        <td style="${numCell}font-weight:700;">${numL(formatINREnglish(subtotal), lang)}</td>
       </tr>
       <tr>
-        <td colspan="10" style="${cellStyle}text-align:right;">GST 18%</td>
-        <td style="${numCell}">${toGujaratiDigits(formatINREnglish(gst))}</td>
+        <td colspan="10" style="${cellStyle}text-align:right;">${S.gst}</td>
+        <td style="${numCell}">${numL(formatINREnglish(gst), lang)}</td>
       </tr>
       <tr>
-        <td colspan="10" style="${cellStyle}font-weight:700;text-align:right;">ગ્રાન્ડ ટોટલ</td>
-        <td style="${numCell}font-weight:700;">${toGujaratiDigits(formatINREnglish(total))}</td>
+        <td colspan="10" style="${cellStyle}font-weight:700;text-align:right;">${S.grandTotal}</td>
+        <td style="${numCell}font-weight:700;">${numL(formatINREnglish(total), lang)}</td>
       </tr>
     </tbody>
   </table>`

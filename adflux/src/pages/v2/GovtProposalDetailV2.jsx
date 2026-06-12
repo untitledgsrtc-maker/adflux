@@ -157,7 +157,7 @@ export default function GovtProposalDetailV2() {
           .select('*')
           .eq('segment', 'GOVERNMENT')
           .eq('media_type', q.media_type)
-          .eq('language', 'gu')
+          .eq('language', q.proposal_language || 'gu')
           .eq('is_active', true)
           .is('effective_to', null)
           .maybeSingle(),

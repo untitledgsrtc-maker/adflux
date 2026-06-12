@@ -23,7 +23,7 @@ export function Step5ReviewGsrtc({ data }) {
         .select('*')
         .eq('segment',    'GOVERNMENT')
         .eq('media_type', 'GSRTC_LED')
-        .eq('language',   'gu')
+        .eq('language',   data.proposal_language || 'gu')
         .eq('is_active',  true)
         .is('effective_to', null)
         .maybeSingle(),
@@ -38,7 +38,7 @@ export function Step5ReviewGsrtc({ data }) {
       setCompany(c)
     })
     return () => { cancel = true }
-  }, [])
+  }, [data.proposal_language])
 
   const signer = useMemo(
     () => signers.find(s => s.id === data.signer_user_id) || null,
