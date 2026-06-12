@@ -56,7 +56,9 @@ const PERIODS = [
 // chip + Phase 100.B Cross-team chip) so visual language stays uniform.
 const STATE_TONE = {
   Pending: { bg: 'var(--v2-bg-2)',          fg: 'var(--v2-ink-2)',     bd: 'var(--v2-line)' },
-  Earned:  { bg: 'var(--accent-soft)',      fg: 'var(--accent-fg)',    bd: 'var(--accent)' },
+  // Phase 141 — tinted chip: bright accent TEXT (matches Payable/Paid/Lost
+  // pattern). Was --accent-fg (navy) → unreadable on the dark soft tint.
+  Earned:  { bg: 'var(--accent-soft)',      fg: 'var(--accent)',       bd: 'var(--accent)' },
   Payable: { bg: 'var(--success-soft)',     fg: 'var(--success)',      bd: 'var(--success)' },
   // Phase 101.A3 — Paid uses the same success tone as Payable; chip
   // text reads "Paid" so the rep can tell the cleared rows apart.
@@ -327,7 +329,9 @@ export default function AgencyEarningsView({ refreshKey }) {
             borderRadius: 999,
             fontSize: 13, fontWeight: 700,
             background: 'var(--accent-soft)',
-            color: 'var(--accent-fg)',
+            // Phase 141 — bright accent text (was --accent-fg navy →
+            // unreadable on the soft tint over the dark page).
+            color: 'var(--accent)',
             border: '1px solid var(--accent)',
           }}>
             <Wallet size={14} style={{ marginRight: 6 }} />
