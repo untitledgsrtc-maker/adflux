@@ -39,6 +39,16 @@ const PRUNE_MS = 30 * 60_000 // entries older than 30 min are abandoned
 // leadId(string) -> { tapAt:number, elapsed:number|null, wentHidden:bool, cleanup:fn|null }
 const pending = new Map()
 
+// Phase 138 — diagnostic stash: getCallElapsed clears the entry, but the
+// capture log needs to know AFTER the fact whether the app backgrounded
+// and via which signal. Keep the last verdict per lead so the log can
+// read it. Bounded (one entry per lead, overwritten).
+const lastDebug = new Map()
+export function getCaptureDebug(leadId) {
+  if (!leadId) return null
+  return lastDebug.get(String(leadId)) || null
+}
+
 // Record the away-time for an entry on return-to-foreground (once).
 function recordReturn(entry) {
   if (entry.wentHidden && entry.elapsed === null) {
@@ -55,7 +65,7 @@ if (typeof window !== 'undefined' && Capacitor?.isNativePlatform?.()) {
     .then(({ App }) => {
       App.addListener('appStateChange', ({ isActive }) => {
         for (const entry of pending.values()) {
-          if (!isActive) entry.wentHidden = true
+          if (!isActive) { entry.wentHidden = true; entry.bgSignal = entry.bgSignal || 'appState' }  // Phase 138
           else recordReturn(entry)
         }
       })
@@ -98,6 +108,7 @@ export function markCallStart(leadId) {
   const onVis = () => {
     if (document.visibilityState === 'hidden') {
       entry.wentHidden = true
+      entry.bgSignal = entry.bgSignal || 'visibility'  // Phase 138
       return
     }
     // Back to visible. Only count it if we actually left the app (a
@@ -127,5 +138,13 @@ export function getCallElapsed(leadId) {
   try { entry.cleanup && entry.cleanup() } catch { /* noop */ }
   // Phase 128.4 — latest tap wins; the prior same-lead call's recorded
   // time is the fallback (a re-tap before saving used to discard it).
-  return entry.elapsed ?? entry.prevElapsed // seconds, or null
+  const elapsed = entry.elapsed ?? entry.prevElapsed
+  // Phase 138 — stash the verdict so the capture log can read whether the
+  // app actually backgrounded (the suspected root of the 0s misses).
+  lastDebug.set(key, {
+    backgrounded: !!entry.wentHidden,
+    bgSignal: entry.bgSignal || 'none',
+    elapsed,
+  })
+  return elapsed // seconds, or null
 }

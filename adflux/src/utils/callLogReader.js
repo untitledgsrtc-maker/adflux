@@ -31,8 +31,27 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
+import { getCaptureDebug } from './callTimer'
 
 const CallLogReader = registerPlugin('CallLogReader')
+
+// Phase 138 — DIAGNOSTIC ONLY (instrumentation, not a fix). One row per
+// capture attempt into call_capture_log so a day of real data proves WHY
+// ~46% of connected calls save 0s. Fire-and-forget; a logging failure
+// never affects the actual patch. Remove once the permanent fix lands.
+async function logCapture(row) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.id) return
+    // permission check runs HERE (inside the fire-and-forget), never on
+    // the patch path — guardian P1 (a native round-trip must not delay
+    // the duration write).
+    const device_permission = Capacitor.isNativePlatform()
+      ? await checkCallLogPermission()
+      : 'web'
+    await supabase.from('call_capture_log').insert([{ user_id: user.id, device_permission, ...row }])
+  } catch { /* swallow — diagnostic must never break a save */ }
+}
 
 /**
  * Look up the Android CallLog for the most recent call to/from
@@ -89,12 +108,14 @@ export async function fetchAndPatchCallDuration({
   //    sinceMs = Date.now() queried [now, now+60min] and never matched
   //    — that's why duration_seconds stayed NULL.)
   let duration = null
+  let deviceFound = false, deviceSeconds = null   // Phase 138 diag
   if (Capacitor.isNativePlatform() && phone && telTapMs) {
     const lookbackMs = telTapMs - 60 * 60_000
     const result = await lookupCall({ phone, sinceMs: lookbackMs })
     if (result && result.found) {
+      deviceFound = true
       const d = Number(result.durationSeconds)
-      if (Number.isFinite(d) && d >= 0) duration = d
+      if (Number.isFinite(d) && d >= 0) { duration = d; deviceSeconds = d }
     }
   }
 
@@ -106,6 +127,26 @@ export async function fetchAndPatchCallDuration({
   if (duration === null && fallbackSeconds != null) {
     const fb = Math.round(Number(fallbackSeconds))
     if (Number.isFinite(fb) && fb >= 5 && fb <= 1800) duration = fb
+  }
+
+  // Phase 138 — log the full verdict of EVERY attempt (incl the 0s/null
+  // misses, which are exactly what we need to diagnose). Fire-and-forget,
+  // never blocks. Captures: did the device read find it, did the app
+  // background (the suspected root), what each path returned.
+  {
+    const dbg = getCaptureDebug(leadId) || {}
+    logCapture({   // fire-and-forget — permission check happens inside it
+      lead_id:           leadId,
+      phone_last10:      String(phone || '').replace(/\D/g, '').slice(-10) || null,
+      device_read_found: deviceFound,
+      device_read_seconds: deviceSeconds,
+      app_backgrounded:  dbg.backgrounded ?? null,
+      bg_signal:         dbg.bgSignal ?? null,
+      timer_seconds:     (fallbackSeconds != null ? Math.round(Number(fallbackSeconds)) : (dbg.elapsed ?? null)),
+      patch_path:        onlyIfMissing ? 'auto60' : 'modal_save',
+      final_seconds:     duration,
+      counted:           duration != null && duration >= 10,
+    })
   }
 
   if (duration === null) return null // nothing reliable to write
