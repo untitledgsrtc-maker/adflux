@@ -632,7 +632,13 @@ function renderGsrtcTable(data, lang = 'gu') {
   // sometimes loses through the cascade in the off-screen capture
   // wrapper). Compact font + tight padding so 11 columns fit A4 width.
   const cellStyle = 'padding:5px 6px;font-size:10.5px;line-height:1.35;border:1px solid #444;color:#111;background:#fff;vertical-align:middle;'
-  const headStyle = cellStyle + 'background:#f5f5f5;font-weight:700;text-align:center;'
+  // Phase 140.1 — English column headers are longer than the short
+  // Gujarati labels and were truncating inside the fixed column widths
+  // (a global `th` uppercase made it worse). For English: smaller font,
+  // wrap to 2 lines, no uppercase. Gujarati keeps the original style.
+  const headStyle = lang === 'en'
+    ? 'padding:4px 4px;font-size:9px;line-height:1.18;border:1px solid #444;color:#111;background:#f5f5f5;font-weight:700;text-align:center;vertical-align:middle;white-space:normal;word-break:break-word;text-transform:none;'
+    : cellStyle + 'background:#f5f5f5;font-weight:700;text-align:center;'
   const numCell   = cellStyle + 'text-align:right;font-variant-numeric:tabular-nums;'
 
   const rowsHtml = items.map((it, i) => {
@@ -694,7 +700,7 @@ function renderGsrtcTable(data, lang = 'gu') {
         <th style="${headStyle}width:54px;">${S.gsrtcHead[5]}</th>
         <th style="${headStyle}width:60px;">${S.gsrtcHead[6]}</th>
         <th style="${headStyle}width:42px;">${S.gsrtcHead[7]}</th>
-        <th style="${headStyle}width:96px;line-height:1.2;font-size:10px;white-space:nowrap;">${S.gsrtcSlotHead}</th>
+        <th style="${headStyle}width:96px;${lang === 'en' ? '' : 'line-height:1.2;font-size:10px;white-space:nowrap;'}">${S.gsrtcSlotHead}</th>
         <th style="${headStyle}width:74px;">${S.gsrtcMonthly}</th>
         <th style="${headStyle}width:80px;">${S.monthsTotal(numL(String(months), lang))}</th>
       </tr>
