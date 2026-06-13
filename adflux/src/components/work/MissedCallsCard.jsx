@@ -106,21 +106,27 @@ export default function MissedCallsCard({ userId, onCallLead, refreshKey }) {
     // any-row: that would self-clear on the tap alone (audit row written
     // even if the dial was cancelled), hiding leads still needing rescue.
     if (out.length > 0) {
-      const { data: later } = await supabase
+      // Phase 146 — owner: "rep already called back but it still shows."
+      // The Truth-5 rule only cleared on a >=10s CONNECT, so a call-back
+      // that didn't connect (lead didn't answer again) never cleared AND
+      // added a fresh no_answer row → the lead kept nagging. New rule: a
+      // missed/no-answer lead is RESCUED once the rep makes ANY call-back
+      // to it — i.e. 2+ TOTAL calls to that lead in the 24h window (the
+      // original + at least one follow-up attempt), connected or not. A
+      // single un-returned call (count == 1) still shows. This matches
+      // "I called back → stop showing it" and also covers the connected
+      // case (the connect is the 2nd row).
+      const { data: allCalls } = await supabase
         .from('call_logs')
-        .select('lead_id, call_at')
+        .select('lead_id')
         .eq('user_id', userId)
         .in('lead_id', out.map(r => r.lead.id))
         .gte('call_at', sinceISO)
-        .gte('duration_seconds', 10)
-        .or('direction.is.null,direction.neq.missed')
-      const cleared = new Set((later || [])
-        .filter(l => {
-          const m = out.find(r => r.lead.id === l.lead_id)
-          return m && new Date(l.call_at) >= new Date(m.call_at)
-        })
-        .map(l => l.lead_id))
-      setRows(out.filter(r => !cleared.has(r.lead.id)))
+      const countByLead = {}
+      for (const c of (allCalls || [])) {
+        countByLead[c.lead_id] = (countByLead[c.lead_id] || 0) + 1
+      }
+      setRows(out.filter(r => (countByLead[r.lead.id] || 0) < 2))
     } else {
       setRows(out)
     }
