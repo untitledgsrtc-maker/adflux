@@ -484,8 +484,21 @@ function AttachmentsTab() {
                 <button
                   type="button"
                   onClick={() => {
-                    setRowField(idx, 'is_required', !r.is_required)
-                    setTimeout(() => persistRow(idx), 0)
+                    // Phase 148 — persist the NEW value DIRECTLY. The old
+                    // setTimeout(persistRow) read rows[idx] from a STALE
+                    // closure (the pre-toggle render), so it saved the OLD
+                    // is_required → the Required toggle reverted on reload.
+                    // r.id + the computed `next` persist the right value.
+                    const next = !r.is_required
+                    setRowField(idx, 'is_required', next)
+                    supabase
+                      .from('attachment_templates')
+                      .update({ is_required: next })
+                      .eq('id', r.id)
+                      .then(({ error }) => {
+                        if (error) setStatusError(`Save failed: ${error.message}`)
+                        else { setStatusMsg('Saved.'); setTimeout(() => setStatusMsg(''), 1500) }
+                      })
                   }}
                   style={{
                     padding: '4px 10px', borderRadius: 999, border: 'none',
