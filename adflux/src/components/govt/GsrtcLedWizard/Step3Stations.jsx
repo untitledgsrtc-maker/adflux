@@ -41,6 +41,10 @@ export function Step3Stations({ data, onChange }) {
   // both English and Gujarati names + category. Only filters the
   // VISIBLE rows — selection state and totals stay across all stations.
   const [search, setSearch] = useState('')
+  // Phase 147 — bulk-set values applied to ALL selected stations at once.
+  const [bulkDaily, setBulkDaily] = useState('')
+  const [bulkSpot,  setBulkSpot]  = useState('')
+  const [bulkDays,  setBulkDays]  = useState('')
 
   if (!loading && data.selected_station_ids === undefined && stations.length) {
     onChange({ selected_station_ids: stations.map(s => s.id) })
@@ -85,6 +89,24 @@ export function Step3Stations({ data, onChange }) {
   function resetOverrides(stationId) {
     const next = { ...overrides }
     delete next[stationId]
+    onChange({ station_overrides: next })
+  }
+
+  // Phase 147 — apply the filled bulk value(s) to EVERY selected station's
+  // override in one shot. Empty bulk fields are skipped (so you can set just
+  // Daily without wiping Spot/Days). Per-row overrides + the 100/10/30
+  // defaults stay intact; live recalc fires via the same station_overrides
+  // state. Identical for Gujarati + English proposals (Step 3 feeds both).
+  function applyBulk() {
+    if (!selected.length) return
+    const next = { ...overrides }
+    for (const id of selected) {
+      const cur = { ...(next[id] || {}) }
+      if (bulkDaily !== '') cur.daily_spots_override       = Number(bulkDaily)
+      if (bulkSpot  !== '') cur.spot_duration_sec_override = Number(bulkSpot)
+      if (bulkDays  !== '') cur.days_override              = Number(bulkDays)
+      next[id] = cur
+    }
     onChange({ station_overrides: next })
   }
 
@@ -147,6 +169,43 @@ export function Step3Stations({ data, onChange }) {
           </div>
           <button type="button" onClick={selectAll}>Select all</button>
           <button type="button" onClick={selectNone}>Select none</button>
+        </div>
+
+        {/* Phase 147 — bulk-set Daily / Spot / Days for ALL selected
+            stations. Fill what you want, hit Apply → writes to every
+            selected station (empty fields skipped, so you can set just
+            Daily). Per-row overrides + 100/10/30 defaults untouched.
+            Same for Gujarati + English proposals. */}
+        <div className="govt-list__bulk" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ color: 'var(--text-muted)' }}>Bulk set selected:</span>
+          <input
+            type="number" min="1" placeholder="Daily"
+            value={bulkDaily}
+            onChange={e => setBulkDaily(e.target.value)}
+            className="govt-input-cell"
+            style={{ maxWidth: 84, textAlign: 'right' }}
+          />
+          <input
+            type="number" min="1" placeholder="Spot (s)"
+            value={bulkSpot}
+            onChange={e => setBulkSpot(e.target.value)}
+            className="govt-input-cell"
+            style={{ maxWidth: 84, textAlign: 'right' }}
+          />
+          <input
+            type="number" min="1" placeholder="Days"
+            value={bulkDays}
+            onChange={e => setBulkDays(e.target.value)}
+            className="govt-input-cell"
+            style={{ maxWidth: 84, textAlign: 'right' }}
+          />
+          <button
+            type="button"
+            onClick={applyBulk}
+            disabled={selected.length === 0 || (bulkDaily === '' && bulkSpot === '' && bulkDays === '')}
+          >
+            Apply to {selected.length} selected
+          </button>
         </div>
 
         {/* Header row */}
