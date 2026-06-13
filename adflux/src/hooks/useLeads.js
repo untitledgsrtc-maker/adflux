@@ -32,21 +32,40 @@ export function useLeads() {
   const fetchLeads = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const { data, error: err } = await supabase
-      .from('leads')
-      .select(SELECT_COLUMNS)
-      .order('created_at', { ascending: false })
+    // Phase 151 — paginate in 1000-row chunks. PostgREST caps a single
+    // request at ~1000 rows, so the old single .select() silently returned
+    // only the first 1000 leads: admin "All (1000)" was the CAP, not the
+    // true total, and leads past 1000 couldn't be searched/filtered. Loop
+    // .range until a short chunk signals the end → loads ALL leads the
+    // rep's RLS allows. Reps (scoped under 1000) still do ONE round trip;
+    // only admin with >1000 leads pays the extra request(s). Hard 20k cap.
+    const CHUNK = 1000
+    let all = []
+    let offset = 0
+    let lastErr = null
+    for (;;) {
+      const { data, error: err } = await supabase
+        .from('leads')
+        .select(SELECT_COLUMNS)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + CHUNK - 1)
+      if (err) { lastErr = err; break }
+      all = all.concat(data || [])
+      if (!data || data.length < CHUNK) break   // last (short) page
+      offset += CHUNK
+      if (offset >= 20000) break                // safety backstop
+    }
 
-    if (err) {
+    if (lastErr) {
       // Phase 12 — surface RLS / auth errors instead of silent empty.
-      console.error('[useLeads] fetch failed:', err)
-      setError(err.message || 'Could not load leads.')
+      console.error('[useLeads] fetch failed:', lastErr)
+      setError(lastErr.message || 'Could not load leads.')
       setLeads([])
     } else {
-      setLeads(data || [])
+      setLeads(all)
     }
     setLoading(false)
-    return { data, error: err }
+    return { data: all, error: lastErr }
   }, [])
 
   const updateLead = useCallback(async (id, patch) => {
