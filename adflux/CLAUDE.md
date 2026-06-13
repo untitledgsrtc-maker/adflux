@@ -3714,3 +3714,55 @@ into LeadsV2 + QuotesV2 (filter) + LeadFormV2 (Private/Govt picker on
 create) — all §28 frozen, guardian each. Dedupe the AdminDashboardDesktop
 local SegmentToggle to the shared one. Only `quotes` + (now) `leads` carry
 segment; other tables don't — the toggle is meaningless elsewhere.
+
+**Phase 142 Batch B — DONE (13 Jun).** Segment pill shipped on LeadsV2 +
+QuotesV2 (`db875fd`), gated to admin/co_owner + ALL-access; LeadFormV2
+already had the Private/Govt picker (so leads.segment was always written).
+Batch B.1 (`2e53158`) removed the now-duplicate segment from the gear
+popover/chips (pill is the sole control; govt media sub-filter kept).
+Phase 145 (`5edfa60`) removed the §139 stage-vs-tasks caption (it sat inside
+the flex filter row and cramped it — owner "disturbs UI"). All guardian-PASS.
+
+
+---
+
+## 65 · Call-duration capture — PROVEN WORKING, NOT a bug (13 Jun 2026) — supersedes the §61 "broken" narrative
+
+Read the Phase 138 `call_capture_log` after 1+ day of real fleet calls
+(121 attempts). **The §61 "capture is broken / needs a native onResume
+fix + APK rebuild" conclusion was WRONG.** The device CallLog read works.
+
+### The data (the path that matters = `modal_save`, rep saved the modal)
+- **110 of 111** confirmed calls: `device_read_found=true`. **0 saved-null**
+  on the 101-row main bucket. The old "connected but 0s / NULL" bug is
+  GONE (the Phase 56i device-read lookback fix + reps granting READ_CALL_LOG
+  did it).
+- `app_backgrounded=null` on the main rows CONFIRMS the away-timer fallback
+  doesn't fire — **but it's MOOT**, because the device read covers it. So
+  do NOT build the native onResume / dialPhone-pivot fix §61 proposed; it
+  fixes a path that isn't the failure.
+- Remaining ~9% null = the `auto60` path (rep never saved the modal →
+  outcome stays no_answer → the Phase 102.B outcome filter correctly
+  withholds a duration) + 2 web rows. Arguably CORRECT to be null
+  (unconfirmed calls). Not worth chasing.
+
+### Why counts still feel low (NOT a capture bug)
+Of 121 attempts only ~34 were ≥10s real talks; ~87 were genuinely short
+(no-answer / quick hangup) → correctly uncounted (§49 ≥10s rule). A rep
+dialing 100× but reaching ~30 people = 30 toward the 50. Honest. The lever
+is more real conversations, not code. Stop treating "low call count" as a
+duration bug — it isn't.
+
+### Score (→ incentive) — owner declined to tighten (13 Jun)
+`compute_daily_score` still counts a call on `outcome IS NOT NULL OR ≥10s`
+(looser than the ≥10s counter), so the score can read higher than the
+honest call count. Offered to tighten it to ≥10s now that capture is
+proven accurate — **owner said "leave it"** (it would lower some reps'
+scores/pay). So the score stays outcome-based. Do NOT re-offer or change
+without the owner asking.
+
+### Housekeeping
+The Phase 138 `call_capture_log` instrumentation + `logCapture()` are
+fire-and-forget diagnostic (harmless, tiny). Left collecting. Can be
+removed in a future cleanup (callLogReader.js is §28 frozen → guardian)
+but no urgency. **Net: the duration saga is CLOSED — capture works.**
