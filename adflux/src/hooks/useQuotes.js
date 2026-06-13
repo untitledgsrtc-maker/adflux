@@ -36,30 +36,46 @@ export function useQuotes() {
     // trigger), so the Follow Up column always rendered "—". Reading
     // from the source-of-truth follow_ups table instead is correct AND
     // keeps the UI accurate when a follow-up is marked done / added.
-    let query = supabase
-      .from('quotes')
-      .select('*, quote_cities(*), payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
-      .order('created_at', { ascending: false })
-
-    // Phase 11g — agency role behaves like sales for ownership.
-    // Both see only their own quotes; admin/owner/co_owner see all.
-    if (profile?.role === 'sales' || profile?.role === 'agency') {
-      query = query.eq('created_by', profile.id)
-    }
-
     const { filters } = store
-    if (filters.status) query = query.eq('status', filters.status)
-    if (filters.search) {
-      query = query.or(
-        `client_name.ilike.%${filters.search}%,client_company.ilike.%${filters.search}%,quote_number.ilike.%${filters.search}%`
-      )
+    // Phase 152 — build a fresh filtered query per page so we can paginate.
+    // PostgREST caps a single .select() at ~1000 rows; without this an org
+    // (or a rep) with >1000 quotes would silently load only the first 1000
+    // — the same trap just fixed for leads (Phase 151). Quotes are ~300
+    // today, so this is ONE request now; it just future-proofs the list.
+    const buildQuery = () => {
+      let q = supabase
+        .from('quotes')
+        .select('*, quote_cities(*), payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
+        .order('created_at', { ascending: false })
+      // Phase 11g — agency behaves like sales: own quotes only; admin sees all.
+      if (profile?.role === 'sales' || profile?.role === 'agency') {
+        q = q.eq('created_by', profile.id)
+      }
+      if (filters.status) q = q.eq('status', filters.status)
+      if (filters.search) {
+        q = q.or(
+          `client_name.ilike.%${filters.search}%,client_company.ilike.%${filters.search}%,quote_number.ilike.%${filters.search}%`
+        )
+      }
+      if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom)
+      if (filters.dateTo)   q = q.lte('created_at', filters.dateTo + 'T23:59:59')
+      return q
     }
-    if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom)
-    if (filters.dateTo)   query = query.lte('created_at', filters.dateTo + 'T23:59:59')
 
-    const { data, error } = await query
-    if (!error) store.setQuotes(data || [])
-    return { data, error }
+    const PAGE = 1000
+    let all = []
+    let from = 0
+    let lastErr = null
+    for (;;) {
+      const { data, error } = await buildQuery().range(from, from + PAGE - 1)
+      if (error) { lastErr = error; break }
+      all = all.concat(data || [])
+      if (!data || data.length < PAGE) break
+      from += PAGE
+      if (from >= 20000) break
+    }
+    if (!lastErr) store.setQuotes(all)
+    return { data: all, error: lastErr }
   }, [profile?.id, store.filters])
 
   const fetchQuoteById = async (id) => {
