@@ -3766,3 +3766,84 @@ The Phase 138 `call_capture_log` instrumentation + `logCapture()` are
 fire-and-forget diagnostic (harmless, tiny). Left collecting. Can be
 removed in a future cleanup (callLogReader.js is §28 frozen → guardian)
 but no urgency. **Net: the duration saga is CLOSED — capture works.**
+
+
+---
+
+## 66 · Phase 140.1–152 — govt-English polish + agency/master/TC fixes + the 1000-row-cap sweep (2026-06-13)
+
+Owner-driven bug+request batch, all on origin (`untitled-os`, HEAD
+`6b86960`) + live. JS-only except Phase 149 (SQL, RUN). No APK rebuild
+(live-update §38/§50 — reaches the APK bundle on next open). Continues the
+§63/§64 govt-English + §65 duration work. Each touching a frozen file got a
+sales-module-guardian PASS.
+
+### What shipped (chronological)
+
+| Phase | SHA | What |
+|---|---|---|
+| 140.1 | `603129e` | GSRTC **English** rate-table header truncation fix (font 9px, `white-space:normal`, `text-transform:none`). gu header byte-unchanged. |
+| 141 | `716135b` | AgencyEarningsView — "Earned" chip + commission pill text `var(--accent-fg)` (navy, unreadable on dim bg) → `var(--accent)` (brand yellow). Readability only. |
+| 143 | `01bbf3f` | DaySummaryCard follow-up Row value `a.follow_ups_done` → `a.follow_ups_real` so the CARD count matches the WhatsApp SHARE text (they disagreed). |
+| 146 | `b5be252` | MissedCallsCard clearing relaxed: was "≥10s connect at/after the row" (§57 Truth 5), now "suppress if **2+ total call_logs for the lead in 24h**" = rep called back, ANY outcome. |
+| 147 | `bfac6cb` | GSRTC LED wizard Step3Stations — bulk-set Daily/Spot/Days for all selected stations (`applyBulk` writes `daily_spots_override`). |
+| 147.1 | `e2289d2` | Owner cut bulk to **Daily-only** + made the row visible/findable (bordered box). + GovtProposalRenderer **Monthly-Spots** cell `numL(daily*days)` → `numL(screens*daily*days)` — owner's formula **માસિક સ્પોટ = total screens × daily spots × days**, gu+en (the one `numL(..,lang)` line; money columns untouched). |
+| 148 | `89f2064` | MasterV2 Attachments **Required toggle reverting** — onClick was `setRowField(...); setTimeout(persistRow,0)` → persistRow read the STALE `rows` closure → saved the OLD value. Now computes `next` + direct `update({is_required: next}).eq('id', r.id)`. Owner's "DAVP letter reverts to optional" — stale closure, NOT a server bug. |
+| 149 | `bec3c35` (SQL RUN) | tc_weekly_stats quote subquery `INNER JOIN leads … WHERE l.telecaller_id` → `LEFT JOIN … WHERE (q.created_by = p_user_id OR l.telecaller_id = p_user_id)`. Owner "Dhara 2 quotes today, Performance 0." |
+| 150 | `d12b895` | (a) FollowUpsV2 markDone gate `+ .gte('duration_seconds',10)` = airtight Done-gate (real ≥10s call); msg "Tap Call and actually talk (10+ sec)". (b) TelecallerV2 idle banner now OPENS the collapsed Call-queue `<details>` + scrollIntoView when idleOnly turns on (`queueRef`); slice `(0, idleOnly?100:12)`. Owner "30 idle but can't open it." |
+| 151 | `f9b362e` | useLeads.fetchLeads → chunked `.range(offset, offset+999)` loop (break short page, 20k backstop). Fixes "All (1000)" = the PostgREST cap, not the true total (1114). |
+| 152 | `6b86960` | useQuotes.fetchQuotes → same chunked `.range` (select/filters wrapped in `buildQuery()`). Quotes ~300 today (not capped) — future-proof. |
+
+### THE 1000-ROW-CAP CONTRACT (new foot-gun class — remember this)
+
+PostgREST caps ANY unpaginated `.select()` at **~1000 rows** (project
+default). A list over 1000 silently loads only the first 1000 — looks like
+a full list, isn't. **Fix pattern (Phase 151/152):**
+```js
+const PAGE = 1000; let all = []; let from = 0; let lastErr = null
+for (;;) {
+  const { data, error } = await buildQuery().range(from, from + PAGE - 1)
+  if (error) { lastErr = error; break }
+  all = all.concat(data || [])
+  if (!data || data.length < PAGE) break   // last (short) page
+  from += PAGE
+  if (from >= 20000) break                 // safety backstop
+}
+```
+RLS-scoped reps (<1000 rows) still do ONE request — only admin pays extras.
+Wrap the query builder in a `buildQuery()` closure so each page re-applies
+the same select + filters.
+
+**Systemic audit done this session (the honest triage):**
+- **leads** (1,114) — the ONLY surface actually capped → **fixed (151)**.
+- **gps_pings** — ALREADY chunked via `fetchAllPings` (`GpsTrackV2:114`), a
+  prior fix. NOT a bug. (Explore over-flagged it; verified the code.)
+- **quotes** (~300) — not capped yet → **hardened (152)** proactively.
+- **payments / per-rep activities** — under 1,000 → accurate today.
+- **admin dashboard per-rep COUNTS** (TeamDashboardV2 / AdminDashboardDesktop
+  load rows then count them, not `count:'exact'`) — accurate at today's
+  volume, latent past 1,000. **PARKED** (owner "park it" 13 Jun). Convert to
+  count-queries (`count:'exact', head:true`) ONLY when a filtered set nears
+  1,000.
+- **Foot-gun:** before flagging a `.select()` as capped, (1) check it isn't
+  already `.range`-chunked, and (2) size the table at THIS org's real
+  volume — a ~300-row table isn't capped, it's latent.
+
+### Owner decisions locked this session (do NOT re-litigate)
+- **/work page = leave as-is** (13 Jun). Owner asked for suggestions, I gave
+  3 (finish numbers / single-Next card / declutter) → "don't do anything,
+  leave it." /work is mature, frozen (§28), live — no edits.
+- **Dashboard count-queries = PARKED** (above). Accurate now; convert only on
+  real volume.
+
+### Notes for future-Claude
+- Phase 149 is **display-only** (TC weekly gate scales the SHOWN figure;
+  real pay = `compute_monthly_salary`, ungated — §49/§115). No pay change.
+- Phase 150's ≥10s Done-gate is safe because §65 proved duration capture
+  works on the modal-save path. If an honest rep is ever blocked, the cause
+  is a capture miss (auto60 / no READ_CALL_LOG), not the gate — check
+  `call_capture_log` before loosening.
+- 147.1 touched GovtProposalRenderer (the §63 gu/en lockstep file) — the
+  Monthly-Spots change is one `numL(..,lang)` line, both languages, money
+  columns untouched. gu output still byte-frozen.
+- No SQL pending (149 already RUN). No APK rebuild needed.
