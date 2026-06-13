@@ -591,6 +591,9 @@ export default function TelecallerV2() {
   // it." Tapping the banner now filters the Call queue to just those
   // leads; tap again to clear. Pure client view-state, no new query.
   const [idleOnly, setIdleOnly] = useState(false)
+  // Phase 150 — ref to the Call-queue <details> so tapping the idle banner
+  // can OPEN it + scroll to it (it's collapsed by default → "can't open it").
+  const queueRef = useRef(null)
   const visibleQueue = useMemo(() => {
     if (!idleOnly) return sortedQueue
     const ids = new Set(staleLeads.map(l => l.id))
@@ -727,7 +730,17 @@ export default function TelecallerV2() {
       {staleLeads.length > 0 && (
         <div
           role="button"
-          onClick={() => setIdleOnly(v => !v)}
+          onClick={() => {
+            const turningOn = !idleOnly
+            setIdleOnly(turningOn)
+            // Phase 150 — open the collapsed Call-queue accordion + scroll to
+            // it so the idle leads are actually visible (was the "can't open
+            // it" gap: tapping filtered a queue that stayed collapsed below).
+            if (turningOn && queueRef.current) {
+              queueRef.current.open = true
+              setTimeout(() => queueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+            }
+          }}
           style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 14px', marginBottom: 14,
@@ -1151,7 +1164,7 @@ export default function TelecallerV2() {
       <div style={{ marginTop: 4 }}>
 
         {/* Call queue */}
-        <details className="lead-card tc-accordion" style={{ marginBottom: 16 }}>
+        <details ref={queueRef} className="lead-card tc-accordion" style={{ marginBottom: 16 }}>
           <summary className="lead-card-head">
             <div>
               <div className="lead-card-title">Call queue</div>
@@ -1171,7 +1184,7 @@ export default function TelecallerV2() {
               {idleOnly ? 'No idle leads in the loaded queue.' : 'Queue empty.'}
             </div>
           ) : (
-            visibleQueue.slice(0, 12).map((l, i) => (
+            visibleQueue.slice(0, idleOnly ? 100 : 12).map((l, i) => (
               <div
                 key={l.id}
                 onClick={() => navigate(`/leads/${l.id}`)}
