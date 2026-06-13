@@ -41,10 +41,8 @@ export function Step3Stations({ data, onChange }) {
   // both English and Gujarati names + category. Only filters the
   // VISIBLE rows — selection state and totals stay across all stations.
   const [search, setSearch] = useState('')
-  // Phase 147 — bulk-set values applied to ALL selected stations at once.
+  // Phase 147.1 — bulk-set Daily applied to ALL selected stations at once.
   const [bulkDaily, setBulkDaily] = useState('')
-  const [bulkSpot,  setBulkSpot]  = useState('')
-  const [bulkDays,  setBulkDays]  = useState('')
 
   if (!loading && data.selected_station_ids === undefined && stations.length) {
     onChange({ selected_station_ids: stations.map(s => s.id) })
@@ -92,20 +90,14 @@ export function Step3Stations({ data, onChange }) {
     onChange({ station_overrides: next })
   }
 
-  // Phase 147 — apply the filled bulk value(s) to EVERY selected station's
-  // override in one shot. Empty bulk fields are skipped (so you can set just
-  // Daily without wiping Spot/Days). Per-row overrides + the 100/10/30
-  // defaults stay intact; live recalc fires via the same station_overrides
-  // state. Identical for Gujarati + English proposals (Step 3 feeds both).
+  // Phase 147.1 — apply the bulk Daily value to EVERY selected station's
+  // override in one shot. Per-row overrides + the 100/10/30 defaults stay
+  // intact; live recalc fires via the same station_overrides state.
   function applyBulk() {
-    if (!selected.length) return
+    if (!selected.length || bulkDaily === '') return
     const next = { ...overrides }
     for (const id of selected) {
-      const cur = { ...(next[id] || {}) }
-      if (bulkDaily !== '') cur.daily_spots_override       = Number(bulkDaily)
-      if (bulkSpot  !== '') cur.spot_duration_sec_override = Number(bulkSpot)
-      if (bulkDays  !== '') cur.days_override              = Number(bulkDays)
-      next[id] = cur
+      next[id] = { ...(next[id] || {}), daily_spots_override: Number(bulkDaily) }
     }
     onChange({ station_overrides: next })
   }
@@ -171,38 +163,30 @@ export function Step3Stations({ data, onChange }) {
           <button type="button" onClick={selectNone}>Select none</button>
         </div>
 
-        {/* Phase 147 — bulk-set Daily / Spot / Days for ALL selected
-            stations. Fill what you want, hit Apply → writes to every
-            selected station (empty fields skipped, so you can set just
-            Daily). Per-row overrides + 100/10/30 defaults untouched.
-            Same for Gujarati + English proposals. */}
-        <div className="govt-list__bulk" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ color: 'var(--text-muted)' }}>Bulk set selected:</span>
+        {/* Phase 147.1 — bulk-set DAILY for ALL selected stations (owner:
+            "need only daily option" + "ui not findable"). Clear bordered
+            input + bold label. Writes daily_spots_override to every selected
+            station; per-row overrides + 100/10/30 defaults untouched. */}
+        <div className="govt-list__bulk" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--text)', fontWeight: 600 }}>
+            Bulk set Daily for all selected:
+          </span>
           <input
-            type="number" min="1" placeholder="Daily"
+            type="number" min="1" placeholder="e.g. 150"
             value={bulkDaily}
             onChange={e => setBulkDaily(e.target.value)}
-            className="govt-input-cell"
-            style={{ maxWidth: 84, textAlign: 'right' }}
-          />
-          <input
-            type="number" min="1" placeholder="Spot (s)"
-            value={bulkSpot}
-            onChange={e => setBulkSpot(e.target.value)}
-            className="govt-input-cell"
-            style={{ maxWidth: 84, textAlign: 'right' }}
-          />
-          <input
-            type="number" min="1" placeholder="Days"
-            value={bulkDays}
-            onChange={e => setBulkDays(e.target.value)}
-            className="govt-input-cell"
-            style={{ maxWidth: 84, textAlign: 'right' }}
+            style={{
+              width: 120, textAlign: 'right',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-strong, #475569)',
+              borderRadius: 6, padding: '7px 10px',
+              color: 'var(--text)', fontSize: 14, outline: 'none',
+            }}
           />
           <button
             type="button"
             onClick={applyBulk}
-            disabled={selected.length === 0 || (bulkDaily === '' && bulkSpot === '' && bulkDays === '')}
+            disabled={selected.length === 0 || bulkDaily === ''}
           >
             Apply to {selected.length} selected
           </button>
