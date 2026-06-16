@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, TrendingUp, TrendingDown, AlertTriangle, Sparkles, CheckCircle2, Circle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { istCurrentMonthYM } from '../../utils/istDate'
 
 // Phase 33L (F5 fix) — inline 6-month sparkline. Pulls from
 // score_history RPC. Renders bars instead of a chart library to
@@ -92,8 +93,12 @@ function fmtINR(n) {
   return '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Number(n) || 0))
 }
 
-function monthStart(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+// Phase 163 (Issue 2) — IST month start (YYYY-MM-01), not the device clock.
+// The old `new Date(...).toISOString().slice(0,10)` returned the previous
+// month's last day for the first ~5.5h of the 1st (UTC) → monthly_score
+// averaged the wrong month at the boundary. istCurrentMonthYM is Asia/Kolkata.
+function monthStart() {
+  return `${istCurrentMonthYM()}-01`
 }
 
 export default function PerformanceScoreCard({ userId: propUserId, hideHeader }) {

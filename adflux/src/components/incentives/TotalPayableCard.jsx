@@ -27,19 +27,21 @@ import { useAuthStore } from '../../store/authStore'
 import { formatCurrency } from '../../utils/formatters'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import { useIncentive } from '../../hooks/useIncentive'
+import { istCurrentMonthYM } from '../../utils/istDate'
 
-const monthStart = () => {
-  const d = new Date(); d.setDate(1); d.setHours(0,0,0,0)
-  return d.toISOString().slice(0, 10)
-}
+// Phase 163 (Issue 2) — anchor the month to IST, not the device clock.
+// The old `new Date().toISOString().slice(0,10)` resolved the previous
+// month for the first ~5.5h of the 1st (UTC) and on any non-IST phone,
+// so the card pulled last month's salary/incentive at the boundary.
+// `istCurrentMonthYM()` is always Asia/Kolkata. (Day-count math via
+// `new Date(y, m, 0)` is timezone-independent — a month's length is fixed.)
+const monthStart = () => `${istCurrentMonthYM()}-01`
 const monthEnd = () => {
-  const d = new Date(); d.setMonth(d.getMonth() + 1, 0); d.setHours(23,59,59,999)
-  return d.toISOString().slice(0, 10)
+  const [y, m] = istCurrentMonthYM().split('-').map(Number)
+  const lastDay = new Date(y, m, 0).getDate()
+  return `${istCurrentMonthYM()}-${String(lastDay).padStart(2, '0')}`
 }
-const monthKey = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
+const monthKey = () => istCurrentMonthYM()
 
 export default function TotalPayableCard() {
   const profile = useAuthStore(s => s.profile)
@@ -68,9 +70,8 @@ export default function TotalPayableCard() {
       // deduction + net_payable. Replaces the client-side math that
       // (a) re-implemented base/variable from monthly_score and
       // (b) forgot to subtract unpaid-leave deduction entirely.
-      const now = new Date()
-      const year = now.getFullYear()
-      const month = now.getMonth() + 1
+      // Phase 163 (Issue 2) — IST month, not device-local (see helpers above).
+      const [year, month] = istCurrentMonthYM().split('-').map(Number)
 
       const [salaryRes, tdaRes, msdRes] = await Promise.all([
         supabase.rpc('compute_monthly_salary', {
@@ -110,8 +111,13 @@ export default function TotalPayableCard() {
       if (myProfile) {
         const cfg = {
           monthlySalary:    Number(myProfile.monthly_salary || 0),
-          salesMultiplier:  Number(myProfile.sales_multiplier || settings?.sales_multiplier || 5),
-          newClientRate:    myProfile.new_client_rate ?? settings?.new_client_rate ?? 0.04,
+          // Phase 163 (Issue 4) — match MyPerformance + IncentiveDashboard:
+          // settings column is `default_multiplier` (not `sales_multiplier`),
+          // and the canonical seeded new-client default is 0.05 (was 0.04 here,
+          // the lone outlier → the two incentive figures on /my-performance
+          // disagreed for a rep with no explicit rate).
+          salesMultiplier:  Number(myProfile.sales_multiplier || settings?.default_multiplier || 5),
+          newClientRate:    myProfile.new_client_rate ?? settings?.new_client_rate ?? 0.05,
           renewalRate:      myProfile.renewal_rate    ?? settings?.renewal_rate    ?? 0.02,
           flatBonus:        myProfile.flat_bonus      ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
         }

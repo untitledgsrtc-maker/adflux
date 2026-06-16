@@ -140,6 +140,105 @@ function SectionCard({ title, sub, action, children }) {
   )
 }
 
+// ─── Performance & pay (Phase 163, Issue 5) ────────────────────────
+// Admin / HR read-only mirror of the rep's own My Performance numbers,
+// by userId. Calls the SAME RPCs the rep's page uses — monthly_score
+// (score %, base, variable) + compute_monthly_salary (net payable,
+// incentive, TA/DA) — so every figure MATCHES the rep's view by
+// construction. Both RPCs are SECURITY DEFINER gated on self-or-admin,
+// so admin/HR can read any user; monthly_sales_data has an admin SELECT
+// policy. Month anchored to IST (same fix as the rep cards, Issue 2).
+function RepPerformanceCard({ userId }) {
+  const [loading, setLoading] = useState(true)
+  const [d, setD] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!userId) return
+      setLoading(true)
+      const ym = istCurrentMonthYM()
+      const [y, m] = ym.split('-').map(Number)
+      const [scoreRes, salRes, msdRes] = await Promise.all([
+        supabase.rpc('monthly_score', { p_user_id: userId, p_month_start: `${ym}-01` }),
+        supabase.rpc('compute_monthly_salary', { p_user_id: userId, p_year: y, p_month: m }),
+        supabase.from('monthly_sales_data')
+          .select('new_client_revenue, renewal_revenue')
+          .eq('staff_id', userId).eq('month_year', ym).maybeSingle(),
+      ])
+      if (cancelled) return
+      const score = scoreRes.data || {}
+      const sal = salRes.data || {}
+      const msd = msdRes.data || {}
+      setD({
+        scorePct:    safeNum(score.avg_score_pct),
+        workingDays: safeNum(score.working_days),
+        base:        safeNum(sal.base),
+        variable:    safeNum(sal.variable),
+        incentive:   safeNum(sal.incentive),
+        taDa:        safeNum(sal.ta_da),
+        unpaidCut:   safeNum(sal.unpaid_deduction),
+        net:         safeNum(sal.net_payable),
+        revenue:     safeNum(msd.new_client_revenue) + safeNum(msd.renewal_revenue),
+      })
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [userId])
+
+  const tiles = d ? [
+    { label: 'Score',          value: fmtPct(d.scorePct), sub: `${d.workingDays} working days`, accent: true },
+    { label: 'Base (70%)',     value: fmtINR(d.base) },
+    { label: 'Variable (30%)', value: fmtINR(d.variable) },
+    { label: 'Incentive',      value: fmtINR(d.incentive) },
+    { label: 'TA / DA',        value: fmtINR(d.taDa) },
+    { label: 'Revenue',        value: fmtINR(d.revenue) },
+  ] : []
+
+  return (
+    <SectionCard
+      title="Performance & pay"
+      sub={`This month (${istCurrentMonthLabel()}) — same figures the rep sees on My Performance`}
+    >
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--v2-ink-2, var(--text-muted))', fontSize: 13 }}>
+          <Loader2 size={16} className="spin" /> Loading…
+        </div>
+      ) : !d ? (
+        <div style={{ color: 'var(--v2-ink-2, var(--text-muted))', fontSize: 13 }}>No data for this month yet.</div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+            {tiles.map(t => (
+              <div key={t.label} style={{
+                background: 'var(--v2-bg-2, var(--surface-2))',
+                border: '1px solid var(--v2-line, var(--border))',
+                borderRadius: 12, padding: '12px 14px',
+              }}>
+                <div style={{ fontSize: 11, color: 'var(--v2-ink-2, var(--text-muted))', marginBottom: 4 }}>{t.label}</div>
+                <div style={{
+                  fontSize: 18, fontWeight: 700,
+                  color: t.accent ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-0, var(--text))',
+                }}>{t.value}</div>
+                {t.sub && <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2, var(--text-muted))', marginTop: 2 }}>{t.sub}</div>}
+              </div>
+            ))}
+          </div>
+          <div style={{
+            marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--v2-line, var(--border))',
+            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
+          }}>
+            <span style={{ fontSize: 13, color: 'var(--v2-ink-2, var(--text-muted))' }}>
+              Projected net payable{d.unpaidCut > 0 ? ` (after ${fmtINR(d.unpaidCut)} unpaid-leave cut)` : ''}
+            </span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--v2-ink-0, var(--text))' }}>{fmtINR(d.net)}</span>
+          </div>
+        </>
+      )}
+    </SectionCard>
+  )
+}
+
 // ─── KPI targets edit modal ────────────────────────────────────────
 // Small in-line modal to flip the rep's daily_targets row. Admin /
 // co_owner only. UPSERT pattern — creates if missing.
@@ -550,7 +649,17 @@ export default function RepProfileV2() {
         p_month:   Number(mStr),
       })
       if (salaryErr) console.warn('[RepProfileV2] salary RPC:', salaryErr.message)
-      setSalary(salaryRes || null)
+      // Phase 163 — compute_monthly_salary returns snake_case keys, but the
+      // Salary-section tiles below read camelCase (netPayable / taTotal /
+      // deductions). Without these aliases Net payable / TA-DA / Deductions
+      // silently render ₹0 / — (pre-existing bug; base + incentive happened to
+      // match). Alias them; keep base/variable/incentive as-is.
+      setSalary(salaryRes ? {
+        ...salaryRes,
+        netPayable: safeNum(salaryRes.net_payable),
+        taTotal:    safeNum(salaryRes.ta_da),
+        deductions: safeNum(salaryRes.unpaid_deduction),
+      } : null)
     } catch (e) {
       console.error('[RepProfileV2] load failed:', e)
       setError(e?.message || 'Could not load profile.')
@@ -664,6 +773,11 @@ export default function RepProfileV2() {
           </div>
         </div>
       </SectionCard>
+
+      {/* ─── 1a. Performance & pay (Phase 163, Issue 5) ───────────── */}
+      {/* Agency = commission-only partner; the score/salary math does
+          not apply, so the card is skipped for them. */}
+      {user.role !== 'agency' && <RepPerformanceCard userId={user.id} />}
 
       {/* ─── 1b. HR Acceptance (Phase 87.5b) ──────────────────────── */}
       <SectionCard

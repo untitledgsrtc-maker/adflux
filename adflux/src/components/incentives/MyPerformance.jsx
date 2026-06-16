@@ -6,12 +6,16 @@ import { useIncentive } from '../../hooks/useIncentive'
 import { useAuthStore } from '../../store/authStore'
 import { calculateIncentive, calculateStreak, isIncrementEligible } from '../../utils/incentiveCalc'
 import { formatCurrency, formatMonthYear, initials, todayISO } from '../../utils/formatters'
+import { istCurrentMonthYM } from '../../utils/istDate'
 
+// Phase 163 (Issue 2) — anchor the 12-month list to the IST current month,
+// not the device clock. The old `new Date()` base mis-bucketed the newest
+// month for the first ~5.5h of the 1st (UTC) and on any non-IST phone.
 function buildMonthOptions(count = 12) {
   const opts = []
-  const now  = new Date()
+  const [baseY, baseM] = istCurrentMonthYM().split('-').map(Number) // IST current month (1-based)
   for (let i = 0; i < count; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const d = new Date(baseY, baseM - 1 - i, 1) // day 1 → only year/month read, TZ-safe
     const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     opts.push(val)
   }
@@ -37,10 +41,8 @@ export function MyPerformance() {
   // approved payment). These add to monthly_sales_data revenue to
   // produce the forward-looking number alongside Earned.
   const [pipeline, setPipeline] = useState({ openNew: 0, openRenewal: 0, wuNew: 0, wuRenewal: 0 })
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
+  // Phase 163 (Issue 2) — default to the IST current month (see buildMonthOptions).
+  const [selectedMonth, setSelectedMonth] = useState(() => istCurrentMonthYM())
 
   const monthOptions = buildMonthOptions()
 
