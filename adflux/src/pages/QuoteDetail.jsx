@@ -489,37 +489,13 @@ export default function QuoteDetail() {
       `Total: Rs. ${formatCurrency(quote.total_amount).replace('₹','')}\n`
     const signoff = `\nThank you,\nUntitled Adflux Pvt Ltd`
 
-    const isNative = typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.()
-
-    // Phase 156 — on the APK, attach the REAL PDF via the share sheet (the
-    // same path WhatsApp uses). A mailto:/Gmail-compose link can ONLY carry
-    // text, so the PDF used to go in as a body link, never a file. The rep
-    // picks their email app from the share sheet and the PDF attaches as a
-    // file. Any failure (not a user-cancel) falls back to the link compose.
-    if (isNative) {
-      try {
-        setPdfLoading(true)
-        const fileUri = await writeQuotePdfToCache(quote, cities)
-        const { Share } = await import('@capacitor/share')
-        await Share.share({
-          title:       subject,   // Android email apps read title as the subject
-          text:        greet + signoff,
-          files:       [fileUri],
-          dialogTitle: 'Email proposal',
-        })
-        logQuoteTouch('email', `Email · proposal ${ref} · PDF attached${to ? ` · to ${to}` : ''}`)
-        return
-      } catch (e) {
-        const msg = e?.message || String(e)
-        if (/cancel/i.test(msg)) return   // rep dismissed the share sheet
-        console.warn('[email] share-attach failed, falling back to link:', msg)
-      } finally {
-        setPdfLoading(false)
-      }
-    }
-
-    // Web (or native share failed) — compose with the PDF as a LINK in the
-    // body; browsers / mailto: can't attach a file.
+    // Phase 160 — REVERTED the Phase 156 share-sheet attach. The share sheet
+    // is a chooser AND Android's share intent can't carry the recipient, so
+    // on the APK it opened a "which app?" picker with an EMPTY To field.
+    // Back to mailto via openEmail: pre-filled To/subject/body + opens Gmail
+    // directly on the APK (Gmail web on desktop); the PDF rides as a LINK in
+    // the body. A real attachment that ALSO pre-fills + auto-opens needs a
+    // custom Gmail intent (native + rebuild) — deferred.
     let pdfUrl = null
     try {
       setPdfLoading(true)
