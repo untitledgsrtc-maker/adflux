@@ -3839,11 +3839,81 @@ the same select + filters.
 ### Notes for future-Claude
 - Phase 149 is **display-only** (TC weekly gate scales the SHOWN figure;
   real pay = `compute_monthly_salary`, ungated — §49/§115). No pay change.
-- Phase 150's ≥10s Done-gate is safe because §65 proved duration capture
-  works on the modal-save path. If an honest rep is ever blocked, the cause
-  is a capture miss (auto60 / no READ_CALL_LOG), not the gate — check
-  `call_capture_log` before loosening.
+- ~~Phase 150's ≥10s Done-gate is safe because §65 proved duration capture
+  works.~~ **REVERSED — see §67. Capture is NOT reliable; Phase 154 dropped
+  the ≥10s gate. Do NOT re-add it.**
 - 147.1 touched GovtProposalRenderer (the §63 gu/en lockstep file) — the
   Monthly-Spots change is one `numL(..,lang)` line, both languages, money
   columns untouched. gu output still byte-frozen.
 - No SQL pending (149 already RUN). No APK rebuild needed.
+
+
+---
+
+## 67 · Phase 153 + 154 — advisor view security + Done-gate UN-tightened (capture NOT reliable, §65 corrected) (2026-06-16)
+
+### Phase 153 (`9a7ca31`, SQL RUN + VERIFIED) — Supabase advisor CRITICAL ×3
+`leads_needing_geocode`, `lead_phone_duplicates`, `push_failures` were
+SECURITY DEFINER views + `GRANT SELECT TO authenticated` → any logged-in
+user could query them via PostgREST and read `leads` (cross-rep phones /
+companies) or `push_log` (admin-only) **bypassing RLS**. Flipped all 3 to
+`security_invoker = on` (`supabase_phase153_security_invoker_views.sql`,
+RUN — `reloptions` show `{security_invoker=on}`). Now the base-table RLS
+applies (rep sees own only; admin all; push rows hidden from non-admin).
+Additive + reversible. Zero frontend/edge consumers (verified). The only
+SQL reader, `dedupe_all_phone_groups()` (SECURITY DEFINER → runs as
+postgres), still sees all → unchanged.
+- **Separate flag, NOT fixed:** `dedupe_all_phone_groups()` is SECURITY
+  DEFINER, **soft-deletes leads (stage='Lost')**, and likely has default
+  `EXECUTE TO PUBLIC` → a rep could call it via the API and mass-mark leads
+  Lost (privilege escalation). Gave owner a read-only check
+  (`pg_proc.proacl`); revisit + REVOKE + add `_assert_self_or_admin` gate if
+  it's open. Higher severity than the views.
+
+### Phase 154 (`c332304`, JS-only, guardian PASS) — Done-gate relaxed; **§65 was WRONG**
+**This CORRECTS §65's "duration capture PROVEN WORKING".** Live data 16 Jun
+(kirti, Samsung APK) disproves it: his genuine **Chandresh 36s + Purvik 10s**
+calls (verified on his phone log) both saved `call_logs.duration_seconds =
+NULL`. The Phase 138 `call_capture_log` showed `device_read_seconds = 0` on
+multiple calls (premature device read — Android hadn't finalized the duration
+yet) and `timer_seconds = null` on EVERY row (the §116 away-timer fallback
+**never fires on the APK** — the dialer doesn't background the WebView). So
+duration capture **works for some calls, silently fails for others** = NOT
+reliable.
+
+The Phase 150 Done-gate (`FollowUpsV2.markDone`, require `duration_seconds
+>= 10`) was built ON that false assumption → it **blocked honest reps**
+("Call them first" popup on a real 36s call he couldn't mark Done). Phase 154
+**drops the `.gte('duration_seconds', 10)` filter** → the gate now accepts
+ANY `call_logs` row to the lead's phone today (the pre-150 / Phase 128
+behaviour). Still blocks a manual Done with ZERO calls logged today. Block
+message no longer claims "10+ sec".
+
+**DO NOT re-add the ≥10s gate** until duration capture is genuinely fixed +
+device-verified. The permanent fix (§61, parked, needs APK rebuild) = read
+the device CallLog on **`MainActivity.onResume`** (call is over → duration is
+final), reconcile onto the open call row by user+lead+nearest-tap-time, drop
+the outcome filter for that sweep. The gate matches by **`client_phone`
+last-10** (NOT `lead_id`), so the relax works even on quote-chase rows where
+`lead_id` is NULL.
+
+### Secondary bugs surfaced 16 Jun (NOT fixed — flagged, next)
+- Kirti's Chandresh + Purvik tel-tap audit rows have **`lead_id NULL`** —
+  they're **quote-chase** follow-ups (`rowPhone()` → `quote.client_phone`),
+  so the audit logged without a lead. Harmless to the gate (phone match) but
+  the calls don't show on a lead. Audit the `openCall` path for quote-tied
+  follow-ups.
+- **"Outcome popup not coming"** — `PostCallOutcomeModal` didn't fire for
+  those calls (outcome stayed `no_answer`). Likely the §128.3 same-minute
+  re-tap path OR he's mixing phone-Recents dials (background-poller rows have
+  note `'... (Phase 56l scan)'`, app tel-taps have `'tel-tap audit ...'`).
+
+### Foot-guns
+- ❌ Declaring duration capture "proven working" off a partial sample. The
+  `call_capture_log` (Phase 138) is the source of truth — read it before ANY
+  gate/score that depends on call duration.
+- ❌ A Done/score gate that REQUIRES a captured duration the APK can't
+  reliably produce → it blocks honest reps. Don't gate on duration until the
+  onResume capture fix ships + is device-verified.
+- ❌ `call_logs` has **no `phone` column** — the rep's number is
+  `client_phone`. (`cl.phone` 42703 errors.)
