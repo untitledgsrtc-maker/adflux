@@ -122,7 +122,7 @@ export default function RenewalToolsV2() {
     setExpiredLoading(true)
     let q = supabase
       .from('quotes')
-      .select('id, quote_number, client_name, campaign_start_date, campaign_end_date, campaign_months, created_by, total_amount')
+      .select('id, quote_number, client_name, campaign_start_date, campaign_end_date, gsrtc_campaign_months, created_by, total_amount')
       .eq('status', 'won')
       .lt('campaign_end_date', today)
     // Narrow by expiry date when a non-'all' preset/range is active.
@@ -247,8 +247,16 @@ export default function RenewalToolsV2() {
     if (q.campaign_start_date && q.campaign_end_date) {
       return `${formatDate(q.campaign_start_date)} → ${formatDate(q.campaign_end_date)}`
     }
-    if (q.campaign_months) return `${q.campaign_months} mo`
+    if (q.gsrtc_campaign_months) return `${q.gsrtc_campaign_months} mo`
     return q.campaign_end_date ? `ends ${formatDate(q.campaign_end_date)}` : '—'
+  }
+
+  // Phase 159 — tapping a campaign card opens its quote. Govt media routes
+  // to /proposal/:id, private (LED / other media) to /quotes/:id (§10).
+  function quoteRoute(q) {
+    return (q.media_type === 'AUTO_HOOD' || q.media_type === 'GSRTC_LED')
+      ? `/proposal/${q.id}`
+      : `/quotes/${q.id}`
   }
 
   function bucketFor(days) {
@@ -571,7 +579,11 @@ export default function RenewalToolsV2() {
                 return (
                   <div key={q.id} className="v2d-panel" style={{
                     padding: 16, display: 'flex', flexDirection: 'column', gap: 8,
-                  }}>
+                    cursor: 'pointer',
+                  }}
+                    onClick={() => navigate(quoteRoute(q))}
+                    role="button" tabIndex={0}
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{
                         fontSize: 10, fontWeight: 700, letterSpacing: '.08em',

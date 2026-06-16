@@ -178,6 +178,10 @@ const TELECALLER_NAV = [
   { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  // Phase 159 — TC closes deals too (§30, same incentive) so they have
+  // renewable campaigns. Renewals was in admin + sales navs but missing
+  // here. Sidebar/drawer only; mobile bottom nav stays at 4 thumb tabs.
+  { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   // Phase 43.1 — /voice dropped per Phase 33N (sales already removed
   // it). Voice input lives inside lead activity note flow now, not as
