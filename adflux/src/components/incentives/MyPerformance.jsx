@@ -193,7 +193,7 @@ export function MyPerformance() {
           {eligible ? <Trophy size={18} color="var(--success)" /> : <Flame size={18} color="var(--warning)" />}
           <span>
             {eligible
-              ? <>You've hit your target for <strong>{streak} consecutive months</strong> — you're eligible for an increment review! 🎉</>
+              ? <>You've hit your target for <strong>{streak} consecutive months</strong> — you're eligible for an increment review!</>
               : <>You're on a <strong>{streak}-month streak</strong> above target. Keep it up!</>
             }
           </span>
@@ -436,7 +436,7 @@ export function MyPerformance() {
                   </td>
                   <td>
                     {r.targetExceeded
-                      ? <span style={{ color: 'var(--success)', fontSize: 12 }}>🏆 Target hit</span>
+                      ? <span style={{ color: 'var(--success)', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Trophy size={12} /> Target hit</span>
                       : r.slabReached
                       ? <span style={{ color: 'var(--warning)', fontSize: 12 }}>✓ Threshold</span>
                       : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Below threshold</span>
