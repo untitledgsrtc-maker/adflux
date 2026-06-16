@@ -217,15 +217,20 @@ export default function FollowUpsV2() {
   }, [nurtureRows])
 
   async function markDone(row) {
-    // Phase 128 / 150 — a follow-up can only be CLOSED BY HAND if the rep had a
-    // REAL call with the lead today. Phase 150: "real" = a call_logs row with
-    // duration_seconds >= 10 (the §49 rule). The old gate counted ANY call
-    // today including the 0-second tel-tap audit row, so a rep could tap Call
-    // (no talk) then Done. Duration capture is now proven reliable (CLAUDE.md
-    // §65), so requiring >=10s is safe + closes that cheat. The normal flow
-    // (tap Call → talk → the outcome chain auto-closes the follow-up) is a
-    // DIFFERENT function (openCall + PostCallOutcomeModal) and is untouched —
-    // this gate only fires on a manual Done tap with no real call on record today.
+    // Phase 128 / 150 / 154 — a follow-up can only be CLOSED BY HAND if the rep
+    // logged a call to this lead today. Phase 150 tightened the gate to a
+    // duration_seconds >= 10 call ("real talk"). REVERTED in Phase 154: device
+    // duration capture is NOT reliable on the APK — genuine talks save duration
+    // null/0 (confirmed live 16 Jun: kirti's real 36s + 10s calls to
+    // Chandresh/Purvik both stored as duration null), so the >=10s gate blocked
+    // honest reps from marking Done. Until the native onResume capture fix ships
+    // (needs an APK rebuild), accept ANY call_logs row to this number today —
+    // still blocks a Done with ZERO calls, just doesn't require a captured
+    // duration the app can't reliably produce. RESTORE the >=10s check here once
+    // capture is fixed + verified. The normal flow (tap Call → talk → the outcome
+    // chain auto-closes the follow-up) is a DIFFERENT function (openCall +
+    // PostCallOutcomeModal) and is untouched — this gate only fires on a manual
+    // Done tap with no call on record today.
     const clean = String(rowPhone(row) || '').replace(/\D/g, '').slice(-10)
     if (clean.length === 10) {
       const { data: calls } = await supabase
@@ -233,14 +238,13 @@ export default function FollowUpsV2() {
         .select('client_phone')
         .eq('user_id', profile?.id)
         .gte('call_at', istTodayISO() + 'T00:00:00+05:30')
-        .gte('duration_seconds', 10)   // Phase 150 — a REAL call (>=10s), not a 0s tel-tap
       const called = (calls || []).some(
         c => String(c.client_phone || '').replace(/\D/g, '').slice(-10) === clean
       )
       if (!called) {
         await confirmDialog({
           title: 'Call them first',
-          message: `You haven't reached ${rowName(row) || 'this lead'} on a call today. Tap Call and actually talk to them (10+ sec) — then you can mark this follow-up done.`,
+          message: `You haven't called ${rowName(row) || 'this lead'} today. Tap Call first — then you can mark this follow-up done.`,
           confirmLabel: 'OK',
         })
         return
