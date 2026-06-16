@@ -13,6 +13,9 @@ public class MainActivity extends BridgeActivity {
         // network state + force-stop detection. Native side fires
         // events; JS writes them to Phase 76.1 tables.
         registerPlugin(TrackingPlugin.class);
+        // Phase 162 — ShareDirect: send a quote PDF straight to Gmail /
+        // WhatsApp (recipient pre-filled, file attached, app opened direct).
+        registerPlugin(ShareDirect.class);
         super.onCreate(savedInstanceState);
     }
 

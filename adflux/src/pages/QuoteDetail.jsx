@@ -31,6 +31,7 @@ import { PaymentSummary } from '../components/payments/PaymentSummary'
 import IncentiveForecastCard from '../components/quotes/IncentiveForecastCard'
 import { setPendingEditOf, setPendingRenewalOf } from '../lib/quoteIntent'
 import { openExternalUrl, openEmail } from '../utils/openExternal'
+import { shareEmailDirect, shareWhatsAppDirect } from '../utils/shareDirect'
 // Phase 102.I (2026-05-29) — native PDF share via Capacitor Share + Filesystem.
 // Lazy-imported on demand inside handleDownloadPDF so the web bundle
 // doesn't pay the plugin size cost. Web build falls through to the
@@ -400,14 +401,30 @@ export default function QuoteDetail() {
       setPdfLoading(true)
       try {
         const uri = await writeQuotePdfToCache(quote, cities)
+        const ref = quote.quote_number || quote.ref_number || ''
+        const caption = buildWhatsAppMessage(quote, cities, {})
+        // Phase 162 — try ShareDirect first: open the CLIENT'S WhatsApp chat
+        // directly (number pre-filled) with the PDF attached. Falls back to
+        // the generic share sheet below if WhatsApp isn't installed / older APK.
+        const digits = String(quote.client_phone || '').replace(/\D/g, '')
+        const direct = await shareWhatsAppDirect({
+          phone:   digits.length === 10 ? `91${digits}` : digits,
+          text:    caption,
+          fileUri: uri,
+        })
+        if (direct.completed) {
+          logQuoteTouch('whatsapp', `WhatsApp · proposal ${ref} · PDF attached · to ${quote.client_phone || ''}`)
+          return
+        }
+        // Fallback — generic system share sheet (rep picks the contact).
         const { Share } = await import('@capacitor/share')
         await Share.share({
-          title:       `Quote ${quote.quote_number || quote.ref_number || ''}`.trim(),
-          text:        buildWhatsAppMessage(quote, cities, {}), // caption, no link — file attached
+          title:       `Quote ${ref}`.trim(),
+          text:        caption, // caption, no link — file attached
           files:       [uri],
           dialogTitle: 'Send proposal',
         })
-        logQuoteTouch('whatsapp', `WhatsApp · proposal ${quote.quote_number || quote.ref_number || ''} · PDF attached`)
+        logQuoteTouch('whatsapp', `WhatsApp · proposal ${ref} · PDF attached`)
         return
       } catch (shareErr) {
         const msg = shareErr?.message || String(shareErr)
@@ -489,13 +506,30 @@ export default function QuoteDetail() {
       `Total: Rs. ${formatCurrency(quote.total_amount).replace('₹','')}\n`
     const signoff = `\nThank you,\nUntitled Adflux Pvt Ltd`
 
-    // Phase 160 — REVERTED the Phase 156 share-sheet attach. The share sheet
-    // is a chooser AND Android's share intent can't carry the recipient, so
-    // on the APK it opened a "which app?" picker with an EMPTY To field.
-    // Back to mailto via openEmail: pre-filled To/subject/body + opens Gmail
-    // directly on the APK (Gmail web on desktop); the PDF rides as a LINK in
-    // the body. A real attachment that ALSO pre-fills + auto-opens needs a
-    // custom Gmail intent (native + rebuild) — deferred.
+    // Phase 162 — on the APK, try ShareDirect first: open Gmail DIRECTLY with
+    // the recipient pre-filled + the PDF ATTACHED as a real file (the custom
+    // Gmail intent the Phase 160 note deferred). Falls back to the mailto+link
+    // path below when Gmail isn't installed / not native / on the web.
+    const isNative = typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.()
+    if (isNative) {
+      try {
+        setPdfLoading(true)
+        const uri = await writeQuotePdfToCache(quote, cities)
+        const direct = await shareEmailDirect({ to, subject, body: greet + signoff, fileUri: uri })
+        if (direct.completed) {
+          logQuoteTouch('email', `Email · proposal ${ref} · PDF attached${to ? ` · to ${to}` : ''}`)
+          return
+        }
+      } catch (e) {
+        console.warn('[email] ShareDirect failed, falling back to mailto:', e?.message)
+      } finally {
+        setPdfLoading(false)
+      }
+    }
+
+    // Fallback (web, or Gmail not installed) — mailto via openEmail: pre-filled
+    // To/subject/body, opens Gmail directly; the PDF rides as a LINK in the
+    // body (mailto can't attach a file).
     let pdfUrl = null
     try {
       setPdfLoading(true)

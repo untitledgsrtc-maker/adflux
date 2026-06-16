@@ -76,8 +76,10 @@ android {
         //         Email button resolves the device mail app on the APK.
         // 96012 — Phase 157: MainActivity.onResume signals JS to reconcile
         //         call durations the dialer suspension dropped.
-        versionCode 96012
-        versionName "0.96.12"
+        // 96013 — Phase 162: ShareDirect plugin — quote PDF straight to
+        //         Gmail / WhatsApp (recipient pre-filled, file attached).
+        versionCode 96013
+        versionName "0.96.13"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
