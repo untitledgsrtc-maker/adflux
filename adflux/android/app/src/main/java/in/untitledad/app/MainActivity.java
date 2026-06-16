@@ -25,5 +25,8 @@ public class MainActivity extends BridgeActivity {
         // backgrounded, so without this hook a multi-minute idle
         // would falsely flag as force_stop on next foreground.
         TrackingPlugin.bumpHeartbeatFromActivity(this);
+        // Phase 157 — signal JS to reconcile call durations on return from
+        // the dialer (the call is over + the CallLog duration is final).
+        CallLogPlugin.notifyAppResumed();
     }
 }

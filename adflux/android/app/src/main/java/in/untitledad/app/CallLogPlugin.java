@@ -54,6 +54,25 @@ import com.getcapacitor.annotation.PermissionCallback;
 )
 public class CallLogPlugin extends Plugin {
 
+    // Phase 157 — static handle so MainActivity.onResume can signal JS to
+    // reconcile call durations. The dialer suspends the WebView mid-call,
+    // killing the JS outcome-modal + duration-patch timers; on return,
+    // Android's onResume is the one signal that fires reliably (the JS
+    // appStateChange does NOT on the APK), and the CallLog duration is
+    // final by then. JS does the Supabase write — native only signals.
+    private static CallLogPlugin instance;
+
+    @Override
+    public void load() {
+        instance = this;
+    }
+
+    public static void notifyAppResumed() {
+        if (instance != null) {
+            instance.notifyListeners("appResumedCallSync", new JSObject());
+        }
+    }
+
     /**
      * Look up the most recent call to / from the given phone number
      * since the given epoch-millis timestamp.

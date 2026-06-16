@@ -10,6 +10,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { initAuth } from './hooks/useAuth'
 import './styles/globals.css'
+// Phase 157 — attach the native-onResume call-duration reconcile (self-inits
+// on import; native-only, web no-op).
+import './utils/callResumeSync'
 
 // Phase 34G — register the PWA service worker (vite-plugin-pwa virtual
 // import). autoUpdate strategy means a new build reloads tabs once the
