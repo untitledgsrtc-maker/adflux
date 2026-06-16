@@ -3917,3 +3917,91 @@ last-10** (NOT `lead_id`), so the relax works even on quote-chase rows where
   onResume capture fix ships + is device-verified.
 - ❌ `call_logs` has **no `phone` column** — the rep's number is
   `client_phone`. (`cl.phone` 42703 errors.)
+
+
+---
+
+## 68 · Phase 163 — My Performance number-truth + admin per-rep view; TC connect-rate HELD (2026-06-16)
+
+Owner: "my performance page has issues … come up with issues, don't patch,
+permanent solution." Then "+ admin page has no my performance of each
+candidate." 3 read-only audit agents traced every number on the 4 cards
+(`PerformanceScoreCard`, `TcWeeklyTiles`, `MyPerformance`, `TotalPayableCard`)
+to its RPC/column. Most contracts were already clean (revenue matches admin,
+no incentive double-count, TA/DA single-source, salary reads the RPC). Found
+4 real "screens disagree" bugs + 1 admin gap. Shipped 4 of 5; **HELD the TC
+connect-rate** (the 5th) for a documented reason.
+
+### Shipped (`6c7d6e9` + `f2f4f12`, JS-only, no SQL, no APK rebuild, guardian PASS)
+All display-only / additive — no call chain, push, cadence, stage, duration
+gate, or `useAutoRefresh` touched.
+- **Issue 2 — IST month anchor.** `PerformanceScoreCard.monthStart`,
+  `TotalPayableCard.monthStart/End/Key` + the RPC `year/month`, and
+  `MyPerformance.buildMonthOptions` + `selectedMonth` all derived from
+  device-local/`new Date().toISOString()` (UTC) → wrong month for the first
+  ~5.5h of the 1st + on any non-IST phone (last month's Score/Salary/Revenue).
+  Now all from `istCurrentMonthYM()` (Asia/Kolkata). Only changes WHICH month
+  is queried — no save/pay math.
+- **Issue 4 — incentive figure agreeing with itself.** `TotalPayableCard`
+  forecast cfg read `settings?.sales_multiplier` (wrong column; real one is
+  `default_multiplier`) + `?? 0.04` (the lone outlier; canonical seed = 0.05).
+  Now `default_multiplier` + 0.05 to match `MyPerformance` + `IncentiveDashboard`.
+  Grand total still = `compute_monthly_salary` `net_payable` (unchanged).
+- **Issue 5 — admin per-rep performance view.** NEW read-only
+  `RepPerformanceCard({ userId })` on `RepProfileV2` (`/people/:userId`,
+  admin/HR-gated). Calls the SAME RPCs the rep's page uses — `monthly_score`
+  + `compute_monthly_salary` (both self-or-admin SECDEF, so admin reads any
+  user) + `monthly_sales_data` — so figures MATCH the rep's My Performance by
+  construction. Shows Score/Base/Variable/Incentive/TA-DA/Revenue/Net. Skipped
+  for agency (commission-only). Month IST-anchored. No writes.
+  - **Why a purpose-built card, not re-mounting the 4 rep cards:** each rep
+    card gates internally on the *logged-in* `profile.role` (e.g.
+    `PerformanceScoreCard` returns null for agency, branches on telecaller) —
+    re-mounting would render in the ADMIN's role context, wrong. The
+    summary-card reads the rep's numbers directly. Reusable pattern.
+- **Bonus (pre-existing bug on the same page):** `RepProfileV2` Salary section
+  read camelCase `salary.netPayable/taTotal/deductions` that the RPC doesn't
+  return (`net_payable/ta_da/unpaid_deduction`) → Net/TA/Deductions showed
+  ₹0/—. Aliased at `setSalary` (base+incentive already matched). Was silently
+  wrong for who-knows-how-long; surfaced by the guardian, fixed in-scope.
+- **Phase 163.1 (`f2f4f12`):** the 2 pre-existing MyPerformance emoji
+  (🎉 streak / 🏆 target-hit) → dropped / Lucide `Trophy` (owner said "up to
+  you"; §7 Lucide-only). Closes the §27 non-waiver flags on this file.
+
+### HELD — Issue 1, the TC connect-rate (NOT shipped, owner-aware, tied to §67)
+The My Performance weekly **connect-rate tile** (`tc_weekly_stats`) and the TC
+Today **hero** (`TelecallerV2:667` `connectedToday/callsToday`) disagree —
+different denominators. The agent labeled the tile "inflated"; the actual
+formula trace says the tile reads LOWER (it divides by ALL taps incl tel-tap
+audits + no-answers) while the hero divides by ≥10s calls only → the hero
+reads ~100% (the §49 "Rima 100% connected" artifact). **Neither is honest:**
+- `outcome='connected'` is rep-entered + ~always true (the modal marks nearly
+  every call connected) → meaningless as a filter (§49 frozen rule).
+- `duration_seconds >= 10` is the only honest signal BUT capture is NOT
+  reliable on the APK (§67, this morning's finding — the reason Phase 154
+  *dropped* the ≥10s Done-gate). Flooring the tile at ≥10s to "match" the hero
+  just makes BOTH show a meaningless ~100%, on the **frozen** `tc_weekly_stats`
+  SQL, in the area that's burned the owner 5+ times.
+- **DECISION: hold Issue 1 until the duration-capture fix lands** (parked
+  APK-rebuild onResume work). The connect-rate becomes honest only then. Do
+  NOT touch `tc_weekly_stats` to chase it before that — it can't be made right
+  and a frozen-SQL change there is pure downside. (If owner later insists on
+  "just make them agree," mirror the hero's ≥10s in the tile knowing it shows
+  ~100% — but only with his explicit eyes-open OK.)
+
+### Foot-guns / lessons
+- ❌ Trusting an audit agent's *direction* ("the tile is inflated") without
+  re-deriving the formula. The tile was actually LOWER. Read both expressions.
+- ❌ "Make two screens agree" is not automatically a fix — if BOTH definitions
+  are broken (here: outcome-meaningless vs duration-uncapturable), agreeing on
+  a meaningless number isn't progress. Name it; hold it.
+- ❌ A money-display page reading camelCase off a snake_case RPC silently shows
+  ₹0 (RepProfileV2 Salary). When wiring a new RPC reader, confirm the exact key
+  case against the function's RETURNS/`jsonb_build_object`.
+- The 4 incentive/score cards (`PerformanceScoreCard`, `MyPerformance`,
+  `TotalPayableCard`, `TcWeeklyTiles`) are NOT in the §28 frozen file list but
+  render inside the frozen `MyPerformanceV2` page → guardian before any commit.
+
+### State on origin after push
+`6c7d6e9` (163 bundle) + `f2f4f12` (163.1 emoji) — JS only, no SQL, no APK
+rebuild. Owner pushes; Vercel deploys; reaches APK on next open.
