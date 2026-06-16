@@ -16,7 +16,7 @@ import {
   Mail,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { openExternalUrl } from '../../utils/openExternal'
+import { openExternalUrl, openEmail } from '../../utils/openExternal'
 import { GovtProposalRenderer } from '../../components/govt/GovtProposalRenderer'
 import { useAuth } from '../../hooks/useAuth'
 import { useAuthStore } from '../../store/authStore'
@@ -895,19 +895,11 @@ export default function GovtProposalDetailV2() {
     if (signerMobile) body += `મો. ${signerMobile}\n`
     body += `અનટાઇટલ્ડ એડવર્ટાઇઝિંગ`
 
-    // Gmail web compose — works for the user's Gmail account in any
-    // browser without needing an OS-level mail handler.
-    const gmailHref =
-      `https://mail.google.com/mail/?view=cm&fs=1` +
-      `&to=${encodeURIComponent(to)}` +
-      `&su=${encodeURIComponent(subject)}` +
-      `&body=${encodeURIComponent(body)}`
-
-    // Phase 95.2 — openExternalUrl routes via Capacitor App.openUrl
-    // on APK + falls back to window.open on web. Gmail HTTPS and
-    // mailto: schemes are both declared in the manifest <queries>
-    // block (Phase 95.1) so the OS resolves them cleanly.
-    openExternalUrl(gmailHref)
+    // Phase 155 — openEmail opens the device email app (mailto:) on the
+    // APK and Gmail web compose on desktop. The old single Gmail-WEB URL
+    // opened in the phone browser and only worked if the rep was signed
+    // into Gmail there — it looked broken on the APK for most reps.
+    openEmail({ to, subject, body })
     // Phase 30C — record the touch in the lead's activity timeline.
     logQuoteTouch('email', `Email · proposal ${refLine}${pdfLinkAdded ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
   }

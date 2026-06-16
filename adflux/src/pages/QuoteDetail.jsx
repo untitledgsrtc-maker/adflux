@@ -30,7 +30,7 @@ import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
 import IncentiveForecastCard from '../components/quotes/IncentiveForecastCard'
 import { setPendingEditOf, setPendingRenewalOf } from '../lib/quoteIntent'
-import { openExternalUrl } from '../utils/openExternal'
+import { openExternalUrl, openEmail } from '../utils/openExternal'
 // Phase 102.I (2026-05-29) — native PDF share via Capacitor Share + Filesystem.
 // Lazy-imported on demand inside handleDownloadPDF so the web bundle
 // doesn't pay the plugin size cost. Web build falls through to the
@@ -503,19 +503,11 @@ export default function QuoteDetail() {
     if (pdfUrl) body += `\nProposal PDF: ${pdfUrl}\n`
     body += `\nThank you,\nUntitled Adflux Pvt Ltd`
 
-    const gmailHref =
-      `https://mail.google.com/mail/?view=cm&fs=1` +
-      `&to=${encodeURIComponent(to)}` +
-      `&su=${encodeURIComponent(subject)}` +
-      `&body=${encodeURIComponent(body)}`
-
-    // Phase 95.2 — openExternalUrl routes via Capacitor App.openUrl on
-    // APK (manifest <queries> in Phase 95.1 lets the OS resolve both
-    // Gmail HTTPS and mailto: schemes), falls back to window.open on
-    // web. window.open returning null was the original popup-blocker
-    // detection; on APK the openExternalUrl helper handles the
-    // fallback uniformly so we drop the dual-branch.
-    openExternalUrl(gmailHref)
+    // Phase 155 — openEmail opens the device email app (mailto:) on the
+    // APK and Gmail web compose on desktop. The old single Gmail-WEB URL
+    // opened in the phone browser and only worked if the rep was logged
+    // into Gmail there — it looked broken on the APK for most reps.
+    openEmail({ to, subject, body })
     // Phase 30C — record the touch in the lead's activity timeline.
     logQuoteTouch('email', `Email · proposal ${quote.quote_number || quote.ref_number || ''}${pdfUrl ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
   }

@@ -141,9 +141,16 @@
             <data android:scheme="https"
                   android:host="api.whatsapp.com" />
         </intent>
-        <!-- Email handler (mailto:) -->
+        <!-- Email handler (mailto:). Phase 155 — AppLauncher.openUrl
+             fires ACTION_VIEW, not SENDTO, so the VIEW+mailto intent is
+             required for the OS to resolve the device email app. Without
+             it the Email button silently did nothing on the APK. -->
         <intent>
             <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
             <data android:scheme="mailto" />
         </intent>
         <!-- Generic HTTPS — for any browser-routed link we open via
@@ -158,5 +165,7 @@
              don't cover their custom paths. -->
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
+        <!-- Phase 155 — Gmail, so the OS surfaces it as a mailto target. -->
+        <package android:name="com.google.android.gm" />
     </queries>
 </manifest>

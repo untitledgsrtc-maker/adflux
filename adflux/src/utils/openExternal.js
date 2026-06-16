@@ -99,3 +99,44 @@ export function openExternalUrl(url) {
   // call sites this helper replaces.
   window.open(url, '_blank', 'noopener,noreferrer')
 }
+
+/**
+ * Open a pre-filled email compose window.
+ *
+ * Phase 155 (16 Jun 2026) — split native vs web:
+ *   • Native (phone APK): mailto: → opens the device's OWN email app
+ *     (Gmail app, Outlook, etc.), which is already signed in. The old
+ *     code sent EVERYONE to Gmail WEB compose (https://mail.google.com)
+ *     via openExternalUrl — on a phone that opens in the browser and
+ *     only works if the rep is logged into Gmail IN that browser, which
+ *     most reps are not → the Email button looked broken on the APK.
+ *   • Web (desktop): keep Gmail web compose — mailto: silently no-ops on
+ *     machines with no configured mail handler (Phase 11j reasoning).
+ *
+ * Requires the manifest <queries> to declare ACTION_VIEW + mailto for
+ * the native intent to resolve (added Phase 155 — needs APK rebuild).
+ *
+ * @param {{to?: string, subject?: string, body?: string}} param0
+ */
+export function openEmail({ to, subject, body } = {}) {
+  const t  = (to || '').trim()
+  const su = subject || ''
+  const bd = body || ''
+  if (isNative()) {
+    // Email address stays raw (it's a clean DB value); encode the
+    // subject + body so newlines / Gujarati / the PDF link survive.
+    const mailto = `mailto:${t}?subject=${encodeURIComponent(su)}&body=${encodeURIComponent(bd)}`
+    try {
+      AppLauncher.openUrl({ url: mailto })
+      return
+    } catch (e) {
+      console.warn('[openExternal] openEmail mailto failed:', e?.message || e)
+    }
+  }
+  const gmail =
+    `https://mail.google.com/mail/?view=cm&fs=1` +
+    `&to=${encodeURIComponent(t)}` +
+    `&su=${encodeURIComponent(su)}` +
+    `&body=${encodeURIComponent(bd)}`
+  window.open(gmail, '_blank', 'noopener,noreferrer')
+}

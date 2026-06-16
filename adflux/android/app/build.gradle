@@ -72,8 +72,10 @@ android {
         // 96009 — Phase 103.D.8 stop-after-checkout (server stop signal).
         // 96010 — Phase 121.2 rebuild: @capacitor/share (WhatsApp PDF
         //         attach) + Phase 76.2 tracking plugin land natively.
-        versionCode 96010
-        versionName "0.96.10"
+        // 96011 — Phase 155: <queries> VIEW+mailto + Gmail package so the
+        //         Email button resolves the device mail app on the APK.
+        versionCode 96011
+        versionName "0.96.11"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
