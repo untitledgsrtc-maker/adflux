@@ -480,6 +480,46 @@ export default function QuoteDetail() {
   // Gmail compose URL works in any browser for the user's Gmail account.
   async function handleEmail() {
     if (!quote) return
+    const to      = (quote.client_email || '').trim()
+    const ref     = quote.quote_number || quote.ref_number || ''
+    const subject = `Proposal — ${ref}`
+    const greet   =
+      `Dear ${quote.client_name || 'Sir/Madam'},\n\n` +
+      `Please find our proposal — ${ref}.\n` +
+      `Total: Rs. ${formatCurrency(quote.total_amount).replace('₹','')}\n`
+    const signoff = `\nThank you,\nUntitled Adflux Pvt Ltd`
+
+    const isNative = typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.()
+
+    // Phase 156 — on the APK, attach the REAL PDF via the share sheet (the
+    // same path WhatsApp uses). A mailto:/Gmail-compose link can ONLY carry
+    // text, so the PDF used to go in as a body link, never a file. The rep
+    // picks their email app from the share sheet and the PDF attaches as a
+    // file. Any failure (not a user-cancel) falls back to the link compose.
+    if (isNative) {
+      try {
+        setPdfLoading(true)
+        const fileUri = await writeQuotePdfToCache(quote, cities)
+        const { Share } = await import('@capacitor/share')
+        await Share.share({
+          title:       subject,   // Android email apps read title as the subject
+          text:        greet + signoff,
+          files:       [fileUri],
+          dialogTitle: 'Email proposal',
+        })
+        logQuoteTouch('email', `Email · proposal ${ref} · PDF attached${to ? ` · to ${to}` : ''}`)
+        return
+      } catch (e) {
+        const msg = e?.message || String(e)
+        if (/cancel/i.test(msg)) return   // rep dismissed the share sheet
+        console.warn('[email] share-attach failed, falling back to link:', msg)
+      } finally {
+        setPdfLoading(false)
+      }
+    }
+
+    // Web (or native share failed) — compose with the PDF as a LINK in the
+    // body; browsers / mailto: can't attach a file.
     let pdfUrl = null
     try {
       setPdfLoading(true)
@@ -494,22 +534,12 @@ export default function QuoteDetail() {
     if (pdfUrl && !/^https?:\/\/[^/]*untitledad\.in\/pdf\//.test(pdfUrl)) {
       try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
     }
-    const to      = (quote.client_email || '').trim()
-    const subject = `Proposal — ${quote.quote_number || quote.ref_number || ''}`
-    let body =
-      `Dear ${quote.client_name || 'Sir/Madam'},\n\n` +
-      `Please find our proposal — ${quote.quote_number || quote.ref_number || ''}.\n` +
-      `Total: Rs. ${formatCurrency(quote.total_amount).replace('₹','')}\n`
+    let body = greet
     if (pdfUrl) body += `\nProposal PDF: ${pdfUrl}\n`
-    body += `\nThank you,\nUntitled Adflux Pvt Ltd`
-
-    // Phase 155 — openEmail opens the device email app (mailto:) on the
-    // APK and Gmail web compose on desktop. The old single Gmail-WEB URL
-    // opened in the phone browser and only worked if the rep was logged
-    // into Gmail there — it looked broken on the APK for most reps.
+    body += signoff
+    // Phase 155 — openEmail: device mail app (mailto:) on APK, Gmail web on desktop.
     openEmail({ to, subject, body })
-    // Phase 30C — record the touch in the lead's activity timeline.
-    logQuoteTouch('email', `Email · proposal ${quote.quote_number || quote.ref_number || ''}${pdfUrl ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
+    logQuoteTouch('email', `Email · proposal ${ref}${pdfUrl ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
   }
 
   async function handleEditPayment(updated) {
