@@ -406,15 +406,16 @@ export default function QuoteDetail() {
         // Phase 162 — try ShareDirect first: open the CLIENT'S WhatsApp chat
         // directly (number pre-filled) with the PDF attached. Falls back to
         // the generic share sheet below if WhatsApp isn't installed / older APK.
-        // Phase 162.1 — owner wants the caption text WITH the attached PDF.
-        // WhatsApp drops EXTRA_TEXT (the caption) when a 'jid' targets a
-        // specific number — that direct-to-number shortcut skips the caption
-        // composer. Send WITHOUT the jid (phone '') so WhatsApp opens its
-        // composer showing the PDF + the caption pre-filled; the rep taps the
-        // contact. Caption chosen over auto-number (owner). setPackage still
-        // opens WhatsApp directly — no app chooser.
+        // Phase 162.2 — owner's final call: AUTO-NUMBER over caption. WhatsApp
+        // cannot carry BOTH a caption and a document to a specific number; a
+        // 'jid' opens the client's chat directly (PDF attached) but drops the
+        // caption text. Owner accepts no caption — the attachment landing on
+        // the right number is what matters. Restores the Phase 162 jid path
+        // (162.1's caption-mode phone:'' reverted). Caption still passed in
+        // case a WhatsApp build chooses to show it; harmless if dropped.
+        const digits = String(quote.client_phone || '').replace(/\D/g, '')
         const direct = await shareWhatsAppDirect({
-          phone:   '',
+          phone:   digits.length === 10 ? `91${digits}` : digits,
           text:    caption,
           fileUri: uri,
         })
