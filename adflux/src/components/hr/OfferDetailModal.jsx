@@ -137,7 +137,11 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
       p_team_role:        'sales',
       p_designation:      offer.position || null,
       p_signature_mobile: offer.mobile || null,
-      p_city:             offer.city || null,
+      // Phase 161 — convert always creates a SALES rep (above), who needs a
+      // city for the TA/DA claim window + DA/Hotel ceilings. An offer with no
+      // city used to make a city-less rep whose claim window broke (Mayur).
+      // Fall back to Vadodara so it's never null; HR can correct in Team.
+      p_city:             offer.city || 'Vadodara',
       p_segment_access:   'PRIVATE',
     })
 
