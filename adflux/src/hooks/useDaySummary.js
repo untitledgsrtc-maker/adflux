@@ -402,8 +402,17 @@ export default function useDaySummary({ dateISO } = {}) {
       const pctOf = (a, t) => (t > 0 ? Math.min(1, a / t) : (a > 0 ? 1 : 0))
       const fuAssigned = fuTotalRes.count || 0
       const quotesToday = quotesTodayRes.count || 0
+      // Phase 164 — the 50-point primary slot is role-aware. A telecaller's
+      // core work is CALLS (>=10s — the same callRes the report's "Calls"
+      // line shows), not field meetings. For TC, planMeetings is 0, so the
+      // old meetings slot scored 0 → the TC report capped ~50/100 and never
+      // credited their calls (owner: "TC daily report doesn't have score").
+      // Sales / agency keep meetings. DISPLAY score only — the pay score
+      // (compute_daily_score) is untouched.
       const dayScore = Math.round(
-        pctOf(meetings, planMeetings) * 50 +
+        (isTC
+          ? pctOf(callRes.count || 0, planCalls) * 50
+          : pctOf(meetings, planMeetings) * 50) +
         pctOf(followUpsReal, fuAssigned) * 20 +
         pctOf(leadRes.count || 0, planLeads) * 15 +
         pctOf(quotesToday, 1) * 15

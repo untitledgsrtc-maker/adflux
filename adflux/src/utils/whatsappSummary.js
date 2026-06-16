@@ -194,12 +194,17 @@ export function formatDaySummaryText(d) {
     lines.push(kmLine)
   }
 
-  // Phase 118 — Day Score (sales only). Message-only, not salary.
-  if (!isTC) {
+  // Phase 118 — Day Score. Message-only, NOT the salary score.
+  // Phase 164 — now shown for TC too: their 50-point slot is CALLS (>=10s,
+  // the same number on the "Calls (>=10s)" line above), not meetings —
+  // useDaySummary computes it that way. Surfaces a score, not a new metric.
+  {
     const sc = a.day_score ?? 0
     lines.push('')
     lines.push(`⭐ *DAY SCORE: ${sc}/100* ${scoreFace(sc)}`)
-    lines.push('   Meetings 50 · Follow-ups 20 · Leads 15 · Quotes 15')
+    lines.push(isTC
+      ? '   Calls 50 · Follow-ups 20 · Leads 15 · Quotes 15'
+      : '   Meetings 50 · Follow-ups 20 · Leads 15 · Quotes 15')
   }
 
   // Phase 91a — Tomorrow preview. Only emit when at least one of
