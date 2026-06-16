@@ -1346,34 +1346,7 @@ export async function downloadQuotePDFHtml(quote, cities = []) {
   URL.revokeObjectURL(url)
 }
 
-// Phase 158 — in-memory render cache. The render+upload is the slow part
-// (~3-7s). When the rep taps share again on a quote whose data is unchanged
-// THIS session (WhatsApp then Email minutes apart), skip it and reuse the
-// link. Keyed by a content hash of the quote + cities being rendered, so
-// ANY edit (incl. a single city amount) changes the hash → re-render → it
-// can NEVER serve a stale PDF. In-memory only (cleared on reload); the
-// stored PDF + the Phase 110 token remain the cross-session reuse.
-let _pdfHtmlCache = { key: null, url: null }
-function quotePdfCacheKey(quote, cities) {
-  try {
-    const payload = JSON.stringify({
-      id:  quote?.id,           n:  quote?.quote_number, tot: quote?.total_amount,
-      st:  quote?.status,       cn: quote?.client_name,  co:  quote?.client_company,
-      ce:  quote?.client_email, cp: quote?.client_phone, cg:  quote?.client_gst,
-      ca:  quote?.client_address, seg: quote?.segment,   mt:  quote?.media_type,
-      upd: quote?.updated_at,   cities: cities || [],
-    })
-    let h = 0
-    for (let i = 0; i < payload.length; i++) h = (Math.imul(h, 31) + payload.charCodeAt(i)) | 0
-    return quote?.id ? `${quote.id}:${h}` : null
-  } catch { return null }
-}
-
 export async function uploadQuotePDFHtml(quote, cities = []) {
-  const cacheKey = quotePdfCacheKey(quote, cities)
-  if (cacheKey && _pdfHtmlCache.key === cacheKey && _pdfHtmlCache.url) {
-    return _pdfHtmlCache.url   // unchanged since last render this session → skip render+upload
-  }
   const company = await fetchCompanyForQuote(quote)
   const blob    = await renderToPdfBlob(quote, cities, company)
   const safeNumber = (quote?.quote_number || 'quote').replace(/[^A-Za-z0-9_-]/g, '_')
@@ -1468,14 +1441,11 @@ export async function uploadQuotePDFHtml(quote, cities = []) {
       }
 
       if (token) {
-        const url = `https://${window.location.hostname}/pdf/${safeNumber}?t=${token}`
-        if (cacheKey) _pdfHtmlCache = { key: cacheKey, url }
-        return url
+        return `https://${window.location.hostname}/pdf/${safeNumber}?t=${token}`
       }
     } catch (tokenErr) {
       console.warn('[pdf-share-token] generation failed:', tokenErr?.message)
     }
   }
-  if (cacheKey) _pdfHtmlCache = { key: cacheKey, url: data.publicUrl }
   return data.publicUrl
 }
