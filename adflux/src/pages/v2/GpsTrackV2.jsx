@@ -395,7 +395,9 @@ export default function GpsTrackV2() {
       //   3. Numbered stop markers (1, 2, 3, ...) at every place
       //      the rep stayed >= 10 minutes within an 80m radius —
       //      mirrors the reference design owner showed.
-      const cleaned = cleanTrack(pings)
+      // Phase 169 — loose clean for the LINE only (fuller drive; owner: jitter
+      // OK). The km headline still reads server daily_ta (strict) — untouched.
+      const cleaned = cleanTrack(pings, { accM: 200, speedKmh: 250 })
       const stops   = detectStops(pings, { radiusM: 80, minMinutes: 10 })
 
       // Phase 70.3 (22 May 2026) — swap Leaflet+OSM tiles for Google

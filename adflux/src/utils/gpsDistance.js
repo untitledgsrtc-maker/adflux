@@ -118,16 +118,29 @@ export function summariseTrack(pings) {
 // map showed all 394 raw pings + every drift point connected by a
 // polyline, so the visualization looked like clusters of dots
 // instead of a clean route. cleanTrack returns the filtered ping
-// sequence used for polyline rendering. Same accuracy + drift +
-// speed thresholds as summariseTrack so the line on the map agrees
-// with the km number.
-export function cleanTrack(pings) {
+// sequence used for polyline rendering. By DEFAULT it uses the same
+// strict accuracy/drift/speed thresholds as summariseTrack; callers
+// drawing the LINE pass loose opts (Phase 169) for a fuller route —
+// the km number is read separately from server daily_ta, so a looser
+// line never changes a paid km.
+export function cleanTrack(pings, opts = {}) {
   if (!Array.isArray(pings) || pings.length === 0) return []
 
-  // Accuracy filter (matches summariseTrack).
+  // Phase 169 — the ROUTE LINE and the KM are two different jobs. KM must be
+  // strict (it's the paid number → server daily_ta thresholds). But the route
+  // line should show the FULLER drive (owner: "the path they actually drove,
+  // jitter is fine") — the strict 50m/120km/h clean dropped most pings on
+  // every rep, so the line looked sparse/incomplete. Callers that draw the
+  // line pass loose opts; callers measuring km pass nothing → strict defaults
+  // unchanged. So loosening the line CANNOT change any km/pay number.
+  const accM      = opts.accM     ?? MAX_ACC_M
+  const speedMaxS = opts.speedKmh ? (opts.speedKmh / 3600) : MAX_SEG_KM_PER_S
+  const minSegKm  = opts.minSegKm ?? MIN_SEG_KM
+
+  // Accuracy filter (matches summariseTrack by default; loose for the line).
   const usableStrict = pings.filter((p) => {
     const acc = Number(p.accuracy_m)
-    return !Number.isFinite(acc) || acc <= MAX_ACC_M
+    return !Number.isFinite(acc) || acc <= accM
   })
   const tooMuchDropped = pings.length > 0
     && usableStrict.length < Math.floor(pings.length * 0.5)
@@ -147,8 +160,8 @@ export function cleanTrack(pings) {
     const dtMs  = new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime()
     const dtSec = Math.max(1, dtMs / 1000)
     const speed = seg / dtSec
-    if (seg < MIN_SEG_KM)         continue   // drift
-    if (speed > MAX_SEG_KM_PER_S) continue   // spike
+    if (seg < minSegKm)    continue   // drift
+    if (speed > speedMaxS) continue   // spike (teleport)
     out.push(b)
   }
   return out

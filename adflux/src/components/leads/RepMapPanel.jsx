@@ -227,7 +227,9 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
   //   so the rep's number == the admin map number. Pure derive — no
   //   money/score/save path touched.
   const trackPts = useMemo(
-    () => cleanTrack(rawPings).map(p => ({
+    // Phase 169 — loose clean for the LINE only (fuller drive; jitter OK).
+    // km headline reads server daily_ta (strict) — untouched.
+    () => cleanTrack(rawPings, { accM: 200, speedKmh: 250 }).map(p => ({
       lat: Number(p.lat), lng: Number(p.lng), t: p.captured_at,
     })),
     [rawPings],
