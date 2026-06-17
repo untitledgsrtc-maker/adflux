@@ -499,26 +499,9 @@ export default function GpsTrackV2() {
         if (sortedRaw.length >= 2) {
           const origin = sortedRaw[0]
           const dest   = sortedRaw[sortedRaw.length - 1]
-          // Phase 171 — route through BOTH stops (parked >=10 min) AND meeting
-          // locations, in time order. A quick meeting that wasn't a "stop" was
-          // skipped before, so the meeting pin had no path to it (owner:
-          // Abhinav). Same meeting set as the pins: gps + not an auto-check-in
-          // companion row (§33). Cap at 12 (well under the Directions limit;
-          // if it ever rejects, the fuller raw line stays as the fallback).
-          const stopWay = (stops || []).map(s => ({
-            lat: Number(s.lat), lng: Number(s.lng), t: new Date(s.started_at).getTime(),
-          }))
-          const meetWay = (activities || [])
-            .filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit')
-                      && Number.isFinite(Number(a.gps_lat))
-                      && Number.isFinite(Number(a.gps_lng))
-                      && !isAutoCheckinRow(a))
-            .map(a => ({ lat: Number(a.gps_lat), lng: Number(a.gps_lng), t: new Date(a.created_at).getTime() }))
-          const wayPts = [...stopWay, ...meetWay]
-            .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
-            .sort((a, b) => a.t - b.t)
-            .slice(0, 12)
-            .map(p => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`)
+          const wayPts = (stops || [])
+            .slice(0, 8)
+            .map(s => `${Number(s.lat).toFixed(6)},${Number(s.lng).toFixed(6)}`)
             .join('|')
           const qs = new URLSearchParams({
             origin:      `${Number(origin.lat).toFixed(6)},${Number(origin.lng).toFixed(6)}`,
