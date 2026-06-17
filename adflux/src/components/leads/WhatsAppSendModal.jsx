@@ -23,13 +23,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { pushToast } from '../v2/Toast'
 import { openExternalUrl } from '../../utils/openExternal'
-
-function cleanPhone(raw) {
-  if (!raw) return null
-  const d = String(raw).replace(/\D/g, '')
-  if (d.length < 10) return null
-  return d.length === 10 ? '91' + d : d
-}
+import { phoneToWaJidOrNull as cleanPhone } from '../../utils/phone'
 
 function renderTemplate(body, ctx) {
   if (!body) return ''

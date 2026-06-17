@@ -23,6 +23,7 @@
 // RPCs + one public storage bucket are touched.
 
 import { useEffect, useState } from 'react'
+import { cleanPhone } from '../utils/phone'
 import { useParams } from 'react-router-dom'
 import { CheckCircle2, AlertTriangle, Download, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -243,7 +244,7 @@ export default function OfferForm() {
     if (form.personal_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.personal_email)) {
       errs.personal_email = 'Invalid email'
     }
-    if (form.mobile && !/^\d{10}$/.test(form.mobile.replace(/\D/g, ''))) {
+    if (form.mobile && !/^\d{10}$/.test(cleanPhone(form.mobile))) {
       errs.mobile = 'Mobile must be 10 digits'
     }
     if (form.pincode && !/^\d{6}$/.test(form.pincode)) {
@@ -252,7 +253,7 @@ export default function OfferForm() {
     if (form.pan_number && !/^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(form.pan_number.trim())) {
       errs.pan_number = 'PAN format: AAAAA9999A'
     }
-    if (form.aadhaar_number && !/^\d{12}$/.test(form.aadhaar_number.replace(/\D/g, ''))) {
+    if (form.aadhaar_number && !/^\d{12}$/.test(cleanPhone(form.aadhaar_number))) {
       errs.aadhaar_number = 'Aadhaar must be 12 digits'
     }
     // Phase 109.4 — both card images are required.
@@ -324,7 +325,7 @@ export default function OfferForm() {
         p_full_legal_name:          form.full_legal_name.trim(),
         p_fathers_name:             form.fathers_name.trim(),
         p_dob:                      form.dob,
-        p_mobile:                   form.mobile.replace(/\D/g, ''),
+        p_mobile:                   cleanPhone(form.mobile),
         p_personal_email:           form.personal_email.trim().toLowerCase(),
         p_address_line1:            form.address_line1.trim(),
         p_address_line2:            form.address_line2.trim() || null,
@@ -333,13 +334,13 @@ export default function OfferForm() {
         p_state:                    form.state.trim(),
         p_pincode:                  form.pincode.trim(),
         p_pan_number:               form.pan_number.trim().toUpperCase(),
-        p_aadhaar_number:           form.aadhaar_number.replace(/\D/g, ''),
+        p_aadhaar_number:           cleanPhone(form.aadhaar_number),
         p_qualification:            form.qualification.trim(),
         p_bank_account_number:      form.bank_account_number.trim(),
         p_bank_name:                form.bank_name.trim(),
         p_bank_ifsc:                form.bank_ifsc.trim().toUpperCase(),
         p_emergency_contact_name:   form.emergency_contact_name.trim(),
-        p_emergency_contact_phone:  form.emergency_contact_phone.replace(/\D/g, ''),
+        p_emergency_contact_phone:  cleanPhone(form.emergency_contact_phone),
         p_emergency_contact_rel:    form.emergency_contact_rel.trim(),
         p_offer_pdf_url:            pdfUrl,
         p_pan_card_path:            panCardPath,

@@ -25,3 +25,11 @@ export function phoneLast10(raw) {
 export function phoneToWaJid(raw) {
   return cleanPhone(raw).replace(/^(\d{10})$/, '91$1')
 }
+
+// Strict jid: returns null for anything under 10 digits (an invalid number).
+// Matches the local cleanPhone the WhatsApp send modals used to carry.
+export function phoneToWaJidOrNull(raw) {
+  const d = cleanPhone(raw)
+  if (d.length < 10) return null
+  return d.replace(/^(\d{10})$/, '91$1')
+}

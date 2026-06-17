@@ -22,14 +22,7 @@ import { useEffect, useState } from 'react'
 import { X, MessageCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openExternalUrl } from '../../utils/openExternal'
-
-function cleanPhone(raw) {
-  if (!raw) return null
-  const digits = String(raw).replace(/\D/g, '')
-  if (digits.length < 10) return null
-  if (digits.length === 10) return '91' + digits
-  return digits
-}
+import { phoneToWaJidOrNull as cleanPhone } from '../../utils/phone'
 
 function mediaFor(segment) {
   // Locked at app level — Govt uses Auto Hood + GSRTC LED; Private
