@@ -360,7 +360,7 @@ Before recommending from memory, **verify the memory is still accurate** by read
 
 - **React 18 + Vite** + **React Router v6**
 - **Zustand** for global state (`authStore`, `quotesStore`, etc.)
-- **React Hook Form + Zod** for forms
+- **Hand-rolled controlled forms** (React Hook Form + Zod were listed here but UNUSED — removed Phase 172.1, see §70)
 - **Supabase** (Postgres + Auth + Realtime + RLS)
 - **`@react-pdf/renderer`** for in-app PDFs (Private LED quotes)
 - **`html2canvas` + `jsPDF`** for HTML-to-PDF (Govt proposals + Other Media)
