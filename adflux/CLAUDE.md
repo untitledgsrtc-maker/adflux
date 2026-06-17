@@ -565,7 +565,9 @@ Phase 34Z.73 closed the sales-module audit cycle. The rep-facing flow is locked.
   `QuotesV2.jsx`, `MyOfferV2.jsx`, `MyPerformanceV2.jsx`, `PushDebugV2.jsx`,
   `SalesDashboard*.jsx`, `CreateQuote*V2.jsx`
 - `V2AppShell.jsx`, `PostCallOutcomeModal.jsx`, `TodaySummaryCard.jsx`,
-  `TodayTasksPanel.jsx`, `MeetingsMapPanel.jsx`
+  `TodayTasksPanel.jsx`
+  (`MeetingsMapPanel.jsx` removed from this list — DELETED 17-Jun-2026; dead since
+  Phase 89.11, replaced by `RepMapPanel`. See §70.)
 - `useLeadTasks.js`, `useAutoRefresh.js`, `pushNotifications.js`, `public/sw.js`
 
 **Frozen DB contracts**:
@@ -4100,3 +4102,51 @@ the §69.1 merge, separate.)
 - Map: hard-refresh a rep day-track → fuller route line; km unchanged.
 - Calls: Rima's count should climb to her phone/other-CRM number (~243) within a
   scan cycle / by next day.
+
+---
+
+## 70 · Consolidation Stage 0 — dead-code purge + duplication audit (Phase 172, 17-Jun-2026)
+
+Owner greenlit the real cure for "works then breaks" (root = the SAME logic written in
+many files; a later rewrite drops an earlier fix. See §69 + the new
+`DUPLICATION_AUDIT_2026-06-17.md`). Stage 0 = the zero-risk foundation: remove dead
+weight + make the disease visible. **No behaviour change** — every deletion was
+certified dead (imported by nothing; only comment-references; no dynamic/lazy import;
+not in App.jsx).
+
+### What shipped (Phase 172)
+- Deleted 5 orphan files (1,175 lines, zero importers):
+  `MeetingsMapPanel.jsx` (702 — dead since Phase 89.11, replaced by `RepMapPanel`),
+  `DidYouKnow.jsx` (160), `RejectionBanner.jsx` (111),
+  `PendingApprovalsBanner.jsx` (106), `RenewalReminderBanner.jsx` (96).
+- Removed 4 certified-dead exports: `HEAT_OPTIONS`, `groupForStage` (`useLeads.js`);
+  `REVENUE_TYPES`, `DURATION_OPTIONS` (`constants.js`). `STAGE_GROUPS` KEPT (still
+  imported by LeadShared + LeadsV2 — verified before cut).
+- Added `DUPLICATION_AUDIT_2026-06-17.md` — full inventory (Categories A–F).
+- Added `scripts/check-duplication.sh` — reports DB-function collisions + orphan files.
+  Diagnostic NOW; becomes a hard pre-commit gate in Stage 2 (once `db/functions/` exists).
+- §28 frozen list: dropped `MeetingsMapPanel.jsx` (deleted).
+
+### The audit numbers (for the record)
+- **Cat A** — 73 Postgres functions `CREATE OR REPLACE`d in ≥2 files. Worst:
+  `compute_daily_score` (10), `compute_monthly_salary` (9), `generate_lead_tasks` (8),
+  `compute_daily_ta` (7), `campaign_conversation_ensure_lead` (5), `call_logs_dedupe` (4).
+- **Cat B** — frontend rules copy-pasted: "today" as UTC `toISOString().slice(0,10)` in
+  **43 files** (should use the existing `istDate.js`), phone-clean `/\D/g` in 19,
+  lead-stage strings in 16, "≥10s = call" in 8.
+- **Cat E** — 17 unused npm packages (the shadcn-ui + react-hook-form + zod stack —
+  abandoned; **§21 stack note is STALE**). Removal = Stage 1.5, build-gated.
+
+### Stale-doc corrections found during the scan
+- `Untitled Proposals/` folder already deleted → §22 Sprint 5 + §23 item 5 are stale.
+- §21 lists "React Hook Form + Zod" as the stack — app imports NEITHER (0 references).
+
+### Next stages (owner-gated, one at a time — do NOT batch)
+- **Stage 1** — extract `phone.js` / `callRules.js` / `leadStages.js` + migrate the 43
+  date files to `istDate.js`. Behaviour-preserving, guardian per commit.
+- **Stage 1.5** — remove the 17 dead npm packages (`npm install` + clean build BEFORE push).
+- **Stage 2** — one canonical `db/functions/<name>.sql` per Postgres function; non-pay
+  first, score/salary/TA LAST with shadow-compare. Then `check-duplication.sh` flips to
+  a hard gate.
+- **Stage 3** — Option 2 map: road-snapped real GPS route, built on the single km
+  source, reusing `/api/snap-to-roads`. Cost ~₹0–2,500/mo (free tier likely covers).

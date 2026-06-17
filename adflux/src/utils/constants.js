@@ -36,11 +36,6 @@ export const GRADES = ['A', 'B', 'C']
 // Payment modes
 export const PAYMENT_MODES = ['NEFT', 'RTGS', 'UPI', 'Cheque', 'Cash']
 
-// Revenue types
-export const REVENUE_TYPES = [
-  { value: 'new', label: 'New Client' },
-  { value: 'renewal', label: 'Renewal' },
-]
 
 // Roles
 export const ROLES = {
@@ -51,8 +46,6 @@ export const ROLES = {
 // GST rate
 export const GST_RATE = 0.18
 
-// Duration options (months)
-export const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 9, 12]
 
 // Sidebar nav items (defined here for use across layout components)
 export const ADMIN_NAV = [

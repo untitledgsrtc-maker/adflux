@@ -223,9 +223,6 @@ export const STAGE_GROUPS = [
   { key: 'lost',        label: 'Lost',        stages: ['Lost'] },
 ]
 
-export function groupForStage(stage) {
-  return STAGE_GROUPS.find(g => g.stages.includes(stage))?.key || 'new'
-}
 
 // Phase 31P — 'Working' DB value displays as 'Follow-up' to reps.
 export const STAGE_LABELS = {
@@ -269,4 +266,3 @@ export const WON_REASONS = [
   { value: 'Other',          label: 'Other' },
 ]
 
-export const HEAT_OPTIONS = ['hot', 'warm', 'cold']
