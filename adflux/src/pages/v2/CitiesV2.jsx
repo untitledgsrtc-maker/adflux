@@ -97,11 +97,15 @@ export default function CitiesV2() {
     setDeleteConfirm(null)
   }
 
-  async function handleBulkUpdate(rateField, value) {
+  async function handleBulkUpdate(rateField, value, ids) {
+    // Phase 165 — ids = the grade-scoped subset chosen in the modal (the
+    // modal filters the selected set by grade). Falls back to all selected
+    // if the modal didn't pass ids (defensive).
+    const targetIds = (ids && ids.length) ? ids : [...selectedIds]
     setBulkLoading(true)
-    const { error } = await bulkUpdateRates([...selectedIds], rateField, value)
+    const { error } = await bulkUpdateRates(targetIds, rateField, value)
     if (error) showToast(error.message, 'error')
-    else { showToast(`Updated ${selectedIds.size} cities`); setBulkModal(false); setSelectedIds(new Set()) }
+    else { showToast(`Updated ${targetIds.length} cities`); setBulkModal(false); setSelectedIds(new Set()) }
     setBulkLoading(false)
   }
 
@@ -220,7 +224,7 @@ export default function CitiesV2() {
       )}
       {bulkModal && (
         <BulkRateModal
-          count={selectedIds.size}
+          cities={filtered.filter(c => selectedIds.has(c.id))}
           onClose={() => setBulkModal(false)}
           onApply={handleBulkUpdate}
           loading={bulkLoading}

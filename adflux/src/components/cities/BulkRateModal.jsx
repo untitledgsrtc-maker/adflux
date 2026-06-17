@@ -1,10 +1,21 @@
 import { useState } from 'react'
 import { X, Zap } from 'lucide-react'
 
-export function BulkRateModal({ count, onClose, onApply, loading }) {
+const GRADES = ['A', 'B', 'C']
+
+export function BulkRateModal({ cities = [], onClose, onApply, loading }) {
   const [rateField, setRateField] = useState('offer_rate')
   const [value, setValue] = useState('')
+  const [grade, setGrade] = useState('all')
   const [error, setError] = useState('')
+
+  // Phase 165 — scope the bulk update by grade so the owner can change
+  // rates grade-wise without the tab + Select-All dance. Only offer grades
+  // that exist in the selected set; "all" = every selected city. The count +
+  // the cities updated track the chosen grade live.
+  const presentGrades = GRADES.filter(g => cities.some(c => (c.grade || '') === g))
+  const target = grade === 'all' ? cities : cities.filter(c => (c.grade || '') === grade)
+  const count = target.length
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -12,7 +23,8 @@ export function BulkRateModal({ count, onClose, onApply, loading }) {
       setError('Enter a valid rate')
       return
     }
-    onApply(rateField, Number(value))
+    if (count === 0) { setError('No cities match that grade'); return }
+    onApply(rateField, Number(value), target.map(c => c.id))
   }
 
   return (
@@ -29,8 +41,22 @@ export function BulkRateModal({ count, onClose, onApply, loading }) {
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Updating <strong style={{ color: 'var(--text)' }}>{count} cities</strong>. This will overwrite existing rates.
+              Updating <strong style={{ color: 'var(--text)' }}>{count} cit{count === 1 ? 'y' : 'ies'}</strong>. This will overwrite existing rates.
             </p>
+
+            <div className="form-group">
+              <label className="form-label">Grade</label>
+              <select
+                className="form-select"
+                value={grade}
+                onChange={e => setGrade(e.target.value)}
+              >
+                <option value="all">All grades</option>
+                {presentGrades.map(g => (
+                  <option key={g} value={g}>Grade {g}</option>
+                ))}
+              </select>
+            </div>
 
             <div className="form-group">
               <label className="form-label">Which Rate</label>
