@@ -47,7 +47,16 @@ const STORE_KEY = (userId) => `last-call-scan-ms-${userId}`
 // in /calls page (default date range).
 const DEFAULT_LOOKBACK_MS = 7 * 24 * 60 * 60_000  // 7 days on first scan
 const POLL_INTERVAL_MS    = 5  * 60_000   // re-scan every 5 min while foregrounded
-const DEDUPE_WINDOW_SEC   = 60            // call_logs row within 60s = same call
+const DEDUPE_WINDOW_SEC   = 60            // exact-phone match window (the clean case)
+// Phase 167 — ROOT FIX window. When the exact-phone match misses, an outgoing
+// device call is matched to the rep's nearest UNPATCHED tel-tap-audit row
+// within +/- this window — by TIME, not number. The app stamps the tap row at
+// the tap moment; the device call log stamps a minute+ later AND may carry a
+// different stored number of the same lead (kirti Vimal Oil: app ...121,
+// device ...122). Matching by "the rep's fresh tap at ~this moment" is
+// invariant to number/lead/minute drift, so no app-initiated call can ever
+// insert a second row again. 5 min covers tap-vs-device-log timestamp skew.
+const TAP_MATCH_WINDOW_SEC = 300
 
 // Phase 102.B (2026-05-29) — outcomes where Android `duration` is ring
 // time, not talk time. OEMs (Vivo / OPPO / Realme) commonly return
@@ -269,7 +278,9 @@ async function ingestOne(userId, raw) {
   // can suppress ring-time on missed / no_answer rows.
   const dupeLower = new Date(dateMs - DEDUPE_WINDOW_SEC * 1000).toISOString()
   const dupeUpper = new Date(dateMs + DEDUPE_WINDOW_SEC * 1000).toISOString()
-  const { data: existing } = await supabase
+
+  // PRIMARY — exact phone within 60s (precise; the clean common case).
+  let { data: existing } = await supabase
     .from('call_logs')
     .select('id, direction, duration_seconds, outcome')
     .eq('user_id', userId)
@@ -279,13 +290,61 @@ async function ingestOne(userId, raw) {
     .limit(1)
     .maybeSingle()
 
+  // PHASE 167 — ROOT FIX (ends the duplicate-call whack-a-mole). The exact-
+  // phone match above misses when the app saved a DIFFERENT stored number of
+  // the same lead than the device dialed (kirti Vimal Oil: app ...121, device
+  // ...122), or the minute drifted past 60s. For an OUTGOING call, fall back
+  // to the rep's NEAREST unpatched tel-tap-audit row within +/- TAP_MATCH_
+  // WINDOW_SEC, matched by TIME (the rep tapped Call ~when the device called),
+  // NOT by number. We then PATCH that row → an app-initiated call can never
+  // insert a 2nd row again, whatever the number/lead/minute. (A call dialed
+  // OUTSIDE the app has no tap row → still inserts, correctly.)
+  if (!existing && direction === 'outgoing') {
+    // Resolve the DIALED number to a lead (same 2-query pattern as the insert
+    // path below). If it resolves, pair ONLY with that lead's tap row — so a
+    // direct dial to a DIFFERENT lead inside the window can't steal this call's
+    // duration (guardian P1). If it does NOT resolve (the dialed number isn't
+    // any lead's stored number — exactly the Vimal Oil ...122 case), fall back
+    // to nearest-by-time among the rep's unpatched taps.
+    let fbLeadId = null
+    if (cleaned) {
+      const tcQ = await supabase.from('leads').select('id').eq('telecaller_id', userId).eq('phone', cleaned).limit(1)
+      if (tcQ.data && tcQ.data.length) fbLeadId = tcQ.data[0].id
+      else {
+        const asQ = await supabase.from('leads').select('id').eq('assigned_to', userId).eq('phone', cleaned).limit(1)
+        if (asQ.data && asQ.data.length) fbLeadId = asQ.data[0].id
+      }
+    }
+    const wideLower = new Date(dateMs - TAP_MATCH_WINDOW_SEC * 1000).toISOString()
+    const wideUpper = new Date(dateMs + TAP_MATCH_WINDOW_SEC * 1000).toISOString()
+    let tapQ = supabase
+      .from('call_logs')
+      .select('id, direction, duration_seconds, outcome, call_at')
+      .eq('user_id', userId)
+      .ilike('notes', 'tel-tap audit%')                      // a fresh in-app tap row
+      .or('duration_seconds.is.null,duration_seconds.eq.0')  // still awaiting its duration
+      .gte('call_at', wideLower)
+      .lte('call_at', wideUpper)
+    if (fbLeadId) tapQ = tapQ.eq('lead_id', fbLeadId)        // same lead only, when the number resolves
+    const { data: taps } = await tapQ.order('call_at', { ascending: false }).limit(8)
+    if (taps && taps.length) {
+      // Nearest tap in time wins — correctly pairs back-to-back taps to their
+      // own device calls.
+      existing = taps.reduce((best, r) => {
+        const d = Math.abs(new Date(r.call_at).getTime() - dateMs)
+        return (!best || d < best.__d) ? { ...r, __d: d } : best
+      }, null)
+    }
+  }
+
   if (existing) {
-    // Tel-tap audit row exists. Backfill direction + duration if they're
-    // missing or generic, but don't double-write.
+    // Patch the matched in-app row's direction + duration; never double-write.
     const patch = {}
     if (existing.direction === 'outgoing' && direction !== 'outgoing') {
       // Unlikely (audit always outgoing) but defensive.
       patch.direction = direction
+    } else if (existing.direction == null && direction) {
+      patch.direction = direction   // tap rows carry no direction → fill it
     }
     // Phase 102.B — gate duration backfill on the EXISTING row's
     // outcome. If the audit row is still 'no_answer' (rep never saved
