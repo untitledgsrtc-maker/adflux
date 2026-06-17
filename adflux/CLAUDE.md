@@ -4005,3 +4005,98 @@ reads ~100% (the §49 "Rima 100% connected" artifact). **Neither is honest:**
 ### State on origin after push
 `6c7d6e9` (163 bundle) + `f2f4f12` (163.1 emoji) — JS only, no SQL, no APK
 rebuild. Owner pushes; Vercel deploys; reaches APK on next open.
+
+
+---
+
+## 69 · Phase 164–170 + the SYSTEMIC root of "works then breaks" (2026-06-17)
+
+Long owner-driven session. Closed five surfaces, then the owner asked the real
+question: *"many things worked fine, then after days spoiled — you patch and it
+spoils everything. is it the agents? analyse deeply, very serious."* The honest
+answer + the two root fixes it produced are the important part of this section.
+
+### Shipped (all on origin unless noted)
+| Phase | SHA | What | Run-state |
+|---|---|---|---|
+| 164 | `74c3348` | TC evening WhatsApp report gets a DAY SCORE (was hidden + the 50-pt slot was meetings → 0 for TC; now TC's 50-pt slot = calls). `useDaySummary` + `whatsappSummary`, guardian PASS, display-only. | JS, live |
+| 165 | `338f1bf` | Cities **bulk-rate Grade filter** — `BulkRateModal` Grade dropdown (All/A/B/C, present-grades only) scopes the selected set; `CitiesV2.handleBulkUpdate(ids)`. | JS, live |
+| 166 | `bc9b714` | (SUPERSEDED by 170) call_logs same-lead 5-min dedup for the Vimal Oil different-number double. | SQL ran, then replaced |
+| 168 | `3cd1bdc` | **QR Leads count = 0** — `campaign_conversation_ensure_lead` rebuilt = C8.1 byte-for-byte + the `location_id` lead-INSERT column C8.1 had DROPPED. + backfill. | SQL RUN ✓ |
+| 169 | `791b861` | **Map route line draws the FULLER drive** — `cleanTrack(pings, opts)`; default = strict (km callers byte-identical), the 2 POLYLINE callers (GpsTrackV2 + RepMapPanel) pass loose `{accM:200, speedKmh:250}`. km stays on server daily_ta → guardian: no km/pay can move. | JS, live |
+| 170 | `8409e18` | **call_logs MIRRORS the phone call log** — see below. | SQL RUN ✓ |
+
+### 69.1 · THE MIRROR-PHONE DECISION (reverses Phase 126 — do NOT undo)
+Owner 17 Jun: *"mirror of call log — yes exactly."* This **REVERSES** the Phase
+126 (8 Jun) "a rep who re-called counts once" rule. Evidence: Rima's app 234
+rows vs her other CRM (mirrors the phone) **243** — the 9 gap = her legitimate
+repeat-calls to the same lead, which 126 (same-phone 30 min) + 166 (same-lead
+5 min) wrongly merged.
+- **Phase 170 is the canonical `call_logs_dedupe_before_insert`.** It folds a
+  row ONLY into an UNPATCHED tel-tap-audit placeholder (`duration_seconds IS
+  NULL OR =0` AND `notes LIKE 'tel-tap audit%'`), matched by phone 60s OR same
+  lead 5 min. No unpatched tap → INSERT (real call). A patched/real row can
+  NEVER be a fold target → two genuine repeat-calls BOTH survive = mirror the
+  phone. Still dedups: tap+scan double-write, ghost double-taps, cross-number
+  same call (Vimal Oil via the lead arm + Phase 167 JS). Missed inbound stays
+  distinct.
+- **⚠ LOCKSTEP: do NOT re-run `supabase_phase126_*` or `supabase_phase166_*`** —
+  they'd revert the broad merge. 170 is the only current version. Pairs with
+  Phase 167 (JS scan reconcile) — same principle (fold scan into the tap,
+  never merge two real calls).
+- Forward-looking: rows ALREADY merged by 126/166 can't un-merge; the next
+  device scan re-ingests + re-inserts the wrongly-merged repeat-calls.
+- Guardian PASS (two-real-calls-survive traced). P3 edge: two back-to-back
+  0s no-answers to one number within 60s may read as one — count/score
+  unaffected (neither ≥10s).
+
+### 69.2 · THE SYSTEMIC ROOT — why "it works, then breaks" (the owner's real Q)
+NOT the agents (they are read-only — they CATCH regressions, don't cause them).
+The cause is **the same logic defined in many places**, proven by counts:
+
+| The same thing, redefined in many files | # |
+|---|---|
+| `compute_daily_score` | **10 files** |
+| `generate_lead_tasks` | 8 |
+| `compute_daily_ta` (km) | 7 |
+| `campaign_conversation_ensure_lead` | 5 |
+| meeting counter (`lead_activity_bump_counter`) | 5 |
+| `call_logs_dedupe_before_insert` | 3 (now 170 canonical) |
+| frontend "≥10s = a call" rule | **22 files** |
+| km computed/read (frontend) | 9 |
+
+Two failure modes, both seen THIS session:
+1. **Multi-file `CREATE OR REPLACE` collision** — a later file rewrites a
+   shared function for a new purpose and silently DROPS an earlier fix. Today's
+   QR bug (§168): C8.1 rewrote the lead-create for telecaller routing and
+   dropped C8's `location_id`. Worked, then "broke."
+2. **No single source of truth** — "a call" lives in 22 places, km in 9; fix
+   one, the others still disagree (Rima's app 234 vs admin's split vs the
+   phone's 243). One cleaning function fed BOTH the km AND the map → tightening
+   it for km (§98.D) spoiled the map (§169 split them).
+
+So "you patch and it spoils something else" is **literally true** — the things
+are wired together from months of patch-on-patch (the §3 anti-pattern at scale).
+
+### 69.3 · THE CURE (owner-aware, NOT YET DONE — the next deliberate sprint)
+Consolidate each recurring-pain concept to ONE source of truth:
+- ONE call-count rule every screen reads (kill the 22 copies).
+- ONE km source (already daily_ta) — §169 decoupled the map LINE from it (the
+  template: route ≠ km).
+- ONE current file per DB function — stop the 10-versions sprawl; a function
+  gets one canonical file + a lockstep header.
+This is a focused consolidation sprint, guardian-checked — NOT more patches.
+Owner agreed it's the real fix; do it deliberately, not mid-fire. §163/§169/§170
+are the first three single-source moves.
+
+### 69.4 · Rima call split (NOT a bug — explained)
+Admin day-track (`GpsTrackV2`) SPLITS calls into "Lead calls · N" (lead?.id) +
+"Unknown numbers · N" (no lead) — `GpsTrackV2:1179`. The screenshot showed only
+"Lead calls · 144"; the other ~90 are in the collapsed Unknown section. 144+90=
+234 = total taps. Admin isn't missing calls; it splits them. (The 234-vs-243 is
+the §69.1 merge, separate.)
+
+### Verify (owner's eyes — pending)
+- Map: hard-refresh a rep day-track → fuller route line; km unchanged.
+- Calls: Rima's count should climb to her phone/other-CRM number (~243) within a
+  scan cycle / by next day.
