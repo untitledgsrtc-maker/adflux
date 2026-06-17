@@ -10,6 +10,7 @@
 // the same layout using our own call_logs + lead_activities data.
 
 import { useEffect, useMemo, useState } from 'react'
+import { cleanPhone } from '../../utils/phone'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing,
@@ -312,7 +313,7 @@ export default function CallLogsV2() {
                           </a>
                         ) : (
                           <a
-                            href={`tel:+${(r.client_phone || '').replace(/\D/g, '')}`}
+                            href={`tel:+${cleanPhone(r.client_phone)}`}
                             style={{
                               color: 'var(--text)', textDecoration: 'none',
                               borderBottom: '1px dotted var(--accent)',

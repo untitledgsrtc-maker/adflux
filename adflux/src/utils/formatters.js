@@ -1,4 +1,5 @@
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
+import { cleanPhone } from './phone'
 
 // ─── Currency ────────────────────────────────────────────────────
 
@@ -96,8 +97,7 @@ export function formatPercent(n, decimals = 1) {
 
 export function formatPhone(phone) {
   if (!phone) return ''
-  // Strip non-digits
-  const clean = phone.replace(/\D/g, '')
+  const clean = cleanPhone(phone)
   if (clean.length === 10) return `+91 ${clean.slice(0,5)} ${clean.slice(5)}`
   return phone
 }

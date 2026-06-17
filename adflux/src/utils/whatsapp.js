@@ -1,5 +1,6 @@
 import { formatCurrency } from './formatters'
 import { openExternalUrl } from './openExternal'
+import { phoneToWaJid } from './phone'
 
 /**
  * Shorten a URL for WhatsApp.
@@ -218,10 +219,8 @@ export function buildWhatsAppMessage(quote, cities = [], opts = {}) {
  * @param {string} message - message text
  */
 export function openWhatsApp(phone, message) {
-  // Clean phone number — strip non-digits, prepend 91 for bare
-  // 10-digit Indian numbers (our default case).
-  let clean = phone?.replace(/\D/g, '') || ''
-  if (clean.length === 10) clean = '91' + clean
+  // Clean phone → WhatsApp jid (bare 10-digit Indian number gets 91 prefix).
+  const clean = phoneToWaJid(phone)
 
   const encoded = encodeURIComponent(message)
   const url = clean

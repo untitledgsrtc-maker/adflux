@@ -1,5 +1,6 @@
 // src/pages/QuoteDetail.jsx
 import { useEffect, useState } from 'react'
+import { cleanPhone } from '../utils/phone'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Download, MessageCircle, ChevronDown,
@@ -413,7 +414,7 @@ export default function QuoteDetail() {
         // the right number is what matters. Restores the Phase 162 jid path
         // (162.1's caption-mode phone:'' reverted). Caption still passed in
         // case a WhatsApp build chooses to show it; harmless if dropped.
-        const digits = String(quote.client_phone || '').replace(/\D/g, '')
+        const digits = cleanPhone(quote.client_phone)
         const direct = await shareWhatsAppDirect({
           phone:   digits.length === 10 ? `91${digits}` : digits,
           text:    caption,
