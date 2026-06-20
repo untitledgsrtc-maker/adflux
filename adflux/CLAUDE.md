@@ -4150,3 +4150,56 @@ not in App.jsx).
   a hard gate.
 - **Stage 3** — Option 2 map: road-snapped real GPS route, built on the single km
   source, reusing `/api/snap-to-roads`. Cost ~₹0–2,500/mo (free tier likely covers).
+
+---
+
+## 71 · NO NEW COPIES — the standing rule that ends "works then breaks" (Phase 173–175, 20-Jun-2026)
+
+Owner directive 20 Jun 2026, after the call / Lost / report bugs recurred (~100×):
+a permanent rule binding **every future session** so the same logic never lives in
+N files again. Root (see §69): one rule re-pasted across many phase files; a later
+file silently reverts an earlier fix. **THIS SECTION IS THE PREVENTION — read it
+before writing ANY SQL function or shared rule.**
+
+### The 6 rules (MANDATORY, every session)
+
+1. **ONE canonical file per DB function.** To change a function, EDIT its single
+   home file (re-paste the whole body THERE). NEVER write a new `phaseN` file that
+   re-pastes the function with a tweak — that is what made `compute_daily_score`
+   live in 10 files. A brand-new function gets one home from birth.
+2. **CHECK-FIRST (read before write).** Before adding ANY function / trigger /
+   rule, grep: does it already exist? On 20 Jun this caught a near-duplicate
+   TWICE (Phase 134 + 135 already had the Lost-followup triggers; a 5th would have
+   BEEN the bug). If it exists, EDIT it in place — never add a sibling.
+3. **MONEY / SECURITY = shadow-compare + owner verifies.** Never switch a
+   score / salary / TA / payment / role function without (a) running new vs old on
+   real data and proving the numbers IDENTICAL, (b) the owner eyeballing the real
+   figures, (c) a one-command revert ready. Never mid-workday for these.
+4. **Every risky function gets a TRIPWIRE** — a read-only monitor / self-test that
+   screams the same day if a copy drifts or an old file is re-run. Examples
+   shipped 20 Jun: the Phase 173 self-test + `direction_guarded` query; the Phase
+   174 "open FUs on Lost = 0" monitor.
+5. **Run `scripts/check-duplication.sh` BEFORE any commit that adds/edits a SQL
+   function.** If a function's file-count went UP, STOP — you are about to make a
+   copy. (Stage 0 added the script; this makes running it mandatory. §15 gate.)
+6. **Guardian audit** on anything touching money / security / a frozen surface.
+   It caught real issues 4× on 20 Jun before they shipped.
+
+### The cure for the EXISTING 73 copies (Stage 2 — owner-gated, slow)
+
+One canonical `db/functions/<name>.sql` per function; DELETE the other copies so
+nothing is left to re-run. Non-money first, **money / security LAST**, each
+shadow-compared + owner-verified. `check-duplication.sh` flips to a HARD gate once
+`db/functions/` exists. Risk-scored inventory: 73 functions, **23 are score-5
+(money/security)** — see `DUPLICATION_AUDIT_2026-06-17.md`.
+
+### Today's 3 fixes — LOCKED contracts (do NOT strip; §33-style — BLOCK on regress)
+
+| Phase | Rule (frozen) | Tripwire |
+|---|---|---|
+| **173** | Call dedup is DIRECTION-AWARE: incoming + outgoing NEVER merge; only an outgoing folds into a tel-tap. Enforced in BOTH the DB trigger AND `callHistoryIngest.js` PRIMARY dedup — change one, change both. | `supabase_phase173_TEST_call_dedup.sql` (PASS) + V2 `direction_guarded` |
+| **174** | A Lost lead has NO open follow-up: `followup_block_on_lost_lead` born-closes ALL (incl cadence); `followup_after_done` has NO `lost_nurture` respawn. | monitor: open FUs on Lost = 0 |
+| **175** | ONE `isSystemClose` (`src/utils/followups.js`) decides rep-done vs system-closed — used by BOTH the team report AND the rep card. | shared util; change once |
+
+A diff that re-introduces a cross-direction call merge, a `lost_nurture` respawn,
+or a second copy of the done-vs-system-close rule is a **BLOCK**.
