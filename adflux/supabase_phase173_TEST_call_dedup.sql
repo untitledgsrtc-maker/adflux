@@ -26,8 +26,10 @@ BEGIN
 
   -- ── R1 + R5: a tap (outgoing-intent, NULL direction) then the real OUTGOING
   --    call 20s later → folds to ONE outgoing row. ──────────────────────────
-  INSERT INTO public.call_logs(user_id, client_phone, direction, duration_seconds, outcome, notes, call_at)
-    VALUES (u, n1, NULL, NULL, 'no_answer', 'tel-tap audit (p173 test)', base);
+  -- tap OMITS `direction` (mirrors callAudit.js — the column is NOT NULL with a
+  -- default; the real tap never sets it explicitly).
+  INSERT INTO public.call_logs(user_id, client_phone, duration_seconds, outcome, notes, call_at)
+    VALUES (u, n1, NULL, 'no_answer', 'tel-tap audit (p173 test)', base);
   INSERT INTO public.call_logs(user_id, client_phone, direction, duration_seconds, outcome, notes, call_at)
     VALUES (u, n1, 'outgoing', 17, 'connected', 'device scan (p173 test)', base + INTERVAL '20 seconds');
 
