@@ -280,15 +280,24 @@ async function ingestOne(userId, raw) {
   const dupeUpper = new Date(dateMs + DEDUPE_WINDOW_SEC * 1000).toISOString()
 
   // PRIMARY — exact phone within 60s (precise; the clean common case).
-  let { data: existing } = await supabase
+  // Phase 173 — DIRECTION-AWARE (the canonical contract, identical to the
+  // call_logs_dedupe trigger): an INCOMING call must NEVER dedup against an
+  // outgoing/tap row, and vice-versa — that cross-direction merge was the
+  // 7874260770 mislabel. An outgoing also matches the direction-null tap
+  // placeholder; incoming/missed match only their own direction.
+  let dupeQ = supabase
     .from('call_logs')
     .select('id, direction, duration_seconds, outcome')
     .eq('user_id', userId)
     .eq('client_phone', cleaned)
     .gte('call_at', dupeLower)
     .lte('call_at', dupeUpper)
-    .limit(1)
-    .maybeSingle()
+  if (direction === 'outgoing') {
+    dupeQ = dupeQ.or('direction.eq.outgoing,direction.is.null')
+  } else {
+    dupeQ = dupeQ.eq('direction', direction)
+  }
+  let { data: existing } = await dupeQ.limit(1).maybeSingle()
 
   // PHASE 167 — ROOT FIX (ends the duplicate-call whack-a-mole). The exact-
   // phone match above misses when the app saved a DIFFERENT stored number of
