@@ -25,6 +25,7 @@
 // DaySummaryCard calls refresh on mount + every 5 min while visible.
 
 import { useEffect, useState, useCallback } from 'react'
+import { isSystemClose } from '../utils/followups'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 import { istTodayISO, istTodayPlusDays } from '../utils/istDate'
@@ -158,7 +159,7 @@ export default function useDaySummary({ dateISO } = {}) {
         // rows (not just a count) so we can gate "real follow-ups" on a
         // real call + qualify. data.length = the old done count.
         supabase.from('follow_ups')
-          .select('id, lead_id')
+          .select('id, lead_id, done_note')
           .eq('assigned_to', profile.id)
           .eq('is_done', true)
           .gte('done_at', startISO)
@@ -354,7 +355,10 @@ export default function useDaySummary({ dateISO } = {}) {
       // qualified").
       const calledLeadIds = new Set(
         (callLeadsRes.data || []).map(r => r.lead_id).filter(Boolean))
-      const doneFu = fuDoneRes.data || []
+      // Phase 175 — exclude system-closed rows (auto-closed on Lost/Won,
+      // auto-skipped, healed) so a rep is never credited for the system closing
+      // a follow-up. Same isSystemClose rule the team report uses.
+      const doneFu = (fuDoneRes.data || []).filter(r => !isSystemClose(r.done_note))
       // Phase 128.3 — a follow-up counts as "real" when it was CLOSED and the
       // rep CALLED the lead today (any attempt). Dropped the qualifiedLeadIds
       // gate: a no-answer call still counts (owner: "called = follow-up done").
@@ -457,7 +461,7 @@ export default function useDaySummary({ dateISO } = {}) {
           calls:             callRes.count || 0,
           leads:             leadRes.count || 0,
           follow_ups_total:  fuTotalRes.count || 0,
-          follow_ups_done:   fuDoneRes.data?.length || 0,   // Phase 118 — 5b is now a row-fetch (no .count)
+          follow_ups_done:   doneFu.length,   // Phase 175 — excludes system-closed rows (isSystemClose)
           site_visits,
           whatsapp_sent,
           voice_notes:       voiceRes.count || 0,

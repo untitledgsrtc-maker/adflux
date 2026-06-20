@@ -21,6 +21,7 @@
 //   • Won today value from quotes status='won' + payments today (rough)
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { isSystemClose } from '../../utils/followups'
 import { useNavigate } from 'react-router-dom'
 import { Users as UsersIcon, MapPin, Mic, Loader2 } from 'lucide-react'
 import { Loader } from '@googlemaps/js-api-loader'
@@ -547,8 +548,6 @@ export default function TeamDashboardV2() {
       // cancel, pause-close, payment auto-close) is not rep work. Its
       // done_note carries the marker; exclude it from the DONE count so
       // "Today F-up done" = follow-ups the rep actually closed.
-      const isSystemClose = (note) =>
-        !!note && /^Auto-closed|^\[(healed|closed: auto|cancelled by stage|auto-skipped)/.test(note)
       const fuMap = {}
       ;(fuRes.data || []).forEach((r) => {
         if (!r.assigned_to) return
