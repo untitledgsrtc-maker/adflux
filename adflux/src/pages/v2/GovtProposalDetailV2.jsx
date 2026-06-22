@@ -733,6 +733,7 @@ export default function GovtProposalDetailV2() {
   // the snapshot.
   async function handleWhatsApp() {
     if (!quote) return
+    const isEn = quote.proposal_language === 'en'   // Phase 176 — match the proposal language
     const phone = (
       quote.client_phone ||
       // Govt proposals often don't capture a phone in the recipient
@@ -741,17 +742,19 @@ export default function GovtProposalDetailV2() {
       (quote.recipient_block || '').match(/\b\d{10}\b/)?.[0] ||
       ''
     )
-    let msg = `નમસ્કાર,\n\nઅનટાઇટલ્ડ એડવર્ટાઇઝિંગ તરફથી ${quote.media_type === 'AUTO_HOOD' ? 'ઓટો રિક્ષા હૂડ' : 'GSRTC LED'} પ્રપોઝલ —\n${quote.quote_number || quote.ref_number || ''}\nરકમ: ₹${formatINREnglish(quote.total_amount || 0)}/-\n`
+    let msg = isEn
+      ? `Hello,\n\nProposal from Untitled Advertising — ${quote.media_type === 'AUTO_HOOD' ? 'Auto Rickshaw Hood' : 'GSRTC LED'} —\n${quote.quote_number || quote.ref_number || ''}\nAmount: ₹${formatINREnglish(quote.total_amount || 0)}/-\n`
+      : `નમસ્કાર,\n\nઅનટાઇટલ્ડ એડવર્ટાઇઝિંગ તરફથી ${quote.media_type === 'AUTO_HOOD' ? 'ઓટો રિક્ષા હૂડ' : 'GSRTC LED'} પ્રપોઝલ —\n${quote.quote_number || quote.ref_number || ''}\nરકમ: ₹${formatINREnglish(quote.total_amount || 0)}/-\n`
     if (quote.locked_proposal_pdf_url) {
       try {
         const url = await getSignedUrl(quote.locked_proposal_pdf_url, 24 * 3600) // 24h link
         const short = await shortenUrl(url).catch(() => url)
-        msg += `\nપ્રપોઝલ PDF: ${short}\n`
+        msg += isEn ? `\nProposal PDF: ${short}\n` : `\nપ્રપોઝલ PDF: ${short}\n`
       } catch (e) {
         // signed URL failed — send without link, user can retry
       }
     }
-    msg += `\nઆભાર.`
+    msg += isEn ? `\nThank you.` : `\nઆભાર.`
     openWhatsApp(phone, msg)
     // Phase 30C — record the touch in the lead's activity timeline.
     logQuoteTouch('whatsapp', `WhatsApp · proposal ${quote.quote_number || quote.ref_number || ''}${quote.locked_proposal_pdf_url ? ' · PDF link sent' : ''}`)
@@ -785,10 +788,16 @@ export default function GovtProposalDetailV2() {
       ? 'ઓટો રિક્ષા હૂડ'
       : 'GSRTC LED સ્ક્રીન'
 
-    // Gujarati subject so the recipient's mail client surfaces the
-    // proposal context immediately.
-    const subject =
-      `પ્રપોઝલ — ${mediaLabelGu} — ${quote.quote_number || quote.ref_number || ''}`
+    // Phase 176 — language branch. en ONLY when the proposal is English
+    // (same proposal_language the PDF uses); every existing/Gujarati proposal
+    // (proposal_language null/'gu') keeps the BYTE-IDENTICAL Gujarati body below.
+    const isEn = quote.proposal_language === 'en'
+
+    // Subject — English mirrors the Gujarati; the recipient's mail client
+    // surfaces the proposal context immediately either way.
+    const subject = isEn
+      ? `Proposal — ${mediaLabelEn} — ${quote.quote_number || quote.ref_number || ''}`
+      : `પ્રપોઝલ — ${mediaLabelGu} — ${quote.quote_number || quote.ref_number || ''}`
 
     const ddmm = quote.proposal_date
       ? new Date(quote.proposal_date).toLocaleDateString('en-IN', {
@@ -811,27 +820,54 @@ export default function GovtProposalDetailV2() {
         `૧૫–૩૦ મિનિટ રાહ જુએ છે. ૧૦ સેકન્ડના સ્લોટ દિવસમાં અનેક વાર ` +
         `પુનરાવર્તિત થતા હોવાથી બ્રાન્ડ રિકોલ ઊંચું રહે છે.`
 
+    // Phase 176 — English pitch (owner-approved 20 Jun 2026). Gujarati pitchGu
+    // above is unchanged.
+    const pitchEn = quote.media_type === 'AUTO_HOOD'
+      ? `Auto-rickshaw hoods are a continuously mobile outdoor medium offering ` +
+        `sustained visibility across all 33 districts of Gujarat, in both urban ` +
+        `and rural areas. Printed on three sides, each hood travels the city's ` +
+        `busy roads, bus stands, stations and market areas from morning to night, ` +
+        `reaching 15,000+ people daily.`
+      : `GSRTC LED screens are installed at Gujarat's major bus stands, where ` +
+        `daily footfall runs into the thousands and passengers wait an average of ` +
+        `15-30 minutes. With 10-second slots repeating several times a day, brand ` +
+        `recall stays high.`
+    const pitch      = isEn ? pitchEn : pitchGu
     const refLine    = quote.quote_number || quote.ref_number || ''
-    const totalLine  = `રૂ. ${formatINREnglish(quote.total_amount || 0)}/-`
+    const totalLine  = isEn
+      ? `Rs. ${formatINREnglish(quote.total_amount || 0)}/-`
+      : `રૂ. ${formatINREnglish(quote.total_amount || 0)}/-`
     const monthsLine = quote.gsrtc_campaign_months
-      ? `${quote.gsrtc_campaign_months} મહિના`
+      ? (isEn ? `${quote.gsrtc_campaign_months} months` : `${quote.gsrtc_campaign_months} મહિના`)
       : ''
 
-    let body =
-      `નમસ્કાર,\n\n` +
-      // Phase 28b — owner correction (7 May 2026): drop "મોલ તેમજ
-      // સિનેમા" from the media list. We do those formats but they're
-      // not relevant for govt proposals.
-      `Untitled Advertising તરફથી નમસ્કાર. અમે ગુજરાતમાં સરકારી તેમજ ` +
-      `ખાનગી ગ્રાહકો માટે OOH (બાહ્ય) જાહેરાત માધ્યમો — ઓટો રિક્ષા હૂડ, ` +
-      `GSRTC LED તેમજ હોર્ડિંગ — નું આયોજન કરીએ છીએ.\n\n` +
-      `આપની માંગણી મુજબ ${mediaLabelGu} માટેની વિગતવાર પ્રપોઝલ રજૂ ` +
-      `કરીએ છીએ. મુખ્ય વિગતો નીચે મુજબ છે:\n\n` +
-      `   સંદર્ભ ક્રમાંક : ${refLine}\n` +
-      (ddmm ? `   તારીખ          : ${ddmm}\n` : '') +
-      (monthsLine ? `   પ્રચાર સમયગાળો : ${monthsLine}\n` : '') +
-      `   કુલ રકમ        : ${totalLine} (GST સહિત)\n\n` +
-      `${pitchGu}\n\n`
+    let body = isEn
+      ? `Dear Sir/Madam,\n\n` +
+        `Greetings from Untitled Advertising. We plan and execute OOH (outdoor) ` +
+        `advertising media — Auto Rickshaw Hoods, GSRTC LED screens and hoardings ` +
+        `— for government and private clients across Gujarat.\n\n` +
+        `As per your requirement, we are pleased to submit our detailed proposal ` +
+        `for ${mediaLabelEn}. The key details are below:\n\n` +
+        `   Reference No.   : ${refLine}\n` +
+        (ddmm ? `   Date            : ${ddmm}\n` : '') +
+        (monthsLine ? `   Campaign period : ${monthsLine}\n` : '') +
+        `   Total amount    : ${totalLine} (incl. GST)\n\n` +
+        `${pitch}\n\n`
+      // Gujarati (default) — BYTE-IDENTICAL to the pre-Phase-176 body.
+      : `નમસ્કાર,\n\n` +
+        // Phase 28b — owner correction (7 May 2026): drop "મોલ તેમજ
+        // સિનેમા" from the media list. We do those formats but they're
+        // not relevant for govt proposals.
+        `Untitled Advertising તરફથી નમસ્કાર. અમે ગુજરાતમાં સરકારી તેમજ ` +
+        `ખાનગી ગ્રાહકો માટે OOH (બાહ્ય) જાહેરાત માધ્યમો — ઓટો રિક્ષા હૂડ, ` +
+        `GSRTC LED તેમજ હોર્ડિંગ — નું આયોજન કરીએ છીએ.\n\n` +
+        `આપની માંગણી મુજબ ${mediaLabelGu} માટેની વિગતવાર પ્રપોઝલ રજૂ ` +
+        `કરીએ છીએ. મુખ્ય વિગતો નીચે મુજબ છે:\n\n` +
+        `   સંદર્ભ ક્રમાંક : ${refLine}\n` +
+        (ddmm ? `   તારીખ          : ${ddmm}\n` : '') +
+        (monthsLine ? `   પ્રચાર સમયગાળો : ${monthsLine}\n` : '') +
+        `   કુલ રકમ        : ${totalLine} (GST સહિત)\n\n` +
+        `${pitchGu}\n\n`
 
     // Phase 28b — try the Combined PDF first. Owner spec: "combine
     // pdf link shuld be there [in email]". The Combined PDF button
@@ -845,9 +881,10 @@ export default function GovtProposalDetailV2() {
       const combinedUrl  = await getSignedUrl(combinedPath, 24 * 3600)
       if (combinedUrl) {
         const short = await shortenUrl(combinedUrl).catch(() => combinedUrl)
-        body +=
-          `સંપૂર્ણ પ્રપોઝલ + દસ્તાવેજો (Combined PDF — 24 કલાક માટે ` +
-          `માન્ય): ${short}\n\n`
+        body += isEn
+          ? `Complete proposal + documents (Combined PDF — valid for 24 hours): ${short}\n\n`
+          : `સંપૂર્ણ પ્રપોઝલ + દસ્તાવેજો (Combined PDF — 24 કલાક માટે ` +
+            `માન્ય): ${short}\n\n`
         pdfLinkAdded = true
       }
     } catch (_) {
@@ -858,24 +895,34 @@ export default function GovtProposalDetailV2() {
       try {
         const url = await getSignedUrl(quote.locked_proposal_pdf_url, 24 * 3600)
         const short = await shortenUrl(url).catch(() => url)
-        body +=
-          `વિગતવાર પ્રપોઝલ — રેટ ટેબલ, જિલ્લા / સ્ટેશન વાર ફાળવણી, ` +
-          `અને બાંધણી — સંલગ્ન PDF માં ઉપલબ્ધ છે.\n` +
-          `પ્રપોઝલ PDF (24 કલાક માટે માન્ય): ${short}\n\n`
+        body += isEn
+          ? `The detailed proposal — rate table, district / station-wise ` +
+            `allocation and terms — is available in the attached PDF.\n` +
+            `Proposal PDF (valid for 24 hours): ${short}\n\n`
+          : `વિગતવાર પ્રપોઝલ — રેટ ટેબલ, જિલ્લા / સ્ટેશન વાર ફાળવણી, ` +
+            `અને બાંધણી — સંલગ્ન PDF માં ઉપલબ્ધ છે.\n` +
+            `પ્રપોઝલ PDF (24 કલાક માટે માન્ય): ${short}\n\n`
         pdfLinkAdded = true
       } catch (e) {
-        body += `વિગતવાર પ્રપોઝલ સંલગ્ન છે. (PDF લિંક પ્રાપ્ત કરવામાં સમસ્યા — અમે ટૂંક સમયમાં ફરી મોકલીશું.)\n\n`
+        body += isEn
+          ? `The detailed proposal is attached. (Trouble fetching the PDF link — we will resend shortly.)\n\n`
+          : `વિગતવાર પ્રપોઝલ સંલગ્ન છે. (PDF લિંક પ્રાપ્ત કરવામાં સમસ્યા — અમે ટૂંક સમયમાં ફરી મોકલીશું.)\n\n`
       }
     } else if (!pdfLinkAdded) {
-      body +=
-        `નોંધ: પ્રપોઝલ PDF ટૂંક સમયમાં મોકલવામાં આવશે ` +
-        `(પહેલા Mark Sent કરો જેથી સ્નેપશોટ લોક થાય).\n\n`
+      body += isEn
+        ? `Note: the proposal PDF will be sent shortly ` +
+          `(Mark Sent first so the snapshot locks).\n\n`
+        : `નોંધ: પ્રપોઝલ PDF ટૂંક સમયમાં મોકલવામાં આવશે ` +
+          `(પહેલા Mark Sent કરો જેથી સ્નેપશોટ લોક થાય).\n\n`
     }
 
-    body +=
-      `કૃપા કરી પ્રપોઝલની વિગતો ચકાસી અને કોઈપણ પ્રશ્ન / ચર્ચા / ` +
-      `મીટિંગ માટે નીચે આપેલા નંબર પર સંપર્ક કરો. અમે આપની ` +
-      `બ્રાન્ડ માટે યોગ્ય મીડિયા-મિક્સ બનાવવા પ્રતિબદ્ધ છીએ.\n\n`
+    body += isEn
+      ? `Kindly review the proposal and contact us on the number below for any ` +
+        `query, discussion or meeting. We are committed to building the right ` +
+        `media-mix for your requirement.\n\n`
+      : `કૃપા કરી પ્રપોઝલની વિગતો ચકાસી અને કોઈપણ પ્રશ્ન / ચર્ચા / ` +
+        `મીટિંગ માટે નીચે આપેલા નંબર પર સંપર્ક કરો. અમે આપની ` +
+        `બ્રાન્ડ માટે યોગ્ય મીડિયા-મિક્સ બનાવવા પ્રતિબદ્ધ છીએ.\n\n`
 
     // Phase 28b — owner correction: drop the manual-attach note. The
     // Combined PDF link above carries the merged file; the rep no
@@ -888,12 +935,12 @@ export default function GovtProposalDetailV2() {
     const signerName   = effectiveSigner?.name || ''
     const signerTitle  = effectiveSigner?.signature_title || ''
     const signerMobile = effectiveSigner?.signature_mobile || ''
-    body += `આભાર,\n`
+    body += isEn ? `Thank you,\n` : `આભાર,\n`
     if (signerName) {
       body += `${signerName}${signerTitle ? ` (${signerTitle})` : ''}\n`
     }
-    if (signerMobile) body += `મો. ${signerMobile}\n`
-    body += `અનટાઇટલ્ડ એડવર્ટાઇઝિંગ`
+    if (signerMobile) body += isEn ? `Mob. ${signerMobile}\n` : `મો. ${signerMobile}\n`
+    body += isEn ? `Untitled Advertising` : `અનટાઇટલ્ડ એડવર્ટાઇઝિંગ`
 
     // Phase 155 — openEmail opens the device email app (mailto:) on the
     // APK and Gmail web compose on desktop. The old single Gmail-WEB URL
