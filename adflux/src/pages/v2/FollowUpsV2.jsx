@@ -111,7 +111,7 @@ export default function FollowUpsV2() {
           total_amount, status,
           payments ( amount_received, approval_status )
         ),
-        lead:leads   ( id, name, company, phone, segment )
+        lead:leads   ( id, name, company, phone, segment, stage )
       `)
       .eq('is_done', false)
       .order('follow_up_date', { ascending: true })
@@ -145,7 +145,10 @@ export default function FollowUpsV2() {
     const [fuRes, nuRes] = await Promise.all([q, nq])
     if (fuRes.error) { setError(fuRes.error.message); setLoading(false); return }
     if (nuRes.error) { setError(nuRes.error.message); setLoading(false); return }
-    setRows(fuRes.data || [])
+    // Phase 176.1 — frontend backstop: never show a follow-up on a LOST lead,
+    // whatever the DB triggers did (lead-linked rows carry lead.stage; quote-
+    // linked rows have lead null and pass through, closed DB-side).
+    setRows((fuRes.data || []).filter(r => r.lead?.stage !== 'Lost'))
     setNurtureRows(nuRes.data || [])
     setLoading(false)
   }, [profile?.id, isPrivileged, repParam])
