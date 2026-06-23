@@ -4400,3 +4400,25 @@ compute_daily_ta · compute_monthly_salary + _compute_monthly_salary_base. Total
 duplicated DB functions 73 → 65. ~5,000 lines of duplicate SQL removed. Every one a
 capture (zero DB run, zero behaviour change), guardian-clean. The remaining 65 are
 lower-count (mostly 2-3 copies) + many are legit overloads / tiny trigger wrappers.
+
+### Phase 178 #10 — generate_quote_number + snapshot-aware dedup (`HEAD`)
+The §4 quote-ref trigger fn (UA/AUTO, UA/GSRTC, UA-YYYY formats). Appeared in 4
+files but 2 are the full-schema fresh-install SNAPSHOTS (supabase_all_migrations.sql
++ supabase_schema.sql) — a DIFFERENT kind of duplication than the phase-file disease.
+- Canonical: db/functions/generate_quote_number.sql (§4 formats guardian-verified).
+- Defused the 2 PHASE files only; LEFT the snapshots intact (they must stay complete
+  to bootstrap a fresh DB — never gut them; regenerate from canonicals if needed).
+- scripts/check-duplication.sh now EXCLUDES the 2 snapshots from its count. **The
+  honest phase-file duplication number is now 55, not 65** — 10 functions were only
+  "duplicated" via a snapshot, never the disease. Going forward the dedup count
+  reflects real phase-file collisions.
+- SNAPSHOT POLICY (new): supabase_all_migrations.sql + supabase_schema.sql are
+  generated fresh-install dumps. Do NOT hand-edit them to change a function; do NOT
+  count them as duplication; the long-term Stage-3 move is to REGENERATE them from
+  db/functions/ canonicals. They are fresh-install-only — running them on the LIVE
+  staging DB would revert everything to the snapshot state (a landmine — flag if
+  anyone proposes it).
+- Scoreboard: 11 functions single-source (10 rounds + the salary helper). Real
+  phase-file duplication 55 remaining (was mis-counted as 65). The tail is now
+  mostly 2-3 copy functions + legit overloads (next_workday etc — do NOT merge) +
+  tiny update_updated_at-style wrappers.
