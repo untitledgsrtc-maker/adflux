@@ -4203,3 +4203,69 @@ shadow-compared + owner-verified. `check-duplication.sh` flips to a HARD gate on
 
 A diff that re-introduces a cross-direction call merge, a `lost_nurture` respawn,
 or a second copy of the done-vs-system-close rule is a **BLOCK**.
+
+
+---
+
+## 72 · Phase 178 — Stage-2 consolidation #1: compute_daily_score → ONE file (2026-06-23, `8e19b66`)
+
+First real Stage-2 (§70/§71) consolidation. compute_daily_score was the worst
+offender — **10 copies** (the disease in §69). Now **one canonical file**.
+Committed, NOT yet pushed (sandbox can't push). **JS-free, SQL-run-free, APK-free.**
+
+### What this was — and what it was NOT
+- It was a **CAPTURE, not a change.** The canonical file is the LIVE function dumped
+  byte-for-byte via `pg_get_functiondef` on 2026-06-23. **Zero DB run requested,
+  zero behaviour change, the running function is untouched.** Scores/incentive/every
+  other function identical. This is the SAFE way to consolidate a money function
+  (§71 rule 3): photograph the live truth, retire the copies, change nothing.
+- Net diff: +266 / −1039 (773 lines of duplicated SQL deleted).
+
+### The new contract (FROZEN — the model for every future Stage-2 function)
+- **`db/functions/compute_daily_score.sql` is the ONE home.** To change the score,
+  EDIT THIS FILE and run it once in Studio. The 10 legacy phase files had their
+  compute_daily_score block + trailing GRANT REMOVED, each replaced by a pointer
+  comment. Re-running any old phase file can no longer revert the score.
+- `db/functions/` is the canonical directory. `check-duplication.sh` now reports
+  compute_daily_score as **1** (was 10) — it has left the collision list. As more
+  functions move here, the script flips to a hard pre-commit gate (§70).
+- The canonical file ends with a read-only **VERIFY/tripwire** (6 LIKE checks on
+  `pg_get_functiondef`): _assert_self_or_admin · min_calls · duration_seconds >= 10 ·
+  'Meeting scheduled%' · auto-check-in · COUNT(DISTINCT COALESCE(la.lead_id...)).
+  Any FALSE = an old copy was re-run → re-run the canonical to restore. Run it anytime.
+- LOCKED fixes baked in (BLOCK on regress, same as §71): 97.2 self-gate · 113 TC
+  target from `daily_targets.min_calls` (not JSONB) · 110 real-call gate · 113/127
+  meeting exclusions + lead dedup. The CALL branch stays `outcome IS NOT NULL OR ≥10s`
+  — owner's intentional looseness (§65/§67), do NOT tighten without his sign-off.
+
+### How it was done safely (the repeatable recipe)
+1. Owner dumped the live function (`pg_get_functiondef`) → ground truth.
+2. Saved verbatim as `db/functions/<name>.sql` + canonical header + VERIFY tripwire.
+3. Found every duplicate via the START line, computed the dollar-quote END
+   (`AS $tag$ … $tag$;`), checked for DROP/GRANT/callers FIRST (a leftover
+   `DROP FUNCTION` would be a landmine — there were none).
+4. Removed each CREATE-block + its trailing GRANT (assertion-guarded by line range),
+   leaving every SIBLING function in the multi-purpose files intact (7 of 10 also
+   defined the AFTER-INSERT score trigger / counter / monthly_score / 21 role-gates).
+5. Neutralised a stale COMMENTED rollback copy in phase97_2 (a pre-110/113/127 body
+   with the calls-JSONB bug) so no one can uncomment a broken score.
+6. Gates: check-sql-schema OK · check-duplication 10→1 · **sales-module-guardian PASS**
+   (all 4 contracts preserved, all siblings intact, no orphan fragment, no DROP).
+
+### NEXT Stage-2 candidates (worst-first, money LAST per §71 rule 3)
+`generate_lead_tasks` (8) · `compute_daily_ta` (7) · `campaign_conversation_ensure_lead`
+(5) · `lead_activity_bump_counter` (5) — these are non-money / lower-risk, do them
+BEFORE the money ones to refine the recipe. Money/security still pending:
+**`compute_monthly_salary` (9 copies)** — its stale rollback copy still sits commented
+in phase97_2 (left intentionally for when it's consolidated). Each money function:
+capture → shadow-compare → owner-verify → defuse copies, never mid-workday.
+
+### Owner action
+Push (JS-free, no SQL to run, no APK rebuild — capture only, your team sees nothing change):
+```
+cd ~/Documents/untitled-os2/Untitled/adflux
+git push origin untitled-os
+```
+Optional: run the VERIFY block at the bottom of `db/functions/compute_daily_score.sql`
+in Supabase Studio — all six should return TRUE (proves the live function still has
+every fix).
