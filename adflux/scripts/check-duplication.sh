@@ -13,9 +13,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "== Postgres functions CREATE OR REPLACE'd across >=2 SQL files (collision risk) =="
-for fn in $(grep -rhoE "CREATE OR REPLACE FUNCTION (public\.)?[a-z0-9_]+" --include='*.sql' . 2>/dev/null \
+# The 2 base snapshots (supabase_all_migrations.sql + supabase_schema.sql) are
+# generated FULL-SCHEMA fresh-install dumps, not the phase-file disease — they
+# legitimately contain every function. Exclude them so the count reflects real
+# phase-file duplication (§70 / Phase 178). Canonical bodies live in db/functions/.
+SNAP_EXCLUDE="--exclude=supabase_all_migrations.sql --exclude=supabase_schema.sql"
+for fn in $(grep -rhoE "CREATE OR REPLACE FUNCTION (public\.)?[a-z0-9_]+" --include='*.sql' $SNAP_EXCLUDE . 2>/dev/null \
             | sed -E 's/.*FUNCTION (public\.)?//' | sort -u); do
-  n=$(grep -rlE "CREATE OR REPLACE FUNCTION (public\.)?${fn}\b" --include='*.sql' . 2>/dev/null | wc -l | tr -d ' ')
+  n=$(grep -rlE "CREATE OR REPLACE FUNCTION (public\.)?${fn}\b" --include='*.sql' $SNAP_EXCLUDE . 2>/dev/null | wc -l | tr -d ' ')
   [ "$n" -ge 2 ] && printf "  %3d  %s\n" "$n" "$fn"
 done | sort -rn
 

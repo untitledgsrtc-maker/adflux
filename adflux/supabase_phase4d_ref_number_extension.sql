@@ -86,43 +86,12 @@ CREATE SEQUENCE IF NOT EXISTS public.quote_number_seq_gsrtc
 -- 3) REPLACE generate_quote_number() with media-aware version --------
 --    The trigger `quotes_quote_number BEFORE INSERT ON quotes` already
 --    points at this function by name. CREATE OR REPLACE is enough.
-CREATE OR REPLACE FUNCTION public.generate_quote_number()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_fy        text;
-  v_next_seq  bigint;
-BEGIN
-  -- Always stamp a fresh server-side number; ignore whatever the
-  -- client sent. Preserves the existing AdFlux invariant.
-
-  IF NEW.media_type = 'AUTO_HOOD' THEN
-    v_fy := public.fy_for_date(CURRENT_DATE);
-    v_next_seq := nextval('public.quote_number_seq_auto');
-    NEW.quote_number :=
-      'UA/AUTO/' || v_fy || '/' || LPAD(v_next_seq::text, 4, '0');
-
-  ELSIF NEW.media_type = 'GSRTC_LED' THEN
-    v_fy := public.fy_for_date(CURRENT_DATE);
-    v_next_seq := nextval('public.quote_number_seq_gsrtc');
-    NEW.quote_number :=
-      'UA/GSRTC/' || v_fy || '/' || LPAD(v_next_seq::text, 4, '0');
-
-  ELSE
-    -- LED_OTHER, HOARDING, MALL, CINEMA, DIGITAL, OTHER → legacy format.
-    -- Uses the existing quote_number_seq the original AdFlux code seeded.
-    v_next_seq := nextval('public.quote_number_seq');
-    NEW.quote_number :=
-      'UA-' || to_char(CURRENT_DATE, 'YYYY')
-            || '-' || LPAD(v_next_seq::text, 4, '0');
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- generate_quote_number REMOVED from this file (Phase 178).
+-- Canonical: db/functions/generate_quote_number.sql (§4 locked ref formats).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (quotes_quote_number) + the base-snapshot copies stay as-is.
+-- -------------------------------------------------------------------------
 
 
 -- =====================================================================

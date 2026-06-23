@@ -61,22 +61,12 @@ SELECT setval(
 -- 3) Replace the trigger function. The trigger itself (quotes_quote_number,
 --    BEFORE INSERT on quotes) already points at this function by name, so
 --    we don't need to drop/recreate the trigger.
-CREATE OR REPLACE FUNCTION public.generate_quote_number()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  -- Always stamp a fresh server-side number; ignore whatever the client sent.
-  NEW.quote_number :=
-    'UA-'
-    || TO_CHAR(CURRENT_DATE, 'YYYY')
-    || '-'
-    || LPAD(nextval('public.quote_number_seq')::text, 4, '0');
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- generate_quote_number REMOVED from this file (Phase 178).
+-- Canonical: db/functions/generate_quote_number.sql (§4 locked ref formats).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (quotes_quote_number) + the base-snapshot copies stay as-is.
+-- -------------------------------------------------------------------------
 
 -- 4) Sanity check (optional — safe to run, just shows current state).
 --    Uncomment to view in SQL editor:
