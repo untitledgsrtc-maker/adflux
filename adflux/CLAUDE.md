@@ -4422,3 +4422,15 @@ files but 2 are the full-schema fresh-install SNAPSHOTS (supabase_all_migrations
   phase-file duplication 55 remaining (was mis-counted as 65). The tail is now
   mostly 2-3 copy functions + legit overloads (next_workday etc — do NOT merge) +
   tiny update_updated_at-style wrappers.
+
+### Phase 178 #11 — monthly_score 3 → 1 (`HEAD`) — salary chain complete
+The score breakdown that feeds compute_monthly_salary (base_amount + variable_earned
++ avg_score_pct + working_days). Lived in 3 phase files. Canonical now
+db/functions/monthly_score.sql. Guardian PASS: 70/30 split (base x0.70 / var cap
+x0.30), variable_earned logic (0 days -> full cap; avg<50 -> 0; else proportional),
+daily_performance + staff_incentive_profiles reads, RETURNS TABLE columns, auth gate
+all byte-faithful. phase97_2 now at 10 live siblings.
+**The whole salary chain is single-source:** compute_monthly_salary ->
+_compute_monthly_salary_base -> monthly_score. Scoreboard: 12 functions done.
+Remaining phase-file duplication ~54 (3s + 2s; legit overloads like bump_daily_counter
+[3-arg + 4-arg], next_workday must NOT be merged; tg_*_push triggers + tiny wrappers).
