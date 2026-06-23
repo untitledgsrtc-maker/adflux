@@ -4434,3 +4434,18 @@ all byte-faithful. phase97_2 now at 10 live siblings.
 _compute_monthly_salary_base -> monthly_score. Scoreboard: 12 functions done.
 Remaining phase-file duplication ~54 (3s + 2s; legit overloads like bump_daily_counter
 [3-arg + 4-arg], next_workday must NOT be merged; tg_*_push triggers + tiny wrappers).
+
+### Phase 178 #12 — enqueue_push 3 → 1 + SECURITY landmine closed (`HEAD`)
+The push-pipeline core (§28). Canonical: db/functions/enqueue_push.sql. Body
+byte-faithful (§34Z.69: 5s timeout, push_log best-effort audit, hardcoded public
+anon key, DEFINER + extensions search_path). **SECURITY WIN:** §97.A2 revoked
+EXECUTE from authenticated, but all 3 old phase files still GRANTed it to
+authenticated — re-running any re-opened the rep-push-spam hole. Phase 178
+neutralized all 3 GRANT lines + the canonical bakes in the REVOKE (FROM PUBLIC,
+anon, authenticated) + GRANT to service_role (live ACL = {postgres, service_role}).
+Guardian PASS. phase33w_push_triggers keeps its 4 push-trigger fns.
+- ⚠ check-sql-schema.sh FALSE-POSITIVES on this canonical: its alias.column
+  heuristic matches the JWT anon key (eyJ…) + the Supabase URL — both string
+  literals with dots, not column refs. The SQL is valid; guardian is the gate. A
+  future script tweak could skip dotted string literals; not done here.
+- Scoreboard: 13 functions single-source. The push pipeline core is now locked.
