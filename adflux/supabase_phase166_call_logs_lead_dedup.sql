@@ -37,87 +37,12 @@
 -- FROZEN call chain (§28) — guardian + audited.
 
 -- ── 1. Extend the single-authority dedup with a same-lead fallback ──────
-CREATE OR REPLACE FUNCTION public.call_logs_dedupe_before_insert()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $function$
-DECLARE
-  v_phone text;
-  v_id    uuid;
-BEGIN
-  v_phone := right(regexp_replace(COALESCE(NEW.client_phone, ''), '\D', '', 'g'), 10);
-
-  -- Unknown / short number → can't correlate; keep the row as-is.
-  -- (Phase 126 behaviour, unchanged. Both ingest paths always carry a real
-  -- number, so the Phase 166 lead path below is still reached for live calls.)
-  IF length(v_phone) < 10 THEN
-    RETURN NEW;
-  END IF;
-
-  -- Real missed inbound = distinct event; never fold into a real call.
-  -- Only collapse a byte-identical same-minute missed (scan race).
-  IF NEW.direction = 'missed' THEN
-    IF EXISTS (
-      SELECT 1 FROM public.call_logs cl
-       WHERE cl.user_id   = NEW.user_id
-         AND cl.direction = 'missed'
-         AND right(regexp_replace(COALESCE(cl.client_phone,''),'\D','','g'),10) = v_phone
-         AND date_trunc('minute', cl.call_at) = date_trunc('minute', NEW.call_at)
-    ) THEN
-      RETURN NULL;
-    END IF;
-    RETURN NEW;
-  END IF;
-
-  -- PHONE MERGE (Phase 126, byte-unchanged): earliest existing NON-missed row
-  -- for this (rep, phone) within +/- 30 min becomes the survivor.
-  SELECT cl.id INTO v_id
-    FROM public.call_logs cl
-   WHERE cl.user_id = NEW.user_id
-     AND COALESCE(cl.direction,'') <> 'missed'
-     AND right(regexp_replace(COALESCE(cl.client_phone,''),'\D','','g'),10) = v_phone
-     AND cl.call_at BETWEEN NEW.call_at - INTERVAL '30 minutes'
-                        AND NEW.call_at + INTERVAL '30 minutes'
-   ORDER BY cl.call_at ASC, cl.id ASC
-   LIMIT 1;
-
-  -- PHASE 166 — SAME-LEAD fallback. The two ingest paths recorded this call
-  -- under different numbers of one lead; the phone key above missed it. Fold a
-  -- non-missed row for the SAME (rep, lead) within a tight +/-5 min window.
-  IF v_id IS NULL AND NEW.lead_id IS NOT NULL THEN
-    SELECT cl.id INTO v_id
-      FROM public.call_logs cl
-     WHERE cl.user_id = NEW.user_id
-       AND cl.lead_id = NEW.lead_id
-       AND COALESCE(cl.direction,'') <> 'missed'
-       AND cl.call_at BETWEEN NEW.call_at - INTERVAL '5 minutes'
-                          AND NEW.call_at + INTERVAL '5 minutes'
-     ORDER BY cl.call_at ASC, cl.id ASC
-     LIMIT 1;
-  END IF;
-
-  IF v_id IS NOT NULL THEN
-    UPDATE public.call_logs cl SET
-      call_at          = LEAST(cl.call_at, NEW.call_at),
-      duration_seconds = GREATEST(COALESCE(cl.duration_seconds,0), COALESCE(NEW.duration_seconds,0)),
-      outcome = CASE
-                  WHEN NEW.outcome = 'connected' THEN 'connected'
-                  WHEN cl.outcome  = 'connected' THEN cl.outcome
-                  WHEN NEW.outcome IN ('callback_requested','sales_ready','already_client','not_interested')
-                       AND cl.outcome IN ('no_answer','busy','wrong_number') THEN NEW.outcome
-                  ELSE cl.outcome
-                END,
-      lead_id  = COALESCE(cl.lead_id, NEW.lead_id),
-      language = COALESCE(cl.language, NEW.language)
-    WHERE cl.id = v_id;
-    RETURN NULL;  -- merged into the survivor → skip the insert
-  END IF;
-
-  RETURN NEW;
-END
-$function$;
+-- -------------------------------------------------------------------------
+-- call_logs_dedupe_before_insert REMOVED from this file (Phase 178).
+-- Canonical: db/functions/call_logs_dedupe_before_insert.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_call_logs_dedupe) stays below / in the phase files.
+-- -------------------------------------------------------------------------
 
 -- Trigger already exists (Phase 126); re-bind defensively (idempotent).
 DROP TRIGGER IF EXISTS trg_call_logs_dedupe ON public.call_logs;

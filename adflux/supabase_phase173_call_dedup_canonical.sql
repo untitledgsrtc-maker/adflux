@@ -34,90 +34,12 @@
 -- incoming calls as their own rows. Idempotent (CREATE OR REPLACE). §33 frozen
 -- meeting/call contracts untouched. One scoped lookup per INSERT (idx_call_logs_user_at).
 
-CREATE OR REPLACE FUNCTION public.call_logs_dedupe_before_insert()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $function$
-DECLARE
-  v_phone text;
-  v_id    uuid;
-BEGIN
-  v_phone := right(regexp_replace(COALESCE(NEW.client_phone, ''), '\D', '', 'g'), 10);
-
-  -- Unknown / short number → can't correlate; keep the row as-is.
-  IF length(v_phone) < 10 THEN
-    RETURN NEW;
-  END IF;
-
-  -- R4 — real missed inbound is a distinct event; collapse only a
-  -- byte-identical same-minute missed (scan race).
-  IF NEW.direction = 'missed' THEN
-    IF EXISTS (
-      SELECT 1 FROM public.call_logs cl
-       WHERE cl.user_id   = NEW.user_id
-         AND cl.direction = 'missed'
-         AND right(regexp_replace(COALESCE(cl.client_phone,''),'\D','','g'),10) = v_phone
-         AND date_trunc('minute', cl.call_at) = date_trunc('minute', NEW.call_at)
-    ) THEN
-      RETURN NULL;
-    END IF;
-    RETURN NEW;
-  END IF;
-
-  -- R1 + R2 + R3 — ONLY an OUTGOING call may fold into a tap. An incoming (or
-  -- any non-outgoing) real call NEVER folds → it falls straight through to the
-  -- INSERT below and lands as its own row. This is the single line that ends
-  -- the cross-direction mislabel.
-  IF NEW.direction = 'outgoing' THEN
-    -- Fold into an UNPATCHED tel-tap audit row (our own placeholder for this
-    -- same physical outgoing call). Match by phone within 60s, OR (cross-number
-    -- same lead — Vimal Oil ...121 vs ...122) within 5 min.
-    SELECT cl.id INTO v_id
-      FROM public.call_logs cl
-     WHERE cl.user_id = NEW.user_id
-       AND COALESCE(cl.direction,'') <> 'missed'
-       AND (cl.duration_seconds IS NULL OR cl.duration_seconds = 0)   -- UNPATCHED
-       AND cl.notes LIKE 'tel-tap audit%'                             -- a tap (outgoing-intent)
-       AND (
-             ( right(regexp_replace(COALESCE(cl.client_phone,''),'\D','','g'),10) = v_phone
-               AND cl.call_at BETWEEN NEW.call_at - INTERVAL '60 seconds'
-                                  AND NEW.call_at + INTERVAL '60 seconds' )
-          OR ( NEW.lead_id IS NOT NULL AND cl.lead_id = NEW.lead_id
-               AND cl.call_at BETWEEN NEW.call_at - INTERVAL '5 minutes'
-                                  AND NEW.call_at + INTERVAL '5 minutes' )
-           )
-     ORDER BY cl.call_at ASC, cl.id ASC
-     LIMIT 1;
-
-    IF v_id IS NOT NULL THEN
-      -- Fold THIS outgoing call into the tap: keep earliest stamp, real
-      -- duration, promote outcome, and STAMP direction = 'outgoing' (the tap
-      -- carried NULL direction — fixing that is part of the contract).
-      UPDATE public.call_logs cl SET
-        call_at          = LEAST(cl.call_at, NEW.call_at),
-        duration_seconds = GREATEST(COALESCE(cl.duration_seconds,0), COALESCE(NEW.duration_seconds,0)),
-        direction        = 'outgoing',
-        outcome = CASE
-                    WHEN NEW.outcome = 'connected' THEN 'connected'
-                    WHEN cl.outcome  = 'connected' THEN cl.outcome
-                    WHEN NEW.outcome IN ('callback_requested','sales_ready','already_client','not_interested')
-                         AND cl.outcome IN ('no_answer','busy','wrong_number') THEN NEW.outcome
-                    ELSE cl.outcome
-                  END,
-        lead_id  = COALESCE(cl.lead_id, NEW.lead_id),
-        language = COALESCE(cl.language, NEW.language)
-      WHERE cl.id = v_id;
-      RETURN NULL;  -- folded into the tap → skip the insert
-    END IF;
-  END IF;
-
-  -- R3 / R5 — incoming real call, OR outgoing with no tap → INSERT (mirror the
-  -- phone). Two real same-direction calls to the same lead both reach here.
-  RETURN NEW;
-END
-$function$;
+-- -------------------------------------------------------------------------
+-- call_logs_dedupe_before_insert REMOVED from this file (Phase 178).
+-- Canonical: db/functions/call_logs_dedupe_before_insert.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_call_logs_dedupe) stays below / in the phase files.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_call_logs_dedupe ON public.call_logs;
 CREATE TRIGGER trg_call_logs_dedupe

@@ -58,27 +58,12 @@ END
 $cleanup$;
 
 -- ── 2. BEFORE INSERT dedup trigger (skips exact duplicates) ─────────
-CREATE OR REPLACE FUNCTION public.call_logs_dedupe_before_insert()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $function$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-      FROM public.call_logs cl
-     WHERE cl.user_id          = NEW.user_id
-       AND cl.client_phone     IS NOT DISTINCT FROM NEW.client_phone
-       AND cl.direction        IS NOT DISTINCT FROM NEW.direction
-       AND cl.duration_seconds IS NOT DISTINCT FROM NEW.duration_seconds
-       AND date_trunc('minute', cl.call_at) = date_trunc('minute', NEW.call_at)
-  ) THEN
-    RETURN NULL;  -- exact duplicate in the same minute — skip the insert
-  END IF;
-  RETURN NEW;
-END
-$function$;
+-- -------------------------------------------------------------------------
+-- call_logs_dedupe_before_insert REMOVED from this file (Phase 178).
+-- Canonical: db/functions/call_logs_dedupe_before_insert.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_call_logs_dedupe) stays below / in the phase files.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_call_logs_dedupe ON public.call_logs;
 CREATE TRIGGER trg_call_logs_dedupe
