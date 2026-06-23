@@ -4383,3 +4383,20 @@ _assert_self_or_admin, ta_override REPLACE-km, ON CONFLICT WHERE status='pending
   shadow-compare wasn't needed (byte-identical = same payout). The LAST one,
   compute_monthly_salary (9 copies + helper _compute_monthly_salary_base), is the
   same — capture only. Reserve shadow-compare for when the owner CHANGES a money fn.
+
+### Phase 178 #9 — salary pair 9+2 → 1 each (`HEAD`) — WORST TIER CLEARED
+compute_monthly_salary (the MOST-duplicated fn, 9 files) + _compute_monthly_salary_base
+(2 files). The payroll RPC. Canonicals: db/functions/compute_monthly_salary.sql
+(phase101.a1 agency-split body) + db/functions/_compute_monthly_salary_base.sql
+(phase97.2 body). Guardian PASS (strict): net formula, leave math (quota 12 / divisor
+26 / half-day / FY carry), agency short-circuit, sales_manager override, auth gate all
+byte-faithful. phase97_2's big commented rollback section (stale copies of both) also
+neutralized. phase97_2 now down to 11 sibling RPCs.
+
+**STAGE-2 WORST TIER COMPLETE (10 functions, 9 rounds):** compute_daily_score ·
+generate_lead_tasks · campaign_conversation_ensure_lead · lead_activity_bump_counter ·
+recompute_daily_meetings · lead_activity_after_insert · call_logs_dedupe_before_insert ·
+compute_daily_ta · compute_monthly_salary + _compute_monthly_salary_base. Total
+duplicated DB functions 73 → 65. ~5,000 lines of duplicate SQL removed. Every one a
+capture (zero DB run, zero behaviour change), guardian-clean. The remaining 65 are
+lower-count (mostly 2-3 copies) + many are legit overloads / tiny trigger wrappers.
