@@ -4341,3 +4341,14 @@ The §33 NOTE in the workspace-root CLAUDE.md was updated: only the THIRD surfac
 GpsTrackV2.jsx (isScheduledMeetingRow + isAutoCheckinRow), remains separate (JS) —
 keep all three in step when adding an exclusion. (Workspace-root CLAUDE.md is above
 the git root → local edit, does NOT push.)
+
+### Phase 178 #6 — lead_activity_after_insert 5 → 1 (`HEAD`)
+The auto-Lost trigger fn (bumps contact_attempts_count + last_contact_at; SOFT-
+suggests auto-Lost at >=15 attempts — §26 Sprint F softened the old "3-attempt
+hard-Lost"). Lived in 5 files (phase12, 31b, 34b, 34z2, 34z17 — the auto-Lost
+evolution). Canonical now db/functions/lead_activity_after_insert.sql, captured
+from the live DB. IMPORTANT: preserved as a PLAIN trigger fn (NOT SECURITY DEFINER,
+no search_path) — that's the live shape; don't "harden" it without owner sign-off.
+Siblings intact (phase12's 6 fns + 6 triggers, phase34b's dismiss_auto_lost RPC);
+trigger wiring left in place. Guardian PASS (threshold 15, soft-only, stage guard
+all verified). Scoreboard: 6 done, 73 → 69.
