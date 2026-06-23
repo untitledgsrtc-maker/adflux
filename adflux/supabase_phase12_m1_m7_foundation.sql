@@ -334,18 +334,12 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.lead_activity_bump_counter()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.activity_type = 'call' THEN
-    PERFORM public.bump_daily_counter(NEW.created_by, 'calls', 1);
-  ELSIF NEW.activity_type = 'meeting' THEN
-    PERFORM public.bump_daily_counter(NEW.created_by, 'meetings', 1);
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_activity_bump_counter REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_activity_bump_counter.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_lead_activity_bump_counter) stays in phase12_m1_m7_foundation.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_lead_activity_bump_counter ON public.lead_activities;
 CREATE TRIGGER trg_lead_activity_bump_counter

@@ -46,62 +46,12 @@
 -- =====================================================================
 
 -- ─── 93.7.1 — Re-target the LIVE counter function ───────────────────
-CREATE OR REPLACE FUNCTION public.lead_activity_bump_counter()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_already_today int;
-BEGIN
-  -- Calls branch — unchanged. Every call row bumps.
-  -- (Connect-rate KPI dedup handled client-side via direction filter
-  -- + Phase 93.1 .or() guard. Counter intentionally raw.)
-  IF NEW.activity_type = 'call' THEN
-    PERFORM public.bump_daily_counter(NEW.created_by, 'calls', 1);
-    RETURN NEW;
-  END IF;
-
-  -- Meeting branch — guards inline.
-  IF NEW.activity_type IN ('meeting', 'site_visit') THEN
-    -- Phase 93.6 — skip "I'm here · auto-check-in" companion rows.
-    -- Companion shares activity_type='meeting' + GPS coords with the
-    -- real meeting row, so without this guard every save double-bumps.
-    IF NEW.notes IS NOT NULL
-       AND NEW.notes LIKE 'I''m here · auto-check-in%' THEN
-      RETURN NEW;
-    END IF;
-
-    -- Phase 93.7 — revisit detection. If NEW.lead_id is set AND the
-    -- rep already has a non-companion meeting/site_visit row today
-    -- for the same lead, skip. Walk-ins (lead_id IS NULL) always
-    -- bump because they can't be dedupe'd.
-    IF NEW.lead_id IS NOT NULL THEN
-      SELECT count(*)
-        INTO v_already_today
-        FROM public.lead_activities prev
-       WHERE prev.created_by      = NEW.created_by
-         AND prev.lead_id         = NEW.lead_id
-         AND prev.activity_type   IN ('meeting', 'site_visit')
-         AND prev.created_at::date = NEW.created_at::date
-         AND prev.id              <> NEW.id
-         AND (prev.notes IS NULL
-              OR prev.notes NOT LIKE 'I''m here · auto-check-in%');
-
-      IF v_already_today > 0 THEN
-        RETURN NEW;  -- revisit; KPI already credited today
-      END IF;
-    END IF;
-
-    -- First non-companion meeting/site_visit for this lead today.
-    PERFORM public.bump_daily_counter(NEW.created_by, 'meetings', 1);
-    RETURN NEW;
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_activity_bump_counter REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_activity_bump_counter.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_lead_activity_bump_counter) stays in phase12_m1_m7_foundation.
+-- -------------------------------------------------------------------------
 
 -- Mark the dead function so future grep stops chasing it.
 COMMENT ON FUNCTION public.bump_meeting_counter() IS

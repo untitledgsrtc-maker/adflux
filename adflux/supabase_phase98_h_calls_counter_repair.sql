@@ -134,76 +134,12 @@ $$;
 --    Meeting branch: byte-identical to Phase 93.7.1 (auto-check-in
 --    skip + revisit dedup).
 -- ────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.lead_activity_bump_counter()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_already_today int;
-  v_sibling_call  int;
-BEGIN
-  -- ── Calls branch (Phase 98.H — was: bump unconditionally) ──
-  -- Skip the bump if a call_logs row for the same (user, lead)
-  -- already INSERTed within 5s. trg_call_log_bump_counter already
-  -- fired for that sibling. Orphan paths (TC outcome-modal,
-  -- LeadsV2 row-call) skip call_logs → no sibling → bump here.
-  -- Net: +1 per real call event, not 2.
-  IF NEW.activity_type = 'call' THEN
-    SELECT count(*)
-      INTO v_sibling_call
-      FROM public.call_logs cl
-     WHERE cl.lead_id = NEW.lead_id
-       AND cl.user_id = NEW.created_by
-       AND abs(extract(epoch FROM (cl.created_at - NEW.created_at))) < 5;
-
-    IF v_sibling_call = 0 THEN
-      PERFORM public.bump_daily_counter(
-        NEW.created_by,
-        'calls',
-        1,
-        (COALESCE(NEW.created_at, now())
-           AT TIME ZONE 'Asia/Kolkata')::date
-      );
-    END IF;
-    RETURN NEW;
-  END IF;
-
-  -- ── Meeting / site_visit branch — Phase 93.6 + 93.7 byte-identical ──
-  IF NEW.activity_type IN ('meeting', 'site_visit') THEN
-    -- Phase 93.6 — skip "I'm here · auto-check-in" companion rows.
-    IF NEW.notes IS NOT NULL
-       AND NEW.notes LIKE 'I''m here · auto-check-in%' THEN
-      RETURN NEW;
-    END IF;
-
-    -- Phase 93.7 — revisit detection. Walk-ins (lead_id IS NULL)
-    -- always bump because they can't be dedupe'd.
-    IF NEW.lead_id IS NOT NULL THEN
-      SELECT count(*)
-        INTO v_already_today
-        FROM public.lead_activities prev
-       WHERE prev.created_by      = NEW.created_by
-         AND prev.lead_id         = NEW.lead_id
-         AND prev.activity_type   IN ('meeting', 'site_visit')
-         AND prev.created_at::date = NEW.created_at::date
-         AND prev.id              <> NEW.id
-         AND (prev.notes IS NULL
-              OR prev.notes NOT LIKE 'I''m here · auto-check-in%');
-
-      IF v_already_today > 0 THEN
-        RETURN NEW;
-      END IF;
-    END IF;
-
-    PERFORM public.bump_daily_counter(NEW.created_by, 'meetings', 1);
-    RETURN NEW;
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_activity_bump_counter REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_activity_bump_counter.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_lead_activity_bump_counter) stays in phase12_m1_m7_foundation.
+-- -------------------------------------------------------------------------
 
 
 NOTIFY pgrst, 'reload schema';
@@ -342,41 +278,7 @@ NOTIFY pgrst, 'reload schema';
 -- END;
 -- $$;
 --
--- CREATE OR REPLACE FUNCTION public.lead_activity_bump_counter()
--- RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
--- AS $$
--- DECLARE
---   v_already_today int;
--- BEGIN
---   IF NEW.activity_type = 'call' THEN
---     PERFORM public.bump_daily_counter(NEW.created_by, 'calls', 1);
---     RETURN NEW;
---   END IF;
---   IF NEW.activity_type IN ('meeting', 'site_visit') THEN
---     IF NEW.notes IS NOT NULL
---        AND NEW.notes LIKE 'I''m here · auto-check-in%' THEN
---       RETURN NEW;
---     END IF;
---     IF NEW.lead_id IS NOT NULL THEN
---       SELECT count(*)
---         INTO v_already_today
---         FROM public.lead_activities prev
---        WHERE prev.created_by      = NEW.created_by
---          AND prev.lead_id         = NEW.lead_id
---          AND prev.activity_type   IN ('meeting', 'site_visit')
---          AND prev.created_at::date = NEW.created_at::date
---          AND prev.id              <> NEW.id
---          AND (prev.notes IS NULL
---               OR prev.notes NOT LIKE 'I''m here · auto-check-in%');
---       IF v_already_today > 0 THEN
---         RETURN NEW;
---       END IF;
---     END IF;
---     PERFORM public.bump_daily_counter(NEW.created_by, 'meetings', 1);
---     RETURN NEW;
---   END IF;
---   RETURN NEW;
--- END;
--- $$;
+-- lead_activity_bump_counter rollback body REMOVED (Phase 178). Stale copy;
+-- to restore, re-run db/functions/lead_activity_bump_counter.sql (canonical).
 --
 -- NOTIFY pgrst, 'reload schema';
