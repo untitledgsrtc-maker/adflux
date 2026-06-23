@@ -4269,3 +4269,34 @@ git push origin untitled-os
 Optional: run the VERIFY block at the bottom of `db/functions/compute_daily_score.sql`
 in Supabase Studio — all six should return TRUE (proves the live function still has
 every fix).
+
+### Phase 178 #2 — generate_lead_tasks 8 → 1 (`39b54e6`)
+
+Second Stage-2 move, same recipe. The smart-task engine (lead_tasks queue →
+per-task push, §34Z.55; frozen-adjacent §28) lived in 8 files across **two
+signatures**. Canonical now `db/functions/generate_lead_tasks.sql`.
+- The live dump returned **ONE** signature, `generate_lead_tasks(uuid)` (the
+  Phase 130 body). The old `(date)` overloads were already dropped (phase34z19)
+  — they survived only as dead repo copies. **Do NOT recreate the (date)
+  signature** (two overloads would let callers bind the wrong one).
+- New overload-specific landmine handled: phase34z19 had `DROP FUNCTION …
+  generate_lead_tasks(uuid) CASCADE` before its CREATE; removing the CREATE
+  alone would have left a re-run bomb (drop-with-cascade, no recreate). Removed
+  the DROPs **with** the block. phase33t's GRANT folded into the canonical.
+- Siblings preserved: phase130's 3 push-hygiene functions + phase19's
+  `complete_lead_task`. Guardian PASS. check-duplication 8 → 1.
+- Locked contracts in the canonical (BLOCK on regress): Phase 130 self-gate +
+  snooze-survival DELETE (`status='open'` only) + no-push `ON CONFLICT DO
+  NOTHING` reuse + the 3 kinds hot_idle/new_untouched/follow_up_due.
+
+**Stage-2 scoreboard:** compute_daily_score ✅ · generate_lead_tasks ✅.
+**Next (worst-first, money LAST):** compute_daily_ta (7 — but it's the ₹3/km TA
+payout, so it's actually MONEY: capture → shadow-compare → owner-verify) ·
+campaign_conversation_ensure_lead (5, non-money) · lead_activity_bump_counter
+(5, feeds the §33 meeting-KPI — high contract-sensitivity) · compute_monthly_salary
+(9, money, LAST). NOTE: I mislabeled compute_daily_ta "non-money" in the §72 push
+note above — it pays TA, treat as money.
+
+### Owner action (Phase 178 #2)
+Same — push, no SQL, no APK rebuild, team sees no change. Optional: run the VERIFY
+block at the bottom of `db/functions/generate_lead_tasks.sql` (all six TRUE).
