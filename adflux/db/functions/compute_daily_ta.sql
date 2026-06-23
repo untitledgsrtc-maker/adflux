@@ -25,11 +25,12 @@
 --    • bike rate: default ₹3/km (v_bike_rate := 3), overridden by the detected
 --                 city's bike_per_km.
 --
--- ⚠ NO 600 km DAILY CAP in the live function. §44.7 documents a "daily cap 600km"
---    but the running body has NONE — the per-segment <=120 km/h filter is the only
---    GPS-spike guard. Captured AS-IS (mirror live). If the owner wants a hard daily
---    ceiling, that is a CHANGE (add LEAST(v_total_km, 600)) → shadow-compare +
---    owner-verify, NOT silently added here. Flagged 2026-06-23.
+-- ✅ 200 km DAILY CAP (Phase 178.1, owner 23-06-2026). The original live body had
+--    NO daily cap (§44.7's "600km" was never in the code). After a 90-day shadow
+--    check (only 1 unapproved day fleet-wide exceeded 200km — Mayur 318), the owner
+--    set a hard 200 km/day ceiling: LEAST(v_total_km, 200) on the GPS km. An admin
+--    ta_override claim stays uncapped (deliberate approval). This is the ONE line
+--    that differs from the 2026-06-23 capture → running this file APPLIES the cap.
 --
 -- 🔒 PAYOUT-SAFETY GUARDS (do NOT remove):
 --    • _assert_self_or_admin(p_user_id) — Phase 97.2 security gate.
@@ -37,9 +38,10 @@
 --      NEVER overwrites an already-APPROVED TA payout. Critical.
 --    • ta_override (approved claim) REPLACES the GPS km (admin override path).
 --
--- PROVENANCE: captured byte-for-byte from the LIVE DB 2026-06-23 via
---    pg_get_functiondef. Single signature (uuid, date). The phase103_d6 "seg10"
---    version. Running this file is a NO-OP.
+-- PROVENANCE: captured from the LIVE DB 2026-06-23 via pg_get_functiondef (the
+--    phase103_d6 "seg10" version), PLUS the Phase 178.1 200km cap line (the only
+--    diff vs the dump). Single signature (uuid, date). Running this file APPLIES
+--    the 200km cap — owner must run it once in Studio to make the cap live.
 --
 -- TRIGGER WIRING (the per-ping TA recompute trigger + the claim-approve
 --    trg_ta_claim_recompute in phase36.8) lives in the phase files — NOT here.
@@ -111,6 +113,14 @@ BEGIN
     v_prev_lng := v_ping.lng;
     v_prev_ts  := v_ping.captured_at;
   END LOOP;
+
+  -- Phase 178.1 (owner 23-06-2026) — hard 200 km/day ceiling on the GPS-computed
+  -- km. The per-segment <=120 km/h filter catches teleport spikes; this catches
+  -- the rare day that still sums absurdly (e.g. Mayur's 318 km on a bike — the
+  -- ONLY >200 day in 90 days across the fleet, unapproved). Applied to GPS km
+  -- only; an admin ta_override claim (below) is a deliberate approval and is NOT
+  -- capped. Decided after a 90-day shadow check: zero approved days exceed 200.
+  v_total_km := LEAST(v_total_km, 200);
 
   SELECT dc.city_name, dc.category, dc.is_home, dc.bike_per_km
     INTO v_city_count
@@ -192,6 +202,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%>= 0.010%'                      AS seg_10m,
 --   pg_get_functiondef(p.oid) LIKE '%v_seg_speed <= 120%'            AS speed_120,
 --   pg_get_functiondef(p.oid) LIKE '%ta_override%'                   AS claim_override_path,
---   pg_get_functiondef(p.oid) LIKE '%daily_ta.status = ''pending''%' AS never_overwrite_approved
+--   pg_get_functiondef(p.oid) LIKE '%daily_ta.status = ''pending''%' AS never_overwrite_approved,
+--   pg_get_functiondef(p.oid) LIKE '%LEAST(v_total_km, 200)%'        AS daily_cap_200_live
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'compute_daily_ta';
