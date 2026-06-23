@@ -4352,3 +4352,15 @@ no search_path) — that's the live shape; don't "harden" it without owner sign-
 Siblings intact (phase12's 6 fns + 6 triggers, phase34b's dismiss_auto_lost RPC);
 trigger wiring left in place. Guardian PASS (threshold 15, soft-only, stage guard
 all verified). Scoreboard: 6 done, 73 → 69.
+
+### Phase 178 #7 — call_logs_dedupe_before_insert 5 → 1 (`HEAD`)
+The §170/§173 call-dedup "mirror the phone log" trigger fn. Lived in 5 files
+(113.5, 126, 166, 170, 173). Live dump = the Phase 173 direction-aware body
+(folds only into an unpatched tel-tap audit row; only outgoing folds; missed
+inbound distinct; two real repeat-calls both survive). Canonical now
+db/functions/call_logs_dedupe_before_insert.sql. BONUS: removing phase126 +
+phase166's broad-merge BODIES kills the §69.1 revert landmine permanently —
+re-running them can no longer over-merge calls. Trigger trg_call_logs_dedupe
+left intact (5 idempotent re-creates). §173 LOCKSTEP: the direction rule is
+mirrored in src/utils/callHistoryIngest.js (frontend JS, untouched — change both
+together). Guardian PASS. Scoreboard: 7 done, 73 → 68.
