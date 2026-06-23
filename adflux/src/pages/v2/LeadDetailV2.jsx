@@ -52,7 +52,11 @@ import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { logCallAudit } from '../../utils/callAudit'
 import { markCallStart } from '../../utils/callTimer'
-import { openExternalUrl } from '../../utils/openExternal'
+import { openExternalUrl, openEmail } from '../../utils/openExternal'
+// Phase 177 — private-lead intro email: GSRTC LED draft + brochure attach.
+import { buildLeadEmailDraft } from '../../utils/leadEmailDraft'
+import { downloadToCache } from '../../utils/downloadToCache'
+import { shareEmailDirect } from '../../utils/shareDirect'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { Modal, ActionButton } from '../../components/v2/primitives'
@@ -480,6 +484,38 @@ export default function LeadDetailV2() {
   // navigation gets the user gesture first. setTimeout(0) puts the
   // insert on the next event-loop tick, after the browser has handed
   // off to the system app.
+  // Phase 177 — PRIVATE lead Email: open a GSRTC-LED intro draft + attach the
+  // company brochure (native, via download-to-cache) or link it (web). Govt
+  // leads never reach here (their Email stays a plain mailto). Best-effort:
+  // any failure falls through to a plain mailto so Email never dead-ends.
+  async function handleLeadBrochureEmail() {
+    if (!lead?.email) return
+    fireAndForgetLog('email', `Email → ${lead.email}`)
+    let company = null
+    try {
+      const { data } = await supabase
+        .from('companies')
+        .select('name, brochure_url')
+        .eq('segment', 'PRIVATE')
+        .limit(1)
+        .maybeSingle()
+      company = data
+    } catch { /* company row missing → draft still composes with the legal name */ }
+    const rep = { name: profile?.name, mobile: profile?.mobile || profile?.phone }
+    const { subject, body } = buildLeadEmailDraft({ lead, company, rep })
+    const brochureUrl = (company?.brochure_url || '').trim()
+    // Native: attach the brochure (download → ShareDirect). Both utils no-op to
+    // false/null on web, so the mailto fallback runs there.
+    try {
+      const fileUri = brochureUrl ? await downloadToCache(brochureUrl, 'brochure.pdf') : ''
+      const direct = await shareEmailDirect({ to: lead.email, subject, body, fileUri: fileUri || '' })
+      if (direct?.completed) return
+    } catch { /* fall through to mailto */ }
+    // Fallback (web / Gmail not installed): mailto with the brochure as a link.
+    const fullBody = brochureUrl ? `${body}\n\nBrochure: ${brochureUrl}` : body
+    openEmail({ to: lead.email, subject, body: fullBody })
+  }
+
   function fireAndForgetLog(activityType, notes) {
     setTimeout(() => { quickLog(activityType, notes) }, 0)
   }
@@ -1274,14 +1310,21 @@ export default function LeadDetailV2() {
               {/* Email — falls back to LogActivityModal when lead has
                   no email on file (most govt leads). */}
               {lead.email ? (
-                <a
-                  href={`mailto:${lead.email}?subject=${encodeURIComponent('Outdoor advertising — ' + (lead.company || lead.name || ''))}`}
-                  className="lead-btn lead-btn-sm"
-                  onClick={() => fireAndForgetLog('email', `Email → ${lead.email}`)}
-                  style={{ textDecoration: 'none' }}
-                >
-                  <Mail size={13} /> <span>Email</span>
-                </a>
+                lead.segment === 'PRIVATE' ? (
+                  /* Phase 177 — PRIVATE: GSRTC intro draft + brochure attach. */
+                  <button className="lead-btn lead-btn-sm" onClick={handleLeadBrochureEmail}>
+                    <Mail size={13} /> <span>Email</span>
+                  </button>
+                ) : (
+                  <a
+                    href={`mailto:${lead.email}?subject=${encodeURIComponent('Outdoor advertising — ' + (lead.company || lead.name || ''))}`}
+                    className="lead-btn lead-btn-sm"
+                    onClick={() => fireAndForgetLog('email', `Email → ${lead.email}`)}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Mail size={13} /> <span>Email</span>
+                  </a>
+                )
               ) : (
                 <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('email')}>
                   <Mail size={13} /> <span>Email</span>
