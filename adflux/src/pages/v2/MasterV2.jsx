@@ -846,6 +846,8 @@ function CompaniesTab() {
       // Phase 80 — admin-uploaded thank-you page for the Private LED
       // quotation PDF. Null = renderer skips the final page.
       thank_you_url:   (r.thank_you_url || '').trim() || null,
+      // Phase 177 — brochure PDF, attached to PRIVATE-lead intro emails.
+      brochure_url:    (r.brochure_url || '').trim() || null,
     }
     const { error } = await supabase
       .from('companies')
@@ -1062,6 +1064,18 @@ function CompaniesTab() {
                     accept="image/png,image/jpeg"
                     onUpload={url => handleAssetUploaded(r.id, 'thank_you_url', url)}
                     onClear={()  => handleAssetCleared(r.id, 'thank_you_url')}
+                  />
+                  {/* Phase 177 — brochure PDF, attached to PRIVATE-lead intro
+                      emails (LeadDetailV2 Email action). Upload on the PRIVATE
+                      company row; govt leads don't use it. */}
+                  <AssetUploader
+                    row={r}
+                    field="brochure_url"
+                    label="Brochure (private lead email)"
+                    kind="brochure"
+                    accept="application/pdf"
+                    onUpload={url => handleAssetUploaded(r.id, 'brochure_url', url)}
+                    onClear={()  => handleAssetCleared(r.id, 'brochure_url')}
                   />
                 </div>
               </div>
