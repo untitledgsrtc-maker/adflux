@@ -512,7 +512,11 @@ export default function LeadDetailV2() {
       if (direct?.completed) return
     } catch { /* fall through to mailto */ }
     // Fallback (web / Gmail not installed): mailto with the brochure as a link.
-    const fullBody = brochureUrl ? `${body}\n\nBrochure: ${brochureUrl}` : body
+    // Phase 177.1 — link the BRANDED route (app.untitledad.in/api/brochure
+    // redirects to the current brochure); the native attach above still
+    // downloads the raw file URL.
+    const brandedBrochure = `${window.location.origin}/api/brochure`
+    const fullBody = brochureUrl ? `${body}\n\nBrochure: ${brandedBrochure}` : body
     openEmail({ to: lead.email, subject, body: fullBody })
   }
 
