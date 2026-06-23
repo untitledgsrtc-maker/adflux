@@ -4290,12 +4290,11 @@ signatures**. Canonical now `db/functions/generate_lead_tasks.sql`.
   NOTHING` reuse + the 3 kinds hot_idle/new_untouched/follow_up_due.
 
 **Stage-2 scoreboard:** compute_daily_score ✅ · generate_lead_tasks ✅ ·
-campaign_conversation_ensure_lead ✅ · lead_activity_bump_counter ✅ (4 done; total
-duplicated DB functions 73 → 71).
+campaign_conversation_ensure_lead ✅ · lead_activity_bump_counter ✅ ·
+recompute_daily_meetings ✅ (5 done — the §33 meeting-counter SQL pair is now BOTH
+single-source; total duplicated DB functions 73 → 70).
 **Next (worst-first, money LAST):** lead_activity_after_insert (5) ·
 call_logs_dedupe_before_insert (~3, §170 mirror-phone contract) ·
-recompute_daily_meetings (2 — the §33 delete-heal LOCKSTEP partner of
-lead_activity_bump_counter; do it SOON so the pair doesn't drift) ·
 compute_daily_ta (7, MONEY — ₹3/km TA payout: capture → shadow-compare → owner-verify) ·
 compute_monthly_salary (9, money, LAST).
 
@@ -4331,3 +4330,14 @@ phase98_h's stale commented rollback was also neutralized.
   workspace-root CLAUDE.md was updated to point at the new canonical (that file is
   above the git root, so it's edited locally but does NOT push — re-edit there if it
   resets).
+
+### Phase 178 #5 — recompute_daily_meetings 2 → 1 (`9230a2a`) — §33 SQL pair CLOSED
+The §33 DELETE-heal, lockstep partner of lead_activity_bump_counter. Lived in 2
+files (103_e1, 103_e2). Live dump = the phase103_e2 body (has the 'Meeting
+scheduled%' skip). Guardian verified its exclusion set is IDENTICAL to the insert
+counter's — so both halves of the §33 SQL lockstep are now single-source in
+db/functions/. phase103_e1 keeps its trigger fn + trg_lead_activity_meeting_recount_del.
+The §33 NOTE in the workspace-root CLAUDE.md was updated: only the THIRD surface,
+GpsTrackV2.jsx (isScheduledMeetingRow + isAutoCheckinRow), remains separate (JS) —
+keep all three in step when adding an exclusion. (Workspace-root CLAUDE.md is above
+the git root → local edit, does NOT push.)
