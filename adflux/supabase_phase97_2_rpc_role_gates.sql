@@ -375,94 +375,11 @@ BEGIN
 END $function$;
 
 -- 5.3 compute_daily_score
-CREATE OR REPLACE FUNCTION public.compute_daily_score(p_user_id uuid, p_date date)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $function$
-DECLARE
-  v_role       text;
-  v_targets    jsonb;
-  v_target     int;
-  v_done       int;
-  v_pct        numeric;
-  v_excluded   boolean := false;
-  v_reason     text    := NULL;
-  v_off_day    boolean := false;
-  v_dow        int;
-  v_activity   text;
-BEGIN
-  PERFORM public._assert_self_or_admin(p_user_id);
-
-  v_dow := EXTRACT(ISODOW FROM p_date);
-
-  IF v_dow = 7 THEN
-    v_excluded := true;
-    v_reason   := 'Sunday';
-  END IF;
-
-  IF NOT v_excluded AND EXISTS (
-    SELECT 1 FROM holidays WHERE holiday_date = p_date AND is_active = true
-  ) THEN
-    v_excluded := true;
-    SELECT name INTO v_reason FROM holidays
-      WHERE holiday_date = p_date AND is_active = true LIMIT 1;
-    v_reason := COALESCE('Holiday: ' || v_reason, 'Holiday');
-  END IF;
-
-  IF NOT v_excluded THEN
-    SELECT COALESCE(is_off_day, false), COALESCE(off_reason, '')
-      INTO v_off_day, v_reason
-      FROM work_sessions
-     WHERE user_id = p_user_id AND work_date = p_date;
-    IF v_off_day THEN
-      v_excluded := true;
-      v_reason   := COALESCE(NULLIF(v_reason, ''), 'Approved leave');
-    END IF;
-  END IF;
-
-  SELECT role, daily_targets
-    INTO v_role, v_targets
-    FROM users
-   WHERE id = p_user_id;
-
-  IF v_role = 'telecaller' THEN
-    v_target   := COALESCE((v_targets->>'calls')::int, 50);
-    v_activity := 'call';
-  ELSE
-    v_target   := COALESCE((v_targets->>'meetings')::int, 5);
-    v_activity := 'meeting';
-  END IF;
-
-  SELECT COUNT(*)
-    INTO v_done
-    FROM lead_activities la
-   WHERE la.created_by    = p_user_id
-     AND la.activity_type = v_activity
-     AND (la.created_at AT TIME ZONE 'Asia/Kolkata')::date = p_date;
-
-  IF v_target = 0 THEN
-    v_pct := 100;
-  ELSE
-    v_pct := LEAST(100, (v_done::numeric / v_target::numeric) * 100);
-  END IF;
-
-  INSERT INTO daily_performance (
-    user_id, work_date, meetings_done, meetings_target,
-    score_pct, is_excluded, excluded_reason, calculated_at
-  ) VALUES (
-    p_user_id, p_date, v_done, v_target,
-    v_pct, v_excluded, v_reason, now()
-  )
-  ON CONFLICT (user_id, work_date) DO UPDATE
-    SET meetings_done   = EXCLUDED.meetings_done,
-        meetings_target = EXCLUDED.meetings_target,
-        score_pct       = EXCLUDED.score_pct,
-        is_excluded     = EXCLUDED.is_excluded,
-        excluded_reason = EXCLUDED.excluded_reason,
-        calculated_at   = now();
-END $function$;
+-- -------------------------------------------------------------------------
+-- compute_daily_score REMOVED from this file (Phase 178 consolidation).
+-- The ONE canonical version now lives in: db/functions/compute_daily_score.sql
+-- Do NOT re-add it here. To change the score, edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
 -- 5.4 monthly_score
 CREATE OR REPLACE FUNCTION public.monthly_score(p_user_id uuid, p_month_start date)
@@ -1008,36 +925,10 @@ NOTIFY pgrst, 'reload schema';
 --   RETURN v_result;
 -- END $function$;
 --
--- CREATE OR REPLACE FUNCTION public.compute_daily_score(p_user_id uuid, p_date date)
--- RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
--- DECLARE v_role text; v_targets jsonb; v_target int; v_done int; v_pct numeric;
---   v_excluded boolean := false; v_reason text := NULL; v_off_day boolean := false; v_dow int; v_activity text;
--- BEGIN
---   v_dow := EXTRACT(ISODOW FROM p_date);
---   IF v_dow = 7 THEN v_excluded := true; v_reason := 'Sunday'; END IF;
---   IF NOT v_excluded AND EXISTS (SELECT 1 FROM holidays WHERE holiday_date = p_date AND is_active = true) THEN
---     v_excluded := true;
---     SELECT name INTO v_reason FROM holidays WHERE holiday_date = p_date AND is_active = true LIMIT 1;
---     v_reason := COALESCE('Holiday: '||v_reason, 'Holiday');
---   END IF;
---   IF NOT v_excluded THEN
---     SELECT COALESCE(is_off_day,false), COALESCE(off_reason,'') INTO v_off_day, v_reason
---       FROM work_sessions WHERE user_id = p_user_id AND work_date = p_date;
---     IF v_off_day THEN v_excluded := true; v_reason := COALESCE(NULLIF(v_reason,''),'Approved leave'); END IF;
---   END IF;
---   SELECT role, daily_targets INTO v_role, v_targets FROM users WHERE id = p_user_id;
---   IF v_role = 'telecaller' THEN v_target := COALESCE((v_targets->>'calls')::int, 50); v_activity := 'call';
---   ELSE v_target := COALESCE((v_targets->>'meetings')::int, 5); v_activity := 'meeting'; END IF;
---   SELECT COUNT(*) INTO v_done FROM lead_activities la
---    WHERE la.created_by = p_user_id AND la.activity_type = v_activity
---      AND (la.created_at AT TIME ZONE 'Asia/Kolkata')::date = p_date;
---   IF v_target = 0 THEN v_pct := 100; ELSE v_pct := LEAST(100,(v_done::numeric/v_target::numeric)*100); END IF;
---   INSERT INTO daily_performance (user_id,work_date,meetings_done,meetings_target,score_pct,is_excluded,excluded_reason,calculated_at)
---   VALUES (p_user_id,p_date,v_done,v_target,v_pct,v_excluded,v_reason,now())
---   ON CONFLICT (user_id,work_date) DO UPDATE SET meetings_done = EXCLUDED.meetings_done,
---     meetings_target = EXCLUDED.meetings_target, score_pct = EXCLUDED.score_pct,
---     is_excluded = EXCLUDED.is_excluded, excluded_reason = EXCLUDED.excluded_reason, calculated_at = now();
--- END $function$;
+-- compute_daily_score rollback body REMOVED (Phase 178). It was a stale
+-- pre-Phase-110/113/127 version (calls-JSONB target, no call-gate, no meeting
+-- exclusions). To restore the score, re-run db/functions/compute_daily_score.sql
+-- — the single canonical source. Do NOT uncomment an old body.
 --
 -- For brevity, the remaining 7 (monthly_score, compute_daily_ta,
 -- backfill_performance, backfill_ta, score_history,
