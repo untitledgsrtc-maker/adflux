@@ -39,37 +39,12 @@ UPDATE public.leads
    AND COALESCE(contact_attempts_count, 0) < 15;
 
 -- 2. Ensure trigger is on the new threshold (re-creates from Phase 34Z.2).
-CREATE OR REPLACE FUNCTION public.lead_activity_after_insert()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-  v_attempts int;
-  v_suggested boolean;
-BEGIN
-  IF NEW.activity_type IN ('call','whatsapp','email','meeting','site_visit') THEN
-    UPDATE public.leads
-       SET contact_attempts_count = contact_attempts_count + 1,
-           last_contact_at        = COALESCE(NEW.created_at, now()),
-           updated_at             = now()
-     WHERE id = NEW.lead_id
-     RETURNING contact_attempts_count, auto_lost_suggested
-       INTO v_attempts, v_suggested;
-
-    -- Threshold = 15 (Phase 34Z.2 / 34Z.17).
-    IF v_attempts >= 15
-       AND (NEW.outcome IS NULL OR NEW.outcome IN ('neutral','negative'))
-       AND v_suggested IS NOT TRUE THEN
-      UPDATE public.leads
-         SET auto_lost_suggested    = true,
-             auto_lost_suggested_at = now(),
-             updated_at             = now()
-       WHERE id = NEW.lead_id
-         AND stage NOT IN ('Won','Lost','Nurture');
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_activity_after_insert REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_activity_after_insert.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_lead_activity_after_insert) stays in phase12 (+ idempotent re-creates).
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_lead_activity_after_insert ON public.lead_activities;
 CREATE TRIGGER trg_lead_activity_after_insert

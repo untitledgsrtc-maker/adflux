@@ -44,39 +44,12 @@ CREATE INDEX IF NOT EXISTS idx_leads_auto_lost_suggested
 
 
 -- ─── 2. Rewrite trigger to signal, not act ───────────────────────────
-CREATE OR REPLACE FUNCTION public.lead_activity_after_insert()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-  v_attempts int;
-  v_suggested boolean;
-BEGIN
-  IF NEW.activity_type IN ('call','whatsapp','email','meeting','site_visit') THEN
-    UPDATE public.leads
-       SET contact_attempts_count = contact_attempts_count + 1,
-           last_contact_at        = COALESCE(NEW.created_at, now()),
-           updated_at             = now()
-     WHERE id = NEW.lead_id
-     RETURNING contact_attempts_count, auto_lost_suggested
-       INTO v_attempts, v_suggested;
-
-    -- Phase 34B — was: auto-flip stage to Lost. Now: set a soft
-    -- suggestion that the UI surfaces as a chip. Only set if not
-    -- already suggested (dismissed suggestions stay dismissed).
-    IF v_attempts >= 3
-       AND (NEW.outcome IS NULL OR NEW.outcome IN ('neutral','negative'))
-       AND v_suggested IS NOT TRUE THEN
-      UPDATE public.leads
-         SET auto_lost_suggested    = true,
-             auto_lost_suggested_at = now(),
-             updated_at             = now()
-       WHERE id = NEW.lead_id
-         AND stage NOT IN ('Won','Lost','Nurture');
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_activity_after_insert REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_activity_after_insert.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_lead_activity_after_insert) stays in phase12 (+ idempotent re-creates).
+-- -------------------------------------------------------------------------
 
 -- Trigger row stays bound to this function — CREATE OR REPLACE
 -- swaps the body in place. Re-bind for safety on fresh DBs.

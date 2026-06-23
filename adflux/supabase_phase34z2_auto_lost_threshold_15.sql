@@ -25,39 +25,12 @@
 -- Idempotent — re-running is a no-op (CREATE OR REPLACE).
 -- =====================================================================
 
-CREATE OR REPLACE FUNCTION public.lead_activity_after_insert()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-  v_attempts int;
-  v_suggested boolean;
-BEGIN
-  IF NEW.activity_type IN ('call','whatsapp','email','meeting','site_visit') THEN
-    UPDATE public.leads
-       SET contact_attempts_count = contact_attempts_count + 1,
-           last_contact_at        = COALESCE(NEW.created_at, now()),
-           updated_at             = now()
-     WHERE id = NEW.lead_id
-     RETURNING contact_attempts_count, auto_lost_suggested
-       INTO v_attempts, v_suggested;
-
-    -- Phase 34Z.2 — threshold bumped 3 → 15. Owner: real B2B deals
-    -- need 6-10 touches before they convert; 3 was firing on still-
-    -- warm leads. 15 keeps the dormant-lead safety net.
-    IF v_attempts >= 15
-       AND (NEW.outcome IS NULL OR NEW.outcome IN ('neutral','negative'))
-       AND v_suggested IS NOT TRUE THEN
-      UPDATE public.leads
-         SET auto_lost_suggested    = true,
-             auto_lost_suggested_at = now(),
-             updated_at             = now()
-       WHERE id = NEW.lead_id
-         AND stage NOT IN ('Won','Lost','Nurture');
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_activity_after_insert REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_activity_after_insert.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_lead_activity_after_insert) stays in phase12 (+ idempotent re-creates).
+-- -------------------------------------------------------------------------
 
 -- Re-bind for safety on fresh DBs.
 DROP TRIGGER IF EXISTS trg_lead_activity_after_insert ON public.lead_activities;

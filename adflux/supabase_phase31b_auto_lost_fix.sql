@@ -24,44 +24,12 @@
 --
 -- Idempotent — replaces the existing function in place.
 
-CREATE OR REPLACE FUNCTION public.lead_activity_after_insert()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-  v_attempts        int;
-  v_negative_count  int;
-BEGIN
-  IF NEW.activity_type IN ('call','whatsapp','email','meeting','site_visit') THEN
-    UPDATE public.leads
-       SET contact_attempts_count = contact_attempts_count + 1,
-           last_contact_at        = COALESCE(NEW.created_at, now()),
-           updated_at             = now()
-     WHERE id = NEW.lead_id
-     RETURNING contact_attempts_count INTO v_attempts;
-
-    -- Phase 31B — only count EXPLICIT negative outcomes. Auto-log
-    -- clicks (Phase 30C rev2) have outcome=null because the rep
-    -- hasn't classified the conversation yet — those should NOT push
-    -- the lead toward Lost. Threshold also raised 3 → 5 so even
-    -- repeated genuine "no answer" attempts give the rep more runway
-    -- before the system forces closure.
-    SELECT COUNT(*) INTO v_negative_count
-      FROM public.lead_activities
-     WHERE lead_id = NEW.lead_id
-       AND outcome = 'negative';
-
-    IF v_negative_count >= 5 THEN
-      UPDATE public.leads
-         SET stage       = 'Lost',
-             lost_reason = COALESCE(lost_reason, 'NoResponse'),
-             updated_at  = now()
-       WHERE id = NEW.lead_id
-         AND stage NOT IN ('Won','Lost');
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_activity_after_insert REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_activity_after_insert.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_lead_activity_after_insert) stays in phase12 (+ idempotent re-creates).
+-- -------------------------------------------------------------------------
 
 -- VERIFY:
 -- The trigger is unchanged structurally (still AFTER INSERT on
