@@ -47,63 +47,13 @@ CREATE POLICY push_log_admin ON public.push_log
 
 
 -- ─── 2. enqueue_push: 5s timeout + audit row ─────────────────────
-CREATE OR REPLACE FUNCTION public.enqueue_push(
-  p_user_id  uuid,
-  p_title    text,
-  p_body     text,
-  p_url      text DEFAULT '/work',
-  p_tag      text DEFAULT 'untitled'
-) RETURNS bigint
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-DECLARE
-  v_request_id bigint;
-  v_url  text := 'https://kompjctmisnitjpbjalh.supabase.co/functions/v1/notify-rep';
-  v_anon text := current_setting('app.settings.anon_key', true);
-BEGIN
-  IF v_anon IS NULL OR v_anon = '' THEN
-    v_anon := 'SET_ANON_KEY_VIA_app.settings.anon_key';
-  END IF;
+-- -------------------------------------------------------------------------
+-- enqueue_push REMOVED from this file (Phase 178).
+-- Canonical: db/functions/enqueue_push.sql (push core; §97.A2 REVOKE baked in).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
-  -- Phase 34Z.69 fix #3 — explicit 5s timeout. pg_net defaults to
-  -- 180s; long enough to hang the calling transaction if notify-rep
-  -- is slow. Push is fire-and-forget, so we want it to fail fast.
-  SELECT net.http_post(
-    url := v_url,
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'apikey', v_anon,
-      'Authorization', 'Bearer ' || v_anon
-    ),
-    body := jsonb_build_object(
-      'user_id', p_user_id,
-      'title',   p_title,
-      'body',    p_body,
-      'url',     p_url,
-      'tag',     p_tag
-    ),
-    timeout_milliseconds := 5000
-  ) INTO v_request_id;
-
-  -- Phase 34Z.69 fix #7 — audit row. Lets admin SELECT * FROM
-  -- push_log to see every notification attempt + correlate with
-  -- net._http_response by request_id.
-  BEGIN
-    INSERT INTO public.push_log (request_id, user_id, title, body, url, tag)
-    VALUES (v_request_id, p_user_id, p_title, p_body, p_url, p_tag);
-  EXCEPTION WHEN OTHERS THEN
-    -- Never block the underlying business event because of audit
-    -- logging. Push table can fail (RLS, disk, anything); we
-    -- swallow.
-    NULL;
-  END;
-
-  RETURN v_request_id;
-END $$;
-
-GRANT EXECUTE ON FUNCTION public.enqueue_push(uuid, text, text, text, text) TO authenticated;
+-- enqueue_push GRANT removed (Phase 178): §97.A2 revoked EXECUTE from authenticated; the canonical (db/functions/enqueue_push.sql) enforces the revoke. Re-granting here would RE-OPEN the rep-to-rep push-spam hole.
 
 NOTIFY pgrst, 'reload schema';
 

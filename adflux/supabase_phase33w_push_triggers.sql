@@ -47,53 +47,13 @@ CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 -- Setting these via current_setting('app.supabase_url') would be
 -- nicer but Supabase doesn't expose those by default. Hardcoded
 -- string keeps this self-contained.
-CREATE OR REPLACE FUNCTION public.enqueue_push(
-  p_user_id  uuid,
-  p_title    text,
-  p_body     text,
-  p_url      text DEFAULT '/work',
-  p_tag      text DEFAULT 'untitled'
-) RETURNS bigint
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-DECLARE
-  v_request_id bigint;
-  v_url  text := 'https://kompjctmisnitjpbjalh.supabase.co/functions/v1/notify-rep';
-  v_anon text := current_setting('app.settings.anon_key', true);
-BEGIN
-  -- Fall back to a sentinel if no setting is configured. Owner can
-  -- ALTER DATABASE SET app.settings.anon_key once + restart, OR just
-  -- replace this literal. For now hardcode allowed since anon keys
-  -- are public-by-design.
-  IF v_anon IS NULL OR v_anon = '' THEN
-    -- Sentinel — keeps function valid but pushes fail loudly until
-    -- owner sets the anon key. Replace the next line with the real
-    -- anon key string OR run:
-    --   ALTER DATABASE postgres SET app.settings.anon_key = 'eyJ...';
-    v_anon := 'SET_ANON_KEY_VIA_app.settings.anon_key';
-  END IF;
+-- -------------------------------------------------------------------------
+-- enqueue_push REMOVED from this file (Phase 178).
+-- Canonical: db/functions/enqueue_push.sql (push core; §97.A2 REVOKE baked in).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
-  SELECT net.http_post(
-    url := v_url,
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'apikey', v_anon,
-      'Authorization', 'Bearer ' || v_anon
-    ),
-    body := jsonb_build_object(
-      'user_id', p_user_id,
-      'title',   p_title,
-      'body',    p_body,
-      'url',     p_url,
-      'tag',     p_tag
-    )
-  ) INTO v_request_id;
-  RETURN v_request_id;
-END $$;
-
-GRANT EXECUTE ON FUNCTION public.enqueue_push(uuid, text, text, text, text) TO authenticated;
+-- enqueue_push GRANT removed (Phase 178): §97.A2 revoked EXECUTE from authenticated; the canonical (db/functions/enqueue_push.sql) enforces the revoke. Re-granting here would RE-OPEN the rep-to-rep push-spam hole.
 
 -- ─── 3. Trigger: new lead assigned ───────────────────────────────
 -- Fires when:

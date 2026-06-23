@@ -11,41 +11,13 @@
 -- Run this AFTER supabase_phase33w_push_triggers.sql. CREATE OR
 -- REPLACE so it's safe to run on top.
 
-CREATE OR REPLACE FUNCTION public.enqueue_push(
-  p_user_id  uuid,
-  p_title    text,
-  p_body     text,
-  p_url      text DEFAULT '/work',
-  p_tag      text DEFAULT 'untitled'
-) RETURNS bigint
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-DECLARE
-  v_request_id bigint;
-  v_url  text := 'https://kompjctmisnitjpbjalh.supabase.co/functions/v1/notify-rep';
-  v_anon text := 'sb_publishable_9_MhDyQkqBES4KQjVQUgxQ_1OsEfoMY';
-BEGIN
-  SELECT net.http_post(
-    url := v_url,
-    headers := jsonb_build_object(
-      'Content-Type',  'application/json',
-      'apikey',        v_anon,
-      'Authorization', 'Bearer ' || v_anon
-    ),
-    body := jsonb_build_object(
-      'user_id', p_user_id,
-      'title',   p_title,
-      'body',    p_body,
-      'url',     p_url,
-      'tag',     p_tag
-    )
-  ) INTO v_request_id;
-  RETURN v_request_id;
-END $$;
+-- -------------------------------------------------------------------------
+-- enqueue_push REMOVED from this file (Phase 178).
+-- Canonical: db/functions/enqueue_push.sql (push core; §97.A2 REVOKE baked in).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
-GRANT EXECUTE ON FUNCTION public.enqueue_push(uuid, text, text, text, text) TO authenticated;
+-- enqueue_push GRANT removed (Phase 178): §97.A2 revoked EXECUTE from authenticated; the canonical (db/functions/enqueue_push.sql) enforces the revoke. Re-granting here would RE-OPEN the rep-to-rep push-spam hole.
 
 -- VERIFY: should return a non-null request_id and your phone should
 -- buzz within ~5 seconds.
