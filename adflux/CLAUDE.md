@@ -4289,13 +4289,25 @@ signatures**. Canonical now `db/functions/generate_lead_tasks.sql`.
   snooze-survival DELETE (`status='open'` only) + no-push `ON CONFLICT DO
   NOTHING` reuse + the 3 kinds hot_idle/new_untouched/follow_up_due.
 
-**Stage-2 scoreboard:** compute_daily_score ✅ · generate_lead_tasks ✅.
-**Next (worst-first, money LAST):** compute_daily_ta (7 — but it's the ₹3/km TA
-payout, so it's actually MONEY: capture → shadow-compare → owner-verify) ·
-campaign_conversation_ensure_lead (5, non-money) · lead_activity_bump_counter
-(5, feeds the §33 meeting-KPI — high contract-sensitivity) · compute_monthly_salary
-(9, money, LAST). NOTE: I mislabeled compute_daily_ta "non-money" in the §72 push
-note above — it pays TA, treat as money.
+**Stage-2 scoreboard:** compute_daily_score ✅ · generate_lead_tasks ✅ ·
+campaign_conversation_ensure_lead ✅ (3 done; total duplicated DB functions 73 → 72).
+**Next (worst-first, money LAST):** lead_activity_bump_counter (5, feeds the §33
+meeting-KPI — high contract-sensitivity, NOT money) · call_logs_dedupe_before_insert
+(now ~3, §170 mirror-phone contract) · lead_activity_after_insert (5) ·
+compute_daily_ta (7, MONEY — ₹3/km TA payout: capture → shadow-compare → owner-verify) ·
+compute_monthly_salary (9, money, LAST).
+
+### Phase 178 #3 — campaign_conversation_ensure_lead 5 → 1 (`2672d6b`)
+The WhatsApp-chat→lead trigger fn (§46/§53) lived in 5 files (C4.5→C8→C8.1→C11→168).
+C8.1 once silently dropped C8's `location_id` → that drop is the whole reason Phase
+168 had to exist (§168) — textbook "works then breaks." Canonical now
+`db/functions/campaign_conversation_ensure_lead.sql` (live dump = the Phase 168 body,
+single trigger-fn signature). Function body removed from all 5; the two `CREATE
+TRIGGER trg_campaign_conv_ensure_lead` (c45 + c8_location), the Phase 168 backfill,
+and the ADD COLUMN statements LEFT INTACT — only the body moved. Guardian PASS:
+all 4 P0 contracts + location_id restore + double-EXCEPTION wrap preserved. The
+TRIGGER wiring intentionally stays in c45/c8 (this canonical owns the function body
+only) — a trigger fn's canonical doesn't need to own the CREATE TRIGGER.
 
 ### Owner action (Phase 178 #2)
 Same — push, no SQL, no APK rebuild, team sees no change. Optional: run the VERIFY
