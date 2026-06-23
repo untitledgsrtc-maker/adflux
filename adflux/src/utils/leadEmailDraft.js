@@ -21,21 +21,25 @@ export function buildLeadEmailDraft({ lead, company, rep } = {}) {
   const repName = (rep?.name || '').trim()
   const repMob  = (rep?.mobile || rep?.phone || '').toString().trim()
 
-  const subject = `${coName} — Introduction & Brochure`
+  const subject = `GSRTC LED Screen Advertising — ${coName}`
 
   const body =
     `Dear ${contact},\n\n` +
-    `Thank you for your time. I'm sharing a brief introduction to ${coName} ` +
-    `along with our brochure for your reference.\n\n` +
-    `${coName} plans and executes outdoor (OOH) advertising across Gujarat — ` +
-    `LED screens, hoardings, auto-rickshaw hoods, and mall & cinema media — ` +
-    `for private brands. We handle planning, site selection, printing and ` +
-    `execution end to end.\n\n` +
-    `The attached brochure covers the media we offer, typical reach, and how a ` +
-    `campaign comes together. I'd be glad to prepare a plan suited to your ` +
-    `requirement.\n\n` +
-    `Please feel free to reach me on the number below for anything further.\n\n` +
-    `Thank you,\n` +
+    `${coName} offers brand advertising on GSRTC LED screens — the digital ` +
+    `display network at Gujarat State Road Transport (GSRTC) bus stands across ` +
+    `the state.\n\n` +
+    `The network spans 264 LED screens across 20 cities. Each bus stand sees ` +
+    `thousands of commuters a day who wait 15-30 minutes — a high-dwell, ` +
+    `high-recall setting, where a 10-second slot repeats through the day and ` +
+    `stays with the viewer.\n\n` +
+    `What sets it apart is AI-powered audience analytics: every screen reports ` +
+    `real data — unique viewers, daily impressions, and gender & age ` +
+    `distribution per location — so you know exactly who is seeing your brand, ` +
+    `not an estimate.\n\n` +
+    `The attached brochure has the full city-by-city screen list, audience ` +
+    `numbers and slot options. We'd be glad to build a plan for your brand and ` +
+    `budget.\n\n` +
+    `For anything further, please reach me on the number below.\n\n` +
     (repName ? `${repName}\n` : '') +
     (repMob ? `${repMob}\n` : '') +
     `${coName}`
