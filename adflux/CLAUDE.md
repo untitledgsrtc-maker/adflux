@@ -4290,10 +4290,12 @@ signatures**. Canonical now `db/functions/generate_lead_tasks.sql`.
   NOTHING` reuse + the 3 kinds hot_idle/new_untouched/follow_up_due.
 
 **Stage-2 scoreboard:** compute_daily_score ✅ · generate_lead_tasks ✅ ·
-campaign_conversation_ensure_lead ✅ (3 done; total duplicated DB functions 73 → 72).
-**Next (worst-first, money LAST):** lead_activity_bump_counter (5, feeds the §33
-meeting-KPI — high contract-sensitivity, NOT money) · call_logs_dedupe_before_insert
-(now ~3, §170 mirror-phone contract) · lead_activity_after_insert (5) ·
+campaign_conversation_ensure_lead ✅ · lead_activity_bump_counter ✅ (4 done; total
+duplicated DB functions 73 → 71).
+**Next (worst-first, money LAST):** lead_activity_after_insert (5) ·
+call_logs_dedupe_before_insert (~3, §170 mirror-phone contract) ·
+recompute_daily_meetings (2 — the §33 delete-heal LOCKSTEP partner of
+lead_activity_bump_counter; do it SOON so the pair doesn't drift) ·
 compute_daily_ta (7, MONEY — ₹3/km TA payout: capture → shadow-compare → owner-verify) ·
 compute_monthly_salary (9, money, LAST).
 
@@ -4312,3 +4314,20 @@ only) — a trigger fn's canonical doesn't need to own the CREATE TRIGGER.
 ### Owner action (Phase 178 #2)
 Same — push, no SQL, no APK rebuild, team sees no change. Optional: run the VERIFY
 block at the bottom of `db/functions/generate_lead_tasks.sql` (all six TRUE).
+
+### Phase 178 #4 — lead_activity_bump_counter 5 → 1 (`2cedb7c`)
+The §33 meeting-KPI counter (burned ~3×). Lived in 5 files (phase12, 93.7.1, 98.h,
+103.e2, 127). The live dump proved the body is the **Phase 127 superset** — it kept
+phase103_e2's `Meeting scheduled%` skip AND added the 127 prior-must-be-done
+refinement, so §33's feared "phase127 reverted 103_e2" landmine did NOT fire.
+Canonical now `db/functions/lead_activity_bump_counter.sql` with a 6-marker tripwire
+(auto-checkin, scheduled, revisit dedup, prior-must-be-done, bump, call-5s). All 5
+§33 exclusions verified by guardian (strict pass). Trigger wiring stays in phase12;
+phase98_h's stale commented rollback was also neutralized.
+- ⚠ LOCKSTEP DEBT: `recompute_daily_meetings()` (the §33 delete-heal partner) is NOT
+  yet consolidated — still in `supabase_phase103_e2_*`. The two share the exact
+  meeting-exclusion set; consolidate recompute_daily_meetings NEXT-ish and keep both
+  bodies identical, or they drift (the §33 disease). The §33 section in the
+  workspace-root CLAUDE.md was updated to point at the new canonical (that file is
+  above the git root, so it's edited locally but does NOT push — re-edit there if it
+  resets).
