@@ -4364,3 +4364,22 @@ re-running them can no longer over-merge calls. Trigger trg_call_logs_dedupe
 left intact (5 idempotent re-creates). §173 LOCKSTEP: the direction rule is
 mirrored in src/utils/callHistoryIngest.js (frontend JS, untouched — change both
 together). Guardian PASS. Scoreboard: 7 done, 73 → 68.
+
+### Phase 178 #8 — compute_daily_ta 7 → 1 (`HEAD`) — first MONEY function
+The TA payout calc (Rs/km bike + DA + hotel + claim merges → daily_ta). Lived in
+7 files. Live dump = the phase103_d6 "seg10" body. Canonical now
+db/functions/compute_daily_ta.sql. Thresholds verified vs §44.7: acc<=50m,
+seg>=10m (0.010km), speed<=120, Rs3/km (city override). Payout guards preserved:
+_assert_self_or_admin, ta_override REPLACE-km, ON CONFLICT WHERE status='pending'
+(never overwrite an approved payout). Guardian PASS, all 13 phase97_2 siblings +
+36_8 claim trigger intact.
+- ⚠ FLAGGED (owner-aware): the LIVE compute_daily_ta has NO 600km daily cap — the
+  §44.7 doc claims "daily cap 600km" but the running body has none (the per-segment
+  <=120km/h filter is the only GPS-spike guard). Captured AS-IS. If owner wants a
+  hard daily ceiling that's a CHANGE (add LEAST(v_total_km,600) → shadow-compare +
+  owner-verify), NOT silently added. The §44.7 doc line should be corrected to
+  "no server-side daily cap; speed filter only" when someone next edits §44.
+- Money-function recipe note: this was a pure CAPTURE (no DB run) so the §71-rule-3
+  shadow-compare wasn't needed (byte-identical = same payout). The LAST one,
+  compute_monthly_salary (9 copies + helper _compute_monthly_salary_base), is the
+  same — capture only. Reserve shadow-compare for when the owner CHANGES a money fn.
