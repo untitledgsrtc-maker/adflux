@@ -43,37 +43,12 @@
 -- =====================================================================
 
 -- ── 1. Recompute helper ──────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.recompute_daily_meetings(p_user uuid, p_date date)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $function$
-DECLARE
-  v_count int;
-BEGIN
-  -- Unique meetings for the day. Dedup key matches Phase 93.7:
-  --   linked lead  -> one per lead_id (revisits collapse)
-  --   walk-in      -> lead_id NULL -> fall back to the row id (each unique)
-  -- Auto-check-in companion rows are excluded (Phase 93.6).
-  SELECT count(DISTINCT COALESCE(lead_id::text, id::text))
-    INTO v_count
-    FROM public.lead_activities
-   WHERE created_by      = p_user
-     AND activity_type   IN ('meeting', 'site_visit')
-     AND created_at::date = p_date
-     AND (notes IS NULL OR notes NOT LIKE 'I''m here · auto-check-in%');
-
-  INSERT INTO public.work_sessions (user_id, work_date, daily_counters)
-  VALUES (p_user, p_date, jsonb_build_object('meetings', v_count))
-  ON CONFLICT (user_id, work_date) DO UPDATE
-    SET daily_counters = jsonb_set(
-          COALESCE(public.work_sessions.daily_counters, '{}'::jsonb),
-          '{meetings}',
-          to_jsonb(v_count)
-        );
-END
-$function$;
+-- -------------------------------------------------------------------------
+-- recompute_daily_meetings REMOVED from this file (Phase 178).
+-- Canonical: db/functions/recompute_daily_meetings.sql
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_lead_activity_meeting_recount_del) stays in phase103_e1.
+-- -------------------------------------------------------------------------
 
 -- Internal helper only — not an RPC. It can't inflate (it counts real
 -- rows), but keep it off the public surface anyway.
