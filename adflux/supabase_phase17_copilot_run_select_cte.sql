@@ -16,37 +16,11 @@
 -- IDEMPOTENT: CREATE OR REPLACE.
 -- =====================================================================
 
-CREATE OR REPLACE FUNCTION public.run_select(sql_text text)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY INVOKER
-AS $$
-DECLARE
-  result jsonb;
-BEGIN
-  -- Hard rejects: anything that isn't a SELECT or a CTE-prefixed SELECT.
-  IF NOT (sql_text ~* '^\s*(select|with)\b') THEN
-    RAISE EXCEPTION 'Only SELECT or WITH … SELECT statements allowed';
-  END IF;
-  -- Belt and suspenders — block any DDL/DML keywords even if the entry
-  -- gate let a CTE through. \m / \M are Postgres word boundaries.
-  IF sql_text ~* '\m(insert|update|delete|drop|truncate|alter|create|grant|revoke)\M' THEN
-    RAISE EXCEPTION 'Write/DDL keywords are forbidden in run_select';
-  END IF;
-
-  EXECUTE format('SELECT coalesce(jsonb_agg(t), ''[]''::jsonb) FROM (%s) t', sql_text)
-    INTO result;
-
-  -- Cap response size at 100 rows even if the inner query didn't have a LIMIT.
-  -- We slice in JSON-land instead of wrapping the SQL in `LIMIT 100` because
-  -- LIMIT after a CTE-with-aggregation can change the result shape.
-  IF jsonb_array_length(result) > 100 THEN
-    result := (SELECT jsonb_agg(elem) FROM jsonb_array_elements(result) WITH ORDINALITY AS arr(elem, idx) WHERE idx <= 100);
-  END IF;
-
-  RETURN result;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- run_select REMOVED from this file (Phase 178).
+-- Canonical: db/functions/run_select.sql (Co-Pilot SQL executor; SECURITY INVOKER).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
 GRANT EXECUTE ON FUNCTION public.run_select(text) TO authenticated;
 

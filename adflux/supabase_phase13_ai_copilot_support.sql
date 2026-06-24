@@ -38,28 +38,11 @@ CREATE POLICY "ai_runs_self_insert" ON public.ai_runs FOR INSERT
 -- SECURITY INVOKER means the SELECT runs as the calling user, so RLS
 -- still filters rows. The function itself rejects anything that isn't
 -- a single SELECT.
-CREATE OR REPLACE FUNCTION public.run_select(sql_text text)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY INVOKER
-AS $$
-DECLARE
-  result jsonb;
-BEGIN
-  -- Hard rejects: anything that isn't a SELECT
-  IF NOT (sql_text ~* '^\s*select\b') THEN
-    RAISE EXCEPTION 'Only SELECT statements allowed';
-  END IF;
-  IF sql_text ~* '\b(insert|update|delete|drop|truncate|alter|create|grant|revoke)\b' THEN
-    RAISE EXCEPTION 'Write/DDL keywords are forbidden in run_select';
-  END IF;
-
-  EXECUTE format('SELECT coalesce(jsonb_agg(t), ''[]''::jsonb) FROM (%s LIMIT 100) t', sql_text)
-    INTO result;
-
-  RETURN result;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- run_select REMOVED from this file (Phase 178).
+-- Canonical: db/functions/run_select.sql (Co-Pilot SQL executor; SECURITY INVOKER).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
 GRANT EXECUTE ON FUNCTION public.run_select(text) TO authenticated;
 

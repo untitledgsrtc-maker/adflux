@@ -18,54 +18,11 @@
 -- IDEMPOTENT: CREATE OR REPLACE.
 -- =====================================================================
 
-CREATE OR REPLACE FUNCTION public.run_select(sql_text text)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY INVOKER
-AS $$
-DECLARE
-  result      jsonb;
-  cleaned     text;
-  first_word  text;
-BEGIN
-  -- Strip a leading SQL comment (single line) if Claude prefixed one.
-  cleaned := regexp_replace(sql_text, '^\s*--[^\n]*\n', '', 'n');
-  cleaned := trim(cleaned);
-
-  -- Extract the first whitespace-delimited token, lowercase it.
-  first_word := lower(regexp_replace(cleaned, '\s.*$', ''));
-  -- regexp_replace strips a trailing semicolon if the SQL is just `select;`
-  first_word := regexp_replace(first_word, ';.*$', '');
-
-  IF first_word NOT IN ('select', 'with') THEN
-    RAISE EXCEPTION 'Only SELECT or WITH … SELECT statements allowed (got: %)', first_word;
-  END IF;
-
-  -- DDL/DML guard. Postgres POSIX word boundaries are \m (start) and
-  -- \M (end). Don't use \b — that's backspace.
-  IF cleaned ~* '\m(insert|update|delete|drop|truncate|alter|create|grant|revoke)\M' THEN
-    RAISE EXCEPTION 'Write/DDL keywords are forbidden in run_select';
-  END IF;
-
-  -- Strip trailing semicolon — EXECUTE format() doesn't like it inside
-  -- the subquery wrapper.
-  cleaned := regexp_replace(cleaned, ';\s*$', '');
-
-  EXECUTE format('SELECT coalesce(jsonb_agg(t), ''[]''::jsonb) FROM (%s) t', cleaned)
-    INTO result;
-
-  -- Cap at 100 rows in jsonb space (LIMIT inside the SQL would mangle CTEs).
-  IF jsonb_array_length(result) > 100 THEN
-    result := (
-      SELECT jsonb_agg(elem)
-      FROM jsonb_array_elements(result) WITH ORDINALITY AS arr(elem, idx)
-      WHERE idx <= 100
-    );
-  END IF;
-
-  RETURN result;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- run_select REMOVED from this file (Phase 178).
+-- Canonical: db/functions/run_select.sql (Co-Pilot SQL executor; SECURITY INVOKER).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
 GRANT EXECUTE ON FUNCTION public.run_select(text) TO authenticated;
 
