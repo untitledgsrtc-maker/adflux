@@ -62,32 +62,11 @@ CREATE INDEX IF NOT EXISTS payments_pending_idx
 --    counts approved final payments.
 -- =====================================================
 
-CREATE OR REPLACE FUNCTION rebuild_monthly_sales(p_staff uuid, p_month text)
-RETURNS void AS $$
-DECLARE
-  new_rev numeric := 0;
-  ren_rev numeric := 0;
-BEGIN
-  SELECT
-    COALESCE(SUM(CASE WHEN q.revenue_type = 'new'     THEN q.subtotal ELSE 0 END), 0),
-    COALESCE(SUM(CASE WHEN q.revenue_type = 'renewal' THEN q.subtotal ELSE 0 END), 0)
-  INTO new_rev, ren_rev
-  FROM payments p
-  JOIN quotes q ON q.id = p.quote_id
-  WHERE p.is_final_payment = true
-    AND p.approval_status  = 'approved'   -- NEW: approved only
-    AND q.created_by       = p_staff
-    AND to_char(p.payment_date, 'YYYY-MM') = p_month;
-
-  INSERT INTO monthly_sales_data (staff_id, month_year, new_client_revenue, renewal_revenue)
-  VALUES (p_staff, p_month, new_rev, ren_rev)
-  ON CONFLICT (staff_id, month_year)
-  DO UPDATE SET
-    new_client_revenue = EXCLUDED.new_client_revenue,
-    renewal_revenue    = EXCLUDED.renewal_revenue,
-    updated_at         = now();
-END;
-$$ LANGUAGE plpgsql;
+-- -------------------------------------------------------------------------
+-- rebuild_monthly_sales REMOVED from this file (Phase 178).
+-- Canonical: db/functions/rebuild_monthly_sales.sql (MONEY — sales ledger core).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
 -- =====================================================
 -- 3. INSERT TRIGGER — replace the old handle_final_payment
