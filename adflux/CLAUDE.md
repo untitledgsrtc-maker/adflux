@@ -4536,3 +4536,14 @@ one-liners. Merging an overload would REGRESS; merging a wrapper isn't worth a c
 The dedup count from here down is noise, not disease. If a future session wants to
 keep going, it should ONLY pick a function that (a) is a real >=2 phase-file duplicate,
 (b) is single-signature (not an overload — check pg_proc), and (c) carries real logic.
+
+### Phase 178 #19 — followup_block_on_lost_lead (§174-FROZEN Lost guard) (`HEAD`)
+The BEFORE-INSERT guard that born-closes any follow-up created on a Lost lead.
+Canonical: db/functions/followup_block_on_lost_lead.sql (live phase174 body).
+Guardian PASS (strict): born-close ALL on Lost (NO cadence_type skip — §174 over
+§135's manual-only), done_note 'Auto-closed: lead is Lost' (§175 isSystemClose marker),
+quote-linked + already-done pass-through, EXCEPTION-wrapped. Trigger in phase135 kept.
+Tripwire no_cadence_skip = the §174 lock. With #13 (followup_after_done) this is the
+§174 Lost-cadence pair, both now single-source. Scoreboard: 20 functions single-source
++ 1 dead-fn dropped. (Pending tail per §72 #18: 5 overloads NEVER-merge + 8 trivial
+triggers + ~25 real 2-3-copy fns, lower-priority.)
