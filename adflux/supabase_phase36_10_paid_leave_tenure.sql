@@ -31,20 +31,10 @@ ALTER TABLE public.leaves
 -- Returns true when user has been with the company for >= 9 months
 -- (per staff_incentive_profiles.join_date). Used by rep UI to
 -- enable/disable the Paid radio button.
-CREATE OR REPLACE FUNCTION public.eligible_for_paid_leave(p_user_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT COALESCE(
-    (SELECT join_date <= (CURRENT_DATE - INTERVAL '9 months')
-       FROM public.staff_incentive_profiles
-      WHERE user_id = p_user_id),
-    false
-  );
-$$;
+-- -------------------------------------------------------------------------
+-- eligible_for_paid_leave REMOVED from this file (Phase 178). Canonical: db/functions/eligible_for_paid_leave.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 GRANT EXECUTE ON FUNCTION public.eligible_for_paid_leave(uuid) TO authenticated;
 

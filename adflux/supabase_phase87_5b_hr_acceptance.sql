@@ -107,61 +107,18 @@ CREATE POLICY users_self_update_avatar ON public.users
 -- COALESCE on each field keeps the earliest acceptance metadata if
 -- the RPC is re-called by mistake; admin must explicitly unaccept
 -- + re-accept to refresh `hr_accepted_at`.
-CREATE OR REPLACE FUNCTION public.accept_user_profile(
-  p_user_id uuid,
-  p_note    text DEFAULT NULL
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  IF public.get_my_role() NOT IN ('admin', 'co_owner', 'hr') THEN
-    RAISE EXCEPTION 'permission denied — admin / co_owner / hr only'
-      USING ERRCODE = '42501';
-  END IF;
-
-  IF p_user_id IS NULL THEN
-    RAISE EXCEPTION 'p_user_id required' USING ERRCODE = '22004';
-  END IF;
-
-  UPDATE public.users
-     SET hr_accepted_at     = COALESCE(hr_accepted_at, now()),
-         hr_accepted_by     = COALESCE(hr_accepted_by, auth.uid()),
-         hr_acceptance_note = COALESCE(p_note, hr_acceptance_note)
-   WHERE id = p_user_id;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- accept_user_profile REMOVED from this file (Phase 178). Canonical: db/functions/accept_user_profile.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 
 -- ─── 4. RPC: unaccept_user_profile ─────────────────────────────────
 -- admin / co_owner only. HR cannot reverse their own acceptance.
-CREATE OR REPLACE FUNCTION public.unaccept_user_profile(
-  p_user_id uuid
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  IF public.get_my_role() NOT IN ('admin', 'co_owner') THEN
-    RAISE EXCEPTION 'permission denied — admin / co_owner only'
-      USING ERRCODE = '42501';
-  END IF;
-
-  IF p_user_id IS NULL THEN
-    RAISE EXCEPTION 'p_user_id required' USING ERRCODE = '22004';
-  END IF;
-
-  UPDATE public.users
-     SET hr_accepted_at     = NULL,
-         hr_accepted_by     = NULL,
-         hr_acceptance_note = NULL
-   WHERE id = p_user_id;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- unaccept_user_profile REMOVED from this file (Phase 178). Canonical: db/functions/unaccept_user_profile.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 
 -- ─── 5. Grants ─────────────────────────────────────────────────────

@@ -136,22 +136,10 @@ GRANT EXECUTE ON FUNCTION public.backfill_ta_all_active_reps() TO authenticated;
 -- pending rows don't get counted. UI inserts as 'approved' directly
 -- since admin is sole approver. Helper for explicit pending → approved
 -- flips:
-CREATE OR REPLACE FUNCTION public.approve_leave(p_leave_id uuid)
-RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
-AS $$
-DECLARE
-  v_row record;
-BEGIN
-  SELECT user_id, leave_date INTO v_row
-    FROM leaves WHERE id = p_leave_id AND status <> 'approved';
-  IF NOT FOUND THEN RETURN; END IF;
-
-  UPDATE leaves SET status = 'approved' WHERE id = p_leave_id;
-
-  -- Recompute the rep's score for that day so the exclusion takes effect.
-  PERFORM public.compute_daily_score(v_row.user_id, v_row.leave_date);
-END $$;
+-- -------------------------------------------------------------------------
+-- approve_leave REMOVED from this file (Phase 178). Canonical: db/functions/approve_leave.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 GRANT EXECUTE ON FUNCTION public.approve_leave(uuid) TO authenticated;
 

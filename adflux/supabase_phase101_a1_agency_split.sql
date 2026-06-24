@@ -81,37 +81,10 @@ UPDATE public.users
 -- admin / co_owner / hr / accounts / staff never had an auto-created
 -- profile in the first place. Agency leaves the door, commission-only.
 
-CREATE OR REPLACE FUNCTION public.auto_create_incentive_profile()
-RETURNS TRIGGER AS $$
-DECLARE
-  s incentive_settings%ROWTYPE;
-BEGIN
-  IF NEW.role NOT IN ('sales') THEN
-    RETURN NEW;
-  END IF;
-
-  IF EXISTS (SELECT 1 FROM staff_incentive_profiles WHERE user_id = NEW.id) THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT * INTO s FROM incentive_settings LIMIT 1;
-
-  INSERT INTO staff_incentive_profiles (
-    user_id, monthly_salary, sales_multiplier,
-    new_client_rate, renewal_rate, flat_bonus,
-    join_date, is_active
-  ) VALUES (
-    NEW.id, 0,
-    COALESCE(s.default_multiplier, 5),
-    COALESCE(s.new_client_rate, 0.05),
-    COALESCE(s.renewal_rate, 0.02),
-    COALESCE(s.default_flat_bonus, 10000),
-    CURRENT_DATE, true
-  );
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- -------------------------------------------------------------------------
+-- auto_create_incentive_profile REMOVED from this file (Phase 178). Canonical: db/functions/auto_create_incentive_profile.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 
 -- ─────────────────────────────────────────────────────────────────────

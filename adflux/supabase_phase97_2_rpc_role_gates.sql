@@ -139,51 +139,19 @@ GRANT  EXECUTE ON FUNCTION public.is_sales_manager() TO authenticated;
 -- ═══════════════════════════════════════════════════════════════
 -- 3. F-101 — approve_leave: admin/co_owner only
 -- ═══════════════════════════════════════════════════════════════
-CREATE OR REPLACE FUNCTION public.approve_leave(p_leave_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $function$
-DECLARE
-  v_row record;
-BEGIN
-  -- Phase 97.2 gate (F-101): admin/co_owner only.
-  IF public.get_my_role() NOT IN ('admin', 'co_owner') THEN
-    RAISE EXCEPTION 'Only admin/co_owner can approve leaves'
-      USING ERRCODE = '42501';
-  END IF;
-
-  SELECT user_id, leave_date INTO v_row
-    FROM leaves WHERE id = p_leave_id AND status <> 'approved';
-  IF NOT FOUND THEN RETURN; END IF;
-
-  UPDATE leaves SET status = 'approved' WHERE id = p_leave_id;
-
-  -- Recompute the rep's score for that day so the exclusion takes effect.
-  PERFORM public.compute_daily_score(v_row.user_id, v_row.leave_date);
-END $function$;
+-- -------------------------------------------------------------------------
+-- approve_leave REMOVED from this file (Phase 178). Canonical: db/functions/approve_leave.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 -- ═══════════════════════════════════════════════════════════════
 -- 4. F-108 — eligible_for_paid_leave: self-or-admin
 -- (LANGUAGE sql → plpgsql so gate can be prepended.)
 -- ═══════════════════════════════════════════════════════════════
-CREATE OR REPLACE FUNCTION public.eligible_for_paid_leave(p_user_id uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $function$
-BEGIN
-  PERFORM public._assert_self_or_admin(p_user_id);
-  RETURN COALESCE(
-    (SELECT join_date <= (CURRENT_DATE - INTERVAL '9 months')
-       FROM public.staff_incentive_profiles
-      WHERE user_id = p_user_id),
-    false
-  );
-END $function$;
+-- -------------------------------------------------------------------------
+-- eligible_for_paid_leave REMOVED from this file (Phase 178). Canonical: db/functions/eligible_for_paid_leave.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 -- ═══════════════════════════════════════════════════════════════
 -- 5. F-102 — 9 sibling SECURITY DEFINER RPCs gated by p_user_id
@@ -489,28 +457,12 @@ NOTIFY pgrst, 'reload schema';
 --   );
 -- $$;
 --
--- CREATE OR REPLACE FUNCTION public.approve_leave(p_leave_id uuid)
--- RETURNS void LANGUAGE plpgsql SECURITY DEFINER
--- SET search_path TO 'public' AS $$
--- DECLARE v_row record;
--- BEGIN
---   SELECT user_id, leave_date INTO v_row
---     FROM leaves WHERE id = p_leave_id AND status <> 'approved';
---   IF NOT FOUND THEN RETURN; END IF;
---   UPDATE leaves SET status = 'approved' WHERE id = p_leave_id;
---   PERFORM public.compute_daily_score(v_row.user_id, v_row.leave_date);
--- END $$;
---
--- CREATE OR REPLACE FUNCTION public.eligible_for_paid_leave(p_user_id uuid)
--- RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
--- SET search_path TO 'public' AS $$
---   SELECT COALESCE(
---     (SELECT join_date <= (CURRENT_DATE - INTERVAL '9 months')
---        FROM public.staff_incentive_profiles
---       WHERE user_id = p_user_id),
---     false
---   );
--- $$;
+-- approve_leave + eligible_for_paid_leave rollback bodies REMOVED (Phase 178).
+-- They were STALE: the approve_leave copy had NO role gate at all (anyone could
+-- approve), the eligible copy had NO _assert_self_or_admin. Uncommenting+running
+-- them = security regression. To restore the CURRENT gated functions, re-run
+-- db/functions/approve_leave.sql / db/functions/eligible_for_paid_leave.sql.
+-- Do NOT uncomment an old body.
 --
 -- For the 10 sibling RPCs — inline rollback bodies below. Each is
 -- byte-identical to the live (pre-Phase-97.2) body, with the

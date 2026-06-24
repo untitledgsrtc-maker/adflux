@@ -48,64 +48,16 @@
 -- VERIFY pattern, or anything outside the 2 function bodies.
 
 
-CREATE OR REPLACE FUNCTION public.accept_user_profile(
-  p_user_id uuid,
-  p_note    text DEFAULT NULL
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  -- Phase 87.5b.1 — NULL guard added so a JWT-less caller can't
-  -- slip past the role gate via 3-valued-logic short-circuit.
-  IF public.get_my_role() IS NULL
-     OR public.get_my_role() NOT IN ('admin', 'co_owner', 'hr') THEN
-    RAISE EXCEPTION 'permission denied — admin / co_owner / hr only'
-      USING ERRCODE = '42501';
-  END IF;
-
-  IF p_user_id IS NULL THEN
-    RAISE EXCEPTION 'p_user_id required' USING ERRCODE = '22004';
-  END IF;
-
-  UPDATE public.users
-     SET hr_accepted_at     = COALESCE(hr_accepted_at, now()),
-         hr_accepted_by     = COALESCE(hr_accepted_by, auth.uid()),
-         hr_acceptance_note = COALESCE(p_note, hr_acceptance_note)
-   WHERE id = p_user_id;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- accept_user_profile REMOVED from this file (Phase 178). Canonical: db/functions/accept_user_profile.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 
-CREATE OR REPLACE FUNCTION public.unaccept_user_profile(
-  p_user_id uuid
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  -- Phase 87.5b.1 — same NULL guard as accept_user_profile.
-  IF public.get_my_role() IS NULL
-     OR public.get_my_role() NOT IN ('admin', 'co_owner') THEN
-    RAISE EXCEPTION 'permission denied — admin / co_owner only'
-      USING ERRCODE = '42501';
-  END IF;
-
-  IF p_user_id IS NULL THEN
-    RAISE EXCEPTION 'p_user_id required' USING ERRCODE = '22004';
-  END IF;
-
-  UPDATE public.users
-     SET hr_accepted_at     = NULL,
-         hr_accepted_by     = NULL,
-         hr_acceptance_note = NULL
-   WHERE id = p_user_id;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- unaccept_user_profile REMOVED from this file (Phase 178). Canonical: db/functions/unaccept_user_profile.sql
+-- Do NOT re-add (§71). Trigger/grant wiring stays.
+-- -------------------------------------------------------------------------
 
 NOTIFY pgrst, 'reload schema';
 
@@ -157,56 +109,11 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- ───────────── ROLLBACK ─────────────
--- Re-applies the Phase 87.5b function bodies byte-identical
--- (drops the NULL guard, restores 3VL short-circuit gap).
---
---   CREATE OR REPLACE FUNCTION public.accept_user_profile(
---     p_user_id uuid,
---     p_note    text DEFAULT NULL
---   )
---   RETURNS void
---   LANGUAGE plpgsql
---   SECURITY DEFINER
---   SET search_path = public, pg_temp
---   AS $$
---   BEGIN
---     IF public.get_my_role() NOT IN ('admin', 'co_owner', 'hr') THEN
---       RAISE EXCEPTION 'permission denied — admin / co_owner / hr only'
---         USING ERRCODE = '42501';
---     END IF;
---     IF p_user_id IS NULL THEN
---       RAISE EXCEPTION 'p_user_id required' USING ERRCODE = '22004';
---     END IF;
---     UPDATE public.users
---        SET hr_accepted_at     = COALESCE(hr_accepted_at, now()),
---            hr_accepted_by     = COALESCE(hr_accepted_by, auth.uid()),
---            hr_acceptance_note = COALESCE(p_note, hr_acceptance_note)
---      WHERE id = p_user_id;
---   END;
---   $$;
---
---   CREATE OR REPLACE FUNCTION public.unaccept_user_profile(
---     p_user_id uuid
---   )
---   RETURNS void
---   LANGUAGE plpgsql
---   SECURITY DEFINER
---   SET search_path = public, pg_temp
---   AS $$
---   BEGIN
---     IF public.get_my_role() NOT IN ('admin', 'co_owner') THEN
---       RAISE EXCEPTION 'permission denied — admin / co_owner only'
---         USING ERRCODE = '42501';
---     END IF;
---     IF p_user_id IS NULL THEN
---       RAISE EXCEPTION 'p_user_id required' USING ERRCODE = '22004';
---     END IF;
---     UPDATE public.users
---        SET hr_accepted_at     = NULL,
---            hr_accepted_by     = NULL,
---            hr_acceptance_note = NULL
---      WHERE id = p_user_id;
---   END;
---   $$;
+-- accept_user_profile + unaccept_user_profile rollback bodies REMOVED (Phase 178).
+-- They were the PRE-87.5b.1 versions that DROP the NULL guard (the §41 3VL
+-- short-circuit gap). Uncommenting+running them = re-open the security hole.
+-- The CURRENT (NULL-guarded) functions are the single canonical source:
+-- db/functions/accept_user_profile.sql + db/functions/unaccept_user_profile.sql.
+-- Do NOT uncomment an old body.
 --
 --   NOTIFY pgrst, 'reload schema';
