@@ -4558,3 +4558,14 @@ in phase33d6 kept. Scoreboard: 21 functions single-source + 1 dropped.
   BOTH phase128_3 + phase33d6), lead_pause_close_auto_followups, lead_auto_create_followup,
   spawn_* helpers. lead_auto_assign / lead_set_handoff_sla / lead_auto_heat_from_outcome
   are adjacent lead-lifecycle 2-copy fns. All real logic, lower-priority (2-copy).
+
+### Phase 178 #21 — cancel_lead_cadence (§128.3 cadence cancel helper) (`HEAD`)
+The LANGUAGE-sql helper that closes open follow_ups for given cadence types.
+Canonical: db/functions/cancel_lead_cadence.sql (live phase128_3 body). Guardian PASS:
+§128.3 legacy-33D.4 close branch ('lead_intro'+cadence_type-NULL+auto_generated+
+'Auto-scheduled:%'), '[cancelled by stage change]' §175 marker, open-only, LANGUAGE sql
+— byte-faithful. Scoreboard: 22 functions single-source + 1 dropped.
+- Cadence family still pending (2-copy): lead_pause_close_auto_followups,
+  lead_auto_create_followup, spawn_lead_intro_cadence/spawn_quote_chase_cadence/
+  spawn_nurture_followup (the spawn helpers), lead_auto_assign, lead_set_handoff_sla,
+  lead_auto_heat_from_outcome. All in phase33d6/128_3, real logic, lower-priority.
