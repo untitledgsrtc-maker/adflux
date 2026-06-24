@@ -4449,3 +4449,14 @@ Guardian PASS. phase33w_push_triggers keeps its 4 push-trigger fns.
   literals with dots, not column refs. The SQL is valid; guardian is the gate. A
   future script tweak could skip dotted string literals; not done here.
 - Scoreboard: 13 functions single-source. The push pipeline core is now locked.
+
+### Phase 178 #13 — followup_after_done (the §174-FROZEN cadence engine) (`HEAD`)
+The cadence engine that bit the owner (lost_nurture respawn). Canonical:
+db/functions/followup_after_done.sql, captured from the live phase174 body and
+VERIFIED to carry every contract (phase174 = clean superset, nothing reverted):
+§174 NO lost_nurture respawn branch · Truth-1 lead_id-NULL skip + flip guard +
+auto-skip earlier FUs + QuoteSent de-stage (quote_chase seq-3 only when DUE) +
+nurture respawn only while stage=Nurture + cadence_paused guard. Guardian PASS
+(strict). phase33d6 keeps its 8 cadence siblings + the trigger. The tripwire's
+`no_lost_nurture_respawn` (NOT LIKE %lost_nurture%) is the §174 lock — keep TRUE.
+Scoreboard: 14 functions single-source.
