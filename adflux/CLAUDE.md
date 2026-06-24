@@ -4547,3 +4547,14 @@ Tripwire no_cadence_skip = the §174 lock. With #13 (followup_after_done) this i
 §174 Lost-cadence pair, both now single-source. Scoreboard: 20 functions single-source
 + 1 dead-fn dropped. (Pending tail per §72 #18: 5 overloads NEVER-merge + 8 trivial
 triggers + ~25 real 2-3-copy fns, lower-priority.)
+
+### Phase 178 #20 — lead_stage_change_cadence (§128.3 cadence stage-machine) (`HEAD`)
+The AFTER-UPDATE-OF-stage trigger that cancels + respawns follow-up cadences.
+Canonical: db/functions/lead_stage_change_cadence.sql (live phase128_3 body).
+Guardian PASS: §128.3 cancels-before-pause-gate, pause-gated spawns, Won->cancel-all,
+full stage mapping, frozen cadence types — byte-faithful. Trigger + 7 cadence siblings
+in phase33d6 kept. Scoreboard: 21 functions single-source + 1 dropped.
+- The cadence family still has 2-copy siblings to do next: cancel_lead_cadence (in
+  BOTH phase128_3 + phase33d6), lead_pause_close_auto_followups, lead_auto_create_followup,
+  spawn_* helpers. lead_auto_assign / lead_set_handoff_sla / lead_auto_heat_from_outcome
+  are adjacent lead-lifecycle 2-copy fns. All real logic, lower-priority (2-copy).
