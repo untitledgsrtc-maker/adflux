@@ -4491,3 +4491,17 @@ followup_after_done · run_select · push_followup_due_reminders. Plus: the dedu
 now excludes the 2 base snapshots (real count corrected 65→55→now lower). The remaining
 tail is ALL leave-alone: real overloads (bump_daily_counter 3+4-arg, next_workday) that
 §70 says NOT to merge · per-event tg_push_on_* triggers · update_updated_at one-liners.
+
+### Phase 178 #16 — DROP dead bump_meeting_counter (removal, not consolidation) (`HEAD`)
+Scoping the tail caught that bump_meeting_counter is DEAD, not a live duplicate — its
+trigger was dropped in Phase 32N (the ÷2 fix); 93.6/93.7 re-defined the fn but never
+re-wired it. Confirmed dead 2026-06-24 (pg_trigger empty). The live meeting counter is
+lead_activity_bump_counter (#4, has all §33 exclusions; bump_meeting_counter is MISSING
+the scheduled-meeting skip → re-wiring it = §33 double-count). So: REMOVED, not homed.
+- NEW supabase_phase178_drop_dead_bump_meeting_counter.sql — owner RUNS to DROP it.
+- Neutralized phase32m's CREATE TRIGGER (the re-wire landmine); kept DROP TRIGGER.
+  Removed the fn body from phase32m/93.6/93.7; fixed 2 re-run hazards (93.7.1 live
+  COMMENT, 32m VERIFY count). Guardian PASS.
+- LESSON: before consolidating a "duplicate", check it's LIVE (pg_trigger / callers).
+  A dead duplicate is a DROP, not a canonical — and its old CREATE TRIGGER is a
+  re-wire landmine. Scoreboard: 16 consolidated + 1 dead-fn dropped.
