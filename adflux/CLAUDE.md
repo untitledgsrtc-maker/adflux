@@ -4517,3 +4517,22 @@ handle_payment_insert + rebuild_monthly_sales override + dismiss_payment_notific
   ALL the payment handlers call). After that it's truly overloads (bump_daily_counter
   3+4-arg, next_workday) + per-event tg_push_on_* + update_updated_at wrappers.
 Scoreboard: 18 functions single-source + 1 dead-fn dropped.
+
+### Phase 178 #18 — rebuild_monthly_sales (sales-ledger core, MONEY) (`HEAD`) — payment chain complete
+The ledger rebuild that all 3 payment handlers + the frontend call; feeds incentive.
+Canonical: db/functions/rebuild_monthly_sales.sql, captured from the live phase3c body
+(approval_status='approved' filter — NOT the older phase2 no-approval version that
+would over-count). Guardian PASS: approved+final filter, new/renewal split, created_by
+credit, idempotent upsert, PLAIN (not DEFINER) all byte-faithful. phase3c keeps
+handle_payment_insert + dismiss_payment_notification.
+**Payment money chain now fully single-source:** handle_payment_{insert,update,delete}
+-> rebuild_monthly_sales -> monthly_sales_data -> compute_monthly_salary.
+
+**STAGE-2 — ALL GENUINELY-WORTH-IT FUNCTIONS DONE (19 consolidated + 1 dead-fn dropped).**
+The remaining ~50 phase-file "duplicates" are ALL leave-alone: real Postgres overloads
+that MUST NOT be merged (bump_daily_counter 3-arg+4-arg, next_workday, etc), per-event
+tg_push_on_* triggers (2-copy, trivial), and update_updated_at/touch_updated_at-style
+one-liners. Merging an overload would REGRESS; merging a wrapper isn't worth a commit.
+The dedup count from here down is noise, not disease. If a future session wants to
+keep going, it should ONLY pick a function that (a) is a real >=2 phase-file duplicate,
+(b) is single-signature (not an overload — check pg_proc), and (c) carries real logic.
