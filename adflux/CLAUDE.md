@@ -4469,3 +4469,25 @@ only; DEFINER would be a breach), first-token select/with check, DDL/DML keyword
 guard, jsonb_agg wrapper, 100-row cap all byte-faithful. GRANT to authenticated kept
 (safe — INVOKER+RLS; contrast enqueue_push which is REVOKED). Tripwire
 `not_security_definer` is the breach alarm. Scoreboard: 15 functions single-source.
+
+### Phase 178 #15 — push_followup_due_reminders 3 → 1 (`HEAD`) — worth-it list DONE
+The cron "follow-up due now" pusher. Canonical: db/functions/push_followup_due_reminders.sql,
+captured from the live phase130 body. Guardian PASS: §130 quiet-hours gate, §97.A400
+per-row unique tag (fu-due-<id>), reminder_sent_at dedup (filter+stamp), 5-min window,
+enqueue_push call, DEFINER+extensions search_path — all byte-faithful. phase130 keeps
+its 2 other push fns. The authenticated GRANT matches live (flagged tightenable to
+service_role-only later — owner call, not changed).
+- ⚠ check-sql-schema.sh false-positives on PL/pgSQL FOR-loop record fields
+  (r.lead_name etc) the same way it does on dotted string literals — guardian is
+  the real gate. (2nd such false positive this session; a future script tweak could
+  teach it about record vars + string literals.)
+
+**STAGE-2 WORTH-IT LIST COMPLETE — 16 functions single-source (15 rounds):**
+compute_daily_score · generate_lead_tasks · campaign_conversation_ensure_lead ·
+lead_activity_bump_counter · recompute_daily_meetings · lead_activity_after_insert ·
+call_logs_dedupe_before_insert · compute_daily_ta(+200km cap) · compute_monthly_salary ·
+_compute_monthly_salary_base · monthly_score · generate_quote_number · enqueue_push ·
+followup_after_done · run_select · push_followup_due_reminders. Plus: the dedup script
+now excludes the 2 base snapshots (real count corrected 65→55→now lower). The remaining
+tail is ALL leave-alone: real overloads (bump_daily_counter 3+4-arg, next_workday) that
+§70 says NOT to merge · per-event tg_push_on_* triggers · update_updated_at one-liners.
