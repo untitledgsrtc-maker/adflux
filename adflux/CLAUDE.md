@@ -4569,3 +4569,18 @@ Canonical: db/functions/cancel_lead_cadence.sql (live phase128_3 body). Guardian
   lead_auto_create_followup, spawn_lead_intro_cadence/spawn_quote_chase_cadence/
   spawn_nurture_followup (the spawn helpers), lead_auto_assign, lead_set_handoff_sla,
   lead_auto_heat_from_outcome. All in phase33d6/128_3, real logic, lower-priority.
+
+### Phase 178 #22 — lead_auto_create_followup + lead_pause_close_auto_followups (`HEAD`)
+Cadence family BATCH. Owner dumped 5; only 2 were real 2-copy phase duplicates.
+Canonicals: db/functions/lead_auto_create_followup.sql (phase33d4+33d6) +
+lead_pause_close_auto_followups.sql (phase128_3+129, §128.3 pause-close + §129
+Nurture-only resume). Guardian PASS, byte-faithful. The 3 spawn_* (spawn_lead_intro_
+cadence/spawn_quote_chase_cadence/spawn_nurture_followup) are SINGLE-COPY (only
+phase33d6) -> deliberately NOT consolidated (single-copy isn't the disease; relocating
+pads the count). Scoreboard: 24 functions single-source + 1 dropped.
+- DEDUP-COUNT CAVEAT (re-learned): the snapshot-excluded check-duplication.sh count
+  still INCLUDES single-phase-copy functions whose 2nd "copy" was a base snapshot —
+  but those snapshots are excluded, so such a function shows count 1 and is NOT listed.
+  When a function IS listed (>=2), confirm BOTH copies are real phase files (not just
+  same-file overloads or a snapshot) before consolidating. The spawn_* trio taught
+  this: they were never in the dedup list — I mis-grouped them into the "family batch".
