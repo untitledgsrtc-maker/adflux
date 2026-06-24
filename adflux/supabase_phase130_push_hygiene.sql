@@ -100,61 +100,11 @@ UPDATE public.follow_ups fu
 -- return: rows due inside quiet hours stay unstamped and their 5-min
 -- window passes -> dropped, same net effect as the 98.A trigger gates;
 -- the 9:30 IST morning push still rolls up anything open.
-CREATE OR REPLACE FUNCTION public.push_followup_due_reminders()
-RETURNS int
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-DECLARE
-  v_today_ist     date;
-  v_now_ist       timestamp;
-  v_window_lower  timestamp;
-  v_window_upper  timestamp;
-  v_count         int := 0;
-  r               record;
-BEGIN
-  -- PHASE-130 (3) — quiet-hours gate, same helper as Phase 61.4 / 98.A.
-  IF NOT public.is_push_allowed_now() THEN
-    RETURN 0;
-  END IF;
-
-  v_now_ist      := (now() AT TIME ZONE 'Asia/Kolkata')::timestamp;
-  v_today_ist    := v_now_ist::date;
-  v_window_lower := v_now_ist - interval '5 minutes';
-  v_window_upper := v_now_ist;
-
-  FOR r IN
-    SELECT fu.id, fu.assigned_to, fu.lead_id, fu.note, fu.follow_up_time,
-           l.name AS lead_name, l.company AS lead_company
-      FROM public.follow_ups fu
-      LEFT JOIN public.leads l ON l.id = fu.lead_id
-     WHERE fu.is_done           = false
-       AND fu.reminder_sent_at  IS NULL
-       AND fu.follow_up_date    = v_today_ist
-       AND fu.follow_up_time    IS NOT NULL
-       AND (v_today_ist::timestamp + fu.follow_up_time::interval) >= v_window_lower
-       AND (v_today_ist::timestamp + fu.follow_up_time::interval) <= v_window_upper
-       AND fu.assigned_to       IS NOT NULL
-  LOOP
-    PERFORM public.enqueue_push(
-      r.assigned_to,
-      'Follow-up due now',
-      COALESCE(r.lead_name, r.lead_company, 'Lead')
-        || ' · ' || to_char(r.follow_up_time, 'HH24:MI')
-        || COALESCE(' · ' || r.note, ''),
-      CASE WHEN r.lead_id IS NOT NULL
-           THEN '/leads/' || r.lead_id::text
-           ELSE '/follow-ups'
-      END,
-      'fu-due-' || r.id::text   -- Phase 97.A400 tag preserved
-    );
-    UPDATE public.follow_ups SET reminder_sent_at = now() WHERE id = r.id;
-    v_count := v_count + 1;
-  END LOOP;
-  RETURN v_count;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- push_followup_due_reminders REMOVED from this file (Phase 178).
+-- Canonical: db/functions/push_followup_due_reminders.sql (cron; quiet-hours + per-row tag).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
 GRANT EXECUTE ON FUNCTION public.push_followup_due_reminders() TO authenticated;
 
