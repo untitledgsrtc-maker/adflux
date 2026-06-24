@@ -4505,3 +4505,15 @@ the scheduled-meeting skip → re-wiring it = §33 double-count). So: REMOVED, n
 - LESSON: before consolidating a "duplicate", check it's LIVE (pg_trigger / callers).
   A dead duplicate is a DROP, not a canonical — and its old CREATE TRIGGER is a
   re-wire landmine. Scoreboard: 16 consolidated + 1 dead-fn dropped.
+
+### Phase 178 #17 — handle_payment_update + handle_payment_delete (MONEY pair) (`HEAD`)
+The payments->monthly_sales_data sync triggers (feed incentive/salary via
+rebuild_monthly_sales). Both live + single-wired (verified pg_trigger 2026-06-24).
+Canonicals: db/functions/handle_payment_update.sql + handle_payment_delete.sql,
+captured from the live phase3c bodies (approval_status='approved' guard, not the
+older phase2 is_final_payment-only). Guardian PASS. Triggers kept; phase3c keeps
+handle_payment_insert + rebuild_monthly_sales override + dismiss_payment_notification.
+- NEXT genuine item: rebuild_monthly_sales (3 copies — the money ledger core that
+  ALL the payment handlers call). After that it's truly overloads (bump_daily_counter
+  3+4-arg, next_workday) + per-event tg_push_on_* + update_updated_at wrappers.
+Scoreboard: 18 functions single-source + 1 dead-fn dropped.
