@@ -65,54 +65,12 @@ END $$;
 
 -- ─── B. followup_after_done — remove the lost_nurture respawn ─────────────
 -- (truth1 function, with ONLY the `ELSIF lost_nurture ...` respawn removed.)
-CREATE OR REPLACE FUNCTION public.followup_after_done()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_lead  leads%ROWTYPE;
-  v_owner uuid;
-BEGIN
-  -- Only act when is_done flips false → true (rep marks done).
-  IF NEW.is_done IS NOT TRUE OR OLD.is_done IS TRUE THEN
-    RETURN NEW;
-  END IF;
-  IF NEW.lead_id IS NULL THEN RETURN NEW; END IF;
-
-  -- Auto-skip earlier OPEN FUs in same cadence_type (catch-up).
-  UPDATE public.follow_ups
-     SET is_done = true,
-         note = COALESCE(note, '') || ' [auto-skipped: later FU done]'
-   WHERE lead_id = NEW.lead_id
-     AND cadence_type = NEW.cadence_type
-     AND is_done = false
-     AND sequence < NEW.sequence;
-
-  SELECT * INTO v_lead FROM public.leads WHERE id = NEW.lead_id;
-  IF v_lead.cadence_paused THEN RETURN NEW; END IF;
-  v_owner := COALESCE(v_lead.assigned_to, v_lead.created_by);
-  IF v_owner IS NULL THEN RETURN NEW; END IF;
-
-  -- Quote chase FU3 done (and actually due) → auto-move to Nurture.
-  IF NEW.cadence_type = 'quote_chase' AND NEW.sequence = 3
-     AND v_lead.stage = 'QuoteSent'
-     AND NEW.follow_up_date <= (now() AT TIME ZONE 'Asia/Kolkata')::date THEN
-    UPDATE public.leads SET stage = 'Nurture' WHERE id = NEW.lead_id;
-    -- The stage-change trigger will spawn the nurture FU.
-  END IF;
-
-  -- Nurture done → spawn next +30, ONLY while still in Nurture.
-  -- Phase 174: the lost_nurture respawn (truth1 P0-B) is REMOVED — a Lost lead
-  -- is dead and never gets a re-spawned follow-up. This is the single deletion
-  -- that ends the close-it-and-it-returns loop.
-  IF NEW.cadence_type = 'nurture' AND v_lead.stage = 'Nurture' THEN
-    PERFORM public.spawn_nurture_followup(NEW.lead_id, v_owner, CURRENT_DATE, NEW.cadence_type);
-  END IF;
-
-  RETURN NEW;
-END $$;
+-- -------------------------------------------------------------------------
+-- followup_after_done REMOVED from this file (Phase 178).
+-- Canonical: db/functions/followup_after_done.sql (§174-FROZEN cadence engine).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring
+-- (trg_followup_after_done) stays in phase33d6.
+-- -------------------------------------------------------------------------
 
 -- ─── Heal — close every currently-open follow_up on a Lost lead ───────────
 -- Now safe to include lost_nurture: with the respawn gone (B), closing via
