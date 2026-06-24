@@ -4460,3 +4460,12 @@ nurture respawn only while stage=Nurture + cadence_paused guard. Guardian PASS
 (strict). phase33d6 keeps its 8 cadence siblings + the trigger. The tripwire's
 `no_lost_nurture_respawn` (NOT LIKE %lost_nurture%) is the §174 lock — keep TRUE.
 Scoreboard: 14 functions single-source.
+
+### Phase 178 #14 — run_select 3 → 1 (Co-Pilot SQL executor, security) (`HEAD`)
+The AI Co-Pilot's arbitrary-SQL executor (§13). Canonical: db/functions/run_select.sql,
+captured from the live phase17c body + an explicit SECURITY INVOKER keyword (no-op
+clarity guard). Guardian PASS: SECURITY INVOKER (RLS applies — rep reads own rows
+only; DEFINER would be a breach), first-token select/with check, DDL/DML keyword
+guard, jsonb_agg wrapper, 100-row cap all byte-faithful. GRANT to authenticated kept
+(safe — INVOKER+RLS; contrast enqueue_push which is REVOKED). Tripwire
+`not_security_definer` is the breach alarm. Scoreboard: 15 functions single-source.
