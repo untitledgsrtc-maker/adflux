@@ -32,45 +32,10 @@ CREATE INDEX IF NOT EXISTS idx_follow_ups_lead       ON follow_ups (lead_id) WHE
 CREATE INDEX IF NOT EXISTS idx_follow_ups_date_open  ON follow_ups (follow_up_date) WHERE is_done = false;
 
 -- ─── 2. Auto-create follow-up trigger on lead INSERT ───────────────
-CREATE OR REPLACE FUNCTION public.lead_auto_create_followup()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_owner uuid;
-BEGIN
-  -- Owner of the follow-up: prefer assigned_to (the rep who will
-  -- action it), fall back to created_by (the person who entered the
-  -- lead). One of these is always non-null for sales-created leads.
-  v_owner := COALESCE(NEW.assigned_to, NEW.created_by);
-  IF v_owner IS NULL THEN
-    -- No owner = no actionable follow-up (e.g. legacy import). Skip.
-    RETURN NEW;
-  END IF;
-
-  -- Only auto-schedule for active stages. Won/Lost/Nurture leads
-  -- don't need a "first contact tomorrow" prompt.
-  IF NEW.stage NOT IN ('New', 'Working') THEN
-    RETURN NEW;
-  END IF;
-
-  INSERT INTO public.follow_ups (
-    lead_id, assigned_to, follow_up_date, follow_up_time,
-    note, auto_generated
-  ) VALUES (
-    NEW.id,
-    v_owner,
-    (CURRENT_DATE + INTERVAL '1 day')::date,
-    '10:00:00',
-    'Auto-scheduled: follow up with new lead',
-    true
-  );
-
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_auto_create_followup REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_auto_create_followup.sql.  Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_lead_auto_followup ON public.leads;
 CREATE TRIGGER trg_lead_auto_followup

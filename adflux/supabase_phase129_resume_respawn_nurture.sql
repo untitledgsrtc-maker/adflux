@@ -27,42 +27,10 @@
 -- cadence_paused gate -> no respawn, no push. The NEW resume spawn fires
 -- AFTER pause flips false, so followup_after_done's stage gate ('nurture'
 -- respawns only while stage='Nurture') is the loop bound there.
-CREATE OR REPLACE FUNCTION public.lead_pause_close_auto_followups()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_owner uuid;
-BEGIN
-  IF NEW.cadence_paused IS TRUE AND OLD.cadence_paused IS DISTINCT FROM TRUE THEN
-    -- Pause ON: close open AUTO follow-ups (Phase 128.3, unchanged).
-    UPDATE public.follow_ups
-       SET is_done = true,
-           note = COALESCE(note, '') || ' [closed: auto follow-ups paused]'
-     WHERE lead_id = NEW.id
-       AND is_done = false
-       AND (cadence_type IN ('lead_intro','quote_chase','nurture','lost_nurture')
-            OR (cadence_type IS NULL AND auto_generated = true
-                AND note LIKE 'Auto-scheduled:%'));
-
-  ELSIF NEW.cadence_paused IS NOT TRUE AND OLD.cadence_paused IS TRUE THEN
-    -- PHASE-129 Resume: Nurture leads ONLY — book the next check-in at
-    -- +30 days (next workday), never earlier. Skip when an open nurture
-    -- row already exists (idempotent re-toggle safe).
-    IF NEW.stage = 'Nurture' THEN
-      v_owner := COALESCE(NEW.assigned_to, NEW.created_by);
-      IF v_owner IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM public.follow_ups
-         WHERE lead_id = NEW.id AND is_done = false AND cadence_type = 'nurture'
-      ) THEN
-        PERFORM public.spawn_nurture_followup(NEW.id, v_owner, CURRENT_DATE, 'nurture');
-      END IF;
-    END IF;
-  END IF;
-  RETURN NEW;
-END $$;
+-- -------------------------------------------------------------------------
+-- lead_pause_close_auto_followups REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_pause_close_auto_followups.sql.  Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 -- self-register
 DO $$

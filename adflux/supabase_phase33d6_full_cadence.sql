@@ -130,29 +130,10 @@ END $$;
 -- -------------------------------------------------------------------------
 
 -- ─── 5. Lead-creation trigger (replaces Phase 33D.4) ────────────────
-CREATE OR REPLACE FUNCTION public.lead_auto_create_followup()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_owner uuid := COALESCE(NEW.assigned_to, NEW.created_by);
-BEGIN
-  IF v_owner IS NULL THEN RETURN NEW; END IF;
-  IF NEW.cadence_paused THEN RETURN NEW; END IF;
-
-  IF NEW.stage IN ('New', 'Working') THEN
-    PERFORM public.spawn_lead_intro_cadence(NEW.id, v_owner, CURRENT_DATE);
-  ELSIF NEW.stage = 'QuoteSent' THEN
-    PERFORM public.spawn_quote_chase_cadence(NEW.id, v_owner, CURRENT_DATE);
-  ELSIF NEW.stage = 'Nurture' THEN
-    PERFORM public.spawn_nurture_followup(NEW.id, v_owner, CURRENT_DATE, 'nurture');
-  ELSIF NEW.stage = 'Lost' THEN
-    PERFORM public.spawn_nurture_followup(NEW.id, v_owner, CURRENT_DATE, 'lost_nurture');
-  END IF;
-  RETURN NEW;
-END $$;
+-- -------------------------------------------------------------------------
+-- lead_auto_create_followup REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_auto_create_followup.sql.  Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 -- Trigger already exists from Phase 33D.4; just replacing the function is enough.
 

@@ -55,25 +55,10 @@
 -- gate → no respawn, no push (34Z.55 early-exits on is_done=true). Single
 -- user action — not a hot path. If a future BULK heal needs to bypass the
 -- cascade, add a session-variable guard then.
-CREATE OR REPLACE FUNCTION public.lead_pause_close_auto_followups()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF NEW.cadence_paused IS TRUE AND OLD.cadence_paused IS DISTINCT FROM TRUE THEN
-    UPDATE public.follow_ups
-       SET is_done = true,
-           note = COALESCE(note, '') || ' [closed: auto follow-ups paused]'
-     WHERE lead_id = NEW.id
-       AND is_done = false
-       AND (cadence_type IN ('lead_intro','quote_chase','nurture','lost_nurture')
-            OR (cadence_type IS NULL AND auto_generated = true
-                AND note LIKE 'Auto-scheduled:%'));
-  END IF;
-  RETURN NEW;
-END $$;
+-- -------------------------------------------------------------------------
+-- lead_pause_close_auto_followups REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_pause_close_auto_followups.sql.  Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_lead_pause_close_auto_followups ON public.leads;
 CREATE TRIGGER trg_lead_pause_close_auto_followups
