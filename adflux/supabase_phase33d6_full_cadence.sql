@@ -162,49 +162,11 @@ END $$;
 -- Trigger already exists from Phase 33D.4; just replacing the function is enough.
 
 -- ─── 6. Stage-change trigger ────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.lead_stage_change_cadence()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_owner uuid := COALESCE(NEW.assigned_to, NEW.created_by);
-BEGIN
-  IF NEW.stage = OLD.stage THEN RETURN NEW; END IF;
-  IF v_owner IS NULL THEN RETURN NEW; END IF;
-
-  -- Won closes everything.
-  IF NEW.stage = 'Won' THEN
-    PERFORM public.cancel_lead_cadence(NEW.id,
-      ARRAY['lead_intro','quote_chase','nurture','lost_nurture']);
-    RETURN NEW;
-  END IF;
-
-  IF NEW.cadence_paused THEN RETURN NEW; END IF;
-
-  -- QuoteSent → cancel pre-quote, start quote chase.
-  IF NEW.stage = 'QuoteSent' AND OLD.stage IN ('New','Working') THEN
-    PERFORM public.cancel_lead_cadence(NEW.id, ARRAY['lead_intro']);
-    PERFORM public.spawn_quote_chase_cadence(NEW.id, v_owner, CURRENT_DATE);
-  -- Nurture (manual move) → cancel quote_chase + lead_intro, start nurture.
-  ELSIF NEW.stage = 'Nurture' AND OLD.stage <> 'Nurture' THEN
-    PERFORM public.cancel_lead_cadence(NEW.id,
-      ARRAY['lead_intro','quote_chase','lost_nurture']);
-    PERFORM public.spawn_nurture_followup(NEW.id, v_owner, CURRENT_DATE, 'nurture');
-  -- Lost → cancel everything, start lost_nurture.
-  ELSIF NEW.stage = 'Lost' AND OLD.stage <> 'Lost' THEN
-    PERFORM public.cancel_lead_cadence(NEW.id,
-      ARRAY['lead_intro','quote_chase','nurture']);
-    PERFORM public.spawn_nurture_followup(NEW.id, v_owner, CURRENT_DATE, 'lost_nurture');
-  -- Re-activated from Nurture → fresh lead_intro cadence.
-  ELSIF NEW.stage IN ('New','Working') AND OLD.stage IN ('Nurture','Lost') THEN
-    PERFORM public.cancel_lead_cadence(NEW.id, ARRAY['nurture','lost_nurture']);
-    PERFORM public.spawn_lead_intro_cadence(NEW.id, v_owner, CURRENT_DATE);
-  END IF;
-
-  RETURN NEW;
-END $$;
+-- -------------------------------------------------------------------------
+-- lead_stage_change_cadence REMOVED from this file (Phase 178).
+-- Canonical: db/functions/lead_stage_change_cadence.sql (§128.3 cadence stage-machine).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_lead_stage_change_cadence ON public.leads;
 CREATE TRIGGER trg_lead_stage_change_cadence
