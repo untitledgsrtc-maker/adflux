@@ -106,45 +106,11 @@ $$ LANGUAGE plpgsql;
 
 -- Handle UPDATE: if the payment's final flag or amount changed,
 -- or if it moved between months, rebuild affected month(s).
-CREATE OR REPLACE FUNCTION handle_payment_update()
-RETURNS TRIGGER AS $$
-DECLARE
-  old_month text;
-  new_month text;
-  old_staff uuid;
-  new_staff uuid;
-BEGIN
-  -- Only care about updates that touch the ledger.
-  IF OLD.is_final_payment = false AND NEW.is_final_payment = false THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT created_by INTO old_staff FROM quotes WHERE id = OLD.quote_id;
-  SELECT created_by INTO new_staff FROM quotes WHERE id = NEW.quote_id;
-
-  old_month := to_char(OLD.payment_date, 'YYYY-MM');
-  new_month := to_char(NEW.payment_date, 'YYYY-MM');
-
-  -- Rebuild old side (covers: flag was true and is now false, or
-  -- date moved to a different month, or quote assignment changed)
-  IF OLD.is_final_payment = true THEN
-    PERFORM rebuild_monthly_sales(old_staff, old_month);
-  END IF;
-
-  -- Rebuild new side (covers: flag just became true, or still true
-  -- with changed amount/date/quote)
-  IF NEW.is_final_payment = true
-     AND (old_staff <> new_staff OR old_month <> new_month OR NOT (OLD.is_final_payment = true)) THEN
-    PERFORM rebuild_monthly_sales(new_staff, new_month);
-  ELSIF NEW.is_final_payment = true THEN
-    -- same staff, same month, stayed-final — rebuild once to catch
-    -- amount changes reflected via the quote's subtotal
-    PERFORM rebuild_monthly_sales(new_staff, new_month);
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- -------------------------------------------------------------------------
+-- handle_payment_update REMOVED from this file (Phase 178).
+-- Canonical: db/functions/handle_payment_update.sql (MONEY — payment->monthly_sales sync).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS payments_update_recalc ON payments;
 CREATE TRIGGER payments_update_recalc
@@ -152,20 +118,11 @@ CREATE TRIGGER payments_update_recalc
   FOR EACH ROW EXECUTE FUNCTION handle_payment_update();
 
 -- Handle DELETE: if a final payment is removed, rebuild its month.
-CREATE OR REPLACE FUNCTION handle_payment_delete()
-RETURNS TRIGGER AS $$
-DECLARE
-  staff_uid uuid;
-  month_str text;
-BEGIN
-  IF OLD.is_final_payment = true THEN
-    SELECT created_by INTO staff_uid FROM quotes WHERE id = OLD.quote_id;
-    month_str := to_char(OLD.payment_date, 'YYYY-MM');
-    PERFORM rebuild_monthly_sales(staff_uid, month_str);
-  END IF;
-  RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
+-- -------------------------------------------------------------------------
+-- handle_payment_delete REMOVED from this file (Phase 178).
+-- Canonical: db/functions/handle_payment_delete.sql (MONEY — payment->monthly_sales sync).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS payments_delete_recalc ON payments;
 CREATE TRIGGER payments_delete_recalc

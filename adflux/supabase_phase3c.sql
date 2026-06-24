@@ -127,48 +127,11 @@ CREATE TRIGGER payments_insert_recalc
 --    transitions (approve / reject / un-approve).
 -- =====================================================
 
-CREATE OR REPLACE FUNCTION handle_payment_update()
-RETURNS TRIGGER AS $$
-DECLARE
-  old_counted boolean;
-  new_counted boolean;
-  old_staff   uuid;
-  new_staff   uuid;
-  old_month   text;
-  new_month   text;
-BEGIN
-  old_counted := (OLD.is_final_payment = true AND OLD.approval_status = 'approved');
-  new_counted := (NEW.is_final_payment = true AND NEW.approval_status = 'approved');
-
-  -- If the row never touched the ledger in either state, no work.
-  IF NOT old_counted AND NOT new_counted THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT created_by INTO old_staff FROM quotes WHERE id = OLD.quote_id;
-  SELECT created_by INTO new_staff FROM quotes WHERE id = NEW.quote_id;
-  old_month := to_char(OLD.payment_date, 'YYYY-MM');
-  new_month := to_char(NEW.payment_date, 'YYYY-MM');
-
-  -- Rebuild OLD side (removes the previous credit cleanly)
-  IF old_counted THEN
-    PERFORM rebuild_monthly_sales(old_staff, old_month);
-  END IF;
-
-  -- Rebuild NEW side (adds the new credit; safe to call even
-  -- when staff+month are identical to OLD — rebuild is idempotent)
-  IF new_counted
-     AND (NOT old_counted OR old_staff <> new_staff OR old_month <> new_month) THEN
-    PERFORM rebuild_monthly_sales(new_staff, new_month);
-  ELSIF new_counted THEN
-    -- Same staff+month: still rebuild once to pick up amount /
-    -- quote reassignment edge cases.
-    PERFORM rebuild_monthly_sales(new_staff, new_month);
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- -------------------------------------------------------------------------
+-- handle_payment_update REMOVED from this file (Phase 178).
+-- Canonical: db/functions/handle_payment_update.sql (MONEY — payment->monthly_sales sync).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS payments_update_recalc ON payments;
 CREATE TRIGGER payments_update_recalc
@@ -180,21 +143,11 @@ CREATE TRIGGER payments_update_recalc
 --    actually contributing (approved + final).
 -- =====================================================
 
-CREATE OR REPLACE FUNCTION handle_payment_delete()
-RETURNS TRIGGER AS $$
-DECLARE
-  staff_uid uuid;
-  month_str text;
-BEGIN
-  IF OLD.is_final_payment = true
-     AND OLD.approval_status = 'approved' THEN
-    SELECT created_by INTO staff_uid FROM quotes WHERE id = OLD.quote_id;
-    month_str := to_char(OLD.payment_date, 'YYYY-MM');
-    PERFORM rebuild_monthly_sales(staff_uid, month_str);
-  END IF;
-  RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
+-- -------------------------------------------------------------------------
+-- handle_payment_delete REMOVED from this file (Phase 178).
+-- Canonical: db/functions/handle_payment_delete.sql (MONEY — payment->monthly_sales sync).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS payments_delete_recalc ON payments;
 CREATE TRIGGER payments_delete_recalc
