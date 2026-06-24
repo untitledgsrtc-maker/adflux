@@ -4584,3 +4584,22 @@ pads the count). Scoreboard: 24 functions single-source + 1 dropped.
   When a function IS listed (>=2), confirm BOTH copies are real phase files (not just
   same-file overloads or a snapshot) before consolidating. The spawn_* trio taught
   this: they were never in the dedup list — I mis-grouped them into the "family batch".
+
+### Phase 178 #23 — 5 lead/quote-lifecycle trigger fns (batch) (`HEAD`)
+Lifecycle BATCH. Five real 2-copy phase duplicates, all captured byte-for-byte.
+Canonicals: db/functions/{lead_auto_assign, lead_auto_heat_from_outcome,
+lead_set_handoff_sla, quote_after_delete_rollback_lead, quote_before_insert_ensure_lead}.sql.
+Guardian PASS (strict), every locked contract byte-faithful:
+- lead_auto_assign (phase34+99_b1) — §99.B.1 TC-intent guard then §34 round-robin. PLAIN.
+- lead_auto_heat_from_outcome (phase47_4+88_4) — positive→hot/negative→cold, skip Won/Lost+same-heat.
+- lead_set_handoff_sla (phase12+34) — first-Working edge, sales_ready_at COALESCE + next_business_moment(+24h). PLAIN.
+- quote_after_delete_rollback_lead (phase34z50+117) — repoint quote_id + §117 QuoteSent→Working + close quote_chase FUs.
+- quote_before_insert_ensure_lead (phase119+144) — §144 NO phone gate (phone-less govt creates lead), dedup-by-phone, double EXCEPTION-wrap.
+Triggers + all siblings intact (phase34 lost 2 fns, phase12 lost 1 — remaining verified).
+Scoreboard: 29 functions single-source + 1 dropped.
+- The 3 spawn_* (spawn_lead_intro/quote_chase/nurture_cadence) confirmed SINGLE-COPY
+  (only phase33d6) → correctly NOT consolidated. The cadence + lead-lifecycle clusters
+  are now done. Remaining real 2-copy worth-it: HR/security (admin_create_user,
+  approve_leave, accept/unaccept_user_profile, eligible_for_paid_leave,
+  auto_create_incentive_profile), create_payment_collection_followups,
+  refresh_expired_quotes, tc_weekly_stats.
