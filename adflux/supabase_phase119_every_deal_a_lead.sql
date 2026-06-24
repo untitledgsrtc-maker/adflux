@@ -51,77 +51,10 @@
 -- =====================================================================
 
 -- ─── 1. Trigger function: ensure every quote has a lead ─────────────
-CREATE OR REPLACE FUNCTION public.quote_before_insert_ensure_lead()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-  v_existing uuid;
-  v_new      uuid;
-  v_stage    text;
-  v_owner    uuid := NEW.created_by;
-BEGIN
-  -- Normal path: quote already linked to a lead → no-op, zero cost.
-  IF NEW.lead_id IS NOT NULL THEN
-    RETURN NEW;
-  END IF;
-
-  -- Orphan path. EVERYTHING below is wrapped so a failure here can
-  -- NEVER block the quote insert (§45). On any error the quote saves
-  -- exactly as today (lead_id stays NULL).
-  BEGIN
-    -- Need a real owner + a usable phone to attach a lead.
-    IF v_owner IS NULL
-       OR NEW.client_phone IS NULL
-       OR length(regexp_replace(NEW.client_phone, '\D', '', 'g')) < 10 THEN
-      RETURN NEW;
-    END IF;
-
-    -- 1. Link to an existing OPEN lead for this phone, if any. Uses the
-    --    SAME function the Phase 34W dup-phone block uses, so we can
-    --    never trip that block (we link, we don't insert).
-    v_existing := public.find_open_lead_id_by_phone(NEW.client_phone);
-    IF v_existing IS NOT NULL THEN
-      NEW.lead_id := v_existing;
-      RETURN NEW;
-    END IF;
-
-    -- 2. No open lead → create one, SILENTLY. cadence_paused = true so
-    --    Phase 33D.6 spawns NO follow-up chase (owner: direct deals get
-    --    a lead but no reminders). leads.quote_id left NULL here — the
-    --    quote doesn't exist yet (FK); quote.lead_id is the real link.
-    v_stage := CASE NEW.status
-                 WHEN 'won'  THEN 'Won'
-                 WHEN 'lost' THEN 'Lost'
-                 ELSE 'QuoteSent'
-               END;
-
-    INSERT INTO public.leads (
-      name, phone, company, segment, source, stage,
-      assigned_to, created_by, heat, cadence_paused, expected_value
-    ) VALUES (
-      COALESCE(NULLIF(btrim(NEW.client_name), ''), 'Direct quote'),
-      NEW.client_phone,
-      NULLIF(btrim(NEW.client_company), ''),
-      COALESCE(NEW.segment, 'PRIVATE'),
-      'Direct Quote',
-      v_stage,
-      v_owner, v_owner, 'cold', true, NEW.total_amount
-    )
-    RETURNING id INTO v_new;
-
-    NEW.lead_id := v_new;
-    RETURN NEW;
-
-  EXCEPTION WHEN OTHERS THEN
-    -- Absolute safety: never break a quote save.
-    RAISE WARNING '[quote_ensure_lead] skipped for quote % (phone %): %',
-      NEW.id, NEW.client_phone, SQLERRM;
-    RETURN NEW;
-  END;
-END $$;
+-- -------------------------------------------------------------------------
+-- quote_before_insert_ensure_lead REMOVED from this file (Phase 178). Canonical: db/functions/quote_before_insert_ensure_lead.sql
+-- Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_quote_before_insert_ensure_lead ON public.quotes;
 CREATE TRIGGER trg_quote_before_insert_ensure_lead

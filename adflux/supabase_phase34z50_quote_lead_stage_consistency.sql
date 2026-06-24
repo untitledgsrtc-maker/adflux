@@ -73,51 +73,10 @@ CREATE TRIGGER trg_quote_status_propagate_ins
 --         stage). Won / Lost / Nurture / New stay put — deleting a
 --         quote doesn't undo a paid deal or reverse a Lost call.
 
-CREATE OR REPLACE FUNCTION public.quote_after_delete_rollback_lead()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_next_quote uuid;
-  v_lead_stage text;
-BEGIN
-  IF OLD.lead_id IS NULL THEN
-    RETURN OLD;
-  END IF;
-
-  -- Find the most-recent surviving quote on the same lead, if any.
-  SELECT q.id INTO v_next_quote
-    FROM public.quotes q
-   WHERE q.lead_id = OLD.lead_id
-     AND q.id <> OLD.id
-   ORDER BY q.created_at DESC
-   LIMIT 1;
-
-  -- Repoint or clear lead.quote_id when it pointed at the deleted row.
-  UPDATE public.leads
-     SET quote_id = v_next_quote,
-         updated_at = now()
-   WHERE id = OLD.lead_id
-     AND quote_id = OLD.id;
-
-  -- If there are no surviving quotes and the lead is still at
-  -- 'QuoteSent', demote to 'Working'. Anything else (Won/Lost/Nurture/
-  -- New) stays.
-  IF v_next_quote IS NULL THEN
-    SELECT stage INTO v_lead_stage FROM public.leads WHERE id = OLD.lead_id;
-    IF v_lead_stage = 'QuoteSent' THEN
-      UPDATE public.leads
-         SET stage = 'Working',
-             updated_at = now()
-       WHERE id = OLD.lead_id;
-    END IF;
-  END IF;
-
-  RETURN OLD;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- quote_after_delete_rollback_lead REMOVED from this file (Phase 178). Canonical: db/functions/quote_after_delete_rollback_lead.sql
+-- Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_quote_after_delete_rollback_lead ON public.quotes;
 CREATE TRIGGER trg_quote_after_delete_rollback_lead

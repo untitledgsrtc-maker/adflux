@@ -254,18 +254,10 @@ CREATE INDEX IF NOT EXISTS idx_call_logs_phone   ON public.call_logs (client_pho
 -- =====================================================================
 
 -- 8.1 Set handoff_sla_due_at = sales_ready_at + 24h when stage flips to SalesReady.
-CREATE OR REPLACE FUNCTION public.lead_set_handoff_sla()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.stage = 'SalesReady' AND (OLD.stage IS DISTINCT FROM 'SalesReady') THEN
-    NEW.sales_ready_at     := COALESCE(NEW.sales_ready_at, now());
-    NEW.handoff_sla_due_at := NEW.sales_ready_at + interval '24 hours';
-  END IF;
-  NEW.updated_at := now();
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_set_handoff_sla REMOVED from this file (Phase 178). Canonical: db/functions/lead_set_handoff_sla.sql
+-- Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_leads_set_handoff_sla ON public.leads;
 CREATE TRIGGER trg_leads_set_handoff_sla

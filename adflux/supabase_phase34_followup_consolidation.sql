@@ -100,22 +100,10 @@ COMMENT ON FUNCTION public.next_business_moment(timestamptz) IS
 -- The body now keys off New → Working (Phase 30A handoff semantics)
 -- and uses next_business_moment() so a Friday-evening handoff
 -- breaches Monday rather than Saturday.
-CREATE OR REPLACE FUNCTION public.lead_set_handoff_sla()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-  -- Stamp the handoff timestamp + SLA when a lead first starts being
-  -- worked. We treat sales_ready_at as the historical name for "rep
-  -- acknowledged the handoff" so the column keeps its meaning.
-  IF NEW.stage = 'Working' AND (OLD.stage IS DISTINCT FROM 'Working') THEN
-    NEW.sales_ready_at     := COALESCE(NEW.sales_ready_at, now());
-    NEW.handoff_sla_due_at :=
-      public.next_business_moment(NEW.sales_ready_at + interval '24 hours');
-  END IF;
-  NEW.updated_at := now();
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_set_handoff_sla REMOVED from this file (Phase 178). Canonical: db/functions/lead_set_handoff_sla.sql
+-- Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 -- Trigger row already exists from Phase 12 §8.1. Re-binding it is a
 -- no-op because CREATE OR REPLACE FUNCTION rewires the body in
@@ -169,16 +157,10 @@ COMMENT ON FUNCTION public.assign_lead_round_robin(text) IS
 -- ─── 4. Auto-assign trigger on lead INSERT ───────────────────────────
 -- Fires only when assigned_to is left blank. Lead-form / wizard
 -- inserts that already set assigned_to (self-assign) are untouched.
-CREATE OR REPLACE FUNCTION public.lead_auto_assign()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.assigned_to IS NULL THEN
-    NEW.assigned_to := public.assign_lead_round_robin(NEW.segment);
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_auto_assign REMOVED from this file (Phase 178). Canonical: db/functions/lead_auto_assign.sql
+-- Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_leads_auto_assign ON public.leads;
 CREATE TRIGGER trg_leads_auto_assign

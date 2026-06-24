@@ -27,57 +27,10 @@
 
 
 -- ─── 1. Function ─────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.lead_auto_heat_from_outcome()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public AS $$
-DECLARE
-  v_target_heat text;
-  v_current     record;
-BEGIN
-  -- Skip if outcome wasn't set on this row.
-  IF NEW.outcome IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  -- On UPDATE, only act when outcome actually changed.
-  IF TG_OP = 'UPDATE' AND OLD.outcome IS NOT DISTINCT FROM NEW.outcome THEN
-    RETURN NEW;
-  END IF;
-
-  -- Pick the target heat for this outcome.
-  IF NEW.outcome = 'positive' THEN
-    v_target_heat := 'hot';
-  ELSIF NEW.outcome = 'negative' THEN
-    v_target_heat := 'cold';
-  ELSE
-    -- neutral / callback / anything else — leave heat alone.
-    RETURN NEW;
-  END IF;
-
-  -- Pull current lead state.
-  SELECT stage, heat INTO v_current
-    FROM public.leads
-   WHERE id = NEW.lead_id;
-
-  -- Skip closed leads — don't reopen heat scoring post-Won/Lost.
-  IF v_current.stage IN ('Won', 'Lost') THEN
-    RETURN NEW;
-  END IF;
-
-  -- Skip if heat already matches (no-op write avoidance).
-  IF v_current.heat = v_target_heat THEN
-    RETURN NEW;
-  END IF;
-
-  -- Apply.
-  UPDATE public.leads
-     SET heat       = v_target_heat,
-         updated_at = now()
-   WHERE id = NEW.lead_id;
-
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_auto_heat_from_outcome REMOVED from this file (Phase 178). Canonical: db/functions/lead_auto_heat_from_outcome.sql
+-- Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 
 -- ─── 2. Trigger ──────────────────────────────────────────────────

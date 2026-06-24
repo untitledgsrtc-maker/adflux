@@ -82,29 +82,10 @@
 -- 1. CREATE OR REPLACE lead_auto_assign() with telecaller_id guard
 -- ────────────────────────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION public.lead_auto_assign()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-  -- Phase 99.B.1 (2026-05-29) — TC-intent guard. If the inserting
-  -- code path explicitly set telecaller_id, routing has already
-  -- been decided; skip round-robin so assigned_to stays NULL.
-  -- Without this guard, LeadUploadV2's new "Default telecaller"
-  -- pick (Phase 99.B) would get a phantom sales rep stamped on
-  -- every TC-only import.
-  IF NEW.telecaller_id IS NOT NULL THEN
-    RETURN NEW;
-  END IF;
-
-  -- Phase 34 — original behaviour for paths that leave both
-  -- columns NULL: round-robin assignment by segment.
-  IF NEW.assigned_to IS NULL THEN
-    NEW.assigned_to := public.assign_lead_round_robin(NEW.segment);
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- lead_auto_assign REMOVED from this file (Phase 178). Canonical: db/functions/lead_auto_assign.sql
+-- Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 
 NOTIFY pgrst, 'reload schema';

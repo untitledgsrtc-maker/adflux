@@ -48,62 +48,10 @@
 -- =====================================================================
 
 -- ─── 1. Extended delete-rollback function ───────────────────────────
-CREATE OR REPLACE FUNCTION public.quote_after_delete_rollback_lead()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_next_quote uuid;
-  v_lead_stage text;
-BEGIN
-  IF OLD.lead_id IS NULL THEN
-    RETURN OLD;
-  END IF;
-
-  -- Most-recent surviving quote on the same lead, if any.
-  SELECT q.id INTO v_next_quote
-    FROM public.quotes q
-   WHERE q.lead_id = OLD.lead_id
-     AND q.id <> OLD.id
-   ORDER BY q.created_at DESC
-   LIMIT 1;
-
-  -- Repoint or clear lead.quote_id when it pointed at the deleted row.
-  UPDATE public.leads
-     SET quote_id   = v_next_quote,
-         updated_at = now()
-   WHERE id = OLD.lead_id
-     AND quote_id = OLD.id;
-
-  -- No surviving quote: demote a QuoteSent lead back to Working AND
-  -- close its now-orphaned quote-chase follow-ups (Phase 117 add).
-  IF v_next_quote IS NULL THEN
-    SELECT stage INTO v_lead_stage FROM public.leads WHERE id = OLD.lead_id;
-    IF v_lead_stage = 'QuoteSent' THEN
-      UPDATE public.leads
-         SET stage      = 'Working',
-             updated_at = now()
-       WHERE id = OLD.lead_id;
-
-      -- Phase 117 — the quote-chase cadence rows spawned at QuoteSent
-      -- now chase a quote that was just deleted. Close them so they
-      -- stop firing. quote_chase only — never the lead's other rows.
-      UPDATE public.follow_ups
-         SET is_done   = true,
-             done_at   = now(),
-             done_note = COALESCE(done_note, '')
-                       || ' [auto-closed: quote deleted, lead back to Working]'
-       WHERE lead_id      = OLD.lead_id
-         AND is_done      = false
-         AND cadence_type = 'quote_chase';
-    END IF;
-  END IF;
-
-  RETURN OLD;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- quote_after_delete_rollback_lead REMOVED from this file (Phase 178). Canonical: db/functions/quote_after_delete_rollback_lead.sql
+-- Do NOT re-add (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 -- Re-assert the trigger (idempotent — self-contained for a fresh DB).
 DROP TRIGGER IF EXISTS trg_quote_after_delete_rollback_lead ON public.quotes;
