@@ -25,42 +25,13 @@
 -- =====================================================================
 
 -- ─── 1. Update bump_meeting_counter to skip auto-check-in rows ──────
-CREATE OR REPLACE FUNCTION public.bump_meeting_counter()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_date date := CURRENT_DATE;
-  v_user uuid := NEW.created_by;
-BEGIN
-  -- Only bump for meeting / site_visit activities.
-  IF NEW.activity_type NOT IN ('meeting', 'site_visit') THEN
-    RETURN NEW;
-  END IF;
-
-  -- Phase 93.6 — skip "I'm here · auto-check-in" companion rows that
-  -- LogMeetingModal auto-stamps next to the real meeting save. The
-  -- companion shares activity_type='meeting' + GPS coords, so the
-  -- unguarded original trigger doubled every meeting count.
-  IF NEW.notes IS NOT NULL
-     AND NEW.notes LIKE 'I''m here · auto-check-in%' THEN
-    RETURN NEW;
-  END IF;
-
-  -- Upsert today's work_session row + bump.
-  INSERT INTO work_sessions (user_id, work_date, daily_counters)
-  VALUES (v_user, v_date, jsonb_build_object('meetings', 1, 'calls', 0, 'new_leads', 0))
-  ON CONFLICT (user_id, work_date) DO UPDATE
-    SET daily_counters = COALESCE(work_sessions.daily_counters, '{}'::jsonb)
-                         || jsonb_build_object(
-                              'meetings',
-                              COALESCE((work_sessions.daily_counters->>'meetings')::int, 0) + 1
-                            );
-  RETURN NEW;
-END;
-$$;
+-- -------------------------------------------------------------------------
+-- bump_meeting_counter REMOVED (Phase 178) — DEAD CODE, NOT consolidated.
+-- Its trigger was dropped in Phase 32N; the live meeting counter is
+-- lead_activity_bump_counter (db/functions/). DROP it from the live DB via
+-- supabase_phase178_drop_dead_bump_meeting_counter.sql. Do NOT re-create it
+-- or its trigger — re-wiring re-introduces the §33 meeting double-count.
+-- -------------------------------------------------------------------------
 
 
 -- ─── 2. Backfill daily_counters.meetings for last 7 days ────────────

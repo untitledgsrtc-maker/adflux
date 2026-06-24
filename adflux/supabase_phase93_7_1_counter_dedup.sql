@@ -53,12 +53,11 @@
 -- (trg_lead_activity_bump_counter) stays in phase12_m1_m7_foundation.
 -- -------------------------------------------------------------------------
 
--- Mark the dead function so future grep stops chasing it.
-COMMENT ON FUNCTION public.bump_meeting_counter() IS
-  'DEAD as of Phase 93.7.1 — no trigger references this function. '
-  'The live counter trigger calls lead_activity_bump_counter() '
-  'instead. Kept for blame-history but unused. Do not edit; edit '
-  'lead_activity_bump_counter().';
+-- Phase 93.7.1 marked bump_meeting_counter DEAD via a COMMENT here; Phase 178 then
+-- DROPPED the function (supabase_phase178_drop_dead_bump_meeting_counter.sql). The
+-- COMMENT ON FUNCTION statement was removed because it would now error (42883
+-- function does not exist) on re-run. The live meeting counter is
+-- lead_activity_bump_counter() (db/functions/lead_activity_bump_counter.sql).
 
 
 -- ─── Backfill daily_counters.meetings for last 7 days ───────────────

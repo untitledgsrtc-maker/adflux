@@ -62,39 +62,18 @@ COMMENT ON COLUMN leads.source IS
 -- Fires on INSERT of any lead_activity with activity_type='meeting' or
 -- 'site_visit'. Increments the rep's work_sessions row for today.
 
-CREATE OR REPLACE FUNCTION bump_meeting_counter()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_date date := CURRENT_DATE;
-  v_user uuid := NEW.created_by;
-BEGIN
-  -- Only bump for meeting / site_visit activities. Calls / notes /
-  -- whatsapp don't roll up to the meetings milestone.
-  IF NEW.activity_type NOT IN ('meeting', 'site_visit') THEN
-    RETURN NEW;
-  END IF;
-
-  -- Upsert today's work_session row. If the rep hasn't checked in yet
-  -- today, we still want the counter to start ticking — the row gets
-  -- created with empty plan / no GPS, and check-in later just merges.
-  INSERT INTO work_sessions (user_id, work_date, daily_counters)
-  VALUES (v_user, v_date, jsonb_build_object('meetings', 1, 'calls', 0, 'new_leads', 0))
-  ON CONFLICT (user_id, work_date) DO UPDATE
-    SET daily_counters = COALESCE(work_sessions.daily_counters, '{}'::jsonb)
-                         || jsonb_build_object(
-                              'meetings',
-                              COALESCE((work_sessions.daily_counters->>'meetings')::int, 0) + 1
-                            );
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- -------------------------------------------------------------------------
+-- bump_meeting_counter REMOVED (Phase 178) — DEAD CODE, NOT consolidated.
+-- Its trigger was dropped in Phase 32N; the live meeting counter is
+-- lead_activity_bump_counter (db/functions/). DROP it from the live DB via
+-- supabase_phase178_drop_dead_bump_meeting_counter.sql. Do NOT re-create it
+-- or its trigger — re-wiring re-introduces the §33 meeting double-count.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_bump_meeting_counter ON lead_activities;
-CREATE TRIGGER trg_bump_meeting_counter
-  AFTER INSERT ON lead_activities
-  FOR EACH ROW
-  EXECUTE FUNCTION bump_meeting_counter();
+-- CREATE TRIGGER trg_bump_meeting_counter REMOVED (Phase 178). bump_meeting_counter
+-- is DEAD (trigger dropped Phase 32N). Re-creating it would re-wire a dead,
+-- exclusion-missing counter -> the §33 double-count returns. DROP TRIGGER above stays.
 
 -- ─── 4. Counter trigger for ad-hoc call activities ────────────────────
 -- Same logic for calls. The planned-call list doesn't track individual
@@ -168,13 +147,13 @@ NOTIFY pgrst, 'reload schema';
 -- ─── VERIFY ───────────────────────────────────────────────────────────
 -- Expected:
 --   row_count_users_with_targets >= number of active sales/agency/telecaller
---   trigger_count = 3 (bump_meeting_counter, bump_call_counter,
---                      bump_new_lead_counter)
+--   trigger_count = 2 (trg_bump_call_counter, trg_bump_new_lead_counter)
+--   — Phase 178 DROPPED the dead trg_bump_meeting_counter (see
+--     supabase_phase178_drop_dead_bump_meeting_counter.sql).
 SELECT
   (SELECT count(*) FROM users
     WHERE team_role IN ('sales', 'agency', 'telecaller')
       AND daily_targets ? 'meetings') AS row_count_users_with_targets,
   (SELECT count(*) FROM pg_trigger
-    WHERE tgname IN ('trg_bump_meeting_counter',
-                     'trg_bump_call_counter',
+    WHERE tgname IN ('trg_bump_call_counter',
                      'trg_bump_new_lead_counter')) AS trigger_count;
