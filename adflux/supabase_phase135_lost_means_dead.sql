@@ -24,37 +24,11 @@
 
 
 -- ─── 1. BEFORE INSERT guard — born-closed on a Lost lead ─────────────
-CREATE OR REPLACE FUNCTION public.followup_block_on_lost_lead()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_stage text;
-BEGIN
-  -- Only born-close MANUAL follow-ups (cadence_type NULL — the rep-typed
-  -- standalone note, which is the leak). Cadence spawns (lost_nurture
-  -- re-engagement etc) pass through untouched so the cadence engine
-  -- (Phase 76.3 / 128.3 / truth1) keeps owning them — guardian P1.
-  IF NEW.lead_id IS NULL
-     OR NEW.is_done IS TRUE
-     OR NEW.cadence_type IS NOT NULL THEN
-    RETURN NEW;
-  END IF;
-  BEGIN
-    SELECT l.stage INTO v_stage FROM public.leads l WHERE l.id = NEW.lead_id;
-    IF v_stage = 'Lost' THEN
-      NEW.is_done   := true;
-      NEW.done_at   := COALESCE(NEW.done_at, now());
-      NEW.done_note := COALESCE(NEW.done_note, 'Auto-closed: lead is Lost (Phase 135)');
-    END IF;
-  EXCEPTION WHEN OTHERS THEN
-    -- never block a legit follow-up insert on a lookup hiccup
-    RAISE WARNING 'followup_block_on_lost_lead skipped for lead %: %', NEW.lead_id, SQLERRM;
-  END;
-  RETURN NEW;
-END $$;
+-- -------------------------------------------------------------------------
+-- followup_block_on_lost_lead REMOVED from this file (Phase 178).
+-- Canonical: db/functions/followup_block_on_lost_lead.sql (§174-FROZEN Lost guard).
+-- Do NOT re-add it here. Edit the canonical file only (§71). Trigger wiring stays.
+-- -------------------------------------------------------------------------
 
 DROP TRIGGER IF EXISTS trg_followup_block_on_lost_lead ON public.follow_ups;
 CREATE TRIGGER trg_followup_block_on_lost_lead
