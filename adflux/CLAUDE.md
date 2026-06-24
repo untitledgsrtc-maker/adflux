@@ -4603,3 +4603,25 @@ Scoreboard: 29 functions single-source + 1 dropped.
   approve_leave, accept/unaccept_user_profile, eligible_for_paid_leave,
   auto_create_incentive_profile), create_payment_collection_followups,
   refresh_expired_quotes, tc_weekly_stats.
+
+### Phase 178 #24 — 6 HR/security fns (batch) + 2 rollback hazards neutralized (`8f023bc`)
+Security cluster. Six real 2-copy phase duplicates, captured byte-for-byte. Canonicals:
+db/functions/{accept_user_profile, admin_create_user, approve_leave,
+auto_create_incentive_profile, eligible_for_paid_leave, unaccept_user_profile}.sql.
+Guardian PASS (strict): §41 NULL-guards, the admin_create_user HR mint-ceiling,
+_assert_self_or_admin, 9-month tenure, PLAIN-not-DEFINER — all byte-faithful.
+- ⚠️ KNOWN GAP (captured AS-IS, owner's call — do NOT silently "fix" in a future
+  session): **approve_leave**'s gate is `get_my_role() NOT IN ('admin','co_owner')`
+  with NO `IS NULL OR` arm = the §41 3VL bypass for a NULL-role caller. This is the
+  LIVE truth (not a regression); the canonical header documents it. Hardening = add
+  the IS-NULL arm (1-line CHANGE, run in Studio) — separate from this capture.
+- SECURITY WIN: two phase files had COMMENTED rollback bodies that restore PRE-fix
+  INSECURE versions (phase87_5b_1 "drops the NULL guard"; phase97_2 approve_leave with
+  NO gate at all). Both replaced with pointers — uncomment-and-run can no longer revert
+  a security fix. (Same hazard class as the §72 #1/#12 compute_daily_score/enqueue_push
+  rollbacks.) The dedup script's non-anchored grep CATCHES commented copies — a useful
+  signal that surfaced these.
+Scoreboard: 35 functions single-source + 1 dropped. HR/security cluster done.
+- Remaining real 2-copy worth-it tail: create_payment_collection_followups,
+  refresh_expired_quotes, tc_weekly_stats. After those it's overloads (NEVER merge) +
+  trivial tg_/touch_updated_at wrappers. Near the honest end of the worth-it list.
