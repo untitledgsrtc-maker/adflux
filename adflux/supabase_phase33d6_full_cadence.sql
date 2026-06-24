@@ -123,16 +123,11 @@ BEGIN
 END $$;
 
 -- Cancel all OPEN follow-ups for a lead by cadence_type set.
-CREATE OR REPLACE FUNCTION public.cancel_lead_cadence(
-  p_lead_id uuid, p_types text[]
-) RETURNS void LANGUAGE sql AS $$
-  UPDATE public.follow_ups
-     SET is_done = true,
-         note = COALESCE(note, '') || ' [cancelled by stage change]'
-   WHERE lead_id = p_lead_id
-     AND is_done = false
-     AND cadence_type = ANY(p_types);
-$$;
+-- -------------------------------------------------------------------------
+-- cancel_lead_cadence REMOVED from this file (Phase 178).
+-- Canonical: db/functions/cancel_lead_cadence.sql (§128.3 cadence cancel helper).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
 -- ─── 5. Lead-creation trigger (replaces Phase 33D.4) ────────────────
 CREATE OR REPLACE FUNCTION public.lead_auto_create_followup()

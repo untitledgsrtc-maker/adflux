@@ -34,22 +34,11 @@
 -- =====================================================================
 
 -- ── 1. cancel_lead_cadence: also close legacy 33D.4 auto rows ────────
-CREATE OR REPLACE FUNCTION public.cancel_lead_cadence(
-  p_lead_id uuid, p_types text[]
-) RETURNS void LANGUAGE sql AS $$
-  UPDATE public.follow_ups
-     SET is_done = true,
-         note = COALESCE(note, '') || ' [cancelled by stage change]'
-   WHERE lead_id = p_lead_id
-     AND is_done = false
-     AND (
-       cadence_type = ANY(p_types)
-       OR ('lead_intro' = ANY(p_types)
-           AND cadence_type IS NULL
-           AND auto_generated = true
-           AND note LIKE 'Auto-scheduled:%')
-     );
-$$;
+-- -------------------------------------------------------------------------
+-- cancel_lead_cadence REMOVED from this file (Phase 178).
+-- Canonical: db/functions/cancel_lead_cadence.sql (§128.3 cadence cancel helper).
+-- Do NOT re-add it here. Edit the canonical file only (§71).
+-- -------------------------------------------------------------------------
 
 -- ── 2. Stage-change trigger: cleanup unconditional, spawns pause-gated ─
 -- -------------------------------------------------------------------------
