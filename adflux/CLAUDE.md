@@ -4752,3 +4752,52 @@ in-app. So even the bootstrap is banner-driven, not manual.
 - Do NOT push #2 (WATCHDOG) via live-update before the APK device-test — it changes
   battery draw on every live phone. It rides the APK.
 - Next session: write the native bundle, owner rebuilds + runs the checklist.
+
+### 74.1 · Native bundle BUILT — Phase 180 (`0fed300`), versions corrected (2026-06-26)
+The §74 native bundle is WRITTEN (not yet rebuilt/device-tested). Correction: the
+current build was already **96013** (not 96010 — §50 was stale), so the bump is
+**96013 → 96014** (the §74 table's "96011" is superseded). `GpsSetupPrompt` + the
+`app_version` seed are gated/keyed to 96014.
+
+**Committed (`0fed300`):** TrackingPlugin.java (installApk + canInstallPackages +
+openLocationSettings + requestBatteryUnrestricted) · AndroidManifest
+(REQUEST_INSTALL_PACKAGES + REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) · file_paths
+(external-files apk/) · build.gradle 96014 · nativeTracking.js (3 wrappers) ·
+backgroundGps.js WATCHDOG 30s · GpsSetupPrompt.jsx + V2AppShell mount. Guardian
+PASS (6/6), FileProvider authority+path self-verified.
+
+**Owner does, in order:**
+1. `git push origin untitled-os` (commits `b549e28` 179/180-web, `0fed300` native,
+   + the doc commits).
+2. Supabase Studio → run `supabase_phase180_app_version.sql` (creates app_version;
+   baseline is_active=false → NO banner yet).
+3. APK rebuild:
+   ```
+   cd ~/Documents/untitled-os2/Untitled/adflux
+   npm run build && npx cap sync android
+   cd android && ./gradlew assembleRelease    # sign as usual
+   ```
+4. **Host the signed APK at app.untitledad.in/apk.** OPEN ITEM — a Vercel domain
+   has no persistent file store, so the file must live somewhere the URL resolves
+   to (a `vercel.json` redirect `/apk` → a Storage/host path, OR commit the ~9 MB
+   APK to `public/apk/` = git bloat per release). Decide before publishing the
+   release row. The in-app updater reads `app_version.apk_url`; set it to wherever
+   you host (branded `https://app.untitledad.in/apk` recommended via redirect).
+5. **Device-test on ONE phone BEFORE the fleet (§39):**
+   - Install 96014 → opens, no crash.
+   - Login as a field-sales rep → the "Turn on accurate GPS" banner appears →
+     tap **Set up** → battery-unrestricted dialog + the app location screen open →
+     set Location = "Allow all the time" + Battery = Unrestricted.
+   - Drive ~2 km phone-LOCKED → `/admin/gps/<rep>` shows the route + km near real,
+     coverage % high. (A 96013 phone on the same drive = lower coverage.)
+   - INSERT a test `app_version` row (version_code 96015, apk_url = the hosted
+     96015 APK) → reopen app → "Update available" banner → tap Update → APK
+     downloads → Android installer → Install. Then retire the test row
+     (is_active=false). NOTE: first install may bounce to "allow this source"
+     (Android 8+) — grant once, retry.
+6. Only after that PASSES → distribute 96014 once (WhatsApp — the LAST manual
+   sideload). 96014 onward = in-app updates.
+
+**Release workflow after 96014:** native change → I bump versionCode + write code →
+you rebuild + host the APK → I INSERT an app_version row → reps get the in-app
+"Update available" → 2 taps. No more WhatsApp.
