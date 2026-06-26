@@ -2,6 +2,7 @@ package in.untitledad.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -13,9 +14,14 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.util.Log;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
+import java.io.File;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -385,6 +391,149 @@ public class TrackingPlugin extends Plugin {
             call.resolve(ret);
         } catch (Throwable t) {
             call.reject("setTrackingContext failed: " + t.getMessage());
+        }
+    }
+
+    // ─── 7. Phase 180 — in-app APK self-update ──────────────────
+    // Downloads the signed APK via the system DownloadManager (shows a
+    // download notification, survives backgrounding) and, on completion,
+    // fires the package-installer intent through the existing FileProvider
+    // (${applicationId}.fileprovider, already declared in the manifest).
+    // Android REQUIRES the user to confirm the install (sideload security):
+    // "tap Update here, tap Install there" (2 taps). The APK lands in the
+    // app-private external files dir (no storage permission needed).
+    private long apkDownloadId = -1L;
+    private BroadcastReceiver apkInstallReceiver;
+
+    @PluginMethod
+    public void installApk(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) { call.reject("Plugin context null"); return; }
+        final String url = call.getString("url");
+        if (url == null || url.isEmpty()) { call.reject("url required"); return; }
+        try {
+            File dir = new File(ctx.getExternalFilesDir(null), "apk");
+            if (!dir.exists()) dir.mkdirs();
+            final File apkFile = new File(dir, "update.apk");
+            if (apkFile.exists()) apkFile.delete();
+
+            DownloadManager dm = (DownloadManager) ctx.getSystemService(Context.DOWNLOAD_SERVICE);
+            if (dm == null) { call.reject("DownloadManager unavailable"); return; }
+            DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
+            req.setTitle("Untitled OS update");
+            req.setDescription("Downloading the latest app…");
+            req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            req.setDestinationInExternalFilesDir(ctx, null, "apk/update.apk");
+            req.setMimeType("application/vnd.android.package-archive");
+
+            // One-shot completion receiver → launch the installer.
+            apkInstallReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context c, Intent intent) {
+                    long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
+                    if (id != apkDownloadId) return;
+                    try { c.unregisterReceiver(this); } catch (Throwable ignore) {}
+                    apkInstallReceiver = null;
+                    try {
+                        Uri apkUri = FileProvider.getUriForFile(
+                            c, c.getPackageName() + ".fileprovider", apkFile);
+                        Intent install = new Intent(Intent.ACTION_VIEW);
+                        install.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                        install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        c.startActivity(install);
+                        Log.d(TAG, "installApk — installer launched");
+                    } catch (Throwable t) {
+                        Log.e(TAG, "installApk launch failed: " + t.getMessage());
+                    }
+                }
+            };
+            IntentFilter f = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+            if (Build.VERSION.SDK_INT >= 33) {
+                ctx.registerReceiver(apkInstallReceiver, f, Context.RECEIVER_EXPORTED);
+            } else {
+                ctx.registerReceiver(apkInstallReceiver, f);
+            }
+            apkDownloadId = dm.enqueue(req);
+            Log.d(TAG, "installApk — download enqueued id=" + apkDownloadId);
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Throwable t) {
+            Log.e(TAG, "installApk failed: " + t.getMessage());
+            call.reject("installApk failed: " + t.getMessage());
+        }
+    }
+
+    // Whether this app may install packages (Android 8+ asks the user to
+    // allow "install unknown apps" for this source). JS uses this to route
+    // the rep to that settings screen if false.
+    @PluginMethod
+    public void canInstallPackages(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) { call.reject("Plugin context null"); return; }
+        boolean can = true;
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                can = ctx.getPackageManager().canRequestPackageInstalls();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "canInstallPackages threw: " + t.getMessage());
+        }
+        JSObject ret = new JSObject();
+        ret.put("value", can);
+        call.resolve(ret);
+    }
+
+    // ─── 8. Phase 180 — GPS-capture onboarding deep-links (§73 #1) ──
+    // The dark-window km undercount is closed by two phone settings the rep
+    // must grant: Location = "Allow all the time" + Battery = Unrestricted.
+    // Android does NOT let an app set these silently — we can only deep-link
+    // the rep to the right screen. JS shows a one-time guided prompt.
+
+    // Opens THIS app's details screen → rep taps Permissions → Location →
+    // "Allow all the time" (background location can't be granted via an
+    // in-app dialog on Android 11+).
+    @PluginMethod
+    public void openLocationSettings(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) { call.reject("Plugin context null"); return; }
+        try {
+            Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + ctx.getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(i);
+            JSObject ret = new JSObject(); ret.put("ok", true); call.resolve(ret);
+        } catch (Throwable t) {
+            call.reject("openLocationSettings failed: " + t.getMessage());
+        }
+    }
+
+    // Fires the system "ignore battery optimizations?" dialog for this app
+    // → rep taps Allow → the foreground GPS service stops getting killed on
+    // screen-lock. Returns {already:true} if already unrestricted (no dialog).
+    @PluginMethod
+    public void requestBatteryUnrestricted(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) { call.reject("Plugin context null"); return; }
+        try {
+            boolean already = false;
+            if (Build.VERSION.SDK_INT >= 23) {
+                PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+                already = pm != null && pm.isIgnoringBatteryOptimizations(ctx.getPackageName());
+                if (!already) {
+                    Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + ctx.getPackageName()));
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    ctx.startActivity(i);
+                }
+            }
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            ret.put("already", already);
+            call.resolve(ret);
+        } catch (Throwable t) {
+            call.reject("requestBatteryUnrestricted failed: " + t.getMessage());
         }
     }
 

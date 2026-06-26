@@ -72,6 +72,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Phase 180 — in-app APK self-update (installApk) + the battery-
+         unrestricted onboarding dialog. REQUEST_INSTALL_PACKAGES lets the
+         app launch the package installer for a downloaded APK (sideload —
+         the user still confirms each install). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- Phase 56 — GPS tracking (foreground + background). Sales reps + TC
          lead use this for daily km calc + meeting verification. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

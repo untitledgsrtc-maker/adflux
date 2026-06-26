@@ -33,6 +33,7 @@ import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
 import { ToastViewport, pushToast } from './Toast'
 import AppUpdateBanner from './AppUpdateBanner'
+import GpsSetupPrompt from './GpsSetupPrompt'
 import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
@@ -798,6 +799,9 @@ export function V2AppShell() {
           {/* Phase 180 — in-app APK update banner. Native-only + dismissible;
               inert on web and until a newer app_version row is published. */}
           <AppUpdateBanner />
+          {/* Phase 180 — one-time GPS-capture setup prompt. Field-sales only,
+              native-only, gated to APK >= 96014 (where the deep-links exist). */}
+          <GpsSetupPrompt enabled={profile?.role === 'sales' && profile?.team_role !== 'sales_manager'} />
           {/* ProposedIncentiveCard — sales / agency only.
               Phase 34Z.58 (15 May 2026) — owner directive: "proposed
               incentive card needed in every tab, fixed." Dropped the

@@ -20,4 +20,8 @@
     <cache-path name="cache_pdfs" path="pdfs/" />
     <!-- Capacitor internal share-intent staging. -->
     <files-path name="capacitor_files" path="capacitor_share/" />
+    <!-- Phase 180 — the in-app APK self-update file lands here (app-private
+         external files dir via DownloadManager.setDestinationInExternalFilesDir),
+         then FileProvider serves it to the package installer. -->
+    <external-files-path name="apk_update" path="apk/" />
 </paths>

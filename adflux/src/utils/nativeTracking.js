@@ -664,3 +664,25 @@ export async function teardownNativeTracking() {
   openGpsOffRowId = null
   openNetOffRowId = null
 }
+
+// ─── Phase 180 — GPS-capture onboarding deep-links (§73 #1) ─────────────
+// Thin guarded wrappers around the native UntitledTracking methods that
+// deep-link the rep to the two phone settings that close the dark-window km
+// undercount: Location = "Allow all the time" + Battery = Unrestricted.
+// Android can't set these silently — these just OPEN the right screen/dialog.
+// Web build + an APK older than 96014 (method absent) → silent no-op.
+
+export async function requestBatteryUnrestricted() {
+  if (!Capacitor.isNativePlatform()) return null
+  try { return await Tracking.requestBatteryUnrestricted?.() } catch { return null }
+}
+
+export async function openLocationSettings() {
+  if (!Capacitor.isNativePlatform()) return null
+  try { return await Tracking.openLocationSettings?.() } catch { return null }
+}
+
+export async function canInstallPackages() {
+  if (!Capacitor.isNativePlatform()) return { value: true }
+  try { return await Tracking.canInstallPackages?.() } catch { return { value: true } }
+}

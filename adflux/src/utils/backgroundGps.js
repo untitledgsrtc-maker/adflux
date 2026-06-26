@@ -93,7 +93,10 @@ let watchdogSkips   = 0      // ticks to skip before the next watchdog re-arm
 let watchdogBackoff = 0      // grows on consecutive failed re-arms (GPS off)
 
 // Phase 103.D.1 cadences
-const WATCHDOG_MS    = 120000  // 2 min — how often the watchdog checks liveness
+const WATCHDOG_MS    = 30000   // 30 s (Phase 180, was 120000/2 min) — faster re-arm
+                               // so a reconnect after a dark window happens sooner;
+                               // shrinks each bridging segment below the 120 km/h TA
+                               // gate instead of it being dropped as a teleport (§73 #2).
 const MAX_BACKOFF    = 8       // cap: ~16 min between re-arm tries while GPS off
 
 /**

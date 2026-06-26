@@ -45,16 +45,21 @@ CREATE POLICY app_version_admin_write ON public.app_version
   USING (public.get_my_role() IN ('admin', 'co_owner'))
   WITH CHECK (public.get_my_role() IN ('admin', 'co_owner'));
 
--- Seed the CURRENT build so the banner stays hidden until the first real release.
+-- Baseline record of the CURRENT build (96013) as is_active=FALSE so NO banner
+-- shows for ANYONE until the first real release is published. A release =
+-- INSERT an is_active=true row with a HIGHER versionCode + a real hosted apk_url.
+-- Keeping the baseline inactive avoids nagging reps on an OLDER build before
+-- app.untitledad.in/apk actually serves a file.
 INSERT INTO public.app_version (version_code, version_name, apk_url, changelog, is_active)
-SELECT 96010, '0.96.10', 'https://app.untitledad.in/apk', 'Current build', true
+SELECT 96013, '0.96.13', 'https://app.untitledad.in/apk', 'Baseline (current build) — not a release', false
 WHERE NOT EXISTS (SELECT 1 FROM public.app_version);
 
 NOTIFY pgrst, 'reload schema';
 
--- VERIFY (read-only): expect table_present=1, rls_count=2, latest = 96010 today.
+-- VERIFY (read-only): expect table_present=1, rls_count=2, active_latest=NULL
+-- (the baseline is is_active=false → no active release → no banner shows).
 -- SELECT
 --   (SELECT count(*) FROM information_schema.tables
 --      WHERE table_schema='public' AND table_name='app_version')                AS table_present,
 --   (SELECT count(*) FROM pg_policies WHERE tablename='app_version')            AS rls_count,
---   (SELECT max(version_code) FROM public.app_version WHERE is_active)          AS latest_code;
+--   (SELECT max(version_code) FROM public.app_version WHERE is_active)          AS active_latest;
