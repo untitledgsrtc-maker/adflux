@@ -48,6 +48,11 @@ THEN roll out to ALL reps — paste this once in Supabase Studio (this is what
 shows the in-app "Update available" banner to everyone):
 
   INSERT INTO public.app_version (version_code, version_name, apk_url, changelog, is_active)
-  VALUES ($VC, '$VN', 'https://app.untitledad.in/apk?v=$VC', 'GPS fix + in-app updates', true);
+  VALUES ($VC, '$VN', 'https://kompjctmisnitjpbjalh.supabase.co/storage/v1/object/public/apk/untitled-os.apk?v=$VC', 'GPS fix + in-app updates', true);
+  -- apk_url is the DIRECT storage URL (NOT app.untitledad.in/apk): the installed app
+  -- OWNS app.untitledad.in, so the banner's browser-download fallback on the old APK
+  -- would open the app (login) instead of downloading. The storage domain isn't
+  -- captured → it downloads. The native installApk follows either, so this is safe
+  -- for both the bootstrap (old APK) and future in-app updates.
 
 EOF
