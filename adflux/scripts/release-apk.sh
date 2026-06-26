@@ -1,53 +1,31 @@
 #!/usr/bin/env bash
 # ============================================================================
-# scripts/release-apk.sh — ONE command to ship an APK update to all reps.
-#   build the debug APK → upload it to the Supabase `apk` bucket → publish the
-#   app_version row. Reps then get the in-app "Update available" banner (2 taps).
-#   NO manual Storage drag, no manual SQL.
+# scripts/release-apk.sh — ONE command to build + upload an APK release.
+#   sweep iCloud dupes -> clean assembleDebug -> upload to the `apk` bucket via the
+#   Supabase CLI (uses your `supabase login` — NO service-role key needed) -> print
+#   the publish SQL. You device-test ONE phone, THEN paste the publish SQL to roll
+#   the update out to all reps (the in-app "Update available" banner).
 #
 #   Run:  npm run release:apk
 #
-# ONE-TIME SETUP (do once):
-#   1. Run supabase_phase180_apk_bucket.sql in Supabase Studio (creates the bucket).
-#   2. Add your service_role key to .env (gitignored, NOT bundled to the client —
-#      only VITE_* vars are). One line:
-#        SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
-#      Get it: Supabase dashboard → Settings → API → service_role ("secret").
-#
-# WHY assembleDebug (not Release): the reps' installed app is debug-signed
-# (~/.android/debug.keystore). A new APK must use the SAME key to install over
-# it, so we stay on debug-signing (see CLAUDE.md §74.1/§74.2). The clean +
-# space-file sweep avoids the iCloud "X 2.dex defined multiple times" failure.
+# PREREQS (one-time): `supabase login` (done) + the apk bucket exists
+#   (supabase_phase180_apk_bucket.sql). assembleDebug keeps the SAME signing key as
+#   the reps' installed app so it installs as an update, not a fresh install (§74.1).
+#   The space-name sweep + clean avoids the iCloud "X 2.dex defined multiple times"
+#   build crash (§74.2).
 # ============================================================================
 set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
+BUCKET_DST="ss:///apk/untitled-os.apk"
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
-PROJECT_REF="kompjctmisnitjpbjalh"
-BUCKET="apk"
-OBJECT="untitled-os.apk"
-
-# --- service key (read ONLY that line from .env; don't source the whole file) ---
-KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
-if [ -z "$KEY" ] && [ -f .env ]; then
-  KEY="$(grep -E '^SUPABASE_SERVICE_ROLE_KEY=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
-fi
-if [ -z "$KEY" ]; then
-  echo "ERROR: SUPABASE_SERVICE_ROLE_KEY not set."
-  echo "  Add one line to .env:  SUPABASE_SERVICE_ROLE_KEY=eyJ..."
-  echo "  (Supabase dashboard → Settings → API → service_role 'secret')"
-  exit 1
-fi
-
-echo "==> 1/4  Sweep iCloud space-name dupes under build/ (the 'X 2.dex' crash)"
+echo "==> 1/3  Sweep iCloud space-name dupes (the §74.2 'X 2.dex' crash)"
 find android -path '*/build/*' -type f -name '* *' -delete 2>/dev/null || true
 find android/app/src/main/res -type f -name '* *' -delete 2>/dev/null || true
 
-echo "==> 2/4  Build web + cap sync + clean assembleDebug"
+echo "==> 2/3  Build web + cap sync + clean assembleDebug"
 npm run build
 npx cap sync android
 ( cd android && ./gradlew clean assembleDebug --console=plain )
-
 APK="android/app/build/outputs/apk/debug/app-debug.apk"
 [ -f "$APK" ] || { echo "ERROR: APK not produced ($APK)"; exit 1; }
 BT="$(ls "$HOME/Library/Android/sdk/build-tools/" | sort -V | tail -1)"
@@ -56,32 +34,20 @@ VC="$("$AAPT" dump badging "$APK" | grep -oE "versionCode='[0-9]+'" | grep -oE '
 VN="$("$AAPT" dump badging "$APK" | grep -oE "versionName='[^']+'" | sed "s/versionName='//; s/'$//")"
 echo "    built versionCode=$VC versionName=$VN  ($(ls -lh "$APK" | awk '{print $5}'))"
 
-echo "==> 3/4  Upload to Storage  $BUCKET/$OBJECT  (overwrite)"
-HTTP="$(curl -sS -o /tmp/apk_upload_resp -w '%{http_code}' -X POST \
-  "https://$PROJECT_REF.supabase.co/storage/v1/object/$BUCKET/$OBJECT" \
-  -H "Authorization: Bearer $KEY" \
-  -H "x-upsert: true" \
-  -H "Content-Type: application/vnd.android.package-archive" \
-  --data-binary "@$APK")"
-if [ "$HTTP" != "200" ]; then
-  echo "ERROR: upload HTTP $HTTP"; echo "  $(cat /tmp/apk_upload_resp)"
-  echo "  → Did you run supabase_phase180_apk_bucket.sql? Is the service key right?"
-  exit 1
-fi
-echo "    uploaded OK"
+echo "==> 3/3  Upload to Storage apk/untitled-os.apk (Supabase CLI, overwrite)"
+supabase storage cp "$APK" "$BUCKET_DST" --experimental
+echo "    uploaded → https://app.untitledad.in/apk"
 
-echo "==> 4/4  Publish app_version row (version_code=$VC, is_active=true)"
-PUB="$(curl -sS -o /tmp/apk_pub_resp -w '%{http_code}' -X POST \
-  "https://$PROJECT_REF.supabase.co/rest/v1/app_version" \
-  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
-  -H "Content-Type: application/json" -H "Prefer: return=minimal" \
-  -d "{\"version_code\":$VC,\"version_name\":\"$VN\",\"apk_url\":\"https://app.untitledad.in/apk?v=$VC\",\"changelog\":\"release\",\"is_active\":true}")"
-if [ "$PUB" != "201" ] && [ "$PUB" != "200" ]; then
-  echo "ERROR: publish HTTP $PUB"; echo "  $(cat /tmp/apk_pub_resp)"; exit 1
-fi
-echo "    published OK"
+cat <<EOF
 
-echo ""
-echo "DONE — v$VC is live."
-echo "  Test the link:  https://app.untitledad.in/apk"
-echo "  Reps on an older build now see the in-app 'Update available' banner (2 taps)."
+NEXT — device-test ONE phone FIRST (§39, never push native to the fleet blind):
+  1. On a test phone open  https://app.untitledad.in/apk  → install (updates over the app).
+  2. Field-rep login → "Set up" GPS banner → grant the 2 settings → drive ~2 km → check /admin/gps km.
+
+THEN roll out to ALL reps — paste this once in Supabase Studio (this is what
+shows the in-app "Update available" banner to everyone):
+
+  INSERT INTO public.app_version (version_code, version_name, apk_url, changelog, is_active)
+  VALUES ($VC, '$VN', 'https://app.untitledad.in/apk?v=$VC', 'GPS fix + in-app updates', true);
+
+EOF
