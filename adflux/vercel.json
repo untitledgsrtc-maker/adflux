@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/apk",
+      "destination": "https://kompjctmisnitjpbjalh.supabase.co/storage/v1/object/public/apk/untitled-os.apk",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/pdf/:ref",
