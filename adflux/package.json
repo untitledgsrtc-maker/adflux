@@ -11,7 +11,8 @@
     "cap:sync": "vite build && npx cap sync android && npm run cap:sweep",
     "cap:open:android": "npx cap open android",
     "cap:run:android": "npm run build && npx cap sync android && npm run cap:sweep && npx cap run android",
-    "cap:build:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug"
+    "cap:build:apk": "npm run cap:sync && find android -path '*/build/*' -name '* *' -delete 2>/dev/null; cd android && ./gradlew clean assembleDebug",
+    "release:apk": "bash scripts/release-apk.sh"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",
