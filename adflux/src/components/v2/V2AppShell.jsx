@@ -32,6 +32,7 @@ import GlobalSearchBar from './GlobalSearchBar'
 import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
 import { ToastViewport, pushToast } from './Toast'
+import AppUpdateBanner from './AppUpdateBanner'
 import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
@@ -794,6 +795,9 @@ export function V2AppShell() {
         )}
 
         <div className="v2d-content">
+          {/* Phase 180 — in-app APK update banner. Native-only + dismissible;
+              inert on web and until a newer app_version row is published. */}
+          <AppUpdateBanner />
           {/* ProposedIncentiveCard — sales / agency only.
               Phase 34Z.58 (15 May 2026) — owner directive: "proposed
               incentive card needed in every tab, fixed." Dropped the
