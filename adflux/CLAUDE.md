@@ -4625,3 +4625,66 @@ Scoreboard: 35 functions single-source + 1 dropped. HR/security cluster done.
 - Remaining real 2-copy worth-it tail: create_payment_collection_followups,
   refresh_expired_quotes, tc_weekly_stats. After those it's overloads (NEVER merge) +
   trivial tg_/touch_updated_at wrappers. Near the honest end of the worth-it list.
+
+---
+
+## 73 · GPS km undercount — ROOT CAUSE (confirmed) + permanent fix plan (2026-06-26)
+
+Owner: "permanent fix not patched, no duplicate file, root cause first then
+never happen again." Ran a deep read-only workflow (5 investigators + an Opus
+adversary that refuted every competing hypothesis). The answer is settled.
+
+### The symptom
+Admin day-track: route line spans ~50 km (Mayur, Somnath→Moraj, road-following),
+but DISTANCE = **5.4 km** ("raw 53.1 km · 138 drift/spike segments dropped", 138 of
+326 pings low-accuracy). The km is what TA pays (₹3/km). Rep is **under-paid** on
+weak-signal days.
+
+### ROOT CAUSE (adversary-confirmed, NOT a regression, NOT the consolidation)
+**The km is lost at CAPTURE, before the math runs — "dark windows".** Capture
+should be ~1 fix/20s (`backgroundGps.js`, `distanceFilter=10m`; ~1,400-1,900
+pings/workday). Mayur got 326 → ~80% of his shift was dark. When Android
+backgrounds/locks the phone WITHOUT "Allow all the time" + battery Unrestricted,
+the background-GPS watcher **dies** and only re-arms ~2 min later (`WATCHDOG_MS=
+120000`). The rep keeps driving; nothing is recorded. The single segment bridging
+the gap spans several km over minutes → the **120 km/h speed gate** in
+`compute_daily_ta` correctly can't tell it from a GPS teleport → **drops it**. The
+loose route line (Phase 169, `cleanTrack {speedKmh:250}`) keeps those bridging
+jumps, so the LINE looks full while the strict TA km is tiny. Neither 5.4 nor 50 is
+the true odometer; the real distance is **unrecorded**.
+
+Refutations tested + rejected: "the filter is wrong" (PARTIAL — it's right, defect
+is upstream; loosening re-admits real spikes → over-pays, the §42 trap) · "just
+Phase 124 visibility" (REFUTED — 124 only changed which number shows) · "Phase 178
+consolidation regression" (REFUTED — byte-identical capture; 200 cap can't lower a
+5.4) · "5.4 is correct, line is spikes" (PARTIAL — 5.4 correct for captured pings,
+but real driving is unrecorded). **NOT the §69 duplication disease** —
+`compute_daily_ta` is single-source post-§72.
+
+### The permanent fix — fix the SOURCE, never the payout math
+Single source of km STAYS `db/functions/compute_daily_ta.sql` — **do NOT touch it.**
+The cure lives entirely on device capture (additive, no duplicate file):
+
+1. **#1 (THE fix, native, APK rebuild) — force the two Android settings on rep
+   login**: Location = "Allow all the time" + Battery = Unrestricted. This is the
+   parked Phase 76.2 plugin + an onboarding prompt (`requestEnableGps` /
+   `SettingsClient`). Recovers the missing ~7h of pings so the real km is RECORDED
+   in the first place. Highest leverage. §43/§50/§39 — do NOT ship blind; device-test.
+2. **#2 (supporting, native) — faster watcher re-arm**: drop `backgroundGps.js`
+   `WATCHDOG_MS` (120000) + foreground-service heartbeat so reconnects happen
+   faster → each bridging segment shrinks BELOW the 120 km/h gate instead of being
+   deleted. Small battery cost (owner accepted ~2-3% §33 — reconfirm before raising).
+3. **#3 (SHIPPED, Phase 179 `7de8e44`, web/display-only) — GPS coverage chip** on
+   admin day-track: "GPS tracked X.Xh of Y.Yh shift (Z%)". Explains a low km as
+   "GPS was dark", not "rep drove 5km". `coverageHours` in gpsDistance.js (single
+   home, append-only). NOT the cure — the honesty band-aid until #1+#2 land.
+4. ❌ **NEVER loosen the 120 km/h / 50m thresholds to "recover" km** — re-admits
+   real GPS spikes → over-pays real money (the §42/§98 lesson). The filter is right.
+
+### Status / next
+- #3 shipped (web, live-update, guardian PASS, zero payout risk).
+- #1 + #2 = the permanent capture fix. **Native → ONE APK rebuild + on-device test**
+  (§39/§50). Bundles with the still-parked Phase 76.2 plugin work. Owner must green-
+  light the APK build; do NOT ship native blind. Until then, #3 makes the undercount
+  legible and the device-settings checklist (Allow-all-the-time + battery
+  Unrestricted) is the manual workaround per rep.
