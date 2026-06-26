@@ -4801,3 +4801,28 @@ PASS (6/6), FileProvider authority+path self-verified.
 **Release workflow after 96014:** native change → I bump versionCode + write code →
 you rebuild + host the APK → I INSERT an app_version row → reps get the in-app
 "Update available" → 2 taps. No more WhatsApp.
+
+### 74.2 · APK build "Type X defined multiple times / X 2.dex" = iCloud, NOT code (2026-06-26)
+The repo lives in `~/Documents/` which is **iCloud-synced**. iCloud silently creates
+" 2" duplicate copies of files (`MainActivity 2.dex`, `app-debug 2.apk`,
+`output-metadata 2.json`) inside `android/app/build/`. The D8 dexer then sees both
+`MainActivity.dex` AND `MainActivity 2.dex` → **"Type in.untitledad.app.MainActivity
+is defined multiple times"** → `mergeProjectDexDebug FAILED`. This is NOT a code bug,
+NOT a patch regression, NOT my Java — it bit Phase 180's debug build (release built
+clean only because its dex dir hadn't been duplicated yet).
+
+**THE FIX (permanent build hygiene — always do this for an APK build):**
+```
+find android -name "* 2.dex" -o -name "* 2.apk" -o -name "* 2.json" -delete
+cd android && ./gradlew clean assembleDebug   # 'clean' wipes the duplicated intermediates
+```
+`assembleDebug` (NOT assembleRelease) — the release signingConfig is still commented
+out (no release keystore exists), so assembleRelease yields an UNSIGNED apk. The reps'
+installed app is **debug-signed** (~/.android/debug.keystore, cert SHA-256 15d785ae…);
+96014 must match that key to install over it. Confirmed: clean assembleDebug → 96014,
+same debug cert, 8.8 MB.
+
+**Deeper prevention (optional, owner's call):** move the repo OUT of ~/Documents (e.g.
+~/dev/adflux) so iCloud never touches it — kills the duplication at the source. Until
+then, the `clean` build above is the standing rule (it's correct practice, not a
+band-aid: clean removes whatever iCloud duplicated since the last build).
