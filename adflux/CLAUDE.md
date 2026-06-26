@@ -4688,3 +4688,67 @@ The cure lives entirely on device capture (additive, no duplicate file):
   light the APK build; do NOT ship native blind. Until then, #3 makes the undercount
   legible and the device-settings checklist (Allow-all-the-time + battery
   Unrestricted) is the manual workaround per rep.
+
+---
+
+## 74 · GPS capture fix + in-app APK updater — the native bundle (2026-06-26)
+
+Owner approved the §73 permanent GPS fix (#1+#2) AND a new ask: stop the manual
+WhatsApp APK sideload — reps should get an in-app "Update available → tap" prompt.
+Owner decisions: **optional dismissible banner · download from app.untitledad.in/apk
+· all in ONE APK build.** Android reality: a sideloaded APK CANNOT silent-install —
+best achievable = in-app tap → download → Android installer → 1 tap Install (2 taps,
+no WhatsApp). Fully silent needs Play Store (rejected §38) or MDM.
+
+### SHIPPED this session (web, live-update, safe — NO rebuild)
+- **Phase 179 (`7de8e44`)** — GPS coverage chip on admin day-track ("GPS tracked
+  X.Xh of Y.Yh shift") = the §73 display-honesty half. Guardian PASS, zero payout risk.
+- **Phase 180 (`b549e28`)** — the update CHANNEL: `app_version` table
+  (`supabase_phase180_app_version.sql`, owner RUNS) + `AppUpdateBanner.jsx` mounted
+  in V2AppShell. Native-only, dismissible, INERT until a newer `app_version` row is
+  published (seed = current 96010). Tap → native `installApk` (next APK) → falls back
+  to a browser download of apk_url (the BOOTSTRAP). Guardian PASS, additive.
+
+### THE NATIVE BUNDLE — NOT yet built (one APK rebuild, device-test required §39)
+All three go in ONE signed APK with a bumped versionCode. I write the code; **owner
+rebuilds + tests on ONE device before distributing** (never ship native blind — §39).
+
+| Piece | Files | What |
+|---|---|---|
+| **#1 GPS prompt** | TrackingPlugin.java (+ JS in nativeTracking.js) + V2AppShell onboarding | On field-rep login: `requestEnableGps()` (SettingsClient location-settings dialog) + deep-link `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` so "Allow all the time" + battery-Unrestricted get set. Closes the dark windows (§73 root). |
+| **#2 watcher re-arm** | src/utils/backgroundGps.js | `WATCHDOG_MS` 120000 → ~20000 + foreground-service heartbeat so reconnect gaps shrink BELOW the 120 km/h TA gate instead of being deleted. (Ship WITH the APK — do NOT live-update this alone; it changes battery behavior on every phone.) |
+| **installApk** | TrackingPlugin.java + AndroidManifest.xml | New plugin method: download APK from apk_url → `Intent.ACTION_VIEW` via FileProvider + `REQUEST_INSTALL_PACKAGES`. Manifest: the permission + a FileProvider entry. Makes the Phase 180 banner a true 2-tap in-app update. |
+| **version bump** | android build.gradle | versionCode 96010 → 96011, versionName 0.96.11. |
+| **/apk host** | vercel.json (or a route) + the signed APK file | `app.untitledad.in/apk` resolves to the latest signed APK. (Hosting note: the file must physically live somewhere — a Vercel redirect to a stable host path keeps the branded URL without git-bloating the 9MB binary. Decide at build time.) |
+
+### THE BOOTSTRAP (one-time, no WhatsApp needed)
+Current reps run 96010 which has the banner JS (via live-update) but NOT installApk.
+Once I publish an `app_version` row for 96011 + host the APK: 96010 reps see the
+banner → tap → it FALLS BACK to a browser download of app.untitledad.in/apk → they
+install the 96011 APK once. 96011 HAS installApk → every future release is fully
+in-app. So even the bootstrap is banner-driven, not manual.
+
+### RELEASE WORKFLOW going forward (after 96011)
+1. Native change → I bump versionCode + write code.
+2. Owner: `npm run build && npx cap sync android && ./gradlew assembleRelease` →
+   sign → upload the APK to the apk_url host.
+3. I INSERT an `app_version` row (new versionCode + version_name + changelog).
+4. Reps open the app → "Update available" → 2 taps → done. No distribute step.
+
+### DEVICE-TEST CHECKLIST (owner, on ONE phone, before fleet)
+- [ ] Install the 96011 APK. App opens, no crash.
+- [ ] Login as a field rep → GPS prompt: "Allow all the time" + battery-Unrestricted
+      dialogs appear. Accept both.
+- [ ] Drive ~2 km with the phone LOCKED → `/admin/gps` shows the route + km close to
+      real (coverage % high). Compare to a 96010 phone on the same drive (should be
+      lower coverage).
+- [ ] Publish a dummy `app_version` row (96012) → banner appears → tap Update →
+      Android installer opens → install → banner gone.
+- [ ] Retire the dummy row (is_active=false) after.
+
+### Discipline (§39/§40 — native = where the owner got burned 5×)
+- `android-push-auditor` + `release-manager` agents run before the build.
+- `REQUEST_INSTALL_PACKAGES` is sensitive — scoped + documented.
+- Do NOT push #2 (WATCHDOG) via live-update before the APK device-test — it changes
+  battery draw on every live phone. It rides the APK.
+- Next session: write the native bundle, owner rebuilds + runs the checklist.
