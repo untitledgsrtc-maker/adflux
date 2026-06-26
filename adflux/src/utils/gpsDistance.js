@@ -238,3 +238,34 @@ export function detectStops(pings, opts = {}) {
   finalise()
   return stops
 }
+
+// ─────────────────────────────────────────────────────────────
+// Phase 179 — GPS COVERAGE (display-only honesty metric; NEVER feeds km/payout).
+// Answers "how much of the shift was the phone actually streaming GPS?" so a low
+// km reads as "GPS was dark 6h", not "rep only drove 5km" (§43/§51 dark-window
+// undercount). A gap between two consecutive pings counts as TRACKED only when it
+// is <= gapMaxS (default 6 min — a dark window is the OS killing the background
+// watcher, the ROOT CAUSE of the km undercount). Pure arithmetic on the pings
+// already fetched — no query, ZERO effect on compute_daily_ta.
+// Returns { trackedH, shiftH, pct } (pct 0-100, rounded).
+export function coverageHours(pings, startISO, endISO, gapMaxS = 360) {
+  const startMs = startISO ? new Date(startISO).getTime()
+    : (pings && pings[0] ? new Date(pings[0].captured_at).getTime() : 0)
+  const endMs = endISO ? new Date(endISO).getTime() : Date.now()
+  const shiftMs = Math.max(0, endMs - startMs)
+  const shiftH = shiftMs / 3600000
+  if (!pings || pings.length < 2 || shiftMs <= 0) {
+    return { trackedH: 0, shiftH, pct: 0 }
+  }
+  const gapMaxMs = gapMaxS * 1000
+  let trackedMs = 0
+  for (let i = 1; i < pings.length; i++) {
+    const prev = new Date(pings[i - 1].captured_at).getTime()
+    const cur  = new Date(pings[i].captured_at).getTime()
+    const gap  = cur - prev
+    if (gap > 0 && gap <= gapMaxMs) trackedMs += gap
+  }
+  const trackedH = trackedMs / 3600000
+  const pct = shiftH > 0 ? Math.min(100, Math.round((trackedH / shiftH) * 100)) : 0
+  return { trackedH, shiftH, pct }
+}

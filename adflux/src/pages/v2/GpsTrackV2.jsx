@@ -31,7 +31,7 @@ import { formatDate } from '../../utils/formatters'
 
 // Phase 34Z.6 — haversine + summariseTrack live in src/utils/
 // gpsDistance.js so /work uses the same filter rules.
-import { summariseTrack, cleanTrack, detectStops } from '../../utils/gpsDistance'
+import { summariseTrack, cleanTrack, detectStops, coverageHours } from '../../utils/gpsDistance'
 
 // Phase 93.6 (25 May 2026) — "I'm here · auto-check-in" companion
 // rows are auto-stamped by LogMeetingModal whenever a rep saves a
@@ -364,6 +364,15 @@ export default function GpsTrackV2() {
       last:  pings[pings.length - 1]?.captured_at,
     }
   }, [pings])
+
+  // Phase 179 — GPS coverage (display-only honesty metric). How much of the
+  // shift the phone actually streamed GPS. End = check_out_at, or now() while the
+  // shift is open. Reads pings + the work_sessions row already fetched — no query,
+  // ZERO effect on km/payout (which stay on server daily_ta).
+  const coverage = useMemo(
+    () => coverageHours(pings, session?.check_in_at, session?.check_out_at),
+    [pings, session],
+  )
 
   // Phase 124 — the headline DISTANCE = the server daily_ta km (TA-paid),
   // falling back to the client filtered km only when daily_ta has no row
@@ -837,6 +846,19 @@ export default function GpsTrackV2() {
             <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 2 }}>
               raw {stats.kmRaw} km · {stats.droppedSegs} drift/spike segments dropped
               {stats.capped ? ' · capped at 600 km' : ''}
+            </div>
+          )}
+          {/* Phase 179 — GPS coverage. A low % means the phone stopped sending GPS
+              during the shift (dark windows) — the km is low because tracking was
+              off, not because the rep didn't move. Display-only; never feeds km. */}
+          {coverage.shiftH > 0.15 && (
+            <div style={{
+              fontSize: 11, marginTop: 4, fontWeight: 600,
+              color: coverage.pct >= 80 ? 'var(--success)'
+                : coverage.pct >= 50 ? 'var(--warning)' : 'var(--danger)',
+            }}>
+              GPS tracked {coverage.trackedH.toFixed(1)}h of {coverage.shiftH.toFixed(1)}h shift ({coverage.pct}%)
+              {coverage.pct < 60 ? ' — km undercounts while GPS is off' : ''}
             </div>
           )}
         </div>
