@@ -45,6 +45,13 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
     /^\/assets\//,
     /^\/fonts\//,
     /^\/letterheads\//,
+    // Phase 181 — server endpoints must NOT get the SPA shell. /apk (the
+    // APK download redirect → /api/apk) + every /api/* edge fn were being
+    // served index.html → the in-app "Update" button landed on the login
+    // page instead of downloading the APK. Mirrors vercel.json's catch-all
+    // exclusion of api/.
+    /^\/api\//,
+    /^\/apk(?:[/?#]|$)/,
     /\.(?:js|mjs|css|map|json|png|jpg|jpeg|svg|webp|gif|ico|ttf|woff2?|wasm)$/,
   ],
 }))
