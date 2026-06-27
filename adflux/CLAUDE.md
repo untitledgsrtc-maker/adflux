@@ -4826,3 +4826,107 @@ same debug cert, 8.8 MB.
 ~/dev/adflux) so iCloud never touches it — kills the duplication at the source. Until
 then, the `clean` build above is the standing rule (it's correct practice, not a
 band-aid: clean removes whatever iCloud duplicated since the last build).
+
+---
+
+## 75 · Sales pitch deck (GSRTC LED network) — PARKED, lives OUTSIDE the repo (2026-06-26)
+
+Owner directive 26 Jun 2026: "leave it park this presentation deck." A standalone
+13-slide HTML pitch deck for the GSRTC bus-station LED screen network. **NOT app
+code, NOT in the repo** — lives on the owner's **Desktop**, so it never shows in
+git. Recorded here only so a future session knows it exists + its state. Spine =
+"AI-verified viewing + scan proof is the moat; reach is supporting evidence."
+
+### Where it lives (all under `~/Desktop/`)
+- `led-deck-final.html` — THE deck (~130 KB, 13 slides, `data-i="0".."12"`).
+- Assets it loads (must sit next to it): `station-hero.mp4` (hero bg),
+  `Botad.mp4` (green-screen station clip), `station-1.jpg` / `station-2.jpg`
+  (real photos), `dashboard-branded.html` (real adFlux audience dashboard,
+  dark+yellow reskin — slide 4 iframe), `screen-detail.html` (real
+  screen-settings page — slide 8 iframe), `cities-real.json` (20 cities from
+  the live `/cities`), `client-ad.mp4` (TATA TISCON sample creative).
+- Revert backup: `…/scratchpad/deck-before-revert.html` (session-temp; may not
+  persist).
+
+### Run it (REQUIRED — iframes are same-origin + local video/canvas)
+```
+python3 -m http.server 8765 --bind 127.0.0.1 --directory ~/Desktop
+# then open  http://localhost:8765/led-deck-final.html
+```
+Opening the file via `file://` breaks the iframes + the chroma-key (canvas taint).
+
+### State at park
+- **Real data only** (owner: "stop assuming, fetch real"): real grades A/B/C,
+  mixed 43"/55", 264 screens / 20 cities, prices ₹650 / ₹850, real geo map ref,
+  embedded real screen page, scan→lead pilot (48 scans → 9 leads),
+  QR → `wa.me/919581578261`. Anand's bad 60k figure dropped; Kheda left null.
+- **Slide 11 = green-screen preview.** `Botad.mp4` (a WIDE shot with ~5 small,
+  scattered green LED screens) is chroma-keyed **in-browser** (canvas, green→
+  transparent). The uploaded creative is **TILED at screen-size** so each green
+  screen shows ONE full ad, not a crop of a stretched-across-everything ad
+  (the opaque station footage hides the tiling everywhere except the screens).
+  QR + "SCAN → WhatsApp · Call 98982 73686" strip overlaid. Other cities' clips
+  drop in the same way (owner will share them later).
+- **Navigation = arrow buttons (bottom-right) + ← → / spacebar ONLY.**
+  Click-to-advance was REMOVED (owner: clicking the slide flipped the page).
+- **Hero face-detection:** owner wanted it as an **OpenArt PROMPT** (baked into a
+  regenerated hero video), NOT built into the deck. A live face-api.js detection
+  build was added then **REVERTED** (the footage's faces are too small/distant to
+  detect reliably; also not what he asked). Static reticles (M·32 / F·41 / F·24 /
+  dwell 18s) restored. The OpenArt prompt (clean station video + optional HUD
+  overlay) was delivered in chat.
+
+### Pending (owner-side, before any resume)
+1. Generate a clean hero video in OpenArt (prompt delivered) → drop on Desktop as
+   `station-hero.mp4`. Faces will move → the static hero reticles need re-placing
+   over the new people (manual, ~2 min — owner sends the clip).
+2. Tight / per-city green-screen clips for the slide-11 preview (Botad is the only
+   one wired; others "share after").
+
+### HARD RULE
+Do **NOT** integrate the deck into the app until the owner explicitly says so
+("don't integrate until I say" — the Start-Presentation / log-meeting / dwell-time
+hooks are designed but NOT built). No app/repo file was touched for the deck.
+
+---
+
+## 76 · APK in-app Update FIXED — /api/apk proxy + SW denylist (2026-06-27, `b438b45` + `ed4d8f3`)
+
+The in-app "Update" button (§74 AppUpdateBanner) was failing two ways. Both fixed,
+both PUSHED + LIVE + owner-confirmed working on device. Additive only — 3 files, all
+APK-download plumbing, **zero live-app/rep-flow touch** (§45-safe).
+
+### The two bugs + the two fixes
+1. **Team got `untitled-os.zip`, not an APK.** The raw Supabase object
+   `apk/untitled-os.apk` is stored `content-type: application/zip` (an APK *is* a
+   zip → storage auto-detected it). Android Chrome renames any `application/zip`
+   download to `.zip` → won't install. **NEW edge fn `api/apk.js`** streams the same
+   bytes with `application/vnd.android.package-archive` + `content-disposition`.
+   `vercel.json` `/apk` redirect now → `/api/apk` (branded link unchanged).
+2. **Update button landed on the LOGIN page.** The PWA service worker's
+   `NavigationRoute` (public/sw.js) served the SPA shell (`/index.html` → login) for
+   `app.untitledad.in/apk`, so the download link never reached the server.
+   **`public/sw.js` denylist gained `/^\/api\//` + `/^\/apk(?:[/?#]|$)/`** (same
+   class as the Phase 34Z.27 `/assets/` fix). Verified live: deployed sw.js carries
+   both regexes.
+
+### Hard-won contracts (do NOT regress)
+- **Supabase serves content-type from the FILE (S3), NOT from `storage.objects.metadata`.**
+  Updating the jsonb `mimetype` via SQL does NOT change the served `Content-Type`
+  (we tried — DB said correct, header still `application/zip`). To fix the raw URL's
+  type you'd have to RE-UPLOAD with explicit contentType. We didn't need to — the
+  `/api/apk` proxy forces the right header regardless.
+- **Any SAME-ORIGIN download/redirect link is swallowed by the SW NavigationRoute → login**
+  unless it's in the denylist. Current denylist: `/assets/ /fonts/ /letterheads/
+  /api/ /apk` + the file-extension regex. A future "open this URL to download" feature
+  on app.untitledad.in MUST be denylisted or it renders the app shell.
+- **`app_version.apk_url` = `https://app.untitledad.in/apk`** (owner set via SQL). The
+  banner's `installApk` (96014+) and the 96013 browser-fallback both read it.
+- **SW change needs the app reopened** — the rep closes+reopens once so the new SW
+  (skipWaiting) takes over. First launch installs it; the Update works after.
+
+### Resolves the §74 "/apk host OPEN ITEM"
+No separate APK host needed. `/api/apk` proxies the EXISTING Supabase
+`apk/untitled-os.apk` with corrected headers. **Future APK release = just overwrite
+`untitled-os.apk` in the `apk` bucket** (any content-type — the proxy fixes it) +
+publish the new `app_version` row. `apk_url`, the proxy, and the redirect stay put.
