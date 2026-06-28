@@ -124,19 +124,17 @@ export default function SalaryAdminV2({ embedded = false }) {
     }
     setTaBreakdown(tb)
 
-    // RPC per rep. Cheap (24 reps × 1 RPC). Sequential keeps Supabase
-    // load light + avoids RLS bursts.
-    const out = []
-    for (const u of (usersRes.data || [])) {
+    // Phase 182 — RPC per rep, now run in parallel (Promise.all preserves
+    // array order, so `out` is identical to the old sequential build — just
+    // not one-at-a-time). Salary tab re-runs this on every tab-focus, so the
+    // serial 24-RPC chain was the sluggishness.
+    const out = await Promise.all((usersRes.data || []).map(async (u) => {
       const { data, error: rpcErr } = await supabase.rpc('compute_monthly_salary', {
         p_user_id: u.id, p_year: y, p_month: m,
       })
-      if (rpcErr) {
-        out.push({ user: u, error: rpcErr.message })
-      } else {
-        out.push({ user: u, ...((data && typeof data === 'object') ? data : {}) })
-      }
-    }
+      if (rpcErr) return { user: u, error: rpcErr.message }
+      return { user: u, ...((data && typeof data === 'object') ? data : {}) }
+    }))
     setRows(out)
     setLoading(false)
   }

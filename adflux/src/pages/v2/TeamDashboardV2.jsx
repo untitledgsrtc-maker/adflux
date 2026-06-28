@@ -380,13 +380,10 @@ export default function TeamDashboardV2() {
           .select('user_id')
           .gte('created_at', startOfDay)
           .lt ('created_at', endOfDay),
-        // Phase 34U — pull every GPS ping captured today; we'll pick
-        // the latest per user client-side.
-        supabase.from('gps_pings')
-          .select('user_id, lat, lng, captured_at, accuracy_m')
-          .gte('captured_at', startOfDay)
-          .lt ('captured_at', endOfDay)
-          .order('captured_at', { ascending: false }),
+        // Phase 183 — latest ping per rep server-side (DISTINCT ON) so no rep
+        // is dropped past the 1000-row cap on busy days; one row per user,
+        // same { data } shape the pingMap loop below already expects.
+        supabase.rpc('latest_ping_per_user', { p_since: startOfDay, p_until: endOfDay }),
         // Phase 73 — daily_targets row per user (active).
         supabase.from('daily_targets')
           .select('user_id, min_calls, min_qualified_weekly')

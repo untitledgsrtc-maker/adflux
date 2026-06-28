@@ -2138,12 +2138,13 @@ function PerformanceTab() {
     const monthStart = new Date()
     monthStart.setDate(1)
     const ms = monthStart.toISOString().slice(0, 10)
-    const rows = []
-    for (const u of (users || [])) {
+    // Phase 182 — monthly_score per rep in parallel (Promise.all preserves
+    // order → `rows` identical to the old sequential build).
+    const rows = await Promise.all((users || []).map(async (u) => {
       const { data: s } = await supabase
         .rpc('monthly_score', { p_user_id: u.id, p_month_start: ms })
-      rows.push({ user: u, score: Array.isArray(s) && s.length > 0 ? s[0] : null })
-    }
+      return { user: u, score: Array.isArray(s) && s.length > 0 ? s[0] : null }
+    }))
     setReps(rows)
     setLoading(false)
   }
