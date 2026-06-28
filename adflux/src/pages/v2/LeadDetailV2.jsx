@@ -1311,6 +1311,12 @@ export default function LeadDetailV2() {
               <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
                 <Edit3 size={13} /> <span>Note</span>
               </button>
+              {/* Phase 187.1 — GSRTC pitch deck, beside Note. Opens the bundled
+                  deck (/deck, public/deck/ §75) in a new tab via openExternalUrl
+                  (web new tab / APK system browser). Additive, §45-safe. */}
+              <button className="lead-btn lead-btn-sm" onClick={() => openExternalUrl(`${window.location.origin}/deck/led-deck-final.html`)}>
+                <Presentation size={13} /> <span>Presentation</span>
+              </button>
               {/* Email — falls back to LogActivityModal when lead has
                   no email on file (most govt leads). */}
               {lead.email ? (
@@ -1701,20 +1707,8 @@ export default function LeadDetailV2() {
                 <span>{lead.created_at ? formatDate(lead.created_at) : '—'}</span>
               </FieldCell>
               <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))', paddingTop: 10, marginTop: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
-                  <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
-                    Notes
-                  </div>
-                  {/* Phase 187 — GSRTC pitch deck, opens in a new tab. Bundled at
-                      /deck (public/deck/, §75); openExternalUrl routes web→new tab,
-                      APK→system browser. Additive, §45-safe (no live-flow touch). */}
-                  <button
-                    type="button"
-                    className="lead-btn lead-btn-sm"
-                    onClick={() => openExternalUrl(`${window.location.origin}/deck/led-deck-final.html`)}
-                  >
-                    <Presentation size={13} /> <span>Presentation</span>
-                  </button>
+                <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
+                  Notes
                 </div>
                 <InlineField
                   value={lead.notes}
