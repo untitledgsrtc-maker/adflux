@@ -73,6 +73,46 @@ function safeDuration(durationSeconds, outcome) {
   return Number(durationSeconds) || 0
 }
 
+// Phase 184 — pre-fetch this user's leads ONCE per scan so ingestOne resolves
+// the lead-by-phone match in memory instead of 2-4 round-trips PER call record
+// (the N+1 on the 5-min poller + the 7-day first scan). The call_logs dupe +
+// tel-tap matching (§170/§173) is DELIBERATELY left as per-record DB queries —
+// untouched. EXACT reproduction of the old lookups: keyed by the RAW lead.phone
+// (the old `.eq('phone', cleaned)` compared the stored phone to the cleaned
+// 10-digit string verbatim — normalising the key would change attribution).
+// Two separate .eq() queries (never .or() with an interpolated id — Phase 56l
+// guardian P1). Chunked (§66) so a rep with >1000 leads isn't capped. Each
+// bucket is created_at-desc, so [0] == the old `.order(created_at desc).limit(1)`.
+// Returns { [rawPhone]: { tc: [...desc], as: [...desc] } }.
+async function buildLeadPhoneMap(userId) {
+  const map = {}
+  async function load(col, bucket) {
+    let from = 0
+    for (;;) {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('id, phone, created_at')
+        .eq(col, userId)
+        .not('phone', 'is', null)
+        .order('created_at', { ascending: false })
+        .range(from, from + 999)
+      if (error || !data) break
+      for (const r of data) {
+        const k = r.phone
+        if (k == null) continue
+        if (!map[k]) map[k] = { tc: [], as: [] }
+        map[k][bucket].push(r)   // pages stay created_at-desc → [0] = most recent
+      }
+      if (data.length < 1000) break
+      from += 1000
+      if (from >= 20000) break   // safety backstop
+    }
+  }
+  await load('telecaller_id', 'tc')
+  await load('assigned_to', 'as')
+  return map
+}
+
 let activeUserId = null
 let pollTimer    = null
 let visListener  = null
@@ -169,10 +209,11 @@ export async function forceIngestRecentCalls(userId, lookbackMs = 7 * 24 * 60 * 
 
   // Process oldest-first so dedupe sees stable order.
   calls.sort((a, b) => Number(a.date) - Number(b.date))
+  const leadMap = await buildLeadPhoneMap(userId)   // Phase 184 — pre-fetch once
   const errors = []
   for (const c of calls) {
     try {
-      await ingestOne(userId, c)
+      await ingestOne(userId, c, leadMap)
     } catch (e) {
       errors.push(`${c?.number || '?'}: ${e?.message || String(e)}`)
     }
@@ -239,9 +280,13 @@ async function runScan(userId) {
     // Process oldest-first so dedupe checks see a stable order.
     calls.sort((a, b) => Number(a.date) - Number(b.date))
 
+    // Phase 184 — pre-fetch the lead→phone map ONCE (was 2-4 lead queries per
+    // record). The dupe/tap call_logs matching inside ingestOne is unchanged.
+    const leadMap = await buildLeadPhoneMap(userId)
+
     for (const c of calls) {
       try {
-        await ingestOne(userId, c)
+        await ingestOne(userId, c, leadMap)
       } catch (e) {
         console.warn('[call-history] ingest failed for', c?.number, e?.message || e)
       }
@@ -253,7 +298,7 @@ async function runScan(userId) {
   }
 }
 
-async function ingestOne(userId, raw) {
+async function ingestOne(userId, raw, leadMap = {}) {
   const number          = (raw?.number || '').toString()
   const type            = (raw?.type   || 'unknown').toString()
   const dateMs          = Number(raw?.date)
@@ -315,14 +360,12 @@ async function ingestOne(userId, raw) {
     // duration (guardian P1). If it does NOT resolve (the dialed number isn't
     // any lead's stored number — exactly the Vimal Oil ...122 case), fall back
     // to nearest-by-time among the rep's unpatched taps.
+    // Phase 184 — resolve from the pre-fetched map (telecaller-first, else
+    // assigned). Same result as the two old .eq('phone', cleaned) lookups.
     let fbLeadId = null
     if (cleaned) {
-      const tcQ = await supabase.from('leads').select('id').eq('telecaller_id', userId).eq('phone', cleaned).limit(1)
-      if (tcQ.data && tcQ.data.length) fbLeadId = tcQ.data[0].id
-      else {
-        const asQ = await supabase.from('leads').select('id').eq('assigned_to', userId).eq('phone', cleaned).limit(1)
-        if (asQ.data && asQ.data.length) fbLeadId = asQ.data[0].id
-      }
+      const fm = leadMap[cleaned]
+      fbLeadId = (fm && ((fm.tc[0] && fm.tc[0].id) || (fm.as[0] && fm.as[0].id))) || null
     }
     const wideLower = new Date(dateMs - TAP_MATCH_WINDOW_SEC * 1000).toISOString()
     const wideUpper = new Date(dateMs + TAP_MATCH_WINDOW_SEC * 1000).toISOString()
@@ -375,27 +418,13 @@ async function ingestOne(userId, raw) {
   // back to assigned_to. Two separate queries instead of `.or()` with
   // string interpolation (guardian P1, 19 May 2026) so no special
   // chars in userId can break PostgREST filter parsing.
+  // Phase 184 — lead match from the pre-fetched map (telecaller-first, else
+  // assigned, most-recent-by-created_at). Identical result to the two old
+  // .order('created_at',desc).limit(1) queries; just no per-record round-trip.
   let leadId = null
   if (cleaned) {
-    const tcQ = await supabase
-      .from('leads')
-      .select('id')
-      .eq('telecaller_id', userId)
-      .eq('phone', cleaned)
-      .order('created_at', { ascending: false })
-      .limit(1)
-    if (tcQ.data && tcQ.data.length > 0) {
-      leadId = tcQ.data[0].id
-    } else {
-      const asQ = await supabase
-        .from('leads')
-        .select('id')
-        .eq('assigned_to', userId)
-        .eq('phone', cleaned)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      if (asQ.data && asQ.data.length > 0) leadId = asQ.data[0].id
-    }
+    const fm = leadMap[cleaned]
+    leadId = (fm && ((fm.tc[0] && fm.tc[0].id) || (fm.as[0] && fm.as[0].id))) || null
   }
 
   // Outcome label for human readers.
