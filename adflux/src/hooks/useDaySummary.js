@@ -30,6 +30,34 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 import { istTodayISO, istTodayPlusDays } from '../utils/istDate'
 
+// Phase 182 — chunked gps_pings read. A high-mileage rep logs ~1,400-1,900
+// pings/day (§73), so a single unpaginated .select() silently capped at the
+// PostgREST 1000-row limit → uptime UNDER-counted on exactly the days that
+// matter. Loops .range() to pull the full day. Returns { data } so it stays a
+// drop-in for the Promise.all element it replaces. Timestamps only (no lat/lng)
+// → cannot affect km (km stays single-source on daily_ta, §51/§124).
+async function fetchAllPingTimestamps(userId, startISO, endISO) {
+  const PAGE = 1000
+  let all = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await supabase
+      .from('gps_pings')
+      .select('captured_at')
+      .eq('user_id', userId)
+      .gte('captured_at', startISO)
+      .lte('captured_at', endISO)
+      .order('captured_at', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) return { data: all, error }
+    all = all.concat(data || [])
+    if (!data || data.length < PAGE) break
+    from += PAGE
+    if (from >= 20000) break   // safety backstop
+  }
+  return { data: all }
+}
+
 /**
  * Convert a YYYY-MM-DD IST date into UTC ISO strings bracketing the
  * IST day (00:00 IST → 23:59:59.999 IST). IST = UTC+5:30.
@@ -189,13 +217,9 @@ export default function useDaySummary({ dateISO } = {}) {
           .gte('created_at', startISO)
           .lte('created_at', endISO),
 
-        // 8) gps_pings for uptime
-        supabase.from('gps_pings')
-          .select('captured_at')
-          .eq('user_id', profile.id)
-          .gte('captured_at', startISO)
-          .lte('captured_at', endISO)
-          .order('captured_at', { ascending: true }),
+        // 8) gps_pings for uptime — Phase 182: chunked (was capped at 1000,
+        // under-counting uptime on high-mileage days, §73). Same { data } shape.
+        fetchAllPingTimestamps(profile.id, startISO, endISO),
 
         // 9a) gps_off_events today
         supabase.from('gps_off_events')

@@ -48,6 +48,30 @@ const STAGE_RAIL = [
   { key: 'Lost',      k: 's-lost',  short: 'Lost',       match: ['Lost'] },
 ]
 
+// Phase 182 — chunked leads read. /lead-dashboard sits under RequireAuth, so
+// an admin/co_owner's RLS returns ALL leads (1,114+) but a single unpaginated
+// .select() capped at the PostgREST 1000-row limit → the dashboard's lists +
+// counts were silently 100+ leads short for admins. Reps are RLS-scoped (<1000)
+// so they paid one request as before. Same { data, error } shape as one query.
+async function fetchAllDashboardLeads() {
+  const PAGE = 1000
+  let all = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*, assigned:assigned_to(id, name, city)')
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE - 1)
+    if (error) return { data: all, error }
+    all = all.concat(data || [])
+    if (!data || data.length < PAGE) break
+    from += PAGE
+    if (from >= 20000) break   // safety backstop
+  }
+  return { data: all, error: null }
+}
+
 export default function LeadDashboardV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
@@ -65,10 +89,7 @@ export default function LeadDashboardV2() {
       setLoading(true)
       setError('')
       const [leadsRes, voiceRes] = await Promise.all([
-        supabase
-          .from('leads')
-          .select('*, assigned:assigned_to(id, name, city)')
-          .order('created_at', { ascending: false }),
+        fetchAllDashboardLeads(),   // Phase 182 — chunked (was capped at 1000)
         supabase
           .from('voice_logs')
           .select(`
