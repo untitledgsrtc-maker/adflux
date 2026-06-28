@@ -32,7 +32,7 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
-import { lookupCall } from './callLogReader'
+import { findOutgoingCallSeconds } from './callLogReader'
 
 const CallLogReader = registerPlugin('CallLogReader')
 
@@ -56,11 +56,11 @@ async function reconcileRecentCalls() {
       const phone = r.client_phone
       if (!phone) continue
       const tapMs = new Date(r.call_at).getTime()
-      // Same backward window the modal-save path uses (Phase 56i).
-      const res = await lookupCall({ phone, sinceMs: tapMs - 60 * 60_000 })
-      if (!res || !res.found) continue
-      const dev = Number(res.durationSeconds)
-      if (!Number.isFinite(dev) || dev < 10) continue   // confirmed real talk only
+      // Phase 185 — the OUTGOING call nearest this row's time (root fix). Was
+      // lookupCall's newest-any → it re-pasted a later inbound call's duration
+      // onto this outgoing row, recreating the cross-paste on every sweep.
+      const dev = await findOutgoingCallSeconds(phone, tapMs)
+      if (dev == null || dev < 10) continue   // confirmed real outgoing talk only
       const { error } = await supabase
         .from('call_logs')
         .update({ duration_seconds: dev })

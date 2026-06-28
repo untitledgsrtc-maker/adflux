@@ -80,6 +80,43 @@ export async function lookupCall({ phone, sinceMs, windowMinutes = 60 }) {
 }
 
 /**
+ * Phase 185 — ROOT fix for the duration cross-paste. The device read must
+ * return the OUTGOING call to `phone` NEAREST `nearMs` — NOT "the newest call
+ * to this number" (what lookupCall does). On two calls a minute apart (an
+ * outgoing then an incoming), lookupCall returned the later INCOMING call's
+ * duration and it got pasted onto the OUTGOING row (confirmed 11 live
+ * cross-pastes: e.g. real outgoing 27s shown as the incoming 57s).
+ *
+ * Uses scanRecentCalls — returns { number, type, date, durationSeconds } per
+ * call, the SAME plugin method the call-history poller already trusts — so this
+ * is JS-only, NO APK rebuild. Direction-pinned (outgoing only) + nearest-by-time
+ * (disambiguates multiple outgoing calls). Number match = last-10 digits (the
+ * app-wide cleanPhone convention). Returns seconds (>=0) or null.
+ */
+export async function findOutgoingCallSeconds(phone, nearMs, windowMs = 60 * 60_000) {
+  if (!Capacitor.isNativePlatform() || !phone || !nearMs) return null
+  const want = String(phone).replace(/\D/g, '').slice(-10)
+  if (!want) return null
+  let calls = []
+  try {
+    const res = await CallLogReader.scanRecentCalls({ sinceTimestamp: nearMs - windowMs, limit: 100 })
+    calls = Array.isArray(res?.calls) ? res.calls : []
+  } catch (e) {
+    console.warn('[call-log] scan failed:', e?.message || e)
+    return null
+  }
+  let best = null
+  for (const c of calls) {
+    if ((c.type || '').toLowerCase() !== 'outgoing') continue           // direction pin
+    if (String(c.number || '').replace(/\D/g, '').slice(-10) !== want) continue
+    const dt = Math.abs(Number(c.date) - nearMs)
+    if (best === null || dt < best.dt) best = { dt, sec: Number(c.durationSeconds) }
+  }
+  if (!best) return null
+  return (Number.isFinite(best.sec) && best.sec >= 0) ? best.sec : null
+}
+
+/**
  * Convenience wrapper that wires the lookup into a Supabase patch.
  * Patches:
  *   1. The most recent call_logs row for (user, lead) within the
@@ -110,13 +147,11 @@ export async function fetchAndPatchCallDuration({
   let duration = null
   let deviceFound = false, deviceSeconds = null   // Phase 138 diag
   if (Capacitor.isNativePlatform() && phone && telTapMs) {
-    const lookbackMs = telTapMs - 60 * 60_000
-    const result = await lookupCall({ phone, sinceMs: lookbackMs })
-    if (result && result.found) {
-      deviceFound = true
-      const d = Number(result.durationSeconds)
-      if (Number.isFinite(d) && d >= 0) { duration = d; deviceSeconds = d }
-    }
+    // Phase 185 — the OUTGOING call nearest the tap (root fix). Was lookupCall's
+    // direction-blind "newest call to this number", which pasted a later
+    // INCOMING call's seconds onto this outgoing row (the 27->57 cross-paste).
+    const sec = await findOutgoingCallSeconds(phone, telTapMs)
+    if (sec != null) { duration = sec; deviceSeconds = sec; deviceFound = true }
   }
 
   // 2. Phase 116 — in-app "time away from app" fallback (callTimer.js).
@@ -178,6 +213,7 @@ export async function fetchAndPatchCallDuration({
     .eq('user_id', userId)
     .eq('lead_id', leadId)
     .gte('call_at', cutoff)
+    .or('direction.eq.outgoing,direction.is.null')   // Phase 185 — never an inbound row
     .in('outcome', ['connected', 'callback_requested'])
     .order('call_at', { ascending: false })
     .limit(1)
