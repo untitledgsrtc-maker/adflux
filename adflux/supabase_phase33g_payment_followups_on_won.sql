@@ -33,13 +33,29 @@ DECLARE
   v_quote    record;
   v_existing int;
 BEGIN
-  SELECT id, created_by, total_amount, COALESCE(quote_number, ref_number, id::text) AS label
+  -- Phase 186 — also read the quote's lead stage (LEFT JOIN: a lead-less quote
+  -- has lead_stage NULL and still gets its chases).
+  SELECT q.id, q.created_by, q.total_amount,
+         COALESCE(q.quote_number, q.ref_number, q.id::text) AS label,
+         l.stage AS lead_stage
     INTO v_quote
-    FROM quotes
-   WHERE id = p_quote_id;
+    FROM quotes q
+    LEFT JOIN leads l ON l.id = q.lead_id
+   WHERE q.id = p_quote_id;
 
   IF NOT FOUND THEN
     RAISE NOTICE 'create_payment_collection_followups: quote % not found', p_quote_id;
+    RETURN;
+  END IF;
+
+  -- Phase 186 — ROOT fix for the recurring "Lost leads still in follow-ups".
+  -- A quote can be marked Won while its lead is ALREADY Lost (rep marks the
+  -- lead Lost, then later closes the deal + marks the quote Won). The payment
+  -- FUs below spawn with lead_id NULL, so every lead-keyed / stage-transition
+  -- closer (§76.3 / §134 / §174) misses them and they live forever on the
+  -- follow-ups screen. Never spawn payment chases on a dead lead.
+  IF v_quote.lead_stage = 'Lost' THEN
+    RAISE NOTICE 'create_payment_collection_followups: lead Lost for %, skipping', p_quote_id;
     RETURN;
   END IF;
 
@@ -87,7 +103,29 @@ CREATE TRIGGER tg_quote_won_payment_followups
   AFTER INSERT OR UPDATE OF status ON quotes
   FOR EACH ROW EXECUTE FUNCTION public.tg_quote_won_payment_followups();
 
+-- ─── 4. Phase 186 heal — close payment FUs already leaked onto Lost leads ──
+-- One-time, idempotent. Closes open 'Payment collection%' follow_ups whose
+-- quote's lead is Lost (the rows the spawn-guard above now prevents). The
+-- 'Auto-closed:' done_note matches §175 isSystemClose, so these never inflate
+-- any rep's "done today" count (§133). Re-running is safe (is_done=true excluded).
+UPDATE public.follow_ups fu
+   SET is_done   = true,
+       done_at   = COALESCE(fu.done_at, now()),
+       done_note = COALESCE(fu.done_note, 'Auto-closed: lead is Lost (Phase 186 payment-FU heal)')
+  FROM public.quotes q
+  JOIN public.leads  l ON l.id = q.lead_id
+ WHERE q.id = fu.quote_id
+   AND fu.is_done = false
+   AND fu.note LIKE 'Payment collection%'
+   AND l.stage = 'Lost';
+
 NOTIFY pgrst, 'reload schema';
+
+-- VERIFY (Phase 186): expect 0 — no open payment FU on a Lost lead remains.
+-- SELECT count(*) FROM public.follow_ups fu
+--   JOIN public.quotes q ON q.id = fu.quote_id
+--   JOIN public.leads  l ON l.id = q.lead_id
+--  WHERE fu.is_done = false AND fu.note LIKE 'Payment collection%' AND l.stage = 'Lost';
 
 -- VERIFY:
 -- Flip a test quote to won and check follow_ups appears:

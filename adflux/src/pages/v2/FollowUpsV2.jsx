@@ -234,8 +234,14 @@ export default function FollowUpsV2() {
     // chain auto-closes the follow-up) is a DIFFERENT function (openCall +
     // PostCallOutcomeModal) and is untouched — this gate only fires on a manual
     // Done tap with no call on record today.
+    // Phase 186 — payment-collection follow-ups are a money chase, not a call
+    // ("call after 10 days"). The gate matches by the quote's phone (rowPhone →
+    // quote.client_phone for these lead_id-NULL rows), so it would ALWAYS block
+    // them. Exempt payment rows; every other row keeps the §128/§154 gate
+    // byte-identical.
+    const isPaymentRow = !!row.note && row.note.startsWith('Payment collection')
     const clean = String(rowPhone(row) || '').replace(/\D/g, '').slice(-10)
-    if (clean.length === 10) {
+    if (!isPaymentRow && clean.length === 10) {
       const { data: calls } = await supabase
         .from('call_logs')
         .select('client_phone')
@@ -295,6 +301,32 @@ export default function FollowUpsV2() {
     if (err) { setError(err.message); return }
     // Phase 130 — move the alarm WITH the date: cancel the old one and
     // arm the new day (same time). Fire-and-forget, native-only.
+    cancelFollowUpAlarm(row.id)
+      .then(() => scheduleFollowUpAlarm({ ...row, follow_up_date: newDate }))
+      .catch(() => {})
+    setRows(prev => prev.map(r => r.id === row.id ? { ...r, follow_up_date: newDate } : r))
+  }
+
+  // Phase 186 — reschedule a payment follow-up by N days WITHOUT a call
+  // ("call after 10 days", owner directive). No call-gate (a payment chase
+  // isn't a call). Mirrors snooze's IST-safe date math + alarm move; only
+  // writes follow_up_date. Used by the +10d button on payment rows.
+  async function pushDays(row, n) {
+    setBusyId(row.id)
+    const todayIso = istTodayISO()
+    const base = (row.follow_up_date && row.follow_up_date > todayIso)
+      ? row.follow_up_date
+      : todayIso
+    const d = new Date(base + 'T00:00:00')
+    d.setDate(d.getDate() + n)
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1)  // Sun → Mon
+    const newDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const { error: err } = await supabase
+      .from('follow_ups')
+      .update({ follow_up_date: newDate })
+      .eq('id', row.id)
+    setBusyId(null)
+    if (err) { setError(err.message); return }
     cancelFollowUpAlarm(row.id)
       .then(() => scheduleFollowUpAlarm({ ...row, follow_up_date: newDate }))
       .catch(() => {})
@@ -610,7 +642,7 @@ export default function FollowUpsV2() {
         tone="danger"
         icon={<AlertTriangle size={14} strokeWidth={2} />}
         defaultOpen={true}
-        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
       />
       <Section
@@ -619,7 +651,7 @@ export default function FollowUpsV2() {
         tone="warning"
         icon={<Clock size={14} strokeWidth={2} />}
         defaultOpen={true}
-        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
       />
       <Section
@@ -627,7 +659,7 @@ export default function FollowUpsV2() {
         rows={buckets.tomorrow}
         tone="neutral"
         defaultOpen={false}
-        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
       />
       <Section
@@ -635,7 +667,7 @@ export default function FollowUpsV2() {
         rows={buckets.week}
         tone="neutral"
         defaultOpen={false}
-        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} busyId={busyId}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
       />
 
@@ -745,7 +777,7 @@ export default function FollowUpsV2() {
   )
 }
 
-function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze, busyId, navigate, defaultOpen }) {
+function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busyId, navigate, defaultOpen }) {
   if (rows.length === 0) return null
   const toneColor =
     tone === 'danger'  ? 'var(--danger)'  :
@@ -797,7 +829,7 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze
         {rows.map(r => (
           <Row
             key={r.id} row={r}
-            onCall={onCall} onWhatsApp={onWhatsApp} onDone={onDone} onSnooze={onSnooze}
+            onCall={onCall} onWhatsApp={onWhatsApp} onDone={onDone} onSnooze={onSnooze} onPushDays={onPushDays}
             busy={busyId === r.id}
             navigate={navigate}
           />
@@ -808,7 +840,7 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze
   )
 }
 
-function Row({ row, onCall, onWhatsApp, onDone, onSnooze, busy, navigate }) {
+function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navigate }) {
   // Phase 33D.4 — follow-up rows can be quote-linked OR lead-linked.
   // Resolve client display + tap target from whichever join is present.
   const isLeadFu = !!row.lead_id
@@ -942,6 +974,18 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, busy, navigate }) {
         >
           <Clock size={13} /> Snooze
         </button>
+        {row.note?.startsWith('Payment collection') && onPushDays && (
+          <button
+            type="button"
+            className="lead-btn lead-btn-sm"
+            onClick={() => onPushDays(row, 10)}
+            disabled={busy}
+            style={{ flex: 1, minWidth: 80, color: 'var(--text-muted)' }}
+            title="Reschedule 10 days"
+          >
+            <Clock size={13} /> +10d
+          </button>
+        )}
         <button
           type="button"
           className="lead-btn lead-btn-sm lead-btn-primary"
