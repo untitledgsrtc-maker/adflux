@@ -52,6 +52,11 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
     // exclusion of api/.
     /^\/api\//,
     /^\/apk(?:[/?#]|$)/,
+    // Bundled GSRTC pitch deck (public/deck/). The deck page AND its iframes
+    // (dashboard-real.html / dashboard-map.html) are same-origin navigations —
+    // without this they'd be served the SPA login shell instead of the deck.
+    // Mirrors the /apk fix.
+    /^\/deck(?:[/?#]|$)/,
     /\.(?:js|mjs|css|map|json|png|jpg|jpeg|svg|webp|gif|ico|ttf|woff2?|wasm)$/,
   ],
 }))

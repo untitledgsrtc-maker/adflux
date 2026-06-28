@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --sidebar:#0a003f; --sidebar-active:#363d49; --bg:#fafafa; --text:#212529;
+  --muted:#737b8c; --heading:#2b303b; --blue:#0d6efd; --accent:#5b6cf2;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:var(--text);background:var(--bg);}
+.app{display:flex;min-height:100vh;}
+/* Sidebar */
+.sidebar{width:192px;background:var(--sidebar);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;padding:8px 0;box-shadow:0 0 12px rgba(0,0,0,.15);z-index:10;}
+.logo{display:flex;align-items:center;gap:8px;padding:14px 16px 16px;color:#fff;font-size:26px;font-weight:800;letter-spacing:-.5px;border-bottom:1px solid rgba(255,255,255,.08);}
+.logo svg{width:30px;height:30px;flex-shrink:0;}
+.nav{flex:1;overflow-y:auto;padding:10px 0;}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#fff;text-decoration:none;font-size:15px;font-weight:400;}
+.nav a svg{width:17px;height:17px;flex-shrink:0;opacity:.92;}
+.nav a.active{background:var(--sidebar-active);font-weight:500;border-left:2px solid var(--blue);padding-left:14px;}
+.nav a:hover:not(.active){background:rgba(255,255,255,.06);}
+.nav .bottom{margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;}
+/* Main */
+.main{margin-left:192px;flex:1;padding:24px 28px;}
+h1{font-size:30px;font-weight:700;color:var(--heading);margin-bottom:6px;}
+/* Header row */
+.headrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap;}
+.refresh{background:#fff;border:1px solid #e6e8f0;color:#2b303b;border-radius:9px;padding:11px 18px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:inherit;}
+.refresh:hover{background:#f6f7fb;}
+.refresh svg{width:15px;height:15px;}
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:18px;}
+.card{border-radius:16px;padding:20px 22px;position:relative;overflow:hidden;}
+.card .lbl{font-size:12px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;}
+.card .val{font-size:30px;font-weight:700;margin:8px 0 10px;}
+.card .sub{font-size:13px;}
+.card .icon{position:absolute;top:18px;right:18px;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.55);}
+.card .icon svg{width:22px;height:22px;}
+/* tints */
+.c-blue{background:linear-gradient(135deg,#dcecff,#eef5ff);}   .c-blue .lbl{color:#3b6ab5;}   .c-blue .val{color:#172554;}   .c-blue .sub{color:#5a7fb5;}   .c-blue .icon svg{color:#3b6ee0;}
+.c-green{background:linear-gradient(135deg,#d8f3ea,#e9fbf4);}  .c-green .lbl{color:#1f8f6c;}  .c-green .val{color:#0d3b2e;}  .c-green .sub{color:#4ba589;}  .c-green .icon svg{color:#16a37b;}
+.c-red{background:linear-gradient(135deg,#fbe0e0,#fdeeee);}    .c-red .lbl{color:#bf3b3b;}    .c-red .val{color:#5a1414;}    .c-red .sub{color:#c46c6c;}    .c-red .icon svg{color:#dd3b3b;}
+.c-teal{background:linear-gradient(135deg,#d6f1f1,#ebfafa);}   .c-teal .lbl{color:#1f8f8f;}   .c-teal .val{color:#0d3b3b;}   .c-teal .sub{color:#4ba5a5;}   .c-teal .icon svg{color:#16a3a3;}
+.c-purple{background:linear-gradient(135deg,#f1e3fb,#fbeefb);} .c-purple .lbl{color:#9051c0;} .c-purple .val{color:#4a1d6b;} .c-purple .sub{color:#a76fc7;} .c-purple .icon svg{color:#9c3fd0;}
+.c-amber{background:linear-gradient(135deg,#fbedd6,#fef7eb);}  .c-amber .lbl{color:#c07f2a;}  .c-amber .val{color:#5a3410;}  .c-amber .sub{color:#bb8c4d;}  .c-amber .icon svg{color:#dd8b2b;}
+/* Bottom row layout */
+.botrow{display:grid;grid-template-columns:45fr 55fr;gap:18px;align-items:stretch;}
+.panel{background:#fff;border-radius:16px;padding:0;box-shadow:0 1px 4px rgba(20,30,60,.05);overflow:hidden;display:flex;flex-direction:column;}
+.panel-head{padding:18px 22px 14px;border-bottom:1px solid #eef0f4;}
+.panel-head h2{font-size:18px;font-weight:700;color:var(--heading);margin-bottom:2px;}
+.panel-head .psub{font-size:13px;color:var(--muted);}
+/* Table */
+.tbl-wrap{padding:6px 10px 10px;}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+thead th{text-align:left;text-transform:uppercase;font-size:11px;letter-spacing:.4px;color:#8b92a3;font-weight:600;padding:10px 10px;border-bottom:1px solid #eef0f4;}
+tbody td{padding:11px 10px;border-bottom:1px solid #f3f4f8;color:#2b303b;vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+.nm{display:flex;align-items:center;gap:9px;font-weight:600;}
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.dot.on{background:#16a37b;box-shadow:0 0 0 3px rgba(22,163,123,.16);}
+.dot.off{background:#dd3b3b;box-shadow:0 0 0 3px rgba(221,59,59,.16);}
+.ornt{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:#5b6cf2;background:#eef0ff;padding:3px 9px;border-radius:6px;}
+.ts{color:#737b8c;font-size:12.5px;white-space:nowrap;}
+.view{border:1px solid #e0e3ee;background:#fff;color:#3b46d6;font-size:12.5px;font-weight:600;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+.view:hover{background:#f4f5fc;}
+/* Map panel */
+.map-panel{background:#fff;border:1px solid #e7eaf3;box-shadow:0 1px 3px rgba(16,24,64,.06);}
+.map-panel .panel-head{border-bottom:1px solid #eef0f7;}
+.map-panel .panel-head h2{color:#1a2342;}
+.map-panel .panel-head .psub{color:#7a86a8;}
+.map-stage{position:relative;flex:1;min-height:420px;background:#e8eef3;}
+#screenmap{position:absolute;inset:0;width:100%;height:100%;background:#e8eef3;z-index:1;}
+.leaflet-container{background:#e8eef3;font-family:'Segoe UI',Tahoma,sans-serif;}
+.leaflet-control-zoom a{background:#ffffff;color:#2b303b;border-color:rgba(0,0,0,.12);}
+.leaflet-control-zoom a:hover{background:#f4f5fb;}
+.leaflet-tooltip.map-tip{background:rgba(10,15,36,.92);border:1px solid rgba(120,150,210,.3);color:#eef1ff;font-size:12px;font-weight:600;border-radius:7px;padding:5px 9px;box-shadow:0 4px 14px rgba(0,0,0,.4);}
+.leaflet-tooltip.map-tip::before{display:none;}
+.leaflet-control-attribution{display:none;}
+.map-legend{position:absolute;left:16px;bottom:14px;display:flex;gap:16px;align-items:center;background:rgba(255,255,255,.94);border:1px solid #e0e4f0;border-radius:10px;padding:8px 14px;backdrop-filter:blur(2px);box-shadow:0 2px 8px rgba(16,24,64,.08);}
+.lg{display:flex;align-items:center;gap:7px;font-size:12px;color:#4a5474;}
+.lg .ld{width:9px;height:9px;border-radius:50%;}
+.lg .ld.on{background:#22c98a;box-shadow:0 0 8px rgba(34,201,138,.7);}
+.lg .ld.off{background:#ff5757;box-shadow:0 0 8px rgba(255,87,87,.7);}
+.map-stat{position:absolute;right:16px;top:14px;background:rgba(255,255,255,.94);border:1px solid #e0e4f0;border-radius:10px;padding:8px 14px;font-size:12.5px;color:#4a5474;box-shadow:0 2px 8px rgba(16,24,64,.08);}
+.map-stat b{color:#22c98a;}
+@media(max-width:980px){.cards{grid-template-columns:repeat(2,1fr);}.botrow{grid-template-columns:1fr;}.main{margin-left:0;padding:16px;}.sidebar{display:none;}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7aa8ff"/><stop offset="1" stop-color="#3b46d6"/></linearGradient></defs><path d="M4 24 L11 8 L13 13 L8 24 Z" fill="url(#lg)"/><path d="M14 24 L21 8 L23 13 L18 24 Z" fill="url(#lg)"/><circle cx="22" cy="11" r="2.4" fill="#3b46d6"/></svg>
+    adFlux
+  </div>
+  <nav class="nav">
+    <a href="#" class="active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v5h-8zm0 7h8v11h-8zM3 13h8v8H3z"/></svg>Dashboard</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>Screens</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/></svg>Groups</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>Library</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>Playlists</a>
+    <a href="dashboard-real.html"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>Audience Analytics</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3h6v3H9z" fill="currentColor"/><path d="M8 13l2 2 2-3 2 4"/></svg>Media Reports</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h3l2-2h6l2 2h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Camera Reports</a>
+    <div class="bottom">
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7M12 17h.01"/></svg>Help</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 6h6"/></svg>APK Updates</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6zM15 20c0-2 .8-3.8 2.2-5 2.3.4 4 2.4 4 5z"/></svg>Team</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>Feedback</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h2l2 12h10l2-8H6"/><circle cx="9" cy="20" r="1.4" fill="currentColor"/><circle cx="17" cy="20" r="1.4" fill="currentColor"/></svg>Billing</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>Account</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8M16 16l4-4-4-4M10 12h10"/></svg>Logout</a>
+    </div>
+  </nav>
+</aside>
+<main class="main">
+  <div class="headrow">
+    <h1>Dashboard</h1>
+    <button class="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>Refresh</button>
+  </div>
+
+  <!-- Row 1 -->
+  <div class="cards">
+    <div class="card c-blue">
+      <div class="lbl">Total Screens</div><div class="val">264</div><div class="sub">Across 20 cities</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg></div>
+    </div>
+    <div class="card c-green">
+      <div class="lbl">Online Screens</div><div class="val">264</div><div class="sub">100% uptime</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5l4 4 10-10"/></svg></div>
+    </div>
+    <div class="card c-green">
+      <div class="lbl">Offline Screens</div><div class="val">0</div><div class="sub">All online</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></div>
+    </div>
+    <div class="card c-teal">
+      <div class="lbl">Screen Licenses</div><div class="val">264</div><div class="sub">All assigned</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l2.5 2.5L16 9"/></svg></div>
+    </div>
+  </div>
+
+  <!-- Row 2 -->
+  <div class="cards">
+    <div class="card c-purple">
+      <div class="lbl">Total Cameras</div><div class="val">264</div><div class="sub">One per screen</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h3l2-2h6l2 2h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+    </div>
+    <div class="card c-green">
+      <div class="lbl">Active Cameras</div><div class="val">264</div><div class="sub">Capturing footfall</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5l4 4 10-10"/></svg></div>
+    </div>
+    <div class="card c-green">
+      <div class="lbl">Inactive Cameras</div><div class="val">0</div><div class="sub">All active</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/></svg></div>
+    </div>
+    <div class="card c-teal">
+      <div class="lbl">Camera Licenses</div><div class="val">25</div><div class="sub">Premium tier</div>
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l2.5 2.5L16 9"/></svg></div>
+    </div>
+  </div>
+
+  <!-- Bottom: table + map -->
+  <div class="botrow">
+    <!-- Players table -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Screen / Players</h2>
+        <div class="psub">Recent player check-ins</div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th style="width:34px">#</th><th>Name</th><th>Orientation</th><th>Last Response</th><th style="text-align:right">Action</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td><div class="nm"><span class="dot on"></span>GANDHINAGAR F7</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:11 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
+            <tr><td>2</td><td><div class="nm"><span class="dot on"></span>MORBI 6</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:10 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
+            <tr><td>3</td><td><div class="nm"><span class="dot on"></span>SURAT B6</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:10 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
+            <tr><td>4</td><td><div class="nm"><span class="dot on"></span>HIMMATNAGAR 6</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:09 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
+            <tr><td>5</td><td><div class="nm"><span class="dot on"></span>JUNAGADH 3</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:09 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
+            <tr><td>6</td><td><div class="nm"><span class="dot on"></span>BHAVNAGAR 2</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:08 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Live map -->
+    <section class="panel map-panel">
+      <div class="panel-head">
+        <h2>Live Screen Map</h2>
+        <div class="psub">Real-time location of your active screens</div>
+      </div>
+      <div class="map-stage">
+        <div id="screenmap"></div>
+        <div class="map-stat">Network <b>264</b> live &middot; all active</div>
+        <div class="map-legend">
+          <span class="lg"><span class="ld on"></span>Online</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+</div>
+
+<script>
+(function(){
+  // City data (from cities-real.json) — offline, embedded.
+  var CITIES = [
+    {city:"Gandhinagar",screens:20,lat:23.2166,lng:72.6427},
+    {city:"Himmatnagar",screens:20,lat:23.5980,lng:72.9630},
+    {city:"Surat",screens:20,lat:21.1702,lng:72.8311},
+    {city:"Bhavnagar",screens:15,lat:21.7645,lng:72.1519},
+    {city:"Junagadh",screens:15,lat:21.5222,lng:70.4579},
+    {city:"Valsad",screens:14,lat:20.5992,lng:72.9342},
+    {city:"Jamnagar",screens:10,lat:22.4707,lng:70.0577},
+    {city:"Godhra",screens:10,lat:22.7788,lng:73.6143},
+    {city:"Anand",screens:20,lat:22.5645,lng:72.9289},
+    {city:"Morbi",screens:15,lat:22.8173,lng:70.8377},
+    {city:"Surendranagar",screens:15,lat:22.7271,lng:71.6379},
+    {city:"Ankleshwar",screens:10,lat:21.6266,lng:73.0020},
+    {city:"Bhachau",screens:10,lat:23.2966,lng:70.3428},
+    {city:"Botad",screens:10,lat:22.1704,lng:71.6685},
+    {city:"Chikhli",screens:10,lat:20.7570,lng:73.0620},
+    {city:"Dahod",screens:10,lat:22.8350,lng:74.2590},
+    {city:"Dwarka",screens:10,lat:22.2442,lng:68.9685},
+    {city:"Porbandar",screens:10,lat:21.6417,lng:69.6293},
+    {city:"Kheda",screens:10,lat:22.7507,lng:72.6847},
+    {city:"Veraval",screens:10,lat:20.9077,lng:70.3673}
+  ];
+  // Real interactive map via Leaflet + light CARTO Voyager tiles. Needs internet for
+  // tiles (it's shown in a live pitch). If Leaflet didn't load (offline),
+  // fail quietly — leave the panel empty, don't crash the page.
+  if (typeof L === "undefined") return;
+
+  var map = L.map("screenmap", {
+    center: [22.6, 71.6],
+    zoom: 7,
+    zoomControl: true,
+    scrollWheelZoom: false,   // don't hijack page scroll
+    attributionControl: false
+  });
+
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    subdomains: "abcd",
+    attribution: "",
+    maxZoom: 19
+  }).addTo(map);
+
+  // All screens active — every marker green.
+  CITIES.forEach(function(c){
+    var marker = L.circleMarker([c.lat, c.lng], {
+      radius: 5 + c.screens * 0.4,   // scale a little with screen count
+      color: "#ffffff",              // thin white stroke
+      weight: 1.2,
+      fillColor: "#22c55e",
+      fillOpacity: 0.92
+    }).addTo(map);
+
+    marker.bindTooltip(
+      c.city + " &middot; " + c.screens + " screens",
+      { className: "map-tip", direction: "top", offset: [0, -4] }
+    );
+
+    // subtle glow on the marker element once it's in the DOM
+    if (marker._path) {
+      marker._path.style.filter = "drop-shadow(0 0 5px rgba(34,197,94,.65))";
+    }
+  });
+})();
+</script>
+
+
+
+<script>/*DECK_NAV_WIRE*/
+(function(){
+  var B='http://localhost:8765/';
+  var DEST={'dashboard':B+'dashboard-map.html','screens':B+'screen-detail.html','audience analytics':B+'dashboard-real.html','media reports':B+'media-report.html'};
+  var DISABLE=/^(groups|library|playlists|camera reports|help|apk updates|team|feedback|billing|account|log ?out|back to screens)$/;
+  function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
+  function handle(e){
+    var el=e.target&&e.target.closest&&e.target.closest('a,button,[role=link],[role=button],li');
+    if(!el) return;
+    var t=norm(el.textContent);
+    if(Object.prototype.hasOwnProperty.call(DEST,t)){ e.preventDefault(); e.stopImmediatePropagation(); window.location.assign(DEST[t]); }
+    else if(DISABLE.test(t)){ e.preventDefault(); e.stopImmediatePropagation(); }
+  }
+  window.addEventListener('click', handle, true);
+  window.addEventListener('pointerup', handle, true);
+  function paint(){
+    document.querySelectorAll('a,button,[role=link]').forEach(function(a){
+      var t=norm(a.textContent);
+      if(Object.prototype.hasOwnProperty.call(DEST,t)){ a.style.opacity=''; a.style.cursor='pointer'; }
+      else if(DISABLE.test(t)){ a.style.opacity='0.45'; a.style.cursor='default'; }
+    });
+  }
+  if(document.readyState!=='loading') paint(); else document.addEventListener('DOMContentLoaded',paint);
+  [600,1500,3000,5000].forEach(function(d){setTimeout(paint,d);});
+})();
+</script>
+</body>
+</html>

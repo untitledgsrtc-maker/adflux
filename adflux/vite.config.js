@@ -30,6 +30,11 @@ export default defineConfig({
         // for any request the SW couldn't match — silently breaking
         // the font fetch with HTML body).
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,ttf}'],
+        // Bundled GSRTC pitch deck (public/deck/) — 8 MB of html/png/svg that
+        // globPatterns would otherwise force onto every rep's phone precache.
+        // Exclude it so the deck loads fresh from network (footage swaps show
+        // immediately). Pairs with the /deck denylist in sw.js.
+        globIgnores: ['deck/**'],
         // Skip enormous auto-generated bundles from the hard cap.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },

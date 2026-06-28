@@ -33,7 +33,7 @@ import {
   ArrowLeft, Phone, MessageCircle, Mail, Calendar, MapPin, Edit3,
   RefreshCw, Sparkles, FileText as FileTextIcon, Users as UsersIcon,
   AlertTriangle, Clock, Mic, ChevronDown, MoreHorizontal,
-  Trash2, ClipboardCheck,
+  Trash2, ClipboardCheck, Presentation,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -1701,8 +1701,20 @@ export default function LeadDetailV2() {
                 <span>{lead.created_at ? formatDate(lead.created_at) : '—'}</span>
               </FieldCell>
               <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))', paddingTop: 10, marginTop: 4 }}>
-                <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
-                  Notes
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
+                    Notes
+                  </div>
+                  {/* Phase 187 — GSRTC pitch deck, opens in a new tab. Bundled at
+                      /deck (public/deck/, §75); openExternalUrl routes web→new tab,
+                      APK→system browser. Additive, §45-safe (no live-flow touch). */}
+                  <button
+                    type="button"
+                    className="lead-btn lead-btn-sm"
+                    onClick={() => openExternalUrl(`${window.location.origin}/deck/led-deck-final.html`)}
+                  >
+                    <Presentation size={13} /> <span>Presentation</span>
+                  </button>
                 </div>
                 <InlineField
                   value={lead.notes}
