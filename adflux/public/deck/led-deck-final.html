@@ -1149,6 +1149,9 @@
   /* ---- Leaflet map fills the panel; dark chrome to match the deck ---- */
   #s5map{position:absolute;inset:0;width:100%;height:100%;background:transparent;z-index:1;}
   #s5map .leaflet-container{background:transparent;font-family:var(--disp);}
+  /* OSM tiles are light; invert -> dark so they match the deck. (cartocdn dark
+     was 503-throttling.) circleMarker dots live in the overlay pane, unaffected. */
+  #s5map .leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.95) saturate(.55);}
   #s5map .leaflet-control-zoom{border:1px solid var(--line);border-radius:10px;overflow:hidden;
     box-shadow:0 4px 16px rgba(0,0,0,.5);margin:14px;}
   #s5map .leaflet-control-zoom a{background:rgba(14,14,18,.88);color:var(--t2);
@@ -1398,8 +1401,8 @@
         attributionControl: false,
         zoomSnap: 0.25
       });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd', maxZoom: 19, attribution: ''
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        subdomains: 'abc', maxZoom: 19, attribution: ''
       }).addTo(map);
 
       CITIES.forEach(function (c, i) {
@@ -2345,7 +2348,7 @@
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>AI audience report</span></div>
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>QR scan tracking</span></div>
         </div>
-        <a class="s12-cta">Get a quote</a>
+        <a class="s12-cta" href="https://wa.me/919581578261?text=Hi%2C%20I%20want%20a%20quote%20for%20the%20Single%20City%20GSRTC%20LED%20package" target="_blank" rel="noopener">Get a quote</a>
       </div>
 
       <!-- Regional — most popular -->
@@ -2366,7 +2369,7 @@
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>AI audience report, per city</span></div>
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>QR scan tracking + creative swaps</span></div>
         </div>
-        <a class="s12-cta">Get a quote</a>
+        <a class="s12-cta" href="https://wa.me/919581578261?text=Hi%2C%20I%20want%20a%20quote%20for%20the%20Regional%20GSRTC%20LED%20package" target="_blank" rel="noopener">Get a quote</a>
       </div>
 
       <!-- All-Gujarat -->
@@ -2386,7 +2389,7 @@
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Statewide AI audience report</span></div>
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>QR scan tracking + priority placement</span></div>
         </div>
-        <a class="s12-cta">Get a quote</a>
+        <a class="s12-cta" href="https://wa.me/919581578261?text=Hi%2C%20I%20want%20a%20quote%20for%20the%20All-Gujarat%20GSRTC%20LED%20package" target="_blank" rel="noopener">Get a quote</a>
       </div>
     </div>
 
