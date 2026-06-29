@@ -873,12 +873,13 @@
           <span class="s4-live"><b></b>Live</span>
         </div>
         <div class="s4-screen">
-          <!-- Phase 187.4 — was an <iframe src="dashboard-real.html">; the stale
-               service worker hijacked the iframe navigation -> "content blocked".
-               A static <img> is a subresource the SW NavigationRoute ignores, so it
-               always renders. (dashboard-real.html kept for the live source / PDF.) -->
-          <img src="dashboard-real.png" alt="adFlux live audience analytics dashboard"
-               style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block;border:0;" />
+          <!-- Phase 187.5 — INTERACTIVE live dashboard (owner: must be clickable,
+               not a static image). Date filter, group/screen dropdowns, refresh,
+               sidebar all work. The /deck SW denylist (sw.js) lets this iframe
+               navigation reach the network — anyone who can see the deck at all
+               already has the current SW (a stale SW would serve the app shell for
+               the WHOLE /deck page, not just here), so it loads. -->
+          <iframe src="dashboard-real.html" loading="lazy" title="Live audience analytics dashboard"></iframe>
         </div>
       </div>
 
