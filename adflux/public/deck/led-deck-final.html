@@ -556,10 +556,10 @@
   /* Markers pinned over the people in the station footage (left group,
      centre, right group). %-based so they track the cover-fit video on a
      wide pitch screen. */
-  .s1-r1 { top: 57%; left: 13%; animation-delay: 1.0s, 1.0s; }
-  .s1-r2 { top: 55%; left: 51%; animation-delay: 1.25s, 1.25s; }
-  .s1-r3 { top: 57%; left: 80%; animation-delay: 1.5s, 1.5s; }
-  .s1-r4 { top: 60%; left: 33%; width: 70px; height: 82px; animation-delay: 1.75s, 1.75s; }
+  .s1-r1 { top: 58%; left: 11%; animation-delay: 1.0s, 1.0s; }
+  .s1-r2 { top: 66%; left: 53%; animation-delay: 1.25s, 1.25s; }
+  .s1-r3 { top: 56%; left: 76%; animation-delay: 1.5s, 1.5s; }
+  .s1-r4 { top: 62%; left: 29%; width: 70px; height: 82px; animation-delay: 1.75s, 1.75s; }
 
 
   .s1-copy { position: absolute; left: 48px; bottom: 150px; z-index: 20; max-width: 640px; }
@@ -880,13 +880,26 @@
           <span class="s4-live"><b></b>Live</span>
         </div>
         <div class="s4-screen">
-          <!-- Phase 187.5 — INTERACTIVE live dashboard (owner: must be clickable,
-               not a static image). Date filter, group/screen dropdowns, refresh,
-               sidebar all work. The /deck SW denylist (sw.js) lets this iframe
-               navigation reach the network — anyone who can see the deck at all
-               already has the current SW (a stale SW would serve the app shell for
-               the WHOLE /deck page, not just here), so it loads. -->
-          <iframe src="dashboard-real.html" loading="lazy" title="Live audience analytics dashboard"></iframe>
+          <!-- Phase 187.7 — INTERACTIVE dashboard that CANNOT be blocked.
+               Default = static PNG (always renders). Then fetch the dashboard
+               HTML and load it via srcdoc (inline content — no iframe-URL
+               navigation), so no privacy/ad extension and no stale service
+               worker can block it. On success the live interactive iframe (date
+               filter, dropdowns, refresh, sidebar) replaces the image. If the
+               fetch is ever blocked, the static image just stays. -->
+          <img id="dashImg" src="dashboard-real.png" alt="adFlux live audience analytics dashboard"
+               style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block;border:0;" />
+          <iframe id="dashFrame" title="Live audience analytics dashboard" style="display:none"></iframe>
+          <script>
+            (function(){
+              var im=document.getElementById('dashImg'), f=document.getElementById('dashFrame');
+              if(!im||!f) return;
+              fetch('dashboard-real.html',{cache:'no-store'})
+                .then(function(r){ if(!r.ok) throw 0; return r.text(); })
+                .then(function(html){ f.srcdoc=html; f.style.display='block'; im.style.display='none'; })
+                .catch(function(){ /* blocked / offline -> keep the static image */ });
+            })();
+          </script>
         </div>
       </div>
 
@@ -2883,9 +2896,15 @@
   var pdf = document.getElementById('btnPdf');
   var email = document.getElementById('btnEmail');
   if (pdf) pdf.addEventListener('click', function () {
-    // native print -> "Save as PDF" (handles the embedded map + console + video frames
-    // better than canvas capture). Every slide is laid out as one landscape page.
-    try { window.print(); } catch (e) {}
+    // Phase 187.7 — download the PRE-RENDERED deck PDF (built once with headless
+    // Chrome, all 11 slides). No live print/re-render each time. Falls back to
+    // window.print() only if the file isn't reachable.
+    try {
+      var a = document.createElement('a');
+      a.href = 'untitled-led-deck.pdf';
+      a.download = 'Untitled-GSRTC-LED-Deck.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { try { window.print(); } catch (e2) {} }
   });
   if (email) email.addEventListener('click', function () {
     var subject = 'GSRTC LED Screen Media — Untitled Advertising';
