@@ -891,13 +891,31 @@
                style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block;border:0;" />
           <iframe id="dashFrame" title="Live audience analytics dashboard" style="display:none"></iframe>
           <script>
+            // Phase 187.9 — the dashboard IMAGE is the always-visible floor. We
+            // load the live console into a hidden iframe (srcdoc, inline) and ONLY
+            // swap it in once we CONFIRM it actually rendered (its document reads
+            // "adFlux"/"Audience Analytics"). A content-blocker extension that
+            // blocks the iframe never lets that confirm → the image just stays →
+            // it can NEVER show Chrome's "content blocked" box. Reps with no
+            // blocker get the live clickable console.
             (function(){
               var im=document.getElementById('dashImg'), f=document.getElementById('dashFrame');
               if(!im||!f) return;
+              var done=false, tries=0;
+              function rendered(){
+                try{ var d=f.contentDocument; return !!(d&&d.body&&/adFlux|Audience Analytics/i.test(d.body.innerText||'')); }
+                catch(e){ return false; }
+              }
+              function check(){
+                if(done) return;
+                if(rendered()){ done=true; f.style.display='block'; im.style.display='none'; return; }
+                if(++tries>20) return;   // ~6s, never confirmed (blocked/offline) → keep the image
+                setTimeout(check,300);
+              }
               fetch('dashboard-real.html',{cache:'no-store'})
                 .then(function(r){ if(!r.ok) throw 0; return r.text(); })
-                .then(function(html){ f.srcdoc=html; f.style.display='block'; im.style.display='none'; })
-                .catch(function(){ /* blocked / offline -> keep the static image */ });
+                .then(function(html){ f.srcdoc=html; check(); })   // image stays until render CONFIRMED
+                .catch(function(){ /* blocked / offline → image stays */ });
             })();
           </script>
         </div>
