@@ -546,10 +546,13 @@
   @keyframes s1Lock { to { opacity: 1; transform: scale(1); } }
   @keyframes s1FlickA { 0%, 92%, 100% { opacity: 1; } 94% { opacity: 0.45; } 96% { opacity: 1; } }
   @keyframes s1CornerPulse { 0%, 100% { border-color: var(--yellow); } 50% { border-color: rgba(255,230,0,0.55); } }
-  .s1-r1 { top: 70%; left: 610px; animation-delay: 1.0s, 1.0s; }
-  .s1-r2 { top: 72%; left: 880px; animation-delay: 1.25s, 1.25s; }
-  .s1-r3 { top: 70%; left: 1080px; animation-delay: 1.5s, 1.5s; }
-  .s1-r4 { top: 74%; left: 745px; width: 70px; height: 82px; animation-delay: 1.75s, 1.75s; }
+  /* Markers pinned over the people in the station footage (left group,
+     centre, right group). %-based so they track the cover-fit video on a
+     wide pitch screen. */
+  .s1-r1 { top: 57%; left: 13%; animation-delay: 1.0s, 1.0s; }
+  .s1-r2 { top: 55%; left: 51%; animation-delay: 1.25s, 1.25s; }
+  .s1-r3 { top: 57%; left: 80%; animation-delay: 1.5s, 1.5s; }
+  .s1-r4 { top: 60%; left: 33%; width: 70px; height: 82px; animation-delay: 1.75s, 1.75s; }
 
 
   .s1-copy { position: absolute; left: 48px; bottom: 150px; z-index: 20; max-width: 640px; }
@@ -870,7 +873,12 @@
           <span class="s4-live"><b></b>Live</span>
         </div>
         <div class="s4-screen">
-          <iframe src="dashboard-real.html" loading="lazy" title="Live audience analytics dashboard"></iframe>
+          <!-- Phase 187.4 — was an <iframe src="dashboard-real.html">; the stale
+               service worker hijacked the iframe navigation -> "content blocked".
+               A static <img> is a subresource the SW NavigationRoute ignores, so it
+               always renders. (dashboard-real.html kept for the live source / PDF.) -->
+          <img src="dashboard-real.png" alt="adFlux live audience analytics dashboard"
+               style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block;border:0;" />
         </div>
       </div>
 
@@ -2348,7 +2356,7 @@
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>AI audience report</span></div>
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>QR scan tracking</span></div>
         </div>
-        <a class="s12-cta" href="https://wa.me/919581578261?text=Hi%2C%20I%20want%20a%20quote%20for%20the%20Single%20City%20GSRTC%20LED%20package" target="_blank" rel="noopener">Get a quote</a>
+        <a class="s12-cta" href="https://app.untitledad.in/quotes/new" target="_blank" rel="noopener">Get a quote</a>
       </div>
 
       <!-- Regional — most popular -->
@@ -2369,7 +2377,7 @@
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>AI audience report, per city</span></div>
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>QR scan tracking + creative swaps</span></div>
         </div>
-        <a class="s12-cta" href="https://wa.me/919581578261?text=Hi%2C%20I%20want%20a%20quote%20for%20the%20Regional%20GSRTC%20LED%20package" target="_blank" rel="noopener">Get a quote</a>
+        <a class="s12-cta" href="https://app.untitledad.in/quotes/new" target="_blank" rel="noopener">Get a quote</a>
       </div>
 
       <!-- All-Gujarat -->
@@ -2389,7 +2397,7 @@
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Statewide AI audience report</span></div>
           <div class="s12-frow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>QR scan tracking + priority placement</span></div>
         </div>
-        <a class="s12-cta" href="https://wa.me/919581578261?text=Hi%2C%20I%20want%20a%20quote%20for%20the%20All-Gujarat%20GSRTC%20LED%20package" target="_blank" rel="noopener">Get a quote</a>
+        <a class="s12-cta" href="https://app.untitledad.in/quotes/new" target="_blank" rel="noopener">Get a quote</a>
       </div>
     </div>
 
@@ -2490,7 +2498,7 @@
         <h2 class="s13-head rv d1">Let's get your brand <span class="y">on the screens.</span></h2>
         <p class="s13-sub rv d2">Verified daily impressions across the GSRTC LED network. Pick your stations, get a quote, go live this month.</p>
         <div class="s13-cta rv d3">
-          <a class="s13-pill prime" href="https://wa.me/919581578261?text=Hi%2C%20I%20want%20a%20quote%20for%20GSRTC%20LED%20screens" target="_blank" rel="noopener">
+          <a class="s13-pill prime" href="https://app.untitledad.in/quotes/new" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
             Get a quote
           </a>
@@ -2827,6 +2835,10 @@
   @page { size: landscape; margin: 0; }
   html, body { width:auto !important; height:auto !important; overflow:visible !important;
     background:#0a0a0c !important; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+  /* #deck is fixed/100vh/overflow:hidden on screen — that clipped every slide
+     into ONE print page. Unconstrain it so the page-broken slides flow. */
+  #deck { position:static !important; inset:auto !important; width:auto !important;
+    height:auto !important; overflow:visible !important; }
   .deck-controls, .deck-progress, .deck-overview, .deck-hint, .skip-link { display:none !important; }
   .slide {
     position:relative !important; inset:auto !important;
