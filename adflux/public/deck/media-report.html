@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard</title>
-<link rel="stylesheet" href="vendor/leaflet.css">
-<script src="vendor/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{
   --sidebar:#0a003f; --sidebar-active:#363d49; --bg:#fafafa; --text:#212529;
@@ -98,13 +98,13 @@ tbody tr:last-child td{border-bottom:none;}
     adFlux
   </div>
   <nav class="nav">
-    <a href="#" class="active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v5h-8zm0 7h8v11h-8zM3 13h8v8H3z"/></svg>Dashboard</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v5h-8zm0 7h8v11h-8zM3 13h8v8H3z"/></svg>Dashboard</a>
     <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>Screens</a>
     <a href="#"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/></svg>Groups</a>
     <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>Library</a>
     <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>Playlists</a>
     <a href="dashboard-real.html"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>Audience Analytics</a>
-    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3h6v3H9z" fill="currentColor"/><path d="M8 13l2 2 2-3 2 4"/></svg>Media Reports</a>
+    <a href="#" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3h6v3H9z" fill="currentColor"/><path d="M8 13l2 2 2-3 2 4"/></svg>Media Reports</a>
     <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h3l2-2h6l2 2h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Camera Reports</a>
     <div class="bottom">
       <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7M12 17h.01"/></svg>Help</a>
@@ -117,92 +117,12 @@ tbody tr:last-child td{border-bottom:none;}
     </div>
   </nav>
 </aside>
-<main class="main">
-  <div class="headrow">
-    <h1>Dashboard</h1>
+<main class="main" style="padding:0;display:flex;flex-direction:column;height:100vh;overflow:hidden;">
+  <div class="headrow" style="margin:0;padding:16px 28px;border-bottom:1px solid #eef0f4;flex:0 0 auto;">
+    <h1 style="margin:0;">Media Reports</h1>
     <button class="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>Refresh</button>
   </div>
-
-  <!-- Row 1 -->
-  <div class="cards">
-    <div class="card c-blue">
-      <div class="lbl">Total Screens</div><div class="val">264</div><div class="sub">Across 20 cities</div>
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg></div>
-    </div>
-    <div class="card c-green">
-      <div class="lbl">Online Screens</div><div class="val">264</div><div class="sub">100% uptime</div>
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5l4 4 10-10"/></svg></div>
-    </div>
-    <div class="card c-green">
-      <div class="lbl">Offline Screens</div><div class="val">0</div><div class="sub">All online</div>
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></div>
-    </div>
-    <div class="card c-teal">
-      <div class="lbl">Screen Licenses</div><div class="val">264</div><div class="sub">All assigned</div>
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l2.5 2.5L16 9"/></svg></div>
-    </div>
-  </div>
-
-  <!-- Row 2 -->
-  <div class="cards">
-    <div class="card c-purple">
-      <div class="lbl">Total Cameras</div><div class="val">264</div><div class="sub">One per screen</div>
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h3l2-2h6l2 2h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
-    </div>
-    <div class="card c-green">
-      <div class="lbl">Active Cameras</div><div class="val">264</div><div class="sub">Capturing footfall</div>
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5l4 4 10-10"/></svg></div>
-    </div>
-    <div class="card c-green">
-      <div class="lbl">Inactive Cameras</div><div class="val">0</div><div class="sub">All active</div>
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/></svg></div>
-    </div>
-    <div class="card c-teal">
-      <div class="lbl">Camera Licenses</div><div class="val">25</div><div class="sub">Premium tier</div>
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l2.5 2.5L16 9"/></svg></div>
-    </div>
-  </div>
-
-  <!-- Bottom: table + map -->
-  <div class="botrow">
-    <!-- Players table -->
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Screen / Players</h2>
-        <div class="psub">Recent player check-ins</div>
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead>
-            <tr><th style="width:34px">#</th><th>Name</th><th>Orientation</th><th>Last Response</th><th style="text-align:right">Action</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>1</td><td><div class="nm"><span class="dot on"></span>GANDHINAGAR F7</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:11 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
-            <tr><td>2</td><td><div class="nm"><span class="dot on"></span>MORBI 6</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:10 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
-            <tr><td>3</td><td><div class="nm"><span class="dot on"></span>SURAT B6</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:10 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
-            <tr><td>4</td><td><div class="nm"><span class="dot on"></span>HIMMATNAGAR 6</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:09 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
-            <tr><td>5</td><td><div class="nm"><span class="dot on"></span>JUNAGADH 3</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:09 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
-            <tr><td>6</td><td><div class="nm"><span class="dot on"></span>BHAVNAGAR 2</div></td><td><span class="ornt">Landscape</span></td><td class="ts">26 Jun 2026, 09:08 PM</td><td style="text-align:right"><button class="view">View &rarr;</button></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Live map -->
-    <section class="panel map-panel">
-      <div class="panel-head">
-        <h2>Live Screen Map</h2>
-        <div class="psub">Real-time location of your active screens</div>
-      </div>
-      <div class="map-stage">
-        <div id="screenmap"></div>
-        <div class="map-stat">Network <b>264</b> live &middot; all active</div>
-        <div class="map-legend">
-          <span class="lg"><span class="ld on"></span>Online</span>
-        </div>
-      </div>
-    </section>
-  </div>
+  <embed src="media-report.pdf" type="application/pdf" style="flex:1 1 auto;width:100%;height:100%;border:0;">
 </main>
 </div>
 
@@ -244,8 +164,8 @@ tbody tr:last-child td{border-bottom:none;}
     attributionControl: false
   });
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    subdomains: "abc",
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    subdomains: "abcd",
     attribution: "",
     maxZoom: 19
   }).addTo(map);
@@ -277,7 +197,7 @@ tbody tr:last-child td{border-bottom:none;}
 
 <script>/*DECK_NAV_WIRE*/
 (function(){
-  var B='';  /* relative — works on localhost AND the deployed /deck/ presentation */
+  var B='http://localhost:8765/';
   var DEST={'dashboard':B+'dashboard-map.html','screens':B+'screen-detail.html','audience analytics':B+'dashboard-real.html','media reports':B+'media-report.html'};
   var DISABLE=/^(groups|library|playlists|camera reports|help|apk updates|team|feedback|billing|account|log ?out|back to screens)$/;
   function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}

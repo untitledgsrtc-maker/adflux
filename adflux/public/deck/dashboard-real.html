@@ -422,7 +422,7 @@ initCharts();updateLabels();refresh();
 
 <script>/*DECK_NAV_WIRE*/
 (function(){
-  var B='http://localhost:8765/';
+  var B='';  /* relative — works on localhost AND the deployed /deck/ presentation */
   var DEST={'dashboard':B+'dashboard-map.html','screens':B+'screen-detail.html','audience analytics':B+'dashboard-real.html','media reports':B+'media-report.html'};
   var DISABLE=/^(groups|library|playlists|camera reports|help|apk updates|team|feedback|billing|account|log ?out|back to screens)$/;
   function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
