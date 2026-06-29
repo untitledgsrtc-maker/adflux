@@ -315,6 +315,13 @@
     outline-offset: 2px;
   }
   .deck-btn svg { width: 18px; height: 18px; display: block; }
+  /* Phase 187.6 — touch tablets (reps present on them): bigger tap targets +
+     swipe hint. Coarse pointer only, so desktop is unchanged. */
+  @media (pointer: coarse) {
+    .deck-controls { gap: 10px; padding: 9px 12px; right: 16px; bottom: 16px; }
+    .deck-btn { width: 46px; height: 46px; }
+    .deck-btn svg { width: 21px; height: 21px; }
+  }
 
   /* ============================================================
      OVERVIEW GRID — jump to any of the 13 slides
@@ -2702,7 +2709,25 @@
     else if (e.key === 'f' || e.key === 'F') { toggleFull(); }
   });
 
-  /* ---- navigation = arrow buttons (bottom-right) + keyboard arrows ONLY.
+  /* ---- touch swipe (reps present on tablets — Phase 187.6). Horizontal swipe
+     flips slides; ignores swipes starting on the map / dashboard iframe / links /
+     controls so panning or scrolling those never changes the slide. ---- */
+  (function(){
+    var x0=0,y0=0,t0=0,skip=false;
+    document.addEventListener('touchstart',function(e){
+      if(e.touches.length!==1){x0=0;return;}
+      var el=e.target;
+      skip=!!(el.closest&&el.closest('#s5map, .leaflet-container, iframe, a, button, input, select, textarea, .s4-screen, .deck-controls, .deck-overview, .ov-grid'));
+      x0=e.touches[0].clientX; y0=e.touches[0].clientY; t0=Date.now();
+    },{passive:true});
+    document.addEventListener('touchend',function(e){
+      if(!x0||skip){x0=0;return;}
+      var t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0, dt=Date.now()-t0; x0=0;
+      if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.4 && dt<700){ if(dx<0) next(); else prev(); }
+    },{passive:true});
+  })();
+
+  /* ---- navigation = arrow buttons (bottom-right) + keyboard arrows + swipe.
          Clicking anywhere on a slide does NOT flip the page. ---- */
 
   /* ---- control buttons ---- */
