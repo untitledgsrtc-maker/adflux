@@ -14,13 +14,13 @@
     if (!document.querySelector('link[data-leaflet]')) {
       var l = document.createElement('link');
       l.rel = 'stylesheet';
-      l.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      l.href = 'vendor/leaflet.css';
       l.setAttribute('data-leaflet', '');
       document.head.appendChild(l);
     }
     if (!window.L && !document.querySelector('script[data-leaflet]')) {
       var s = document.createElement('script');
-      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      s.src = 'vendor/leaflet.js';
       s.setAttribute('data-leaflet', '');
       document.head.appendChild(s);
     }
@@ -1098,7 +1098,7 @@
   if (typeof window.QRCode === 'function') { paintAll(); }
   else {
     var sc = document.createElement('script');
-    sc.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+    sc.src = 'vendor/qrcode.min.js';
     sc.onload = paintAll; sc.onerror = paintAll;
     document.head.appendChild(sc);
     setTimeout(function(){ var b = slide.querySelector('#s5qr'); if (b && !b.firstChild) paintAll(); }, 4000);
@@ -2179,7 +2179,7 @@
   function ensureQR(){
     if (typeof window.QRCode === 'function') { paintQR(qrBox, 132); return; }
     var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+    s.src = 'vendor/qrcode.min.js';
     s.onload = function(){ paintQR(qrBox, 132); };
     s.onerror = function(){ paintQR(qrBox, 132); };  // offline -> placeholder
     document.head.appendChild(s);
@@ -2783,7 +2783,7 @@
 </script>
 <script>/*IFRAME_BI_FONT*/
 (function(){
-  var FURL='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/fonts/bootstrap-icons.woff2';
+  var FURL='vendor/bootstrap-icons.woff2';
   var DESIGN_W=1440;
   function isScreen(d){ try{ return !!d.querySelector('i[class*="bi-"]'); }catch(e){ return false; } }
   function fix(){
@@ -2921,149 +2921,6 @@
   }
   window.addEventListener('beforeprint', finalizeForPrint);
   if(window.matchMedia){var mq=window.matchMedia('print'); if(mq.addEventListener) mq.addEventListener('change',function(e){if(e.matches)finalizeForPrint();});}
-})();
-</script>
-<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.min.js"></script>
-<script>
-// Hero live face detection — real boxes + age/gender on the people in the
-// station video. Static .s1-reticle stay as fallback; hidden once live locks.
-(function () {
-  var slide = document.querySelector('.slide[data-i="0"]');
-  if (!slide) return;
-  var video  = slide.querySelector('.s1-bg-video');
-  var canvas = slide.querySelector('.s1-facecanvas');
-  if (!video || !canvas) return;
-  var ctx = canvas.getContext('2d');
-  var MODEL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model';
-  var ready = false, liveActive = false, boxes = [];
-
-  function fit() {
-    var w = slide.clientWidth, h = slide.clientHeight;
-    if (canvas.width !== w)  canvas.width = w;
-    if (canvas.height !== h) canvas.height = h;
-  }
-  // object-fit:cover mapping from video pixels -> displayed canvas
-  function cover() {
-    var vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
-    var cw = canvas.width, ch = canvas.height;
-    var s = Math.max(cw / vw, ch / vh);
-    return { s: s, ox: (cw - vw * s) / 2, oy: (ch - vh * s) / 2 };
-  }
-  function draw() {
-    fit();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (var i = 0; i < boxes.length; i++) {
-      var b = boxes[i];
-      var L = Math.max(10, Math.min(20, b.w * 0.3));
-      ctx.strokeStyle = '#FFE600'; ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(255,230,0,0.6)'; ctx.shadowBlur = 5;
-      var cs = [[b.x, b.y, 1, 1], [b.x + b.w, b.y, -1, 1], [b.x, b.y + b.h, 1, -1], [b.x + b.w, b.y + b.h, -1, -1]];
-      for (var c = 0; c < 4; c++) {
-        var x = cs[c][0], y = cs[c][1], sx = cs[c][2], sy = cs[c][3];
-        ctx.beginPath(); ctx.moveTo(x, y + sy * L); ctx.lineTo(x, y); ctx.lineTo(x + sx * L, y); ctx.stroke();
-      }
-      ctx.shadowBlur = 0;
-      if (b.tag) {
-        ctx.font = '600 12px "Space Grotesk", system-ui, sans-serif';
-        var tw = ctx.measureText(b.tag).width + 12;
-        ctx.fillStyle = '#FFE600'; ctx.fillRect(b.x, b.y + b.h + 3, tw, 17);
-        ctx.fillStyle = '#0a0a0c'; ctx.fillText(b.tag, b.x + 6, b.y + b.h + 15);
-      }
-    }
-    requestAnimationFrame(draw);
-  }
-  async function detect() {
-    if (!ready || !slide.classList.contains('active') || video.readyState < 2) return;
-    var res;
-    try {
-      res = await faceapi
-        .detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 }))
-        .withAgeAndGender();
-    } catch (e) { return; }
-    var m = cover();
-    boxes = (res || []).map(function (r) {
-      var x = r.detection.box;
-      return {
-        x: m.ox + x.x * m.s, y: m.oy + x.y * m.s,
-        w: x.width * m.s, h: x.height * m.s,
-        tag: (r.gender === 'male' ? 'M' : 'F') + ' · ' + Math.round(r.age),
-      };
-    });
-    // SSD-MobileNet reliably locks 4-6 faces on this footage, so the live
-    // boxes (real, on the people, moving with them) replace the decorative
-    // static reticles once detection goes live.
-    if (boxes.length > 0 && !liveActive) {
-      liveActive = true;
-      slide.querySelectorAll('.s1-reticle').forEach(function (el) { el.style.display = 'none'; });
-    }
-  }
-  async function load() {
-    if (!window.faceapi) return;
-    try {
-      await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL);
-      await faceapi.nets.ageGenderNet.loadFromUri(MODEL);
-      ready = true;
-      requestAnimationFrame(draw);
-      setInterval(detect, 700);
-    } catch (e) { console.warn('[face] model load failed — static reticles stay', e); }
-  }
-  if (window.faceapi) load();
-  else window.addEventListener('load', load);
-})();
-</script>
-<script>
-// ONE-PRESS BAKE — run in a FOREGROUND browser. On slide 1, press B to record
-// the live face-detection (video + reticles) into a clip + download it. Then
-// it's swapped in as the hero footage so detection never re-runs. No effect on
-// normal viewing.
-(function () {
-  var slide = document.querySelector('.slide[data-i="0"]'); if (!slide) return;
-  var status, baking = false;
-  function setStatus(t, color) {
-    if (!status) { status = document.createElement('div');
-      status.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:99999;background:#0a0a0c;color:#FFE600;font:600 14px Arial;padding:10px 16px;border-radius:10px;border:1px solid #FFE600;box-shadow:0 8px 24px rgba(0,0,0,.5)';
-      document.body.appendChild(status); }
-    status.textContent = t; if (color) status.style.color = color;
-  }
-  async function bake() {
-    if (baking) return; baking = true;
-    var v = slide.querySelector('.s1-bg-video');
-    if (!window.faceapi || !faceapi.nets.ssdMobilenetv1.params) { setStatus('AI model still loading — wait 5s, press B again', '#EF4444'); baking = false; return; }
-    setStatus('Baking… recording ~8s. Keep this tab in front.');
-    var W = 1280, H = 720, cv = document.createElement('canvas'); cv.width = W; cv.height = H; var cx = cv.getContext('2d');
-    var boxes = [], stop = false;
-    (async function det() { while (!stop) { try {
-      var r = await faceapi.detectAllFaces(v, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 })).withAgeAndGender();
-      boxes = r.map(function (o) { return { x: o.detection.box.x, y: o.detection.box.y, w: o.detection.box.width, h: o.detection.box.height, tag: (o.gender === 'male' ? 'M' : 'F') + ' · ' + Math.round(o.age) }; });
-    } catch (e) {} await new Promise(function (r) { setTimeout(r, 280); }); } })();
-    function ret(b) { var L = Math.max(12, Math.min(24, b.w * 0.32));
-      cx.strokeStyle = '#FFE600'; cx.lineWidth = 3; cx.shadowColor = 'rgba(255,230,0,.6)'; cx.shadowBlur = 7;
-      var cs = [[b.x, b.y, 1, 1], [b.x + b.w, b.y, -1, 1], [b.x, b.y + b.h, 1, -1], [b.x + b.w, b.y + b.h, -1, -1]];
-      for (var i = 0; i < 4; i++) { var c = cs[i]; cx.beginPath(); cx.moveTo(c[0], c[1] + c[3] * L); cx.lineTo(c[0], c[1]); cx.lineTo(c[0] + c[2] * L, c[1]); cx.stroke(); }
-      cx.shadowBlur = 0; cx.font = 'bold 18px Arial'; var tw = cx.measureText(b.tag).width + 14;
-      cx.fillStyle = '#FFE600'; cx.fillRect(b.x, b.y + b.h + 5, tw, 24); cx.fillStyle = '#0a0a0c'; cx.fillText(b.tag, b.x + 7, b.y + b.h + 22); }
-    var raf; function draw() { cx.drawImage(v, 0, 0, W, H); for (var i = 0; i < boxes.length; i++) ret(boxes[i]); raf = requestAnimationFrame(draw); }
-    v.muted = true; v.loop = true; try { await v.play(); } catch (e) {}
-    await new Promise(function (r) { setTimeout(r, 1500); });
-    draw();
-    var stream = cv.captureStream(30);
-    var mime = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E') ? 'video/mp4;codecs=avc1.42E01E'
-             : MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-    var rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
-    var chunks = []; rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-    v.currentTime = 0; await new Promise(function (r) { setTimeout(r, 150); });
-    rec.start();
-    await new Promise(function (res) { rec.onstop = res; setTimeout(function () { rec.stop(); }, 8200); });
-    stop = true; cancelAnimationFrame(raf);
-    var blob = new Blob(chunks, { type: mime });
-    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = mime.indexOf('mp4') >= 0 ? 'station-hero-baked.mp4' : 'station-hero-baked.webm';
-    document.body.appendChild(a); a.click();
-    var mb = Math.round(blob.size / 1e5) / 10;
-    setStatus(mb < 1 ? ('Bake empty (' + mb + 'MB) — keep tab IN FRONT, press B again') : ('Baked OK ' + mb + 'MB -> Downloads/' + a.download), mb < 1 ? '#EF4444' : '#10B981');
-    baking = false;
-  }
-  window.addEventListener('keydown', function (e) { if ((e.key === 'b' || e.key === 'B') && slide.classList.contains('active')) bake(); });
 })();
 </script>
 </body>
