@@ -66,7 +66,21 @@ export default function CreateQuoteV2() {
   // ClientsV2's "New quote" button hands us a prefill payload via
   // router state. We pass it through to the wizard so Step1Client
   // starts with the client fields already populated.
-  const prefill = location.state?.prefill || null
+  //
+  // Phase 187.8 — deck "Get a quote" deep-link. The pitch deck is a static
+  // page, so it can only pass a URL tag (?pkg=<tier>), never router state.
+  // We seed ONLY the notes so the rep sees which package was pitched, then
+  // fills client + cities. Purely additive: location.state.prefill
+  // (ClientsV2 / renewal) always wins; no ?pkg → DECK_PKG miss → null →
+  // behaviour byte-identical to before.
+  const DECK_PKG = {
+    single:     'Interested via deck — GSRTC LED · Single City package (one bus station, 10–20 screens).',
+    regional:   'Interested via deck — GSRTC LED · Regional package (3–5 cities, mixed Grade A & B).',
+    allgujarat: 'Interested via deck — GSRTC LED · All-Gujarat package (all 264 screens, 20 cities).',
+  }
+  const deckPkg = searchParams.get('pkg')
+  const prefill = location.state?.prefill
+    || (deckPkg && DECK_PKG[deckPkg] ? { client_notes: DECK_PKG[deckPkg] } : null)
 
   // Phase 95.7-debug — one-shot diagnostic log for the persistent
   // Edit-blank bug on APK. Logs the path detection result so we can
