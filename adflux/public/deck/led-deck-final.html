@@ -861,6 +861,114 @@
     .s4-live{display:none}
   }
 </style>
+<section class="slide" data-i="6" aria-label="The scale — reach across Gujarat">
+  <div class="s7-wrap">
+    <img class="s7-bg" src="station-1.jpg" alt="GSRTC concourse" />
+    <div class="s7-bg-tint"></div>
+    <div class="s7-inner">
+      <p class="s7-ey rv">The scale</p>
+      <h2 class="s7-head rv d1">Built for <em>reach</em>,<br>not just rotation.</h2>
+      <div class="s7-grid rv d2">
+        <div class="s7-cell">
+          <div class="s7-num"><b data-count="264">0</b></div>
+          <div class="s7-lab">Screens live</div>
+        </div>
+        <div class="s7-cell">
+          <div class="s7-num"><b data-count="20">0</b></div>
+          <div class="s7-lab">Cities covered</div>
+        </div>
+        <div class="s7-cell">
+          <div class="s7-num"><b data-count="95">0</b><span class="s7-suf">K+</span></div>
+          <div class="s7-lab">Daily views</div>
+        </div>
+        <div class="s7-cell">
+          <div class="s7-num"><b data-count="30">0</b><span class="s7-suf">K+</span></div>
+          <div class="s7-lab">Unique / day</div>
+        </div>
+      </div>
+      <p class="s7-sub rv d3">Every screen sits inside a GSRTC concourse — a captive audience that <b>waits</b>, not one that scrolls past. The number that matters isn't impressions. It's the same commuter, seen again tomorrow.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-i="5" aria-label="Real coverage map — 20 cities, 264 screens">
+  <div class="s6-wrap">
+    <div class="s6-head">
+      <span class="s6-eyebrow rv">The network</span>
+      <h2 class="s6-title rv d1">20 cities. 264 screens. <span class="s6-hl">One network.</span></h2>
+      <div class="s6-search rv d1">
+        <div class="s6-sbar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="s6search" type="text" placeholder="Search your city &mdash; Surat, Anand, Morbi&hellip;" autocomplete="off" />
+        </div>
+        <div class="s6-results" id="s6results"></div>
+      </div>
+    </div>
+
+    <div class="s6-stage">
+      <!-- LEFT: map + details below -->
+      <div class="s6-left rv d2">
+        <div class="s6-map">
+          <div id="s5map"></div>
+          <div class="s6-mapcap">Live screen map · <b>264</b> active</div>
+          <div class="s6-legend">
+            <span class="s6-lg"><span class="s6-ld"></span>Grade A</span>
+            <span class="s6-lg"><span class="s6-ld b"></span>Grade B</span>
+            <span class="s6-lg"><span class="s6-ld c"></span>Grade C</span>
+          </div>
+        </div>
+        <div class="s6-card">
+          <div class="s6-cardtop">
+            <div>
+              <div class="s6-cname" id="s6name">Gandhinagar</div>
+              <div class="s6-csub" id="s6sub">Capital region · mainland Gujarat</div>
+            </div>
+            <span class="s6-chip" id="s6chip">Grade A</span>
+          </div>
+          <div class="s6-rows">
+            <div class="s6-row"><span class="s6-rk">Screens</span>
+              <span class="s6-rv"><span id="s6screens">20</span><span class="s6-u" id="s6size">· 55"</span></span></div>
+            <div class="s6-row"><span class="s6-rk">Rate</span>
+              <span class="s6-rv">&#8377;<span id="s6price">850</span><span class="s6-u">/ screen / mo</span></span></div>
+            <div class="s6-row"><span class="s6-rk">Daily impressions</span>
+              <span class="s6-rv" id="s6daily">9,000<span class="s6-u">/ day</span></span></div>
+            <div class="s6-row"><span class="s6-rk">Unique reach</span>
+              <span class="s6-rv" id="s6unique">2,000<span class="s6-u">/ day</span></span></div>
+          </div>
+        </div>
+        <div class="s6-tot">
+          <div class="s6-tcell"><span class="s6-tnum">20</span><span class="s6-tlab">Cities</span></div>
+          <div class="s6-tcell"><span class="s6-tnum">264</span><span class="s6-tlab">Screens</span></div>
+          <div class="s6-tcell"><span class="s6-tnum">8</span><span class="s6-tlab">Grade A</span></div>
+        </div>
+      </div>
+      <!-- RIGHT: big city poster -->
+      <div class="s6-photowrap rv d3">
+        <img id="s6photo" class="s6-photo" alt="" referrerpolicy="no-referrer" />
+      </div>
+    </div>
+  </div>
+</section>
+<style>
+  /* city search on the coverage slide */
+  .s6-search{position:relative;width:min(460px,92%);margin:14px auto 2px;z-index:40;}
+  .s6-sbar{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:11px 18px;transition:border-color .2s,box-shadow .2s;}
+  .s6-search:focus-within .s6-sbar{border-color:rgba(255,230,0,.55);box-shadow:0 0 0 3px rgba(255,230,0,.12);}
+  .s6-sbar svg{width:18px;height:18px;color:var(--t3);flex:none;}
+  .s6-sbar input{flex:1;min-width:0;background:transparent;border:0;outline:none;color:var(--t1);font-family:var(--body,inherit);font-size:.95rem;}
+  .s6-sbar input::placeholder{color:var(--t3);}
+  .s6-results{position:absolute;top:calc(100% + 8px);left:0;right:0;max-height:46vh;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:6px;box-shadow:0 22px 56px rgba(0,0,0,.55);display:none;}
+  .s6-results.open{display:block;}
+  .s6-ritem{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:transparent;border:0;cursor:pointer;padding:9px 12px;border-radius:9px;text-align:left;}
+  .s6-ritem:hover{background:rgba(255,230,0,.09);}
+  .s6-rname{font-family:var(--disp);font-weight:600;font-size:.96rem;color:var(--t1);}
+  .s6-rmeta{display:flex;align-items:center;gap:9px;font-size:.78rem;color:var(--t3);white-space:nowrap;}
+  .s6-rgrade{font-family:var(--disp);font-weight:700;font-size:.64rem;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:5px;color:var(--ink);}
+  .s6-rgrade.gA{background:#FFE600;}.s6-rgrade.gB{background:#F0D070;}.s6-rgrade.gC{background:#9a8a3a;color:#fff;}
+  .s6-rno{padding:13px 14px;font-size:.86rem;color:var(--t3);line-height:1.45;}
+  .s6-rno b{color:var(--yellow);}
+</style>
+
 <section class="slide center" data-i="3" aria-label="Dashboard as evidence">
   <div class="inner">
     <div class="s4-wrap">
@@ -1407,57 +1515,7 @@
     font-size:10.5px;font-weight:600;color:var(--t3);}
 </style>
 
-<section class="slide" data-i="5" aria-label="Real coverage map — 20 cities, 264 screens">
-  <div class="s6-wrap">
-    <div class="s6-head">
-      <span class="s6-eyebrow rv">The network</span>
-      <h2 class="s6-title rv d1">20 cities. 264 screens. <span class="s6-hl">One network.</span></h2>
-    </div>
 
-    <div class="s6-stage">
-      <!-- LEFT: map + details below -->
-      <div class="s6-left rv d2">
-        <div class="s6-map">
-          <div id="s5map"></div>
-          <div class="s6-mapcap">Live screen map · <b>264</b> active</div>
-          <div class="s6-legend">
-            <span class="s6-lg"><span class="s6-ld"></span>Grade A</span>
-            <span class="s6-lg"><span class="s6-ld b"></span>Grade B</span>
-            <span class="s6-lg"><span class="s6-ld c"></span>Grade C</span>
-          </div>
-        </div>
-        <div class="s6-card">
-          <div class="s6-cardtop">
-            <div>
-              <div class="s6-cname" id="s6name">Gandhinagar</div>
-              <div class="s6-csub" id="s6sub">Capital region · mainland Gujarat</div>
-            </div>
-            <span class="s6-chip" id="s6chip">Grade A</span>
-          </div>
-          <div class="s6-rows">
-            <div class="s6-row"><span class="s6-rk">Screens</span>
-              <span class="s6-rv"><span id="s6screens">20</span><span class="s6-u" id="s6size">· 55"</span></span></div>
-            <div class="s6-row"><span class="s6-rk">Rate</span>
-              <span class="s6-rv">&#8377;<span id="s6price">850</span><span class="s6-u">/ screen / mo</span></span></div>
-            <div class="s6-row"><span class="s6-rk">Daily impressions</span>
-              <span class="s6-rv" id="s6daily">9,000<span class="s6-u">/ day</span></span></div>
-            <div class="s6-row"><span class="s6-rk">Unique reach</span>
-              <span class="s6-rv" id="s6unique">2,000<span class="s6-u">/ day</span></span></div>
-          </div>
-        </div>
-        <div class="s6-tot">
-          <div class="s6-tcell"><span class="s6-tnum">20</span><span class="s6-tlab">Cities</span></div>
-          <div class="s6-tcell"><span class="s6-tnum">264</span><span class="s6-tlab">Screens</span></div>
-          <div class="s6-tcell"><span class="s6-tnum">8</span><span class="s6-tlab">Grade A</span></div>
-        </div>
-      </div>
-      <!-- RIGHT: big city poster -->
-      <div class="s6-photowrap rv d3">
-        <img id="s6photo" class="s6-photo" alt="" referrerpolicy="no-referrer" />
-      </div>
-    </div>
-  </div>
-</section>
 
 <script>
 (function () {
@@ -1657,6 +1715,30 @@
 
   /* Seed the card immediately so it reads correctly even before the map paints. */
   setCard(0);
+
+  /* ---- city search (focus = full list, type = filter, click = select + pan) ---- */
+  (function(){
+    var sInput = slide.querySelector('#s6search'), sRes = slide.querySelector('#s6results');
+    if(!sInput || !sRes) return;
+    function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+    function render(q){
+      q=(q||'').trim().toLowerCase();
+      var list=[]; CITIES.forEach(function(c,i){ if(!q || c.name.toLowerCase().indexOf(q)>=0) list.push({c:c,i:i}); });
+      if(!list.length){ sRes.innerHTML='<div class="s6-rno"><b>'+esc(q)+'</b> isn\'t in the current 20 \u2014 ask us about adding it.</div>'; }
+      else { sRes.innerHTML=list.map(function(o){ return '<button type="button" class="s6-ritem" data-i="'+o.i+'"><span class="s6-rname">'+esc(o.c.name)+'</span><span class="s6-rmeta"><span class="s6-rgrade g'+o.c.grade+'">'+o.c.grade+'</span>'+o.c.screens+' screens</span></button>'; }).join(''); }
+      sRes.classList.add('open');
+    }
+    sInput.addEventListener('focus', function(){ render(sInput.value); });
+    sInput.addEventListener('input', function(){ render(sInput.value); });
+    sInput.addEventListener('keydown', function(e){ e.stopPropagation();
+      if(e.key==='Enter'){ var f=sRes.querySelector('.s6-ritem'); if(f) f.click(); }
+      else if(e.key==='Escape'){ sRes.classList.remove('open'); sInput.blur(); } });
+    sRes.addEventListener('click', function(e){ var b=e.target.closest('.s6-ritem'); if(!b) return;
+      var i=parseInt(b.getAttribute('data-i'),10); select(i); var c=CITIES[i];
+      if(map){ try{ map.setView([c.lat,c.lng], 9, {animate:true}); }catch(err){} }
+      sInput.value=c.name; sRes.classList.remove('open'); });
+    document.addEventListener('click', function(e){ if(!e.target.closest('.s6-search')) sRes.classList.remove('open'); });
+  })();
 })();
 </script>
 <style>
@@ -1700,35 +1782,7 @@
   .s7-num{font-size:clamp(44px,12vw,72px)}
 }
 </style>
-<section class="slide" data-i="6" aria-label="The scale — reach across Gujarat">
-  <div class="s7-wrap">
-    <img class="s7-bg" src="station-1.jpg" alt="GSRTC concourse" />
-    <div class="s7-bg-tint"></div>
-    <div class="s7-inner">
-      <p class="s7-ey rv">The scale</p>
-      <h2 class="s7-head rv d1">Built for <em>reach</em>,<br>not just rotation.</h2>
-      <div class="s7-grid rv d2">
-        <div class="s7-cell">
-          <div class="s7-num"><b data-count="264">0</b></div>
-          <div class="s7-lab">Screens live</div>
-        </div>
-        <div class="s7-cell">
-          <div class="s7-num"><b data-count="20">0</b></div>
-          <div class="s7-lab">Cities covered</div>
-        </div>
-        <div class="s7-cell">
-          <div class="s7-num"><b data-count="95">0</b><span class="s7-suf">K+</span></div>
-          <div class="s7-lab">Daily views</div>
-        </div>
-        <div class="s7-cell">
-          <div class="s7-num"><b data-count="30">0</b><span class="s7-suf">K+</span></div>
-          <div class="s7-lab">Unique / day</div>
-        </div>
-      </div>
-      <p class="s7-sub rv d3">Every screen sits inside a GSRTC concourse — a captive audience that <b>waits</b>, not one that scrolls past. The number that matters isn't impressions. It's the same commuter, seen again tomorrow.</p>
-    </div>
-  </div>
-</section>
+
 
 
 <script>
