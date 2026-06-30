@@ -39,10 +39,9 @@ export default function PresentView() {
     return () => clearInterval(t)
   }, [])
 
-  const goBack = useCallback(() => {
-    navigate(leadId ? `/leads/${leadId}` : '/work')
-  }, [navigate, leadId])
-
+  // End the presentation: log the time (unless it was an accidental <3s open),
+  // then go to the lead. Both the "End" button and the "Back" arrow call this,
+  // so a rep can't lose the timing by exiting the "wrong" way.
   const end = useCallback(async () => {
     if (endingRef.current) return
     endingRef.current = true
@@ -50,24 +49,48 @@ export default function PresentView() {
     const active = getActive()
     const dur = Math.min(elapsedSeconds(active), CAP_SECONDS)
     try {
-      const { error } = await supabase.from('presentation_sessions').insert({
-        user_id: profile?.id,
-        lead_id: leadId || null,
-        started_at: new Date(active?.startedAt || Date.now()).toISOString(),
-        ended_at: new Date().toISOString(),
-        duration_seconds: dur,
-        source: 'meeting',
-      })
-      if (error) throw error
+      if (active && dur >= 3) {
+        const { error } = await supabase.from('presentation_sessions').insert({
+          user_id: profile?.id,
+          lead_id: leadId || null,
+          started_at: new Date(active.startedAt).toISOString(),
+          ended_at: new Date().toISOString(),
+          duration_seconds: dur,
+          source: 'meeting',
+        })
+        if (error) throw error
+        toastSuccess(`Presentation logged · ${fmtClock(dur)}`)
+      }
       clearPresentation()
-      toastSuccess(`Presentation logged · ${fmtClock(dur)}`)
-      goBack()
     } catch (e) {
       toastError(e, 'Could not log the presentation time.')
       endingRef.current = false
       setEnding(false)
+      return
     }
-  }, [leadId, profile, goBack])
+    navigate(leadId ? `/leads/${leadId}` : '/work')
+  }, [leadId, profile, navigate])
+
+  // Safety net: if the rep leaves via hardware/browser back (no button tap),
+  // still log the elapsed time on unmount (fire-and-forget — the view is gone).
+  useEffect(() => {
+    return () => {
+      if (endingRef.current) return
+      const active = getActive()
+      if (!active) return
+      const dur = Math.min(elapsedSeconds(active), CAP_SECONDS)
+      clearPresentation()
+      if (dur < 3 || !profile?.id) return
+      supabase.from('presentation_sessions').insert({
+        user_id: profile.id,
+        lead_id: leadId || null,
+        started_at: new Date(active.startedAt).toISOString(),
+        ended_at: new Date().toISOString(),
+        duration_seconds: dur,
+        source: 'meeting',
+      }).then(() => {}, () => {})
+    }
+  }, [leadId, profile])
 
   const capped = elapsed >= CAP_SECONDS
 
@@ -101,7 +124,7 @@ export default function PresentView() {
         }}
       >
         <button
-          onClick={goBack}
+          onClick={end}
           aria-label="Back to lead"
           style={{
             display: 'inline-flex',
