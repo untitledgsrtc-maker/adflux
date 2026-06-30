@@ -13,6 +13,7 @@ import DashboardV2 from './pages/v2/DashboardV2'
 import QuotesV2           from './pages/v2/QuotesV2'
 import MyPerformanceV2    from './pages/v2/MyPerformanceV2'
 import CheckInV2          from './pages/v2/CheckInV2'   // Phase 60
+import PresentView        from './pages/v2/PresentView'  // Phase 181 — in-app deck + timer
 import CheckInGate        from './components/v2/CheckInGate'   // Phase 60
 import ManagerDashboardV2 from './pages/v2/ManagerDashboardV2' // Phase 61
 import TeamManagerAssignV2 from './pages/v2/TeamManagerAssignV2' // Phase 61
@@ -226,6 +227,12 @@ export default function App() {
             inside V2AppShell redirects sales + telecaller reps here
             on app open until they've checked in today. */}
         <Route path="/check-in" element={<RequireAuth><CheckInV2 /></RequireAuth>} />
+
+        {/* Phase 181 — in-app GSRTC presentation (full-screen, outside the
+            shell). Opens the offline deck + a stopwatch; logs the time.
+            Specific before parameterized (§10). */}
+        <Route path="/present" element={<RequireAuth><PresentView /></RequireAuth>} />
+        <Route path="/present/:leadId" element={<RequireAuth><PresentView /></RequireAuth>} />
 
         {/* ─── v2 inner pages (share V2AppShell chrome) ───
             Phase 18 — /dashboard moved INSIDE V2AppShell so it shares

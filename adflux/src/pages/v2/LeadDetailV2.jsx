@@ -224,6 +224,7 @@ export default function LeadDetailV2() {
   // local activity save.
   const [linkedQuotes, setLinkedQuotes] = useState([])
   const [openFollowUps, setOpenFollowUps] = useState([])
+  const [presentations, setPresentations] = useState([]) // Phase 181 — logged GSRTC presentations for this lead
   // Phase 93.17 (26 May 2026) — resilient GPS capture via shared
   // helper. Was: raw navigator.geolocation with 8s timeout + high-
   // accuracy → "Could not capture GPS: Timeout expired" on weak
@@ -571,7 +572,7 @@ export default function LeadDetailV2() {
     // lead. Separate from the main load() promises so a quote/RLS
     // hiccup doesn't break the page render.
     try {
-      const [qRes, fuRes] = await Promise.all([
+      const [qRes, fuRes, psRes] = await Promise.all([
         supabase.from('quotes')
           .select('id, ref, status, segment, media_type, total_amount, created_at')
           .eq('lead_id', id)
@@ -583,9 +584,17 @@ export default function LeadDetailV2() {
           .eq('is_done', false)
           .order('follow_up_date', { ascending: true })
           .limit(10),
+        // Phase 181 — logged in-app GSRTC presentations for this lead.
+        supabase.from('presentation_sessions')
+          .select('id, duration_seconds, started_at, user:user_id(id, name)')
+          .eq('lead_id', id)
+          .not('duration_seconds', 'is', null)
+          .order('started_at', { ascending: false })
+          .limit(20),
       ])
       setLinkedQuotes(qRes.data || [])
       setOpenFollowUps(fuRes.data || [])
+      setPresentations(psRes.data || [])
     } catch (e) {
       // Non-fatal — leave cards empty.
       console.warn('[lead] linked load failed:', e?.message || e)
@@ -1311,10 +1320,11 @@ export default function LeadDetailV2() {
               <button className="lead-btn lead-btn-sm" onClick={() => setActivityType('note')}>
                 <Edit3 size={13} /> <span>Note</span>
               </button>
-              {/* Phase 187.1 — GSRTC pitch deck, beside Note. Opens the bundled
-                  deck (/deck, public/deck/ §75) in a new tab via openExternalUrl
-                  (web new tab / APK system browser). Additive, §45-safe. */}
-              <button className="lead-btn lead-btn-sm" onClick={() => openExternalUrl(`${window.location.origin}/deck/led-deck-final.html`)}>
+              {/* Phase 187.1 → 181 — GSRTC pitch deck. Now opens IN-APP at
+                  /present/:leadId (offline deck + stopwatch), not a new Chrome
+                  tab. The timer logs presentation time to the lead + rep log.
+                  Additive, §45-safe. */}
+              <button className="lead-btn lead-btn-sm" onClick={() => navigate(`/present/${lead.id}`)}>
                 <Presentation size={13} /> <span>Presentation</span>
               </button>
               {/* Email — falls back to LogActivityModal when lead has
@@ -1877,6 +1887,46 @@ export default function LeadDetailV2() {
                         border: `1px solid ${statusColor}`,
                       }}>
                         {status}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Phase 181 — logged in-app GSRTC presentations + time spent. */}
+          {presentations.length > 0 && (
+            <div className="lead-card">
+              <div className="lead-card-head">
+                <div className="lead-card-title">Presentations · {presentations.length}</div>
+              </div>
+              <div className="lead-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {presentations.map(p => {
+                  const secs = p.duration_seconds || 0
+                  const mins = Math.floor(secs / 60)
+                  const dur = mins ? `${mins}m ${secs % 60}s` : `${secs}s`
+                  return (
+                    <div key={p.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 10px', borderRadius: 10,
+                      background: 'var(--surface-2, #0f172a)',
+                      border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
+                          Presented the deck
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {p.user?.name ? p.user.name + ' · ' : ''}
+                          {p.started_at && new Date(p.started_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                        </div>
+                      </div>
+                      <div className="tabular-nums" style={{
+                        fontFamily: 'var(--v2-display, "Space Grotesk")',
+                        fontSize: 13, fontWeight: 700, color: 'var(--accent, #FFE600)',
+                      }}>
+                        {dur}
                       </div>
                     </div>
                   )

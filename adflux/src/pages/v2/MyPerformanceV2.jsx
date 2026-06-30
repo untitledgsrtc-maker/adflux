@@ -16,6 +16,7 @@ import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCa
 import TcWeeklyTiles from '../../components/incentives/TcWeeklyTiles'
 import { MyPerformance } from '../../components/incentives/MyPerformance'
 import TotalPayableCard from '../../components/incentives/TotalPayableCard'
+import PresentationStatCard from '../../components/incentives/PresentationStatCard' // Phase 181
 import AgencyEarningsView from '../../components/agency/AgencyEarningsView'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { useAuthStore } from '../../store/authStore'
@@ -76,6 +77,9 @@ export default function MyPerformanceV2() {
           Base + Variable + Incentive + TA/DA = one rupee number the
           rep can read first thing. Owner directive 15 May 2026. */}
       <TotalPayableCard key={`tp-${refreshKey}`} />
+
+      {/* Phase 181 — time spent presenting the GSRTC deck this month. */}
+      <PresentationStatCard key={`present-${refreshKey}`} />
     </div>
   )
 }

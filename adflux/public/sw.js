@@ -117,6 +117,28 @@ registerRoute(
   }),
 )
 
+// ─── RUNTIME CACHE — bundled offline pitch deck (in-app presentations) ──────
+// Phase 181 — the GSRTC deck (/deck/*) is self-contained + large + immutable
+// per release: the deck HTML, the console iframe, the media-report PDF, and the
+// hero/station videos. CacheFirst = instant load + works with ZERO internet
+// after the first online open (the field-meeting "Start Presentation" flow).
+// Additive: matches only same-origin /deck/ GETs, touches no existing route
+// and adds no latency to any rep hot path (§45). On a new deck release, bump
+// the cacheName suffix so reps re-fetch.
+registerRoute(
+  ({ url, request }) =>
+    request.method === 'GET' &&
+    url.origin === self.location.origin &&
+    url.pathname.startsWith('/deck/'),
+  new CacheFirst({
+    cacheName: 'pitch-deck-v1',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 90 }),
+    ],
+  }),
+)
+
 // ─── INSTALL / ACTIVATE ─────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   // Activate the new SW immediately on update — don't wait for tabs to close.

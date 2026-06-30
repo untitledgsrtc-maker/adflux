@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { confirmDialog } from '../../components/v2/ConfirmDialog' // Phase 181 — post-meeting Start Presentation
 import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera, MapPin } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -301,6 +302,18 @@ export default function LeadFormV2() {
     }
     setSaving(false)
     savingRef.current = false   // Phase 113.4 — release latch
+    // Phase 181 — after logging a field meeting, offer the in-app GSRTC
+    // presentation (logs the time to this lead). "Not now" → /work as before.
+    if (meetingMode && !openAfter && data?.id) {
+      const yes = await confirmDialog({
+        title: 'Meeting logged',
+        message: 'Start the GSRTC presentation now? The time you spend is recorded on this lead.',
+        confirmLabel: 'Start Presentation',
+        cancelLabel: 'Not now',
+      })
+      navigate(yes ? `/present/${data.id}` : '/work')
+      return
+    }
     navigate(openAfter ? `/leads/${data.id}` : (meetingMode ? '/work' : '/leads'))
   }
 
