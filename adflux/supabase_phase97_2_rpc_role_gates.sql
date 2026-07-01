@@ -91,7 +91,12 @@ SECURITY INVOKER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  IF public.get_my_role() NOT IN ('admin', 'co_owner')
+  -- Phase 182 (2026-07-01) — 'accounts' added: the payroll/finance role reads
+  -- ANY rep's salary/score/TA figures via the payroll RPCs. Over-grant note:
+  -- this also opens generate_lead_tasks (write+push) + todays_suggested_tasks
+  -- (read) to accounts — operational, not finance; low-risk (trusted role, the
+  -- accounts UI never calls them). See CLAUDE.md §78.
+  IF public.get_my_role() NOT IN ('admin', 'co_owner', 'accounts')
      AND p_user_id <> auth.uid() THEN
     RAISE EXCEPTION 'Restricted: cannot access another user''s data (caller=%, target=%)',
                     auth.uid(), p_user_id

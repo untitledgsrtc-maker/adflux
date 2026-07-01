@@ -60,7 +60,7 @@ const TABS = [
 export default function PeopleV2() {
   const navigate = useNavigate()
   const profile  = useAuthStore(s => s.profile)
-  const isAdmin  = ['admin', 'co_owner'].includes(profile?.role)
+  const isAdmin  = ['admin', 'co_owner', 'accounts'].includes(profile?.role) // Phase 182 — accounts = payroll access
 
   const [params, setParams] = useSearchParams()
   const location = useLocation()

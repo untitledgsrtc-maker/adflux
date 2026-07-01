@@ -232,6 +232,13 @@ const HR_NAV = [
   { to: '/hr/new-user',       label: 'Add Member',     icon: UserPlus },
 ]
 
+// Phase 182 (2026-07-01) — Accounts login. Payroll-only nav: the People
+// shell carries Team / Incentives / Salary / Leaves / TA Claims tabs, which
+// is the whole finance surface. Routes guarded by RequireAccountsOrPrivileged.
+const ACCOUNTS_NAV = [
+  { to: '/people',            label: 'Payroll',        icon: Wallet },
+]
+
 const MOBILE_NAV_ADMIN = [
   { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
   { to: '/pending-approvals', label: 'Approve',        icon: CheckSquare },
@@ -365,7 +372,8 @@ export function V2AppShell() {
   useEffect(() => {
     if (!profile?.id) return
     const role = (profile?.role || '').toLowerCase()
-    if (role === 'telecaller' || role === 'agency') return
+    // Phase 182 — accounts is an office-only finance role; skip the watcher.
+    if (role === 'telecaller' || role === 'agency' || role === 'accounts') return
     startBackgroundGps(profile.id).catch((e) =>
       console.warn('[v2-shell] bg-gps start failed:', e?.message || e)
     )
@@ -499,10 +507,12 @@ export function V2AppShell() {
   const isTelecaller = profile?.team_role === 'telecaller'
   const isAgency     = profile?.role === 'agency'
   const isHR         = profile?.role === 'hr'   // Phase 109 — HR login
+  const isAccounts   = profile?.role === 'accounts'   // Phase 182 — Accounts login
   const nav =
     isPrivileged   ? ADMIN_NAV :
     isManager      ? MANAGER_NAV :
     isHR           ? HR_NAV :
+    isAccounts     ? ACCOUNTS_NAV :
     isTelecaller   ? TELECALLER_NAV :
     isAgency       ? AGENCY_NAV :
                      SALES_NAV
@@ -514,6 +524,7 @@ export function V2AppShell() {
     isPrivileged   ? MOBILE_NAV_ADMIN :
     isManager      ? MOBILE_NAV_MANAGER :
     isHR           ? HR_NAV :
+    isAccounts     ? ACCOUNTS_NAV :
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES
@@ -554,6 +565,7 @@ export function V2AppShell() {
             <div className="v2d-brand-s">{
               isPrivileged ? 'Admin'
               : isHR ? 'HR'
+              : isAccounts ? 'Accounts'
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
               : 'Sales'
@@ -743,6 +755,7 @@ export function V2AppShell() {
               <div className="v2d-me-role">{
                 isPrivileged ? 'Admin'
                 : isHR ? 'HR'
+                : isAccounts ? 'Accounts'
                 : isTelecaller ? 'Telecaller'
                 : isAgency ? 'Agency'
                 : 'Sales'
@@ -821,6 +834,7 @@ export function V2AppShell() {
               sales reps". The card uses compute_monthly_salary which
               already covers TC. Dropping the !isTelecaller exclusion. */}
           {!isPrivileged
+            && !isAccounts /* Phase 182 — no rep incentive card for the finance role */
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 0 }}>
@@ -846,6 +860,7 @@ export function V2AppShell() {
                   <div className="v2d-brand-s">{
               isPrivileged ? 'Admin'
               : isHR ? 'HR'
+              : isAccounts ? 'Accounts'
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
               : 'Sales'

@@ -121,6 +121,19 @@ function RequireHROrPrivileged({ children }) {
   return children
 }
 
+/* Phase 182 (2026-07-01) — Accounts login. The payroll / finance surface
+   (People shell + salary / TA-DA / incentives / leaves) admits role='accounts'
+   alongside admin + co_owner. Accounts can view + edit amounts + pay salary /
+   TA / incentives + approve TA claims. It does NOT reach sales ops, quote
+   writes, campaigns, HR sign-off, user minting, or P&L (guarded elsewhere). */
+function RequireAccountsOrPrivileged({ children }) {
+  const { isPrivileged, profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  const isAccounts = profile?.role === 'accounts'
+  if (!isPrivileged && !isAccounts) return <Navigate to="/quotes" replace />
+  return children
+}
+
 /* Phase 61 (19 May 2026) — Manager guard. Gates `/manager` route to
    team leads (team_role='sales_manager') and admins. Non-managers
    bounce to their role's home via RootRedirect. */
@@ -208,6 +221,8 @@ function RootRedirect() {
   // Without this, hr falls through to /dashboard → an empty sales view
   // it can't use.
   if (role === 'hr')                              return <Navigate to="/hr" replace />
+  // Phase 182 — Accounts login lands on the payroll shell.
+  if (role === 'accounts')                        return <Navigate to="/people" replace />
   return <Navigate to="/dashboard" replace />
 }
 
@@ -342,8 +357,8 @@ export default function App() {
           <Route path="/cities"                    element={<RequirePrivileged><CitiesV2 /></RequirePrivileged>} />
           <Route path="/auto-districts"            element={<RequirePrivileged><AutoDistrictsV2 /></RequirePrivileged>} />
           <Route path="/gsrtc-stations"            element={<RequirePrivileged><GsrtcStationsV2 /></RequirePrivileged>} />
-          <Route path="/team"                      element={<RequirePrivileged><TeamV2 /></RequirePrivileged>} />
-          <Route path="/incentives"                element={<RequirePrivileged><IncentivesV2 /></RequirePrivileged>} />
+          <Route path="/team"                      element={<RequireAccountsOrPrivileged><TeamV2 /></RequireAccountsOrPrivileged>} />
+          <Route path="/incentives"                element={<RequireAccountsOrPrivileged><IncentivesV2 /></RequireAccountsOrPrivileged>} />
           <Route path="/pending-approvals"         element={<RequirePrivileged><PendingApprovalsV2 /></RequirePrivileged>} />
           {/* Phase 109 — HR login. These 3 routes admit role='hr' as well
               as admin/co_owner via RequireHROrPrivileged. Every OTHER
@@ -354,21 +369,21 @@ export default function App() {
           {/* Phase 33G.8 — admin Leaves CRUD. Excluded days for the
               monthly performance score now come from a real table
               instead of the work_sessions.is_off_day proxy. */}
-          <Route path="/admin/leaves"              element={<RequirePrivileged><LeavesAdminV2 /></RequirePrivileged>} />
+          <Route path="/admin/leaves"              element={<RequireAccountsOrPrivileged><LeavesAdminV2 /></RequireAccountsOrPrivileged>} />
           {/* Phase 33H — TA (travel allowance) computed from GPS pings.
               Per-day DA + bike + hotel, approval workflow, CSV export
               for finance. */}
-          <Route path="/admin/ta-payouts"          element={<RequirePrivileged><TaPayoutsAdminV2 /></RequirePrivileged>} />
+          <Route path="/admin/ta-payouts"          element={<RequireAccountsOrPrivileged><TaPayoutsAdminV2 /></RequireAccountsOrPrivileged>} />
           {/* Phase 36 — Salary Sheet. Per-rep monthly breakdown with
               auto leave deduction. Admin / co_owner only. */}
-          <Route path="/admin/salary"              element={<RequirePrivileged><SalaryAdminV2 /></RequirePrivileged>} />
+          <Route path="/admin/salary"              element={<RequireAccountsOrPrivileged><SalaryAdminV2 /></RequireAccountsOrPrivileged>} />
           {/* Phase 101.A3 JSX — agency commission payout admin
               surface. Backed by Phase 101.A3 SQL agency_commission_
               payouts table. admin+co_owner per acp_admin_all RLS. */}
           <Route path="/admin/agency-commission"   element={<RequirePrivileged><AgencyCommissionAdminV2 /></RequirePrivileged>} />
           {/* Phase 38 — People (consolidated). Old routes above stay
               as deep-links; sidebar uses /people. */}
-          <Route path="/people"                    element={<RequirePrivileged><PeopleV2 /></RequirePrivileged>} />
+          <Route path="/people"                    element={<RequireAccountsOrPrivileged><PeopleV2 /></RequireAccountsOrPrivileged>} />
           {/* Phase 90 (2026-05-23) — rep profile drill-down. Specific
               before parameterized would matter only if /people/new
               existed; it doesn't, so /people/:userId catches all

@@ -43,7 +43,7 @@ function currentMonthYM() { return istCurrentMonthYM() }
 export default function SalaryAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isAdmin = ['admin', 'co_owner'].includes(profile?.role)
+  const isAdmin = ['admin', 'co_owner', 'accounts'].includes(profile?.role) // Phase 182 — accounts = payroll access
 
   useEffect(() => {
     if (profile && !isAdmin) navigate('/work')

@@ -20,7 +20,7 @@ export default function IncentivesV2({ embedded = false }) {
   const profile = useAuthStore(s => s.profile)
   if (!profile) return null
 
-  if (profile.role === 'admin') {
+  if (profile.role === 'admin' || profile.role === 'accounts') { // Phase 182 — accounts manages incentives
     return (
       <div className="v2d-inc">
         {!embedded && (
