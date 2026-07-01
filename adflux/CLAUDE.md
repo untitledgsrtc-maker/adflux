@@ -4930,3 +4930,104 @@ No separate APK host needed. `/api/apk` proxies the EXISTING Supabase
 `apk/untitled-os.apk` with corrected headers. **Future APK release = just overwrite
 `untitled-os.apk` in the `apk` bucket** (any content-type — the proxy fixes it) +
 publish the new `app_version` row. `apk_url`, the proxy, and the redirect stay put.
+
+
+---
+
+## 77 · Phase 181 — offline in-app GSRTC presentation + timer (2026-06-30)
+
+Owner ask: after a rep logs a field meeting, show a **Start Presentation**
+option; whenever they present, punch a log with the total time spent; show it
+in the rep's log. Then two hard constraints: **open IN-APP (not a new Chrome
+tab)** and **work fully OFFLINE** ("internet not always working there"), fast.
+Built additive + §45-safe. Guardian PASS. On origin (HEAD `e1aee3d`), SQL RUN,
+proven live (4 sessions logged 30 Jun).
+
+### What it does (the live flow)
+1. Rep logs a **field meeting** (the LIVE path = `LeadFormV2` meetingMode via
+   `/leads/new`, NOT the dead `LogMeetingModal`) → on save, `confirmDialog`
+   "Start the GSRTC presentation now?" → yes = `/present/:leadId`, no = `/work`.
+   Also the lead-page **Presentation** button (`LeadDetailV2`, More drawer) now
+   navigates to `/present/:leadId` instead of `openExternalUrl` (was a new tab).
+2. `/present/:leadId` (`PresentView.jsx`, full-screen, OUTSIDE V2AppShell,
+   `RequireAuth`) shows the deck in a **same-origin iframe**
+   (`/deck/led-deck-final.html`) + a yellow stopwatch bar.
+3. **End** (or the Back arrow, or hardware/browser back — Phase 181.1 all log)
+   → writes `presentation_sessions`. 60-min cap. `localStorage` persists the
+   start so backgrounding the app doesn't lose the timer. 3-second floor skips
+   accidental opens.
+4. **Shown:** "Presentations · N" card on the lead timeline (`LeadDetailV2`) +
+   "Presentations this month" stat (`PresentationStatCard` on `MyPerformanceV2`).
+
+### Data model — DELIBERATELY NOT a lead_activities row
+`presentation_sessions` (`supabase_phase181_presentation_sessions.sql`, RUN):
+`user_id, lead_id, started_at, ended_at, duration_seconds, source`. Standalone
+table so an "End Presentation" fires **NO** score / meeting-counter / heat
+trigger (§33 + §45 hot-path safe). RLS: `ps_self_all` (user_id=auth.uid()) +
+`ps_admin_all` (admin/co_owner). **This is the ONLY new permission.**
+
+### Permissions / accounts (owner asked — the full answer)
+- **No new accounts. No device/OS permission. No APK rebuild** (pure JS + a SW
+  runtime-cache route → reaches the APK via live-update on reopen).
+- **Backend:** just the 2 RLS policies above. Reps write/read own; admin+co_owner
+  all. HR/accounts can technically write own (ps_self_all) but never present.
+- **Roles that use it:** sales / agency / telecaller present (own rows); admin +
+  co_owner see all on the lead. The lead-page Presentation button is NOT
+  role-gated (any lead-viewer). The post-meeting prompt only fires on the
+  field-meeting save path (sales/agency; TC has no meetingMode).
+- **Offline requirement:** the rep opens the app **once on wi-fi** so the SW
+  caches `/deck/*`. Automatic — no dialog. After that, zero internet.
+
+### Offline deck (`public/deck/led-deck-final.html`, ~7.3 MB, self-contained)
+Built by inlining every external asset so the deck needs ZERO network: 3 Google
+fonts + Leaflet js/css + a **frozen Gujarat OSM tile set** (z6-8, draggable
+offline, `maxBounds`) + the 20 city photos (downscaled). 0 external asset refs.
+The heavy companions (console iframe `adflux-console.html`, `media-report.pdf`,
+hero/station videos) stay separate `/deck/` files, cached by the SW route. The
+map search pans to z8 only (never needs un-frozen tiles).
+- ⚠ On a **new deck release**, bump the SW cache name suffix (`pitch-deck-v1`
+  → v2 in `public/sw.js`) so reps re-fetch — CacheFirst serves stale otherwise.
+- The deck (12 slides) also carries the earlier pitch work: page-3 Scale, page-4
+  Map + city-search, page-5 "How your ad runs" animated flow, page-7 10-point
+  comparison table. Deck edits happen on the owner's Desktop copy then get
+  offline-rebuilt into `public/deck/` (§75 is the standalone-deck note; Phase 181
+  is the in-app integration the owner green-lit — supersedes §75's "don't
+  integrate" for this feature).
+
+### SW change (`public/sw.js`, §28 frozen — guardian PASS)
+Added ONE runtime route: `CacheFirst` for same-origin GET `/deck/*`
+(`pitch-deck-v1`). Additive — no existing route / denylist / push handler
+touched, zero rep-hot-path latency.
+
+### Files
+- NEW: `PresentView.jsx` · `utils/presentationTimer.js` · `components/incentives/
+  PresentationStatCard.jsx` · `supabase_phase181_presentation_sessions.sql`.
+- Frozen, additive (guardian PASS): `public/sw.js` (deck cache route) ·
+  `LeadDetailV2.jsx` (button → in-app + timeline card) · `LeadFormV2.jsx`
+  (post-meeting prompt) · `MyPerformanceV2.jsx` (stat mount) · `App.jsx`
+  (/present routes, outside the shell, §10 specific-before-param).
+- `WorkV2.jsx` left BYTE-UNCHANGED — I first wired the prompt to its
+  `LogMeetingModal.onSaved`, discovered that modal is **dead** (no
+  `setMeetingModalOpen(true)` caller; live meeting path is LeadFormV2), reverted.
+
+### Foot-guns
+- ❌ Wiring "after a meeting" to `LogMeetingModal` (WorkV2) — it's DEAD. The live
+  field-meeting save is `LeadFormV2` meetingMode (`navigate('/leads/new',{state:
+  {meetingMode:true}})`), which saves `activity_type:'meeting'` then navigates
+  to `/work`. Hook there.
+- ❌ Logging a presentation as a `lead_activities` row — fires the §33 counter /
+  compute_daily_score / auto_heat chain. Use the standalone table.
+- ❌ Only logging on the explicit "End" button — reps exit via Back / hardware
+  back and lose the timing (owner's first test: "not punched"). Log on ANY exit
+  (Phase 181.1) + an unmount safety net.
+- ❌ Testing before a hard-refresh — the PWA/SW serves the OLD bundle, so the
+  Presentation button still opens a new tab (no timer). Reopen twice / Cmd+Shift+R
+  to swap the SW (§76 same lesson).
+
+### Commits
+```
+e1aee3d Phase 181.1: presentation auto-logs on ANY exit (Back / hardware back)
+474c729 Phase 181: offline in-app GSRTC presentation + timer
+```
+No APK rebuild. No further SQL. Deck offline-rebuild is a Desktop→public/deck
+copy (not a code path).
