@@ -17,6 +17,7 @@ import TcWeeklyTiles from '../../components/incentives/TcWeeklyTiles'
 import { MyPerformance } from '../../components/incentives/MyPerformance'
 import TotalPayableCard from '../../components/incentives/TotalPayableCard'
 import PresentationStatCard from '../../components/incentives/PresentationStatCard' // Phase 181
+import SalarySlipsCard from '../../components/incentives/SalarySlipsCard' // Phase 185
 import AgencyEarningsView from '../../components/agency/AgencyEarningsView'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { useAuthStore } from '../../store/authStore'
@@ -80,6 +81,9 @@ export default function MyPerformanceV2() {
 
       {/* Phase 181 — time spent presenting the GSRTC deck this month. */}
       <PresentationStatCard key={`present-${refreshKey}`} />
+
+      {/* Phase 185 — download own salary slip (PDF) for any fully-paid month. */}
+      <SalarySlipsCard key={`slip-${refreshKey}`} />
     </div>
   )
 }

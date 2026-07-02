@@ -5102,3 +5102,58 @@ unchanged EXCEPT the new 3×-business full-variable override.
   every month. For a pay CUT (Rule 2), that claws back already-worked months —
   flag it + offer a July-forward guard BEFORE the owner runs it (done here; owner
   chose June-now).
+
+
+---
+
+## 79 · Phase 185 — rep-downloadable salary slip (2026-07-02, guardian PASS)
+
+Owner: reps should download their own salary slip (the Phase-184 breakup) AFTER
+they're paid. Built additive, rep-facing, RLS-safe, NO new SQL / NO APK rebuild
+(pure JS, live-update). Guardian PASS (no §28/§37 contract touched).
+
+### Owner decisions (2026-07-02)
+- **Unlock = after FULL payment.** A month's slip appears only once a
+  `salary_payouts` row with `is_full_payment=true` exists for that rep+month
+  (accounts records it via the existing Salary Payout button, Phase 37). No
+  partial-unlock, no admin "publish" step.
+- **Plain "Untitled" logo header** (`/icon-192.png`) — no legal entity / GSTIN.
+- **Show the score %** on the variable line (so the rep sees why variable moved).
+
+### Files
+- NEW `src/components/incentives/SalarySlipPDF.jsx` — `@react-pdf/renderer`
+  one-page A4 slip (`SalarySlipDocument`) + `downloadSalarySlip(data)` (renders +
+  triggers a client-side download; no server). Uses "Rs." + `toLocaleString('en-IN')`
+  (avoids the ₹ glyph blanking in react-pdf's Helvetica). §9 day-palette hexes
+  (allowed for PDF renderers, same as OfferLetterPDF). Layout: logo header ·
+  employee block · Earnings (base 70% / variable 30% + score% / incentive / TA-DA
+  → gross) · Deductions (leave × salary÷26) · Net payable · "Paid Rs.X on <date>".
+- NEW `src/components/incentives/SalarySlipsCard.jsx` — rep-facing card on My
+  Performance. Self-fetches the rep's OWN `salary_payouts` (`eq user_id=profile.id`,
+  `eq is_full_payment true`) → lists fully-paid months → Download per month calls
+  `rpc('compute_monthly_salary', {p_user_id: profile.id, y, m})` → builds+downloads
+  the PDF. Hidden until ≥1 paid month. Agency skipped (commission-only). v2 tokens.
+- MODIFIED `src/pages/v2/MyPerformanceV2.jsx` (§28 FROZEN) — additive ONLY: one
+  import + one `<SalarySlipsCard key={`slip-${refreshKey}`} />` mount after
+  PresentationStatCard. No existing card/hook/useAutoRefresh touched.
+
+### Security (rep sees own slip ONLY — do NOT weaken)
+Both id sites use `profile.id` from `useAuthStore` — no prop/param/URL id, no
+admin/impersonation branch. `salary_payouts` = Phase 37 rep-SELECT-own RLS;
+`compute_monthly_salary` = `_assert_self_or_admin` gate. So the rep can only ever
+read/generate their own. **No new permission / RLS added.**
+
+### Money = display-only (single-source honored)
+The slip reads `compute_monthly_salary`'s jsonb verbatim
+(base/variable/incentive/ta_da/unpaid_deduction/net_payable/score_pct). `net` is a
+straight echo of `net_payable`; `gross` is just the sum of the earning lines for
+display. Nothing re-derived. If accounts ever pays an amount ≠ computed net, the
+slip honestly shows BOTH (computed Net payable + actual "Paid Rs.X") — a Phase 37
+`salary_payouts` property, not a bug.
+
+### To ship
+JS-only — `git push origin untitled-os`, Vercel deploys, reaches the APK on next
+open. No SQL, no APK rebuild. Smoke: as a rep with a full-paid month, open My
+Performance → "Salary slips" card → tap Slip → PDF downloads with the breakup +
+"Paid" line. As a rep with no paid month → card hidden. Rep can't reach another
+rep's slip (self-only).
