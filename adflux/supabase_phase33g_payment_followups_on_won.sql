@@ -35,8 +35,10 @@ DECLARE
 BEGIN
   -- Phase 186 — also read the quote's lead stage (LEFT JOIN: a lead-less quote
   -- has lead_stage NULL and still gets its chases).
+  -- Phase 182.1 — dropped q.ref_number (column removed in Phase 33N; Phase 186's
+  -- rewrite here re-introduced it → "column q.ref_number does not exist" on WON).
   SELECT q.id, q.created_by, q.total_amount,
-         COALESCE(q.quote_number, q.ref_number, q.id::text) AS label,
+         COALESCE(q.quote_number, q.id::text) AS label,
          l.stage AS lead_stage
     INTO v_quote
     FROM quotes q
