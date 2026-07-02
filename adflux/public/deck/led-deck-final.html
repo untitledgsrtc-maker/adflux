@@ -2933,7 +2933,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
     min-width:0;
   }
   .s11-stage{
-    position:relative; width:100%; aspect-ratio:1104/832; max-height:100%;
+    position:relative; width:100%; aspect-ratio:1920/1080; max-height:100%;
     border-radius:18px; overflow:hidden;
     background:#000; border:1px solid var(--border,#23232a);
     box-shadow:0 24px 70px rgba(0,0,0,.55);
@@ -3055,7 +3055,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       </label>
     </div>
 
-    <div class="s11-note rv"><span class="s11-dot"></span>Green-screen demo · Bhavnagar Bus Station</div>
+    <div class="s11-note rv"><span class="s11-dot"></span>Green-screen demo · Gandhinagar Bus Station</div>
   </div>
 
   <div class="s11-right">
@@ -3064,10 +3064,10 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         <canvas class="s11-screens" id="s11-screens"></canvas>
       </div>
 
-      <video class="s11-rawvideo" id="s11-raw" src="bhavnagar.mp4" autoplay muted loop playsinline></video>
+      <video class="s11-rawvideo" id="s11-raw" src="gandhinagar.mp4" autoplay muted loop playsinline></video>
       <canvas class="s11-canvas" id="s11-canvas"></canvas>
 
-      <div class="s11-tag"><span class="s11-tdot"></span>Bhavnagar Bus Station</div>
+      <div class="s11-tag"><span class="s11-tdot"></span>Gandhinagar Bus Station</div>
 
       <div class="s11-strip">
         <div class="s11-scan">
@@ -3092,16 +3092,19 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
   // Fixed positions of the 4 green LED screens, in % of the video frame.
   var SCREENS = [
-    { x:17.0, y:57.6, w:2.9,  h:3.9  },
-    { x:30.3, y:55.7, w:4.1,  h:4.7  },
-    { x:48.9, y:53.2, w:6.2,  h:6.1  },
-    { x:80.1, y:49.0, w:10.6, h:7.5  }
+    { x:13.5, y:39.3, w:10.4, h:15.6 },
+    { x:28.5, y:61.5, w:1.2,  h:3.3  },
+    { x:39.8, y:49.3, w:5.8,  h:10.4 },
+    { x:50.6, y:53.0, w:5.8,  h:8.5  },
+    { x:57.7, y:55.9, w:3.8,  h:8.9  },
+    { x:62.3, y:57.8, w:7.9,  h:8.5  },
+    { x:70.6, y:61.1, w:2.1,  h:5.9  }
   ];
   // ONE creative -> auto-fitted onto EVERY screen at its own size.
   var AD = { media:null, kind:null, _url:null };
 
   var keyCtx, backCtx, off, offCtx;
-  var OW = 552, OH = 416;
+  var OW = 640, OH = 360;
   var FPS = 24, frameGap = 1000 / FPS, last = 0, raf = 0;
 
   function setupFallback(){ stage.classList.add('s11-fallback'); var p=video.play(); if(p&&p.catch)p.catch(function(){}); }
