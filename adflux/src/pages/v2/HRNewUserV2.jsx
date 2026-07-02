@@ -25,6 +25,7 @@ import { UserPlus, Save, AlertTriangle, CheckCircle2, ArrowLeft, Send } from 'lu
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess, pushToast } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 
 const CITIES = [
   'Vadodara', 'Surat', 'Ahmedabad', 'Gandhinagar', 'Rajkot',
@@ -142,6 +143,24 @@ export default function HRNewUserV2() {
       toastError(new Error('Bad password'), 'Set a login password (min 4 chars).')
       return
     }
+
+    // Phase 183 — confirm the RESOLVED role before minting. The designation
+    // dropdown lists every role in one flat list (Sales / Telecaller / Office
+    // / Accounts) so a wrong pick is easy; this surfaces auth_role + team_role
+    // + salary in plain words so HR catches it before the account exists.
+    // (JAYNA ROHIT was created 'sales' from a mis-picked designation — the RPC
+    // faithfully mints whatever is picked; there is no code path Telecaller→sales.)
+    const salaryTxt = form.monthly_salary && Number(form.monthly_salary) > 0
+      ? '₹' + Number(form.monthly_salary).toLocaleString('en-IN')
+      : 'not set'
+    const ok = await confirmDialog({
+      title: 'Create this member?',
+      message: `Creating ${form.name.trim()} as role ${String(pickedDesignation.auth_role).toUpperCase()} · team ${pickedDesignation.team_role} · designation ${pickedDesignation.name} · salary ${salaryTxt}. Correct?`,
+      confirmLabel: 'Create',
+      cancelLabel: 'Back',
+    })
+    if (!ok) return
+
     setSaving(true)
 
     // Phase 66 (21 May 2026) — single RPC creates auth.users +
