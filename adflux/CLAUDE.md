@@ -4985,8 +4985,17 @@ offline, `maxBounds`) + the 20 city photos (downscaled). 0 external asset refs.
 The heavy companions (console iframe `adflux-console.html`, `media-report.pdf`,
 hero/station videos) stay separate `/deck/` files, cached by the SW route. The
 map search pans to z8 only (never needs un-frozen tiles).
-- ⚠ On a **new deck release**, bump the SW cache name suffix (`pitch-deck-v1`
-  → v2 in `public/sw.js`) so reps re-fetch — CacheFirst serves stale otherwise.
+- ⚠ On a **new deck release**, bump the SW cache name suffix in `public/sw.js`
+  so reps re-fetch — CacheFirst serves stale otherwise. **Currently
+  `pitch-deck-v2`** (Phase 189, 2 Jul) — bump to `v3` next.
+- **Phase 189 (2 Jul 2026):** removed the pricing slide (data-i="11" "Real
+  pricing") from `public/deck/led-deck-final.html` (nav auto-recounts via
+  `querySelectorAll('.slide')` → 12→11 slides) + added `public/deck/ad.mp4`
+  (556KB, `gg.mov` compressed 4K→1080p via ffmpeg) as the **default placeholder
+  creative** — the slide's existing `autoload()` (tries ad.mp4/png/jpg) plays it
+  on the green screens until a client uploads their own. Desktop copy
+  (`~/Desktop/led-deck-final.html`) NOT synced (owner: in-app only) — it still has
+  the pricing slide + no ad.mp4.
 - The deck (12 slides) also carries the earlier pitch work: page-3 Scale, page-4
   Map + city-search, page-5 "How your ad runs" animated flow, page-7 10-point
   comparison table. Deck edits happen on the owner's Desktop copy then get

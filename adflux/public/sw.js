@@ -131,7 +131,7 @@ registerRoute(
     url.origin === self.location.origin &&
     url.pathname.startsWith('/deck/'),
   new CacheFirst({
-    cacheName: 'pitch-deck-v1',
+    cacheName: 'pitch-deck-v2',
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 90 }),
