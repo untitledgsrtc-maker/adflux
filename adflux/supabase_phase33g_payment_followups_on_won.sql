@@ -23,63 +23,12 @@
 --     impossible).
 
 -- ─── 1. Function ──────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.create_payment_collection_followups(p_quote_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_quote    record;
-  v_existing int;
-BEGIN
-  -- Phase 186 — also read the quote's lead stage (LEFT JOIN: a lead-less quote
-  -- has lead_stage NULL and still gets its chases).
-  -- Phase 182.1 — dropped q.ref_number (column removed in Phase 33N; Phase 186's
-  -- rewrite here re-introduced it → "column q.ref_number does not exist" on WON).
-  SELECT q.id, q.created_by, q.total_amount,
-         COALESCE(q.quote_number, q.id::text) AS label,
-         l.stage AS lead_stage
-    INTO v_quote
-    FROM quotes q
-    LEFT JOIN leads l ON l.id = q.lead_id
-   WHERE q.id = p_quote_id;
-
-  IF NOT FOUND THEN
-    RAISE NOTICE 'create_payment_collection_followups: quote % not found', p_quote_id;
-    RETURN;
-  END IF;
-
-  -- Phase 186 — ROOT fix for the recurring "Lost leads still in follow-ups".
-  -- A quote can be marked Won while its lead is ALREADY Lost (rep marks the
-  -- lead Lost, then later closes the deal + marks the quote Won). The payment
-  -- FUs below spawn with lead_id NULL, so every lead-keyed / stage-transition
-  -- closer (§76.3 / §134 / §174) misses them and they live forever on the
-  -- follow-ups screen. Never spawn payment chases on a dead lead.
-  IF v_quote.lead_stage = 'Lost' THEN
-    RAISE NOTICE 'create_payment_collection_followups: lead Lost for %, skipping', p_quote_id;
-    RETURN;
-  END IF;
-
-  -- Skip if payment FUs already exist for this quote (duplicate-Won guard).
-  SELECT COUNT(*) INTO v_existing
-    FROM follow_ups
-   WHERE quote_id = p_quote_id
-     AND note LIKE 'Payment collection%';
-
-  IF v_existing > 0 THEN
-    RAISE NOTICE 'create_payment_collection_followups: already exist for %, skipping', p_quote_id;
-    RETURN;
-  END IF;
-
-  INSERT INTO follow_ups (quote_id, assigned_to, follow_up_date, note) VALUES
-    (p_quote_id, v_quote.created_by, (CURRENT_DATE + INTERVAL '7 days')::date,
-     'Payment collection: ₹' || to_char(v_quote.total_amount, 'FM99,99,99,999') || ' due (' || v_quote.label || ')'),
-    (p_quote_id, v_quote.created_by, (CURRENT_DATE + INTERVAL '15 days')::date,
-     'Payment collection: 2nd reminder · ₹' || to_char(v_quote.total_amount, 'FM99,99,99,999')),
-    (p_quote_id, v_quote.created_by, (CURRENT_DATE + INTERVAL '30 days')::date,
-     'Payment collection: final reminder · escalate if unpaid');
-END $$;
+-- Phase 182.1 (§71/§72) — create_payment_collection_followups body MOVED to its
+-- canonical home: db/functions/create_payment_collection_followups.sql. It was
+-- duplicated here (with q.ref_number + the Lost guard) AND in phase33n_ref_number_
+-- fix (no ref_number, no Lost guard); Phase 186's rewrite here re-added ref_number
+-- and reverted the 33N fix → the WON crash. The body is now single-source; the
+-- trigger + wiring below stay. Do NOT re-paste the function body here.
 
 GRANT EXECUTE ON FUNCTION public.create_payment_collection_followups(uuid) TO authenticated;
 

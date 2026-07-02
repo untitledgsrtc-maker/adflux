@@ -25,49 +25,11 @@
 -- Idempotent: CREATE OR REPLACE on both.
 
 -- ─── 1. create_payment_collection_followups ──────────────────────
-CREATE OR REPLACE FUNCTION public.create_payment_collection_followups(p_quote_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_quote    record;
-  v_existing int;
-BEGIN
-  -- Phase 33N fix — dropped ref_number from the COALESCE.
-  SELECT id, created_by, total_amount,
-         COALESCE(quote_number, id::text) AS label
-    INTO v_quote
-    FROM quotes
-   WHERE id = p_quote_id;
-
-  IF NOT FOUND THEN
-    RAISE NOTICE 'create_payment_collection_followups: quote % not found', p_quote_id;
-    RETURN;
-  END IF;
-
-  -- Skip if payment FUs already exist for this quote (duplicate-Won guard).
-  SELECT COUNT(*) INTO v_existing
-    FROM follow_ups
-   WHERE quote_id = p_quote_id
-     AND note LIKE 'Payment collection%';
-
-  IF v_existing > 0 THEN
-    RAISE NOTICE 'create_payment_collection_followups: already exist for %, skipping', p_quote_id;
-    RETURN;
-  END IF;
-
-  INSERT INTO follow_ups (quote_id, assigned_to, follow_up_date, note) VALUES
-    (p_quote_id, v_quote.created_by, (CURRENT_DATE + INTERVAL '7 days')::date,
-     'Payment collection: ₹' || to_char(v_quote.total_amount, 'FM99,99,99,999') || ' due (' || v_quote.label || ')'),
-    (p_quote_id, v_quote.created_by, (CURRENT_DATE + INTERVAL '15 days')::date,
-     'Payment collection: 2nd reminder · ₹' || to_char(v_quote.total_amount, 'FM99,99,99,999')),
-    (p_quote_id, v_quote.created_by, (CURRENT_DATE + INTERVAL '30 days')::date,
-     'Payment collection: final reminder · escalate if unpaid');
-END $$;
-
-GRANT EXECUTE ON FUNCTION public.create_payment_collection_followups(uuid) TO authenticated;
+-- Phase 182.1 (§71/§72) — body MOVED to db/functions/create_payment_collection_
+-- followups.sql (the single canonical home). This phase33n copy dropped
+-- ref_number but LACKED the Phase 186 Lost-lead guard — re-running it would
+-- overwrite the live function with a guard-less version. Neutralized to a
+-- pointer so it can no longer revert. (The OTHER functions in this file stay.)
 
 -- ─── 2. regen_payment_fu_notes ───────────────────────────────────
 CREATE OR REPLACE FUNCTION public.regen_payment_fu_notes(p_quote_id uuid)
