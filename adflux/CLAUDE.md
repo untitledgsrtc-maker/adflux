@@ -5157,3 +5157,40 @@ open. No SQL, no APK rebuild. Smoke: as a rep with a full-paid month, open My
 Performance → "Salary slips" card → tap Slip → PDF downloads with the breakup +
 "Paid" line. As a rep with no paid month → card hidden. Rep can't reach another
 rep's slip (self-only).
+
+
+---
+
+## 80 · Phase 186 — rep-facing daily-score breakdown (2026-07-02, guardian PASS)
+
+Owner: after explaining the score is daily → monthly-average, he asked to WIRE the
+daily scores so the rep sees which days dragged the month down. Built additive,
+rep-facing, RLS-safe, NO SQL / NO APK rebuild. Owner picked: on the My Performance
+page (not the slip).
+
+### Files
+- NEW `src/components/incentives/DailyScoresCard.jsx` — self-fetching, READ-ONLY.
+  Reads the rep's OWN `daily_performance` (`eq user_id=profile.id`; cols work_date,
+  score_pct, meetings_done, meetings_target, is_excluded, excluded_reason) for a
+  month. Month stepper (◀▶) capped at the current IST month (istCurrentMonthYM, no
+  future). Collapsible daily list: each day → done/target + score% (green ≥50 /
+  amber <50 / grey for excluded) + the off-day reason (Sunday/holiday/leave). Shows
+  a display month-average = AVG(non-excluded score_pct). Agency → null. v2 tokens.
+- MODIFIED `src/pages/v2/MyPerformanceV2.jsx` (§28 FROZEN) — additive: 1 import + 1
+  `<DailyScoresCard key={`daily-${refreshKey}`} />` mount right after
+  PerformanceScoreCard. Guardian PASS.
+
+### Contracts
+- Security: rep reads own rows only (`dp_own` RLS = `user_id = auth.uid()`); no
+  prop/param/URL id, no write. Cannot reach another rep's scores.
+- DISPLAY-ONLY: the card's client-side AVG is for the rep to read — it does NOT feed
+  pay. Real pay avg = `monthly_score`/`compute_monthly_salary` (server-side AVG,
+  untouched). The two can differ by a hair (independent queries); neither feeds the
+  other. Do NOT wire this card's number into any pay path.
+- Radii kept on the tokens.css scale (10/14/20) — the guardian's 3 P2 off-scale
+  flags (12/8) were fixed to 10 before commit.
+
+### To ship
+`git push origin untitled-os` (JS-only). Smoke: rep opens My Performance → "Daily
+scores" card under the score card → "Show daily breakdown" → per-day rows; ◀▶ steps
+months, can't go future; excluded days show the reason + grey "—".

@@ -18,6 +18,7 @@ import { MyPerformance } from '../../components/incentives/MyPerformance'
 import TotalPayableCard from '../../components/incentives/TotalPayableCard'
 import PresentationStatCard from '../../components/incentives/PresentationStatCard' // Phase 181
 import SalarySlipsCard from '../../components/incentives/SalarySlipsCard' // Phase 185
+import DailyScoresCard from '../../components/incentives/DailyScoresCard' // Phase 186
 import AgencyEarningsView from '../../components/agency/AgencyEarningsView'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { useAuthStore } from '../../store/authStore'
@@ -59,6 +60,9 @@ export default function MyPerformanceV2() {
       {/* Phase 33E — task-completion score (meetings done vs target)
           + 70/30 base + variable salary projection. */}
       <PerformanceScoreCard key={`score-${refreshKey}`} />
+
+      {/* Phase 186 — per-day score breakdown behind the monthly average. */}
+      <DailyScoresCard key={`daily-${refreshKey}`} />
 
       {/* Phase 53 — TC-only weekly KPI strip + variable-unlock gate.
           Hidden for sales / agency / staff. Surfaces connect rate
