@@ -5031,3 +5031,74 @@ e1aee3d Phase 181.1: presentation auto-logs on ANY exit (Back / hardware back)
 ```
 No APK rebuild. No further SQL. Deck offline-rebuild is a Desktop→public/deck
 copy (not a code path).
+
+
+---
+
+## 78 · Phase 184 — two owner-approved salary rules (LIVE, retroactive) (2026-07-02)
+
+Owner added two salary rules. Both are CHANGES (not captures) to the canonical
+money functions, guardian PASS (2 P2 only), shadow-compared on real June data,
+then owner RAN the SQL → **LIVE**. Commit `5096099`.
+
+### The two rules (FROZEN — do not silently alter; owner sign-off to change)
+1. **3×-business → full variable** (`db/functions/monthly_score.sql`). A **sales
+   or telecaller** whose this-month business (`monthly_sales_data`
+   new_client_revenue + renewal_revenue, credited by `staff_id`=created_by —
+   the SAME basis the incentive uses) is `>= 3 × monthly_salary` earns the FULL
+   30% variable cap **regardless of daily score**. New branch prepended to the
+   variable_earned IF; gated `v_role IN ('sales','telecaller') AND v_salary>0 AND
+   v_business >= v_salary*3`. Fail-closed on NULL role (IN allow-list — do NOT add
+   a NULL branch). Other roles NEVER get this override. Everything else in
+   monthly_score byte-identical (70/30, avg<50→0, 0-days→full cap).
+2. **Every leave deducts, full salary rate** (`db/functions/_compute_monthly_
+   salary_base.sql`). EVERY approved leave now deducts — **no free 12-day paid
+   quota** — at the FULL rate `round(monthly_salary / unpaid_divisor[26] ×
+   leave_days)` (was `base/26` beyond quota). Only the leave block changed:
+   `v_leave_paid:=0`, `v_leave_unpaid:=v_leave_total`. net formula + half-day +
+   auth gate + all jsonb keys preserved (`leave_days_paid` now always 0,
+   `leave_days_unpaid` = total; `paid_quota`/`paid_used_ytd` stay in the return
+   for display only, no longer reduce pay). Applies to **ALL salaried roles**
+   (hr/accounts too, not just sales/TC).
+
+### EFFECTIVE = RETROACTIVE (no start-date guard) — important
+Neither rule has an effective-month gate. `compute_monthly_salary` computes live
+from current logic → the moment the SQL ran, the new rules apply to **every
+month queried, including June 2026** (which accounts was paying on 2 Jul). Owner
+chose June-now by running it as-is (declined the offered `p_month_start >=
+'2026-07-01'` July-forward guard). If a future "effective from month X" is ever
+wanted, add a date gate in monthly_score (Rule 1) + base (Rule 2), shadow-compare,
+owner-verify.
+
+### Shadow-compare deltas (June 2026, real — what moved)
+- **Rule 1 moved almost nothing in June** — only **Rima** crossed 3× (business
+  60,205 ≥ her 54,000): variable 5,184→5,400 (+216, small because her score was
+  already 96%). Dhara did 62,550 but missed her 69,000 threshold. Everyone else
+  had 0 business. Rule 1 is a *future* reward (low-score + high-revenue rep), not
+  a June mover.
+- **Rule 2 is the real mover — it CUTS pay** for anyone with leave: Dixita −3,750
+  (13 leaves), Jignesh −3,173 (11), Abhinav −2,307 (8), Viral −2,100 (6.5), kirti
+  −346 (1), Rima −416 (2, partly offset by the +216 Rule 1). Every row verified
+  arithmetically correct against the formula.
+
+### Files + gates
+- `db/functions/monthly_score.sql` (Rule 1) + `_compute_monthly_salary_base.sql`
+  (Rule 2) — canonical, edit-in-place (§71/§72, no new copies). Headers +
+  VERIFY tripwires updated (rule1_3x_override / rule2_full_salary_leave markers).
+- `src/pages/v2/SalaryAdminV2.jsx:272` — policy caption now "every leave deducted
+  · salary ÷ N per day" (display-only).
+- The 4 salary consumers (`TotalPayableCard`, `SalaryAdminV2`, `RepProfileV2`,
+  `RepPerformanceCard`) all READ the RPC — single-source, no re-compute. Guardian
+  PASS. This whole change is a §45-safe money edit (no rep-flow / hot-path touch).
+
+### SUPERSEDES old salary-math docs
+Any earlier note describing "12 free paid leaves/year, then base ÷ 26" (e.g.
+§36.10, §72 #9 header language) is now **STALE for the deduction** — the live rule
+is every-leave × full-salary ÷ 26. The 70/30 split + score→variable logic is
+unchanged EXCEPT the new 3×-business full-variable override.
+
+### Foot-gun
+- ❌ A live money-function change with no effective-date gate is RETROACTIVE to
+  every month. For a pay CUT (Rule 2), that claws back already-worked months —
+  flag it + offer a July-forward guard BEFORE the owner runs it (done here; owner
+  chose June-now).
