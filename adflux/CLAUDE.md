@@ -5194,3 +5194,73 @@ page (not the slip).
 `git push origin untitled-os` (JS-only). Smoke: rep opens My Performance → "Daily
 scores" card under the score card → "Show daily breakdown" → per-day rows; ◀▶ steps
 months, can't go future; excluded days show the reason + grey "—".
+
+
+---
+
+## 81 · CURRENT STATE (2026-07-02) — accounts + payroll session + the LIVE GPS/APK blocker
+
+Full session 2 Jul. Everything below is **on origin (`untitled-os`, HEAD `7741d58`)
++ live** unless flagged. All JS/SQL — no APK rebuild in any of it.
+
+### Shipped this session (origin log)
+```
+7741d58 Phase 186: rep daily-score breakdown on My Performance (JS, guardian PASS)
+167323a Phase 185: rep salary-slip PDF, unlock after full payment (JS, guardian PASS)
+3c50e09 docs §78
+5096099 Phase 184: two salary rules — 3x-business full variable + every-leave deduct
+        (DB fns compute — CHANGE, LIVE, owner ran the SQL, retroactive/June-now)
+483ad47 Phase 183: confirm resolved role before creating a member (HR Add Member)
+4aedd91 Phase 182.2 · fd27347 182.1 · 6cf2922 Phase 182: ACCOUNTS role payroll login
+```
+- **§78** = Phase 184 salary rules (see it — retroactive, every leave now cut at
+  full-salary÷26, sales/TC 3× business → full variable). Owner-verified live
+  (kirti June net 22,088).
+- **§79** = Phase 185 salary slip (rep downloads own, unlocks on full salary_payouts).
+- **§80** = Phase 186 daily-score breakdown (rep sees per-day scores → month avg).
+- **Phase 182** = `accounts` role (Diya) — payroll/finance login (view+edit+pay
+  salary/TA/incentive), 13 additive RLS policies + `_assert_self_or_admin` widened
+  to accounts (home = supabase_phase97_2). Also fixed the WON crash (182.1/182.2 —
+  `create_payment_collection_followups` consolidated to ONE canonical, dropped the
+  dead `q.ref_number`; §72 model).
+
+### JAYNA ROHIT role fix (data-only, no guardrail)
+Was created `sales`, should be `telecaller`. NOT a code bug — the designation
+master + admin_create_user are correct; a sales designation was mis-picked on the
+Add Member form. Fixed her row (UPDATE role/team_role/designation + salary 18k).
+Phase 183 added a **confirm-before-create** (shows the resolved role) so the next
+mis-pick is caught before minting — but nothing HARD-blocks a wrong pick.
+
+### ⚠ LIVE BLOCKER — GPS fix + in-app updater: 96014 NOT actually on phones
+The §73/§74 GPS capture fix is in the **96014 native bundle** (`0fed300`, 26 Jun):
+GpsSetupPrompt (forces Location "Allow all the time" + Battery Unrestricted),
+WATCHDOG 120s→30s, installApk. But **reps are NOT on 96014** (confirmed 2 Jul):
+- `app_version` table is CORRECT — advertises 96014 is_active, no stray row.
+- The yellow "Update" banner keeps showing → because the installed version is
+  **older than 96014** → so GPS is still broken (96014 code isn't running).
+- **Root (to confirm):** the actual 96014 APK file was very likely **never uploaded
+  to the Supabase `apk` bucket** (`untitled-os.apk`). The app_version ROW was
+  published, but tapping Update downloads whatever file sits at
+  `app.untitledad.in/apk` (= the bucket object, §76 `/api/apk` proxy) — if that's
+  still the old APK, Update reinstalls the OLD version → banner never clears.
+  (Secondary possibility: signature mismatch — 96014 must be **debug-signed** to
+  install over the reps' debug-signed app, §74.2.)
+- **Owner to check next:** (a) phone Settings→Apps→Untitled OS version (bet 0.96.13
+  /older), (b) the `apk` bucket file's Last-modified date (bet older than 26 Jun).
+- **Fix (native — device-test ONE phone first, §39):** actually BUILD 96014 (§74.2
+  hygiene: delete iCloud `* 2.dex` dups → `./gradlew clean assembleDebug`) → UPLOAD
+  it to the `apk` bucket as `untitled-os.apk` → update one phone → confirm banner
+  clears + GPS prompt appears + a 2 km locked drive shows real km on `/admin/gps`
+  → THEN fleet.
+- **Honest expectation set for owner:** GPS is NOT auto-fixed on install. The
+  faster watcher helps automatically, but the big recovery needs the rep to ACCEPT
+  the two settings the prompt requests. Past days' lost km is **unrecoverable**
+  (pings never captured) — the fix is forward-only.
+
+### NEXT (owner named 2 Jul, in order)
+1. This CLAUDE.md update (done — §81).
+2. **Campaign issue** — owner to describe. Module is live (§54/§55): WhatsApp
+   receive + reply + routing on real number 95815 78261, inbox at /campaigns/inbox.
+3. **Presentation** — the in-app GSRTC deck (§77 Phase 181 + the deck at Phase
+   188.x, `a521cfa` reorder). Owner to describe the issue.
+Do NOT start either until the owner describes the specific problem.
