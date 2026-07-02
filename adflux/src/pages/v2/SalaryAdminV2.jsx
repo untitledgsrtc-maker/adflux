@@ -269,7 +269,7 @@ export default function SalaryAdminV2({ embedded = false }) {
             <h1 className="v2d-page-title">Salary Sheet</h1>
             <div className="v2d-page-sub">
               Per-rep monthly breakdown: base + variable + incentive + TA – leave
-              deduction. Policy: {policy ? `${policy.paid_quota_days} paid days/year · base ÷ ${policy.unpaid_divisor} per unpaid day` : 'loading…'}.
+              deduction. Policy: {policy ? `every leave deducted · salary ÷ ${policy.unpaid_divisor} per day` : 'loading…'}.
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>

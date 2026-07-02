@@ -18,14 +18,19 @@
 --
 -- LOCKED CONTRACTS (a diff that changes any is owner-sign-off):
 --    • 70/30 split — base = monthly_salary × 0.70, variable cap = × 0.30.
---    • variable_earned — 0 working days → full cap (avg forced 100); avg < 50 → 0;
---      else (avg/100) × cap (proportional to the average daily score).
+--    • Phase 184 Rule 1 — a SALES/TELECALLER whose this-month business
+--      (new_client_revenue + renewal_revenue) >= 3 × monthly_salary earns the
+--      FULL variable cap, score ignored. Other roles never get this override.
+--    • variable_earned (when Rule 1 does NOT apply) — 0 working days → full cap
+--      (avg forced 100); avg < 50 → 0; else (avg/100) × cap.
 --    • avg + working_days from daily_performance WHERE is_excluded = false.
---    • monthly_salary from staff_incentive_profiles.
+--    • monthly_salary from staff_incentive_profiles; business from monthly_sales_data.
 --    • _assert_self_or_admin(p_user_id) gate. STABLE SECURITY DEFINER + pg_temp.
 --
--- PROVENANCE: captured byte-for-byte from the LIVE DB 2026-06-23 (the phase97.2
---    version). Single signature (uuid, date) → RETURNS TABLE. Running this = NO-OP.
+-- PROVENANCE: Phase 184 (2026-07-02) CHANGE — added Rule 1 (3×-business full
+--    variable, sales/TC only) to the byte-captured phase97.2 body. Owner-approved,
+--    shadow-compared. Single signature (uuid, date) → RETURNS TABLE. To revert the
+--    rule, delete the `v_role IN ('sales','telecaller') … >= v_salary * 3` branch.
 --
 -- SUPERSEDES (Phase 178 removed the body from each):
 --      supabase_phase33e_performance_score.sql
@@ -48,6 +53,8 @@ DECLARE
   v_base    numeric;
   v_var_cap numeric;
   v_var_earned numeric;
+  v_role    text;
+  v_business numeric := 0;
 BEGIN
   PERFORM public._assert_self_or_admin(p_user_id);
 
@@ -63,10 +70,28 @@ BEGIN
     FROM staff_incentive_profiles sip
    WHERE sip.user_id = p_user_id;
 
+  -- Phase 184 Rule 1 inputs: role + this month's business (new-client + renewal
+  -- revenue). A sales/telecaller whose business >= 3x salary earns the FULL 30%
+  -- variable regardless of daily score.
+  -- Fail-closed on purpose: if the row is missing, v_role stays NULL and the
+  -- `v_role IN (...)` allow-list below evaluates NULL → false, so Rule 1 simply
+  -- doesn't fire. Do NOT "fix" this with a NULL branch — that would change behavior.
+  SELECT role INTO v_role FROM public.users WHERE id = p_user_id;
+
+  SELECT COALESCE(SUM(COALESCE(new_client_revenue,0) + COALESCE(renewal_revenue,0)), 0)
+    INTO v_business
+    FROM public.monthly_sales_data
+   WHERE staff_id = p_user_id
+     AND month_year = to_char(p_month_start, 'YYYY-MM');
+
+  v_avg     := COALESCE(v_avg, 0);
   v_base    := v_salary * 0.70;
   v_var_cap := v_salary * 0.30;
 
-  IF v_days = 0 THEN
+  IF v_role IN ('sales','telecaller') AND v_salary > 0 AND v_business >= v_salary * 3 THEN
+    -- Rule 1: 3x-business override — full variable, score ignored (sales/TC only).
+    v_var_earned := v_var_cap;
+  ELSIF v_days = 0 THEN
     v_avg := 100;
     v_var_earned := v_var_cap;
   ELSIF v_avg < 50 THEN
@@ -93,6 +118,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%_assert_self_or_admin%'      AS auth_gate,
 --   pg_get_functiondef(p.oid) LIKE '%* 0.70%'                     AS base_70,
 --   pg_get_functiondef(p.oid) LIKE '%* 0.30%'                     AS variable_cap_30,
+--   pg_get_functiondef(p.oid) LIKE '%v_business >= v_salary * 3%' AS rule1_3x_override,
 --   pg_get_functiondef(p.oid) LIKE '%v_avg < 50%'                 AS sub50_zero_variable,
 --   pg_get_functiondef(p.oid) LIKE '%daily_performance%'          AS reads_daily_perf,
 --   pg_get_functiondef(p.oid) LIKE '%staff_incentive_profiles%'   AS reads_salary_profile

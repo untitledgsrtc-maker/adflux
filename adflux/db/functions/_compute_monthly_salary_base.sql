@@ -14,9 +14,13 @@
 --
 -- WHAT IT DOES: returns a jsonb salary breakdown for (user, year, month):
 --    base + variable (from monthly_score) + incentive (incentive_payouts) +
---    ta_da (daily_ta) − unpaid-leave deduction. Leave: paid up to the FY quota
---    (salary_policy.paid_quota_days, default 12), the rest unpaid; unpaid_deduction
---    = round(base / unpaid_divisor[26] × unpaid_days); half-days count 0.5.
+--    ta_da (daily_ta) − leave deduction.
+--    ⚠ Phase 184 Rule 2 (2026-07-02): EVERY approved leave deducts (no free paid
+--    quota) at the FULL monthly-salary daily rate:
+--       unpaid_deduction = round(monthly_salary / unpaid_divisor[26] × leave_days).
+--    (Was: paid up to salary_policy.paid_quota_days[12], rest unpaid, at base/26.)
+--    Half-days count 0.5. paid_quota / paid_used_ytd remain in the return for
+--    display only — they no longer reduce pay.
 --
 -- 🔒 GUARDS (do NOT remove): _assert_self_or_admin(p_user_id) — blocks cross-user
 --    salary reads (42501 for anyone else). STABLE SECURITY DEFINER + pg_temp.
@@ -29,8 +33,13 @@
 --      supabase_phase97_2_rpc_role_gates.sql  (real def + a commented rollback copy)
 --
 -- LOCKED CONTRACTS (a diff that changes any is owner-sign-off): the net_payable
---    formula (base+variable+incentive+ta_da−unpaid_deduction); paid-quota / unpaid-
---    divisor leave math; half-day 0.5; FY-to-date paid-used carry; the auth gate.
+--    formula (base+variable+incentive+ta_da−unpaid_deduction); half-day 0.5; the
+--    auth gate; and the Phase 184 Rule 2 leave math (every leave deducts at
+--    monthly_salary/divisor — no free quota).
+--
+-- PROVENANCE: Phase 184 (2026-07-02) CHANGE — Rule 2 leave math on the byte-
+--    captured phase97.2 body. Owner-approved, shadow-compared. To revert to the
+--    old 12-free-days + base/26 math, restore the pre-184 leave block from git.
 --
 -- REVERT: re-run this file. TRIPWIRE: VERIFY block at the bottom.
 -- ============================================================================
@@ -125,12 +134,16 @@ BEGIN
      AND leave_date >= v_fy_start
      AND leave_date <  v_month_start;
 
-  v_leave_paid := LEAST(v_leave_paid_req,
-                        GREATEST(0, v_paid_quota - v_paid_used_ytd));
-  v_leave_unpaid := v_leave_unpaid_req + (v_leave_paid_req - v_leave_paid);
+  -- Phase 184 Rule 2 (2026-07-02): EVERY approved leave deducts — no free paid
+  -- quota — and the daily rate is the FULL monthly salary / divisor (was base /
+  -- divisor). v_leave_total already = all approved leave days (paid + unpaid
+  -- requests, half-day aware). paid_quota / paid_used_ytd stay in the return for
+  -- display only; they no longer reduce the deduction.
+  v_leave_paid   := 0;                 -- no free leaves under Rule 2
+  v_leave_unpaid := v_leave_total;     -- every approved leave day is deducted
 
-  IF v_base > 0 AND v_unpaid_divisor > 0 THEN
-    v_unpaid_deduction := round((v_base / v_unpaid_divisor) * v_leave_unpaid);
+  IF v_monthly_salary > 0 AND v_unpaid_divisor > 0 THEN
+    v_unpaid_deduction := round((v_monthly_salary / v_unpaid_divisor) * v_leave_unpaid);
   ELSE
     v_unpaid_deduction := 0;
   END IF;
@@ -173,6 +186,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%_assert_self_or_admin%'   AS auth_gate,
 --   pg_get_functiondef(p.oid) LIKE '%monthly_score%'           AS reads_score,
 --   pg_get_functiondef(p.oid) LIKE '%unpaid_divisor%'          AS unpaid_divisor_logic,
+--   pg_get_functiondef(p.oid) LIKE '%v_monthly_salary / v_unpaid_divisor%' AS rule2_full_salary_leave,
 --   pg_get_functiondef(p.oid) LIKE '%unpaid_deduction%'        AS unpaid_deduction,
 --   pg_get_functiondef(p.oid) LIKE '%is_half_day%'             AS half_day_aware,
 --   pg_get_functiondef(p.oid) LIKE '%net_payable%'             AS returns_net
