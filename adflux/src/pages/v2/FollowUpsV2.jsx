@@ -85,11 +85,30 @@ export default function FollowUpsV2() {
   // follow-up + nurture lists to one rep. No-op for non-admins, who are
   // already scoped to their own assigned_to.
   const repParam = searchParams.get('rep') || ''
+  // Phase 194 — a per-user team viewer (can_view_team_dashboard) drilling into
+  // ANOTHER rep's follow-ups from the dashboard. Own-only RLS would show her own
+  // rows, so she reads the target rep's list via the gated team_rep_followups
+  // RPC — and the view is READ-ONLY (no Call/WhatsApp/Done/Snooze; she monitors,
+  // she can't act as the rep). Never true for admin (isPrivileged) or when she's
+  // on her own /follow-ups (no rep param, or rep == herself).
+  const canViewTeam = profile?.can_view_team_dashboard === true
+  const viewingOther = !isPrivileged && canViewTeam && !!repParam && repParam !== profile?.id
 
   const load = useCallback(async () => {
     if (!profile?.id) return
     setLoading(true)
     setError('')
+    // Phase 194 — team viewer drilling into another rep: read that rep's
+    // follow-ups + nurture leads via the gated RPC (own-only RLS otherwise),
+    // apply the same Lost-lead frontend backstop, and stop (read-only view).
+    if (viewingOther) {
+      const { data: b, error: bErr } = await supabase.rpc('team_rep_followups', { p_rep_id: repParam })
+      if (bErr) { setError(bErr.message); setLoading(false); return }
+      setRows(((b?.follow_ups) || []).filter(r => r.lead?.stage !== 'Lost'))
+      setNurtureRows((b?.nurture_leads) || [])
+      setLoading(false)
+      return
+    }
     // Privileged users (admin / co_owner) see ALL pending follow-ups
     // so they can spot-check the team. Sales reps see their own.
     // Phase 33D.4 — pull both quote-linked AND lead-linked follow-ups
@@ -151,7 +170,7 @@ export default function FollowUpsV2() {
     setRows((fuRes.data || []).filter(r => r.lead?.stage !== 'Lost'))
     setNurtureRows(nuRes.data || [])
     setLoading(false)
-  }, [profile?.id, isPrivileged, repParam])
+  }, [profile?.id, isPrivileged, repParam, viewingOther])
 
   useEffect(() => { load() }, [load])
   // Phase 34Z.59 — refetch on tab-resume so completed follow-ups
@@ -644,6 +663,7 @@ export default function FollowUpsV2() {
         defaultOpen={true}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
+        readOnly={viewingOther}
       />
       <Section
         title="Due today"
@@ -653,6 +673,7 @@ export default function FollowUpsV2() {
         defaultOpen={true}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
+        readOnly={viewingOther}
       />
       <Section
         title="Tomorrow"
@@ -661,6 +682,7 @@ export default function FollowUpsV2() {
         defaultOpen={false}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
+        readOnly={viewingOther}
       />
       <Section
         title="This week"
@@ -669,6 +691,7 @@ export default function FollowUpsV2() {
         defaultOpen={false}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
+        readOnly={viewingOther}
       />
 
       {/* Phase 31S — Nurture revisit sections. Distinct from follow-ups
@@ -694,6 +717,7 @@ export default function FollowUpsV2() {
         icon={<AlertTriangle size={14} strokeWidth={2} />}
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
+        readOnly={viewingOther}
       />
       <NurtureSection
         title="Revisit today"
@@ -702,6 +726,7 @@ export default function FollowUpsV2() {
         icon={<Clock size={14} strokeWidth={2} />}
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
+        readOnly={viewingOther}
       />
       <NurtureSection
         title="Revisit tomorrow"
@@ -709,6 +734,7 @@ export default function FollowUpsV2() {
         tone="neutral"
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
+        readOnly={viewingOther}
       />
       <NurtureSection
         title="Revisit this week"
@@ -716,6 +742,7 @@ export default function FollowUpsV2() {
         tone="neutral"
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
+        readOnly={viewingOther}
       />
 
       {/* Phase 34Z.63 — outcome capture + WhatsApp prompt chain, same
@@ -777,7 +804,7 @@ export default function FollowUpsV2() {
   )
 }
 
-function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busyId, navigate, defaultOpen }) {
+function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busyId, navigate, defaultOpen, readOnly }) {
   if (rows.length === 0) return null
   const toneColor =
     tone === 'danger'  ? 'var(--danger)'  :
@@ -832,6 +859,7 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze
             onCall={onCall} onWhatsApp={onWhatsApp} onDone={onDone} onSnooze={onSnooze} onPushDays={onPushDays}
             busy={busyId === r.id}
             navigate={navigate}
+            readOnly={readOnly}
           />
         ))}
       </div>
@@ -840,7 +868,7 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze
   )
 }
 
-function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navigate }) {
+function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navigate, readOnly }) {
   // Phase 33D.4 — follow-up rows can be quote-linked OR lead-linked.
   // Resolve client display + tap target from whichever join is present.
   const isLeadFu = !!row.lead_id
@@ -945,6 +973,7 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navi
         })()}
       </div>
 
+      {!readOnly && (
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
           type="button"
@@ -998,6 +1027,7 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navi
             : <><CheckCircle2 size={13} /> Done</>}
         </button>
       </div>
+      )}
     </div>
   )
 }
@@ -1010,7 +1040,7 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navi
    "Mark done"). Visual style mirrors the follow-up rows so the page
    reads as one continuous list, just with a header divider.
    ───────────────────────────────────────────────────────────────── */
-function NurtureSection({ title, rows, tone, icon, onCall, onWhatsApp, onReactivate, busyId, navigate }) {
+function NurtureSection({ title, rows, tone, icon, onCall, onWhatsApp, onReactivate, busyId, navigate, readOnly }) {
   if (rows.length === 0) return null
   const toneColor =
     tone === 'danger'  ? 'var(--danger)'  :
@@ -1040,6 +1070,7 @@ function NurtureSection({ title, rows, tone, icon, onCall, onWhatsApp, onReactiv
             onCall={onCall} onWhatsApp={onWhatsApp} onReactivate={onReactivate}
             busy={busyId === l.id}
             navigate={navigate}
+            readOnly={readOnly}
           />
         ))}
       </div>
@@ -1047,7 +1078,7 @@ function NurtureSection({ title, rows, tone, icon, onCall, onWhatsApp, onReactiv
   )
 }
 
-function NurtureRow({ lead, onCall, onWhatsApp, onReactivate, busy, navigate }) {
+function NurtureRow({ lead, onCall, onWhatsApp, onReactivate, busy, navigate, readOnly }) {
   const dateLabel = formatDate(lead.revisit_date)
   return (
     <div
@@ -1069,6 +1100,7 @@ function NurtureRow({ lead, onCall, onWhatsApp, onReactivate, busy, navigate }) 
         </div>
       </div>
 
+      {!readOnly && (
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
           type="button"
@@ -1101,6 +1133,7 @@ function NurtureRow({ lead, onCall, onWhatsApp, onReactivate, busy, navigate }) 
             : <><RefreshCw size={13} /> Reactivate</>}
         </button>
       </div>
+      )}
     </div>
   )
 }

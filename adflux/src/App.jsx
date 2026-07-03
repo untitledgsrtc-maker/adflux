@@ -362,8 +362,11 @@ export default function App() {
           {/* Phase 30F — admin map view of a rep's day track. Date is
               optional (defaults to today). Specific BEFORE the
               two-segment fallback so it never gets shadowed. */}
-          <Route path="/admin/gps/:userId/:date"   element={<RequirePrivileged><GpsTrackV2 /></RequirePrivileged>} />
-          <Route path="/admin/gps/:userId"         element={<RequirePrivileged><GpsTrackV2 /></RequirePrivileged>} />
+          {/* Phase 194 — RequireTeamView so a can_view_team_dashboard viewer can
+              open a rep's route activity from the dashboard drill-down. Her data
+              comes from the gated team_rep_daytrack RPC (own-only RLS otherwise). */}
+          <Route path="/admin/gps/:userId/:date"   element={<RequireTeamView><GpsTrackV2 /></RequireTeamView>} />
+          <Route path="/admin/gps/:userId"         element={<RequireTeamView><GpsTrackV2 /></RequireTeamView>} />
           {/* Phase 12 rev3 — /cockpit retired. Folded into /dashboard. */}
 
           {/* Sales-only */}

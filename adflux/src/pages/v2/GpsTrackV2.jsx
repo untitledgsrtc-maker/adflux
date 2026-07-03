@@ -137,6 +137,11 @@ export default function GpsTrackV2() {
   const targetDate = date || new Date().toISOString().slice(0, 10)
   const profile = useAuthStore(s => s.profile)
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+  // Phase 194 — a per-user team viewer (can_view_team_dashboard) can open a
+  // rep's route activity from the dashboard drill-down. Kept SEPARATE from
+  // isPrivileged: her own RLS is own-only, so she loads the rep's day-track via
+  // the gated team_rep_daytrack RPC (below), never the admin client-side reads.
+  const canViewTeam = profile?.can_view_team_dashboard === true
 
   const [pings, setPings]   = useState([])
   const [user, setUser]     = useState(null)
@@ -192,7 +197,25 @@ export default function GpsTrackV2() {
     ;(async () => {
       const start = `${targetDate}T00:00:00`
       const end   = `${targetDate}T23:59:59`
-      const [userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes] = await Promise.all([
+      // Phase 194 — a flagged viewer (own-only RLS) reads the whole rep day-track
+      // through ONE gated RPC, mapped into the same *Res shapes; every line after
+      // is untouched. Admin keeps the exact Promise.all (else) — byte-unchanged.
+      let userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes
+      if (!isPrivileged && canViewTeam) {
+        const { data: b, error: bErr } = await supabase.rpc('team_rep_daytrack', {
+          p_user_id: userId, p_start: start, p_end: end, p_date: targetDate,
+        })
+        if (bErr) { if (!cancelled) { setError(bErr.message); setLoading(false) } return }
+        userRes     = { data: b?.user || null, error: null }
+        pingsRes    = { data: b?.pings || [], error: null }
+        sessionRes  = { data: b?.session || null, error: null }
+        actsRes     = { data: b?.activities || [], error: null }
+        voiceRes    = { data: b?.voice || [], error: null }
+        gpsOffRes   = { data: b?.gps_off || [], error: null }
+        callRowsRes = { data: b?.calls || [], error: null }
+        setTaKm(b?.ta_km ?? null)
+      } else {
+      ;[userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
         fetchAllPings(userId, start, end),  // Phase 103.D.6 — paged past 1000-row cap
         // Phase 32E — work_sessions row gives check-in/out times,
@@ -239,6 +262,7 @@ export default function GpsTrackV2() {
           .order('call_at', { ascending: false })
           .limit(2000),
       ])
+      }
       if (cancelled) return
       if (userRes.error)  { setError(userRes.error.message);  setLoading(false); return }
       if (pingsRes.error) { setError(pingsRes.error.message); setLoading(false); return }
@@ -315,6 +339,7 @@ export default function GpsTrackV2() {
   // day has no daily_ta row (headline falls back to the client km below).
   useEffect(() => {
     if (!userId) return
+    if (!isPrivileged) return   // Phase 194 — viewer gets ta_km from the gated bundle
     let cancelled = false
     ;(async () => {
       const { data, error: e } = await supabase.from('daily_ta')
@@ -768,7 +793,7 @@ export default function GpsTrackV2() {
     }
   }, [loading, pings, activities, viewMode])
 
-  if (!isPrivileged) {
+  if (!isPrivileged && !canViewTeam) {
     return (
       <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
         Admin / co-owner access only.
