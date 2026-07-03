@@ -5356,3 +5356,70 @@ role. Additive, SELECT-only, §45-safe.
 ### P3 (noted, no fix): push_subscriptions SELECT is column-blind (includes push
 creds) — matches the existing ps_admin pattern, no write path to abuse. Tighten
 to column-level only if owner asks.
+
+
+---
+
+## 84 · Phase 193 → 193.2 — team-dashboard viewer done RIGHT: real page + gated bundle (2026-07-03)
+
+**SUPERSEDES §83.** The §83 Phase 192 approach (13 broad SELECT policies) LEAKED
+all leads/clients/calls to the viewer app-wide (RLS is OR/permissive + per-USER,
+never per-PAGE). Owner dropped the 13 policies (leak closed), then rejected a new
+light /team-monitor page ("i want SAME as admin page, no new UI"). Final shipped
+design (on origin, HEAD `9180f69`, SQL RUN):
+
+### The pattern (reusable — "let a scoped user see a team page without broad RLS")
+A per-user viewer (flag `users.can_view_team_dashboard`, e.g. Jayna the telecaller)
+sees the **REAL /team-dashboard** (same TeamDashboardV2 component, same UI/numbers/
+pills). Her team data comes from **ONE gated SECURITY DEFINER RPC**
+(`team_dashboard_bundle`) — NOT broad table grants — so her own RLS stays own-only
+on /leads, /work, etc. Admin path is BYTE-UNCHANGED (the original client-side
+Promise.all in the `else`); only a flagged NON-privileged viewer branches to the RPC.
+- Canonical SQL: `supabase_phase193_team_dashboard_gated.sql` (self-contained + re-
+  runnable-safe: ensures flag column + `is_team_viewer()` helper, DROPs the 13 leak
+  policies, DROPs the interim `team_monitor_snapshot()`, creates the bundle RPC).
+- `supabase_phase192_team_dashboard_viewer.sql` = NEUTERED to a DROP-only closer +
+  SUPERSEDED banner (no CREATE POLICY anywhere → re-pasting it can NEVER recreate the
+  leak, §71). The interim `supabase_phase193_team_monitor_rpc.sql` + `TeamMonitorV2.jsx`
+  were DELETED.
+- Frontend gate: `RequireTeamView` (App.jsx) = isPrivileged OR flag, on /team-dashboard.
+  `V2AppShell` "Team Live" nav → /team-dashboard, appended only for a flagged
+  non-privileged/non-manager rep (dedup). `TeamDashboardV2` has `canViewTeam`
+  (SEPARATE from isPrivileged); loader/map/bounce widened with it; realtime gps
+  subscriptions LEFT admin-only (viewer = snapshot, matches admin's reload-only §57).
+
+### The bundle RPC is a MIRROR — keep in lockstep
+`team_dashboard_bundle` reproduces TeamDashboardV2's loader (20 reads: the 18-item
+Promise.all + push_subscriptions + gps_off_events) column-for-column + filter-for-
+filter. A parity agent verified 18/18 (then +2 pills). **If a dashboard query changes
+in the JS, update the matching branch in the RPC** or the viewer's numbers drift from
+admin's. It's a monitoring view (not pay) → a drift is cosmetic, not financial.
+- 193.2 added `push_subs` (user_id + last_seen_at ONLY — never push creds) + `gps_off`
+  (open gps_off_events) so the viewer's Push/GPS pills match admin. The two admin-only
+  reads are wrapped `if (isPrivileged)`; the viewer builds those maps from the bundle.
+
+### GUARDIAN P0 LESSON (the gate 3VL trap — §41 again)
+First gate `IF NOT (is_team_viewer() OR get_my_role() IN ('admin','co_owner'))` was
+NOT fail-closed: for a NULL role, `NULL IN (...)` = NULL, `false OR NULL` = NULL,
+`NOT NULL` = NULL, and PL/pgSQL `IF NULL` is treated as FALSE → the RETURN is SKIPPED
+→ full bundle leaks to any NULL-role caller. My comment claiming "IN (...) fails
+closed" was WRONG. FIX (shipped): wrap in COALESCE →
+`IF NOT (is_team_viewer() OR COALESCE(get_my_role() IN ('admin','co_owner'), false))`.
+Every gated RPC using role checks MUST fail closed on NULL (COALESCE, or `IS NULL OR
+NOT IN`) — same as `_assert_self_or_admin` / `admin_create_user` (§41/§97.2). Note:
+the guardian's FIRST review (of the retired team_monitor_snapshot) MISSED this same
+bug — do not trust a single "fails closed" claim; re-derive the 3VL.
+
+### Foot-guns added 2026-07-03
+- ❌ Giving a scoped user a team page via broad `FOR SELECT` RLS policies — RLS is
+  per-USER + app-wide, so it leaks to EVERY page, not just the one. Use a gated
+  SECURITY DEFINER RPC that returns the page's bundle; keep the user's base RLS
+  own-only.
+- ❌ A role-gate `IF NOT (... OR role IN (...))` without COALESCE — NULL role → NULL
+  → IF skips → leak. Always COALESCE the IN to false (or `IS NULL OR NOT IN`).
+- ❌ Building a NEW page when the owner said "same as the admin page" — feed the
+  EXISTING component via a gated data path instead; branch only the load, leave the
+  render + admin path byte-unchanged.
+- ❌ A gated bundle RPC that mirrors a client loader is a §69 duplication by design —
+  acceptable ONLY for a non-pay monitoring view + documented as a MIRROR; do NOT use
+  this shortcut for a money/pay path.
