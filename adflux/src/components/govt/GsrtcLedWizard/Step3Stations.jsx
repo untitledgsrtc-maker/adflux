@@ -26,7 +26,9 @@ function effectiveValues(s, override) {
   const duration = (override?.spot_duration_sec_override ?? null) || DEFAULT_DURATION
   const days     = (override?.days_override          ?? null) || DEFAULT_DAYS
   const screens  = Number(s.screens_count) || 0
-  const rate     = Number(s.davp_per_slot_rate) || 0
+  // Phase 195 — per-proposal rate override (offer a discount off the master
+  // DAVP grade rate). NULL / 0 falls back to the station master's rate.
+  const rate     = (override?.rate_override ?? null) || Number(s.davp_per_slot_rate) || 0
   const monthly  = screens * daily * days * rate
   return { daily, duration, days, screens, rate, monthly }
 }
@@ -43,6 +45,10 @@ export function Step3Stations({ data, onChange }) {
   const [search, setSearch] = useState('')
   // Phase 147.1 — bulk-set Daily applied to ALL selected stations at once.
   const [bulkDaily, setBulkDaily] = useState('')
+  // Phase 195 — bulk-set the per-slot RATE by grade (A/B/C). Empty grade box =
+  // leave that grade's rate at the master default. Owner: "change rate in bulk
+  // according grade" — this proposal only (override), master untouched.
+  const [bulkRates, setBulkRates] = useState({ A: '', B: '', C: '' })
 
   if (!loading && data.selected_station_ids === undefined && stations.length) {
     onChange({ selected_station_ids: stations.map(s => s.id) })
@@ -98,6 +104,24 @@ export function Step3Stations({ data, onChange }) {
     const next = { ...overrides }
     for (const id of selected) {
       next[id] = { ...(next[id] || {}), daily_spots_override: Number(bulkDaily) }
+    }
+    onChange({ station_overrides: next })
+  }
+
+  // Phase 195 — apply the per-grade rate to every SELECTED station whose
+  // category matches a filled grade box. Only touches rate_override; the
+  // daily/days/duration overrides + master rate for other grades stay intact.
+  function applyBulkRate() {
+    const filled = Object.entries(bulkRates)
+      .filter(([, v]) => v !== '' && !Number.isNaN(Number(v)))
+    if (!selected.length || !filled.length) return
+    const byGrade = Object.fromEntries(filled.map(([g, v]) => [g, Number(v)]))
+    const next = { ...overrides }
+    for (const s of stations) {
+      if (!selected.includes(s.id)) continue
+      const g = (s.category || '').toUpperCase()
+      if (byGrade[g] == null) continue
+      next[s.id] = { ...(next[s.id] || {}), rate_override: byGrade[g] }
     }
     onChange({ station_overrides: next })
   }
@@ -192,10 +216,45 @@ export function Step3Stations({ data, onChange }) {
           </button>
         </div>
 
+        {/* Phase 195 — bulk-set the per-slot RATE by grade. Fill any of A/B/C
+            and Apply → every selected station of that grade gets the rate as a
+            per-proposal override (master untouched). Empty grade box = leave it
+            at the master DAVP rate. */}
+        <div className="govt-list__bulk" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--text)', fontWeight: 600 }}>
+            Bulk set Rate by grade:
+          </span>
+          {['A', 'B', 'C'].map(g => (
+            <span key={g} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span className={`govt-pill govt-pill--${g}`}>{g}</span>
+              <input
+                type="number" min="0" step="0.01" placeholder="rate"
+                value={bulkRates[g]}
+                onChange={e => setBulkRates(prev => ({ ...prev, [g]: e.target.value }))}
+                style={{
+                  width: 84, textAlign: 'right',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border-strong, #475569)',
+                  borderRadius: 6, padding: '7px 10px',
+                  color: 'var(--text)', fontSize: 14, outline: 'none',
+                }}
+              />
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={applyBulkRate}
+            disabled={selected.length === 0
+              || !['A', 'B', 'C'].some(g => bulkRates[g] !== '')}
+          >
+            Apply rate to selected
+          </button>
+        </div>
+
         {/* Header row */}
         <div
           className="govt-list__row govt-list__row--head"
-          style={{ gridTemplateColumns: '24px 1fr 50px 60px 78px 78px 78px 110px' }}
+          style={{ gridTemplateColumns: '24px 1fr 50px 60px 78px 78px 78px 78px 110px' }}
         >
           <span></span>
           <span>Station</span>
@@ -204,6 +263,7 @@ export function Step3Stations({ data, onChange }) {
           <span style={{ textAlign: 'right' }}>Daily</span>
           <span style={{ textAlign: 'right' }}>Spot (s)</span>
           <span style={{ textAlign: 'right' }}>Days</span>
+          <span style={{ textAlign: 'right' }}>Rate</span>
           <span style={{ textAlign: 'right' }}>Monthly</span>
         </div>
 
@@ -228,13 +288,14 @@ export function Step3Stations({ data, onChange }) {
           const hasOverride =
             ov.daily_spots_override != null ||
             ov.spot_duration_sec_override != null ||
-            ov.days_override != null
+            ov.days_override != null ||
+            ov.rate_override != null
           return (
             <div
               key={s.id}
               className="govt-list__row"
               style={{
-                gridTemplateColumns: '24px 1fr 50px 60px 64px 64px 64px 110px',
+                gridTemplateColumns: '24px 1fr 50px 60px 64px 64px 64px 78px 110px',
                 opacity: isChecked ? 1 : 0.55,
               }}
             >
@@ -293,6 +354,19 @@ export function Step3Stations({ data, onChange }) {
                 placeholder={String(DEFAULT_DAYS)}
                 value={ov.days_override ?? ''}
                 onChange={e => setOverride(s.id, 'days_override', e.target.value)}
+                disabled={!isChecked}
+                className="govt-input-cell"
+                style={{ maxWidth: 70, textAlign: 'right' }}
+              />
+              {/* Phase 195 — per-slot rate. Placeholder = the master DAVP grade
+                  rate; type a value to override it for this proposal only. */}
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={String(Number(s.davp_per_slot_rate) || 0)}
+                value={ov.rate_override ?? ''}
+                onChange={e => setOverride(s.id, 'rate_override', e.target.value)}
                 disabled={!isChecked}
                 className="govt-input-cell"
                 style={{ maxWidth: 70, textAlign: 'right' }}

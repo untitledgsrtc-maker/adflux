@@ -111,6 +111,7 @@ export default function CreateGovtGsrtcLedV2() {
         if (c.daily_spots_override       != null) ov.daily_spots_override       = c.daily_spots_override
         if (c.days_override              != null) ov.days_override              = c.days_override
         if (c.spot_duration_sec_override != null) ov.spot_duration_sec_override = c.spot_duration_sec_override
+        if (c.rate_override              != null) ov.rate_override              = c.rate_override
         if (Object.keys(ov).length) overrides[c.ref_id] = ov
       })
 
@@ -174,7 +175,9 @@ export default function CreateGovtGsrtcLedV2() {
       const ov = overrides[s.id] || {}
       const daily = ov.daily_spots_override ?? 100
       const days  = ov.days_override        ?? 30
-      const monthly = (Number(s.screens_count) || 0) * daily * days * Number(s.davp_per_slot_rate || 0)
+      // Phase 195 — per-proposal rate override; NULL/0 falls back to master.
+      const rate  = (ov.rate_override ?? null) || Number(s.davp_per_slot_rate || 0)
+      const monthly = (Number(s.screens_count) || 0) * daily * days * rate
       return sum + monthly
     }, 0)
     const subtotal = monthlySum * months
@@ -271,7 +274,12 @@ export default function CreateGovtGsrtcLedV2() {
       const daily    = ov.daily_spots_override ?? 100
       const days     = ov.days_override ?? 30
       const duration = ov.spot_duration_sec_override ?? 10
-      const monthly  = (Number(s.screens_count) || 0) * daily * days * Number(s.davp_per_slot_rate || 0)
+      // Phase 195 — effective per-slot rate (override or master). unit_rate /
+      // offered_rate carry the effective rate (the proposal + PDF read these);
+      // listed_rate stays the master DAVP rate so the offered-vs-listed gap shows.
+      const masterRate = Number(s.davp_per_slot_rate || 0)
+      const rate       = (ov.rate_override ?? null) || masterRate
+      const monthly  = (Number(s.screens_count) || 0) * daily * days * rate
       const lineTotal = monthly * months
       return {
         quote_id:     quote.id,
@@ -281,18 +289,20 @@ export default function CreateGovtGsrtcLedV2() {
         city_name:    s.station_name_en,
         description:  s.station_name_en,
         qty:          months,
-        unit_rate:    Number(s.davp_per_slot_rate || 0),
+        unit_rate:    rate,
         amount:       lineTotal,
         screens:      s.screens_count || 0,
         grade:        s.category,
-        listed_rate:  Number(s.davp_per_slot_rate || 0),
-        offered_rate: Number(s.davp_per_slot_rate || 0),
+        listed_rate:  masterRate,
+        offered_rate: rate,
         campaign_total: lineTotal,
         duration_months: months,
         // Phase 7 — per-row overrides (NULL means "use default")
         daily_spots_override:       ov.daily_spots_override ?? null,
         days_override:              ov.days_override ?? null,
         spot_duration_sec_override: ov.spot_duration_sec_override ?? null,
+        // Phase 195 — per-proposal rate override (NULL = master rate)
+        rate_override:              ov.rate_override ?? null,
         // Legacy slot fields kept for the existing AdFlux columns
         slot_seconds: duration,
         slots_per_day: daily,
