@@ -143,7 +143,6 @@ export default function TeamDashboardV2() {
   const isPrivileged =
     ['admin', 'co_owner'].includes(profile?.role)
     || profile?.team_role === 'sales_manager'
-    || profile?.can_view_team_dashboard === true   // Phase 192 — per-user viewer grant
 
   const [reps, setReps] = useState([])
   const [sessions, setSessions] = useState([])

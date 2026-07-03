@@ -1,34 +1,29 @@
 -- ============================================================================
--- Phase 192 — per-user "team dashboard viewer" grant (ADDITIVE)
+-- Phase 192 — SUPERSEDED by Phase 193. NEUTERED to a DROP-ONLY closer.
 -- ============================================================================
--- Owner (3 Jul 2026): give ONE telecaller (Jayna) read access to
--- /team-dashboard — the live field map + all reps' calls / meetings / leads /
--- revenue — WITHOUT making her an admin and WITHOUT affecting any other rep.
+-- ⚠️  DO NOT restore the CREATE POLICY loop that used to live here.
 --
--- Mechanism = a per-user boolean flag `users.can_view_team_dashboard`. It is a
--- pure ACCESS grant, NOT a role: her role/team_role stay 'telecaller', her
--- pay/score/nav as a rep are untouched, and no other telecaller is affected
--- (default false). The dashboard reads 13 tables for EVERY rep; a telecaller's
--- normal RLS only returns her own rows, so the flag also opens SELECT-only
--- read on those 13 tables — gated on the flag via is_team_viewer().
+-- Phase 192 originally granted a per-user viewer (Jayna) team access via 13
+-- broad `FOR SELECT USING (is_team_viewer())` policies. RLS is OR/permissive +
+-- APP-WIDE, so those policies LEAKED all leads / clients / calls / quotes to her
+-- on EVERY page (owner: "jayna can see all the lead why?"). That was the leak.
 --
--- RLS is OR/permissive → these ADD policies. Every existing admin / co_owner /
--- self / manager / govt_partner policy is UNTOUCHED, so admin access stays
--- byte-identical (§45). SELECT-only — the viewer can never WRITE (no reassign,
--- no push): those need write policies she doesn't get + enqueue_push is REVOKED
--- from authenticated (§97.A2). Idempotent (§8).
+-- Phase 193 replaced the approach with ONE gated SECURITY DEFINER RPC
+-- (`team_monitor_snapshot()`, supabase_phase193_team_monitor_rpc.sql) + a light
+-- /team-monitor page. The viewer now sees team rollups ONLY there and stays
+-- own-only everywhere else.
 --
--- TO GRANT a user: UPDATE public.users SET can_view_team_dashboard = true
---                    WHERE email = '<their login email>';  (see bottom)
--- TO REVOKE: set it back to false. No other change needed.
+-- This file is kept ONLY so re-running it is SAFE: it now just re-asserts the
+-- flag column + helper and DROPS the 13 leak policies (never recreates them).
+-- The canonical, self-contained file to run is Phase 193 — running THAT does
+-- everything this file does plus creates the RPC. (§8/§71 no-re-runnable-leak.)
 -- ============================================================================
 
--- ---- 1) the flag ------------------------------------------------------------
+-- flag column (idempotent) — still used by Phase 193's RPC + the route guard.
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS can_view_team_dashboard boolean NOT NULL DEFAULT false;
 
--- ---- 2) helper (SECURITY DEFINER so the policy can read the flag without
---          recursing through users RLS; STABLE for planner caching) ----------
+-- helper (idempotent) — read the caller's own flag; used by team_monitor_snapshot().
 CREATE OR REPLACE FUNCTION public.is_team_viewer()
  RETURNS boolean
  LANGUAGE sql
@@ -42,10 +37,8 @@ $function$;
 
 GRANT EXECUTE ON FUNCTION public.is_team_viewer() TO authenticated;
 
--- ---- 3) additive SELECT policies on the 13 dashboard tables -----------------
--- gps_pings (live map) · gps_off_events · users (rep list) · work_sessions ·
--- call_logs · leads · quotes · voice_logs · daily_targets · follow_ups ·
--- payments · lead_activities · push_subscriptions.
+-- CLOSE THE LEAK: drop the 13 broad SELECT policies (never recreate them).
+-- Idempotent + safe if already dropped. This is the whole point of the neuter.
 DO $$
 DECLARE t text;
   tbls text[] := ARRAY[
@@ -55,28 +48,13 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY tbls LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t||'_team_viewer_read', t);
-    EXECUTE format(
-      'CREATE POLICY %I ON public.%I FOR SELECT USING (public.is_team_viewer())',
-      t||'_team_viewer_read', t);
   END LOOP;
 END $$;
 
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- GRANT JAYNA (owner: confirm her exact login email, then run ONE of these).
+-- VERIFY — expect 0 leak policies remaining.
 -- ============================================================================
--- UPDATE public.users SET can_view_team_dashboard = true WHERE email = 'jayna@untitledad.in';
---   -- or, if unsure of the email, by name (verify it returns exactly 1 row FIRST):
---   -- SELECT id, name, email, role FROM public.users WHERE name ILIKE '%jayna%';
---   -- UPDATE public.users SET can_view_team_dashboard = true WHERE id = '<her uuid>';
-
--- ============================================================================
--- VERIFY — expect 13 policies + the helper + the column + exactly the granted users.
--- ============================================================================
--- SELECT count(*) AS policies FROM pg_policies
---   WHERE schemaname='public' AND policyname LIKE '%\_team\_viewer\_read';                 -- 13
--- SELECT to_regprocedure('public.is_team_viewer()') IS NOT NULL AS helper_present;         -- t
--- SELECT column_name FROM information_schema.columns
---   WHERE table_schema='public' AND table_name='users' AND column_name='can_view_team_dashboard';
--- SELECT name, email, role FROM public.users WHERE can_view_team_dashboard = true;         -- just Jayna
+-- SELECT count(*) AS leak_policies FROM pg_policies
+--   WHERE schemaname='public' AND policyname LIKE '%\_team\_viewer\_read';   -- 0
