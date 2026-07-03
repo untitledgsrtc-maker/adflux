@@ -144,6 +144,14 @@ export default function TeamDashboardV2() {
     ['admin', 'co_owner'].includes(profile?.role)
     || profile?.team_role === 'sales_manager'
 
+  // Phase 193 — a per-user viewer (e.g. a telecaller the owner grants
+  // can_view_team_dashboard) sees this SAME page, but her own RLS is own-only,
+  // so she CANNOT take the admin client-side Promise.all path (it would return
+  // only her rows). Kept SEPARATE from isPrivileged: the loader branches on
+  // this flag to fetch the team bundle via ONE gated RPC (team_dashboard_bundle)
+  // instead, so no broad RLS is needed and she stays own-only everywhere else.
+  const canViewTeam = profile?.can_view_team_dashboard === true
+
   const [reps, setReps] = useState([])
   const [sessions, setSessions] = useState([])
   // Phase 103.E — admin compose-push target ({ id, name }) or null.
@@ -277,7 +285,7 @@ export default function TeamDashboardV2() {
   const [mapReady, setMapReady] = useState(false)
 
   useEffect(() => {
-    if (!isPrivileged) return
+    if (!isPrivileged && !canViewTeam) return
     async function load() {
       setLoading(true); setError('')
       // Phase 82 — query window comes from PeriodPicker. Default
@@ -304,7 +312,47 @@ export default function TeamDashboardV2() {
       const monthStartIso = thisMonth().startIso
       const monthEndIso   = thisMonth().endIso
 
-      const [repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes, qualifiedRes, callbacksRes, monthQuotesRes, monthWonRes] = await Promise.all([
+      // Phase 193 — a per-user viewer (can_view_team_dashboard, not privileged)
+      // has own-only RLS, so the client-side Promise.all below would return only
+      // HER rows. Instead she reads the SAME bundle through ONE gated RPC
+      // (team_dashboard_bundle), mapped into the identical *Res shapes so every
+      // line after this block is untouched. Admins keep the exact Promise.all
+      // path (the else branch) — byte-unchanged, zero regression risk.
+      let repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes,
+          policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes,
+          actGeoRes, qualifiedRes, callbacksRes, monthQuotesRes, monthWonRes
+      if (!isPrivileged && canViewTeam) {
+        const { data: b, error: bErr } = await supabase.rpc('team_dashboard_bundle', {
+          p_start_of_day: startOfDay,
+          p_end_of_day:   endOfDay,
+          p_period_start: period.startIso,
+          p_period_end:   period.endIso,
+          p_today:        today,
+          p_cb_floor:     cbFloor,
+          p_month_start:  monthStartIso,
+          p_month_end:    monthEndIso,
+        })
+        const wrap = (arr) => ({ data: arr || [], error: bErr })
+        repsRes        = wrap(b?.reps)
+        sesRes         = wrap(b?.sessions)
+        callsRes       = wrap(b?.calls)
+        newLeadsRes    = { count: b?.new_leads_count || 0, error: bErr }
+        pipelineRes    = wrap(b?.pipeline)
+        voiceRes       = wrap(b?.voice)
+        pingsRes       = wrap(b?.pings)
+        policyRes      = wrap(b?.policy)
+        fuRes          = wrap(b?.fu)
+        quoteSentRes   = wrap(b?.quote_sent)
+        quoteWonRes    = wrap(b?.quote_won)
+        paymentsRes    = wrap(b?.payments)
+        overdueFuRes   = wrap(b?.overdue_fu)
+        actGeoRes      = wrap(b?.act_geo)
+        qualifiedRes   = wrap(b?.qualified)
+        callbacksRes   = wrap(b?.callbacks)
+        monthQuotesRes = wrap(b?.month_quotes)
+        monthWonRes    = wrap(b?.month_won)
+      } else {
+      ;[repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes, qualifiedRes, callbacksRes, monthQuotesRes, monthWonRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
         // an employee. They don't have GPS / attendance / morning
@@ -493,6 +541,7 @@ export default function TeamDashboardV2() {
           .gte('updated_at', monthStartIso)
           .lt ('updated_at', monthEndIso),
       ])
+      }
       if (repsRes.error || sesRes.error) {
         setError(repsRes.error?.message || sesRes.error?.message || 'Load failed')
       }
@@ -710,7 +759,7 @@ export default function TeamDashboardV2() {
     load()
     // Phase 82 — re-run on period change so PeriodPicker drives the
     // whole grid (calls, voice, follow-ups, chase counts, pipeline).
-  }, [isPrivileged, period.startIso, period.endIso])
+  }, [isPrivileged, canViewTeam, period.startIso, period.endIso])
 
   // Phase 70.2 (22 May 2026) — initialize Leaflet map once + subscribe
   // to Supabase Realtime for gps_pings INSERT. Owner directive: "live
@@ -732,7 +781,7 @@ export default function TeamDashboardV2() {
   // place via google.maps.Marker.setPosition(); no re-render of all
   // markers needed.
   useEffect(() => {
-    if (!isPrivileged) return
+    if (!isPrivileged && !canViewTeam) return
     if (loading) return
     if (mapRef.current) return  // already mounted
 
@@ -799,7 +848,7 @@ export default function TeamDashboardV2() {
       markersRef.current = {}
       setMapReady(false)
     }
-  }, [isPrivileged, loading])
+  }, [isPrivileged, canViewTeam, loading])
 
   // Phase 87.6 — pre-load every rep's profile_image_url into an
   // HTMLImageElement cache so the marker-icon canvas can draw the
@@ -1148,7 +1197,7 @@ export default function TeamDashboardV2() {
 
   // Phase 31E — total voice logs across the team, today.
 
-  if (!isPrivileged) {
+  if (!isPrivileged && !canViewTeam) {
     return (
       <div className="lead-root">
         <div className="lead-card lead-card-pad" style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>

@@ -46,7 +46,6 @@ import ClientsV2          from './pages/v2/ClientsV2'
 import LeadsV2             from './pages/v2/LeadsV2'
 import LeadDashboardV2     from './pages/v2/LeadDashboardV2'
 import TeamDashboardV2     from './pages/v2/TeamDashboardV2'
-import TeamMonitorV2       from './pages/v2/TeamMonitorV2'
 import LeadDetailV2        from './pages/v2/LeadDetailV2'
 import LeadFormV2          from './pages/v2/LeadFormV2'
 import LeadUploadV2        from './pages/v2/LeadUploadV2'
@@ -145,14 +144,14 @@ function RequireManager({ children }) {
   return children
 }
 
-/* Phase 193 (3 Jul 2026) — per-user "team monitor" viewer. Gates ONLY the
-   light /team-monitor route (NOT the full /team-dashboard, which stays
-   RequirePrivileged) for a user with the can_view_team_dashboard flag (owner
-   grants it to one telecaller). The viewer's data comes from ONE gated
-   SECURITY DEFINER RPC (team_monitor_snapshot, supabase_phase193_team_monitor_rpc.sql)
-   — NOT broad table grants — so she sees team rollups only here and stays
-   own-only on /leads, /work, etc. (Supersedes the Phase 192 13-policy approach,
-   which leaked all-rep data app-wide; those policies were dropped.) */
+/* Phase 193 (3 Jul 2026) — gate for /team-dashboard. Admits admin/co_owner/
+   sales_manager (isPrivileged) OR a per-user viewer with the
+   can_view_team_dashboard flag (owner grants it to one telecaller). The viewer
+   sees the SAME dashboard, but her team data is fetched inside TeamDashboardV2
+   via ONE gated SECURITY DEFINER RPC (team_dashboard_bundle,
+   supabase_phase193_team_dashboard_gated.sql) — NOT broad table grants — so she
+   stays own-only on /leads, /work, etc. (Supersedes the Phase 192 13-policy
+   approach that leaked all-rep data app-wide; those policies were dropped.) */
 function RequireTeamView({ children }) {
   const { isPrivileged, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
@@ -317,10 +316,11 @@ export default function App() {
               uuid column ("invalid input syntax for type uuid: new"). */}
           <Route path="/leads"                     element={<RequireNonAgency><LeadsV2 /></RequireNonAgency>} />
           <Route path="/lead-dashboard"            element={<LeadDashboardV2 />} />
-          <Route path="/team-dashboard"            element={<RequirePrivileged><TeamDashboardV2 /></RequirePrivileged>} />
-          {/* Phase 193 — light team monitor for a can_view_team_dashboard viewer
-              (data via the gated team_monitor_snapshot RPC; no broad RLS grant). */}
-          <Route path="/team-monitor"              element={<RequireTeamView><TeamMonitorV2 /></RequireTeamView>} />
+          {/* Phase 193 — the REAL team dashboard, admin OR a per-user
+              can_view_team_dashboard viewer. The viewer's team data comes from
+              the gated team_dashboard_bundle RPC (no broad RLS); she stays
+              own-only everywhere else. */}
+          <Route path="/team-dashboard"            element={<RequireTeamView><TeamDashboardV2 /></RequireTeamView>} />
           <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
           {/* Campaign module (admin, token-free). Specific /campaigns/* before /campaigns. */}
           <Route path="/campaigns/qr"              element={<RequirePrivileged><CampaignQrV2 /></RequirePrivileged>} />

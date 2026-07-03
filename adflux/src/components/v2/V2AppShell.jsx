@@ -528,18 +528,18 @@ export function V2AppShell() {
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES
-  // Phase 193 — a per-user "team monitor" viewer (e.g. a plain telecaller the
-  // owner grants can_view_team_dashboard) gets a "Team Live" link to the light
-  // /team-monitor page appended to their role nav. Additive + gated on the flag;
-  // every role's base nav is byte-unchanged when the flag is off (default).
-  // Skipped for privileged/manager users — they already have a "Team Live" entry
-  // (to the full /team-dashboard) in ADMIN_NAV/MANAGER_NAV, so the flag is moot
-  // for them and appending would double the label.
+  // Phase 193 — a per-user viewer (e.g. a plain telecaller the owner grants
+  // can_view_team_dashboard) gets a "Team Live" link to the REAL /team-dashboard
+  // appended to their role nav. Additive + gated on the flag; every role's base
+  // nav is byte-unchanged when the flag is off (default). Skipped for privileged/
+  // manager users — they already have a "Team Live" entry (to /team-dashboard) in
+  // ADMIN_NAV/MANAGER_NAV, so the flag is moot for them and appending would
+  // double the label.
   const canTeamView =
     profile?.can_view_team_dashboard === true && !isPrivileged && !isManager
-  const teamItem = { to: '/team-monitor', label: 'Team Live', icon: Users }
+  const teamItem = { to: '/team-dashboard', label: 'Team Live', icon: Users }
   const withTeam = (arr) =>
-    canTeamView && !arr.some((n) => n.to === '/team-monitor')
+    canTeamView && !arr.some((n) => n.to === '/team-dashboard')
       ? [...arr, teamItem] : arr
   const nav = withTeam(baseNav)
   const mobileNav = withTeam(baseMobileNav)
