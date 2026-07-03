@@ -5273,3 +5273,45 @@ WATCHDOG 120s→30s, installApk. But **reps are NOT on 96014** (confirmed 2 Jul)
 3. **Presentation** — the in-app GSRTC deck (§77 Phase 181 + the deck at Phase
    188.x, `a521cfa` reorder). Owner to describe the issue.
 Do NOT start either until the owner describes the specific problem.
+
+
+---
+
+## 82 · Phase 191 — WhatsApp lead name regression (C11) RE-fixed + locked (2026-07-03)
+
+Owner: "when a WhatsApp inquiry comes, lead name shows 'WhatsApp lead' not the
+person's name. We solved it before but it came back." Classic §69 "works then
+breaks." Fixed permanently in the ONE canonical + tripwire-locked.
+
+### Root cause (the recurrence)
+`campaign_conversation_ensure_lead` (the WhatsApp-chat→lead trigger) names the
+new lead. The **C11 fix** (`supabase_campaign_c11_lead_name.sql`) had it read
+`whatsapp_conversations.customer_name` — the sender's WhatsApp profile name that
+`api/wa/webhook.js` captures from `contacts[].profile.name` and the inbox shows.
+Then **Phase 168** (the QR location_id fix) rewrote the SAME function and dropped
+the name line back to the hardcoded `'WhatsApp lead'`; the **Phase 178
+consolidation captured that already-regressed body** byte-for-byte. So the
+canonical shipped with the bug baked in.
+
+### The fix (Phase 191, `db/functions/campaign_conversation_ensure_lead.sql`)
+- Lead name = `COALESCE(NULLIF(BTRIM(NEW.customer_name), ''), 'WhatsApp lead')`
+  — real name, generic fallback only when WhatsApp sends none. Guardian PASS
+  (all 4 P0 contracts untouched; name can't be null/empty).
+- **LOCKED** as a header contract bullet + a **tripwire** (`c11_lead_name`
+  = `%NEW.customer_name%`) so a future rewrite that drops it FAILS the VERIFY.
+- One-time idempotent **heal** after NOTIFY: renames existing `name='WhatsApp
+  lead'` leads to their conversation's `customer_name`.
+
+### LESSON (new foot-gun class)
+A Stage-2 **capture** can capture an ALREADY-REGRESSED body if the regression
+landed BEFORE the capture date. The capture "photographs the live truth" — but
+if the live truth is already broken, the canonical inherits the break silently.
+Mitigation: every risky canonical needs a tripwire asserting each KNOWN fix is
+present (not just "matches the capture"). When consolidating, cross-check the
+superseded files' VERIFY blocks — if an old file (c11_lead_name) asserted a fix
+(`NEW.customer_name`) the captured body lacks, the capture is stale → restore it.
+
+### Owner runs
+Re-run `db/functions/campaign_conversation_ensure_lead.sql` in Supabase Studio
+(replaces the function + heals existing rows). JS-free, no APK rebuild. Then the
+7-check VERIFY block at the bottom should all be TRUE.

@@ -23,7 +23,7 @@
 --
 -- PROVENANCE: captured byte-for-byte from the LIVE database 2026-06-23 via
 --    pg_get_functiondef. Single signature (trigger fn, no args). Running this
---    file now is a NO-OP.
+--    file now is a NO-OP EXCEPT the Phase 191 (3 Jul) C11 name restore.
 --
 -- SUPERSEDES (Phase 178 removed the function body from each; their triggers /
 --    other functions / backfills stay):
@@ -44,6 +44,11 @@
 --    • P0-4         — stage 'New' only; cadence_paused=true → no follow-up/push cascade.
 --    • Phase 168    — location_id = NEW.location_id on the lead INSERT (QR board
 --                     roll-up). C8.1 dropped this once; do NOT drop it again.
+--    • C11         — lead NAME = NEW.customer_name (the sender's WhatsApp
+--                     profile name, what the inbox shows), 'WhatsApp lead'
+--                     fallback. Phase 168 dropped it -> every lead showed
+--                     'WhatsApp lead'; RESTORED Phase 191 (3 Jul). Never
+--                     re-hardcode the name.
 --    • Safety       — double EXCEPTION wrap: a race/error must NEVER break the
 --                     whatsapp_conversations store.
 --
@@ -123,7 +128,7 @@ BEGIN
       name, phone, segment, source, stage,
       telecaller_id, assigned_to, created_by, heat, cadence_paused, campaign_id, location_id
     ) VALUES (
-      'WhatsApp lead',
+      COALESCE(NULLIF(BTRIM(NEW.customer_name), ''), 'WhatsApp lead'),
       NEW.customer_wa_id,
       v_segment,
       'WhatsApp',
@@ -168,8 +173,18 @@ END $function$;
 
 NOTIFY pgrst, 'reload schema';
 
+-- Phase 191 heal — rename existing leads stuck at 'WhatsApp lead' (created
+-- while the C11 fix was dropped) to their conversation's customer_name.
+-- Idempotent: only touches 'WhatsApp lead' rows whose conversation has a name.
+UPDATE public.leads l
+   SET name = c.customer_name
+  FROM public.whatsapp_conversations c
+ WHERE c.lead_id = l.id
+   AND l.name = 'WhatsApp lead'
+   AND COALESCE(BTRIM(c.customer_name), '') <> '';
+
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All six must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All seven must be TRUE.
 -- A FALSE means an older copy was re-run and stripped a P0 contract → re-run this.
 -- ============================================================================
 -- SELECT
@@ -177,6 +192,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%cadence_paused%'             AS p0_4_no_cascade,
 --   pg_get_functiondef(p.oid) LIKE '%NEW.location_id%'            AS phase168_location,
 --   pg_get_functiondef(p.oid) LIKE '%''WhatsApp''%'               AS source_whatsapp,
+--   pg_get_functiondef(p.oid) LIKE '%NEW.customer_name%'          AS c11_lead_name,
 --   pg_get_functiondef(p.oid) LIKE '%inbound_leads%'              AS routing_audit_queue,
 --   pg_get_functiondef(p.oid) LIKE '%EXCEPTION WHEN OTHERS%'      AS never_break_store
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
