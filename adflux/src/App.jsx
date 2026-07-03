@@ -144,6 +144,19 @@ function RequireManager({ children }) {
   return children
 }
 
+/* Phase 192 (3 Jul 2026) — per-user team-dashboard viewer. Widens ONLY the
+   /team-dashboard route to admit a user with the can_view_team_dashboard flag
+   (owner grants it to one telecaller). Global RequirePrivileged is unchanged,
+   so no other route opens up. The 13 additive SELECT policies in
+   supabase_phase192_team_dashboard_viewer.sql back the all-rep data reads;
+   the viewer is read-only (no write policies granted). */
+function RequireTeamView({ children }) {
+  const { isPrivileged, profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!isPrivileged && !profile?.can_view_team_dashboard) return <Navigate to="/" replace />
+  return children
+}
+
 /* Govt-segment guard. Used by the Government wizard so a Private-only
    sales rep can't reach it via direct URL. ALL or GOVERNMENT is OK. */
 function RequireGovtAccess({ children }) {
@@ -301,7 +314,7 @@ export default function App() {
               uuid column ("invalid input syntax for type uuid: new"). */}
           <Route path="/leads"                     element={<RequireNonAgency><LeadsV2 /></RequireNonAgency>} />
           <Route path="/lead-dashboard"            element={<LeadDashboardV2 />} />
-          <Route path="/team-dashboard"            element={<RequirePrivileged><TeamDashboardV2 /></RequirePrivileged>} />
+          <Route path="/team-dashboard"            element={<RequireTeamView><TeamDashboardV2 /></RequireTeamView>} />
           <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
           {/* Campaign module (admin, token-free). Specific /campaigns/* before /campaigns. */}
           <Route path="/campaigns/qr"              element={<RequirePrivileged><CampaignQrV2 /></RequirePrivileged>} />

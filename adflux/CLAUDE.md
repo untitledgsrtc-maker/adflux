@@ -5315,3 +5315,44 @@ superseded files' VERIFY blocks — if an old file (c11_lead_name) asserted a fi
 Re-run `db/functions/campaign_conversation_ensure_lead.sql` in Supabase Studio
 (replaces the function + heals existing rows). JS-free, no APK rebuild. Then the
 7-check VERIFY block at the bottom should all be TRUE.
+
+
+---
+
+## 83 · Phase 192 — per-user "team dashboard viewer" grant (2026-07-03, guardian PASS)
+
+Owner: give ONE telecaller (Jayna) read access to /team-dashboard (live field
+map + all reps' calls/meetings/leads/revenue) WITHOUT making her admin and
+WITHOUT affecting any other rep. Built as a reusable per-user ACCESS flag, not a
+role. Additive, SELECT-only, §45-safe.
+
+### Mechanism
+- `users.can_view_team_dashboard boolean DEFAULT false` — the grant flag. It is
+  NOT a role: her role/team_role stay 'telecaller', pay/score/queue untouched,
+  no other rep affected (default false).
+- `public.is_team_viewer()` — SECURITY DEFINER STABLE helper, returns the
+  caller's own flag (COALESCE→false). Like get_my_role().
+- **13 additive `FOR SELECT USING (is_team_viewer())` policies** (gps_pings,
+  gps_off_events, users, work_sessions, call_logs, leads, quotes, voice_logs,
+  daily_targets, follow_ups, payments, lead_activities, push_subscriptions — the
+  exact tables TeamDashboardV2 reads). OR-permissive → admin/co_owner/self
+  policies byte-identical. SELECT-only: the viewer can NEVER reassign/push/mutate
+  (no write policy + enqueue_push is REVOKED from authenticated, §97.A2).
+- `supabase_phase192_team_dashboard_viewer.sql` (column + helper + 13 policies,
+  idempotent DO-loop). Owner runs it, THEN one UPDATE to set the flag for Jayna.
+
+### Frontend (fail-closed — flag undefined until the SQL runs → stays locked)
+- `App.jsx` — NEW `RequireTeamView` guard (isPrivileged OR
+  profile.can_view_team_dashboard); ONLY the /team-dashboard route swapped to it.
+  Global RequirePrivileged unchanged → no other route opens.
+- `TeamDashboardV2.jsx` — in-page gate gains `|| can_view_team_dashboard`.
+- `V2AppShell.jsx` (§28 FROZEN, guardian PASS) — `withTeam()` appends a "Team
+  Live" nav item ONLY when the flag is on; every role's base nav byte-unchanged.
+
+### To grant / revoke ANYONE (reusable)
+`UPDATE public.users SET can_view_team_dashboard = true  WHERE email = '<email>';`
+(false to revoke). No role change, no other edit. View-only by construction.
+
+### P3 (noted, no fix): push_subscriptions SELECT is column-blind (includes push
+creds) — matches the existing ps_admin pattern, no write path to abuse. Tighten
+to column-level only if owner asks.

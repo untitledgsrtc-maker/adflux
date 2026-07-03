@@ -508,7 +508,7 @@ export function V2AppShell() {
   const isAgency     = profile?.role === 'agency'
   const isHR         = profile?.role === 'hr'   // Phase 109 — HR login
   const isAccounts   = profile?.role === 'accounts'   // Phase 182 — Accounts login
-  const nav =
+  const baseNav =
     isPrivileged   ? ADMIN_NAV :
     isManager      ? MANAGER_NAV :
     isHR           ? HR_NAV :
@@ -520,7 +520,7 @@ export function V2AppShell() {
   // Agency mobile mirrors the sidebar (3 items + a hidden 4th slot
   // for visual balance — empty slot kept since agency is desktop-
   // mostly anyway).
-  const mobileNav =
+  const baseMobileNav =
     isPrivileged   ? MOBILE_NAV_ADMIN :
     isManager      ? MOBILE_NAV_MANAGER :
     isHR           ? HR_NAV :
@@ -528,6 +528,17 @@ export function V2AppShell() {
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES
+  // Phase 192 — a per-user team-dashboard viewer (e.g. a TC supervisor with the
+  // can_view_team_dashboard flag) gets a "Team Live" link appended to whatever
+  // their role nav is. Additive + gated on the flag; every role's base nav is
+  // byte-unchanged when the flag is off (default), and admins already have it.
+  const canTeamView = profile?.can_view_team_dashboard === true
+  const teamItem = { to: '/team-dashboard', label: 'Team Live', icon: Users }
+  const withTeam = (arr) =>
+    canTeamView && !arr.some((n) => n.to === '/team-dashboard')
+      ? [...arr, teamItem] : arr
+  const nav = withTeam(baseNav)
+  const mobileNav = withTeam(baseMobileNav)
 
   // Topbar search — commits to the shared quote-filter store and
   // jumps to /quotes. Keeps the field as a global quick-search so
