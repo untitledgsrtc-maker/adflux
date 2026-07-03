@@ -17,7 +17,8 @@ function effectiveMonthly(s, override) {
   const daily   = (override?.daily_spots_override ?? null) || DEFAULT_DAILY
   const days    = (override?.days_override        ?? null) || DEFAULT_DAYS
   const screens = Number(s.screens_count) || 0
-  const rate    = Number(s.davp_per_slot_rate) || 0
+  // Phase 195 — honor the per-proposal rate override (Step 3); fall back to master.
+  const rate    = (override?.rate_override ?? null) || Number(s.davp_per_slot_rate) || 0
   return screens * daily * days * rate
 }
 

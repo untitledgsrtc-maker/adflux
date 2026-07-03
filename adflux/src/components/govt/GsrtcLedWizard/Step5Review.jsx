@@ -57,7 +57,8 @@ export function Step5ReviewGsrtc({ data }) {
     const days     = ov.days_override ?? 30
     const duration = ov.spot_duration_sec_override ?? 10
     const screens  = Number(s.screens_count) || 0
-    const rate     = Number(s.davp_per_slot_rate || 0)
+    // Phase 195 — honor the per-proposal rate override (Step 3); fall back to master.
+    const rate     = (ov.rate_override ?? null) || Number(s.davp_per_slot_rate || 0)
     const monthly  = screens * daily * days * rate
     return {
       id: s.id,
