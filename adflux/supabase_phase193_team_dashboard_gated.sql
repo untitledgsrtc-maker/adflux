@@ -276,6 +276,27 @@ BEGIN
         WHERE status = 'won'
           AND updated_at >= p_month_start AND updated_at < p_month_end
       ) mw
+    ), '[]'::jsonb),
+
+    -- 19) push_subs  (freshest push row per rep — for the Push/Online pills;
+    --     only user_id + last_seen_at, never the endpoint/keys)
+    'push_subs', COALESCE((
+      SELECT jsonb_agg(to_jsonb(ps))
+      FROM (
+        SELECT DISTINCT ON (user_id) user_id, last_seen_at
+        FROM public.push_subscriptions
+        ORDER BY user_id, last_seen_at DESC
+      ) ps
+    ), '[]'::jsonb),
+
+    -- 20) gps_off  (OPEN gps-off events per rep — for the GPS on/off pill)
+    'gps_off', COALESCE((
+      SELECT jsonb_agg(to_jsonb(go))
+      FROM (
+        SELECT user_id, toggled_off_at
+        FROM public.gps_off_events
+        WHERE toggled_on_at IS NULL
+      ) go
     ), '[]'::jsonb)
 
   ) INTO v_out;

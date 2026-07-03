@@ -351,6 +351,21 @@ export default function TeamDashboardV2() {
         callbacksRes   = wrap(b?.callbacks)
         monthQuotesRes = wrap(b?.month_quotes)
         monthWonRes    = wrap(b?.month_won)
+        // Push + GPS-off pills — same maps the admin builds below (lines ~700 /
+        // loadGpsOff), but from the gated bundle so the viewer's pills match the
+        // admin's. The admin-only reads below are gated so they don't overwrite.
+        const pm = {}
+        ;(b?.push_subs || []).forEach((r) => {
+          if (r.user_id && !pm[r.user_id]) pm[r.user_id] = { has_sub: true, last_seen_at: r.last_seen_at }
+        })
+        setPushByUser(pm)
+        const gm = {}
+        ;(b?.gps_off || []).forEach((r) => {
+          if (!r.user_id) return
+          const t = new Date(r.toggled_off_at).getTime()
+          if (!gm[r.user_id] || t > gm[r.user_id]) gm[r.user_id] = t
+        })
+        setGpsOffByUser(gm)
       } else {
       ;[repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes, qualifiedRes, callbacksRes, monthQuotesRes, monthWonRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
@@ -697,6 +712,9 @@ export default function TeamDashboardV2() {
       // the "Push on/off" + "Online" status pills below the KPI row.
       // Last-seen-at acts as a proxy for whether the device has been
       // reachable recently (3h+ stale = treat as offline).
+      // Phase 193.2 — admin path only. A flagged viewer's own-only RLS would
+      // blank teammates' pills, so she gets these from the gated bundle above.
+      if (isPrivileged) {
       try {
         const { data: pushRows } = await supabase
           .from('push_subscriptions')
@@ -714,6 +732,7 @@ export default function TeamDashboardV2() {
         // Defensive — RLS hiccup shouldn't break the page render.
         console.warn('[team-dashboard] push load failed:', e?.message || e)
       }
+      }
 
       // Phase 102.H.2 (2026-05-29) — load OPEN gps_off_events per rep.
       // Rep's APK shim writes a row when phone Location toggles off
@@ -723,7 +742,8 @@ export default function TeamDashboardV2() {
       // override the ping-freshness GPS pill below.
       // Phase 102.J — body extracted to loadGpsOff useCallback so the
       // realtime subscription below can refetch independently.
-      await loadGpsOff()
+      // Phase 193.2 — admin path only (viewer gets gps_off from the bundle above).
+      if (isPrivileged) await loadGpsOff()
 
       // Phase 89.1 + 89.8 — geo-tagged lead activities populate
       // pins on the field map. Coerced to numbers + filtered to
