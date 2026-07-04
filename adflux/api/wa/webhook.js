@@ -253,9 +253,14 @@ async function storeInbound(payload) {
         // C7 — detect a NEW conversation (the customer's first-ever message)
         // BEFORE the upsert creates it, so the auto-reply fires exactly once.
         const preConv = await admin.from('whatsapp_conversations')
-          .select('id').eq('whatsapp_account_id', accountId)
+          .select('id, window_expires_at').eq('whatsapp_account_id', accountId)
           .eq('customer_wa_id', customerWaId).maybeSingle()
         const isNewConv = !preConv.data
+        // Phase 202 — also greet a RETURNING lead whose 24h service window had
+        // already closed before this message (re-engagement). Won't spam an
+        // active chat (window still open → no re-greet).
+        const windowWasClosed = !!preConv.data?.window_expires_at
+          && new Date(preConv.data.window_expires_at) < new Date(nowIso)
 
         let conv = await admin.from('whatsapp_conversations').upsert(
           convRow,
@@ -302,7 +307,7 @@ async function storeInbound(payload) {
         // C7 — auto-reply once on a new customer's first message. Free-form is
         // allowed (their inbound just opened the 24h service window) and free.
         // Best-effort: a send failure NEVER affects the store or the 200 to Meta.
-        if (isNewConv && convId && !autoReplied.has(convId) && autoReplied.size < 25
+        if ((isNewConv || windowWasClosed) && convId && !autoReplied.has(convId) && autoReplied.size < 25
             && WA_TOKEN && acct && acct.auto_reply_enabled && acct.auto_reply_text) {
           autoReplied.add(convId)
           try {
