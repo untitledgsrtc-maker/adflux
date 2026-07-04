@@ -142,8 +142,13 @@ async function storeInbound(payload) {
   let botRules = null             // chatbot rules, lazy-loaded once per webhook call
   async function getBotRules() {
     if (botRules) return botRules
-    const { data } = await admin.from('campaign_bot_rules')
-      .select('keywords, reply, is_active, display_order').order('display_order', { ascending: true })
+    // Phase 203 — pull media_url/type too, tolerant when the columns aren't run.
+    let { data, error } = await admin.from('campaign_bot_rules')
+      .select('keywords, reply, media_url, media_type, is_active, display_order').order('display_order', { ascending: true })
+    if (error && /media_url|media_type|could not find|column/i.test(error.message || '')) {
+      ;({ data } = await admin.from('campaign_bot_rules')
+        .select('keywords, reply, is_active, display_order').order('display_order', { ascending: true }))
+    }
     botRules = (data || []).filter((r) => r.is_active !== false)
     return botRules
   }
@@ -156,6 +161,32 @@ async function storeInbound(payload) {
       const { via_bot, ...rest } = row   // eslint-disable-line no-unused-vars
       await admin.from('whatsapp_messages').insert(rest)
     }
+  }
+  // Phase 203 — replace {{1}} / {{name}} with the customer's WhatsApp name
+  // (falls back to "there" when the profile name is hidden).
+  function personalize(text, name) {
+    const n = (name && String(name).trim()) || 'there'
+    return String(text || '').replace(/\{\{\s*1\s*\}\}/g, n).replace(/\{\{\s*name\s*\}\}/gi, n)
+  }
+  // Phase 203 — send a bot message: media (image/video/document) with a caption
+  // when a media URL is set, else plain text. Bot replies are free service
+  // messages, so a media link is allowed (no template/approval needed).
+  async function botSend(pnid, to, text, mediaUrl, mediaType) {
+    const mt = String(mediaType || '').toLowerCase()
+    let payload
+    if (mediaUrl && ['image', 'video', 'document'].includes(mt)) {
+      const obj = { link: mediaUrl }
+      if (text) obj.caption = text
+      if (mt === 'document') obj.filename = 'document.pdf'
+      payload = { messaging_product: 'whatsapp', to, type: mt, [mt]: obj }
+    } else {
+      payload = { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }
+    }
+    return fetch(`${GRAPH}/${pnid}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
   }
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
@@ -311,17 +342,11 @@ async function storeInbound(payload) {
             && WA_TOKEN && acct && acct.auto_reply_enabled && acct.auto_reply_text) {
           autoReplied.add(convId)
           try {
-            const r = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                messaging_product: 'whatsapp', to: customerWaId,
-                type: 'text', text: { body: acct.auto_reply_text },
-              }),
-            })
+            const wtext = personalize(acct.auto_reply_text, customerName)
+            const r = await botSend(phoneNumberId, customerWaId, wtext, acct.auto_reply_media_url, acct.auto_reply_media_type)
             if (r.ok) {
               const j = await r.json().catch(() => ({}))
-              await logBotOut(convId, j?.messages?.[0]?.id || null, acct.auto_reply_text)
+              await logBotOut(convId, j?.messages?.[0]?.id || null, wtext)
               repliedThisMsg = true
             }
           } catch { /* best-effort — auto-reply must never break receive */ }
@@ -340,13 +365,10 @@ async function storeInbound(payload) {
               const text = String(messageBody(m) || '').toLowerCase()
               const rules = await getBotRules()
               const hit = rules.find((rule) => (rule.keywords || []).some((k) => k && text.includes(String(k).toLowerCase())))
-              if (hit && hit.reply) {
-                const br = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
-                  method: 'POST',
-                  headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ messaging_product: 'whatsapp', to: customerWaId, type: 'text', text: { body: hit.reply } }),
-                })
-                if (br.ok) { const bj = await br.json().catch(() => ({})); await logBotOut(convId, bj?.messages?.[0]?.id || null, hit.reply) }
+              if (hit && (hit.reply || hit.media_url)) {
+                const rtext = personalize(hit.reply, customerName)   // Phase 203
+                const br = await botSend(phoneNumberId, customerWaId, rtext, hit.media_url, hit.media_type)
+                if (br.ok) { const bj = await br.json().catch(() => ({})); await logBotOut(convId, bj?.messages?.[0]?.id || null, rtext || '[media]') }
               }
             }
           } catch { /* best-effort — bot must never break receive */ }

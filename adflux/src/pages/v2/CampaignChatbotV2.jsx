@@ -39,6 +39,8 @@ export default function CampaignChatbotV2() {
   // Phase 201 — welcome auto-reply (reply to everyone's first message, free).
   const [greetingText, setGreetingText] = useState('')
   const [savingGreet, setSavingGreet] = useState(false)
+  const [greetMediaBusy, setGreetMediaBusy] = useState(false)
+  const [ruleMediaBusy, setRuleMediaBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -46,8 +48,13 @@ export default function CampaignChatbotV2() {
       .select('*').eq('is_active', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
     setAcct(a || null)
     setGreetingText(a?.auto_reply_text || '')   // Phase 201
-    const { data: r, error } = await supabase.from('campaign_bot_rules')
-      .select('id, keywords, reply, is_active, display_order').order('display_order', { ascending: true })
+    // Phase 203 — include media_url/type; fall back if those columns aren't run.
+    let { data: r, error } = await supabase.from('campaign_bot_rules')
+      .select('id, keywords, reply, media_url, media_type, is_active, display_order').order('display_order', { ascending: true })
+    if (error && /media_url|media_type|could not find|column/i.test(error.message || '')) {
+      ;({ data: r, error } = await supabase.from('campaign_bot_rules')
+        .select('id, keywords, reply, is_active, display_order').order('display_order', { ascending: true }))
+    }
     if (error) {
       if (/relation .* does not exist|could not find the table/i.test(error.message || '')) setTablesMissing(true)
       else toastError(error, 'Could not load bot rules.')
@@ -91,6 +98,52 @@ export default function CampaignChatbotV2() {
     if (error) toastError(error, 'Could not save.')
     else { setAcct({ ...acct, auto_reply_text: greetingText.trim() }); toastSuccess('Welcome message saved.') }
     setSavingGreet(false)
+  }
+
+  // Phase 203 — upload a bot-reply image/video/PDF to the campaign-media bucket.
+  async function uploadMedia(file) {
+    const ext = ((file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'bin'
+    const path = `bot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const { error } = await supabase.storage.from('campaign-media').upload(path, file, { upsert: false, contentType: file.type || undefined })
+    if (error) throw error
+    return supabase.storage.from('campaign-media').getPublicUrl(path).data.publicUrl
+  }
+  function mediaKind(file) {
+    const t = (file?.type || '').toLowerCase()
+    if (t.startsWith('image/')) return 'image'
+    if (t.startsWith('video/')) return 'video'
+    return 'document'
+  }
+  async function saveGreetMedia(file) {
+    if (!acct?.id) return
+    if (!file) {
+      const { error } = await supabase.from('whatsapp_accounts').update({ auto_reply_media_url: null, auto_reply_media_type: null }).eq('id', acct.id)
+      if (error) { toastError(error, 'Could not remove.'); return }
+      setAcct({ ...acct, auto_reply_media_url: null, auto_reply_media_type: null }); toastSuccess('Media removed.'); return
+    }
+    setGreetMediaBusy(true)
+    try {
+      const url = await uploadMedia(file); const kind = mediaKind(file)
+      const { error } = await supabase.from('whatsapp_accounts').update({ auto_reply_media_url: url, auto_reply_media_type: kind }).eq('id', acct.id)
+      if (error) throw error
+      setAcct({ ...acct, auto_reply_media_url: url, auto_reply_media_type: kind }); toastSuccess('Media added to the welcome.')
+    } catch (e) { toastError(e, 'Media upload failed.') } finally { setGreetMediaBusy(false) }
+  }
+  // Save a keyword rule's media (or clear it).
+  async function saveRuleMedia(file) {
+    if (typeof sel !== 'string' || sel === 'greeting' || sel === 'handoff') return
+    if (!file) {
+      const { error } = await supabase.from('campaign_bot_rules').update({ media_url: null, media_type: null }).eq('id', sel)
+      if (error) { toastError(error, 'Could not remove.'); return }
+      setRules((p) => p.map((x) => x.id === sel ? { ...x, media_url: null, media_type: null } : x)); toastSuccess('Media removed.'); return
+    }
+    setRuleMediaBusy(true)
+    try {
+      const url = await uploadMedia(file); const kind = mediaKind(file)
+      const { error } = await supabase.from('campaign_bot_rules').update({ media_url: url, media_type: kind }).eq('id', sel)
+      if (error) throw error
+      setRules((p) => p.map((x) => x.id === sel ? { ...x, media_url: url, media_type: kind } : x)); toastSuccess('Media added to this answer.')
+    } catch (e) { toastError(e, 'Media upload failed.') } finally { setRuleMediaBusy(false) }
   }
 
   async function addNode() {
@@ -212,6 +265,23 @@ export default function CampaignChatbotV2() {
                 <input style={pinp} value={editKw} onChange={(e) => setEditKw(e.target.value)} placeholder="rate, price, cost" />
                 <div style={plabel}>Reply with</div>
                 <textarea style={ptext} value={editReply} onChange={(e) => setEditReply(e.target.value)} />
+                <div style={{ marginTop: 10 }}>
+                  <label style={plabel}>Attach image / video / PDF (optional)</label>
+                  {(() => {
+                    const rr = rules.find((x) => x.id === sel)
+                    return rr?.media_url ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                        <span style={{ color: 'var(--v2-green, #22c55e)', textTransform: 'capitalize' }}>{rr.media_type || 'file'} attached</span>
+                        <a href={rr.media_url} target="_blank" rel="noreferrer" style={{ color: 'var(--v2-ink-2)' }}>view</a>
+                        <button type="button" onClick={() => saveRuleMedia(null)} style={{ ...btnG, height: 28, padding: '0 10px', fontSize: 12 }}>{ruleMediaBusy ? '…' : 'Remove'}</button>
+                      </div>
+                    ) : (
+                      <input type="file" accept="image/*,video/*,application/pdf" disabled={ruleMediaBusy}
+                        onChange={(e) => e.target.files?.[0] && saveRuleMedia(e.target.files[0])}
+                        style={{ ...pinp, padding: '7px 10px' }} />
+                    )
+                  })()}
+                </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                   <button type="button" style={{ ...btnY, opacity: saving ? 0.6 : 1 }} onClick={saveRule} disabled={saving}>{saving ? <Loader2 size={14} strokeWidth={1.6} className="spin" /> : null} Save</button>
                   <button type="button" style={{ ...btnG, color: 'var(--v2-rose, #f87171)' }} onClick={delRule}><Trash2 size={14} strokeWidth={1.6} /></button>
@@ -226,6 +296,20 @@ export default function CampaignChatbotV2() {
                   placeholder="Hi! Thanks for messaging Untitled Advertising. How can we help?" />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
                   <button type="button" style={{ ...btnY, opacity: savingGreet ? 0.6 : 1 }} onClick={saveGreeting} disabled={savingGreet}>{savingGreet ? <Loader2 size={14} strokeWidth={1.6} className="spin" /> : null} Save welcome</button>
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <label style={plabel}>Image / video / PDF (optional — rides on top of the welcome)</label>
+                  {acct?.auto_reply_media_url ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                      <span style={{ color: 'var(--v2-green, #22c55e)', textTransform: 'capitalize' }}>{acct.auto_reply_media_type || 'file'} attached</span>
+                      <a href={acct.auto_reply_media_url} target="_blank" rel="noreferrer" style={{ color: 'var(--v2-ink-2)' }}>view</a>
+                      <button type="button" onClick={() => saveGreetMedia(null)} style={{ ...btnG, height: 28, padding: '0 10px', fontSize: 12 }}>{greetMediaBusy ? '…' : 'Remove'}</button>
+                    </div>
+                  ) : (
+                    <input type="file" accept="image/*,video/*,application/pdf" disabled={greetMediaBusy}
+                      onChange={(e) => e.target.files?.[0] && saveGreetMedia(e.target.files[0])}
+                      style={{ ...pinp, padding: '7px 10px' }} />
+                  )}
                 </div>
                 <div style={{ ...toggle, marginTop: 14 }}><span>Welcome reply is {acct?.auto_reply_enabled ? 'ON' : 'OFF'}</span>
                   <button type="button" onClick={toggleWelcome} style={{ ...sw, background: acct?.auto_reply_enabled ? 'var(--v2-green, #22c55e)' : 'var(--v2-bg-3)' }}><span style={{ ...swDot, [acct?.auto_reply_enabled ? 'right' : 'left']: 2 }} /></button>
