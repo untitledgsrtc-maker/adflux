@@ -5423,3 +5423,47 @@ bug — do not trust a single "fails closed" claim; re-derive the 3VL.
 - ❌ A gated bundle RPC that mirrors a client loader is a §69 duplication by design —
   acceptable ONLY for a non-pay monitoring view + documented as a MIRROR; do NOT use
   this shortcut for a money/pay path.
+
+
+---
+
+## 85 · Phase 196–197 — DB-perf: chart 1000-cap fix + index sweep + cap guard (2026-07-04)
+
+### Phase 196 — Leads Collected chart undercount (1000-row cap, 3rd recurrence)
+`LeadsCollectedChart` pulled raw lead rows + bucketed client-side; PostgREST caps
+the response at ~1000 rows (its `.limit(20000)` was IGNORED), so a >1000-lead window
+truncated recent days (3 Jul: 200 real→7 shown; today 8→0). Fixed by counting on the
+SERVER: `db → supabase_phase196_leads_by_day.sql` = `leads_collected_by_day(from,to,
+segment,source)` RETURNS (ist_day,cnt), SECURITY INVOKER (RLS scopes per role), IST-day
+GROUP BY. Chart reads the RPC. Commit `b0919a0` (SQL RUN + pushed). **A chart/count MUST
+aggregate server-side, never pull-and-count client-side.**
+
+### THE 1000-ROW-CAP LAW (§66 restated — this bit the owner 3× now)
+PostgREST silently returns only ~1000 rows for ANY `.select()` without `.range()`
+paging. `.limit(20000)` does NOT override it. It's INVISIBLE in testing (only shows
+once a table crosses 1000 in prod). Fixed sites: useLeads (151), useQuotes (152),
+GpsTrackV2 fetchAllPings, LeadsCollectedChart (196). It's a DISEASE, not one bug —
+every big-table query is a separate site.
+
+### Phase 197 — recurrence guard (NEW pre-commit check) + P1 indexes
+- **`scripts/check-query-cap.mjs`** — flags any `supabase.from('<big table>')...select()`
+  (leads/quotes/call_logs/gps_pings/lead_activities/follow_ups/payments) with NEITHER
+  `.range()` NOR `.limit()`/`.single()`/`count:`/`head:`. WARN-only (exit 0; `--strict`
+  fails). Mark a confirmed-bounded query with a `// cap-ok` comment to silence it.
+  **Run it on every changed .jsx/.js before commit** (add to §15 gate): `node
+  scripts/check-query-cap.mjs <changed files>`. Catches the silent cap that eyeballs
+  miss. (~84 existing WARN sites are grandfathered/mostly-bounded; annotate `// cap-ok`
+  as you touch them. AdminDashboardDesktop:138 `quotes.select('*')` is a real latent
+  one — quotes is small now, fix when it nears 1000.)
+- **`supabase_phase197_perf_indexes.sql`** — 5 P1 composite indexes from the 4 Jul
+  DB-perf audit (quotes(created_by,status) · follow_ups(assigned_to,is_done) ·
+  call_logs(user_id,outcome) · gps_pings(user_id,captured_at) · lead_activities(
+  created_by,created_at)) + verify payments(quote_id). ALL `CREATE INDEX CONCURRENTLY
+  IF NOT EXISTS` → **owner runs ONE LINE AT A TIME** (CONCURRENTLY can't run in a Studio
+  batch; builds without locking writes — §45-safe on the live app).
+
+### DB-perf audit verdict (4 Jul 2026, read-only, 5-agent workflow)
+N+1 = GOOD (zero) · connection pool = GOOD (1 shared client, no realtime leaks) ·
+1000-cap = GOOD (swept) · indexes = CONCERN (5 P1 gaps → Phase 197) · SELECT* = MINOR
+(7 spots, worst AdminDashboardDesktop:138/154 + useFollowUps — narrow columns later).
+~80 indexes already exist; this closed the last big gaps. No P0.
