@@ -188,6 +188,47 @@ async function storeInbound(payload) {
       body: JSON.stringify(payload),
     })
   }
+  // Phase 204 — greeting tap-buttons. Cached per webhook call; tolerant when the
+  // table isn't run yet (falls back to no buttons → plain text/media greeting).
+  let botButtons = null
+  async function getButtons(accountId) {
+    if (botButtons) return botButtons
+    const { data, error } = await admin.from('campaign_bot_buttons')
+      .select('id, label, position, action, reply_text, media_url, media_type, is_active')
+      .eq('whatsapp_account_id', accountId).order('position', { ascending: true })
+    botButtons = error ? [] : (data || []).filter((b) => b.is_active !== false)
+    return botButtons
+  }
+  // Send the greeting as a WhatsApp interactive message: 1-3 buttons = reply
+  // buttons (media header allowed); 4-10 = a list message (text header only).
+  async function botSendButtons(pnid, to, bodyText, buttons, headerUrl, headerType) {
+    const rows = (buttons || []).slice(0, 10)
+    const mt = String(headerType || '').toLowerCase()
+    let interactive
+    if (rows.length <= 3) {
+      interactive = {
+        type: 'button',
+        body: { text: bodyText || '…' },
+        action: { buttons: rows.map((b) => ({ type: 'reply', reply: { id: `btn_${b.id}`, title: String(b.label || '').slice(0, 20) } })) },
+      }
+      if (headerUrl && ['image', 'video', 'document'].includes(mt)) {
+        interactive.header = mt === 'document'
+          ? { type: 'document', document: { link: headerUrl, filename: 'document.pdf' } }
+          : { type: mt, [mt]: { link: headerUrl } }
+      }
+    } else {
+      interactive = {
+        type: 'list',
+        body: { text: bodyText || '…' },
+        action: { button: 'Choose', sections: [{ title: 'Options', rows: rows.map((b) => ({ id: `btn_${b.id}`, title: String(b.label || '').slice(0, 24) })) }] },
+      }
+    }
+    return fetch(`${GRAPH}/${pnid}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'interactive', interactive }),
+    })
+  }
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       const v = change.value || {}
@@ -343,13 +384,41 @@ async function storeInbound(payload) {
           autoReplied.add(convId)
           try {
             const wtext = personalize(acct.auto_reply_text, customerName)
-            const r = await botSend(phoneNumberId, customerWaId, wtext, acct.auto_reply_media_url, acct.auto_reply_media_type)
+            const btns = await getButtons(accountId)   // Phase 204 — tap-buttons
+            const r = btns.length
+              ? await botSendButtons(phoneNumberId, customerWaId, wtext, btns, acct.auto_reply_media_url, acct.auto_reply_media_type)
+              : await botSend(phoneNumberId, customerWaId, wtext, acct.auto_reply_media_url, acct.auto_reply_media_type)
             if (r.ok) {
               const j = await r.json().catch(() => ({}))
               await logBotOut(convId, j?.messages?.[0]?.id || null, wtext)
               repliedThisMsg = true
             }
           } catch { /* best-effort — auto-reply must never break receive */ }
+        }
+
+        // Phase 204 — the customer TAPPED a greeting button → run that button's
+        // action (send a reply/media, or hand off to a human). Takes priority
+        // over keyword matching. Always allowed (a tap is an explicit request).
+        if (!repliedThisMsg && m.type === 'interactive' && convId && WA_TOKEN && acct) {
+          const ir = m.interactive || {}
+          const btnId = String(ir.button_reply?.id || ir.list_reply?.id || '')
+          if (btnId.startsWith('btn_')) {
+            try {
+              const btns = await getButtons(accountId)
+              const b = btns.find((x) => `btn_${x.id}` === btnId)
+              if (b && b.action === 'handoff') {
+                const hmsg = 'Thanks! Connecting you with our team — someone will reply shortly.'
+                const hr = await botSend(phoneNumberId, customerWaId, hmsg)
+                if (hr.ok) { const hj = await hr.json().catch(() => ({})); await logBotOut(convId, hj?.messages?.[0]?.id || null, hmsg) }
+                repliedThisMsg = true
+              } else if (b && (b.reply_text || b.media_url)) {
+                const rtext = personalize(b.reply_text, customerName)
+                const rr = await botSend(phoneNumberId, customerWaId, rtext, b.media_url, b.media_type)
+                if (rr.ok) { const rj = await rr.json().catch(() => ({})); await logBotOut(convId, rj?.messages?.[0]?.id || null, rtext || '[media]') }
+                repliedThisMsg = true
+              }
+            } catch { /* best-effort — button action must never break receive */ }
+          }
         }
 
         // Chatbot — keyword auto-responder. Runs only when the bot is ON, this

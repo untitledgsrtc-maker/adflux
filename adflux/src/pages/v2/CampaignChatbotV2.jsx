@@ -41,6 +41,10 @@ export default function CampaignChatbotV2() {
   const [savingGreet, setSavingGreet] = useState(false)
   const [greetMediaBusy, setGreetMediaBusy] = useState(false)
   const [ruleMediaBusy, setRuleMediaBusy] = useState(false)
+  // Phase 204 — greeting tap-buttons.
+  const [buttons, setButtons] = useState([])
+  const [selBtn, setSelBtn] = useState(null)
+  const [btnBusy, setBtnBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -48,6 +52,12 @@ export default function CampaignChatbotV2() {
       .select('*').eq('is_active', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
     setAcct(a || null)
     setGreetingText(a?.auto_reply_text || '')   // Phase 201
+    if (a?.id) {   // Phase 204 — greeting buttons (tolerant if the table isn't run)
+      const { data: b } = await supabase.from('campaign_bot_buttons')
+        .select('id, label, position, action, reply_text, media_url, media_type')
+        .eq('whatsapp_account_id', a.id).order('position', { ascending: true })
+      setButtons(b || [])
+    }
     // Phase 203 — include media_url/type; fall back if those columns aren't run.
     let { data: r, error } = await supabase.from('campaign_bot_rules')
       .select('id, keywords, reply, media_url, media_type, is_active, display_order').order('display_order', { ascending: true })
@@ -144,6 +154,39 @@ export default function CampaignChatbotV2() {
       if (error) throw error
       setRules((p) => p.map((x) => x.id === sel ? { ...x, media_url: url, media_type: kind } : x)); toastSuccess('Media added to this answer.')
     } catch (e) { toastError(e, 'Media upload failed.') } finally { setRuleMediaBusy(false) }
+  }
+
+  // Phase 204 — greeting tap-button CRUD.
+  async function addButton() {
+    if (!acct?.id) { toastError(new Error('acct'), 'No active WhatsApp number.'); return }
+    if (buttons.length >= 10) { toastError(new Error('max'), 'Max 10 buttons (WhatsApp limit).'); return }
+    const { data, error } = await supabase.from('campaign_bot_buttons')
+      .insert({ whatsapp_account_id: acct.id, label: 'New button', position: buttons.length, action: 'send', reply_text: '', created_by: profile?.id || null })
+      .select('id, label, position, action, reply_text, media_url, media_type').maybeSingle()
+    if (error || !data) {
+      if (/relation .* does not exist|could not find the table/i.test(error?.message || '')) toastError(error, 'Run the Phase 204 SQL first (buttons table).')
+      else toastError(error, 'Could not add the button.')
+      return
+    }
+    setButtons((p) => [...p, data]); setSelBtn(data.id)
+  }
+  async function saveButton(id, patch) {
+    setButtons((p) => p.map((b) => b.id === id ? { ...b, ...patch } : b))
+    const { error } = await supabase.from('campaign_bot_buttons').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) toastError(error, 'Could not save the button.')
+  }
+  async function delButton(id) {
+    const ok = await confirmDialog({ title: 'Delete button?', message: 'Remove this button from the greeting?', confirmLabel: 'Delete', danger: true })
+    if (!ok) return
+    const { error } = await supabase.from('campaign_bot_buttons').delete().eq('id', id)
+    if (error) { toastError(error, 'Could not delete.'); return }
+    setButtons((p) => p.filter((b) => b.id !== id)); if (selBtn === id) setSelBtn(null)
+  }
+  async function saveBtnMedia(id, file) {
+    if (!file) { await saveButton(id, { media_url: null, media_type: null }); return }
+    setBtnBusy(true)
+    try { const url = await uploadMedia(file); await saveButton(id, { media_url: url, media_type: mediaKind(file) }); toastSuccess('Media added.') }
+    catch (e) { toastError(e, 'Upload failed.') } finally { setBtnBusy(false) }
   }
 
   async function addNode() {
@@ -310,6 +353,51 @@ export default function CampaignChatbotV2() {
                       onChange={(e) => e.target.files?.[0] && saveGreetMedia(e.target.files[0])}
                       style={{ ...pinp, padding: '7px 10px' }} />
                   )}
+                </div>
+                {/* Phase 204 — tap-buttons: customer taps instead of typing */}
+                <div style={{ marginTop: 14 }}>
+                  <label style={plabel}>Buttons — customer taps instead of typing (up to 10)</label>
+                  {buttons.map((b) => (
+                    <div key={b.id} style={{ border: '1px solid var(--v2-line)', borderRadius: 10, padding: 10, marginBottom: 8, background: 'var(--v2-bg-2, #1a2742)' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input style={{ ...pinp, flex: 1 }} value={b.label || ''} maxLength={24}
+                          onChange={(e) => setButtons((p) => p.map((x) => x.id === b.id ? { ...x, label: e.target.value } : x))}
+                          onBlur={(e) => saveButton(b.id, { label: e.target.value.trim() || 'Button' })} placeholder="Rates" />
+                        <button type="button" onClick={() => setSelBtn(selBtn === b.id ? null : b.id)} style={{ ...btnG, height: 30, padding: '0 10px', fontSize: 12 }}>{selBtn === b.id ? 'Close' : 'Edit'}</button>
+                        <button type="button" onClick={() => delButton(b.id)} style={{ ...btnG, height: 30, padding: '0 8px', color: 'var(--v2-rose, #f87171)' }}><Trash2 size={13} strokeWidth={1.6} /></button>
+                      </div>
+                      {selBtn === b.id && (
+                        <div style={{ marginTop: 10 }}>
+                          <label style={plabel}>When tapped</label>
+                          <select style={pinp} value={b.action || 'send'} onChange={(e) => saveButton(b.id, { action: e.target.value })}>
+                            <option value="send">Send a reply</option>
+                            <option value="handoff">Talk to a person (hand off)</option>
+                          </select>
+                          {b.action !== 'handoff' && (
+                            <>
+                              <label style={{ ...plabel, marginTop: 10 }}>Reply text</label>
+                              <textarea style={{ ...ptext, minHeight: 70 }} value={b.reply_text || ''}
+                                onChange={(e) => setButtons((p) => p.map((x) => x.id === b.id ? { ...x, reply_text: e.target.value } : x))}
+                                onBlur={(e) => saveButton(b.id, { reply_text: e.target.value })} placeholder="Here are our rates…" />
+                              <label style={{ ...plabel, marginTop: 10 }}>Attach image / video / PDF (optional)</label>
+                              {b.media_url ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                                  <span style={{ color: 'var(--v2-green, #22c55e)', textTransform: 'capitalize' }}>{b.media_type || 'file'} attached</span>
+                                  <a href={b.media_url} target="_blank" rel="noreferrer" style={{ color: 'var(--v2-ink-2)' }}>view</a>
+                                  <button type="button" onClick={() => saveBtnMedia(b.id, null)} style={{ ...btnG, height: 26, padding: '0 10px', fontSize: 12 }}>Remove</button>
+                                </div>
+                              ) : (
+                                <input type="file" accept="image/*,video/*,application/pdf" disabled={btnBusy}
+                                  onChange={(e) => e.target.files?.[0] && saveBtnMedia(b.id, e.target.files[0])} style={{ ...pinp, padding: '7px 10px' }} />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <button type="button" onClick={addButton} style={btnG}>+ Add button</button>
+                  <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 6 }}>1-3 buttons show as tap buttons; 4-10 as a pick-list. The welcome text + media above ride along.</div>
                 </div>
                 <div style={{ ...toggle, marginTop: 14 }}><span>Welcome reply is {acct?.auto_reply_enabled ? 'ON' : 'OFF'}</span>
                   <button type="button" onClick={toggleWelcome} style={{ ...sw, background: acct?.auto_reply_enabled ? 'var(--v2-green, #22c55e)' : 'var(--v2-bg-3)' }}><span style={{ ...swDot, [acct?.auto_reply_enabled ? 'right' : 'left']: 2 }} /></button>
