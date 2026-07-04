@@ -36,12 +36,16 @@ export default function CampaignChatbotV2() {
   const [saving, setSaving] = useState(false)
   const [toggling, setToggling] = useState(false)
   const saveRef = useRef(false)
+  // Phase 201 — welcome auto-reply (reply to everyone's first message, free).
+  const [greetingText, setGreetingText] = useState('')
+  const [savingGreet, setSavingGreet] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     const { data: a } = await supabase.from('whatsapp_accounts')
       .select('*').eq('is_active', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
     setAcct(a || null)
+    setGreetingText(a?.auto_reply_text || '')   // Phase 201
     const { data: r, error } = await supabase.from('campaign_bot_rules')
       .select('id, keywords, reply, is_active, display_order').order('display_order', { ascending: true })
     if (error) {
@@ -65,6 +69,28 @@ export default function CampaignChatbotV2() {
     const { error } = await supabase.from('whatsapp_accounts').update({ bot_enabled: next }).eq('id', acct.id)
     if (error) { toastError(error, 'Could not switch the bot.'); setToggling(false); return }
     setAcct({ ...acct, bot_enabled: next }); toastSuccess(next ? 'Chatbot ON.' : 'Chatbot OFF.'); setToggling(false)
+  }
+
+  // Phase 201 — welcome auto-reply: reply to EVERY customer's first message with
+  // a set greeting (free service message). Independent of the keyword chatbot.
+  async function toggleWelcome() {
+    if (!acct?.id) { toastError(new Error('acct'), 'No active WhatsApp number.'); return }
+    if (!acct.auto_reply_enabled && !greetingText.trim()) { toastError(new Error('text'), 'Write the welcome message first.'); return }
+    const next = !acct.auto_reply_enabled
+    const { error } = await supabase.from('whatsapp_accounts')
+      .update({ auto_reply_enabled: next, auto_reply_text: greetingText.trim() || null }).eq('id', acct.id)
+    if (error) { toastError(error, 'Could not switch the welcome reply.'); return }
+    setAcct({ ...acct, auto_reply_enabled: next, auto_reply_text: greetingText.trim() })
+    toastSuccess(next ? 'Welcome reply ON.' : 'Welcome reply OFF.')
+  }
+  async function saveGreeting() {
+    if (!acct?.id) { toastError(new Error('acct'), 'No active WhatsApp number.'); return }
+    if (!greetingText.trim()) { toastError(new Error('text'), 'Write the welcome message.'); return }
+    setSavingGreet(true)
+    const { error } = await supabase.from('whatsapp_accounts').update({ auto_reply_text: greetingText.trim() }).eq('id', acct.id)
+    if (error) toastError(error, 'Could not save.')
+    else { setAcct({ ...acct, auto_reply_text: greetingText.trim() }); toastSuccess('Welcome message saved.') }
+    setSavingGreet(false)
   }
 
   async function addNode() {
@@ -195,9 +221,16 @@ export default function CampaignChatbotV2() {
               <>
                 <div style={ph}><span style={{ width: 9, height: 9, borderRadius: 3, background: 'var(--v2-blue, #60a5fa)', display: 'inline-block' }} />Greeting</div>
                 <div style={psub}>The first-message welcome</div>
-                <div style={plabel}>Welcome message (your auto-reply)</div>
-                <div style={{ ...ptext, minHeight: 'auto', padding: '10px 11px', color: 'var(--v2-ink-1)', whiteSpace: 'pre-wrap' }}>{acct?.auto_reply_text || 'Set via the auto-reply config.'}</div>
-                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 8 }}>Edit the welcome in the auto-reply config (DB). Add answer nodes with <b style={{ color: 'var(--v2-yellow, #FFE600)' }}>+</b>.</div>
+                <div style={plabel}>Welcome message — auto-sent to everyone on their first message (free)</div>
+                <textarea style={{ ...ptext, minHeight: 120 }} value={greetingText} onChange={(e) => setGreetingText(e.target.value)}
+                  placeholder="Hi! Thanks for messaging Untitled Advertising. How can we help?" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                  <button type="button" style={{ ...btnY, opacity: savingGreet ? 0.6 : 1 }} onClick={saveGreeting} disabled={savingGreet}>{savingGreet ? <Loader2 size={14} strokeWidth={1.6} className="spin" /> : null} Save welcome</button>
+                </div>
+                <div style={{ ...toggle, marginTop: 14 }}><span>Welcome reply is {acct?.auto_reply_enabled ? 'ON' : 'OFF'}</span>
+                  <button type="button" onClick={toggleWelcome} style={{ ...sw, background: acct?.auto_reply_enabled ? 'var(--v2-green, #22c55e)' : 'var(--v2-bg-3)' }}><span style={{ ...swDot, [acct?.auto_reply_enabled ? 'right' : 'left']: 2 }} /></button>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 8 }}>Below: keyword answers (need the chatbot ON). The welcome above fires on the first message regardless.</div>
                 <div style={{ ...toggle, marginTop: 16 }}><span>Bot is {on ? 'ON' : 'OFF'}</span>
                   <button type="button" onClick={toggleBot} style={{ ...sw, background: on ? 'var(--v2-green, #22c55e)' : 'var(--v2-bg-3)' }}><span style={{ ...swDot, [on ? 'right' : 'left']: 2 }} /></button>
                 </div>
