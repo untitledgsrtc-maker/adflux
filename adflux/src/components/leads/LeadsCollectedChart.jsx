@@ -77,48 +77,26 @@ export default function LeadsCollectedChart({ onDayClick }) {
     async function load() {
       setLoading(true); setErr('')
 
-      // Phase 61.2 (19 May 2026) — IST window. Postgres treats
-      // bare `2026-05-19T00:00:00` as UTC; we want IST midnight so
-      // the bucket boundaries match what the rep sees on the clock.
-      // +05:30 suffix anchors to Asia/Kolkata. Without this, a lead
-      // created at 02:00 IST today lands in yesterday's bucket and
-      // today's bar undercounts.
-      let q = supabase
-        .from('leads')
-        .select('id, created_at, segment, source')
-        .gte('created_at', `${from}T00:00:00+05:30`)
-        .lte('created_at', `${to}T23:59:59+05:30`)
-        .limit(20000)
-      if (segment !== 'all') {
-        // Private rows historically have segment=null (pre-Phase 4).
-        if (segment === 'private') {
-          q = q.or('segment.eq.PRIVATE,segment.is.null')
-        } else {
-          q = q.eq('segment', segment.toUpperCase())
-        }
-      }
-      if (source !== 'all') q = q.eq('source', source)
-
-      const { data, error } = await q
+      // Phase 196 — count on the SERVER via leads_collected_by_day. The old
+      // client-side path pulled raw rows and bucketed them, but PostgREST caps
+      // the response at ~1000 rows (the .limit(20000) was ignored), so a window
+      // with >1000 leads truncated the recent days (3 Jul: 200 real -> 7 shown;
+      // today 8 -> 0). The RPC does the IST-day bucketing + segment/source
+      // filters server-side (SECURITY INVOKER -> RLS still scopes per role), so
+      // there is no row cap and every day is exact.
+      const { data, error } = await supabase.rpc('leads_collected_by_day', {
+        p_from:    from,
+        p_to:      to,
+        p_segment: segment,
+        p_source:  source,
+      })
       if (cancelled) return
       if (error) { setErr(error.message); setLoading(false); return }
 
-      // Phase 61.2 — bucket by IST calendar day, not UTC slice.
-      // `r.created_at` is a Postgres timestamptz that arrives as an
-      // ISO UTC string; slicing the first 10 chars gives the UTC
-      // date which is off by up to 5h30 from the IST workday. Using
-      // Intl.DateTimeFormat with timeZone='Asia/Kolkata' gives the
-      // correct IST date even when the lead was inserted between
-      // midnight and 5:30am IST.
-      const istFmt = new Intl.DateTimeFormat('en-CA', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        timeZone: 'Asia/Kolkata',
-      })
       const bucket = new Map()
       for (const r of (data || [])) {
-        if (!r.created_at) continue
-        const d = istFmt.format(new Date(r.created_at))  // yyyy-mm-dd IST
-        bucket.set(d, (bucket.get(d) || 0) + 1)
+        if (!r.ist_day) continue
+        bucket.set(String(r.ist_day).slice(0, 10), Number(r.cnt) || 0)
       }
       // Fill every day in range (including zero days) so the X axis is
       // continuous and not just sparse.
