@@ -151,14 +151,19 @@ export default function CampaignBroadcastV2() {
   }
 
   async function sendTest() {
-    const selTpl = templates.find((t) => t.name === tplName)
+    // Phase 198 — resolve the APPROVED row (not any same-name pending/rejected
+    // row) and send ITS exact Meta language. No blind 'en' fallback: sending a
+    // language the template isn't approved in is exactly Meta #132001.
+    const selTpl = approvedList.find((t) => t.name === tplName)
     if (!tplName) { toastError(new Error('tpl'), 'Pick an approved template first.'); return }
+    if (!selTpl) { toastError(new Error('tpl'), 'That template is not approved yet — pick an approved one.'); return }
+    if (!selTpl.language) { toastError(new Error('lang'), 'This template has no language on file — reload templates.'); return }
     if (!testTo.trim()) { toastError(new Error('to'), 'Enter your own number to test.'); return }
     setTesting(true)
     try {
       const r = await authedFetch('/api/wa/broadcast', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'test', template_name: tplName, template_language: selTpl?.language || 'en', to: testTo.trim() }),
+        body: JSON.stringify({ action: 'test', template_name: tplName, template_language: selTpl.language, to: testTo.trim() }),
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { toastError(new Error(j?.detail || j?.error || 'failed'), 'Test send failed.'); return }
@@ -167,9 +172,12 @@ export default function CampaignBroadcastV2() {
   }
 
   async function sendBroadcast() {
-    const selTpl = templates.find((t) => t.name === tplName)
+    // Phase 198 — approved row + its exact language (see sendTest).
+    const selTpl = approvedList.find((t) => t.name === tplName)
     const seg = segments.find((s) => s.id === segId)
     if (!segId || !tplName) { toastError(new Error('pick'), 'Pick a segment + an approved template.'); return }
+    if (!selTpl) { toastError(new Error('tpl'), 'That template is not approved yet — pick an approved one.'); return }
+    if (!selTpl.language) { toastError(new Error('lang'), 'This template has no language on file — reload templates.'); return }
     if (sendRef.current || sending) return
     const ok = await confirmDialog({
       title: 'Send broadcast?',
@@ -181,7 +189,7 @@ export default function CampaignBroadcastV2() {
     try {
       const cr = await authedFetch('/api/wa/broadcast', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', segment_id: segId, template_name: tplName, template_language: selTpl?.language || 'en' }),
+        body: JSON.stringify({ action: 'create', segment_id: segId, template_name: tplName, template_language: selTpl.language }),
       })
       const cj = await cr.json().catch(() => ({}))
       if (!cr.ok) { toastError(new Error(cj?.detail || cj?.error || 'failed'), 'Could not queue the broadcast.'); return }
@@ -295,7 +303,7 @@ export default function CampaignBroadcastV2() {
               <label style={lbl}>Template (approved)</label>
               <select style={inp} value={tplName} onChange={(e) => setTplName(e.target.value)}>
                 <option value="">Pick a template…</option>
-                {approvedList.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
+                {approvedList.map((t) => <option key={`${t.name}|${t.language}`} value={t.name}>{t.name} · {t.language || 'en'}</option>)}
               </select>
             </div>
           </div>
