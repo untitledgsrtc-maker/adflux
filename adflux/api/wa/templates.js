@@ -37,8 +37,11 @@ export default async function handler(req, res) {
   if (!me || !['admin', 'co_owner'].includes(me.role)) return res.status(403).json({ error: 'not_allowed' })
 
   // ── resolve the WABA id from the active campaign account ──
+  // Phase 200 — require a COMPLETE account (both ids), same as broadcast.js, so
+  // the template list + the send always resolve the SAME account.
   const { data: acct } = await admin.from('whatsapp_accounts')
-    .select('waba_id').eq('is_active', true).not('waba_id', 'is', null)
+    .select('waba_id').eq('is_active', true)
+    .not('waba_id', 'is', null).not('phone_number_id', 'is', null)
     .order('created_at', { ascending: true }).limit(1).maybeSingle()
   const wabaId = acct?.waba_id
   if (!wabaId) return res.status(409).json({ error: 'no_waba', detail: 'No WhatsApp Business Account id on file yet.' })

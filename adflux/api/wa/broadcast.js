@@ -55,8 +55,12 @@ export default async function handler(req, res) {
   if (!me || !['admin', 'co_owner'].includes(me.role)) return res.status(403).json({ error: 'not_allowed' })
 
   // active sending account (phone_number_id + waba_id)
+  // Phase 200 — require a COMPLETE account (both ids). A half-configured active
+  // row (e.g. a leftover with waba_id NULL) must never be picked, or the send
+  // goes out a different number than templates.js lists → Meta #132001.
   const { data: acct } = await admin.from('whatsapp_accounts')
-    .select('phone_number_id, waba_id').eq('is_active', true).not('phone_number_id', 'is', null)
+    .select('phone_number_id, waba_id').eq('is_active', true)
+    .not('phone_number_id', 'is', null).not('waba_id', 'is', null)
     .order('created_at', { ascending: true }).limit(1).maybeSingle()
   const pnid = acct?.phone_number_id
   const wabaId = acct?.waba_id
