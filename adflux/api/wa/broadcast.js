@@ -31,6 +31,15 @@ function cleanPhone(p) {
   return d.length >= 11 ? d : ''
 }
 
+// Phase 199 — build the template media-header component for a broadcast/test.
+// type ∈ image|video|document; url = a public link Meta fetches. null = no header.
+function buildHeaderComp(type, url) {
+  const t = String(type || '').toLowerCase()
+  if (!url || !['image', 'video', 'document'].includes(t)) return null
+  if (t === 'document') return { type: 'header', parameters: [{ type: 'document', document: { link: url, filename: 'document.pdf' } }] }
+  return { type: 'header', parameters: [{ type: t, [t]: { link: url } }] }
+}
+
 export default async function handler(req, res) {
   if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'server not configured' })
   if (!WA_TOKEN) return res.status(503).json({ error: 'token_missing', detail: 'CAMPAIGN_WA_TOKEN not set in Vercel.' })
@@ -91,7 +100,12 @@ export default async function handler(req, res) {
     const segmentId = body?.segment_id
     const templateName = String(body?.template_name || '').trim()
     const language = String(body?.template_language || 'en')
+    // Phase 199 — optional media header (image/video/document) sent on every msg.
+    const headerType = String(body?.header_type || '').trim().toLowerCase()
+    const headerMediaUrl = String(body?.header_media_url || '').trim()
     if (!segmentId || !templateName) return res.status(400).json({ error: 'segment_id + template_name required' })
+    if (headerType && !['image', 'video', 'document'].includes(headerType)) return res.status(400).json({ error: 'bad_header' })
+    if (headerType && !headerMediaUrl) return res.status(400).json({ error: 'no_header_media', detail: 'This template has a media header — upload the image/video/PDF to send.' })
 
     const { data: seg } = await admin.from('campaign_segments').select('id, name, rules_json').eq('id', segmentId).maybeSingle()
     if (!seg) return res.status(404).json({ error: 'segment_not_found' })
@@ -118,6 +132,7 @@ export default async function handler(req, res) {
     const { data: bc, error: be } = await admin.from('campaign_broadcasts').insert({
       segment_id: seg.id, segment_name: seg.name, template_name: templateName,
       template_language: language, status: 'queued', total: uniq.length, created_by: uid,
+      header_type: headerType || null, header_media_url: headerMediaUrl || null,
     }).select('id').maybeSingle()
     if (be || !bc) return res.status(502).json({ error: 'create_failed', detail: be?.message })
 
@@ -150,12 +165,17 @@ export default async function handler(req, res) {
     }
     if (batch.length) await admin.from('campaign_broadcasts').update({ status: 'sending' }).eq('id', bid)
     const hasVar = batch.length ? await templateHasVar(bc.template_name) : false
+    // Phase 199 — media header component (same creative for every recipient).
+    const headerComp = buildHeaderComp(bc.header_type, bc.header_media_url)
 
     let sent = 0, failed = 0
     for (const rec of batch) {
       try {
         const tpl = { name: bc.template_name, language: { code: bc.template_language || 'en' } }
-        if (hasVar) tpl.components = [{ type: 'body', parameters: [{ type: 'text', text: rec.name || 'there' }] }]
+        const comps = []
+        if (headerComp) comps.push(headerComp)
+        if (hasVar) comps.push({ type: 'body', parameters: [{ type: 'text', text: rec.name || 'there' }] })
+        if (comps.length) tpl.components = comps
         const resp = await fetch(`${GRAPH}/${pnid}/messages`, {
           method: 'POST', headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ messaging_product: 'whatsapp', to: rec.phone, type: 'template', template: tpl }),
@@ -192,8 +212,12 @@ export default async function handler(req, res) {
     const to = cleanPhone(body?.to)
     if (!templateName || !to) return res.status(400).json({ error: 'template_name + valid to required' })
     const hasVar = await templateHasVar(templateName)
+    const headerComp = buildHeaderComp(body?.header_type, body?.header_media_url)  // Phase 199
     const tpl = { name: templateName, language: { code: language } }
-    if (hasVar) tpl.components = [{ type: 'body', parameters: [{ type: 'text', text: 'Test' }] }]
+    const comps = []
+    if (headerComp) comps.push(headerComp)
+    if (hasVar) comps.push({ type: 'body', parameters: [{ type: 'text', text: 'Test' }] })
+    if (comps.length) tpl.components = comps
     try {
       const resp = await fetch(`${GRAPH}/${pnid}/messages`, {
         method: 'POST', headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },

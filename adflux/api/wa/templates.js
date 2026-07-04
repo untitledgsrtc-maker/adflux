@@ -62,17 +62,32 @@ export default async function handler(req, res) {
     const category = String(body?.category || 'MARKETING').toUpperCase()
     const language = String(body?.language || 'en')
     const example = String(body?.example || 'Rajesh').trim() || 'Rajesh'
+    // Phase 199 — optional media header (image/video/document). header_handle
+    // comes from api/wa/media-sample (Meta resumable upload of a sample file).
+    const headerFormat = String(body?.header_format || '').trim().toUpperCase()
+    const headerHandle = String(body?.header_handle || '').trim()
     if (!name || !bodyText) return res.status(400).json({ error: 'bad_input', detail: 'Name + body required.' })
     if (!['MARKETING', 'UTILITY'].includes(category)) return res.status(400).json({ error: 'bad_category' })
     if (bodyText.length > 1024) return res.status(400).json({ error: 'too_long', detail: 'Body max 1024 chars.' })
+    if (headerFormat && !['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat)) {
+      return res.status(400).json({ error: 'bad_header', detail: 'Header must be IMAGE, VIDEO or DOCUMENT.' })
+    }
+    if (headerFormat && !headerHandle) {
+      return res.status(400).json({ error: 'no_sample', detail: 'A sample file is required for a media header.' })
+    }
 
     // {{1}} in the body → Meta needs a sample value.
     const hasVar = /\{\{\s*1\s*\}\}/.test(bodyText)
-    const components = [{
+    const components = []
+    // A media HEADER (if chosen) must come FIRST in the components array.
+    if (headerFormat) {
+      components.push({ type: 'HEADER', format: headerFormat, example: { header_handle: [headerHandle] } })
+    }
+    components.push({
       type: 'BODY',
       text: bodyText,
       ...(hasVar ? { example: { body_text: [[example]] } } : {}),
-    }]
+    })
 
     const r = await fetch(`${GRAPH}/${wabaId}/message_templates`, {
       method: 'POST',

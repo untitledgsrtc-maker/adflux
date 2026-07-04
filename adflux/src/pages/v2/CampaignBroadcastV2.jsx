@@ -57,6 +57,11 @@ export default function CampaignBroadcastV2() {
   const [bodyText, setBodyText] = useState(DEFAULT_BODY)
   const [example, setExample] = useState('Rajesh')
   const [submitting, setSubmitting] = useState(false)
+  // Phase 199 — media header (image/video/document). headerFormat is for the
+  // CREATE form (sample); bcMediaFile is the actual creative sent on a broadcast.
+  const [headerFormat, setHeaderFormat] = useState('')      // '' | IMAGE | VIDEO | DOCUMENT
+  const [headerFile, setHeaderFile] = useState(null)        // sample file for template create
+  const [bcMediaFile, setBcMediaFile] = useState(null)      // creative for the broadcast/test send
   const submitRef = useRef(false)
 
   // broadcast composer
@@ -126,22 +131,50 @@ export default function CampaignBroadcastV2() {
 
   useEffect(() => { load(); loadAux() }, [load, loadAux])
 
+  // Phase 199 — upload a file to the campaign-media bucket, return its public URL.
+  async function uploadToCampaignMedia(file) {
+    const ext = ((file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'bin'
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const { error } = await supabase.storage.from('campaign-media').upload(path, file, { upsert: false, contentType: file.type || undefined })
+    if (error) throw error
+    return supabase.storage.from('campaign-media').getPublicUrl(path).data.publicUrl
+  }
+  // Meta template header format (image|video|document) or '' — read from components.
+  function headerFmtOf(t) {
+    const h = (t?.components || []).find((c) => String(c.type).toUpperCase() === 'HEADER')
+    const f = String(h?.format || '').toUpperCase()
+    return ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(f) ? f.toLowerCase() : ''
+  }
+
   async function submit() {
     const nm = name.trim()
     if (!nm) { toastError(new Error('name'), 'Name the template (lowercase, no spaces).'); return }
     if (!bodyText.trim()) { toastError(new Error('body'), 'Write the message body.'); return }
+    if (headerFormat && !headerFile) { toastError(new Error('sample'), 'Attach a sample file for the header.'); return }
     if (submitRef.current || submitting) return
     submitRef.current = true; setSubmitting(true)
     try {
+      // Phase 199 — media header: upload the sample to Meta first → header_handle.
+      let header_format = '', header_handle = ''
+      if (headerFormat) {
+        const url = await uploadToCampaignMedia(headerFile)
+        const sr = await authedFetch('/api/wa/media-sample', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ media_url: url, mime_type: headerFile.type }),
+        })
+        const sj = await sr.json().catch(() => ({}))
+        if (!sr.ok || !sj.header_handle) { toastError(new Error(sj?.detail || sj?.error || 'upload'), 'Sample upload to Meta failed.'); return }
+        header_format = headerFormat; header_handle = sj.header_handle
+      }
       const r = await authedFetch('/api/wa/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nm, category, body_text: bodyText.trim(), example: example.trim() || 'Rajesh' }),
+        body: JSON.stringify({ name: nm, category, body_text: bodyText.trim(), example: example.trim() || 'Rajesh', header_format, header_handle }),
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { toastError(new Error(j?.detail || j?.error || 'Submit failed'), 'Meta rejected the template.'); return }
       toastSuccess(`Submitted "${j.name || nm}" — Meta is reviewing it.`)
-      setShowForm(false); setName('')
+      setShowForm(false); setName(''); setHeaderFormat(''); setHeaderFile(null)
       load()
     } catch (e) {
       toastError(e, 'Could not submit the template.')
@@ -159,11 +192,16 @@ export default function CampaignBroadcastV2() {
     if (!selTpl) { toastError(new Error('tpl'), 'That template is not approved yet — pick an approved one.'); return }
     if (!selTpl.language) { toastError(new Error('lang'), 'This template has no language on file — reload templates.'); return }
     if (!testTo.trim()) { toastError(new Error('to'), 'Enter your own number to test.'); return }
+    // Phase 199 — if the template has a media header, attach the creative.
+    const hType = headerFmtOf(selTpl)
+    if (hType && !bcMediaFile) { toastError(new Error('media'), `This template has a ${hType} header — attach the ${hType} below to send.`); return }
     setTesting(true)
     try {
+      let header_media_url = ''
+      if (hType) header_media_url = await uploadToCampaignMedia(bcMediaFile)
       const r = await authedFetch('/api/wa/broadcast', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'test', template_name: tplName, template_language: selTpl.language, to: testTo.trim() }),
+        body: JSON.stringify({ action: 'test', template_name: tplName, template_language: selTpl.language, to: testTo.trim(), header_type: hType, header_media_url }),
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { toastError(new Error(j?.detail || j?.error || 'failed'), 'Test send failed.'); return }
@@ -178,6 +216,9 @@ export default function CampaignBroadcastV2() {
     if (!segId || !tplName) { toastError(new Error('pick'), 'Pick a segment + an approved template.'); return }
     if (!selTpl) { toastError(new Error('tpl'), 'That template is not approved yet — pick an approved one.'); return }
     if (!selTpl.language) { toastError(new Error('lang'), 'This template has no language on file — reload templates.'); return }
+    // Phase 199 — media header requires the creative.
+    const hType = headerFmtOf(selTpl)
+    if (hType && !bcMediaFile) { toastError(new Error('media'), `This template has a ${hType} header — attach the ${hType} below to send.`); return }
     if (sendRef.current || sending) return
     const ok = await confirmDialog({
       title: 'Send broadcast?',
@@ -187,9 +228,11 @@ export default function CampaignBroadcastV2() {
     if (!ok) return
     sendRef.current = true; setSending(true); setProgress(null)
     try {
+      let header_media_url = ''
+      if (hType) header_media_url = await uploadToCampaignMedia(bcMediaFile)
       const cr = await authedFetch('/api/wa/broadcast', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', segment_id: segId, template_name: tplName, template_language: selTpl.language }),
+        body: JSON.stringify({ action: 'create', segment_id: segId, template_name: tplName, template_language: selTpl.language, header_type: hType, header_media_url }),
       })
       const cj = await cr.json().catch(() => ({}))
       if (!cr.ok) { toastError(new Error(cj?.detail || cj?.error || 'failed'), 'Could not queue the broadcast.'); return }
@@ -214,6 +257,8 @@ export default function CampaignBroadcastV2() {
   const approvedCount = templates.filter((t) => String(t.status).toUpperCase() === 'APPROVED').length
   const approvedList = templates.filter((t) => String(t.status).toUpperCase() === 'APPROVED')
   const selTplBody = bodyOf(templates.find((t) => t.name === tplName) || {})
+  // Phase 199 — media-header format of the picked broadcast template ('' = text).
+  const bcHeaderType = headerFmtOf(approvedList.find((t) => t.name === tplName))
   const refreshBtn = (
     <button type="button" onClick={load} style={btnG}><RefreshCw size={14} strokeWidth={1.6} /> Refresh</button>
   )
@@ -307,6 +352,15 @@ export default function CampaignBroadcastV2() {
               </select>
             </div>
           </div>
+          {/* Phase 199 — this template has a media header → attach the creative to send */}
+          {bcHeaderType && (
+            <div style={{ marginTop: 12 }}>
+              <label style={lbl}>Attach the {bcHeaderType} to send (this template has a {bcHeaderType} header)</label>
+              <input type="file" style={{ ...inp, padding: '7px 10px' }}
+                accept={bcHeaderType === 'image' ? 'image/*' : bcHeaderType === 'video' ? 'video/*' : 'application/pdf'}
+                onChange={(e) => setBcMediaFile(e.target.files?.[0] || null)} />
+            </div>
+          )}
           {selTplBody && (
             <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--v2-green-soft, rgba(34,197,94,0.10))', border: '1px solid var(--v2-line)', fontSize: 12.5, color: 'var(--v2-ink-1)', whiteSpace: 'pre-wrap' }}>
               <Users size={12} strokeWidth={1.6} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--v2-ink-2)' }} />{selTplBody}
@@ -394,6 +448,26 @@ export default function CampaignBroadcastV2() {
             <div style={{ marginTop: 12 }}>
               <label style={lbl}>Message body — use {'{{1}}'} for the lead&rsquo;s name</label>
               <textarea style={{ ...inp, height: 96, padding: '9px 12px', resize: 'vertical' }} value={bodyText} onChange={(e) => setBodyText(e.target.value)} />
+            </div>
+            {/* Phase 199 — optional media header (image / video / PDF at the top of the message) */}
+            <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'end' }}>
+              <div>
+                <label style={lbl}>Header image / video / PDF (optional)</label>
+                <select style={inp} value={headerFormat} onChange={(e) => { setHeaderFormat(e.target.value); setHeaderFile(null) }}>
+                  <option value="">None — text only</option>
+                  <option value="IMAGE">Image</option>
+                  <option value="VIDEO">Video</option>
+                  <option value="DOCUMENT">Document (PDF)</option>
+                </select>
+              </div>
+              {headerFormat && (
+                <div>
+                  <label style={lbl}>Sample {headerFormat.toLowerCase()} — Meta needs it to approve</label>
+                  <input type="file" style={{ ...inp, padding: '7px 10px' }}
+                    accept={headerFormat === 'IMAGE' ? 'image/*' : headerFormat === 'VIDEO' ? 'video/*' : 'application/pdf'}
+                    onChange={(e) => setHeaderFile(e.target.files?.[0] || null)} />
+                </div>
+              )}
             </div>
             <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
               <button type="button" style={{ ...btnY, opacity: submitting ? 0.6 : 1 }} onClick={submit} disabled={submitting}>
