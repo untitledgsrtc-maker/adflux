@@ -12,7 +12,8 @@
 // table / hot path (§45) — new page, reads new tables only.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
+import { useAuthStore } from '../../store/authStore'   // Phase 205 — rep vs admin scope
 import {
   Loader2, AlertTriangle, RefreshCw, MessageSquare, Lock, ArrowLeft, Send, Check, CheckCheck,
   ChevronDown, FileText,
@@ -89,6 +90,11 @@ function isImageMsg(m) {
 
 export default function CampaignInboxV2() {
   const navigate = useNavigate()
+  // Phase 205 — admin sees all + can reassign; a sales/telecaller/agency rep
+  // sees only their assigned chats (RLS-scoped) and replies, no reassign.
+  const profile = useAuthStore((s) => s.profile)
+  const isPrivileged = ['admin', 'co_owner'].includes(profile?.role) || profile?.team_role === 'sales_manager'
+  const canInbox = isPrivileged || ['sales', 'telecaller', 'agency'].includes(profile?.role)
 
   const [loading, setLoading] = useState(true)
   const [tablesMissing, setTablesMissing] = useState(false)
@@ -204,11 +210,12 @@ export default function CampaignInboxV2() {
     prevMsgCount.current = msgs.length
   }, [msgs])
 
-  // Telecallers — for the reassign dropdown (mount once).
+  // Telecallers — for the reassign dropdown (admin only; reps don't reassign).
   useEffect(() => {
+    if (!isPrivileged) return
     supabase.from('users').select('id, name').eq('role', 'telecaller').order('name')
       .then(({ data }) => setTcs(data || []))
-  }, [])
+  }, [isPrivileged])
 
   const sel = threads.find((t) => t.id === selId) || null
   const openCount = threads.filter((t) => windowOpen(t.window_expires_at)).length
@@ -305,6 +312,20 @@ export default function CampaignInboxV2() {
       <RefreshCw size={16} strokeWidth={1.6} /> Refresh
     </button>
   )
+
+  // Phase 205 — fail CLOSED while auth hydrates: show a loader until the
+  // profile resolves (nothing sensitive renders in the unknown window), then
+  // bounce non-rep roles (hr / accounts / office_staff) who have no inbox.
+  if (!profile) {
+    return (
+      <CampaignChrome active="inbox" title="Inbox" right={refreshBtn}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+          <Loader2 size={22} strokeWidth={1.6} className="spin" style={{ color: 'var(--v2-yellow, #FFE600)' }} />
+        </div>
+      </CampaignChrome>
+    )
+  }
+  if (!canInbox) return <Navigate to="/" replace />
 
   if (tablesMissing) {
     return (
@@ -443,7 +464,8 @@ export default function CampaignInboxV2() {
                 </span>
                 {sel.lead_id && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    {/* assigned-to + reassign (mockup) */}
+                    {/* assigned-to + reassign — admin only (Phase 205) */}
+                    {isPrivileged && (
                     <div style={{ position: 'relative' }}>
                       <button type="button" onClick={() => setReassignOpen((o) => !o)} style={btnGhost} title="Reassign telecaller">
                         {(() => {
@@ -465,6 +487,7 @@ export default function CampaignInboxV2() {
                         </div>
                       )}
                     </div>
+                    )}
                     <button type="button" onClick={() => navigate(`/leads/${sel.lead_id}`)} style={btnGhost}>Open lead</button>
                     <button type="button" onClick={createQuote} style={btnY}><FileText size={14} strokeWidth={1.6} /> Create quote</button>
                   </div>

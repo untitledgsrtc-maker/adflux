@@ -46,7 +46,8 @@ export default async function handler(req, res) {
   const uid = ures?.user?.id
   if (uerr || !uid) return res.status(401).json({ error: 'bad_auth' })
   const { data: me } = await admin.from('users').select('role').eq('id', uid).maybeSingle()
-  if (!me || !['admin', 'co_owner'].includes(me.role)) return res.status(403).json({ error: 'not_allowed' })
+  if (!me) return res.status(403).json({ error: 'not_allowed' })
+  const isAdmin = ['admin', 'co_owner'].includes(me.role)   // Phase 205
 
   // ── body ──
   let body = req.body
@@ -58,9 +59,21 @@ export default async function handler(req, res) {
 
   // ── conversation → recipient + window + account ──
   const { data: conv } = await admin.from('whatsapp_conversations')
-    .select('id, customer_wa_id, window_expires_at, whatsapp_account_id')
+    .select('id, customer_wa_id, window_expires_at, whatsapp_account_id, assigned_to, lead_id')
     .eq('id', conversationId).maybeSingle()
   if (!conv) return res.status(404).json({ error: 'conversation_not_found' })
+
+  // Phase 205 — a non-admin may reply ONLY to a chat assigned to them (or on a
+  // lead they own). Admin/co_owner reply to any. Server-enforced — the send runs
+  // as service-role, so this gate IS the access control, not the RLS.
+  if (!isAdmin) {
+    let ok = conv.assigned_to === uid
+    if (!ok && conv.lead_id) {
+      const { data: ld } = await admin.from('leads').select('assigned_to, telecaller_id').eq('id', conv.lead_id).maybeSingle()
+      ok = !!ld && (ld.assigned_to === uid || ld.telecaller_id === uid)
+    }
+    if (!ok) return res.status(403).json({ error: 'not_allowed', detail: 'This chat is not assigned to you.' })
+  }
 
   const windowOpen = conv.window_expires_at && new Date(conv.window_expires_at).getTime() > Date.now()
   if (!windowOpen) {

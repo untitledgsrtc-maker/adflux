@@ -62,7 +62,7 @@ import {
   LayoutDashboard, FileText, CheckSquare, Users, Building2,
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
-  Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone,
+  Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone, MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -117,6 +117,7 @@ const SALES_NAV = [
   { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/campaigns/inbox',   label: 'WhatsApp',       icon: MessageCircle },   // Phase 205 — assigned WhatsApp chats
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   // Phase 33N — owner directive: voice is no longer a standalone
   // surface. Voice input lives inside the Note activity modal
@@ -180,6 +181,7 @@ const TELECALLER_NAV = [
   { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/campaigns/inbox',   label: 'WhatsApp',       icon: MessageCircle },   // Phase 205 — assigned WhatsApp chats
   // Phase 159 — TC closes deals too (§30, same incentive) so they have
   // renewable campaigns. Renewals was in admin + sales navs but missing
   // here. Sidebar/drawer only; mobile bottom nav stays at 4 thumb tabs.

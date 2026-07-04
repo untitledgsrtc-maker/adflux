@@ -325,7 +325,9 @@ export default function App() {
           {/* Campaign module (admin, token-free). Specific /campaigns/* before /campaigns. */}
           <Route path="/campaigns/qr"              element={<RequirePrivileged><CampaignQrV2 /></RequirePrivileged>} />
           <Route path="/campaigns/clients"         element={<RequirePrivileged><CampaignClientQrV2 /></RequirePrivileged>} />
-          <Route path="/campaigns/inbox"           element={<RequirePrivileged><CampaignInboxV2 /></RequirePrivileged>} />
+          {/* Phase 205 — reps reach the inbox too (scoped to their assigned chats
+              by RLS + an in-page role gate). Admin still sees all + reassigns. */}
+          <Route path="/campaigns/inbox"           element={<CampaignInboxV2 />} />
           <Route path="/campaigns/segments"        element={<RequirePrivileged><CampaignSegmentsV2 /></RequirePrivileged>} />
           <Route path="/campaigns/broadcast"       element={<RequirePrivileged><CampaignBroadcastV2 /></RequirePrivileged>} />
           <Route path="/campaigns/integrations"    element={<RequirePrivileged><CampaignIntegrationsV2 /></RequirePrivileged>} />
