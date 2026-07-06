@@ -9,14 +9,11 @@
 --   isn't already approved; PERFORM compute_daily_score(user, leave_date) AFTER —
 --   keep the recompute (else the approved day still drags the score).
 --
--- ⚠️ KNOWN GAP (captured AS-IS, NOT fixed here — owner's call):
---   This gate is `IF get_my_role() NOT IN ('admin','co_owner')` with NO `IS NULL OR`
---   arm — the §41 3-valued-logic foot-gun. A caller whose get_my_role() is NULL
---   (no users row / JWT-less) gets `NULL NOT IN (...)` → NULL → IF skips → gate
---   BYPASSED. Practical exposure is low (every authenticated rep has a non-NULL
---   role), but it should match accept_user_profile's §87.5b.1 pattern. Hardening =
---   add `public.get_my_role() IS NULL OR` to the IF — a 1-line CHANGE (run in
---   Studio), deliberately separate from this capture. Flagged to owner 2026-06-24.
+-- ✅ §41 NULL-guard CLOSED (Phase 209, 2026-07-06, security-advisor remediation):
+--   the gate now `IF get_my_role() IS NULL OR ... NOT IN ('admin','co_owner')` so a
+--   NULL-role (no users row / JWT-less) caller can no longer self-approve leave via
+--   the 3-valued-logic hole. Matches accept_user_profile's §87.5b.1 pattern. Owner
+--   surfaced it via the Supabase Security Advisor + approved the 1-line fix.
 --
 -- PROVENANCE: live dump 2026-06-24 (phase97_2 body). SECURITY DEFINER + pg_temp.
 -- SUPERSEDES: supabase_phase33l_history_workflow.sql · supabase_phase97_2_rpc_role_gates.sql
@@ -31,7 +28,10 @@ AS $function$
 DECLARE
   v_row record;
 BEGIN
-  IF public.get_my_role() NOT IN ('admin', 'co_owner') THEN
+  -- §41 NULL-guard (Phase 209): a NULL-role caller must NOT slip through the
+  -- 3-valued-logic hole (NULL NOT IN (...) → NULL → IF skips). Fail closed.
+  IF public.get_my_role() IS NULL
+     OR public.get_my_role() NOT IN ('admin', 'co_owner') THEN
     RAISE EXCEPTION 'Only admin/co_owner can approve leaves'
       USING ERRCODE = '42501';
   END IF;
@@ -46,6 +46,9 @@ BEGIN
 END $function$;
 
 NOTIFY pgrst, 'reload schema';
--- VERIFY: LIKE '%admin/co_owner can approve%' (gate) AND
---         '%compute_daily_score%' (recompute) — both TRUE.
--- NOTE: deliberately NOT asserting an IS NULL arm — see KNOWN GAP above.
+-- VERIFY (all TRUE): gate present · recompute present · NULL-guard present.
+SELECT
+  position('admin/co_owner can approve' in pg_get_functiondef(oid)) > 0 AS has_gate,
+  position('compute_daily_score'        in pg_get_functiondef(oid)) > 0 AS has_recompute,
+  position('get_my_role() IS NULL'      in pg_get_functiondef(oid)) > 0 AS has_null_guard
+FROM pg_proc WHERE proname = 'approve_leave' LIMIT 1;
