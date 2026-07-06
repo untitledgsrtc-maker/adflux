@@ -5467,3 +5467,88 @@ N+1 = GOOD (zero) · connection pool = GOOD (1 shared client, no realtime leaks)
 1000-cap = GOOD (swept) · indexes = CONCERN (5 P1 gaps → Phase 197) · SELECT* = MINOR
 (7 spots, worst AdminDashboardDesktop:138/154 + useFollowUps — narrow columns later).
 ~80 indexes already exist; this closed the last big gaps. No P0.
+
+
+---
+
+## 86 · Phase 205–211 — WhatsApp inbox/push + app-version chip + Supabase Security Advisor remediation (2026-07-06)
+
+Long session. Campaign inbox for reps, per-message WhatsApp push, an
+app-version chip on the team dashboard, then a full triage + fix of the
+Supabase **Security Advisor** (269 warnings). All on origin (HEAD `064654f`),
+all SQL run by owner + verified. Each frozen-file touch = sales-module-guardian
+PASS; the schema-wide sweep also got a dedicated security audit.
+
+### Feature commits (this session)
+| Phase | SHA | What | Deploy |
+|---|---|---|---|
+| 205 | `1f31390` | Campaign **inbox for reps** — a rep (sales/TC/agency) sees a WhatsApp nav item + replies to chats **assigned to them only**; admin-only reassign. `api/wa/send.js` server-gates a non-admin to `conv.assigned_to===uid OR lead owned by uid` (runs as service-role → the gate IS the access control). CampaignInboxV2 fail-closed loader while profile hydrates. V2AppShell nav additive (guardian PASS). **No SQL** (assigned_to + RLS already exist). | JS |
+| 206 | `35df278` | **Per-message inbound WhatsApp push** — AFTER INSERT on whatsapp_messages (direction='in') → enqueue_push the chat's owner (`COALESCE(conversation.assigned_to, lead.telecaller_id, lead.assigned_to)`). **Unique tag `wa-msg-<id>`** per message (APK LocalNotifications replaces by hashed-id with NO renotify → a per-conversation tag would silently update in place = no sound; unique tag re-sounds every message). 8s per-conversation burst-collapse. Quiet-hours gated, DEFINER, EXCEPTION-wrapped, writes NO lead_activities (P0-3). `supabase_phase206_wa_message_push.sql` **RUN**. C5's lead-creation push (first message) unchanged → first contact gets both pings (accepted). | SQL |
+| 208 | `405cd5b` | **App-version chip on the team-dashboard card** — reps self-report their installed version via a new `set_my_app_version(text,int)` SECURITY DEFINER RPC (writes ONLY the caller's own 3 `users` cols, §41 fail-closed). `AppUpdateBanner` (mounted in V2AppShell for all roles) calls it on app-open (native→real 0.96.x, web→'web'). TeamDashboardV2 rep card shows a neutral `v0.96.14`/`web`/`—` chip. Lets the owner SEE who's on which APK (the §81 GPS-fix rollout). `supabase_phase208_app_version_report.sql` **RUN**. JS report reaches the APK via live-update → each rep's CURRENT version populates on next open (old builds included). | SQL+JS |
+
+### Security-Advisor remediation — the triage (269 warnings → mostly noise)
+A 4-agent workflow (3 analysts + synthesis) triaged all 269 against the actual
+code. **0 errors.** The honest breakdown:
+- **~127 `anon/authenticated can execute SECURITY DEFINER fn`** — NOT explicit
+  grants; Postgres's **PUBLIC default**. Mostly internal trigger fns (error out
+  if RPC-poked) + already-gated admin RPCs. Real exploitability LOW.
+- **~50 `function_search_path_mutable`** — old plain helpers, hardening-noise,
+  SKIPPED (they run as caller; no privilege boundary).
+- **7 `public_bucket_allows_listing`** — only **offer-letters** mattered (PII).
+- **1 leaked-password protection off** — dashboard toggle (owner enabled).
+
+### The real fixes shipped
+| Phase | SHA | Hole | Fix |
+|---|---|---|---|
+| 207 | `1362399` | dedupe_all_phone_groups / dedupe_phone_lead_group — SECURITY DEFINER + mass `UPDATE leads SET stage='Lost'`, EXECUTE granted to authenticated → any rep could mass-Lost every lead via rpc(). | `REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated`. Zero app callers. `supabase_phase207_dedupe_revoke.sql` **RUN** (false/false). |
+| 209 | `b805560` | **approve_leave §41 NULL-guard** — gate was `NOT IN ('admin','co_owner')` with no `IS NULL OR` arm → a NULL-role caller self-approves leave (→ salary). **regen_payment_fu_notes** — ungated DEFINER write, zero callers. | approve_leave canonical edited in-place (§72 #24 gap closed); regen REVOKE'd. `supabase_phase209_*.sql` + `db/functions/approve_leave.sql` **RUN** (3×true / false-false). |
+| 210 | `064654f` | **offer-letters bucket public + listable**, and the offer PDF embeds employee **PAN + salary + address** → anyone could `.list()` + download EVERY employee's PAN. | DROP the broad public-read SELECT policy → `.list()` blocked; direct known-URL download (the 3 read sites' getPublicUrl hrefs) + the anon upload (INSERT policy) untouched. Zero code, zero frozen file. `supabase_phase210_*.sql` **RUN** (0 leftover policies, bucket still public). |
+| 211 | `064654f` | **~127 anon-executable** via PUBLIC default. | `REVOKE ALL FUNCTIONS FROM PUBLIC` + `GRANT ... TO authenticated` + re-lock the closed holes + keep the 3 pre-login offer fns anon. Signature-proof dynamic DO-loops. `supabase_phase211_*.sql` **RUN** (verified A false / B all-true / C true / D false). |
+
+### THE SECURITY-AUDIT CATCH (why the sweep got its own audit — do NOT skip this pattern)
+Phase 211's `GRANT EXECUTE ON ALL FUNCTIONS ... TO authenticated` (step 2)
+**re-opens EVERY deliberately-revoked function.** The re-lock (step 3) listed 4
+(enqueue_push, dedupe pair, regen) but a general-purpose security agent found a
+**5th: `_reassign_lead_apply`** — SECURITY DEFINER, trusts a **caller-supplied
+`p_caller_role`** (§100.A revoked it from authenticated). Without the catch, a
+rep could `rpc('_reassign_lead_apply',{p_caller_role:'admin',...})` and reassign
+any lead as admin. Fix: added it to the re-lock list + VERIFY-D. **LESSON: a
+blanket `GRANT ON ALL FUNCTIONS TO authenticated` silently reverses every
+`REVOKE ... FROM authenticated` in the repo — before running one, grep every
+`REVOKE EXECUTE ... FROM ... authenticated` in db/functions + supabase_*.sql and
+re-lock ALL of them (there are exactly 5: enqueue_push, dedupe_all_phone_groups,
+dedupe_phone_lead_group, regen_payment_fu_notes, _reassign_lead_apply).**
+
+### Advisor items still OPEN (owner-aware)
+1. **offer-letters full private+signed lock** — enumeration is CLOSED (210); the
+   *leaked-individual-URL* case (a stored public URL is downloadable forever) is
+   NOT. Closing it = make the bucket private + signed URLs, which touches the
+   **anon new-hire upload**, **rep-reads-own** storage RLS (a plain sales rep is
+   NOT "staff" → a naive staff-only policy breaks their /my-offer link), **legacy
+   stored public URLs**, and the **frozen MyOfferV2**. Real live-HR-flow
+   regression risk (§45) → deferred as a careful separate build. Owner chose
+   enumeration-closed as enough for now.
+2. **`authenticated_security_definer_function_executable` (~127)** — LEFT as-is.
+   Those functions are internal triggers / self-or-admin-gated RPCs the app calls
+   as authenticated; revoking would break the app. By-design, not fixed.
+3. **~50 `function_search_path_mutable`** — hardening-noise, skipped.
+4. **Phase 211 durability**: no `ALTER DEFAULT PRIVILEGES` → a NEWLY created
+   function re-gets the PUBLIC default → re-introduces anon-executable. Either
+   re-run phase211 after adding functions, OR add the ALTER (but then every new
+   RPC needs an explicit `GRANT ... TO authenticated` or the app can't call it).
+   Not done — avoids silently breaking future functions.
+
+### Foot-guns added 2026-07-06
+- ❌ A blanket `GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated`
+  re-opens every `REVOKE ... FROM authenticated` in the repo. Always pair it with
+  a re-lock of ALL 5 currently-revoked fns (list above) + a security audit.
+- ❌ A per-conversation push tag on the APK silently updates in place (no
+  renotify on LocalNotifications) → no sound on the 2nd+ message. Use a UNIQUE
+  per-message tag when every message must re-alert (§206).
+- ❌ "Fix the PII bucket" ≠ "make it private" reflexively — the advisor's finding
+  was LISTING; dropping the listing policy closes the mass-enumeration risk with
+  ZERO regression, vs a full private+signed migration that risks the live HR
+  flow. Match the fix to the actual finding.
+- ❌ Hand-typing a 24-arg function signature in a GRANT/REVOKE (submit_offer_
+  acceptance) — use a `DO $$ ... oid::regprocedure ... $$` loop by proname
+  instead (covers overloads, no typo).
