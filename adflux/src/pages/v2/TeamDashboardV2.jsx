@@ -378,7 +378,7 @@ export default function TeamDashboardV2() {
         // counts against daily targets — owner reported Dhara not
         // appearing in /team-dashboard despite live pings + 26 calls.
         supabase.from('users')
-          .select('id, name, team_role, city, daily_targets, is_active, profile_image_url')
+          .select('id, name, team_role, city, daily_targets, is_active, profile_image_url, app_version')
           .in('team_role', ['sales', 'sales_manager', 'telecaller'])
           .eq('is_active', true)
           .order('name'),
@@ -1724,6 +1724,22 @@ export default function TeamDashboardV2() {
                     {pill('GPS',    gpsOn)}
                     {pill('Online', onlineOk)}
                     {pill('Push',   pushOn, () => setPushTarget({ id: r.id, name: r.name }))}
+                    {/* Phase 208 — installed app version (— until the rep opens
+                        the reporting build). Neutral chip: info, not health. */}
+                    <span
+                      title="Installed app version"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center',
+                        padding: '3px 8px', borderRadius: 999,
+                        fontSize: 10, fontWeight: 600, letterSpacing: '.04em',
+                        textTransform: 'uppercase',
+                        border: '1px solid var(--v2-line, #334155)',
+                        background: 'var(--v2-bg-2, rgba(148,163,184,0.10))',
+                        color: 'var(--v2-ink-2, #94a3b8)',
+                      }}
+                    >
+                      {r.app_version ? (r.app_version === 'web' ? 'web' : `v${r.app_version}`) : '—'}
+                    </span>
                   </div>
                 )
               })()}

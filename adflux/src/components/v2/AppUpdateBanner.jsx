@@ -29,16 +29,28 @@ export default function AppUpdateBanner() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      // Native APK only — the browser/PWA updates itself.
-      if (!Capacitor?.isNativePlatform?.()) return
+      // Phase 208 — report THIS device's installed app version so the admin
+      // team-dashboard shows who's on which APK. Native → real "0.96.14" +
+      // versionCode; web/PWA → 'web'. Fire-and-forget, never blocks the banner.
+      const native = !!Capacitor?.isNativePlatform?.()
       let installedBuild = 0
-      try {
-        const { App } = await import('@capacitor/app')
-        const i = await App.getInfo()
-        installedBuild = Number(i?.build) || 0   // Android: build === versionCode
-      } catch {
-        return   // no @capacitor/app → can't compare safely → never nag
+      let versionName = 'web'
+      if (native) {
+        try {
+          const { App } = await import('@capacitor/app')
+          const i = await App.getInfo()
+          installedBuild = Number(i?.build) || 0   // Android: build === versionCode
+          versionName = i?.version || '?'
+        } catch {
+          return   // no @capacitor/app → can't read version → skip report + banner
+        }
       }
+      supabase
+        .rpc('set_my_app_version', { p_version: versionName, p_code: installedBuild })
+        .then(({ error }) => { if (error) console.warn('[AppUpdateBanner] version report failed:', error.message) })
+
+      // ── update banner below is NATIVE-ONLY (the browser/PWA self-updates) ──
+      if (!native) return
       const { data, error } = await supabase
         .from('app_version')
         .select('version_code, version_name, apk_url, mandatory')

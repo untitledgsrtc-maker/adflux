@@ -98,7 +98,7 @@ BEGIN
     'reps', COALESCE((
       SELECT jsonb_agg(to_jsonb(r) ORDER BY r.name)
       FROM (
-        SELECT id, name, team_role, city, daily_targets, is_active, profile_image_url
+        SELECT id, name, team_role, city, daily_targets, is_active, profile_image_url, app_version  -- Phase 208
         FROM public.users
         WHERE team_role IN ('sales','sales_manager','telecaller')
           AND is_active = true
