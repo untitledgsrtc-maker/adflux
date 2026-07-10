@@ -229,6 +229,134 @@ async function storeInbound(payload) {
       body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'interactive', interactive }),
     })
   }
+
+  // ── Phase C — flow runtime ──────────────────────────────────────────
+  // When an account has a PUBLISHED flow (campaign_bot_flows.published_flow +
+  // is_published) AND the bot is ON, the flow graph drives the bot end-to-end
+  // (greeting via start->first node, buttons, keyword branches, handoff) and
+  // the flat C7/204/keyword logic is skipped for that message. With NO
+  // published flow the runtime no-ops and the flat bot is 100% unchanged (§45).
+  // Every send is awaited; the call site try/catches — a flow bug can never
+  // break the 200 to Meta.
+  let _flowCache
+  async function getFlow(accountId) {
+    if (_flowCache !== undefined) return _flowCache
+    let f = null
+    try {
+      const { data, error } = await admin.from('campaign_bot_flows')
+        .select('published_flow, is_published').eq('account_id', accountId).maybeSingle()
+      if (!error && data && data.is_published && data.published_flow
+          && Array.isArray(data.published_flow.nodes) && data.published_flow.nodes.length) {
+        f = data.published_flow
+      }
+    } catch { f = null }
+    _flowCache = f
+    return f
+  }
+  async function readBotNode(convId) {
+    try {
+      const { data, error } = await admin.from('whatsapp_conversations').select('bot_node_id').eq('id', convId).maybeSingle()
+      return error ? null : (data?.bot_node_id || null)
+    } catch { return null }
+  }
+  async function writeBotNode(convId, nodeId) {
+    try { await admin.from('whatsapp_conversations').update({ bot_node_id: nodeId }).eq('id', convId) } catch { /* column may be unrun — degrade, never throw */ }
+  }
+  async function flowSend(pnid, to, convId, text, mUrl, mType) {
+    const r = await botSend(pnid, to, text, mUrl, mType)
+    if (r.ok) { const j = await r.json().catch(() => ({})); await logBotOut(convId, j?.messages?.[0]?.id || null, text || '[media]') }
+  }
+  // A flow "buttons" node -> WhatsApp interactive. Button ids encode the source
+  // node + index: `flow~<nodeId>~<i>`. 1-3 = reply buttons (media rides as a
+  // header); 4-10 = a list (WhatsApp lists allow only a TEXT header, so the
+  // media is sent as a SEPARATE message first — the image-attach fix).
+  async function sendFlowButtons(pnid, to, convId, node, name) {
+    const body = personalize(node.data?.text || '…', name)
+    const btns = (node.data?.buttons || []).slice(0, 10)
+    const mUrl = node.data?.media_url, mType = String(node.data?.media_type || '').toLowerCase()
+    if (!btns.length) { await flowSend(pnid, to, convId, body, mUrl, mType); return }
+    let interactive
+    if (btns.length <= 3) {
+      interactive = { type: 'button', body: { text: body },
+        action: { buttons: btns.map((b, i) => ({ type: 'reply', reply: { id: `flow~${node.id}~${i}`, title: String(b.label || `Option ${i + 1}`).slice(0, 20) } })) } }
+      if (mUrl && ['image', 'video', 'document'].includes(mType)) {
+        interactive.header = mType === 'document'
+          ? { type: 'document', document: { link: mUrl, filename: 'document.pdf' } }
+          : { type: mType, [mType]: { link: mUrl } }
+      }
+    } else {
+      if (mUrl && ['image', 'video', 'document'].includes(mType)) { await botSend(pnid, to, '', mUrl, mType) }
+      interactive = { type: 'list', body: { text: body },
+        action: { button: 'Choose', sections: [{ title: 'Options', rows: btns.map((b, i) => ({ id: `flow~${node.id}~${i}`, title: String(b.label || `Option ${i + 1}`).slice(0, 24) })) }] } }
+    }
+    const r = await fetch(`${GRAPH}/${pnid}/messages`, {
+      method: 'POST', headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'interactive', interactive }),
+    })
+    if (r.ok) { const j = await r.json().catch(() => ({})); await logBotOut(convId, j?.messages?.[0]?.id || null, body) }
+  }
+  // Execute the graph for one inbound message. bot_enabled + published already
+  // checked by the caller. Best-effort; caller wraps in try/catch.
+  async function runFlow(flow, ctx) {
+    const { pnid, to, convId, m, name, isNew } = ctx
+    // Pause the moment a human (telecaller) has replied in this chat.
+    const { data: humanOut } = await admin.from('whatsapp_messages')
+      .select('id').eq('conversation_id', convId).eq('direction', 'out').not('via_bot', 'is', true).limit(1)
+    if (humanOut && humanOut.length) return
+    const nodes = flow.nodes || [], edges = flow.edges || []
+    const byId = {}; for (const n of nodes) byId[n.id] = n
+    const target = (nodeId, handle) => {
+      const e = edges.find((x) => x.source === nodeId && (handle == null ? true : (x.sourceHandle || null) === handle))
+      return e ? byId[e.target] : null
+    }
+    const state = await readBotNode(convId)
+    if (state === '__handoff__') return   // already handed to a human -> silent
+    const text = String(messageBody(m) || '').toLowerCase().trim()
+    const tapId = m.type === 'interactive' ? String(m.interactive?.button_reply?.id || m.interactive?.list_reply?.id || '') : ''
+
+    let entry = null
+    if (tapId.startsWith('flow~')) {
+      const parts = tapId.split('~'); const nodeId = parts[1]; const idx = Number(parts[2])
+      entry = target(nodeId, `btn_${idx}`)
+      if (!entry) {   // unwired button -> inline reply, then clear
+        const b = byId[nodeId]?.data?.buttons?.[idx]
+        if (b && (b.reply_text || b.media_url)) await flowSend(pnid, to, convId, personalize(b.reply_text, name), b.media_url, b.media_type)
+        await writeBotNode(convId, null); return
+      }
+    } else if (state && byId[state]?.type === 'buttons') {   // typed a button label
+      const bn = byId[state]; const idx = (bn.data?.buttons || []).findIndex((b) => String(b.label || '').toLowerCase().trim() === text)
+      if (idx >= 0) {
+        entry = target(bn.id, `btn_${idx}`)
+        if (!entry) { const b = bn.data.buttons[idx]; if (b && (b.reply_text || b.media_url)) await flowSend(pnid, to, convId, personalize(b.reply_text, name), b.media_url, b.media_type); await writeBotNode(convId, null); return }
+      }
+    }
+    if (!entry) {   // global keyword branch (any inbound)
+      const kw = nodes.find((n) => n.type === 'keyword' && (n.data?.keywords || []).some((k) => k && text.includes(String(k).toLowerCase())))
+      if (kw) entry = kw
+    }
+    if (!entry && (isNew || !state)) {   // first message / fresh -> start
+      const start = nodes.find((n) => n.type === 'start')
+      entry = start ? target(start.id, null) : null
+    }
+    if (!entry) return   // no match mid-flow -> stay silent
+
+    // Traverse: auto-advance through message/keyword/action(send) nodes; stop
+    // at a buttons node (wait) or a handoff (terminal). Hop cap guards cycles.
+    let cur = entry, hops = 0, wait = null
+    while (cur && hops < 12) {
+      hops++
+      if (cur.type === 'buttons') { await sendFlowButtons(pnid, to, convId, cur, name); wait = cur.id; break }
+      if (cur.type === 'handoff' || (cur.type === 'action' && cur.data?.kind === 'handoff')) {
+        const h = (cur.data?.text && personalize(cur.data.text, name)) || 'Connecting you with our team — someone will reply shortly.'
+        await flowSend(pnid, to, convId, h, cur.data?.media_url, cur.data?.media_type); wait = '__handoff__'; break
+      }
+      const txt = personalize(cur.data?.reply ?? cur.data?.text ?? '', name)
+      if (txt || cur.data?.media_url) await flowSend(pnid, to, convId, txt, cur.data?.media_url, cur.data?.media_type)
+      cur = target(cur.id, null)
+    }
+    await writeBotNode(convId, wait)
+  }
+
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       const v = change.value || {}
@@ -376,10 +504,24 @@ async function storeInbound(payload) {
         stored++
         let repliedThisMsg = false
 
+        // Phase C — a PUBLISHED flow (+ bot ON) drives the bot end-to-end and
+        // replaces the flat C7/204/keyword logic for this message. No published
+        // flow -> flowActive stays false and the flat bot below runs unchanged.
+        let flowActive = false
+        if (convId && WA_TOKEN && acct && acct.bot_enabled) {
+          try {
+            const flow = await getFlow(accountId)
+            if (flow) {
+              flowActive = true; repliedThisMsg = true
+              await runFlow(flow, { pnid: phoneNumberId, to: customerWaId, convId, m, name: customerName, isNew: isNewConv || windowWasClosed })
+            }
+          } catch { /* best-effort — flow must never break receive */ }
+        }
+
         // C7 — auto-reply once on a new customer's first message. Free-form is
         // allowed (their inbound just opened the 24h service window) and free.
         // Best-effort: a send failure NEVER affects the store or the 200 to Meta.
-        if ((isNewConv || windowWasClosed) && convId && !autoReplied.has(convId) && autoReplied.size < 25
+        if (!flowActive && (isNewConv || windowWasClosed) && convId && !autoReplied.has(convId) && autoReplied.size < 25
             && WA_TOKEN && acct && acct.auto_reply_enabled && acct.auto_reply_text) {
           autoReplied.add(convId)
           try {
