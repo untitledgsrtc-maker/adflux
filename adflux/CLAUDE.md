@@ -5552,3 +5552,95 @@ dedupe_phone_lead_group, regen_payment_fu_notes, _reassign_lead_apply).**
 - ❌ Hand-typing a 24-arg function signature in a GRANT/REVOKE (submit_offer_
   acceptance) — use a `DO $$ ... oid::regprocedure ... $$` loop by proname
   instead (covers overloads, no typo).
+
+
+---
+
+## 87 · Phase 213–216 — salary auto-sync KILLED + agency pickers + report total + TA/DA flags (2026-07-07)
+
+Four owner-driven fixes, all on origin (`untitled-os`, HEAD `4c8a39e`) + live.
+Phase 213/216 are SQL (owner RAN both in Studio, verified); 214/215 are JS
+(live-update, no APK rebuild). Each frozen-file touch = sales-module-guardian PASS.
+
+### Phase 213 — designation→salary auto-sync REMOVED (owner directive "B") — §39/§36.10 phase64 notes are DEAD
+Owner: "system changed Jayna's salary on its own — 15k I set → became 18k."
+Root cause = the Phase 64 auto-sync (`supabase_phase64_profile_autosync.sql`):
+2 triggers (`tg_users_profile_autosync` ON users, `tg_designations_salary_propagate`
+ON designations) → `sync_user_profile_from_designation(uuid)` which
+`ON CONFLICT DO UPDATE SET monthly_salary = designation.default_monthly_salary`
+→ silently reverted ANY hand-set salary to the designation rate whenever the
+user's designation/is_active was touched OR the rate-card edited. Hit EVERY
+salaried person, not just Jayna.
+- **Fix (owner chose B): DROP both triggers + all 3 functions. Salary is now
+  100% MANUAL — nothing auto-changes it.** `supabase_phase213_drop_salary_autosync.sql`
+  (idempotent DROP IF EXISTS + VERIFY, RUN 2026-07-07 → both SELECTs 0 rows).
+- `supabase_phase64_profile_autosync.sql` NEUTRALIZED to a DROP-only tombstone
+  (§72 landmine-defuse) — re-pasting it can NEVER resurrect the auto-sync.
+- **⚠ SUPERSEDES the stale docs:** §39 "Built but not shipped" table lists
+  phase64 as "owner-approve before applying" and §36.10 references it — BOTH
+  are now WRONG/dangerous. Do NOT "ship" phase64. Do NOT reintroduce ANY
+  designation→salary sync (trigger, backfill, or otherwise) without explicit
+  owner re-approval. Salary is manual, full stop.
+- The DROP mutates NO salary data — it only stops future reverts. Owner re-sets
+  any wrongly-reverted salary by hand (blast-radius query = users whose
+  monthly_salary == designation.default_monthly_salary are candidates).
+
+### Phase 214 — agency removed from every lead-OWNER picker (`3141bf4`)
+Owner: "when we reassign a lead, agency names + inactive members show — shouldn't."
+Agency = external commission partner, **never owns a lead** (ARCHITECTURE.md).
+Removed `'agency'` from the team_role filter in ALL FOUR lead-owner dropdowns:
+`ReassignModal.jsx`, `LeadsV2.jsx` (bulk reassign), `LeadFormV2.jsx` (create),
+`LeadUploadV2.jsx` (CSV import). `is_active=true` filter kept in all (deactivated
+members already hidden — the "inactive" half is DATA: deactivate a departed rep
+via Team→Edit and they vanish from every picker). Backend `reassign_lead` RPC
+unchanged — UI-only narrowing; a lead already owned by an agency user can still
+be reassigned AWAY. Guardian PASS.
+
+### Phase 215 — honest follow-up total on the rep day-summary report (`bb3ef24`)
+Rep evening report read "175/209" while the admin Team-Dashboard card read
+"175/175" for the same rep. Root cause in `useDaySummary.js` query 5a: the
+report DENOMINATOR counted EVERY follow_up dated today with NO is_done/done_at/
+isSystemClose filter → open + rep-done + system-auto-closed + stacked-duplicate
+callbacks all inflated it, and it wasn't even a superset of the numerator.
+- Fix: query 5a now counts only OPEN due-today rows; report total =
+  `followUpsReal + open-due-today` (a proper superset of the 175 numerator,
+  mirroring the card's "Today F-up" = done + open-due). When the rep cleared her
+  plate it now reads 175/175, not 175/209.
+- Also lifts the DISPLAY day-score (follow-up slot was 175/209×20=16.75 → now
+  full 20). Pay score (compute_daily_score, server) UNTOUCHED. Applies to TC +
+  sales reports. Guardian PASS. `useDaySummary` feeds the frozen /work
+  DaySummaryCard → guardian any future edit.
+
+### Phase 216 — sales reps' TA/DA/Hotel claim flags healed (`4c8a39e`, SQL RUN)
+Owner: "Dipak Chauhan can't claim DA/TA; Mayur had this before; why don't all
+sales reps have the same policy?" The claim tabs on /my-offer are gated by
+per-user booleans `users.allow_ta/allow_da/allow_hotel` (Phase 57) — a FROZEN
+snapshot from `designations.default_allow_*` at create time, **never re-synced**.
+- **KEY: it is NOT a role/team_role/designation rule.** Owner's data disproved
+  the first hypothesis (that Sales Head's team_role='sales_manager' fell through
+  Phase 57b's `WHERE team_role='sales'` heal) — all 3 Sales Heads are actually
+  team_role='sales', yet Viral=all-true while Dipak+Avkash=false. It's per-row
+  DRIFT: rows created before the Phase 57b default-heal (or manually un-ticked)
+  stayed false; nothing resyncs them. The designation DEFAULTS are correct
+  (Phase 57b set all sales designations true → future hires snap on).
+- Fix: `supabase_phase216_sales_allow_flags_heal.sql` — one-time
+  `UPDATE users SET allow_ta=allow_da=allow_hotel=true WHERE role='sales' AND
+  (any false)`. RUN 2026-07-07 → VERIFY shows all 11 sales reps all-true.
+  Blanket `role='sales'` scope (NOT a designation-join) deliberately — it also
+  healed "Abhinav singh" who has `designation=NULL` (a join-resync would skip him).
+- **NO trigger** — an ongoing designation→flag auto-sync is the exact pattern
+  Phase 213 just removed. One-time heal only; future creates already snap right.
+
+### Foot-guns added 2026-07-07
+- ❌ Trusting an elegant structural theory (team_role gap) before the owner's
+  actual row data confirms it — Dipak's data disproved it (team_role='sales',
+  not 'sales_manager'). Verify against real rows before asserting a mechanism.
+- ❌ A per-user config SNAPSHOT (allow_ta, monthly_salary, allow_*) with no
+  enforced link to its designation source DRIFTS silently — some rows get the
+  new default, older/edited rows don't. Heal with a one-time backfill, NOT an
+  auto-sync trigger (the trigger is the §213 disease). Scope a heal by the
+  robust key (role) not a fragile one (designation string / team_role) so
+  NULL/typo'd rows aren't skipped.
+- ❌ A ratio where the numerator isn't a subset of the denominator (report
+  175/209: two independent queries) reads as "34 undone" when nothing is undone.
+  A completion ratio's denominator must be a superset of its numerator.
