@@ -177,11 +177,18 @@ export default function useDaySummary({ dateISO } = {}) {
           .gte('created_at', startISO)
           .lte('created_at', endISO),
 
-        // 5a) follow_ups assigned to rep due today
+        // 5a) follow_ups still OPEN and due today (Phase 215). Was "all rows
+        // dated today" (open + done + system-auto-closed + stacked duplicate
+        // callbacks) → an inflated denominator that made the report read
+        // "175/209" while the admin Team-Dashboard card read "175/175". Now
+        // counts only still-open due-today rows; the report total below =
+        // real-done + this (a proper superset of the numerator), matching the
+        // Team-Dashboard "Today F-up" definition.
         supabase.from('follow_ups')
           .select('id', { count: 'exact', head: true })
           .eq('assigned_to', profile.id)
-          .eq('follow_up_date', targetDate),
+          .eq('follow_up_date', targetDate)
+          .eq('is_done', false),
 
         // 5b) follow_ups done by rep today — Phase 118: return lead_id
         // rows (not just a count) so we can gate "real follow-ups" on a
@@ -388,6 +395,11 @@ export default function useDaySummary({ dateISO } = {}) {
       // gate: a no-answer call still counts (owner: "called = follow-up done").
       const followUpsReal = doneFu.filter(f =>
         f.lead_id && calledLeadIds.has(f.lead_id)).length
+      // Phase 215 — total plate = real-done today + still-open-due-today
+      // (fuTotalRes now counts open-only). A proper superset of followUpsReal
+      // so the ratio can never read "175 of 209 undone" when the rep cleared
+      // everything; mirrors the admin Team-Dashboard "Today F-up" total.
+      const followUpsTotal = followUpsReal + (fuTotalRes.count || 0)
 
       // Revisit tiers: for each lead met today (real, non-scheduled,
       // non-auto-checkin meeting/visit), what visit number is it over the
@@ -428,7 +440,7 @@ export default function useDaySummary({ dateISO } = {}) {
       // real follow-ups 20 / new leads 15 / quotes today 15. Each line =
       // min(1, actual/target) × weight.
       const pctOf = (a, t) => (t > 0 ? Math.min(1, a / t) : (a > 0 ? 1 : 0))
-      const fuAssigned = fuTotalRes.count || 0
+      const fuAssigned = followUpsTotal   // Phase 215 — honest plate (real-done + open-due), not all-dated-today
       const quotesToday = quotesTodayRes.count || 0
       // Phase 164 — the 50-point primary slot is role-aware. A telecaller's
       // core work is CALLS (>=10s — the same callRes the report's "Calls"
@@ -484,7 +496,7 @@ export default function useDaySummary({ dateISO } = {}) {
           meetings,
           calls:             callRes.count || 0,
           leads:             leadRes.count || 0,
-          follow_ups_total:  fuTotalRes.count || 0,
+          follow_ups_total:  followUpsTotal,   // Phase 215 — real-done + open-due (was all-dated-today)
           follow_ups_done:   doneFu.length,   // Phase 175 — excludes system-closed rows (isSystemClose)
           site_visits,
           whatsapp_sent,
