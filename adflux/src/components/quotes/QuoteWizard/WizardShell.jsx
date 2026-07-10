@@ -158,6 +158,11 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
             offer_rate: qc.offered_rate,
             monthly_rate: qc.listed_rate,
             screens: qc.screens,
+            // Phase 212: carry the snapshotted impressions so an edit/renew
+            // re-save preserves them (else the delete+reinsert zeroes the
+            // CPM basis and the PDF silently reverts to the 5,200 estimate).
+            impressions_month: qc.impressions_month ?? 0,
+            impressions_day: qc.impressions_day ?? 0,
           },
           screens: qc.screens,
           duration_months: qc.duration_months || 1,
@@ -241,6 +246,11 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
       override_reason: c.override_reason || null,
       campaign_total: c.campaign_total,
       duration_months: c.duration_months,
+      // Phase 212: snapshot the city's real monthly + daily impressions from
+      // the Cities master onto the quote, so the PDF CPM reads
+      // offer-price / real-impressions instead of a 5,200/screen guess.
+      impressions_month: Number(c.impressions_month ?? c.city?.impressions_month) || 0,
+      impressions_day:   Number(c.impressions_day ?? c.city?.impressions_day) || 0,
       // Slot metadata. Never null — falling back to the pre-migration
       // defaults (10s, 100/day) keeps rows self-describing even if a
       // caller forgets to set them.
@@ -426,6 +436,8 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
                           city: { id: r.city_id, name: r.city_name, grade: r.grade },
                           screens:           r.screens,
                           duration_months:   r.duration_months,
+                          impressions_month: Number(r.impressions_month || 0),
+                          impressions_day:   Number(r.impressions_day || 0),
                           listed_rate:       Number(r.listed_rate || 0),
                           offered_rate:      Number(r.offered_rate || r.listed_rate || 0),
                           override_reason:   r.override_reason || null,

@@ -76,9 +76,16 @@ function quoteSlotSecondsFn(cities) {
   }
   return bestSec
 }
+function cityMonthlyImpressions(c) {
+  // Phase 212: real monthly impressions snapshotted from the Cities master
+  // (quote_cities.impressions_month). Fallback to the old ~5,200/screen
+  // estimate for quotes saved before the snapshot existed, so CPM + the
+  // impressions figure never go blank.
+  const real = Number(c.impressions_month) || 0
+  return real > 0 ? real : (Number(c.screens) || 0) * 5200
+}
 function totalImpressionsFn(cities) {
-  // ~5200 impressions/screen/month (matches reference PDF ratios).
-  return cities.reduce((s, c) => s + (Number(c.screens) || 0) * 5200, 0)
+  return cities.reduce((s, c) => s + cityMonthlyImpressions(c), 0)
 }
 function formatLakhFn(n) {
   if (n >= 100000) return (n / 100000).toFixed(1) + 'L'
@@ -992,8 +999,14 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
               Hidden when impressions = 0 (defensive). */}
           {(() => {
             const totalImps = totalImpressionsFn(allCities)
-            if (!totalImps || subtotal <= 0) return null
-            const cpm = (subtotal / totalImps) * 1000
+            // Phase 212 (owner rule): CPM = one-month OFFER price / real
+            // monthly impressions x 1000. Numerator is offered_rate x screens
+            // (per month) — NOT the full quote total — so a multi-month deal
+            // doesn't inflate the CPM.
+            const offerMonthly = allCities.reduce(
+              (s, c) => s + (Number(c.offered_rate) || 0) * (Number(c.screens) || 0), 0)
+            if (!totalImps || offerMonthly <= 0) return null
+            const cpm = (offerMonthly / totalImps) * 1000
             return (
               <div style={{
                 marginTop:      4,
