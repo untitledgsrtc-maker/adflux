@@ -171,11 +171,17 @@ export function formatDaySummaryText(d) {
   // TRACKING INTEGRITY
   const t = d.tracking || {}
   lines.push('🛰️ *TRACKING*')
-  lines.push(`• GPS uptime:    ${fmtDuration(t.gps_uptime_seconds)}`)
-  if ((t.gps_off_count ?? 0) > 0) {
-    lines.push(`• GPS off:       ${t.gps_off_count} times (${fmtDuration(t.gps_off_duration_seconds)}) ⚠️`)
-  } else {
-    lines.push(`• GPS off:       0 times ✅`)
+  // Phase 217 — GPS lines only for GPS-tracked reps. A telecaller isn't
+  // tracked (background GPS skips them), so GPS uptime / GPS off / KM are
+  // always 0/blank noise on their report. Internet + force-stop stay — those
+  // are connectivity, still meaningful for a desk rep.
+  if (!isTC) {
+    lines.push(`• GPS uptime:    ${fmtDuration(t.gps_uptime_seconds)}`)
+    if ((t.gps_off_count ?? 0) > 0) {
+      lines.push(`• GPS off:       ${t.gps_off_count} times (${fmtDuration(t.gps_off_duration_seconds)}) ⚠️`)
+    } else {
+      lines.push(`• GPS off:       0 times ✅`)
+    }
   }
   if ((t.network_off_count ?? 0) > 0) {
     lines.push(`• Internet lost: ${t.network_off_count} times (${fmtDuration(t.network_off_duration_seconds)})`)
@@ -185,10 +191,11 @@ export function formatDaySummaryText(d) {
   if ((t.force_stop_count ?? 0) > 0) {
     lines.push(`• App force-stop: ${t.force_stop_count} times ⚠️`)
   }
-  if (t.km_traveled != null) {
+  // Phase 217 — KM is GPS-derived; a telecaller isn't tracked → skip it.
+  if (!isTC && t.km_traveled != null) {
     let kmLine = `• KM traveled:   ${Number(t.km_traveled).toFixed(1)} km`
-    // Phase 118 — justify the travel against the day score (sales only).
-    if (!isTC && Number(t.km_traveled) >= 1) {
+    // Phase 118 — justify the travel against the day score.
+    if (Number(t.km_traveled) >= 1) {
       kmLine += (a.day_score ?? 0) >= 70 ? ' · ✅ justified' : ' · ❌ not justified'
     }
     lines.push(kmLine)

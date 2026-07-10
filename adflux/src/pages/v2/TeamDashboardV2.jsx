@@ -1359,6 +1359,14 @@ export default function TeamDashboardV2() {
           // daily_targets table (default 50). Sales falls back to
           // users.daily_targets JSONB (default 20).
           const isTC = r.team_role === 'telecaller'
+          // Phase 217 — GPS pill only for GPS-tracked reps. A telecaller
+          // isn't tracked (background GPS skips them, V2AppShell:378), so a
+          // red "GPS off" on their card is meaningless noise. The reps query
+          // is already scoped to team_role IN (sales, sales_manager,
+          // telecaller) — agency/accounts never reach this map — so isTC is
+          // the only untracked case here. (r.role isn't selected; team_role
+          // is.) Online + Push pills stay — those still matter.
+          const gpsTracked = !isTC
           const policy = policyByUser[r.id]
           const usersJsonbTargets = r.daily_targets || { meetings: 5, calls: 20, new_leads: 10 }
           const callsHere = callsByUser[r.id] || 0           // total tel-taps
@@ -1721,7 +1729,7 @@ export default function TeamDashboardV2() {
                     }}
                     title="GPS / Online / Push status — red if rep's phone signal is broken"
                   >
-                    {pill('GPS',    gpsOn)}
+                    {gpsTracked && pill('GPS',    gpsOn)}
                     {pill('Online', onlineOk)}
                     {pill('Push',   pushOn, () => setPushTarget({ id: r.id, name: r.name }))}
                     {/* Phase 208 — installed app version (— until the rep opens

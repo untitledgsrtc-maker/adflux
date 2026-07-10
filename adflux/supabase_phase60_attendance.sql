@@ -432,7 +432,13 @@ BEGIN
         JOIN public.work_sessions w
           ON w.user_id = u.id AND w.work_date = v_date
        WHERE u.is_active = true
-         AND u.role IN ('sales','telecaller')
+         -- Phase 217 — TC EXCLUDED. Telecallers are NOT GPS-tracked
+         -- (background GPS skips them, V2AppShell:378), so this scan's
+         -- "no fresh ping in 30 min" is ALWAYS true for a TC → it spammed
+         -- every checked-in TC a meaningless "GPS off — for TA kms" push
+         -- every 15 min, 9:30-19:45 IST. Field sales only here. The check-in
+         -- (§7a), internet-off (§7c) and mark-absent (§7e) scans KEEP TC.
+         AND u.role = 'sales'
          AND w.check_in_at IS NOT NULL
          AND w.check_out_at IS NULL
          AND public.is_workday_for(u.id, v_date)
