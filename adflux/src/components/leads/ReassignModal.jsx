@@ -52,8 +52,8 @@ function targetLane(rep) {
 function eligibleTargets(reps, profile) {
   if (!profile) return []
   // Self-exclude only. The SELECT already filters to active reps in
-  // sales/agency/sales_manager/telecaller team_roles, so admin/other
-  // never reach this list. Per owner override: fetch-time filter OK.
+  // sales/sales_manager/telecaller team_roles (agency dropped Phase 214),
+  // so admin/other never reach this list. Fetch-time filter OK.
   return (reps || []).filter(r => r.id !== profile.id)
 }
 
@@ -108,7 +108,10 @@ export default function ReassignModal({ lead, onClose, onSaved }) {
       // assigned_to. Phase 100.B keeps it: the inline helpers
       // above need `role` to compute targetLane().
       .select('id, name, role, team_role, city, is_active')
-      .in('team_role', ['sales', 'agency', 'sales_manager', 'telecaller'])
+      // Phase 214 — no 'agency': agency = external commission partner,
+      // never owns leads (owner 2026-07-07). is_active=true hides
+      // deactivated members from the picker.
+      .in('team_role', ['sales', 'sales_manager', 'telecaller'])
       .eq('is_active', true)
       .order('name')
       .then(({ data }) => setReps(data || []))

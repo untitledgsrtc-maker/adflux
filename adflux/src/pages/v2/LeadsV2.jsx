@@ -283,7 +283,10 @@ export default function LeadsV2() {
     supabase
       .from('users')
       .select('id, name, role, team_role, city, is_active')
-      .in('team_role', ['sales', 'agency', 'sales_manager', 'telecaller'])
+      // Phase 214 — no 'agency': agency = external commission partner,
+      // never owns leads (owner 2026-07-07). is_active=true hides
+      // deactivated members from the picker.
+      .in('team_role', ['sales', 'sales_manager', 'telecaller'])
       .eq('is_active', true)
       .order('name')
       .then(({ data, error: err }) => {

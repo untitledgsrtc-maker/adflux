@@ -575,7 +575,8 @@ export default function LeadUploadV2() {
                   >
                     <option value="">— unassigned —</option>
                     {users
-                      .filter(u => ['sales','agency','sales_manager'].includes(u.team_role))
+                      // Phase 214 — no 'agency': commission-only, never owns leads
+                      .filter(u => ['sales','sales_manager'].includes(u.team_role))
                       .map(u => (
                         <option key={u.id} value={u.id}>{u.name}</option>
                       ))}

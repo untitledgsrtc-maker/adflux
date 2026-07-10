@@ -115,7 +115,9 @@ export default function LeadFormV2() {
     supabase
       .from('users')
       .select('id, name, team_role, city, is_active')
-      .in('team_role', ['sales', 'agency', 'sales_manager'])
+      // Phase 214 — no 'agency': agency = external commission partner,
+      // never owns leads (owner 2026-07-07).
+      .in('team_role', ['sales', 'sales_manager'])
       .eq('is_active', true)
       .order('name')
       .then(({ data }) => setReps(data || []))
