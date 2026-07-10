@@ -243,9 +243,12 @@ async function storeInbound(payload) {
     if (_flowCache !== undefined) return _flowCache
     let f = null
     try {
+      // C14 — a number can hold several flows; run ONLY the Live (published)
+      // one. The partial unique index guarantees at most one is_published per
+      // account, so maybeSingle is safe. None published -> null -> flat bot.
       const { data, error } = await admin.from('campaign_bot_flows')
-        .select('published_flow, is_published').eq('account_id', accountId).maybeSingle()
-      if (!error && data && data.is_published && data.published_flow
+        .select('published_flow').eq('account_id', accountId).eq('is_published', true).maybeSingle()
+      if (!error && data && data.published_flow
           && Array.isArray(data.published_flow.nodes) && data.published_flow.nodes.length) {
         f = data.published_flow
       }

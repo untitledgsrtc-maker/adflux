@@ -210,6 +210,9 @@ export default function CampaignChatbotV2() {
   const [loading, setLoading] = useState(true)
   const [tablesMissing, setTablesMissing] = useState(false)
   const [acct, setAcct] = useState(null)
+  const [flows, setFlows] = useState([])       // C14 — [{id,name,is_published}] per number
+  const [flowId, setFlowId] = useState(null)   // the flow currently being edited
+  const [curName, setCurName] = useState('')   // editable name of the current flow
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [selId, setSelId] = useState(null)
@@ -220,6 +223,34 @@ export default function CampaignChatbotV2() {
   const readyRef = useRef(false)      // guards autosave from firing during load
   const saveTimer = useRef(null)
 
+  // Load a flow row's graph JSON into the canvas. Disarms autosave so the load
+  // itself isn't written back; re-arms after two frames.
+  const loadIntoCanvas = useCallback((flowRow) => {
+    readyRef.current = false
+    setFlowId(flowRow?.id || null)
+    setCurName(flowRow?.name || '')
+    const g = flowRow?.draft_flow && Array.isArray(flowRow.draft_flow.nodes) && flowRow.draft_flow.nodes.length
+      ? flowRow.draft_flow : { nodes: [], edges: [] }
+    setNodes((g.nodes || []).map((n) => ({ ...n })))
+    setEdges((g.edges || []).map((e) => ({ ...e, markerEnd: e.markerEnd || { type: MarkerType.ArrowClosed } })))
+    setSelId(null)
+    setTimeout(() => { readyRef.current = true }, 400)
+  }, [setNodes, setEdges])
+
+  // Build a starter graph from the existing flat bot (lossless) — tolerant of
+  // un-run tables.
+  async function seedFromExisting(a) {
+    let rules = []
+    const rr = await supabase.from('campaign_bot_rules')
+      .select('id, keywords, reply, media_url, media_type, display_order').order('display_order', { ascending: true })
+    if (!rr.error) rules = rr.data || []
+    let btns = []
+    const bb = await supabase.from('campaign_bot_buttons')
+      .select('label, position, action, reply_text, media_url, media_type').eq('whatsapp_account_id', a.id).order('position', { ascending: true })
+    if (!bb.error) btns = bb.data || []
+    return seedFlow(a, rules, btns)
+  }
+
   const load = useCallback(async () => {
     setLoading(true); readyRef.current = false
     const { data: a } = await supabase.from('whatsapp_accounts')
@@ -227,45 +258,43 @@ export default function CampaignChatbotV2() {
     setAcct(a || null)
     if (!a?.id) { setLoading(false); return }
 
-    // Existing flow?
-    const { data: flow, error: fErr } = await supabase.from('campaign_bot_flows')
-      .select('draft_flow').eq('account_id', a.id).maybeSingle()
-    if (fErr && /relation .* does not exist|could not find the table/i.test(fErr.message || '')) {
+    // C14 — all flows for this number.
+    let list = null
+    const r1 = await supabase.from('campaign_bot_flows')
+      .select('id, name, is_published, draft_flow').eq('account_id', a.id).order('created_at', { ascending: true })
+    if (r1.error && /relation .* does not exist|could not find the table/i.test(r1.error.message || '')) {
       setTablesMissing(true); setLoading(false); return
     }
-
-    let graph = flow?.draft_flow
-    if (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
-      // Seed from the existing flat bot (lossless) — tolerant of un-run tables.
-      let rules = []
-      const rr = await supabase.from('campaign_bot_rules')
-        .select('id, keywords, reply, media_url, media_type, display_order').order('display_order', { ascending: true })
-      if (!rr.error) rules = rr.data || []
-      let btns = []
-      const bb = await supabase.from('campaign_bot_buttons')
-        .select('label, position, action, reply_text, media_url, media_type').eq('whatsapp_account_id', a.id).order('position', { ascending: true })
-      if (!bb.error) btns = bb.data || []
-      graph = seedFlow(a, rules, btns)
+    if (r1.error && /name|is_published|could not find|column/i.test(r1.error.message || '')) {
+      // pre-C14 (no name/is_published columns) — degrade to a single 'Main'.
+      const r2 = await supabase.from('campaign_bot_flows').select('id, draft_flow').eq('account_id', a.id)
+      list = (r2.data || []).map((x) => ({ ...x, name: 'Main', is_published: false }))
+    } else {
+      list = r1.data || []
     }
-    setNodes((graph.nodes || []).map((n) => ({ ...n })))
-    setEdges((graph.edges || []).map((e) => ({ ...e, markerEnd: e.markerEnd || { type: MarkerType.ArrowClosed } })))
+
+    if (!list.length) {
+      const graph = await seedFromExisting(a)
+      const ins = await supabase.from('campaign_bot_flows')
+        .insert({ account_id: a.id, name: 'Main', draft_flow: graph })
+        .select('id, name, is_published, draft_flow').maybeSingle()
+      list = ins.data ? [ins.data] : [{ id: null, name: 'Main', is_published: false, draft_flow: graph }]
+    }
+    setFlows(list.map((f) => ({ id: f.id, name: f.name, is_published: !!f.is_published })))
+    loadIntoCanvas(list.find((f) => f.is_published) || list[0])
     setLoading(false)
-    // let two render frames pass before autosave arms, so the initial
-    // setNodes/setEdges don't count as a user edit.
-    setTimeout(() => { readyRef.current = true }, 400)
-  }, [setNodes, setEdges])
+  }, [loadIntoCanvas])
   useEffect(() => { load() }, [load])
 
   // ── autosave draft (debounced) ──
   const saveDraft = useCallback(async () => {
-    if (!acct?.id) return
+    if (!acct?.id || !flowId) return
     setSaving(true)
-    const draft = serialize(nodes, edges)
     const { error } = await supabase.from('campaign_bot_flows')
-      .upsert({ account_id: acct.id, draft_flow: draft }, { onConflict: 'account_id' })
+      .update({ draft_flow: serialize(nodes, edges) }).eq('id', flowId)
     if (error) toastError(error, 'Could not save the flow.')
     setSaving(false)
-  }, [acct?.id, nodes, edges])
+  }, [acct?.id, flowId, nodes, edges])
 
   useEffect(() => {
     if (!readyRef.current) return
@@ -330,15 +359,60 @@ export default function CampaignChatbotV2() {
   }
 
   async function publish() {
-    if (!acct?.id) return
+    if (!acct?.id || !flowId) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setPublishing(true)
     const draft = serialize(nodes, edges)
+    // One Live flow per number -> un-publish siblings, then publish this.
+    await supabase.from('campaign_bot_flows').update({ is_published: false }).eq('account_id', acct.id)
     const { error } = await supabase.from('campaign_bot_flows')
-      .upsert({ account_id: acct.id, draft_flow: draft, published_flow: draft, is_published: true, published_at: new Date().toISOString(), published_by: profile?.id || null }, { onConflict: 'account_id' })
+      .update({ draft_flow: draft, published_flow: draft, is_published: true, published_at: new Date().toISOString(), published_by: profile?.id || null })
+      .eq('id', flowId)
     if (error) toastError(error, 'Could not publish.')
-    else toastSuccess('Flow published. (Runtime goes live in Phase C.)')
+    else { setFlows((fs) => fs.map((f) => ({ ...f, is_published: f.id === flowId }))); toastSuccess('This chatbot is now Live on WhatsApp.') }
     setPublishing(false)
+  }
+
+  // ── C14 — multiple named chatbots per number ──
+  async function newFlow() {
+    if (!acct?.id) return
+    const graph = { nodes: [{ id: 'start', type: 'start', position: { x: 60, y: 240 }, data: {} }], edges: [] }
+    const { data, error } = await supabase.from('campaign_bot_flows')
+      .insert({ account_id: acct.id, name: `Bot ${flows.length + 1}`, draft_flow: graph })
+      .select('id, name, is_published, draft_flow').maybeSingle()
+    if (error || !data) { toastError(error, 'Could not create the chatbot.'); return }
+    setFlows((fs) => [...fs, { id: data.id, name: data.name, is_published: false }])
+    loadIntoCanvas(data)
+    toastSuccess('New chatbot created. Build it, then Publish to go Live.')
+  }
+  async function switchFlow(id) {
+    if (!id || id === flowId) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    const { data } = await supabase.from('campaign_bot_flows')
+      .select('id, name, is_published, draft_flow').eq('id', id).maybeSingle()
+    if (data) loadIntoCanvas(data)
+  }
+  async function renameFlow(name) {
+    const nm = (name || '').trim()
+    if (!flowId || !nm || nm === flows.find((f) => f.id === flowId)?.name) return
+    const { error } = await supabase.from('campaign_bot_flows').update({ name: nm }).eq('id', flowId)
+    if (error) { toastError(error, 'Could not rename.'); return }
+    setFlows((fs) => fs.map((f) => f.id === flowId ? { ...f, name: nm } : f))
+  }
+  async function delFlow() {
+    if (!flowId) return
+    if (flows.length <= 1) { toastError(new Error('min'), 'Keep at least one chatbot.'); return }
+    const ok = await confirmDialog({ title: 'Delete chatbot?', message: `Delete "${curName}"? This removes the whole flow.`, confirmLabel: 'Delete', danger: true })
+    if (!ok) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    const { error } = await supabase.from('campaign_bot_flows').delete().eq('id', flowId)
+    if (error) { toastError(error, 'Could not delete.'); return }
+    const rest = flows.filter((f) => f.id !== flowId)
+    setFlows(rest)
+    const { data } = await supabase.from('campaign_bot_flows')
+      .select('id, name, is_published, draft_flow').eq('id', rest[0].id).maybeSingle()
+    if (data) loadIntoCanvas(data)
+    toastSuccess('Chatbot deleted.')
   }
 
   const on = !!acct?.bot_enabled
@@ -374,6 +448,20 @@ export default function CampaignChatbotV2() {
         <div style={banner}><AlertTriangle size={18} strokeWidth={1.6} style={{ color: 'var(--v2-amber, #F59E0B)' }} />
           <div style={{ fontSize: 13, color: 'var(--v2-ink-1)' }}>No active WhatsApp number to attach the bot to.</div></div>
       ) : (
+        <>
+        {/* C14 — pick which chatbot to edit; one is Live on WhatsApp */}
+        <div style={flowbar}>
+          <span style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.07em', fontWeight: 600 }}>Chatbot</span>
+          <select style={{ ...pinp, width: 'auto', minWidth: 130, height: 34 }} value={flowId || ''} onChange={(e) => switchFlow(e.target.value)}>
+            {flows.map((f) => <option key={f.id || 'x'} value={f.id || ''}>{f.name}{f.is_published ? '  ·  LIVE' : ''}</option>)}
+          </select>
+          <input style={{ ...pinp, width: 150, height: 34 }} value={curName} onChange={(e) => setCurName(e.target.value)} onBlur={() => renameFlow(curName)} placeholder="name" title="Rename this chatbot" />
+          <button type="button" onClick={newFlow} style={{ ...btnG, height: 34 }}><Plus size={13} strokeWidth={1.8} /> New</button>
+          <button type="button" onClick={delFlow} style={{ ...btnG, height: 34, padding: '0 10px', color: 'var(--v2-rose, #f87171)' }} title="Delete this chatbot"><Trash2 size={13} strokeWidth={1.6} /></button>
+          <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 600, color: (flows.find((f) => f.id === flowId)?.is_published) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2)' }}>
+            {(flows.find((f) => f.id === flowId)?.is_published) ? '● LIVE on WhatsApp' : 'Draft — Publish to go Live'}
+          </span>
+        </div>
         <div style={botwrap}>
           {/* rail — drag OR click to add a typed block */}
           <div style={rail}>
@@ -424,6 +512,7 @@ export default function CampaignChatbotV2() {
             )}
           </div>
         </div>
+        </>
       )}
       <style>{`@keyframes spin{to{transform:rotate(360deg)}} .spin{animation:spin 1s linear infinite}
         .react-flow__attribution{display:none}
@@ -523,6 +612,7 @@ function NodeEditor({ node, patch, mediaBusy, uploadFor }) {
 
 // ─── styles ──────────────────────────────────────────────────────────
 const banner = { border: '1px solid var(--v2-amber, #F59E0B)', borderRadius: 14, padding: 18, background: 'var(--v2-amber-soft, rgba(245,158,11,0.12))', display: 'flex', gap: 10, alignItems: 'flex-start' }
+const flowbar = { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', marginBottom: 10, border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 12, background: 'var(--v2-bg-1, #0f1525)', flexWrap: 'wrap' }
 const botwrap = { display: 'flex', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, overflow: 'hidden', background: 'var(--v2-bg-1, #0f1525)', height: 620 }
 const rail = { width: 64, borderRight: '1px solid var(--v2-line)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '14px 0', background: 'var(--v2-bg-2, #1a2742)', flexShrink: 0 }
 const ri = { width: 50, height: 50, borderRadius: 10, border: '1px solid var(--v2-line)', background: 'var(--v2-bg-1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'grab' }
