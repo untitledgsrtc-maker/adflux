@@ -5644,3 +5644,78 @@ snapshot from `designations.default_allow_*` at create time, **never re-synced**
 - ❌ A ratio where the numerator isn't a subset of the denominator (report
   175/209: two independent queries) reads as "34 undone" when nothing is undone.
   A completion ratio's denominator must be a superset of its numerator.
+
+
+---
+
+## 88 · Campaign chatbot BUILDER — real branching flow (C12–C13, 2026-07-10)
+
+Owner directive 10 Jul: build the REAL branching bot builder to match
+`_design_reference/campaign_module_mockup.html` (the previous Chatbot tab was a
+FACADE — absolutely-positioned divs + fake SVG wires + 5 dead rail icons + a flat
+keyword list; §46/§53/§55 had it slotted as "V3/not built" but a skin shipped
+early). Built A→C in one session. **SUPERSEDES the §46/§53/§54/§55 "auto-reply/
+chatbot = V3 / soon / not built" notes — the chatbot builder is now REAL + live.**
+
+### The three phases (all on origin)
+| Phase | What | Commit |
+|---|---|---|
+| A · flow model | `campaign_bot_flows` table — one row/campaign-number, graph as react-flow JSON `{nodes,edges}` in `draft_flow` + `published_flow`. Documented node/edge CONTRACT in the SQL header (Phases B+C depend on it). | `036d4d4` (`supabase_campaign_c12_bot_flow_model.sql`, RUN) |
+| B setup | `reactflow@11.11.4` dep (isolated commit, §35). Lazy on the campaign page only. | `14c7ddc` |
+| B · canvas | Rewrote `CampaignChatbotV2.jsx` into a real react-flow editor: rail click/drag adds typed blocks, drag-connect ports, per-node props panel, autosave to `draft_flow`, Publish (draft→published). LOSSLESS seed: first open with no draft rebuilds the graph from the existing greeting/keywords/buttons. | `f8079f5` |
+| C · runtime | `whatsapp_conversations.bot_node_id` (C13, state) + a flow engine in `api/wa/webhook.js` (`getFlow`/`runFlow`/`sendFlowButtons`) that EXECUTES the published graph. | `d650dfd` (`supabase_campaign_c13_bot_flow_state.sql`) |
+
+### Node types v1 (the CONTRACT — see the C12 SQL header)
+`start · message · buttons · keyword · action(send_media/create_lead/handoff) ·
+handoff`. A `buttons` node exposes one output PORT per button (`sourceHandle
+btn_<i>`); the runtime sends WhatsApp buttons with id `flow~<nodeId>~<i>` and on
+tap/typed-label follows that button's edge → real branching. Global `keyword`
+nodes match any inbound. `bot_node_id` tracks where each customer is waiting
+(a buttons node), or `'__handoff__'` after a handoff.
+
+### THE §45 SAFETY (why this was safe to ship to a live webhook)
+The engine is **DORMANT until Publish.** `runFlow` only fires when
+`bot_enabled AND is_published AND published_flow.nodes.length` — else
+`flowActive=false` and the OLD flat bot (C7 welcome + Phase 204 buttons +
+`campaign_bot_rules` keyword) runs **100% unchanged**. The whole flow block is
+try/caught → a flow bug can NEVER break the 200 to Meta. The builder edits the
+DRAFT; the live bot only changes when the owner Publishes.
+- **ROLLBACK (instant):** `UPDATE campaign_bot_flows SET is_published=false
+  WHERE account_id=…` (or turn the Bot OFF) → `getFlow` returns null → the flat
+  bot is restored. No deploy needed.
+
+### Image-attach bug (#1 from the owner's report) — FIXED in the flow path
+The flat path's `botSendButtons` list branch (4+ buttons → WhatsApp `list`, which
+allows only a TEXT header) silently drops the media. `sendFlowButtons` (Phase C)
+sends the media as a SEPARATE message BEFORE the list. (The OLD flat
+`botSendButtons` still has the bug — but the owner is moving to the flow. If a
+number stays on the flat bot with 4+ greeting buttons + an image, port the same
+"media first" fix there.)
+
+### Deploy (owner) — needs BOTH
+1. `git push origin untitled-os` (deploys the webhook engine + the builder;
+   Vercel installs reactflow).
+2. Supabase Studio: run `supabase_campaign_c12_bot_flow_model.sql` (RUN 10 Jul)
+   + `supabase_campaign_c13_bot_flow_state.sql`.
+3. Build a flow → **Publish** → turn Bot ON → message the number from your own
+   phone → verify the branches. **MUST be smoke-tested on a real WhatsApp chat**
+   — the Meta round-trip couldn't be tested from the sandbox; node --check +
+   vite build passed, logic self-reviewed, fallback airtight.
+
+### NOT built (v1 scope) / next
+- **Phase D** — a "Test bot" in-app simulator. Publish works; the sim is a
+  nice-to-have, deferred. (Owner said finish at C.)
+- Drop-position mapping (dragged nodes land at a default spot, not the cursor —
+  they're draggable after). Minor UX.
+- Per-node analytics, A/B, richer action kinds — later.
+- The flat `campaign_bot_rules`/`campaign_bot_buttons`/`auto_reply_*` tables are
+  KEPT (the seed reads them + they're the live fallback). Don't drop them.
+
+### Foot-guns
+- ❌ Don't assume the campaign chatbot is "not built / V3" (stale §46/§53/§54/§55).
+  It's a real react-flow builder + webhook runtime as of 10 Jul.
+- ❌ Don't edit the node/edge shape without updating BOTH the C12 SQL contract
+  AND `runFlow` in webhook.js AND the builder — the graph JSON is the interface
+  between all three.
+- ❌ Don't make the flow engine fire without the `is_published`+`bot_enabled`
+  gate — that gate is the §45 dormancy guarantee for the live bot.
