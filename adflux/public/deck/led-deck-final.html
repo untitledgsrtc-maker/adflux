@@ -1792,12 +1792,12 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         </div>
       </div>
       <!-- RIGHT: big city poster -->
-      <div class="s6-photowrap rv d3" style="position:relative">
+      <div class="s6-photowrap rv d3" id="s6photowrap" style="position:relative">
         <img id="s6photo" class="s6-photo" alt="" referrerpolicy="no-referrer" />
-        <button id="s6play" type="button" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);align-items:center;gap:10px;padding:14px 24px;border:none;border-radius:999px;background:#FFE600;color:#0a0a0c;font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.02rem;cursor:pointer;box-shadow:0 12px 34px rgba(0,0,0,.55)">
-          <span style="display:inline-block;width:0;height:0;border-left:15px solid #0a0a0c;border-top:9px solid transparent;border-bottom:9px solid transparent"></span>
-          Watch this station
+        <button id="s6play" type="button" class="s6-playbtn" aria-label="Watch station video">
+          <span class="s6-playtri" aria-hidden="true"></span>
         </button>
+        <div class="s6-playlabel" id="s6playlabel">Watch station video</div>
       </div>
     </div>
   </div>
@@ -2367,6 +2367,29 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
   /* ---- SIDE: list + detail card ---- */
   .s6-photo{display:block;width:100%;height:100%;object-fit:contain;border-radius:18px;background:#0a0a0c;border:1px solid var(--border);}
+  /* Phase 221.2 — big "Watch video" overlay on the coverage-slide poster.
+     Shows ONLY when the current city has a video (.has-video toggled in JS).
+     The whole poster is tappable; the pulsing circle draws the eye. */
+  .s6-photowrap.has-video{cursor:pointer;}
+  .s6-photowrap.has-video::after{content:'';position:absolute;inset:0;border-radius:18px;
+    background:radial-gradient(circle at 50% 46%,rgba(0,0,0,.06),rgba(0,0,0,.38));pointer-events:none;z-index:1;}
+  .s6-playbtn{display:none;}
+  .s6-photowrap.has-video .s6-playbtn{display:flex;position:absolute;left:50%;top:46%;
+    transform:translate(-50%,-50%);align-items:center;justify-content:center;
+    width:84px;height:84px;border-radius:999px;border:none;background:#FFE600;cursor:pointer;z-index:3;
+    animation:s6pulse 2.2s ease-out infinite;transition:transform .15s ease;}
+  .s6-photowrap.has-video .s6-playbtn:hover{transform:translate(-50%,-50%) scale(1.07);}
+  .s6-playtri{width:0;height:0;margin-left:7px;border-left:27px solid #0a0a0c;
+    border-top:17px solid transparent;border-bottom:17px solid transparent;}
+  .s6-playlabel{display:none;}
+  .s6-photowrap.has-video .s6-playlabel{display:block;position:absolute;left:50%;top:calc(46% + 66px);
+    transform:translateX(-50%);z-index:3;font-family:'Space Grotesk',sans-serif;font-weight:700;
+    font-size:.92rem;letter-spacing:.02em;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.7);
+    background:rgba(10,10,12,.5);padding:5px 15px;border-radius:999px;white-space:nowrap;pointer-events:none;}
+  @keyframes s6pulse{
+    0%{box-shadow:0 14px 40px rgba(0,0,0,.55),0 0 0 0 rgba(255,230,0,.42);}
+    70%{box-shadow:0 14px 40px rgba(0,0,0,.55),0 0 0 24px rgba(255,230,0,0);}
+    100%{box-shadow:0 14px 40px rgba(0,0,0,.55),0 0 0 0 rgba(255,230,0,0);}}
   .s6-side{display:flex;flex-direction:column;gap:14px;min-height:0;}
   .s6-card{background:var(--card);border:1px solid var(--border);border-radius:20px;
     padding:clamp(18px,1.8vw,24px);display:flex;flex-direction:column;gap:16px;}
@@ -2483,7 +2506,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
   function setCard(i) {
     var c = CITIES[i];
     if (elPhoto) { var ph = PHOTO[c.name]; if (ph) { elPhoto.src = ph; elPhoto.style.display='block'; } else { elPhoto.style.display='none'; } }
-    if (elPlay) { var _vk=(c.name||'').toUpperCase().split(/[^A-Z]/)[0]; var _vu=(window.DECK_VIDEOS||{})[_vk]; if(_vu){ elPlay.style.display='inline-flex'; elPlay.dataset.url=_vu; } else { elPlay.style.display='none'; } }
+    if (elPlay) { var _vk=(c.name||'').toUpperCase().split(/[^A-Z]/)[0]; var _vu=(window.DECK_VIDEOS||{})[_vk]; var _wrap=elPlay.parentNode, _lbl=slide.querySelector('#s6playlabel'); if(_vu){ elPlay.dataset.url=_vu; if(_wrap) _wrap.classList.add('has-video'); if(_lbl) _lbl.textContent='Watch '+c.name; } else { elPlay.dataset.url=''; if(_wrap) _wrap.classList.remove('has-video'); } }
     elName.textContent = c.name;
     elSub.textContent  = c.sub;
     elChip.textContent = 'Grade ' + c.grade;
@@ -4023,14 +4046,16 @@ window.DECK_VIDEOS = window.DECK_VIDEOS || {};
   var lb=document.getElementById('s6lb'), lbf=document.getElementById('s6lbf'), lbx=document.getElementById('s6lbx'), play=document.getElementById('s6play');
   function openLb(url){ var id=vidId(url); if(!id||!lb||!lbf) return; lbf.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0'; lb.style.display='flex'; }
   function closeLb(){ if(!lb||!lbf) return; lb.style.display='none'; lbf.src=''; }
-  if(play) play.addEventListener('click', function(){ if(this.dataset.url) openLb(this.dataset.url); });
+  if(play) play.addEventListener('click', function(e){ e.stopPropagation(); if(this.dataset.url) openLb(this.dataset.url); });
+  var s6pw=document.getElementById('s6photowrap');
+  if(s6pw) s6pw.addEventListener('click', function(){ var u=play&&play.dataset.url; if(u) openLb(u); });
   if(lbx) lbx.addEventListener('click', closeLb);
   if(lb) lb.addEventListener('click', function(e){ if(e.target===lb) closeLb(); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeLb(); });
   fetch('/api/deck-videos').then(function(r){return r.json()}).then(function(m){
     window.DECK_VIDEOS = m || {};
     var nm=document.getElementById('s6name');
-    if(nm&&play){ var k=nm.textContent.toUpperCase().split(/[^A-Z]/)[0]; var u=window.DECK_VIDEOS[k]; if(u){ play.style.display='inline-flex'; play.dataset.url=u; } }
+    if(nm&&play){ var k=nm.textContent.toUpperCase().split(/[^A-Z]/)[0]; var u=window.DECK_VIDEOS[k]; var wrap=play.parentNode, lbl=document.getElementById('s6playlabel'); if(u){ play.dataset.url=u; if(wrap) wrap.classList.add('has-video'); if(lbl) lbl.textContent='Watch '+nm.textContent; } else { play.dataset.url=''; if(wrap) wrap.classList.remove('has-video'); } }
     // Phase 221 — fill the Watch-a-station-video dropdown with the cities that
     // actually have a video, and play the picked one in the lightbox.
     var vwrap=document.getElementById('s6vidwrap'), vpick=document.getElementById('s6vidpick');
