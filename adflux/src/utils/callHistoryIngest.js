@@ -308,13 +308,50 @@ async function ingestOne(userId, raw, leadMap = {}) {
   // Normalise type → call_logs.direction enum.
   let direction
   if (type === 'outgoing')                              direction = 'outgoing'
-  else if (type === 'incoming' && durationSeconds > 0)  direction = 'incoming'
-  else if (type === 'incoming' && durationSeconds === 0) direction = 'missed'  // incoming with 0s = effectively missed
+  // Phase 220 — an Android INCOMING(1) call is an incoming call, full stop.
+  // The old `incoming + 0s → missed` reclassification misfiled every answered
+  // inbound call whose duration the scan read as 0 (unreliable device-duration
+  // read, same root as the outgoing 0s issue) → the "INCOMING always 0" symptom
+  // (Jayna: 7 days, 0 incoming, every inbound piled into 'missed'). Android
+  // already types a genuinely-unanswered ring as MISSED(3), not INCOMING(1),
+  // so trusting the TYPE is correct. Duration accuracy is a separate native
+  // issue; the direction bucket must not depend on it.
+  else if (type === 'incoming')                         direction = 'incoming'
   else if (type === 'missed' || type === 'rejected')    direction = 'missed'
   else return  // voicemail / blocked / unknown → skip
 
   const callAtIso = new Date(dateMs).toISOString()
   const cleaned   = cleanPhone(number)
+
+  // Phase 220 — same-physical-call guard for INBOUND rows. The device call_at
+  // is exact + deterministic, so a row at the SAME (user, phone, call_at) is
+  // THIS call already captured — even if a PRE-fix scan filed it under a
+  // different inbound direction (an answered incoming misread as 0s → 'missed').
+  // The direction-aware window dedup below filters by the NEW direction and
+  // would MISS the old 'missed' row → a manual re-scan ("Scan call log now",
+  // 7-day lookback, bypasses the poller checkpoint) would insert a duplicate
+  // (guardian P1). Two genuinely-different calls always have a different call_at,
+  // so this can never merge them; outgoing is excluded so §173 is untouched.
+  if (direction !== 'outgoing') {
+    const { data: samePhysical } = await supabase
+      .from('call_logs')
+      .select('id, direction')
+      .eq('user_id', userId)
+      .eq('client_phone', cleaned)
+      .eq('call_at', callAtIso)
+      .not('direction', 'eq', 'outgoing')   // never touch an outgoing / tap row (§173)
+      .limit(1)
+      .maybeSingle()
+    if (samePhysical) {
+      // Heal a pre-fix 'missed' row that is really an answered incoming.
+      if (samePhysical.direction === 'missed' && direction === 'incoming') {
+        await supabase.from('call_logs')
+          .update({ direction: 'incoming', outcome: 'connected' })
+          .eq('id', samePhysical.id)
+      }
+      return   // already captured — never a duplicate insert
+    }
+  }
 
   // Dedupe: existing call_logs row within DEDUPE_WINDOW_SEC of this
   // timestamp + same phone + same user = already captured (the tel-tap
