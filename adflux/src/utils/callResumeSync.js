@@ -44,7 +44,7 @@ async function reconcileRecentCalls() {
     const sinceIso = new Date(Date.now() - 6 * 60 * 60_000).toISOString()  // last 6h
     const { data: rows } = await supabase
       .from('call_logs')
-      .select('id, client_phone, call_at, duration_seconds, direction')
+      .select('id, client_phone, call_at, duration_seconds, direction, outcome')
       .eq('user_id', user.id)
       .gte('call_at', sinceIso)
       .or('duration_seconds.is.null,duration_seconds.eq.0')
@@ -53,6 +53,14 @@ async function reconcileRecentCalls() {
     for (const r of (rows || [])) {
       // OUTGOING only (or unlabelled tel-tap rows). Incoming/missed skipped.
       if (r.direction && r.direction !== 'outgoing') continue
+      // Phase 218 — CONNECTED-only gate. Mirrors the modal-save patch
+      // (callLogReader.js `.in('outcome', ['connected','callback_requested'])`).
+      // Without it the sweep pasted a nearby connected call's device seconds
+      // onto a row the rep marked "not connected" (§138: resume_sweep wrote
+      // 231 durations with NO outcome check → the "not-connected shows a time"
+      // bug). A not-connected row must stay duration-less; null / no_answer
+      // rows wait until the rep confirms the call via the outcome modal.
+      if (!['connected', 'callback_requested'].includes(r.outcome)) continue
       const phone = r.client_phone
       if (!phone) continue
       const tapMs = new Date(r.call_at).getTime()
@@ -66,6 +74,7 @@ async function reconcileRecentCalls() {
         .update({ duration_seconds: dev })
         .eq('id', r.id)
         .or('duration_seconds.is.null,duration_seconds.eq.0')   // no clobber
+        .in('outcome', ['connected', 'callback_requested'])     // Phase 218 — race-safe: never write a not-connected row
       // Phase 138 diagnostic — prove the resume sweep is landing.
       supabase.from('call_capture_log').insert([{
         user_id:             user.id,
