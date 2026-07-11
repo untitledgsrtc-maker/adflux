@@ -1785,8 +1785,12 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         </div>
       </div>
       <!-- RIGHT: big city poster -->
-      <div class="s6-photowrap rv d3">
+      <div class="s6-photowrap rv d3" style="position:relative">
         <img id="s6photo" class="s6-photo" alt="" referrerpolicy="no-referrer" />
+        <button id="s6play" type="button" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);align-items:center;gap:10px;padding:14px 24px;border:none;border-radius:999px;background:#FFE600;color:#0a0a0c;font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.02rem;cursor:pointer;box-shadow:0 12px 34px rgba(0,0,0,.55)">
+          <span style="display:inline-block;width:0;height:0;border-left:15px solid #0a0a0c;border-top:9px solid transparent;border-bottom:9px solid transparent"></span>
+          Watch this station
+        </button>
       </div>
     </div>
   </div>
@@ -2457,7 +2461,8 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       elDay  = slide.querySelector('#s6daily'),
       elUni  = slide.querySelector('#s6unique'),
       elCpm  = slide.querySelector('#s6cpm'),
-      elPhoto= slide.querySelector('#s6photo');
+      elPhoto= slide.querySelector('#s6photo'),
+      elPlay = slide.querySelector('#s6play');
 
   var markers = [];      // parallel to CITIES
   var activeIdx = -1;
@@ -2465,6 +2470,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
   function setCard(i) {
     var c = CITIES[i];
     if (elPhoto) { var ph = PHOTO[c.name]; if (ph) { elPhoto.src = ph; elPhoto.style.display='block'; } else { elPhoto.style.display='none'; } }
+    if (elPlay) { var _vk=(c.name||'').toUpperCase().split(/[^A-Z]/)[0]; var _vu=(window.DECK_VIDEOS||{})[_vk]; if(_vu){ elPlay.style.display='inline-flex'; elPlay.dataset.url=_vu; } else { elPlay.style.display='none'; } }
     elName.textContent = c.name;
     elSub.textContent  = c.sub;
     elChip.textContent = 'Grade ' + c.grade;
@@ -3987,6 +3993,32 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
   }
   window.addEventListener('beforeprint', finalizeForPrint);
   if(window.matchMedia){var mq=window.matchMedia('print'); if(mq.addEventListener) mq.addEventListener('change',function(e){if(e.matches)finalizeForPrint();});}
+})();
+</script>
+<div id="s6lb" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);align-items:center;justify-content:center">
+  <button id="s6lbx" type="button" style="position:absolute;top:20px;right:26px;width:46px;height:46px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:1.6rem;line-height:1;cursor:pointer">&times;</button>
+  <div style="width:min(92vw,1120px);aspect-ratio:16/9;max-height:86vh">
+    <iframe id="s6lbf" style="width:100%;height:100%;border:0;border-radius:14px" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
+  </div>
+</div>
+<script>
+/* Coverage-slide "Watch this station" — per-city videos from /api/deck-videos
+   (online only). Silently falls back to the photo when offline / no video. */
+window.DECK_VIDEOS = window.DECK_VIDEOS || {};
+(function(){
+  function vidId(u){ u=String(u||''); var m=u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{6,})/); return m?m[1]:''; }
+  var lb=document.getElementById('s6lb'), lbf=document.getElementById('s6lbf'), lbx=document.getElementById('s6lbx'), play=document.getElementById('s6play');
+  function openLb(url){ var id=vidId(url); if(!id||!lb||!lbf) return; lbf.src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0'; lb.style.display='flex'; }
+  function closeLb(){ if(!lb||!lbf) return; lb.style.display='none'; lbf.src=''; }
+  if(play) play.addEventListener('click', function(){ if(this.dataset.url) openLb(this.dataset.url); });
+  if(lbx) lbx.addEventListener('click', closeLb);
+  if(lb) lb.addEventListener('click', function(e){ if(e.target===lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeLb(); });
+  fetch('/api/deck-videos').then(function(r){return r.json()}).then(function(m){
+    window.DECK_VIDEOS = m || {};
+    var nm=document.getElementById('s6name');
+    if(nm&&play){ var k=nm.textContent.toUpperCase().split(/[^A-Z]/)[0]; var u=window.DECK_VIDEOS[k]; if(u){ play.style.display='inline-flex'; play.dataset.url=u; } }
+  }).catch(function(){});
 })();
 </script>
 <script>

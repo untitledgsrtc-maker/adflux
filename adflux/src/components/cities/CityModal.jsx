@@ -16,6 +16,7 @@ const EMPTY = {
   impressions_month: '',
   unique_viewers: '',
   photo_url: '',
+  youtube_url: '',
   is_active: true,
 }
 
@@ -269,6 +270,7 @@ export function CityModal({ city, onClose, onSave, loading }) {
         impressions_month: city.impressions_month || '',
         unique_viewers: city.unique_viewers || '',
         photo_url: city.photo_url || '',
+        youtube_url: city.youtube_url || '',
         is_active: city.is_active !== false,
       })
     } else {
@@ -303,6 +305,7 @@ export function CityModal({ city, onClose, onSave, loading }) {
       impressions_day: Number(form.impressions_day) || 0,
       impressions_month: Number(form.impressions_month) || 0,
       unique_viewers: Number(form.unique_viewers) || 0,
+      youtube_url: (form.youtube_url || '').trim() || null,
     })
   }
 
@@ -376,6 +379,16 @@ export function CityModal({ city, onClose, onSave, loading }) {
                   onChange={url => set('photo_url', url)}
                 />
               </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">YouTube video URL <span style={{ color: 'var(--text-subtle)', fontWeight: 400 }}>(plays on the deck when online)</span></label>
+              <input
+                className="form-input"
+                value={form.youtube_url}
+                onChange={e => set('youtube_url', e.target.value)}
+                placeholder="https://youtu.be/…  or  https://youtube.com/watch?v=…"
+              />
             </div>
 
             <div className="modal-section-label">Rates (per month)</div>
