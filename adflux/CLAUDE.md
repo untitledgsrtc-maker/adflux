@@ -5719,3 +5719,63 @@ number stays on the flat bot with 4+ greeting buttons + an image, port the same
   between all three.
 - ❌ Don't make the flow engine fire without the `is_published`+`bot_enabled`
   gate — that gate is the §45 dormancy guarantee for the live bot.
+
+
+---
+
+## 89 · Phase 220 — incoming-call classification = FROZEN contract (2026-07-11, `a7d88a9`)
+
+Owner: "incoming calls not appearing." Root (proven by Jayna the TC: 7 days of
+outgoing + missed rows, ZERO incoming; owner screenshot showed answered
+incoming 45s/37s not appearing): `callHistoryIngest.js:ingestOne` — the ONE and
+ONLY code path that creates a `call_logs` incoming/missed row — reclassified an
+Android **INCOMING** call to `direction='missed'` whenever the device scan read
+its duration as **0** (`incoming + 0s → missed`). On phones where the
+device-duration read is unreliable (the same native root as the outgoing 0s
+issue, §67), EVERY answered incoming call became a 'missed' row → INCOMING tile
+永远 0. Device-dependent → some reps had 2,285 incoming rows, others zero.
+
+### The contract (FROZEN — do NOT re-add the reclassification)
+- **An Android INCOMING(1) call is `direction='incoming'`, ALWAYS.** Never
+  reclassify it to 'missed' based on duration. Android already types a
+  genuinely-unanswered ring as MISSED(3), not INCOMING(1), so the type IS the
+  truth. Duration accuracy is a SEPARATE native issue (§67); the direction
+  bucket must not depend on it.
+- **Single source of truth:** `ingestOne` (the device-scan poller) is the sole
+  classifier. `callAudit.js` inserts outgoing tel-tap rows (direction defaults
+  'outgoing'); the DB dedup trigger folds, does not classify. There is NO
+  duplicate copy of the type→direction rule — so this can't §69-drift.
+- **⚠ FOOT-GUN — do NOT re-introduce `type === 'incoming' && duration === 0 →
+  'missed'`.** That line WAS the bug. If a future session "cleans up" the
+  classifier and re-adds a duration-based downgrade, incoming vanishes again.
+
+### The re-scan heal guard (same commit, §170/§173-safe)
+`ingestOne` gained a same-physical-call guard for INBOUND rows only: an exact
+`(user_id, client_phone, call_at)` match = the identical device call already
+stored. It (a) closes the force-ingest ("Scan call log now", 7-day re-scan)
+duplicate the direction-aware ±60s window dedup would miss (the old row is
+'missed', the new classifies 'incoming' → different direction → window dedup
+misses it → dup), and (b) HEALS a pre-fix 'missed' row → 'incoming' on re-scan.
+- Scoped `if (direction !== 'outgoing')` + query `.not('direction','eq','outgoing')`
+  → NEVER reads/merges an outgoing or tap row → §170/§173 untouched.
+- EXACT `call_at` (Android epoch-ms, deterministic per physical call) can NEVER
+  merge two genuinely-different calls (they have different timestamps). Distinct
+  from the ±60s window dedup below it.
+- Manual "Scan call log now" on a rep's phone now doubles as a one-time heal:
+  reclassifies the last ~7 days of mislabeled 'missed' inbound → 'incoming'
+  (older than the device-log window stays 'missed'). Idempotent (2nd pass finds
+  it already 'incoming' → no-op).
+
+### No score/pay impact (the CORRECT reason)
+`compute_daily_score`'s call branch DOES read `call_logs.direction` (via an
+EXISTS join, `direction IS NULL OR direction <> 'missed'` AND `duration_seconds
+>= 10`) — it is NOT "lead_activities-only" (guardian corrected my first premise).
+Safety is because the heal updates ONLY direction+outcome, NEVER
+duration_seconds; a healed row stays `duration_seconds=0` → can't satisfy the
+`>= 10s` clause regardless of direction. Missed AND incoming are both excluded
+from the TC outbound target. Guardian PASS (classifier + guard).
+
+### What Phase 220 does NOT fix (still open, separate native track)
+The incoming call's DURATION still reads 0 on some phones (§67 native
+duration-capture). Phase 220 makes the call SHOW as incoming; it does not make
+the duration accurate. That is the parked APK/onResume track, unchanged.
