@@ -1767,16 +1767,21 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
               <span class="s6-rv"><span id="s6screens">20</span><span class="s6-u" id="s6size">· 55"</span></span></div>
             <div class="s6-row"><span class="s6-rk">Rate</span>
               <span class="s6-rv">&#8377;<span id="s6price">850</span><span class="s6-u">/ screen / mo</span></span></div>
-            <div class="s6-row"><span class="s6-rk">Daily impressions</span>
-              <span class="s6-rv" id="s6daily">9,000<span class="s6-u">/ day</span></span></div>
-            <div class="s6-row"><span class="s6-rk">Unique reach</span>
-              <span class="s6-rv" id="s6unique">2,000<span class="s6-u">/ day</span></span></div>
+            <div class="s6-row"><span class="s6-rk">Impressions / month</span>
+              <span class="s6-rv" id="s6daily">3,14,769<span class="s6-u">/ mo</span></span></div>
+            <div class="s6-row"><span class="s6-rk">Unique viewers / month</span>
+              <span class="s6-rv" id="s6unique">80,555<span class="s6-u">/ mo</span></span></div>
+          </div>
+          <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-radius:14px;background:#FFE600;color:#0a0a0c;box-shadow:0 8px 24px rgba(255,230,0,.28)">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;opacity:.72">CPM · cost / 1,000 views</span>
+            <span style="font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:800;line-height:1">&#8377;<span id="s6cpm">54</span></span>
           </div>
         </div>
         <div class="s6-tot">
           <div class="s6-tcell"><span class="s6-tnum">20</span><span class="s6-tlab">Cities</span></div>
           <div class="s6-tcell"><span class="s6-tnum">264</span><span class="s6-tlab">Screens</span></div>
           <div class="s6-tcell"><span class="s6-tnum">8</span><span class="s6-tlab">Grade A</span></div>
+          <div class="s6-tcell"><span class="s6-tnum" style="color:#FFE600">&#8377;61</span><span class="s6-tlab">Overall CPM</span></div>
         </div>
       </div>
       <!-- RIGHT: big city poster -->
@@ -2361,26 +2366,26 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
      right-side detail card. {name, grade, screens, size, price, daily,
      unique, lat, lng, sub}. daily/unique may be null (show "—"). */
   var CITIES = [
-    {name:"Gandhinagar",  grade:"A",screens:20,size:"55",price:850,daily:9000,unique:2000,lat:23.2166,lng:72.6427,sub:"Capital region · mainland"},
-    {name:"Himmatnagar",  grade:"A",screens:20,size:"55",price:850,daily:9000,unique:3000,lat:23.5980,lng:72.9630,sub:"North Gujarat · mainland"},
-    {name:"Surat",        grade:"A",screens:20,size:"55",price:850,daily:8000,unique:2500,lat:21.1702,lng:72.8311,sub:"South Gujarat · mainland"},
-    {name:"Bhavnagar",    grade:"A",screens:15,size:"55",price:850,daily:5000,unique:2000,lat:21.7645,lng:72.1519,sub:"Saurashtra · coastal"},
-    {name:"Junagadh",     grade:"A",screens:15,size:"55",price:850,daily:7000,unique:2400,lat:21.5222,lng:70.4579,sub:"Saurashtra peninsula"},
-    {name:"Valsad",       grade:"A",screens:14,size:"55",price:850,daily:3500,unique:1200,lat:20.5992,lng:72.9342,sub:"South Gujarat · mainland"},
-    {name:"Jamnagar",     grade:"A",screens:10,size:"43",price:850,daily:4700,unique:1300,lat:22.4707,lng:70.0577,sub:"Saurashtra · coastal"},
-    {name:"Godhra",       grade:"A",screens:10,size:"43",price:850,daily:1200,unique:368, lat:22.7788,lng:73.6143,sub:"Central Gujarat · mainland"},
-    {name:"Anand",        grade:"B",screens:20,size:"43",price:650,daily:6500,unique:2000,lat:22.5645,lng:72.9289,sub:"Central Gujarat · mainland"},
-    {name:"Morbi",        grade:"B",screens:15,size:"55",price:650,daily:3500,unique:1300,lat:22.8173,lng:70.8377,sub:"Saurashtra · north"},
-    {name:"Surendranagar",grade:"B",screens:15,size:"55",price:650,daily:4000,unique:1500,lat:22.7271,lng:71.6379,sub:"Saurashtra · north"},
-    {name:"Ankleshwar",   grade:"B",screens:10,size:"55",price:650,daily:5300,unique:2000,lat:21.6266,lng:73.0020,sub:"South Gujarat · mainland"},
-    {name:"Bhachau",      grade:"B",screens:10,size:"55",price:650,daily:3000,unique:815, lat:23.2966,lng:70.3428,sub:"Kutch district"},
-    {name:"Botad",        grade:"B",screens:10,size:"55",price:650,daily:4000,unique:1500,lat:22.1704,lng:71.6685,sub:"Saurashtra · central"},
-    {name:"Chikhli",      grade:"B",screens:10,size:"43",price:650,daily:5000,unique:1700,lat:20.7570,lng:73.0620,sub:"South Gujarat · mainland"},
-    {name:"Dahod",        grade:"B",screens:10,size:"55",price:650,daily:6500,unique:2000,lat:22.8350,lng:74.2590,sub:"East Gujarat · mainland"},
-    {name:"Dwarka",       grade:"B",screens:10,size:"55",price:650,daily:3000,unique:1400,lat:22.2442,lng:68.9685,sub:"Saurashtra · west tip"},
-    {name:"Porbandar",    grade:"B",screens:10,size:"55",price:650,daily:5000,unique:1500,lat:21.6417,lng:69.6293,sub:"Saurashtra · coastal"},
-    {name:"Kheda",        grade:"C",screens:10,size:"55",price:650,daily:null,unique:null,lat:22.7507,lng:72.6847,sub:"Central Gujarat · mainland"},
-    {name:"Veraval",      grade:"C",screens:10,size:"55",price:650,daily:2600,unique:675, lat:20.9077,lng:70.3673,sub:"Saurashtra · south coast"}
+    {name:"Gandhinagar",  grade:"A",screens:20,size:"55",price:850,daily:10492,month:314769,unique:80555,cpm:54,lat:23.2166,lng:72.6427,sub:"Capital region · mainland"},
+    {name:"Himmatnagar",  grade:"A",screens:20,size:"55",price:850,daily:10211,month:306326,unique:102501,cpm:55,lat:23.5980,lng:72.9630,sub:"North Gujarat · mainland"},
+    {name:"Surat",        grade:"A",screens:20,size:"55",price:850,daily:7449,month:223457,unique:67273,cpm:76,lat:21.1702,lng:72.8311,sub:"South Gujarat · mainland"},
+    {name:"Bhavnagar",    grade:"A",screens:15,size:"55",price:850,daily:7514,month:225431,unique:81034,cpm:57,lat:21.7645,lng:72.1519,sub:"Saurashtra · coastal"},
+    {name:"Junagadh",     grade:"A",screens:15,size:"55",price:850,daily:7858,month:235752,unique:79991,cpm:54,lat:21.5222,lng:70.4579,sub:"Saurashtra peninsula"},
+    {name:"Valsad",       grade:"A",screens:14,size:"55",price:850,daily:3762,month:112874,unique:37189,cpm:105,lat:20.5992,lng:72.9342,sub:"South Gujarat · mainland"},
+    {name:"Jamnagar",     grade:"A",screens:10,size:"43",price:850,daily:6452,month:193569,unique:64052,cpm:44,lat:22.4707,lng:70.0577,sub:"Saurashtra · coastal"},
+    {name:"Godhra",       grade:"A",screens:10,size:"43",price:850,daily:7204,month:216123,unique:57316,cpm:39,lat:22.7788,lng:73.6143,sub:"Central Gujarat · mainland"},
+    {name:"Anand",        grade:"B",screens:20,size:"43",price:650,daily:7410,month:222301,unique:70364,cpm:58,lat:22.5645,lng:72.9289,sub:"Central Gujarat · mainland"},
+    {name:"Morbi",        grade:"B",screens:15,size:"55",price:650,daily:2493,month:74798,unique:28786,cpm:130,lat:22.8173,lng:70.8377,sub:"Saurashtra · north"},
+    {name:"Surendranagar",grade:"B",screens:15,size:"55",price:650,daily:3759,month:112767,unique:37519,cpm:86,lat:22.7271,lng:71.6379,sub:"Saurashtra · north"},
+    {name:"Ankleshwar",   grade:"B",screens:10,size:"55",price:650,daily:6235,month:187038,unique:66717,cpm:35,lat:21.6266,lng:73.0020,sub:"South Gujarat · mainland"},
+    {name:"Bhachau",      grade:"B",screens:10,size:"55",price:650,daily:3488,month:104648,unique:28184,cpm:62,lat:23.2966,lng:70.3428,sub:"Kutch district"},
+    {name:"Botad",        grade:"B",screens:10,size:"55",price:650,daily:2102,month:63049,unique:18419,cpm:103,lat:22.1704,lng:71.6685,sub:"Saurashtra · central"},
+    {name:"Chikhli",      grade:"B",screens:10,size:"43",price:650,daily:2022,month:60661,unique:15828,cpm:107,lat:20.7570,lng:73.0620,sub:"South Gujarat · mainland"},
+    {name:"Dahod",        grade:"B",screens:10,size:"55",price:650,daily:2754,month:82626,unique:28298,cpm:79,lat:22.8350,lng:74.2590,sub:"East Gujarat · mainland"},
+    {name:"Dwarka",       grade:"B",screens:10,size:"55",price:650,daily:3656,month:109680,unique:38567,cpm:59,lat:22.2442,lng:68.9685,sub:"Saurashtra · west tip"},
+    {name:"Porbandar",    grade:"B",screens:10,size:"55",price:650,daily:4620,month:138598,unique:44103,cpm:47,lat:21.6417,lng:69.6293,sub:"Saurashtra · coastal"},
+    {name:"Kheda",        grade:"C",screens:10,size:"55",price:650,daily:2917,month:87496,unique:28759,cpm:74,lat:22.7507,lng:72.6847,sub:"Central Gujarat · mainland"},
+    {name:"Veraval",      grade:"C",screens:10,size:"55",price:650,daily:4499,month:134981,unique:52295,cpm:48,lat:20.9077,lng:70.3673,sub:"Saurashtra · south coast"}
   ];
 
   /* grade -> deck brand palette */
@@ -2425,6 +2430,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       elPr   = slide.querySelector('#s6price'),
       elDay  = slide.querySelector('#s6daily'),
       elUni  = slide.querySelector('#s6unique'),
+      elCpm  = slide.querySelector('#s6cpm'),
       elPhoto= slide.querySelector('#s6photo');
 
   var markers = [];      // parallel to CITIES
@@ -2440,16 +2446,10 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
     elScr.textContent  = c.screens;
     elSize.textContent = '· ' + c.size + '"';
     elPr.textContent   = c.price;
-    if (c.daily == null) {
-      elDay.innerHTML = 'Not metered';
-      elDay.classList.add('muted');
-      elUni.innerHTML = '&mdash;';
-      elUni.classList.add('muted');
-    } else {
-      elDay.classList.remove('muted'); elUni.classList.remove('muted');
-      elDay.innerHTML = fmt(c.daily)  + '<span class="s6-u">/ day</span>';
-      elUni.innerHTML = fmt(c.unique) + '<span class="s6-u">/ day</span>';
-    }
+    elDay.classList.remove('muted'); elUni.classList.remove('muted');
+    elDay.innerHTML = fmt(c.month)  + '<span class="s6-u">/ mo</span>';
+    elUni.innerHTML = fmt(c.unique) + '<span class="s6-u">/ mo</span>';
+    if (elCpm) elCpm.textContent = c.cpm;
   }
 
   function select(i) {
