@@ -303,6 +303,21 @@ export function V2AppShell() {
     } catch { /* localStorage blocked — leave attr empty, defaults to night */ }
   }, [])
 
+  // Personalize the pitch deck's "point of contact" card with the presenting
+  // rep. The deck (public/deck, same origin) reads localStorage.deck_contact
+  // and shows this rep's name/phone/email instead of the default (Brijesh).
+  useEffect(() => {
+    if (!profile?.name) return
+    try {
+      localStorage.setItem('deck_contact', JSON.stringify({
+        name:  profile.name,
+        phone: profile.phone || profile.mobile || '',
+        email: profile.email || '',
+        city:  profile.city || '',
+      }))
+    } catch { /* localStorage blocked — deck keeps the default contact */ }
+  }, [profile?.name, profile?.phone, profile?.mobile, profile?.email, profile?.city])
+
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)

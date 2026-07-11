@@ -3989,5 +3989,36 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
   if(window.matchMedia){var mq=window.matchMedia('print'); if(mq.addEventListener) mq.addEventListener('change',function(e){if(e.matches)finalizeForPrint();});}
 })();
 </script>
+<script>
+/* Contact card personalization — shows the presenting rep. The app writes
+   {name,phone,email,city} to localStorage.deck_contact (same origin); this
+   fills the "Your point of contact" card + call/WhatsApp/email. Falls back to
+   the default (Brijesh) when absent, e.g. a cold link with no rep context. */
+(function(){
+  try{
+    var c = JSON.parse(localStorage.getItem('deck_contact')||'null');
+    if(!c || !c.name) return;
+    var name = String(c.name).trim();
+    var ten  = String(c.phone||'').replace(/\D/g,'').slice(-10);
+    var disp = ten.length===10 ? ten.slice(0,5)+' '+ten.slice(5) : (c.phone||'');
+    var initials = name.split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();
+    var q = function(sel){return document.querySelector(sel)};
+    var set = function(sel,txt){var el=q(sel); if(el&&txt!=null) el.textContent=txt;};
+    set('.s13-av', initials);
+    set('.s13-name', name);
+    set('.s13-role', 'Untitled Advertising'+(c.city ? ' \u00b7 '+c.city : ''));
+    if(ten.length===10){
+      var call=q('a.s13-row[href^="tel:"]');
+      if(call){ call.setAttribute('href','tel:+91'+ten); var rv=call.querySelector('.s13-rv'); if(rv) rv.textContent=disp; }
+      var ph=q('.s11-phone'); if(ph) ph.textContent='Call '+disp;
+      var wa=q('a.s13-pill.ghost'); if(wa) wa.setAttribute('href','https://wa.me/91'+ten);
+    }
+    if(c.email){
+      var em=q('a.s13-row[href^="mailto:"]');
+      if(em){ em.setAttribute('href','mailto:'+c.email); var rv2=em.querySelector('.s13-rv'); if(rv2) rv2.textContent=c.email; }
+    }
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
