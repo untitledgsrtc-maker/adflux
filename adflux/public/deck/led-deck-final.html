@@ -1740,6 +1740,13 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         </div>
         <div class="s6-results" id="s6results"></div>
       </div>
+      <div id="s6vidwrap" class="s6-vidwrap rv d1" style="display:none">
+        <span class="s6-vidtri" aria-hidden="true"></span>
+        <span class="s6-vidlabel">Video</span>
+        <select id="s6vidpick" class="s6-vidpick" aria-label="Watch a station video">
+          <option value="">Pick a station to watch&hellip;</option>
+        </select>
+      </div>
     </div>
 
     <div class="s6-stage">
@@ -1797,6 +1804,12 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 </section>
 <style>
   /* city search on the coverage slide */
+  /* Phase 221 — Watch-a-station-video dropdown (coverage slide) */
+  .s6-vidwrap{display:flex;align-items:center;gap:9px;width:min(460px,92%);margin:9px auto 2px;background:#FFE600;border-radius:999px;padding:9px 16px 9px 18px;box-shadow:0 8px 24px rgba(255,230,0,.28);}
+  .s6-vidtri{width:0;height:0;border-left:11px solid #0a0a0c;border-top:7px solid transparent;border-bottom:7px solid transparent;flex:none;}
+  .s6-vidlabel{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:#0a0a0c;flex:none;}
+  .s6-vidpick{flex:1;min-width:0;background:transparent;border:0;outline:none;color:#0a0a0c;font-family:var(--body,inherit);font-weight:600;font-size:.95rem;cursor:pointer;}
+  .s6-vidpick option{color:#0a0a0c;background:#fff;}
   .s6-search{position:relative;width:min(460px,92%);margin:14px auto 2px;z-index:40;}
   .s6-sbar{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:11px 18px;transition:border-color .2s,box-shadow .2s;}
   .s6-search:focus-within .s6-sbar{border-color:rgba(255,230,0,.55);box-shadow:0 0 0 3px rgba(255,230,0,.12);}
@@ -4018,6 +4031,22 @@ window.DECK_VIDEOS = window.DECK_VIDEOS || {};
     window.DECK_VIDEOS = m || {};
     var nm=document.getElementById('s6name');
     if(nm&&play){ var k=nm.textContent.toUpperCase().split(/[^A-Z]/)[0]; var u=window.DECK_VIDEOS[k]; if(u){ play.style.display='inline-flex'; play.dataset.url=u; } }
+    // Phase 221 — fill the Watch-a-station-video dropdown with the cities that
+    // actually have a video, and play the picked one in the lightbox.
+    var vwrap=document.getElementById('s6vidwrap'), vpick=document.getElementById('s6vidpick');
+    if(vwrap&&vpick){
+      var keys=Object.keys(window.DECK_VIDEOS||{});
+      if(keys.length){
+        keys.sort().forEach(function(kk){
+          var o=document.createElement('option');
+          o.value=window.DECK_VIDEOS[kk];
+          o.textContent=kk.charAt(0)+kk.slice(1).toLowerCase();
+          vpick.appendChild(o);
+        });
+        vwrap.style.display='flex';
+        vpick.addEventListener('change', function(){ if(this.value){ openLb(this.value); this.selectedIndex=0; } });
+      }
+    }
   }).catch(function(){});
 })();
 </script>
