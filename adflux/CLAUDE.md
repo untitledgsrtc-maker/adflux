@@ -5779,3 +5779,92 @@ from the TC outbound target. Guardian PASS (classifier + guard).
 The incoming call's DURATION still reads 0 on some phones (§67 native
 duration-capture). Phase 220 makes the call SHOW as incoming; it does not make
 the duration accurate. That is the parked APK/onResume track, unchanged.
+
+
+---
+
+## 90 · Phase 218–221.4 — deploy unblock + deck per-station video (2026-07-11)
+
+Same-day session as §89. Two live-app infra fixes, then the in-app GSRTC deck
+(§77 Phase 181) got a per-station video feature end-to-end. All JS/HTML, no APK
+rebuild. Push state: §89 Phase 220 (`a7d88a9`) + Phase 221 (`f021ca3`) + 221.1
+(`c9cd0bf`) are ON ORIGIN; **221.2 `90f110b` + 221.3 `87d8185` + 221.4 `a48b91e`
+committed locally, owner pushes** (`git push origin untitled-os`).
+
+### Phase 218 (`85cd7f5`) — call-duration resume-sweep outcome gate
+`src/utils/callResumeSync.js` app-resume sweep was pasting device durations onto
+NOT-connected call rows ungated → "call history shows a time for calls that never
+connected." Added `outcome` to the SELECT + a loop guard `if
+(!['connected','callback_requested'].includes(r.outcome)) continue` + `.in('outcome',
+['connected','callback_requested'])` on the UPDATE. Guardian PASS. Ties to the §67
+duration-capture saga (capture is unreliable; do NOT gate score/Done on duration).
+
+### Phase 219 (`bf0ace0`) — deck-videos Node→Edge = ALL deploys unblocked
+THE recurring "Vercel deploy Error" was NOT a build failure (build logged `✓ built`).
+Real cause: **Vercel Hobby plan hard cap = 12 Serverless Functions per deployment**;
+adding `api/deck-videos.js` as a Node serverless fn hit 13 → every deploy failed.
+Fix: converted it to an **Edge function** (`export const config = { runtime: 'edge' }`,
+raw `fetch` to PostgREST, dropped `@supabase/supabase-js`). **Edge functions do NOT
+count against the 12-fn cap.** This kept the video endpoint AND unblocked every future
+deploy. VERIFIED Ready·Production.
+- **FROZEN RULE:** on Hobby, new `api/*.js` = another serverless fn toward the 12 cap.
+  Prefer Edge (`runtime:'edge'`) for new endpoints, or consolidate. If deploys start
+  failing with no build error, COUNT the `api/*` files first — it's the cap, not the code.
+
+### Phase 221 (`f021ca3`) — CSP frame-src (the real "video not playing") + cache
+The deck video lightbox showed a broken box because the app CSP (a server header in
+`vercel.json`, `source:/(.*)`) had NO `frame-src` → YouTube iframe blocked. Added
+`frame-src 'self' blob: https://www.youtube.com https://www.youtube-nocookie.com`
+(CSP `frame-src` governs iframe embedding; absent → falls back to `child-src`). Also
+bumped `public/sw.js` deck cache `pitch-deck-v11`→`v12` (SW caches the response incl.
+headers, so a CSP change needs the cache bump too).
+- **FROZEN RULE:** any new embedded iframe host must be added to `frame-src` in
+  `vercel.json` OR it's silently blocked (broken box, no error).
+
+### Phase 221.1→221.4 — deck coverage-slide video feature (data-i="5")
+The pipeline: `/api/deck-videos` (Edge) reads `cities.name` + `cities.youtube_url`
+(active, non-null) → deck `fetch` fills `window.DECK_VIDEOS` (UPPERCASE-city → url) →
+UI. Add a YouTube URL to a city (Master → Cities → Edit) and it auto-appears; offline
+the fetch silently no-ops (deck still works, video just absent).
+
+| Phase | SHA | What |
+|---|---|---|
+| 221.1 | `c9cd0bf` | Yellow "Video · Pick a station to watch" dropdown on the coverage slide (populated from DECK_VIDEOS; change→`openLb`). **Later removed (221.3).** |
+| 221.2 | `90f110b` | Big pulsing **Watch ▶** button ON the station poster (`#s6play`/`.s6-playbtn`), shown via a `has-video` class when the current card city has a video; whole poster (`#s6photowrap`) is tap-to-play. Owner picked "play button on the photo" over dropdown/card-switch. |
+| 221.3 | `87d8185` | Removed the 221.1 yellow capsule (redundant with the poster button) — markup + CSS + the fetch-population JS. Poster button is the sole video entry point. |
+| 221.4 | `a48b91e` | Coverage-slide RELAYOUT: search bar → right column (owner ask); map → full-height LEFT column so the frozen Gujarat tiles fill it (kills black bands); city card + station poster side-by-side in `.s6-rightrow`; "Overall CPM ₹76" → head yellow chip (class `.s6-ocpm`). |
+
+Each touched `public/sw.js` (§28 frozen) only for the deck-cache bump (v11→v15 across
+the four commits) — guardian PASS every time. `public/deck/led-deck-final.html` is NOT
+a frozen file (standalone pitch-deck asset, §77).
+
+### DECK CONTRACTS (freeze — the deck video + map)
+- **Deck cache bump EVERY deck content change**: `public/sw.js` deck route
+  `cacheName: 'pitch-deck-vNN'` — bump NN or reps serve the stale cached deck
+  (CacheFirst). Now at **v15**. This is the §77 pattern.
+- **Coverage-slide map fill**: the frozen Gujarat tiles render ~1.3 aspect. The map
+  PANEL must be ~that aspect or black bands appear on the wide sides (contain-fit
+  leaves no-tile black). 221.4 fixed it by giving the map the full-height left column
+  (~1.27 aspect). Do NOT put content back UNDER the map (that squashes it wide-short →
+  black returns). Map init (`fitBounds`/`maxBounds [19.6,67.4]→[25.3,75.4]`/frozen tile
+  layer, z6-8) is UNCHANGED — the fix was layout only.
+- **Poster Watch button**: driven by the `has-video` class on `#s6photowrap` (toggled in
+  `setCard` + the fetch-resolve). `openLb(url)` → `#s6lb` lightbox → youtube embed. Needs
+  the §221 CSP frame-src + the §219 Edge endpoint + a `cities.youtube_url`.
+- Deck JS-bound IDs that must survive any deck edit: `s5map, s6search, s6results,
+  s6name/sub/chip/screens/size/price/daily/unique/cpm, s6photowrap, s6photo, s6play,
+  s6playlabel`. Rename one → break the inline deck script.
+
+### Foot-guns added 2026-07-11
+- ❌ Reading a Vercel "Error" as a build failure — check the deploy page for the REAL
+  error. Hobby 12-serverless-fn cap fails with `✓ built`. Count `api/*` files.
+- ❌ A new `api/*.js` on Hobby silently pushes toward the 12-fn cap → the NEXT deploy
+  fails. Use Edge (`runtime:'edge'`, doesn't count) for new endpoints.
+- ❌ An embedded iframe with no matching `frame-src` in the vercel.json CSP = silent
+  block (broken box, no console-obvious error). Add the host.
+- ❌ Editing the deck without bumping the SW `pitch-deck-vNN` cache → reps keep the old
+  deck forever (CacheFirst). Bump every time; owner reopens the app once to swap the SW.
+- ❌ A wide-short map panel + a fixed-extent frozen tile set = black bands. Match the
+  panel aspect to the tiles (don't stack content under the map).
+- ❌ `object-fit:cover` on a pre-composed marketing poster crops its baked-in text — use
+  `contain` for images with text burned in.
