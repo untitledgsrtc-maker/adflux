@@ -160,6 +160,19 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="mailto" />
         </intent>
+        <!-- SMS (sms: / smsto:). Phase 222 — AppLauncher.openUrl fires
+             ACTION_VIEW, so the VIEW+sms intent is required for the OS to
+             resolve the device Messages app; mirrors the Phase 155 mailto
+             fix. Without it the "Send SMS" button silently does nothing on
+             the APK (web/PWA needs no manifest). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="sms" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="smsto" />
+        </intent>
         <!-- Generic HTTPS — for any browser-routed link we open via
              App.openUrl (e.g. Maps links, share URLs). Most apps
              register HTTPS handlers so this catches anything. -->

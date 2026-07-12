@@ -81,8 +81,10 @@ android {
         // 96014 — Phase 180: in-app APK updater (installApk) + GPS-capture
         //         onboarding deep-links (Location "Allow all the time" +
         //         battery Unrestricted). See CLAUDE.md §73/§74.
-        versionCode 96014
-        versionName "0.96.14"
+        // 96015 — Phase 222: <queries> VIEW+sms/smsto so the post-call
+        //         "Send SMS" deep-link resolves the device Messages app.
+        versionCode 96015
+        versionName "0.96.15"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

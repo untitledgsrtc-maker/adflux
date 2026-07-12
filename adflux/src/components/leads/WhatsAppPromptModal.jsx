@@ -19,7 +19,7 @@
 // mapping all happen here so callers stay simple.
 
 import { useEffect, useState } from 'react'
-import { X, MessageCircle, Loader2 } from 'lucide-react'
+import { X, MessageCircle, MessageSquare, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openExternalUrl } from '../../utils/openExternal'
 import { phoneToWaJidOrNull as cleanPhone } from '../../utils/phone'
@@ -82,6 +82,26 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
     onClose?.()
   }
 
+  function sendSms() {
+    const phone = cleanPhone(lead?.phone)
+    if (!phone) {
+      setError('No phone number on file for this lead.')
+      return
+    }
+    // sms: deep-link — opens the device Messages app with the number +
+    // this reviewed text pre-filled; the rep just taps Send. Free (rep's
+    // own SIM), same simple pattern as the WhatsApp button. Android reads
+    // ?body=; some iOS / OEM messaging apps ignore the prefill, so the rep
+    // may have to type it. On the native APK, openExternalUrl fires
+    // ACTION_VIEW — the OS resolves it only if the sms VIEW intent is in
+    // AndroidManifest <queries> (added same phase, mirrors the Phase 155
+    // mailto fix), else the button silently no-ops. Web/PWA needs no
+    // manifest.
+    const url = `sms:+${phone}?body=${encodeURIComponent(body)}`
+    openExternalUrl(url)
+    onClose?.()
+  }
+
   return (
     <div className="lead-modal-back" onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}>
       <div className="lead-modal" style={{ width: 'min(520px, calc(100% - 32px))' }}>
@@ -92,7 +112,7 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
               Send follow-up to {lead?.name || 'lead'}?
             </div>
             <div className="lead-card-sub">
-              Review the message — you can edit anything in WhatsApp before sending.
+              Review the message — edit it here, then send by WhatsApp or SMS.
             </div>
           </div>
           <button className="lead-btn lead-btn-sm" onClick={onClose} aria-label="Close">
@@ -125,6 +145,13 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
 
         <div className="lead-modal-foot">
           <button className="lead-btn" onClick={onClose}>Skip</button>
+          <button
+            className="lead-btn"
+            onClick={sendSms}
+            disabled={loading || !body || !!error}
+          >
+            <MessageSquare size={13} /> Send SMS
+          </button>
           <button
             className="lead-btn lead-btn-primary"
             onClick={send}
