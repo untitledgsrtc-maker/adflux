@@ -1390,10 +1390,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
   /* Markers pinned over the people in the station footage (left group,
      centre, right group). %-based so they track the cover-fit video on a
      wide pitch screen. */
-  .s1-r1 { top: 58%; left: 11%; animation-delay: 1.0s, 1.0s; }
-  .s1-r2 { top: 66%; left: 53%; animation-delay: 1.25s, 1.25s; }
-  .s1-r3 { top: 56%; left: 76%; animation-delay: 1.5s, 1.5s; }
-  .s1-r4 { top: 62%; left: 29%; width: 70px; height: 82px; animation-delay: 1.75s, 1.75s; }
+  /* Phase 226 — repositioned over the Veraval clip's crowd. The clip is a
+     continuous right pan, so the crowd drifts through the lower third; these
+     sit in the lower-center-right people-zone (clear of the bottom-left title
+     + the top-right AI card) where the seated crowd is through the mid/late
+     loop. Static boxes can't pixel-lock a panning shot — reads as "AI scan". */
+  .s1-r1 { top: 73%; left: 46%; animation-delay: 1.0s, 1.0s; }
+  .s1-r2 { top: 80%; left: 63%; animation-delay: 1.25s, 1.25s; }
+  .s1-r3 { top: 69%; left: 79%; animation-delay: 1.5s, 1.5s; }
+  .s1-r4 { top: 82%; left: 54%; width: 70px; height: 82px; animation-delay: 1.75s, 1.75s; }
 
 
   .s1-copy { position: absolute; left: 48px; bottom: 150px; z-index: 20; max-width: 640px; }
@@ -1501,7 +1506,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 
       <!-- BACKGROUND -->
       <video class="s1-bg-video" autoplay muted loop playsinline>
-        <source src="station-hero.mp4?v=2" type="video/mp4" />
+        <source src="veraval-hero.mp4?v=1" type="video/mp4" />
       </video>
       <div class="s1-scrim"></div>
       <div class="s1-scrim-top"></div>
