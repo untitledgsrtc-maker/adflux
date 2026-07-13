@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/check-sw-denylist.mjs && vite build",
     "preview": "vite preview",
     "cap:sweep": "find android/app/src/main/res -name '* *.*' -print -delete || true",
     "cap:sync": "vite build && npx cap sync android && npm run cap:sweep",
