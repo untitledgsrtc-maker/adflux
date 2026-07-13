@@ -57,7 +57,13 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
     // without this they'd be served the SPA login shell instead of the deck.
     // Mirrors the /apk fix.
     /^\/deck(?:[/?#]|$)/,
-    /\.(?:js|mjs|css|map|json|png|jpg|jpeg|svg|webp|gif|ico|ttf|woff2?|wasm)$/,
+    // Phase 223 — the quote-PDF share link /pdf/<ref>?t=<token> is a Vercel
+    // function (api/pdf/[ref]) that 302-redirects to the signed PDF. Without
+    // this, a rep's installed app (service worker registered) served the
+    // /pdf/ navigation the SPA login shell — so the rep saw the LOGIN page
+    // when opening their own shared quote link (clients, with no SW, were
+    // unaffected + got the PDF). Mirrors the /api + /apk fix (Phase 181/76).
+    /^\/pdf(?:[/?#]|$)/,
   ],
 }))
 
