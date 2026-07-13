@@ -5868,3 +5868,87 @@ a frozen file (standalone pitch-deck asset, §77).
   panel aspect to the tiles (don't stack content under the map).
 - ❌ `object-fit:cover` on a pre-composed marketing poster crops its baked-in text — use
   `contain` for images with text burned in.
+
+
+---
+
+## 91 · Phase 222–224 — post-call SMS + the SW-denylist recurrence CLOSED (2026-07-12/13)
+
+All on origin (`untitled-os`, HEAD `ebe7400`). JS/build only, no SQL. Phase 222
+carries a native manifest change (APK rebuild deferred; web works now).
+
+### Phase 222 (`99f17c0`) — "Send SMS" beside "Send WhatsApp" (post-call popup)
+Owner: the follow-up popup after a call should also send a plain SMS from the
+rep's phone, not just WhatsApp. `WhatsAppPromptModal.jsx` (mounted on frozen
+WorkV2 + TelecallerV2 + LeadDetailV2 + FollowUpsV2 via `waPrompt`) gained a
+`sendSms()` mirroring `send()` — same reviewed `body`, same `cleanPhone` +
+`openExternalUrl`, opens `sms:+<phone>?body=<text>` → the device Messages app,
+rep taps Send. Free (rep's own SIM), NO in-app record, reply lands on the rep's
+phone (owner accepted — same tradeoff as the WhatsApp deep-link). Additive,
+guardian PASS.
+- AndroidManifest `<queries>`: added `sms` + `smsto` VIEW intents (mirrors the
+  Phase 155 mailto fix) — else the button silently no-ops on the APK.
+  `versionCode 96014 → 96015`. **Web works on push; the APK SMS button needs an
+  APK rebuild + reinstall** (native, §39/§40). Text prefill is flaky on some
+  iOS/OEM Messages apps (number always fills; rep may type the text).
+- Bigger option still on the table (NOT built): route post-call WhatsApp
+  through the business number so replies land in each rep's in-app inbox
+  (`/campaigns/inbox`). Today's inbox is half-wired — see §55/§86: every inbound
+  auto-routes to ONE default telecaller (Rima), reassign is telecaller-only, so
+  sales/agency inboxes sit empty. Distributing routing + widening reassign is
+  the "all-team inbox" job, deferred.
+
+### Phase 223 (`a2e5d15`) — quote PDF share link opened the LOGIN page on reps' phones
+A rep shared a quote; tapping `app.untitledad.in/pdf/<ref>?t=<token>` opened the
+LOGIN page instead of the PDF. **Root: the service-worker `NavigationRoute`
+denylist (`public/sw.js`) was missing `/pdf/`** → the SW served the SPA login
+shell for the `/pdf/` navigation. Clients (no app → no SW) were UNAFFECTED —
+verified by curl: the URL 302-redirects to the real signed PDF. So it's
+rep-only, and the quote reached the client fine (no re-send needed). Fix: added
+`/^\/pdf(?:[/?#]|$)/` to the denylist (mirrors `/api/` + `/apk` + `/deck/`). §28
+frozen file, guardian PASS. **Reps reopen the app once** for the new SW.
+
+### Phase 224 (`ebe7400`) — PERMANENT cure: SW-denylist ↔ vercel.json tripwire
+The §223 bug was the **4th recurrence** of "a same-origin server link opens the
+login shell" (34Z.27 assets/fonts · 76 api/apk · 181 deck · 223 pdf). ROOT (the
+§69/§71 disease): "which paths are SERVER routes, not the SPA" is written in TWO
+files that drift — `vercel.json` (redirects/rewrites) and `public/sw.js` (the
+NavigationRoute denylist). `/pdf/` was in vercel.json (client worked) but missing
+from sw.js (rep broke). It hides for weeks because only reps (app installed) hit
+it, and only on their OWN server link.
+- **`scripts/check-sw-denylist.mjs`** derives the server paths from vercel.json
+  (redirect sources + rewrites to `/api/*` + the SPA catch-all's negative-
+  lookahead exclusions) and asserts every one is covered by a sw.js denylist
+  regex. Missing → exit 1 with the exact fix line.
+- **Wired into `build`**: `"build": "node scripts/check-sw-denylist.mjs && vite
+  build"` → Vercel (`npm run build`) FAILS the deploy on drift. Do NOT drop the
+  check prefix.
+- **FAIL-SAFE (§45)**: ONLY a positively-detected missing path exits 1. Any
+  internal error (garbled/missing file, regex parse) warns + exits 0 — a bug in
+  the checker can NEVER brick a deploy. Do NOT "harden" it to hard-fail on its
+  own errors.
+- Tested: current state passes · a simulated `/brochure/` rewrite blocks · garbage
+  input fails-safe · full `npm run build` still succeeds.
+
+### FROZEN CONTRACT — SW denylist ↔ vercel.json (do not break)
+- The `public/sw.js` NavigationRoute **denylist MUST cover every server path
+  vercel.json serves** (`/api/`, `/apk`, `/pdf/`, + the static folders `/deck/`,
+  `/assets/`, `/fonts/`, `/letterheads/`). Enforced by the Phase 224 build
+  tripwire.
+- **Adding ANY new public server link** — a vercel.json rewrite/redirect to
+  `/api/*`, or a new static folder a user navigates to — **MUST add the matching
+  denylist entry to `public/sw.js` in the SAME commit**, or the build fails.
+  Then reps reopen the app once for the new SW.
+- The QR shortener is safe (`/api/q/<code>` → under `/api/`, already covered) —
+  NOT a hidden gap.
+
+### Foot-guns
+- ❌ A same-origin server link (rewrite/redirect/static folder) not in the sw.js
+  denylist → reps (app installed) get the login shell; clients (no SW) are fine →
+  the bug hides for weeks. The tripwire catches it at build now; still add the
+  denylist entry in the same commit as the link.
+- ❌ Diagnosing "PDF/APK/deck link → login" as a server/function failure. The
+  function is fine (curl the URL: it 302s / serves). It's the client-side SW
+  serving the SPA shell. Fix = the sw.js denylist, not the function.
+- ❌ `sms:`/`smsto:` (or any new scheme) opened via `openExternalUrl` without the
+  matching `<queries>` VIEW intent in AndroidManifest → silent no-op on the APK.
