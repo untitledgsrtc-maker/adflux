@@ -130,7 +130,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
 
   const [users, setUsers]       = useState([])
   const [rows, setRows]         = useState([])
-  const [fUser, setFUser]       = useState('')
+  const [fUser, setFUser]       = useState('ALL')   // Phase 225 — default = All team
   const [fMonth, setFMonth]     = useState(monthISO())
   const [loading, setLoading]   = useState(false)
   const [recomputing, setRecomputing] = useState(false)
@@ -160,12 +160,14 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     ;(async () => {
       const { data } = await supabase.from('users')
         .select('id, name, role')
-        // Phase 101.A2 — agency dropped (no TA/DA, commission-only).
-        .in('role', ['sales', 'telecaller'])
+        // Phase 225 — agency (Phase 101.A2) + telecaller dropped: neither does
+        // field travel, so neither earns TA/DA (TCs are phone-only). Active
+        // reps only — deactivated members shouldn't clutter the TA list.
+        .eq('role', 'sales')
+        .eq('is_active', true)
         .order('name', { ascending: true })
       setUsers(data || [])
-      // Auto-select first rep so the page isn't empty on first visit.
-      if (data && data.length && !fUser) setFUser(data[0].id)
+      // Default filter is 'ALL' (see fUser useState) — no auto-select-first-rep.
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
