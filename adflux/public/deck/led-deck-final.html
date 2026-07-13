@@ -1390,15 +1390,22 @@ svg.leaflet-image-layer.leaflet-interactive path {
   /* Markers pinned over the people in the station footage (left group,
      centre, right group). %-based so they track the cover-fit video on a
      wide pitch screen. */
-  /* Phase 226 — repositioned over the Veraval clip's crowd. The clip is a
-     continuous right pan, so the crowd drifts through the lower third; these
-     sit in the lower-center-right people-zone (clear of the bottom-left title
-     + the top-right AI card) where the seated crowd is through the mid/late
-     loop. Static boxes can't pixel-lock a panning shot — reads as "AI scan". */
-  .s1-r1 { top: 73%; left: 46%; animation-delay: 1.0s, 1.0s; }
-  .s1-r2 { top: 80%; left: 63%; animation-delay: 1.25s, 1.25s; }
-  .s1-r3 { top: 69%; left: 79%; animation-delay: 1.5s, 1.5s; }
-  .s1-r4 { top: 82%; left: 54%; width: 70px; height: 82px; animation-delay: 1.75s, 1.75s; }
+  /* Phase 226.1 — 10 age/gender boxes spread across the crowd band. The clip
+     is a continuous right pan, so the crowd drifts through the lower third;
+     these blanket the lower-center-right people-zone (clear of the bottom-left
+     title + the top-right AI card) so at any loop moment several land on real
+     faces — reads as "AI detecting the whole crowd". Staggered flick-in makes
+     them lock one-by-one. Mostly small boxes = tighter face-locks. */
+  .s1-r1  { top: 60%; left: 44%; width: 60px; height: 70px; animation-delay: 0.8s, 0.8s; }
+  .s1-r2  { top: 71%; left: 55%; width: 54px; height: 64px; animation-delay: 1.0s, 1.0s; }
+  .s1-r3  { top: 64%; left: 67%; width: 50px; height: 60px; animation-delay: 1.2s, 1.2s; }
+  .s1-r4  { top: 76%; left: 79%; width: 70px; height: 82px; animation-delay: 1.4s, 1.4s; }
+  .s1-r5  { top: 82%; left: 61%; width: 48px; height: 58px; animation-delay: 1.6s, 1.6s; }
+  .s1-r6  { top: 67%; left: 88%; width: 46px; height: 56px; animation-delay: 1.8s, 1.8s; }
+  .s1-r7  { top: 81%; left: 46%; width: 52px; height: 62px; animation-delay: 2.0s, 2.0s; }
+  .s1-r8  { top: 84%; left: 73%; width: 44px; height: 54px; animation-delay: 2.2s, 2.2s; }
+  .s1-r9  { top: 57%; left: 58%; width: 44px; height: 54px; animation-delay: 2.4s, 2.4s; }
+  .s1-r10 { top: 85%; left: 85%; width: 46px; height: 56px; animation-delay: 2.6s, 2.6s; }
 
 
   .s1-copy { position: absolute; left: 48px; bottom: 150px; z-index: 20; max-width: 640px; }
@@ -1516,8 +1523,14 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       <!-- HUD RETICLES over people (static fallback; hidden once live faces lock) -->
       <div class="s1-reticle s1-flick s1-r1"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">M · 32</span></div>
       <div class="s1-reticle s1-flick s1-r2"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">F · 24</span></div>
-      <div class="s1-reticle s1-flick s1-r3"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">dwell 18s</span></div>
+      <div class="s1-reticle s1-flick s1-r3"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">M · 45</span></div>
       <div class="s1-reticle s1-flick s1-r4"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">F · 41</span></div>
+      <div class="s1-reticle s1-flick s1-r5"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">M · 29</span></div>
+      <div class="s1-reticle s1-flick s1-r6"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">F · 38</span></div>
+      <div class="s1-reticle s1-flick s1-r7"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">M · 19</span></div>
+      <div class="s1-reticle s1-flick s1-r8"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">F · 27</span></div>
+      <div class="s1-reticle s1-flick s1-r9"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">M · 51</span></div>
+      <div class="s1-reticle s1-flick s1-r10"><span class="s1-corner s1-tl"></span><span class="s1-corner s1-tr"></span><span class="s1-corner s1-bl"></span><span class="s1-corner s1-br"></span><span class="s1-tag">F · 33</span></div>
 
       <!-- BRAND LOCKUP -->
       <div class="s1-brand">
@@ -1537,7 +1550,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         <div class="s1-ai-sub"><b>people seen</b> &amp; verified this month</div>
         <div class="s1-scanbar"></div>
         <div class="s1-ai-tags">
-          <span class="s1-t">faces <b>4</b></span>
+          <span class="s1-t">faces <b>10</b></span>
           <span class="s1-t">age · gender</span>
           <span class="s1-t">QR scans <b id="qrCount">8,612</b></span>
         </div>
