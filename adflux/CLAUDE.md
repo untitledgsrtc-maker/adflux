@@ -6233,3 +6233,55 @@ last 14h backfill. **229 + 229.1 together = the permanent outgoing fix**: no pop
 needed (229) + no per-brand type code needed (229.1). The only residual is a phone
 with READ_CALL_LOG denied / an OEM that writes DURATION=0 post-call — no data to
 read; the fix there is granting the permission (onboarding prompts it).
+
+---
+
+## 96 · TC score ≠ "50 qualified (≥10s)" — CHECKED, tightening DEFERRED (2026-07-14)
+
+Owner clarified 14 Jul: the TC daily target is **50 QUALIFIED calls = talked ≥10s**,
+NOT 50 tapped-through calls. Read-only check (no build) confirmed the live
+`compute_daily_score` CALL branch does NOT match this: it counts
+`la.outcome IS NOT NULL OR EXISTS(≥10s call_log)` — the `outcome IS NOT NULL`
+clause credits EVERY call the rep closed the popup on, regardless of talk time.
+Since the modal marks ~every call 'connected' (§49/§67), that clause inflates the
+count far above true qualified performance.
+
+### The real numbers (7 days, read-only, 14 Jul)
+| Rep | logged | counts_now (outcome OR ≥10s) | qualified (≥10s only) | inflation |
+|---|---|---|---|---|
+| Rima | 1286 | 1266 | 415 | 851 (67% NOT ≥10s) |
+| Jayna | 556 | 547 | 402 | 145 |
+| Dhara | 407 | 333 | 172 | 161 |
+
+Effect of tightening to ≥10s-only (per day vs the 50 target): **Rima ~69/day →
+100% (no change), Jayna ~67/day → 100% (no change), Dhara ~29/day → ~57% (down
+from ~100%).** So tightening is NOT a broad cut — Rima+Jayna genuinely clear 50
+qualified/day; it's essentially a **Dhara correction**.
+
+### Part A incoming-backfill flag (§94) — EMPIRICALLY A NON-ISSUE
+The guardian P1 (an incoming ≥10s could backfill an unfinished outbound tap toward
+the target) is negligible in real data: `of_which_incoming` = Dhara 3, Jayna 0,
+Rima 0 — 3 calls across the whole team in a week. No tightening needed for the
+incoming path. **This closes that open flag.**
+
+### DECISION (owner, 14 Jul): tighten LATER, not now — "first share the APK to all"
+The §49/§65/§67 "leave the loose `outcome` gate" was a compromise BECAUSE duration
+capture was unreliable. Capture is now fixed (229 + 229.1 + Part A) — BUT 96018
+(the reliable capture) is JUST rolling out; not every TC is on it. Tightening TODAY
+would cut a rep whose phone is still under-capturing (the exact §67 trap — never
+gate pay on a duration the phone can't produce). Owner chose: roll the APK to all
+first. So the sequence is:
+1. Get 96018 onto every TC (banner is live, §94 Part B) + confirm each phone
+   actually captures ≥10s durations (per-rep capture-health query available).
+2. ONLY THEN tighten `compute_daily_score` — drop the `outcome IS NOT NULL OR`,
+   count `≥10s only` — as a MONEY change (§71 rule 3: verify capture → shadow-
+   compare → owner-verify Dhara's real figure → one-command revert). NOT mid-workday.
+
+### DO NOT
+- Do NOT tighten compute_daily_score to ≥10s-only until 96018 is fleet-wide AND
+  per-rep capture is verified. Premature = the §67 mistake (cuts honest reps for a
+  capture gap).
+- The §49/§65/§67 "owner said leave it" is now SUPERSEDED: the target IS ≥10s
+  (owner-confirmed 14 Jul); the loose gate is a TEMPORARY compromise, not permanent.
+- Do NOT re-run any old compute_daily_score copy — canonical is
+  `db/functions/compute_daily_score.sql` (§72); any tighten edits THAT file only.
