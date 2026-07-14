@@ -92,6 +92,14 @@ export default async function handler(req, res) {
   // being cached. NEVER renders the app login.
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  // Phase 231 — a client QR can now target a plain LINK, not just WhatsApp.
+  // Match the copy to the destination (a link shows neutral "Opening…" copy;
+  // WhatsApp keeps the green "Open WhatsApp"). btnBg is a constant hex, safe to
+  // inline; target/heading/label are all escaped.
+  const isWa = /(?:wa\.me|api\.whatsapp\.com|whatsapp:)/i.test(target)
+  const heading  = isWa ? 'Opening WhatsApp…' : 'Opening…'
+  const btnLabel = isWa ? 'Open WhatsApp' : 'Continue'
+  const btnBg    = isWa ? '#25D366' : '#FFE600'
   res.statusCode = 200
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store, max-age=0')
@@ -99,12 +107,12 @@ export default async function handler(req, res) {
     '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta http-equiv="refresh" content="0;url=' + esc(target) + '">' +
-    '<title>Opening WhatsApp…</title>' +
+    '<title>' + esc(heading) + '</title>' +
     '<script>location.replace(' + JSON.stringify(target) + ')</script>' +
     '<style>html,body{height:100%}body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;' +
     'background:#0b1220;color:#f5f7fb;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}' +
-    'a{background:#25D366;color:#0b1220;font-weight:700;padding:14px 24px;border-radius:12px;text-decoration:none;display:inline-block;margin-top:16px}</style>' +
-    '</head><body><div><div style="font-size:15px;opacity:.85">Opening WhatsApp…</div>' +
-    '<a href="' + esc(target) + '">Open WhatsApp</a></div></body></html>'
+    'a{color:#0b1220;font-weight:700;padding:14px 24px;border-radius:12px;text-decoration:none;display:inline-block;margin-top:16px}</style>' +
+    '</head><body><div><div style="font-size:15px;opacity:.85">' + esc(heading) + '</div>' +
+    '<a style="background:' + btnBg + '" href="' + esc(target) + '">' + esc(btnLabel) + '</a></div></body></html>'
   )
 }

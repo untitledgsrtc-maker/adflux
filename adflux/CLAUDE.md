@@ -6285,3 +6285,42 @@ first. So the sequence is:
   (owner-confirmed 14 Jul); the loose gate is a TEMPORARY compromise, not permanent.
 - Do NOT re-run any old compute_daily_score copy — canonical is
   `db/functions/compute_daily_score.sql` (§72); any tighten edits THAT file only.
+
+---
+
+## 97 · Phase 231 — client QR: LINK option (not just WhatsApp) (2026-07-14)
+
+Owner: the "New client QR" modal (`/campaigns/clients`, admin) only took a
+WhatsApp number; he wanted a **link** option too (a QR that opens a website /
+video / form, still scan-tracked). Shipped JS-only — **no SQL, no APK, no schema
+change.** Additive; campaign admin page (NOT §28 frozen); §45-safe.
+
+### Why no schema
+A client QR is a `campaign_locations` row with `client_name` set; its `qr_text`
+column IS the redirect target, and `/api/q/<code>` already 302s to whatever
+`qr_text` holds. So a **link just stores the URL in `qr_text`** instead of a
+`wa.me` link — the existing redirect works unchanged. The page is **create-only**
+(no edit flow), so the type is INFERRED from `qr_text` for the table display
+(`/wa\.me\/(\d+)/` → phone; else → link). No `qr_kind` column needed.
+
+### What changed (2 files)
+- `src/pages/v2/CampaignClientQrV2.jsx` — a WhatsApp/Link segmented toggle in the
+  modal; Link shows a URL input (`normalizeUrl()` accepts http(s) or prepends
+  https:// to a bare domain, '' if not a URL); `target` = link URL or the wa.me
+  URL; preview/validation/save/reset all keyed off `target`; the table column
+  renamed "WhatsApp number" → "Opens" (phone for wa.me rows, the link otherwise).
+- `api/q/[code].js` — the redirect PAGE copy now adapts: a WhatsApp target keeps
+  "Opening WhatsApp…" + green button; a link shows "Opening…" + "Continue" (brand
+  yellow). `target` stays escaped; `btnBg` is a constant hex. The scan-log +
+  same-visitor dedup + fallback-to-WhatsApp are unchanged.
+
+### Contracts / notes
+- `qr_text` was ALWAYS an admin-set arbitrary string; a link is not a new security
+  surface (the endpoint already redirected to it, now escaped into an HTML page
+  the same way). The open-redirect is the feature (admin's own QR → wherever).
+- Boards tab (`CampaignQrV2`, `client_name IS NULL`) never sees client QRs →
+  untouched. C8 ensure-lead trigger is on `whatsapp_conversations`, not
+  `campaign_locations` → untouched.
+- Owner smoke: `/campaigns/clients` → New client QR → toggle **Link** → paste a
+  URL → preview QR renders → Create → scan the printed QR opens the link + the
+  Scans count ticks. WhatsApp mode still works as before.

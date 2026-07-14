@@ -27,6 +27,16 @@ function digitsToWa(raw) {
   const d = String(raw || '').replace(/\D/g, '')
   return d.length === 10 ? '91' + d : d
 }
+// Phase 231 — a client QR can target a plain LINK, not just WhatsApp. Normalise
+// the owner's input into a redirect URL: keep an explicit http(s) scheme, or
+// prepend https:// to a bare domain ("acme.com/x"). Returns '' if it isn't a URL.
+function normalizeUrl(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  if (/^https?:\/\//i.test(s)) return s
+  if (/^[\w-]+(\.[\w-]+)+([/?#].*)?$/i.test(s)) return 'https://' + s
+  return ''
+}
 function fmtDate(iso) {
   try { return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) } catch { return '—' }
 }
@@ -46,8 +56,10 @@ export default function CampaignClientQrV2() {
   const [showModal, setShowModal] = useState(false)
 
   const [clientName, setClientName] = useState('')
+  const [qrType, setQrType] = useState('whatsapp') // 'whatsapp' | 'link' (Phase 231)
   const [number, setNumber] = useState('')
   const [message, setMessage] = useState('')
+  const [linkUrl, setLinkUrl] = useState('')
   const [codeSuffix, setCodeSuffix] = useState('01') // stable per modal-open → unique code, survives deletes
   const previewRef = useRef(null)
 
@@ -90,6 +102,10 @@ export default function CampaignClientQrV2() {
     () => (waNumber ? `https://wa.me/${waNumber}${message.trim() ? `?text=${encodeURIComponent(message.trim())}` : ''}` : ''),
     [waNumber, message]
   )
+  // Phase 231 — the QR's redirect target: a WhatsApp link OR a plain URL.
+  // Stored verbatim in campaign_locations.qr_text; /api/q/<code> 302s to it.
+  const linkTarget = useMemo(() => normalizeUrl(linkUrl), [linkUrl])
+  const target = qrType === 'link' ? linkTarget : waUrl
   const nextCode = useMemo(() => {
     const slug = String(clientName || 'client').replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'CLNT'
     return `CL-${slug}-${codeSuffix}`
@@ -107,14 +123,18 @@ export default function CampaignClientQrV2() {
 
   async function saveClient() {
     if (!clientName.trim()) { pushToast('Enter the client name.', 'danger'); return }
-    if (!waNumber || waNumber.replace(/\D/g, '').length < 10) { pushToast('Enter a valid WhatsApp number.', 'danger'); return }
+    if (qrType === 'whatsapp') {
+      if (!waNumber || waNumber.replace(/\D/g, '').length < 10) { pushToast('Enter a valid WhatsApp number.', 'danger'); return }
+    } else {
+      if (!target) { pushToast('Enter a valid link (e.g. https://…).', 'danger'); return }
+    }
     setSaving(true)
     try {
       const { error } = await supabase.from('campaign_locations').insert({
         client_name: clientName.trim(),
         code: nextCode,
         label: clientName.trim(),
-        qr_text: waUrl,
+        qr_text: target,
         campaign_id: null,
         is_active: true,
       })
@@ -123,7 +143,7 @@ export default function CampaignClientQrV2() {
         throw error
       }
       toastSuccess('Client QR created.')
-      setClientName(''); setNumber(''); setMessage(''); setShowModal(false)
+      setClientName(''); setNumber(''); setMessage(''); setLinkUrl(''); setQrType('whatsapp'); setShowModal(false)
       load()
     } catch (err) {
       toastError(err, 'Could not create the client QR.')
@@ -172,7 +192,7 @@ export default function CampaignClientQrV2() {
     <CampaignChrome
       active="clients"
       title="Client QRs"
-      sub="Make a tracked QR for a client (e.g. a QR in their video). Enter their WhatsApp number — the QR opens a chat to THEM and counts every scan, so you can report the reach. No lead routing; these chats land in the client's WhatsApp."
+      sub="Make a tracked QR for a client (e.g. a QR in their video). Point it at their WhatsApp number OR any link (website, video, form) — the QR counts every scan, so you can report the reach, then opens the target. No lead routing; WhatsApp chats land in the client's own WhatsApp."
       right={newBtn}
     >
       <div style={{ ...panel, padding: 0 }}>
@@ -197,7 +217,7 @@ export default function CampaignClientQrV2() {
                 <tr>
                   <th style={{ ...th, width: 48 }}></th>
                   <th style={th}>Client</th>
-                  <th style={th}>WhatsApp number</th>
+                  <th style={th}>Opens</th>
                   <th style={{ ...th, textAlign: 'right' }}>Scans</th>
                   <th style={th}>Created</th>
                   <th style={{ ...th, textAlign: 'right' }}></th>
@@ -206,7 +226,8 @@ export default function CampaignClientQrV2() {
               <tbody>
                 {rows.map((r) => {
                   const scans = scansByQr[r.id] || 0
-                  const num = (() => { const m = String(r.qr_text || '').match(/wa\.me\/(\d+)/); return m ? m[1] : '' })()
+                  const qt = String(r.qr_text || '')
+                  const waM = qt.match(/wa\.me\/(\d+)/)
                   return (
                     <tr key={r.id} className="cl-row">
                       <td style={{ ...td, padding: '8px 16px' }}><Thumb qr={qrValue(r.code)} /></td>
@@ -214,7 +235,13 @@ export default function CampaignClientQrV2() {
                         <div style={{ fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>{r.client_name}</div>
                         <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', letterSpacing: '.04em', marginTop: 2 }}>{r.code}</div>
                       </td>
-                      <td style={{ ...td, fontFamily: 'var(--v2-display)' }}>{num ? fmtPhone(num) : '—'}</td>
+                      <td style={td}>
+                        {waM
+                          ? <span style={{ fontFamily: 'var(--v2-display)' }}>{fmtPhone(waM[1])}</span>
+                          : qt
+                            ? <a href={qt} target="_blank" rel="noreferrer" style={{ color: 'var(--v2-ink-1)', textDecoration: 'none', wordBreak: 'break-all' }}>{qt.replace(/^https?:\/\//, '')}</a>
+                            : '—'}
+                      </td>
                       <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 700, color: scans ? 'var(--v2-ink-0, #f5f7fb)' : 'var(--v2-ink-2, #6a7590)' }}>{scans}</td>
                       <td style={td}>{fmtDate(r.created_at)}</td>
                       <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -233,7 +260,7 @@ export default function CampaignClientQrV2() {
       </div>
 
       <p style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', margin: '14px 0 0', lineHeight: 1.6 }}>
-        Same tracker as your boards — a scan hits /api/q/&lt;code&gt;, logs one scan, then opens the client's WhatsApp. Re-download the PNG after any edit so the printed QR carries the tracked link.
+        Same tracker as your boards — a scan hits /api/q/&lt;code&gt;, logs one scan, then opens the target (WhatsApp or a link). Re-download the PNG after any edit so the printed QR carries the tracked link.
       </p>
 
       {showModal && (
@@ -250,13 +277,36 @@ export default function CampaignClientQrV2() {
                   <input style={inp} value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="e.g. Sharma Motors" />
                 </div>
                 <div style={{ marginTop: 12 }}>
-                  <label style={lbl}>Client&rsquo;s WhatsApp number</label>
-                  <input style={inp} value={number} onChange={(e) => setNumber(e.target.value)} placeholder="e.g. 9898273686" />
+                  <label style={lbl}>QR opens</label>
+                  <div style={seg}>
+                    <button type="button" onClick={() => setQrType('whatsapp')} style={qrType === 'whatsapp' ? segOn : segOff}>WhatsApp number</button>
+                    <button type="button" onClick={() => setQrType('link')} style={qrType === 'link' ? segOn : segOff}>Link</button>
+                  </div>
                 </div>
-                <div style={{ marginTop: 12 }}>
-                  <label style={lbl}>Pre-filled message (optional)</label>
-                  <textarea style={{ ...inp, height: 56, padding: '9px 12px', resize: 'none' }} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Hi, saw your video…" />
-                </div>
+                {qrType === 'whatsapp' ? (
+                  <>
+                    <div style={{ marginTop: 12 }}>
+                      <label style={lbl}>Client&rsquo;s WhatsApp number</label>
+                      <input style={inp} value={number} onChange={(e) => setNumber(e.target.value)} placeholder="e.g. 9898273686" />
+                    </div>
+                    <div style={{ marginTop: 12 }}>
+                      <label style={lbl}>Pre-filled message (optional)</label>
+                      <textarea style={{ ...inp, height: 56, padding: '9px 12px', resize: 'none' }} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Hi, saw your video…" />
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ marginTop: 12 }}>
+                    <label style={lbl}>Link (website, video, form…)</label>
+                    <input style={inp} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="e.g. https://youtu.be/… or acme.com/offer" />
+                    <div style={{ marginTop: 6, fontSize: 10.5, color: 'var(--v2-ink-2)', wordBreak: 'break-all' }}>
+                      {linkUrl.trim() && !target
+                        ? <span style={{ color: 'var(--v2-rose, #f87171)' }}>Not a valid link.</span>
+                        : target
+                          ? <>Opens: <b style={{ color: 'var(--v2-ink-1)' }}>{target}</b></>
+                          : 'Any http(s) link. A scan still counts before it opens.'}
+                    </div>
+                  </div>
+                )}
                 <div style={{ marginTop: 10, fontSize: 11, color: 'var(--v2-ink-2)' }}>Code: <b style={{ color: 'var(--v2-ink-1)' }}>{nextCode}</b></div>
                 <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
                   <button type="button" style={{ ...btnY, opacity: saving ? 0.6 : 1 }} onClick={saveClient} disabled={saving}>
@@ -268,13 +318,13 @@ export default function CampaignClientQrV2() {
               <div style={{ flex: '0 0 200px', textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 10 }}>Live preview</div>
                 <div ref={previewRef} style={{ background: 'white', borderRadius: 10, padding: 14, display: 'inline-block' }}>
-                  {waUrl ? (
+                  {target ? (
                     <Suspense fallback={<div style={{ width: 170, height: 170 }} />}><QRCodeCanvas value={qrValue(nextCode)} size={170} /></Suspense>
                   ) : (
-                    <div style={{ width: 170, height: 170, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--v2-ink-2, #6a7590)', fontSize: 12 }}>Enter a number</div>
+                    <div style={{ width: 170, height: 170, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--v2-ink-2, #6a7590)', fontSize: 12 }}>{qrType === 'link' ? 'Enter a link' : 'Enter a number'}</div>
                   )}
                 </div>
-                <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', marginTop: 8, wordBreak: 'break-all' }}>{waUrl ? qrValue(nextCode) : '—'}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', marginTop: 8, wordBreak: 'break-all' }}>{target ? qrValue(nextCode) : '—'}</div>
               </div>
             </div>
           </div>
@@ -319,6 +369,10 @@ const lbl = { fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'u
 const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
 const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', border: 'none', borderRadius: 10, height: 38, padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
 const btnG = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 38, padding: '0 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
+const seg = { display: 'flex', gap: 4, background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, padding: 3 }
+const segBase = { flex: 1, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
+const segOn = { ...segBase, background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', fontWeight: 700 }
+const segOff = { ...segBase, background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', fontWeight: 600 }
 const th = { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2, #6a7590)', borderBottom: '1px solid var(--v2-line, #1f2b47)', whiteSpace: 'nowrap', background: 'rgba(255,255,255,.02)' }
 const td = { padding: '12px 16px', borderBottom: '1px solid var(--v2-line, #1f2b47)', fontSize: 13, color: 'var(--v2-ink-1, #a9b3c7)', verticalAlign: 'middle', position: 'relative' }
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px', overflowY: 'auto' }
