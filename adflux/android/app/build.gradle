@@ -83,8 +83,11 @@ android {
         //         battery Unrestricted). See CLAUDE.md §73/§74.
         // 96015 — Phase 222: <queries> VIEW+sms/smsto so the post-call
         //         "Send SMS" deep-link resolves the device Messages app.
-        versionCode 96015
-        versionName "0.96.15"
+        // 96016 — Phase 227: CallLogPlugin maps type 7 (ANSWERED_EXTERNALLY)
+        //         -> "incoming" so calls answered on Bluetooth/linked device/
+        //         3rd-party dialer are recorded (were dropped as "unknown").
+        versionCode 96016
+        versionName "0.96.16"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

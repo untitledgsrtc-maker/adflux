@@ -201,6 +201,14 @@ public class CallLogPlugin extends Plugin {
         switch (type) {
             case CallLog.Calls.OUTGOING_TYPE: return "outgoing";
             case CallLog.Calls.INCOMING_TYPE: return "incoming";
+            // Phase 227 — ANSWERED_EXTERNALLY_TYPE (=7, API 25+): an incoming
+            // call answered on a Bluetooth headset / car / linked device / some
+            // third-party dialers. It IS an answered incoming call, but the old
+            // switch hit `default -> "unknown"` and the JS scan skipped it, so it
+            // never reached call_logs (Jayna: incoming stopped 6 Jul after her
+            // calling setup changed; her phone's own Recents showed them, ours
+            // didn't). Literal 7 (not the constant) so it compiles on any SDK.
+            case 7:                           return "incoming";
             case CallLog.Calls.MISSED_TYPE:   return "missed";
             case CallLog.Calls.VOICEMAIL_TYPE: return "voicemail";
             case CallLog.Calls.REJECTED_TYPE: return "rejected";
