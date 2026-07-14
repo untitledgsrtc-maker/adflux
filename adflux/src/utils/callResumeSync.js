@@ -18,10 +18,20 @@
 // is FINAL. We re-read the device call log for any of today's recent
 // OUTGOING calls still missing a duration and fill it in.
 //
+// Phase 229 (14 Jul 2026) — HEAL THE no_answer ROWS TOO. The sweep used to
+// require the row already be outcome='connected'/'callback_requested' (Phase
+// 218 gate). That EXCLUDED the single biggest cause of a blank "—": a rep who
+// never saved the outcome modal (the dialer suspends the WebView → the modal
+// never opens → outcome stays at the tel-tap default 'no_answer'). Those are
+// exactly the rows that need a duration. The gate is now GONE — see the long
+// comment on the reader below for why that's safe (Phase 185 reader can only
+// ever write THIS outgoing call's real talk seconds). Widened the window to a
+// full workday so an end-of-day reopen still heals the morning's calls.
+//
 // SAFETY (§28 / §45 / Phase 102.B):
 //   • OUTGOING only — Android's duration for an outgoing call is TALK time
-//     (0 if not answered), so a >=10s read is a genuine connect. Incoming/
-//     missed durations can be ring time (102.B) → we never touch those.
+//     (0 if not answered → we skip it), so a read is genuine talk time.
+//     Incoming/missed durations can be ring time (102.B) → we never touch those.
 //   • duration only — we do NOT flip outcome. The TC 50-target + the gate
 //     count on duration_seconds, so filling it is enough; outcome semantics
 //     stay frozen.
@@ -41,7 +51,7 @@ async function reconcileRecentCalls() {
   try {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id) return
-    const sinceIso = new Date(Date.now() - 6 * 60 * 60_000).toISOString()  // last 6h
+    const sinceIso = new Date(Date.now() - 14 * 60 * 60_000).toISOString()  // full workday (Phase 229)
     const { data: rows } = await supabase
       .from('call_logs')
       .select('id, client_phone, call_at, duration_seconds, direction, outcome')
@@ -49,18 +59,23 @@ async function reconcileRecentCalls() {
       .gte('call_at', sinceIso)
       .or('duration_seconds.is.null,duration_seconds.eq.0')
       .order('call_at', { ascending: false })
-      .limit(30)
+      .limit(60)
     for (const r of (rows || [])) {
       // OUTGOING only (or unlabelled tel-tap rows). Incoming/missed skipped.
       if (r.direction && r.direction !== 'outgoing') continue
-      // Phase 218 — CONNECTED-only gate. Mirrors the modal-save patch
-      // (callLogReader.js `.in('outcome', ['connected','callback_requested'])`).
-      // Without it the sweep pasted a nearby connected call's device seconds
-      // onto a row the rep marked "not connected" (§138: resume_sweep wrote
-      // 231 durations with NO outcome check → the "not-connected shows a time"
-      // bug). A not-connected row must stay duration-less; null / no_answer
-      // rows wait until the rep confirms the call via the outcome modal.
-      if (!['connected', 'callback_requested'].includes(r.outcome)) continue
+      // Phase 229 — the Phase 218 CONNECTED-only gate is REMOVED (this is the
+      // fix for the blank "—" on real calls). It used to require outcome be
+      // already 'connected'/'callback_requested', which skipped every row where
+      // the rep never saved the modal (outcome stuck at the 'no_answer' default)
+      // — the biggest slice of blank durations. It's safe to drop because the
+      // §138 "231 wrong durations" bug it guarded against was the OLD reader
+      // (lookupCall, direction-blind newest-any-call). The reader BELOW is
+      // findOutgoingCallSeconds (Phase 185): it returns ONLY an OUTGOING device
+      // call, matched to THIS row's phone (last-10), NEAREST this row's tap time
+      // — so it can only ever write THIS call's real talk seconds, never a
+      // neighbour's. The phone is ground truth even when the rep mis-marked the
+      // outcome. (Duration display is separate from outcome — we still never
+      // flip outcome; §28 semantics stay frozen.)
       const phone = r.client_phone
       if (!phone) continue
       const tapMs = new Date(r.call_at).getTime()
@@ -68,13 +83,17 @@ async function reconcileRecentCalls() {
       // lookupCall's newest-any → it re-pasted a later inbound call's duration
       // onto this outgoing row, recreating the cross-paste on every sweep.
       const dev = await findOutgoingCallSeconds(phone, tapMs)
-      if (dev == null || dev < 10) continue   // confirmed real outgoing talk only
+      // Phase 229 — write real talk time (>=1s). Android returns 0 for an
+      // unanswered outgoing → skip it (stays blank, never counts toward the
+      // >=10s target). We write short talks too (e.g. 6s shows "0:06", honest)
+      // — the >=10s COUNT gate lives in compute_daily_score, not here, so a
+      // sub-10s duration is honest display without inflating any count.
+      if (dev == null || dev < 1) continue
       const { error } = await supabase
         .from('call_logs')
         .update({ duration_seconds: dev })
         .eq('id', r.id)
-        .or('duration_seconds.is.null,duration_seconds.eq.0')   // no clobber
-        .in('outcome', ['connected', 'callback_requested'])     // Phase 218 — race-safe: never write a not-connected row
+        .or('duration_seconds.is.null,duration_seconds.eq.0')   // no clobber — never overwrite a value the modal-save path already wrote (Phase 229: outcome gate dropped, this stays)
       // Phase 138 diagnostic — prove the resume sweep is landing.
       supabase.from('call_capture_log').insert([{
         user_id:             user.id,

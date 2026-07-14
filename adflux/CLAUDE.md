@@ -6131,6 +6131,80 @@ Part C on origin. **Part A CODE SHIPPED + guardian PASS (2026-07-14)** — commi
 below; native, so it does NOT run until Part B's APK rebuild. Part B (build →
 upload `untitled-os.apk` to the Supabase `apk` bucket → publish `app_version`
 96018 → device-test ONE phone → fleet via the in-app updater) is owner-run — I
-write no more code for it. Open follow-up: the compute_daily_score incoming-credit
-flag (Part A block above) — a money-function change awaiting owner sign-off +
-shadow-compare.
+write no more code for it. **Part B build DONE 14 Jul** — 96018 built
+(assembleDebug, debug-signed), uploaded to the `apk` bucket, verified live via
+the `/api/apk` proxy (versionCode 96018). NOT yet published to `app_version`
+(fleet banner held pending the one-phone incoming test). Open follow-up: the
+compute_daily_score incoming-credit flag (Part A block above) — a money-function
+change awaiting owner sign-off + shadow-compare.
+
+---
+
+## 95 · Phase 229 — outgoing call duration "—" fixed (resume sweep heals no_answer rows) (2026-07-14)
+
+Permanent fix for "outgoing call shows — (blank duration)" — the §67/§138 saga.
+**JS-only (callResumeSync.js), ships via live-update to EVERY phone incl. current
+APKs, NO rebuild.** Guardian PASS (1 P2 money flag, below). DECOUPLED from the
+Phase 228 incoming APK — the two ride different rails (incoming = native/96018;
+outgoing = JS/instant), so the team does NOT update twice for this.
+
+### Root cause (deep 5-path workflow trace)
+An outgoing call_logs row is BORN blank (duration_seconds NULL, outcome
+'no_answer' — the tel-tap audit default, callAudit.js). Duration is only ever
+filled by fetchAndPatchCallDuration (modal-save + auto60) AND the resume sweep —
+ALL THREE gated on `outcome IN ('connected','callback_requested')`. So the #1
+cause of "—": a rep who never saves the PostCallOutcomeModal (the dialer suspends
+the WebView → the modal never opens → outcome stuck at no_answer) → the outcome
+filter DISCARDS the duration even when the device read succeeded. The §116
+away-timer never fires on the APK (AppLauncher.openUrl's ACTION_VIEW doesn't
+background the WebView). So a real talk by a rep who skips the modal = permanent
+"—".
+
+### The fix (callResumeSync.js — the app-resume sweep, Phase 157)
+Dropped the Phase 218 outcome gate (both the JS `continue` and the
+`.in('outcome',...)` on the UPDATE). The sweep now heals no_answer rows too.
+SAFE because the reader is Phase 185 `findOutgoingCallSeconds` — pins
+type='outgoing' + last-10 phone match to THIS row + NEAREST this row's tap → it
+can ONLY ever write THIS call's real talk seconds, never a neighbour's or an
+incoming call (the §138 "231 wrong durations" bug was the OLD direction-blind
+`lookupCall`, already retired). Kept: outgoing-only guard, no-clobber
+`.or(duration_seconds.is.null,eq.0)`, outcome NEVER flipped (§28 semantics
+frozen). Threshold `<10`→`<1` (write real talk incl. short; skip 0/unanswered).
+Window 6h→14h + limit 30→60 (heal a full workday on an end-of-day reopen).
+
+### FROZEN CONTRACTS / foot-guns
+- The resume sweep is now the UNIVERSAL outgoing-duration healer. It uses the
+  DEVICE talk duration (Android `CallLog.DURATION` = talk time, 0 for
+  unanswered), NEVER an off-hook timer. Do NOT switch outgoing to the Phase 228
+  CallStateReceiver — a caller has no "callee answered" signal, so off-hook time
+  = ring-wait + talk → over-counts (that's why CallStateReceiver is incoming-only).
+- The §28-frozen `callLogReader.js` (modal-save + auto60 paths) KEEPS its outcome
+  filter — untouched. The resume sweep (non-frozen file) is the catch-all healing
+  what those miss.
+- Do NOT re-add the outcome gate to the sweep — it blocks the exact rows that
+  need healing, and the cross-paste it guarded against is already prevented by
+  findOutgoingCallSeconds (this-phone + nearest-tap + direction-pin).
+
+### MONEY MOVEMENT (owner-aware, §71 rule 3)
+This is the FIRST writer that can put `duration_seconds >= 10` onto a still-
+`no_answer` row → it ACTIVATES compute_daily_score's previously-dormant TC
+call-branch EXISTS fallback (`call_logs ≥10s` WITHOUT an outcome confirmation).
+So some TCs' daily scores → incentive may RISE this week — real calls that were
+dropped as blank now count. This is the §49-sanctioned mechanism ("the ONLY
+honest way to raise the count is to fix capture, NEVER loosen the gate") — a
+correction, NOT inflation. compute_daily_score SQL is UNTOUCHED. Nuance (guardian):
+the EXISTS matches by lead_id+date, so if a TC made 3 attempts to one lead and
+ONE gets a real duration, all 3 same-day 'call' activities to that lead count →
+per-lead effect can be bigger than "one row crossed 10s." A read-only before/after
+shadow of which reps move + by how much is available before the owner pushes.
+
+### Residual (not JS-fixable)
+Phones with READ_CALL_LOG denied, or OEMs that write DURATION=0 even post-call →
+the device has no data → those outgoing stay "—". No JS invents it; the fix is
+granting the permission (onboarding prompts it). The Phase 228 real-time listener
+does NOT help outgoing (ring-wait over-count).
+
+### Ships
+JS-only → push → Vercel → reaches every phone (incl. current APKs) on next open.
+No SQL, no APK rebuild. On the next app resume, blank outgoing durations from the
+last 14h backfill.
