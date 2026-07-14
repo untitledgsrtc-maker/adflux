@@ -86,8 +86,11 @@ android {
         // 96016 — Phase 227: CallLogPlugin maps type 7 (ANSWERED_EXTERNALLY)
         //         -> "incoming" so calls answered on Bluetooth/linked device/
         //         3rd-party dialer are recorded (were dropped as "unknown").
-        versionCode 96016
-        versionName "0.96.16"
+        // 96017 — Phase 227.1: CallLogPlugin maps Realme/ColorOS custom types
+        //         100 -> outgoing, 101 -> incoming (Oppo-family phones). Fixes
+        //         Jayna's Realme where incoming stopped recording ~2 Jul.
+        versionCode 96017
+        versionName "0.96.17"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

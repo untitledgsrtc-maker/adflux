@@ -209,6 +209,17 @@ public class CallLogPlugin extends Plugin {
             // calling setup changed; her phone's own Recents showed them, ours
             // didn't). Literal 7 (not the constant) so it compiles on any SDK.
             case 7:                           return "incoming";
+            // Phase 227.1 — Realme / ColorOS (Oppo-family) phones write CUSTOM
+            // call types the standard switch doesn't know: 100 = outgoing,
+            // 101 = incoming. Confirmed on Jayna's Realme: type-100 volume
+            // matches her daily outgoing dial count (that's why her outgoing
+            // stayed correct), and every type-101 row is an answered call with a
+            // real duration (11-120s) = incoming. Before this they hit
+            // `default -> "unknown"` and the JS scan dropped them, so her
+            // incoming stopped recording ~2 Jul. Standard 1/2/3 still handled
+            // above; these are additive and only fire on Oppo-family phones.
+            case 100:                         return "outgoing";
+            case 101:                         return "incoming";
             case CallLog.Calls.MISSED_TYPE:   return "missed";
             case CallLog.Calls.VOICEMAIL_TYPE: return "voicemail";
             case CallLog.Calls.REJECTED_TYPE: return "rejected";
