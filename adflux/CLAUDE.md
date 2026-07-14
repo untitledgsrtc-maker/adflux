@@ -6423,3 +6423,59 @@ Owner: "videos not there and map is not there" (the deck has both). Added to
   future opacity-0-until-JS reveal MUST be guarded this way. Verified: hero
   computed `opacity:1` after load; the screenshot tool misrenders brightness/yellow
   on this dark page (trust computed styles, not the screenshot).
+
+---
+
+## 99 · Email send via Resend — PLANNED, NOT BUILT (2026-07-14)
+
+Owner wants HR (starting point) + eventually everyone to SEND email from the app
+(offers to candidates, quotes/proposals to clients) via **Resend** (resend.com).
+Directive: "1st plan it, don't build." Plan locked; awaiting owner Phase-0 (domain
+verify) before ANY code.
+
+### Why (honest framing)
+Today email buttons open the rep's OWN Gmail via `mailto:`/openExternalUrl (§95.2)
+— no branding, no auto-attached PDF, no record, breaks with no mail app. Resend =
+send from `@untitledad.in`, PDF attached, tracked, logged. It's an UPGRADE not a
+fix (the mailto flow works). Additive only (§45).
+
+### Owner decisions (LOCKED 14 Jul — do NOT re-litigate)
+- **First build = BOTH** HR offer emails + client quote/proposal emails (one engine,
+  both buttons in Phase 1).
+- **Client emails = PDF attached AND the branded `app.untitledad.in/pdf` link
+  (§44.9) in the body.**
+- **Everyone can send** (all roles). → guardrails REQUIRED: one-to-one only (NO
+  bulk-blast button — bulk needs unsubscribe/consent or the domain gets
+  blacklisted), reply-to = the sender's login email, per-sender rate limit.
+- **Role from-addresses:** `hr@untitledad.in` (HR offers) + `quotes@untitledad.in`
+  (client quotes); reply-to = the logged-in sender's email (every user has a login
+  email = their real address).
+
+### Architecture (when built)
+- `api/email/send.js` — **EDGE** function (Vercel Hobby 12-serverless-fn cap, §219 —
+  must be Edge, not Node). Auth-gated (verify Supabase JWT / same-origin + session),
+  per-sender rate-limit, validates recipient, POSTs to `https://api.resend.com/emails`
+  with `RESEND_API_KEY` (Vercel env, server-only). Attachments: fetch the stored PDF
+  (§44.9 pdf_share_tokens / storage) → base64. Logs every send.
+- `supabase_email_log.sql` — `email_log` (id, sent_by, to_email, subject, kind,
+  related_id, resend_id, status, created_at) + RLS (admin/HR read all, sender reads
+  own). Additive table, no live-flow touch.
+- UI: a `SendEmailModal` + buttons on the HR offer flow (§109 HROfferLetterV2 /
+  SendOfferModal) + QuoteDetail / GovtProposalDetail (a REAL send beside the
+  existing Gmail mailto). A couple of templates (offer, quote).
+
+### Phase 0 = OWNER prerequisite (critical path, blocks everything)
+1. Create Resend account. 2. Add domain `untitledad.in` → get SPF/DKIM/DMARC DNS
+records. 3. Add those records at the DNS host (owner to confirm host — registrar or
+Vercel). 4. Owner creates the API key + pastes `RESEND_API_KEY` into Vercel env
+(Claude NEVER handles the key). Domain "Verified" + key set → THEN build Phase 1.
+Without domain verify → emails hit spam / Resend won't send.
+
+### Cost
+Free 3,000/mo, 100/day (plenty for HR + reps); ~$20/mo beyond. Flag before the cap.
+
+### Open (pre-build)
+Where is untitledad.in DNS managed (registrar vs Vercel)? — needed for the DNS
+walkthrough. Reply handling: reply-to the sender is v1; a real `hr@` inbox +
+Resend inbound (paid) is later. NO bulk/marketing send until unsubscribe+consent
+designed (separate decision).
