@@ -6348,3 +6348,39 @@ edit-close is clean). Board edit also matches the board's wa number back to its
   dropdown AND the edit modal — same column, last-write-wins, both admin.
 - Files: `CampaignClientQrV2.jsx`, `CampaignQrV2.jsx`. Both create + edit now
   share one modal. No guardian needed (campaign admin pages, not §28 frozen).
+
+---
+
+## 98 · Phase 233 — public GSRTC-LED marketing landing page (2026-07-14)
+
+Owner wanted a NEW, PUBLIC, mobile-first, high-CTA marketing landing page built
+from the presentation-deck content (§75/§77 GSRTC LED network) — explicitly NOT
+editing `/present` or the deck. Built as a standalone static HTML page.
+
+- **File:** `public/led/index.html` — fully self-contained (inline CSS/JS, Google
+  Fonts CDN). Vercel serves static `public/` files ahead of the SPA rewrite, so
+  it's live at **app.untitledad.in/led** (public, NO login).
+- **SW denylist (guardian PASS):** added `/^\/led(?:[/?#]|$)/` to the `public/sw.js`
+  NavigationRoute denylist so a rep's installed SW serves the static landing, not
+  the SPA login shell (the §76/§181/§223 recurrence). Prospects (no SW) hit the
+  file directly. The regex boundary `(?:[/?#]|$)` was verified NOT to shadow the
+  frozen `/leads` sales route. `/led` is a static file (not a vercel.json rewrite),
+  so the §224 build tripwire is unaffected (it only checks vercel.json→sw.js
+  coverage). **Reps must reopen the app once for the new SW** — until then the /led
+  link shows THEM the login shell (prospects are fine immediately).
+- **Design (frontend-design skill):** deep brand — navy `#0A0E1A` + brand yellow
+  `#FFE600`, Space Grotesk display + DM Sans body + Space Mono for data. Signature
+  = a scrolling GSRTC station "departure board" city strip. Sections: hero → stat
+  band (count-up) → moat (billboard-vs-measurable) → 4-step how-it-works → proof
+  funnel → cities → final CTA form → footer. Sticky mobile WhatsApp+Call dock.
+  Scroll-reveal + `prefers-reduced-motion` respected. Verified in-browser: no
+  horizontal overflow at 375px, grids collapse, `rgb(255,230,0)` bright yellow.
+- **CTA = the lead funnel:** every WhatsApp button → `wa.me/919581578261` (the
+  campaign number, §54 → the inbound chat auto-creates a routed lead in Rima's
+  queue). The quote form (name/brand/city) pre-fills the WhatsApp message — NO
+  backend/endpoint needed. Call → `tel:+919898273686`.
+- **Real facts only:** 264 screens · 20 stations · Gujarat; the scan→lead moat;
+  funnel numbers ROUNDED (500+ scans / 100+ leads, from the live 535/119 dashboard)
+  so they don't go stale; cities = the confirmed real boards + "+ 10 more."
+- Static/JS-only, no SQL, no APK. Editing the deck is unrelated (§77); this is a
+  separate public page. To change stats/copy, edit `public/led/index.html`.

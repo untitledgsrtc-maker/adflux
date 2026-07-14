@@ -64,6 +64,11 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
     // when opening their own shared quote link (clients, with no SW, were
     // unaffected + got the PDF). Mirrors the /api + /apk fix (Phase 181/76).
     /^\/pdf(?:[/?#]|$)/,
+    // Phase 233 — the PUBLIC GSRTC-LED marketing landing (public/led/index.html)
+    // is a real static file, not the SPA. A rep with the SW installed (or anyone
+    // previewing) must get the landing, not the login shell. Prospects (no SW)
+    // hit the static file directly. Mirrors the /deck + /pdf fix.
+    /^\/led(?:[/?#]|$)/,
   ],
 }))
 
