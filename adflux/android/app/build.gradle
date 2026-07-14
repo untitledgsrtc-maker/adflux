@@ -89,8 +89,14 @@ android {
         // 96017 — Phase 227.1: CallLogPlugin maps Realme/ColorOS custom types
         //         100 -> outgoing, 101 -> incoming (Oppo-family phones). Fixes
         //         Jayna's Realme where incoming stopped recording ~2 Jul.
-        versionCode 96017
-        versionName "0.96.17"
+        // 96018 — Phase 228 Part A: real-time incoming-call listener
+        //         (CallStateReceiver + PHONE_STATE + READ_PHONE_STATE/NUMBERS +
+        //         TrackingPlugin.drainPendingCalls). Captures incoming calls LIVE
+        //         (ring/answer/hangup) independent of the OEM call-log TYPE —
+        //         the permanent fix that supersedes the 220/227/227.1 type
+        //         patches (CLAUDE.md §92). Requires APK rebuild (Part B).
+        versionCode 96018
+        versionName "0.96.18"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -22,6 +22,7 @@ import android.util.Log;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import java.io.File;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -299,6 +300,40 @@ public class TrackingPlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("online", online);
         call.resolve(ret);
+    }
+
+    // ─── 5b. Phase 228 Part A — real-time incoming-call queue drain ─────
+    // CallStateReceiver (manifest PHONE_STATE receiver) records every incoming
+    // call LIVE — answered vs missed + a duration WE compute — into a
+    // "pending_calls" JSON queue in SharedPreferences, OEM-independent (§92 —
+    // stop trusting per-brand call-log TYPE integers). This returns + CLEARS the
+    // queue so JS (callHistoryIngest.js) can ingest each row through the same
+    // dedup as the device-log scan. Native holds no Supabase creds; JS writes.
+    // Returns { calls: [{ number, direction, durationSeconds, atMs }] }.
+    @PluginMethod
+    public void drainPendingCalls(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) { call.reject("Plugin context null"); return; }
+        try {
+            SharedPreferences prefs = ctx.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
+            String rawJson = prefs.getString("pending_calls", "[]");
+            // Clear atomically on drain. Worst case (JS insert fails after drain)
+            // = the incoming still lands via the device-log scan; the §220 guard
+            // dedups it, so no double, no loss of the call record.
+            prefs.edit().remove("pending_calls").apply();
+            JSArray calls;
+            try {
+                calls = new JSArray(rawJson);
+            } catch (Throwable t) {
+                calls = new JSArray();
+            }
+            JSObject ret = new JSObject();
+            ret.put("calls", calls);
+            call.resolve(ret);
+        } catch (Throwable t) {
+            Log.e(TAG, "drainPendingCalls failed: " + t.getMessage());
+            call.reject("drainPendingCalls failed: " + t.getMessage());
+        }
     }
 
     // ─── 6. Phase 103.D.3 — native foreground location service ──────

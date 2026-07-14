@@ -64,6 +64,23 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <!-- Phase 228 Part A (2026-07-14) — real-time incoming-call listener.
+             Fires on ring / answer / hangup even when the app is backgrounded
+             or killed; records each incoming call (answered vs missed + a
+             duration WE compute) to a local queue that the JS call-history scan
+             drains + ingests. OEM-independent — replaces the fragile
+             read-the-call-log-and-guess-the-TYPE approach (§92).
+             exported="true" is REQUIRED: PHONE_STATE is a system broadcast; a
+             non-exported receiver never receives it. -->
+        <receiver
+            android:name=".CallStateReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->
@@ -94,8 +111,16 @@
          instead of through the Play Store.
          Phase 76.2.2 (2026-05-23) — READ_PHONE_STATE removed.
          CallLogPlugin only touches CallLog.Calls content URI; it
-         never reads phone state. Permission was unused. -->
+         never reads phone state. Permission was unused.
+         Phase 228 Part A (2026-07-14) — READ_PHONE_STATE RE-ADDED:
+         CallStateReceiver now reads live call state (ring/answer/
+         hangup) to capture incoming calls WITHOUT trusting the OEM
+         call-log TYPE integer (§92 — that broke on every new brand).
+         READ_PHONE_NUMBERS added so the incoming number resolves on
+         Android 11+. Sideload only (Play flags these). -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
 
     <!-- Phase 56d — Push notifications via FCM.
          Phase 76.2.2 (2026-05-23) — RECEIVE_BOOT_COMPLETED removed.

@@ -49,6 +49,20 @@ import com.getcapacitor.annotation.PermissionCallback;
         @Permission(
             alias = "callLog",
             strings = { Manifest.permission.READ_CALL_LOG }
+        ),
+        // Phase 228 Part A — READ_PHONE_STATE / READ_PHONE_NUMBERS for the
+        // real-time CallStateReceiver (live ring/answer/hangup + incoming
+        // number). Separate alias so the no-arg CallLogReader.requestPermissions()
+        // (called in NativeOnboarding) prompts for these TOO, while the call-log
+        // scan gate stays keyed on "callLog" only — granting/denying phone-state
+        // never blocks the device-log scan. Grant is app-wide, so the manifest
+        // receiver can then read the incoming number.
+        @Permission(
+            alias = "phoneState",
+            strings = {
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.READ_PHONE_NUMBERS
+            }
         )
     }
 )

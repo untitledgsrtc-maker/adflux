@@ -6061,11 +6061,64 @@ merge + a `kind:'network_off'` render branch. Guardian PASS (no §33 meeting-KPI
 - TeamDashboardV2 (live-map gps-off indicator) intentionally NOT touched — the
   owner's ask was "internet-off in the ACTIVITY" = the day-track timeline.
 
-### Part A — real-time incoming-call listener (PENDING, native)
-Not started. Replaces the fragile call-log-type reading (§92): a manifest
-`PHONE_STATE` receiver + `READ_PHONE_STATE`/`READ_PHONE_NUMBERS` re-added,
-captures incoming live (ring→answered/missed + our own duration), OEM-independent.
-Supersedes 220/227/227.1. See the plan doc Part A.
+### Part A — real-time incoming-call listener (CODE SHIPPED, needs APK rebuild = Part B)
+Written + committed + guardian PASS (2026-07-14). Replaces the fragile
+read-the-call-log-and-guess-the-TYPE approach (§92) with a LIVE listener. Does NOT
+run on the fleet until Part B rebuilds + rolls out the APK (native → live-update
+can't carry it).
+
+**Files (all in the Phase 228 Part A commit):**
+- NEW `android/.../CallStateReceiver.java` — manifest `PHONE_STATE`
+  BroadcastReceiver (fires backgrounded/killed). State machine persisted in
+  SharedPreferences (`commit()`, survives a kill between broadcasts): RINGING
+  captures number + ring time; OFFHOOK-after-RINGING = answered; IDLE writes a
+  completed row to a `pending_calls` JSON queue — `incoming` (answered,
+  duration = hangup − answer, OUR clock) or `missed` (dur 0). OFFHOOK with NO
+  prior RINGING = outgoing → NOT queued (already captured via tel-tap + outgoing
+  scan; §173/§220 — no double).
+- `TrackingPlugin.java` — `drainPendingCalls()` returns + clears the queue
+  (`JSArray`). Native holds no Supabase creds; JS writes.
+- `AndroidManifest.xml` — RE-added `READ_PHONE_STATE` + `READ_PHONE_NUMBERS`
+  (removed Phase 76.2.2) + `<receiver CallStateReceiver>` (exported=true, required
+  for the system broadcast).
+- `CallLogPlugin.java` — new `phoneState` permission alias
+  (READ_PHONE_STATE + READ_PHONE_NUMBERS) so the EXISTING no-arg
+  `CallLogReader.requestPermissions()` in `NativeOnboarding.jsx:114` prompts for
+  them too (the call-log scan gate stays keyed on `callLog` only — phone-state
+  grant/deny never blocks the device scan).
+- `callHistoryIngest.js` — `pullRealtimeCalls()` drains the queue + maps each
+  `{number,direction,durationSeconds,atMs}` to `ingestOne`'s raw shape
+  (`missed`→type `missed`, else type `incoming`). Wired into `runScan` (drained
+  even when the device scan is empty; real-time ingested BEFORE device rows so its
+  authoritative direction/duration wins the dedup) + `forceIngestRecentCalls`.
+  `ingestOne` UNCHANGED — real-time rows go through the SAME §170/§173/§220 dedup,
+  so a real-time `incoming` + a later device-scan `incoming` for the same physical
+  call MERGE, never double.
+- `build.gradle` — versionCode 96017 → **96018**, versionName 0.96.18.
+
+**FROZEN CONTRACTS (do NOT regress):** direction is resolved from LIVE phone state
+(RINGING→answered=incoming, RINGING→never-answered=missed), NEVER from a duration
+or an OEM TYPE integer (§89/§92). The receiver's own answer→hangup duration also
+fixes the §67 unreliable-incoming-duration read. `CallLogPlugin.typeLabel`
+(7/100/101) is UNTOUCHED — it stays as a harmless stopgap until Part A is proven on
+the fleet, then it's moot (do NOT extend it, §92).
+
+**Two guardian P1 flags:**
+1. **Permission wiring — CLOSED** in this commit (the `phoneState` alias). Still
+   device-test that the receiver actually gets the number on a real phone (§39/§40).
+2. **compute_daily_score exposure — FLAGGED, NOT patched (owner sign-off needed,
+   §71 rule 3).** The score's call-EXISTS clause is `duration_seconds>=10 AND
+   direction<>'missed'` — it does NOT exclude `direction='incoming'`. A bare inbound
+   can't create score alone (still needs a rep-action `lead_activities` row), but an
+   accurate ≥10s incoming CAN backfill credit for a same-day/same-lead outbound tap
+   whose outcome was never saved (customer calls back). Part A amplifies this by
+   landing accurate durations on far more genuine incoming calls. Fixing it =
+   add `direction='outgoing' only` (or exclude incoming) to the score's call clause
+   → a MONEY-function change → shadow-compare + owner-verify + one-command revert,
+   never a silent patch. Left for a deliberate follow-up.
+
+**Owner action:** push (JS reaches the APK on next open, but the native listener
+does NOT — it needs Part B). Nothing runs until Part B rebuilds + rolls out 96018.
 
 ### Part B — one clean signed APK + fleet rollout (PENDING, native + owner)
 Not started. The FOUNDATION: build → upload to the Supabase `apk` bucket as
@@ -6074,5 +6127,10 @@ Not started. The FOUNDATION: build → upload to the Supabase `apk` bucket as
 GPS-off + internet-off watchers actually run on the team. See the plan doc Part B.
 
 ### Status
-Part C on origin (this commit). Parts A + B are the next native session (owner
-runs the build/upload/rollout; I write the code). Nothing else pending here.
+Part C on origin. **Part A CODE SHIPPED + guardian PASS (2026-07-14)** — commit
+below; native, so it does NOT run until Part B's APK rebuild. Part B (build →
+upload `untitled-os.apk` to the Supabase `apk` bucket → publish `app_version`
+96018 → device-test ONE phone → fleet via the in-app updater) is owner-run — I
+write no more code for it. Open follow-up: the compute_daily_score incoming-credit
+flag (Part A block above) — a money-function change awaiting owner sign-off +
+shadow-compare.

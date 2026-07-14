@@ -39,6 +39,11 @@ import { Preferences } from '@capacitor/preferences'
 import { supabase } from '../lib/supabase'
 
 const CallLogReader = registerPlugin('CallLogReader')
+// Phase 228 Part A — the native tracking plugin also exposes drainPendingCalls,
+// the real-time incoming-call queue filled LIVE by CallStateReceiver (ring/
+// answer/hangup), OEM-independent (§92). registerPlugin is a name proxy — safe
+// to register the same plugin here and in nativeTracking.js.
+const Tracking = registerPlugin('UntitledTracking')
 
 const STORE_KEY = (userId) => `last-call-scan-ms-${userId}`
 // Phase 68.3 (21 May 2026) — widen first-scan window to 7 days. The
@@ -111,6 +116,38 @@ async function buildLeadPhoneMap(userId) {
   await load('telecaller_id', 'tc')
   await load('assigned_to', 'as')
   return map
+}
+
+// Phase 228 Part A — drain the native real-time incoming-call queue and map each
+// entry to ingestOne's raw shape. CallStateReceiver (manifest PHONE_STATE
+// receiver) records every incoming call the moment it happens — answered vs
+// missed + a duration IT computes from ring/answer/hangup — INDEPENDENT of how
+// the OEM logs it afterward (§92 — stop trusting per-brand call-log TYPE
+// integers; that broke on every new phone). drainPendingCalls returns + clears
+// the queue. Each row then flows through the SAME ingestOne dedup as the
+// device-log scan, so a real-time row + a later call-log-scan row for the same
+// physical call MERGE (§220 exact-call_at + direction-aware window) — no double.
+// No-op on web, or on an old APK without the plugin/method (drain throws → []).
+async function pullRealtimeCalls() {
+  if (!Capacitor.isNativePlatform()) return []
+  let calls = []
+  try {
+    const res = await Tracking.drainPendingCalls()
+    calls = Array.isArray(res?.calls) ? res.calls : []
+  } catch {
+    return []  // plugin/method absent on an older APK shell
+  }
+  return calls
+    .map((c) => ({
+      number:          (c?.number || '').toString(),
+      // direction is already resolved LIVE by the receiver; map to ingestOne's
+      // type vocabulary. ingestOne classifies incoming→incoming, missed→missed.
+      type:            c?.direction === 'missed' ? 'missed' : 'incoming',
+      date:            Number(c?.atMs),
+      durationSeconds: Number(c?.durationSeconds) || 0,
+    }))
+    // oldest-first so the dedup sees a stable order (matches the device scan)
+    .sort((a, b) => a.date - b.date)
 }
 
 let activeUserId = null
@@ -211,6 +248,19 @@ export async function forceIngestRecentCalls(userId, lookbackMs = 7 * 24 * 60 * 
   calls.sort((a, b) => Number(a.date) - Number(b.date))
   const leadMap = await buildLeadPhoneMap(userId)   // Phase 184 — pre-fetch once
   const errors = []
+
+  // Phase 228 Part A — also drain the native real-time incoming-call queue on a
+  // manual scan (same OEM-independent capture as the poller). Ingested first so
+  // its authoritative direction/duration wins any dedup against the device read.
+  const realtime = await pullRealtimeCalls()
+  for (const rc of realtime) {
+    try {
+      await ingestOne(userId, rc, leadMap)
+    } catch (e) {
+      errors.push(`${rc?.number || '?'}: ${e?.message || String(e)}`)
+    }
+  }
+
   for (const c of calls) {
     try {
       await ingestOne(userId, c, leadMap)
@@ -272,7 +322,12 @@ async function runScan(userId) {
       return
     }
 
-    if (calls.length === 0) {
+    // Phase 228 Part A — drain the native real-time incoming-call queue
+    // (CallStateReceiver). Pulled here (not gated on the device-scan count) so a
+    // live-captured incoming still ingests even when the device log read nothing.
+    const realtime = await pullRealtimeCalls()
+
+    if (calls.length === 0 && realtime.length === 0) {
       await updateScanTimestamp(userId, Date.now())
       return
     }
@@ -283,6 +338,17 @@ async function runScan(userId) {
     // Phase 184 — pre-fetch the lead→phone map ONCE (was 2-4 lead queries per
     // record). The dupe/tap call_logs matching inside ingestOne is unchanged.
     const leadMap = await buildLeadPhoneMap(userId)
+
+    // Real-time rows first: their direction + duration are authoritative (§92),
+    // so if the same call is also read from the device log with a 0 duration,
+    // the device pass folds into (and can't downgrade) the real-time row.
+    for (const rc of realtime) {
+      try {
+        await ingestOne(userId, rc, leadMap)
+      } catch (e) {
+        console.warn('[call-history] realtime ingest failed for', rc?.number, e?.message || e)
+      }
+    }
 
     for (const c of calls) {
       try {
