@@ -6324,3 +6324,27 @@ column IS the redirect target, and `/api/q/<code>` already 302s to whatever
 - Owner smoke: `/campaigns/clients` → New client QR → toggle **Link** → paste a
   URL → preview QR renders → Create → scan the printed QR opens the link + the
   Scans count ticks. WhatsApp mode still works as before.
+
+### Phase 232 (2026-07-14) — EDIT for client QRs + board QRs
+Owner wanted to edit an existing QR's details on BOTH `/campaigns/clients`
+(CampaignClientQrV2) and `/campaigns/qr` boards (CampaignQrV2). Added an **Edit**
+(pencil) button per row → the SAME modal opens pre-filled (`openEdit` parses
+`qr_text` back into the form: `wa.me/(\d+)` + `?text=` → WhatsApp number+message,
+else → link/target). JS-only, no schema, §45-safe (UPDATE existing
+`campaign_locations` rows).
+
+**THE KEY CONTRACT — the code is FIXED on edit.** A printed QR encodes
+`/api/q/<code>`; the redirect target (`qr_text`) is what the endpoint 302s to. So
+editing re-points an **already-printed QR with NO reprint** — the UPDATE never
+touches `code`/`id`. Client-QR code shows a "fixed — no reprint" note; board-QR
+Code field is `readOnly` on edit. Save button → "Save changes"; New button resets
+all edit state (`openNew`/`openModal` clear `editingId` + fields so a New after an
+edit-close is clean). Board edit also matches the board's wa number back to its
+`whatsapp_accounts` row so the number dropdown shows it, and sets
+`codeEdited`/`msgEdited=true` to block the auto-code/auto-message effects.
+- §45: editing `qr_text` only changes FUTURE scans' redirect; existing leads
+  (location_id) + the /api/q endpoint (reads current qr_text) are unaffected. The
+  board routing column (`default_telecaller_id`) is written by both the inline
+  dropdown AND the edit modal — same column, last-write-wins, both admin.
+- Files: `CampaignClientQrV2.jsx`, `CampaignQrV2.jsx`. Both create + edit now
+  share one modal. No guardian needed (campaign admin pages, not §28 frozen).

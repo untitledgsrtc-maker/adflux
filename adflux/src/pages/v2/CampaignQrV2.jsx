@@ -20,7 +20,7 @@
 // (/work, /telecaller, lead detail) are byte-unchanged.
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
-import { Plus, Download, Loader2, AlertTriangle, MapPin, RefreshCw, X, Trash2 } from 'lucide-react'
+import { Plus, Download, Loader2, AlertTriangle, MapPin, RefreshCw, X, Trash2, Pencil } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
 import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
@@ -63,6 +63,7 @@ export default function CampaignQrV2() {
   const [tcId, setTcId] = useState('')   // board → telecaller (mockup routing)
   const [codeEdited, setCodeEdited] = useState(false)
   const [msgEdited, setMsgEdited] = useState(false)
+  const [editingId, setEditingId] = useState(null)   // null = create; row id = editing (Phase 232). Code stays FIXED on edit.
   const previewRef = useRef(null)
 
   async function load() {
@@ -210,33 +211,77 @@ export default function CampaignQrV2() {
   async function saveBoard() {
     if (!waNumber) { pushToast('Enter the WhatsApp number first.', 'danger'); return }
     if (!label.trim()) { pushToast('Enter a board / location name.', 'danger'); return }
-    if (!code.trim()) { pushToast('Code is required.', 'danger'); return }
+    if (!editingId && !code.trim()) { pushToast('Code is required.', 'danger'); return }
     setSaving(true)
     try {
-      const row = {
-        code: code.trim(), label: label.trim(), city: city.trim() || null,
-        qr_text: waUrl, campaign_id: campaignId || null, is_active: true,
+      // On edit the code is FIXED (an already-printed QR encodes /api/q/<code>)
+      // → re-pointing the number/label/city/routing needs NO reprint.
+      const fields = {
+        label: label.trim(), city: city.trim() || null,
+        qr_text: waUrl, campaign_id: campaignId || null,
       }
-      let { error } = await supabase.from('campaign_locations')
-        .insert({ ...row, default_telecaller_id: tcId || null })
-      // default_telecaller_id column not added yet → save without it + warn, so
-      // the board still works (it just won't route by board until the SQL runs).
-      if (error && /default_telecaller_id|column/i.test(error.message || '')) {
-        ;({ error } = await supabase.from('campaign_locations').insert(row))
-        if (!error) pushToast('Board saved. Run supabase_campaign_c8_1_board_telecaller.sql to enable telecaller routing.', 'info')
+      let error
+      if (editingId) {
+        ;({ error } = await supabase.from('campaign_locations')
+          .update({ ...fields, default_telecaller_id: tcId || null }).eq('id', editingId))
+        // default_telecaller_id column not added yet → update without it.
+        if (error && /default_telecaller_id|column/i.test(error.message || '')) {
+          ;({ error } = await supabase.from('campaign_locations').update(fields).eq('id', editingId))
+        }
+      } else {
+        const row = { ...fields, code: code.trim(), is_active: true }
+        ;({ error } = await supabase.from('campaign_locations')
+          .insert({ ...row, default_telecaller_id: tcId || null }))
+        // default_telecaller_id column not added yet → save without it + warn, so
+        // the board still works (it just won't route by board until the SQL runs).
+        if (error && /default_telecaller_id|column/i.test(error.message || '')) {
+          ;({ error } = await supabase.from('campaign_locations').insert(row))
+          if (!error) pushToast('Board saved. Run supabase_campaign_c8_1_board_telecaller.sql to enable telecaller routing.', 'info')
+        }
       }
       if (error) {
         if (error.code === '23505') { toastError(error, 'That code already exists — pick a different one.'); return }
         throw error
       }
-      toastSuccess('Board QR saved.')
-      setLabel(''); setCity(''); setCodeEdited(false); setMsgEdited(false); setShowModal(false)
+      toastSuccess(editingId ? 'Board updated.' : 'Board QR saved.')
+      setLabel(''); setCity(''); setCodeEdited(false); setMsgEdited(false); setEditingId(null); setShowModal(false)
       load()
     } catch (err) {
       toastError(err, 'Could not save board.')
     } finally {
       setSaving(false)
     }
+  }
+
+  // Phase 232 — open the modal fresh for a NEW board (reset edit state + form).
+  function openNew() {
+    setEditingId(null)
+    setLabel(''); setCity(''); setMessage(''); setCampaignId(''); setTcId('')
+    setCodeEdited(false); setMsgEdited(false)
+    setNumber(accounts[0]?.display_number || number)
+    setShowModal(true)
+  }
+
+  // Phase 232 — EDIT a board. Parse qr_text back into the form; the code stays
+  // FIXED (already-printed QR keeps working, no reprint). Match the board's wa
+  // number back to its account so the number dropdown shows it.
+  function openEdit(b) {
+    setEditingId(b.id)
+    const t = String(b.qr_text || '')
+    const waM = t.match(/wa\.me\/(\d+)/)
+    const waNum = waM ? waM[1] : ''
+    const acct = accounts.find((a) => digitsToWa(a.display_number) === waNum)
+    setNumber(acct ? acct.display_number : (waNum || accounts[0]?.display_number || ''))
+    const tx = t.match(/[?&]text=([^&]+)/)
+    setMessage(tx ? (() => { try { return decodeURIComponent(tx[1]) } catch { return '' } })() : '')
+    setCity(b.city || '')
+    setLabel(b.label || '')
+    setCode(b.code || '')
+    setCampaignId(b.campaign_id || '')
+    setTcId(b.default_telecaller_id || '')
+    setCodeEdited(true)  // block the auto-code effect
+    setMsgEdited(true)   // block the auto-message effect
+    setShowModal(true)
   }
 
   async function deleteBoard(board) {
@@ -267,7 +312,7 @@ export default function CampaignQrV2() {
   }
 
   const newBtn = (
-    <button type="button" style={btnY} onClick={() => setShowModal(true)}><Plus size={14} strokeWidth={1.6} /> New QR</button>
+    <button type="button" style={btnY} onClick={openNew}><Plus size={14} strokeWidth={1.6} /> New QR</button>
   )
 
   if (tablesMissing) {
@@ -402,6 +447,9 @@ export default function CampaignQrV2() {
                       </td>
                       <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <BoardDownload board={b} qr={qrValue(b.code)} />
+                        <button type="button" title="Edit board" onClick={() => openEdit(b)} style={{ ...btnG, height: 30, fontSize: 12, padding: '0 8px', marginLeft: 6 }}>
+                          <Pencil size={13} strokeWidth={1.6} />
+                        </button>
                         <button type="button" title="Delete board" onClick={() => deleteBoard(b)} style={{ ...btnG, height: 30, fontSize: 12, padding: '0 8px', marginLeft: 6, color: 'var(--v2-rose, #f87171)' }}>
                           <Trash2 size={13} strokeWidth={1.6} />
                         </button>
@@ -445,7 +493,7 @@ export default function CampaignQrV2() {
         <div style={overlay} onClick={() => setShowModal(false)}>
           <div style={modalBox} onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--v2-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 15 }}>New board QR</span>
+              <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 15 }}>{editingId ? 'Edit board QR' : 'New board QR'}</span>
               <button type="button" onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--v2-ink-2)', display: 'flex' }}><X size={18} strokeWidth={1.6} /></button>
             </div>
             <div style={{ padding: 18, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
@@ -483,8 +531,14 @@ export default function CampaignQrV2() {
                   )}
                 </div>
                 <div style={{ marginTop: 12 }}>
-                  <label style={lbl}>Code (auto, editable)</label>
-                  <input style={inp} value={code} onChange={(e) => { setCode(e.target.value); setCodeEdited(true) }} />
+                  <label style={lbl}>{editingId ? 'Code (fixed)' : 'Code (auto, editable)'}</label>
+                  <input
+                    style={{ ...inp, ...(editingId ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+                    value={code}
+                    readOnly={!!editingId}
+                    onChange={(e) => { if (!editingId) { setCode(e.target.value); setCodeEdited(true) } }}
+                  />
+                  {editingId && <div style={{ marginTop: 5, fontSize: 11, color: 'var(--v2-ink-2)' }}>Fixed — the printed QR keeps working, no reprint.</div>}
                 </div>
                 <div style={{ marginTop: 12 }}>
                   <label style={lbl}>Pre-filled WhatsApp message</label>
@@ -492,7 +546,7 @@ export default function CampaignQrV2() {
                 </div>
                 <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
                   <button type="button" style={{ ...btnY, opacity: saving ? 0.6 : 1 }} onClick={saveBoard} disabled={saving}>
-                    {saving ? <Loader2 size={14} className="spin" /> : <Plus size={14} strokeWidth={1.6} />} Save board
+                    {saving ? <Loader2 size={14} className="spin" /> : editingId ? <Pencil size={14} strokeWidth={1.6} /> : <Plus size={14} strokeWidth={1.6} />} {editingId ? 'Save changes' : 'Save board'}
                   </button>
                   <button style={btnG} onClick={() => downloadFromRef(previewRef, code)}><Download size={14} strokeWidth={1.6} /> PNG</button>
                 </div>

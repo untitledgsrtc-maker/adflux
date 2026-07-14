@@ -15,7 +15,7 @@
 // is lazy-loaded (rep bundles unchanged).
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
-import { Plus, Download, Loader2, AlertTriangle, RefreshCw, X, Trash2, QrCode } from 'lucide-react'
+import { Plus, Download, Loader2, AlertTriangle, RefreshCw, X, Trash2, QrCode, Pencil } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
 import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
@@ -61,6 +61,8 @@ export default function CampaignClientQrV2() {
   const [message, setMessage] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [codeSuffix, setCodeSuffix] = useState('01') // stable per modal-open → unique code, survives deletes
+  const [editingId, setEditingId] = useState(null)   // null = create; row id = editing (Phase 232)
+  const [editingCode, setEditingCode] = useState('') // the existing code — FIXED on edit so the printed QR keeps working
   const previewRef = useRef(null)
 
   async function load() {
@@ -110,6 +112,9 @@ export default function CampaignClientQrV2() {
     const slug = String(clientName || 'client').replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'CLNT'
     return `CL-${slug}-${codeSuffix}`
   }, [clientName, codeSuffix])
+  // On edit the code is FIXED (an already-printed QR encodes /api/q/<code> — keep
+  // it so re-pointing the target needs NO reprint). New rows get nextCode.
+  const displayCode = editingId ? editingCode : nextCode
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.untitledad.in'
   const qrValue = (c) => (c ? `${origin}/api/q/${encodeURIComponent(c)}` : '')
@@ -130,20 +135,30 @@ export default function CampaignClientQrV2() {
     }
     setSaving(true)
     try {
-      const { error } = await supabase.from('campaign_locations').insert({
-        client_name: clientName.trim(),
-        code: nextCode,
-        label: clientName.trim(),
-        qr_text: target,
-        campaign_id: null,
-        is_active: true,
-      })
+      let error
+      if (editingId) {
+        // UPDATE — keep the code fixed (the printed QR keeps working; only the
+        // name + redirect target change). No reprint needed.
+        ;({ error } = await supabase.from('campaign_locations')
+          .update({ client_name: clientName.trim(), label: clientName.trim(), qr_text: target })
+          .eq('id', editingId))
+      } else {
+        ;({ error } = await supabase.from('campaign_locations').insert({
+          client_name: clientName.trim(),
+          code: nextCode,
+          label: clientName.trim(),
+          qr_text: target,
+          campaign_id: null,
+          is_active: true,
+        }))
+      }
       if (error) {
         if (error.code === '23505') { toastError(error, 'That code already exists — change the client name slightly.'); return }
         throw error
       }
-      toastSuccess('Client QR created.')
-      setClientName(''); setNumber(''); setMessage(''); setLinkUrl(''); setQrType('whatsapp'); setShowModal(false)
+      toastSuccess(editingId ? 'Client QR updated.' : 'Client QR created.')
+      setClientName(''); setNumber(''); setMessage(''); setLinkUrl(''); setQrType('whatsapp')
+      setEditingId(null); setEditingCode(''); setShowModal(false)
       load()
     } catch (err) {
       toastError(err, 'Could not create the client QR.')
@@ -166,9 +181,35 @@ export default function CampaignClientQrV2() {
   }
 
   function openModal() {
-    // unique code suffix generated ONCE per open (not in render) so the code
-    // survives deletes + the preview/download/saved code all match.
+    // Clean-slate NEW. unique code suffix generated ONCE per open (not in render)
+    // so the code survives deletes + the preview/download/saved code all match.
+    setEditingId(null); setEditingCode('')
+    setClientName(''); setQrType('whatsapp'); setNumber(''); setMessage(''); setLinkUrl('')
     setCodeSuffix(Math.random().toString(36).slice(2, 6).toUpperCase())
+    setShowModal(true)
+  }
+
+  // Phase 232 — EDIT an existing client QR. Parse qr_text back into the form.
+  // The code stays fixed (already-printed QR keeps working; only the redirect
+  // changes) so re-pointing needs no reprint.
+  function openEdit(row) {
+    setEditingId(row.id)
+    setEditingCode(row.code)
+    setClientName(row.client_name || '')
+    const t = String(row.qr_text || '')
+    const waM = t.match(/wa\.me\/(\d+)/)
+    if (waM) {
+      const n = waM[1]
+      setQrType('whatsapp')
+      setNumber(n.length === 12 && n.startsWith('91') ? n.slice(2) : n)
+      const tx = t.match(/[?&]text=([^&]+)/)
+      setMessage(tx ? (() => { try { return decodeURIComponent(tx[1]) } catch { return '' } })() : '')
+      setLinkUrl('')
+    } else {
+      setQrType('link')
+      setLinkUrl(t)
+      setNumber(''); setMessage('')
+    }
     setShowModal(true)
   }
   const newBtn = (
@@ -246,6 +287,9 @@ export default function CampaignClientQrV2() {
                       <td style={td}>{fmtDate(r.created_at)}</td>
                       <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <Dl code={r.code} qr={qrValue(r.code)} />
+                        <button type="button" title="Edit" onClick={() => openEdit(r)} style={{ ...btnG, height: 30, fontSize: 12, padding: '0 8px', marginLeft: 6 }}>
+                          <Pencil size={13} strokeWidth={1.6} />
+                        </button>
                         <button type="button" title="Delete" onClick={() => deleteClient(r)} style={{ ...btnG, height: 30, fontSize: 12, padding: '0 8px', marginLeft: 6, color: 'var(--v2-rose, #f87171)' }}>
                           <Trash2 size={13} strokeWidth={1.6} />
                         </button>
@@ -260,14 +304,14 @@ export default function CampaignClientQrV2() {
       </div>
 
       <p style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', margin: '14px 0 0', lineHeight: 1.6 }}>
-        Same tracker as your boards — a scan hits /api/q/&lt;code&gt;, logs one scan, then opens the target (WhatsApp or a link). Re-download the PNG after any edit so the printed QR carries the tracked link.
+        Same tracker as your boards — a scan hits /api/q/&lt;code&gt;, logs one scan, then opens the target (WhatsApp or a link). <b style={{ color: 'var(--v2-ink-1)' }}>Editing re-points the SAME QR</b> — the code is fixed, so an already-printed QR keeps working with no reprint. Only download the PNG for a brand-new QR.
       </p>
 
       {showModal && (
         <div style={overlay} onClick={() => setShowModal(false)}>
           <div style={modalBox} onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--v2-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 15 }}>New client QR</span>
+              <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 15 }}>{editingId ? 'Edit client QR' : 'New client QR'}</span>
               <button type="button" onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--v2-ink-2)', display: 'flex' }}><X size={18} strokeWidth={1.6} /></button>
             </div>
             <div style={{ padding: 18, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
@@ -307,24 +351,27 @@ export default function CampaignClientQrV2() {
                     </div>
                   </div>
                 )}
-                <div style={{ marginTop: 10, fontSize: 11, color: 'var(--v2-ink-2)' }}>Code: <b style={{ color: 'var(--v2-ink-1)' }}>{nextCode}</b></div>
+                <div style={{ marginTop: 10, fontSize: 11, color: 'var(--v2-ink-2)' }}>
+                  Code: <b style={{ color: 'var(--v2-ink-1)' }}>{displayCode}</b>
+                  {editingId && <span style={{ marginLeft: 8, color: 'var(--v2-ink-2)' }}>· fixed — the printed QR keeps working, no reprint</span>}
+                </div>
                 <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
                   <button type="button" style={{ ...btnY, opacity: saving ? 0.6 : 1 }} onClick={saveClient} disabled={saving}>
-                    {saving ? <Loader2 size={14} strokeWidth={1.6} className="spin" /> : <Plus size={14} strokeWidth={1.6} />} Create QR
+                    {saving ? <Loader2 size={14} strokeWidth={1.6} className="spin" /> : editingId ? <Pencil size={14} strokeWidth={1.6} /> : <Plus size={14} strokeWidth={1.6} />} {editingId ? 'Save changes' : 'Create QR'}
                   </button>
-                  <button type="button" style={btnG} onClick={() => downloadFromRef(previewRef, nextCode)}><Download size={14} strokeWidth={1.6} /> PNG</button>
+                  <button type="button" style={btnG} onClick={() => downloadFromRef(previewRef, displayCode)}><Download size={14} strokeWidth={1.6} /> PNG</button>
                 </div>
               </div>
               <div style={{ flex: '0 0 200px', textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 10 }}>Live preview</div>
                 <div ref={previewRef} style={{ background: 'white', borderRadius: 10, padding: 14, display: 'inline-block' }}>
                   {target ? (
-                    <Suspense fallback={<div style={{ width: 170, height: 170 }} />}><QRCodeCanvas value={qrValue(nextCode)} size={170} /></Suspense>
+                    <Suspense fallback={<div style={{ width: 170, height: 170 }} />}><QRCodeCanvas value={qrValue(displayCode)} size={170} /></Suspense>
                   ) : (
                     <div style={{ width: 170, height: 170, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--v2-ink-2, #6a7590)', fontSize: 12 }}>{qrType === 'link' ? 'Enter a link' : 'Enter a number'}</div>
                   )}
                 </div>
-                <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', marginTop: 8, wordBreak: 'break-all' }}>{target ? qrValue(nextCode) : '—'}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', marginTop: 8, wordBreak: 'break-all' }}>{target ? qrValue(displayCode) : '—'}</div>
               </div>
             </div>
           </div>
