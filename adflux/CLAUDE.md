@@ -5952,3 +5952,85 @@ it, and only on their OWN server link.
   serving the SPA shell. Fix = the sw.js denylist, not the function.
 - ❌ `sms:`/`smsto:` (or any new scheme) opened via `openExternalUrl` without the
   matching `<queries>` VIEW intent in AndroidManifest → silent no-op on the APK.
+
+
+---
+
+## 92 · CALL-LOG CAPTURE IS FRAGILE — STOP patching per-phone types (2026-07-14, FROZEN)
+
+**The single most-repeated patch class in this project.** Owner (14 Jul):
+"we repaired this many times, why do you keep doing it, why patches?" He is
+right. Read this BEFORE touching anything about incoming/call capture.
+
+### The disease
+The app captures calls by **reading the device Android call log
+(`CallLogPlugin.scanRecentCalls`) and trusting the OEM's `TYPE` integer** to
+decide direction. Every phone brand numbers calls differently, so **each new
+phone brand breaks capture and gets its own patch**:
+- Phase 220 — standard phones that report an answered incoming with 0 duration
+  → was misfiled 'missed'. Fixed the classifier.
+- Phase 227 — type 7 (ANSWERED_EXTERNALLY: Bluetooth/linked device) → dropped.
+- Phase 227.1 — Realme/ColorOS custom types 100=outgoing / 101=incoming → dropped.
+- Plus the duration-capture patches: §65 · §116 · §128.4 · §138 · §154.
+- ~8 call-related patches total. The NEXT brand will break it again.
+
+### THE RULE (frozen — do NOT violate)
+1. **Do NOT add another per-phone `case <N>: return "..."` as "the fix."** The
+   read-the-log-and-trust-the-type approach is inherently fragile; every added
+   case is a symptom patch, not a solution.
+2. **The permanent fix (agreed 14 Jul, not yet built): a REAL-TIME native
+   incoming-call listener** — re-add `READ_PHONE_STATE` + a manifest
+   `PHONE_STATE` BroadcastReceiver / `TelephonyCallback` that captures the
+   incoming call LIVE (ring → answered/missed, duration computed by us),
+   independent of the OEM's call-log `TYPE`. Same real-time receiver pattern as
+   the GPS-off / network-off watchers (§76.2). Once shipped it SUPERSEDES the
+   type patches (220/227/227.1) for every phone, forever.
+3. **Next session, any "incoming calls not recording" report → the answer is
+   NOT another type case.** It is: is the real-time listener shipped + on that
+   phone's APK? Yes → debug the listener. No → ship it. **Type-patching is
+   BANNED for this feature.**
+4. The already-shipped type patches (220/227/227.1) stay (harmless stopgap that
+   helps until the listener lands) but are NOT the solution — don't extend them.
+
+### Why it kept recurring (the honest root, so it doesn't again)
+- I defaulted to the fast visible patch (fixes the one reported rep today) over
+  the bigger root fix (real-time listener + an APK rollout that's been stuck,
+  §81). That's the §3/§69 patch-chain anti-pattern — on this feature specifically.
+- The call-log lessons were scattered across ~8 sections (§65/§67/§89/§116/§138/
+  §154/§227) with no single "STOP" rule, so each session re-treated a fresh
+  report as a new bug. THIS section is that single STOP rule. §93 (daily update)
+  exists so this can't scatter again.
+
+
+---
+
+## 93 · STANDING RULE — CLAUDE.md updated every session / every commit batch (2026-07-14, OWNER DIRECTIVE)
+
+Owner directive 14 Jul (verbatim intent): "whatever we build today we update in
+CLAUDE.md at 8pm every day; if we're not working at that time, the next commit
+must be with a CLAUDE.md update."
+
+**This is THE fix for "why do you forget everything."** CLAUDE.md is the only
+memory across sessions. When it lags the code, the next session re-solves solved
+problems and re-patches closed bugs (exactly what happened with the call log,
+§92). Keeping it current is non-negotiable.
+
+### The rule
+1. **Every working day, by ~8:00 PM IST (end of day), append a CLAUDE.md
+   section** covering what was built that day — phases, commit SHAs, contracts,
+   foot-guns — in the standard §25 format.
+2. **If no session runs at 8 PM** (we work other hours), the update rides the
+   **NEXT commit**: **no substantive work ships without its CLAUDE.md record in
+   the same commit or the next one.**
+3. **Net:** CLAUDE.md never falls behind the code. The scattered/forgotten
+   history that caused the repeat-patching can't build up again.
+
+### How to apply (part of "done", like the pre-commit checks §15/§35/§40)
+- A work batch is not complete until its CLAUDE.md section is written. Treat the
+  doc update as the last mandatory step of the batch, before declaring done.
+- Money/security/native/contract work → the CLAUDE.md entry is MANDATORY (these
+  are the ones that bite when forgotten). Trivial one-off tweaks can batch into
+  the next section.
+- The daily entry answers, for future-me: what shipped, what's now frozen, what's
+  still open, and any new foot-gun. If a decision was made ("we chose X over Y"),
+  record the decision + why, so it's not re-litigated.
