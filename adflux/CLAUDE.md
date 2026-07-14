@@ -6404,3 +6404,21 @@ Owner: "videos not there and map is not there" (the deck has both). Added to
 - Both use public CDNs (Leaflet, CartoDB tiles) — fine for a public marketing page
   (loads on the visitor's device). To add more station pins, edit the `stations`
   array in the page's inline JS.
+
+### Phase 233.2 — official logo + muted video + reveal fail-safe (2026-07-14)
+- **Logo:** the owner's official `01. UNTITLED LOGO_FULL.svg` copied to
+  `public/led/logo.svg` (white emblem + "UNTITLED" wordmark). Replaces the text
+  wordmark in the header (`.logo` height 40/34px) + footer. Referenced as `<img>`
+  (white on the navy header, no recolor).
+- **Video sound:** owner "no need voice, mute is ok" → removed the "Tap for sound"
+  toggle button + its JS. Video stays autoplay-muted-loop-playsinline (the only way
+  mobile autoplays anyway).
+- **FOOT-GUN FIXED (important):** the scroll-reveal used bare `.rise{opacity:0}` +
+  JS adding `.in`. If JS ever fails / is slow, the whole page's content stays
+  INVISIBLE forever. Fixed with the standard `.js`-guard: an inline
+  `<script>document.documentElement.className+=" js"</script>` at the top of
+  `<head>`, and the reveal rules scoped to `.js .rise` / `.js .rise.in` (+ the
+  reduced-motion override). No `.js` class (no JS) → content shows normally. Any
+  future opacity-0-until-JS reveal MUST be guarded this way. Verified: hero
+  computed `opacity:1` after load; the screenshot tool misrenders brightness/yellow
+  on this dark page (trust computed styles, not the screenshot).

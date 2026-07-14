@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<script>document.documentElement.className+=" js";</script>
 <title>GSRTC LED Network — Advertise across Gujarat | Untitled Advertising</title>
 <meta name="description" content="264 LED screens across 20 GSRTC bus stations in Gujarat. AI-verified views and a QR that turns every scan into a tracked lead — the only outdoor advertising you can actually measure." />
 <meta name="theme-color" content="#0A0E1A" />
@@ -56,6 +57,8 @@
     backdrop-filter:blur(12px);background:rgba(10,14,26,.72);border-bottom:1px solid var(--line)}
   .bar{display:flex;align-items:center;justify-content:space-between;height:62px}
   .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;letter-spacing:-.01em;font-size:16px}
+  .logo{height:40px;width:auto;display:block}
+  @media(max-width:640px){.logo{height:34px}}
   .brand .dot{width:11px;height:11px;border-radius:3px;background:var(--yellow);box-shadow:0 0 14px var(--yellow)}
   .brand small{font-family:var(--mono);font-weight:400;font-size:9.5px;letter-spacing:.14em;color:var(--muted);display:block;margin-top:-3px}
   .nav-cta{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13.5px;
@@ -237,8 +240,9 @@
   .dock .btn-ghost{flex:0 0 auto;padding:14px 18px}
 
   /* reveal */
-  .rise{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
-  .rise.in{opacity:1;transform:none}
+  /* reveal is JS-enhancement only — without JS (.js unset) content shows normally */
+  .js .rise{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .js .rise.in{opacity:1;transform:none}
 
   /* responsive */
   @media(max-width:860px){
@@ -259,7 +263,7 @@
     html{scroll-behavior:auto}
     .flip-track{animation:none;transform:none;flex-wrap:wrap;justify-content:center}
     .board-head .live i{animation:none}
-    .rise{opacity:1;transform:none;transition:none}
+    .js .rise{opacity:1;transform:none;transition:none}
   }
 </style>
 </head>
@@ -269,8 +273,7 @@
 <header>
   <div class="wrap bar">
     <a class="brand" href="/led" aria-label="Untitled Advertising home">
-      <span class="dot"></span>
-      <span>UNTITLED<small>ADVERTISING · GUJARAT</small></span>
+      <img class="logo" src="/led/logo.svg" alt="Untitled Advertising" width="82" height="41" />
     </a>
     <a class="nav-cta" id="navWa" href="#" aria-label="Chat on WhatsApp">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.8 14.06c-.24.68-1.42 1.31-1.95 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.88-4.6-4.06-.13-.18-1.1-1.47-1.1-2.8 0-1.33.7-1.98.94-2.25.24-.27.53-.34.71-.34.18 0 .36 0 .51.01.16.01.39-.06.6.46.24.58.82 2 .89 2.15.07.14.12.31.02.5-.09.18-.14.29-.28.45-.14.16-.29.36-.42.48-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.55.73 1.82.86.27.14.45.2.51.31.07.11.07.63-.17 1.32Z"/></svg>
@@ -334,10 +337,6 @@
         <div class="screen rise">
           <span class="tag" id="vtag">STATION · LIVE</span>
           <video id="mainVideo" src="/deck/station-hero.mp4" poster="/deck/station-1.jpg" muted loop playsinline autoplay preload="metadata"></video>
-          <button class="sound" id="soundBtn" type="button" aria-label="Toggle sound">
-            <svg id="soundIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
-            <span id="soundLbl">Tap for sound</span>
-          </button>
         </div>
         <div class="thumbs rise">
           <button class="thumb active" data-src="/deck/station-hero.mp4" data-tag="STATION · LIVE" type="button">Station</button>
@@ -484,7 +483,7 @@
 
 <footer>
   <div class="wrap foot">
-    <span class="brand" style="display:flex;align-items:center;gap:9px"><span class="dot" style="width:10px;height:10px;border-radius:3px;background:var(--yellow);box-shadow:0 0 12px var(--yellow)"></span> Untitled Advertising</span>
+    <img src="/led/logo.svg" alt="Untitled Advertising" style="height:30px;width:auto" />
     <span>GSRTC LED Network · Gujarat</span>
     <span><a href="tel:+919898273686">+91 98982 73686</a></span>
   </div>
@@ -589,18 +588,9 @@
     }
   }
 
-  // video showcase — sound toggle + city switcher
+  // video showcase — muted autoplay + city switcher (no sound, owner call)
   var mainVideo = document.getElementById("mainVideo");
-  var soundBtn = document.getElementById("soundBtn");
-  var soundLbl = document.getElementById("soundLbl");
   var vtag = document.getElementById("vtag");
-  if(soundBtn && mainVideo){
-    soundBtn.addEventListener("click", function(){
-      mainVideo.muted = !mainVideo.muted;
-      if(!mainVideo.muted){ mainVideo.play().catch(function(){}); if(soundLbl) soundLbl.textContent = "Mute"; }
-      else if(soundLbl){ soundLbl.textContent = "Tap for sound"; }
-    });
-  }
   document.querySelectorAll(".thumb").forEach(function(t){
     t.addEventListener("click", function(){
       if(!mainVideo) return;
