@@ -6034,3 +6034,45 @@ problems and re-patches closed bugs (exactly what happened with the call log,
 - The daily entry answers, for future-me: what shipped, what's now frozen, what's
   still open, and any new foot-gun. If a decision was made ("we chose X over Y"),
   record the decision + why, so it's not re-litigated.
+
+
+---
+
+## 94 · Phase 228 — permanent-call-fix job, Part C shipped (internet-off log) (2026-07-14)
+
+The "real-time listener + APK rollout" job (§92 permanent call fix). Full scope:
+`docs/PLAN_realtime_call_listener_and_apk_rollout.md`. Order C → A → B.
+
+### Part C — internet-off log surfaced (SHIPPED, JS/live-update)
+`GpsTrackV2.jsx` day-track activity timeline now shows `network_off_events`
+inline, mirroring the existing `gps_off_events` display exactly (Phase 84.5
+pattern): amber "Internet off" row with `lost_at` time + duration + "back on at"
+/ "still off". Additive display only — new query in the admin Promise.all
+(mirrors the gps_off query), viewer §194-bundle path degrades to `[]`, timeline
+merge + a `kind:'network_off'` render branch. Guardian PASS (no §33 meeting-KPI /
+§51 km / call-breakdown / hot-path touch; destructuring lockstep verified).
+- The `network_off_events` table + native NetworkWatcher already existed
+  (§33/§37 Phase 76.1/76.2) — this only DISPLAYS them.
+- ⚠ FOOT-GUN: it only shows DATA once the native NetworkWatcher is actually
+  running on the phone — i.e. after Part B's APK is installed. On old APKs / web
+  there are no network_off rows to show. Not a bug; the capture is native.
+- Follow-up (optional): to show it for §194 team-viewers too, add `network_off`
+  to the `team_rep_daytrack` RPC (SQL) — currently viewer path is graceful-empty.
+- TeamDashboardV2 (live-map gps-off indicator) intentionally NOT touched — the
+  owner's ask was "internet-off in the ACTIVITY" = the day-track timeline.
+
+### Part A — real-time incoming-call listener (PENDING, native)
+Not started. Replaces the fragile call-log-type reading (§92): a manifest
+`PHONE_STATE` receiver + `READ_PHONE_STATE`/`READ_PHONE_NUMBERS` re-added,
+captures incoming live (ring→answered/missed + our own duration), OEM-independent.
+Supersedes 220/227/227.1. See the plan doc Part A.
+
+### Part B — one clean signed APK + fleet rollout (PENDING, native + owner)
+Not started. The FOUNDATION: build → upload to the Supabase `apk` bucket as
+`untitled-os.apk` (the §81 step that was skipped) → publish an `app_version` row
+→ device-test one phone → fleet via the in-app updater. Makes the call listener +
+GPS-off + internet-off watchers actually run on the team. See the plan doc Part B.
+
+### Status
+Part C on origin (this commit). Parts A + B are the next native session (owner
+runs the build/upload/rollout; I write the code). Nothing else pending here.

@@ -158,6 +158,7 @@ export default function GpsTrackV2() {
   // turn off gps put it in activity log also". Same data feeds
   // Phase 76 DaySummaryCard.
   const [gpsOffEvents, setGpsOffEvents] = useState([])
+  const [networkOffEvents, setNetworkOffEvents] = useState([])  // Phase 228 — internet-off log
   // Phase 76.2.2 (2026-05-23) — live call_logs breakdown for this
   // rep+day. Owner directive: show total / missed (0 or null) /
   // short (1-9s) / qualified (>=10s) as separate KPI buckets so
@@ -200,7 +201,7 @@ export default function GpsTrackV2() {
       // Phase 194 — a flagged viewer (own-only RLS) reads the whole rep day-track
       // through ONE gated RPC, mapped into the same *Res shapes; every line after
       // is untouched. Admin keeps the exact Promise.all (else) — byte-unchanged.
-      let userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes
+      let userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes
       if (!isPrivileged && canViewTeam) {
         const { data: b, error: bErr } = await supabase.rpc('team_rep_daytrack', {
           p_user_id: userId, p_start: start, p_end: end, p_date: targetDate,
@@ -213,9 +214,10 @@ export default function GpsTrackV2() {
         voiceRes    = { data: b?.voice || [], error: null }
         gpsOffRes   = { data: b?.gps_off || [], error: null }
         callRowsRes = { data: b?.calls || [], error: null }
+        networkOffRes = { data: b?.network_off || [], error: null }  // Phase 228 (empty until RPC surfaces it)
         setTaKm(b?.ta_km ?? null)
       } else {
-      ;[userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes] = await Promise.all([
+      ;[userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
         fetchAllPings(userId, start, end),  // Phase 103.D.6 — paged past 1000-row cap
         // Phase 32E — work_sessions row gives check-in/out times,
@@ -261,6 +263,15 @@ export default function GpsTrackV2() {
           .lte('call_at', end)
           .order('call_at', { ascending: false })
           .limit(2000),
+        // Phase 228 — internet-off events for this rep+day (Phase 76.1),
+        // mirrors the gps_off_events query above. Native NetworkWatcher writes
+        // a row on each internet drop/regain.
+        supabase.from('network_off_events')
+          .select('id, lost_at, regained_at, duration_seconds, source')
+          .eq('user_id', userId)
+          .gte('lost_at', start)
+          .lte('lost_at', end)
+          .order('lost_at', { ascending: false }),
       ])
       }
       if (cancelled) return
@@ -272,6 +283,7 @@ export default function GpsTrackV2() {
       setActivities(actsRes.data || [])
       setVoiceLogs(voiceRes.data || [])
       setGpsOffEvents(gpsOffRes?.data || [])
+      setNetworkOffEvents(networkOffRes?.data || [])
       // Phase 76.2.2 — bucket the call rows. NULL duration goes to
       // missed (likely Phase 65 hasn't patched yet; treat as not-yet-
       // qualified). Zero duration also missed (no ring picked up).
@@ -1007,6 +1019,7 @@ export default function GpsTrackV2() {
           activities={activities}
           voiceLogs={voiceLogs}
           gpsOffEvents={gpsOffEvents}
+          networkOffEvents={networkOffEvents}
           callBreakdown={callBreakdown}
           callRows={callRows}
           navigate={navigate}
@@ -1134,7 +1147,7 @@ function CallHistorySection({ title, sub, rows, navigate, defaultOpen = false })
   )
 }
 
-function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], callBreakdown = { total: 0, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0 }, callRows = [], navigate }) {
+function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], networkOffEvents = [], callBreakdown = { total: 0, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0 }, callRows = [], navigate }) {
   const counters = session?.daily_counters || {}
   const checkIn  = session?.check_in_at
   const checkOut = session?.check_out_at
@@ -1265,6 +1278,11 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
             ts:   new Date(e.toggled_off_at).getTime(),
             raw:  e,
           })),
+          ...networkOffEvents.map(e => ({
+            kind: 'network_off',
+            ts:   new Date(e.lost_at).getTime(),
+            raw:  e,
+          })),
         ].sort((a, b) => b.ts - a.ts)
 
         return (
@@ -1273,7 +1291,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
               <div>
                 <div className="lead-card-title">Activity timeline · {tl.length}</div>
                 <div className="lead-card-sub">
-                  Calls · WhatsApp · meetings · notes · GPS-off events
+                  Calls · WhatsApp · meetings · notes · GPS-off · internet-off events
                 </div>
               </div>
             </div>
@@ -1311,6 +1329,41 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], cal
                             textTransform: 'uppercase',
                             fontSize: 12,
                           }}>GPS turned off</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                            duration {fmtDur(e.duration_seconds)}
+                            {onT ? ` · back on at ${onT}` : ' · still off'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+                  if (item.kind === 'network_off') {
+                    const e = item.raw
+                    const t  = new Date(e.lost_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                    const onT = e.regained_at
+                      ? new Date(e.regained_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                      : null
+                    return (
+                      <div
+                        key={`netoff-${e.id}`}
+                        style={{
+                          padding: '10px 14px',
+                          borderTop: '1px solid var(--border)',
+                          background: 'var(--warning-soft, rgba(245,158,11,.08))',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
+                          <span style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 11,
+                            color: 'var(--text-muted)', minWidth: 44,
+                          }}>{t}</span>
+                          <span style={{
+                            fontWeight: 700,
+                            color: 'var(--warning, #F59E0B)',
+                            letterSpacing: '.04em',
+                            textTransform: 'uppercase',
+                            fontSize: 12,
+                          }}>Internet off</span>
                           <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                             duration {fmtDur(e.duration_seconds)}
                             {onT ? ` · back on at ${onT}` : ' · still off'}
