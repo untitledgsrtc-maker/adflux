@@ -6406,11 +6406,11 @@ Owner: "videos not there and map is not there" (the deck has both). Added to
   array in the page's inline JS.
 
 ### Phase 233.2 — official logo + muted video + reveal fail-safe (2026-07-14)
-- **Logo:** the owner's official full-lockup SVG (variant with the "ADVERTISING"
-  tagline) at `public/led/logo.svg` (white emblem + "UNTITLED" + tagline). Replaces
-  the text wordmark in the header (`.logo` height 48/42px) + footer (46px).
-  Referenced as `<img>` (white on the navy header, no recolor). To change the logo,
-  overwrite `public/led/logo.svg`.
+- **Logo:** the owner's official wordmark SVG (emblem + "UNTITLED", NO tagline —
+  owner picked this over the tagline variant, "old one was good") at
+  `public/led/logo.svg`. Header (`.logo` height 40/34px) + footer (30px). White
+  `<img>` on the navy header, no recolor. To change the logo, overwrite
+  `public/led/logo.svg`.
 - **Video sound:** owner "no need voice, mute is ok" → removed the "Tap for sound"
   toggle button + its JS. Video stays autoplay-muted-loop-playsinline (the only way
   mobile autoplays anyway).
