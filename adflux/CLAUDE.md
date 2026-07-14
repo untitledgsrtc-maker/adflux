@@ -6384,3 +6384,23 @@ editing `/present` or the deck. Built as a standalone static HTML page.
   so they don't go stale; cities = the confirmed real boards + "+ 10 more."
 - Static/JS-only, no SQL, no APK. Editing the deck is unrelated (§77); this is a
   separate public page. To change stats/copy, edit `public/led/index.html`.
+
+### Phase 233.1 — video + map added (2026-07-14)
+Owner: "videos not there and map is not there" (the deck has both). Added to
+`public/led/index.html`:
+- **Video showcase** ("See it live") — reuses the deck's real station videos
+  (`/deck/station-hero.mp4` default + `veraval-hero.mp4`, `bhavnagar.mp4`,
+  `gandhinagar.mp4`). A 16:9 framed autoplay-muted-loop `<video>` (playsinline) +
+  a "Tap for sound" toggle + a city-pill switcher that swaps the source. The
+  videos live in `public/deck/` (already served + denylisted `/deck/`; same-origin
+  from `/led`). preload="metadata" keeps first load light.
+- **Interactive Gujarat map** — Leaflet 1.9.4 (unpkg CDN, no SRI) + CartoDB
+  `dark_all` tiles (no key, brand-dark) + 12 yellow `divIcon` station pins with
+  popups (Anand, Surendranagar, Jamnagar, Junagadh, Porbandar, Dwarka, Morbi,
+  Bhachau, Botad, Veraval, Bhavnagar, Gandhinagar — the confirmed real stations),
+  `fitBounds` to the pins, `scrollWheelZoom:false` (won't hijack page scroll). Map
+  init is try/caught (a bonus — never breaks the page). Verified in-browser: 12
+  pins placed, tiles rendering, video loads, no h-overflow at 375px.
+- Both use public CDNs (Leaflet, CartoDB tiles) — fine for a public marketing page
+  (loads on the visitor's device). To add more station pins, edit the `stations`
+  array in the page's inline JS.

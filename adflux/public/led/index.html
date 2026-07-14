@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 <style>
   :root{
     --ink:#0A0E1A; --ink-1:#0E1524; --ink-2:#131c2f; --card:#111a2c;
@@ -172,6 +173,36 @@
   .city i{width:6px;height:6px;border-radius:50%;background:var(--yellow);box-shadow:0 0 8px var(--yellow);flex:0 0 auto}
   .city.more{color:var(--muted);justify-content:center;font-size:12px}
 
+  /* video showcase */
+  .show{margin-top:34px;display:grid;gap:16px}
+  .screen{position:relative;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#05070d;aspect-ratio:16/9;box-shadow:0 30px 60px -30px #000}
+  .screen video{width:100%;height:100%;object-fit:cover;display:block}
+  .screen .tag{position:absolute;top:13px;left:13px;z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:7px;padding:6px 10px;color:var(--yellow)}
+  .screen .sound{position:absolute;bottom:13px;right:13px;z-index:2;display:inline-flex;align-items:center;gap:8px;
+    background:rgba(10,14,26,.74);backdrop-filter:blur(8px);border:1px solid var(--line-2);color:var(--paper);
+    border-radius:999px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .screen .sound svg{width:15px;height:15px}
+  .thumbs{display:flex;gap:9px;flex-wrap:wrap}
+  .thumb{font-family:var(--mono);font-size:12px;letter-spacing:.03em;color:var(--paper);background:var(--card);
+    border:1px solid var(--line-2);border-radius:999px;padding:9px 15px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+  .thumb:hover{border-color:var(--yellow)}
+  .thumb.active{background:var(--yellow);color:var(--yellow-ink);border-color:var(--yellow)}
+
+  /* map */
+  .map-wrap{margin-top:34px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--ink-1)}
+  #map{height:clamp(300px,52vw,460px);width:100%;background:#0a0f1c;z-index:1}
+  .leaflet-container{background:#0a0f1c;font-family:var(--body)}
+  .leaflet-popup-content-wrapper{background:var(--ink-2);color:var(--paper);border-radius:10px;border:1px solid var(--line-2);box-shadow:0 12px 30px -12px #000}
+  .leaflet-popup-tip{background:var(--ink-2);border:1px solid var(--line-2)}
+  .leaflet-popup-content{font-family:var(--mono);font-size:12px;margin:9px 13px;color:var(--paper)}
+  .leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+  .leaflet-bar a{background:var(--ink-2);color:var(--paper);border-color:var(--line-2)}
+  .leaflet-bar a:hover{background:var(--card)}
+  .leaflet-control-attribution{background:rgba(10,14,26,.6)!important;color:var(--muted-2)!important}
+  .leaflet-control-attribution a{color:var(--muted)!important}
+  .station-pin{width:14px;height:14px;border-radius:50%;background:var(--yellow);border:2px solid #0a0f1c;box-shadow:0 0 0 3px rgba(255,230,0,.22),0 0 12px var(--yellow)}
+
   /* final CTA */
   .cta-final{padding:0 0 40px}
   .cta-card{position:relative;overflow:hidden;border:1px solid var(--line-2);border-radius:22px;
@@ -293,6 +324,31 @@
     </div>
   </div>
 
+  <!-- VIDEO SHOWCASE -->
+  <section>
+    <div class="wrap">
+      <div class="sec-eyebrow rise">See it live</div>
+      <h2 class="rise">Real screens. Real stations.</h2>
+      <p class="sec-sub rise">Your ad, glowing on the LED walls where Gujarat waits — bus stations, platforms, thousands of eyes a day.</p>
+      <div class="show">
+        <div class="screen rise">
+          <span class="tag" id="vtag">STATION · LIVE</span>
+          <video id="mainVideo" src="/deck/station-hero.mp4" poster="/deck/station-1.jpg" muted loop playsinline autoplay preload="metadata"></video>
+          <button class="sound" id="soundBtn" type="button" aria-label="Toggle sound">
+            <svg id="soundIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
+            <span id="soundLbl">Tap for sound</span>
+          </button>
+        </div>
+        <div class="thumbs rise">
+          <button class="thumb active" data-src="/deck/station-hero.mp4" data-tag="STATION · LIVE" type="button">Station</button>
+          <button class="thumb" data-src="/deck/veraval-hero.mp4" data-tag="VERAVAL · LIVE" type="button">Veraval</button>
+          <button class="thumb" data-src="/deck/bhavnagar.mp4" data-tag="BHAVNAGAR · LIVE" type="button">Bhavnagar</button>
+          <button class="thumb" data-src="/deck/gandhinagar.mp4" data-tag="GANDHINAGAR · LIVE" type="button">Gandhinagar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- MOAT -->
   <section>
     <div class="wrap">
@@ -381,6 +437,7 @@
     <div class="wrap">
       <div class="sec-eyebrow rise">Where you'll show up</div>
       <h2 class="rise">20 stations. One Gujarat. <span class="dim">Growing.</span></h2>
+      <div class="map-wrap rise"><div id="map" aria-label="Map of GSRTC LED stations across Gujarat"></div></div>
       <div class="cities-wrap rise">
         <div class="cities-head"><span>STATIONS · LIVE</span><span>264 SCREENS</span></div>
         <div class="cities">
@@ -445,6 +502,7 @@
   </a>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 (function(){
   var WA = "919581578261";
@@ -529,6 +587,52 @@
       }, { threshold:.4 });
       io2.observe(band);
     }
+  }
+
+  // video showcase — sound toggle + city switcher
+  var mainVideo = document.getElementById("mainVideo");
+  var soundBtn = document.getElementById("soundBtn");
+  var soundLbl = document.getElementById("soundLbl");
+  var vtag = document.getElementById("vtag");
+  if(soundBtn && mainVideo){
+    soundBtn.addEventListener("click", function(){
+      mainVideo.muted = !mainVideo.muted;
+      if(!mainVideo.muted){ mainVideo.play().catch(function(){}); if(soundLbl) soundLbl.textContent = "Mute"; }
+      else if(soundLbl){ soundLbl.textContent = "Tap for sound"; }
+    });
+  }
+  document.querySelectorAll(".thumb").forEach(function(t){
+    t.addEventListener("click", function(){
+      if(!mainVideo) return;
+      document.querySelectorAll(".thumb").forEach(function(x){ x.classList.remove("active"); });
+      t.classList.add("active");
+      mainVideo.src = t.getAttribute("data-src");
+      if(vtag) vtag.textContent = t.getAttribute("data-tag");
+      mainVideo.play().catch(function(){});
+    });
+  });
+
+  // Gujarat station map (Leaflet, dark tiles, yellow pins)
+  var mapEl = document.getElementById("map");
+  if(mapEl && window.L){
+    var stations = [
+      ["Anand",22.556,72.951],["Surendranagar",22.727,71.638],["Jamnagar",22.470,70.057],
+      ["Junagadh",21.521,70.457],["Porbandar",21.641,69.601],["Dwarka",22.240,68.968],
+      ["Morbi",22.812,70.837],["Bhachau",23.297,70.343],["Botad",22.170,71.667],
+      ["Veraval",20.906,70.367],["Bhavnagar",21.764,72.152],["Gandhinagar",23.223,72.650]
+    ];
+    try{
+      var map = L.map(mapEl,{ scrollWheelZoom:false, attributionControl:true });
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{
+        subdomains:"abcd", maxZoom:12, minZoom:5,
+        attribution:'&copy; OpenStreetMap, &copy; CARTO'
+      }).addTo(map);
+      var icon = L.divIcon({ className:"", html:'<div class="station-pin"></div>', iconSize:[14,14], iconAnchor:[7,7] });
+      var markers = stations.map(function(s){
+        return L.marker([s[1],s[2]],{ icon:icon }).addTo(map).bindPopup(s[0] + " bus station");
+      });
+      map.fitBounds(L.featureGroup(markers).getBounds().pad(0.18));
+    }catch(e){ /* map is a bonus — never break the page */ }
   }
 })();
 </script>
