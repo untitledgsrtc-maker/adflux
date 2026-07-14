@@ -6204,7 +6204,26 @@ the device has no data → those outgoing stay "—". No JS invents it; the fix 
 granting the permission (onboarding prompts it). The Phase 228 real-time listener
 does NOT help outgoing (ring-wait over-count).
 
+### Phase 229.1 — brand-proof the outgoing read (§92, the "never again" piece)
+The Phase 229 sweep still relied on `findOutgoingCallSeconds` reading a device row
+typed `'outgoing'` — so a BRAND-NEW phone whose outgoing code `typeLabel()` doesn't
+recognise (the §227.1 Realme-100/101 trap, but for outgoing) would map to
+`'unknown'` and still blank the duration. Closed it: `findOutgoingCallSeconds`
+(callLogReader.js, §28-FROZEN, guardian PASS) now collects TWO nearest candidates —
+`best` (type `'outgoing'`) and `bestUnknown` (type `'unknown'`) — both number-pinned
+to the lead's last-10 + nearest-to-tap, and returns `best || bestUnknown`. Recognised
+phones are BYTE-UNCHANGED (`best` wins); a new brand's unrecognised outgoing code now
+resolves by dialed-number+time instead of the OEM integer. incoming/missed NEVER
+matched. So outgoing capture no longer depends on the per-brand type code — the same
+principle as the incoming listener (§92): match the fact you dialed this number, not
+the phone's label. P3 (accepted): a brand that types BOTH directions `'unknown'` could
+prefer a mislabeled return-call — bounded to duration DISPLAY on that brand, no
+outcome/stage/dedup/pay effect; nearest-to-tap biases correct in practice.
+
 ### Ships
 JS-only → push → Vercel → reaches every phone (incl. current APKs) on next open.
 No SQL, no APK rebuild. On the next app resume, blank outgoing durations from the
-last 14h backfill.
+last 14h backfill. **229 + 229.1 together = the permanent outgoing fix**: no popup
+needed (229) + no per-brand type code needed (229.1). The only residual is a phone
+with READ_CALL_LOG denied / an OEM that writes DURATION=0 post-call — no data to
+read; the fix there is granting the permission (onboarding prompts it).

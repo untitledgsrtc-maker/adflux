@@ -89,9 +89,12 @@ export async function lookupCall({ phone, sinceMs, windowMinutes = 60 }) {
  *
  * Uses scanRecentCalls — returns { number, type, date, durationSeconds } per
  * call, the SAME plugin method the call-history poller already trusts — so this
- * is JS-only, NO APK rebuild. Direction-pinned (outgoing only) + nearest-by-time
- * (disambiguates multiple outgoing calls). Number match = last-10 digits (the
- * app-wide cleanPhone convention). Returns seconds (>=0) or null.
+ * is JS-only, NO APK rebuild. Matches the OUTGOING call by dialed-number
+ * (last-10, the app-wide cleanPhone convention) + nearest-by-time (disambiguates
+ * repeat dials). Phase 229.1 — brand-proof: prefers a row typed 'outgoing', but
+ * falls back to an 'unknown'-typed row (a new phone brand's unrecognised outgoing
+ * code) when no recognised outgoing row exists, so a new OEM can't blank the
+ * duration (§92). Never matches incoming/missed. Returns seconds (>=0) or null.
  */
 export async function findOutgoingCallSeconds(phone, nearMs, windowMs = 60 * 60_000) {
   if (!Capacitor.isNativePlatform() || !phone || !nearMs) return null
@@ -105,15 +108,36 @@ export async function findOutgoingCallSeconds(phone, nearMs, windowMs = 60 * 60_
     console.warn('[call-log] scan failed:', e?.message || e)
     return null
   }
+  // Phase 229.1 — brand-proof the OUTGOING read (§92: stop trusting the OEM
+  // TYPE integer). Two candidates, ONE pass:
+  //   best        = nearest row typed 'outgoing' (2/100) — the recognized case,
+  //                 identical to the pre-229.1 behaviour.
+  //   bestUnknown = nearest row typed 'unknown' — a NEW phone brand whose
+  //                 outgoing code typeLabel() doesn't recognise yet (the same
+  //                 trap that broke incoming on Realme 100/101, §227.1). Since
+  //                 the rep TAPPED to dial THIS number, a call-log row to this
+  //                 number nearest the tap IS this call, whatever the OEM
+  //                 labelled it. We fall back to it ONLY when no recognised
+  //                 'outgoing' row exists, so recognised phones are byte-unchanged.
+  // incoming/missed/rejected/voicemail/blocked are deliberately NEVER matched: a
+  // caller can't be receiving a call from the number they just dialled, and those
+  // types carry ring-time on some OEMs (§102.B). Both candidates are number-pinned
+  // (last-10) to THIS lead + nearest-by-time (disambiguates repeat dials).
   let best = null
+  let bestUnknown = null
   for (const c of calls) {
-    if ((c.type || '').toLowerCase() !== 'outgoing') continue           // direction pin
-    if (String(c.number || '').replace(/\D/g, '').slice(-10) !== want) continue
+    if (String(c.number || '').replace(/\D/g, '').slice(-10) !== want) continue  // this lead's number only
+    const type = (c.type || '').toLowerCase()
     const dt = Math.abs(Number(c.date) - nearMs)
-    if (best === null || dt < best.dt) best = { dt, sec: Number(c.durationSeconds) }
+    if (type === 'outgoing') {
+      if (best === null || dt < best.dt) best = { dt, sec: Number(c.durationSeconds) }
+    } else if (type === 'unknown') {
+      if (bestUnknown === null || dt < bestUnknown.dt) bestUnknown = { dt, sec: Number(c.durationSeconds) }
+    }
   }
-  if (!best) return null
-  return (Number.isFinite(best.sec) && best.sec >= 0) ? best.sec : null
+  const pick = best || bestUnknown   // recognised outgoing wins; else the unknown-typed outgoing (new brand)
+  if (!pick) return null
+  return (Number.isFinite(pick.sec) && pick.sec >= 0) ? pick.sec : null
 }
 
 /**
