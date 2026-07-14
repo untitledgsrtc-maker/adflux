@@ -6131,12 +6131,18 @@ Part C on origin. **Part A CODE SHIPPED + guardian PASS (2026-07-14)** — commi
 below; native, so it does NOT run until Part B's APK rebuild. Part B (build →
 upload `untitled-os.apk` to the Supabase `apk` bucket → publish `app_version`
 96018 → device-test ONE phone → fleet via the in-app updater) is owner-run — I
-write no more code for it. **Part B build DONE 14 Jul** — 96018 built
+write no more code for it. **Part B COMPLETE 14 Jul** — 96018 built
 (assembleDebug, debug-signed), uploaded to the `apk` bucket, verified live via
-the `/api/apk` proxy (versionCode 96018). NOT yet published to `app_version`
-(fleet banner held pending the one-phone incoming test). Open follow-up: the
-compute_daily_score incoming-credit flag (Part A block above) — a money-function
-change awaiting owner sign-off + shadow-compare.
+the `/api/apk` proxy (versionCode 96018), **device-tested on ONE phone (owner
+confirmed 0.96.18 opens fine + incoming calls record via the native listener)**,
+then **`app_version` 96018 row published (is_active=true) → the fleet
+"Update available" banner is LIVE**. Reps update via the in-app 2-tap updater
+(§76 `/api/apk`). NOTE: a stale `96014` is_active row remains — harmless (the
+banner reads MAX(version_code) WHERE is_active → 96018 wins). After each rep
+updates, they must tap Allow on the phone/call permission (incoming number) +
+GPS "Allow all the time" + battery-Unrestricted (§73/§74 GPS capture). Open
+follow-up: the compute_daily_score incoming-credit flag (Part A block above) — a
+money-function change awaiting owner sign-off + shadow-compare.
 
 ---
 
