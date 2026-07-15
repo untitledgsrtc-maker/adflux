@@ -86,30 +86,51 @@ const TABS = [
 // path stays untouched. Throws on any failure → caller falls back to the
 // link flow. Native-only (callers gate on Capacitor.isNativePlatform).
 async function writeQuotePdfToCache(quote, cities) {
-  const url = await uploadQuotePDF(quote, cities)
-  if (!url) throw new Error('PDF upload returned no URL')
-  const { Filesystem, Directory } = await import('@capacitor/filesystem')
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('PDF fetch failed: ' + res.status)
-  const blob = await res.blob()
-  const buf = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buf)
-  let binary = ''
-  const chunkSize = 0x8000
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize))
+  // Phase 236 — every step is tagged so a failure names EXACTLY where the
+  // native attach chain dies (upload / fetch / empty-pdf / filesystem). The
+  // caller surfaces `err.step` + `err.message` on-screen (no more silent
+  // console.warn → link). This is the instrument that ends the "attach breaks,
+  // we can't see why, we patch blind, it re-breaks" loop (§92).
+  let step = 'upload'
+  try {
+    const url = await uploadQuotePDF(quote, cities)
+    if (!url) throw new Error('upload returned no URL')
+
+    step = 'fetch'
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+
+    step = 'read'
+    const blob = await res.blob()
+    const buf = await blob.arrayBuffer()
+    // A cross-origin/opaque redirect (e.g. /pdf/ → Supabase without CORS) yields
+    // a 0-byte body → we'd write a broken empty PDF. Catch it here, loudly.
+    if (!buf || buf.byteLength === 0) throw new Error('PDF body is 0 bytes (opaque/blocked fetch)')
+    const bytes = new Uint8Array(buf)
+    let binary = ''
+    const chunkSize = 0x8000
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize))
+    }
+    const base64 = btoa(binary)
+
+    step = 'filesystem'
+    const { Filesystem, Directory } = await import('@capacitor/filesystem')
+    // quote_number first (the UA-2026-NNNN ref) — same as handleDownloadPDF.
+    const safeRef = String(quote.quote_number || quote.ref_number || quote.id || 'quote')
+      .replace(/[^A-Za-z0-9_-]/g, '_')
+    // pdfs/ subfolder is the FileProvider-exposed cache path (102.I.1).
+    const fileName = `pdfs/quote-${safeRef}.pdf`
+    await Filesystem.writeFile({
+      path: fileName, data: base64, directory: Directory.Cache, recursive: true,
+    })
+    const uriRes = await Filesystem.getUri({ path: fileName, directory: Directory.Cache })
+    return uriRes.uri
+  } catch (e) {
+    const err = new Error('[' + step + '] ' + (e?.message || String(e)))
+    err.step = step
+    throw err
   }
-  const base64 = btoa(binary)
-  // quote_number first (the UA-2026-NNNN ref) — same as handleDownloadPDF.
-  const safeRef = String(quote.quote_number || quote.ref_number || quote.id || 'quote')
-    .replace(/[^A-Za-z0-9_-]/g, '_')
-  // pdfs/ subfolder is the FileProvider-exposed cache path (102.I.1).
-  const fileName = `pdfs/quote-${safeRef}.pdf`
-  await Filesystem.writeFile({
-    path: fileName, data: base64, directory: Directory.Cache, recursive: true,
-  })
-  const uriRes = await Filesystem.getUri({ path: fileName, directory: Directory.Cache })
-  return uriRes.uri
 }
 
 export default function QuoteDetail() {
@@ -440,6 +461,15 @@ export default function QuoteDetail() {
         const msg = shareErr?.message || String(shareErr)
         if (/cancel/i.test(msg)) return // rep dismissed the share sheet — silent
         console.warn('[handleWhatsApp] native PDF share failed, falling back to link:', msg)
+        // Phase 236 — LOUD, not silent. The attach failed; surface the exact
+        // step + reason on-screen (msg already carries the [step] tag from
+        // writeQuotePdfToCache) so the cause is knowable in one screenshot,
+        // every time — instead of the invisible console.warn that let this
+        // recur (§92). Persist it in the status banner too (a toast can be
+        // missed) before falling through to the wa.me link.
+        toastError(shareErr, 'PDF could not attach — sending a link instead. Reason: ' + msg)
+        setStatusMsg('PDF attach failed → ' + msg + '. Sent as a link. Please screenshot this.')
+        setTimeout(() => setStatusMsg(''), 12000)
         // fall through to the wa.me link flow
       } finally {
         setPdfLoading(false)

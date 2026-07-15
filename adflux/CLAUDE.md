@@ -6701,3 +6701,78 @@ Re-run `supabase_phase100_a_reassign_rpc.sql` in Supabase Studio (idempotent —
 whole file is re-runnable; it recreates the 3 functions + re-applies the correct
 GRANT/REVOKE posture). Then push (JS-free). Smoke: reassign 6+ leads in a day as a
 non-admin → no "daily limit" block; every reassign still shows in `reassign_audit`.
+
+
+---
+
+## 104 · Phase 236 — WhatsApp quote-PDF attach: made LOUD (the recurrence cure), fix PENDING the reveal (2026-07-15)
+
+Owner (frustrated — "solved this 1000000 times"): on 96018 (latest APK), sharing a
+quote sends a **wa.me link, not the attached PDF**, for **everyone**. He wants the
+ROOT CAUSE + a PERMANENT fix, not another blind patch.
+
+### ROOT CAUSE (the meta-root — why it recurs, not just today's break)
+The WhatsApp attach is a **native chain**: render PDF → `uploadQuotePDF` → fetch it
+back → base64 → `@capacitor/filesystem` writeFile to cache → `ShareDirect.whatsapp`
+hands WhatsApp a `FileProvider` content:// URI via `ACTION_SEND`. It works ONLY if
+the APK build includes those native plugins AND every step succeeds on the device.
+When ANY step fails, `handleWhatsApp` **silently** falls through to the wa.me link
+(a URL — physically can't carry a file), logging only a `console.warn` **nobody can
+see on the phone**. So: the failure is (1) silent, (2) native, (3) only
+device-testable → every APK rebuild can re-break it, we can't see why, we
+symptom-patch blind, it re-breaks. That silence IS the disease (same lesson as §92
+call-capture). **Verified from here: the source code, AndroidManifest (FileProvider
++ WhatsApp queries), and capacitor.plugins.json (filesystem + share registered) are
+ALL correct.** So 96018 is a build/runtime failure on the device — which is exactly
+why re-reading/re-editing code never permanently fixes it. Phase 235 (yesterday's
+email work) touched ONLY `handleEmail`, NOT the WhatsApp path — ruled out.
+
+### What Phase 236 ships (JS-only, live-update, NO APK rebuild) — the INSTRUMENT + guard
+`src/pages/QuoteDetail.jsx` (NOT §28-frozen; IS a money flow — parse-checked,
+additive only, success path byte-identical):
+- `writeQuotePdfToCache` — every step now tagged (`upload` / `fetch` / `read` /
+  `filesystem`); on failure it throws `[step] message` (+ `err.step`). Added a
+  **0-byte-body guard** (a cross-origin/opaque `/pdf/`→Supabase fetch returns 0
+  bytes → we were writing a broken empty PDF; now it throws loudly). The guard can
+  only improve behavior (working phones have >0 bytes → unaffected).
+- `handleWhatsApp` native catch — the silent `console.warn` now ALSO fires a
+  `toastError` + a 12s status banner with the exact `[step] reason`. So the cause is
+  knowable in ONE screenshot, every time — and a native break can **never hide
+  again** (the permanent anti-recurrence guard the owner asked for).
+
+### Why the exact one-line fix is NOT in this batch (discipline, per owner's rule)
+The error is swallowed on the phone → I genuinely cannot name which step dies on
+96018 from the sandbox. Guessing a fix now = the blind patch that recurred 1000000×
+(§92). So: ship LOUD first → a rep shares one quote → the on-screen `[step] reason`
+names it → THEN the targeted permanent fix (JS if JS-fixable — e.g. the likely
+`[read] 0 bytes` opaque-fetch → render the PDF blob locally instead of
+upload-then-fetch-back, removing the network/CORS/SW round-trip entirely; or a
+clean APK rebuild per §74.2 if it's `[filesystem]`/plugin-missing).
+
+### The permanent solution has 3 parts (part 1 shipped)
+1. ✅ **Loud + never-silent** (this batch) — reveals the cause + can't hide again.
+2. ⏳ **Fix the revealed step** — targeted, evidence-based, next batch (minutes after
+   the owner shares once). Leading suspect: the upload→fetch-back round-trip
+   (opaque/SW) → switch to a LOCAL blob render (no network) = removes the whole
+   fragile class. Confirm via the `[step]` tag first.
+3. ⏳ **On-device self-test** (optional) — one tap runs the whole chain + reports
+   which step passed/failed, so every future rebuild is verified before rollout.
+
+### NUCLEAR option (offered, owner hasn't chosen) — zero native dependency ever
+Send the quote PDF from the **business number via the WhatsApp Cloud API** (live,
+§54) as a document message — server-side, no FileProvider/ACTION_SEND/APK, never
+breaks on a rebuild. Trade-off: from the company number (not the rep's personal
+WhatsApp) + first-contact needs an approved template.
+
+### Owner action
+Push (I push + verify — JS-only, no SQL, no APK rebuild). Reps **reopen the app
+once** (PWA/SW serves the old bundle until then). Then have a rep share a quote →
+**screenshot the red error / status banner** → the `[step] reason` tells us the exact
+cause → I ship the targeted permanent fix. (`handleEmail` has the same silent
+pattern; left for scope — same treatment when we do the fix.)
+
+### Foot-gun
+- ❌ A native feature that silently degrades to a lesser fallback (attach → link)
+  with only a `console.warn` = invisible on the APK → recurs forever. Any native
+  path that can fail MUST surface the reason on-screen (toast + persistent banner),
+  or you're blind and will patch it blind. Instrument → reveal → fix (§92).
