@@ -277,6 +277,27 @@ export default function FollowUpsV2() {
         })
         return
       }
+    } else if (!isPaymentRow && row.lead_id) {
+      // Phase 234 — NO-PHONE HOLE (owner pick "Option A", 14 Jul). A lead with no
+      // valid 10-digit phone skipped the call-gate above → Done was free. Require
+      // ANY logged activity today for this lead (call / meeting / note / whatsapp /
+      // site_visit) so a phone-less lead can't be closed with zero engagement. A
+      // read-only check; payment + quote-chase-without-lead rows are untouched.
+      const { data: acts } = await supabase
+        .from('lead_activities')
+        .select('id')
+        .eq('created_by', profile?.id)
+        .eq('lead_id', row.lead_id)
+        .gte('created_at', istTodayISO() + 'T00:00:00+05:30')
+        .limit(1)
+      if (!acts || acts.length === 0) {
+        await confirmDialog({
+          title: 'Log something first',
+          message: `${rowName(row) || 'This lead'} has no phone on file. Log a call, meeting or note for them today before you mark this follow-up done.`,
+          confirmLabel: 'OK',
+        })
+        return
+      }
     }
     setBusyId(row.id)
     const { error: err } = await supabase

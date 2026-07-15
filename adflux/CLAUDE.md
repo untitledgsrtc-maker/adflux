@@ -6479,3 +6479,38 @@ Where is untitledad.in DNS managed (registrar vs Vercel)? — needed for the DNS
 walkthrough. Reply handling: reply-to the sender is v1; a real `hr@` inbox +
 Resend inbound (paid) is later. NO bulk/marketing send until unsubscribe+consent
 designed (separate decision).
+UPDATE 14 Jul: owner made the Resend account (untitledgsrtc@gmail.com). Claude
+added `untitledad.in` (root, so hr@/quotes@ work) via his browser + generated the
+DNS records. **DNS host = GoDaddy** (Resend auto-detected). Records (DKIM
+`resend._domainkey`, SPF MX+TXT on `send`, optional DMARC `_dmarc`) use Resend-
+specific names → won't clash with existing root email. PENDING owner: add records
+in GoDaddy (via Resend "Auto configure" GoDaddy-OAuth — HIS click, not Claude's)
+OR manual paste, then create the API key + put `RESEND_API_KEY` in Vercel env (his
+secret). Domain "Verified" + key set → build Phase 1.
+
+---
+
+## 100 · Phase 234 — close the "Done without calling" no-phone hole (2026-07-14)
+
+Owner: reps marking follow-ups **Done without calling**. The `FollowUpsV2.markDone`
+gate (§128/§154) blocks Done only when the rep has ZERO `call_logs` to the lead's
+phone today — but it SKIPPED entirely for a lead with no valid 10-digit phone →
+free Done (one of the two known holes, §62/§139). Owner picked closing THIS hole
+(**Option A**); the bigger **tap-without-talk hole stays OPEN** (his call, revisit).
+
+### Fix (markDone, §28 FROZEN, guardian PASS, JS-only, no SQL)
+Added an `else if (!isPaymentRow && row.lead_id)` branch: a phone-less lead now
+requires ≥1 `lead_activities` row today (`created_by`=rep, `lead_id`, ANY type —
+call/meeting/note/whatsapp/site_visit) before Done, else a "Log something first"
+confirmDialog + return. The existing call-gate branch (`clean.length===10`) is
+BYTE-IDENTICAL; payment rows (§186) + orphan quote-chase (no lead_id) still exempt.
+Read-only SELECT, off the hot path (fires only on a manual Done tap). Columns:
+`created_by` (§76 foot-gun — NOT user_id), IST anchor matches the call-gate.
+
+### Still OPEN (owner-aware, the honest tension §65/§67)
+- **Tap-without-talk hole** — a bare tel-tap audit row satisfies the call-gate
+  (tap Call → back → Done). Not closed (owner didn't pick it).
+- **Manager "unverified Done" report** (visibility) + the **hard ≥10s gate** —
+  BOTH parked until 96018 is fleet-wide + capture proven (ties to §96). Can't
+  hard-require a real call until duration capture is reliable, else honest reps
+  whose phone under-captures get blocked (the exact §154 reversal).
