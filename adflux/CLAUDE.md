@@ -6450,6 +6450,10 @@ fix (the mailto flow works). Additive only (§45).
 - **Role from-addresses:** `hr@untitledad.in` (HR offers) + `quotes@untitledad.in`
   (client quotes); reply-to = the logged-in sender's email (every user has a login
   email = their real address).
+- **Quote email CCs the sending rep** (their own login email), **visible CC**
+  (client sees it) — owner pick 14 Jul. So the rep gets a copy of the sent quote in
+  their inbox + the client sees who's on the thread. (reply-to = same rep, so
+  replies also land with them.) One `cc: [sender email]` param on the quote send.
 
 ### Architecture (when built)
 - `api/email/send.js` — **EDGE** function (Vercel Hobby 12-serverless-fn cap, §219 —
