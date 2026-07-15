@@ -45,6 +45,7 @@ import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 // Phase 43.1 — parity with WorkV2 + LeadDetailV2 call chain. Tel-tap
 // audit + post-call outcome capture + auto-refresh.
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
+import PendingOutcomesCard from '../../components/leads/PendingOutcomesCard'
 import { logCallAudit } from '../../utils/callAudit'
 import { markCallStart } from '../../utils/callTimer'
 import { dialPhone } from '../../utils/openExternal'
@@ -83,6 +84,9 @@ export default function TelecallerV2() {
   const [loading, setLoading] = useState(true)
   // Phase 43.1 — PostCallOutcomeModal chain state (mirror of WorkV2).
   const [callLead, setCallLead] = useState(null)
+  // Phase 237 — bumped after every outcome save so PendingOutcomesCard drops
+  // the resolved call from its list.
+  const [pendingBump, setPendingBump] = useState(0)
   // Phase 113.5 — synchronous re-entrancy latch on the Call button. A
   // WebView ghost-click fired quickLogCall twice in one tick → 2 call_logs
   // + 2 lead_activities (the §47 dup-lead disease, on calls). callingRef
@@ -1003,6 +1007,18 @@ export default function TelecallerV2() {
         })}
       </div>
 
+      {/* Phase 237 — calls tapped but never given an outcome (mirror of
+          /work). Each row opens the same PostCallOutcomeModal below. */}
+      <PendingOutcomesCard
+        repId={profile?.id}
+        refreshKey={pendingBump}
+        onResolve={(it) => {
+          setCallLead(it.lead)
+          setPendingActivityId(it.activityId)
+          setPostCallOpen(true)
+        }}
+      />
+
       {/* Phase 43.3 — upcoming callbacks panel. Shows the rep's open
           follow_ups due in the next 48 hours. Each row has a Call
           button that fires the same quickLogCall chain. Empty when
@@ -1235,6 +1251,7 @@ export default function TelecallerV2() {
         onSaved={async ({ nextAction } = {}) => {
           setPostCallOpen(false)
           setPendingActivityId(null)
+          setPendingBump(b => b + 1)  // Phase 237 — refresh the pending-outcomes list
           load(true)  // Phase 71 — silent refresh, preserve scroll
           // Phase 113.8 — parity with /work: prompt a WhatsApp follow-up
           // after the outcome. Skip when the next action is a meeting

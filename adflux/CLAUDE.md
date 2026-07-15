@@ -6776,3 +6776,62 @@ pattern; left for scope — same treatment when we do the fix.)
   with only a `console.warn` = invisible on the APK → recurs forever. Any native
   path that can fail MUST surface the reason on-screen (toast + persistent banner),
   or you're blind and will patch it blind. Instrument → reveal → fix (§92).
+
+
+---
+
+## 105 · Phase 237 — "calls that need an outcome" nudge (accountability, not compulsory) (2026-07-15)
+
+Owner saw a call row `1m44s · no_answer` (real 104-sec call, wrong outcome) because
+the rep tapped Call but **dismissed the post-call popup** → the `lead_activities`
+row's outcome stayed NULL (its `no_answer`/blank default). He asked about a
+**compulsory** popup; I pushed back (a hard block just makes a 50-100-calls/day
+telecaller mash a button to escape → WRONG outcomes, worse than missing; also
+doesn't fix the app-killed-during-call case where the popup never opens). He chose
+**pending-outcome list + manager visibility (accountability)**.
+
+### The signal (clean, no new schema)
+A "pending outcome" = `lead_activities` row, `activity_type='call'`,
+**`outcome IS NULL`**, `created_by=rep`. The tel-tap inserts it with `outcome:null`
+(WorkV2:698 / TelecallerV2 quickLogCall:470); PostCallOutcomeModal patches the
+outcome on save. NULL = the rep never completed the popup. Device-**scan** rows
+already carry an outcome (connected/no_answer) so they're NOT pending — only the
+rep-initiated, modal-not-saved calls are.
+
+### What shipped — REP side (JS-only, live-update, guardian PASS)
+- NEW `src/hooks/usePendingOutcomes.js` — derived query. **No new table, no
+  trigger, no write, no hot-path load (§45-safe).** Two-query merge (activities →
+  leads, NOT a PostgREST FK embed — §36.6). Bounded to **TODAY (IST**:
+  `${istTodayISO()}T00:00:00+05:30`, not UTC — §57), older than **3 min** (skip the
+  in-flight call), `lead_id` not null, excludes **Won/Lost** leads, `created_by`
+  (not user_id — §76). Refetches on window focus. Best-effort (never breaks the page).
+- NEW `src/components/leads/PendingOutcomesCard.jsx` — exception-rendered (null when
+  empty). "N calls need an outcome" + list (lead · time) + a **Set outcome** button
+  per row → `onResolve(item)`.
+- FROZEN, ADDITIVE (guardian PASS): `WorkV2.jsx` + `TelecallerV2.jsx` — import +
+  `pendingBump` state + a `<PendingOutcomesCard>` mount whose `onResolve` opens the
+  **EXISTING** PostCallOutcomeModal via its state setters (`setCallLead(it.lead)` +
+  `setPendingActivityId(it.activityId)` + `setPostCallOpen(true)`) + one
+  `setPendingBump(b=>b+1)` in the existing `onSaved`. **The tel-tap→1.5s→modal chain
+  + PostCallOutcomeModal are BYTE-UNCHANGED** — the pending card just opens the same
+  modal from a new trigger, so there is ONE outcome path (§71: patch via
+  `pendingActivityId`, full follow-up spawn). WorkV2 card gated `{checkedIn &&
+  !dayDone &&` (the standard §44.2 card gate — no new exception).
+
+### NOT built yet — manager visibility (next commit)
+A per-rep "N no outcome today" count on TeamDashboardV2 (admin path — JS query on
+`lead_activities`). The §84 team-viewer (Jayna) count needs the `team_dashboard_bundle`
+RPC mirror (SQL) — deferred; admin/co_owner is the accountability watcher.
+
+### Owner action
+Push (I push + verify — JS-only, no SQL, no APK rebuild). Reps reopen the app once.
+Smoke: tap Call, dismiss the popup → after ~3 min "1 call needs an outcome" appears
+on /work + /telecaller → tap Set outcome → the same popup opens for that call → save
+→ clears + follow-up spawns.
+
+### Foot-gun
+- ❌ A COMPULSORY post-call popup on a high-volume caller = compliance-tapping, not
+  truth (reps mash the nearest button to proceed → wrong outcomes). For "reps skip
+  the step" problems, prefer a visible pending-list + manager count (accountability)
+  over a hard UI block — and reuse the existing modal (one outcome path), never a
+  second inline picker (would fork the follow-up-spawn logic, §71).

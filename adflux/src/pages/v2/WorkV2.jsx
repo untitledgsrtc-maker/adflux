@@ -73,6 +73,7 @@ import DaySummaryCard from '../../components/work/DaySummaryCard'
 import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 import GpsOffBanner from '../../components/work/GpsOffBanner'
 import MissedCallsCard from '../../components/work/MissedCallsCard'
+import PendingOutcomesCard from '../../components/leads/PendingOutcomesCard'
 import NearbyLeadsCard from '../../components/work/NearbyLeadsCard'
 import useGpsLock from '../../hooks/useGpsLock'
 
@@ -187,6 +188,9 @@ export default function WorkV2() {
   const [postCallOpen, setPostCallOpen] = useState(false)
   const [pendingActivityId, setPendingActivityId] = useState(null)
   const [callLead, setCallLead] = useState(null)
+  // Phase 237 — bumped after every outcome save so PendingOutcomesCard drops
+  // the resolved call from its list.
+  const [pendingBump, setPendingBump] = useState(0)
   // Phase 113.5 — synchronous re-entrancy latch on the Call button (see
   // TelecallerV2). Stops a WebView ghost-click double-firing quickLogCall.
   const callingRef = useRef(false)
@@ -1069,6 +1073,23 @@ export default function WorkV2() {
           />
         )}
 
+        {/* Phase 237 — calls tapped but never given an outcome. Each row opens
+            the SAME PostCallOutcomeModal (below) for that call. Follows the
+            standard card gate (§44.2) — the manager count catches any skipped
+            at end of day. */}
+        {checkedIn && !dayDone && (
+          <PendingOutcomesCard
+            repId={profile?.id}
+            refreshKey={pendingBump}
+            onResolve={(it) => {
+              setCallLead(it.lead)
+              setPendingActivityId(it.activityId)
+              setCallTaskId(null)
+              setPostCallOpen(true)
+            }}
+          />
+        )}
+
         {/* Phase 35.0 pass 4 — StickyPrimaryCta now only renders here
             for NON-active states (start day / check-in / submit
             evening). In active state the same component renders ABOVE
@@ -1223,6 +1244,7 @@ export default function WorkV2() {
         onSaved={async ({ nextAction }) => {
           setPostCallOpen(false)
           setPendingActivityId(null)
+          setPendingBump(b => b + 1)  // Phase 237 — refresh the pending-outcomes list
           // Phase 34Z.79 — dropped explicit completeSmartTask RPC.
           // PostCallOutcomeModal handleSave already closes EVERY open
           // lead_task for (lead, rep) via direct UPDATE (Phase 34Z.60).
