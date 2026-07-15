@@ -6818,10 +6818,17 @@ rep-initiated, modal-not-saved calls are.
   `pendingActivityId`, full follow-up spawn). WorkV2 card gated `{checkedIn &&
   !dayDone &&` (the standard §44.2 card gate — no new exception).
 
-### NOT built yet — manager visibility (next commit)
-A per-rep "N no outcome today" count on TeamDashboardV2 (admin path — JS query on
-`lead_activities`). The §84 team-viewer (Jayna) count needs the `team_dashboard_bundle`
-RPC mirror (SQL) — deferred; admin/co_owner is the accountability watcher.
+### Manager visibility — SHIPPED (Phase 237, 2nd commit)
+`TeamDashboardV2` rep card gets an amber **"N no outcome"** chip (next to the
+quotes/won capsules) = calls that rep tapped TODAY with no outcome saved. A
+STANDALONE `isPrivileged`-gated `useEffect` (NOT in the admin Promise.all → can't
+shift its destructure, §35), reload-only (§57). **ONE definition (§71):** both the
+rep card AND the manager count call the SHARED `applyPendingOutcomeFilters(qb)` +
+`PENDING_CLOSED_STAGES` exported from `usePendingOutcomes.js` (guardian caught the
+first draft using a looser filter — the exact §69 drift; fixed to share the rule so
+the manager count == the sum of what reps see). `.limit(2000)` per §66/§85.
+- The §84 team-viewer (Jayna) gets `{}` → no chip (its count would need the
+  `team_dashboard_bundle` RPC mirror — deferred; admin/co_owner is the watcher).
 
 ### Owner action
 Push (I push + verify — JS-only, no SQL, no APK rebuild). Reps reopen the app once.

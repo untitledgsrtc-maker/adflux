@@ -22,7 +22,25 @@ import { supabase } from '../lib/supabase'
 import { istTodayISO } from '../utils/istDate'
 
 const IN_FLIGHT_MS = 3 * 60 * 1000   // skip the call the rep is still on / resolving
-const CLOSED_STAGES = ['Won', 'Lost']
+
+// Phase 237 — ONE definition of a "pending outcome", shared by the rep list
+// (this hook) AND the manager count (TeamDashboardV2), so the two never drift
+// (§69/§71 — same rule in two places is the "works then breaks" disease).
+// Change the rule HERE and both surfaces move together.
+export const PENDING_CLOSED_STAGES = ['Won', 'Lost']
+
+// Applies the shared pending filters to a `lead_activities` query builder:
+// a call, no outcome saved, TODAY (IST), older than the in-flight buffer, tied
+// to a lead. The Won/Lost exclusion needs the lead row, so the caller does it
+// with PENDING_CLOSED_STAGES after joining leads.
+export function applyPendingOutcomeFilters(qb) {
+  return qb
+    .eq('activity_type', 'call')
+    .is('outcome', null)
+    .gte('created_at', `${istTodayISO()}T00:00:00+05:30`)                 // IST midnight, not UTC (§57)
+    .lt('created_at', new Date(Date.now() - IN_FLIGHT_MS).toISOString())  // skip the in-flight call
+    .not('lead_id', 'is', null)
+}
 
 export default function usePendingOutcomes(repId, refreshKey = 0) {
   const [items, setItems] = useState([])
@@ -32,19 +50,11 @@ export default function usePendingOutcomes(repId, refreshKey = 0) {
     if (!repId) { setItems([]); return }
     setLoading(true)
     try {
-      const dayStart = `${istTodayISO()}T00:00:00+05:30`           // IST midnight (not UTC — §57)
-      const beforeNow = new Date(Date.now() - IN_FLIGHT_MS).toISOString()
-      const { data: acts, error } = await supabase
-        .from('lead_activities')
-        .select('id, lead_id, created_at')
-        .eq('created_by', repId)                                   // NOT user_id (§76)
-        .eq('activity_type', 'call')
-        .is('outcome', null)
-        .gte('created_at', dayStart)
-        .lt('created_at', beforeNow)
-        .not('lead_id', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(40)
+      const { data: acts, error } = await applyPendingOutcomeFilters(
+        supabase.from('lead_activities')
+          .select('id, lead_id, created_at')
+          .eq('created_by', repId)                                   // NOT user_id (§76)
+      ).order('created_at', { ascending: false }).limit(40)
       if (error || !acts || acts.length === 0) { setItems([]); return }
 
       const leadIds = [...new Set(acts.map(a => a.lead_id))]
@@ -56,7 +66,7 @@ export default function usePendingOutcomes(repId, refreshKey = 0) {
 
       const list = acts
         .map(a => ({ activityId: a.id, created_at: a.created_at, lead: leadMap[a.lead_id] }))
-        .filter(x => x.lead && !CLOSED_STAGES.includes(x.lead.stage))
+        .filter(x => x.lead && !PENDING_CLOSED_STAGES.includes(x.lead.stage))
       setItems(list)
     } catch {
       setItems([])   // best-effort — an accountability nudge never breaks the page

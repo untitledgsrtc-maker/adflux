@@ -33,6 +33,7 @@ import { formatCurrency } from '../../utils/formatters'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import AdminPushModal from '../../components/v2/AdminPushModal'
 import { presetToday, thisMonth } from '../../utils/period'
+import { applyPendingOutcomeFilters, PENDING_CLOSED_STAGES } from '../../hooks/usePendingOutcomes'
 
 // Phase 87.6 — avatar marker helpers. Owner directive 24 May 2026:
 // reference Pimpri-Chinchwad map pin with profile pic. Renders the
@@ -274,6 +275,8 @@ export default function TeamDashboardV2() {
   // Phase 112.7 — ₹ value alongside the counts, for the header capsules.
   const [monthQuoteAmtByUser, setMonthQuoteAmtByUser] = useState({})
   const [monthWonAmtByUser,   setMonthWonAmtByUser]   = useState({})
+  // Phase 237 — per-rep "calls tapped today with no outcome saved" (manager visibility).
+  const [pendingOutcomesByUser, setPendingOutcomesByUser] = useState({})
   // Phase 89.10 — flag that flips true once the Google Map mounts.
   // Marker render effects depend on mapRef.current + map.__google
   // both being non-null; refs don't trigger React re-runs, so
@@ -780,6 +783,35 @@ export default function TeamDashboardV2() {
     // Phase 82 — re-run on period change so PeriodPicker drives the
     // whole grid (calls, voice, follow-ups, chase counts, pipeline).
   }, [isPrivileged, canViewTeam, period.startIso, period.endIso])
+
+  // Phase 237 — per-rep "calls tapped TODAY with no outcome saved" for the
+  // manager. Admin/co_owner only (they read all lead_activities via RLS); the
+  // §84 team-viewer gets 0 here (its count would need the team_dashboard_bundle
+  // RPC — deferred). STANDALONE effect, NOT in the admin Promise.all, so it can
+  // never shift that destructure (§35). Reload-only, like the rest of this
+  // dashboard (§57). Best-effort — a missing count never breaks the page.
+  useEffect(() => {
+    if (!isPrivileged) { setPendingOutcomesByUser({}); return }
+    let cancelled = false
+    ;(async () => {
+      // SAME definition as the rep's PendingOutcomesCard (shared filters +
+      // Won/Lost exclusion) so the manager count == the sum of what reps see
+      // as pending — never a second definition (§69/§71).
+      const { data: acts } = await applyPendingOutcomeFilters(
+        supabase.from('lead_activities').select('created_by, lead_id')
+      ).limit(2000)   // §66/§85 cap — 22 reps × today's null-outcome calls is well under
+      if (cancelled) return
+      if (!acts || acts.length === 0) { setPendingOutcomesByUser({}); return }
+      const leadIds = [...new Set(acts.map(a => a.lead_id))]
+      const { data: leads } = await supabase.from('leads').select('id, stage').in('id', leadIds)
+      if (cancelled) return
+      const closed = new Set((leads || []).filter(l => PENDING_CLOSED_STAGES.includes(l.stage)).map(l => l.id))
+      const m = {}
+      acts.forEach(a => { if (a.created_by && !closed.has(a.lead_id)) m[a.created_by] = (m[a.created_by] || 0) + 1 })
+      setPendingOutcomesByUser(m)
+    })()
+    return () => { cancelled = true }
+  }, [isPrivileged, period.startIso])
 
   // Phase 70.2 (22 May 2026) — initialize Leaflet map once + subscribe
   // to Supabase Realtime for gps_pings INSERT. Owner directive: "live
@@ -1443,6 +1475,14 @@ export default function TeamDashboardV2() {
                       >
                         {mw} won · {formatLakh(mwA)}
                       </span>
+                      {(pendingOutcomesByUser[r.id] || 0) > 0 && (
+                        <span
+                          style={chip('var(--warning, #F59E0B)', 'rgba(245,158,11,0.12)')}
+                          title={`${pendingOutcomesByUser[r.id]} call${pendingOutcomesByUser[r.id] === 1 ? '' : 's'} tapped today with no outcome saved`}
+                        >
+                          {pendingOutcomesByUser[r.id]} no outcome
+                        </span>
+                      )}
                     </div>
                   )
                 })()}
