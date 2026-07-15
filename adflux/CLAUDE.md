@@ -6900,3 +6900,57 @@ Then push (JS reaches the APK on next open). Smoke: reassign a lead to a TC → 
 appears in the TC's Today/Follow-ups + they get a "New lead handed to you" push; on
 the sender's /work, "Leads you handed off" shows it as "not called yet" until the TC
 logs a call.
+
+
+---
+
+## 107 · Phase 238 — day-summary "Quotes won this month" fixed (true win date) (2026-07-15)
+
+Owner: Dhara's (a telecaller) evening report read **"Quotes won: 3 · ₹1,30,400
+(this month)"** but she didn't win them — "only payment came." Traced the 3 quotes:
+- UA-2026-0135 (₹82,600) — final payment **16 June**; UA-2026-0144 (₹6,500) — final
+  payment **23 June**. Both won in JUNE, but `updated_at` got bumped to 11 Jul (a
+  later touch) → re-counted as July wins.
+- UA-2026-0203 (₹41,300) — `status='won'` with **ZERO payments** (never actually won).
+
+### Root
+`useDaySummary` counted won = `quotes WHERE created_by=rep AND status='won' AND
+updated_at in month`. **`updated_at` is not the win date** — it bumps on ANY later
+touch (a July payment on a June deal re-dates it), and `status='won'` with no
+payment slips in. (Same flawed `updated_at` proxy is on AdminDashboardDesktop +
+SalesDashboard — systemic, but this fix is the day-summary only.)
+
+### Fix
+Count "won this month" by the **TRUE win = a FINAL, APPROVED payment with
+`payment_date` in the month**, credited to `quotes.created_by` — the SAME rule as
+`rebuild_monthly_sales`/incentive (§71 single definition). So June wins land in June
+(₹0 for Dhara's July) and 0203 (no payment) drops out.
+- NEW `supabase_phase238_quotes_won_month.sql` — `my_quotes_won_month(p_month)`
+  DEFINER RPC, scoped `q.created_by = auth.uid()`, returns `(won_count, won_amount)`.
+- `src/hooks/useDaySummary.js` — query 6b (`qWonRes`) is now `rpc('my_quotes_won_month',
+  {p_month:'YYYY-MM'})`; return reads `qWonRes.data[0]`. `monthStartISO`/`endISO` +
+  6a (quotes_sent) untouched.
+
+### GUARDIAN CATCH (why a DEFINER RPC, not a client payments query)
+First draft did a raw `supabase.from('payments')` client query. Guardian: **a
+telecaller may NOT have a direct `payments` read policy** — Phase 28c widened
+`payments_sales_read_own` to telecaller, but two LATER files (phase113_13,
+phase118) document it as still sales-only (the §69 "later file drops earlier fix"
+disease), and there's NO "SQL RUN" marker for 28c. An RLS-filtered SELECT returns
+`[]` silently → the fix would show **₹0 for EVERY TC** (a worse regression than the
+over-count). So it uses a DEFINER RPC (auth.uid()-scoped) — the SAME pattern
+`my_chase_counts` already uses in this file for exactly this reason.
+- **FOOT-GUN: do NOT do a raw client `payments` read for a rep-facing figure** —
+  a telecaller's payments RLS is unconfirmed; it silently returns 0. Use a
+  self-scoped DEFINER RPC (like my_chase_counts / my_quotes_won_month).
+
+### Still open — UA-2026-0203 (won with no payment)
+The fix EXCLUDES it from the report (no approved final payment). But the quote row
+is still `status='won'` with no money — a data anomaly (likely a manual status flip
+to 'won' without recording a payment). Owner to decide if it should be reverted to
+'sent'/'negotiating'. A quote should normally only reach 'won' via a final payment.
+
+### Owner action
+Run `supabase_phase238_quotes_won_month.sql`, then push (JS). Reps reopen the app
+once. Smoke: Dhara's evening report → "Quotes won" now shows her REAL July wins
+(likely ₹0), June wins no longer re-counted, 0203 gone.

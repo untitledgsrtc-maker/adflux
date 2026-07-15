@@ -115,6 +115,8 @@ export default function useDaySummary({ dateISO } = {}) {
     // IST midnight (UTC+5:30 → previous-day 18:30Z).
     const [_qy, _qm] = targetDate.split('-').map(Number)
     const monthStartISO = new Date(Date.UTC(_qy, _qm - 1, 1, -5, -30, 0)).toISOString()
+    // Phase 238 — 'YYYY-MM' of the target month for the won-this-month RPC.
+    const wonMonthStr = `${_qy}-${String(_qm).padStart(2, '0')}`
     // Phase 91a — tomorrow preview. Anchored to IST regardless of
     // device clock (istTodayPlusDays guarantees that). Only needed
     // when targetDate is "today" — historical dates don't show a
@@ -207,15 +209,16 @@ export default function useDaySummary({ dateISO } = {}) {
           .gte('created_at', monthStartISO)
           .lte('created_at', endISO),
 
-        // 6b) quotes WON this month — rows for count + ₹. No `won_at`
-        // column; `updated_at` is the won-flip proxy (same pattern as
-        // AdminDashboardDesktop:385 / SalesDashboard:575).
-        supabase.from('quotes')
-          .select('total_amount')
-          .eq('created_by', profile.id)
-          .eq('status', 'won')
-          .gte('updated_at', monthStartISO)
-          .lte('updated_at', endISO),
+        // 6b) quotes WON this month — via the self-scoped DEFINER RPC
+        // my_quotes_won_month('YYYY-MM'). The TRUE win = a FINAL APPROVED payment
+        // in the month (matches rebuild_monthly_sales / incentive). The old
+        // `status='won' AND updated_at this month` re-dated OLD wins on any later
+        // touch (a July payment on a June deal → false July win) AND counted
+        // status='won' quotes with NO payment — both over-counted (owner 15 Jul:
+        // Dhara "won ₹1.3L" was 2 June wins + a no-payment quote). RPC (not a raw
+        // payments read) because a telecaller may lack a direct payments policy
+        // — same pattern as my_chase_counts. Returns [{ won_count, won_amount }].
+        supabase.rpc('my_quotes_won_month', { p_month: wonMonthStr }),
 
         // 7) voice_logs count
         supabase.from('voice_logs')
@@ -483,6 +486,10 @@ export default function useDaySummary({ dateISO } = {}) {
         meetings:   tomorrowMeetings,
       }
 
+      // Phase 238 — won-this-month straight from the self-scoped RPC result.
+      const quotesWonCount  = Number(qWonRes.data?.[0]?.won_count) || 0
+      const quotesWonAmount = Number(qWonRes.data?.[0]?.won_amount) || 0
+
       const _summary = {
         repName: profile.name,
         role,
@@ -504,8 +511,8 @@ export default function useDaySummary({ dateISO } = {}) {
           // Phase 110b (2026-06-02) — quotes are MONTH-TO-DATE now, with ₹.
           quotes_sent:        (qSentRes.data || []).length,
           quotes_sent_amount: (qSentRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0),
-          quotes_won:         (qWonRes.data || []).length,
-          quotes_won_amount:  (qWonRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0),
+          quotes_won:         quotesWonCount,
+          quotes_won_amount:  quotesWonAmount,
           qualified,
           // Phase 118 — Sales Day Summary extras.
           follow_ups_real:          followUpsReal,
