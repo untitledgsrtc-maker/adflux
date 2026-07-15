@@ -74,6 +74,7 @@ import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 import GpsOffBanner from '../../components/work/GpsOffBanner'
 import MissedCallsCard from '../../components/work/MissedCallsCard'
 import PendingOutcomesCard from '../../components/leads/PendingOutcomesCard'
+import HandedOffCard from '../../components/leads/HandedOffCard'
 import NearbyLeadsCard from '../../components/work/NearbyLeadsCard'
 import useGpsLock from '../../hooks/useGpsLock'
 
@@ -1088,6 +1089,13 @@ export default function WorkV2() {
               setPostCallOpen(true)
             }}
           />
+        )}
+
+        {/* Phase 100.E — leads this rep handed off (reassigned away). Exception-
+            rendered; surfaces uncontacted handoffs so a passed-on lead doesn't
+            vanish from the sender's view (RLS hides the lead once reassigned). */}
+        {checkedIn && !dayDone && (
+          <HandedOffCard />
         )}
 
         {/* Phase 35.0 pass 4 — StickyPrimaryCta now only renders here

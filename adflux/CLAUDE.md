@@ -6842,3 +6842,61 @@ on /work + /telecaller → tap Set outcome → the same popup opens for that cal
   the step" problems, prefer a visible pending-list + manager count (accountability)
   over a hard UI block — and reuse the existing modal (one outcome path), never a
   second inline picker (would fork the follow-up-spawn logic, §71).
+
+
+---
+
+## 106 · Phase 100.E — handed-off leads stop dying (landing task + ping + sender view) (2026-07-15)
+
+Owner: a sales rep reassigns a lead to a telecaller (Jayna), then BOTH forget —
+the rep loses sight (RLS hides the lead once they don't own it) and Jayna's pile is
+huge. Root (traced): a reassign **moved** the lead but, if it had no open follow-up,
+put it on **nobody's to-do list and told no one** (Phase 130 transfer only MOVES an
+existing follow_up; §100.A push was deferred + never built) → it sat in the new
+owner's big lead list and died. Owner picked **Option 1 (task + ping for the new
+owner) + Option 2 (sender's "handed off" view)**. Additive; both audits passed.
+
+### Stage 1 — handoff landing task + ping (`_reassign_lead_apply`, edited in place §71)
+After the ownership UPDATE, a `BEGIN…EXCEPTION` subtransaction INSERTs a follow_up
+for the new owner (`follow_up_date=CURRENT_DATE`, **`follow_up_time=NULL`**,
+`auto_generated=false`, cadence_type NULL) **only if they have no open follow_up for
+the lead** (the Phase 130 transfer, which fires on the same UPDATE, moved one first
+→ no duplicate). It lands in the new owner's Today/Follow-ups queue, and the existing
+`tg_push_followup_due` AFTER-INSERT trigger (§34Z.55) fires the ping — **no direct
+enqueue_push** (no double-ping, reuses the frozen push path). 
+- **Why it's §45-safe:** the subtransaction sits AFTER the UPDATE + audit rows, so
+  any failure rolls back ONLY the task (RAISE WARNING) — the reassign can NEVER
+  break. It's in `_apply` (called only by reassign_lead/bulk), NOT a leads trigger →
+  does NOT fire on auto-assign / campaign routing (no spam). `auto_generated=false`
+  + note not `'Auto-scheduled:%'` → immune to every cadence/auto-cleanup trigger.
+- **P1 FIXED (guardian):** the first draft omitted `follow_up_time` → it took the
+  table's stale `DEFAULT '10:00:00'` → the `push_followup_due` **cron** (needs
+  `follow_up_time IS NOT NULL`) re-pinged same-day rows created before 10 AM =
+  double-ping. Explicit `follow_up_time = NULL` kills that → single on-INSERT push.
+  **FOOT-GUN: any NEW same-day follow_up INSERT must set `follow_up_time = NULL`
+  explicitly, or the stale 10:00 default double-pings via the cron.**
+- Known/accepted: a BULK reassign of N leads → N immediate pings (tag `fu-<id>`, no
+  burst-collapse, no quiet-hours on this path). Bounded (non-admin 20/bulk cap);
+  each is a real handoff. Owner-accept; revisit if bulk gets noisy.
+
+### Stage 2 — sender's "leads you handed off" view (`my_handed_off_leads` RPC + card)
+`supabase_phase100e_handed_off_view.sql` — DEFINER RPC (LANGUAGE sql,
+search_path-pinned) scoped `WHERE ra.caller_id = auth.uid()` (the rep sees ONLY
+their own reassigns; NULL uid → 0 rows; anon REVOKED). Returns each handed-off
+lead's current stage + `contacted_since` (a real, non-status_change activity after
+the handoff). Security review: SAFE (auth.uid() resolves to the CALLER inside a
+DEFINER fn; no leak — every row is a lead the rep personally owned; DEFINER needed
+because `fu_sales_own` RLS would block the cross-user follow_up INSERT under INVOKER;
+no injection — `p_caller_name` is a bound VALUE, server-derived).
+- `src/hooks/useHandedOffLeads.js` + `src/components/leads/HandedOffCard.jsx`
+  (exception-rendered, read-only — rows not clickable since RLS hides the lead) +
+  additive mount on `WorkV2` (frozen, guardian PASS). Shows uncontacted handoffs
+  ("not called yet · → owner") FIRST + a "N being worked" count.
+
+### Owner action — run BOTH in Supabase Studio, then push
+1. The updated **`_reassign_lead_apply`** function (from `supabase_phase100_a_reassign_rpc.sql`) — the landing task.
+2. **`supabase_phase100e_handed_off_view.sql`** — the RPC.
+Then push (JS reaches the APK on next open). Smoke: reassign a lead to a TC → it
+appears in the TC's Today/Follow-ups + they get a "New lead handed to you" push; on
+the sender's /work, "Leads you handed off" shows it as "not called yet" until the TC
+logs a call.

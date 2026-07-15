@@ -374,6 +374,41 @@ BEGIN
          updated_at         = now()
    WHERE id = p_lead_id;
 
+  -- Phase 100.E (2026-07-15) — HANDOFF LANDING TASK. A reassign moved the lead
+  -- but if it had NO open follow-up it landed on nobody's to-do list and told
+  -- no one → it died in the new owner's big lead list (owner report: "sales
+  -- assigns to Jayna, both forget"). Give the new owner a follow-up due TODAY
+  -- so it lands in their Today / Follow-ups queue; the existing
+  -- tg_push_followup_due trigger (§34Z.55) fires the ping on THIS INSERT
+  -- automatically (no direct enqueue_push here → no double-ping, reuses the
+  -- frozen push path). SKIP if they already have an open follow-up for this
+  -- lead (the Phase 130 transfer AFTER-UPDATE trigger just moved one).
+  -- Subtransaction + EXCEPTION so a failure here can NEVER roll back or break
+  -- the reassign itself — the task/ping is best-effort, the handoff is the core.
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.follow_ups
+       WHERE lead_id = p_lead_id
+         AND assigned_to = p_new_owner
+         AND is_done = false
+    ) THEN
+      -- follow_up_time = NULL EXPLICITLY (override the table's stale
+      -- DEFAULT '10:00:00'). With a time set, a same-day row is BOTH pushed
+      -- now by tg_push_followup_due AND re-pushed by the push_followup_due
+      -- cron's 10:00 window (which requires follow_up_time IS NOT NULL) →
+      -- double-ping. NULL keeps it to the single on-INSERT push.
+      INSERT INTO public.follow_ups (
+        lead_id, assigned_to, follow_up_date, follow_up_time, note, auto_generated
+      ) VALUES (
+        p_lead_id, p_new_owner, CURRENT_DATE, NULL,
+        'New lead handed to you by ' || COALESCE(p_caller_name, 'a colleague')
+          || ' — call today', false
+      );
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'handoff landing task skipped for lead %: %', p_lead_id, SQLERRM;
+  END;
+
   RETURN jsonb_build_object(
     'ok', true,
     'lead_id', p_lead_id,
