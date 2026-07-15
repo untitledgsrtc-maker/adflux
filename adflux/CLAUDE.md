@@ -6640,3 +6640,64 @@ alternative if ever needed).
 - ❌ A login/alias address (@untitledad.in here) is NOT a deliverable mailbox —
   reply-to / CC / BCC to it bounces silently. For any app-sent email, route
   reply-to + copies to a verified REAL inbox (users.contact_email), never the login.
+
+
+---
+
+## 103 · Phase 100.D — reassign 5/day cap REMOVED (2026-07-15)
+
+Owner hit "Daily limit reached (5 reassigns/day)" reassigning a lead to a TC and
+asked to lift it. Removed the daily cap — **all non-admin can now reassign any
+number of leads/day.** SQL-only, edited the canonical in place (§71 rule 1 — no
+new copy file).
+
+### What the cap WAS (before you touch this)
+The 5/day cap was a **deliberate anti-abuse throttle** you added in Phase 100.A
+(29 May 2026) when self-service reassign was opened up (before that only admin
+could reassign). It counted ALL of a non-admin's reassigns that IST day (to
+anyone, any direction — NOT just to TC); the 6th threw `daily reassign limit
+reached (5)`. Purpose: stop a rep dumping their whole lead pile on someone to
+dodge work. You decided 15 Jul the throttle isn't worth the friction — unlimited
+for everyone, audit trail kept.
+
+### The change (`supabase_phase100_a_reassign_rpc.sql`, owner RE-RUNS the file)
+- `reassign_lead` (single): dropped the Q2 `IF v_today_count >= 5` block.
+- `reassign_leads_bulk`: dropped the Q2 projection; `v_can_attempt := v_total`
+  (attempt every lead in the batch).
+- Header matrix + Q2-decision + section comments updated so a future session
+  doesn't re-add it.
+- **KEPT (unchanged):** every role/lane/stage/segment guard in
+  `_reassign_lead_apply` (sales→TC only on New/Working/Nurture, no self-assign, no
+  admin target, no closed leads, government_partner scope), the **20-per-call bulk
+  cap** (Q3 — a fat-finger guard, NOT the daily throttle), the `reassign_audit` +
+  `lead_activities` status_change writes (accountability intact), and the §211
+  `_reassign_lead_apply` REVOKE-from-authenticated lock.
+
+### Why it's safe (two read-only audits PASS, 15 Jul)
+- **Reassign is OPERATIONAL only — lead ownership does NOT move money or score.**
+  Incentive credits by `quotes.created_by` (rebuild_monthly_sales), score counts
+  `lead_activities.created_by` (compute_daily_score) — neither reads the lead's
+  current `assigned_to`/`telecaller_id`. So unlimited reassign can't game pay. The
+  reassign's own activity row is `status_change` (excluded from score). Verified
+  against db/functions/ canonicals.
+- Not a §28-frozen DB contract; frontend untouched (SQL-only); no hot-path
+  regression (the removed count-query makes the RPC LIGHTER).
+- LOW caveat (accepted): the cap was incidentally a write-throttle — a looping
+  client could amplify `leads` UPDATEs. Fine at 22 trusted users + session
+  required + your explicit directive.
+
+### Harmless dead code left behind (P3 — a future cleanup commit, guardian for the JS)
+- `reassign_lead` / `reassign_leads_bulk`: unused DECLAREs (`v_today_count`,
+  `v_today_ist`, `v_remaining`) + a now-unreachable `ELSE` over-limit branch in the
+  bulk loop (its stale "daily reassign limit reached during this batch" message can
+  never fire → not misleading). Trim next time the file is touched.
+- `ReassignModal.jsx:71` + `LeadsV2.jsx:72` (LeadsV2 is §28-FROZEN): the
+  `'daily reassign limit reached' → 'Daily limit reached (5 reassigns/day).'`
+  error-string mapping is now dead (the RPC never raises it). Left alone — removing
+  needs a guardian-PASS cleanup commit; harmless meanwhile.
+
+### Owner action
+Re-run `supabase_phase100_a_reassign_rpc.sql` in Supabase Studio (idempotent — the
+whole file is re-runnable; it recreates the 3 functions + re-applies the correct
+GRANT/REVOKE posture). Then push (JS-free). Smoke: reassign 6+ leads in a day as a
+non-admin → no "daily limit" block; every reassign still shows in `reassign_audit`.

@@ -24,7 +24,8 @@
 --                                   as target.
 --   - Non-admin                   → cannot reassign Won / Lost.
 --   - All                         → no self-assign.
---   - Non-admin                   → max 5 reassigns/rep/day (IST).
+--   - Non-admin                   → UNLIMITED reassigns/day (5/day
+--                                   cap removed 2026-07-15; audit kept).
 --   - Non-admin                   → max 20 leads per bulk call.
 --   - Cross-team                  → reason required (≥3 chars).
 --   - Same-lane                   → reason optional.
@@ -37,8 +38,8 @@
 --   Q1  YES — sales/agency/SM → TC allowed, but only on stage IN
 --             ('New','Working','Nurture'). Closed-or-quote stages
 --             blocked at trigger time.
---   Q2  Daily limit 5 reassigns/rep/day for non-admin. Admin
---       exempt. Counter reads from `reassign_audit` rows.
+--   Q2  Daily limit REMOVED 2026-07-15 (owner: any number/day).
+--       Every reassign still logged in `reassign_audit`.
 --   Q3  Bulk cap 20 leads per call for non-admin. Admin exempt.
 --   Q4  PUSH DEFERRED to Phase 100.C. This file does NOT call
 --       enqueue_push. Audit chain = `lead_activities`
@@ -385,7 +386,8 @@ $$;
 
 -- ────────────────────────────────────────────────────────────────
 -- 3. reassign_lead — single-lead public RPC.
--- Auths caller, enforces daily limit, calls _apply once.
+-- Auths caller (role/lane/stage/segment guards), calls _apply once.
+-- No daily cap (removed 2026-07-15).
 -- ────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.reassign_lead(
@@ -423,20 +425,10 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  -- Q2 — daily limit 5/rep for non-admin. Counter reads today's
-  -- IST-anchored window from reassign_audit.
-  IF v_caller_role NOT IN ('admin', 'co_owner') THEN
-    SELECT count(*)
-      INTO v_today_count
-      FROM public.reassign_audit
-     WHERE caller_id = v_caller
-       AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = v_today_ist;
-
-    IF v_today_count >= 5 THEN
-      RAISE EXCEPTION 'daily reassign limit reached (5)'
-        USING ERRCODE = '42501';
-    END IF;
-  END IF;
+  -- Q2 — daily reassign cap REMOVED 2026-07-15 (owner directive: any
+  -- number of reassigns/day). Every reassign is still written to
+  -- reassign_audit inside _apply, so the accountability trail is
+  -- intact. Role / lane / stage / segment guards above are UNCHANGED.
 
   RETURN public._reassign_lead_apply(
     v_caller, v_caller_role, v_caller_name, v_caller_team,
@@ -448,8 +440,8 @@ $$;
 
 -- ────────────────────────────────────────────────────────────────
 -- 4. reassign_leads_bulk — bulk public RPC.
--- Enforces bulk cap (20 for non-admin) and projects rate limit
--- across the batch BEFORE iterating. Returns per-row results.
+-- Enforces the 20/call bulk cap (non-admin). No daily cap (removed
+-- 2026-07-15). Returns per-row results.
 -- ────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.reassign_leads_bulk(
@@ -506,26 +498,11 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  -- Q2 — daily limit. For non-admin we project against today's
-  -- count. If the batch would push past 5, only the first
-  -- (5 - today_count) leads are attempted; the rest are recorded
-  -- as failures so the caller sees exactly which ones didn't run.
+  -- Q2 — daily reassign cap REMOVED 2026-07-15 (owner directive: any
+  -- number of reassigns/day). Attempt every lead in the batch; the
+  -- 20-per-call bulk cap (Q3, above) stays as a fat-finger guard.
+  -- Every reassign is still audited inside _apply.
   v_can_attempt := v_total;
-  IF v_caller_role NOT IN ('admin', 'co_owner') THEN
-    SELECT count(*)
-      INTO v_today_count
-      FROM public.reassign_audit
-     WHERE caller_id = v_caller
-       AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = v_today_ist;
-
-    v_remaining := GREATEST(0, 5 - v_today_count);
-    v_can_attempt := LEAST(v_total, v_remaining);
-
-    IF v_remaining = 0 THEN
-      RAISE EXCEPTION 'daily reassign limit reached (5)'
-        USING ERRCODE = '42501';
-    END IF;
-  END IF;
 
   -- Iterate the leads. The first v_can_attempt entries hit
   -- _apply; the rest (if any) are recorded as over-limit failures.
