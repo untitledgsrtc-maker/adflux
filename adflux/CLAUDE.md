@@ -6574,3 +6574,69 @@ your inbox (the CC), before emailing a real client. THEN it's live.
   (HROfferLetterV2 / SendOfferModal), kind='offer' (from hr@). Small.
 - Optional: open/click tracking (Resend webhooks) → email_log status; a real hr@
   inbox for replies (v1 = reply-to the sender). NO bulk/marketing send (§99).
+
+
+---
+
+## 102 · Phase 235.1 — per-rep REAL reply/BCC inbox for app-sent email (2026-07-15)
+
+The §101 quote-email shipped with `reply-to + CC = the sender's @untitledad.in
+login`. Owner caught that those @untitledad.in addresses are **login IDs, not real
+mailboxes** — a client Reply or the rep's copy would BOUNCE. Fixed: map each rep to
+their REAL Gmail; use it for reply-to + BCC.
+
+### The mapping (owner-supplied 14 Jul)
+`users.contact_email` (new nullable column, `supabase_users_contact_email.sql`):
+- dhara@untitledad.in → untitledadvertising1@gmail.com
+- mayur@untitledad.in → mayur.salesuntitled@gmail.com
+- rima@untitledad.in → untitled.ad2@gmail.com
+- dixita@untitledad.in → untitleddesigning@gmail.com
+- riya@ + hr@untitledad.in → hr.untitledad@gmail.com
+
+### Decisions (LOCKED — supersede the §99/§101 "visible CC" choice)
+- **BCC, not CC** (owner-confirmed 14 Jul). The real inboxes are generic Gmails
+  (untitledadvertising1@…) — a visible CC to the client looks unprofessional. BCC:
+  the rep gets a hidden copy, the client never sees the Gmail, reply-to still routes
+  the client's Reply to the rep. So §101's "cc: [senderEmail]" is REPLACED by
+  "bcc: [replyInbox]".
+- **reply-to + BCC = `users.contact_email`, server-derived by the caller's uid**
+  (not client-supplied, not the login). Unmapped sender → `FALLBACK_REPLY =
+  untitledadvertising@gmail.com` (the owner's monitored inbox) so a reply can NEVER
+  bounce. The from-address (quotes@ / hr@) is unchanged — those don't need a real
+  inbox (send-only).
+- **The `from` aliases (quotes@, hr@) do NOT need a real mailbox; only reply-to/BCC
+  do.** This is the whole reason the mapping exists.
+
+### Files
+- `supabase_users_contact_email.sql` (owner RUNS) — ADD COLUMN + seed the 6 logins
+  (case-insensitive match) + NOTIFY + a VERIFY-2 that lists any expected login that
+  did NOT match a users row (catches a login spelled differently in the DB).
+- `api/email/send.js` — fetch `role,contact_email` by uid; `replyInbox =
+  contact_email (valid) || FALLBACK_REPLY`; payload `bcc:[replyInbox]` +
+  `reply_to: replyInbox`. Degrades gracefully if the column doesn't exist yet
+  (select 400s → role/contact null → quote still sends with the owner-Gmail
+  fallback; offer refused until role resolves).
+- `src/components/v2/SendEmailModal.jsx` — note "A copy is CC'd to you" → "A copy
+  goes to your inbox."
+
+### Not §28-frozen, §45-safe
+New Phase 235 endpoint + a new nullable column no live code reads. No guardian
+needed. Push (JS/Edge, no APK). Owner RUNS the SQL, then the reply/BCC routing goes
+live. Before the SQL runs, quote emails still work (reply/BCC → owner fallback).
+
+### quotes@untitledad.in forwarding — DEFERRED (domain not in the owner's GoDaddy)
+Owner wanted `quotes@untitledad.in → forward to a Gmail` so a client who TYPES that
+address fresh is caught. Blocked: **untitledad.in is registered under a DIFFERENT
+GoDaddy login** (the owner's current GoDaddy portfolio has only adfluxcms.com +
+ajadflux.com). Resend's DNS records were added there via that other account /
+Resend auto-config. Owner has **requested a transfer of untitledad.in to his own
+GoDaddy** — the forwarding waits for that. It's OPTIONAL: the per-rep reply-to
+above already routes normal client Replies to the rep's real inbox; forwarding only
+catches the rare fresh-typed-to-quotes@ case. Do NOT chase it until the transfer
+lands; do NOT buy anything (GoDaddy paywalls forwarding — ImprovMX is the free
+alternative if ever needed).
+
+### Foot-gun
+- ❌ A login/alias address (@untitledad.in here) is NOT a deliverable mailbox —
+  reply-to / CC / BCC to it bounces silently. For any app-sent email, route
+  reply-to + copies to a verified REAL inbox (users.contact_email), never the login.

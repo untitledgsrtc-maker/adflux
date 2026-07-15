@@ -3,10 +3,11 @@
 // Send an email from the app via Resend (CLAUDE.md §99).
 //   • HR offer  (kind='offer') → from hr@untitledad.in
 //   • Client quote (kind='quote') → from quotes@untitledad.in
-// reply-to + CC = the sending user's own email (server-derived from their JWT,
-// so it can't be spoofed). The client's PDF rides as a base64 attachment; the
-// branded link goes in the html body (both — §99). Every send is logged to
-// email_log.
+// reply-to + BCC = the sending rep's REAL Gmail (users.contact_email; their
+// @untitledad.in login is a send-only alias that would bounce). BCC (not CC) so
+// the client never sees the generic Gmail. The client's PDF rides as a base64
+// attachment; the branded link goes in the html body (both — §99). Every send is
+// logged to email_log.
 //
 // WHY EDGE, not Node serverless: the Vercel Hobby plan caps a deployment at 12
 // *Serverless* Functions and this project is already at 12 (§219 / §99). Edge
@@ -18,7 +19,8 @@
 //   • Auth REQUIRED — verifies the caller's Supabase JWT; any authenticated
 //     user may send (owner decision "everyone can send", §99).
 //   • from is SERVER-CONTROLLED by `kind` (client can't send from an arbitrary
-//     address); reply-to + cc = the AUTHED user's email (not client-supplied).
+//     address); reply-to + BCC = the AUTHED user's REAL Gmail from users.contact_email
+//     (server-derived by their uid, not client-supplied).
 //   • ONE-TO-ONE ONLY — `to` must be a single valid email. Arrays / comma lists
 //     are rejected (no bulk blast — §99 guardrail; bulk needs unsubscribe+consent).
 //   • Soft per-user rate limit (in-memory; resets on cold start — fine as a
@@ -41,6 +43,12 @@ const FROM = {
   offer: 'Untitled Advertising <hr@untitledad.in>',
   quote: 'Untitled Advertising <quotes@untitledad.in>',
 }
+
+// Where replies + the sender's own copy land. The @untitledad.in from-addresses
+// AND the reps' @untitledad.in logins are send-only aliases; each rep's REAL
+// Gmail lives in users.contact_email. An unmapped sender falls back to the
+// owner's monitored inbox so a reply can never bounce.
+const FALLBACK_REPLY = 'untitledadvertising@gmail.com'
 
 const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/
 
@@ -84,15 +92,25 @@ export default async function handler(req) {
   if (!uid || !senderEmail) return json({ error: 'bad_auth' }, 401)
   if (rateLimited(uid)) return json({ error: 'rate_limited', detail: 'Too many emails just now — wait a few minutes.' }, 429)
 
-  // sender role — offer emails (from hr@) are HR-only.
+  // sender role + real reply inbox. Offer emails (from hr@) are HR-only.
+  // reply-to + BCC use the rep's REAL Gmail (users.contact_email) — their
+  // @untitledad.in LOGIN is a send-only alias, so a reply/copy sent there bounces.
   let role = null
+  let contactEmail = ''
   try {
-    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role`, {
+    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role,contact_email`, {
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     })
     const rows = await rr.json().catch(() => [])
-    role = Array.isArray(rows) && rows[0] ? rows[0].role : null
-  } catch { /* role unknown → offer send will be refused below */ }
+    if (Array.isArray(rows) && rows[0]) {
+      role = rows[0].role || null
+      contactEmail = String(rows[0].contact_email || '').trim()
+    }
+  } catch { /* role/contact unknown → offer refused + reply falls back below */ }
+
+  // The real inbox replies + the sender's own copy go to. NEVER the @untitledad.in
+  // login (send-only). Owner inbox fallback when a rep isn't mapped yet.
+  const replyInbox = (contactEmail && EMAIL_RE.test(contactEmail)) ? contactEmail : FALLBACK_REPLY
 
   // ── body ──
   let body
@@ -123,8 +141,8 @@ export default async function handler(req) {
   const payload = {
     from: FROM[kind],
     to: [to],
-    cc: [senderEmail],          // §99 — the sending user gets a visible copy
-    reply_to: senderEmail,      // replies come back to the real sender
+    bcc: [replyInbox],          // rep gets a HIDDEN copy (client never sees the generic Gmail)
+    reply_to: replyInbox,       // replies land in the rep's REAL inbox
     subject,
     html,
   }

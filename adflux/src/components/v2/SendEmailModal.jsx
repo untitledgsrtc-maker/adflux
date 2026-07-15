@@ -82,7 +82,7 @@ export default function SendEmailModal({
 
           <div style={note}>
             {pdfUrl && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Paperclip size={13} strokeWidth={1.7} /> PDF attached + link in the email</span>}
-            <span>A copy is CC&rsquo;d to you.</span>
+            <span>A copy goes to your inbox.</span>
           </div>
 
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
