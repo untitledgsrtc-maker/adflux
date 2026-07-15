@@ -84,14 +84,33 @@ export default async function handler(req) {
   if (!uid || !senderEmail) return json({ error: 'bad_auth' }, 401)
   if (rateLimited(uid)) return json({ error: 'rate_limited', detail: 'Too many emails just now — wait a few minutes.' }, 429)
 
+  // sender role — offer emails (from hr@) are HR-only.
+  let role = null
+  try {
+    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    })
+    const rows = await rr.json().catch(() => [])
+    role = Array.isArray(rows) && rows[0] ? rows[0].role : null
+  } catch { /* role unknown → offer send will be refused below */ }
+
   // ── body ──
   let body
   try { body = await req.json() } catch { body = {} }
   const kind = body?.kind === 'offer' ? 'offer' : 'quote'
+  if (kind === 'offer' && !['hr', 'admin', 'co_owner'].includes(role)) {
+    return json({ error: 'not_allowed', detail: 'Only HR can send offer emails.' }, 403)
+  }
   const to = String(body?.to || '').trim()
   const subject = String(body?.subject || '').trim()
   const html = String(body?.html || '').trim()
   const pdfBase64 = body?.pdfBase64 ? String(body.pdfBase64) : ''
+  const pdfUrlRaw = body?.pdfUrl ? String(body.pdfUrl) : ''   // Resend fetches it server-side
+  // Only attach an app-owned URL (the branded /pdf link or our Supabase storage)
+  // — never hand Resend an arbitrary URL to fetch.
+  const storagePrefix = SUPABASE_URL ? `${SUPABASE_URL}/storage/` : ''
+  const pdfUrl = (pdfUrlRaw.startsWith('https://app.untitledad.in/pdf/')
+    || (storagePrefix && pdfUrlRaw.startsWith(storagePrefix))) ? pdfUrlRaw : ''
   const pdfName = String(body?.pdfName || 'document.pdf').trim() || 'document.pdf'
   const relatedId = body?.related_id ? String(body.related_id) : null
 
@@ -110,6 +129,7 @@ export default async function handler(req) {
     html,
   }
   if (pdfBase64) payload.attachments = [{ filename: pdfName, content: pdfBase64 }]
+  else if (pdfUrl) payload.attachments = [{ filename: pdfName, path: pdfUrl }]
 
   let resendId = null, status = 'sent', errDetail = null
   try {

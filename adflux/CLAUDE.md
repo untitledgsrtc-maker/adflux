@@ -6518,3 +6518,59 @@ Read-only SELECT, off the hot path (fires only on a manual Done tap). Columns:
   BOTH parked until 96018 is fleet-wide + capture proven (ties to §96). Can't
   hard-require a real call until duration capture is reliable, else honest reps
   whose phone under-captures get blocked (the exact §154 reversal).
+
+---
+
+## 101 · Phase 235 — email send via Resend, Phase 1 (2026-07-14)
+
+The §99 email feature, built. **Phase 0 DONE** (owner 14 Jul): Resend account +
+domain `untitledad.in` VERIFIED (GoDaddy DNS, Claude drove the Resend add) +
+`RESEND_API_KEY` in Vercel (untitled-os project, Sending-access key scoped to
+untitledad.in). **Phase 1 = the CLIENT QUOTE email shipped.** HR-offer button is
+the small next step (same engine).
+
+### What shipped
+- `api/email/send.js` — **EDGE** fn (Vercel Hobby 12-serverless-fn cap, §219 —
+  the project is at 12 Node fns, a 13th breaks deploys; Edge doesn't count).
+  Verifies the caller's Supabase JWT; **any authed user may send** (§99), EXCEPT
+  `kind='offer'` (from hr@) is gated to **hr/admin/co_owner**. `from` is
+  SERVER-locked by kind (offer→hr@, quote→quotes@ untitledad.in). `reply_to`+`cc`
+  = the JWT sender's own email (no spoof; §99 visible-CC decision). ONE-TO-ONE
+  only (single `to`, comma/semicolon-blocking regex — no bulk, §99). Soft
+  per-user rate limit. Attachment = `pdfBase64` OR `pdfUrl` (validated to
+  app.untitledad.in/pdf/ or our Supabase storage — Resend fetches it server-side,
+  no arbitrary-URL SSRF). Logs every attempt to email_log. Raw fetch (Edge-safe,
+  no supabase-js).
+- `supabase_email_log.sql` — email_log + RLS (admin/co_owner/hr/accounts read all;
+  sender reads own; **service-role-only insert** so reps can't forge rows). Owner
+  RUNS this.
+- `src/utils/sendEmail.js` — `sendAppEmail()` (attaches the session JWT, POSTs) +
+  `buildEmailHtml()` (escapes body + link → branded HTML).
+- `src/components/v2/SendEmailModal.jsx` — reusable send modal (To/Subject/Message,
+  one-email validation, "CC'd to you" note). Kind-agnostic.
+- `src/pages/QuoteDetail.jsx` — `handleEmail` UPGRADED: was mailto/native-Gmail
+  share (§95.2/§162) → now uploads the quote PDF (branded link) + opens
+  SendEmailModal (Resend send, from quotes@, PDF attached + link in body, CC the
+  rep). Web + APK both send over the network. logQuoteTouch('email',…) on sent.
+  (The old openEmail/shareEmailDirect imports are now unused in handleEmail but
+  left in place — §16 scope discipline; harmless.)
+
+### Security (general-purpose adversarial review → SHIP, all 9 checks PASS)
+Auth mandatory (401 w/o JWT), from unspoofable, reply-to/cc from JWT (no
+impersonation), one-to-one enforced, secrets server-only, email_log RLS
+sender-scoped. Two LOW findings applied as hardening: pdfUrl allow-list + the
+kind='offer' HR gate. Two LOW left (defense-in-depth, contained): server trusts
+the client-rendered `html` (escaped in buildEmailHtml on the shipped path);
+rate-limit is per-Edge-instance.
+
+### Owner action to go live
+1. Push. 2. Run `supabase_email_log.sql` in Studio. 3. Vercel auto-deploys (the
+key's already set). 4. **TEST FIRST — send a quote to YOUR OWN email**, confirm it
+arrives from quotes@untitledad.in with the PDF attached + branded link + a copy in
+your inbox (the CC), before emailing a real client. THEN it's live.
+
+### Next (not built)
+- **HR offer email button** — same SendEmailModal, wired into the HR offer flow
+  (HROfferLetterV2 / SendOfferModal), kind='offer' (from hr@). Small.
+- Optional: open/click tracking (Resend webhooks) → email_log status; a real hr@
+  inbox for replies (v1 = reply-to the sender). NO bulk/marketing send (§99).

@@ -39,6 +39,7 @@ import { shareEmailDirect, shareWhatsAppDirect } from '../utils/shareDirect'
 // existing blob-download path.
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
+import SendEmailModal from '../components/v2/SendEmailModal'
 import { confirmDialog } from '../components/v2/ConfirmDialog'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
 import { FollowUpList } from '../components/followups/FollowUpList'
@@ -154,6 +155,7 @@ export default function QuoteDetail() {
   const [showEditPayment, setShowEditPayment] = useState(false)
   const [editingPayment, setEditingPayment] = useState(null)
   const [pendingStatus, setPendingStatus]   = useState(null)
+  const [emailModal, setEmailModal]         = useState({ open: false })   // Phase 235 — Resend send
 
   useEffect(() => {
     setLoading(true)
@@ -503,61 +505,38 @@ export default function QuoteDetail() {
   // Phase 11j — switched from mailto: to Gmail web compose.
   // mailto: silently no-ops on macs without a configured mail handler;
   // Gmail compose URL works in any browser for the user's Gmail account.
+  // Phase 235 — send the quote by email FROM the app (Resend), not the rep's
+  // own mail app. Uploads the PDF (Resend attaches it via the branded link +
+  // the link goes in the body), then opens SendEmailModal: from
+  // quotes@untitledad.in, reply-to + CC the sending rep (§99). Web + APK both
+  // send over the network (no device mail app needed).
   async function handleEmail() {
     if (!quote) return
-    const to      = (quote.client_email || '').trim()
-    const ref     = quote.quote_number || quote.ref_number || ''
-    const subject = `Proposal — ${ref}`
-    const greet   =
-      `Dear ${quote.client_name || 'Sir/Madam'},\n\n` +
-      `Please find our proposal — ${ref}.\n` +
-      `Total: Rs. ${formatCurrency(quote.total_amount).replace('₹','')}\n`
-    const signoff = `\nThank you,\nUntitled Adflux Pvt Ltd`
-
-    // Phase 162 — on the APK, try ShareDirect first: open Gmail DIRECTLY with
-    // the recipient pre-filled + the PDF ATTACHED as a real file (the custom
-    // Gmail intent the Phase 160 note deferred). Falls back to the mailto+link
-    // path below when Gmail isn't installed / not native / on the web.
-    const isNative = typeof window !== 'undefined' && window?.Capacitor?.isNativePlatform?.()
-    if (isNative) {
-      try {
-        setPdfLoading(true)
-        const uri = await writeQuotePdfToCache(quote, cities)
-        const direct = await shareEmailDirect({ to, subject, body: greet + signoff, fileUri: uri })
-        if (direct.completed) {
-          logQuoteTouch('email', `Email · proposal ${ref} · PDF attached${to ? ` · to ${to}` : ''}`)
-          return
-        }
-      } catch (e) {
-        console.warn('[email] ShareDirect failed, falling back to mailto:', e?.message)
-      } finally {
-        setPdfLoading(false)
-      }
-    }
-
-    // Fallback (web, or Gmail not installed) — mailto via openEmail: pre-filled
-    // To/subject/body, opens Gmail directly; the PDF rides as a LINK in the
-    // body (mailto can't attach a file).
-    let pdfUrl = null
+    const ref = quote.quote_number || quote.ref_number || ''
+    let pdfUrl = ''
     try {
       setPdfLoading(true)
-      pdfUrl = await uploadQuotePDF(quote, cities)
+      pdfUrl = (await uploadQuotePDF(quote, cities)) || ''   // branded /pdf link (no shorten — Resend fetches it)
     } catch (e) {
       console.warn('[email] PDF upload failed:', e?.message)
+      toastError(e, 'PDF upload failed — you can still send the email without the attachment.')
     } finally {
       setPdfLoading(false)
     }
-    // Phase 95.3 — preserve branded app.untitledad.in/pdf/<ref>?t=…
-    // URL; only shorten raw Supabase fallback URLs.
-    if (pdfUrl && !/^https?:\/\/[^/]*untitledad\.in\/pdf\//.test(pdfUrl)) {
-      try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
-    }
-    let body = greet
-    if (pdfUrl) body += `\nProposal PDF: ${pdfUrl}\n`
-    body += signoff
-    // Phase 155 — openEmail: device mail app (mailto:) on APK, Gmail web on desktop.
-    openEmail({ to, subject, body })
-    logQuoteTouch('email', `Email · proposal ${ref}${pdfUrl ? ' · PDF link sent' : ''}${to ? ` · to ${to}` : ''}`)
+    const body =
+      `Dear ${quote.client_name || 'Sir/Madam'},\n\n` +
+      `Please find our proposal — ${ref}.\n` +
+      `Total: Rs. ${formatCurrency(quote.total_amount).replace('₹', '')}\n\n` +
+      `Thank you,\nUntitled Adflux Pvt Ltd`
+    setEmailModal({
+      open: true,
+      to: (quote.client_email || '').trim(),
+      subject: `Proposal — ${ref}`,
+      body,
+      pdfUrl,
+      pdfName: `proposal-${ref || 'untitled'}.pdf`,
+      ref,
+    })
   }
 
   async function handleEditPayment(updated) {
@@ -1041,6 +1020,23 @@ export default function QuoteDetail() {
           totalPaid={totalPaid}
           onConfirm={handleWonWithPayment}
           onClose={() => setShowWonModal(false)}
+        />
+      )}
+
+      {/* Phase 235 — send the quote by email from the app (Resend) */}
+      {emailModal.open && (
+        <SendEmailModal
+          open={emailModal.open}
+          kind="quote"
+          title="Email quote to client"
+          defaultTo={emailModal.to}
+          defaultSubject={emailModal.subject}
+          defaultBody={emailModal.body}
+          pdfUrl={emailModal.pdfUrl}
+          pdfName={emailModal.pdfName}
+          relatedId={quote?.id}
+          onClose={() => setEmailModal({ open: false })}
+          onSent={() => logQuoteTouch('email', `Email · proposal ${emailModal.ref || ''} · sent from app${emailModal.pdfUrl ? ' · PDF attached' : ''}`)}
         />
       )}
     </div>
