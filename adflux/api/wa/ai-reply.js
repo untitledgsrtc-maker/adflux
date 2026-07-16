@@ -42,29 +42,41 @@ const sb = (path, init = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
 // whatsapp_accounts.ai_system_prompt. Facts here are the REAL network — the
 // model must not invent beyond them, must not quote a final total, must not
 // confirm a booking, and must keep the calm Untitled voice (§20).
-const DEFAULT_SYSTEM = `You are the WhatsApp assistant for Untitled Advertising, which runs a network of LED advertising screens across Gujarat's GSRTC (state bus) stations.
+const DEFAULT_SYSTEM = `You are the WhatsApp assistant for Untitled Advertising, which runs the GSRTC LED Network — a network of LED advertising screens across Gujarat's GSRTC (state bus) stations.
 
-WHAT WE OFFER (facts — do not invent anything beyond these):
+THE NETWORK (facts — never invent beyond these):
 - 264 LED screens across 20 major GSRTC bus stations in Gujarat.
-- ~29 lakh impressions per month (~95,000 per day) from real travellers.
-- Audience is measured with AI analytics (gender, age band) — advertisers get real proof of who saw the ad, plus QR scans that turn viewers into trackable leads. This measurable, scan-proof reporting is our main differentiator vs ordinary hoardings.
-- Stations/cities include Surat, Anand, Gandhinagar, Vadodara, Bhavnagar, Veraval, Junagadh, Jamnagar, Porbandar, Botad, Morbi and more.
-- Indicative screen rates are roughly Rs 650 to Rs 850 per screen depending on grade/size (43" / 55"). These are indicative only.
+- ~29 lakh impressions per month (~95,000 per day) from real travellers waiting at busy bus stations.
+- Screens are 43" and 55", graded A / B / C by footfall.
+- Live stations include Surat, Vadodara, Anand, Gandhinagar, Bhavnagar, Veraval, Surendranagar, Jamnagar, Junagadh, Porbandar, Dwarka, Morbi, Bhachau, Botad — and more (20 total).
+- Indicative screen rates are roughly Rs 650 to Rs 850 per screen depending on grade/size. INDICATIVE ONLY.
 - Full details, video and a live map: https://app.untitledad.in/led
 
+WHY WE'RE DIFFERENT (this is the main pitch — "a billboard can't tell you who looked; ours can"):
+- Ordinary outdoor/hoardings: you print it and hope. No idea how many people saw it, no way to know if it drove a single call, one flat rate, zero reporting.
+- The GSRTC LED Network: you run it AND measure it. AI-verified views (real eyes + real dwell time, not guessed). Every screen shows a QR — one tap opens WhatsApp, no typing — and every scan becomes a tracked lead tagged to the exact station it came from. Advertisers get a per-screen dashboard: scans, leads, city breakdown. It's a funnel you can watch, not "impressions" you estimate.
+
+HOW IT WORKS (4 steps):
+1. Your creative goes live on the LED screens at Gujarat's busiest bus stations.
+2. Thousands of travellers wait, look up and watch — views AI-verified, not guessed.
+3. They scan the on-screen QR → it opens WhatsApp on their phone in one tap.
+4. Every scan lands as a tracked lead, tagged to the station it came from — proof, not hope.
+
+PROOF: the funnel is already running live — hundreds of scans have already turned into real, routed leads, each tagged to the exact screen that pulled it in. Real numbers, no estimates.
+
 YOUR JOB:
-- Reply helpfully and briefly (this is WhatsApp — 2 to 5 short sentences).
-- Answer questions about the network, coverage, audience and how it works.
-- Share the link https://app.untitledad.in/led when it helps.
+- Reply helpfully and briefly (WhatsApp — 2 to 5 short sentences; break longer answers into a couple of short messages of thought).
+- Explain the network, coverage, audience, the measurable/scan-proof advantage, and how it works.
+- Share https://app.untitledad.in/led when it helps (it has the video, live map and full details).
 - Gently find out what they need: which city/stations, what brand or product, and rough timeline — so our team can prepare a tailored quote.
 - Reply in the customer's own language (English, Hindi or Gujarati) matching how they wrote.
 
 HARD RULES:
-- Do NOT quote a final or total price, and do NOT confirm any booking. If they ask for exact pricing or want to book, say our team will share a tailored quote shortly and ask for their requirement (city, brand, dates).
-- Do NOT invent screens, cities, guarantees, or numbers that aren't listed above.
-- Be calm, precise and professional — never pushy or salesy, and avoid heavy emoji. It's completely fine if they don't book; just be genuinely helpful.
-- If they ask to stop or unsubscribe, apologise briefly and tell them they won't be messaged further.
-- Keep it human and short. Do not mention that you are an AI unless asked directly.`
+- Do NOT quote a final or total price, and do NOT confirm any booking. If they ask exact pricing or want to book, say our team will share a tailored quote shortly and ask for their requirement (city, brand, dates).
+- Do NOT invent screens, cities, guarantees, or numbers beyond the facts above.
+- Calm, precise, professional — never pushy or salesy, avoid heavy emoji. It's completely fine if they don't book; just be genuinely helpful.
+- If they ask to stop/unsubscribe, apologise briefly and tell them they won't be messaged further.
+- Keep it human. Don't say you are an AI unless asked directly.`
 
 export default async function handler(req) {
   if (req.method !== 'POST') return nope('method_not_allowed', 405)
@@ -87,6 +99,19 @@ export default async function handler(req) {
   const acct = (await (await sb(`whatsapp_accounts?id=eq.${conv.whatsapp_account_id}&select=phone_number_id,ai_enabled,ai_system_prompt&limit=1`)).json())?.[0]
   if (!acct?.ai_enabled) return nope('ai_disabled')
   if (!acct.phone_number_id) return nope('no_sending_number')
+
+  // Phase 246.1 — cities we have a real PHOTO or VIDEO for. The AI can SEND a
+  // city photo (image; public city-photos bucket → Meta fetches the link) and
+  // SHARE a city video link (cities.youtube_url, §221) in its text. Wrapped so a
+  // transient catalog-load failure degrades to "no media" — the TEXT reply must
+  // never fail because of a media lookup.
+  let allCities = []
+  try {
+    allCities = ((await (await sb(`cities?select=name,photo_url,youtube_url&is_active=eq.true&limit=300`)).json()) || []).filter((c) => c && c.name)
+  } catch { /* no media catalog → text-only */ }
+  const cityRows = allCities.filter((c) => c.photo_url && String(c.photo_url).trim())
+  const photoCities = cityRows.map((c) => c.name)
+  const videoRows = allCities.filter((c) => c.youtube_url && String(c.youtube_url).trim())
 
   // ── recent thread (newest first) ──
   const rows = (await (await sb(`whatsapp_messages?conversation_id=eq.${convId}&order=at.desc&limit=16&select=direction,type,body,at`)).json()) || []
@@ -115,18 +140,40 @@ export default async function handler(req) {
   if (!turns.length) return nope('nothing_to_answer')
 
   // ── ask Claude ──
+  let system = acct.ai_system_prompt || DEFAULT_SYSTEM
+  if (photoCities.length) {
+    system += `\n\nPHOTOS YOU CAN SEND: ${photoCities.join(', ')}.\nIf the customer asks to see a photo, the screens, or what it looks like in ONE of these cities, add a FINAL separate line exactly in this form:\nPHOTO: <city name>\nUse the exact city name from the list, ONE city only, and ONLY if it is in the list. If they ask about a city not in the list, do NOT add the line — say our team will share photos.`
+  }
+  if (videoRows.length) {
+    system += `\n\nVIDEOS YOU CAN SHARE — when the customer asks to see a video/reel of one of these stations, include the EXACT link in your reply text (WhatsApp shows a preview):\n${videoRows.map((c) => `- ${c.name}: ${c.youtube_url}`).join('\n')}\nOnly share a link from this list, for the city asked. If they ask for a city not listed, say our team will share a video.`
+  }
   let reply = ''
   try {
     const ar = await fetch(ANTHROPIC, {
       method: 'POST',
       headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 400, system: acct.ai_system_prompt || DEFAULT_SYSTEM, messages: turns }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 400, system, messages: turns }),
     })
     if (!ar.ok) return nope('claude_' + ar.status, 502)
     const data = await ar.json()
     reply = (data?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim()
   } catch (e) { return nope('claude_error', 502) }
-  if (!reply) return nope('empty_reply')
+
+  // Phase 246.1 — a `PHOTO: <city>` marker means send that city's photo as a
+  // WhatsApp image. Strip the marker from the text; resolve to a real city we
+  // actually have a photo for (never a made-up url).
+  let photoUrl = null
+  const pm = reply.match(/(^|\n)[ \t]*PHOTO:[ \t]*(.*?)[ \t]*$/im)
+  if (pm) {
+    reply = (reply.slice(0, pm.index) + reply.slice(pm.index + pm[0].length)).trim()  // always strip our control marker
+    const want = pm[2].trim().toLowerCase()
+    if (want) {  // empty city → resolve nothing (never default to the first city)
+      const hit = cityRows.find((c) => c.name.toLowerCase() === want) ||
+                  cityRows.find((c) => want.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(want))
+      if (hit) photoUrl = hit.photo_url
+    }
+  }
+  if (!reply && !photoUrl) return nope('empty_reply')
 
   // ── backstop the two HARD rules (no final price, no booking confirmation) ──
   // The system prompt is the primary guard; this catches a jailbreak BEFORE it
@@ -148,25 +195,34 @@ export default async function handler(req) {
   const fresh = (await (await sb(`whatsapp_messages?conversation_id=eq.${convId}&order=at.desc&limit=1&select=direction`)).json())?.[0]
   if (fresh && fresh.direction !== 'in') return nope('superseded')
 
-  // ── send on WhatsApp ──
-  let wamid = null
-  try {
+  // ── send: the text (if any) then the city photo (if any) ──
+  const sendWa = async (payload) => {
     const gr = await fetch(`${GRAPH}/${acct.phone_number_id}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${WA_TOKEN}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', to: conv.customer_wa_id, type: 'text', text: { body: reply } }),
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: conv.customer_wa_id, ...payload }),
     })
     const gd = await gr.json().catch(() => ({}))
-    if (!gr.ok) return nope('send_failed:' + (gd?.error?.message || gr.status), 502)
-    wamid = gd?.messages?.[0]?.id || null
-  } catch (e) { return nope('send_error', 502) }
+    if (!gr.ok) throw new Error(gd?.error?.message || ('graph_' + gr.status))
+    return gd?.messages?.[0]?.id || null
+  }
+  const logOut = async (type, textBody, wamid) => {
+    const atIso = new Date().toISOString()
+    try {
+      await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify({ conversation_id: convId, wamid, direction: 'out', type, body: textBody, at: atIso }) })
+      await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ updated_at: atIso }) })
+    } catch { /* the message was sent; a log failure is non-fatal */ }
+  }
 
-  // ── log the outbound so it shows in the inbox (best-effort) ──
-  const atIso = new Date().toISOString()
   try {
-    await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify({ conversation_id: convId, wamid, direction: 'out', type: 'text', body: reply, at: atIso }) })
-    await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ updated_at: atIso }) })
-  } catch { /* the message was sent; a log failure is non-fatal */ }
+    if (reply) { const id = await sendWa({ type: 'text', text: { body: reply } }); await logOut('text', reply, id) }
+  } catch (e) { return nope('send_failed:' + String(e?.message || e), 502) }
+  // Photo is best-effort — the text already went; a bad/unreachable photo_url
+  // must not fail the whole reply.
+  if (photoUrl) {
+    try { const id = await sendWa({ type: 'image', image: { link: photoUrl } }); await logOut('image', '[image]', id) }
+    catch { /* photo skipped — text delivered */ }
+  }
 
-  return ok({ wamid })
+  return ok({ photo: !!photoUrl })
 }

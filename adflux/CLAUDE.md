@@ -7442,3 +7442,26 @@ both adversarial reviews PASS (safety/correctness + AI/security).
 - ❌ Turning `ai_enabled=true` WITHOUT setting `bot_enabled=false` +
   `auto_reply_enabled=false` → the old flat/flow bot AND the AI both reply. Use the
   one 3-flag UPDATE in step 5.
+
+### Phase 246.1 — LIVE (owner turned it on 16 Jul) + photos/videos/richer context
+Owner enabled it (95815 78261: ai_enabled=true, bot_enabled=false,
+auto_reply_enabled=false) + Vercel envs ANTHROPIC_API_KEY + AI_REPLY_SECRET set
+(Production). Confirmed working (text replies live). Then extended (`api/wa/ai-reply.js`,
+review PASS, deploys straight to the LIVE AI — text path byte-preserved):
+- **Sends a city PHOTO** — loads `cities.photo_url` (public `city-photos` bucket,
+  Phase 80); the system prompt lists the cities we have a photo for; Claude emits a
+  final `PHOTO: <city>` control marker; the endpoint strips it, resolves to a real
+  `cities` row (never a made-up url), sends text + the image (image best-effort,
+  can't fail the text). Empty-`want` guard (never defaults to the first city).
+- **Shares a city VIDEO link** — loads `cities.youtube_url` (§221); injects a
+  city→url list; Claude includes the exact link in its text (WhatsApp previews it).
+- **Richer knowledge** — DEFAULT_SYSTEM rewritten from the real deck + landing-page
+  copy (public/led + public/deck): the measurable/scan-proof MOAT, the 4-step
+  how-it-works, the vs-ordinary-outdoor comparison, AI-verified views + dwell, the
+  live funnel proof, exact stations, 43"/55" Grade A/B/C, indicative Rs 650-850.
+- Cities catalog load is try/caught → a lookup failure degrades to text-only.
+- The AI account can override the whole persona via `whatsapp_accounts.ai_system_prompt`
+  (admin-write-only). The DEFAULT is the guardrailed one.
+- **KNOWN:** the AI's own SENT photo logs as `body:'[image]'` (no media_id) so YOUR
+  inbox shows a placeholder for it (the customer gets the real image) — cosmetic,
+  the §114 store-on-receipt only covers INBOUND media, not AI outbound.
