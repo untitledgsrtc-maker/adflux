@@ -1,6 +1,5 @@
 // src/pages/QuoteDetail.jsx
 import { useEffect, useState } from 'react'
-import { cleanPhone } from '../utils/phone'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Download, MessageCircle, ChevronDown,
@@ -25,14 +24,14 @@ import {
 // cinema, …). Routed in handleDownloadPDF based on quote.media_type so
 // the existing private LED PDF stays untouched.
 import { downloadOtherMediaPdf } from '../components/quotes/OtherMediaQuotePDF'
-import { buildWhatsAppMessage, openWhatsApp, shortenUrl } from '../utils/whatsapp'
 import { PaymentModal } from '../components/payments/PaymentModal'
 import { PaymentHistory } from '../components/payments/PaymentHistory'
 import { PaymentSummary } from '../components/payments/PaymentSummary'
 import IncentiveForecastCard from '../components/quotes/IncentiveForecastCard'
 import { setPendingEditOf, setPendingRenewalOf } from '../lib/quoteIntent'
 import { openExternalUrl, openEmail } from '../utils/openExternal'
-import { shareEmailDirect, shareWhatsAppDirect } from '../utils/shareDirect'
+import { shareEmailDirect } from '../utils/shareDirect'
+import { shareQuoteViaWhatsApp } from '../utils/shareQuoteWhatsApp'
 // Phase 102.I (2026-05-29) — native PDF share via Capacitor Share + Filesystem.
 // Lazy-imported on demand inside handleDownloadPDF so the web bundle
 // doesn't pay the plugin size cost. Web build falls through to the
@@ -78,60 +77,11 @@ const TABS = [
 // single shared map STATUS_COLOR_VARS in utils/constants.js so brand
 // changes propagate automatically. Import is at the top of the file.
 
-// Phase 103.D.8 — write the quote PDF to the Capacitor cache and return
-// a shareable file:// uri, so the APK WhatsApp path can attach a REAL
-// PDF instead of a wa.me text link (owner: "cant we attach pdf along
-// with whatsapp template?"). Mirrors the inline native block in
-// handleDownloadPDF, kept as a separate helper so that working download
-// path stays untouched. Throws on any failure → caller falls back to the
-// link flow. Native-only (callers gate on Capacitor.isNativePlatform).
-async function writeQuotePdfToCache(quote, cities) {
-  // Phase 236 — every step is tagged so a failure names EXACTLY where the
-  // native attach chain dies (upload / fetch / empty-pdf / filesystem). The
-  // caller surfaces `err.step` + `err.message` on-screen (no more silent
-  // console.warn → link). This is the instrument that ends the "attach breaks,
-  // we can't see why, we patch blind, it re-breaks" loop (§92).
-  let step = 'upload'
-  try {
-    const url = await uploadQuotePDF(quote, cities)
-    if (!url) throw new Error('upload returned no URL')
-
-    step = 'fetch'
-    const res = await fetch(url)
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-
-    step = 'read'
-    const blob = await res.blob()
-    const buf = await blob.arrayBuffer()
-    // A cross-origin/opaque redirect (e.g. /pdf/ → Supabase without CORS) yields
-    // a 0-byte body → we'd write a broken empty PDF. Catch it here, loudly.
-    if (!buf || buf.byteLength === 0) throw new Error('PDF body is 0 bytes (opaque/blocked fetch)')
-    const bytes = new Uint8Array(buf)
-    let binary = ''
-    const chunkSize = 0x8000
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize))
-    }
-    const base64 = btoa(binary)
-
-    step = 'filesystem'
-    const { Filesystem, Directory } = await import('@capacitor/filesystem')
-    // quote_number first (the UA-2026-NNNN ref) — same as handleDownloadPDF.
-    const safeRef = String(quote.quote_number || quote.ref_number || quote.id || 'quote')
-      .replace(/[^A-Za-z0-9_-]/g, '_')
-    // pdfs/ subfolder is the FileProvider-exposed cache path (102.I.1).
-    const fileName = `pdfs/quote-${safeRef}.pdf`
-    await Filesystem.writeFile({
-      path: fileName, data: base64, directory: Directory.Cache, recursive: true,
-    })
-    const uriRes = await Filesystem.getUri({ path: fileName, directory: Directory.Cache })
-    return uriRes.uri
-  } catch (e) {
-    const err = new Error('[' + step + '] ' + (e?.message || String(e)))
-    err.step = step
-    throw err
-  }
-}
+// Phase 239 — writeQuotePdfToCache + the whole WhatsApp share cascade moved to
+// the shared util `src/utils/shareQuoteWhatsApp.js`, called by BOTH this page
+// AND the post-create Step4Send screen. ONE definition (§71) — the attach logic
+// used to live only here, so Step4Send's button sent a link-only share (owner
+// report 16 Jul). handleWhatsApp below now calls shareQuoteViaWhatsApp.
 
 export default function QuoteDetail() {
   const { id } = useParams()
@@ -414,121 +364,34 @@ export default function QuoteDetail() {
 
   async function handleWhatsApp() {
     if (!quote) return
-    // Phase 103.D.8 — APK: attach the actual PDF via the system share
-    // sheet (rep taps WhatsApp), with the proposal text as the caption.
-    // wa.me deep-links can't carry a file, so this is the only way to
-    // send the PDF itself. On any failure (or on web), fall through to
-    // the wa.me text-link flow below.
-    const isNative = typeof window !== 'undefined'
-      && window?.Capacitor?.isNativePlatform?.()
-    if (isNative) {
-      setPdfLoading(true)
-      try {
-        const uri = await writeQuotePdfToCache(quote, cities)
-        const ref = quote.quote_number || quote.ref_number || ''
-        const caption = buildWhatsAppMessage(quote, cities, {})
-        // Phase 162 — try ShareDirect first: open the CLIENT'S WhatsApp chat
-        // directly (number pre-filled) with the PDF attached. Falls back to
-        // the generic share sheet below if WhatsApp isn't installed / older APK.
-        // Phase 162.2 — owner's final call: AUTO-NUMBER over caption. WhatsApp
-        // cannot carry BOTH a caption and a document to a specific number; a
-        // 'jid' opens the client's chat directly (PDF attached) but drops the
-        // caption text. Owner accepts no caption — the attachment landing on
-        // the right number is what matters. Restores the Phase 162 jid path
-        // (162.1's caption-mode phone:'' reverted). Caption still passed in
-        // case a WhatsApp build chooses to show it; harmless if dropped.
-        const digits = cleanPhone(quote.client_phone)
-        const direct = await shareWhatsAppDirect({
-          phone:   digits.length === 10 ? `91${digits}` : digits,
-          text:    caption,
-          fileUri: uri,
-        })
-        if (direct.completed) {
-          logQuoteTouch('whatsapp', `WhatsApp · proposal ${ref} · PDF attached · to ${quote.client_phone || ''}`)
-          return
-        }
-        // Fallback — generic system share sheet (rep picks the contact).
-        const { Share } = await import('@capacitor/share')
-        await Share.share({
-          title:       `Quote ${ref}`.trim(),
-          text:        caption, // caption, no link — file attached
-          files:       [uri],
-          dialogTitle: 'Send proposal',
-        })
-        logQuoteTouch('whatsapp', `WhatsApp · proposal ${ref} · PDF attached`)
-        return
-      } catch (shareErr) {
-        const msg = shareErr?.message || String(shareErr)
-        if (/cancel/i.test(msg)) return // rep dismissed the share sheet — silent
-        console.warn('[handleWhatsApp] native PDF share failed, falling back to link:', msg)
-        // Phase 236 — LOUD, not silent. The attach failed; surface the exact
-        // step + reason on-screen (msg already carries the [step] tag from
-        // writeQuotePdfToCache) so the cause is knowable in one screenshot,
-        // every time — instead of the invisible console.warn that let this
-        // recur (§92). Persist it in the status banner too (a toast can be
-        // missed) before falling through to the wa.me link.
-        toastError(shareErr, 'PDF could not attach — sending a link instead. Reason: ' + msg)
-        setStatusMsg('PDF attach failed → ' + msg + '. Sent as a link. Please screenshot this.')
-        setTimeout(() => setStatusMsg(''), 12000)
-        // fall through to the wa.me link flow
-      } finally {
-        setPdfLoading(false)
-      }
-    }
-    // Upload PDF first so the WhatsApp message carries a public URL
-    // the client can tap to download. wa.me can't attach files, so
-    // this shortlink is the only way to get the PDF to them.
-    // On failure (bucket not set up, RLS block, network), fall back
-    // to sending the message without a link + trigger a local
-    // download so the sales user can attach it manually.
-    let pdfUrl = null
+    // Phase 239 — the whole share cascade (attach the PDF on the APK, wa.me link
+    // on web) is the shared helper `shareQuoteViaWhatsApp` now, so the
+    // post-create Step4Send button attaches too (§71 — one definition; the
+    // attach used to live only here). onStatus surfaces the SAME feedback this
+    // page always showed: the loud attach-fail banner (§236) + upload-fail toast.
+    setPdfLoading(true)
     try {
-      setPdfLoading(true)
-      pdfUrl = await uploadQuotePDF(quote, cities)
-    } catch (e) {
-      // Phase 34c — the inner catch on downloadQuotePDF was empty, so
-      // if both upload AND local download failed the user saw
-      // "downloaded locally" while nothing was downloaded — then the
-      // WhatsApp opened with no attachment and they thought the deal
-      // had shipped with a PDF. Surface that double-failure via toast.
-      // Phase 34Z.22 — log the upload error explicitly so the rep
-      // can read it. "PDF not generating" reports almost always come
-      // back to a missing companies row or a ₹0 subtotal; without
-      // the message the rep can't tell which.
-      console.warn('[handleWhatsApp] PDF upload failed:', e)
-      toastError(e, 'PDF upload failed: ' + (e?.message || 'unknown'))
-      let downloadedLocally = false
-      try {
-        await downloadQuotePDF(quote, cities)
-        downloadedLocally = true
-      } catch (dlErr) {
-        console.error('[handleWhatsApp] local download also failed:', dlErr)
-        toastError(dlErr, 'PDF upload AND local download failed: ' + (dlErr?.message || 'unknown') + '. WhatsApp will open without an attachment.')
-      }
-      if (downloadedLocally) {
-        setStatusMsg('PDF upload failed — downloaded locally. Please attach it in WhatsApp.')
-        setTimeout(() => setStatusMsg(''), 4000)
+      const r = await shareQuoteViaWhatsApp(quote, cities, {
+        onStatus: (s) => {
+          if (s.type === 'attach_failed') {
+            toastError(new Error(s.message), s.message)
+            setStatusMsg(s.message + ' Please screenshot this.')
+            setTimeout(() => setStatusMsg(''), 12000)
+          } else if (s.type === 'upload_failed' || s.type === 'download_failed') {
+            toastError(s.error, s.message)
+          } else if (s.type === 'downloaded_local') {
+            setStatusMsg(s.message)
+            setTimeout(() => setStatusMsg(''), 4000)
+          }
+        },
+      })
+      if (r.method !== 'cancelled') {
+        // Phase 30C — record the touch in the lead's activity timeline.
+        logQuoteTouch('whatsapp', `WhatsApp · proposal ${r.ref || ''}${r.method === 'attach' ? ' · PDF attached' : (r.pdfUrl ? ' · PDF link sent' : '')}`)
       }
     } finally {
       setPdfLoading(false)
     }
-    // Shorten the Supabase storage URL (~130 chars) to a tinyurl.com
-    // link so WhatsApp shows a clean preview card instead of a wrapped
-    // spammy-looking blob. Shortener failures fall back to the original
-    // URL inside shortenUrl — never blocks the send.
-    //
-    // Phase 95.3 (27 May 2026) — skip the shortener when uploadQuotePDF
-    // already returned the branded share URL (Phase 85.1 path:
-    // app.untitledad.in/pdf/<ref>?t=<token>). Owner spec: "we made
-    // custom url for quote send via whatsapp but now there is different
-    // url" — the further-shortened is.gd / cleanuri link was burying
-    // the branded URL.
-    if (pdfUrl && !/^https?:\/\/[^/]*untitledad\.in\/pdf\//.test(pdfUrl)) {
-      try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
-    }
-    openWhatsApp(quote.client_phone, buildWhatsAppMessage(quote, cities, { pdfUrl }))
-    // Phase 30C — record the touch in the lead's activity timeline.
-    logQuoteTouch('whatsapp', `WhatsApp · proposal ${quote.quote_number || quote.ref_number || ''}${pdfUrl ? ' · PDF link sent' : ''}`)
   }
 
   // Phase 11i — team feedback: add Email parallel to WhatsApp.

@@ -6954,3 +6954,55 @@ to 'won' without recording a payment). Owner to decide if it should be reverted 
 Run `supabase_phase238_quotes_won_month.sql`, then push (JS). Reps reopen the app
 once. Smoke: Dhara's evening report → "Quotes won" now shows her REAL July wins
 (likely ₹0), June wins no longer re-counted, 0203 gone.
+
+
+---
+
+## 108 · Phase 239 — quote→WhatsApp share unified (post-create button now attaches the PDF) (2026-07-16)
+
+Owner (video, 3 points): (1) sharing a **direct quote right after creating it** goes
+to WhatsApp as a **LINK, not the PDF**; (2) sharing from the lead/quote **PDF option
+works ✅** (attaches); (3) all shares open the **rep's personal WhatsApp**.
+
+### Root (issue 1)
+There were TWO "Send to WhatsApp" buttons with DIFFERENT code:
+- **Post-create** (`QuoteWizard/Step4Send.jsx`) — upload PDF → `openWhatsApp(text+link)`
+  → **link only, never attached**.
+- **Quote detail** (`QuoteDetail.handleWhatsApp`) — tries the native
+  `ShareDirect.whatsapp` **PDF attach** first (Phase 162), link fallback.
+The attach was added to the detail button but **never to the post-create button** —
+the §69 "fix in one place, not the parallel place" drift.
+
+### Fix (Phase 239) — ONE shared cascade (§71)
+- NEW `src/utils/shareQuoteWhatsApp.js` — `shareQuoteViaWhatsApp(quote, cities,
+  {onStatus})` = the EXACT QuoteDetail cascade (native attach → §236 loud fail →
+  web link with the §95.3 branded-link gate). `writeQuotePdfToCache` (§236
+  step-tagged) MOVED here. Returns `{method:'attach'|'link'|'cancelled', pdfUrl?,
+  message?, ref}`.
+- `QuoteDetail.handleWhatsApp` + `Step4Send.handleWhatsApp` both call it. Behavior
+  on the detail page is byte-preserved (guardian-verified). Post-create now
+  ATTACHES on the APK.
+- **GUARDIAN P1 fixed:** Step4Send's summary toast was overwriting the `onStatus`
+  attach-fail message → a native fail showed a false "PDF link included" / blank
+  (the §236 silent-failure, re-created). Now a `warned` flag suppresses the success
+  toast + keeps the failure reason up 12s. **FOOT-GUN: after an `onStatus`/error
+  callback, do NOT unconditionally set a success toast — gate it on a `warned`
+  flag, or you clobber the failure the callback surfaced.**
+- Removed the now-dead QuoteDetail imports (cleanPhone, buildWhatsAppMessage,
+  openWhatsApp, shortenUrl, shareWhatsAppDirect — each was import-only after the
+  extraction).
+
+### Issue 3 (personal vs business WhatsApp) — PARKED on an owner decision
+Every share uses a `wa.me`/`whatsapp://` deep link → always opens the **rep's own**
+WhatsApp app (personal, or their WhatsApp Business app), to the client's chat. A
+deep link **cannot** route through a central company number. Two paths, owner to
+pick: (a) each rep uses the **WhatsApp Business app** on their phone (still their
+own number — a phone setting, not app code); (b) send from the ONE company number
+(95815 78261) → the **WhatsApp Cloud API** (campaign channel §54), server-side, a
+bigger build. Asked the owner which; not built.
+
+### Owner action
+Push (JS-only, no SQL, no APK rebuild — reaches the APK on next open). Smoke:
+create a quote → on the "Quote Created" screen tap **Send via WhatsApp** on the APK
+→ WhatsApp opens with the **PDF attached** (not a link). Quote-detail share still
+attaches as before.

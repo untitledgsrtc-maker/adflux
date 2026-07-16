@@ -1,16 +1,11 @@
 import { useState } from 'react'
 import { CheckCircle, MessageCircle, FileText, ArrowRight } from 'lucide-react'
-import { buildWhatsAppMessage, openWhatsApp, shortenUrl } from '../../../utils/whatsapp'
-// Phase 34Z.33 — was importing the broken @react-pdf renderer
-// (`../QuotePDF`). Owner reported the post-create "Send via WhatsApp"
-// button always showed "Failed to generate PDF", while the same
-// action from QuoteDetail worked. Reason: QuoteDetail already moved
-// to QuotePDFHtml (html2canvas + jsPDF) in Phase 34Z.25 but Step4Send
-// was missed. Aliased imports to keep the call sites unchanged.
-import {
-  downloadQuotePDFHtml as downloadQuotePDF,
-  uploadQuotePDFHtml   as uploadQuotePDF,
-} from '../QuotePDFHtml'
+import { openWhatsApp } from '../../../utils/whatsapp'
+// Phase 239 — share cascade unified with QuoteDetail. This button was link-only
+// (owner 16 Jul: "direct quotation share goes as a link"); now it uses the same
+// shared helper so the APK attaches the real PDF, web sends a link. ONE
+// definition (§71) — no more drift between the two share buttons.
+import { shareQuoteViaWhatsApp } from '../../../utils/shareQuoteWhatsApp'
 import { formatCurrency } from '../../../utils/formatters'
 
 export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, onDone, onViewQuote }) {
@@ -35,50 +30,36 @@ export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, o
   }
 
   async function handleWhatsApp() {
-    // If we've already sent once, skip all the async work and just
-    // re-open with the cached message. Keeps the user-gesture chain
-    // unbroken so popup permission survives.
+    // Already sent once on WEB → re-open synchronously with the cached message
+    // (keeps the user-gesture chain unbroken so the popup isn't blocked — Phase
+    // 32K). On the APK the native share re-runs below (no popup issue; no cache).
     if (sent && cachedMessage) {
       reopenWhatsApp()
       return
     }
     setSending(true)
-    // Try uploading the PDF so the WhatsApp message carries a real
-    // downloadable URL. If upload fails (bucket not configured, RLS
-    // blocks, network), fall back to the old "download locally and
-    // attach manually" flow so the sales user is never stuck.
-    let pdfUrl = null
+    let warned = false
     try {
-      pdfUrl = await uploadQuotePDF(quote, cities)
-    } catch (e) {
-      console.warn('PDF upload failed, falling back to local download:', e.message)
-      try {
-        await downloadQuotePDF(quote, cities)
-        setToastMsg('Upload unavailable — PDF downloaded locally, please attach manually in WhatsApp.')
-      } catch (dlErr) {
-        setToastMsg('Failed to generate PDF')
-        setTimeout(() => setToastMsg(''), 3000)
-        setSending(false)
-        return
+      // Phase 239 — same cascade as QuoteDetail: attach the PDF on the APK,
+      // wa.me link on web. Was link-only here (owner 16 Jul).
+      const r = await shareQuoteViaWhatsApp(quote, cities, {
+        // Keep the failure reason visible (§236) — do NOT let the summary
+        // toast below clobber it into a false "success".
+        onStatus: (s) => { warned = true; setToastMsg(s.message) },
+      })
+      if (r.method !== 'cancelled') {
+        if (r.method === 'link' && r.message) setCachedMessage(r.message)   // Phase 32K — cache for re-click (web)
+        if (!warned) {
+          setToastMsg(r.method === 'attach'
+            ? 'PDF attached in WhatsApp.'
+            : (r.pdfUrl ? 'PDF link included in WhatsApp message.' : ''))
+        }
+        setSent(true)
+        setTimeout(() => setToastMsg(''), warned ? 12000 : 3500)
       }
+    } finally {
+      setSending(false)
     }
-
-    // Shorten the (long) Supabase storage URL to a tinyurl.com link so
-    // the WhatsApp preview reads cleanly. Falls back to the original
-    // URL inside shortenUrl on any failure — never blocks the send.
-    if (pdfUrl) {
-      try { pdfUrl = await shortenUrl(pdfUrl) } catch {}
-    }
-
-    const message = buildWhatsAppMessage(quote, cities, { pdfUrl })
-    openWhatsApp(quote.client_phone, message)
-    setCachedMessage(message)   // Phase 32K — cache for re-click.
-    setSent(true)
-    setSending(false)
-    if (pdfUrl) {
-      setToastMsg('PDF link included in WhatsApp message.')
-    }
-    setTimeout(() => setToastMsg(''), 3500)
   }
 
   return (
