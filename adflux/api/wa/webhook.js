@@ -109,6 +109,37 @@ function mediaInfo(m) {
     : { id: null, mime: null }
 }
 
+// Phase 245 — download an inbound media object to OUR storage while Meta still
+// has the bytes (Meta deletes media after a few days). Called FIRE-AND-FORGET
+// from the webhook (NOT awaited) → zero pre-200 latency, never delays the bot
+// reply (§46). Self-contained try/catch → never rejects, so an un-awaited call
+// is safe. The 7s abort caps the Graph fetches if the serverless fn stays alive;
+// if it freezes before finishing, the /api/wa/media proxy lazy-caches the bytes
+// on first view — THAT is the guaranteed capture, this is the fast-path bonus.
+async function storeInboundMedia(admin, mediaId, mime) {
+  if (!admin || !mediaId || !WA_TOKEN) return
+  if (!/^[0-9]{5,}$/.test(String(mediaId))) return   // match the proxy — numeric Meta ids only; never a weird storage key
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), 7000)
+  try {
+    // Skip if we already have it (idempotent on Meta webhook retries).
+    const existing = await admin.storage.from('campaign-inbound-media').list('', { search: String(mediaId), limit: 1 })
+    if (existing?.data?.some((f) => f.name === String(mediaId))) return
+    const metaRes = await fetch(`${GRAPH}/${mediaId}`, { headers: { Authorization: `Bearer ${WA_TOKEN}` }, signal: ctl.signal })
+    if (!metaRes.ok) return
+    const meta = await metaRes.json()
+    if (!meta?.url) return
+    const binRes = await fetch(meta.url, { headers: { Authorization: `Bearer ${WA_TOKEN}` }, signal: ctl.signal })
+    if (!binRes.ok) return
+    const buf = Buffer.from(await binRes.arrayBuffer())
+    await admin.storage.from('campaign-inbound-media').upload(String(mediaId), buf, {
+      contentType: meta.mime_type || mime || 'application/octet-stream',
+      upsert: true,
+    })
+  } catch { /* tolerant — proxy lazy-cache backstop covers a miss */ }
+  finally { clearTimeout(timer) }
+}
+
 // C8 — pull the QR board code from a pre-filled scan message, e.g.
 // "Hi, saw your screen at MG Road [RR-AHM-01]". The first [bracketed] token
 // of letters/digits/hyphens, uppercased for the case-insensitive
@@ -505,6 +536,12 @@ async function storeInbound(payload) {
           return { ok: false, error: 'message: ' + msg.error.message, stored }
         }
         stored++
+        // Phase 245 — persist inbound media to our storage while Meta still has
+        // the bytes (deleted after days). FIRE-AND-FORGET (no await) → ZERO
+        // pre-200 latency, never delays the store or the bot reply (§46). Best-
+        // effort; the /api/wa/media proxy lazy-caches on first view as the
+        // guaranteed backstop. storeInboundMedia never rejects (self-contained).
+        if (media.id) { void storeInboundMedia(admin, media.id, media.mime) }
         let repliedThisMsg = false
 
         // Phase C — a PUBLISHED flow (+ bot ON) drives the bot end-to-end and

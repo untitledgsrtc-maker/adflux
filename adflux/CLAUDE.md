@@ -7282,3 +7282,74 @@ Run `supabase_phase243_wa_conv_owner_sync.sql` in Studio (creates the trigger +
 heals existing stuck rows), then push (JS carries the client backstop). VERIFY
 block: trigger present = 1, stuck rows = 0. Smoke: reassign a chat's lead away from
 Rima → she no longer sees that conversation; the new owner does.
+
+
+---
+
+## 114 · Phase 244–245 — inbound WhatsApp images now PERSIST (were expiring on Meta) (2026-07-16)
+
+Owner: "customer sends an image but in our inbox it's not showing." Root-caused
+(proxy diagnostic → Meta's own error) then fixed with store-on-receipt. Both
+adversarial reviews PASS (webhook §46 safety + storage security).
+
+### Root cause — PROVEN via Meta's error (not a guess)
+The inbox proxied media from Meta ON DEMAND (`api/wa/media.js`) and stored only
+the `media_id`, never the bytes. **Meta DELETES media after a few days.** By the
+time anyone opened the chat, the bytes were gone → 502 → no image.
+- **Phase 244** (`37450b2`) made the proxy's opaque `502 meta_lookup_failed`
+  surface Meta's real error. Curling a stored `media_id` returned
+  `code 100, HTTP 400: "Object with ID '…' does not exist"` = media DELETED/expired.
+  Even a 9-day-old image was already gone. The token is FINE (sending works;
+  code 100 = object gone, NOT code 190 = bad token). Same `CAMPAIGN_WA_TOKEN`
+  everywhere — it can POST (send) but can't GET a deleted media.
+- The 2 pre-existing stored images (Jul 7, Jun 20) are PERMANENTLY LOST
+  (Meta deleted them — unrecoverable). Fix is forward-only.
+
+### Fix — store the bytes while Meta still has them (Phase 245, `<pushed>`)
+Reviews PASS. Files:
+- `supabase_campaign_inbound_media` bucket — NEW **PRIVATE** bucket
+  `campaign-inbound-media` (`supabase_phase245_inbound_media_store.sql`, owner
+  RUNS). `public=false`, 25 MB cap, NO storage policies → service-role-only
+  (webhook writes, proxy reads; both use SERVICE_KEY which bypasses storage RLS).
+  No public URL ever minted → the storage layer is unreachable except via the
+  proxy. Security review verified no project storage policy leaks it.
+- `api/wa/webhook.js` `storeInboundMedia()` — on an inbound media message,
+  downloads the bytes to the bucket. **FIRE-AND-FORGET (`void`, NOT awaited)** →
+  ZERO pre-200 latency, never delays the store or the bot reply (§46 — the first
+  review flagged that awaiting it lengthened the pre-200 window; fire-and-forget
+  fixes that). Self-contained try/catch (never rejects → safe un-awaited), 7s
+  AbortController on the Graph fetches, `^[0-9]{5,}$` id guard, skips if already
+  stored (idempotent on Meta retries).
+- `api/wa/media.js` — serves from OUR storage FIRST (`storage.download(id)`);
+  falls through to a live Meta fetch only when not cached; **lazy-caches** the
+  bytes on any successful Meta fetch. So the FIRST view within Meta's window
+  captures the image forever — this proxy lazy-cache is the GUARANTEED capture
+  (the webhook fire-and-forget is the fast-path bonus).
+- Render UNCHANGED (`<img src="/api/wa/media?id=…">`) — the proxy just serves
+  from storage now.
+
+### Why it's permanent
+Once captured (at receipt OR first view), the bytes are OURS in a private bucket
+→ never re-fetched, never expire, no render-time Meta dependency. An active TC
+opens a new chat same-day → the image is captured on first view → shows + persists
+forever.
+
+### Residuals (tracked, not blocking)
+- **Phase 243 GAP-1 is NOT closed by this** (security review corrected my first
+  SQL comment): the proxy gate (same-origin + media_id-exists, no per-user check)
+  is unchanged, and persisting the bytes marginally WIDENS GAP-1's window (days →
+  forever) — a media_id a same-origin caller already recorded stays fetchable.
+  Acceptable (gate unchanged, enumeration infeasible + rate-limited). Proper fix
+  (signed short-lived img token OR authed fetch→blob render) still OPEN.
+- **Retention** — media kept forever grows storage cost + keeps GAP-1's window
+  open. A manual purge query (inbound media > 6 months) is in the SQL tail; run
+  monthly. A proper TTL cron is a follow-up.
+- Old expired images (pre-Phase-245) are unrecoverable.
+
+### Owner action
+1. Run `supabase_phase245_inbound_media_store.sql` in Studio (creates the private
+   bucket). VERIFY: one row, public=false.
+2. Push (I push — JS/Edge, no APK rebuild). Reps reopen the app once.
+3. Smoke: send a FRESH image to 95815 78261 → open that chat in the inbox → the
+   image renders (and persists — reopen tomorrow, still there). Old chats' images
+   stay broken (Meta already deleted them).

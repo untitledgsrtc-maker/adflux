@@ -63,6 +63,20 @@ export default async function handler(req, res) {
     .from('whatsapp_messages').select('media_mime').eq('media_id', id).limit(1).maybeSingle()
   if (error || !row) return res.status(404).json({ error: 'not_found' })
 
+  // Phase 245 — serve from OUR storage first (downloaded at receipt by the
+  // webhook, or lazy-cached on a prior view). This is what makes an image that
+  // has EXPIRED on Meta still render. Fall through to a live Meta fetch (+
+  // cache) only when we don't have the bytes yet.
+  try {
+    const dl = await admin.storage.from('campaign-inbound-media').download(id)
+    if (dl?.data) {
+      const buf = Buffer.from(await dl.data.arrayBuffer())
+      res.setHeader('Content-Type', row.media_mime || dl.data.type || 'application/octet-stream')
+      res.setHeader('Cache-Control', 'private, max-age=86400')
+      return res.status(200).send(buf)
+    }
+  } catch { /* not cached yet → fall through to Meta */ }
+
   try {
     const metaRes = await fetch(`${GRAPH}/${id}`, { headers: { Authorization: `Bearer ${WA_TOKEN}` } })
     if (!metaRes.ok) {
@@ -80,6 +94,9 @@ export default async function handler(req, res) {
 
     const buf = Buffer.from(await binRes.arrayBuffer())
     const mime = meta.mime_type || row.media_mime || binRes.headers.get('content-type') || 'application/octet-stream'
+    // Phase 245 — cache to OUR storage so it never re-fetches and can't expire
+    // on Meta again. Best-effort; a failure just means the next view re-fetches.
+    try { await admin.storage.from('campaign-inbound-media').upload(id, buf, { contentType: mime, upsert: true }) } catch { /* noop */ }
     res.setHeader('Content-Type', mime)
     res.setHeader('Cache-Control', 'private, max-age=86400') // media is immutable per id
     return res.status(200).send(buf)
