@@ -117,6 +117,11 @@ export default async function handler(req, res) {
   if (logErr) console.error('[wa/send] outbound message logged to Meta but DB insert failed:', logErr.message)
   // bump the thread so it sorts to the top of the inbox
   await admin.from('whatsapp_conversations').update({ updated_at: atIso }).eq('id', conv.id)
+  // Phase 246 — a human just replied → pause the AI auto-responder on this
+  // thread so it never talks over the rep. SEPARATE update + tolerant so a
+  // missing ai_paused column (before the Phase 246 SQL is run) can NEVER break
+  // the thread-bump above (§45 no-regression). Result intentionally unchecked.
+  try { await admin.from('whatsapp_conversations').update({ ai_paused: true }).eq('id', conv.id) } catch { /* column may be unrun */ }
 
   return res.status(200).json({
     ok: true, wamid,

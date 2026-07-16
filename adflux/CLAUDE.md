@@ -7353,3 +7353,92 @@ forever.
 3. Smoke: send a FRESH image to 95815 78261 → open that chat in the inbox → the
    image renders (and persists — reopen tomorrow, still there). Old chats' images
    stay broken (Meta already deleted them).
+
+
+---
+
+## 115 · Phase 246 — WhatsApp AI auto-responder (SHIPPED OFF by default) (2026-07-16)
+
+Owner: an AI agent that replies to inbound WhatsApp on its own, grounded in our
+GSRTC LED context, keeps the lead warm, hands off to the TC. Owner locked:
+auto-send · service line 95815 78261 · "ok if they don't book" · **"don't change
+the current flow, everyone's using it."** Built FULLY ADDITIVE + OFF by default;
+both adversarial reviews PASS (safety/correctness + AI/security).
+
+### Architecture (why it's §45/§46-safe)
+- `whatsapp_accounts.ai_enabled` (DEFAULT **false**) + `ai_system_prompt` (optional
+  override, admin-write-only via `wa_accounts_admin_write`) + `whatsapp_conversations
+  .ai_paused` (DEFAULT false). `supabase_phase246_ai_agent.sql`.
+- **The webhook is UNTOUCHED.** A pg_net trigger (`trg_wa_ai_reply` /
+  `wa_ai_reply_dispatch`, AFTER INSERT ON whatsapp_messages WHEN direction='in')
+  fires the AI endpoint ASYNC — zero webhook latency (§46, same pattern as
+  §34Z.69/§55). With ai_enabled=false the trigger does ONE indexed flag read then
+  RETURN — no HTTP, no work. On the campaign table, NOT leads/hot-path.
+- `api/wa/ai-reply.js` (EDGE — §219 12-Node cap; raw fetch, no supabase-js):
+  secret-gated (`x-ai-secret`), re-checks every gate server-side (ai_enabled,
+  ai_paused, 24h window, newest-msg-inbound, rate cap), calls Claude
+  (`claude-sonnet-5`, override via `ANTHROPIC_MODEL`) with the real GSRTC context,
+  sends via Graph, logs the outbound. Recipient is SERVER-derived (customer_wa_id),
+  never request-chosen.
+- **Human takeover:** a manual inbox reply (`api/wa/send.js`) sets `ai_paused=true`
+  (separate + tolerant update → can't break the thread-bump before the SQL runs) →
+  AI goes silent on that thread.
+- No self-loop (AI logs direction='out'; trigger is direction='in' only).
+
+### Guardrails (baked into DEFAULT_SYSTEM + a post-generation backstop)
+- Real facts only (264 screens/20 stations/rates 650-850/moat/landing page), calm
+  Untitled voice (§20), reply in the customer's language, NEVER a final price or a
+  booking confirmation → hand to the team, honor opt-out.
+- **Post-gen backstop** (`ai-reply.js`, review MVP-blocker): before sending, regex
+  the reply for a 4+-digit rupee figure OR commitment words (confirmed/booked/
+  guaranteed/final-total price) → if hit, swap to a safe hand-off line AND set
+  ai_paused (human closes). The prompt is the primary guard; this catches a
+  jailbreak before it goes out on the live brand number.
+
+### Review fixes applied (both reviews PASS after)
+- conversation_id validated as a UUID (kills a PostgREST param-injection via the
+  interpolated id).
+- Per-conversation rate cap (≥10 outbound in the last hour → skip): cost + spam.
+- Pre-send re-check (if an outbound landed while Claude was thinking → bail):
+  narrows the rapid-inbound double-reply race.
+- Post-gen price/booking backstop (above).
+- send.js ai_paused split from the updated_at bump (no regression pre-SQL).
+
+### RESIDUALS (owner-aware; MVP-acceptable off-by-default)
+- **Secret in the trigger body** — after the owner fills `<AI_REPLY_SECRET>`, it's
+  a plaintext literal in `pg_proc.prosrc`, which a staff login could read via the
+  `run_select` RPC (§72#14). Blast radius is BOUNDED (with the secret an attacker
+  can only nudge ONE AI reply to a REAL in-window conversation whose UUID they
+  know, delivered to the REAL customer — not an attacker number; rate-capped).
+  Accept for MVP (matches the §34Z.69 hardcoded-key precedent). **Before scaling:
+  move to Supabase Vault.**
+- **No un-pause path** — once a human replies, ai_paused sticks (the SAFE
+  direction). Clear it via SQL to re-arm the AI on a thread. UI toggle = follow-up.
+- **Double-reply race** — narrowed (pre-send re-check + rate cap) but not atomic; a
+  true compare-and-set (`ai_replying_at`) is the full fix, deferred.
+- **DPDP data-flow** — customer MESSAGE TEXT goes to the Anthropic API (not the
+  phone number). Acceptable (they messaged a business); disclosure item to know.
+- **Media** — MVP is text (+ it shares the /led link which has deck+video+map).
+  Attaching an image/deck file from the library is a follow-up.
+
+### Owner action — to SHIP (stays OFF): 
+1. Run `supabase_phase246_ai_agent.sql` — but FIRST replace `<AI_REPLY_SECRET>`
+   with a long random string. VERIFY: columns + trigger present, `ai_enabled`
+   count = 0 (still off).
+2. Set Vercel envs: `ANTHROPIC_API_KEY` (your Claude API key), `AI_REPLY_SECRET`
+   (the SAME string you put in the SQL). (CAMPAIGN_WA_TOKEN + SUPABASE already set.)
+3. Push (I push — Edge, no APK, no Node-cap hit). Nothing happens yet (off).
+### To TURN ON (after testing):
+4. Confirm the model id `claude-sonnet-5` works (or set `ANTHROPIC_MODEL`).
+5. ONE UPDATE flips it + kills the old bot (no double reply):
+   `UPDATE whatsapp_accounts SET ai_enabled=true, bot_enabled=false,
+    auto_reply_enabled=false WHERE display_number LIKE '%578261%';`
+6. Test from YOUR phone: message the number → the AI replies with real context;
+   ask for a price → it hands off (doesn't quote); reply as a TC in the inbox →
+   the AI goes silent on that thread.
+7. To pause everything again: `UPDATE whatsapp_accounts SET ai_enabled=false WHERE …`.
+
+### Foot-gun
+- ❌ Turning `ai_enabled=true` WITHOUT setting `bot_enabled=false` +
+  `auto_reply_enabled=false` → the old flat/flow bot AND the AI both reply. Use the
+  one 3-flag UPDATE in step 5.
