@@ -33,6 +33,7 @@ import { useAuthStore } from '../../store/authStore'
 import CampaignChrome from '../../components/v2/CampaignChrome'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import MediaPicker from '../../components/campaign/MediaPicker'
 
 // ─── ids + media helpers ─────────────────────────────────────────────
 let _seq = 0
@@ -41,21 +42,6 @@ function uid(prefix = 'n') {
   _seq += 1
   return `${prefix}_${Date.now().toString(36)}${_seq}${Math.random().toString(36).slice(2, 6)}`
 }
-function mediaKind(file) {
-  const t = (file?.type || '').toLowerCase()
-  if (t.startsWith('image/')) return 'image'
-  if (t.startsWith('video/')) return 'video'
-  return 'document'
-}
-async function uploadMedia(file) {
-  const ext = ((file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'bin'
-  const path = `bot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-  const { error } = await supabase.storage.from('campaign-media')
-    .upload(path, file, { upsert: false, contentType: file.type || undefined })
-  if (error) throw error
-  return supabase.storage.from('campaign-media').getPublicUrl(path).data.publicUrl
-}
-
 // The palette the rail offers. type = the node type inserted.
 const BLOCKS = [
   { type: 'message', label: 'Message', Icon: MessageSquare, tint: 'var(--v2-blue, #60a5fa)' },
@@ -219,7 +205,6 @@ export default function CampaignChatbotV2() {
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [toggling, setToggling] = useState(false)
-  const [mediaBusy, setMediaBusy] = useState(false)
   const readyRef = useRef(false)      // guards autosave from firing during load
   const saveTimer = useRef(null)
 
@@ -340,14 +325,6 @@ export default function CampaignChatbotV2() {
     setSelId(null)
   }
 
-  async function uploadFor(setter) {
-    return async (file) => {
-      if (!file) { setter(null, null); return }
-      setMediaBusy(true)
-      try { const url = await uploadMedia(file); setter(url, mediaKind(file)); toastSuccess('Media attached.') }
-      catch (e) { toastError(e, 'Upload failed.') } finally { setMediaBusy(false) }
-    }
-  }
 
   async function toggleBot() {
     if (!acct?.id) { toastError(new Error('acct'), 'No active WhatsApp number.'); return }
@@ -502,7 +479,7 @@ export default function CampaignChatbotV2() {
               <>
                 <div style={ph}><span style={{ width: 9, height: 9, borderRadius: 3, background: DOT[sel.type], display: 'inline-block' }} />{TITLE[sel.type]}</div>
                 <div style={psub}>{sel.type} block</div>
-                <NodeEditor node={sel} patch={patch} mediaBusy={mediaBusy} uploadFor={uploadFor} />
+                <NodeEditor node={sel} patch={patch} />
                 {sel.type !== 'start' && (
                   <button type="button" style={{ ...btnG, color: 'var(--v2-rose, #f87171)', marginTop: 16 }} onClick={delSelected}>
                     <Trash2 size={14} strokeWidth={1.6} /> Delete block
@@ -522,7 +499,7 @@ export default function CampaignChatbotV2() {
 }
 
 // ─── per-node-type property editor ───────────────────────────────────
-function NodeEditor({ node, patch, mediaBusy, uploadFor }) {
+function NodeEditor({ node, patch }) {
   const d = node.data || {}
   const setMedia = (url, type) => patch({ media_url: url, media_type: type })
   const mediaRow = (
@@ -535,9 +512,7 @@ function NodeEditor({ node, patch, mediaBusy, uploadFor }) {
           <button type="button" onClick={() => setMedia(null, null)} style={{ ...btnG, height: 28, padding: '0 10px', fontSize: 12 }}>Remove</button>
         </div>
       ) : (
-        <input type="file" accept="image/*,video/*,application/pdf" disabled={mediaBusy}
-          onChange={async (e) => { const f = e.target.files?.[0]; if (f) (await uploadFor(setMedia))(f) }}
-          style={{ ...pinp, padding: '7px 10px' }} />
+        <MediaPicker accept="image/*,video/*,application/pdf" onSelect={(url, type) => setMedia(url, type)} />
       )}
     </div>
   )

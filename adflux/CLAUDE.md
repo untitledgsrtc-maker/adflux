@@ -7137,3 +7137,48 @@ The marketing number 98982 73686 is entangled with **Cronberry** (a BSP running 
   re-registration fails the number can be stuck → that's why the PIN had to be sorted
   FIRST. Do the migration when the owner can tolerate brief downtime + is at the Meta
   UI with Claude guiding.
+
+
+---
+
+## 111 · Phase 241 — campaign media LIBRARY (pick-existing + upload-new) (2026-07-16)
+
+Owner: "when attach media option i want select media from existing and then upload
+option so same media not upload many times." Built a reusable media LIBRARY so the
+same image/video/PDF isn't re-uploaded every time on the campaign pages. Additive,
+new campaign admin surface (NOT §28-frozen), §45-safe (new table + new component;
+the live webhook/inbox/routing untouched).
+
+### What shipped
+- NEW `supabase_campaign_media_library.sql` (owner RUNS) — `campaign_media` index
+  table (id, url, media_type, name, uploaded_by, created_at) + UNIQUE(url) +
+  created_at index + admin/co_owner RLS (`campaign_media_admin_all` via
+  `get_my_role() IN ('admin','co_owner')`). Files STILL live in the existing
+  `campaign-media` storage bucket — this table is just the INDEX the picker lists.
+  Best-effort backfill: DISTINCT media_url from `campaign_bot_rules` +
+  `campaign_bot_buttons` + `whatsapp_accounts.auto_reply_media_url` (ON CONFLICT
+  (url) DO NOTHING) so the library isn't empty on day 1.
+- NEW `src/components/campaign/MediaPicker.jsx` — self-contained "Attach media"
+  control: trigger button → modal with a thumbnail GRID of `campaign_media` rows
+  (select → `onSelect(url, type, name)`) + an "Upload new" button (uploads to the
+  `campaign-media` bucket path `lib-<ts>-<rand>.<ext>` → inserts a `campaign_media`
+  row → onSelect). Reusable via `<MediaPicker accept onSelect />`.
+- `src/pages/v2/CampaignChatbotV2.jsx` — the bot builder's NodeEditor media attach
+  (`mediaRow`) now uses `<MediaPicker>` instead of a bare `<input type=file>`.
+  Removed the now-dead `uploadMedia`/`mediaKind`/`uploadFor`/`mediaBusy` (their ONLY
+  consumer was the replaced input; grep-confirmed module-local, not exported →
+  contained blast radius). `setMedia(url,type)` still the sink; the success path is
+  otherwise unchanged.
+
+### Not wired (deliberate)
+- `CampaignBroadcastV2.uploadToCampaignMedia` (the Meta TEMPLATE header upload) is a
+  DIFFERENT mechanism — it uploads to Meta and needs a media HANDLE, not a public
+  URL. The picker returns a URL → wouldn't work there. Left alone.
+- The picker lists `campaign_media` only (admin RLS). It's for the bot-builder /
+  auto-reply media attach, not template headers.
+
+### Owner action
+Run `supabase_campaign_media_library.sql` in Supabase Studio, then it's live (the
+push carries the picker + wiring). Smoke: Campaigns → Chatbot → a message/action
+node → "Attach media" → the modal shows previously-used media as a grid (pick one,
+no re-upload) OR "Upload new" (adds it to the library for next time).
