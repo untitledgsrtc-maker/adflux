@@ -7210,3 +7210,75 @@ all (acceptable, fail-closed is correct).
 ### Owner action
 Push (JS-only, no SQL, no APK rebuild). Reps reopen the app once. Smoke: TC opens
 Campaigns → sees ONLY the Inbox tab; admin still sees all 8.
+
+
+---
+
+## 113 · Phase 243 — WhatsApp inbox read-leak CLOSED (rep saw all chats) (2026-07-16)
+
+Owner: "Rima getting all chat data even leads not assigned to her." A telecaller
+was reading EVERY customer WhatsApp thread in the campaign inbox. Root-caused via a
+3-tracer + security-review workflow, fixed, guardian PASS + adversarial-security
+PASS (primary leak fully closed).
+
+### Root cause (a data-sync gap, NOT wide-open RLS)
+Two facts stacked:
+1. **Every inbound conversation is stamped `whatsapp_conversations.assigned_to =
+   the account default_telecaller_id (Rima)`** — C4.5 routing
+   (`campaign_conversation_ensure_lead.sql:142`, `COALESCE(assigned_to, v_owner)`).
+2. **Reassigning the LEAD never re-pointed the CONVERSATION.**
+   `_reassign_lead_apply` updates only `public.leads` — grep for
+   `whatsapp_conversations` = NO MATCH (`supabase_phase100_a_reassign_rpc.sql:369`).
+So the RLS SELECT policy `wa_conv_self_or_lead` (`assigned_to = auth.uid() OR
+lead-owned`, `supabase_campaign_c2_foundation.sql:192`) kept returning handed-off
+chats to Rima forever via the frozen `assigned_to` stamp. Genuine PII READ leak
+(she could read other reps' customer threads; the SEND path is separately gated,
+so no impersonation). Bounded to Rima (the default router) + any rep's own leads —
+NOT "everyone sees everything" (a different TC saw only theirs).
+
+### Fix (`supabase_phase243_wa_conv_owner_sync.sql`, owner RUNS) + JS
+- **Trigger** `trg_lead_owner_sync_wa_conv` AFTER UPDATE OF assigned_to,
+  telecaller_id ON leads → `sync_wa_conversation_owner()` (SECURITY DEFINER,
+  search_path pinned, EXCEPTION-wrapped) re-points `whatsapp_conversations
+  .assigned_to = COALESCE(NEW.telecaller_id, NEW.assigned_to)` for that lead.
+  Column-specific → fires ONLY on a reassign, NOT on a normal lead save
+  (stage/heat/notes) → zero hot-path cost (§45). Covers EVERY reassign path (RPC,
+  bulk, inbox-writes-lead, future). Mirrors the Phase 130 owner-transfer trigger.
+- **One-time heal** re-points existing stuck conversations (idempotent).
+- **Client backstop** `CampaignInboxV2.loadThreads` adds `.eq('assigned_to',
+  profile.id)` for non-privileged; admin/co_owner/manager unchanged. Defense-in-
+  depth — RLS is the real gate (proven sufficient alone post-fix).
+- Lead owner = `COALESCE(telecaller_id, assigned_to)` (Phase 99.C reassign writes
+  the two columns mutually-exclusively → COALESCE picks the live owner). §71: same
+  expression already used at CampaignInboxV2:477.
+
+### Verified (security walk)
+Post-reassign both RLS branches go FALSE for Rima: branch A (assigned_to now = new
+owner ≠ Rima) + branch B (the lead-owned EXISTS runs under HER `leads` RLS
+`leads_telecaller_own` → she can't SELECT the reassigned lead → FALSE).
+`whatsapp_messages` rides off the conversation (`wa_msg_via_conv`) so text bodies
+close too. Admin FOR-ALL (`wa_conv_admin`) untouched.
+
+### RESIDUAL gaps (PRE-EXISTING, NOT introduced by Phase 243 — do NOT assume closed)
+- **GAP 1 — media proxy is a capability-URL, not RLS-scoped (`api/wa/media.js`,
+  LOW-MEDIUM).** The inbound image/sticker proxy authorizes on a SPOOFABLE
+  same-origin Referer + "the media_id exists in whatsapp_messages" — NO JWT, NO
+  per-user/conversation check. So an image `media_id` a rep ALREADY captured stays
+  re-fetchable via `/api/wa/media?id=<id>` even after this fix revokes their thread
+  access. Practical risk limited (15-17-digit Meta ids unguessable → only ids she
+  already scraped; image/sticker only, not text; she loses new-id visibility once
+  the thread leak is closed). Proper fix = a signed short-lived token in the img
+  URL OR authenticated fetch→blob render (a REDESIGN of the inbox media-render path)
+  — deliberately NOT folded into Phase 243 (would risk the live inbox render for a
+  low-severity, requires-deliberate-exfil residual). Separate follow-up.
+- **GAP 2 — orphaned-lead conversation keeps its stale stamp (LOW, by design).**
+  The `IS NOT NULL` guards don't null a conversation owner when a lead loses its
+  owner (owner user deleted → FK SET NULL) — avoids orphaning a live chat. Such a
+  conversation stays stamped to whoever last held it. NOT a cross-rep leak (no one
+  owns that lead → branch B empty for everyone). Noted, no action.
+
+### Owner action
+Run `supabase_phase243_wa_conv_owner_sync.sql` in Studio (creates the trigger +
+heals existing stuck rows), then push (JS carries the client backstop). VERIFY
+block: trigger present = 1, stuck rows = 0. Smoke: reassign a chat's lead away from
+Rima → she no longer sees that conversation; the new owner does.

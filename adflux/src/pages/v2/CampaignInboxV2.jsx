@@ -115,13 +115,18 @@ export default function CampaignInboxV2() {
 
   const loadThreads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
-    const { data, error } = await supabase
+    let q = supabase
       .from('whatsapp_conversations')
       // '*' so customer_name (C11) flows through and a missing column never
       // breaks the inbox load before the SQL is run.
       .select('*')
       .order('last_inbound_at', { ascending: false, nullsFirst: false })
       .limit(200)
+    // Phase 243 — a rep sees only their own conversations. RLS already scopes
+    // this, but filter in the UI too so the intent is explicit and a rep never
+    // relies solely on RLS. Admin / co_owner / manager see every thread.
+    if (!isPrivileged && profile?.id) q = q.eq('assigned_to', profile.id)
+    const { data, error } = await q
     if (error) {
       // On a silent poll, swallow transient errors (no spinner, no toast spam).
       if (!silent) {
@@ -153,7 +158,7 @@ export default function CampaignInboxV2() {
       }
       setPreviews(map)
     }
-  }, [])
+  }, [isPrivileged, profile?.id])
 
   const loadMsgs = useCallback(async (convId, silent = false) => {
     if (!convId) { setMsgs([]); return }
