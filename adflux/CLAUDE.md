@@ -7182,3 +7182,31 @@ Run `supabase_campaign_media_library.sql` in Supabase Studio, then it's live (th
 push carries the picker + wiring). Smoke: Campaigns → Chatbot → a message/action
 node → "Attach media" → the modal shows previously-used media as a grid (pick one,
 no re-upload) OR "Upload new" (adds it to the library for next time).
+
+
+---
+
+## 112 · Phase 242 — campaign tab bar: reps see INBOX only (2026-07-16)
+
+Owner: a telecaller opening the campaign module saw ALL 8 tabs (Campaigns / Inbox
+/ QR & Locations / Client QRs / Broadcast / Segments / Chatbot / Integrations).
+Clicking a non-inbox tab already showed nothing (routes are role-guarded — "good")
+but the TABS still showed. Owner wants reps to see the **Inbox tab only**.
+
+### Fix (`src/components/v2/CampaignChrome.jsx`, JS-only, §45-safe)
+`CampaignChrome` (the shared campaign tab bar) rendered `TABS` unconditionally — no
+role awareness. Now reads `useAuthStore(s => s.profile?.role)`:
+`isPriv = admin | co_owner` → all tabs (BYTE-IDENTICAL map, admin unchanged); any
+other role (sales/telecaller/agency) → `TABS.filter(key==='inbox')` = Inbox tab
+only. **Fail-closed while the profile hydrates** (null role → Inbox only) so a rep
+never flashes the admin tabs; an admin may briefly see Inbox-only then re-render to
+all (acceptable, fail-closed is correct).
+- The non-inbox ROUTES were already role-guarded (that's why clicking them showed
+  nothing) — this just hides the tabs so they don't appear. The decorative
+  head-count queries are unchanged (a rep gets null for admin-only tables → pill
+  hidden anyway; the tabs aren't rendered for them regardless). No new data path,
+  no SQL, not §28-frozen.
+
+### Owner action
+Push (JS-only, no SQL, no APK rebuild). Reps reopen the app once. Smoke: TC opens
+Campaigns → sees ONLY the Inbox tab; admin still sees all 8.

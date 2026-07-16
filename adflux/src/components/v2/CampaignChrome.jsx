@@ -15,6 +15,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/authStore'
 
 const TABS = [
   { key: 'campaigns', label: 'Campaigns',       to: '/campaigns' },
@@ -30,6 +31,15 @@ const TABS = [
 export default function CampaignChrome({ active, title = 'Campaigns', sub, right, children }) {
   const navigate = useNavigate()
   const [counts, setCounts] = useState(null)
+
+  // Reps (sales / telecaller / agency) get the INBOX tab only — they reply to
+  // their own chats, nothing else. Admin / co_owner run the whole module and
+  // see every tab. Fail-closed while the profile hydrates (null role → Inbox
+  // only) so a rep never flashes the admin tabs. The non-inbox routes are
+  // already role-guarded; this hides the tabs so they don't even show.
+  const role = useAuthStore((s) => s.profile?.role)
+  const isPriv = role === 'admin' || role === 'co_owner'
+  const visibleTabs = isPriv ? TABS : TABS.filter((t) => t.key === 'inbox')
 
   // Live per-tab counts (mockup's mono count pills). head-only counts on the
   // campaign tables — cheap, decorative, never block the page (§45).
@@ -85,7 +95,7 @@ export default function CampaignChrome({ active, title = 'Campaigns', sub, right
         display: 'flex', gap: 4, borderBottom: '1px solid var(--v2-line, #1f2b47)',
         margin: '22px 0', flexWrap: 'wrap',
       }}>
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const isActive = t.key === active
           const disabled = !!t.soon
           const n = counts && !disabled ? counts[t.key] : null
