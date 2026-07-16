@@ -65,12 +65,18 @@ export default async function handler(req, res) {
 
   try {
     const metaRes = await fetch(`${GRAPH}/${id}`, { headers: { Authorization: `Bearer ${WA_TOKEN}` } })
-    if (!metaRes.ok) return res.status(502).json({ error: 'meta_lookup_failed' })
+    if (!metaRes.ok) {
+      // Surface Meta's actual error so a 502 is diagnosable (expired media vs a
+      // token/permission problem) instead of an opaque failure (§236 loud).
+      let detail = null, code = null
+      try { const e = (await metaRes.json())?.error; detail = e?.message || null; code = e?.code ?? null } catch { /* noop */ }
+      return res.status(502).json({ error: 'meta_lookup_failed', status: metaRes.status, code, detail })
+    }
     const meta = await metaRes.json()
     if (!meta?.url) return res.status(404).json({ error: 'no_url' })
 
     const binRes = await fetch(meta.url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } })
-    if (!binRes.ok) return res.status(502).json({ error: 'download_failed' })
+    if (!binRes.ok) return res.status(502).json({ error: 'download_failed', status: binRes.status })
 
     const buf = Buffer.from(await binRes.arrayBuffer())
     const mime = meta.mime_type || row.media_mime || binRes.headers.get('content-type') || 'application/octet-stream'
