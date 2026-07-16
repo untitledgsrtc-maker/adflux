@@ -97,14 +97,18 @@ export default async function handler(req) {
   // @untitledad.in LOGIN is a send-only alias, so a reply/copy sent there bounces.
   let role = null
   let contactEmail = ''
+  let footerUrl = ''
+  let senderName = ''
   try {
-    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role,contact_email`, {
+    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role,contact_email,email_footer_url,name`, {
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     })
     const rows = await rr.json().catch(() => [])
     if (Array.isArray(rows) && rows[0]) {
       role = rows[0].role || null
       contactEmail = String(rows[0].contact_email || '').trim()
+      footerUrl = String(rows[0].email_footer_url || '').trim()
+      senderName = String(rows[0].name || '').trim()
     }
   } catch { /* role/contact unknown → offer refused + reply falls back below */ }
 
@@ -138,13 +142,24 @@ export default async function handler(req) {
   if (!html) return json({ error: 'body_required' }, 400)
 
   // ── build + send via Resend ──
+  // Per-rep email signature banner (Phase 240). Server-appended from the AUTHED
+  // sender's users.email_footer_url so it can't be spoofed; only our own hosted
+  // /email-footers/*.png is allowed. Gmail (verified domain) auto-loads it; a
+  // client that blocks remote images shows the alt (rep name) instead.
+  const validFooter = /^https:\/\/app\.untitledad\.in\/email-footers\/[a-z0-9_-]+\.png$/i.test(footerUrl) ? footerUrl : ''
+  const altName = senderName.replace(/[<>"&]/g, '')
+  const footerHtml = validFooter
+    ? `<div style="margin-top:22px"><img src="${validFooter}" alt="${altName}" width="520" style="display:block;width:100%;max-width:520px;height:auto;border:0" /></div>`
+    : ''
+  const finalHtml = html + footerHtml
+
   const payload = {
     from: FROM[kind],
     to: [to],
     bcc: [replyInbox],          // rep gets a HIDDEN copy (client never sees the generic Gmail)
     reply_to: replyInbox,       // replies land in the rep's REAL inbox
     subject,
-    html,
+    html: finalHtml,
   }
   if (pdfBase64) payload.attachments = [{ filename: pdfName, content: pdfBase64 }]
   else if (pdfUrl) payload.attachments = [{ filename: pdfName, path: pdfUrl }]

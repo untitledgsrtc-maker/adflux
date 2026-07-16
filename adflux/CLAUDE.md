@@ -7006,3 +7006,46 @@ Push (JS-only, no SQL, no APK rebuild — reaches the APK on next open). Smoke:
 create a quote → on the "Quote Created" screen tap **Send via WhatsApp** on the APK
 → WhatsApp opens with the **PDF attached** (not a link). Quote-detail share still
 attaches as before.
+
+
+---
+
+## 109 · Phase 240 — per-rep email signature banner + kirti's Gmail (2026-07-16)
+
+Owner: add a **team email footer** (each rep's signature banner PNG — photo, name,
+title, mobile, email; 600×150, brand) to app-sent emails; and wire kirti's real
+Gmail (was missing from §102). Owner supplied 11 per-rep PNGs (option b — name +
+mobile baked in).
+
+### What shipped (additive, §45-safe)
+- `public/email-footers/<slug>.png` — the 11 rep banners (mayur/viral/avkash/kirti/
+  dipak/jayna/rima/dhara/riya/kamina/diya, ~45KB each). Served by Vercel as static
+  files at `app.untitledad.in/email-footers/<slug>.png` (filesystem wins over the
+  SPA rewrite; email clients fetch them — no SW involved, no denylist needed).
+- `supabase_phase240_email_footers.sql` (owner RUNS) — `users.email_footer_url`
+  column + per-rep UPDATE (matched by name ILIKE; VERIFY lists matches) + kirti's
+  `contact_email = untitledadvertisinggandhinagar@gmail.com`.
+- `api/email/send.js` — fetches the AUTHED sender's `email_footer_url` + `name`,
+  appends `<img src=footer>` to the email html. **Server-side + validated**
+  (`/^https:\/\/app\.untitledad\.in\/email-footers\/[a-z0-9_-]+\.png$/`) so it
+  can't be spoofed or injected; `alt` = escaped sender name (shows if the client
+  blocks remote images). No footer_url → sends normally (graceful).
+
+### Caveat (told owner)
+Baked-in PNG (option b) means if a recipient's client **blocks remote images**, the
+signature (name/mobile) doesn't render until "show images". Gmail auto-loads it for
+the verified domain (untitledad.in DKIM) so it shows for most; the `alt` (rep name)
+is the fallback. If guaranteed display is ever needed → CID-embed (adds a 2nd
+attachment) — not done.
+
+### Owner action
+Run `supabase_phase240_email_footers.sql`, then push (the PNGs + endpoint deploy via
+Vercel). Paste the VERIFY output (should show 11 reps mapped). Smoke: send a quote
+email → the rep's signature banner shows under the body; kirti's replies now route
+to her Gmail. To change a rep's number → replace their PNG in `public/email-footers/`
+(same filename) + push; no SQL.
+
+### Foot-gun
+- ❌ Referencing an email image the recipient's client can block (remote `<img>`) as
+  the ONLY carrier of name/mobile — set a meaningful `alt` and know Gmail auto-loads
+  but others may not. Text always beats a baked-in-image for critical info.
