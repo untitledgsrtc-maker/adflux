@@ -7049,3 +7049,59 @@ to her Gmail. To change a rep's number → replace their PNG in `public/email-fo
 - ❌ Referencing an email image the recipient's client can block (remote `<img>`) as
   the ONLY carrier of name/mobile — set a meaningful `alt` and know Gmail auto-loads
   but others may not. Text always beats a baked-in-image for critical info.
+
+
+---
+
+## 110 · Campaign — 2nd WhatsApp number for MARKETING (Phase A foundation) (2026-07-16)
+
+Owner wants TWO numbers, split by role (correct architecture — protects the inbox
+number's quality rating from marketing spam-reports):
+- **95815 78261** (current) = **service inbox** (2-way, §54) — `purpose='service'`.
+- **98982 73686** (new, WABA `4261024264172185`) = **MARKETING** — auto-sends
+  (lead-punch welcome, post-call) + broadcasts — `purpose='marketing'`.
+
+### The hard WhatsApp constraints (told owner, gate the whole feature)
+- Business-initiated = **pre-approved TEMPLATES only** (Meta review each). No free text.
+- Ban risk: auto/broadcast marketing to non-opted-in → spam reports → quality tanks →
+  limits/ban. Throttle (≤1 auto-msg/lead/day), outcome-gate, honor opt-out
+  (`wa_opt_out` §47.5), only-engaged audiences.
+- Marketing templates are **paid** (~₹0.7–0.9/msg India). Cap + monitor.
+- Replies to the marketing number land on IT (needs routing to a person/inbox).
+
+### App is ALREADY multi-number-ready (no rewrite)
+- `api/wa/send.js` sends from the **conversation's account** phone_number_id (not env).
+- `api/wa/webhook.js` resolves/auto-provisions the account by phone_number_id.
+- So adding a number = Meta setup (subscribe WABA + token access) + register the row.
+
+### Phase A shipped (foundation — code done, Meta setup is OWNER-side, pending)
+- NEW `api/wa/send-template.js` — **EDGE** (§219 Node-cap: api/wa/send + webhook are
+  Node; a Node fn here breaks deploys). Auth + **admin/co_owner** gated (Phase A
+  manual/test; Phase-B automation will call the Graph API from a DEFINER/service
+  path, not this user endpoint). Sends an APPROVED template from the
+  `purpose='marketing'` account's phone_number_id via the Graph API. ONE recipient
+  (no bulk — broadcast = Phase C with its own guards). from-number server-resolved
+  (not client-chosen).
+- NEW `supabase_campaign_marketing_number.sql` — `whatsapp_accounts.purpose` column
+  (default 'service' → nothing existing changes) + register the marketing number
+  (owner fills `<PHONE_NUMBER_ID>` from Meta) + tag the inbox number 'service'.
+
+### Owner's Meta setup (critical path — the code can't send until this is done)
+1. Confirm 98982 73686 isn't live on ANOTHER app/BSP (screenshot: "Connected" — to
+   what? if AiSensy/another Meta app, it must move to our "Waba" app first).
+2. Give the `campaign-api` System User FULL access to WABA `4261024264172185`.
+3. Get the number's **phone_number_id** (WhatsApp Manager → API setup).
+4. Subscribe the WABA to our app: `scripts/subscribe-wa-waba.sh` with WABA
+   `4261024264172185` (the `messages` field is already subscribed at app level, §54).
+5. Fill `<PHONE_NUMBER_ID>` in the SQL + run it.
+
+### Next (after Meta setup)
+- Prove the pipe: send Meta's pre-approved `hello_world` template to the owner's
+  number (via Meta Manager first, then an in-app admin test button — Phase A.2).
+- Then Phase B (automation triggers) + Phase C (broadcast). Decisions still needed:
+  trigger rules (throttle/outcome-gate), opt-in status, template wording, reply routing.
+
+### Foot-gun
+- ❌ A new Node serverless fn on this project breaks EVERY deploy (12-fn Hobby cap,
+  §219). New `api/*` endpoints MUST be Edge (`runtime: 'edge'`, raw fetch, no
+  supabase-js).
