@@ -47,9 +47,10 @@ const DEFAULT_SYSTEM = `You are the WhatsApp assistant for Untitled Advertising,
 THE NETWORK (facts — never invent beyond these):
 - 264 LED screens across 20 major GSRTC bus stations in Gujarat.
 - ~29 lakh impressions per month (~95,000 per day) from real travellers waiting at busy bus stations.
-- Screens are 43" and 55", graded A / B / C by footfall.
+- Screens are 43" and 55" high-brightness LED — clear even in bright daylight — graded A / B / C by footfall.
+- Each screen reaches 1000+ people a day, plays your ad ~14 hours a day, with AI-tracked daily impressions.
 - Live stations include Surat, Vadodara, Anand, Gandhinagar, Bhavnagar, Veraval, Surendranagar, Jamnagar, Junagadh, Porbandar, Dwarka, Morbi, Bhachau, Botad — and more (20 total).
-- Indicative screen rates are roughly Rs 650 to Rs 850 per screen depending on grade/size. INDICATIVE ONLY.
+- Advertising STARTS AT JUST Rs 75 — the entry price. The exact rate depends on the city, number of screens and duration; our team shares a tailored quote. (Never quote a final total.)
 - Full details, video and a live map: https://app.untitledad.in/led
 
 WHY WE'RE DIFFERENT (this is the main pitch — "a billboard can't tell you who looked; ours can"):
@@ -96,7 +97,7 @@ export default async function handler(req) {
   if (conv.ai_paused) return nope('ai_paused')                                   // a human took over
   if (conv.window_expires_at && new Date(conv.window_expires_at).getTime() < Date.now()) return nope('window_closed')  // 24h policy window
 
-  const acct = (await (await sb(`whatsapp_accounts?id=eq.${conv.whatsapp_account_id}&select=phone_number_id,ai_enabled,ai_system_prompt&limit=1`)).json())?.[0]
+  const acct = (await (await sb(`whatsapp_accounts?id=eq.${conv.whatsapp_account_id}&select=phone_number_id,ai_enabled,ai_system_prompt,ai_welcome_image_url&limit=1`)).json())?.[0]
   if (!acct?.ai_enabled) return nope('ai_disabled')
   if (!acct.phone_number_id) return nope('no_sending_number')
 
@@ -124,6 +125,10 @@ export default async function handler(req) {
   // saw many outbound in the last hour. Uses the already-fetched window.
   const hourAgo = Date.now() - 3600_000
   if (rows.filter((m) => m.direction === 'out' && new Date(m.at).getTime() > hourAgo).length >= 10) return nope('rate_capped')
+
+  // First contact = no reply has ever gone out on this thread → the AI opens
+  // with the welcome poster (whatsapp_accounts.ai_welcome_image_url) once.
+  const firstContact = !rows.some((m) => m.direction === 'out')
 
   // Build Claude turns oldest→newest: in→user, out→assistant. Represent a media
   // message by a short tag so a turn is never empty. Collapse consecutive
@@ -212,6 +217,12 @@ export default async function handler(req) {
       await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify({ conversation_id: convId, wamid, direction: 'out', type, body: textBody, at: atIso }) })
       await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ updated_at: atIso }) })
     } catch { /* the message was sent; a log failure is non-fatal */ }
+  }
+
+  // Welcome poster on the FIRST message of a conversation (best-effort — a bad
+  // url must never block the reply). Sent before the text so it opens the chat.
+  if (firstContact && acct.ai_welcome_image_url && String(acct.ai_welcome_image_url).trim()) {
+    try { const id = await sendWa({ type: 'image', image: { link: acct.ai_welcome_image_url } }); await logOut('image', '[image]', id) } catch { /* poster skipped */ }
   }
 
   try {

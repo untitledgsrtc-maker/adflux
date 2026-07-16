@@ -7465,3 +7465,16 @@ review PASS, deploys straight to the LIVE AI — text path byte-preserved):
 - **KNOWN:** the AI's own SENT photo logs as `body:'[image]'` (no media_id) so YOUR
   inbox shows a placeholder for it (the customer gets the real image) — cosmetic,
   the §114 store-on-receipt only covers INBOUND media, not AI outbound.
+
+### Phase 246.2 — welcome poster on first message + poster pricing (16 Jul)
+Owner: send the GSRTC LED poster as the FIRST message when anyone new messages +
+align the AI to the poster's facts.
+- NEW `whatsapp_accounts.ai_welcome_image_url` (`supabase_phase246_2_ai_welcome_image.sql`).
+  On FIRST contact (no outbound has gone on the thread) the AI sends this image once
+  (best-effort — a bad url never blocks the reply), then its text. Off unless set.
+  Owner hosts the poster (Supabase Storage → campaign-media public bucket) → sets the
+  URL via the SET UPDATE in the SQL. `firstContact = !rows.some(out)`.
+- DEFAULT_SYSTEM updated to the poster: **starts at just Rs 75** (entry price, replaces
+  the old Rs 650-850), each screen **1000+ people/day**, **~14 hours/day** play,
+  **high-brightness** LED, **AI-tracked daily impressions**. The price backstop
+  (4+-digit rupee → hand off) still blocks the AI computing a TOTAL.
