@@ -7105,3 +7105,35 @@ number's quality rating from marketing spam-reports):
 - ❌ A new Node serverless fn on this project breaks EVERY deploy (12-fn Hobby cap,
   §219). New `api/*` endpoints MUST be Edge (`runtime: 'edge'`, raw fetch, no
   supabase-js).
+
+### STATUS 2026-07-16 eve — reclaim 98982 73686 from Cronberry PARKED for tomorrow
+The marketing number 98982 73686 is entangled with **Cronberry** (a BSP running on
+**Jio's** WhatsApp API):
+- It's on WABA `4261024264172185` (the owner's "Untitled Advertising" WABA), but its
+  payment method is a **credit line allocated from Jio Things Limited** (Cronberry/
+  Jio's, not the owner's). Cronberry conversation wallet at −27 INR.
+- Adding the owner's own Visa (···· 2580, in the edigiexpert portfolio) to the WABA
+  **FAILED — "doesn't support"** → almost certainly the **billing-model conflict**
+  (a partner credit line owns the account; a direct card can't be added until the
+  number leaves the BSP). So the card can't be pre-attached as a safety net.
+- **Decision: RECLAIM 98982 73686** (owner has the SIM + can get the OTP; brand value
+  as the landing-page Call number). NOT a fresh number.
+- **2-step PIN prerequisite: DONE** (owner sorted it — the blocker that could strand
+  the number mid-migration).
+- **The migration sequence (do tomorrow, low-traffic, brief downtime):**
+  1. Settle the −27 INR Cronberry balance.
+  2. Disconnect/disable the Cronberry channel → releases the number + drops the Jio
+     credit line.
+  3. Re-register 98982 73686 on the owner's **"Waba" app** (App 1443324144491532) →
+     verify via OTP + the 2-step PIN → new phone_number_id.
+  4. Add the Visa to the WABA (now off the credit line = direct model → should attach).
+  5. Cloud-API wiring: give `campaign-api` System User access to the WABA + subscribe
+     it (`scripts/subscribe-wa-waba.sh` WABA 4261024264172185) + fill `<PHONE_NUMBER_ID>`
+     in `supabase_campaign_marketing_number.sql` → run → the Phase-A send-template
+     endpoint can send from it.
+- App code (Phase A: `api/wa/send-template.js` Edge + the SQL) is ALREADY shipped
+  (§110) — waiting only on this number being live on the owner's Cloud API.
+- ⚠ Risk: "Permanently Disable Channel" is irreversible on Cronberry's side; if
+  re-registration fails the number can be stuck → that's why the PIN had to be sorted
+  FIRST. Do the migration when the owner can tolerate brief downtime + is at the Meta
+  UI with Claude guiding.
