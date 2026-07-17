@@ -7512,9 +7512,31 @@ untouched, no leak to other pages, no write-hole.
   contact another rep's client + write call_logs), and the Assigned/owner column is
   shown to her (guardian P2, widened header + cell) minus the per-row reassign icon.
 
-### NEXT — quotes team view (increment 3)
-- `team_all_quotes()` RPC (mirror useQuotes: quotes + quote_cities + payments +
-  follow_ups) + viewer branch in QuotesV2 (read-only, amounts shown). Gated + guardian.
+### SHIPPED — quotes team view (increment 3, Phase 247.3, guardian PASS)
+- `supabase_phase247_3_team_quotes_rpc.sql` — `team_all_quotes()` (same gated pattern):
+  jsonb ARRAY of all quotes shaped like useQuotes SELECT (`to_jsonb(q) ||
+  {quote_cities, payments, follow_ups}`), LIMIT 20000, read-only. Amounts included
+  (owner-approved).
+- `useQuotes.fetchQuotes(opts)` — ADDITIVE `if (opts.team)` → `rpc('team_all_quotes')`.
+- `QuotesV2.jsx` (§28 FROZEN) — "My quotes | Team (all)" toggle (canViewTeam &&
+  !isAdmin); `refetch = () => fetchQuotes({team: teamViewing})` used by the load
+  effect AND `useAutoRefresh(refetch)` (so a refresh can't clobber team-view) AND
+  post-delete. READ-ONLY: `canDeleteQuote→false` + both Edit buttons gated
+  `!teamViewing`. QuotesV2 has NO Call/WA buttons → no other write path. (P3
+  cosmetic: an empty action cell renders in team-view — harmless.)
+
+### ALL 3 DONE — Jayna sees the whole team, read-only
+Follow-ups (247) + Leads (247.2) + Quotes (247.3), each a "My / Team (all)" toggle
+→ gated read-only RPC (`team_all_followups` / `team_all_leads` / `team_all_quotes`),
+amounts shown, no write, no leak, no write-escalation. Her base RLS stays own-only
+(/work + /telecaller untouched). Normal reps + admin byte-unchanged. To grant/revoke
+ANY user: `UPDATE users SET can_view_team_dashboard = true|false`.
+
+### Owner action — run these 2 SQL files (follow-ups RPC already run)
+`supabase_phase247_2_team_leads_rpc.sql` + `supabase_phase247_3_team_quotes_rpc.sql`
+in Studio. VERIFY each: `SELECT to_regprocedure('public.team_all_leads()') IS NOT
+NULL;` / `...team_all_quotes()...` → t. Then Jayna's /leads + /quotes show the
+"My / Team (all)" toggle.
 
 ### Owner action (increment 1)
 Run `supabase_phase247_team_followups_rpc.sql` in Studio (creates the function; her

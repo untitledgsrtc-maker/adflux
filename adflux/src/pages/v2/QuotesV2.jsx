@@ -8,7 +8,7 @@
 // hook, same filters store, same status tabs, same QuoteTable).
 // The only thing we change is the chrome.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react'
 // Phase 94 — path-param routing replaces the quoteIntent fallback.
@@ -56,6 +56,13 @@ export default function QuotesV2() {
 
   const { quotes, filters, setFilters, resetFilters, fetchQuotes } = useQuotes()
   const [loading, setLoading] = useState(true)
+  // Phase 247.3 — a per-user team viewer (can_view_team_dashboard) can flip to
+  // ALL reps' quotes (READ-ONLY) via a toggle; default stays her own (RLS).
+  // Never for admin (already see all) or a normal rep (no flag → no toggle).
+  const canViewTeam = profile?.can_view_team_dashboard === true
+  const [teamView, setTeamView] = useState(false)
+  const teamViewing = canViewTeam && !isAdmin && teamView
+  const refetch = useCallback(() => fetchQuotes({ team: teamViewing }), [fetchQuotes, teamViewing])
 
   // Phase 29c — inline Edit / Delete from the list row. Saves a click
   // for cleanup workflows. Each handler stops row-click propagation
@@ -87,6 +94,7 @@ export default function QuotesV2() {
   // hides for terminal cases instead of throwing.
   function canDeleteQuote(q) {
     if (!q) return false
+    if (teamViewing) return false   // Phase 247.3 — team view is READ-ONLY
     const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
     if (q.status === 'won') {
       // Won always blocked when payments present. Trigger does the
@@ -118,7 +126,7 @@ export default function QuotesV2() {
       return
     }
     toastSuccess('Quote deleted.')
-    fetchQuotes()
+    refetch()
   }
   const [searchDraft, setSearchDraft] = useState(filters.search || '')
   const [sortField, setSortField] = useState('created_at')
@@ -136,13 +144,14 @@ export default function QuotesV2() {
 
   useEffect(() => {
     setLoading(true)
-    fetchQuotes().finally(() => setLoading(false))
+    refetch().finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
+  }, [filters, teamViewing])
 
   // Phase 34Z.59 — refetch on tab-resume / window focus so newly
-  // created or won quotes show up without a manual reload.
-  useAutoRefresh(fetchQuotes)
+  // created or won quotes show up without a manual reload. Phase 247.3 — carry
+  // the team-view flag so an auto-refresh doesn't silently reload her own quotes.
+  useAutoRefresh(refetch)
 
   // Keep the in-page search draft in sync with the store — the topbar
   // quick-search in V2AppShell also writes to filters.search, and
@@ -270,6 +279,26 @@ export default function QuotesV2() {
 
   return (
     <div className="v2d-quotes">
+      {/* Phase 247.3 — team viewer toggle: default = her own quotes (RLS);
+          "Team (all)" = every rep's quotes, READ-ONLY (no Edit/Delete).
+          Hidden for admin + normal reps. */}
+      {canViewTeam && !isAdmin && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 999, padding: 3 }}>
+            {[{ v: false, t: 'My quotes' }, { v: true, t: 'Team (all)' }].map((o) => (
+              <button key={o.t} type="button" onClick={() => setTeamView(o.v)}
+                style={{
+                  border: 0, cursor: 'pointer', borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600,
+                  background: teamView === o.v ? 'var(--v2-yellow, #FFE600)' : 'transparent',
+                  color: teamView === o.v ? 'var(--accent-fg, #0b1220)' : 'var(--v2-ink-1, #a9b3c7)',
+                }}>
+                {o.t}
+              </button>
+            ))}
+          </div>
+          {teamViewing && <span style={{ fontSize: 12, color: 'var(--v2-ink-2, #6a7590)' }}>Read-only &middot; all reps&rsquo; quotes</span>}
+        </div>
+      )}
       {/* Phase 34Z.4 — V2Hero strip for cross-page consistency
           (same teal hero as /work, /leads, /follow-ups). Value =
           total quoted amount in the current filter scope; chip =
@@ -577,7 +606,7 @@ export default function QuotesV2() {
                         so these don't double-fire navigate. */}
                     <td>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {q.status !== 'lost' && (
+                        {!teamViewing && q.status !== 'lost' && (
                           <button
                             type="button"
                             className="v2d-ghost"
@@ -680,7 +709,7 @@ export default function QuotesV2() {
                       borderTop: '1px solid var(--v2-line, #1f2741)',
                       paddingTop: 10,
                     }}>
-                      {q.status !== 'lost' && (
+                      {!teamViewing && q.status !== 'lost' && (
                         <button
                           type="button"
                           className="v2d-ghost"

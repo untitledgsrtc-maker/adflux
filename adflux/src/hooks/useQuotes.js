@@ -25,7 +25,16 @@ export function useQuotes() {
   const store   = useQuoteStore()
   const profile = useAuthStore(s => s.profile)
 
-  const fetchQuotes = useCallback(async () => {
+  const fetchQuotes = useCallback(async (opts = {}) => {
+    // Phase 247.3 — team viewer: load ALL reps' quotes (READ-ONLY) via the gated
+    // team_all_quotes() RPC (her own-only RLS would return just hers). Same shape
+    // as the normal SELECT (quote row + quote_cities/payments/follow_ups nested),
+    // so downstream rendering is unchanged. Off unless opts.team.
+    if (opts.team) {
+      const { data, error } = await supabase.rpc('team_all_quotes')
+      if (!error) store.setQuotes(Array.isArray(data) ? data : [])
+      return { data: Array.isArray(data) ? data : [], error }
+    }
     // `payments(...)` pulls approved payments alongside each quote so the
     // Quotes list can render an Outstanding column without a second round-trip.
     // The filter on approval_status lives in the caller (QuoteTable), not here,
