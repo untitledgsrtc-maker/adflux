@@ -7499,12 +7499,22 @@ untouched, no leak to other pages, no write-hole.
   (`viewReadOnly = viewingOther || teamViewing` hides all 8 Section action rows).
   Normal rep + admin byte-unchanged; her default stays her own actionable list.
 
-### NEXT (same gated-RPC pattern) — increments 2 + 3
-- Leads team view: `team_all_leads()` RPC (mirror useLeads SELECT: leads + assigned/
-  telecaller joins) + a viewer branch in LeadsV2 (read-only).
-- Quotes team view: `team_all_quotes()` RPC (mirror useQuotes: quotes + quote_cities +
-  payments + follow_ups) + a viewer branch in QuotesV2 (read-only, amounts shown).
-Both gated `is_team_viewer() OR admin`, read-only, guardian each.
+### SHIPPED — leads team view (increment 2, Phase 247.2, guardian PASS after 2 fixes)
+- `supabase_phase247_2_team_leads_rpc.sql` — `team_all_leads()` (same gated pattern):
+  jsonb ARRAY of all leads shaped like useLeads SELECT_COLUMNS (`to_jsonb(l) ||
+  {assigned, telecaller}`), LIMIT 20000, read-only.
+- `useLeads.fetchLeads(opts)` — ADDITIVE `if (opts.team)` branch → `rpc('team_all_leads')`
+  → setLeads. Default path byte-unchanged.
+- `LeadsV2.jsx` (§28 FROZEN) — "My leads | Team (all)" toggle (canViewTeam &&
+  !isPrivileged); `fetchLeads({team: teamViewing})`; data flows through the SAME
+  `leads` state so all ~13 memos are unchanged. READ-ONLY: `canReassign→false` (no
+  checkboxes/bulk), Call/WhatsApp row buttons hidden (guardian P1 — else she could
+  contact another rep's client + write call_logs), and the Assigned/owner column is
+  shown to her (guardian P2, widened header + cell) minus the per-row reassign icon.
+
+### NEXT — quotes team view (increment 3)
+- `team_all_quotes()` RPC (mirror useQuotes: quotes + quote_cities + payments +
+  follow_ups) + viewer branch in QuotesV2 (read-only, amounts shown). Gated + guardian.
 
 ### Owner action (increment 1)
 Run `supabase_phase247_team_followups_rpc.sql` in Studio (creates the function; her

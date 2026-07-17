@@ -29,9 +29,20 @@ export function useLeads() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const fetchLeads = useCallback(async () => {
+  const fetchLeads = useCallback(async (opts = {}) => {
     setLoading(true)
     setError(null)
+    // Phase 247.2 — team viewer: load ALL reps' leads (READ-ONLY) via the gated
+    // team_all_leads() RPC (her own-only RLS would return just hers). The RPC
+    // returns the same shape as SELECT_COLUMNS (row + assigned/telecaller
+    // nested), so every downstream memo/render is unchanged. Off unless opts.team.
+    if (opts.team) {
+      const { data, error: err } = await supabase.rpc('team_all_leads')
+      if (err) { console.error('[useLeads] team fetch failed:', err); setError(err.message || 'Could not load team leads.'); setLeads([]) }
+      else { setLeads(Array.isArray(data) ? data : []) }
+      setLoading(false)
+      return { data: Array.isArray(data) ? data : [], error: err }
+    }
     // Phase 151 — paginate in 1000-row chunks. PostgREST caps a single
     // request at ~1000 rows, so the old single .select() silently returned
     // only the first 1000 leads: admin "All (1000)" was the CAP, not the

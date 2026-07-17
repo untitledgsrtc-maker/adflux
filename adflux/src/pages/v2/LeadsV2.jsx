@@ -130,6 +130,12 @@ export default function LeadsV2() {
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+  // Phase 247.2 — a per-user team viewer (can_view_team_dashboard) can flip to
+  // ALL reps' leads (READ-ONLY) via a toggle; default stays her own (RLS). Never
+  // for admin (they already see all) or a normal rep (no flag → no toggle).
+  const canViewTeam = profile?.can_view_team_dashboard === true
+  const [teamView, setTeamView] = useState(false)
+  const teamViewing = canViewTeam && !isPrivileged && teamView
 
   // Phase 93.10 (25 May 2026) — owner: sales / TC / sales_manager
   // need bulk reassign on the leads LIST page, not just on the lead
@@ -141,6 +147,7 @@ export default function LeadsV2() {
   // Per-row check used to decide whether to render the checkbox.
   function canReassign(l) {
     if (!l || !profile) return false
+    if (teamViewing) return false   // Phase 247.2 — team view is READ-ONLY (no checkboxes → no bulk actions)
     // Phase 100.B — non-admin cannot reassign Won/Lost (RPC blocks
     // it server-side; hide the checkbox so UX doesn't dangle). Admin
     // and co_owner can still flip closed leads if needed.
@@ -207,7 +214,7 @@ export default function LeadsV2() {
   const [reassignReason, setReassignReason] = useState('')
   const [reassignFailures, setReassignFailures] = useState(null)
 
-  useEffect(() => { fetchLeads() /* eslint-disable-next-line */ }, [fetchLeads, location.key])
+  useEffect(() => { fetchLeads({ team: teamViewing }) /* eslint-disable-next-line */ }, [fetchLeads, location.key, teamViewing])
 
   // Phase 113.10 — deep-link the stage filter from the URL (?stage=<group key>:
   // new | working | quote_sent | nurture | won | lost). Lets the telecaller
@@ -713,6 +720,26 @@ export default function LeadsV2() {
 
   return (
     <div className="lead-root">
+      {/* Phase 247.2 — team viewer toggle: default = her own leads (RLS);
+          "Team (all)" = every rep's leads, READ-ONLY (no checkboxes/bulk).
+          Hidden for admin + normal reps. */}
+      {canViewTeam && !isPrivileged && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 999, padding: 3 }}>
+            {[{ v: false, t: 'My leads' }, { v: true, t: 'Team (all)' }].map((o) => (
+              <button key={o.t} type="button" onClick={() => setTeamView(o.v)}
+                style={{
+                  border: 0, cursor: 'pointer', borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600,
+                  background: teamView === o.v ? 'var(--v2-yellow, #FFE600)' : 'transparent',
+                  color: teamView === o.v ? 'var(--accent-fg, #0b1220)' : 'var(--v2-ink-1, #a9b3c7)',
+                }}>
+                {o.t}
+              </button>
+            ))}
+          </div>
+          {teamViewing && <span style={{ fontSize: 12, color: 'var(--v2-ink-2, #6a7590)' }}>Read-only &middot; all reps&rsquo; leads</span>}
+        </div>
+      )}
       {/* Phase 34Z.4 — V2Hero strip on /leads for cross-page consistency
           (same teal hero as /work, /quotes, /follow-ups). Value = total
           expected pipeline; chip = won/lost split; right = win-rate. */}
@@ -1095,7 +1122,7 @@ export default function LeadsV2() {
                 <th>Stage</th>
                 <th>Segment</th>
                 <th>Source</th>
-                {isPrivileged && <th>Assigned</th>}
+                {(isPrivileged || teamViewing) && <th>Assigned</th>}
                 <th>Last</th>
                 <th style={{ textAlign: 'right' }}>Value</th>
               </tr>
@@ -1187,6 +1214,9 @@ export default function LeadsV2() {
                     {l.phone ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <span>{l.phone}</span>{/* Phase 34Z.76 */}
+                        {/* Phase 247.2 — team view is READ-ONLY: show the number,
+                            hide Call/WhatsApp so she can't contact another rep's client. */}
+                        {!teamViewing && (<>
                         <a
                           href={`tel:${String(l.phone).replace(/\s/g, '')}`}
                           title="Call"
@@ -1248,6 +1278,7 @@ export default function LeadsV2() {
                             fontSize: 11,
                           }}
                         >WA</a>
+                        </>)}
                       </span>
                     ) : (
                       // Phase 34Z.76 — owner directive (16 May 2026):
@@ -1282,7 +1313,7 @@ export default function LeadsV2() {
                   <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {l.source || '—'}
                   </td>
-                  {isPrivileged && (
+                  {(isPrivileged || teamViewing) && (
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {l.assigned?.name ? (
@@ -1313,6 +1344,7 @@ export default function LeadsV2() {
                             Per-row icon: tap → select this one lead →
                             open existing ReassignModal in single-lead
                             mode. Uses same bulk-reassign code path. */}
+                        {!teamViewing && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1335,6 +1367,7 @@ export default function LeadsV2() {
                         >
                           <UsersIcon size={11} /> Reassign
                         </button>
+                        )}
                       </div>
                     </td>
                   )}
