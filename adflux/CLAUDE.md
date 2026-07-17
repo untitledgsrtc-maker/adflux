@@ -7466,6 +7466,55 @@ review PASS, deploys straight to the LIVE AI — text path byte-preserved):
   inbox shows a placeholder for it (the customer gets the real image) — cosmetic,
   the §114 store-on-receipt only covers INBOUND media, not AI outbound.
 
+## 116 · Phase 247 — sales "team viewer" (Jayna) sees the whole team, READ-ONLY (2026-07-16)
+
+Owner: give Jayna (a telecaller) admin-style READ of every rep's leads / quotes /
+follow-ups, read-only, deal amounts OK, payments/P&L hidden. Behind her existing
+`can_view_team_dashboard` flag (§84).
+
+### THE BLOCKED SHORTCUT — do NOT re-attempt broad RLS (2 reviews caught it)
+First tried broad `FOR SELECT USING (is_team_viewer())` on leads/quotes/follow_ups/
+lead_activities. **BLOCKED** — guardian P0 + security review:
+1. It silently changes the FROZEN LeadsV2/QuotesV2 pages (show all to her) with the
+   edit/reassign buttons still rendered — a frozen-page behavior change with no code
+   (§45/§84, the exact hole §84 reverted once).
+2. Broad `leads` SELECT transitively gives WRITE access to ANY rep's `lead_activities`
+   via the visibility-gated `lead_activities_via_lead` FOR ALL policy (USING
+   `lead_id IN (SELECT id FROM leads)`, no ownership check) → touches compute_daily_score
+   (incentive). NOT read-only.
+3. The security-review "fix" (a RESTRICTIVE write policy on lead_activities) would sit
+   on the HOTTEST write path (every call logs an activity) for all 22 reps → §45 danger.
+So: **team visibility goes through gated SECURITY DEFINER RPCs (the §193/§194 pattern),
+NEVER a broad table grant.** Her base RLS stays own-only → /work + /telecaller
+untouched, no leak to other pages, no write-hole.
+
+### SHIPPED — follow-ups team view (increment 1, guardian PASS)
+- `supabase_phase247_team_followups_rpc.sql` — `team_all_followups()` SECURITY DEFINER
+  STABLE, gated `is_team_viewer() OR admin` (else '{}'), returns `{follow_ups,
+  nurture_leads}` for ALL reps (open FUs + nurture window + owner_name), read-only,
+  LIMIT 2000/100. A clone of `team_rep_followups`(§194) without the per-rep filter.
+- `FollowUpsV2.jsx` (§28 FROZEN, PASS): a **"My follow-ups | Team (all)"** toggle
+  (only `canViewTeam && !isPrivileged && !repParam`) → `teamViewing` → the load calls
+  `team_all_followups()` (same RPC branch as the §194 per-rep drill) → read-only
+  (`viewReadOnly = viewingOther || teamViewing` hides all 8 Section action rows).
+  Normal rep + admin byte-unchanged; her default stays her own actionable list.
+
+### NEXT (same gated-RPC pattern) — increments 2 + 3
+- Leads team view: `team_all_leads()` RPC (mirror useLeads SELECT: leads + assigned/
+  telecaller joins) + a viewer branch in LeadsV2 (read-only).
+- Quotes team view: `team_all_quotes()` RPC (mirror useQuotes: quotes + quote_cities +
+  payments + follow_ups) + a viewer branch in QuotesV2 (read-only, amounts shown).
+Both gated `is_team_viewer() OR admin`, read-only, guardian each.
+
+### Owner action (increment 1)
+Run `supabase_phase247_team_followups_rpc.sql` in Studio (creates the function; her
+flag is already set from §84). Push (JS). VERIFY: `SELECT to_regprocedure('public
+.team_all_followups()') IS NOT NULL;` → t. Smoke: Jayna opens /follow-ups → sees the
+"My follow-ups | Team (all)" toggle → "Team (all)" shows every rep's open follow-ups,
+read-only (no Call/WhatsApp/Done/Snooze). A normal rep sees no toggle, unchanged.
+
+---
+
 ### Phase 246.2 — welcome poster on first message + poster pricing (16 Jul)
 Owner: send the GSRTC LED poster as the FIRST message when anyone new messages +
 align the AI to the poster's facts.

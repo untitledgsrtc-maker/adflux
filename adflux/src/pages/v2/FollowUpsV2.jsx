@@ -93,6 +93,12 @@ export default function FollowUpsV2() {
   // on her own /follow-ups (no rep param, or rep == herself).
   const canViewTeam = profile?.can_view_team_dashboard === true
   const viewingOther = !isPrivileged && canViewTeam && !!repParam && repParam !== profile?.id
+  // Phase 247 — the team viewer can flip to the WHOLE team's open follow-ups
+  // (READ-ONLY) via a toggle; default stays her own actionable list. Not the
+  // ?rep drill (viewingOther) and never for admin (they already see all).
+  const [teamView, setTeamView] = useState(false)
+  const teamViewing = canViewTeam && !isPrivileged && teamView && !repParam
+  const viewReadOnly = viewingOther || teamViewing
 
   const load = useCallback(async () => {
     if (!profile?.id) return
@@ -101,8 +107,13 @@ export default function FollowUpsV2() {
     // Phase 194 — team viewer drilling into another rep: read that rep's
     // follow-ups + nurture leads via the gated RPC (own-only RLS otherwise),
     // apply the same Lost-lead frontend backstop, and stop (read-only view).
-    if (viewingOther) {
-      const { data: b, error: bErr } = await supabase.rpc('team_rep_followups', { p_rep_id: repParam })
+    // Phase 194 (drill one rep) OR Phase 247 (team viewer sees ALL) → read the
+    // team's follow-ups via a gated SECURITY DEFINER RPC (own-only RLS would
+    // return just her own). Read-only view — the actions are hidden downstream.
+    if (viewingOther || teamViewing) {
+      const { data: b, error: bErr } = teamViewing
+        ? await supabase.rpc('team_all_followups')
+        : await supabase.rpc('team_rep_followups', { p_rep_id: repParam })
       if (bErr) { setError(bErr.message); setLoading(false); return }
       setRows(((b?.follow_ups) || []).filter(r => r.lead?.stage !== 'Lost'))
       setNurtureRows((b?.nurture_leads) || [])
@@ -170,7 +181,7 @@ export default function FollowUpsV2() {
     setRows((fuRes.data || []).filter(r => r.lead?.stage !== 'Lost'))
     setNurtureRows(nuRes.data || [])
     setLoading(false)
-  }, [profile?.id, isPrivileged, repParam, viewingOther])
+  }, [profile?.id, isPrivileged, repParam, viewingOther, teamViewing])
 
   useEffect(() => { load() }, [load])
   // Phase 34Z.59 — refetch on tab-resume so completed follow-ups
@@ -576,6 +587,26 @@ export default function FollowUpsV2() {
 
   return (
     <div className="lead-root" style={{ paddingBottom: 24 }}>
+      {/* Phase 247 — team viewer (can_view_team_dashboard) toggle: default is
+          her own actionable list; "Team (all)" flips to the WHOLE team's open
+          follow-ups, READ-ONLY. Hidden for admin + during a ?rep drill. */}
+      {canViewTeam && !isPrivileged && !repParam && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 999, padding: 3 }}>
+            {[{ v: false, t: 'My follow-ups' }, { v: true, t: 'Team (all)' }].map((o) => (
+              <button key={o.t} type="button" onClick={() => setTeamView(o.v)}
+                style={{
+                  border: 0, cursor: 'pointer', borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600,
+                  background: teamView === o.v ? 'var(--v2-yellow, #FFE600)' : 'transparent',
+                  color: teamView === o.v ? 'var(--accent-fg, #0b1220)' : 'var(--v2-ink-1, #a9b3c7)',
+                }}>
+                {o.t}
+              </button>
+            ))}
+          </div>
+          {teamViewing && <span style={{ fontSize: 12, color: 'var(--v2-ink-2, #6a7590)' }}>Read-only &middot; whole team&rsquo;s open follow-ups</span>}
+        </div>
+      )}
       {/* Phase 34Z.63 — active filter banner. Shown only when
           ?filter=meetings (or future filter values). Tap "Show all"
           to drop the filter and see the full queue. */}
@@ -684,7 +715,7 @@ export default function FollowUpsV2() {
         defaultOpen={true}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
-        readOnly={viewingOther}
+        readOnly={viewReadOnly}
       />
       <Section
         title="Due today"
@@ -694,7 +725,7 @@ export default function FollowUpsV2() {
         defaultOpen={true}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
-        readOnly={viewingOther}
+        readOnly={viewReadOnly}
       />
       <Section
         title="Tomorrow"
@@ -703,7 +734,7 @@ export default function FollowUpsV2() {
         defaultOpen={false}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
-        readOnly={viewingOther}
+        readOnly={viewReadOnly}
       />
       <Section
         title="This week"
@@ -712,7 +743,7 @@ export default function FollowUpsV2() {
         defaultOpen={false}
         onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
         navigate={navigate}
-        readOnly={viewingOther}
+        readOnly={viewReadOnly}
       />
 
       {/* Phase 31S — Nurture revisit sections. Distinct from follow-ups
@@ -738,7 +769,7 @@ export default function FollowUpsV2() {
         icon={<AlertTriangle size={14} strokeWidth={2} />}
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
-        readOnly={viewingOther}
+        readOnly={viewReadOnly}
       />
       <NurtureSection
         title="Revisit today"
@@ -747,7 +778,7 @@ export default function FollowUpsV2() {
         icon={<Clock size={14} strokeWidth={2} />}
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
-        readOnly={viewingOther}
+        readOnly={viewReadOnly}
       />
       <NurtureSection
         title="Revisit tomorrow"
@@ -755,7 +786,7 @@ export default function FollowUpsV2() {
         tone="neutral"
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
-        readOnly={viewingOther}
+        readOnly={viewReadOnly}
       />
       <NurtureSection
         title="Revisit this week"
@@ -763,7 +794,7 @@ export default function FollowUpsV2() {
         tone="neutral"
         onCall={nurtureCall} onWhatsApp={nurtureWhatsApp} onReactivate={reactivate}
         busyId={busyId} navigate={navigate}
-        readOnly={viewingOther}
+        readOnly={viewReadOnly}
       />
 
       {/* Phase 34Z.63 — outcome capture + WhatsApp prompt chain, same
