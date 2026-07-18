@@ -175,9 +175,10 @@ export default function CreateGovtGsrtcLedV2() {
       const ov = overrides[s.id] || {}
       const daily = ov.daily_spots_override ?? 100
       const days  = ov.days_override        ?? 30
+      const dur   = ov.spot_duration_sec_override ?? 10   // Phase 247.4 — 10s slot ×1, 30s ×3
       // Phase 195 — per-proposal rate override; NULL/0 falls back to master.
       const rate  = (ov.rate_override ?? null) || Number(s.davp_per_slot_rate || 0)
-      const monthly = (Number(s.screens_count) || 0) * daily * days * rate
+      const monthly = (Number(s.screens_count) || 0) * daily * days * rate * ((dur > 0 ? dur : 10) / 10)
       return sum + monthly
     }, 0)
     const subtotal = monthlySum * months
@@ -279,7 +280,8 @@ export default function CreateGovtGsrtcLedV2() {
       // listed_rate stays the master DAVP rate so the offered-vs-listed gap shows.
       const masterRate = Number(s.davp_per_slot_rate || 0)
       const rate       = (ov.rate_override ?? null) || masterRate
-      const monthly  = (Number(s.screens_count) || 0) * daily * days * rate
+      // Phase 247.4 — spot-duration multiplier (rate is per 10s slot; 30s ×3).
+      const monthly  = (Number(s.screens_count) || 0) * daily * days * rate * ((duration > 0 ? duration : 10) / 10)
       const lineTotal = monthly * months
       return {
         quote_id:     quote.id,

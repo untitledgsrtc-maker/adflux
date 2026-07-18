@@ -70,6 +70,7 @@ const STR = {
     companyFallback: 'અનટાઇટલ્ડ એડવર્ટાઇઝિંગ',
     gsrtcCaption:    (m) => `GSRTC માન્ય રેટ ટેબલ — ${m} માસ માટે કેમ્પેઇન`,
     monthsTotal:     (m) => `${m} માસ કુલ`,
+    gsrtcSpotNote:   'નોંધ: સ્પોટ ડ્યુરેશન ડિફૉલ્ટ ૧૦ સેકન્ડ છે અને ભાવ દરેક ૧૦ સેકન્ડના સ્લોટ પ્રમાણે છે. ૨૦ સેકન્ડ = ×૨, ૩૦ સેકન્ડ = ×૩, ૪૦ સેકન્ડ = ×૪ (ગુણક = સ્પોટ સેકન્ડ ÷ ૧૦).',
   },
   en: {
     to:              'To,',
@@ -97,6 +98,7 @@ const STR = {
     companyFallback: 'Untitled Advertising',
     gsrtcCaption:    (m) => `GSRTC approved rate table — campaign for ${m} month(s)`,
     monthsTotal:     (m) => `${m} month total`,
+    gsrtcSpotNote:   'Note: spot duration is 10 seconds by default and the rate is per 10-second slot. 20 sec = ×2, 30 sec = ×3, 40 sec = ×4 (multiplier = spot seconds ÷ 10).',
   },
 }
 
@@ -644,21 +646,23 @@ function renderGsrtcTable(data, lang = 'gu') {
   const rowsHtml = items.map((it, i) => {
     // Use per-row values if set; fall back to defaults
     const daily      = Number(it.daily_spots ?? 100)
-    const baseDays   = Number(it.days ?? 30)
-    // Phase 18b — owner directive: when campaign is 2 months, the
-    // "days" column should show 60 and "monthly spots" should aggregate
-    // over the full campaign duration, not 1 month. Fix: multiply
-    // base-days by `months` for everything in the row + totals.
-    const days       = baseDays * months
+    // Phase 247.4 — "Monthly" is a TRUE 30-day month; the N-month total is
+    // monthly × months. (Reverses Phase 18b's `days × months`, which made the
+    // Monthly and N-month columns identical.) `days` is the 30-day basis.
+    const days       = Number(it.days ?? 30)
     const dur        = Number(it.spot_duration_sec ?? 10)
+    // Phase 247.4 — spot-duration multiplier: the rate is per 10-SECOND slot,
+    // so a 20/30/40-sec spot counts as 2/3/4 slots. Default 10s → ×1.
+    const durMult    = (dur > 0 ? dur : 10) / 10
     const screens    = Number(it.screens || 0)
     const rate       = Number(it.unit_rate || 0)
-    const monthly    = screens * daily * days * rate
-    const lineTotal  = monthly
+    const monthlySpots = screens * daily * days
+    const monthly      = monthlySpots * rate * durMult   // 30-day money (with duration)
+    const lineTotal    = monthly * months                // campaign (N-month) money
     subtotal        += lineTotal
     totalScreens    += screens
     totalDaily      += daily * screens
-    totalMonthly    += daily * days * screens
+    totalMonthly    += monthlySpots
     // Phase 11i — prefer Gujarati station name for the gu letter
     // (joined from gsrtc_stations master in GovtProposalDetailV2.load).
     // Falls back to English description for legacy items / wizard
@@ -674,7 +678,7 @@ function renderGsrtcTable(data, lang = 'gu') {
         <td style="${numCell}">${numL(String(screens), lang)}</td>
         <td style="${numCell}">${numL(String(daily), lang)}</td>
         <td style="${numCell}">${numL(String(dur), lang)} ${S.sec}</td>
-        <td style="${numCell}">${numL(String(screens * daily * days), lang)}</td>
+        <td style="${numCell}">${numL(String(monthlySpots), lang)}</td>
         <td style="${numCell}">${numL(String(days), lang)}</td>
         <td style="${numCell}">${formatRate(rate, lang)}</td>
         <td style="${numCell}">${numL(formatINREnglish(monthly), lang)}</td>
@@ -725,5 +729,6 @@ function renderGsrtcTable(data, lang = 'gu') {
         <td style="${numCell}font-weight:700;">${numL(formatINREnglish(total), lang)}</td>
       </tr>
     </tbody>
-  </table>`
+  </table>
+  <p style="margin:6px 0 0;color:#333;font-size:10px;line-height:1.4;">${S.gsrtcSpotNote}</p>`
 }

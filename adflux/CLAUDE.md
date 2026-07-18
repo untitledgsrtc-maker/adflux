@@ -7466,6 +7466,60 @@ review PASS, deploys straight to the LIVE AI — text path byte-preserved):
   inbox shows a placeholder for it (the customer gets the real image) — cosmetic,
   the §114 store-on-receipt only covers INBOUND media, not AI outbound.
 
+## 117 · Phase 247.4 — GSRTC govt quote: true 30-day monthly + spot-duration multiplier (2026-07-16)
+
+Owner caught that the GSRTC LED govt rate table's "monthly" and "2-month" columns
+were IDENTICAL. Fixed + added a spot-duration price multiplier. Adversarial review
+PASS (money math verified, wizard↔PDF agree, gu/en lockstep).
+
+### Two fixes (owner-approved)
+1. **Monthly = true 30-day; N-month total = monthly × months.** Reverses Phase 18b
+   (`days = baseDays × months` → 60, which made "માસિક કુલ" == "૨ માસ કુલ"). Now the
+   Days column shows the 30-day basis, માસિક સ્પોટ / માસિક કુલ are the real month,
+   and the N-month column is monthly × months. **Grand total UNCHANGED** for the
+   standard 10s spot (₹27,27,000 / GST ₹4,90,860 / ₹32,17,860 for the owner's quote).
+2. **Spot-duration multiplier** (`durMult = spot_seconds / 10`): the rate is per
+   10-SECOND slot, so 20/30/40s spots count as ×2/×3/×4. Default 10s → ×1 (no change).
+   e.g. a 30s Anand → monthly ₹4,95,000 (×3).
+
+### Files
+- `src/components/govt/GovtProposalRenderer.jsx` `renderGsrtcTable` — row calc:
+  `days` = 30-day basis (not ×months), `durMult`, `monthlySpots = screens×daily×days`,
+  `monthly = monthlySpots×rate×durMult`, `lineTotal = monthly×months`; totals fixed
+  (`totalMonthly` sums 30-day monthlySpots). + `gsrtcSpotNote` in STR **gu AND en**
+  (only 20/30/40 mentioned) rendered after the table.
+- `src/pages/v2/CreateGovtGsrtcLedV2.jsx` — `monthlySum` + line-item `monthly` both
+  `× durMult`. subtotal = monthlySum × months (was already 30-day; just added durMult).
+- `src/components/govt/GsrtcLedWizard/Step3Stations.jsx` — `effectiveValues.monthly`
+  × durMult; the SPOT(S) field is now a **10–60s `<select>` dropdown** (picking the
+  default 10 stores null = no override).
+
+### Contracts / notes
+- **Wizard and renderer apply durMult on the IDENTICAL formula** → the saved
+  `total_amount` == the printed table. (Verified — this was the highest-risk check.)
+- **gu/en lockstep** (§63): the calc is language-agnostic; every figure via
+  `numL(v, lang)` → both languages get the same corrected numbers; note in both STR.
+- **Legacy/locked:** the renderer RECOMPUTES from line_items (never reads a stored
+  "monthly"), so old proposals re-render with the corrected 30-day monthly but the
+  same grand total (for 10s). Locked/snapshot PDFs (§9) don't re-render → unaffected.
+- **FLAG-1 (owner to confirm):** a legacy UNLOCKED proposal that stored a duration
+  >10s would re-render inflated (old engine had no multiplier). Run to confirm zero
+  exposure: `SELECT count(*) FROM quote_cities WHERE ref_kind='STATION' AND
+  COALESCE(spot_duration_sec_override, slot_seconds, 10) > 10;` → expect 0.
+- **FLAG-2 (dead field, foot-gun):** line-item `monthly_total`/`monthly_spots`
+  (GovtProposalDetailV2:257, Step5Review:62) are computed WITHOUT durMult but are
+  UNREAD by the GSRTC table (renderer recomputes). Harmless now; if a future dev
+  wires one into a summary, apply durMult there too or it'll mismatch.
+
+### Owner action
+Push (JS-only, no SQL, no APK). Smoke: open a GSRTC govt proposal → the "monthly"
+column is now the real 30-day (half the 2-month), grand total same; on Step 3 the
+Spot(s) column is a 10–60s dropdown; pick 30s on a row → that row's cost triples;
+the Gujarati note appears under the table. Run the FLAG-1 query once to confirm no
+legacy >10s proposal exists.
+
+---
+
 ## 116 · Phase 247 — sales "team viewer" (Jayna) sees the whole team, READ-ONLY (2026-07-16)
 
 Owner: give Jayna (a telecaller) admin-style READ of every rep's leads / quotes /

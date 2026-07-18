@@ -29,7 +29,8 @@ function effectiveValues(s, override) {
   // Phase 195 — per-proposal rate override (offer a discount off the master
   // DAVP grade rate). NULL / 0 falls back to the station master's rate.
   const rate     = (override?.rate_override ?? null) || Number(s.davp_per_slot_rate) || 0
-  const monthly  = screens * daily * days * rate
+  // Phase 247.4 — spot-duration multiplier: rate is per 10s slot → 20/30/40s = ×2/×3/×4.
+  const monthly  = screens * daily * days * rate * ((duration > 0 ? duration : DEFAULT_DURATION) / DEFAULT_DURATION)
   return { daily, duration, days, screens, rate, monthly }
 }
 
@@ -338,16 +339,20 @@ export function Step3Stations({ data, onChange }) {
                 className="govt-input-cell"
                 style={{ maxWidth: 70, textAlign: 'right' }}
               />
-              <input
-                type="number"
-                min="1"
-                placeholder={String(DEFAULT_DURATION)}
-                value={ov.spot_duration_sec_override ?? ''}
-                onChange={e => setOverride(s.id, 'spot_duration_sec_override', e.target.value)}
+              {/* Phase 247.4 — spot duration is a 10–60s dropdown; the rate is
+                  per 10s slot so 20/30/40s multiply the cost ×2/×3/×4. Picking
+                  the default (10) stores null = "no override". */}
+              <select
+                value={String(ov.spot_duration_sec_override ?? DEFAULT_DURATION)}
+                onChange={e => setOverride(s.id, 'spot_duration_sec_override', e.target.value === String(DEFAULT_DURATION) ? '' : e.target.value)}
                 disabled={!isChecked}
                 className="govt-input-cell"
                 style={{ maxWidth: 70, textAlign: 'right' }}
-              />
+              >
+                {[10, 20, 30, 40, 50, 60].map(v => (
+                  <option key={v} value={String(v)}>{v}s</option>
+                ))}
+              </select>
               <input
                 type="number"
                 min="1"
