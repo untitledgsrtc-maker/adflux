@@ -7629,3 +7629,46 @@ align the AI to the poster's facts.
   the old Rs 650-850), each screen **1000+ people/day**, **~14 hours/day** play,
   **high-brightness** LED, **AI-tracked daily impressions**. The price backstop
   (4+-digit rupee → hand off) still blocks the AI computing a TOTAL.
+
+
+---
+
+## 118 · Phase 248 — private LED wizard: drop the rate-change reason prompt (2026-07-16, `a10a826`)
+
+Owner (screenshot of the private "Campaign Locations" step): "I ALSO WANT IN
+PRIVATE SAME LOGIC AND WHEN WE CHANGE THE PRICE WE ASK FOR REASON, I DON'T WANT
+IT." Clarified via AskUserQuestion: (1) slot-seconds = **describe only, NO price
+multiplier** for private (leave current behaviour); (2) remove **only** the
+price-change (offered-rate) reason — KEEP the slots/day reason.
+
+### What shipped (JS-only, on origin, guardian PASS, §45-safe)
+`src/components/quotes/QuoteWizard/Step2Campaign.jsx` (private LED wizard Step 2 —
+NOT §28-frozen but a live quote/money flow → guardian'd anyway):
+- `handleNext()` validation loop: REMOVED the offered-rate override-reason gate
+  (was blocking Next with "Please provide reason for all rate overrides." when
+  `offered_rate` ≠ the city default and `override_reason` was empty). KEPT the
+  slots/day override-reason gate byte-identical.
+- Render: REMOVED the `{rateOverridden && (...)}` "Reason for Rate Override *"
+  input block + the now-unused `const rateOverridden` declaration. KEPT the
+  `{slotsOverridden && (...)}` "Reason for Slots Override *" input.
+
+### Why it's safe (guardian PASS + verified)
+- **No money-math change:** `calcTotal` = `Math.round(offeredRate × screens ×
+  months)` byte-unchanged; `slot_seconds`/`slots_per_day` stay excluded from
+  `campaign_total` (describe-only — owner declined a private slot-sec multiplier,
+  UNLIKE the govt GSRTC §117 which DOES multiply). Do NOT add a slot-sec price
+  multiplier to the private wizard.
+- `override_reason` still initialises `''` in `buildEntry()` + persists nullable
+  end-to-end (`WizardShell.jsx` `|| null`; `quote_cities.override_reason` is
+  `text`, no NOT NULL) → it now simply saves empty; no constraint break, no
+  display break.
+- No lead_id / stage / cadence contract touched. Other 3 wizards (Other Media,
+  Auto Hood, GSRTC) never had a rate-override-reason gate → no module-consistency
+  gap. Pre-existing P3 (`#fbc42d` fallback on the QUICK_DURATIONS pills,
+  Step2Campaign:220/226) left per §16 scope discipline.
+
+### Owner action
+Push done (`a10a826`, JS-only, no SQL, no APK rebuild — reaches the APK on next
+open). Smoke: private LED wizard → Step 2 → change a city's rate away from the
+default → Next proceeds WITHOUT asking for a reason; changing slots/day still
+prompts for the slots reason.
