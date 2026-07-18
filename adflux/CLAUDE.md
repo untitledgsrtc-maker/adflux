@@ -7517,6 +7517,22 @@ column is now the real 30-day (half the 2-month), grand total same; on Step 3 th
 Spot(s) column is a 10–60s dropdown; pick 30s on a row → that row's cost triples;
 the Gujarati note appears under the table. Run the FLAG-1 query once to confirm no
 legacy >10s proposal exists.
+- **FLAG-1 result (owner ran 16 Jul):** count=1 → draft `UA/GSRTC/2026-27/0134`
+  (Bhavnagar, 15 screens, daily 84, **30s**, rate ₹9). It's a DRAFT (not sent/locked)
+  → zero client impact; it genuinely has a 30s spot so it correctly re-prices ×3
+  (₹3,40,200 → ₹10,20,600 for that row). No data fix — the rep just reviews the draft
+  (keep 30s = correct new price, or set the dropdown to 10s if it was a typo).
+
+### Phase 247.5 — Step 3 bulk-set Duration + collapsed bulk panel (16 Jul)
+Owner: "bulk change duration" + "minimal this many selection/edit lines."
+`Step3Stations.jsx` (govt wizard, not §28-frozen, additive UI):
+- NEW **bulk-set Duration** — a 10–60s dropdown + "Apply to N selected" →
+  `applyBulkDuration()` writes `spot_duration_sec_override` to every selected station
+  (picking 10 stores null = no override), mirroring the existing bulk-Daily.
+- The bulk tools (Daily / Duration / Rate-by-grade) are now **collapsed behind a
+  "Bulk edit ▾" toggle** (`bulkOpen`, default closed, Lucide ChevronDown per §7) so
+  the header is just search + Select all/none by default. Daily + Duration share one
+  compact row; Rate below. Per-station rows + the pricing calc unchanged.
 
 ---
 

@@ -11,7 +11,7 @@
 // Live recalc as overrides change.
 
 import { useMemo, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, ChevronDown } from 'lucide-react'
 import { useGsrtcStations } from '../../../hooks/useGovtMasters'
 import { formatINREnglish } from '../../../utils/gujaratiNumber'
 
@@ -50,6 +50,11 @@ export function Step3Stations({ data, onChange }) {
   // leave that grade's rate at the master default. Owner: "change rate in bulk
   // according grade" — this proposal only (override), master untouched.
   const [bulkRates, setBulkRates] = useState({ A: '', B: '', C: '' })
+  // Phase 247.5 — collapse the bulk tools (Daily / Duration / Rate) behind one
+  // "Bulk edit" toggle so the header stays short; open only when needed. Plus a
+  // bulk-set SPOT DURATION (owner request).
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkDuration, setBulkDuration] = useState('')
 
   if (!loading && data.selected_station_ids === undefined && stations.length) {
     onChange({ selected_station_ids: stations.map(s => s.id) })
@@ -105,6 +110,18 @@ export function Step3Stations({ data, onChange }) {
     const next = { ...overrides }
     for (const id of selected) {
       next[id] = { ...(next[id] || {}), daily_spots_override: Number(bulkDaily) }
+    }
+    onChange({ station_overrides: next })
+  }
+
+  // Phase 247.5 — bulk-set the SPOT DURATION for every selected station.
+  // Picking the default (10) stores null (no override); else the value.
+  function applyBulkDuration() {
+    if (!selected.length || bulkDuration === '') return
+    const dur = Number(bulkDuration)
+    const next = { ...overrides }
+    for (const id of selected) {
+      next[id] = { ...(next[id] || {}), spot_duration_sec_override: dur === DEFAULT_DURATION ? null : dur }
     }
     onChange({ station_overrides: next })
   }
@@ -186,22 +203,27 @@ export function Step3Stations({ data, onChange }) {
           </div>
           <button type="button" onClick={selectAll}>Select all</button>
           <button type="button" onClick={selectNone}>Select none</button>
+          <button
+            type="button"
+            onClick={() => setBulkOpen(o => !o)}
+            style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          >
+            Bulk edit
+            <ChevronDown size={13} style={{ transform: bulkOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+          </button>
         </div>
 
-        {/* Phase 147.1 — bulk-set DAILY for ALL selected stations (owner:
-            "need only daily option" + "ui not findable"). Clear bordered
-            input + bold label. Writes daily_spots_override to every selected
-            station; per-row overrides + 100/10/30 defaults untouched. */}
+        {/* Phase 247.5 — bulk tools collapsed behind the "Bulk edit" toggle.
+            Daily + Duration in one compact row; Rate-by-grade below. */}
+        {bulkOpen && (<>
         <div className="govt-list__bulk" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: 'var(--text)', fontWeight: 600 }}>
-            Bulk set Daily for all selected:
-          </span>
+          <span style={{ color: 'var(--text)', fontWeight: 600 }}>Daily:</span>
           <input
-            type="number" min="1" placeholder="e.g. 150"
+            type="number" min="1" placeholder="150"
             value={bulkDaily}
             onChange={e => setBulkDaily(e.target.value)}
             style={{
-              width: 120, textAlign: 'right',
+              width: 90, textAlign: 'right',
               background: 'var(--surface-2)',
               border: '1px solid var(--border-strong, #475569)',
               borderRadius: 6, padding: '7px 10px',
@@ -212,6 +234,28 @@ export function Step3Stations({ data, onChange }) {
             type="button"
             onClick={applyBulk}
             disabled={selected.length === 0 || bulkDaily === ''}
+          >
+            Apply
+          </button>
+
+          <span style={{ color: 'var(--text)', fontWeight: 600, marginLeft: 14 }}>Duration:</span>
+          <select
+            value={bulkDuration}
+            onChange={e => setBulkDuration(e.target.value)}
+            style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-strong, #475569)',
+              borderRadius: 6, padding: '7px 10px',
+              color: 'var(--text)', fontSize: 14, outline: 'none',
+            }}
+          >
+            <option value="">— sec —</option>
+            {[10, 20, 30, 40, 50, 60].map(v => <option key={v} value={String(v)}>{v}s</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={applyBulkDuration}
+            disabled={selected.length === 0 || bulkDuration === ''}
           >
             Apply to {selected.length} selected
           </button>
@@ -251,6 +295,7 @@ export function Step3Stations({ data, onChange }) {
             Apply rate to selected
           </button>
         </div>
+        </>)}
 
         {/* Header row */}
         <div
