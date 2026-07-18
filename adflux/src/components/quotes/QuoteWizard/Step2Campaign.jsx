@@ -129,17 +129,10 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       setError('Add at least one city to continue.')
       return
     }
-    // Override reason required whenever the rep deviates from the
-    // stored default for either rate or slots. Slot-count overrides
-    // tracked separately so admin review knows WHY a rep cut the
-    // daily spot commitment below 100 — common negotiation lever.
+    // Slot-count overrides tracked separately so admin review knows WHY a
+    // rep cut the daily spot commitment below 100 — common negotiation lever.
+    // Rate changes no longer prompt for a reason (owner directive).
     for (const sc of selectedCities) {
-      const defaultRate = sc.city.offer_rate || 0
-      const offeredRate = sc.offered_rate || 0
-      if (Math.abs(offeredRate - defaultRate) > 0.01 && !sc.override_reason?.trim()) {
-        setError('Please provide reason for all rate overrides.')
-        return
-      }
       const slots = Number(sc.slots_per_day) || DEFAULT_SLOTS_PER_DAY
       if (slots !== DEFAULT_SLOTS_PER_DAY && !sc.slots_override_reason?.trim()) {
         setError('Please provide reason when slots/day differs from 100.')
@@ -163,7 +156,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       {selectedCities.length > 0 && (
         <div className="campaign-cities">
           {selectedCities.map(sc => {
-            const rateOverridden = Math.abs((sc.offered_rate || 0) - (sc.city.offer_rate || 0)) > 0.01
             const slotsOverridden = (Number(sc.slots_per_day) || DEFAULT_SLOTS_PER_DAY) !== DEFAULT_SLOTS_PER_DAY
             return (
               <div key={sc.city.id} className="campaign-city-row">
@@ -322,19 +314,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                     <label className="ccr-label">Total</label>
                     <p className="ccr-total">{formatCurrency(sc.campaign_total)}</p>
                   </div>
-
-                  {rateOverridden && (
-                    <div className="ccr-field" style={{ gridColumn: '1 / -1' }}>
-                      <label className="ccr-label" style={{ color: '#ffb74d' }}>Reason for Rate Override *</label>
-                      <input
-                        type="text"
-                        className="ccr-input"
-                        placeholder="Why is the rate different?"
-                        value={sc.override_reason || ''}
-                        onChange={e => updateEntry(sc.city.id, 'override_reason', e.target.value)}
-                      />
-                    </div>
-                  )}
 
                   {slotsOverridden && (
                     <div className="ccr-field" style={{ gridColumn: '1 / -1' }}>
