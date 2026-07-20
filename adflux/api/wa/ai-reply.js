@@ -92,10 +92,22 @@ export default async function handler(req) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(convId)) return nope('bad_conversation')
 
   // ── load conversation + account ──
-  const conv = (await (await sb(`whatsapp_conversations?id=eq.${convId}&select=id,customer_wa_id,whatsapp_account_id,window_expires_at,ai_paused&limit=1`)).json())?.[0]
+  const conv = (await (await sb(`whatsapp_conversations?id=eq.${convId}&select=id,customer_wa_id,whatsapp_account_id,window_expires_at,ai_paused,lead_id&limit=1`)).json())?.[0]
   if (!conv) return nope('conv_not_found')
   if (conv.ai_paused) return nope('ai_paused')                                   // a human took over
   if (conv.window_expires_at && new Date(conv.window_expires_at).getTime() < Date.now()) return nope('window_closed')  // 24h policy window
+
+  // Opt-out is a property of the LEAD, not of this thread. ai_paused only mutes
+  // the conversation it was set on, so without this check the AI keeps replying
+  // to someone who opted out via the admin toggle, or who sent STOP on the OTHER
+  // number (the same lead can hold a thread on both 95815… and 98982…, §119).
+  // Best-effort: a lookup failure must not silence a legitimate reply.
+  if (conv.lead_id) {
+    try {
+      const ld = (await (await sb(`leads?id=eq.${conv.lead_id}&select=wa_opt_out&limit=1`)).json())?.[0]
+      if (ld?.wa_opt_out) return nope('lead_opted_out')
+    } catch { /* ignore — never block a reply on a failed lookup */ }
+  }
 
   const acct = (await (await sb(`whatsapp_accounts?id=eq.${conv.whatsapp_account_id}&select=phone_number_id,ai_enabled,ai_system_prompt,ai_welcome_image_url&limit=1`)).json())?.[0]
   if (!acct?.ai_enabled) return nope('ai_disabled')

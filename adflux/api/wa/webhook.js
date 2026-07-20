@@ -109,6 +109,42 @@ function mediaInfo(m) {
     : { id: null, mime: null }
 }
 
+// Honour an inbound opt-out keyword.
+//
+// WhatsApp's own "Stop promotions" affordance sends exactly this text, and Meta
+// counts continuing to message someone who sent it against the number's quality
+// rating. Until now NOTHING in the app ingested it — wa_opt_out was only ever
+// set by an admin toggling it by hand.
+//
+// WHOLE-MESSAGE exact match only (trimmed, case- and space-insensitive, length
+// capped) so conversational uses never trigger it — "don't stop the campaign"
+// must NOT opt a paying client out of their own thread.
+//
+// Also pauses the AI on that thread: without it the responder cheerfully replies
+// to "STOP". The AI dispatch trigger fires on the message INSERT, so this can
+// race and let one reply through — it still stops every subsequent one.
+//
+// Called FIRE-AND-FORGET (not awaited) → zero pre-200 latency. Self-contained
+// try/catch → never rejects, so an un-awaited call is safe (§46).
+const STOP_WORDS = new Set([
+  'STOP', 'STOP ALL', 'STOP PROMOTIONS', 'UNSUBSCRIBE', 'OPT OUT', 'OPTOUT',
+])
+async function honourStopKeyword(admin, convId, text) {
+  try {
+    if (!admin || !convId) return
+    const t = String(text || '').trim().toUpperCase().replace(/\s+/g, ' ')
+    if (!t || t.length > 20 || !STOP_WORDS.has(t)) return
+    const { data: c } = await admin.from('whatsapp_conversations')
+      .select('lead_id').eq('id', convId).maybeSingle()
+    // Pause the AI regardless of whether a lead is linked — a bare
+    // conversation can still be mid-AI-thread.
+    await admin.from('whatsapp_conversations')
+      .update({ ai_paused: true }).eq('id', convId)
+    if (!c?.lead_id) return
+    await admin.from('leads').update({ wa_opt_out: true }).eq('id', c.lead_id)
+  } catch { /* best-effort — never breaks the webhook */ }
+}
+
 // Phase 245 — download an inbound media object to OUR storage while Meta still
 // has the bytes (Meta deletes media after a few days). Called FIRE-AND-FORGET
 // from the webhook (NOT awaited) → zero pre-200 latency, never delays the bot
@@ -542,6 +578,8 @@ async function storeInbound(payload) {
         // effort; the /api/wa/media proxy lazy-caches on first view as the
         // guaranteed backstop. storeInboundMedia never rejects (self-contained).
         if (media.id) { void storeInboundMedia(admin, media.id, media.mime) }
+        // Opt-out keyword — same fire-and-forget contract as the media capture.
+        if (convId) { void honourStopKeyword(admin, convId, messageBody(m)) }
         let repliedThisMsg = false
 
         // Phase C — a PUBLISHED flow (+ bot ON) drives the bot end-to-end and

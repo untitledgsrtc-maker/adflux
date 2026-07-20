@@ -34,12 +34,36 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
   const [body, setBody] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [optedOut, setOptedOut] = useState(false)
 
   useEffect(() => {
     if (!open || !stage) return
     let cancelled = false
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setOptedOut(false)
     ;(async () => {
+      // Opt-out is read from the DB, NEVER from the passed `lead` prop.
+      // TelecallerV2 selects wa_opt_out, but WorkV2 / FollowUpsV2 /
+      // LeadDetailV2 pass lead objects that don't carry the flag — a
+      // prop-based guard (`!lead?.wa_opt_out`) reads undefined there and
+      // is a SILENT NO-OP that looks like a working fix. Hence this read.
+      //
+      // lead.id is not always a lead: FollowUpsV2 quote-chase rows pass a
+      // QUOTE uuid (lead_id is null on those). maybeSingle() then returns
+      // no row — we proceed, because there is no lead to have opted out.
+      // Fail-closed on a positive flag, fail-open on "not a lead".
+      if (lead?.id) {
+        const { data: l } = await supabase
+          .from('leads')
+          .select('wa_opt_out')
+          .eq('id', lead.id)
+          .maybeSingle()
+        if (cancelled) return
+        if (l?.wa_opt_out) {
+          setLoading(false)
+          setOptedOut(true)
+          return
+        }
+      }
       const { data, error: tErr } = await supabase
         .from('message_templates')
         .select('body')
@@ -68,6 +92,7 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
   if (!open) return null
 
   function send() {
+    if (optedOut) return
     const phone = cleanPhone(lead?.phone)
     if (!phone) {
       setError('No phone number on file for this lead.')
@@ -83,6 +108,7 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
   }
 
   function sendSms() {
+    if (optedOut) return
     const phone = cleanPhone(lead?.phone)
     if (!phone) {
       setError('No phone number on file for this lead.')
@@ -125,6 +151,13 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 13 }}>
               <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading template…
             </div>
+          ) : optedOut ? (
+            <div style={{
+              background: 'var(--warning-soft)', border: '1px solid var(--warning)',
+              color: 'var(--warning)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 13,
+            }}>
+              This lead asked not to receive WhatsApp messages. Sending is blocked.
+            </div>
           ) : error ? (
             <div style={{
               background: 'var(--danger-soft)', border: '1px solid var(--danger)',
@@ -144,18 +177,18 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
         </div>
 
         <div className="lead-modal-foot">
-          <button className="lead-btn" onClick={onClose}>Skip</button>
+          <button className="lead-btn" onClick={onClose}>{optedOut ? 'Close' : 'Skip'}</button>
           <button
             className="lead-btn"
             onClick={sendSms}
-            disabled={loading || !body || !!error}
+            disabled={loading || optedOut || !body || !!error}
           >
             <MessageSquare size={13} /> Send SMS
           </button>
           <button
             className="lead-btn lead-btn-primary"
             onClick={send}
-            disabled={loading || !body || !!error}
+            disabled={loading || optedOut || !body || !!error}
           >
             <MessageCircle size={13} /> Send WhatsApp
           </button>
