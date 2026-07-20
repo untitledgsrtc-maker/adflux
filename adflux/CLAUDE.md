@@ -7981,3 +7981,45 @@ build.
 tree** (§115 says keep it out of git). The secret is already in the DB trigger and
 in Vercel, so the local copy is redundant — `git checkout --` that file. NEVER
 `git add -A` in this repo.
+
+### 249.3 / 249.4 — pilot findings (20 Jul, same day)
+
+**PILOT SUCCEEDED.** A real post-call send went out from the business number,
+delivered ✓✓, and the customer's reply landed in the campaign inbox. P3/P4 proven
+end-to-end on a live thread.
+
+Two problems the owner spotted in that one screenshot, both fixed (`6914609`):
+
+1. **Inbox showed `[template] post_call_callback`**, not the message the customer
+   received — a rep opening the thread could not tell what had been said. Meta
+   does not expose the approved body at send time, so `wa_outcome_templates
+   .preview_body` holds a COPY; the endpoint substitutes the vars and logs the
+   real text (falls back to the placeholder if null).
+   ⚠️ **LOCKSTEP: edit a Meta template → edit `preview_body` too**, else the log
+   shows text the customer never got. Log only; never affects what is sent.
+2. **"Don't call me again" did nothing.** The STOP matcher was exact-match only
+   (`STOP`/`UNSUBSCRIBE`/…), and real people never type that. Added `STOP_PHRASES`
+   (don't call me / stop calling / remove my number / leave me alone / …),
+   substring-matched but ONLY inside a message ≤120 chars — a refusal is terse,
+   the same words in a long reply are conversational. Apostrophes normalised.
+   **Deliberately EXCLUDES "not interested"** — ordinary negotiation talk;
+   auto-muting a workable lead costs more than it saves, and that case is the
+   Lost outcome the rep picks. Verified against 9 phrasings including the
+   false-positive guard "we dont want to stop the campaign…" → correctly NOT an
+   opt-out.
+
+**MEETING CONFIRMATION — endpoint ready, prompt NOT wired (guardian BLOCKED it).**
+Removing `if (nextAction === 'meeting') return` from TelecallerV2 does NOT work:
+`PostCallOutcomeModal` fires `onSaved()` unawaited then `onLogMeeting()`, which
+navigates to `/leads/:id` and unmounts the page, so the prompt's stage-refetch +
+200ms timer resolve on an unmounted component and it never renders. The guard is
+RESTORED with a comment so nobody removes it again for the same wrong reason.
+`post_call_meeting` + the 'meeting' pseudo-outcome ARE shipped and correct
+(2h-bounded — unbounded, any old meeting would override every future send with a
+wrong date). To finish it: raise the prompt where the rep LANDS (lead detail), and
+ship to all 4 hosts at once — WorkV2/FollowUpsV2/LeadDetailV2 all still skip too.
+
+**SQL run-state:** `phase249_2` RUN ✓ · `phase249_4` RUN ✓ (5 rows, all
+preview_body) · **`phase249_3` NOT run** (meeting row absent — fine, unwired).
+⚠️ If `249_3` is ever run, **re-run `249_4` after it** or the meeting row lands
+without `preview_body`.
