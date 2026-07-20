@@ -9,11 +9,14 @@
 // api/wa/webhook.js are Node (supabase-js). A Node fn here breaks every deploy.
 // Edge functions don't count — raw fetch to the Graph API + Supabase REST.
 //
-// SECURITY (§45): auth REQUIRED; ADMIN / co_owner only for now (manual + test
-// sends). The automation triggers (Phase B) will call the Graph API from a
-// DEFINER DB path / service role, not this user-gated endpoint. from-number is
-// SERVER-resolved (the marketing account), never client-chosen. ONE recipient
-// per call (no bulk here — the broadcast tool is Phase C with its own guards).
+// SECURITY (§45): auth REQUIRED. TWO modes:
+//   • RAW mode  (body.to)      — ADMIN / co_owner only. Manual + test sends.
+//   • LEAD mode (body.lead_id) — admin / co_owner / TELECALLER (pilot). The
+//     client sends only a lead id; phone, outcome and template are all derived
+//     server-side, so a tampered request cannot reach an arbitrary number.
+// from-number is SERVER-resolved (the marketing account), never client-chosen.
+// ONE recipient per call (no bulk here — broadcast is Phase C with its own
+// guards).
 //
 // Env: SUPABASE_URL (||VITE_) + SUPABASE_SERVICE_ROLE_KEY + SUPABASE_ANON_KEY
 //   (||VITE_) + CAMPAIGN_WA_TOKEN (the permanent System User token, §54).
@@ -29,6 +32,48 @@ const GRAPH = 'https://graph.facebook.com/v21.0'
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } })
+
+// Supabase REST with the service role. Edge runtime → raw fetch, no supabase-js.
+const sb = (path, init = {}) =>
+  fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
+  })
+
+const one = async (path) => {
+  try { const r = await sb(path); const j = await r.json().catch(() => []); return Array.isArray(j) ? j[0] : null }
+  catch { return null }
+}
+
+// 10-digit Indian mobile → 91XXXXXXXXXX. Returns null if it isn't a sane number.
+function waPhone(raw) {
+  const d = String(raw || '').replace(/\D/g, '')
+  if (d.length === 10) return `91${d}`
+  if (d.length === 12 && d.startsWith('91')) return d
+  if (d.length === 11 && d.startsWith('0')) return `91${d.slice(1)}`
+  return /^\d{11,15}$/.test(d) ? d : null
+}
+
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+function prettyDate(iso) {
+  if (!iso) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso))
+  if (!m) return null
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] || ''}`.trim()
+}
+function prettyTime(t) {
+  if (!t) return null
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t))
+  if (!m) return null
+  let h = Number(m[1]); const ap = h >= 12 ? 'PM' : 'AM'
+  h = h % 12 || 12
+  return `${h}:${m[2]} ${ap}`
+}
 
 export default async function handler(req) {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -48,20 +93,32 @@ export default async function handler(req) {
   } catch { return json({ error: 'auth_unreachable' }, 502) }
   if (!uid) return json({ error: 'bad_auth' }, 401)
 
-  // ── role gate: admin / co_owner only (fail closed on NULL, §41) ──
-  let role = null
+  // ── caller's row (fail closed on NULL, §41) ──
+  let role = null, callerName = null
   try {
-    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role`, {
+    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role,name`, {
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     })
     const rows = await rr.json().catch(() => [])
     role = Array.isArray(rows) && rows[0] ? rows[0].role : null
+    callerName = Array.isArray(rows) && rows[0] ? rows[0].name : null
   } catch { /* role unknown → refused below */ }
-  if (!['admin', 'co_owner'].includes(role)) return json({ error: 'not_allowed', detail: 'Admin only for now.' }, 403)
 
   // ── body ──
   let body
   try { body = await req.json() } catch { body = {} }
+
+  // ══ LEAD MODE (P3) ══════════════════════════════════════════════════════
+  // Post-call send. The rep taps "Send from company number" in
+  // WhatsAppPromptModal; everything that matters is decided HERE, server-side:
+  // the recipient phone, the template, and the three conversation fields that
+  // make the reply come back to the right person.
+  if (body?.lead_id) {
+    return await sendToLead({ uid, role, callerName, leadId: String(body.lead_id) })
+  }
+
+  // ══ RAW MODE (unchanged) — admin/co_owner manual + test sends ═══════════
+  if (!['admin', 'co_owner'].includes(role)) return json({ error: 'not_allowed', detail: 'Admin only for now.' }, 403)
   const to = String(body?.to || '').replace(/\D/g, '')
   const templateName = String(body?.template || '').trim()
   const lang = String(body?.language || 'en_US').trim()
@@ -111,4 +168,177 @@ export default async function handler(req) {
   }
 
   return json({ ok: true, wamid: data?.messages?.[0]?.id || null, account_id: accountId })
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// LEAD MODE — post-call template send from the business number.
+//
+// Everything security-relevant is decided server-side. The client sends ONLY a
+// lead_id: the phone, the template and the recipient are all derived here, so a
+// tampered request cannot message an arbitrary number or pick a template.
+//
+// The three fields written onto the conversation ARE the feature:
+//   lead_id      — else trg_campaign_conv_ensure_lead spawns a DUPLICATE lead
+//   assigned_to  — else the reply is invisible to the rep who sent it
+//                  (CampaignInboxV2 filters non-privileged users on assigned_to)
+//   ai_paused    — else the AI answers before the rep, and treats the next
+//                  inbound as first contact and fires the welcome poster
+//
+// Deliberately writes NO lead_activities row: lead_activity_after_insert bumps
+// contact_attempts_count (halving the auto-Lost threshold) and sets
+// last_contact_at, which re-sorts the TC queue and would deprioritise the lead
+// the rep just messaged.
+// ─────────────────────────────────────────────────────────────────────────
+async function sendToLead({ uid, role, callerName, leadId }) {
+  // Pilot gate: telecallers + admins only (§ plan P5 — widen after the pilot).
+  if (!['admin', 'co_owner', 'telecaller'].includes(role)) {
+    return json({ error: 'not_allowed', detail: 'Telecallers only during the pilot.' }, 403)
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(leadId)) return json({ error: 'bad_lead_id' }, 400)
+
+  const lead = await one(`leads?id=eq.${leadId}&select=id,name,phone,stage,wa_opt_out,do_not_call,assigned_to,telecaller_id&limit=1`)
+  if (!lead) return json({ error: 'lead_not_found' }, 404)
+
+  // Ownership — the caller must own the lead, unless privileged.
+  const privileged = ['admin', 'co_owner'].includes(role)
+  if (!privileged && lead.assigned_to !== uid && lead.telecaller_id !== uid) {
+    return json({ error: 'not_your_lead' }, 403)
+  }
+  if (lead.wa_opt_out) return json({ error: 'opted_out', detail: 'This lead asked not to receive WhatsApp messages.' }, 409)
+
+  const to = waPhone(lead.phone)
+  if (!to) return json({ error: 'no_phone', detail: 'No usable phone number on this lead.' }, 400)
+
+  // Outcome is READ BACK from the call the rep just saved — never taken from the
+  // client. Keeps the four frozen host pages untouched (they don't pass it).
+  const act = await one(
+    `lead_activities?lead_id=eq.${leadId}&created_by=eq.${uid}&activity_type=eq.call` +
+    `&outcome=not.is.null&select=outcome&order=created_at.desc&limit=1`
+  )
+  let outcome = act?.outcome || null
+  if (!outcome) return json({ error: 'no_outcome', detail: 'No saved call outcome for this lead yet.' }, 409)
+
+  // The UI's "Nurture" outcome is STORED as 'neutral' — lead_activities.outcome
+  // has a CHECK allowing only positive/neutral/negative/callback (Phase 107 chose
+  // that workaround). Reading the column back therefore can never yield
+  // 'nurture', which would silently send the "Maybe" template to every parked
+  // lead. Nurture is the one outcome that also moves the lead to stage=Nurture,
+  // so that pair disambiguates it — server-side, no client trust.
+  if (outcome === 'neutral' && lead.stage === 'Nurture') outcome = 'nurture'
+
+  const tpl = await one(`wa_outcome_templates?outcome=eq.${outcome}&is_active=eq.true&select=*&limit=1`)
+  if (!tpl?.meta_template_name) {
+    return json({ error: 'no_template_for_outcome', detail: `No template mapped for outcome "${outcome}".` }, 409)
+  }
+
+  // ── marketing account (server-controlled sender) ──
+  const acct = await one(`whatsapp_accounts?purpose=eq.marketing&phone_number_id=not.is.null&select=id,phone_number_id&limit=1`)
+  if (!acct?.phone_number_id) return json({ error: 'no_marketing_number' }, 503)
+
+  // ── existing thread (also drives the throttle) ──
+  const conv = await one(`whatsapp_conversations?whatsapp_account_id=eq.${acct.id}&customer_wa_id=eq.${to}&select=id&limit=1`)
+
+  // Throttle: at most ONE business-initiated template to a lead per day. Bounds
+  // both cost and annoyance, and is per-LEAD (a per-rep cap would collide with
+  // the TC's own 50-call daily target).
+  if (conv?.id) {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+    const recent = await one(
+      `whatsapp_messages?conversation_id=eq.${conv.id}&direction=eq.out&type=eq.template&at=gte.${since}&select=id&limit=1`
+    )
+    if (recent) return json({ error: 'already_sent_today', detail: 'A message was already sent to this lead in the last 24 hours.' }, 429)
+  }
+
+  // ── variables ──
+  const leadName = (lead.name || 'there').slice(0, 60)
+  const repName = (callerName || 'our team').slice(0, 60)
+  let vars = [leadName, repName]
+  if (outcome === 'callback') {
+    // The callback template confirms a specific date + time, so it cannot be
+    // sent without one. Read the follow-up the outcome modal just spawned.
+    const fu = await one(
+      `follow_ups?lead_id=eq.${leadId}&is_done=eq.false&select=follow_up_date,follow_up_time&order=follow_up_date.asc&limit=1`
+    )
+    const d = prettyDate(fu?.follow_up_date), t = prettyTime(fu?.follow_up_time)
+    if (!d || !t) return json({ error: 'no_callback_time', detail: 'No callback date/time saved, so the confirmation cannot be sent.' }, 409)
+    vars = [leadName, repName, d, t]
+  }
+
+  const components = [{ type: 'body', parameters: vars.map((v) => ({ type: 'text', text: v })) }]
+  if (tpl.header_doc_url) {
+    components.unshift({
+      type: 'header',
+      parameters: [{ type: 'document', document: { link: tpl.header_doc_url, filename: tpl.header_doc_name || 'Untitled Advertising.pdf' } }],
+    })
+  }
+
+  // ── send ──
+  let resp, data
+  try {
+    resp = await fetch(`${GRAPH}/${acct.phone_number_id}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp', to, type: 'template',
+        template: { name: tpl.meta_template_name, language: { code: tpl.language || 'en' }, components },
+      }),
+    })
+    data = await resp.json().catch(() => ({}))
+  } catch (e) {
+    return json({ error: 'send_failed', detail: String(e?.message || e) }, 502)
+  }
+  if (!resp.ok) {
+    return json({ error: 'send_failed', detail: data?.error?.message || `Graph HTTP ${resp.status}`, meta: data?.error || null }, 502)
+  }
+  const wamid = data?.messages?.[0]?.id || null
+
+  // ── the three fields that make replies come back (see header) ──
+  const nowIso = new Date().toISOString()
+  let convId = conv?.id || null
+  let routingOk = true
+  try {
+    if (convId) {
+      await sb(`whatsapp_conversations?id=eq.${convId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ lead_id: leadId, assigned_to: uid, ai_paused: true, updated_at: nowIso }),
+      })
+    } else {
+      // lead_id MUST be present on INSERT — trg_campaign_conv_ensure_lead only
+      // early-returns when it is, otherwise it creates a duplicate lead.
+      const r = await sb('whatsapp_conversations', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation,resolution=merge-duplicates' },
+        body: JSON.stringify({
+          whatsapp_account_id: acct.id, customer_wa_id: to, lead_id: leadId,
+          assigned_to: uid, ai_paused: true, status: 'open',
+        }),
+      })
+      const rows = await r.json().catch(() => [])
+      convId = Array.isArray(rows) && rows[0] ? rows[0].id : null
+    }
+    if (!convId) routingOk = false
+  } catch { routingOk = false }
+
+  // ── log the outbound (also stops the AI treating the next inbound as first
+  // contact and firing the welcome poster) ──
+  if (convId) {
+    try {
+      await sb('whatsapp_messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          conversation_id: convId, wamid, direction: 'out', type: 'template',
+          body: `[template] ${tpl.meta_template_name}`, status: 'sent', at: nowIso,
+        }),
+      })
+    } catch { /* best-effort */ }
+  }
+
+  // The message IS sent either way — but if the conversation write failed, the
+  // reply will NOT route back to this rep and the AI is not muted. Surface it
+  // rather than returning a clean ok:true over a half-done send (the exact
+  // "looks successful, silently broken" mode this plan set out to avoid).
+  return json({
+    ok: true, wamid, outcome, template: tpl.meta_template_name, conversation_id: convId,
+    ...(routingOk ? {} : { warning: 'reply_routing_failed', detail: 'Message sent, but the reply may not appear in your inbox. Tell an admin.' }),
+  })
 }

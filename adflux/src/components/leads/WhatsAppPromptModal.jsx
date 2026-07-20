@@ -18,8 +18,8 @@
 // Phone normalization, OCR placeholder fill, and segment→media
 // mapping all happen here so callers stay simple.
 
-import { useEffect, useState } from 'react'
-import { X, MessageCircle, MessageSquare, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, MessageCircle, MessageSquare, Loader2, Building2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openExternalUrl } from '../../utils/openExternal'
 import { phoneToWaJidOrNull as cleanPhone } from '../../utils/phone'
@@ -35,6 +35,18 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [optedOut, setOptedOut] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sentOk, setSentOk] = useState(false)
+  // SEPARATE from `error` on purpose: `error` gates the template textarea and
+  // disables the WhatsApp/SMS buttons. A failed company-send must NOT take the
+  // deep-link fallback away — that fallback is the whole point.
+  const [sendError, setSendError] = useState('')
+  const sendingRef = useRef(false)
+
+  // Company-number sending is telecaller-first during the pilot; the server
+  // enforces the same gate, this only avoids showing a button that would 403.
+  const canSendFromCompany =
+    !!lead?.id && ['telecaller', 'admin', 'co_owner'].includes(profile?.role)
 
   useEffect(() => {
     if (!open || !stage) return
@@ -107,6 +119,44 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
     onClose?.()
   }
 
+  // Send from the COMPANY number instead of deep-linking into the rep's own
+  // WhatsApp. The reply then lands in the app inbox assigned to this rep, and
+  // the AI is paused on that thread so it doesn't answer before they do.
+  //
+  // Server decides everything that matters — it takes only the lead id and
+  // derives the phone, the outcome and the template itself. Tapping this button
+  // IS the consent record: the rep just spoke to the person and is asserting
+  // they agreed to receive it, which is why the label says so.
+  async function sendFromCompany() {
+    if (optedOut || sendingRef.current || !lead?.id) return
+    sendingRef.current = true            // §47 synchronous latch — a WebView
+    setSending(true); setSendError('')   // ghost-click must not double-send
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/wa/send-template', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ lead_id: lead.id }),
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok || !out?.ok) {
+        setSendError(out?.detail || out?.error || `Could not send (HTTP ${res.status}).`)
+        return
+      }
+      if (out.warning) { setSendError(out.detail || out.warning); return }
+      setSentOk(true)
+      setTimeout(() => onClose?.(), 1200)
+    } catch (e) {
+      setSendError(String(e?.message || e))
+    } finally {
+      setSending(false)
+      sendingRef.current = false
+    }
+  }
+
   function sendSms() {
     if (optedOut) return
     const phone = cleanPhone(lead?.phone)
@@ -176,19 +226,41 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
           )}
         </div>
 
+        {sendError && (
+          <div style={{
+            margin: '0 16px 10px', background: 'var(--danger-soft)',
+            border: '1px solid var(--danger)', color: 'var(--danger)',
+            borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 12.5,
+          }}>
+            {sendError} — you can still send it yourself with the buttons below.
+          </div>
+        )}
+
         <div className="lead-modal-foot">
           <button className="lead-btn" onClick={onClose}>{optedOut ? 'Close' : 'Skip'}</button>
+          {canSendFromCompany && (
+            <button
+              className="lead-btn"
+              onClick={sendFromCompany}
+              disabled={loading || optedOut || sending || sentOk}
+              title="Sends from the company WhatsApp number — only use this if they agreed on the call. Their reply comes back to your inbox."
+            >
+              {sending
+                ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</>
+                : <><Building2 size={13} /> {sentOk ? 'Sent' : 'Send from company number'}</>}
+            </button>
+          )}
           <button
             className="lead-btn"
             onClick={sendSms}
-            disabled={loading || optedOut || !body || !!error}
+            disabled={loading || optedOut || sending || !body || !!error}
           >
             <MessageSquare size={13} /> Send SMS
           </button>
           <button
             className="lead-btn lead-btn-primary"
             onClick={send}
-            disabled={loading || optedOut || !body || !!error}
+            disabled={loading || optedOut || sending || !body || !!error}
           >
             <MessageCircle size={13} /> Send WhatsApp
           </button>
