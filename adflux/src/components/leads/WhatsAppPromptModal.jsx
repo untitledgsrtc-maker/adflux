@@ -238,9 +238,31 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
 
         <div className="lead-modal-foot">
           <button className="lead-btn" onClick={onClose}>{optedOut ? 'Close' : 'Skip'}</button>
+          <button
+            className="lead-btn"
+            onClick={sendSms}
+            disabled={loading || optedOut || sending || !body || !!error}
+          >
+            <MessageSquare size={13} /> Send SMS
+          </button>
+          {/* Personal WhatsApp. Demoted from primary when the company send is
+              available — that one is the better path (reply lands in the app,
+              it's logged, the AI can help, it survives the rep leaving), so it
+              gets the yellow. Renamed to "My WhatsApp" because two buttons both
+              reading "WhatsApp" gave the rep no way to tell them apart.
+              When the company send ISN'T available (field sales), this keeps the
+              primary style so the modal still has one obvious action. */}
+          <button
+            className={canSendFromCompany ? 'lead-btn' : 'lead-btn lead-btn-primary'}
+            onClick={send}
+            disabled={loading || optedOut || sending || !body || !!error}
+            title={canSendFromCompany ? 'Opens WhatsApp on your own phone — their reply comes to you, not the app.' : undefined}
+          >
+            <MessageCircle size={13} /> {canSendFromCompany ? 'My WhatsApp' : 'Send WhatsApp'}
+          </button>
           {canSendFromCompany && (
             <button
-              className="lead-btn"
+              className="lead-btn lead-btn-primary"
               onClick={sendFromCompany}
               disabled={loading || optedOut || sending || sentOk}
               title="Sends from the company WhatsApp number — only use this if they agreed on the call. Their reply comes back to your inbox."
@@ -250,20 +272,6 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
                 : <><Building2 size={13} /> {sentOk ? 'Sent' : 'Send from company number'}</>}
             </button>
           )}
-          <button
-            className="lead-btn"
-            onClick={sendSms}
-            disabled={loading || optedOut || sending || !body || !!error}
-          >
-            <MessageSquare size={13} /> Send SMS
-          </button>
-          <button
-            className="lead-btn lead-btn-primary"
-            onClick={send}
-            disabled={loading || optedOut || sending || !body || !!error}
-          >
-            <MessageCircle size={13} /> Send WhatsApp
-          </button>
         </div>
       </div>
     </div>
