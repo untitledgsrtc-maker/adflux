@@ -7928,3 +7928,56 @@ for mobile data.
   must carry `lead_id` + `assigned_to = calling rep` + `ai_paused = true`.
 - `gsrtc_led_intro` (Marketing) APPROVED — retire `gsrtc_led_screen300_campaign2`
   ("300+ screens"; real is 264).
+
+### P3 + P4 SHIPPED (`754319b`) — send from the business number
+
+`api/wa/send-template.js` gained a **LEAD MODE** branch (no new api file — the
+Node function cap is untouched; edge runtime intact). Client posts ONLY
+`{lead_id}`; the server derives phone, outcome and template, so a tampered
+request cannot reach an arbitrary number.
+
+Gates: role (admin/co_owner/**telecaller** for the pilot) · lead ownership
+(`assigned_to`/`telecaller_id`) · `wa_opt_out` · 1 business-initiated template
+per lead per 24h (per-LEAD, not per-rep — a per-rep cap would collide with the
+TC's own 50-call target).
+
+**The three conversation fields ARE the feature** (all written on send):
+`lead_id` (else `trg_campaign_conv_ensure_lead` spawns a DUPLICATE lead) ·
+`assigned_to = caller` (else the reply is invisible to the rep — `CampaignInboxV2`
+filters non-privileged on `assigned_to`) · `ai_paused = true` (else the AI answers
+first). Writes **NO** `lead_activities` row — that would bump
+`contact_attempts_count` (halving the auto-Lost threshold) and set
+`last_contact_at`, re-sorting the TC queue against the lead just messaged.
+
+`WhatsAppPromptModal` gained the button (§47 useRef latch). **Tapping it IS the
+consent record** — owner chose this over a separate consent chip, which also kept
+the frozen `PostCallOutcomeModal` out of the plan entirely.
+
+**Guardian P1s caught + fixed (all three were silent-failure bugs):**
+1. **'nurture' is STORED as 'neutral'** — `lead_activities.outcome` CHECK allows
+   only positive/neutral/negative/callback (Phase 107 workaround). The read-back
+   could therefore NEVER match 'nurture', so every parked lead would have been
+   sent the *Maybe* template. Disambiguated server-side via `stage='Nurture'`.
+   ⚠️ Remember this whenever reading an outcome back from the DB.
+2. Company-send failure shared the `error` state that gates the textarea and the
+   deep-link buttons → a failed send removed the fallback. Own state now.
+3. A failed conversation write returned a clean `ok:true` over a half-done send.
+   Now returns `warning: reply_routing_failed`.
+
+### Templates — ALL FIVE APPROVED, still UTILITY (20 Jul)
+
+`post_call_good` · `post_call_callback` · `post_call_maybe` · `post_call_nurture`
+· `post_call_lost` — all **Active**, none reclassified to Marketing. Mapping table
+`wa_outcome_templates` RUN + verified (5 rows, PDF on positive + neutral only).
+
+### Only P5 (pilot) remains
+
+One telecaller, ~20 leads. Exit criteria: template quality unflagged · zero blocks
+or reports · delivered-vs-read healthy · **replies visibly landing in the SENDING
+rep's inbox**. Any template pause or block ends it. Widening is a decision, not a
+build.
+
+⚠️ **`supabase_phase246_ai_agent.sql` carries the live AI secret in the working
+tree** (§115 says keep it out of git). The secret is already in the DB trigger and
+in Vercel, so the local copy is redundant — `git checkout --` that file. NEVER
+`git add -A` in this repo.
