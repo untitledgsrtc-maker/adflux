@@ -226,6 +226,28 @@ async function sendToLead({ uid, role, callerName, leadId }) {
   // so that pair disambiguates it — server-side, no client trust.
   if (outcome === 'neutral' && lead.stage === 'Nurture') outcome = 'nurture'
 
+  // A MEETING beats any outcome. Scheduling one is a NEXT ACTION, so a rep can
+  // book it off Good / Maybe / Call-later — and when they have, confirming the
+  // appointment matters more than a generic follow-up.
+  //
+  // Detected via the row PostCallOutcomeModal writes for nextAction='meeting'
+  // (activity_type='meeting', notes 'Meeting scheduled · <date>'). That note
+  // prefix is the §33 exclusion marker, so this is reading an existing, stable
+  // contract rather than inventing a signal.
+  //
+  // TIME-BOUNDED to the last 2 hours. Without a bound, ANY meeting ever booked
+  // on this lead — held, cancelled, weeks old — would override every future
+  // send and post a "we will meet you on <date>" confirmation built from the
+  // earliest OPEN follow-up, which need not be that meeting at all. That is
+  // wrong information going to a customer from the business number.
+  const mtgSince = new Date(Date.now() - 2 * 3600 * 1000).toISOString()
+  const mtg = await one(
+    `lead_activities?lead_id=eq.${leadId}&created_by=eq.${uid}&activity_type=eq.meeting` +
+    `&notes=like.Meeting%20scheduled*&created_at=gte.${mtgSince}` +
+    `&select=id&order=created_at.desc&limit=1`
+  )
+  if (mtg) outcome = 'meeting'
+
   const tpl = await one(`wa_outcome_templates?outcome=eq.${outcome}&is_active=eq.true&select=*&limit=1`)
   if (!tpl?.meta_template_name) {
     return json({ error: 'no_template_for_outcome', detail: `No template mapped for outcome "${outcome}".` }, 409)
@@ -253,14 +275,19 @@ async function sendToLead({ uid, role, callerName, leadId }) {
   const leadName = (lead.name || 'there').slice(0, 60)
   const repName = (callerName || 'our team').slice(0, 60)
   let vars = [leadName, repName]
-  if (outcome === 'callback') {
-    // The callback template confirms a specific date + time, so it cannot be
-    // sent without one. Read the follow-up the outcome modal just spawned.
+  if (outcome === 'callback' || outcome === 'meeting') {
+    // Both templates CONFIRM a specific date + time, so neither can be sent
+    // without one. Read the follow-up the outcome modal just spawned.
     const fu = await one(
       `follow_ups?lead_id=eq.${leadId}&is_done=eq.false&select=follow_up_date,follow_up_time&order=follow_up_date.asc&limit=1`
     )
     const d = prettyDate(fu?.follow_up_date), t = prettyTime(fu?.follow_up_time)
-    if (!d || !t) return json({ error: 'no_callback_time', detail: 'No callback date/time saved, so the confirmation cannot be sent.' }, 409)
+    if (!d || !t) {
+      return json({
+        error: outcome === 'meeting' ? 'no_meeting_time' : 'no_callback_time',
+        detail: `No ${outcome === 'meeting' ? 'meeting' : 'callback'} date/time saved, so the confirmation cannot be sent.`,
+      }, 409)
+    }
     vars = [leadName, repName, d, t]
   }
 

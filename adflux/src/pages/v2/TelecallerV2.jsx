@@ -1256,6 +1256,15 @@ export default function TelecallerV2() {
           // Phase 113.8 — parity with /work: prompt a WhatsApp follow-up
           // after the outcome. Skip when the next action is a meeting
           // (onLogMeeting routes to lead detail) or the lead is WA opt-out.
+          //
+          // Phase 249.3 — this early-return was briefly removed to surface the
+          // new meeting-confirmation template, then RESTORED: PostCallOutcomeModal
+          // fires onSaved() unawaited and then onLogMeeting(), which navigates to
+          // /leads/:id and unmounts this page. The prompt's stage-refetch + 200ms
+          // timer therefore resolve on an unmounted component and it never
+          // renders. Removing the line achieves nothing but a wasted query and an
+          // unmounted-setState warning. Sending a meeting confirmation needs the
+          // prompt raised where the rep LANDS (lead detail), not here.
           if (nextAction === 'meeting') return
           // Pure check (no toast side-effect) — blockedByWaOptOut() toasts,
           // which would surface a stray "opted out" message after save.
