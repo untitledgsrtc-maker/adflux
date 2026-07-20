@@ -7763,10 +7763,24 @@ history and insights are lost (Meta's own dialog says so).
 ### Cost of the cutover (owner accepted in advance)
 
 Cronberry's sending on this number **stopped immediately**. Last 30 days it had
-carried **7,823 messages sent / 5,623 paid Marketing-lite**. Marketing is now
-DARK until approved templates exist in the new WABA — business-initiated
-marketing requires Meta-approved templates. The lower-risk sequence (templates
-approved first, migrate second) was offered and the owner chose to cut over now.
+carried **7,823 messages sent / 5,623 paid Marketing-lite**.
+
+⚠️ **CORRECTION (same day):** I warned marketing would go DARK until new
+templates were approved. **That was WRONG — approved message templates MIGRATE
+WITH THE NUMBER.** WABA `2870129030006085` landed with 9 live templates
+(6 Marketing + 2 Utility), all "Active – Quality pending": `gsrtc300screennew`,
+`gsrtc300screennew_clone`, `gsrtc300screennew_clone_clone`,
+`gsrtc_led_screen300_campaign2`, `campaign_1`, `welcome_message_new`,
+`configuration_template`, `utility_welcome_message`, `hello_world`. So there is
+NO template gap on a WABA-to-WABA migration, and the "approve templates first,
+then migrate" sequencing I recommended was unnecessary caution. Remember this
+for any future number move.
+
+`gsrtc_led_screen300_campaign2` (Marketing, English, **no variables**, one
+"Call Now!" button) is the simplest one to test-send with.
+⚠️ Its copy claims "300+ screens" — the real inventory is **264**. Cronberry-era
+wording, inaccurate + salesy vs §20 house voice. Worth replacing with an
+on-brand template rather than reusing as-is.
 
 ### State + what's left
 
