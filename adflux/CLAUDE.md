@@ -7819,3 +7819,38 @@ on-brand template rather than reusing as-is.
 - **Opt-in discipline:** template approval does NOT make cold blasting safe. Spam
   reports would sink the High quality rating this whole migration existed to
   protect. Send only to opted-in recipients.
+
+### QR board routing MOVED to the marketing number (20 Jul 2026)
+
+Owner moved all **22 hoarding board QRs** from the service number to the
+marketing number. Done in the safe order — **AI enabled + tested on the new
+number FIRST, boards re-pointed second.**
+
+1. Cloned the AI config service → marketing:
+   `UPDATE whatsapp_accounts SET ai_enabled=true, ai_system_prompt=<service>,
+   ai_welcome_image_url=<service>, bot_enabled=false, auto_reply_enabled=false`
+   on `phone_number_id='1209093615625212'`. (The `bot_enabled`/`auto_reply_enabled`
+   false is the §115 foot-gun — without it the old flat bot AND the AI both reply.)
+   NOTE `ai_system_prompt` is NULL on BOTH accounts — that is CORRECT, it's an
+   optional override; null means the endpoint uses the enriched `DEFAULT_SYSTEM`
+   baked into `api/wa/ai-reply.js`.
+2. Owner test-messaged 98982 73686 → welcome poster + AI reply confirmed working.
+3. `UPDATE campaign_locations SET qr_text = replace(qr_text,'919581578261',
+   '919898273686') WHERE qr_text LIKE '%919581578261%' AND client_name IS NULL;`
+   → VERIFY returned **22 on the new number, 0 still old**.
+
+**NO REPRINTING NEEDED — and this is the reusable lesson:** printed board QRs
+encode `/api/q/<code>`, and `campaign_locations.qr_text` is only the redirect
+target. So the destination number (or any target) can be changed at any time by
+updating `qr_text`; the physical QR never changes. Same property as §232's edit
+flow. Scoped `client_name IS NULL` so the 2 Client QRs were untouched.
+
+Baseline before the move (proof the inbound funnel works): **742 scans → 177
+messaged → 174 leads created**, top board Morbi. Watch that conversion holds on
+the new number.
+
+⚠️ **Split still live:** the public `/led` landing page CTAs still send WhatsApp
+to **919581578261** (`wa.me/919581578261`) while its Call button is
+**919898273686**. So QR scans → 9898, website clicks → 9581. Both are AI-answered
+and both route to Rima, so nothing breaks — but if the numbers are ever unified,
+it's an edit to `public/led/index.html` + deploy, not SQL.
