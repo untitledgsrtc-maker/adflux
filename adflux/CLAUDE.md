@@ -7854,3 +7854,77 @@ to **919581578261** (`wa.me/919581578261`) while its Call button is
 **919898273686**. So QR scans → 9898, website clicks → 9581. Both are AI-answered
 and both route to Rima, so nothing breaks — but if the numbers are ever unified,
 it's an edit to `public/led/index.html` + deploy, not SQL.
+
+
+---
+
+## 120 · Phase 249 — post-call messaging: opt-out closed (P0) + 5 outcome templates (P2) (2026-07-20)
+
+Owner: "I want the TC to send messages after a call outcome — first check what we
+can do." Audit found the button ALREADY exists on 4 pages; the real gaps were
+where it sends FROM, and that nothing was recorded. Plan (rev 2, adversarially
+reviewed) at `docs/PLAN_post_call_business_number_messaging.md`.
+
+### P0 SHIPPED (`f116f80`) — opt-out honoured everywhere
+
+- `WhatsAppPromptModal` reads `leads.wa_opt_out` **from the DB** on open and
+  blocks both send buttons. **NOT from the `lead` prop** — `WorkV2` and
+  `FollowUpsV2` never select that column, so `!lead?.wa_opt_out` reads
+  `undefined` and a prop-based guard is a SILENT NO-OP that looks like a fix.
+  Guarding in the shared modal covers all 4 host pages with ZERO frozen edits.
+- `webhook.js` `honourStopKeyword()` — ingests inbound STOP/UNSUBSCRIBE/
+  STOP PROMOTIONS. Nothing did before; `wa_opt_out` was admin-toggle-only.
+  Whole-message exact match (≤20 chars) so "don't stop the campaign" can't opt a
+  client out. Fire-and-forget `void` like `storeInboundMedia` → zero pre-200
+  latency (§45/§46).
+- `ai-reply.js` now gates on the linked lead's `wa_opt_out`. `ai_paused` only
+  mutes ONE thread, so the AI kept replying to leads opted out via the admin
+  toggle or who sent STOP on the other number.
+- Guardian PASS. No frozen file touched. No new api file (Vercel cap untouched).
+
+### P2 DONE — five UTILITY templates, one per outcome
+
+The 5 outcomes are `positive|neutral|callback|nurture|negative`
+(`PostCallOutcomeModal` OUTCOMES). All five templates In review on WABA
+`2870129030006085`, created by `scripts/create-post-call-templates.sh` (API, not
+the UI — 5 UI passes would be ~50 interactions).
+
+| Template | Outcome | PDF | Note |
+|---|---|---|---|
+| `post_call_good` | Good | ✅ | verified in Meta UI: document header present |
+| `post_call_callback` | Call later | — | appointment confirmation; strongest Utility case, deliberately NO attachment |
+| `post_call_maybe` | Maybe | ✅ | |
+| `post_call_nurture` | Nurture | — | |
+| `post_call_lost` | Lost | — | ONE polite sign-off, no price/link/pitch. Owner overruled my "send nothing" — reasonable, a courteous close is not spam. NEVER repeat it. |
+
+**Category discipline (the money lever):** post-call follow-ups are **UTILITY**
+(~Rs 0.11-0.12) not **MARKETING** (~Rs 0.8) — a ~7x difference plus a frequency
+cap. Bodies are deliberately transactional (no price, no offer, no CTA); where a
+PDF is attached the DOCUMENT carries the selling so the COPY stays clean. A
+glossy body is what makes a reviewer reclassify.
+
+**PDF attachments ARE allowed on Utility** — a DOCUMENT header. Sample uploaded
+at approval via the resumable upload API; the REAL file is supplied per-send, so
+it can differ per lead later (e.g. that lead's own quote PDF). Brochure comes
+from `companies.brochure_url` (PRIVATE, public bucket) — 7 MB, works but chunky
+for mobile data.
+
+### Foot-guns
+
+- ❌ A guard reading a column the page never SELECTed = silent no-op. Read from
+  the DB, or verify the column is in the page's select list.
+- ❌ Assuming Marketing pricing for a follow-up. Check the category first.
+- ❌ Attaching a brochure to an appointment-confirmation template — dilutes the
+  cleanest Utility case toward Marketing.
+- ❌ Driving Meta's template UI 5x by hand. Use the Graph API
+  (`POST /{WABA}/message_templates`).
+
+### Open
+
+- Owner to RUN `supabase_phase249_meta_template_link.sql`.
+- Templates awaiting Meta review; final category can still change.
+- P3 (extend `send-template.js` with a lead mode) / P4 (button) / P5 (20-lead
+  pilot) not started. The three fields that ARE the feature: conversation row
+  must carry `lead_id` + `assigned_to = calling rep` + `ai_paused = true`.
+- `gsrtc_led_intro` (Marketing) APPROVED — retire `gsrtc_led_screen300_campaign2`
+  ("300+ screens"; real is 264).
