@@ -7782,14 +7782,32 @@ for any future number move.
 wording, inaccurate + salesy vs §20 house voice. Worth replacing with an
 on-brand template rather than reusing as-is.
 
-### State + what's left
+### State — COMPLETE + END-TO-END VERIFIED (2026-07-20)
 
-- `supabase_campaign_marketing_number.sql` updated with the new ids + pushed
-  (`f66270b`). **Owner still needs to RUN it in Supabase Studio.**
-- Owner ran `POST /v21.0/2870129030006085/subscribed_apps` to attach the WABA to
-  the Waba app (webhooks).
-- NEXT: create + submit marketing templates in WABA `2870129030006085` so
-  `api/wa/send-template.js` has something approved to send.
+- `supabase_campaign_marketing_number.sql` updated with the new ids, pushed
+  (`f66270b`), and **RUN by owner**. `whatsapp_accounts` now holds exactly two
+  rows: `919898273686`/`1209093615625212`/`2870129030006085`/**marketing** and
+  `919581578261`/`122102627516008558`/`122098901360016777`/**service**.
+- Stale Meta test-number row (`15551967216`, waba_id NULL, 0 conversations)
+  deleted after a read-first check.
+- `POST /v21.0/2870129030006085/subscribed_apps` run + verified by GET — the
+  **Waba** app (`1443324144491532`) is subscribed, so webhooks reach us.
+- **Test send from the new registration returned `message_status: accepted`** —
+  the full chain (registration → own billing → template → delivery) works.
+- Service inbox + AI responder on 95815 78261 never went down at any point.
+
+### Still open (none blocking)
+
+- **Inbound owner unset** on the marketing account. Replies to marketing messages
+  will error-queue instead of creating leads (safe by design, §53 P0-2). Set
+  `whatsapp_accounts.default_telecaller_id` on the marketing row when the owner
+  names who should work them.
+- **Replace `gsrtc_led_screen300_campaign2`** — Cronberry-era copy, claims "300+
+  screens" (real: 264) and is salesy vs §20. An accurate on-brand replacement was
+  drafted but not yet submitted.
 - Old WABA `4261024264172185` still carries the orphaned Jio credit line and the
-  portfolio still has the AiSensy one. Both harmless (no number attached). Ask
-  the partners to deallocate at leisure; settle the **−₹27** Cronberry balance.
+  portfolio still has the AiSensy one. Both now point at EMPTY WABAs → harmless.
+  Ask the partners to deallocate at leisure; settle the **−₹27** Cronberry balance.
+- **Opt-in discipline:** template approval does NOT make cold blasting safe. Spam
+  reports would sink the High quality rating this whole migration existed to
+  protect. Send only to opted-in recipients.
