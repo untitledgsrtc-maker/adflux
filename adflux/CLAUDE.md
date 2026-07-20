@@ -7672,3 +7672,110 @@ Push done (`a10a826`, JS-only, no SQL, no APK rebuild — reaches the APK on nex
 open). Smoke: private LED wizard → Step 2 → change a city's rate away from the
 default → Next proceeds WITHOUT asking for a reason; changing slots/day still
 prompts for the slots reason.
+
+
+---
+
+## 119 · Marketing number 98982 73686 RECLAIMED from Cronberry — WABA migration DONE (2026-07-20, `f66270b`)
+
+**SUPERSEDES §110's "reclaim is PARKED / entangled with Cronberry" and every
+reference to WABA `4261024264172185` as the marketing home.** The number is now
+on the owner's own billing. No Cronberry dependency remains.
+
+### The IDs that changed (use ONLY the new ones)
+
+| | OLD (dead) | NEW (live) |
+|---|---|---|
+| WABA | `4261024264172185` | **`2870129030006085`** |
+| phone_number_id | `864573796748171` | **`1209093615625212`** |
+| Billing | Credit line — **Jio Things Limited** (Cronberry) | **Visa \*2580 (owner's own)** |
+| Status now | **Transferred** (empty) | **Connected · High** |
+
+Service/inbox number 95815 78261 (WABA `122098901360016777`) is UNTOUCHED — the
+live 2-way inbox + AI responder (§54/§115) kept running throughout.
+
+### What the diagnosis actually found (the useful part)
+
+Owner opened Meta's **"Delete phone number"** dialog trying to migrate. Deleting
+would have destroyed the registration + **High quality rating** + messaging tier.
+Stopped that. Then read-only recon established:
+- The marketing WABA was **already owned by the owner** (edigiexpert portfolio),
+  **0 partners assigned** — Cronberry had NO partner control.
+- The ONLY tie was billing: a **partner-allocated credit line** (bill-to AND
+  sold-to = Jio Things Limited). Business portfolio also carries a second
+  leftover credit line from **AiSensy**.
+- **A partner-allocated credit line CANNOT be removed by the receiving business** —
+  no remove/detach control exists anywhere (verified by reading every interactive
+  element on the credit-line details page). Only the allocating partner can revoke.
+- ⚠️ **Two different Meta screens disagree about "Add payment method":**
+  Billing → *Accounts* → WABA shows it **greyed out** (this is where the owner hit
+  the "doesn't support" wall for weeks). Billing → **Payment methods** →
+  *WhatsApp Business accounts* tab shows the SAME action **enabled**. If a card
+  ever needs attaching to a WABA, use the Payment methods page, not Accounts.
+
+### Why migration beat "just add the card"
+
+Adding a card to the old WABA would have left the Jio credit line attached
+(unremovable) and still Default. Moving the number to a WABA that already had
+the owner's Visa sidesteps the partner entirely — no Cronberry cooperation, no
+settlement negotiation. Quality rating + display name carry over; only chat
+history and insights are lost (Meta's own dialog says so).
+
+### The cutover recipe (worked; reuse if another number ever moves)
+
+1. Destination WABA → **Add phone number** → business profile (matched the old
+   profile exactly: display name, **Category = Other**, same description) → enter
+   the number. Result: status **Pending**. Display name auto-approved.
+2. Assign the destination WABA to the `campaign-api` **System User**
+   (Business Settings → Users → System users → ⋯ → Assign assets → WhatsApp
+   accounts → **Full access**). Required before any API call against it.
+3. **The UI cannot finish it.** WhatsApp Manager only *claims* a number; for a
+   Cloud API number already registered elsewhere the cutover is **API-only** —
+   which is why no OTP prompt ever appears and the row sits at Pending.
+4. Terminal (owner runs — token never leaves his machine):
+   - `POST /v21.0/<new_pnid>/request_code` → returned **`136024 / 2388366
+     "Phone number already verified"`**. That is EXPECTED and GOOD when the
+     number is already live on another WABA of yours — **skip request_code and
+     verify_code entirely**.
+   - `POST /v21.0/<new_pnid>/register` with `messaging_product=whatsapp` + a
+     6-digit `pin` → `{"success":true}` = the cutover.
+5. Verify in BOTH WABAs (never trust the API response alone): new = Connected,
+   old = **Transferred**.
+
+### Foot-guns (hard-won today)
+
+- ❌ Using **Delete phone number** to move a number. It destroys quality rating +
+  tier + registration. Migration is a different flow entirely; the delete dialog
+  only *mentions* migration as an alternative.
+- ❌ Assuming a greyed "Add payment method" means the card is refused. Check the
+  other billing screen first (see the two-screens note above).
+- ❌ Trying to remove a partner credit line from the receiving side. Impossible.
+  Either migrate away, or have the partner deallocate.
+- ❌ **Vercel "Sensitive" env vars cannot be read back** (`CAMPAIGN_WA_TOKEN` is
+  one). To get a token for manual API work, generate a FRESH System User token in
+  Meta (Business Settings → System users → campaign-api → **Generate token**,
+  scopes `whatsapp_business_messaging` + `whatsapp_business_management`).
+  **NEVER click "Revoke tokens"** — that kills the token the live app uses.
+- ❌ Driving Meta's `type` action for long text — it silently drops characters
+  (mangled the business description into "rusted / yeas / Gujrat"). Use
+  `form_input` to set field values, then eyeball the result.
+
+### Cost of the cutover (owner accepted in advance)
+
+Cronberry's sending on this number **stopped immediately**. Last 30 days it had
+carried **7,823 messages sent / 5,623 paid Marketing-lite**. Marketing is now
+DARK until approved templates exist in the new WABA — business-initiated
+marketing requires Meta-approved templates. The lower-risk sequence (templates
+approved first, migrate second) was offered and the owner chose to cut over now.
+
+### State + what's left
+
+- `supabase_campaign_marketing_number.sql` updated with the new ids + pushed
+  (`f66270b`). **Owner still needs to RUN it in Supabase Studio.**
+- Owner ran `POST /v21.0/2870129030006085/subscribed_apps` to attach the WABA to
+  the Waba app (webhooks).
+- NEXT: create + submit marketing templates in WABA `2870129030006085` so
+  `api/wa/send-template.js` has something approved to send.
+- Old WABA `4261024264172185` still carries the orphaned Jio credit line and the
+  portfolio still has the AiSensy one. Both harmless (no number attached). Ask
+  the partners to deallocate at leisure; settle the **−₹27** Cronberry balance.
