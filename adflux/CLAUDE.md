@@ -7799,10 +7799,10 @@ on-brand template rather than reusing as-is.
 
 ### Still open (none blocking)
 
-- **Inbound owner unset** on the marketing account. Replies to marketing messages
-  will error-queue instead of creating leads (safe by design, §53 P0-2). Set
-  `whatsapp_accounts.default_telecaller_id` on the marketing row when the owner
-  names who should work them.
+- ~~Inbound owner unset~~ **DONE 20 Jul** — `default_telecaller_id` on the
+  marketing row set to **Rima** (`058b3000-7630-4112-a01f-c42e7e24b6e8`), the
+  same TC who owns service-number inbound, so both numbers feed one queue.
+  Verified: `919898273686 → Rima`. Live telecallers are Dhara, JAYNA ROHIT, Rima.
 - **Replace `gsrtc_led_screen300_campaign2`** — Cronberry-era copy, claims "300+
   screens" (real: 264) and is salesy vs §20. An accurate on-brand replacement was
   drafted but not yet submitted.
