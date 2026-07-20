@@ -1,8 +1,14 @@
 -- supabase_campaign_marketing_number.sql
 --
 -- Phase A (campaign marketing) — register the MARKETING number (98982 73686,
--- WABA 4261024264172185) + mark accounts by purpose so the app knows which
+-- WABA 2870129030006085) + mark accounts by purpose so the app knows which
 -- number is the inbox (service) and which is the outbound marketing channel.
+--
+-- 2026-07-20 MIGRATION: 98982 73686 was moved OFF WABA 4261024264172185
+-- (Cronberry / Jio Things Limited credit line) ONTO WABA 2870129030006085,
+-- which bills to the owner's own card. Old WABA now reads "Transferred".
+-- phone_number_id CHANGED 864573796748171 → 1209093615625212. Do NOT use the
+-- old ids anywhere.
 --
 --   • 95815 78261 (current)  → purpose='service'  (the live 2-way inbox, §54)
 --   • 98982 73686 (new)      → purpose='marketing' (templates / broadcast)
@@ -15,10 +21,10 @@ ALTER TABLE public.whatsapp_accounts ADD COLUMN IF NOT EXISTS purpose text DEFAU
 COMMENT ON COLUMN public.whatsapp_accounts.purpose IS
   'service = inbox / 2-way conversations · marketing = outbound templates + broadcast';
 
--- ⚠️ FILL IN <PHONE_NUMBER_ID> — get it from Meta: WhatsApp Manager → the 98982
--- 73686 number → API setup → "Phone number ID". (NOT the WABA id 4261024264172185.)
+-- phone_number_id 1209093615625212 = the 98982 73686 registration on WABA
+-- 2870129030006085 (verified Connected · High in WhatsApp Manager, 20 Jul 2026).
 INSERT INTO public.whatsapp_accounts (provider, phone_number_id, display_number, waba_id, purpose)
-VALUES ('cloud_api', '<PHONE_NUMBER_ID>', '919898273686', '4261024264172185', 'marketing')
+VALUES ('cloud_api', '1209093615625212', '919898273686', '2870129030006085', 'marketing')
 ON CONFLICT (phone_number_id) WHERE phone_number_id IS NOT NULL
   DO UPDATE SET purpose = 'marketing',
                 waba_id = EXCLUDED.waba_id,
