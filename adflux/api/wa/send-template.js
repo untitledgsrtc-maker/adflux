@@ -350,11 +350,17 @@ async function sendToLead({ uid, role, callerName, leadId }) {
   // contact and firing the welcome poster) ──
   if (convId) {
     try {
+      // Log the REAL text, not "[template] <name>". A rep opening the thread
+      // has to be able to read what the customer was actually sent — the raw
+      // template name told them nothing.
+      const logBody = tpl.preview_body
+        ? vars.reduce((s, v, i) => s.split(`{{${i + 1}}}`).join(v), tpl.preview_body)
+        : `[template] ${tpl.meta_template_name}`
       await sb('whatsapp_messages', {
         method: 'POST',
         body: JSON.stringify({
           conversation_id: convId, wamid, direction: 'out', type: 'template',
-          body: `[template] ${tpl.meta_template_name}`, status: 'sent', at: nowIso,
+          body: logBody, status: 'sent', at: nowIso,
         }),
       })
     } catch { /* best-effort */ }

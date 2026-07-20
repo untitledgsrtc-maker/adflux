@@ -129,11 +129,32 @@ function mediaInfo(m) {
 const STOP_WORDS = new Set([
   'STOP', 'STOP ALL', 'STOP PROMOTIONS', 'UNSUBSCRIBE', 'OPT OUT', 'OPTOUT',
 ])
+// Natural-language refusals. A real customer almost never types "STOP" — they
+// write "don't call me again", which the exact-match set above missed entirely
+// (owner caught this on a live thread). These are matched as a SUBSTRING, but
+// only inside a SHORT message: a refusal is terse, whereas the same words
+// inside a long business reply are usually conversational
+// ("...we don't want to stop the campaign, but...").
+//
+// Kept to phrasings with no innocent reading. Deliberately EXCLUDES "not
+// interested" — that is standard negotiation talk and auto-muting a lead the
+// rep could still work would do more harm than good. It belongs to the Lost
+// outcome, which the rep chooses.
+const STOP_PHRASES = [
+  'DONT CALL ME', 'DO NOT CALL ME', 'STOP CALLING', 'DONT CONTACT ME',
+  'DO NOT CONTACT ME', 'DONT MESSAGE ME', 'DO NOT MESSAGE ME',
+  'REMOVE MY NUMBER', 'DONT SEND ME', 'DO NOT SEND ME', 'LEAVE ME ALONE',
+]
 async function honourStopKeyword(admin, convId, text) {
   try {
     if (!admin || !convId) return
     const t = String(text || '').trim().toUpperCase().replace(/\s+/g, ' ')
-    if (!t || t.length > 20 || !STOP_WORDS.has(t)) return
+    if (!t) return
+    // Strip apostrophes so don't / dont / don’t all normalise to DONT.
+    const flat = t.replace(/['‘’]/g, '')
+    const exact = t.length <= 20 && STOP_WORDS.has(t)
+    const phrase = flat.length <= 120 && STOP_PHRASES.some((p) => flat.includes(p))
+    if (!exact && !phrase) return
     const { data: c } = await admin.from('whatsapp_conversations')
       .select('lead_id').eq('id', convId).maybeSingle()
     // Pause the AI regardless of whether a lead is linked — a bare
