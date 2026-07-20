@@ -7792,8 +7792,9 @@ on-brand template rather than reusing as-is.
   deleted after a read-first check.
 - `POST /v21.0/2870129030006085/subscribed_apps` run + verified by GET — the
   **Waba** app (`1443324144491532`) is subscribed, so webhooks reach us.
-- **Test send from the new registration returned `message_status: accepted`** —
-  the full chain (registration → own billing → template → delivery) works.
+- **Test send verified DELIVERED on the owner's handset** (not just
+  `message_status: accepted` — the template message physically arrived). Full
+  chain proven: registration → own billing → approved template → delivery.
 - Service inbox + AI responder on 95815 78261 never went down at any point.
 
 ### Still open (none blocking)
