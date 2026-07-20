@@ -7803,9 +7803,16 @@ on-brand template rather than reusing as-is.
   marketing row set to **Rima** (`058b3000-7630-4112-a01f-c42e7e24b6e8`), the
   same TC who owns service-number inbound, so both numbers feed one queue.
   Verified: `919898273686 → Rima`. Live telecallers are Dhara, JAYNA ROHIT, Rima.
-- **Replace `gsrtc_led_screen300_campaign2`** — Cronberry-era copy, claims "300+
-  screens" (real: 264) and is salesy vs §20. An accurate on-brand replacement was
-  drafted but not yet submitted.
+- **Replacement template SUBMITTED 20 Jul — `gsrtc_led_intro`** (Marketing,
+  English, body variable `{{1}}` = contact name, sample "Rajesh"), status
+  **In review**. Accurate + on-brand: says **264 screens at 20 stations**, from
+  ₹75, AI-tracked impressions, links to https://app.untitledad.in/led. No
+  exclamation marks / no "reach lakhs!" — §20 house voice.
+  Once approved, **stop using `gsrtc_led_screen300_campaign2`** (Cronberry-era,
+  claims "300+ screens" — inflated, salesy).
+  NOTE: submitted WITHOUT quick-reply buttons — Meta's "Add button" dropdown
+  would not open via automation. Buttons are optional and CAN be added later by
+  editing the approved template. Meta auto-appends an opt-out on marketing sends.
 - Old WABA `4261024264172185` still carries the orphaned Jio credit line and the
   portfolio still has the AiSensy one. Both now point at EMPTY WABAs → harmless.
   Ask the partners to deallocate at leisure; settle the **−₹27** Cronberry balance.
