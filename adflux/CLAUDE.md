@@ -8201,3 +8201,81 @@ which is the deepest trap of the four.
 default) showing the read-only v1 with real job names, real clients and one
 control per card. Also carries **Client brief** + **Monthly plan** from the
 digital-services planning earlier the same day.
+
+---
+
+## 123 · Creative module — per-role views, APPROVED DESIGN v3 (2026-07-21)
+
+Owner rejected two mockups ("still not happy — make admin, designer and all
+views, think deeply"). Both were ONE screen with tabs; he wants each person's
+own view. Ran a three-direction design panel (one-screen-per-person /
+exception-first-admin / one-shared-pipeline) judged into a single spec.
+
+**Full spec: `docs/DESIGN_creative_role_views.md`. Mockup:
+`_design_reference/task_module_mockup.html` (role switcher, phone-size).
+DESIGN ONLY — nothing built, owner has not approved yet.**
+
+### The decision
+One shared job record; each role sees a different slice. The artwork→video
+dependency is a FACT on the record, not a message someone types. Admin screen
+taken wholesale from the exception-first direction.
+
+**Rejected:** a five-stage pipeline board (only works if something moves a job
+to "being made" — nothing does), five separate maker files, and every version of
+a creative screen for sales reps.
+
+### Frozen vocabulary — four words, each an event we actually capture
+**Assigned · Sent · Approved · Changes asked.** Nothing renders "in progress",
+"started", "WIP" or a percentage anywhere in this module, for any role. If it is
+not one of those four plus a deadline, it does not appear.
+
+### Two structural rules
+1. No job exists without a client, an owner, a deadline and a defined finish —
+   enforced at creation, not display.
+2. **A job never routes to its own maker for checking.** Renuka Vasava's own
+   banner, or Safika's own GSRTC video, routes to Brijesh instead. None of the
+   three directions covered this; it would have produced a silently stuck job in
+   month one.
+
+Every person is printed **full name + role** ("Renuka Vasava · Design approval").
+Two Renukas and two Dixitas make this correctness, not style.
+
+### The five views (see the spec for section-by-section detail)
+- **Designer** — one card with an ANSWER BLOCK: the eight questions she would
+  otherwise WhatsApp before starting. Unanswered field renders amber and is not
+  her problem. "After you:" names who she unblocks. One button: Send file.
+- **Video editor** — same grammar + a WAITING SHELF with **zero interactive
+  elements**, carrying the escalation sentence. "Ready now" is backfilled from
+  retainer reels and is never allowed to be empty (an empty list misrepresents
+  him to the owner).
+- **Approver** — no separate page: the designer screen with a LID on top, above
+  her own work. Every row names **who is stopped**, never what is pending.
+  Verdict is one tap; rejecting costs the same (chips, no typing). **At 10
+  working hours the check re-routes to Brijesh automatically** — her queue has an
+  exit that does not depend on her. At zero the lid is simply absent.
+- **Sales rep** — **NO screen, NO route, NO sidebar entry.** A two-line strip on
+  the order he already opens + two pushes (approved file to forward; a one-tap
+  Yes/No when his brief has a hole). Three permitted forms only: a name and a
+  date, sent with the file, or not assigned yet. **No chase button, ever** — six
+  reps out-pinging eight makers gets the app muted, which kills the time data.
+- **Owner** — blank on a good day, but always states a fact it had to query.
+  Sections vanish when empty: nobody-checking · late · waiting >6h · due today
+  (not before 3 PM) · no owner · retainer behind pace. **No per-person output,
+  no ranking, anywhere** — the day the team reads it as monitoring, the time
+  tracking gets gamed.
+
+### THE ONE THING THAT KILLS IT (and the sequencing it forces)
+**A finished file reaching the client outside the app.** One wrong record is
+wrong on five screens at once, and the owner stops trusting the page — permanently.
+
+So: **build the delivery half FIRST and ship nothing else until files flow
+through it.** Week one is three things — the approver's verdict screen, the
+approved-file push to the rep, and the file chip on the order page. No maker
+queues, no desk. The goal is that sending through the app becomes the FASTEST way
+for a designer to get a rep off her back. After three weeks, check the number: if
+files are arriving, build the rest on a habit that exists; if not, we found out in
+three weeks instead of ten.
+
+### Also decided
+Turn the sales incentive card OFF for designer/video roles — it currently paints
+above every non-admin page, and creative staff are not on that plan.
