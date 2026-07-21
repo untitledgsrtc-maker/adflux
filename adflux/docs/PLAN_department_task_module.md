@@ -136,3 +136,31 @@ it — a fully ad-hoc answer would have killed auto-routing.
 
 - NAMES: who approves DESIGN, and who approves VIDEO.
 - The full medium -> department map beyond GSRTC LED.
+
+### Approvers (owner, 2026-07-21)
+
+| Work type | Approver |
+|---|---|
+| Design / artwork | **Renuka** |
+| Video (general) | **Peyush** |
+| **GSRTC video** | **Safika** |
+
+⚠️ **This is NOT a simple department -> approver map.** GSRTC video has a
+different approver from ordinary video, so the rule needs BOTH the work type and
+the MEDIA TYPE: "video + GSRTC_LED -> Safika" must beat "video -> Peyush".
+
+Design consequence: the approver table is keyed on (job_type, media_type) with
+media_type NULL meaning "any", and the most specific match wins. Small, but it
+must be built this way from the start — a plain department->approver column
+cannot express the GSRTC exception and would send every GSRTC video to the wrong
+person.
+
+### To confirm before building
+
+1. **Renuka** is recorded in this system as a TELECALLER lead (§30, §42.2 - she
+   monitors Dhara + Rima). Approving design as well is plausible if she wears two
+   hats, but confirm it is the same person and not a name collision.
+2. **Do Peyush and Safika have logins?** Neither appears anywhere in CLAUDE.md.
+   An approver needs an account, a role, and push enabled - otherwise approvals
+   queue up against a person who cannot act on them. If they are new users they
+   must be created (HR -> Add Member) before this module can work.
