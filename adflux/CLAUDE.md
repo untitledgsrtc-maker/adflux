@@ -8023,3 +8023,93 @@ ship to all 4 hosts at once — WorkV2/FollowUpsV2/LeadDetailV2 all still skip t
 preview_body) · **`phase249_3` NOT run** (meeting row absent — fine, unwired).
 ⚠️ If `249_3` is ever run, **re-run `249_4` after it** or the meeting row lands
 without `preview_body`.
+
+
+---
+
+## 121 · Phase 250 — lost post-call outcomes: THE root cause, not another instance (2026-07-20)
+
+Owner: "rep calls a lead, comes back to the app, it reloads, outcome doesn't come,
+call not logged" — Dhara + kirti. He asked why it keeps coming back when it was
+"solved before".
+
+### It was never the same bug — one symptom, THREE causes
+
+| # | Cause | Status |
+|---|---|---|
+| 1 | Same-minute re-tap collides with the Phase 68.2 dedupe index (23505); old code bailed without opening the modal | SOLVED Phase 113.8 (`TelecallerV2:474-491` rescues the existing row) |
+| 2 | Rep dismisses the popup → call sits with `outcome NULL`, invisible | MITIGATED Phase 237 (pending-outcomes card) |
+| 3 | **The OS KILLS the app during the call** | **NEVER ADDRESSED until now** |
+
+Fixes 1+2 cannot touch cause 3: there is no DB error (the app is simply gone), and
+the Phase 237 card needs the `lead_activities` row to EXIST — it may never have
+been sent. That is why it kept "coming back": each report was traced to whichever
+cause was visible that week, while the underlying fragility — the modal depending
+on a 1.5s timer and in-memory React state — was never removed. Same shape as §92.
+
+### The mechanism (verified, `TelecallerV2:443-505` / `WorkV2:668-730`)
+
+Tap → `dialPhone()` fires FIRST (it must — a tel: navigation off the user gesture
+is blocked by the OS) → THEN `logCallAudit` (fire-and-forget) → THEN a
+`setTimeout(0)` that awaits the `lead_activities` insert → THEN
+`setTimeout(1500)` to open the modal. **The dialer takes the foreground before a
+single write is confirmed.** Nothing was persisted to the device.
+
+### The fix — `src/utils/pendingCall.js`
+
+Write the in-progress call to **localStorage SYNCHRONOUSLY, immediately before
+`dialPhone()`**. That is the ONLY write guaranteed to land, precisely because a
+network write cannot be awaited without losing the gesture. On next launch the
+outcome modal is restored for that lead. 6h TTL, scoped to the signed-in user so
+a shared device never resurfaces someone else's call.
+⚠️ **`rememberPendingCall()` must stay immediately before `dialPhone()`.** Anything
+inserted between them re-opens the hole.
+
+**Guardian P1s (both were silent-damage bugs):**
+1. The restore guard was set only when a record existed → the check re-ran on
+   every `loading` flip (check-in, checkout, ticking a task) and could pop the
+   modal mid-flow. Now set unconditionally = once per mount.
+2. When the activity insert HAD succeeded but the app died before the id was
+   recorded, the restored modal would INSERT a second call row. **Nothing catches
+   it** — the Phase 68.2 index keys on `notes`, which differ between the tap row
+   and the outcome-save row — and `compute_daily_score` COUNTs both, **inflating
+   score and therefore pay**. The restore now adopts the orphan row and patches it.
+
+### Reused rather than rebuilt (owner: "1st check what we have already built")
+
+- `usePendingOutcomes` widened **today-only → 3 days**. Losses happen at the END
+  of a call i.e. late in the day — exactly what a midnight cutoff discarded.
+  Shared filter keeps the TeamDashboard manager count in lockstep.
+- `GpsSetupPrompt` gains `mode='battery'`, now shown to **telecallers**. The
+  battery whitelist existed since Phase 180 but was gated `role === 'sales'`, so
+  the very reps reporting this had NEVER been asked. **No APK rebuild** — the
+  native method already ships in 96018.
+
+### Measured cost (Q4B, real data)
+
+| Rep | calls lost this month | Rs at risk |
+|---|---|---|
+| Dhara | 128 | 188 |
+| JAYNA | 24 | 42 |
+| Rima | 45 | 0 |
+
+**The money is NOT the problem — ~Rs 230/month total.** The >=10s duration rule
+already rescues most calls for scoring. Rima shows 45 lost with ZERO pay impact
+because she is capped at 100% — **score is a BAD detector for this bug; do not
+use it to judge whether the fix worked.**
+
+**The real cost is 197 calls this month with no outcome → no follow-up spawned →
+those customers were never contacted again.** That is the loss, not the rupees.
+
+⚠️ **STILL UNMEASURED: whether this is device-specific.** Q4B gives absolute
+counts, not rates — Dhara's 128 could be a normal rate on huge volume or a bad
+rate on normal volume. **Q2 in `docs/measure_lost_call_outcomes.sql` settles it**
+and had not been run at time of writing. Do not buy phones before running it.
+
+### Open
+
+- Q2 baseline not yet run; re-run a week after deploy to prove the fix.
+- `LeadDetailV2`'s own call path is NOT wired to `pendingCall` — only `/telecaller`
+  and `/work`.
+- Reps must reopen the app; telecallers must ACCEPT the battery prompt or the fix
+  does not reach them.
