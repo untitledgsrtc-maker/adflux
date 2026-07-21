@@ -86,6 +86,7 @@
   .tick{width:16px;height:16px;border-radius:5px;border:1.6px solid var(--line-2);flex-shrink:0;}
   .tick.on{background:var(--green);border-color:var(--green);}
   .sub-item.done{color:var(--ink-2);text-decoration:line-through;}
+  .sub-item.got{color:var(--ink-1);}
 
   .files{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
   .file{display:inline-flex;align-items:center;gap:8px;font-size:12px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:7px 11px;color:var(--ink-1);}
@@ -120,6 +121,20 @@
   .seg .opt{flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-2);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;}
   .seg .opt.on{background:var(--yellow);border-color:var(--yellow);color:#0a0e1a;}
   .inp{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--ink-0);font-family:inherit;font-size:13px;}
+  /* ── client brief + monthly plan ── */
+  .cols{display:grid;grid-template-columns:1.55fr 1fr;gap:18px;align-items:start;}
+  .bgrid.two{grid-template-columns:repeat(2,1fr);}
+  .bgrid.three{grid-template-columns:repeat(3,1fr);}
+  .prog-wrap{height:6px;background:var(--bg-3);border-radius:999px;overflow:hidden;margin-top:10px;}
+  .prog-bar{height:100%;background:var(--yellow);border-radius:999px;}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;}
+  .flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .step{font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:999px;background:var(--bg-2);border:1px solid var(--line);color:var(--ink-1);}
+  .step.new{background:var(--yellow-soft);border-color:rgba(255,230,0,.28);color:var(--yellow);}
+  .arr{color:var(--ink-2);font-size:11px;}
+  .ro{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:700;}
+  .row-l{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .row-l:last-child{border-bottom:none;}
   svg{stroke-width:1.6;}
 </style>
 </head>
@@ -144,6 +159,8 @@
     <button class="tab active" data-p="mine">My work <span class="count">4</span></button>
     <button class="tab" data-p="all">All jobs <span class="count">12</span></button>
     <button class="tab" data-p="appr">Approvals <span class="count">3</span></button>
+    <button class="tab" data-p="brief">Client brief</button>
+    <button class="tab" data-p="plan">Monthly plan</button>
     <button class="tab" data-p="route">Routing</button>
     <button class="tab" data-p="win">On winning a quote</button>
   </div>
@@ -348,6 +365,234 @@
 
     <div class="callout">
       <b>The "client sends it" answer is the important one.</b> About half your orders arrive with client artwork. Without this question every one of those creates a job nobody needs — and a list full of jobs nobody needs is a list people stop opening.
+    </div>
+  </div>
+
+  <!-- ══ CLIENT BRIEF ══ -->
+  <div class="pane" id="p-brief">
+    <div class="sech">
+      <h2>Mahant Investment Ltd</h2>
+      <span class="note">Brief filled by Mayur · 12 Jul 2026 · sample taken from your own workbook</span>
+    </div>
+
+    <!-- identity: never re-typed -->
+    <div class="job">
+      <div class="brief-h">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Client details
+        <span class="chip c-wait" style="margin-left:4px;">from the lead record — not typed again</span>
+      </div>
+      <div class="bgrid three">
+        <div><div class="bg-l">Company / Brand Name</div><div class="bg-v">Mahant Investment Ltd</div></div>
+        <div><div class="bg-l">Contact Person Name</div><div class="bg-v">R. Mahant</div></div>
+        <div><div class="bg-l">Mobile Number</div><div class="bg-v tnum">+260 97 000 0000</div></div>
+        <div><div class="bg-l">Email Address</div><div class="bg-v">info@mahantinvestment.com</div></div>
+        <div><div class="bg-l">Business Industry</div><div class="bg-v">Fleet &amp; Tyre Supply</div></div>
+        <div><div class="bg-l">Business Location / City</div><div class="bg-v">Lusaka, Zambia</div></div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div>
+        <!-- services -->
+        <div class="job">
+          <div class="brief-h">Services on for this client</div>
+          <div class="tags">
+            <span class="chip c-auto">Social Media Management</span>
+          </div>
+          <div style="font-size:11.5px;color:var(--ink-2);margin-top:10px;">The other nine services are off for this client. Turning one on adds its fields below and its jobs to the plan.</div>
+        </div>
+
+        <!-- the part a designer actually opens -->
+        <div class="job">
+          <div class="brief-h">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+            What the designer opens
+          </div>
+          <div class="bgrid two">
+            <div><div class="bg-l">Content Language</div><div class="bg-v">English</div></div>
+            <div><div class="bg-l">Brand Tone</div><div class="bg-v">Professional · Corporate</div></div>
+            <div><div class="bg-l">Preferred Design Style</div><div class="bg-v">Creative · Light Theme</div></div>
+            <div><div class="bg-l">Who will provide the content information?</div><div class="bg-v">Client will provide complete content</div></div>
+            <div><div class="bg-l">Original photos and videos?</div><div class="bg-v">Partially — product and office photos</div></div>
+            <div><div class="bg-l">AI-generated / stock allowed?</div><div class="bg-v">Yes</div></div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <div class="bg-l">Brand Colours &amp; Fonts</div>
+            <div style="font-size:12.5px;color:var(--ink-2);margin-top:6px;line-height:1.7;">
+              Nothing to show. Your workbook records that the colour and font files <b style="color:var(--ink-0);">arrived</b> — never what they <b style="color:var(--ink-0);">are</b>, so a designer still opens a PDF to find a hex code. These become fields here.
+            </div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <div class="bg-l">Things to Avoid</div>
+            <div style="font-size:12.5px;color:var(--ink-2);margin-top:6px;">None recorded — this section is blank on the filled sheet.</div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <div class="bg-l">Competitor Details</div>
+            <div style="font-size:12.5px;color:var(--ink-1);margin-top:6px;line-height:1.7;">
+              instagram.com/example-competitor<br>
+              <span style="color:var(--ink-2);">"Clean product shots and quick turnaround on offer posts."</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- brand assets -->
+        <div class="job">
+          <div class="brief-h">Brand assets</div>
+          <div class="row-l"><span>Logo PNG</span><span class="chip c-doing">Uploaded</span></div>
+          <div class="row-l"><span>Logo Vector File</span><span style="color:var(--ink-2);">—</span></div>
+          <div class="row-l"><span>Brand Guidelines</span><span style="color:var(--ink-2);">—</span></div>
+          <div class="row-l"><span>Brand Colors</span><span class="chip c-doing">Uploaded</span></div>
+          <div class="row-l"><span>Font Details</span><span style="color:var(--ink-2);">—</span></div>
+          <div class="row-l"><span>Company Profile</span><span class="chip c-todo">Pending</span></div>
+          <div class="row-l"><span>Brochure</span><span style="color:var(--ink-2);">—</span></div>
+          <div class="row-l"><span>Product Catalogue</span><span style="color:var(--ink-2);">—</span></div>
+          <div class="actions"><button class="btn">Upload file</button></div>
+        </div>
+      </div>
+
+      <div>
+        <!-- section 8, as a real tracker -->
+        <div class="job">
+          <div class="brief-h">Onboarding</div>
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <div class="tnum" style="font-size:30px;font-weight:700;color:var(--ink-0);line-height:1;">69%</div>
+            <div style="font-size:12px;color:var(--ink-2);">9 of 13 received</div>
+          </div>
+          <div class="prog-wrap"><div class="prog-bar" style="width:69%;"></div></div>
+
+          <div class="sub-list" style="margin-top:14px;">
+            <div class="sub-item got"><span class="tick on"></span>Client Details Received</div>
+            <div class="sub-item got"><span class="tick on"></span>Logo Received</div>
+            <div class="sub-item got"><span class="tick on"></span>Brand Details Received</div>
+            <div class="sub-item got"><span class="tick on"></span>Product Information Received</div>
+            <div class="sub-item got"><span class="tick on"></span>Social Media Links Received</div>
+            <div class="sub-item"><span class="tick"></span>Photos Received</div>
+            <div class="sub-item"><span class="tick"></span>Videos Received</div>
+            <div class="sub-item got"><span class="tick on"></span>Instagram Access Received</div>
+            <div class="sub-item got"><span class="tick on"></span>Facebook Access Received</div>
+            <div class="sub-item"><span class="tick"></span>Meta Business Access Received</div>
+            <div class="sub-item got"><span class="tick on"></span>Competitor References Received</div>
+            <div class="sub-item"><span class="tick"></span>Content Plan Approved</div>
+            <div class="sub-item got"><span class="tick on"></span>Posting Approval Person Confirmed</div>
+          </div>
+          <div style="font-size:11.5px;color:var(--ink-2);margin-top:12px;">The four open items are what to chase. This is the same list as section 8 of the workbook — the percentage is counted, not typed.</div>
+        </div>
+
+        <!-- section 5 -->
+        <div class="job">
+          <div class="brief-h">Who signs off, on the client side</div>
+          <div class="row-l"><span style="color:var(--ink-2);">Approver Name</span><b style="color:var(--ink-0);">R. Mahant</b></div>
+          <div class="row-l"><span style="color:var(--ink-2);">Mobile Number</span><span class="tnum">+260 97 000 0000</span></div>
+          <div class="row-l"><span style="color:var(--ink-2);">Preferred approval method</span><span class="chip c-doing">WhatsApp</span></div>
+          <div class="row-l"><span style="color:var(--ink-2);">Expected approval time</span><span class="chip c-doing">Within 24 Hours</span></div>
+        </div>
+
+        <!-- section 6 -->
+        <div class="job">
+          <div class="brief-h">Posting access</div>
+          <div class="row-l"><span style="color:var(--ink-2);">Who will upload the content?</span><b style="color:var(--ink-0);">Untitled Advertising</b></div>
+          <div class="row-l"><span>Instagram Access Provided</span><span class="chip c-done">Access Completed</span></div>
+          <div class="row-l"><span>Facebook Page Access Provided</span><span class="chip c-done">Access Completed</span></div>
+          <div class="row-l"><span>Meta Business Access Provided</span><span class="chip c-done">Access Completed</span></div>
+          <div class="row-l"><span>LinkedIn Page Access Provided</span><span class="chip c-done">Access Completed</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>One decision to make here.</b> Six of the ten services in your workbook do not exist anywhere in the app — social media management, Meta ads, graphic design, reel editing, branding, logo design. Four already do. This screen shows them on <b>one list</b>, which is the recommendation: one list, one truth. The cost is that those six also appear in the Other Media quote dropdown — which is probably right, since you sell them.
+    </div>
+  </div>
+
+  <!-- ══ MONTHLY PLAN ══ -->
+  <div class="pane" id="p-plan">
+    <div class="sech">
+      <h2>Mahant Investment Ltd — monthly plan</h2>
+      <span class="note">Section 3.5 of the workbook, turned into work</span>
+    </div>
+
+    <div class="cols">
+      <div>
+        <div class="job">
+          <div class="brief-h">The retainer</div>
+          <div class="bgrid three">
+            <div><div class="bg-l">Service</div><div class="bg-v">Social Media Management</div></div>
+            <div><div class="bg-l">Started</div><div class="bg-v">Jul 2026</div></div>
+            <div><div class="bg-l">Status</div><div class="bg-v" style="color:var(--green);">Active</div></div>
+            <div><div class="bg-l">Posts / Month</div><div class="bg-v tnum">9</div></div>
+            <div><div class="bg-l">Reels / Month</div><div class="bg-v tnum">3</div></div>
+            <div><div class="bg-l">Stories / Month</div><div class="bg-v" style="color:var(--ink-2);">not set</div></div>
+          </div>
+          <div style="font-size:11.5px;color:var(--ink-2);margin-top:12px;">Your workbook offers 4 / 8 / 12 / 15 posts, 2 / 4 / 6 / 8 reels, 4 / 8 / 12 / daily stories, or a custom number. This client is on custom.</div>
+        </div>
+
+        <div class="job">
+          <div class="brief-h">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            On 25 July, this creates August
+          </div>
+          <div class="row-l">
+            <span style="display:flex;align-items:center;gap:9px;"><span class="chip c-auto">Auto</span> Static post <span class="tnum" style="color:var(--ink-2);">× 9</span></span>
+            <b style="color:var(--ink-0);">Design team</b>
+          </div>
+          <div class="row-l">
+            <span style="display:flex;align-items:center;gap:9px;"><span class="chip c-auto">Auto</span> Reel <span class="tnum" style="color:var(--ink-2);">× 3</span></span>
+            <b style="color:var(--ink-0);">Peyush</b>
+          </div>
+          <div style="font-size:11.5px;color:var(--ink-2);margin-top:12px;">Every card arrives carrying the brief — English, Professional · Corporate, no AI images, no religious or political content — so nobody opens a spreadsheet to start work.</div>
+        </div>
+
+        <div class="job">
+          <div class="brief-h">How a digital job moves</div>
+          <div class="flow">
+            <span class="step">To do</span><span class="arr">›</span>
+            <span class="step">Doing</span><span class="arr">›</span>
+            <span class="step">Internal check</span><span class="arr">›</span>
+            <span class="step new">Sent to client</span><span class="arr">›</span>
+            <span class="step new">Client approved</span><span class="arr">›</span>
+            <span class="step">Scheduled</span><span class="arr">›</span>
+            <span class="step">Posted</span>
+          </div>
+          <div style="margin-top:16px;">
+            <div class="ro" style="margin-bottom:7px;">An outdoor job keeps the short flow</div>
+            <div class="flow">
+              <span class="step">To do</span><span class="arr">›</span>
+              <span class="step">Doing</span><span class="arr">›</span>
+              <span class="step">Sent for approval</span><span class="arr">›</span>
+              <span class="step">Done</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="job">
+          <div class="brief-h">What this will never do</div>
+          <div class="sub-list" style="margin-top:4px;">
+            <div class="sub-item"><span class="tick on"></span>Create the same month twice</div>
+            <div class="sub-item"><span class="tick on"></span>Create for a paused retainer</div>
+            <div class="sub-item"><span class="tick on"></span>Create past the end date</div>
+            <div class="sub-item"><span class="tick on"></span>Send 12 separate notifications</div>
+          </div>
+          <div style="font-size:11.5px;color:var(--ink-2);margin-top:12px;">One message for the batch. Twelve pushes in a minute is how people turn notifications off — and that would silently break the sales alerts too.</div>
+        </div>
+
+        <div class="job">
+          <div class="brief-h">Why this matters more than it looks</div>
+          <div style="font-size:12.5px;color:var(--ink-1);line-height:1.7;">
+            A won hoarding order makes a handful of jobs, once.<br><br>
+            This client makes <b style="color:var(--ink-0);">12 jobs every month</b>, and keeps making them. Across a few retainer clients that is most of what the creative team does — and none of it comes from a quote.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>The second decision.</b> Client sign-off is a different gate from ours. Renuka checks the design; then the client has to approve it before it goes out. The two yellow steps above are that gate. They belong on digital work only — putting them on a hoarding job adds two clicks that mean nothing.
     </div>
   </div>
 
