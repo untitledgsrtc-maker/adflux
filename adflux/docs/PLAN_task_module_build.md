@@ -338,3 +338,117 @@ Monthly **billing** for retainers. Quotes are one-off; a retainer is currently
 typed as a lump sum in the Other Media wizard. Recurring invoicing is an
 accounts problem, not a task-module problem — noted so it is not assumed to be
 covered.
+
+---
+
+# 10 · Trackdek evidence — corrections to this plan (2026-07-21)
+
+Observed first-hand in the owner's live Trackdek account, not inferred from
+marketing material. This section OVERRIDES section 2 where they disagree.
+
+## 10.1 · What was found
+
+**The time half is used every day. The task half has never been used.**
+
+- Ten creative staff clock real hours daily (29h 29m across the team on the
+  day observed; screenshots capturing continuously).
+- Every task in every project checked sits at status **New**. Filtering
+  *Completed* returns "No completed tasks found". Filtering *In Progress*
+  returns nothing. Same on the busiest project.
+- Every task: **"No Description Available"**, comment count **0**,
+  **Assigned To: Not assigned**, **Due date: N/A**.
+- `REEL EDITING` — **356h 37m**, created 6 May 2026, still New.
+  `IMAGE/ VIDEO SEARCHING` 55h 18m, New. `THUMBNAIL MAKING` 19h 29m, New.
+- Task titles are activity categories (MEETING, MAIL QUOTATION, IMAGE/VIDEO
+  SEARCHING), not deliverables.
+
+A task in Trackdek is a billing code with a clock on it. The status,
+assignee, due-date and comment fields all exist and are all empty.
+
+## 10.2 · Section 2 is wrong — corrected
+
+| Was | Now |
+|---|---|
+| "Trackdek **stays** — both halves used." | **Trackdek is a timeclock. Keep paying for it. Assume the task half does not exist.** |
+
+Consequences:
+1. Trackdek's task list is **not** evidence that the job side is covered. The
+   real baseline this module competes with is **WhatsApp**.
+2. **Stage 0 is no longer blocking.** The core job list has been written by
+   the team over ten weeks, in their own words: BANNER DESIGN · POST DESIGN ·
+   LETTERHEAD DESIGN · VISITING CARD CHANGES · APP PAGE DESIGN · FESTIVAL
+   STORY · THUMBNAIL MAKING · REEL EDITING · REEL UPLOAD WORK · REMOVE GREEN
+   SCREEN · IMAGE/VIDEO SEARCHING. (MEETING and MAIL QUOTATION are sales/admin
+   — keep them out of the creative job list.)
+3. **Stage 7 is not a late stage.** Where the hours actually are: reel editing
+   356h against letterhead design 3h30m. The creative load is recurring
+   retainer content, not campaign artwork. A won-quote-only module covers the
+   small end. Recurring generation is half the spine.
+4. Unresolved contradiction for the owner: this plan says Trackdek stays,
+   CLAUDE.md section 13 lists "sunset Trackdek" as Phase 4. Pick one.
+
+## 10.3 · The behavioural warning — and the rule it forces
+
+This team has performed a status change **zero times** in the history of the
+account. Every optional field is empty, everywhere, for ten weeks.
+
+Therefore, predicted for any new module: every optional field blank, nothing
+ever marked done, the comment thread dead on arrival (feedback lives on
+WhatsApp).
+
+**HARD RULE — version one is READ-ONLY for the designer. She types nothing.**
+She opens it, sees today's jobs already filled in, and that is all. No status
+button, no comment box, no date picker. If the first thing on her screen is an
+empty field she is expected to complete, it stays empty and we will have paid
+to rebuild Trackdek's task half.
+
+When completion is added later it must be a **by-product of something she
+already wants to do** — the card closes when she uploads the finished file,
+because the file has to be handed over anyway. Never a button whose only
+reward is a tidier list. She has ignored exactly that button, daily, for ten
+weeks.
+
+**No card may exist without a client, an owner, a deadline and a defined
+finish.** A freehand card with everything optional becomes REEL EDITING —
+open forever, 356 hours deep — inside our own database.
+
+## 10.4 · Take / leave
+
+**Take:** the 13 real task names (section 10.2) · the hours split, read ONCE as
+a capacity study and never again · the 30+ project list, which is the real
+account list and diffs usefully against `clients` to find retainer clients with
+no quote · **"Rejected" as a kill state** — the five statuses in section 4 have
+no exit for killed work · the white-label branding, since the team already
+experiences Trackdek as "the Untitled app".
+
+**Leave:** screenshots and any monitoring — the job card's only value is that
+it is opened voluntarily; put surveillance beside it and it becomes the
+surveillance app · hours, timesheets, attendance — paid for and working ·
+**the open-ended task**, the deepest trap of the four.
+
+## 10.5 · Name collisions — now two
+
+Two Renukas (Renuka Vasava, designer / Renuka, telecaller lead) and **two
+Dixitas** (Dixita Rana, Dixita Gohel — both creative). This has cost nothing
+so far only because nobody has ever assigned anything. The moment assignment
+becomes real, so does the misrouting. Full name plus role in every picker.
+
+## 10.6 · The cheapest test — before any significant build
+
+Ten working days. One person sends each designer, each morning, one WhatsApp
+message per job **before she asks**: client, what to make, size/format,
+deadline. Nothing else. ~5 jobs a day, ~20 minutes.
+
+Measure: (a) how many follow-up questions still came back — if she still asks
+"what should it say / which photos", the brief format is wrong and pre-filling
+a card will not fix it; (b) how many of the ten mornings the sender actually
+managed it — if a human cannot produce five briefs a day, the automated
+version has nothing to draw on; (c) **where the brief content came from.**
+
+(c) is the one that matters. A won quote gives client, media, city and dates.
+It does not give "30-second Diwali reel, these three product shots, Gujarati
+caption." That lives in the Excel brief workbook. If most of the brief comes
+out of Excel and the owner's head rather than out of the quote, then **the real
+build is brief-capture at the sales end, not a task list at the creative end.**
+The card is the easy half. The content to put in it is the hard half, and
+nobody has solved it yet.
