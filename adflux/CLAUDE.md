@@ -8113,3 +8113,91 @@ and had not been run at time of writing. Do not buy phones before running it.
   and `/work`.
 - Reps must reopen the app; telecallers must ACCEPT the battery prompt or the fix
   does not reach them.
+
+---
+
+## 122 · Trackdek read + the task module's READ-ONLY v1 rule (2026-07-21)
+
+Owner shared his live Trackdek account and asked what to take from it. Read it
+first-hand (his logged-in dashboard, Projects, Task Progress, a task detail).
+The finding changed the task-module plan; the corrected screen is in the mockup.
+
+### What the data says (first-hand, not marketing copy)
+
+**The time half is used every day. The task half has never been used.**
+- ~10 creative staff clock real hours daily (29h 29m team-wide on the day seen;
+  screenshots capturing continuously). That half is genuinely load-bearing.
+- Every task in every project checked sits at status **New**. Filter *Completed*
+  → "No completed tasks found". *In Progress* → nothing. Same on the busiest
+  project.
+- Every task: **"No Description Available"**, comments **0**, **Assigned To: Not
+  assigned**, **Due date: N/A**.
+- `REEL EDITING` — **356h 37m**, created 6 May, still New. `IMAGE/ VIDEO
+  SEARCHING` 55h 18m. `THUMBNAIL MAKING` 19h 29m.
+- Task titles are activity categories (MEETING, MAIL QUOTATION), not deliverables.
+
+A Trackdek task is a billing code with a clock on it. The status, assignee,
+due-date and comment fields all exist and are all empty.
+
+### The rule this forces (FROZEN — applies to the task module when it is built)
+
+This team has performed a status change **zero times** in the history of an
+account it opens daily. So:
+
+> **Version one is READ-ONLY for the designer. She types nothing.**
+
+She opens it, sees today's jobs already filled in, and that is all. No status
+button, no comment box, no date picker. If the first thing on her screen is an
+empty field she is expected to complete, it stays empty and we will have paid to
+rebuild Trackdek's task half.
+
+Completion, when added later, must be a **by-product of something she already
+wants to do** — the card closes when she uploads the finished file, because the
+file has to be handed over anyway. Never a button whose only reward is a tidier
+list.
+
+**No card may exist without a client, an owner, a deadline and a defined finish.**
+A freehand card with everything optional becomes REEL EDITING — open forever,
+356 hours deep — inside our own database.
+
+### Free inputs taken from the account
+
+- **The core job list** (Stage 0 was blocked on this): BANNER DESIGN · POST
+  DESIGN · LETTERHEAD DESIGN · VISITING CARD CHANGES · APP PAGE DESIGN ·
+  FESTIVAL STORY · THUMBNAIL MAKING · REEL EDITING · REEL UPLOAD WORK · REMOVE
+  GREEN SCREEN · IMAGE/VIDEO SEARCHING. (MEETING / MAIL QUOTATION are sales-admin
+  — keep them out of a creative job list.)
+- **The creative roster:** renuka vasava · Akshar Gohil · Riya Jangid · KAMINA
+  THAKOR · Dixita Rana · SHREYA PANCHAL · DIXITA GOHEL · Damini Rane · Piyush
+  Kumawat · safika Bansiwala.
+- **A second name collision — two Dixitas** (Dixita Rana, Dixita Gohel), on top
+  of the two Renukas (§the plan's risk 4). Harmless only because nothing has ever
+  been assigned. Full name + role in every person-picker.
+- 30+ projects = the real client list, incl. MAHANT INVESTMENT and TRIMURTI
+  CLINIC — the same two clients in the owner's Excel brief workbook. A client
+  therefore exists in three disconnected places today.
+
+### Corrections to the plan (written into `docs/PLAN_task_module_build.md` §10)
+
+- The locked decision "Trackdek stays — **both halves used**" is WRONG on the
+  second half. Corrected to: *Trackdek is a timeclock; assume the task half does
+  not exist.* The real baseline the module competes with is **WhatsApp**.
+- Recurring/retainer generation is **not a late stage** — 356h reel editing
+  against 3h30m letterhead design says the creative load is recurring content,
+  so a won-quote-only module covers the small end.
+- Unresolved for the owner: this plan says Trackdek stays; CLAUDE.md §13 lists
+  "sunset Trackdek" as Phase 4. Pick one.
+
+### Do NOT copy
+
+Screenshots or any monitoring — the job card's only value is that it is opened
+voluntarily; put surveillance beside it and it becomes the surveillance app.
+Hours / timesheets / attendance — paid for and working. And the open-ended task,
+which is the deepest trap of the four.
+
+### Mockup
+
+`_design_reference/task_module_mockup.html` gained a **Morning list** tab (now the
+default) showing the read-only v1 with real job names, real clients and one
+control per card. Also carries **Client brief** + **Monthly plan** from the
+digital-services planning earlier the same day.
