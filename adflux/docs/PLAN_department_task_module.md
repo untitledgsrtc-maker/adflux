@@ -76,3 +76,37 @@ Two of these you must decide (1–3 become 3 new fields on the win screen). Item
 4. **Who approves creative** before it goes to the client — you, or Piyush as creative lead? One name.
 5. **Do you want free-form task assignment in stage 1?** I recommend no. If you insist, say so now and I'll price it separately.
 6. **How do designers mark attendance** — office check-in, or not tracked in the app at all?
+
+---
+
+## OWNER DECISIONS (2026-07-21)
+
+| # | Decision | Consequence |
+|---|---|---|
+| 1 | **Trackdek: both halves used equally** | Trackdek STAYS for time tracking + screenshots. We build only the job/task side. Two tools, each doing what it is good at. Do NOT attempt to replace monitoring. |
+| 2 | **Free-form task assignment IN stage 1** — anyone assigns anyone, with sub-tasks | Owner overruled the recommendation after being warned. See mitigation below. Stage 1 grows from ~1 week to ~2 weeks. |
+| 3 | **A creative lead approves** creative before it reaches the client | Approval gate is needed. Name still to confirm. Not the assigner, not the owner. |
+| 4 | **Designers/editors DO check in**, same as sales | Reuse the existing check-in rather than building a second attendance path. GPS relevance to be confirmed — they are office staff. |
+
+### Mitigating decision 2 (free-form tasks)
+
+The stated risk stands: a generic to-do app inside a CRM typically dies in ~8
+weeks because nothing forces anyone to use it. Since it is being built anyway,
+design so it has the best chance:
+
+- **ONE list per person.** Free-form tasks and auto-created job cards appear in
+  the SAME "my work today" list. Never two places to look — a second list is how
+  the first one dies.
+- **ONE level of sub-tasks.** Not a tree. Deep nesting is never used and makes
+  every screen harder.
+- Free-form tasks carry the SAME five statuses as job cards. No custom statuses.
+- **Measure it.** If after 6 weeks most free-form tasks are created by fewer than
+  3 people, or the median task has no status change after creation, say so plainly
+  and consider removing it rather than defending it.
+
+### Still needed from the owner
+
+- The creative lead's NAME (decision 3).
+- The medium -> department map: who makes the material for GSRTC LED, hoarding,
+  newspaper, auto hood, cinema, radio, digital.
+- The Stage 0 test: last 10 won orders, what jobs did each produce.
