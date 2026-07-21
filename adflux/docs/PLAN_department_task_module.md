@@ -110,3 +110,29 @@ design so it has the best chance:
 - The medium -> department map: who makes the material for GSRTC LED, hoarding,
   newspaper, auto hood, cinema, radio, digital.
 - The Stage 0 test: last 10 won orders, what jobs did each produce.
+
+### Round 2 answers (2026-07-21) — and what each one changes
+
+| Answer | Design consequence |
+|---|---|
+| **Different approver per type** (design vs video) | Approval is not one name. Needs a small settings table: department -> approver. Cheap, but it must exist from stage 1 or approvals get hardcoded and then hardcoded wrong. |
+| **GSRTC LED = designer THEN editor** | ⚠️ Jobs are SEQUENTIAL, not a flat list. The editor's job should not start until the artwork is approved. This is a dependency between jobs — genuinely more than a to-do list, and the single biggest complexity in the module. |
+| **Artwork: roughly half and half** | The win screen MUST ask "creative needed?" before any job is created. Without it, half of all auto-created jobs are noise — and noise is what teaches people to ignore a list. This one field decides whether the module is trusted. |
+| **Orders: a core plus extras** | Auto-create the predictable CORE only, and let people add the extras by hand. Confirms auto-creation is worth building AND that free-form (owner's decision 2) has a genuine job to do — the extras. The two halves now fit together instead of competing. |
+
+**Net: the module is justified.** The "core plus extras" answer is what validates
+it — a fully ad-hoc answer would have killed auto-routing.
+
+### Revised shape
+
+1. Won quote -> win screen asks **creative needed? (yes/no)** + material-due date.
+2. If yes, auto-create the CORE jobs for that media type from the medium ->
+   department map, respecting sequence (design before video where both apply).
+3. Extras added manually by anyone (free-form, one sub-task level).
+4. Each job goes to its department's approver on completion.
+5. Everything appears in ONE "my work today" list per person.
+
+### Open
+
+- NAMES: who approves DESIGN, and who approves VIDEO.
+- The full medium -> department map beyond GSRTC LED.
