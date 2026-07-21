@@ -148,7 +148,28 @@ on any hot path.
    hood → Dixita.
 2. **The Stage 0 core job list** — from the last 10 won orders.
 3. **Full names + phone numbers** for the accounts to create.
-4. Confirm **Dixita** already has a login (she appears in the system) or needs one.
+4. ~~Confirm Dixita has a login~~ — owner confirms **NOBODY in creative has a
+   login**, Dixita included.
+
+⚠️ **But check for existing rows before creating anyone.** `dixita@untitledad.in`
+already appears in the users table (it is in the Phase 240 email-footer mapping),
+and §42 flagged Dixita/Kamina/Jignesh as scoring 0.0 all week — i.e. rows that
+exist but are unused. So the work may be "activate and onboard", not "create",
+and creating a second Dixita would be worse than doing nothing.
+
+Run this first:
+
+```sql
+SELECT id, name, email, role, designation, is_active, last_sign_in_at
+  FROM public.users
+ WHERE name ILIKE ANY (ARRAY['%dixita%','%renuka%','%peyush%','%safika%'])
+ ORDER BY name;
+```
+
+Rows that come back → activate + set designation + send credentials.
+Nothing back → create fresh via HR → Add Member.
+Two Renukas → expected; keep the DESIGNER one straight (see the name-collision
+note in the analysis doc).
 
 ---
 
