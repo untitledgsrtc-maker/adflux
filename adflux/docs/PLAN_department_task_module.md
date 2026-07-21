@@ -191,3 +191,48 @@ pick up) OR media_type -> a named person. Person-level routing is more precise b
 breaks when that person is on leave, so a department fallback is needed.
 
 Still to map: hoarding, newspaper, cinema, digital/social, and anything else sold.
+
+## ⚠️ THE REAL STARTING POINT (owner, 2026-07-21): nobody in creative has a login
+
+Peyush, Safika, Renuka Vasava — none of them have accounts. The creative team has
+NEVER used this app. Everything they do today happens in WhatsApp and Trackdek.
+
+This changes what stage 1 actually is. It is not "build a task module" — it is
+**"give the creative team a working login and a home screen"**. Nothing else in
+this plan can function until people who approve and do the work can sign in.
+
+### And there is no role for them
+
+The live `users_role_check` allows exactly nine roles (Phase 97.E):
+`admin, sales, co_owner, agency, telecaller, office_staff, hr, accounts, staff`.
+
+**There is no `designer` and no `video_editor`.** Two options:
+
+1. **Extend the CHECK** — cleanest to read, but it is a live constraint on the
+   users table and every role-gated query/RLS policy has to be reviewed for what
+   the new value does. Touches a lot.
+2. **`role='staff'` + `designation='Designer' / 'Video Editor'`** (the designations
+   master already exists, Phase 50) — no constraint change, no RLS review, and
+   routing keys on designation. **Recommended.**
+
+Either way this must be decided BEFORE any accounts are created, because changing
+a person's role later means re-checking every permission they picked up.
+
+### Adoption risk is now HIGHER than first assessed
+
+The original estimate assumed staff who already use the app daily. They do not.
+This is a brand-new user group being asked to change how they work, on a phone,
+for a system they have never opened. That is change management, not a build
+problem — and it is the single most likely reason this fails.
+
+Mitigation that actually works: give them something useful on day one that has
+nothing to do with tasks — their job list with the client, media, city and dates
+already filled in from the won quote. If their first experience is "this saves me
+asking the rep what the job is", they come back. If their first experience is an
+empty to-do list they have to populate themselves, they will not.
+
+### Revised stage 1 (was ~1 week, now realistically ~2 weeks)
+
+Accounts + role decision + a creative home screen + fixing the live bug where a
+non-sales user lands on the SALES screens. Useful on its own even before a single
+task exists.
