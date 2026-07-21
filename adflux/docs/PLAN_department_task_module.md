@@ -164,3 +164,30 @@ person.
    An approver needs an account, a role, and push enabled - otherwise approvals
    queue up against a person who cannot act on them. If they are new users they
    must be created (HR -> Add Member) before this module can work.
+
+### ⚠️ TWO RENUKAS — name collision, confirmed by owner (2026-07-21)
+
+- **Renuka Vasava = DESIGNER**, and the approver for design work.
+- **Renuka (the other one) = TELECALLER LEAD** (§30, §42.2 — monitors Dhara + Rima).
+
+Different people. This WILL cause a wrong assignment the first time someone picks
+from a list showing only first names.
+
+Build consequence: every person-picker in this module must show the FULL name
+(and ideally the role), never just "Renuka". Worth checking the existing pickers
+too — reassign, approver settings, task assignment — because the collision exists
+in the live data today, not just in this module.
+
+### Routing so far
+
+| Media | Who does the work |
+|---|---|
+| GSRTC LED | designer **then** editor (sequential) |
+| **Govt auto hood** | **Dixita** |
+
+⚠️ Note "Govt auto hood -> Dixita" routes to a PERSON, not a department. So the
+routing table needs to allow either: media_type -> department (anyone in it can
+pick up) OR media_type -> a named person. Person-level routing is more precise but
+breaks when that person is on leave, so a department fallback is needed.
+
+Still to map: hoarding, newspaper, cinema, digital/social, and anything else sold.
