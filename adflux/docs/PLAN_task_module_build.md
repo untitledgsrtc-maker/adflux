@@ -95,12 +95,24 @@ workload dashboards · anything Trackdek does.
 - Manager view: who has how many open, and what is overdue.
 - Overdue count on the admin dashboard.
 
-### Stage 5 — only if asked twice
+### Stage 5 — client page + brief + assets · ~1 week
+See section 9. Rep-filled, no client link.
+
+### Stage 6 — the brief lands on the job card · ~3 days
+See section 9.
+
+### Stage 7 — retainers + monthly auto-jobs · ~1 week
+See section 9. This is where the module pays for itself on the digital side.
+
+### Stage 8 — client sign-off gate · ~4 days
+See section 9. Internal approval and client approval are two different gates.
+
+### Later — only if asked twice
 WhatsApp share of a job · client-visible proof links · workload balancing ·
 anything resembling time tracking (**never** — that is Trackdek's job).
 
-**Total: roughly 6 weeks of build**, plus Stage 0 and real adoption time between
-stages.
+**Total: roughly 6 weeks for Stages 0–4, plus ~3 weeks for Stages 5–8**, plus
+Stage 0 and real adoption time between stages.
 
 ---
 
@@ -179,3 +191,150 @@ Time tracking · screenshots · Gantt charts · drag-drop boards · custom statu
 multiple assignees per job · a client portal · deep sub-task trees · hours-based
 billing. Each of these has killed an in-house task module somewhere. If one is
 genuinely needed later it can be argued on its own merits — not smuggled in.
+
+---
+
+# 9 · The digital-services half (Stages 5–8)
+
+Added 2026-07-21 after the owner shared
+`Untitled Advertising Client Brief.xlsx` — the workbook the team fills with a
+client before social-media work starts.
+
+## 9.1 · Why this exists
+
+Stages 0–4 assume **won quote → jobs**. True for GSRTC LED and hoardings: one
+order, a few jobs, finished.
+
+Social-media retainers do not work that way. Section 3.5 of the workbook sets a
+monthly quantity — 12 posts, 4 reels, 8 stories. That is roughly **24 design
+jobs every month, per client, indefinitely**, and not one of them comes from a
+won quote.
+
+Without Stages 5–8, the task module covers the smaller half of the creative
+team's actual workload.
+
+## 9.2 · What the app does not have today (verified 2026-07-21)
+
+| Thing | State |
+|---|---|
+| Service list (`media_types`) | OOH/print only — newspaper, hoarding, cinema, mall, radio |
+| Anything recurring or retainer | None. `RenewalToolsV2` is a report over won quotes, not a schedule |
+| Client detail page | None. `/clients` is a table plus a six-field edit modal |
+| Files against a client | None. Files attach to quotes, leads, companies — never a client |
+| Client brief / brand assets | None |
+
+There is nothing to reuse and nothing to break. Everything below is additive.
+
+## 9.3 · Decisions locked
+
+| Decision | Choice | Consequence |
+|---|---|---|
+| Who fills the brief | **The rep, in the office** | No public link, no token form, no client login. Cuts a week of build and every security question with it. |
+| Scope | **All the way, including monthly auto-jobs** | Stages 5–8 all in. |
+| How much of the workbook to model | **Only what somebody reads back** | ~20 real fields. The long tick-lists become arrays. Sections nobody reads stay in the file. |
+| The Excel itself | **Keeps working during the build** | It is not switched off until reps are using the client page by choice. |
+
+**The workbook is ~200 rows; a designer reads about 15 of them.** Modelling all
+200 produces a form nobody finishes. That limit is the point, not a shortcut.
+
+## 9.4 · How the workbook maps
+
+| Section | What it actually is | Where it goes |
+|---|---|---|
+| 1 · Basic details | Duplicate of Leads/Clients — company, contact, phone, city, industry | **Read from the existing record. Never typed twice.** |
+| 2 · Select services | The service catalogue the app is missing | Services master (see 9.6) |
+| 3.1–3.4, 3.6, 3.7 | Platforms, goals, audience, language, tone | Arrays on the brief |
+| 3.5 · Monthly quantity | **The recurring job generator** | `client_retainers` (Stage 7) |
+| 4 · Assets, style, things to avoid | The prefilled brief on the job card | Brief columns + `client_files` |
+| 5 · Approval process | The **client's** approver — a different person from ours | Brief columns (Stage 8) |
+| 6 · Posting access | Who publishes, per-platform access status | Brief columns |
+| 7 · Meta Ads | Paid-ads brief, only when that service is on | Arrays on the brief |
+| 8 · Checklist + % complete | **An onboarding tracker.** A task list, already designed | Checklist on the brief (Stage 5) |
+
+## 9.5 · Two approvals, not one
+
+Stage 4 approvals are **internal** — design → Renuka Vasava, video → Peyush,
+GSRTC video → Safika. Section 5 of the workbook is a **different** gate: the
+client signs off before anything is published.
+
+The five statuses in the mockup (To do / Doing / Sent for approval / Changes
+needed / Done) collapse both into one. For digital work the real sequence is:
+
+```
+To do → Doing → Internal check → Sent to client → Client approved → Scheduled → Posted
+```
+
+Do not bolt this onto the OOH flow, which genuinely has one gate. **Statuses
+should vary by service, or the OOH team gets two pointless extra steps.** This
+is the main open design question in Stage 8.
+
+## 9.6 · One service list or two — owner decision needed
+
+Section 2 lists ten services. Four already exist as `media_types` (outdoor,
+GSRTC LED, print, digital). Six do not (social media management, Meta ads,
+graphic design, reel/video editing, branding, logo design).
+
+- **Option A — extend `media_types`, add a `department` column.** One list.
+  Cost: the Other Media quote wizard dropdown grows by six entries, which is
+  arguably correct since these are sold.
+- **Option B — a separate `services` master for routing.** Quoting stays
+  untouched. Cost: two overlapping lists — exactly the duplication that section
+  69 of CLAUDE.md documents as the cause of "works, then breaks".
+
+**Recommend A.** One list, one truth. Confirm before Stage 5.
+
+## 9.7 · Stage detail
+
+### Stage 5 — client page + brief + assets · ~1 week
+- A real client detail page (`/clients/:id`) — none exists.
+- **Add Client** button. Today a client row only appears via a saved quote, so a
+  retainer client with no quote yet cannot be created at all.
+- `client_briefs` — one row per client. Real columns for what gets read back
+  (brand colours, fonts, design style, languages, tone, who supplies content,
+  things to avoid, competitor links, approver name/phone/method/SLA, posting
+  owner). Tick-lists stored as text arrays. Nothing modelled that nobody reads.
+- `client_files` + a `client-assets` bucket — logo PNG, logo vector, brand
+  guidelines, brochure, catalogue, product photos. Same upload pattern as the
+  existing quote attachments.
+- Section 8's 13-item checklist, with the % complete it already calculates.
+  Stored as a JSON list on the brief for v1 — a table only if "who marked this,
+  and when" turns out to matter.
+- Section 1 fields are **displayed from the existing lead/client record**, never
+  re-entered.
+
+### Stage 6 — the brief on the job card · ~3 days
+The designer opens a job and sees brand colours, fonts, tone, language, design
+style, things to avoid, competitor references and the asset files — without
+opening a spreadsheet or asking the rep. This is the same promise Stage 3 makes
+for won orders, applied to retainer work.
+
+### Stage 7 — retainers + monthly auto-jobs · ~1 week
+- `client_retainers` — client, service, posts/reels/stories per month, start
+  month, active flag.
+- A scheduled job (the same `pg_cron` that already sends pushes) runs near
+  month-end and creates next month's cards for every active retainer,
+  pre-filled from the brief and routed by service.
+- **Guard rails, learned from the follow-up cadence work:** never generate twice
+  for the same client-month; never generate for a paused or ended retainer;
+  never generate past the retainer's end. One notification for the batch, not
+  24 — notification fatigue is risk #2 in section 6 and 24 pushes would prove it.
+
+### Stage 8 — client sign-off gate · ~4 days
+Per-service status sets (9.5), a "sent to client / client approved / changes
+needed" step with the reason captured, and the client-side approver from Section
+5 shown on the card so nobody has to ask who signs off.
+
+## 9.8 · Fix the workbook itself (free, today)
+
+The blank template and the filled example disagree. Blank section 3.4 lists 14
+content types (Static Posts, Reels, Carousel…); the example has two rows
+("Content provide by us" / "by client"). Anyone copying the example into the
+blank template will misalign the rows. Worth correcting in the file regardless
+of what gets built.
+
+## 9.9 · Out of scope, flagged
+
+Monthly **billing** for retainers. Quotes are one-off; a retainer is currently
+typed as a lump sum in the Other Media wizard. Recurring invoicing is an
+accounts problem, not a task-module problem — noted so it is not assumed to be
+covered.
