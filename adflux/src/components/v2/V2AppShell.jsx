@@ -847,6 +847,11 @@ export function V2AppShell() {
           {/* Phase 180 — one-time GPS-capture setup prompt. Field-sales only,
               native-only, gated to APK >= 96014 (where the deep-links exist). */}
           <GpsSetupPrompt enabled={profile?.role === 'sales' && profile?.team_role !== 'sales_manager'} />
+          {/* Phase 250 — telecallers get the BATTERY half only. They have no km
+              to protect, but an app the OS is free to kill loses the post-call
+              outcome and the follow-up with it. Separate done-key, so a rep who
+              dismissed the GPS prompt still sees this one. */}
+          <GpsSetupPrompt enabled={profile?.role === 'telecaller'} mode="battery" />
           {/* ProposedIncentiveCard — sales / agency only.
               Phase 34Z.58 (15 May 2026) — owner directive: "proposed
               incentive card needed in every tab, fixed." Dropped the

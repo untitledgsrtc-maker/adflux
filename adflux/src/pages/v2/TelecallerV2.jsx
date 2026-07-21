@@ -48,6 +48,7 @@ import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import PendingOutcomesCard from '../../components/leads/PendingOutcomesCard'
 import { logCallAudit } from '../../utils/callAudit'
 import { markCallStart } from '../../utils/callTimer'
+import { rememberPendingCall, attachPendingActivityId, readPendingCall, clearPendingCall } from '../../utils/pendingCall'
 import { dialPhone } from '../../utils/openExternal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { pushToast } from '../../components/v2/Toast'
@@ -311,6 +312,57 @@ export default function TelecallerV2() {
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
 
+  // Phase 250 — RESTORE a call the app was killed during.
+  //
+  // If Android reclaimed the app while the rep was talking, the 1.5s timer and
+  // every piece of React state died with it, so the outcome modal never opened
+  // and the follow-up was never created. The synchronous localStorage write in
+  // quickLogCall survives that, so on the next launch we reopen the modal for
+  // that lead. activityId may be null (the insert never left the phone) — the
+  // modal inserts in that case rather than patching, so the call is still
+  // captured. Runs once, after the queue loads, so callLead can be a real row.
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (restoredRef.current || !profile?.id || loading) return
+    restoredRef.current = true   // unconditional: this must run exactly ONCE per
+                                 // mount. Setting it only when a record exists
+                                 // left the check re-running on every load()
+                                 // flip (check-in, checkout, ticking a task),
+                                 // which could pop the modal mid-flow.
+    const p = readPendingCall(profile.id)
+    if (!p) return
+    ;(async () => {
+      let actId = p.activityId || null
+      if (!actId) {
+        // The insert may have SUCCEEDED server-side and only the follow-up
+        // bookkeeping died with the app. Adopt that row instead of inserting a
+        // second one: nothing would catch the duplicate (the Phase 68.2 dedupe
+        // index keys on notes, which differ between the tap row and the
+        // outcome-save row) and compute_daily_score COUNTs both, inflating the
+        // TC's score and therefore pay.
+        const { data: orphan } = await supabase
+          .from('lead_activities')
+          .select('id')
+          .eq('lead_id', p.leadId)
+          .eq('created_by', profile.id)
+          .eq('activity_type', 'call')
+          .is('outcome', null)
+          .gte('created_at', new Date(p.at - 60_000).toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        actId = orphan?.id || null
+      }
+      // Prefer the freshly-loaded lead row; fall back to the stored snapshot so
+      // this still works when the lead has dropped out of today's queue.
+      const fromQueue = leads.find(l => l.id === p.leadId)
+      setCallLead(fromQueue || { id: p.leadId, name: p.leadName, company: p.leadCompany, phone: p.phone })
+      setPendingActivityId(actId)
+      setPostCallOpen(true)
+    })()
+    /* eslint-disable-next-line */
+  }, [profile?.id, loading])
+
   // Phase 110 — manual end-of-day checkout for telecallers. Stamps
   // check_out_at on today's session; the 8 PM cron still auto-closes
   // anyone who forgets. No GPS (TC is desk-based). check_out_source is a
@@ -456,6 +508,14 @@ export default function TelecallerV2() {
     callingRef.current = true
     setTimeout(() => { callingRef.current = false }, 2500)
     setCallLead(lead)
+    // Phase 250 — SYNCHRONOUS, and it must stay immediately BEFORE dialPhone.
+    // Everything after this line can be lost if Android kills the app while the
+    // rep is on the call; this localStorage write is the only thing guaranteed
+    // to land, and it is what lets the outcome modal come back on next launch.
+    rememberPendingCall({
+      leadId: lead.id, leadName: lead.name, leadCompany: lead.company,
+      phone: lead.phone, userId: profile.id,
+    })
     dialPhone(phone)
     logCallAudit(supabase, { userId: profile.id, leadId: lead.id, phone: lead.phone })
     markCallStart(lead.id)   // Phase 116 — arm the time-away duration fallback
@@ -494,6 +554,9 @@ export default function TelecallerV2() {
         return
       }
       setPendingActivityId(actRow?.id || null)
+      // Phase 250 — if the insert DID land, record its id so a restored modal
+      // patches that row instead of inserting a duplicate call.
+      attachPendingActivityId(actRow?.id || null)
       setTimeout(() => setPostCallOpen(true), 1500)
 
       // Phase 65 (20 May 2026) — auto-patch duration_seconds 60s
@@ -1247,10 +1310,12 @@ export default function TelecallerV2() {
         onClose={() => {
           setPostCallOpen(false)
           setPendingActivityId(null)
+          clearPendingCall()   // Phase 250 — rep chose to skip; don't nag on next launch
         }}
         onSaved={async ({ nextAction } = {}) => {
           setPostCallOpen(false)
           setPendingActivityId(null)
+          clearPendingCall()   // Phase 250 — outcome captured; nothing left to restore
           setPendingBump(b => b + 1)  // Phase 237 — refresh the pending-outcomes list
           load(true)  // Phase 71 — silent refresh, preserve scroll
           // Phase 113.8 — parity with /work: prompt a WhatsApp follow-up

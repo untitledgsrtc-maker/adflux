@@ -14,12 +14,12 @@
 // Derived query only — NO new table, NO trigger, NO hot-path load (§45-safe).
 // Reads existing lead_activities with a new filter. Two-query merge (activities
 // then leads) instead of a PostgREST FK embed — the embed nulls under some
-// FK+RLS combos (§36.6). Bounded to TODAY (IST) so day 1 doesn't dump a
-// months-old backlog (§131 foot-gun).
+// FK+RLS combos (§36.6). Bounded to a SHORT window (see LOOKBACK_DAYS) so it
+// never dumps a months-old backlog as fresh work (§131 foot-gun).
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { istTodayISO } from '../utils/istDate'
+import { istTodayPlusDays } from '../utils/istDate'
 
 const IN_FLIGHT_MS = 3 * 60 * 1000   // skip the call the rep is still on / resolving
 
@@ -33,12 +33,21 @@ export const PENDING_CLOSED_STAGES = ['Won', 'Lost']
 // a call, no outcome saved, TODAY (IST), older than the in-flight buffer, tied
 // to a lead. The Won/Lost exclusion needs the lead row, so the caller does it
 // with PENDING_CLOSED_STAGES after joining leads.
+// Phase 250 — widened from today-only to a 3-day window.
+//
+// Today-only meant a call lost at 7pm was gone from the list by the next
+// morning, so the rep never captured the outcome and the customer was never
+// followed up. The commonest loss (the app being killed mid-call) happens at the
+// END of a call, i.e. late in the day, which is exactly what a midnight cutoff
+// throws away. Three days covers a weekend without becoming a guilt list.
+const LOOKBACK_DAYS = 3
+
 export function applyPendingOutcomeFilters(qb) {
   return qb
     .eq('activity_type', 'call')
     .is('outcome', null)
-    .gte('created_at', `${istTodayISO()}T00:00:00+05:30`)                 // IST midnight, not UTC (§57)
-    .lt('created_at', new Date(Date.now() - IN_FLIGHT_MS).toISOString())  // skip the in-flight call
+    .gte('created_at', `${istTodayPlusDays(-LOOKBACK_DAYS)}T00:00:00+05:30`)  // IST, not UTC (§57)
+    .lt('created_at', new Date(Date.now() - IN_FLIGHT_MS).toISOString())      // skip the in-flight call
     .not('lead_id', 'is', null)
 }
 

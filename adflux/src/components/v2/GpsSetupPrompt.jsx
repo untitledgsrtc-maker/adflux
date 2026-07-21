@@ -4,8 +4,15 @@ import { Satellite, X } from 'lucide-react'
 import { requestBatteryUnrestricted, openLocationSettings } from '../../utils/nativeTracking'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Phase 180 — one-time GPS-capture onboarding (§73 #1). Field-sales only,
-// native-only. Closes the dark-window km undercount by walking the rep to the
+// Phase 180 — one-time GPS-capture onboarding (§73 #1). Native-only.
+//
+// Phase 250 — now serves TELECALLERS too, in `battery` mode. The battery half
+// was always the important part for them: an app that Android is free to kill
+// loses the post-call outcome AND the follow-up when the dialer takes the
+// foreground (§250). Telecallers were excluded from this prompt entirely, so
+// the very reps reporting "the app reloaded and the outcome never came" had
+// never once been asked to whitelist it. GPS wording is wrong for them, hence
+// the mode. Closes the dark-window km undercount by walking the rep to the
 // two phone settings Android won't let an app set silently:
 //   Location = "Allow all the time"  +  Battery = Unrestricted.
 //
@@ -15,10 +22,11 @@ import { requestBatteryUnrestricted, openLocationSettings } from '../../utils/na
 // app's location-settings screen.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DONE_KEY = 'gps_setup_prompt_done'
+const DONE_KEY_BY_MODE = { gps: 'gps_setup_prompt_done', battery: 'battery_setup_prompt_done' }
 const MIN_BUILD = 96014
 
-export default function GpsSetupPrompt({ enabled = false }) {
+export default function GpsSetupPrompt({ enabled = false, mode = 'gps' }) {
+  const DONE_KEY = DONE_KEY_BY_MODE[mode] || DONE_KEY_BY_MODE.gps
   const [show, setShow] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -53,7 +61,8 @@ export default function GpsSetupPrompt({ enabled = false }) {
       // Battery first (a quick allow/deny dialog), then the app's location
       // settings screen where the rep picks "Allow all the time".
       await requestBatteryUnrestricted()
-      await openLocationSettings()
+      // Location is meaningless for a telecaller — battery is the whole point.
+      if (mode !== 'battery') await openLocationSettings()
     } catch { /* deep-links are best-effort */ }
     finally {
       setBusy(false)
@@ -77,7 +86,9 @@ export default function GpsSetupPrompt({ enabled = false }) {
     }}>
       <Satellite size={18} strokeWidth={1.6} />
       <span style={{ flex: 1 }}>
-        Turn on accurate GPS — set Location to "Allow all the time" + Battery to Unrestricted so your km counts.
+        {mode === 'battery'
+          ? 'Set Battery to Unrestricted so the app is not closed during a call — otherwise the outcome popup is lost.'
+          : 'Turn on accurate GPS — set Location to "Allow all the time" + Battery to Unrestricted so your km counts.'}
       </span>
       <button
         onClick={setUp}

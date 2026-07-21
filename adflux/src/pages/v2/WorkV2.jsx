@@ -63,6 +63,7 @@ import { useLeadTasks } from '../../hooks/useLeadTasks'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { logCallAudit } from '../../utils/callAudit'
 import { markCallStart } from '../../utils/callTimer'
+import { rememberPendingCall, attachPendingActivityId, readPendingCall, clearPendingCall } from '../../utils/pendingCall'
 import { dialPhone } from '../../utils/openExternal'
 import { istTodayISO, istTodayPlusDays } from '../../utils/istDate'
 import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../components/v2/primitives'
@@ -408,6 +409,51 @@ export default function WorkV2() {
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id, location.key])
+
+  // Phase 250 — RESTORE a call the app was killed during. See TelecallerV2 for
+  // the full reasoning: the synchronous localStorage write in quickLogCall is
+  // the only thing that survives the OS reclaiming the app mid-call, so on the
+  // next launch we reopen the outcome modal for that lead. activityId may be
+  // null (the insert never left the phone) - the modal then inserts rather than
+  // patching, so the call is still captured.
+  const restoredCallRef = useRef(false)
+  useEffect(() => {
+    if (restoredCallRef.current || !profile?.id || loading) return
+    restoredCallRef.current = true   // unconditional: this must run exactly ONCE per
+                                 // mount. Setting it only when a record exists
+                                 // left the check re-running on every load()
+                                 // flip (check-in, checkout, ticking a task),
+                                 // which could pop the modal mid-flow.
+    const p = readPendingCall(profile.id)
+    if (!p) return
+    ;(async () => {
+      let actId = p.activityId || null
+      if (!actId) {
+        // The insert may have SUCCEEDED server-side and only the follow-up
+        // bookkeeping died with the app. Adopt that row instead of inserting a
+        // second one: nothing would catch the duplicate (the Phase 68.2 dedupe
+        // index keys on notes, which differ between the tap row and the
+        // outcome-save row) and compute_daily_score COUNTs both, inflating the
+        // TC's score and therefore pay.
+        const { data: orphan } = await supabase
+          .from('lead_activities')
+          .select('id')
+          .eq('lead_id', p.leadId)
+          .eq('created_by', profile.id)
+          .eq('activity_type', 'call')
+          .is('outcome', null)
+          .gte('created_at', new Date(p.at - 60_000).toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        actId = orphan?.id || null
+      }
+      setCallLead({ id: p.leadId, name: p.leadName, company: p.leadCompany, phone: p.phone })
+      setPendingActivityId(actId)
+      setPostCallOpen(true)
+    })()
+    /* eslint-disable-next-line */
+  }, [profile?.id, loading])
   // Phase 34Z.59 — also refetch on tab-resume (return from dialer /
   // WhatsApp / Log meeting modal). location.key only fires on
   // in-app router navigation, not on browser-level resume.
@@ -679,6 +725,14 @@ export default function WorkV2() {
     setTimeout(() => { callingRef.current = false }, 2500)
     setCallLead(lead)
     setCallTaskId(taskId)
+    // Phase 250 — SYNCHRONOUS, and it must stay immediately BEFORE dialPhone.
+    // Everything after this line can be lost if the OS kills the app during the
+    // call; this localStorage write is the only thing guaranteed to land, and it
+    // is what lets the outcome modal come back on next launch.
+    rememberPendingCall({
+      leadId: lead.id, leadName: lead.name, leadCompany: lead.company,
+      phone: lead.phone, userId: profile.id,
+    })
     // Fire the dialer immediately on the user gesture, then queue the
     // activity insert + modal on the next event-loop tick.
     dialPhone(phone)
@@ -705,6 +759,8 @@ export default function WorkV2() {
         return
       }
       setPendingActivityId(actRow?.id || null)
+      // Phase 250 — restored modal patches this row instead of duplicating.
+      attachPendingActivityId(actRow?.id || null)
       setTimeout(() => setPostCallOpen(true), 1500)
 
       // Phase 65 (20 May 2026) — auto-patch call_logs.duration_seconds
@@ -1248,8 +1304,9 @@ export default function WorkV2() {
         open={postCallOpen}
         lead={callLead}
         pendingActivityId={pendingActivityId}
-        onClose={() => { setPostCallOpen(false); setPendingActivityId(null); setCallTaskId(null) }}
+        onClose={() => { setPostCallOpen(false); setPendingActivityId(null); setCallTaskId(null); clearPendingCall() }}
         onSaved={async ({ nextAction }) => {
+          clearPendingCall()   // Phase 250 — outcome captured; nothing to restore
           setPostCallOpen(false)
           setPendingActivityId(null)
           setPendingBump(b => b + 1)  // Phase 237 — refresh the pending-outcomes list
