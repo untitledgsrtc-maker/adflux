@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Work / Task Module — mockup v1</title>
-<meta name="viewport" content="width=1280, initial-scale=1" />
+<title>Work / Task Module — mockup v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -21,703 +21,409 @@
     --sans:'DM Sans', system-ui, sans-serif;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;background:var(--bg);color:var(--ink-1);font-family:var(--sans);font-size:14px;line-height:1.5;}
-  .wrap{max-width:1280px;margin:0 auto;padding:0 28px 80px;}
+  html,body{margin:0;background:var(--bg);color:var(--ink-1);font-family:var(--sans);font-size:15px;line-height:1.55;}
+  .wrap{max-width:880px;margin:0 auto;padding:0 22px 90px;}
   .tnum{font-family:var(--display);font-variant-numeric:tabular-nums;}
+  svg{stroke-width:1.6;}
 
-  .topbar{position:sticky;top:0;z-index:50;background:rgba(10,14,26,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);}
-  .topbar-in{max-width:1280px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
+  /* ── top ── */
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(10,14,26,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);}
+  .topbar-in{max-width:880px;margin:0 auto;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;}
   .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;color:var(--ink-0);font-size:15px;}
   .brand .logo{width:26px;height:26px;border-radius:7px;background:var(--yellow);color:#0a0e1a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
-  .top-right{display:flex;align-items:center;gap:14px;}
   .me{width:34px;height:34px;border-radius:999px;background:var(--bg-3);color:var(--ink-0);display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--display);font-size:13px;}
-  .me-name{font-size:12px;color:var(--ink-2);text-align:right;line-height:1.25;}
-  .me-name b{display:block;color:var(--ink-0);font-size:13px;}
 
-  .pagehead{padding:30px 0 0;}
-  .kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);font-weight:600;}
-  h1.title{font-family:var(--display);font-size:30px;font-weight:700;margin:6px 0 4px;color:var(--ink-0);letter-spacing:-.01em;}
-  .sub{font-size:13px;color:var(--ink-2);max-width:760px;}
+  .hello{padding:30px 0 2px;font-family:var(--display);font-size:26px;font-weight:700;color:var(--ink-0);letter-spacing:-.01em;}
+  .hello-sub{font-size:15px;color:var(--ink-2);margin-bottom:22px;}
 
-  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:24px 0 22px;flex-wrap:wrap;}
-  .tab{padding:11px 16px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:8px;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:20px 0 26px;}
+  .tab{padding:11px 15px;font-size:13.5px;font-weight:600;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;}
   .tab:hover{color:var(--ink-1);}
   .tab.active{color:var(--yellow);border-bottom-color:var(--yellow);}
-  .tab .count{font-family:var(--display);font-size:10px;background:var(--bg-2);border:1px solid var(--line);padding:2px 7px;border-radius:999px;color:var(--ink-2);}
-  .tab.active .count{background:var(--yellow-soft);border-color:transparent;color:var(--yellow);}
   .pane{display:none;} .pane.on{display:block;}
 
-  .sech{display:flex;align-items:baseline;justify-content:space-between;margin:26px 0 12px;}
-  .sech h2{font-family:var(--display);font-size:14px;font-weight:600;color:var(--ink-0);margin:0;letter-spacing:.01em;}
-  .sech .note{font-size:12px;color:var(--ink-2);}
+  /* ── the job row — the whole point ── */
+  .job{background:var(--bg-1);border:1px solid var(--line);border-radius:16px;margin-bottom:12px;overflow:hidden;}
+  .job.now{border-color:var(--line-2);}
+  .job-main{display:flex;gap:16px;padding:20px;align-items:flex-start;}
+  .num{flex:0 0 30px;height:30px;border-radius:999px;background:var(--bg-3);color:var(--ink-2);
+       font-family:var(--display);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;margin-top:2px;}
+  .job.now .num{background:var(--yellow);color:#0a0e1a;}
+  .job-body{flex:1;min-width:0;}
+  .job-t{font-family:var(--display);font-size:18px;font-weight:600;color:var(--ink-0);line-height:1.3;}
+  .job-line{font-size:14px;color:var(--ink-1);margin-top:5px;}
+  .job-when{font-size:13px;color:var(--ink-2);margin-top:3px;}
+  .job-when b{color:var(--amber);font-weight:600;}
+  .job-act{flex:0 0 auto;}
 
-  /* job card */
-  .job{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px;}
-  .job.dim{opacity:.62;}
-  .job-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;}
-  .job-t{font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink-0);}
-  .job-meta{font-size:12px;color:var(--ink-2);margin-top:3px;}
-  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;white-space:nowrap;}
-  .c-todo{background:var(--bg-3);color:var(--ink-1);}
-  .c-doing{background:var(--blue-soft);color:var(--blue);}
-  .c-sent{background:var(--amber-soft);color:var(--amber);}
-  .c-chg{background:var(--rose-soft);color:var(--rose);}
-  .c-done{background:var(--green-soft);color:var(--green);}
-  .c-wait{background:var(--bg-2);color:var(--ink-2);border:1px dashed var(--line-2);}
-  .c-auto{background:var(--yellow-soft);color:var(--yellow);}
-
-  /* the prefilled brief — the whole point of the module */
-  .brief{margin-top:12px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
-  .brief-h{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:7px;}
-  .bgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 18px;}
-  .bg-l{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);font-weight:600;}
-  .bg-v{font-size:13px;color:var(--ink-0);font-weight:600;margin-top:2px;}
-
-  .actions{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap;}
-  .btn{font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--ink-1);cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+  .btn{font-family:inherit;font-size:14px;font-weight:600;padding:11px 18px;border-radius:12px;border:1px solid var(--line-2);
+       background:var(--bg-2);color:var(--ink-1);cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;}
   .btn:hover{border-color:var(--ink-2);color:var(--ink-0);}
   .btn.pri{background:var(--yellow);border-color:var(--yellow);color:#0a0e1a;}
   .btn.pri:hover{background:#F0D800;}
-  .btn.ok{background:var(--green-soft);border-color:transparent;color:var(--green);}
-  .btn.no{background:var(--rose-soft);border-color:transparent;color:var(--rose);}
+  .btn.sm{font-size:13px;padding:8px 13px;border-radius:10px;}
 
-  .sub-list{margin:12px 0 0;padding:0 0 0 14px;border-left:2px solid var(--line);}
-  .sub-item{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:13px;color:var(--ink-1);}
-  .tick{width:16px;height:16px;border-radius:5px;border:1.6px solid var(--line-2);flex-shrink:0;}
-  .tick.on{background:var(--green);border-color:var(--green);}
-  .sub-item.done{color:var(--ink-2);text-decoration:line-through;}
-  .sub-item.got{color:var(--ink-1);}
+  /* progressive disclosure — everything else lives behind this */
+  details.more{border-top:1px solid var(--line);}
+  details.more>summary{list-style:none;cursor:pointer;padding:12px 20px 12px 66px;font-size:13.5px;color:var(--ink-2);
+                       display:flex;align-items:center;gap:8px;font-weight:600;}
+  details.more>summary::-webkit-details-marker{display:none;}
+  details.more>summary:hover{color:var(--ink-1);}
+  details.more>summary svg{transition:transform .15s;}
+  details.more[open]>summary svg{transform:rotate(180deg);}
+  .facts{padding:2px 20px 20px 66px;display:grid;grid-template-columns:1fr 1fr;gap:14px 26px;}
+  .f-l{font-size:12px;color:var(--ink-2);}
+  .f-v{font-size:14.5px;color:var(--ink-0);font-weight:600;margin-top:1px;}
+  .f-wide{grid-column:1 / -1;}
+  .f-v a{color:var(--ink-0);}
 
-  .files{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
-  .file{display:inline-flex;align-items:center;gap:8px;font-size:12px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:7px 11px;color:var(--ink-1);}
-  .thumb{width:26px;height:26px;border-radius:6px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;color:var(--ink-2);}
+  /* states she does not set */
+  .state{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;padding:8px 13px;border-radius:12px;white-space:nowrap;}
+  .s-sent{background:var(--blue-soft);color:var(--blue);}
+  .s-ok{background:var(--green-soft);color:var(--green);}
+  .s-wait{background:var(--bg-2);color:var(--ink-2);border:1px dashed var(--line-2);}
+  .job.dim{opacity:.55;}
+  .job.dim .num{background:transparent;border:1px dashed var(--line-2);}
 
-  .cmt{margin-top:12px;border-top:1px solid var(--line);padding-top:11px;}
-  .cmt-row{display:flex;gap:10px;margin-bottom:9px;}
-  .av{width:26px;height:26px;border-radius:999px;background:var(--bg-3);color:var(--ink-0);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:var(--display);flex-shrink:0;}
-  .cmt-b .who{font-size:12px;font-weight:700;color:var(--ink-0);}
-  .cmt-b .when{font-size:10px;color:var(--ink-2);margin-left:6px;}
-  .cmt-b .txt{font-size:12.5px;color:var(--ink-1);}
+  .quiet{font-size:13.5px;color:var(--ink-2);margin:26px 0 10px;font-weight:600;}
+  .rule{height:1px;background:var(--line);margin:30px 0 4px;}
 
+  /* ── shared bits for the other three tabs ── */
+  .sech{margin:30px 0 12px;}
+  .sech h2{font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink-0);margin:0;}
+  .sech p{font-size:13.5px;color:var(--ink-2);margin:4px 0 0;}
+  .panel{background:var(--bg-1);border:1px solid var(--line);border-radius:16px;overflow:hidden;}
   table{width:100%;border-collapse:collapse;}
-  th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);font-weight:700;padding:0 14px 10px;border-bottom:1px solid var(--line);}
-  td{padding:13px 14px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink-1);}
+  th{text-align:left;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);font-weight:700;padding:14px 18px 11px;border-bottom:1px solid var(--line);}
+  td{padding:14px 18px;border-bottom:1px solid var(--line);font-size:14px;color:var(--ink-1);}
   tr:last-child td{border-bottom:none;}
-  .panel{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  td b{color:var(--ink-0);}
+  .muted{color:var(--ink-2);}
+  .card{background:var(--bg-1);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:12px;}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px;}
+  .note{background:var(--yellow-soft);border:1px solid rgba(255,230,0,.28);border-radius:14px;padding:15px 18px;font-size:14px;color:var(--ink-1);margin:20px 0;}
+  .note b{color:var(--yellow);}
+  .counts{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+  .count{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:15px 16px;}
+  .count .n{font-family:var(--display);font-size:24px;font-weight:700;color:var(--ink-0);line-height:1;}
+  .count .n.warn{color:var(--amber);}
+  .count .l{font-size:12px;color:var(--ink-2);margin-top:6px;}
+  .tick{width:18px;height:18px;border-radius:6px;border:1.6px solid var(--line-2);flex:0 0 auto;}
+  .tick.on{background:var(--green);border-color:var(--green);}
+  .li{display:flex;align-items:center;gap:11px;padding:9px 0;font-size:14px;}
+  .bar{height:7px;background:var(--bg-3);border-radius:999px;overflow:hidden;margin-top:11px;}
+  .bar i{display:block;height:100%;background:var(--yellow);border-radius:999px;}
+  .seg{display:flex;gap:7px;}
+  .seg .o{flex:1;text-align:center;padding:11px;border-radius:12px;border:1px solid var(--line-2);background:var(--bg-2);font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;}
+  .seg .o.on{background:var(--yellow);border-color:var(--yellow);color:#0a0e1a;}
+  .inp{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--ink-0);font-family:inherit;font-size:14px;}
+  .lab{display:block;font-size:12px;color:var(--ink-2);margin-bottom:7px;}
 
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:8px;}
-  .kpi{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:15px 17px;}
-  .kpi .l{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);font-weight:700;}
-  .kpi .v{font-family:var(--display);font-size:26px;font-weight:700;color:var(--ink-0);margin-top:5px;line-height:1;}
-  .kpi .v.warn{color:var(--amber);} .kpi .v.bad{color:var(--rose);}
-  .kpi .d{font-size:11px;color:var(--ink-2);margin-top:5px;}
-
-  .callout{background:var(--yellow-soft);border:1px solid rgba(255,230,0,.28);border-radius:12px;padding:13px 16px;font-size:12.5px;color:var(--ink-1);margin:18px 0;}
-  .callout b{color:var(--yellow);}
-  .win-inset{background:var(--bg-1);border:1px solid var(--line-2);border-radius:14px;padding:18px;max-width:520px;}
-  .field{margin-bottom:14px;}
-  .field label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:700;margin-bottom:6px;}
-  .seg{display:flex;gap:6px;}
-  .seg .opt{flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-2);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;}
-  .seg .opt.on{background:var(--yellow);border-color:var(--yellow);color:#0a0e1a;}
-  .inp{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--ink-0);font-family:inherit;font-size:13px;}
-  /* ── client brief + monthly plan ── */
-  .cols{display:grid;grid-template-columns:1.55fr 1fr;gap:18px;align-items:start;}
-  .bgrid.two{grid-template-columns:repeat(2,1fr);}
-  .bgrid.three{grid-template-columns:repeat(3,1fr);}
-  .prog-wrap{height:6px;background:var(--bg-3);border-radius:999px;overflow:hidden;margin-top:10px;}
-  .prog-bar{height:100%;background:var(--yellow);border-radius:999px;}
-  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;}
-  .flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-  .step{font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:999px;background:var(--bg-2);border:1px solid var(--line);color:var(--ink-1);}
-  .step.new{background:var(--yellow-soft);border-color:rgba(255,230,0,.28);color:var(--yellow);}
-  .arr{color:var(--ink-2);font-size:11px;}
-  .ro{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:700;}
-  .row-l{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;}
-  .row-l:last-child{border-bottom:none;}
-  svg{stroke-width:1.6;}
+  @media (max-width:640px){
+    .job-main{flex-wrap:wrap;}
+    .job-act{flex-basis:100%;padding-left:46px;}
+    .facts,.kv{grid-template-columns:1fr;}
+    .counts{grid-template-columns:1fr 1fr;}
+    details.more>summary,.facts{padding-left:20px;}
+  }
 </style>
 </head>
 <body>
 
 <div class="topbar"><div class="topbar-in">
-  <div class="brand"><div class="logo">UA</div> Untitled OS</div>
-  <div class="top-right">
-    <div class="me-name"><b>Renuka Vasava</b>Designer</div>
-    <div class="me">RV</div>
-  </div>
+  <div class="brand"><div class="logo">UA</div> Untitled</div>
+  <div class="me">RV</div>
 </div></div>
 
 <div class="wrap">
-  <div class="pagehead">
-    <div class="kicker">Work · Jobs · Approvals</div>
-    <h1 class="title">Work</h1>
-    <p class="sub">Everything you need to make, in one list. Jobs from won orders arrive already filled in — client, media, city and dates — so nobody has to ask the sales rep.</p>
-  </div>
+
+  <div class="hello">Good morning, Renuka</div>
+  <div class="hello-sub">Three things to make today. Start at the top.</div>
 
   <div class="tabs">
-    <button class="tab active" data-p="day">Morning list <span class="count">4</span></button>
-    <button class="tab" data-p="mine">My work <span class="count">4</span></button>
-    <button class="tab" data-p="all">All jobs <span class="count">12</span></button>
-    <button class="tab" data-p="appr">Approvals <span class="count">3</span></button>
-    <button class="tab" data-p="brief">Client brief</button>
-    <button class="tab" data-p="plan">Monthly plan</button>
-    <button class="tab" data-p="route">Routing</button>
-    <button class="tab" data-p="win">On winning a quote</button>
+    <button class="tab active" data-p="today">Today</button>
+    <button class="tab" data-p="jobs">All jobs</button>
+    <button class="tab" data-p="client">Clients</button>
+    <button class="tab" data-p="setup">Setup</button>
   </div>
 
+  <!-- ════════ TODAY — the only screen a designer needs ════════ -->
+  <div class="pane on" id="p-today">
 
-  <!-- ══ MORNING LIST — the read-only v1 ══ -->
-  <div class="pane on" id="p-day">
-    <div class="sech"><h2>Tuesday 21 July</h2><span class="note">Four jobs · nothing to fill in</span></div>
-
-    <div class="callout" style="margin-top:0;">
-      <b>She types nothing on this screen.</b> Every job arrives complete. There is no status button, no comment box and no date picker — on the tool you already pay for, this team has set a status zero times in ten weeks. The one control per job is the thing she has to do anyway: hand over the finished file.
+    <!-- 1 -->
+    <div class="job now">
+      <div class="job-main">
+        <div class="num">1</div>
+        <div class="job-body">
+          <div class="job-t">Reel for All Rounder Baby</div>
+          <div class="job-line">30 seconds &middot; vertical</div>
+          <div class="job-when">Due <b>today, 6:00 PM</b></div>
+        </div>
+        <div class="job-act"><button class="btn pri">Send file</button></div>
+      </div>
+      <details class="more">
+        <summary>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9l6 6 6-6"/></svg>
+          Everything else
+        </summary>
+        <div class="facts">
+          <div><div class="f-l">Raw footage</div><div class="f-v">Provided by client</div></div>
+          <div><div class="f-l">Captions</div><div class="f-v">Yes, English</div></div>
+          <div><div class="f-l">Style</div><div class="f-v">Fast-paced, minimal</div></div>
+          <div><div class="f-l">Music</div><div class="f-v">Upbeat, trending</div></div>
+          <div><div class="f-l">Goes to</div><div class="f-v">Instagram, YouTube</div></div>
+          <div><div class="f-l">Changes allowed</div><div class="f-v">2 rounds</div></div>
+          <div class="f-wide"><div class="f-l">This month's plan</div><div class="f-v">Reel 2 of 3</div></div>
+        </div>
+      </details>
     </div>
 
+    <!-- 2 -->
     <div class="job">
-      <div class="job-top">
-        <div>
-          <div class="job-t">REEL EDITING — All Rounder Baby</div>
-          <div class="job-meta">Due today, 6:00 PM</div>
+      <div class="job-main">
+        <div class="num">2</div>
+        <div class="job-body">
+          <div class="job-t">GSRTC screen for Trimurti Clinic</div>
+          <div class="job-line">20-second spot &middot; 10 screens at Jamnagar</div>
+          <div class="job-when">Needed by <b>12 April</b> &middot; campaign starts 15 April</div>
         </div>
-        <span class="chip c-auto">From the monthly plan</span>
+        <div class="job-act"><button class="btn pri">Send file</button></div>
       </div>
-      <div class="brief">
-        <div class="brief-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg> Everything needed to start</div>
-          <div class="bgrid">
-            <div><div class="bg-l">Length</div><div class="bg-v">30 seconds</div></div>
-            <div><div class="bg-l">Ratio</div><div class="bg-v">9:16 vertical</div></div>
-            <div><div class="bg-l">Platform</div><div class="bg-v">Instagram · YouTube</div></div>
-            <div><div class="bg-l">Captions</div><div class="bg-v">Yes — English</div></div>
-            <div><div class="bg-l">Style</div><div class="bg-v">Fast-paced · Minimal</div></div>
-            <div><div class="bg-l">Music</div><div class="bg-v">Upbeat, trending</div></div>
-            <div><div class="bg-l">Raw files</div><div class="bg-v">Provided</div></div>
-            <div><div class="bg-l">Revisions included</div><div class="bg-v">2</div></div>
-          </div>
-      </div>
-      <div class="actions"><button class="btn pri">Upload finished file</button></div>
+      <details class="more">
+        <summary>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9l6 6 6-6"/></svg>
+          Everything else
+        </summary>
+        <div class="facts">
+          <div><div class="f-l">Address on screen</div><div class="f-v">Yes</div></div>
+          <div><div class="f-l">Phone on screen</div><div class="f-v">Yes</div></div>
+          <div><div class="f-l">Logo</div><div class="f-v">Uploaded</div></div>
+          <div><div class="f-l">Campaign runs</div><div class="f-v">15 Apr &ndash; 15 Jul</div></div>
+          <div class="f-wide"><div class="f-l">Reference from client</div><div class="f-v"><a href="#">drive.google.com/trimurti-reference</a></div></div>
+          <div><div class="f-l">Sold by</div><div class="f-v">Mayur</div></div>
+          <div><div class="f-l">Order</div><div class="f-v tnum">UA/GSRTC/2026-27/0118</div></div>
+        </div>
+      </details>
     </div>
 
+    <!-- 3 -->
     <div class="job">
-      <div class="job-top">
-        <div>
-          <div class="job-t">GSRTC LED creative — Trimurti Clinic</div>
-          <div class="job-meta">Material needed by 12 Apr · campaign starts 15 Apr</div>
+      <div class="job-main">
+        <div class="num">3</div>
+        <div class="job-body">
+          <div class="job-t">Festival story for Mahant Investment</div>
+          <div class="job-line">Story size &middot; English</div>
+          <div class="job-when">Due tomorrow, 1:00 PM</div>
         </div>
-        <span class="chip c-todo">From won order UA/GSRTC/2026-27/0118</span>
+        <div class="job-act"><button class="btn pri">Send file</button></div>
       </div>
-      <div class="brief">
-        <div class="brief-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg> Everything needed to start</div>
-          <div class="bgrid">
-            <div><div class="bg-l">Station</div><div class="bg-v">Jamnagar</div></div>
-            <div><div class="bg-l">Screens</div><div class="bg-v">10</div></div>
-            <div><div class="bg-l">Spot length</div><div class="bg-v">20 seconds</div></div>
-            <div><div class="bg-l">Campaign</div><div class="bg-v">15 Apr – 15 Jul 2026</div></div>
-            <div><div class="bg-l">Address on screen</div><div class="bg-v">Yes</div></div>
-            <div><div class="bg-l">Phone on screen</div><div class="bg-v">Yes</div></div>
-            <div><div class="bg-l">Logo</div><div class="bg-v">Uploaded</div></div>
-            <div><div class="bg-l">Reference</div><div class="bg-v">drive.google.com/trimurti…</div></div>
-          </div>
-      </div>
-      <div class="actions"><button class="btn pri">Upload finished file</button></div>
+      <details class="more">
+        <summary>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9l6 6 6-6"/></svg>
+          Everything else
+        </summary>
+        <div class="facts">
+          <div><div class="f-l">Tone</div><div class="f-v">Professional, corporate</div></div>
+          <div><div class="f-l">Look</div><div class="f-v">Creative, light theme</div></div>
+          <div><div class="f-l">Words come from</div><div class="f-v">Client sends them</div></div>
+          <div><div class="f-l">Photos you can use</div><div class="f-v">Product and office only</div></div>
+          <div><div class="f-l">AI or stock images</div><div class="f-v">Allowed</div></div>
+          <div><div class="f-l">Client signs off</div><div class="f-v">R. Mahant, on WhatsApp</div></div>
+        </div>
+      </details>
     </div>
 
-    <div class="job">
-      <div class="job-top">
-        <div>
-          <div class="job-t">FESTIVAL STORY — Mahant Investment</div>
-          <div class="job-meta">Due tomorrow, 1:00 PM</div>
-        </div>
-        <span class="chip c-auto">From the monthly plan</span>
-      </div>
-      <div class="brief">
-        <div class="brief-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg> Everything needed to start</div>
-          <div class="bgrid">
-            <div><div class="bg-l">Language</div><div class="bg-v">English</div></div>
-            <div><div class="bg-l">Tone</div><div class="bg-v">Professional · Corporate</div></div>
-            <div><div class="bg-l">Style</div><div class="bg-v">Creative · Light Theme</div></div>
-            <div><div class="bg-l">Content</div><div class="bg-v">Client provides complete content</div></div>
-            <div><div class="bg-l">Photos</div><div class="bg-v">Product and office only</div></div>
-            <div><div class="bg-l">AI / stock</div><div class="bg-v">Allowed</div></div>
-            <div><div class="bg-l">Avoid</div><div class="bg-v" style="color:var(--ink-2);">Nothing recorded</div></div>
-            <div><div class="bg-l">Approver</div><div class="bg-v">R. Mahant · WhatsApp</div></div>
-          </div>
-      </div>
-      <div class="actions"><button class="btn pri">Upload finished file</button></div>
-    </div>
-
-    <div class="job">
-      <div class="job-top">
-        <div>
-          <div class="job-t">POST DESIGN — Rara Jewel</div>
-          <div class="job-meta">Due Thursday</div>
-        </div>
-        <span class="chip c-auto">From the monthly plan</span>
-      </div>
-      <div class="brief">
-        <div class="brief-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg> Everything needed to start</div>
-          <div class="bgrid">
-            <div><div class="bg-l">Size</div><div class="bg-v">1080 × 1080</div></div>
-            <div><div class="bg-l">Language</div><div class="bg-v">English · Gujarati</div></div>
-            <div><div class="bg-l">Tone</div><div class="bg-v">Premium</div></div>
-            <div><div class="bg-l">Logo</div><div class="bg-v">Uploaded</div></div>
-            <div><div class="bg-l">Brand colours</div><div class="bg-v">Uploaded</div></div>
-            <div><div class="bg-l">Fonts</div><div class="bg-v">Uploaded</div></div>
-            <div><div class="bg-l">Reference</div><div class="bg-v" style="color:var(--ink-2);">Not provided</div></div>
-            <div><div class="bg-l">Approver</div><div class="bg-v">Renuka Vasava</div></div>
-          </div>
-      </div>
-      <div class="actions"><button class="btn pri">Upload finished file</button></div>
-    </div>
-
-    <div class="sech"><h2>What is deliberately missing</h2><span class="note">and why</span></div>
-    <div class="panel">
-      <table>
-        <thead><tr><th>Not here</th><th>Because</th></tr></thead>
-        <tbody>
-          <tr><td><b style="color:var(--ink-0)">Mark as done</b></td><td>Zero status changes in ten weeks. The card closes itself when the file is uploaded.</td></tr>
-          <tr><td><b style="color:var(--ink-0)">Comment box</b></td><td>Every comment count in the current tool is zero. Feedback happens on WhatsApp.</td></tr>
-          <tr><td><b style="color:var(--ink-0)">Due-date picker</b></td><td>Every task there has no due date. The date comes from the order or the plan.</td></tr>
-          <tr><td><b style="color:var(--ink-0)">Description field</b></td><td>Every task there reads "No Description Available". The brief is filled in for her.</td></tr>
-          <tr><td><b style="color:var(--ink-0)">Hours and screenshots</b></td><td>Trackdek does this, it is paid for, and it is the one half the team genuinely uses.</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="callout">
-      <b>An open card with no owner and no end date becomes REEL EDITING.</b> That job has been sitting at "New" since 6 May with 356 hours logged against it. Nothing here can be created without a client, an owner, a deadline and a defined finish.
-    </div>
-  </div>
-
-  <!-- ══ MY WORK ══ -->
-  <div class="pane" id="p-mine">
-    <div class="sech"><h2>Due today</h2><span class="note">2 jobs</span></div>
-
-    <!-- the hero: an auto-created job, prefilled -->
-    <div class="job">
-      <div class="job-top">
-        <div>
-          <div class="job-t">Creative for Reliance Trends — GSRTC LED</div>
-          <div class="job-meta">Due today, 6:00 PM · created automatically when the order was won</div>
-        </div>
-        <span class="chip c-doing">In progress</span>
-      </div>
-
-      <div class="brief">
-        <div class="brief-h">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-          From the won order — nothing typed by hand
-        </div>
-        <div class="bgrid">
-          <div><div class="bg-l">Client</div><div class="bg-v">Reliance Trends</div></div>
-          <div><div class="bg-l">Media</div><div class="bg-v">GSRTC LED</div></div>
-          <div><div class="bg-l">Stations</div><div class="bg-v">Anand, Nadiad +3</div></div>
-          <div><div class="bg-l">Campaign starts</div><div class="bg-v">28 Jul 2026</div></div>
-          <div><div class="bg-l">Spot length</div><div class="bg-v">20 seconds</div></div>
-          <div><div class="bg-l">Screens</div><div class="bg-v">14</div></div>
-          <div><div class="bg-l">Order</div><div class="bg-v">UA-2026-0212</div></div>
-          <div><div class="bg-l">Sales rep</div><div class="bg-v">Mayur</div></div>
-        </div>
-      </div>
-
-      <div class="sub-list">
-        <div class="sub-item done"><span class="tick on"></span> Collect logo + brand colours from client</div>
-        <div class="sub-item"><span class="tick"></span> First artwork draft</div>
-      </div>
-
-      <div class="files">
-        <span class="file"><span class="thumb"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span> trends-draft-v2.jpg</span>
-        <button class="btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> Add photo</button>
-      </div>
-
-      <div class="actions">
-        <button class="btn pri">Send for approval</button>
-        <button class="btn">Add sub-task</button>
-        <button class="btn">Comment</button>
-      </div>
-    </div>
-
-    <div class="job">
-      <div class="job-top">
-        <div>
-          <div class="job-t">Auto hood artwork — Gujarat Tourism</div>
-          <div class="job-meta">Due today · Govt · assigned to you by Brijesh</div>
-        </div>
-        <span class="chip c-chg">Changes needed</span>
-      </div>
-      <div class="cmt">
-        <div class="cmt-row">
-          <div class="av">RV</div>
-          <div class="cmt-b"><span class="who">Renuka Vasava</span><span class="when">1h ago</span>
-            <div class="txt">Logo is stretched on the left panel. Please fix the ratio and resend.</div></div>
-        </div>
-      </div>
-      <div class="actions"><button class="btn pri">Upload new version</button><button class="btn">Reply</button></div>
-    </div>
-
-    <div class="sech"><h2>This week</h2><span class="note">2 jobs</span></div>
-
+    <!-- not yet — shows the sequence without asking her to manage it -->
     <div class="job dim">
-      <div class="job-top">
-        <div>
-          <div class="job-t">Video edit — Reliance Trends GSRTC</div>
-          <div class="job-meta">Starts once the artwork above is approved</div>
+      <div class="job-main">
+        <div class="num">&mdash;</div>
+        <div class="job-body">
+          <div class="job-t">Video edit for Reliance Trends</div>
+          <div class="job-line">Starts once the artwork is approved</div>
         </div>
-        <span class="chip c-wait">Waiting on design</span>
+        <div class="job-act"><span class="state s-wait">Not yet</span></div>
+      </div>
+    </div>
+
+    <div class="rule"></div>
+    <div class="quiet">Already sent today</div>
+
+    <div class="job">
+      <div class="job-main">
+        <div class="num">&#10003;</div>
+        <div class="job-body">
+          <div class="job-t">Post design for Rara Jewel</div>
+          <div class="job-line">Sent 11:40 AM</div>
+        </div>
+        <div class="job-act"><span class="state s-sent">Being checked</span></div>
       </div>
     </div>
 
     <div class="job">
-      <div class="job-top">
-        <div>
-          <div class="job-t">Update rate-card design for August</div>
-          <div class="job-meta">Fri 25 Jul · added by Brijesh · not linked to an order</div>
+      <div class="job-main">
+        <div class="num">&#10003;</div>
+        <div class="job-body">
+          <div class="job-t">Banner for Scalact</div>
+          <div class="job-line">Sent 9:15 AM</div>
         </div>
-        <span class="chip c-todo">To do</span>
+        <div class="job-act"><span class="state s-ok">Approved</span></div>
       </div>
-      <div class="actions"><button class="btn pri">Start</button><button class="btn">Add sub-task</button></div>
     </div>
 
-    <div class="callout">
-      <b>Why the first card matters.</b> Everything in the grey box came from the won order automatically. If a designer ever has to message the rep asking "which stations?" or "what size?", this module has failed.
+    <div class="note">
+      <b>She never types anything on this screen.</b> No status to set, no comment box, no date to pick. She opens it, works down the list, and sends each file. The card moves itself &mdash; sent, then being checked, then approved.
     </div>
+
   </div>
 
-  <!-- ══ ALL JOBS ══ -->
-  <div class="pane" id="p-all">
-    <div class="kpis">
-      <div class="kpi"><div class="l">Open</div><div class="v tnum">12</div><div class="d">across 4 people</div></div>
-      <div class="kpi"><div class="l">Due today</div><div class="v tnum warn">5</div><div class="d">2 not started</div></div>
-      <div class="kpi"><div class="l">Overdue</div><div class="v tnum bad">2</div><div class="d">oldest 3 days</div></div>
-      <div class="kpi"><div class="l">Awaiting approval</div><div class="v tnum">3</div><div class="d">1 over 24h</div></div>
+  <!-- ════════ ALL JOBS — the manager view ════════ -->
+  <div class="pane" id="p-jobs">
+    <div class="counts">
+      <div class="count"><div class="n">12</div><div class="l">Open</div></div>
+      <div class="count"><div class="n">5</div><div class="l">Due today</div></div>
+      <div class="count"><div class="n warn">2</div><div class="l">Late</div></div>
+      <div class="count"><div class="n">3</div><div class="l">Waiting on a check</div></div>
     </div>
 
-    <div class="panel" style="margin-top:16px;">
-      <table>
-        <thead><tr><th>Job</th><th>Who</th><th>Order</th><th>Due</th><th>Status</th></tr></thead>
-        <tbody>
-          <tr><td><b style="color:var(--ink-0)">Creative — Reliance Trends</b><div style="font-size:11px;color:var(--ink-2)">GSRTC LED · Anand +4</div></td><td>Renuka Vasava<div style="font-size:11px;color:var(--ink-2)">Designer</div></td><td>UA-2026-0212</td><td>Today 6 PM</td><td><span class="chip c-doing">In progress</span></td></tr>
-          <tr><td><b style="color:var(--ink-0)">Video edit — Reliance Trends</b><div style="font-size:11px;color:var(--ink-2)">after design approval</div></td><td>Peyush<div style="font-size:11px;color:var(--ink-2)">Video editor</div></td><td>UA-2026-0212</td><td>27 Jul</td><td><span class="chip c-wait">Waiting</span></td></tr>
-          <tr><td><b style="color:var(--ink-0)">Auto hood artwork</b><div style="font-size:11px;color:var(--ink-2)">Gujarat Tourism · Govt</div></td><td>Dixita<div style="font-size:11px;color:var(--ink-2)">Designer</div></td><td>UA/AUTO/2026-27/0141</td><td style="color:var(--rose)">Overdue 1d</td><td><span class="chip c-chg">Changes needed</span></td></tr>
-          <tr><td><b style="color:var(--ink-0)">GSRTC video — Bhavnagar</b><div style="font-size:11px;color:var(--ink-2)">30 sec spot</div></td><td>Peyush<div style="font-size:11px;color:var(--ink-2)">Video editor</div></td><td>UA/GSRTC/2026-27/0138</td><td>29 Jul</td><td><span class="chip c-sent">Sent for approval</span></td></tr>
-          <tr><td><b style="color:var(--ink-0)">Rate card — August</b><div style="font-size:11px;color:var(--ink-2)">not linked to an order</div></td><td>Renuka Vasava</td><td style="color:var(--ink-2)">—</td><td>25 Jul</td><td><span class="chip c-todo">To do</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ══ APPROVALS ══ -->
-  <div class="pane" id="p-appr">
-    <div class="callout">
-      Approvals route by <b>what the work is AND what media it is for</b>. Design goes to Renuka Vasava, video to Peyush — but <b>GSRTC video goes to Safika</b>. The specific rule always beats the general one.
-    </div>
-
-    <div class="job">
-      <div class="job-top">
-        <div><div class="job-t">GSRTC video — Bhavnagar, 30 sec</div>
-        <div class="job-meta">From Peyush · waiting 26 hours · order UA/GSRTC/2026-27/0138</div></div>
-        <span class="chip c-sent">Your approval</span>
-      </div>
-      <div class="files">
-        <span class="file"><span class="thumb"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span> bhavnagar-30s-v3.mp4</span>
-      </div>
-      <div class="actions">
-        <button class="btn ok"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg> Approve</button>
-        <button class="btn no"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6L6 18M6 6l12 12"/></svg> Send back</button>
-      </div>
-      <div style="font-size:11px;color:var(--ink-2);margin-top:9px;">Sending back requires a reason — it becomes the first comment.</div>
-    </div>
-  </div>
-
-  <!-- ══ ROUTING ══ -->
-  <div class="pane" id="p-route">
-    <div class="sech"><h2>Who does the work</h2><span class="note">Admin only · used when an order is won</span></div>
     <div class="panel">
       <table>
-        <thead><tr><th>Media</th><th>Goes to</th><th>Then</th><th>Fallback if away</th></tr></thead>
+        <thead><tr><th>What</th><th>Client</th><th>Who</th><th>Due</th><th>State</th></tr></thead>
         <tbody>
-          <tr><td><b style="color:var(--ink-0)">GSRTC LED</b></td><td>Designer</td><td>Video editor <span class="chip c-wait" style="margin-left:6px">in sequence</span></td><td>Design team</td></tr>
-          <tr><td><b style="color:var(--ink-0)">Govt auto hood</b></td><td>Dixita <span style="color:var(--ink-2);font-size:11px">(person)</span></td><td style="color:var(--ink-2)">—</td><td>Design team</td></tr>
-          <tr><td><b style="color:var(--ink-0)">Hoarding</b></td><td style="color:var(--ink-2)">not set</td><td style="color:var(--ink-2)">—</td><td style="color:var(--ink-2)">—</td></tr>
-          <tr><td><b style="color:var(--ink-0)">Newspaper</b></td><td style="color:var(--ink-2)">not set</td><td style="color:var(--ink-2)">—</td><td style="color:var(--ink-2)">—</td></tr>
-          <tr><td><b style="color:var(--ink-0)">Cinema</b></td><td style="color:var(--ink-2)">not set</td><td style="color:var(--ink-2)">—</td><td style="color:var(--ink-2)">—</td></tr>
+          <tr><td><b>Reel</b></td><td>All Rounder Baby</td><td>Renuka Vasava</td><td>Today 6 PM</td><td><span class="muted">Making</span></td></tr>
+          <tr><td><b>GSRTC screen</b></td><td>Trimurti Clinic</td><td>Renuka Vasava</td><td>12 Apr</td><td><span class="muted">Making</span></td></tr>
+          <tr><td><b>Festival story</b></td><td>Mahant Investment</td><td>Renuka Vasava</td><td>Tomorrow</td><td><span class="muted">Making</span></td></tr>
+          <tr><td><b>Post design</b></td><td>Rara Jewel</td><td>Shreya Panchal</td><td>Today</td><td>Being checked</td></tr>
+          <tr><td><b>Thumbnail</b></td><td>Scalact</td><td>Akshar Gohil</td><td style="color:var(--rose)">Yesterday</td><td style="color:var(--rose)">Late</td></tr>
+          <tr><td><b>Video edit</b></td><td>Reliance Trends</td><td>Piyush Kumawat</td><td>&mdash;</td><td class="muted">Waiting on artwork</td></tr>
         </tbody>
       </table>
     </div>
 
-    <div class="sech"><h2>Who approves</h2></div>
+    <div class="note">
+      Nobody has to mark anything &ldquo;in progress&rdquo;. A job is <b>Making</b> until a file is sent, <b>Being checked</b> until someone approves it, then <b>Done</b>. Three states, all automatic.
+    </div>
+  </div>
+
+  <!-- ════════ CLIENTS — what we know + what we owe monthly ════════ -->
+  <div class="pane" id="p-client">
+    <div class="sech">
+      <h2>Mahant Investment</h2>
+      <p>Filled in by Mayur &middot; 12 July 2026</p>
+    </div>
+
+    <div class="card">
+      <div class="kv">
+        <div><div class="f-l">Contact</div><div class="f-v">R. Mahant</div></div>
+        <div><div class="f-l">Phone</div><div class="f-v tnum">+260 97 000 0000</div></div>
+        <div><div class="f-l">Business</div><div class="f-v">Fleet &amp; tyre supply</div></div>
+        <div><div class="f-l">City</div><div class="f-v">Lusaka, Zambia</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--ink-2);margin-top:16px;">Taken from the lead. Nobody types it twice.</div>
+    </div>
+
+    <div class="sech"><h2>What we make for them each month</h2></div>
+    <div class="card">
+      <div class="kv">
+        <div><div class="f-l">Posts</div><div class="f-v tnum">9</div></div>
+        <div><div class="f-l">Reels</div><div class="f-v tnum">3</div></div>
+      </div>
+      <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px;">
+        <div class="f-l" style="margin-bottom:10px;">On 25 July this creates August</div>
+        <div class="li"><span class="tick on"></span> 9 post designs &rarr; <b style="color:var(--ink-0)">Design team</b></div>
+        <div class="li"><span class="tick on"></span> 3 reels &rarr; <b style="color:var(--ink-0)">Piyush</b></div>
+        <div style="font-size:13px;color:var(--ink-2);margin-top:10px;">Each one arrives with the brief below already on it. One message for the batch, not twelve.</div>
+      </div>
+    </div>
+
+    <div class="sech"><h2>The brief a designer opens</h2></div>
+    <div class="card">
+      <div class="kv">
+        <div><div class="f-l">Language</div><div class="f-v">English</div></div>
+        <div><div class="f-l">Tone</div><div class="f-v">Professional, corporate</div></div>
+        <div><div class="f-l">Look</div><div class="f-v">Creative, light theme</div></div>
+        <div><div class="f-l">Words come from</div><div class="f-v">Client sends them</div></div>
+        <div><div class="f-l">Photos</div><div class="f-v">Product and office only</div></div>
+        <div><div class="f-l">AI or stock</div><div class="f-v">Allowed</div></div>
+        <div class="f-wide"><div class="f-l">Never use</div><div class="f-v muted">Nothing recorded</div></div>
+        <div class="f-wide"><div class="f-l">Brand colours and fonts</div>
+          <div style="font-size:14px;color:var(--ink-2);margin-top:3px;">Not captured. The workbook records that the files <b style="color:var(--ink-0)">arrived</b>, never what they <b style="color:var(--ink-0)">are</b> &mdash; so a designer still opens a PDF to find a colour code. These become fields here.</div></div>
+      </div>
+    </div>
+
+    <div class="sech"><h2>Onboarding</h2></div>
+    <div class="card">
+      <div style="display:flex;align-items:baseline;gap:10px;">
+        <div class="tnum" style="font-size:30px;font-weight:700;color:var(--ink-0);line-height:1;">77%</div>
+        <div style="font-size:13.5px;color:var(--ink-2);">10 of 13 received</div>
+      </div>
+      <div class="bar"><i style="width:77%"></i></div>
+      <div style="margin-top:14px;">
+        <div class="li"><span class="tick"></span> Product information</div>
+        <div class="li"><span class="tick"></span> Videos</div>
+        <div class="li"><span class="tick"></span> Content plan approved</div>
+      </div>
+      <div style="font-size:13px;color:var(--ink-2);margin-top:10px;">Only the three still missing are shown. The percentage is counted, not typed.</div>
+    </div>
+  </div>
+
+  <!-- ════════ SETUP — the rules, set once ════════ -->
+  <div class="pane" id="p-setup">
+
+    <div class="sech">
+      <h2>Who makes what</h2>
+      <p>When an order is won, the job goes here automatically.</p>
+    </div>
     <div class="panel">
       <table>
-        <thead><tr><th>Work type</th><th>Media</th><th>Approver</th></tr></thead>
+        <thead><tr><th>Media</th><th>Goes to</th><th>Then</th></tr></thead>
         <tbody>
-          <tr><td>Design</td><td style="color:var(--ink-2)">any</td><td><b style="color:var(--ink-0)">Renuka Vasava</b> <span style="color:var(--ink-2);font-size:11px">Designer</span></td></tr>
-          <tr><td>Video</td><td style="color:var(--ink-2)">any</td><td><b style="color:var(--ink-0)">Peyush</b> <span style="color:var(--ink-2);font-size:11px">Video editor</span></td></tr>
-          <tr><td>Video</td><td><b style="color:var(--yellow)">GSRTC LED</b></td><td><b style="color:var(--ink-0)">Safika</b> <span style="color:var(--ink-2);font-size:11px">beats the rule above</span></td></tr>
+          <tr><td><b>GSRTC LED</b></td><td>Design team</td><td>Piyush, after the artwork is approved</td></tr>
+          <tr><td><b>Govt auto hood</b></td><td>Dixita Rana</td><td class="muted">&mdash;</td></tr>
+          <tr><td><b>Social media</b></td><td>Design team</td><td class="muted">&mdash;</td></tr>
+          <tr><td><b>Hoarding</b></td><td class="muted">not set</td><td class="muted">&mdash;</td></tr>
+          <tr><td><b>Newspaper</b></td><td class="muted">not set</td><td class="muted">&mdash;</td></tr>
+          <tr><td><b>Cinema</b></td><td class="muted">not set</td><td class="muted">&mdash;</td></tr>
         </tbody>
       </table>
     </div>
-    <div class="callout" style="margin-top:18px;">
-      Names are shown in full, always. There are <b>two Renukas</b> — Renuka Vasava the designer, and Renuka the telecaller lead. A first-name-only picker will assign the wrong one.
-    </div>
-  </div>
 
-  <!-- ══ WIN SCREEN ══ -->
-  <div class="pane" id="p-win">
-    <div class="sech"><h2>What the rep is asked when a quote is won</h2><span class="note">Two questions, then the jobs create themselves</span></div>
-    <div class="win-inset">
-      <div style="font-family:var(--display);font-weight:600;color:var(--ink-0);font-size:15px;margin-bottom:4px;">Order won — UA-2026-0212</div>
-      <div style="font-size:12px;color:var(--ink-2);margin-bottom:18px;">Reliance Trends · GSRTC LED · 14 screens</div>
-
-      <div class="field">
-        <label>Do we need to make the creative?</label>
-        <div class="seg"><div class="opt on">Yes, we make it</div><div class="opt">Client sends it</div></div>
-      </div>
-
-      <div class="field">
-        <label>Material needed by</label>
-        <input class="inp" value="26 Jul 2026" readonly />
-      </div>
-
-      <div style="background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:12.5px;">
-        <div style="color:var(--ink-2);font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Will create</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span class="chip c-auto">Auto</span> Creative for Reliance Trends → <b style="color:var(--ink-0)">Design team</b></div>
-        <div style="display:flex;align-items:center;gap:8px;"><span class="chip c-auto">Auto</span> Video edit → <b style="color:var(--ink-0)">Peyush</b>, after design approval</div>
-      </div>
-
-      <div class="actions" style="margin-top:16px;"><button class="btn pri">Confirm</button><button class="btn">Skip — no creative needed</button></div>
+    <div class="sech"><h2>Who checks it</h2></div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>Work</th><th>Media</th><th>Checked by</th></tr></thead>
+        <tbody>
+          <tr><td>Design</td><td class="muted">any</td><td><b>Renuka Vasava</b></td></tr>
+          <tr><td>Video</td><td class="muted">any</td><td><b>Piyush Kumawat</b></td></tr>
+          <tr><td>Video</td><td><b style="color:var(--yellow)">GSRTC LED</b></td><td><b>Safika Bansiwala</b></td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <div class="callout">
-      <b>The "client sends it" answer is the important one.</b> About half your orders arrive with client artwork. Without this question every one of those creates a job nobody needs — and a list full of jobs nobody needs is a list people stop opening.
+    <div class="note">
+      Names are always shown in full. There are <b>two Renukas</b> and <b>two Dixitas</b> in the team &mdash; a first-name list will send work to the wrong person.
     </div>
-  </div>
 
-  <!-- ══ CLIENT BRIEF ══ -->
-  <div class="pane" id="p-brief">
     <div class="sech">
-      <h2>Mahant Investment Ltd</h2>
-      <span class="note">Brief filled by Mayur · 12 Jul 2026 · sample taken from your own workbook</span>
+      <h2>When a quote is won</h2>
+      <p>The rep answers two questions. Nothing else.</p>
     </div>
+    <div class="card" style="max-width:460px;">
+      <div style="font-family:var(--display);font-weight:600;color:var(--ink-0);font-size:16px;">Order won &mdash; Reliance Trends</div>
+      <div style="font-size:13.5px;color:var(--ink-2);margin:3px 0 20px;">GSRTC LED &middot; 14 screens</div>
 
-    <!-- identity: never re-typed -->
-    <div class="job">
-      <div class="brief-h">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        Client details
-        <span class="chip c-wait" style="margin-left:4px;">from the lead record — not typed again</span>
-      </div>
-      <div class="bgrid three">
-        <div><div class="bg-l">Company / Brand Name</div><div class="bg-v">Mahant Investment Ltd</div></div>
-        <div><div class="bg-l">Contact Person Name</div><div class="bg-v">R. Mahant</div></div>
-        <div><div class="bg-l">Mobile Number</div><div class="bg-v tnum">+260 97 000 0000</div></div>
-        <div><div class="bg-l">Email Address</div><div class="bg-v">info@mahantinvestment.com</div></div>
-        <div><div class="bg-l">Business Industry</div><div class="bg-v">Fleet &amp; Tyre Supply</div></div>
-        <div><div class="bg-l">Business Location / City</div><div class="bg-v">Lusaka, Zambia</div></div>
+      <label class="lab">Do we make the creative?</label>
+      <div class="seg" style="margin-bottom:20px;"><div class="o on">Yes, we make it</div><div class="o">Client sends it</div></div>
+
+      <label class="lab">Material needed by</label>
+      <input class="inp" value="26 Jul 2026" readonly />
+
+      <div style="margin-top:20px;display:flex;gap:9px;">
+        <button class="btn pri">Confirm</button><button class="btn">Skip</button>
       </div>
     </div>
 
-    <div class="cols">
-      <div>
-        <!-- services -->
-        <div class="job">
-          <div class="brief-h">Services on for this client</div>
-          <div class="tags">
-            <span class="chip c-auto">Social Media Management</span>
-          </div>
-          <div style="font-size:11.5px;color:var(--ink-2);margin-top:10px;">The other nine services are off for this client. Turning one on adds its fields below and its jobs to the plan.</div>
-        </div>
-
-        <!-- the part a designer actually opens -->
-        <div class="job">
-          <div class="brief-h">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
-            What the designer opens
-          </div>
-          <div class="bgrid two">
-            <div><div class="bg-l">Content Language</div><div class="bg-v">English</div></div>
-            <div><div class="bg-l">Brand Tone</div><div class="bg-v">Professional · Corporate</div></div>
-            <div><div class="bg-l">Preferred Design Style</div><div class="bg-v">Creative · Light Theme</div></div>
-            <div><div class="bg-l">Who will provide the content information?</div><div class="bg-v">Client will provide complete content</div></div>
-            <div><div class="bg-l">Original photos and videos?</div><div class="bg-v">Partially — product and office photos</div></div>
-            <div><div class="bg-l">AI-generated / stock allowed?</div><div class="bg-v">Yes</div></div>
-          </div>
-
-          <div style="margin-top:16px;">
-            <div class="bg-l">Brand Colours &amp; Fonts</div>
-            <div style="font-size:12.5px;color:var(--ink-2);margin-top:6px;line-height:1.7;">
-              Nothing to show. Your workbook records that the colour and font files <b style="color:var(--ink-0);">arrived</b> — never what they <b style="color:var(--ink-0);">are</b>, so a designer still opens a PDF to find a hex code. These become fields here.
-            </div>
-          </div>
-
-          <div style="margin-top:16px;">
-            <div class="bg-l">Things to Avoid</div>
-            <div style="font-size:12.5px;color:var(--ink-2);margin-top:6px;">None recorded — this section is blank on the filled sheet.</div>
-          </div>
-
-          <div style="margin-top:16px;">
-            <div class="bg-l">Competitor Details</div>
-            <div style="font-size:12.5px;color:var(--ink-1);margin-top:6px;line-height:1.7;">
-              instagram.com/example-competitor<br>
-              <span style="color:var(--ink-2);">"Clean product shots and quick turnaround on offer posts."</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- brand assets -->
-        <div class="job">
-          <div class="brief-h">Brand assets</div>
-          <div class="row-l"><span>Logo PNG</span><span class="chip c-doing">Uploaded</span></div>
-          <div class="row-l"><span>Logo Vector File</span><span style="color:var(--ink-2);">—</span></div>
-          <div class="row-l"><span>Brand Guidelines</span><span style="color:var(--ink-2);">—</span></div>
-          <div class="row-l"><span>Brand Colors</span><span class="chip c-doing">Uploaded</span></div>
-          <div class="row-l"><span>Font Details</span><span style="color:var(--ink-2);">—</span></div>
-          <div class="row-l"><span>Company Profile</span><span class="chip c-todo">Pending</span></div>
-          <div class="row-l"><span>Brochure</span><span style="color:var(--ink-2);">—</span></div>
-          <div class="row-l"><span>Product Catalogue</span><span style="color:var(--ink-2);">—</span></div>
-          <div class="actions"><button class="btn">Upload file</button></div>
-        </div>
-      </div>
-
-      <div>
-        <!-- section 8, as a real tracker -->
-        <div class="job">
-          <div class="brief-h">Onboarding</div>
-          <div style="display:flex;align-items:baseline;gap:8px;">
-            <div class="tnum" style="font-size:30px;font-weight:700;color:var(--ink-0);line-height:1;">69%</div>
-            <div style="font-size:12px;color:var(--ink-2);">9 of 13 received</div>
-          </div>
-          <div class="prog-wrap"><div class="prog-bar" style="width:69%;"></div></div>
-
-          <div class="sub-list" style="margin-top:14px;">
-            <div class="sub-item got"><span class="tick on"></span>Client Details Received</div>
-            <div class="sub-item got"><span class="tick on"></span>Logo Received</div>
-            <div class="sub-item got"><span class="tick on"></span>Brand Details Received</div>
-            <div class="sub-item got"><span class="tick on"></span>Product Information Received</div>
-            <div class="sub-item got"><span class="tick on"></span>Social Media Links Received</div>
-            <div class="sub-item"><span class="tick"></span>Photos Received</div>
-            <div class="sub-item"><span class="tick"></span>Videos Received</div>
-            <div class="sub-item got"><span class="tick on"></span>Instagram Access Received</div>
-            <div class="sub-item got"><span class="tick on"></span>Facebook Access Received</div>
-            <div class="sub-item"><span class="tick"></span>Meta Business Access Received</div>
-            <div class="sub-item got"><span class="tick on"></span>Competitor References Received</div>
-            <div class="sub-item"><span class="tick"></span>Content Plan Approved</div>
-            <div class="sub-item got"><span class="tick on"></span>Posting Approval Person Confirmed</div>
-          </div>
-          <div style="font-size:11.5px;color:var(--ink-2);margin-top:12px;">The four open items are what to chase. This is the same list as section 8 of the workbook — the percentage is counted, not typed.</div>
-        </div>
-
-        <!-- section 5 -->
-        <div class="job">
-          <div class="brief-h">Who signs off, on the client side</div>
-          <div class="row-l"><span style="color:var(--ink-2);">Approver Name</span><b style="color:var(--ink-0);">R. Mahant</b></div>
-          <div class="row-l"><span style="color:var(--ink-2);">Mobile Number</span><span class="tnum">+260 97 000 0000</span></div>
-          <div class="row-l"><span style="color:var(--ink-2);">Preferred approval method</span><span class="chip c-doing">WhatsApp</span></div>
-          <div class="row-l"><span style="color:var(--ink-2);">Expected approval time</span><span class="chip c-doing">Within 24 Hours</span></div>
-        </div>
-
-        <!-- section 6 -->
-        <div class="job">
-          <div class="brief-h">Posting access</div>
-          <div class="row-l"><span style="color:var(--ink-2);">Who will upload the content?</span><b style="color:var(--ink-0);">Untitled Advertising</b></div>
-          <div class="row-l"><span>Instagram Access Provided</span><span class="chip c-done">Access Completed</span></div>
-          <div class="row-l"><span>Facebook Page Access Provided</span><span class="chip c-done">Access Completed</span></div>
-          <div class="row-l"><span>Meta Business Access Provided</span><span class="chip c-done">Access Completed</span></div>
-          <div class="row-l"><span>LinkedIn Page Access Provided</span><span class="chip c-done">Access Completed</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="callout">
-      <b>One decision to make here.</b> Six of the ten services in your workbook do not exist anywhere in the app — social media management, Meta ads, graphic design, reel editing, branding, logo design. Four already do. This screen shows them on <b>one list</b>, which is the recommendation: one list, one truth. The cost is that those six also appear in the Other Media quote dropdown — which is probably right, since you sell them.
-    </div>
-  </div>
-
-  <!-- ══ MONTHLY PLAN ══ -->
-  <div class="pane" id="p-plan">
-    <div class="sech">
-      <h2>Mahant Investment Ltd — monthly plan</h2>
-      <span class="note">Section 3.5 of the workbook, turned into work</span>
-    </div>
-
-    <div class="cols">
-      <div>
-        <div class="job">
-          <div class="brief-h">The retainer</div>
-          <div class="bgrid three">
-            <div><div class="bg-l">Service</div><div class="bg-v">Social Media Management</div></div>
-            <div><div class="bg-l">Started</div><div class="bg-v">Jul 2026</div></div>
-            <div><div class="bg-l">Status</div><div class="bg-v" style="color:var(--green);">Active</div></div>
-            <div><div class="bg-l">Posts / Month</div><div class="bg-v tnum">9</div></div>
-            <div><div class="bg-l">Reels / Month</div><div class="bg-v tnum">3</div></div>
-            <div><div class="bg-l">Stories / Month</div><div class="bg-v" style="color:var(--ink-2);">not set</div></div>
-          </div>
-          <div style="font-size:11.5px;color:var(--ink-2);margin-top:12px;">Your workbook offers 4 / 8 / 12 / 15 posts, 2 / 4 / 6 / 8 reels, 4 / 8 / 12 / daily stories, or a custom number. This client is on custom.</div>
-        </div>
-
-        <div class="job">
-          <div class="brief-h">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-            On 25 July, this creates August
-          </div>
-          <div class="row-l">
-            <span style="display:flex;align-items:center;gap:9px;"><span class="chip c-auto">Auto</span> Static post <span class="tnum" style="color:var(--ink-2);">× 9</span></span>
-            <b style="color:var(--ink-0);">Design team</b>
-          </div>
-          <div class="row-l">
-            <span style="display:flex;align-items:center;gap:9px;"><span class="chip c-auto">Auto</span> Reel <span class="tnum" style="color:var(--ink-2);">× 3</span></span>
-            <b style="color:var(--ink-0);">Peyush</b>
-          </div>
-          <div style="font-size:11.5px;color:var(--ink-2);margin-top:12px;">Every card arrives carrying the brief — English, Professional · Corporate, no AI images, no religious or political content — so nobody opens a spreadsheet to start work.</div>
-        </div>
-
-        <div class="job">
-          <div class="brief-h">How a digital job moves</div>
-          <div class="flow">
-            <span class="step">To do</span><span class="arr">›</span>
-            <span class="step">Doing</span><span class="arr">›</span>
-            <span class="step">Internal check</span><span class="arr">›</span>
-            <span class="step new">Sent to client</span><span class="arr">›</span>
-            <span class="step new">Client approved</span><span class="arr">›</span>
-            <span class="step">Scheduled</span><span class="arr">›</span>
-            <span class="step">Posted</span>
-          </div>
-          <div style="margin-top:16px;">
-            <div class="ro" style="margin-bottom:7px;">An outdoor job keeps the short flow</div>
-            <div class="flow">
-              <span class="step">To do</span><span class="arr">›</span>
-              <span class="step">Doing</span><span class="arr">›</span>
-              <span class="step">Sent for approval</span><span class="arr">›</span>
-              <span class="step">Done</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="job">
-          <div class="brief-h">What this will never do</div>
-          <div class="sub-list" style="margin-top:4px;">
-            <div class="sub-item"><span class="tick on"></span>Create the same month twice</div>
-            <div class="sub-item"><span class="tick on"></span>Create for a paused retainer</div>
-            <div class="sub-item"><span class="tick on"></span>Create past the end date</div>
-            <div class="sub-item"><span class="tick on"></span>Send 12 separate notifications</div>
-          </div>
-          <div style="font-size:11.5px;color:var(--ink-2);margin-top:12px;">One message for the batch. Twelve pushes in a minute is how people turn notifications off — and that would silently break the sales alerts too.</div>
-        </div>
-
-        <div class="job">
-          <div class="brief-h">Why this matters more than it looks</div>
-          <div style="font-size:12.5px;color:var(--ink-1);line-height:1.7;">
-            A won hoarding order makes a handful of jobs, once.<br><br>
-            This client makes <b style="color:var(--ink-0);">12 jobs every month</b>, and keeps making them. Across a few retainer clients that is most of what the creative team does — and none of it comes from a quote.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="callout">
-      <b>The second decision.</b> Client sign-off is a different gate from ours. Renuka checks the design; then the client has to approve it before it goes out. The two yellow steps above are that gate. They belong on digital work only — putting them on a hoarding job adds two clicks that mean nothing.
+    <div class="note">
+      <b>The second answer is the important one.</b> About half of all orders arrive with the client&rsquo;s own artwork. Without that question, half the jobs created are jobs nobody needs &mdash; and a list full of those is a list people stop opening.
     </div>
   </div>
 
