@@ -8793,3 +8793,12 @@ Owner (4 asks, all shipped):
 4. BOTH hero CTA buttons removed ("Book your screens" + "See how it works").
    Conversion paths remaining: header WhatsApp pill, sticky mobile dock
    (WhatsApp + Call), final CTA form. heroWa dropped from the JS wiring array.
+
+### 129.5 · Phase 257.5 — /led WhatsApp CTAs → the MARKETING number (22 Jul)
+Owner: WhatsApp on /led = 98982 73686. `var WA` in public/led/index.html
+flipped 919581578261 → 919898273686. Closes the §119 split — /led WhatsApp,
+/led Call and the 22 board QRs are now ALL on the marketing number
+(AI-answered §119, welcome poster §246.2, inbound → Rima's queue). The
+service number 95815 78261 keeps the campaign inbox + its own AI. Every /led
+WhatsApp path (nav pill, dock, plans, form, station cards where present)
+reads this ONE var — future number changes are a one-line edit.
