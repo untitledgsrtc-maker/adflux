@@ -179,7 +179,9 @@ export default async function handler(req, res) {
       recipient_type: 'individual',
       to: conv.customer_wa_id,
       type: 'text',
-      text: { preview_url: false, body: text },
+      // Phase 254.1 — preview only when the text carries a link (station
+      // video links get a playable card); plain replies stay preview-free.
+      text: { preview_url: /https?:\/\//i.test(text), body: text },
     }
   }
   let metaData

@@ -123,6 +123,11 @@ export default function CampaignInboxV2() {
   const [quoteMenuOpen, setQuoteMenuOpen] = useState(false)
   const [leadQuotes, setLeadQuotes] = useState(null) // null = not loaded yet
   const [quotesLoading, setQuotesLoading] = useState(false)
+  // Phase 254.1 — Video button: station videos (cities.youtube_url, the same
+  // links the AI shares) + a video-only cut of the media library.
+  const [videoMenuOpen, setVideoMenuOpen] = useState(false)
+  const [stationVideos, setStationVideos] = useState(null) // null = not loaded yet
+  const [stationsLoading, setStationsLoading] = useState(false)
 
   const loadThreads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -254,6 +259,7 @@ export default function CampaignInboxV2() {
     setAttach(null)
     setQuoteMenuOpen(false)
     setLeadQuotes(null)
+    setVideoMenuOpen(false)
   }, [selId])
 
   // Phase 254 — the PRIVATE company brochure powers the "Rate card" chip
@@ -304,9 +310,11 @@ export default function CampaignInboxV2() {
   // server (api/wa/send) re-checks the window + role, so this is just the UX.
   // Phase 254: `extra` carries an attachment (media_url/…) or a quote_id —
   // ONE send path for text, media and quote-PDF so the latch + error handling
-  // never fork (§71).
-  async function sendReply(extra = null) {
-    const text = draft.trim()
+  // never fork (§71). Phase 254.1: `textOverride` sends a prepared message
+  // (station video link) WITHOUT consuming the rep's typed draft or staged
+  // attachment.
+  async function sendReply(extra = null, textOverride = null) {
+    const text = (textOverride ?? draft).trim()
     const withAttach = !!(extra?.media_url || extra?.quote_id)
     if ((!text && !withAttach) || !sel) return
     if (sendingRef.current || sending) return   // §47 latch — same-tick ghost-click guard
@@ -329,9 +337,9 @@ export default function CampaignInboxV2() {
         toastError(new Error(msg), 'Could not send.')
         return
       }
-      setDraft('')
-      setAttach(null)
+      if (!textOverride) { setDraft(''); setAttach(null) }   // a prepared send leaves the composer as-is
       setQuoteMenuOpen(false)
+      setVideoMenuOpen(false)
       setPreviews((p) => ({ ...p, [sel.id]: data?.message?.body || text || '[attachment]' }))
       loadMsgs(sel.id)            // reload to show the just-sent row from the DB
     } catch (e) {
@@ -356,6 +364,7 @@ export default function CampaignInboxV2() {
   async function openQuoteMenu() {
     if (!sel?.lead_id) return
     setQuoteMenuOpen((o) => !o)
+    setVideoMenuOpen(false)
     if (leadQuotes !== null || quotesLoading) return
     setQuotesLoading(true)
     const { data, error } = await supabase.from('quotes')
@@ -370,6 +379,30 @@ export default function CampaignInboxV2() {
 
   function sendQuote(q) {
     sendReply({ quote_id: q.id })
+  }
+
+  // Phase 254.1 — Video button: station videos come from the cities master
+  // (name + youtube_url, active only — the same links the AI shares, §246.1;
+  // sent as TEXT so WhatsApp previews the video, no file-size limits). The
+  // list is global → cached for the session, not per-conversation.
+  async function openVideoMenu() {
+    setVideoMenuOpen((o) => !o)
+    setQuoteMenuOpen(false)
+    if (stationVideos !== null || stationsLoading) return
+    setStationsLoading(true)
+    const { data, error } = await supabase.from('cities')
+      .select('id, name, youtube_url') // cap-ok — active cities with a video, .limit(60)
+      .eq('is_active', true)
+      .not('youtube_url', 'is', null)
+      .order('name')
+      .limit(60)
+    if (error) toastError(error, 'Could not load station videos.')
+    setStationVideos(data || [])
+    setStationsLoading(false)
+  }
+
+  function sendStationVideo(c) {
+    sendReply(null, `${c.name} station video: ${c.youtube_url}`)
   }
 
   // Reassign the lead to another telecaller (admin action). Sets BOTH owner
@@ -730,6 +763,11 @@ export default function CampaignInboxV2() {
                       triggerLabel="Attach"
                       onSelect={(url, type, name) => setAttach({ url, type: type || 'document', name: name || null })}
                     />
+                    {/* Phase 254.1 — send a video (station links / video files) */}
+                    <button type="button" onClick={openVideoMenu} style={chipReply}>
+                      <Film size={14} strokeWidth={1.6} style={{ verticalAlign: 'text-bottom', marginRight: 4 }} />
+                      Video
+                    </button>
                     {/* Phase 254 — send one of this lead's quote PDFs */}
                     {sel.lead_id && (
                       <button type="button" onClick={openQuoteMenu} style={chipReply}>
@@ -738,6 +776,60 @@ export default function CampaignInboxV2() {
                       </button>
                     )}
                   </div>
+
+                  {/* video picker — station videos (sent as a link the customer
+                      can play in-chat) + the video-only media library */}
+                  {videoMenuOpen && (
+                    <div style={{
+                      marginBottom: 8, padding: 8, borderRadius: 10,
+                      background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)',
+                    }}>
+                      <div style={{
+                        fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+                        color: 'var(--v2-ink-2, #6a7590)', padding: '2px 6px 6px',
+                      }}>
+                        Station videos
+                      </div>
+                      {stationsLoading ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: 8 }}>
+                          <Loader2 size={15} strokeWidth={1.6} className="spin" style={{ color: 'var(--v2-yellow, #FFE600)' }} />
+                        </div>
+                      ) : !stationVideos || stationVideos.length === 0 ? (
+                        <div style={{ fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)', padding: '0 6px 6px' }}>
+                          No station videos yet — add a YouTube link on a city (Master → Cities).
+                        </div>
+                      ) : (
+                        <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                          {stationVideos.map((c) => (
+                            <button
+                              key={c.id} type="button" disabled={sending}
+                              onClick={() => sendStationVideo(c)}
+                              style={{
+                                width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '7px 8px', fontSize: 12.5, fontWeight: 600, cursor: sending ? 'default' : 'pointer',
+                                background: 'transparent', border: 'none', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)',
+                              }}
+                            >
+                              <Film size={14} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }} />
+                              {c.name}
+                              <span style={{ color: 'var(--v2-ink-2, #6a7590)', marginLeft: 'auto', fontSize: 11.5 }}>Send link</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ borderTop: '1px solid var(--v2-line, #1f2b47)', margin: '6px 0', paddingTop: 8, paddingLeft: 6 }}>
+                        <MediaPicker
+                          accept="video/*"
+                          filterType="video"
+                          triggerLabel="Pick / upload a video file"
+                          onSelect={(url, type, name) => {
+                            setAttach({ url, type: 'video', name: name || null })
+                            setVideoMenuOpen(false)
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* quote picker */}
                   {quoteMenuOpen && (

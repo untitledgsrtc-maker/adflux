@@ -8573,3 +8573,23 @@ fn — the §219 12-fn cap is untouched).
   the business number would fetch + deliver ANY URL. Every media_url through
   a rep-authed endpoint must be host-allowlisted (or server-derived, like the
   quote signed URL).
+
+### 127.1 · Phase 254.1 — Video button in the composer (22 Jul, same day)
+Owner: "in chat bottom I want send video option" → picked **Both** (station
+videos + any video file). Guardian PASS. 3 files, JS-only, no SQL, no APK:
+- **Video chip** (Film icon) in the composer → panel with two halves:
+  (a) **Station videos** — reads the cities master (`is_active` +
+  `youtube_url` not null, the §246.1 links the AI shares) → tap sends TEXT
+  `"<CITY> station video: <url>"`, which WhatsApp renders as a playable card
+  (no file-size limit — deck mp4s can exceed WhatsApp's 16 MB video cap, the
+  YouTube link never does); (b) **Pick / upload a video file** — MediaPicker
+  `accept="video/*"` staging a normal video attachment.
+- `MediaPicker` gained an additive `filterType` prop (grid filters to one
+  media_type; null = existing callers byte-identical).
+- `sendReply(extra, textOverride)` — a prepared send (station link) does NOT
+  consume the rep's typed draft or staged attachment; latch + gates unchanged.
+- `send.js` text sends: `preview_url` now true ONLY when the body carries a
+  URL (station link previews; plain replies unchanged).
+- Empty-state tells the admin where videos come from: Master → Cities →
+  YouTube link. Adding a link there auto-appears in the inbox Video panel
+  (same source as the deck + AI — §71 one source).

@@ -23,6 +23,10 @@ export default function MediaPicker({
   accept = 'image/*,video/*,application/pdf',
   onSelect,
   triggerLabel = 'Attach media',
+  // Phase 254.1 — optional grid filter ('image' | 'video' | 'document') so a
+  // dedicated Video button lists only videos. Default = all (existing callers
+  // unchanged).
+  filterType = null,
 }) {
   const profile = useAuthStore((s) => s.profile)
   const [open, setOpen] = useState(false)
@@ -30,13 +34,15 @@ export default function MediaPicker({
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
+    let q = supabase
       .from('campaign_media')
       .select('id, url, media_type, name, created_at')
       .order('created_at', { ascending: false })
       .limit(200)
+    if (filterType) q = q.eq('media_type', filterType)
+    const { data, error } = await q
     if (!error) setItems(data || [])
-  }, [])
+  }, [filterType])
   useEffect(() => { if (open) load() }, [open, load])
 
   function pick(url, type, name) {
