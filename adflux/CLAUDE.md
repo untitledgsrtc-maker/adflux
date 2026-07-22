@@ -8777,3 +8777,19 @@ runs directly below the logo bar · stat band removed, replaced by 264 / 20 /
   content), and the count-up has a hard `setTimeout` that lands the final
   number even if rAF never fires. Any future /led entrance effect: class +
   transition + hard fallback, never keyframes-from-invisible.
+
+### 129.4 · Phase 257.4 — /led: full-width ticker · real wordmark · cycling big stat · hero buttons removed (22 Jul)
+Owner (4 asks, all shipped):
+1. Ticker = full-width marquee, "GSRTC · SCREENS LIVE" label REMOVED.
+2. Header wordmark = the ACTUAL logo letterforms — NEW `public/led/logo-word.svg`
+   (logo.svg viewBox-cropped to the letters, `0 988 3036.27 540`; bbox computed
+   from the path data). Styled-font "UNTITLED" span dropped. Brand = mark img +
+   word img.
+3. Hero stats now cycle ONE at a time in the SAME space (`.hero-stats`
+   position:relative + absolute `.hstat`s, min-height reserved), number size up
+   to clamp(64px,17vw,120px), count-up re-runs on every cycle (2.8s interval).
+   §129 pattern kept: class-driven `.in`, hard setTimeout lands final numbers,
+   no-JS = stacked static (never invisible).
+4. BOTH hero CTA buttons removed ("Book your screens" + "See how it works").
+   Conversion paths remaining: header WhatsApp pill, sticky mobile dock
+   (WhatsApp + Call), final CTA form. heroWa dropped from the JS wiring array.
