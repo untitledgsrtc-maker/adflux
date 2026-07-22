@@ -8639,3 +8639,23 @@ in the thread they're looking at. Fix: the endpoint already returns
 - Cost: Utility ~Rs 0.11-0.12/send; the per-lead 24h throttle bounds it.
 - Templates listed from `wa_outcome_templates` (read-all-authenticated,
   §249.2) — edit a template at Meta → §249.3 lockstep: update preview_body.
+
+### 128.1 · Phase 256 — /led: all city videos wired + LED-board hero backdrop (22 Jul)
+Owner: "wired all city video from yt link here + add something screen related
+background." Static page only (`public/led/index.html`), no SQL, no APK, no SW
+cache bump needed (/led is network-served, not CacheFirst).
+- **City videos** — on load the page fetches `/api/deck-videos` (the §221
+  public Edge endpoint — SAME cities-master source as the deck + the AI, §71)
+  and REBUILDS the video pills: [Station · local hero mp4] + one pill per city
+  with a `youtube_url`. Tap a city → the frame swaps to a muted autoplaying
+  youtube-nocookie embed (CSP frame-src already allows it, §221); tap Station
+  → back to the local <video>. FAIL-SAFE: fetch error/empty → the original 4
+  static pills remain byte-identical. Adding a YouTube link on a city (Master
+  → Cities) now auto-appears on the deck + AI + inbox Video panel + /led.
+- **Hero backdrop** — `.ledbg`: a faint brand-yellow LED dot matrix
+  (radial-gradient pixels, masked to the headline side) + a slow light sweep
+  (::after keyframes, `prefers-reduced-motion` static). Pure CSS, z-indexed
+  under `.hero .wrap`, pointer-events none.
+- The 3 old hardcoded city pills (Veraval/Bhavnagar/Gandhinagar local mp4s)
+  are REPLACED by the dynamic YouTube set when the fetch succeeds — they
+  remain only as the offline/static fallback.

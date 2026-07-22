@@ -68,7 +68,20 @@
   .nav-cta svg{width:15px;height:15px}
 
   /* ── hero ──────────────────────────────────────────────── */
-  .hero{padding:64px 0 44px}
+  .hero{padding:64px 0 44px;position:relative;overflow:hidden}
+  .hero .wrap{position:relative;z-index:1}
+  /* LED pixel-board backdrop — a faint dot matrix (the screens themselves)
+     with a slow light sweep, like content gliding across an LED wall. */
+  .ledbg{position:absolute;inset:0;z-index:0;pointer-events:none;
+    background-image:radial-gradient(circle, rgba(255,230,0,.09) 1px, transparent 1.7px);
+    background-size:15px 15px;
+    -webkit-mask-image:radial-gradient(130% 95% at 28% 18%, #000 0%, transparent 72%);
+            mask-image:radial-gradient(130% 95% at 28% 18%, #000 0%, transparent 72%)}
+  .ledbg::after{content:"";position:absolute;inset:-45%;
+    background:linear-gradient(115deg, transparent 42%, rgba(255,230,0,.055) 50%, transparent 58%);
+    animation:ledsweep 8s linear infinite}
+  @keyframes ledsweep{from{transform:translateX(-60%)}to{transform:translateX(60%)}}
+  @media(prefers-reduced-motion:reduce){.ledbg::after{animation:none}}
   .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;
     color:var(--yellow);display:inline-flex;align-items:center;gap:10px;margin-bottom:22px}
   .eyebrow::before{content:"";width:26px;height:1px;background:var(--yellow);opacity:.7}
@@ -180,6 +193,7 @@
   .show{margin-top:34px;display:grid;gap:16px}
   .screen{position:relative;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#05070d;aspect-ratio:16/9;box-shadow:0 30px 60px -30px #000}
   .screen video{width:100%;height:100%;object-fit:cover;display:block}
+  .screen iframe{width:100%;height:100%;border:0;display:block}
   .screen .tag{position:absolute;top:13px;left:13px;z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
     background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:7px;padding:6px 10px;color:var(--yellow)}
   .screen .sound{position:absolute;bottom:13px;right:13px;z-index:2;display:inline-flex;align-items:center;gap:8px;
@@ -285,6 +299,7 @@
 <main>
   <!-- HERO -->
   <section class="hero">
+    <div class="ledbg" aria-hidden="true"></div>
     <div class="wrap">
       <span class="eyebrow rise">GSRTC LED Network</span>
       <h1 class="rise">Your brand, on every <span class="hl">platform</span> in Gujarat.</h1>
@@ -588,19 +603,75 @@
     }
   }
 
-  // video showcase — muted autoplay + city switcher (no sound, owner call)
+  // video showcase — muted autoplay + city switcher (no sound, owner call).
+  // Local mp4 pills are the static fallback; on load we fetch the SAME public
+  // city->YouTube map the deck + AI use (/api/deck-videos, cities master) and
+  // rebuild the pills: [Station · local hero] + one pill per city with a video.
+  // Add a YouTube link on a city (Master -> Cities) and it appears here too.
   var mainVideo = document.getElementById("mainVideo");
   var vtag = document.getElementById("vtag");
-  document.querySelectorAll(".thumb").forEach(function(t){
-    t.addEventListener("click", function(){
-      if(!mainVideo) return;
-      document.querySelectorAll(".thumb").forEach(function(x){ x.classList.remove("active"); });
+  var screenBox = mainVideo ? mainVideo.parentElement : null;
+  var thumbsRow = document.querySelector(".thumbs");
+
+  function ytId(u){
+    var m = String(u||"").match(/(?:youtu\.be\/|v=|shorts\/|embed\/|live\/)([\w-]{6,})/);
+    return m ? m[1] : null;
+  }
+  function showLocal(src, tag){
+    if(!mainVideo) return;
+    var fr = document.getElementById("ytFrame");
+    if(fr) fr.remove();
+    mainVideo.style.display = "";
+    mainVideo.src = src;
+    if(vtag) vtag.textContent = tag;
+    mainVideo.play().catch(function(){});
+  }
+  function showYouTube(url, tag){
+    var id = ytId(url);
+    if(!id || !screenBox){ return; }
+    if(mainVideo){ mainVideo.pause(); mainVideo.style.display = "none"; }
+    var fr = document.getElementById("ytFrame");
+    if(!fr){
+      fr = document.createElement("iframe");
+      fr.id = "ytFrame";
+      fr.allow = "autoplay; encrypted-media; picture-in-picture";
+      fr.allowFullscreen = true;
+      screenBox.appendChild(fr);
+    }
+    fr.src = "https://www.youtube-nocookie.com/embed/" + id +
+      "?autoplay=1&mute=1&playsinline=1&rel=0&loop=1&playlist=" + id;
+    if(vtag) vtag.textContent = tag;
+  }
+  function titleCase(s){
+    return String(s||"").toLowerCase().replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+
+  // one delegated handler covers static + dynamic pills
+  if(thumbsRow){
+    thumbsRow.addEventListener("click", function(ev){
+      var t = ev.target.closest(".thumb");
+      if(!t) return;
+      thumbsRow.querySelectorAll(".thumb").forEach(function(x){ x.classList.remove("active"); });
       t.classList.add("active");
-      mainVideo.src = t.getAttribute("data-src");
-      if(vtag) vtag.textContent = t.getAttribute("data-tag");
-      mainVideo.play().catch(function(){});
+      var yt = t.getAttribute("data-yt");
+      if(yt) showYouTube(yt, t.getAttribute("data-tag"));
+      else showLocal(t.getAttribute("data-src"), t.getAttribute("data-tag"));
     });
-  });
+  }
+
+  // wire ALL city videos from the cities master (fail-safe: fetch error /
+  // empty map -> the static pills stay exactly as before)
+  fetch("/api/deck-videos").then(function(r){ return r.ok ? r.json() : null; }).then(function(map){
+    if(!map || !thumbsRow) return;
+    var cities = Object.keys(map).filter(function(k){ return ytId(map[k]); }).sort();
+    if(!cities.length) return;
+    var html = '<button class="thumb active" data-src="/deck/station-hero.mp4" data-tag="STATION · LIVE" type="button">Station</button>';
+    cities.forEach(function(c){
+      var esc = c.replace(/[^A-Z0-9 ]/gi, "");
+      html += '<button class="thumb" data-yt="' + map[c].replace(/"/g, "&quot;") + '" data-tag="' + esc + ' · LIVE" type="button">' + titleCase(esc) + '</button>';
+    });
+    thumbsRow.innerHTML = html;
+  }).catch(function(){ /* offline / endpoint down — static pills remain */ });
 
   // Gujarat station map (Leaflet, dark tiles, yellow pins)
   var mapEl = document.getElementById("map");
