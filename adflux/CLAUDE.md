@@ -8504,3 +8504,11 @@ BROCHURE_URL, end-of-day).
 - LESSON: an edited approved template keeps SENDING its previous approved
   version while In review (Meta). "Approval and mapping flip together" means
   flip on the status change to Active — never during the review window.
+
+### 126.2 · Phase 253 COMPLETE (22 Jul, night)
+Meta approved both edited templates (Active – Quality pending) →
+`supabase_phase253b_postcall_pdf_map.sql` **RUN** + verified: has_pdf true on
+callback / neutral / nurture / positive, false on negative. Every §126 item is
+now live. Post-call brochure PDF rides EVERY outcome except Lost. The §126.1
+serving-version lesson stands: 253b was rolled back twice for running during
+the review window — the mapping must flip only when the templates show Active.
