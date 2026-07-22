@@ -8279,3 +8279,60 @@ three weeks instead of ten.
 ### Also decided
 Turn the sales incentive card OFF for designer/video roles — it currently paints
 above every non-admin page, and creative staff are not on that plan.
+
+---
+
+## 124 · Phase 251 — inbox sorts by last MESSAGE + the 200-row cap removed (2026-07-21)
+
+Owner: "Jayna's leads' messages not visible to me or the TC inbox; new messages
+show last, I want them first." Root-caused, one fix for both.
+
+### Root
+`CampaignInboxV2.loadThreads` ordered by **`last_inbound_at` DESC + .limit(200)**.
+Only the WEBHOOK writes last_inbound_at. A conversation CREATED by an outbound
+post-call template send (§120 P3, Jayna's sends) has it NULL → `nullsFirst:false`
+sorts it dead LAST → position ~333 of 332 → beyond the 200-row fetch → **the
+thread was never loaded, for admin or the sending TC**. Same mechanism kept any
+outbound-latest thread buried, and 332 > 200 meant 132 threads were invisible to
+everyone (the §66 row-cap disease, self-inflicted at 200).
+
+### Fix (single source, §71)
+- `supabase_phase251_inbox_last_message.sql` (owner RUNS): additive
+  `whatsapp_conversations.last_message_at + last_message_direction` + ONE
+  AFTER-INSERT trigger on `whatsapp_messages` (`trg_wa_message_bump_conv`,
+  DEFINER, pinned, EXCEPTION-wrapped, forward-only `NEW.at >= last_message_at`)
+  — every sender (webhook, send.js, send-template, ai-reply, future) inserts a
+  message row, so ONE trigger covers all of them with zero endpoint edits +
+  index + backfill (newest message per conv; message-less convs get
+  COALESCE(last_inbound_at, updated_at, created_at)).
+- `CampaignInboxV2.jsx`: sort by `last_message_at` with a ONCE-per-session
+  fallback to `last_inbound_at` if the column 400s (deploy-before-SQL safe,
+  §45) · the 200 cap → chunked `.range` pages (500/pg, 4000 backstop, §66
+  pattern) · row time shows `last_message_at || last_inbound_at` · NEW amber
+  **"Reply" chip** when `last_message_direction === 'in'` and the window is
+  open — the needs-reply marker the inbox analysis (same day) said was missing
+  ("haa sir" waiting 5 days) · preview `.in()` capped to the newest 300 ids.
+
+### Contracts
+- **The inbox sort key is `last_message_at`, maintained ONLY by the Phase 251
+  trigger.** Do not add per-endpoint bumps (that is the §69 drift) — a new
+  sender that inserts whatsapp_messages rows is covered automatically.
+- Not §28-frozen (campaign page/tables); trigger fires on campaign message
+  inserts only — zero sales hot-path cost.
+
+### Same-day inbox/chat ANALYSIS (read-only, findings logged for follow-ups)
+AI replies are strong (multilingual, station-tagged, price-backstop firing,
+out-of-scope refusals). Open problems found, NOT yet fixed: (1) customers
+answering and nobody following — "haa sir" 5d, "vijapur" 5d, "Limbdi" 9d —
+root = `ai_paused` sticks + (until 251) no needs-reply marker; (2) ~30 threads
+ending "Connecting you with our team — someone will reply shortly", 5-16d old,
+never picked up; (3) **"Don't call me" sets wa_opt_out but NOT do_not_call and
+does not cancel the open callback follow-up** — D M Joshi: 20 call attempts,
+opt-out ON, callback for 22 Jul still open; (4) callback template fired with a
+PAST date ("call you back on 12 July" sent 21 Jul — reads a stale follow_up)
++ junk names in the greeting ("Hi .", "Hi WhatsApp lead") + one wrong
+name/number pairing (S K Chechani greeting on CA Hersh Jani's number);
+(5) ~300 out-of-window threads with no re-engagement pass; (6) lead pollution
+(job seekers/spam auto-become leads → TC queue noise). Ranked fix order given
+to owner: needs-reply/un-pause path → call-refusal→DNC+cancel-callback →
+template date/name guards → re-engage pass → junk triage.

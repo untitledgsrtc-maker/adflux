@@ -108,6 +108,9 @@ export default function CampaignInboxV2() {
   const sendingRef = useRef(false)   // §47 synchronous latch — no double-send on a WebView ghost-click
   const msgScrollRef = useRef(null)  // C5.1 — auto-scroll anchor for the message pane
   const prevMsgCount = useRef(0)
+  // Phase 251 — inbox sort column; drops to the legacy last_inbound_at once
+  // per session if the new column's SQL has not been run yet.
+  const sortColRef = useRef('last_message_at')
   const [tcs, setTcs] = useState([])          // telecallers (reassign dropdown)
   const [selLead, setSelLead] = useState(null) // selected conversation's lead row
   const [reassignOpen, setReassignOpen] = useState(false)
@@ -115,18 +118,42 @@ export default function CampaignInboxV2() {
 
   const loadThreads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
-    let q = supabase
-      .from('whatsapp_conversations')
-      // '*' so customer_name (C11) flows through and a missing column never
-      // breaks the inbox load before the SQL is run.
-      .select('*')
-      .order('last_inbound_at', { ascending: false, nullsFirst: false })
-      .limit(200)
-    // Phase 243 — a rep sees only their own conversations. RLS already scopes
-    // this, but filter in the UI too so the intent is explicit and a rep never
-    // relies solely on RLS. Admin / co_owner / manager see every thread.
-    if (!isPrivileged && profile?.id) q = q.eq('assigned_to', profile.id)
-    const { data, error } = await q
+    // Phase 251 — sort by last MESSAGE (in OR out), not last inbound. A thread
+    // created by an outbound template send has last_inbound_at NULL and used to
+    // sort dead last, past the old .limit(200) → never fetched, invisible to
+    // admin AND the sending TC. last_message_at is stamped by the Phase 251
+    // trigger on every whatsapp_messages insert; until the owner runs that SQL
+    // we fall back to the legacy sort so the inbox never breaks (§45).
+    // Chunked .range paging replaces the hard 200 cap (§66 — 332 threads and
+    // growing meant 132 conversations were invisible to everyone).
+    const sortCol = sortColRef.current
+    const PAGE = 500
+    let rows = []
+    let error = null
+    for (let from = 0; from < 4000; from += PAGE) {
+      let q = supabase
+        .from('whatsapp_conversations')
+        // '*' so customer_name (C11) + last_message_* (Phase 251) flow through
+        // and a missing column never breaks the inbox load before the SQL runs.
+        .select('*')
+        .order(sortCol, { ascending: false, nullsFirst: false })
+        .range(from, from + PAGE - 1) // cap-ok: chunked pages, 4000 backstop
+      // Phase 243 — a rep sees only their own conversations. RLS already scopes
+      // this, but filter in the UI too so the intent is explicit and a rep never
+      // relies solely on RLS. Admin / co_owner / manager see every thread.
+      if (!isPrivileged && profile?.id) q = q.eq('assigned_to', profile.id)
+      const { data, error: pageErr } = await q
+      if (pageErr) { error = pageErr; break }
+      rows = rows.concat(data || [])
+      if (!data || data.length < PAGE) break
+    }
+    // Phase 251 SQL not run yet → the new sort column 400s. Drop to the legacy
+    // sort ONCE for this session and retry (no loop: after the flip the guard
+    // below can never match again).
+    if (error && sortCol === 'last_message_at' && /last_message_at/i.test(error.message || '')) {
+      sortColRef.current = 'last_inbound_at'
+      return loadThreads(silent)
+    }
     if (error) {
       // On a silent poll, swallow transient errors (no spinner, no toast spam).
       if (!silent) {
@@ -139,13 +166,12 @@ export default function CampaignInboxV2() {
       }
       return
     }
-    const rows = data || []
     setThreads(rows)
     if (!silent) setLoading(false)
 
     // Best-effort last-message preview per thread (one query, newest first).
     if (rows.length) {
-      const ids = rows.map((r) => r.id)
+      const ids = rows.slice(0, 300).map((r) => r.id) // preview budget: newest threads only
       const { data: pm } = await supabase
         .from('whatsapp_messages')
         .select('conversation_id, body, type, at')
@@ -406,7 +432,7 @@ export default function CampaignInboxV2() {
                         }}>
                           {t.customer_name || fmtPhone(t.customer_wa_id)}
                         </span>
-                        <span style={{ fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }}>{relTime(t.last_inbound_at)}</span>
+                        <span style={{ fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }}>{relTime(t.last_message_at || t.last_inbound_at)}</span>
                       </span>
                       <span style={{
                         display: 'block', fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)', marginTop: 2,
@@ -418,6 +444,10 @@ export default function CampaignInboxV2() {
                         <span style={windowOpen(t.window_expires_at) ? chipG : chipA}>
                           {windowOpen(t.window_expires_at) ? 'Open' : 'Needs template'}
                         </span>
+                        {/* Phase 251 — last word is the customer's: somebody must answer */}
+                        {t.last_message_direction === 'in' && windowOpen(t.window_expires_at) && (
+                          <span style={chipA}>Reply</span>
+                        )}
                         {t.lead_id && <span style={chipB}>Lead</span>}
                       </span>
                     </span>
