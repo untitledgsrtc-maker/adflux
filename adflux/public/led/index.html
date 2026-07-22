@@ -57,8 +57,19 @@
     backdrop-filter:blur(12px);background:rgba(10,14,26,.72);border-bottom:1px solid var(--line)}
   .bar{display:flex;align-items:center;justify-content:space-between;height:62px}
   .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;letter-spacing:-.01em;font-size:16px}
-  .logo{height:40px;width:auto;display:block}
-  @media(max-width:640px){.logo{height:34px}}
+  /* round mark + wordmark beside it (Phase 257.3, owner ask) */
+  .brand .mark{height:34px;width:34px;display:block}
+  .brand-name{font-family:var(--display);font-weight:700;letter-spacing:.18em;font-size:16.5px;color:var(--paper)}
+  @media(max-width:640px){.brand .mark{height:30px;width:30px}.brand-name{font-size:15px}}
+
+  /* GSRTC scroller strip below the logo bar (Phase 257.3) */
+  .tickerbar{display:flex;align-items:center;gap:12px;background:#080b14;
+    border-bottom:1px solid var(--line);padding:7px 0 7px 16px;position:relative;z-index:35}
+  .tk-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--muted);
+    white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+  .tk-label i{width:6px;height:6px;border-radius:50%;background:var(--yellow);
+    box-shadow:0 0 8px var(--yellow);animation:blink 1.6s steps(2) infinite}
+  .tickerbar .flip{flex:1;min-width:0}
   .brand .dot{width:11px;height:11px;border-radius:3px;background:var(--yellow);box-shadow:0 0 14px var(--yellow)}
   .brand small{font-family:var(--mono);font-weight:400;font-size:9.5px;letter-spacing:.14em;color:var(--muted);display:block;margin-top:-3px}
   .nav-cta{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13.5px;
@@ -109,6 +120,17 @@
   .trust b{color:var(--paper);font-weight:400}
   .tick{width:15px;height:15px;color:var(--yellow)}
 
+  /* hero stats — replace the stat band; each arrives one by one (Phase 257.3).
+     Class-driven (JS adds .in staggered), NOT keyframes — §129: the end state
+     must never depend on animation/observer delivery. No JS → visible. */
+  .hero-stats{display:flex;flex-wrap:wrap;gap:22px 34px;margin-top:34px}
+  .js .hstat{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+  .js .hstat.in{opacity:1;transform:none}
+  .hstat .n{font-family:var(--display);font-weight:700;font-size:clamp(30px,7.4vw,46px);line-height:1;letter-spacing:-.02em}
+  .hstat .n .u{color:var(--yellow);font-size:.6em;vertical-align:.3em;margin-left:2px}
+  .hstat .l{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+  @media(prefers-reduced-motion:reduce){.js .hstat{opacity:1;transform:none;transition:none}}
+
   /* ── station departure board (the signature) ───────────── */
   .board{margin-top:40px;border:1px solid var(--line);border-radius:16px;overflow:hidden;
     background:linear-gradient(180deg,#080b14,#0b1120);box-shadow:inset 0 0 0 1px rgba(255,255,255,.02),0 30px 60px -30px #000}
@@ -142,8 +164,6 @@
   /* video showcase sits tight under the hero (Phase 257.2) */
   .sec-video{padding:18px 0 60px}
   /* trust ticks + departure board, relocated below the videos */
-  .hero-tail{padding:0 0 10px}
-  .hero-tail .trust{margin-top:0}
   .sec-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--yellow);margin-bottom:16px}
   h2{font-family:var(--display);font-weight:700;letter-spacing:-.02em;line-height:1.05;font-size:clamp(28px,6vw,44px)}
   h2 .dim{color:var(--muted-2)}
@@ -297,7 +317,8 @@
 <header>
   <div class="wrap bar">
     <a class="brand" href="/led" aria-label="Untitled Advertising home">
-      <img class="logo" src="/led/logo.svg" alt="Untitled Advertising" width="82" height="41" />
+      <img class="mark" src="/led/logo-mark.svg" alt="" width="34" height="34" />
+      <span class="brand-name">UNTITLED</span>
     </a>
     <a class="nav-cta" id="navWa" href="#" aria-label="Chat on WhatsApp">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.8 14.06c-.24.68-1.42 1.31-1.95 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.88-4.6-4.06-.13-.18-1.1-1.47-1.1-2.8 0-1.33.7-1.98.94-2.25.24-.27.53-.34.71-.34.18 0 .36 0 .51.01.16.01.39-.06.6.46.24.58.82 2 .89 2.15.07.14.12.31.02.5-.09.18-.14.29-.28.45-.14.16-.29.36-.42.48-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.55.73 1.82.86.27.14.45.2.51.31.07.11.07.63-.17 1.32Z"/></svg>
@@ -305,6 +326,14 @@
     </a>
   </div>
 </header>
+
+<!-- GSRTC scroller — runs directly below the logo bar (Phase 257.3) -->
+<div class="tickerbar" role="img" aria-label="Live GSRTC station board: Anand, Surendranagar, Jamnagar, Junagadh, Porbandar, Dwarka, Morbi, Bhachau, Botad, Veraval">
+  <span class="tk-label">GSRTC · SCREENS LIVE <i></i></span>
+  <div class="flip">
+    <div class="flip-track" id="flip"></div>
+  </div>
+</div>
 
 <main>
   <!-- HERO -->
@@ -323,6 +352,13 @@
           Book your screens
         </a>
         <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+
+      <!-- one-by-one animated stats (replace the old stat band — owner, 22 Jul) -->
+      <div class="hero-stats">
+        <div class="hstat"><div class="n"><span data-count="264">0</span></div><div class="l">LED screens</div></div>
+        <div class="hstat"><div class="n"><span data-count="20">0</span></div><div class="l">Bus stations</div></div>
+        <div class="hstat"><div class="n"><span data-count="20">0</span><span class="u">+</span></div><div class="l">Cities in Gujarat</div></div>
       </div>
     </div>
   </section>
@@ -346,40 +382,6 @@
       </div>
     </div>
   </section>
-
-  <!-- trust ticks + station board (relocated below the videos) -->
-  <section class="hero-tail">
-    <div class="wrap">
-      <div class="trust rise">
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>264 screens</b></span>
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>20 stations live</b></span>
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>Every scan tracked</b></span>
-      </div>
-
-      <!-- SIGNATURE: live station departure board -->
-      <div class="board rise" role="img" aria-label="Live GSRTC station board: Anand, Surendranagar, Jamnagar, Junagadh, Porbandar, Dwarka, Morbi, Bhachau, Botad, Veraval">
-        <div class="board-head">
-          <span>GSRTC · SCREENS LIVE</span>
-          <span class="live"><i></i> ON AIR</span>
-        </div>
-        <div class="flip">
-          <div class="flip-track" id="flip"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- STATS -->
-  <div class="stats">
-    <div class="wrap">
-      <div class="stat-grid">
-        <div class="stat rise"><div class="n"><span data-count="264">0</span></div><div class="l">LED screens</div></div>
-        <div class="stat rise"><div class="n"><span data-count="20">0</span></div><div class="l">Bus stations</div></div>
-        <div class="stat rise"><div class="n"><span data-count="20">0</span><span class="u">+</span></div><div class="l">Cities in Gujarat</div></div>
-        <div class="stat rise"><div class="n"><span data-count="100">0</span><span class="u">%</span></div><div class="l">Scans tracked</div></div>
-      </div>
-    </div>
-  </div>
 
   <!-- MOAT -->
   <section>
@@ -609,34 +611,31 @@
     if(!rises.length) clearInterval(sweepIv);
   }, 400);
 
-  // count-up on the stat band
-  var counted = false;
-  function runCount(){
-    if(counted) return; counted = true;
-    document.querySelectorAll("[data-count]").forEach(function(el){
-      var end = +el.getAttribute("data-count");
-      if(reduce){ el.textContent = end; return; }
-      var start = null, dur = 1100;
+  // hero stat count-up + one-by-one entrance (Phase 257.3). Stats live in
+  // the hero (visible at load), so no visibility polling. Class-staggered
+  // entrance; rAF drives the count but a hard setTimeout ALWAYS lands the
+  // final number even if rAF never runs (§129: end state never depends on
+  // animation delivery).
+  document.querySelectorAll(".hstat").forEach(function(el, idx){
+    var span = el.querySelector("[data-count]");
+    var end = span ? +span.getAttribute("data-count") : 0;
+    if(reduce){ el.classList.add("in"); if(span) span.textContent = end; return; }
+    setTimeout(function(){
+      el.classList.add("in");
+      if(!span) return;
+      var start = null, dur = 950, done = false;
       function tick(t){
+        if(done) return;
         if(!start) start = t;
         var p = Math.min((t-start)/dur, 1);
         var eased = 1 - Math.pow(1-p, 3);
-        el.textContent = Math.round(end*eased);
-        if(p<1) requestAnimationFrame(tick);
+        span.textContent = Math.round(end*eased);
+        if(p<1) requestAnimationFrame(tick); else done = true;
       }
       requestAnimationFrame(tick);
-    });
-  }
-  // same no-IO rule as the reveal (§129): poll until the band is reached
-  var band = document.querySelector(".stats");
-  function bandCheck(){
-    if(!band || counted) return;
-    if(reduce){ runCount(); return; }
-    if(band.getBoundingClientRect().top < (window.innerHeight || 800)){ runCount(); }
-  }
-  bandCheck();
-  window.addEventListener("scroll", bandCheck, { passive:true });
-  var bandIv = setInterval(function(){ bandCheck(); if(counted) clearInterval(bandIv); }, 400);
+      setTimeout(function(){ if(!done){ done = true; span.textContent = end; } }, dur + 1600);
+    }, 200 + idx*450);
+  });
 
   // video showcase — muted autoplay + city switcher (no sound, owner call).
   // Local mp4 pills are the static fallback; on load we fetch the SAME public

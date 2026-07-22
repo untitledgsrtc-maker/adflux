@@ -8754,3 +8754,26 @@ GSRTC departure board (relocated into a new `.hero-tail` section) → stats band
 → moat → how-it-works → funnel → stations → CTA. Markup moved verbatim —
 no JS change (video pills still rebuild from /api/deck-videos, board flip +
 count-up untouched).
+
+### 129.3 · Phase 257.3 — /led header logo · ticker under logo · one-by-one hero stats (22 Jul)
+Owner (3 asks): logo = round mark + "UNTITLED" beside it · the GSRTC scroller
+runs directly below the logo bar · stat band removed, replaced by 264 / 20 /
+20+ animating in one by one.
+- NEW `public/led/logo-mark.svg` — the round emblem CROPPED out of the official
+  logo.svg via viewBox (`1074 -10 888 888`; the wordmark paths fall outside the
+  viewBox and clip away — original file untouched, footer still uses it).
+  Header brand = mark img + a styled `UNTITLED` span (Space Grotesk).
+- `.tickerbar` strip under `<header>` — label "GSRTC · SCREENS LIVE" + blink
+  dot + the SAME `#flip` marquee (JS untouched; the old departure-board CARD
+  markup removed — board CSS kept because .flip/.flip-cell/blink live there).
+- Stats band + hero-tail (trust ticks + board card) REMOVED. Hero gains
+  `.hero-stats`: 264 LED screens · 20 Bus stations · 20+ Cities in Gujarat
+  (100% Scans tracked dropped per the owner's list), each entering staggered
+  with a sequential count-up.
+- **§129 rule extended by a hidden-tab find:** CSS KEYFRAME-driven reveals
+  (`animation … forwards` from opacity:0) never reach their end state if the
+  animation doesn't run (hidden tab, paused animations). The hstat entrance is
+  therefore CLASS-driven (`.js .hstat` + JS adds `.in` staggered — no-JS shows
+  content), and the count-up has a hard `setTimeout` that lands the final
+  number even if rAF never fires. Any future /led entrance effect: class +
+  transition + hard fallback, never keyframes-from-invisible.
