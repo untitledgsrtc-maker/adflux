@@ -8659,3 +8659,69 @@ cache bump needed (/led is network-served, not CacheFirst).
 - The 3 old hardcoded city pills (Veraval/Bhavnagar/Gandhinagar local mp4s)
   are REPLACED by the dynamic YouTube set when the fetch succeeds — they
   remain only as the offline/static fallback.
+
+---
+
+## 129 · Phase 257 — /led REBUILT from deep research (Gujarati-first, map dropped) (2026-07-22)
+
+Owner (two screenshots): the "20 stations" section showed a BLANK box + "vlank
+stillnont apealing / 1st deep rserch and make it accordingly / here mesge cant
+convay." Ran a 5-researcher + synthesis workflow (global DOOH teardowns, SMB
+conversion patterns, Indian OOH buyer psychology, hard critique) FIRST, then
+rebuilt `public/led/index.html` to the brief. Verdict that drove it: "the page
+was 100% abstraction and 0% product — the fix is photos of glowing screens, a
+visible price, and proof artifacts, in Gujarati-first language."
+
+### The blank box root cause — Leaflet was CSP-blocked, map DROPPED for good
+The old "20 stations" map never rendered on live: the `vercel.json` CSP
+`script-src` has NO unpkg.com → Leaflet JS blocked → `window.L` undefined →
+the try/catch swallowed it → a permanent empty bordered box (§233.1's "12 pins
+verified" was a pre-CSP local test). Decision (research-backed): do NOT fix the
+map — DELETE it. A blank/generic map on a page selling "we measure everything"
+is a credibility contradiction. **Do not re-add Leaflet / any CDN script to
+/led** — the CSP forbids it and the station cards replaced it.
+
+### The rebuilt page (all real facts, §20 voice, lakh/crore, no jargon)
+Order: sticky header → HERO (real station video `/deck/station-hero.mp4` over
+`station-1.jpg`, Gujarati-first headline "તમારી જાહેરાત, ગુજરાતના 20 બસ સ્ટેશન
+પર", English subline with **₹75 થી શરૂ IN the hero**, 3 proof ticks incl.
+742→174, scrolling GSRTC departure board) → **type-your-shop-name LED mockup**
+(input + 5 business-type chips → the name glows on a CSS dot-matrix LED board;
+the WA CTA carries the typed name in the prefill) → PROOF ("અંદાજ નહીં. આંકડા."
+742 QR સ્કેન → 177 મેસેજ → 174 લીડ + the AI view-count explainer + the real
+`/deck/dashboard-real.png`) → PRICE (₹75 vs hoarding comparison rows + 4
+include-chips + 3 plans: 1 સ્ટેશન / આખું શહેર / આખું ગુજરાત, each a WA prefill)
+→ **STATION CARDS** (replaces map + cities grid: photo `station-1/2.jpg`
+alternating + city + "1,000+ લોકો રોજ" + per-city WA prefill + સ્ટેશન જુઓ
+YouTube link; dynamic from `/api/deck-videos` — same §71 source as deck/AI/
+inbox — with a 12-city hardcoded fallback painted instantly) → WHY BUS STATIONS
+(3 points + `station-2.jpg`) → 3 STEPS → CLIENTS (all four `/deck/logos-*.png`
+walls on white + Vadodara + phone) → FINAL CTA (name/business/city form → WA
+prefill) → footer + sticky mobile WhatsApp+Call dock.
+- Numbers used: 264 screens · 20 stations · 742→177→174 (live QR funnel §119)
+  · ₹75 entry (poster price §246.2) · ~14 hr/day · 1,000+/day per screen.
+  WhatsApp = 919581578261 (service, AI-answered §115) · Call = 919898273686.
+
+### REVEAL CONTRACT (new — the §233.2 rule, stronger)
+The scroll-reveal (`.rise`) now uses **NO IntersectionObserver at all**: a
+cheap sweep (reveal any el whose top < viewport bottom) runs at load + on
+scroll (rAF-throttled) + on a 400ms interval that self-clears when done, plus
+the existing `.js`-guard. Reason: a skipped IO entry (fast/jump scroll — and
+one real env where IO simply never fired) leaves a section PERMANENTLY
+invisible. **Rule: on /led, content reveal must never depend on observer/event
+delivery — keep the sweep + interval pattern for any future reveal.**
+
+### Verified (local static render, mobile 375 + desktop 1280)
+No h-overflow · 37/37 rises reveal through a jump-scroll · LED mockup updates
+board + WA link with typed Gujarati · form → correct wa.me prefill · all 4 logo
+walls + station photos + dashboard shot load · fallback station cards paint
+with `/api/deck-videos` absent. Live check after deploy: 21 video-linked
+station cards should appear (incl. the DWRKA typo city — owner fixes the name
+in Master → Cities and it corrects everywhere).
+
+### Foot-guns
+- ❌ A CDN `<script>` on /led — the app-wide CSP blocks it silently (blank
+  feature, no visible error). /led must stay self-contained (inline JS, same-
+  origin assets, Google Fonts CSS only).
+- ❌ IntersectionObserver-gated `opacity:0` content — a skipped entry never
+  re-fires. Use the sweep + interval reveal (above).
