@@ -8812,3 +8812,28 @@ the cycling hero stat — min-height clamp(110,26vw,168) → clamp(94,24vw,150)
 (content 91/147 → slack ≤3px both breakpoints). Everything else verified
 aligned: hero rhythm, video section, moat cards, steps, funnel, cities grid,
 form, footer; no horizontal overflow at either width.
+
+### 129.7 · Phase 257.7 — WhatsApp AI: coverage truth + real impressions + after-7:30 takeover (22 Jul)
+Owner caught the AI telling a customer **Vadodara is a live station — it is
+NOT** (office city only). Root: the Phase 246.1 DEFAULT_SYSTEM hardcoded a
+station list WITH Vadodara in it. Three fixes in `api/wa/ai-reply.js` (Edge,
+live on both AI numbers):
+1. **Coverage = injected LIVE from the cities master** (§71 one source — the
+   same rows behind the deck/CPM//led). The prompt now carries "STATION
+   COVERAGE — the ONLY cities with screens" + HARD RULES: any other city
+   (Vadodara/Ahmedabad/Rajkot named) = no screens today, say so honestly,
+   offer nearest covered stations + team follow-up. Catalog-load failure →
+   the AI must NOT name/confirm cities at all. The static DEFAULT_SYSTEM list
+   corrected to the real 20 as backup.
+2. **Real impressions in chat** — the injection includes each city's measured
+   `impressions_day` + `impressions_month` (lakh-formatted); the AI shares the
+   city's real daily audience when discussing it. Data =
+   `supabase_cities_impressions_2026_07.sql` (owner-measured, Phase 212 CPM
+   source — now committed to the repo).
+3. **After-hours takeover** — 19:30→09:30 IST (team offline, owner: "after
+   7:30 my team is not responding"), a PAUSED lead-linked thread answers after
+   just 60 min of outbound silence (daytime keeps the §126 48h rule). Same
+   guards: confirmed non-opted-out lead only; bare threads never auto-resume.
+- FOOT-GUN closed: a hardcoded "facts" list in an AI system prompt goes stale
+  /wrong silently (Vadodara). Ground per-entity facts by INJECTING from the
+  master at request time; hardcode only what never changes.

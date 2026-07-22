@@ -49,7 +49,7 @@ THE NETWORK (facts — never invent beyond these):
 - ~29 lakh impressions per month (~95,000 per day) from real travellers waiting at busy bus stations.
 - Screens are 43" and 55" high-brightness LED — clear even in bright daylight — graded A / B / C by footfall.
 - Each screen reaches 1000+ people a day, plays your ad ~14 hours a day, with AI-tracked daily impressions.
-- Live stations include Surat, Vadodara, Anand, Gandhinagar, Bhavnagar, Veraval, Surendranagar, Jamnagar, Junagadh, Porbandar, Dwarka, Morbi, Bhachau, Botad — and more (20 total).
+- The 20 live stations: Anand, Ankleshwar, Bhachau, Bhavnagar, Botad, Chikhli, Dahod, Dwarka, Gandhinagar, Godhra, Himmatnagar, Jamnagar, Junagadh, Kheda, Morbi, Porbandar, Surat, Surendranagar, Valsad, Veraval. NO other city has screens today — Vadodara, Ahmedabad and Rajkot are NOT covered (Vadodara is only our office city).
 - Advertising STARTS AT JUST Rs 75 — the entry price. The exact rate depends on the city, number of screens and duration; our team shares a tailored quote. (Never quote a final total.)
 - Full details, video and a live map: https://app.untitledad.in/led
 
@@ -133,7 +133,15 @@ export default async function handler(req) {
       )).json())?.[0]
     } catch { return nope('ai_paused') /* unknown history → stay silent */ }
     const idleMs = lastOut?.at ? Date.now() - new Date(lastOut.at).getTime() : Infinity
-    if (idleMs < 48 * 3600 * 1000) return nope('ai_paused')
+    // Phase 257.7 (owner, 22 Jul): after 7:30 PM IST the team is offline — a
+    // paused thread whose last outbound is >60 min old gets answered by the AI
+    // so a night customer isn't left hanging till morning. Daytime keeps the
+    // 48h abandoned-thread rule (§126). Guard rails above still apply: only a
+    // lead-linked thread with a CONFIRMED non-opted-out lead may auto-resume.
+    const istMin = (Math.floor(Date.now() / 60000) + 330) % 1440   // minutes into the IST day
+    const offHours = istMin >= 19 * 60 + 30 || istMin < 9 * 60 + 30  // 19:30 → 09:30 IST
+    const takeoverMs = offHours ? 3600_000 : 48 * 3600 * 1000
+    if (idleMs < takeoverMs) return nope('ai_paused')
     try {
       await sb(`whatsapp_conversations?id=eq.${convId}`, {
         method: 'PATCH', body: JSON.stringify({ ai_paused: false }),
@@ -152,7 +160,7 @@ export default async function handler(req) {
   // never fail because of a media lookup.
   let allCities = []
   try {
-    allCities = ((await (await sb(`cities?select=name,photo_url,youtube_url&is_active=eq.true&limit=300`)).json()) || []).filter((c) => c && c.name)
+    allCities = ((await (await sb(`cities?select=name,photo_url,youtube_url,impressions_day,impressions_month&is_active=eq.true&limit=300`)).json()) || []).filter((c) => c && c.name)
   } catch { /* no media catalog → text-only */ }
   const cityRows = allCities.filter((c) => c.photo_url && String(c.photo_url).trim())
   const photoCities = cityRows.map((c) => c.name)
@@ -190,6 +198,26 @@ export default async function handler(req) {
 
   // ── ask Claude ──
   let system = acct.ai_system_prompt || DEFAULT_SYSTEM
+
+  // Phase 257.7 — the AUTHORITATIVE coverage list + real measured audience,
+  // injected LIVE from the cities master (§71 one source — same rows that feed
+  // the deck, CPM and /led). Kills the "Vadodara is a live station" class of
+  // hallucination: the model must never claim coverage beyond this list, and
+  // when a covered city comes up it shares that city's real daily audience.
+  if (allCities.length) {
+    const lakh = (n) => (n >= 100000 ? `~${(n / 100000).toFixed(1)} lakh/month` : `~${Number(n).toLocaleString('en-IN')}/month`)
+    system += `\n\nSTATION COVERAGE — these are the ONLY cities with our screens, with REAL measured audience:\n${allCities
+      .map((c) => {
+        const d = Number(c.impressions_day) || 0
+        const m = Number(c.impressions_month) || 0
+        const aud = d ? ` — ~${d.toLocaleString('en-IN')} people/day${m ? ` (${lakh(m)})` : ''}` : ''
+        return `- ${c.name}${aud}`
+      })
+      .join('\n')}\nCOVERAGE HARD RULES:\n- A city NOT on this list has NO screens today (Vadodara, Ahmedabad, Rajkot are NOT covered). Say so honestly, suggest the nearest covered stations, and offer that our team can discuss options — NEVER claim or imply coverage beyond the list.\n- When a covered city is being discussed, mention its real daily audience number from the list (these are measured, not estimates).`
+  } else {
+    system += `\n\nNOTE: the live station list could not be loaded right now — do NOT name or confirm specific covered cities; say the team will confirm coverage for their city.`
+  }
+
   if (photoCities.length) {
     system += `\n\nPHOTOS YOU CAN SEND: ${photoCities.join(', ')}.\nIf the customer asks to see a photo, the screens, or what it looks like in ONE of these cities, add a FINAL separate line exactly in this form:\nPHOTO: <city name>\nUse the exact city name from the list, ONE city only, and ONLY if it is in the list. If they ask about a city not in the list, do NOT add the line — say our team will share photos.`
   }
