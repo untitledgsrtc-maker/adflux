@@ -75,6 +75,19 @@ function prettyTime(t) {
   return `${h}:${m[2]} ${ap}`
 }
 
+// Junk-name guard (Phase 252). Auto-created leads can be named '.', a bare
+// phone number, or the 'WhatsApp lead' placeholder — used raw, the customer
+// received "Hi ." from the business number (real incident, §124). A name with
+// no letters (Latin / Devanagari / Gujarati) or the known placeholder falls
+// back to a neutral greeting instead.
+function cleanLeadName(raw) {
+  const n = String(raw || '').trim()
+  if (!n) return 'there'
+  if (/^whatsapp lead$/i.test(n)) return 'there'
+  if (!/[a-zA-Zऀ-ॿ઀-૿]/.test(n)) return 'there'
+  return n.slice(0, 60)
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
   if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'server_not_configured' }, 500)
@@ -272,20 +285,31 @@ async function sendToLead({ uid, role, callerName, leadId }) {
   }
 
   // ── variables ──
-  const leadName = (lead.name || 'there').slice(0, 60)
+  const leadName = cleanLeadName(lead.name)
   const repName = (callerName || 'our team').slice(0, 60)
   let vars = [leadName, repName]
   if (outcome === 'callback' || outcome === 'meeting') {
     // Both templates CONFIRM a specific date + time, so neither can be sent
-    // without one. Read the follow-up the outcome modal just spawned.
+    // without one — and it MUST be the one the rep JUST saved in the outcome
+    // modal. The old read (`order=follow_up_date.asc` over ALL open rows)
+    // picked the lead's EARLIEST open follow-up, which on a lead with an
+    // overdue backlog was a STALE row → "we will call you back on 12 July"
+    // went out on the 21st (real incident, §124). So (Phase 252): only a row
+    // CREATED in the last 2 hours (same bound as the meeting detection above),
+    // by THIS rep, newest first — and its date must not be in the past.
+    const freshSince = new Date(Date.now() - 2 * 3600 * 1000).toISOString()
     const fu = await one(
-      `follow_ups?lead_id=eq.${leadId}&is_done=eq.false&select=follow_up_date,follow_up_time&order=follow_up_date.asc&limit=1`
+      `follow_ups?lead_id=eq.${leadId}&assigned_to=eq.${uid}&is_done=eq.false` +
+      `&created_at=gte.${freshSince}` +
+      `&select=follow_up_date,follow_up_time&order=created_at.desc&limit=1`
     )
     const d = prettyDate(fu?.follow_up_date), t = prettyTime(fu?.follow_up_time)
-    if (!d || !t) {
+    // IST calendar day — a past-dated confirmation must never reach a customer.
+    const istToday = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10)
+    if (!d || !t || String(fu.follow_up_date) < istToday) {
       return json({
         error: outcome === 'meeting' ? 'no_meeting_time' : 'no_callback_time',
-        detail: `No ${outcome === 'meeting' ? 'meeting' : 'callback'} date/time saved, so the confirmation cannot be sent.`,
+        detail: `No fresh ${outcome === 'meeting' ? 'meeting' : 'callback'} date/time saved on this call, so the confirmation cannot be sent.`,
       }, 409)
     }
     vars = [leadName, repName, d, t]

@@ -8336,3 +8336,64 @@ name/number pairing (S K Chechani greeting on CA Hersh Jani's number);
 (job seekers/spam auto-become leads → TC queue noise). Ranked fix order given
 to owner: needs-reply/un-pause path → call-refusal→DNC+cancel-callback →
 template date/name guards → re-engage pass → junk triage.
+
+---
+
+## 125 · Phase 252 — post-call template: fresh date + junk-name guard + "fixed template" caption (2026-07-22)
+
+Owner: "template not wired with their input, also brochure not attached." Checked
+the whole §120 chain. The VARIABLE wiring exists and is correct — but two real
+bugs made it look unwired, plus one UI-comprehension gap. Guardian PASS.
+
+### The two real bugs (both already evidenced in the §124 chat analysis)
+1. **Stale callback date** — `send-template.js` read the confirmation date from
+   the lead's EARLIEST open follow-up (`order=follow_up_date.asc`), not the one
+   the rep just saved → "we will call you back on 12 July" sent 21 July. FIXED:
+   the read is now `assigned_to = the caller` + `created_at >= now-2h` (same
+   bound as the meeting detection) + `order=created_at.desc`, and REFUSES (409)
+   if the row's `follow_up_date` is before IST today — a past-dated confirmation
+   must never reach a customer. Guardian verified PostCallOutcomeModal's spawn
+   (`assigned_to: profile.id`, `created_at DEFAULT now()`) matches the filter →
+   no 409 on the normal flow.
+2. **Junk lead name** — `lead.name` used raw → "Hi .", "Hi WhatsApp lead" on a
+   customer's phone. FIXED: `cleanLeadName()` — empty / `WhatsApp lead`
+   placeholder / no letters (Latin + Devanagari + Gujarati ranges) → 'there'.
+
+### The comprehension gap (why it read as "not wired")
+The company-number button sends a FIXED Meta-approved template chosen by the
+call's outcome — a WhatsApp rule for business-initiated messages. It has never
+sent the modal's editable text (that text goes with My WhatsApp / SMS only).
+Nothing in the UI said so → reps assumed the typed text goes. FIXED with a
+caption under the button row in `WhatsAppPromptModal` ("fixed approved message
+for this call's outcome · brochure attaches on Good / Maybe · not the text
+above"). Do NOT "fix" this by trying to send free text from the business number
+— Meta rejects non-template business-initiated sends.
+
+### Brochure — code path VERIFIED CORRECT, live evidence still needed
+`wa_outcome_templates` maps the PDF to **positive + neutral ONLY** (§120 —
+callback/nurture/lost carry NO PDF by design). The brochure URL is live (HTTP
+200, 7.3 MB, application/pdf), the templates were approved WITH a document
+header, and the endpoint attaches `header_doc_url` as the document parameter.
+So "brochure not attached" is one of: (a) the test was a no-PDF outcome —
+by design; (b) the send was accepted but delivery FAILED async (Meta fetching
+the 7.3 MB link) → `whatsapp_messages.status='failed'` via the status webhook;
+(c) a Meta-side template/header problem. Owner runs the two diagnostics (in
+chat 22 Jul): recent template sends + status, and the mapping table. If
+good/maybe rows show status='failed' → compress the brochure (7.3 MB is heavy
+for a template fetch) and update `companies.brochure_url` + the mapping.
+
+### Files
+- `api/wa/send-template.js` — cleanLeadName + the fresh-follow-up read.
+  RAW mode / auth / throttle / conversation-field writes byte-unchanged.
+- `src/components/leads/WhatsAppPromptModal.jsx` — one additive caption
+  (token color + `#6a7590` fallback = the live `--v2-ink-2` value).
+
+### Foot-guns
+- ❌ Reading "the follow-up" for a post-call confirmation via
+  `order=follow_up_date.asc` over ALL open rows — a lead with an overdue
+  backlog serves a STALE date to the customer. Read the row the rep JUST
+  created (assigned_to + created_at window + newest-first) and refuse past
+  dates.
+- ❌ Any customer-visible greeting built from `leads.name` raw — auto-created
+  leads carry '.', phone numbers, 'WhatsApp lead'. Pass it through a
+  junk-name guard first (cleanLeadName, send-template.js).

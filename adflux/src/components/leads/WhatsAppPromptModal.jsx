@@ -273,6 +273,17 @@ export default function WhatsAppPromptModal({ open, stage, lead, profile, onClos
             </button>
           )}
         </div>
+        {/* Phase 252 — the company send is a FIXED, Meta-approved template
+            picked by the call's outcome (WhatsApp rule for business-initiated
+            messages). It does NOT send the editable text above — without this
+            line reps assumed it did and read the mismatch as a bug. */}
+        {canSendFromCompany && !optedOut && (
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--v2-ink-2, #6a7590)' }}>
+            Company number sends a fixed approved message for this call&rsquo;s
+            outcome (brochure PDF attaches on Good / Maybe) — not the text above.
+            The text above goes with My WhatsApp / SMS only.
+          </div>
+        )}
       </div>
     </div>
   )
