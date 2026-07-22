@@ -162,7 +162,43 @@ async function honourStopKeyword(admin, convId, text) {
     await admin.from('whatsapp_conversations')
       .update({ ai_paused: true }).eq('id', convId)
     if (!c?.lead_id) return
-    await admin.from('leads').update({ wa_opt_out: true }).eq('id', c.lead_id)
+    if (exact && !phrase) {
+      // Bare STOP / Stop promotions = a MARKETING opt-out (WhatsApp's own
+      // affordance). Mute WhatsApp only — the rep may still call.
+      await admin.from('leads').update({ wa_opt_out: true }).eq('id', c.lead_id)
+      return
+    }
+    // Phase 253 (§124 finding 3) — a natural-language refusal ("don't call
+    // me", "stop calling", "leave me alone") is a FULL contact refusal, not a
+    // marketing preference. Before this, D M Joshi said "Don't call me" and
+    // got 20 more call attempts with his callback still booked: wa_opt_out
+    // went true but do_not_call stayed false and the open follow-up survived.
+    // cadence_paused is LOAD-BEARING here (guardian P0): closing a due
+    // quote_chase seq-3 row below fires followup_after_done, whose QuoteSent→
+    // Nurture de-stage would make lead_stage_change_cadence SPAWN a fresh
+    // 30-day nurture follow-up on this DNC'd lead — the exact "still getting
+    // chased" incident this fix exists for. The pause gate in BOTH functions
+    // runs first and blocks that chain.
+    await admin.from('leads').update({
+      wa_opt_out: true,
+      do_not_call: true,
+      dnc_reason: 'WhatsApp: customer asked not to be contacted',
+      dnc_at: new Date().toISOString(),
+      cadence_paused: true,
+    }).eq('id', c.lead_id)
+    // Cancel the lead's open follow-ups so no callback resurfaces the number.
+    // nurture / lost_nurture cadence rows are DELETEd, not closed — closing
+    // them via is_done fires followup_after_done which RESPAWNS the cadence
+    // (§60 close→respawn re-leak). Everything else closes with a §175
+    // isSystemClose marker so dashboards don't count it as rep work.
+    await admin.from('follow_ups').delete()
+      .eq('lead_id', c.lead_id).eq('is_done', false)
+      .in('cadence_type', ['nurture', 'lost_nurture'])
+    await admin.from('follow_ups').update({
+      is_done: true,
+      done_at: new Date().toISOString(),
+      done_note: '[closed: auto] customer asked not to be contacted (WhatsApp)',
+    }).eq('lead_id', c.lead_id).eq('is_done', false)
   } catch { /* best-effort — never breaks the webhook */ }
 }
 
@@ -466,6 +502,21 @@ async function storeInbound(payload) {
             .eq('wamid', swamid).not('status', 'in', '(read,failed)')
           await admin.from('whatsapp_messages').update({ status: sstatus })
             .eq('wamid', swamid).not('status', 'in', '(read,failed)')
+          // Phase 253 — keep Meta's failure REASON, not just the word 'failed'.
+          // SEPARATE tolerant update: if the error_detail column's SQL hasn't
+          // run yet this update just errors quietly and the ticks above are
+          // untouched (§45 — never let an add-on break the live status path).
+          if (sstatus === 'failed') {
+            const e = (s.errors && s.errors[0]) || null
+            const detail = e
+              ? [e.code, e.title, e.message || (e.error_data && e.error_data.details)]
+                  .filter(Boolean).join(' · ').slice(0, 500)
+              : null
+            if (detail) {
+              await admin.from('whatsapp_messages').update({ error_detail: detail })
+                .eq('wamid', swamid)
+            }
+          }
         } catch { /* best-effort — status capture must never break receive */ }
       }
 

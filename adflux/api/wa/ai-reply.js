@@ -94,19 +94,51 @@ export default async function handler(req) {
   // ── load conversation + account ──
   const conv = (await (await sb(`whatsapp_conversations?id=eq.${convId}&select=id,customer_wa_id,whatsapp_account_id,window_expires_at,ai_paused,lead_id&limit=1`)).json())?.[0]
   if (!conv) return nope('conv_not_found')
-  if (conv.ai_paused) return nope('ai_paused')                                   // a human took over
   if (conv.window_expires_at && new Date(conv.window_expires_at).getTime() < Date.now()) return nope('window_closed')  // 24h policy window
 
   // Opt-out is a property of the LEAD, not of this thread. ai_paused only mutes
   // the conversation it was set on, so without this check the AI keeps replying
   // to someone who opted out via the admin toggle, or who sent STOP on the OTHER
   // number (the same lead can hold a thread on both 95815… and 98982…, §119).
-  // Best-effort: a lookup failure must not silence a legitimate reply.
+  // NOT best-effort on a PAUSED thread: the auto-unpause below must never fire
+  // without a confirmed non-opted-out lead, so a failed lookup fails CLOSED
+  // there; on an active thread a lookup failure still never silences a reply.
+  let leadOptedOut = null   // true / false / null = unknown
   if (conv.lead_id) {
     try {
       const ld = (await (await sb(`leads?id=eq.${conv.lead_id}&select=wa_opt_out&limit=1`)).json())?.[0]
-      if (ld?.wa_opt_out) return nope('lead_opted_out')
-    } catch { /* ignore — never block a reply on a failed lookup */ }
+      leadOptedOut = !!ld?.wa_opt_out
+      if (leadOptedOut) return nope('lead_opted_out')
+    } catch { /* unknown — active threads proceed; the unpause below won't */ }
+  }
+
+  // A human took over (manual reply / post-call template) — the AI stays out of
+  // the thread. Phase 253 (§124 finding 1): but "out" used to mean FOREVER.
+  // A customer who answered days later got silence from BOTH sides — the AI was
+  // paused and the human had moved on ("haa sir", unanswered for 5 days). So:
+  // if NOTHING outbound has gone on this thread for 48h (while paused, every
+  // outbound is human/template), the human has abandoned it → the AI takes the
+  // thread back and answers this inbound.
+  //
+  // Guard rails: only a LEAD-linked thread with a CONFIRMED non-opted-out lead
+  // may auto-resume. A bare paused conversation stays paused forever — for a
+  // conversation with no lead row, the pause may BE its only opt-out record
+  // (honourStopKeyword pauses bare threads on STOP, §120).
+  if (conv.ai_paused) {
+    if (!conv.lead_id || leadOptedOut !== false) return nope('ai_paused')
+    let lastOut = null
+    try {
+      lastOut = (await (await sb(
+        `whatsapp_messages?conversation_id=eq.${convId}&direction=eq.out&select=at&order=at.desc&limit=1`
+      )).json())?.[0]
+    } catch { return nope('ai_paused') /* unknown history → stay silent */ }
+    const idleMs = lastOut?.at ? Date.now() - new Date(lastOut.at).getTime() : Infinity
+    if (idleMs < 48 * 3600 * 1000) return nope('ai_paused')
+    try {
+      await sb(`whatsapp_conversations?id=eq.${convId}`, {
+        method: 'PATCH', body: JSON.stringify({ ai_paused: false }),
+      })
+    } catch { /* flag write failed — still answer this one; next inbound retries */ }
   }
 
   const acct = (await (await sb(`whatsapp_accounts?id=eq.${conv.whatsapp_account_id}&select=phone_number_id,ai_enabled,ai_system_prompt,ai_welcome_image_url&limit=1`)).json())?.[0]

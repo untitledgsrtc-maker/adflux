@@ -8414,3 +8414,74 @@ prompt on the lead-detail landing (§120 open item) is what would surface it.
 - ❌ FOOT-GUN: a template send that carries a header attachment but logs only
   the body text reads as "attachment missing" to every human. Log what the
   customer actually received — text AND attachment marker.
+
+---
+
+## 126 · Phase 253 — post-call PDF widened + failure reasons + two §124 fixes (2026-07-22)
+
+Owner "go" on four items. Guardian BLOCK→fix→PASS cycle (P0 caught, below).
+
+### 1 · PDF on Call-later + Nurture — TWO-STEP, order is LIFE-OR-DEATH
+The two Meta templates were approved WITHOUT a document header, so this is NOT
+just SQL. `scripts/add-doc-header-post-call.sh` edits `post_call_callback` +
+`post_call_nurture` at Meta (uploads the brochure sample, resends the FULL
+components with a DOCUMENT header — an edit must include the whole array).
+`supabase_phase253b_postcall_pdf_map.sql` then maps `header_doc_url` onto the
+callback + nurture rows. **The hazard cuts BOTH ways:** SQL before Meta
+approval = header param on a header-less template → every send rejected;
+approval before SQL = header-less send on a header template → also rejected.
+Run the script → wait for BOTH templates Active in WhatsApp Manager → run the
+SQL IMMEDIATELY. Editing puts the templates In review (Utility usually fast);
+Call-later/Nurture company sends error during that window — run end-of-day.
+Meta caps edits 1/day, 10/month per template. `post_call_lost` + `meeting`
+stay PDF-free by design (§120). Token: generate a FRESH System User token
+(§119 — Vercel's is unreadable; NEVER "Revoke tokens").
+
+### 2 · Meta failure reason captured + shown
+`supabase_phase253_wa_error_detail.sql` (run NOW, safe) — `whatsapp_messages
+.error_detail`. `webhook.js` status handler writes Meta's `errors[]`
+(code · title · message) on status='failed' via a SEPARATE tolerant update —
+pre-SQL it no-ops inside the existing try/catch, ticks untouched (§45).
+`CampaignInboxV2` failed bubbles show "failed · <reason>" (rose token);
+`loadMsgs` selects `error_detail` with a §45 tolerant retry (non-recursive —
+inline re-query without the column when it 400s pre-SQL).
+
+### 3 · §124 finding 3 — "don't call me" now means it
+`honourStopKeyword` SPLIT: exact STOP words → `wa_opt_out` only (marketing
+opt-out, unchanged). Natural-language refusal phrases → `wa_opt_out` +
+`do_not_call` + `dnc_reason/dnc_at` + **`cadence_paused=true`** + cancel the
+lead's open follow-ups (nurture/lost_nurture rows DELETEd — closing them via
+is_done respawns the cadence, §60; everything else closed with the §175
+`[closed: auto]` marker so dashboards don't count it as rep work).
+- **GUARDIAN P0 (the reason cadence_paused is there):** without it, closing a
+  DUE quote_chase seq-3 row fires `followup_after_done` → QuoteSent→Nurture
+  de-stage → `lead_stage_change_cadence` SPAWNS a fresh 30-day nurture
+  follow-up on the just-DNC'd lead → rep gets pushed to call them in a month —
+  the exact D M Joshi incident this fix exists for. The pause gate in both
+  functions runs first and kills the chain. **FOOT-GUN: any bulk follow-up
+  close on a lead must pause the cadence FIRST (same awaited update), or the
+  close itself resurrects the contact.**
+- Verified clean: no AFTER DELETE trigger on follow_ups; `tg_push_on_followup
+  _due` early-returns on is_done=true → no push storm; fire-and-forget → zero
+  webhook latency.
+
+### 4 · §124 finding 1 — AI takes back abandoned threads (48h)
+`ai-reply.js`: `ai_paused` no longer sticks forever. A paused thread whose
+lead is CONFIRMED not opted out, with NO outbound for 48h (while paused all
+outbound is human/template), auto-unpauses and the AI answers the fresh
+inbound — closes the "haa sir, unanswered 5 days" black hole. Guard rails:
+bare (no-lead) paused threads NEVER auto-resume (their pause may BE the STOP
+record); a failed lead lookup fails CLOSED for the unpause (active threads
+still reply); gate reorder is behavior-neutral otherwise.
+
+### 5 · Re-engage + junk triage = OPERATIONAL, no code
+Cold-thread re-engage = Segments tab (rules over leads) + Broadcast tab with
+the approved `gsrtc_led_intro` — audiences messaged us once (opt-in basis) but
+watch quality rating; start small. Junk-lead triage = review query given in
+chat 22 Jul; read-first (§47) then bulk-Lost via LeadsV2.
+
+### Run-state
+SQL to run NOW: `supabase_phase253_wa_error_detail.sql`. Later (after the
+Meta edit approves): `supabase_phase253b_postcall_pdf_map.sql`. Script:
+`scripts/add-doc-header-post-call.sh` (owner runs with fresh TOKEN +
+BROCHURE_URL, end-of-day).

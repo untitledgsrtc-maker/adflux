@@ -189,12 +189,23 @@ export default function CampaignInboxV2() {
   const loadMsgs = useCallback(async (convId, silent = false) => {
     if (!convId) { setMsgs([]); return }
     if (!silent) setMsgLoading(true)
-    const { data, error } = await supabase
+    // error_detail (Phase 253) shows Meta's failure reason on failed bubbles.
+    // Tolerant: until its SQL runs, selecting it 400s — retry without so the
+    // deploy-before-SQL window can't blank the message pane (§45).
+    let { data, error } = await supabase
       .from('whatsapp_messages')
-      .select('id, direction, type, body, status, at, media_id')
+      .select('id, direction, type, body, status, at, media_id, error_detail')
       .eq('conversation_id', convId)
       .order('at', { ascending: true })
       .limit(500)
+    if (error && /error_detail/i.test(error.message || '')) {
+      ({ data, error } = await supabase
+        .from('whatsapp_messages')
+        .select('id, direction, type, body, status, at, media_id')
+        .eq('conversation_id', convId)
+        .order('at', { ascending: true })
+        .limit(500))
+    }
     // Don't blank the open conversation on a transient (silent) error.
     if (error) { if (!silent) toastError(error, 'Could not load messages.') }
     else setMsgs(data || [])
@@ -596,6 +607,17 @@ export default function CampaignInboxV2() {
                               )}
                               {out && m.status === 'sent' && (
                                 <Check size={13} strokeWidth={1.6} />
+                              )}
+                              {/* Phase 253 — a failed send says so (+ Meta's reason
+                                  when the webhook captured one) instead of silently
+                                  showing no ticks. */}
+                              {out && m.status === 'failed' && (
+                                <span
+                                  style={{ color: 'var(--v2-rose, #EF4444)', fontWeight: 600 }}
+                                  title={m.error_detail || 'Delivery failed'}
+                                >
+                                  failed{m.error_detail ? ` · ${String(m.error_detail).slice(0, 60)}` : ''}
+                                </span>
                               )}
                             </div>
                           </div>
