@@ -128,6 +128,11 @@ export default function CampaignInboxV2() {
   const [videoMenuOpen, setVideoMenuOpen] = useState(false)
   const [stationVideos, setStationVideos] = useState(null) // null = not loaded yet
   const [stationsLoading, setStationsLoading] = useState(false)
+  // Phase 255 — closed-window follow-up: pick an APPROVED template (the §120
+  // Utility set) and send it from the company number via send-template.js.
+  const [tplPanelOpen, setTplPanelOpen] = useState(false)
+  const [outTemplates, setOutTemplates] = useState(null) // null = not loaded yet
+  const [tplLoading, setTplLoading] = useState(false)
 
   const loadThreads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -260,6 +265,7 @@ export default function CampaignInboxV2() {
     setQuoteMenuOpen(false)
     setLeadQuotes(null)
     setVideoMenuOpen(false)
+    setTplPanelOpen(false)
   }, [selId])
 
   // Phase 254 — the PRIVATE company brochure powers the "Rate card" chip
@@ -403,6 +409,71 @@ export default function CampaignInboxV2() {
 
   function sendStationVideo(c) {
     sendReply(null, `${c.name} station video: ${c.youtube_url}`)
+  }
+
+  // Phase 255 — closed-window: send an APPROVED template from the company
+  // number. Only the STANDALONE templates are pickable (callback/meeting
+  // confirm a specific time — the server refuses them here too). The server
+  // re-checks role / lead ownership / opt-out / the 1-per-lead-24h throttle.
+  const PICKABLE_TPLS = [
+    { key: 'positive', label: 'Thank you + brochure' },
+    { key: 'neutral',  label: 'Follow-up + brochure' },
+    { key: 'nurture',  label: 'Stay in touch' },
+    { key: 'negative', label: 'Polite sign-off' },
+  ]
+  const canCompanySend = isPrivileged || profile?.role === 'telecaller'
+
+  async function openTplPanel() {
+    setTplPanelOpen((o) => !o)
+    if (outTemplates !== null || tplLoading) return
+    setTplLoading(true)
+    const { data, error } = await supabase.from('wa_outcome_templates')
+      .select('outcome, meta_template_name, preview_body, header_doc_url')
+      .eq('is_active', true)
+      .in('outcome', PICKABLE_TPLS.map((t) => t.key))
+    if (error) toastError(error, 'Could not load templates.')
+    setOutTemplates(data || [])
+    setTplLoading(false)
+  }
+
+  async function sendCompanyTemplate(key) {
+    if (!sel?.lead_id) return
+    if (sendingRef.current || sending) return   // §47 latch — shared with the composer
+    sendingRef.current = true
+    setSending(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (!jwt) { toastError(new Error('Session expired'), 'Please sign in again.'); return }
+      const resp = await fetch('/api/wa/send-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ lead_id: sel.lead_id, template_key: key }),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        const msg = data?.error === 'already_sent_today'
+          ? 'Already messaged this lead in the last 24 hours.'
+          : (data?.detail || data?.error || `Send failed (${resp.status})`)
+        toastError(new Error(msg), 'Could not send.')
+        return
+      }
+      setTplPanelOpen(false)
+      toastSuccess('Sent from the company number. Their reply re-opens the chat.')
+      // Guardian P1 — the template goes out on the MARKETING number. If this
+      // open thread is on the service number, the message lands in a SIBLING
+      // conversation (same customer, marketing account) — so jump the rep to
+      // the thread it actually landed in instead of showing no change here.
+      const landedIn = data?.conversation_id || null
+      await loadThreads(true)
+      if (landedIn && landedIn !== sel.id) setSelId(landedIn)
+      else loadMsgs(sel.id, true)
+    } catch (e) {
+      toastError(e, 'Could not send.')
+    } finally {
+      setSending(false)
+      sendingRef.current = false
+    }
   }
 
   // Reassign the lead to another telecaller (admin action). Sets BOTH owner
@@ -919,11 +990,70 @@ export default function CampaignInboxV2() {
                   </div>
                 </div>
               ) : (
-                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--v2-line)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--v2-bg-2)' }}>
-                  <Lock size={16} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)' }}>
-                    24h window closed — re-opening needs an approved template (coming with broadcast).
-                  </span>
+                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--v2-line)', background: 'var(--v2-bg-2)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <Lock size={16} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)', flex: 1, minWidth: 200 }}>
+                      {sel.lead_id && canCompanySend
+                        ? '24h window closed — send an approved message to reach them again (their reply re-opens the chat).'
+                        : '24h window closed — re-opening needs an approved template.'}
+                    </span>
+                    {/* Phase 255 — closed-window follow-up via approved template */}
+                    {sel.lead_id && canCompanySend && (
+                      <button type="button" onClick={openTplPanel} style={chipReply}>
+                        <Send size={14} strokeWidth={1.6} style={{ verticalAlign: 'text-bottom', marginRight: 4 }} />
+                        Send approved message
+                      </button>
+                    )}
+                  </div>
+
+                  {tplPanelOpen && (
+                    <div style={{
+                      marginTop: 10, padding: 8, borderRadius: 10,
+                      background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)',
+                    }}>
+                      {tplLoading ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: 8 }}>
+                          <Loader2 size={15} strokeWidth={1.6} className="spin" style={{ color: 'var(--v2-yellow, #FFE600)' }} />
+                        </div>
+                      ) : (
+                        PICKABLE_TPLS.map((t) => {
+                          const row = (outTemplates || []).find((r) => r.outcome === t.key)
+                          if (outTemplates !== null && !row) return null   // not mapped/active → hide
+                          const preview = row?.preview_body
+                            ? String(row.preview_body).replace(/\{\{\d\}\}/g, '…').replace(/\s+/g, ' ').slice(0, 110)
+                            : ''
+                          return (
+                            <button
+                              key={t.key} type="button" disabled={sending}
+                              onClick={() => sendCompanyTemplate(t.key)}
+                              style={{
+                                width: '100%', textAlign: 'left', display: 'block',
+                                padding: '8px 8px', cursor: sending ? 'default' : 'pointer',
+                                background: 'transparent', border: 'none', borderRadius: 10,
+                                opacity: sending ? 0.6 : 1,
+                              }}
+                            >
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, color: 'var(--v2-ink-0, #f5f7fb)' }}>
+                                {t.label}
+                                {row?.header_doc_url && (
+                                  <span style={{ ...chipYSmall }}>PDF</span>
+                                )}
+                              </span>
+                              {preview && (
+                                <span style={{ display: 'block', fontSize: 11.5, color: 'var(--v2-ink-2, #6a7590)', marginTop: 2 }}>
+                                  {preview}…
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })
+                      )}
+                      <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2, #6a7590)', padding: '6px 8px 2px', borderTop: '1px solid var(--v2-line, #1f2b47)', marginTop: 4 }}>
+                        Fixed Meta-approved wording (name auto-filled) · sent from the company number · max one per lead per 24h.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -966,6 +1096,11 @@ const miniAv = {
   width: 18, height: 18, borderRadius: 999, flexShrink: 0, marginRight: 2,
   background: 'var(--v2-blue-soft, rgba(96,165,250,0.16))', color: 'var(--v2-blue, #60a5fa)',
   fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+}
+const chipYSmall = {
+  display: 'inline-flex', alignItems: 'center', padding: '1px 6px', borderRadius: 999,
+  fontSize: 9.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+  background: 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', color: 'var(--v2-yellow, #FFE600)',
 }
 const chipReply = {
   fontSize: 12, fontWeight: 600, cursor: 'pointer',

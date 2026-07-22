@@ -8593,3 +8593,49 @@ videos + any video file). Guardian PASS. 3 files, JS-only, no SQL, no APK:
 - Empty-state tells the admin where videos come from: Master → Cities →
   YouTube link. Adding a link there auto-appears in the inbox Video panel
   (same source as the deck + AI — §71 one source).
+
+---
+
+## 128 · Phase 255 — closed-window follow-up: approved-template picker in the inbox (2026-07-22)
+
+Owner: "after 24h how can I send any approved follow up message?" The inbox's
+closed-window state was a dead lock bar ("coming with broadcast"). Now it's a
+picker of the APPROVED §120 Utility templates, sent from the company number.
+Guardian FLAG(P1)→fixed→clean. JS/Edge only, no SQL, no APK, no new api file.
+
+### What shipped (2 files)
+- `api/wa/send-template.js` — lead mode gains optional **`template_key`
+  (PICK mode)**: server allowlist `['positive','neutral','nurture','negative']`
+  → outcome = the picked key, SKIPPING only the outcome read-back + nurture
+  disambiguation + meeting detection. The date-confirming callback/meeting
+  templates are NOT pickable (they confirm a specific time the picker path
+  doesn't have) — server-enforced, bad key = 400. Everything else shared +
+  unchanged: role gate (admin/co_owner/telecaller), lead ownership,
+  wa_opt_out, phone derivation, **1-template-per-lead-per-24h throttle**,
+  vars [cleanLeadName, repName], header PDF, the 3 conversation writes
+  (lead_id + assigned_to=caller + ai_paused=true), preview_body log with
+  attachment marker. The no-pickKey (post-call §120) path is byte-identical
+  (guardian-verified — the block was only wrapped in an else).
+- `CampaignInboxV2.jsx` — closed-window bar: when the chat has a lead AND the
+  caller is admin/co_owner/telecaller (mirrors the server gate), a **"Send
+  approved message"** button → panel listing the 4 templates (label +
+  preview_body snippet + PDF chip) → tap sends `{lead_id, template_key}`.
+  429 already_sent_today → clear toast. Same §47 latch as the composer.
+
+### GUARDIAN P1 (caught + fixed) — the sibling-thread jump
+The template always goes out on the MARKETING number. If the open thread is a
+SERVICE-number conversation, the message lands in a SIBLING conversation
+(same customer, marketing account) — the rep would see "sent" and no change
+in the thread they're looking at. Fix: the endpoint already returns
+`conversation_id`; on success the inbox awaits a thread refresh and JUMPS
+`setSelId` to the conversation the message actually landed in.
+- FOOT-GUN: any inbox action that routes through `send-template.js` sends
+  from the marketing account — never assume it lands in the open thread;
+  follow the returned conversation_id.
+
+### Notes
+- Customer's reply re-opens a fresh 24h window (service-window rule) → the
+  normal composer + attachments take over from there.
+- Cost: Utility ~Rs 0.11-0.12/send; the per-lead 24h throttle bounds it.
+- Templates listed from `wa_outcome_templates` (read-all-authenticated,
+  §249.2) — edit a template at Meta → §249.3 lockstep: update preview_body.

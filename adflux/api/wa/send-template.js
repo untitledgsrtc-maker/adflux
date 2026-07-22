@@ -126,8 +126,19 @@ export default async function handler(req) {
   // WhatsAppPromptModal; everything that matters is decided HERE, server-side:
   // the recipient phone, the template, and the three conversation fields that
   // make the reply come back to the right person.
+  //
+  // Phase 255 — optional `template_key`: the inbox closed-window picker lets
+  // the rep CHOOSE one of the standalone approved templates instead of the
+  // outcome read-back. Validated against a server-side allowlist (never the
+  // date-confirming callback/meeting templates — those need a fresh saved
+  // time). Every other gate (role, ownership, opt-out, phone, per-lead 24h
+  // throttle, conversation writes) is identical.
   if (body?.lead_id) {
-    return await sendToLead({ uid, role, callerName, leadId: String(body.lead_id) })
+    return await sendToLead({
+      uid, role, callerName,
+      leadId: String(body.lead_id),
+      pickKey: body.template_key ? String(body.template_key) : null,
+    })
   }
 
   // ══ RAW MODE (unchanged) — admin/co_owner manual + test sends ═══════════
@@ -202,7 +213,7 @@ export default async function handler(req) {
 // last_contact_at, which re-sorts the TC queue and would deprioritise the lead
 // the rep just messaged.
 // ─────────────────────────────────────────────────────────────────────────
-async function sendToLead({ uid, role, callerName, leadId }) {
+async function sendToLead({ uid, role, callerName, leadId, pickKey = null }) {
   // Pilot gate: telecallers + admins only (§ plan P5 — widen after the pilot).
   if (!['admin', 'co_owner', 'telecaller'].includes(role)) {
     return json({ error: 'not_allowed', detail: 'Telecallers only during the pilot.' }, 403)
@@ -222,13 +233,26 @@ async function sendToLead({ uid, role, callerName, leadId }) {
   const to = waPhone(lead.phone)
   if (!to) return json({ error: 'no_phone', detail: 'No usable phone number on this lead.' }, 400)
 
+  // ── which template? ──
+  // Phase 255 PICK mode: the inbox closed-window picker names one of the
+  // STANDALONE templates (2 body vars — name + rep). Server allowlist: the
+  // date-confirming callback/meeting templates are NOT pickable (they confirm
+  // a specific time, which the picker path does not have).
+  let outcome
+  if (pickKey) {
+    const PICKABLE = ['positive', 'neutral', 'nurture', 'negative']
+    if (!PICKABLE.includes(pickKey)) {
+      return json({ error: 'bad_template_key', detail: 'That template cannot be sent from the inbox.' }, 400)
+    }
+    outcome = pickKey
+  } else {
   // Outcome is READ BACK from the call the rep just saved — never taken from the
   // client. Keeps the four frozen host pages untouched (they don't pass it).
   const act = await one(
     `lead_activities?lead_id=eq.${leadId}&created_by=eq.${uid}&activity_type=eq.call` +
     `&outcome=not.is.null&select=outcome&order=created_at.desc&limit=1`
   )
-  let outcome = act?.outcome || null
+  outcome = act?.outcome || null
   if (!outcome) return json({ error: 'no_outcome', detail: 'No saved call outcome for this lead yet.' }, 409)
 
   // The UI's "Nurture" outcome is STORED as 'neutral' — lead_activities.outcome
@@ -260,6 +284,7 @@ async function sendToLead({ uid, role, callerName, leadId }) {
     `&select=id&order=created_at.desc&limit=1`
   )
   if (mtg) outcome = 'meeting'
+  }
 
   const tpl = await one(`wa_outcome_templates?outcome=eq.${outcome}&is_active=eq.true&select=*&limit=1`)
   if (!tpl?.meta_template_name) {
