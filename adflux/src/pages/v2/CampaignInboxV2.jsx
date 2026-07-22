@@ -16,10 +16,11 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'   // Phase 205 — rep vs admin scope
 import {
   Loader2, AlertTriangle, RefreshCw, MessageSquare, Lock, ArrowLeft, Send, Check, CheckCheck,
-  ChevronDown, FileText,
+  ChevronDown, FileText, X, Film, ImageIcon,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
+import MediaPicker from '../../components/campaign/MediaPicker'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 
 // Quick-reply chips (mockup) — label on the chip, fuller text in the box.
@@ -115,6 +116,13 @@ export default function CampaignInboxV2() {
   const [selLead, setSelLead] = useState(null) // selected conversation's lead row
   const [reassignOpen, setReassignOpen] = useState(false)
   const [reassigning, setReassigning] = useState(false)
+  // Phase 254 — composer attachment (from the media library / rate-card chip)
+  // + the "Send quote" picker for the chat's lead.
+  const [attach, setAttach] = useState(null)         // { url, type, name } | null
+  const [brochureUrl, setBrochureUrl] = useState(null)
+  const [quoteMenuOpen, setQuoteMenuOpen] = useState(false)
+  const [leadQuotes, setLeadQuotes] = useState(null) // null = not loaded yet
+  const [quotesLoading, setQuotesLoading] = useState(false)
 
   const loadThreads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -240,6 +248,22 @@ export default function CampaignInboxV2() {
   // Reset the scroll anchor when switching conversations.
   useEffect(() => { prevMsgCount.current = 0 }, [selId])
 
+  // Phase 254 — an attachment / quote picker never carries across chats
+  // (guards against sending a file staged for one customer to another).
+  useEffect(() => {
+    setAttach(null)
+    setQuoteMenuOpen(false)
+    setLeadQuotes(null)
+  }, [selId])
+
+  // Phase 254 — the PRIVATE company brochure powers the "Rate card" chip
+  // (one small read; RLS-blocked or missing → chip stays text-only).
+  useEffect(() => {
+    supabase.from('companies').select('brochure_url').eq('segment', 'PRIVATE').maybeSingle()
+      .then(({ data }) => { if (data?.brochure_url) setBrochureUrl(data.brochure_url) })
+      .catch(() => {})
+  }, [])
+
   // Auto-scroll to the newest message: on open, and when a new message
   // arrives while already near the bottom (don't yank the view if the user
   // scrolled up to read history).
@@ -278,9 +302,13 @@ export default function CampaignInboxV2() {
 
   // Send a free-form reply (only reachable when the 24h window is open). The
   // server (api/wa/send) re-checks the window + role, so this is just the UX.
-  async function sendReply() {
+  // Phase 254: `extra` carries an attachment (media_url/…) or a quote_id —
+  // ONE send path for text, media and quote-PDF so the latch + error handling
+  // never fork (§71).
+  async function sendReply(extra = null) {
     const text = draft.trim()
-    if (!text || !sel) return
+    const withAttach = !!(extra?.media_url || extra?.quote_id)
+    if ((!text && !withAttach) || !sel) return
     if (sendingRef.current || sending) return   // §47 latch — same-tick ghost-click guard
     sendingRef.current = true
     setSending(true)
@@ -291,15 +319,20 @@ export default function CampaignInboxV2() {
       const resp = await fetch('/api/wa/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
-        body: JSON.stringify({ conversation_id: sel.id, text }),
+        body: JSON.stringify({ conversation_id: sel.id, text, ...(extra || {}) }),
       })
       const data = await resp.json().catch(() => ({}))
       if (!resp.ok) {
-        toastError(new Error(data?.detail || data?.error || `Send failed (${resp.status})`), 'Could not send.')
+        const msg = data?.error === 'quote_pdf_missing'
+          ? (data?.detail || 'This quote has no PDF yet — open the quote and share it once first.')
+          : (data?.detail || data?.error || `Send failed (${resp.status})`)
+        toastError(new Error(msg), 'Could not send.')
         return
       }
       setDraft('')
-      setPreviews((p) => ({ ...p, [sel.id]: text }))
+      setAttach(null)
+      setQuoteMenuOpen(false)
+      setPreviews((p) => ({ ...p, [sel.id]: data?.message?.body || text || '[attachment]' }))
       loadMsgs(sel.id)            // reload to show the just-sent row from the DB
     } catch (e) {
       toastError(e, 'Could not send.')
@@ -307,6 +340,36 @@ export default function CampaignInboxV2() {
       setSending(false)
       sendingRef.current = false
     }
+  }
+
+  // Composer Send button — includes the staged attachment, if any.
+  function sendFromComposer() {
+    if (attach) {
+      sendReply({ media_url: attach.url, media_type: attach.type || 'document', filename: attach.name || undefined })
+    } else {
+      sendReply()
+    }
+  }
+
+  // Phase 254 — "Send quote": list this chat's lead's quotes (RLS-scoped:
+  // rep sees own, admin all), tap one → the server resolves its stored PDF.
+  async function openQuoteMenu() {
+    if (!sel?.lead_id) return
+    setQuoteMenuOpen((o) => !o)
+    if (leadQuotes !== null || quotesLoading) return
+    setQuotesLoading(true)
+    const { data, error } = await supabase.from('quotes')
+      .select('id, quote_number, total_amount, status') // cap-ok — per-lead, .limit(20)
+      .eq('lead_id', sel.lead_id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (error) toastError(error, 'Could not load quotes.')
+    setLeadQuotes(data || [])
+    setQuotesLoading(false)
+  }
+
+  function sendQuote(q) {
+    sendReply({ quote_id: q.id })
   }
 
   // Reassign the lead to another telecaller (admin action). Sets BOTH owner
@@ -640,23 +703,108 @@ export default function CampaignInboxV2() {
                   : '24h window CLOSED · needs an approved template'}
               </div>
 
-              {/* composer — free-form text, allowed only inside the 24h window */}
+              {/* composer — free-form text + attachments, only inside the 24h window */}
               {windowOpen(sel.window_expires_at) ? (
                 <div style={{ padding: '10px 12px', borderTop: '1px solid var(--v2-line)', background: 'var(--v2-bg-2)' }}>
-                  {/* quick-reply chips (mockup) — click fills the box for editing */}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {/* quick-reply chips (mockup) — click fills the box for editing.
+                      Phase 254: Rate card also stages the real brochure PDF when
+                      the company row carries one. */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
                     {CANNED.map((c) => (
-                      <button key={c.label} type="button" onClick={() => setDraft(c.text)} style={chipReply} title={c.text}>
+                      <button
+                        key={c.label} type="button" style={chipReply} title={c.text}
+                        onClick={() => {
+                          if (c.label === 'Rate card' && brochureUrl) {
+                            setDraft('Please find our rate card attached.')
+                            setAttach({ url: brochureUrl, type: 'document', name: 'Untitled Advertising - GSRTC LED Network.pdf' })
+                          } else {
+                            setDraft(c.text)
+                          }
+                        }}
+                      >
                         {c.label}
                       </button>
                     ))}
+                    {/* Phase 254 — attach from the media library (Phase 241) */}
+                    <MediaPicker
+                      triggerLabel="Attach"
+                      onSelect={(url, type, name) => setAttach({ url, type: type || 'document', name: name || null })}
+                    />
+                    {/* Phase 254 — send one of this lead's quote PDFs */}
+                    {sel.lead_id && (
+                      <button type="button" onClick={openQuoteMenu} style={chipReply}>
+                        <FileText size={14} strokeWidth={1.6} style={{ verticalAlign: 'text-bottom', marginRight: 4 }} />
+                        Send quote
+                      </button>
+                    )}
                   </div>
+
+                  {/* quote picker */}
+                  {quoteMenuOpen && (
+                    <div style={{
+                      marginBottom: 8, padding: 8, borderRadius: 10,
+                      background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)',
+                    }}>
+                      {quotesLoading ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: 8 }}>
+                          <Loader2 size={15} strokeWidth={1.6} className="spin" style={{ color: 'var(--v2-yellow, #FFE600)' }} />
+                        </div>
+                      ) : !leadQuotes || leadQuotes.length === 0 ? (
+                        <div style={{ fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)', padding: '4px 6px' }}>
+                          No quotes on this lead (that you can see).
+                        </div>
+                      ) : (
+                        leadQuotes.map((q) => (
+                          <button
+                            key={q.id} type="button" disabled={sending}
+                            onClick={() => sendQuote(q)}
+                            style={{
+                              width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '7px 8px', fontSize: 12.5, fontWeight: 600, cursor: sending ? 'default' : 'pointer',
+                              background: 'transparent', border: 'none', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)',
+                            }}
+                          >
+                            <FileText size={14} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }} />
+                            <span style={{ fontFamily: 'var(--v2-display)' }}>{q.quote_number}</span>
+                            <span style={{ color: 'var(--v2-ink-2, #6a7590)', marginLeft: 'auto' }}>
+                              {q.total_amount != null ? `₹${Number(q.total_amount).toLocaleString('en-IN')}` : ''}
+                              {q.status ? ` · ${q.status}` : ''}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* staged attachment chip */}
+                  {attach && (
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 8,
+                      padding: '5px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                      background: 'var(--v2-tint-yellow, rgba(255,230,0,0.14))',
+                      border: '1px solid var(--v2-line, #1f2b47)', color: 'var(--v2-ink-0, #f5f7fb)',
+                      maxWidth: '100%',
+                    }}>
+                      {attach.type === 'image'
+                        ? <ImageIcon size={14} strokeWidth={1.6} />
+                        : attach.type === 'video'
+                          ? <Film size={14} strokeWidth={1.6} />
+                          : <FileText size={14} strokeWidth={1.6} />}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>
+                        {attach.name || attach.type || 'attachment'}
+                      </span>
+                      <button type="button" onClick={() => setAttach(null)} style={iconBtn} title="Remove attachment">
+                        <X size={14} strokeWidth={1.6} />
+                      </button>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
                     <textarea
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
-                      placeholder="Type a reply…"
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFromComposer() } }}
+                      placeholder={attach ? 'Add a caption… (optional)' : 'Type a reply…'}
                       rows={1}
                       style={{
                         flex: 1, resize: 'none', maxHeight: 120, minHeight: 38, padding: '9px 12px',
@@ -665,12 +813,12 @@ export default function CampaignInboxV2() {
                       }}
                     />
                     <button
-                      type="button" onClick={sendReply} disabled={sending || !draft.trim()}
+                      type="button" onClick={sendFromComposer} disabled={sending || (!draft.trim() && !attach)}
                       style={{
                         flexShrink: 0, height: 38, padding: '0 14px', borderRadius: 10, border: 'none',
                         background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0f172a)',
-                        fontWeight: 700, fontSize: 13, cursor: (sending || !draft.trim()) ? 'default' : 'pointer',
-                        opacity: (sending || !draft.trim()) ? 0.55 : 1, display: 'inline-flex', alignItems: 'center', gap: 6,
+                        fontWeight: 700, fontSize: 13, cursor: (sending || (!draft.trim() && !attach)) ? 'default' : 'pointer',
+                        opacity: (sending || (!draft.trim() && !attach)) ? 0.55 : 1, display: 'inline-flex', alignItems: 'center', gap: 6,
                       }}
                     >
                       {sending ? <Loader2 size={15} strokeWidth={1.6} className="spin" /> : <Send size={15} strokeWidth={1.6} />}

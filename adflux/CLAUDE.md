@@ -8512,3 +8512,64 @@ callback / neutral / nurture / positive, false on negative. Every §126 item is
 now live. Post-call brochure PDF rides EVERY outcome except Lost. The §126.1
 serving-version lesson stands: 253b was rolled back twice for running during
 the review window — the mapping must flip only when the templates show Active.
+
+
+---
+
+## 127 · Phase 254 — inbox ATTACHMENTS: media library + quote PDF from the chat (2026-07-22)
+
+Owner: "no attachment option in the inbox — if we generate a Quotation how can
+we send?" Approved plan A+B+C ("go a+b+c"). Built additive; guardian PASS
+(zero P0/P1); §45-safe (inbox page + send endpoint only, no frozen/hot-path
+touch). NO SQL, NO APK rebuild, no new api file (send.js is an EXISTING Node
+fn — the §219 12-fn cap is untouched).
+
+### What shipped (2 files)
+- **A · `api/wa/send.js`** — the inbox send now takes an optional attachment,
+  free-form inside the open 24h window (Meta allows media then — the AI already
+  sends city photos this way):
+  - `{ media_url, media_type: image|video|document, filename? }` — `text`
+    becomes the caption (1024-char cap; 4096 stays for plain text; text now
+    optional when an attachment is present). **media_url is https-only +
+    host-allowlisted** to the Supabase project host (derived from SUPABASE_URL)
+    or app.untitledad.in — a tampered request can't make the business number
+    deliver an arbitrary URL.
+  - `{ quote_id }` — SERVER resolves the quote's stored PDF: authz = quote tied
+    to THIS conversation's lead OR created_by the caller OR admin → fresh
+    600s `createSignedUrl('quote-pdfs', '<safeRef>.pdf')` → sent as document,
+    filename `<ref>.pdf`. **Deliberately a direct signed URL, NOT the branded
+    `/pdf/<ref>?t=` 302 link** (Meta fetches media server-side; the redirect
+    variable is removed). No stored PDF (quote never shared once) → **409
+    quote_pdf_missing** — honest, no server-side render.
+  - Log row: `type` = the media type, `body` = caption + `(document: <name>)`
+    marker (§125.1 — log what the customer received, never "attachment
+    missing"). Auth / role / ownership / window gates + ai_paused write
+    byte-unchanged, and they run BEFORE any attachment resolution.
+- **B+C · `src/pages/v2/CampaignInboxV2.jsx`** — composer gains: an **Attach**
+  button = the Phase 241 `MediaPicker` (pick existing from campaign_media or
+  upload new) staging an attachment chip (X to clear); the **Rate card** quick
+  chip now also stages the real brochure (`companies.brochure_url`, PRIVATE
+  row) as a document when present; a **Send quote** button (only when the chat
+  has a lead) → lists that lead's quotes (RLS-scoped, `.limit(20)`) → tap
+  sends `{quote_id}` with the draft as caption. ONE send path — `sendReply
+  (extra)` keeps the §47 latch for text, media and quote (no forked logic,
+  §71). Attachment/quote state RESETS on conversation switch (never send a
+  file staged for one customer to another). 409 quote_pdf_missing → clear
+  toast: "open the quote and share it once first."
+
+### Contracts / notes
+- The 24h-window rule is unchanged: attachments only ride an OPEN service
+  window; a closed window still needs a template (§120 path).
+- The quote PDF exists only once the quote was shared at least once
+  (uploadQuotePDFHtml writes `quote-pdfs/<ref>.pdf`, §44.9). The inbox does
+  NOT render quote PDFs itself — a never-shared quote 409s with instructions.
+- Outbound attachments render in the inbox as the body marker (no media_id →
+  no img tag) — same display class as the AI's own sent photos (§115 KNOWN).
+- Guardian P3 (accepted): the Rate-card chip's filename literal names the
+  GSRTC brochure — update it if `companies.brochure_url` ever changes files.
+
+### Foot-gun
+- ❌ Sending a customer-facing media link that a client request chose freely —
+  the business number would fetch + deliver ANY URL. Every media_url through
+  a rep-authed endpoint must be host-allowlisted (or server-derived, like the
+  quote signed URL).
