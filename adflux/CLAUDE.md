@@ -8802,3 +8802,13 @@ flipped 919581578261 → 919898273686. Closes the §119 split — /led WhatsApp,
 service number 95815 78261 keeps the campaign inbox + its own AI. Every /led
 WhatsApp path (nav pill, dock, plans, form, station cards where present)
 reads this ONE var — future number changes are a one-line edit.
+
+### 129.6 · Phase 257.6 — /led alignment + spacing pass (22 Jul)
+Owner: "check alignment and spacing." Full mobile(375) + desktop pass. Two real
+issues, both fixed: (1) the ticker strip was TALLER than the header (67px vs
+63px) — cells slimmed via tickerbar-scoped overrides (font 12px, padding 6/11,
+strip+flip padding 4px) → 50px, reads as a ticker again; (2) dead slack under
+the cycling hero stat — min-height clamp(110,26vw,168) → clamp(94,24vw,150)
+(content 91/147 → slack ≤3px both breakpoints). Everything else verified
+aligned: hero rhythm, video section, moat cards, steps, funnel, cities grid,
+form, footer; no horizontal overflow at either width.
