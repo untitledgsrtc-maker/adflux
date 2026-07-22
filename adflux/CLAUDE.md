@@ -8725,3 +8725,23 @@ in Master → Cities and it corrects everywhere).
   origin assets, Google Fonts CSS only).
 - ❌ IntersectionObserver-gated `opacity:0` content — a skipped entry never
   re-fires. Use the sweep + interval reveal (above).
+
+### 129.1 · Phase 257.1 — Gujarati rebuild PARKED; old page back + station-footage hero (22 Jul, same day)
+Owner (screenshot of the new hero): "park this we will use this later — i want
+old one, just background changes like this." So:
+- **The Gujarati rebuild is PARKED, not dead** — saved at
+  `_design_reference/led_gujarati_rebuild_parked_2026-07-22.html` (+ commit
+  `4bb0c9d` in history). When the owner says "use the letter/new page", restore
+  THAT file to `public/led/index.html` — do NOT rebuild from scratch.
+- `public/led/index.html` = the Phase 256 page RESTORED, plus:
+  1. **Hero background = real station footage** (`.hero-media`: station-hero.mp4
+     over station-1.jpg + dark gradient), UNDER the existing `.ledbg` dot matrix
+     (z: media 0 · ledbg 1 · wrap 2) — the look he approved from the rebuild.
+  2. **§129 reveal contract ported**: the IO scroll-reveal AND the IO count-up
+     trigger replaced with the sweep + 400ms-interval pattern (no
+     IntersectionObserver anywhere on /led — a skipped entry = permanently
+     invisible content / stats stuck at 0).
+  3. **Blank-map fix kept**: Leaflet stays for local/file use, but when
+     `window.L` is absent (live CSP blocks unpkg — the original "vlank"
+     complaint) the `.map-wrap` box now HIDES instead of rendering an empty
+     frame. Cities grid below still shows. Do NOT remove this else-branch.

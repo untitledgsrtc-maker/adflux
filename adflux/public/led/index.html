@@ -1,20 +1,21 @@
 <!doctype html>
-<html lang="gu">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <script>document.documentElement.className+=" js";</script>
-<title>GSRTC બસ સ્ટેશન પર તમારી જાહેરાત — ₹75 થી | Untitled Advertising</title>
-<meta name="description" content="ગુજરાતના 20 GSRTC બસ સ્ટેશન પર 264 LED સ્ક્રીન. દરેક સ્ક્રીન સામે રોજ 1,000+ લોકો. AI ગણતરી + QR સ્કેન → લીડ. ₹75 થી શરૂ." />
+<title>GSRTC LED Network — Advertise across Gujarat | Untitled Advertising</title>
+<meta name="description" content="264 LED screens across 20 GSRTC bus stations in Gujarat. AI-verified views and a QR that turns every scan into a tracked lead — the only outdoor advertising you can actually measure." />
 <meta name="theme-color" content="#0A0E1A" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="તમારી જાહેરાત, ગુજરાતના 20 બસ સ્ટેશન પર — ₹75 થી" />
-<meta property="og:description" content="264 LED સ્ક્રીન · રોજ 1,000+ લોકો દરેક સ્ક્રીન સામે · દરેક QR સ્કેન = એક લીડ. Outdoor advertising you can measure." />
-<meta property="og:image" content="/deck/station-1.jpg" />
+<meta property="og:title" content="Advertise on GSRTC LED screens across Gujarat" />
+<meta property="og:description" content="264 screens · 20 bus stations · every scan tracked to a lead. Outdoor advertising you can measure." />
+<meta property="og:image" content="/icon-512.png" />
 <meta name="twitter:card" content="summary_large_image" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Space+Mono:wght@400;700&family=Noto+Sans+Gujarati:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 <style>
   :root{
     --ink:#0A0E1A; --ink-1:#0E1524; --ink-2:#131c2f; --card:#111a2c;
@@ -22,9 +23,9 @@
     --yellow:#FFE600; --yellow-2:#FFD400; --yellow-ink:#0A0E1A;
     --paper:#F2F5FC; --muted:#98a2ba; --muted-2:#69748f;
     --glow:rgba(255,230,0,.16);
-    --display:"Space Grotesk","Noto Sans Gujarati",system-ui,sans-serif;
-    --body:"DM Sans","Noto Sans Gujarati",system-ui,sans-serif;
-    --mono:"Space Mono","Noto Sans Gujarati",ui-monospace,monospace;
+    --display:"Space Grotesk",system-ui,sans-serif;
+    --body:"DM Sans",system-ui,sans-serif;
+    --mono:"Space Mono",ui-monospace,monospace;
     --wrap:1120px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -35,12 +36,12 @@
     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
   }
   a{color:inherit;text-decoration:none}
-  img,svg,video{display:block;max-width:100%}
+  img,svg{display:block;max-width:100%}
   ::selection{background:var(--yellow);color:var(--yellow-ink)}
   :focus-visible{outline:2px solid var(--yellow);outline-offset:3px;border-radius:4px}
   .wrap{width:100%;max-width:var(--wrap);margin:0 auto;padding:0 20px}
 
-  /* atmosphere — soft LED glow, faint grid */
+  /* atmosphere — a soft LED glow behind the fold, no image needed */
   .atmos{position:fixed;inset:0;z-index:0;pointer-events:none}
   .atmos::before{content:"";position:absolute;top:-24vh;left:50%;transform:translateX(-50%);
     width:min(1100px,140vw);height:70vh;
@@ -58,35 +59,41 @@
   .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;letter-spacing:-.01em;font-size:16px}
   .logo{height:40px;width:auto;display:block}
   @media(max-width:640px){.logo{height:34px}}
+  .brand .dot{width:11px;height:11px;border-radius:3px;background:var(--yellow);box-shadow:0 0 14px var(--yellow)}
+  .brand small{font-family:var(--mono);font-weight:400;font-size:9.5px;letter-spacing:.14em;color:var(--muted);display:block;margin-top:-3px}
   .nav-cta{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13.5px;
     background:var(--yellow);color:var(--yellow-ink);padding:9px 15px;border-radius:999px;
     box-shadow:0 6px 20px -8px var(--yellow);transition:transform .15s,box-shadow .15s}
   .nav-cta:hover{transform:translateY(-1px);box-shadow:0 10px 26px -8px var(--yellow)}
   .nav-cta svg{width:15px;height:15px}
 
-  /* ── hero (real station, real screen) ──────────────────── */
-  .hero{position:relative;overflow:hidden;padding:72px 0 46px}
+  /* ── hero ──────────────────────────────────────────────── */
+  .hero{padding:64px 0 44px;position:relative;overflow:hidden}
+  .hero .wrap{position:relative;z-index:2}
+  /* real station footage behind the headline (Phase 257.1) */
   .hero-media{position:absolute;inset:0;z-index:0}
   .hero-media video,.hero-media img{width:100%;height:100%;object-fit:cover;opacity:.5}
   .hero-media::after{content:"";position:absolute;inset:0;
     background:linear-gradient(180deg,rgba(10,14,26,.55) 0%,rgba(10,14,26,.82) 55%,var(--ink) 100%)}
+  /* LED pixel-board backdrop — a faint dot matrix (the screens themselves)
+     with a slow light sweep, like content gliding across an LED wall. */
   .ledbg{position:absolute;inset:0;z-index:1;pointer-events:none;
-    background-image:radial-gradient(circle, rgba(255,230,0,.08) 1px, transparent 1.7px);
+    background-image:radial-gradient(circle, rgba(255,230,0,.09) 1px, transparent 1.7px);
     background-size:15px 15px;
     -webkit-mask-image:radial-gradient(130% 95% at 28% 18%, #000 0%, transparent 72%);
             mask-image:radial-gradient(130% 95% at 28% 18%, #000 0%, transparent 72%)}
-  .hero .wrap{position:relative;z-index:2}
-  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;
-    color:var(--yellow);display:inline-flex;align-items:center;gap:10px;margin-bottom:20px}
+  .ledbg::after{content:"";position:absolute;inset:-45%;
+    background:linear-gradient(115deg, transparent 42%, rgba(255,230,0,.055) 50%, transparent 58%);
+    animation:ledsweep 8s linear infinite}
+  @keyframes ledsweep{from{transform:translateX(-60%)}to{transform:translateX(60%)}}
+  @media(prefers-reduced-motion:reduce){.ledbg::after{animation:none}}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--yellow);display:inline-flex;align-items:center;gap:10px;margin-bottom:22px}
   .eyebrow::before{content:"";width:26px;height:1px;background:var(--yellow);opacity:.7}
-  h1{font-family:var(--display);font-weight:700;letter-spacing:-.02em;line-height:1.1;
-    font-size:clamp(30px,7vw,58px)}
-  h1 .hl{color:var(--yellow)}
-  .h1-en{font-family:var(--display);font-weight:500;color:var(--muted);letter-spacing:-.01em;
-    font-size:clamp(15px,3.8vw,21px);margin-top:14px;line-height:1.4}
-  .h1-en b{color:var(--paper);font-weight:600}
-  .h1-en .price{color:var(--yellow);font-weight:700}
-  .lede{font-size:clamp(15px,4vw,18px);color:var(--muted);max-width:42ch;margin:16px 0 26px}
+  h1{font-family:var(--display);font-weight:700;letter-spacing:-.025em;line-height:1.02;
+    font-size:clamp(38px,8.6vw,74px)}
+  h1 .hl{color:var(--yellow);position:relative;white-space:nowrap}
+  .lede{font-size:clamp(16px,4.2vw,20px);color:var(--muted);max-width:34ch;margin:22px 0 30px}
   .lede b{color:var(--paper);font-weight:600}
   .cta-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;font-weight:600;
@@ -95,15 +102,15 @@
   .btn svg{width:18px;height:18px;flex:0 0 auto}
   .btn-primary{background:var(--yellow);color:var(--yellow-ink);box-shadow:0 12px 34px -12px var(--yellow)}
   .btn-primary:hover{transform:translateY(-2px);box-shadow:0 18px 40px -12px var(--yellow)}
-  .btn-ghost{background:rgba(10,14,26,.4);color:var(--paper);border-color:var(--line-2);backdrop-filter:blur(4px)}
+  .btn-ghost{background:transparent;color:var(--paper);border-color:var(--line-2)}
   .btn-ghost:hover{border-color:var(--yellow);color:var(--yellow)}
-  .trust{margin-top:24px;display:flex;flex-wrap:wrap;gap:8px 20px;font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+  .trust{margin-top:26px;display:flex;flex-wrap:wrap;gap:8px 22px;font-size:12.5px;color:var(--muted-2);font-family:var(--mono)}
   .trust span{display:inline-flex;align-items:center;gap:7px}
   .trust b{color:var(--paper);font-weight:400}
-  .tick{width:15px;height:15px;color:var(--yellow);flex:0 0 auto}
+  .tick{width:15px;height:15px;color:var(--yellow)}
 
-  /* station departure board (signature) */
-  .board{margin-top:38px;border:1px solid var(--line);border-radius:16px;overflow:hidden;
+  /* ── station departure board (the signature) ───────────── */
+  .board{margin-top:40px;border:1px solid var(--line);border-radius:16px;overflow:hidden;
     background:linear-gradient(180deg,#080b14,#0b1120);box-shadow:inset 0 0 0 1px rgba(255,255,255,.02),0 30px 60px -30px #000}
   .board-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
     padding:11px 16px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--muted)}
@@ -121,169 +128,162 @@
   .flip-cell b{color:var(--muted);font-weight:400;font-size:11px}
   @keyframes slide{to{transform:translateX(-50%)}}
 
+  /* ── stat band ─────────────────────────────────────────── */
+  .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(255,255,255,.015),transparent)}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
+  .stat{background:var(--ink);padding:30px 18px;text-align:center}
+  .stat .n{font-family:var(--display);font-weight:700;font-size:clamp(32px,7vw,50px);line-height:1;letter-spacing:-.02em}
+  .stat .n .u{color:var(--yellow);font-size:.5em;vertical-align:baseline;margin-left:2px}
+  .stat .l{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:12px}
+
   /* ── generic section ───────────────────────────────────── */
-  section{padding:68px 0}
-  .sec-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--yellow);margin-bottom:14px}
-  h2{font-family:var(--display);font-weight:700;letter-spacing:-.02em;line-height:1.12;font-size:clamp(26px,5.6vw,42px)}
+  section{padding:74px 0}
+  .sec-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--yellow);margin-bottom:16px}
+  h2{font-family:var(--display);font-weight:700;letter-spacing:-.02em;line-height:1.05;font-size:clamp(28px,6vw,44px)}
   h2 .dim{color:var(--muted-2)}
-  h2 .hl{color:var(--yellow)}
-  .sec-sub{color:var(--muted);font-size:clamp(14.5px,3.6vw,17px);max-width:56ch;margin-top:14px}
-  .sec-sub b{color:var(--paper);font-weight:600}
+  .sec-sub{color:var(--muted);font-size:clamp(15px,3.6vw,17px);max-width:52ch;margin-top:18px}
 
-  /* ── LED name board (mockup device) ────────────────────── */
-  .ledboard-wrap{margin-top:30px;display:grid;gap:18px}
-  .ledboard{position:relative;border-radius:18px;overflow:hidden;
-    background:#04060c;border:10px solid #10141f;outline:1px solid var(--line-2);
-    box-shadow:0 34px 70px -30px #000, inset 0 0 60px rgba(0,0,0,.7);
-    aspect-ratio:16/6;display:flex;align-items:center;justify-content:center;padding:16px}
-  .ledboard::before{content:"";position:absolute;inset:0;
-    background-image:radial-gradient(circle, rgba(255,230,0,.07) 1px, transparent 1.5px);
-    background-size:9px 9px}
-  .ledboard::after{content:"";position:absolute;inset:-30%;pointer-events:none;
-    background:linear-gradient(115deg, transparent 44%, rgba(255,255,255,.045) 50%, transparent 56%);
-    animation:ledsweep 6.5s linear infinite}
-  @keyframes ledsweep{from{transform:translateX(-55%)}to{transform:translateX(55%)}}
-  @media(prefers-reduced-motion:reduce){.ledboard::after{animation:none}}
-  .ledtext{position:relative;z-index:1;font-family:var(--display);font-weight:700;text-align:center;
-    color:var(--yellow);font-size:clamp(22px,6.4vw,52px);letter-spacing:.01em;line-height:1.15;
-    text-shadow:0 0 18px rgba(255,230,0,.55),0 0 55px rgba(255,230,0,.25);
-    overflow-wrap:anywhere}
-  .ledtext.placeholder{color:rgba(255,230,0,.4);text-shadow:0 0 12px rgba(255,230,0,.2)}
-  .ledboard-cap{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--muted-2);text-transform:uppercase;text-align:center}
-  .mock-controls{display:grid;gap:12px;max-width:560px}
-  .mock-input{display:flex;gap:10px;flex-wrap:wrap}
-  .mock-input input{flex:1;min-width:200px;background:var(--ink-1);border:1px solid var(--line-2);
-    border-radius:12px;padding:14px 16px;color:var(--paper);font-size:16px;font-family:var(--body);outline:none}
-  .mock-input input:focus{border-color:var(--yellow)}
-  .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{font-family:var(--mono);font-size:12.5px;color:var(--muted);background:var(--card);
-    border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;cursor:pointer;
-    transition:border-color .15s,color .15s}
-  .chip:hover,.chip.active{border-color:var(--yellow);color:var(--yellow)}
+  /* moat split */
+  .moat{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:38px}
+  .moat .col{border:1px solid var(--line);border-radius:16px;padding:24px 22px;background:var(--ink-1)}
+  .moat .bad{opacity:.62}
+  .moat .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);margin-bottom:12px}
+  .moat .good .kicker{color:var(--yellow)}
+  .moat h3{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;margin-bottom:14px}
+  .moat ul{list-style:none;display:grid;gap:11px}
+  .moat li{display:flex;gap:11px;font-size:14.5px;color:var(--muted)}
+  .moat .good li{color:var(--paper)}
+  .moat li svg{width:17px;height:17px;flex:0 0 auto;margin-top:2px;color:var(--muted-2)}
+  .moat .good li svg{color:var(--yellow)}
 
-  /* ── proof ─────────────────────────────────────────────── */
-  .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
-    border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:30px}
-  .num{background:var(--ink-1);padding:26px 14px;text-align:center}
-  .num .n{font-family:var(--display);font-weight:700;font-size:clamp(30px,7vw,52px);line-height:1;letter-spacing:-.02em}
-  .num .n .arrow{color:var(--yellow)}
-  .num .l{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:10px}
-  .nums-cap{font-family:var(--mono);font-size:11.5px;color:var(--muted-2);margin-top:12px}
-  .proof-mech{margin-top:26px;padding:18px 20px;border-left:3px solid var(--yellow);
-    background:linear-gradient(90deg,rgba(255,230,0,.06),transparent 70%);border-radius:0 12px 12px 0;
-    color:var(--paper);font-size:clamp(14.5px,3.8vw,16.5px);max-width:60ch}
-  .proof-shot{margin-top:30px;border:1px solid var(--line-2);border-radius:16px;overflow:hidden;
-    background:#05070d;box-shadow:0 30px 60px -30px #000}
-  .proof-shot img{width:100%;display:block}
-  .proof-shot-cap{padding:12px 16px;border-top:1px solid var(--line);font-family:var(--mono);
-    font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:42px;counter-reset:s}
+  .step{border:1px solid var(--line);border-radius:16px;padding:22px 20px 24px;background:var(--card);position:relative;overflow:hidden}
+  .step::before{counter-increment:s;content:"0" counter(s);position:absolute;top:14px;right:16px;
+    font-family:var(--mono);font-weight:700;font-size:13px;color:var(--line-2)}
+  .step .ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    background:var(--glow);color:var(--yellow);margin-bottom:16px}
+  .step .ic svg{width:21px;height:21px}
+  .step h4{font-family:var(--display);font-weight:600;font-size:16.5px;margin-bottom:8px;letter-spacing:-.01em}
+  .step p{font-size:13.5px;color:var(--muted)}
 
-  /* ── price ─────────────────────────────────────────────── */
-  .cmp{margin-top:30px;display:grid;gap:12px}
-  .cmp-row{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;
-    border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--ink-1)}
-  .cmp-row.bad .cmp-ic{color:var(--muted-2)}
-  .cmp-row.good{border-color:rgba(255,230,0,.4);background:linear-gradient(180deg,rgba(255,230,0,.05),var(--ink-1))}
-  .cmp-row.good .cmp-ic{color:var(--yellow)}
-  .cmp-ic{width:22px;height:22px;flex:0 0 auto;margin-top:2px}
-  .cmp-row h3{font-family:var(--display);font-size:16.5px;font-weight:600;margin-bottom:4px}
-  .cmp-row p{color:var(--muted);font-size:14.5px}
-  .cmp-row.good p b{color:var(--yellow);font-weight:700}
-  .inc{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
-  .inc span{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12.5px;
-    color:var(--paper);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:9px 14px}
-  .inc .tick{width:13px;height:13px}
-  .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
-  @media(max-width:760px){.plans{grid-template-columns:1fr}}
-  .plan{border:1px solid var(--line);border-radius:16px;padding:22px 20px;background:var(--ink-1);
-    display:flex;flex-direction:column;gap:8px;transition:border-color .15s,transform .15s}
-  .plan:hover{border-color:var(--yellow);transform:translateY(-2px)}
-  .plan .p-name{font-family:var(--display);font-weight:700;font-size:19px}
-  .plan .p-sub{color:var(--muted);font-size:13.5px;flex:1}
-  .plan .btn{margin-top:14px;padding:12px 16px;font-size:14px;border-radius:12px}
-  .plan.hot{border-color:rgba(255,230,0,.5);background:linear-gradient(180deg,rgba(255,230,0,.06),var(--ink-1))}
-  .plan .p-tag{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+  /* proof / funnel */
+  .proof{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:center;margin-top:40px}
+  .funnel{border:1px solid var(--line);border-radius:18px;background:var(--ink-1);padding:24px;display:grid;gap:12px}
+  .fstep{display:grid;grid-template-columns:1fr auto;align-items:center;gap:14px;
+    padding:15px 18px;border-radius:12px;background:var(--card);border:1px solid var(--line)}
+  .fstep .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .fstep .v{font-family:var(--display);font-weight:700;font-size:22px}
+  .fstep.hot{border-color:var(--yellow);background:linear-gradient(90deg,var(--glow),transparent)}
+  .fstep.hot .v{color:var(--yellow)}
+  .fbar{grid-column:1/-1;height:6px;border-radius:999px;background:#0a0f1c;overflow:hidden}
+  .fbar span{display:block;height:100%;background:linear-gradient(90deg,var(--yellow),var(--yellow-2));border-radius:999px}
+  .proof-copy h3{font-family:var(--display);font-weight:600;font-size:clamp(22px,5vw,30px);letter-spacing:-.02em;line-height:1.15;margin-bottom:16px}
+  .proof-copy p{color:var(--muted);font-size:15px;margin-bottom:16px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-family:var(--mono);font-size:11.5px;color:var(--paper);border:1px solid var(--line-2);border-radius:999px;padding:7px 13px}
+  .chip.on{color:var(--yellow-ink);background:var(--yellow);border-color:var(--yellow)}
 
-  /* ── station cards ─────────────────────────────────────── */
-  .stns{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:30px}
-  .stn{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--ink-1);
-    display:flex;flex-direction:column;transition:border-color .15s,transform .15s}
-  .stn:hover{border-color:var(--line-2);transform:translateY(-2px)}
-  .stn-img{aspect-ratio:16/8;overflow:hidden;background:#05070d;position:relative}
-  .stn-img img{width:100%;height:100%;object-fit:cover;opacity:.85}
-  .stn-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:6px;flex:1}
-  .stn-name{font-family:var(--display);font-weight:700;font-size:17px;display:flex;align-items:center;gap:8px}
-  .stn-name i{width:7px;height:7px;border-radius:50%;background:var(--yellow);box-shadow:0 0 8px var(--yellow);flex:0 0 auto}
-  .stn-foot{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
-  .stn-acts{display:flex;gap:8px;margin-top:10px}
-  .stn-acts a{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;
-    font-size:13px;font-weight:600;padding:10px 8px;border-radius:10px}
-  .stn-wa{background:var(--yellow);color:var(--yellow-ink)}
-  .stn-vid{border:1px solid var(--line-2);color:var(--muted)}
-  .stn-vid:hover{border-color:var(--yellow);color:var(--yellow)}
-  .stn-acts svg{width:14px;height:14px}
+  /* cities */
+  .cities-wrap{margin-top:34px;border:1px solid var(--line);border-radius:16px;background:var(--ink-1);overflow:hidden}
+  .cities-head{padding:14px 18px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--muted);display:flex;justify-content:space-between}
+  .cities{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .city{display:flex;align-items:center;gap:10px;padding:15px 18px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:13px;letter-spacing:.03em}
+  .city i{width:6px;height:6px;border-radius:50%;background:var(--yellow);box-shadow:0 0 8px var(--yellow);flex:0 0 auto}
+  .city.more{color:var(--muted);justify-content:center;font-size:12px}
 
-  /* ── why / photo strip ─────────────────────────────────── */
-  .why{display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:center;margin-top:30px}
-  @media(max-width:820px){.why{grid-template-columns:1fr}}
-  .why-photo{border:1px solid var(--line-2);border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -30px #000}
-  .why-photo img{width:100%;display:block}
-  .why-points{display:grid;gap:16px}
-  .why-point{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
-  .why-point .tick{width:20px;height:20px;margin-top:3px}
-  .why-point h3{font-family:var(--display);font-size:17px;font-weight:600;margin-bottom:3px}
-  .why-point p{color:var(--muted);font-size:14.5px}
+  /* video showcase */
+  .show{margin-top:34px;display:grid;gap:16px}
+  .screen{position:relative;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#05070d;aspect-ratio:16/9;box-shadow:0 30px 60px -30px #000}
+  .screen video{width:100%;height:100%;object-fit:cover;display:block}
+  .screen iframe{width:100%;height:100%;border:0;display:block}
+  .screen .tag{position:absolute;top:13px;left:13px;z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:7px;padding:6px 10px;color:var(--yellow)}
+  .screen .sound{position:absolute;bottom:13px;right:13px;z-index:2;display:inline-flex;align-items:center;gap:8px;
+    background:rgba(10,14,26,.74);backdrop-filter:blur(8px);border:1px solid var(--line-2);color:var(--paper);
+    border-radius:999px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .screen .sound svg{width:15px;height:15px}
+  .thumbs{display:flex;gap:9px;flex-wrap:wrap}
+  .thumb{font-family:var(--mono);font-size:12px;letter-spacing:.03em;color:var(--paper);background:var(--card);
+    border:1px solid var(--line-2);border-radius:999px;padding:9px 15px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+  .thumb:hover{border-color:var(--yellow)}
+  .thumb.active{background:var(--yellow);color:var(--yellow-ink);border-color:var(--yellow)}
 
-  /* ── steps ─────────────────────────────────────────────── */
-  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
-  @media(max-width:760px){.steps{grid-template-columns:1fr}}
-  .step{border:1px solid var(--line);border-radius:16px;padding:22px 20px;background:var(--ink-1)}
-  .step .s-no{font-family:var(--mono);font-weight:700;font-size:13px;color:var(--yellow-ink);
-    background:var(--yellow);width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
-  .step h3{font-family:var(--display);font-size:17px;font-weight:600;margin-bottom:5px}
-  .step p{color:var(--muted);font-size:14px}
+  /* map */
+  .map-wrap{margin-top:34px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--ink-1)}
+  #map{height:clamp(300px,52vw,460px);width:100%;background:#0a0f1c;z-index:1}
+  .leaflet-container{background:#0a0f1c;font-family:var(--body)}
+  .leaflet-popup-content-wrapper{background:var(--ink-2);color:var(--paper);border-radius:10px;border:1px solid var(--line-2);box-shadow:0 12px 30px -12px #000}
+  .leaflet-popup-tip{background:var(--ink-2);border:1px solid var(--line-2)}
+  .leaflet-popup-content{font-family:var(--mono);font-size:12px;margin:9px 13px;color:var(--paper)}
+  .leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+  .leaflet-bar a{background:var(--ink-2);color:var(--paper);border-color:var(--line-2)}
+  .leaflet-bar a:hover{background:var(--card)}
+  .leaflet-control-attribution{background:rgba(10,14,26,.6)!important;color:var(--muted-2)!important}
+  .leaflet-control-attribution a{color:var(--muted)!important}
+  .station-pin{width:14px;height:14px;border-radius:50%;background:var(--yellow);border:2px solid #0a0f1c;box-shadow:0 0 0 3px rgba(255,230,0,.22),0 0 12px var(--yellow)}
 
-  /* ── clients ───────────────────────────────────────────── */
-  .walls{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:30px}
-  @media(max-width:760px){.walls{grid-template-columns:1fr}}
-  .wall{background:#fff;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
-  .wall img{width:100%;display:block}
-  .trust-line{margin-top:26px;font-family:var(--mono);font-size:12.5px;color:var(--muted);
-    display:flex;flex-wrap:wrap;gap:8px 22px}
-  .trust-line b{color:var(--paper);font-weight:400}
-
-  /* ── final CTA ─────────────────────────────────────────── */
-  .cta-final{padding-bottom:110px}
-  .cta-card{border:1px solid rgba(255,230,0,.35);border-radius:22px;padding:clamp(24px,5vw,44px);
-    background:
-      radial-gradient(90% 120% at 50% 0%,rgba(255,230,0,.09),transparent 60%),
-      linear-gradient(180deg,var(--ink-1),var(--ink))}
-  .quote{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:26px}
-  @media(max-width:640px){.quote{grid-template-columns:1fr}}
-  .field{display:grid;gap:6px}
+  /* final CTA */
+  .cta-final{padding:0 0 40px}
+  .cta-card{position:relative;overflow:hidden;border:1px solid var(--line-2);border-radius:22px;
+    background:radial-gradient(120% 140% at 0% 0%,rgba(255,230,0,.10),transparent 55%),var(--ink-1);
+    padding:clamp(28px,6vw,52px)}
+  .cta-card h2{margin-bottom:12px}
+  .cta-card .sec-sub{margin-bottom:26px}
+  .quote{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:520px}
+  .field{display:flex;flex-direction:column;gap:7px}
   .field.full{grid-column:1/-1}
-  .field label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-  .field input{background:var(--ink);border:1px solid var(--line-2);border-radius:12px;
-    padding:13px 15px;color:var(--paper);font-size:15px;font-family:var(--body);outline:none}
+  .field label{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .field input{background:var(--ink);border:1px solid var(--line-2);border-radius:12px;color:var(--paper);
+    font-family:var(--body);font-size:15px;padding:13px 15px;outline:none;transition:border-color .15s}
   .field input:focus{border-color:var(--yellow)}
-  .quote .btn{grid-column:1/-1;margin-top:4px}
-  .cta-alt{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px;font-size:14px;color:var(--muted)}
-  .cta-alt a{color:var(--yellow);font-weight:600}
+  .field input::placeholder{color:var(--muted-2)}
+  .quote .btn{grid-column:1/-1;width:100%;margin-top:4px;font-size:16px;padding:16px}
+  .cta-alt{margin-top:16px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
+  .cta-alt a{color:var(--paper);font-weight:600;border-bottom:1px solid var(--line-2)}
+  .cta-alt a:hover{color:var(--yellow);border-color:var(--yellow)}
 
-  footer{border-top:1px solid var(--line);padding:26px 0 96px}
-  .foot{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;font-family:var(--mono);font-size:12px;color:var(--muted-2)}
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:36px 0 120px}
+  .foot{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+  .foot .brand{color:var(--paper)}
+  .foot a{color:var(--muted)}.foot a:hover{color:var(--yellow)}
 
-  /* sticky mobile dock */
-  .dock{position:fixed;bottom:0;left:0;right:0;z-index:50;display:flex;gap:10px;
-    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
-    background:rgba(10,14,26,.86);backdrop-filter:blur(12px);border-top:1px solid var(--line)}
-  .dock .btn{flex:1;padding:13px 14px;font-size:14.5px;border-radius:12px}
-  @media(min-width:900px){.dock{display:none}footer{padding-bottom:26px}.cta-final{padding-bottom:80px}}
+  /* sticky mobile CTA bar */
+  .dock{position:fixed;left:0;right:0;bottom:0;z-index:50;display:none;gap:10px;
+    padding:12px 14px calc(12px + env(safe-area-inset-bottom));
+    background:rgba(10,14,26,.9);backdrop-filter:blur(14px);border-top:1px solid var(--line)}
+  .dock .btn{flex:1;padding:14px;font-size:15px;border-radius:13px}
+  .dock .btn-ghost{flex:0 0 auto;padding:14px 18px}
 
   /* reveal */
-  .js .rise{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}
+  /* reveal is JS-enhancement only — without JS (.js unset) content shows normally */
+  .js .rise{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
   .js .rise.in{opacity:1;transform:none}
-  @media(prefers-reduced-motion:reduce){.js .rise{opacity:1;transform:none;transition:none}.flip-track{animation:none}}
+
+  /* responsive */
+  @media(max-width:860px){
+    .proof{grid-template-columns:1fr;gap:20px}
+    .steps{grid-template-columns:repeat(2,1fr)}
+    .stat-grid{grid-template-columns:repeat(2,1fr)}
+  }
+  @media(max-width:640px){
+    section{padding:56px 0}
+    .hero{padding:44px 0 32px}
+    .moat{grid-template-columns:1fr}
+    .quote{grid-template-columns:1fr;max-width:none}
+    .dock{display:flex}
+    footer{padding-bottom:130px}
+    .nav-cta span{display:none}.nav-cta{padding:9px 12px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .flip-track{animation:none;transform:none;flex-wrap:wrap;justify-content:center}
+    .board-head .live i{animation:none}
+    .js .rise{opacity:1;transform:none;transition:none}
+  }
 </style>
 </head>
 <body>
@@ -291,42 +291,42 @@
 
 <header>
   <div class="wrap bar">
-    <a class="brand" href="#" aria-label="Untitled Advertising">
-      <img class="logo" src="/led/logo.svg" alt="Untitled Advertising" />
+    <a class="brand" href="/led" aria-label="Untitled Advertising home">
+      <img class="logo" src="/led/logo.svg" alt="Untitled Advertising" width="82" height="41" />
     </a>
-    <a class="nav-cta" id="navWa" href="#">
+    <a class="nav-cta" id="navWa" href="#" aria-label="Chat on WhatsApp">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.8 14.06c-.24.68-1.42 1.31-1.95 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.88-4.6-4.06-.13-.18-1.1-1.47-1.1-2.8 0-1.33.7-1.98.94-2.25.24-.27.53-.34.71-.34.18 0 .36 0 .51.01.16.01.39-.06.6.46.24.58.82 2 .89 2.15.07.14.12.31.02.5-.09.18-.14.29-.28.45-.14.16-.29.36-.42.48-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.55.73 1.82.86.27.14.45.2.51.31.07.11.07.63-.17 1.32Z"/></svg>
-      WhatsApp
+      <span>WhatsApp</span>
     </a>
   </div>
 </header>
 
 <main>
-  <!-- HERO — the real station, the real screen -->
+  <!-- HERO -->
   <section class="hero">
     <div class="hero-media" aria-hidden="true">
       <video src="/deck/station-hero.mp4" poster="/deck/station-1.jpg" muted loop playsinline autoplay preload="metadata"></video>
     </div>
     <div class="ledbg" aria-hidden="true"></div>
     <div class="wrap">
-      <span class="eyebrow rise">GSRTC LED નેટવર્ક · ગુજરાત</span>
-      <h1 class="rise">તમારી <span class="hl">જાહેરાત</span>,<br>ગુજરાતના 20 બસ સ્ટેશન પર.</h1>
-      <p class="h1-en rise">Your ad on <b>264 LED screens</b> across GSRTC bus stations — <span class="price">₹75 થી શરૂ.</span></p>
-      <p class="lede rise">દરેક સ્ક્રીન સામે રોજ <b>1,000+ લોકો</b>. કેટલા લોકોએ જોઈ, કેટલા QR સ્કેન થયા — <b>ચોક્કસ આંકડા</b> તમને મળે.</p>
+      <span class="eyebrow rise">GSRTC LED Network</span>
+      <h1 class="rise">Your brand, on every <span class="hl">platform</span> in Gujarat.</h1>
+      <p class="lede rise">264 LED screens across 20 GSRTC bus stations. <b>AI-verified views</b> and a QR that turns every scan into a <b>tracked lead</b> — outdoor advertising you can actually measure.</p>
       <div class="cta-row rise">
         <a class="btn btn-primary" id="heroWa" href="#">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.8 14.06c-.24.68-1.42 1.31-1.95 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.88-4.6-4.06-.13-.18-1.1-1.47-1.1-2.8 0-1.33.7-1.98.94-2.25.24-.27.53-.34.71-.34.18 0 .36 0 .51.01.16.01.39-.06.6.46.24.58.82 2 .89 2.15.07.14.12.31.02.5-.09.18-.14.29-.28.45-.14.16-.29.36-.42.48-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.55.73 1.82.86.27.14.45.2.51.31.07.11.07.63-.17 1.32Z"/></svg>
-          WhatsApp પર વાત કરો
+          Book your screens
         </a>
-        <a class="btn btn-ghost" href="#price">ભાવ જુઓ</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
       </div>
       <div class="trust rise">
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>742 QR સ્કેન → 174 લીડ</b></span>
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>264 સ્ક્રીન · 20 સ્ટેશન</b></span>
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>રોજ ~14 કલાક</b></span>
+        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>264 screens</b></span>
+        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>20 stations live</b></span>
+        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>Every scan tracked</b></span>
       </div>
 
-      <div class="board rise" role="img" aria-label="GSRTC સ્ટેશન બોર્ડ">
+      <!-- SIGNATURE: live station departure board -->
+      <div class="board rise" role="img" aria-label="Live GSRTC station board: Anand, Surendranagar, Jamnagar, Junagadh, Porbandar, Dwarka, Morbi, Bhachau, Botad, Veraval">
         <div class="board-head">
           <span>GSRTC · SCREENS LIVE</span>
           <span class="live"><i></i> ON AIR</span>
@@ -338,162 +338,143 @@
     </div>
   </section>
 
-  <!-- MOCKUP — type your name, see it on the screen -->
+  <!-- STATS -->
+  <div class="stats">
+    <div class="wrap">
+      <div class="stat-grid">
+        <div class="stat rise"><div class="n"><span data-count="264">0</span></div><div class="l">LED screens</div></div>
+        <div class="stat rise"><div class="n"><span data-count="20">0</span></div><div class="l">Bus stations</div></div>
+        <div class="stat rise"><div class="n"><span data-count="20">0</span><span class="u">+</span></div><div class="l">Cities in Gujarat</div></div>
+        <div class="stat rise"><div class="n"><span data-count="100">0</span><span class="u">%</span></div><div class="l">Scans tracked</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIDEO SHOWCASE -->
   <section>
     <div class="wrap">
-      <div class="sec-eyebrow rise">તમારી જાહેરાત અહીં</div>
-      <h2 class="rise">તમારું નામ લખો — <span class="hl">સ્ક્રીન પર જુઓ.</span></h2>
-      <p class="sec-sub rise">આ જ રીતે તમારી જાહેરાત સ્ટેશનની LED સ્ક્રીન પર ચમકશે — બસની રાહ જોતા લોકોની સામે.</p>
-      <div class="ledboard-wrap rise">
-        <div class="mock-controls">
-          <div class="mock-input">
-            <input id="mockName" type="text" maxlength="40" placeholder="તમારી દુકાન / ધંધાનું નામ લખો…" autocomplete="organization" />
-          </div>
-          <div class="chips" id="mockChips">
-            <button class="chip" type="button" data-name="શ્રી ડેન્ટલ ક્લિનિક">ક્લિનિક</button>
-            <button class="chip" type="button" data-name="આશા કોચિંગ ક્લાસ">કોચિંગ</button>
-            <button class="chip" type="button" data-name="પટેલ મોબાઈલ શોપ">દુકાન</button>
-            <button class="chip" type="button" data-name="શિવ બિલ્ડર્સ">બિલ્ડર</button>
-            <button class="chip" type="button" data-name="રાજ રેસ્ટોરન્ટ">રેસ્ટોરન્ટ</button>
-          </div>
+      <div class="sec-eyebrow rise">See it live</div>
+      <h2 class="rise">Real screens. Real stations.</h2>
+      <p class="sec-sub rise">Your ad, glowing on the LED walls where Gujarat waits — bus stations, platforms, thousands of eyes a day.</p>
+      <div class="show">
+        <div class="screen rise">
+          <span class="tag" id="vtag">STATION · LIVE</span>
+          <video id="mainVideo" src="/deck/station-hero.mp4" poster="/deck/station-1.jpg" muted loop playsinline autoplay preload="metadata"></video>
         </div>
-        <div>
-          <div class="ledboard"><div class="ledtext placeholder" id="ledText">તમારી દુકાનનું નામ</div></div>
-          <p class="ledboard-cap" style="margin-top:10px">LED screen preview · GSRTC bus station</p>
-        </div>
-        <div class="cta-row">
-          <a class="btn btn-primary" id="mockWa" href="#">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.8 14.06c-.24.68-1.42 1.31-1.95 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.88-4.6-4.06-.13-.18-1.1-1.47-1.1-2.8 0-1.33.7-1.98.94-2.25.24-.27.53-.34.71-.34.18 0 .36 0 .51.01.16.01.39-.06.6.46.24.58.82 2 .89 2.15.07.14.12.31.02.5-.09.18-.14.29-.28.45-.14.16-.29.36-.42.48-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.55.73 1.82.86.27.14.45.2.51.31.07.11.07.63-.17 1.32Z"/></svg>
-            આ નામ સાથે ભાવ પૂછો
-          </a>
+        <div class="thumbs rise">
+          <button class="thumb active" data-src="/deck/station-hero.mp4" data-tag="STATION · LIVE" type="button">Station</button>
+          <button class="thumb" data-src="/deck/veraval-hero.mp4" data-tag="VERAVAL · LIVE" type="button">Veraval</button>
+          <button class="thumb" data-src="/deck/bhavnagar.mp4" data-tag="BHAVNAGAR · LIVE" type="button">Bhavnagar</button>
+          <button class="thumb" data-src="/deck/gandhinagar.mp4" data-tag="GANDHINAGAR · LIVE" type="button">Gandhinagar</button>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- PROOF — numbers, not adjectives -->
+  <!-- MOAT -->
   <section>
     <div class="wrap">
-      <div class="sec-eyebrow rise">સાબિતી</div>
-      <h2 class="rise">અંદાજ નહીં. <span class="hl">આંકડા.</span></h2>
-      <div class="nums rise">
-        <div class="num"><div class="n">742</div><div class="l">QR સ્કેન</div></div>
-        <div class="num"><div class="n"><span class="arrow">→</span> 177</div><div class="l">મેસેજ કર્યા</div></div>
-        <div class="num"><div class="n"><span class="arrow">→</span> 174</div><div class="l">લીડ બન્યા</div></div>
-      </div>
-      <p class="nums-cap rise">અમારા જાહેરાતકર્તાઓના QR કોડના સાચા આંકડા — બોર્ડ સ્કેન થાય એટલે સીધો WhatsApp ચેટ, દરેક ગણાય.</p>
-      <p class="proof-mech rise">સ્ક્રીન પરનો AI કેમેરા ગણે છે કે કેટલા લોકો સામેથી પસાર થયા. હોર્ડિંગ પર કોઈ કહી ના શકે કે કેટલા લોકોએ જોઈ — અહીં તમને ચોક્કસ સંખ્યા મળે છે.</p>
-      <div class="proof-shot rise">
-        <img src="/deck/dashboard-real.png" alt="જાહેરાતકર્તાનું લાઈવ ડેશબોર્ડ — વ્યૂ અને સ્કેનની ગણતરી" loading="lazy" />
-        <div class="proof-shot-cap">Advertiser dashboard · live views + scans</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PRICE -->
-  <section id="price">
-    <div class="wrap">
-      <div class="sec-eyebrow rise">ખર્ચ</div>
-      <h2 class="rise"><span class="hl">₹75 થી શરૂ.</span> <span class="dim">એક ચા કરતાં પણ ઓછું.</span></h2>
-      <div class="cmp rise">
-        <div class="cmp-row bad">
-          <svg class="cmp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          <div><h3>હોર્ડિંગ</h3><p>મોટું ભાડું, છપાઈ અને માઉન્ટિંગ અલગ — અને કેટલા લોકોએ જોઈ, એનો કોઈ રિપોર્ટ નહીં.</p></div>
+      <div class="sec-eyebrow rise">Why it's different</div>
+      <h2 class="rise">A billboard can't tell you who looked. <span class="dim">Ours can.</span></h2>
+      <div class="moat">
+        <div class="col bad rise">
+          <div class="kicker">Ordinary outdoor</div>
+          <h3>Print it. Hope.</h3>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg> No idea how many people saw it</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg> No way to know if it drove a single call</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg> One flat rate, zero reporting</li>
+          </ul>
         </div>
-        <div class="cmp-row good">
-          <svg class="cmp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><h3>સ્ટેશન LED સ્ક્રીન</h3><p><b>₹75 થી શરૂ</b> — રોજ ~14 કલાક ચાલે, દરેક જોનારની ગણતરી થાય, QR સ્કેન સીધા તમારા WhatsApp પર આવે.</p></div>
-        </div>
-      </div>
-      <div class="inc rise">
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> 10-સેકન્ડ સ્લોટ, આખો દિવસ રિપીટ</span>
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> રોજ ~14 કલાક પ્લે</span>
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> AI વ્યૂ-કાઉન્ટ</span>
-        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> QR સ્કેન → લીડ WhatsApp પર</span>
-      </div>
-      <div class="plans rise">
-        <div class="plan">
-          <div class="p-name">1 સ્ટેશન</div>
-          <div class="p-sub">તમારા શહેરનું સ્ટેશન — શરૂઆત માટે.</div>
-          <a class="btn btn-primary plan-wa" data-plan="1 station" href="#">ભાવ પૂછો</a>
-        </div>
-        <div class="plan hot">
-          <div class="p-tag">સૌથી વધુ લેવાય છે</div>
-          <div class="p-name">આખું શહેર</div>
-          <div class="p-sub">શહેરની બધી સ્ક્રીન — તમારો વિસ્તાર આખો કવર.</div>
-          <a class="btn btn-primary plan-wa" data-plan="full city" href="#">ભાવ પૂછો</a>
-        </div>
-        <div class="plan">
-          <div class="p-name">આખું ગુજરાત</div>
-          <div class="p-sub">264 સ્ક્રીન · 20 સ્ટેશન — આખા રાજ્યમાં બ્રાન્ડ.</div>
-          <a class="btn btn-primary plan-wa" data-plan="all Gujarat (264 screens)" href="#">ભાવ પૂછો</a>
+        <div class="col good rise">
+          <div class="kicker">GSRTC LED Network</div>
+          <h3>Run it. Measure it.</h3>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> AI-verified views — real eyes, real dwell time</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> Every QR scan becomes a tracked lead</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> Per-screen dashboard — scans, leads, city</li>
+          </ul>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- STATIONS — your city -->
-  <section id="cities">
-    <div class="wrap">
-      <div class="sec-eyebrow rise">તમારું શહેર</div>
-      <h2 class="rise">20 સ્ટેશન. <span class="dim">તમારું ક્યું?</span></h2>
-      <p class="sec-sub rise">દરેક સ્ટેશન પર LED સ્ક્રીન, દરેક સ્ક્રીન સામે રોજ 1,000+ લોકો. તમારા શહેર પર ટૅપ કરો — સીધા WhatsApp પર વાત.</p>
-      <div class="stns rise" id="stnGrid"><!-- dynamic; fallback below --></div>
-    </div>
-  </section>
-
-  <!-- WHY BUS STATIONS -->
-  <section>
-    <div class="wrap">
-      <div class="sec-eyebrow rise">કેમ બસ સ્ટેશન?</div>
-      <h2 class="rise">રાહ જોતા લોકો = <span class="hl">જોતા લોકો.</span></h2>
-      <div class="why rise">
-        <div class="why-photo"><img src="/deck/station-2.jpg" alt="GSRTC બસ સ્ટેશન — LED સ્ક્રીન અને રાહ જોતા મુસાફરો" loading="lazy" /></div>
-        <div class="why-points">
-          <div class="why-point">
-            <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
-            <div><h3>લોકો ઊભા રહે છે, ઉતાવળમાં નથી</h3><p>હોર્ડિંગ પાસેથી ગાડી સેકન્ડમાં નીકળી જાય. સ્ટેશન પર લોકો બસની રાહ જુએ છે — અને નજર સ્ક્રીન પર જાય છે.</p></div>
-          </div>
-          <div class="why-point">
-            <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
-            <div><h3>રોજ નવા 1,000+ લોકો, દરેક સ્ક્રીન સામે</h3><p>મુસાફરો, વેપારીઓ, વિદ્યાર્થીઓ, પરિવારો — તમારા શહેરના જ લોકો, રોજ.</p></div>
-          </div>
-          <div class="why-point">
-            <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
-            <div><h3>ચમકતી સ્ક્રીન, દિવસે પણ રાત્રે પણ</h3><p>High-brightness LED — રોજ ~14 કલાક તમારી જાહેરાત ચાલતી રહે.</p></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 3 STEPS -->
+  <!-- HOW -->
   <section id="how">
     <div class="wrap">
-      <div class="sec-eyebrow rise">કેવી રીતે</div>
-      <h2 class="rise">ત્રણ સ્ટેપ. <span class="dim">બસ.</span></h2>
-      <div class="steps rise">
-        <div class="step"><div class="s-no">1</div><h3>WhatsApp પર મેસેજ કરો</h3><p>તમારું શહેર અને ધંધો જણાવો — અમે ભાવ અને સ્ક્રીન મોકલીશું.</p></div>
-        <div class="step"><div class="s-no">2</div><h3>જાહેરાત સ્ક્રીન પર ચાલુ</h3><p>તમારી જાહેરાત સ્ટેશનની LED સ્ક્રીન પર, આખો દિવસ રિપીટ.</p></div>
-        <div class="step"><div class="s-no">3</div><h3>આંકડા તમને મળે</h3><p>કેટલા લોકોએ જોઈ, કેટલા QR સ્કેન થયા — ચોક્કસ ગણતરી.</p></div>
+      <div class="sec-eyebrow rise">How it works</div>
+      <h2 class="rise">From screen to lead, in four steps.</h2>
+      <div class="steps">
+        <div class="step rise">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+          <h4>Your ad goes live</h4>
+          <p>Your creative runs on LED screens at Gujarat's busiest bus stations.</p>
+        </div>
+        <div class="step rise">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div>
+          <h4>Travelers watch</h4>
+          <p>Thousands wait, look up, and watch — with views AI-verified, not guessed.</p>
+        </div>
+        <div class="step rise">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M14 21h.01M17 21h4v-4"/></svg></div>
+          <h4>They scan the QR</h4>
+          <p>An on-screen QR opens WhatsApp on their phone — one tap, no typing.</p>
+        </div>
+        <div class="step rise">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6 9 17l-5-5"/><path d="M22 4v6h-6" opacity=".0"/></svg></div>
+          <h4>You get the lead</h4>
+          <p>Every scan lands as a tracked lead with the station it came from — proof, not hope.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- CLIENTS -->
+  <!-- PROOF -->
   <section>
     <div class="wrap">
-      <div class="sec-eyebrow rise">અમારા જાહેરાતકર્તાઓ</div>
-      <h2 class="rise">સરકારથી લઈને <span class="hl">દુકાનદાર સુધી.</span></h2>
-      <div class="walls rise">
-        <div class="wall"><img src="/deck/logos-1.png" alt="Government / PSU જાહેરાતકર્તાઓ — Gujarat Tourism, Government of Gujarat, IFFCO, UNICEF" loading="lazy" /></div>
-        <div class="wall"><img src="/deck/logos-2.png" alt="Education અને Healthcare જાહેરાતકર્તાઓ — Aakash, IDP, Apollo Munich, Medkart" loading="lazy" /></div>
-        <div class="wall"><img src="/deck/logos-3.png" alt="જાહેરાતકર્તાઓ" loading="lazy" /></div>
-        <div class="wall"><img src="/deck/logos-4.png" alt="જાહેરાતકર્તાઓ" loading="lazy" /></div>
+      <div class="sec-eyebrow rise">Real numbers</div>
+      <h2 class="rise">The funnel is already running.</h2>
+      <div class="proof">
+        <div class="funnel rise" aria-label="Scans to leads funnel">
+          <div class="fstep"><span class="k">Scans logged</span><span class="v">500+</span><span class="fbar"><span style="width:100%"></span></span></div>
+          <div class="fstep"><span class="k">Reached WhatsApp</span><span class="v">120+</span><span class="fbar"><span style="width:24%"></span></span></div>
+          <div class="fstep hot"><span class="k">Became a lead</span><span class="v">100+</span><span class="fbar"><span style="width:22%"></span></span></div>
+        </div>
+        <div class="proof-copy rise">
+          <h3>Numbers you can stand behind in a meeting.</h3>
+          <p>Across the live network, hundreds of scans have already turned into real, routed leads — each one tagged to the exact screen that pulled it in. No estimates. No "impressions." Just a funnel you can watch.</p>
+          <div class="chips">
+            <span class="chip on">Per-screen scans</span>
+            <span class="chip">Lead tagging</span>
+            <span class="chip">City breakdown</span>
+            <span class="chip">Live dashboard</span>
+          </div>
+        </div>
       </div>
-      <div class="trust-line rise">
-        <span><b>Untitled Advertising</b> · વડોદરા, ગુજરાત</span>
-        <span><a href="tel:+919898273686"><b>+91 98982 73686</b></a></span>
+    </div>
+  </section>
+
+  <!-- CITIES -->
+  <section>
+    <div class="wrap">
+      <div class="sec-eyebrow rise">Where you'll show up</div>
+      <h2 class="rise">20 stations. One Gujarat. <span class="dim">Growing.</span></h2>
+      <div class="map-wrap rise"><div id="map" aria-label="Map of GSRTC LED stations across Gujarat"></div></div>
+      <div class="cities-wrap rise">
+        <div class="cities-head"><span>STATIONS · LIVE</span><span>264 SCREENS</span></div>
+        <div class="cities">
+          <div class="city"><i></i> Anand</div>
+          <div class="city"><i></i> Surendranagar</div>
+          <div class="city"><i></i> Jamnagar</div>
+          <div class="city"><i></i> Junagadh</div>
+          <div class="city"><i></i> Porbandar</div>
+          <div class="city"><i></i> Dwarka</div>
+          <div class="city"><i></i> Morbi</div>
+          <div class="city"><i></i> Bhachau</div>
+          <div class="city"><i></i> Botad</div>
+          <div class="city"><i></i> Veraval</div>
+          <div class="city more">+ 10 more stations live</div>
+        </div>
       </div>
     </div>
   </section>
@@ -502,20 +483,20 @@
   <section class="cta-final">
     <div class="wrap">
       <div class="cta-card rise">
-        <div class="sec-eyebrow">શરૂ કરો</div>
-        <h2>સ્ક્રીન બુક કરો.</h2>
-        <p class="sec-sub">નામ, ધંધો, શહેર — બાકી વાત WhatsApp પર. સામાન્ય રીતે એક કલાકમાં જવાબ.</p>
+        <div class="sec-eyebrow">Get started</div>
+        <h2>Put your brand on the screens.</h2>
+        <p class="sec-sub">Tell us who you are — we'll send you screens, cities and plans on WhatsApp. Usually within the hour.</p>
         <form class="quote" id="quoteForm" onsubmit="return false">
-          <div class="field"><label for="qn">તમારું નામ · Name</label><input id="qn" name="name" placeholder="દા.ત. રવિ શાહ" autocomplete="name" /></div>
-          <div class="field"><label for="qb">ધંધો · Business</label><input id="qb" name="brand" placeholder="દા.ત. શાહ મોટર્સ" autocomplete="organization" /></div>
-          <div class="field full"><label for="qc">શહેર · City</label><input id="qc" name="city" placeholder="દા.ત. રાજકોટ, આણંદ…" /></div>
+          <div class="field"><label for="qn">Your name</label><input id="qn" name="name" placeholder="e.g. Ravi Shah" autocomplete="name" /></div>
+          <div class="field"><label for="qb">Brand / business</label><input id="qb" name="brand" placeholder="e.g. Shah Motors" autocomplete="organization" /></div>
+          <div class="field full"><label for="qc">City you want to advertise in</label><input id="qc" name="city" placeholder="e.g. Rajkot, Surat…" /></div>
           <button class="btn btn-primary" id="formWa" type="submit">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.8 14.06c-.24.68-1.42 1.31-1.95 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.88-4.6-4.06-.13-.18-1.1-1.47-1.1-2.8 0-1.33.7-1.98.94-2.25.24-.27.53-.34.71-.34.18 0 .36 0 .51.01.16.01.39-.06.6.46.24.58.82 2 .89 2.15.07.14.12.31.02.5-.09.18-.14.29-.28.45-.14.16-.29.36-.42.48-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.55.73 1.82.86.27.14.45.2.51.31.07.11.07.63-.17 1.32Z"/></svg>
-            WhatsApp પર મોકલો
+            Send on WhatsApp
           </button>
         </form>
         <div class="cta-alt">
-          <span>ફોન પર વાત કરવી છે?</span>
+          <span>Prefer to talk?</span>
           <a href="tel:+919898273686">Call +91 98982 73686</a>
         </div>
       </div>
@@ -543,121 +524,35 @@
   </a>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 (function(){
   var WA = "919581578261";
-  var DEFAULT_MSG = "Hi, mane GSRTC bus station par ad chalavvi che — rate card moklo.";
+  var DEFAULT_MSG = "Hi Untitled Advertising — I want to advertise on your GSRTC LED screens in Gujarat.";
   function waLink(msg){ return "https://wa.me/" + WA + "?text=" + encodeURIComponent(msg || DEFAULT_MSG); }
 
-  // plain WhatsApp buttons
+  // wire the plain WhatsApp buttons
   ["navWa","heroWa","dockWa"].forEach(function(id){
     var el = document.getElementById(id);
     if(el){ el.href = waLink(); el.target = "_blank"; el.rel = "noopener"; }
   });
 
-  // plan buttons — package prefilled
-  document.querySelectorAll(".plan-wa").forEach(function(el){
-    el.href = waLink("Hi, mane " + el.getAttribute("data-plan") + " par ad chalavvi che — bhaav moklo.");
-    el.target = "_blank"; el.rel = "noopener";
-  });
-
-  // form → WhatsApp with details prefilled
+  // form → WhatsApp with the prospect's details prefilled
   var form = document.getElementById("quoteForm");
   if(form){
     form.addEventListener("submit", function(){
       var name  = (document.getElementById("qn").value || "").trim();
       var brand = (document.getElementById("qb").value || "").trim();
       var city  = (document.getElementById("qc").value || "").trim();
-      var msg = "Hi, mane GSRTC bus station par ad chalavvi che.";
+      var msg = "Hi Untitled Advertising — I want to advertise on your GSRTC LED screens.";
       if(name)  msg += "\nName: " + name;
-      if(brand) msg += "\nBusiness: " + brand;
+      if(brand) msg += "\nBrand: " + brand;
       if(city)  msg += "\nCity: " + city;
       window.open(waLink(msg), "_blank", "noopener");
     });
   }
 
-  // ── LED name-board mockup ──
-  var ledText = document.getElementById("ledText");
-  var mockName = document.getElementById("mockName");
-  var mockWa = document.getElementById("mockWa");
-  var PLACEHOLDER = "તમારી દુકાનનું નામ";
-  function setLed(name){
-    var v = (name || "").trim();
-    if(ledText){
-      ledText.textContent = v || PLACEHOLDER;
-      ledText.classList.toggle("placeholder", !v);
-    }
-    if(mockWa){
-      var msg = v
-        ? 'Hi, "' + v + '" ni ad GSRTC bus station ni LED screen par chalavvi che — bhaav moklo.'
-        : DEFAULT_MSG;
-      mockWa.href = waLink(msg);
-      mockWa.target = "_blank"; mockWa.rel = "noopener";
-    }
-  }
-  setLed("");
-  if(mockName){ mockName.addEventListener("input", function(){ setLed(mockName.value); }); }
-  var chipBox = document.getElementById("mockChips");
-  if(chipBox){
-    chipBox.addEventListener("click", function(ev){
-      var c = ev.target.closest(".chip");
-      if(!c) return;
-      chipBox.querySelectorAll(".chip").forEach(function(x){ x.classList.remove("active"); });
-      c.classList.add("active");
-      if(mockName) mockName.value = c.getAttribute("data-name");
-      setLed(c.getAttribute("data-name"));
-    });
-  }
-
-  // ── station cards — ALL stations from the cities master (/api/deck-videos,
-  // the same public map the deck + AI use). Fallback: the 12 confirmed. ──
-  var FALLBACK = ["Anand","Surendranagar","Jamnagar","Junagadh","Porbandar","Dwarka",
-                  "Morbi","Bhachau","Botad","Veraval","Bhavnagar","Gandhinagar"];
-  var PHOTOS = ["/deck/station-1.jpg","/deck/station-2.jpg"];
-  function ytId(u){
-    var m = String(u||"").match(/(?:youtu\.be\/|v=|shorts\/|embed\/|live\/)([\w-]{6,})/);
-    return m ? m[1] : null;
-  }
-  function titleCase(s){
-    return String(s||"").toLowerCase().replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-  }
-  function stnCard(name, vidUrl, i){
-    var nice = titleCase(name.replace(/[^A-Z0-9 ]/gi,""));
-    var waMsg = "Hi, mane " + nice + " bus station par ad chalavvi che — bhaav moklo.";
-    var html = '<div class="stn">' +
-      '<div class="stn-img"><img src="' + PHOTOS[i % 2] + '" alt="' + nice + ' bus station" loading="lazy" /></div>' +
-      '<div class="stn-body">' +
-        '<div class="stn-name"><i></i>' + nice + '</div>' +
-        '<div class="stn-foot">1,000+ લોકો રોજ · દરેક સ્ક્રીન</div>' +
-        '<div class="stn-acts">' +
-          '<a class="stn-wa" href="' + waLink(waMsg) + '" target="_blank" rel="noopener">' +
-            '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Z"/></svg>' +
-            'WhatsApp</a>';
-    if(vidUrl && ytId(vidUrl)){
-      html += '<a class="stn-vid" href="' + String(vidUrl).replace(/"/g,"&quot;") + '" target="_blank" rel="noopener">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>' +
-        'સ્ટેશન જુઓ</a>';
-    }
-    html += '</div></div></div>';
-    return html;
-  }
-  var grid = document.getElementById("stnGrid");
-  function renderStations(map){
-    if(!grid) return;
-    var html = "";
-    if(map && Object.keys(map).length){
-      Object.keys(map).sort().forEach(function(c, i){ html += stnCard(c, map[c], i); });
-    } else {
-      FALLBACK.forEach(function(c, i){ html += stnCard(c, null, i); });
-    }
-    grid.innerHTML = html;
-  }
-  renderStations(null); // instant fallback paint
-  fetch("/api/deck-videos").then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(map){ if(map && Object.keys(map).length) renderStations(map); })
-    .catch(function(){ /* offline — fallback stays */ });
-
-  // station board — scrolling strip (duplicated for a seamless loop)
+  // station board — build the scrolling city strip (duplicated for a seamless loop)
   var cities = [
     ["Anand","AN"],["Surendranagar","SU"],["Jamnagar","JA"],["Junagadh","JU"],
     ["Porbandar","PO"],["Dwarka","DW"],["Morbi","MO"],["Bhachau","BH"],
@@ -678,8 +573,8 @@
 
   // scroll reveal — NO IntersectionObserver on purpose: reveal must never
   // depend on observer/event delivery (a skipped IO entry leaves a section
-  // permanently invisible — §233.2 class of bug). A cheap sweep reveals any
-  // .rise at/above the viewport; runs at load, on scroll, and on a short
+  // permanently invisible — CLAUDE.md §129 contract). A cheap sweep reveals
+  // any .rise at/above the viewport; runs at load, on scroll, and on a short
   // interval as the fail-safe. Reduced motion reveals everything instantly.
   var rises = Array.prototype.slice.call(document.querySelectorAll(".rise"));
   if(reduce){
@@ -703,6 +598,134 @@
     sweep();
     if(!rises.length) clearInterval(sweepIv);
   }, 400);
+
+  // count-up on the stat band
+  var counted = false;
+  function runCount(){
+    if(counted) return; counted = true;
+    document.querySelectorAll("[data-count]").forEach(function(el){
+      var end = +el.getAttribute("data-count");
+      if(reduce){ el.textContent = end; return; }
+      var start = null, dur = 1100;
+      function tick(t){
+        if(!start) start = t;
+        var p = Math.min((t-start)/dur, 1);
+        var eased = 1 - Math.pow(1-p, 3);
+        el.textContent = Math.round(end*eased);
+        if(p<1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+  // same no-IO rule as the reveal (§129): poll until the band is reached
+  var band = document.querySelector(".stats");
+  function bandCheck(){
+    if(!band || counted) return;
+    if(reduce){ runCount(); return; }
+    if(band.getBoundingClientRect().top < (window.innerHeight || 800)){ runCount(); }
+  }
+  bandCheck();
+  window.addEventListener("scroll", bandCheck, { passive:true });
+  var bandIv = setInterval(function(){ bandCheck(); if(counted) clearInterval(bandIv); }, 400);
+
+  // video showcase — muted autoplay + city switcher (no sound, owner call).
+  // Local mp4 pills are the static fallback; on load we fetch the SAME public
+  // city->YouTube map the deck + AI use (/api/deck-videos, cities master) and
+  // rebuild the pills: [Station · local hero] + one pill per city with a video.
+  // Add a YouTube link on a city (Master -> Cities) and it appears here too.
+  var mainVideo = document.getElementById("mainVideo");
+  var vtag = document.getElementById("vtag");
+  var screenBox = mainVideo ? mainVideo.parentElement : null;
+  var thumbsRow = document.querySelector(".thumbs");
+
+  function ytId(u){
+    var m = String(u||"").match(/(?:youtu\.be\/|v=|shorts\/|embed\/|live\/)([\w-]{6,})/);
+    return m ? m[1] : null;
+  }
+  function showLocal(src, tag){
+    if(!mainVideo) return;
+    var fr = document.getElementById("ytFrame");
+    if(fr) fr.remove();
+    mainVideo.style.display = "";
+    mainVideo.src = src;
+    if(vtag) vtag.textContent = tag;
+    mainVideo.play().catch(function(){});
+  }
+  function showYouTube(url, tag){
+    var id = ytId(url);
+    if(!id || !screenBox){ return; }
+    if(mainVideo){ mainVideo.pause(); mainVideo.style.display = "none"; }
+    var fr = document.getElementById("ytFrame");
+    if(!fr){
+      fr = document.createElement("iframe");
+      fr.id = "ytFrame";
+      fr.allow = "autoplay; encrypted-media; picture-in-picture";
+      fr.allowFullscreen = true;
+      screenBox.appendChild(fr);
+    }
+    fr.src = "https://www.youtube-nocookie.com/embed/" + id +
+      "?autoplay=1&mute=1&playsinline=1&rel=0&loop=1&playlist=" + id;
+    if(vtag) vtag.textContent = tag;
+  }
+  function titleCase(s){
+    return String(s||"").toLowerCase().replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+
+  // one delegated handler covers static + dynamic pills
+  if(thumbsRow){
+    thumbsRow.addEventListener("click", function(ev){
+      var t = ev.target.closest(".thumb");
+      if(!t) return;
+      thumbsRow.querySelectorAll(".thumb").forEach(function(x){ x.classList.remove("active"); });
+      t.classList.add("active");
+      var yt = t.getAttribute("data-yt");
+      if(yt) showYouTube(yt, t.getAttribute("data-tag"));
+      else showLocal(t.getAttribute("data-src"), t.getAttribute("data-tag"));
+    });
+  }
+
+  // wire ALL city videos from the cities master (fail-safe: fetch error /
+  // empty map -> the static pills stay exactly as before)
+  fetch("/api/deck-videos").then(function(r){ return r.ok ? r.json() : null; }).then(function(map){
+    if(!map || !thumbsRow) return;
+    var cities = Object.keys(map).filter(function(k){ return ytId(map[k]); }).sort();
+    if(!cities.length) return;
+    var html = '<button class="thumb active" data-src="/deck/station-hero.mp4" data-tag="STATION · LIVE" type="button">Station</button>';
+    cities.forEach(function(c){
+      var esc = c.replace(/[^A-Z0-9 ]/gi, "");
+      html += '<button class="thumb" data-yt="' + map[c].replace(/"/g, "&quot;") + '" data-tag="' + esc + ' · LIVE" type="button">' + titleCase(esc) + '</button>';
+    });
+    thumbsRow.innerHTML = html;
+  }).catch(function(){ /* offline / endpoint down — static pills remain */ });
+
+  // Gujarat station map (Leaflet, dark tiles, yellow pins)
+  var mapEl = document.getElementById("map");
+  if(mapEl && window.L){
+    var stations = [
+      ["Anand",22.556,72.951],["Surendranagar",22.727,71.638],["Jamnagar",22.470,70.057],
+      ["Junagadh",21.521,70.457],["Porbandar",21.641,69.601],["Dwarka",22.240,68.968],
+      ["Morbi",22.812,70.837],["Bhachau",23.297,70.343],["Botad",22.170,71.667],
+      ["Veraval",20.906,70.367],["Bhavnagar",21.764,72.152],["Gandhinagar",23.223,72.650]
+    ];
+    try{
+      var map = L.map(mapEl,{ scrollWheelZoom:false, attributionControl:true });
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{
+        subdomains:"abcd", maxZoom:12, minZoom:5,
+        attribution:'&copy; OpenStreetMap, &copy; CARTO'
+      }).addTo(map);
+      var icon = L.divIcon({ className:"", html:'<div class="station-pin"></div>', iconSize:[14,14], iconAnchor:[7,7] });
+      var markers = stations.map(function(s){
+        return L.marker([s[1],s[2]],{ icon:icon }).addTo(map).bindPopup(s[0] + " bus station");
+      });
+      map.fitBounds(L.featureGroup(markers).getBounds().pad(0.18));
+    }catch(e){ /* map is a bonus — never break the page */
+      if(mapEl.parentElement) mapEl.parentElement.style.display = "none";
+    }
+  } else if(mapEl){
+    // Leaflet blocked by the app CSP (script-src has no unpkg) — hide the
+    // box instead of showing a blank frame (the owner's "vlank" complaint).
+    if(mapEl.parentElement) mapEl.parentElement.style.display = "none";
+  }
 })();
 </script>
 </body>
