@@ -8485,3 +8485,22 @@ SQL to run NOW: `supabase_phase253_wa_error_detail.sql`. Later (after the
 Meta edit approves): `supabase_phase253b_postcall_pdf_map.sql`. Script:
 `scripts/add-doc-header-post-call.sh` (owner runs with fresh TOKEN +
 BROCHURE_URL, end-of-day).
+
+### 126.1 · Phase 253 run-state + the early-253b incident (22 Jul, eve)
+- `supabase_phase253_wa_error_detail.sql` — **RUN** ✓ (error_detail live).
+- Template edits (add DOC header to post_call_callback + post_call_nurture) —
+  **submitted via the script, both In review** as of 22 Jul eve. Meta kept
+  serving the OLD (header-less) versions during review — PROVEN live (a
+  callback delivered 106→107 mid-review). So the §126 hazard is real in the
+  in-review window too: the mapping must match the SERVING version.
+- **Incident:** owner ran 253b during review → mapping (header param) vs
+  serving version (no header) mismatch → every new callback/nurture send
+  would have been rejected. Caught within minutes; ROLLED BACK (callback +
+  nurture header_doc_url NULLed, verified false). positive/neutral stay
+  mapped (their approved templates already carry headers).
+- **PENDING: when BOTH templates show Active in WhatsApp Manager, re-run the
+  FULL `supabase_phase253b_postcall_pdf_map.sql`.** That is the only open
+  step of Phase 253.
+- LESSON: an edited approved template keeps SENDING its previous approved
+  version while In review (Meta). "Approval and mapping flip together" means
+  flip on the status change to Active — never during the review window.
