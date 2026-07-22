@@ -8397,3 +8397,20 @@ for a template fetch) and update `companies.brochure_url` + the mapping.
 - ❌ Any customer-visible greeting built from `leads.name` raw — auto-created
   leads carry '.', phone numbers, 'WhatsApp lead'. Pass it through a
   junk-name guard first (cleanLeadName, send-template.js).
+
+### 125.1 · Phase 252.1 — brochure WAS delivering; inbox just never said so (22 Jul)
+Owner's diagnostics settled it: `post_call_maybe` (PDF template) sent 10× —
+9 delivered/read (8 READ), 1 failed (number likely not on WhatsApp). A WhatsApp
+template is ONE atomic message → delivered = text + PDF together. So "brochure
+not attached" was a DISPLAY gap: the inbox log stored only the substituted text
+with no sign the document header went. Fix: `send-template.js` appends
+`(attachment: <header_doc_name>)` to the logged body when `header_doc_url` is
+set. `post_call_good` = 0 sends EVER (144 total) — behavioral, not mechanical:
+a Good outcome usually leads to booking a meeting as next action, which SKIPS
+the WhatsApp prompt (the §120 meeting guard), so the company-send button is
+never offered on the happiest path. Mechanism proven identical to Maybe (same
+doc header + 2 vars) → no code fix needed; wiring the meeting-confirmation
+prompt on the lead-detail landing (§120 open item) is what would surface it.
+- ❌ FOOT-GUN: a template send that carries a header attachment but logs only
+  the body text reads as "attachment missing" to every human. Log what the
+  customer actually received — text AND attachment marker.

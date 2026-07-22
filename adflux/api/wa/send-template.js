@@ -377,9 +377,16 @@ async function sendToLead({ uid, role, callerName, leadId }) {
       // Log the REAL text, not "[template] <name>". A rep opening the thread
       // has to be able to read what the customer was actually sent — the raw
       // template name told them nothing.
-      const logBody = tpl.preview_body
+      let logBody = tpl.preview_body
         ? vars.reduce((s, v, i) => s.split(`{{${i + 1}}}`).join(v), tpl.preview_body)
         : `[template] ${tpl.meta_template_name}`
+      // Phase 252.1 — when the template carries a document header, SAY SO in
+      // the log. The PDF was delivering all along (verified: 9/10 read or
+      // delivered), but the inbox showed only the text, so everyone read it
+      // as "brochure not attached".
+      if (tpl.header_doc_url) {
+        logBody += `\n\n(attachment: ${tpl.header_doc_name || 'PDF'})`
+      }
       await sb('whatsapp_messages', {
         method: 'POST',
         body: JSON.stringify({
