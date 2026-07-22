@@ -8745,3 +8745,12 @@ old one, just background changes like this." So:
      `window.L` is absent (live CSP blocks unpkg — the original "vlank"
      complaint) the `.map-wrap` box now HIDES instead of rendering an empty
      frame. Cities grid below still shows. Do NOT remove this else-branch.
+
+### 129.2 · Phase 257.2 — /led video showcase moved up under the hero (22 Jul)
+Owner (red-box sketch): "i want videos to be here, all other data below." New
+/led order: hero (headline · lede · CTA buttons) → **video showcase**
+(`.sec-video`, tight 18px top padding, sec-sub line dropped) → trust ticks +
+GSRTC departure board (relocated into a new `.hero-tail` section) → stats band
+→ moat → how-it-works → funnel → stations → CTA. Markup moved verbatim —
+no JS change (video pills still rebuild from /api/deck-videos, board flip +
+count-up untouched).

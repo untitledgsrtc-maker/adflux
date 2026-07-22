@@ -139,6 +139,11 @@
 
   /* ── generic section ───────────────────────────────────── */
   section{padding:74px 0}
+  /* video showcase sits tight under the hero (Phase 257.2) */
+  .sec-video{padding:18px 0 60px}
+  /* trust ticks + departure board, relocated below the videos */
+  .hero-tail{padding:0 0 10px}
+  .hero-tail .trust{margin-top:0}
   .sec-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--yellow);margin-bottom:16px}
   h2{font-family:var(--display);font-weight:700;letter-spacing:-.02em;line-height:1.05;font-size:clamp(28px,6vw,44px)}
   h2 .dim{color:var(--muted-2)}
@@ -319,6 +324,32 @@
         </a>
         <a class="btn btn-ghost" href="#how">See how it works</a>
       </div>
+    </div>
+  </section>
+
+  <!-- VIDEO SHOWCASE — moved up under the hero (owner, 22 Jul); all other data below -->
+  <section class="sec-video">
+    <div class="wrap">
+      <div class="sec-eyebrow rise">See it live</div>
+      <h2 class="rise">Real screens. Real stations.</h2>
+      <div class="show">
+        <div class="screen rise">
+          <span class="tag" id="vtag">STATION · LIVE</span>
+          <video id="mainVideo" src="/deck/station-hero.mp4" poster="/deck/station-1.jpg" muted loop playsinline autoplay preload="metadata"></video>
+        </div>
+        <div class="thumbs rise">
+          <button class="thumb active" data-src="/deck/station-hero.mp4" data-tag="STATION · LIVE" type="button">Station</button>
+          <button class="thumb" data-src="/deck/veraval-hero.mp4" data-tag="VERAVAL · LIVE" type="button">Veraval</button>
+          <button class="thumb" data-src="/deck/bhavnagar.mp4" data-tag="BHAVNAGAR · LIVE" type="button">Bhavnagar</button>
+          <button class="thumb" data-src="/deck/gandhinagar.mp4" data-tag="GANDHINAGAR · LIVE" type="button">Gandhinagar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- trust ticks + station board (relocated below the videos) -->
+  <section class="hero-tail">
+    <div class="wrap">
       <div class="trust rise">
         <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>264 screens</b></span>
         <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <b>20 stations live</b></span>
@@ -349,27 +380,6 @@
       </div>
     </div>
   </div>
-
-  <!-- VIDEO SHOWCASE -->
-  <section>
-    <div class="wrap">
-      <div class="sec-eyebrow rise">See it live</div>
-      <h2 class="rise">Real screens. Real stations.</h2>
-      <p class="sec-sub rise">Your ad, glowing on the LED walls where Gujarat waits — bus stations, platforms, thousands of eyes a day.</p>
-      <div class="show">
-        <div class="screen rise">
-          <span class="tag" id="vtag">STATION · LIVE</span>
-          <video id="mainVideo" src="/deck/station-hero.mp4" poster="/deck/station-1.jpg" muted loop playsinline autoplay preload="metadata"></video>
-        </div>
-        <div class="thumbs rise">
-          <button class="thumb active" data-src="/deck/station-hero.mp4" data-tag="STATION · LIVE" type="button">Station</button>
-          <button class="thumb" data-src="/deck/veraval-hero.mp4" data-tag="VERAVAL · LIVE" type="button">Veraval</button>
-          <button class="thumb" data-src="/deck/bhavnagar.mp4" data-tag="BHAVNAGAR · LIVE" type="button">Bhavnagar</button>
-          <button class="thumb" data-src="/deck/gandhinagar.mp4" data-tag="GANDHINAGAR · LIVE" type="button">Gandhinagar</button>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <!-- MOAT -->
   <section>
