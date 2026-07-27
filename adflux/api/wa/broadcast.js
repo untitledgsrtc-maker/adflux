@@ -54,12 +54,15 @@ export default async function handler(req, res) {
   const { data: me } = await admin.from('users').select('role').eq('id', uid).maybeSingle()
   if (!me || !['admin', 'co_owner'].includes(me.role)) return res.status(403).json({ error: 'not_allowed' })
 
-  // active sending account (phone_number_id + waba_id)
-  // Phase 200 — require a COMPLETE account (both ids). A half-configured active
-  // row (e.g. a leftover with waba_id NULL) must never be picked, or the send
-  // goes out a different number than templates.js lists → Meta #132001.
+  // marketing sending account (phone_number_id + waba_id)
+  // Phase 262 — resolve by purpose='marketing', NOT is_active. Both the service
+  // and marketing numbers are is_active=true, so the old "is_active ORDER BY
+  // created_at ASC LIMIT 1" silently picked the OLDEST = the SERVICE number →
+  // a broadcast would go out the wrong line, and the picker listed the wrong
+  // WABA's templates (§133). A broadcast is business-initiated marketing → it
+  // MUST use the marketing number. Still require a COMPLETE account (both ids).
   const { data: acct } = await admin.from('whatsapp_accounts')
-    .select('phone_number_id, waba_id').eq('is_active', true)
+    .select('phone_number_id, waba_id').eq('purpose', 'marketing')
     .not('phone_number_id', 'is', null).not('waba_id', 'is', null)
     .order('created_at', { ascending: true }).limit(1).maybeSingle()
   const pnid = acct?.phone_number_id
@@ -133,19 +136,43 @@ export default async function handler(req, res) {
     }
     if (!uniq.length) return res.status(400).json({ error: 'no_recipients', detail: 'This segment has no leads with a usable phone.' })
 
+    // Phase 262 — HARD OPT-IN GATE. A broadcast is business-initiated marketing;
+    // WhatsApp policy requires the recipient to have OPTED IN, not merely "not
+    // opted out". So we keep ONLY phones that MESSAGED our WhatsApp first (a
+    // conversation with last_inbound_at set = they contacted us). This makes it
+    // impossible to cold-blast a lead list — the exact mistake that got the
+    // marketing number flagged for spam (§133). Cross-number: a prior inbound on
+    // EITHER our line counts as opting in to the business.
+    const optedIn = new Set()
+    const allPhones = uniq.map((x) => x.phone)
+    for (let i = 0; i < allPhones.length; i += 300) {
+      const chunk = allPhones.slice(i, i + 300)
+      const { data: convs, error: ce } = await admin.from('whatsapp_conversations')
+        .select('customer_wa_id')
+        .in('customer_wa_id', chunk)
+        .not('last_inbound_at', 'is', null)
+      if (ce) return res.status(502).json({ error: 'optin_check_failed', detail: ce.message })
+      ;(convs || []).forEach((c) => optedIn.add(c.customer_wa_id))
+    }
+    const gated = uniq.filter((x) => optedIn.has(x.phone))
+    if (!gated.length) return res.status(400).json({
+      error: 'no_opted_in_recipients',
+      detail: 'A broadcast can only go to people who messaged your WhatsApp first (opt-in). No one in this segment has — WhatsApp bans cold marketing to non-opted-in numbers.',
+    })
+
     const { data: bc, error: be } = await admin.from('campaign_broadcasts').insert({
       segment_id: seg.id, segment_name: seg.name, template_name: templateName,
-      template_language: language, status: 'queued', total: uniq.length, created_by: uid,
+      template_language: language, status: 'queued', total: gated.length, created_by: uid,
       header_type: headerType || null, header_media_url: headerMediaUrl || null,
     }).select('id').maybeSingle()
     if (be || !bc) return res.status(502).json({ error: 'create_failed', detail: be?.message })
 
-    const rows = uniq.map((x) => ({ broadcast_id: bc.id, lead_id: x.lead_id, phone: x.phone, name: x.name, status: 'queued' }))
+    const rows = gated.map((x) => ({ broadcast_id: bc.id, lead_id: x.lead_id, phone: x.phone, name: x.name, status: 'queued' }))
     for (let i = 0; i < rows.length; i += 500) {
       const { error: ie } = await admin.from('broadcast_recipients').insert(rows.slice(i, i + 500))
       if (ie) return res.status(502).json({ error: 'queue_failed', detail: ie.message })
     }
-    return res.status(200).json({ ok: true, broadcast_id: bc.id, total: uniq.length })
+    return res.status(200).json({ ok: true, broadcast_id: bc.id, total: gated.length })
   }
 
   // ── SEND_BATCH: send the next ≤25 queued recipients ──

@@ -37,10 +37,13 @@ export default async function handler(req, res) {
   if (!me || !['admin', 'co_owner'].includes(me.role)) return res.status(403).json({ error: 'not_allowed' })
 
   // ── resolve the WABA id from the active campaign account ──
-  // Phase 200 — require a COMPLETE account (both ids), same as broadcast.js, so
-  // the template list + the send always resolve the SAME account.
+  // Phase 262 — resolve by purpose='marketing', NOT is_active (both numbers are
+  // is_active=true → the old resolver picked the oldest = SERVICE WABA, so this
+  // listed the wrong WABA's templates while broadcast.js sent from another line,
+  // §133). Marketing is where our business-initiated templates live. Must match
+  // broadcast.js exactly so the template list + the send resolve the SAME WABA.
   const { data: acct } = await admin.from('whatsapp_accounts')
-    .select('waba_id').eq('is_active', true)
+    .select('waba_id').eq('purpose', 'marketing')
     .not('waba_id', 'is', null).not('phone_number_id', 'is', null)
     .order('created_at', { ascending: true }).limit(1).maybeSingle()
   const wabaId = acct?.waba_id

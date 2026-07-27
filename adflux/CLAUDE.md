@@ -9049,3 +9049,61 @@ request, `PHOTO: <city>` marker), which is a response, not a cold push.
 - ❌ Concluding a WhatsApp spam flag is "inherited / do nothing" without the
   per-number, per-day OUTBOUND volume cut. A live 200-300/day auto-message funnel on
   a young number is a driver, not noise — and it's fixable on our side.
+
+
+---
+
+## 134 · Phase 262 — WhatsApp send routing made purpose-explicit + hard opt-IN gate on Broadcast (2026-07-27)
+
+The two hardenings flagged in §133, shipped + adversarially reviewed (verdict
+PASS after one P2 fix). Both close the "we could repeat Cronberry's spam" risk.
+JS/Edge only, no SQL, no APK.
+
+### Fix 1 — sends resolve by PURPOSE, not is_active (`api/wa/broadcast.js` + `api/wa/templates.js`)
+BOTH numbers are `is_active=true` (service 919581578261 + marketing 919898273686),
+so the old resolver `.eq('is_active',true).order('created_at').limit(1)` silently
+picked the OLDEST = the SERVICE number. So a broadcast would have gone out the wrong
+line, and the broadcast page's template picker listed the SERVICE WABA's templates
+while our real templates (post_call_*, gsrtc_led_intro) live on the MARKETING WABA
+(§119/§120) — a latent mismatch (`templateHasVar` could silently fail). Both now
+`.eq('purpose','marketing')` (keeping the complete-account `.not(...is null)` guards
++ limit(1)), so the template LIST and the SEND resolve the SAME marketing WABA (the
+Phase 200 invariant). `send.js` + `ai-reply.js` were already correct (they resolve by
+the conversation's own account — a reply goes out the number the customer messaged);
+`send-template.js` already used `purpose='marketing'`.
+- **CONTRACT:** a marketing/broadcast/template-manager send resolves the account by
+  `purpose='marketing'`, NEVER by `is_active`. A per-conversation reply resolves by
+  the conversation's `whatsapp_account_id`. Do NOT reintroduce `is_active`-based
+  account resolution while >1 account is active.
+
+### Fix 2 — HARD opt-IN gate on Broadcast (`api/wa/broadcast.js` create)
+A broadcast is business-initiated marketing → WhatsApp policy requires opt-**IN**,
+not merely "not opted out". After building the segment's `uniq` recipients, the
+create action now keeps ONLY phones that MESSAGED us first — present in
+`whatsapp_conversations` with `last_inbound_at IS NOT NULL` (chunked `.in()` at 300,
+service-role read so it sees all conversations, cross-number: a prior inbound on
+EITHER line counts). `gated` replaces `uniq` for the stored `total`, the recipient
+rows, AND the response. Empty → 400 `no_opted_in_recipients`. So it is now
+IMPOSSIBLE to cold-blast a lead list from the app — the exact Cronberry mistake.
+- Format match verified: `customer_wa_id = m.from` (webhook.js:563) = Meta's raw
+  wa_id = '91'+10 digits for Indian numbers = exactly `cleanPhone` output → the gate
+  ADMITS real opted-in people (not always-empty), and a format mismatch would fail
+  CLOSED (exclude → never blast) = safe direction.
+- `send_batch` sends the already-gated queued rows; the `test` action (send to ONE
+  number) is intentionally left ungated (admin test-to-self, not a blast).
+- **CONTRACT:** Broadcast recipients MUST be opt-in (prior inbound). Do NOT relax the
+  gate to "excludes opted-out only" — that's what got the number flagged.
+
+### Review catch (the P2, fixed pre-push)
+The create response still returned the PRE-gate `total: uniq.length` at line 175 (the
+DB total + rows already used `gated`) → the API would report "500 recipients" when 50
+were queued, undermining the gate's transparency. Fixed to `gated.length`.
+- ❌ FOOT-GUN: when swapping a variable (uniq→gated) across a block, grep EVERY
+  reference — the response-JSON copy is the easy one to miss (DB write + loop looked
+  done). The adversarial reviewer caught it; the parse-check did not (both are valid JS).
+
+### Still open (owner-aware)
+- The `is_active=true`-on-both-accounts DATA is unchanged (both legitimately active);
+  Phase 262 fixed the CODE to not depend on it. If a future path needs "the active
+  sender", it must pick by purpose.
+- Optional "send poster once they REPLY" engagement gate (§133) — not built.
