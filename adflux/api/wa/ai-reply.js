@@ -291,11 +291,18 @@ export default async function handler(req) {
     } catch { /* the message was sent; a log failure is non-fatal */ }
   }
 
-  // Welcome poster on the FIRST message of a conversation (best-effort — a bad
-  // url must never block the reply). Sent before the text so it opens the chat.
-  if (firstContact && acct.ai_welcome_image_url && String(acct.ai_welcome_image_url).trim()) {
-    try { const id = await sendWa({ type: 'image', image: { link: acct.ai_welcome_image_url } }); await logOut('image', '[image]', id) } catch { /* poster skipped */ }
-  }
+  // Phase 261 (2026-07-27) — auto welcome-POSTER on first contact REMOVED to
+  // protect the marketing number's WhatsApp quality rating. Meta flagged
+  // 98982 73686 for "sending spam" (07-27): the number does 200-327 auto-
+  // messages/day from cold QR-scan first-contacts, and an unsolicited IMAGE
+  // before the person says a word is the top block/report trigger. The AI now
+  // opens with TEXT ONLY (its reply already shares the app.untitledad.in/led
+  // link, which carries the poster + video + map). The poster/photo is still
+  // sent CONTEXTUALLY below — only when the customer asks to see a specific
+  // city (the engagement-gated `photoUrl` path). `firstContact` (line ~183) is
+  // retained for a possible future "send poster once they reply" gate.
+  // DO NOT re-add an auto-image on firstContact without owner sign-off — it is
+  // the exact signal this removal exists to stop (§115 live-AI change).
 
   try {
     if (reply) { const id = await sendWa({ type: 'text', text: { body: reply } }); await logOut('text', reply, id) }

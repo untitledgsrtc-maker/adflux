@@ -8980,3 +8980,72 @@ whose phone another rep owns → the error names the rep.
 - ❌ A dup-lead warning that resolves the owner via `assigned_to` alone MISSES the
   TC owner of a telecaller-owned lead. Resolve owner as COALESCE(telecaller_id,
   assigned_to) everywhere (§113/§243) — the same expression the inbox + reassign use.
+
+
+---
+
+## 133 · Phase 261 — WhatsApp AI drops the auto welcome-IMAGE on first contact (spam-flag response) (2026-07-27)
+
+Meta flagged the MARKETING number 98982 73686 (WABA 2870129030006085) for
+"sending spam" (email from notification@facebookmail.com — real Meta domain,
+07-27). Investigation (read-only SQL, owner ran) established the cause.
+
+### The investigation (what the data showed)
+- **We NEVER ran a broadcast** — `campaign_broadcasts` last 60 days = 0 rows. Our
+  `api/wa/broadcast.js` cold-blast path was never used (and it resolves the OLDEST
+  is_active account = the SERVICE number anyway, not marketing).
+- **BUT both accounts are `is_active=true`** (service 919581578261 + marketing
+  919898273686) — a LATENT ambiguity: the "active sender" resolver
+  (broadcast.js `is_active=true ORDER BY created_at ASC LIMIT 1`) could pick the
+  wrong line. FLAGGED, not fixed (owner decision pending). If a send ever goes out
+  the wrong number, this is why — make sends purpose-explicit.
+- **The real driver:** the marketing number went live 07-20 (QR boards re-pointed
+  §119 + AI enabled) and since then does **200-327 outbound/day** — all from the
+  cold QR-scan funnel. `whatsapp_messages` out-count per day, marketing number,
+  ramped from 20 (07-20) to 306 (07-22) and held 200-327. Flag arrived 07-27 after
+  a week of that volume on a YOUNG number. Each first-time scanner triggered, before
+  saying a word: (1) an auto welcome-POSTER image (§246.2), (2) an AI sales reply.
+  Unsolicited image → block/report → Meta spam detection. The Cronberry pre-migration
+  history (§119, ~5,600 blasts) adds to it but the LIVE auto-image funnel is the lever.
+- ❌ CORRECTED MYSELF mid-investigation: first said "just Cronberry legacy, do
+  nothing" — WRONG. The per-number/per-day outbound data showed a live 300/day
+  auto-message funnel on a fresh number. Always pull the volume-by-day-by-number cut
+  before concluding a spam flag is "just inherited."
+
+### The fix (Phase 261, `api/wa/ai-reply.js`, owner picked option A)
+REMOVED the `firstContact` auto welcome-IMAGE block (was: send poster image BEFORE
+the text on the first message of every conversation). The AI now opens with **TEXT
+ONLY** — its reply already shares the app.untitledad.in/led link (poster + video +
+map). The poster/photo is still sent CONTEXTUALLY (the engagement-gated `photoUrl`
+path, line ~313) — ONLY when the customer asks to see a specific city (a real
+request, `PHOTO: <city>` marker), which is a response, not a cold push.
+- Applies to BOTH numbers' AI (both accounts have `ai_welcome_image_url` set) —
+  consistent, protects the service number's quality too.
+- `firstContact` (line ~183) is retained (unused now) for a possible future
+  "send poster once they REPLY" gate. `ai_welcome_image_url` is still selected +
+  stored — untouched, just no longer auto-fired.
+
+### FROZEN CONTRACT (do NOT regress)
+- ❌ DO NOT re-add an auto-image (or any unsolicited media) on `firstContact` in
+  ai-reply.js without owner sign-off. That IS the block/report signal this removal
+  exists to stop. A young/recovering number has near-zero tolerance for
+  unsolicited-feeling auto-media to cold first-contacts.
+- Business-initiated marketing on WhatsApp needs opt-**IN**, not merely "not opted
+  out." A QR scanner who messaged once is a weak opt-in; auto-pushing media to them
+  before they engage reads as spam.
+- The AI text reply + the contextual city-photo-on-request stay — those are
+  customer-initiated responses, policy-safe.
+
+### Recovery + still-open
+- Quality recovers over days-to-weeks as the block/report signal ages out AND no new
+  auto-image goes to cold scanners. Owner: check WhatsApp Manager → 98982 → Quality.
+- STILL OPEN (owner-aware, not built): (1) the `is_active=true` on BOTH accounts —
+  make sends purpose-explicit so the active-sender resolver can't pick wrong; (2) a
+  hard opt-IN gate on `api/wa/broadcast.js` (today it excludes opted-OUT leads but
+  does NOT require a prior inbound — it CAN cold-blast a lead list; never used, but
+  the gap is real); (3) optional "send poster after they reply" engagement gate.
+
+### Foot-gun
+- ❌ Concluding a WhatsApp spam flag is "inherited / do nothing" without the
+  per-number, per-day OUTBOUND volume cut. A live 200-300/day auto-message funnel on
+  a young number is a driver, not noise — and it's fixable on our side.
