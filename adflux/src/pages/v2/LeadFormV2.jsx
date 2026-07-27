@@ -184,11 +184,16 @@ export default function LeadFormV2() {
       setError('City is required.')
       return
     }
-    // Phase 33D.6 — re-check dup at save time too (in case rep didn't blur).
+    // Phase 33D.6 + 260 — re-check dup at save time too (in case rep
+    // didn't blur). Name the owning rep, not just the lead.
     const dup = await findLeadByPhone(form.phone)
     if (dup) {
       setDupLead(dup)
-      setError(`This phone is already in your pipeline as "${dup.name}". Open the existing lead instead of creating a duplicate.`)
+      const dupOwnerId = dup.owner_id || dup.assigned_to
+      const mine = dupOwnerId && profile?.id && dupOwnerId === profile.id
+      setError(mine
+        ? `This phone is already in your pipeline as "${dup.name}". Open the existing lead instead of creating a duplicate.`
+        : `This phone is already with ${dup.owner_name || 'another rep'}${dup.owner_role ? ` (${dup.owner_role})` : ''} as "${dup.name}". Contact admin to reassign — do not create a duplicate.`)
       return
     }
     if (!form.source) {
@@ -420,16 +425,21 @@ export default function LeadFormV2() {
         </div>
       </div>
 
-      {/* Phase 33D.6 + 34Z.30 — duplicate-phone warning, two messages.
-          findLeadByPhone returns matches across ALL reps (RPC is
-          SECURITY DEFINER); the message branches on ownership so a
-          rep doesn't see a useless "Open existing" button pointing
-          at a lead RLS won't let them view.
-          • Mine     → message says "your pipeline" + Open existing button.
-          • Someone else's → message says "already in the system on
-            another rep's pipeline" + ask-admin nudge, no Open button. */}
+      {/* Phase 33D.6 + 34Z.30 + 260 — duplicate-phone warning.
+          findLeadByPhone (RPC find_lead_by_phone, SECURITY DEFINER)
+          returns matches across ALL reps + the OWNING rep. The message
+          branches on ownership so a rep doesn't see a useless "Open
+          existing" button pointing at a lead RLS won't let them view.
+          • Mine  → "your pipeline" + Open existing button.
+          • Someone else's → NAMES the rep who already has it (Phase 260
+            owner ask) + ask-admin nudge, no Open button. Owner comes
+            from COALESCE(telecaller_id, assigned_to) so a TC-owned lead
+            shows the TC, not the round-robin assigned_to. */}
       {dupLead && (() => {
-        const isMine = dupLead.assigned_to && profile?.id && dupLead.assigned_to === profile.id
+        const ownerId = dupLead.owner_id || dupLead.assigned_to
+        const isMine = ownerId && profile?.id && ownerId === profile.id
+        const roleLabel = { telecaller: 'Telecaller', sales: 'Sales', agency: 'Agency',
+          admin: 'Admin', co_owner: 'Co-owner', sales_manager: 'Manager' }[dupLead.owner_role] || null
         return (
           <div style={{
             marginBottom: 14, padding: '12px 14px',
@@ -442,10 +452,14 @@ export default function LeadFormV2() {
                 <>This number is already in <b>your pipeline</b> as <b>{dupLead.name}</b>
                   {dupLead.company ? ` (${dupLead.company})` : ''} · {dupLead.stage}.</>
               ) : (
-                <>This number is already in the system on <b>another rep's pipeline</b>
-                  {' '}({dupLead.name || '—'}{dupLead.company ? ` · ${dupLead.company}` : ''}
-                  {dupLead.stage ? ` · ${dupLead.stage}` : ''}).
-                  Contact admin to reassign or use a different number.</>
+                <>This number is already with{' '}
+                  {dupLead.owner_name
+                    ? <><b>{dupLead.owner_name}</b>{roleLabel ? ` · ${roleLabel}` : ''}</>
+                    : <b>another rep (not yet assigned)</b>}
+                  {' '}as <b>{dupLead.name || '—'}</b>
+                  {dupLead.company ? ` (${dupLead.company})` : ''}
+                  {dupLead.stage ? ` · ${dupLead.stage}` : ''}.
+                  {' '}Contact admin to reassign, or use a different number.</>
               )}
             </div>
             {isMine && (

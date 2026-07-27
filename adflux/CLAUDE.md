@@ -8906,3 +8906,77 @@ filter by the assigned telecaller. JS-only, additive, §45-safe, parse-clean.
 - Owner smoke: /campaigns/inbox as admin → the "All team" dropdown shows below
   the status chips → pick a telecaller → list narrows to their chats; pick
   Unassigned → only null-owner threads; a rep sees no dropdown (own threads only).
+
+
+---
+
+## 132 · Phase 260 — duplicate lead now NAMES the rep who already has it (2026-07-22)
+
+Owner: "when someone tries to add a lead already in the pipeline, show the
+representative who already has that lead" + "make everything permanent, don't
+small patches." Built as a single-source change (§71/§72), not a per-screen
+patch. Verified by a 4-lens adversarial workflow (guardian + security +
+completeness + correctness) → all PASS, only 2 P3 nits (both addressed/parked).
+
+### The gap
+The add-lead dup warning (`LeadFormV2`, the live create + meetingMode path)
+already blocked dups, but for ANOTHER rep's lead it said "another rep's pipeline"
+with **no name**. `find_lead_by_phone` returned `assigned_to` (owner id) but never
+the owner's NAME.
+
+### The permanent fix — the TWO single-source places every lead-add path flows through
+1. **`db/functions/find_lead_by_phone.sql`** (NEW canonical, §71/§72 — was
+   duplicated in phase33d6, body now REMOVED there). RETURNS-type change (DROP
+   before CREATE): ADDS `owner_id = COALESCE(telecaller_id, assigned_to)` (the
+   TRUE owner — a TC-owned lead lives on telecaller_id §113/§243, so resolving via
+   assigned_to alone was wrong), `owner_name` (users.name), `owner_role`,
+   `is_open` (stage NOT IN Won/Lost). SECURITY DEFINER (phone-keyed single row, not
+   an enumeration). Phone match widened to (v_digits, v_key, v_bare) = same
+   normalization as `find_open_lead_id_by_phone` so it catches the 91-prefix
+   variants. ORDER BY is_open DESC, created_at ASC → picks the SAME lead the block
+   trigger would → warning + DB safety-net always agree.
+2. **`db/functions/leads_block_dup_phone.sql`** (NEW canonical, was single-copy in
+   phase34w, body moved). The BEFORE-INSERT trigger that catches EVERY path that
+   bypasses the form (CSV import cross-rep rows, programmatic, race). Now SECURITY
+   DEFINER + its RAISE EXCEPTION NAMES the owning rep (SELECT l.name, u.name … LEFT
+   JOIN users ON id = COALESCE(telecaller_id, assigned_to) WHERE l.id = v_existing).
+   The users lookup runs ONLY in the reject branch → zero hot-path cost on the
+   common no-dup INSERT (§45). So CSV-import error rows + any future path surface
+   WHO owns it — not just the form.
+3. **`src/pages/v2/LeadFormV2.jsx`** (§28 FROZEN, guardian PASS): the dup-warning
+   render + the save-time error now show `owner_name` (+ role label); `isMine` now
+   uses `owner_id` (was `assigned_to`). Display-only — the leads INSERT payload +
+   dedup gate behavior byte-unchanged. `src/utils/leadDedup.js` untouched (returns
+   the row verbatim → the extra columns flow through; a superset, no caller breaks).
+
+### Contracts / notes
+- **Deploy-order safe (§45):** if the SQL hasn't been run yet, the new columns are
+  `undefined` → the frontend falls back to `assigned_to` + generic text. No hazard.
+- **Neutered copies:** phase33d6 (find_lead_by_phone) + phase34w
+  (leads_block_dup_phone body) had their bodies removed → re-running the old phase
+  files can NEVER revert the owner columns. phase34w keeps find_open_lead_id_by_phone
+  + the CREATE TRIGGER wiring; the canonical owns the fn body only (the §72 pattern).
+- **Security (review PASS):** owner_name/owner_role is data the `users` read-all
+  policy already exposes to every authenticated user; no incremental leak; exactly
+  what the owner asked for; the block trigger's SECDEF body is a pure read + RAISE
+  (no writes, no dynamic SQL, search_path pinned) and does NOT change who the INSERT
+  itself runs as (trigger-fn scope only).
+- **PARKED (P3, pre-existing, NOT a Phase 260 regression):** the frontend hard-blocks
+  Save on a Won/Lost dup too, while the DB trigger deliberately PERMITS re-adding a
+  closed lead (renewal/re-engage). `find_lead_by_phone` now returns `is_open` so a
+  future change could gate the frontend block on `is_open === true` (warn-but-allow
+  closed) to match the trigger — owner decision, left as-is (changing save behavior
+  on a frozen page is scope creep; owner asked only to show the rep).
+
+### Owner action
+Run BOTH in Supabase Studio: `db/functions/find_lead_by_phone.sql` +
+`db/functions/leads_block_dup_phone.sql`. Each ends with a VERIFY block (fn_exists,
+has_owner_name/names_owner, resolves_tc_owner, is_definer — all should be true/1).
+Then push (JS reaches the APK on next open). Smoke: as a rep, type a phone that
+another rep owns → the warning names that rep (+ role); as admin, CSV-import a row
+whose phone another rep owns → the error names the rep.
+
+### Foot-gun
+- ❌ A dup-lead warning that resolves the owner via `assigned_to` alone MISSES the
+  TC owner of a telecaller-owned lead. Resolve owner as COALESCE(telecaller_id,
+  assigned_to) everywhere (§113/§243) — the same expression the inbox + reassign use.

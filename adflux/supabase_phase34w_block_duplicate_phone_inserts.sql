@@ -73,30 +73,13 @@ GRANT EXECUTE ON FUNCTION public.find_open_lead_id_by_phone(text) TO authenticat
 
 
 -- ─── 2. Trigger: block duplicate-phone inserts ──────────────────────
-CREATE OR REPLACE FUNCTION public.leads_block_dup_phone()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-  v_existing uuid;
-BEGIN
-  -- No phone on the new row → nothing to dedup.
-  IF NEW.phone IS NULL OR length(regexp_replace(NEW.phone, '\D', '', 'g')) < 10 THEN
-    RETURN NEW;
-  END IF;
-
-  -- Find any OPEN lead (stage not terminal) with same phone.
-  v_existing := public.find_open_lead_id_by_phone(NEW.phone);
-
-  IF v_existing IS NOT NULL THEN
-    RAISE EXCEPTION
-      'Phone % is already in an open lead (id %). Open that lead instead, or mark it Lost first before re-adding.',
-      NEW.phone, v_existing
-      USING HINT = 'Frontend phone-dedup should have caught this — see Phase 33D.6 findLeadByPhone.';
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+-- MOVED (Phase 260, §71/§72): the leads_block_dup_phone() BODY is now
+-- the single canonical file db/functions/leads_block_dup_phone.sql,
+-- which additionally NAMES the owning rep in the rejection message. The
+-- body was REMOVED here so re-running phase34w can no longer revert to
+-- the owner-less version. The helper find_open_lead_id_by_phone (above)
+-- + the CREATE TRIGGER (below) stay here — this file still owns the
+-- trigger wiring; run the canonical for the function body.
 
 DROP TRIGGER IF EXISTS trg_leads_block_dup_phone ON public.leads;
 CREATE TRIGGER trg_leads_block_dup_phone

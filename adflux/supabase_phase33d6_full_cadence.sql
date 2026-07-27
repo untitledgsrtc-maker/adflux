@@ -165,27 +165,11 @@ CREATE TRIGGER trg_followup_after_done
   EXECUTE FUNCTION public.followup_after_done();
 
 -- ─── 8. Duplicate phone lookup ──────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.find_lead_by_phone(p_phone text)
-RETURNS TABLE (id uuid, name text, company text, stage text, assigned_to uuid)
-LANGUAGE plpgsql STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_digits text := regexp_replace(COALESCE(p_phone, ''), '\D', '', 'g');
-  v_norm text;
-BEGIN
-  IF length(v_digits) < 10 THEN RETURN; END IF;
-  v_norm := CASE WHEN length(v_digits) = 10 THEN '91' || v_digits ELSE v_digits END;
-  RETURN QUERY
-  SELECT l.id, l.name, l.company, l.stage, l.assigned_to
-    FROM public.leads l
-   WHERE regexp_replace(COALESCE(l.phone, ''), '\D', '', 'g') = v_digits
-      OR regexp_replace(COALESCE(l.phone, ''), '\D', '', 'g') = v_norm
-   LIMIT 1;
-END $$;
-
-GRANT EXECUTE ON FUNCTION public.find_lead_by_phone(text) TO authenticated;
+-- MOVED (Phase 260, §71/§72): find_lead_by_phone is now the single
+-- canonical file db/functions/find_lead_by_phone.sql, which ADDS the
+-- owner columns (owner_name/owner_id/owner_role/is_open) the dup warning
+-- needs. The body was REMOVED here so re-running phase33d6 can no longer
+-- revert to the owner-less version. To change it, edit the canonical.
 
 -- ─── 9. Seed 3 nurture template variants (rotation) ────────────────
 -- Keep existing 'Nurture' row; add 2 sibling rows so the rotation has
@@ -213,6 +197,10 @@ ON CONFLICT DO NOTHING;
 NOTIFY pgrst, 'reload schema';
 
 -- ─── VERIFY ────────────────────────────────────────────────────────
+-- NOTE (Phase 260): find_lead_by_phone's body now lives ONLY in
+-- db/functions/find_lead_by_phone.sql. This count still includes it, so
+-- function_count = 8 requires that canonical file to have been run too
+-- (7 if only this file is run standalone). Not a break — expectation note.
 SELECT
   (SELECT count(*) FROM pg_proc WHERE proname IN
     ('spawn_lead_intro_cadence','spawn_quote_chase_cadence',
