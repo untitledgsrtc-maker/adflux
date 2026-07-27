@@ -16,7 +16,7 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'   // Phase 205 — rep vs admin scope
 import {
   Loader2, AlertTriangle, RefreshCw, MessageSquare, Lock, ArrowLeft, Send, Check, CheckCheck,
-  ChevronDown, FileText, X, Film, ImageIcon,
+  ChevronDown, FileText, X, Film, ImageIcon, Search,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import CampaignChrome from '../../components/v2/CampaignChrome'
@@ -102,6 +102,11 @@ export default function CampaignInboxV2() {
   const [threads, setThreads] = useState([])
   const [previews, setPreviews] = useState({}) // convId → last message body
   const [selId, setSelId] = useState(null)
+  // Phase 258 — conversation search (name or number) + status filter. Purely
+  // client-side over the already-loaded threads (no new query). A TC searches
+  // within their own assigned threads (RLS-scoped, §243).
+  const [convSearch, setConvSearch] = useState('')
+  const [convFilter, setConvFilter] = useState('all') // all | open | needs | reply
   const [msgs, setMsgs] = useState([])
   const [msgLoading, setMsgLoading] = useState(false)
   const [draft, setDraft] = useState('')
@@ -297,6 +302,25 @@ export default function CampaignInboxV2() {
 
   const sel = threads.find((t) => t.id === selId) || null
   const openCount = threads.filter((t) => windowOpen(t.window_expires_at)).length
+
+  // Phase 258 — filter the loaded threads by the search box (name OR number)
+  // and the status chip. Client-side only; the full list stays in `threads`.
+  const searchQ = convSearch.trim().toLowerCase()
+  const searchDigits = searchQ.replace(/\D/g, '')
+  const filteredThreads = threads.filter((t) => {
+    const isOpen = windowOpen(t.window_expires_at)
+    if (convFilter === 'open' && !isOpen) return false
+    if (convFilter === 'needs' && isOpen) return false
+    if (convFilter === 'reply' && !(t.last_message_direction === 'in' && isOpen)) return false
+    if (!searchQ) return true
+    const name = String(t.customer_name || '').toLowerCase()
+    if (name.includes(searchQ)) return true
+    if (searchDigits.length >= 3) {
+      const phone = String(t.customer_wa_id || '').replace(/\D/g, '')
+      if (phone.includes(searchDigits)) return true
+    }
+    return false
+  })
 
   // Load the selected conversation's lead (powers the assigned/reassign pill +
   // Create quote). One small read per conversation-open; campaign admin page.
@@ -562,14 +586,75 @@ export default function CampaignInboxV2() {
           background: 'var(--v2-bg-1)', border: '1px solid var(--v2-line)',
           borderRadius: 14, overflow: 'hidden', alignSelf: 'flex-start',
         }}>
-          <div style={{
-            padding: '12px 14px', borderBottom: '1px solid var(--v2-line)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--v2-ink-0, #f5f7fb)', fontFamily: 'var(--v2-display)' }}>
-              Conversations
-            </span>
-            {threads.length > 0 && <span style={chipY}>{openCount} open</span>}
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--v2-line)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--v2-ink-0, #f5f7fb)', fontFamily: 'var(--v2-display)' }}>
+                Conversations
+              </span>
+              {threads.length > 0 && <span style={chipY}>{openCount} open</span>}
+            </div>
+
+            {/* Phase 258 — search by name or number */}
+            <div style={{ position: 'relative' }}>
+              <Search size={15} strokeWidth={1.6} style={{
+                position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+                color: 'var(--v2-ink-2, #6a7590)', pointerEvents: 'none',
+              }} />
+              <input
+                type="text"
+                value={convSearch}
+                onChange={(e) => setConvSearch(e.target.value)}
+                placeholder="Search name or number"
+                aria-label="Search conversations by name or number"
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '9px 30px 9px 32px', fontSize: 13,
+                  background: 'var(--v2-bg-2)', color: 'var(--v2-ink-0, #f5f7fb)',
+                  border: '1px solid var(--v2-line)', borderRadius: 10, outline: 'none',
+                }}
+              />
+              {convSearch && (
+                <button
+                  type="button"
+                  onClick={() => setConvSearch('')}
+                  title="Clear"
+                  style={{
+                    position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                    display: 'flex', padding: 4, border: 'none', background: 'transparent',
+                    color: 'var(--v2-ink-2, #6a7590)', cursor: 'pointer',
+                  }}
+                >
+                  <X size={15} strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
+
+            {/* status filter chips */}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'reply', label: 'Reply' },
+                { key: 'open', label: 'Open' },
+                { key: 'needs', label: 'Needs template' },
+              ].map((f) => {
+                const on = convFilter === f.key
+                return (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => setConvFilter(f.key)}
+                    style={{
+                      fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999,
+                      cursor: 'pointer', border: '1px solid ' + (on ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-line)'),
+                      background: on ? 'var(--v2-tint-yellow, rgba(255,230,0,0.14))' : 'transparent',
+                      color: on ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-2, #6a7590)',
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {loading ? (
@@ -582,9 +667,15 @@ export default function CampaignInboxV2() {
               <p style={{ fontSize: 13, margin: '10px 0 0' }}>No conversations yet.</p>
               <p style={{ fontSize: 12, margin: '4px 0 0' }}>A WhatsApp message to your number appears here.</p>
             </div>
+          ) : filteredThreads.length === 0 ? (
+            <div style={{ padding: '30px 18px', textAlign: 'center', color: 'var(--v2-ink-2, #6a7590)' }}>
+              <Search size={22} strokeWidth={1.6} style={{ opacity: 0.5 }} />
+              <p style={{ fontSize: 13, margin: '10px 0 0' }}>No conversations match.</p>
+              <p style={{ fontSize: 12, margin: '4px 0 0' }}>Try a different name, number or filter.</p>
+            </div>
           ) : (
             <div style={{ maxHeight: 600, overflowY: 'auto' }}>
-              {threads.map((t) => {
+              {filteredThreads.map((t) => {
                 const active = t.id === selId
                 const av = avatarFor(t.customer_wa_id)
                 return (

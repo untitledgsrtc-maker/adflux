@@ -8837,3 +8837,37 @@ live on both AI numbers):
 - FOOT-GUN closed: a hardcoded "facts" list in an AI system prompt goes stale
   /wrong silently (Vadodara). Ground per-entity facts by INJECTING from the
   master at request time; hardcode only what never changes.
+
+---
+
+## 130 · Phase 258 — campaign inbox: Conversations search + status filter (2026-07-22)
+
+Owner: "conversation section with search bar and filter · same TC also can search
+the lead via number or name." Added a search box + status-filter chips to the
+Conversations panel of `CampaignInboxV2.jsx`. JS-only, additive, §45-safe (no new
+query, no send-path touch, campaign page — NOT §28 frozen).
+
+### What shipped (`src/pages/v2/CampaignInboxV2.jsx`)
+- **Search by name OR number** — `convSearch` state; a `Search`-icon input under
+  the "Conversations · N open" header with a clear (X) button. Filters the
+  already-loaded `threads` client-side: `customer_name` case-insensitive includes,
+  OR the digits of the query (≥3 digits) matched against `customer_wa_id` digits.
+  So "rima", "98982", "9898273686" all work.
+- **Status filter chips** — `convFilter` state (`all | reply | open | needs`):
+  All · Reply (last inbound + window open, the §124 needs-reply marker) · Open
+  (24h window open) · Needs template (window closed). Brand-yellow when active.
+- `filteredThreads` (a plain `threads.filter`, no useMemo) drives the list +
+  a new "No conversations match" empty state; the full list stays in `threads`.
+- **The open chat is unaffected by search** — `sel`/`selId` read from `threads`,
+  not the filtered list, so searching never closes the conversation you're reading.
+
+### Contracts / notes
+- **TC scope is already correct** — a rep's inbox is RLS-scoped to their assigned
+  threads (§243), so the search runs over the rep's own conversations. No new
+  access. Admin/co_owner search all (their threads are all).
+- Purely client-side over the loaded threads (chunked-paged since §124, up to
+  4000) — no new DB read, zero hot-path cost. Tokens-only (no hardcoded hex),
+  radii 10/999 on-scale, `Search`/`X` Lucide icons.
+- Not §28-frozen; parse-clean (esbuild). To ship: push (JS reaches the APK on
+  next open). Smoke: /campaigns/inbox → type a name or number → list narrows;
+  tap a filter chip → Reply/Open/Needs-template narrow; clear → full list back.
