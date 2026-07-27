@@ -107,6 +107,7 @@ export default function CampaignInboxV2() {
   // within their own assigned threads (RLS-scoped, §243).
   const [convSearch, setConvSearch] = useState('')
   const [convFilter, setConvFilter] = useState('all') // all | open | needs | reply
+  const [convTeam, setConvTeam] = useState('all')     // Phase 259 — assigned_to filter (privileged only)
   const [msgs, setMsgs] = useState([])
   const [msgLoading, setMsgLoading] = useState(false)
   const [draft, setDraft] = useState('')
@@ -309,6 +310,11 @@ export default function CampaignInboxV2() {
   const searchDigits = searchQ.replace(/\D/g, '')
   const filteredThreads = threads.filter((t) => {
     const isOpen = windowOpen(t.window_expires_at)
+    // Phase 259 — team filter (privileged only; reps see own threads via RLS §243)
+    if (isPrivileged && convTeam !== 'all') {
+      if (convTeam === '__none__') { if (t.assigned_to) return false }
+      else if (t.assigned_to !== convTeam) return false
+    }
     if (convFilter === 'open' && !isOpen) return false
     if (convFilter === 'needs' && isOpen) return false
     if (convFilter === 'reply' && !(t.last_message_direction === 'in' && isOpen)) return false
@@ -655,6 +661,29 @@ export default function CampaignInboxV2() {
                 )
               })}
             </div>
+
+            {/* Phase 259 — team (assigned telecaller) filter; privileged only */}
+            {isPrivileged && tcs.length > 0 && (
+              <select
+                value={convTeam}
+                onChange={(e) => setConvTeam(e.target.value)}
+                aria-label="Filter conversations by assigned telecaller"
+                style={{
+                  width: '100%', boxSizing: 'border-box', marginTop: 8,
+                  padding: '8px 10px', fontSize: 12.5,
+                  background: 'var(--v2-bg-2)',
+                  color: convTeam === 'all' ? 'var(--v2-ink-2, #6a7590)' : 'var(--v2-ink-0, #f5f7fb)',
+                  border: '1px solid ' + (convTeam === 'all' ? 'var(--v2-line)' : 'var(--v2-yellow, #FFE600)'),
+                  borderRadius: 10, outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="all">All team</option>
+                {tcs.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+                <option value="__none__">Unassigned</option>
+              </select>
+            )}
           </div>
 
           {loading ? (

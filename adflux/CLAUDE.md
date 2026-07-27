@@ -8871,3 +8871,38 @@ query, no send-path touch, campaign page — NOT §28 frozen).
 - Not §28-frozen; parse-clean (esbuild). To ship: push (JS reaches the APK on
   next open). Smoke: /campaigns/inbox → type a name or number → list narrows;
   tap a filter chip → Reply/Open/Needs-template narrow; clear → full list back.
+
+
+---
+
+## 131 · Phase 259 — campaign inbox: team (telecaller) filter (2026-07-22)
+
+Owner: "i want team filter also" — extend the §130 Conversations panel with a
+filter by the assigned telecaller. JS-only, additive, §45-safe, parse-clean.
+
+### What shipped (`src/pages/v2/CampaignInboxV2.jsx`)
+- **`convTeam` state** (`'all'` default) + a telecaller `<select>` under the
+  §130 status chips, gated **`isPrivileged && tcs.length > 0`** (admin/co_owner/
+  sales_manager only — reps see ONLY their own threads via RLS §243, so a team
+  filter is meaningless for them; the dropdown never renders for a rep).
+  Options: **All team** · each telecaller (`tcs` = `{id,name}`, the SAME list
+  the reassign dropdown uses, loaded `role='telecaller'`) · **Unassigned**
+  (`__none__`, catches error-queued / null-owner threads).
+- `filteredThreads` gains ONE clause BEFORE the status/search clauses:
+  `if (isPrivileged && convTeam !== 'all') { __none__ → keep only null
+  assigned_to; else keep t.assigned_to === convTeam }`. Client-side over the
+  already-loaded `threads` (chunked-paged, §124) — no new query, no hot-path
+  cost. `assigned_to` flows through the `.select('*')` loadThreads (verified).
+
+### Contracts / notes
+- Composes with §130 search + status chips (all three narrow together) and the
+  §113/§243 read-scope (a rep's threads are RLS-own already → the filter clause
+  is gated off for them, double-safe). The open chat (`sel`/`selId`) reads from
+  `threads`, not the filtered list → filtering never closes the open thread.
+- Select is yellow-bordered when active, muted when 'All team' (mirrors the
+  §130 chip active-state). Tokens-only, radius 10 on-scale, no hardcoded hex.
+- Reassign already writes `assigned_to` on the thread in state (`setThreads`
+  §55) → picking a TC then reassigning a thread away updates the filter live.
+- Owner smoke: /campaigns/inbox as admin → the "All team" dropdown shows below
+  the status chips → pick a telecaller → list narrows to their chats; pick
+  Unassigned → only null-owner threads; a rep sees no dropdown (own threads only).
