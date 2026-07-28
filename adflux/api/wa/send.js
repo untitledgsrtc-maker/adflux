@@ -210,9 +210,20 @@ export default async function handler(req, res) {
   const logBody = mediaUrl
     ? `${text ? `${text}\n\n` : ''}(${mediaType}: ${filename || 'attachment'})`
     : text
-  const { data: inserted, error: logErr } = await admin.from('whatsapp_messages').insert({
-    conversation_id: conv.id, wamid, direction: 'out', type: logType, body: logBody, at: atIso,
-  }).select('id, direction, type, body, status, at').maybeSingle()
+  // Phase 263 — store the sent media link so the inbox renders it (image
+  // inline, document as a download). ONLY for a direct attachment (its
+  // media_url is host-allowlisted + durable); NEVER for a quote — that's a
+  // 600s ephemeral signed URL that would be dead when the inbox opened it.
+  const logMediaUrl = (mediaUrl && !quoteId) ? mediaUrl : null
+  const baseRow = { conversation_id: conv.id, wamid, direction: 'out', type: logType, body: logBody, at: atIso }
+  let { data: inserted, error: logErr } = await admin.from('whatsapp_messages')
+    .insert(logMediaUrl ? { ...baseRow, media_url: logMediaUrl } : baseRow)
+    .select('id, direction, type, body, status, at').maybeSingle()
+  if (logErr && logMediaUrl) {
+    // media_url column not present yet → retry without it (deploy-order safety).
+    ;({ data: inserted, error: logErr } = await admin.from('whatsapp_messages')
+      .insert(baseRow).select('id, direction, type, body, status, at').maybeSingle())
+  }
   if (logErr) console.error('[wa/send] outbound message logged to Meta but DB insert failed:', logErr.message)
   // bump the thread so it sorts to the top of the inbox
   await admin.from('whatsapp_conversations').update({ updated_at: atIso }).eq('id', conv.id)

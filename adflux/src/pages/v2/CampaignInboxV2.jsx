@@ -218,11 +218,14 @@ export default function CampaignInboxV2() {
     // deploy-before-SQL window can't blank the message pane (§45).
     let { data, error } = await supabase
       .from('whatsapp_messages')
-      .select('id, direction, type, body, status, at, media_id, error_detail')
+      .select('id, direction, type, body, status, at, media_id, media_url, error_detail')
       .eq('conversation_id', convId)
       .order('at', { ascending: true })
       .limit(500)
-    if (error && /error_detail/i.test(error.message || '')) {
+    // Phase 263 — media_url added to the select. Until its SQL (or the Phase 253
+    // error_detail SQL) runs, selecting the missing column 400s → fall back to
+    // the minimal set so the deploy-before-SQL window can't blank the pane (§45).
+    if (error && /error_detail|media_url/i.test(error.message || '')) {
       ({ data, error } = await supabase
         .from('whatsapp_messages')
         .select('id, direction, type, body, status, at, media_id')
@@ -706,6 +709,10 @@ export default function CampaignInboxV2() {
             <div style={{ maxHeight: 600, overflowY: 'auto' }}>
               {filteredThreads.map((t) => {
                 const active = t.id === selId
+                // Phase 263 — UNREAD = the customer sent the last message and we
+                // haven't replied. NOT window-gated (unlike the Reply chip), so a
+                // customer waiting past 24h still stands out instead of hiding.
+                const unread = t.last_message_direction === 'in'
                 const av = avatarFor(t.customer_wa_id)
                 return (
                   <button
@@ -717,18 +724,28 @@ export default function CampaignInboxV2() {
                       display: 'flex', alignItems: 'flex-start', gap: 11,
                       padding: '12px 14px', border: 'none',
                       borderBottom: '1px solid var(--v2-line)',
-                      borderLeft: active ? '2px solid var(--v2-yellow, #FFE600)' : '2px solid transparent',
-                      background: active ? 'var(--v2-bg-2)' : 'transparent',
+                      borderLeft: active
+                        ? '2px solid var(--v2-yellow, #FFE600)'
+                        : (unread ? '2px solid var(--v2-yellow, #FFE600)' : '2px solid transparent'),
+                      background: active
+                        ? 'var(--v2-bg-2)'
+                        : (unread ? 'rgba(255,230,0,0.06)' : 'transparent'),
                     }}
                   >
                     <span style={{ ...avBox, background: av.bg, color: av.fg }}>{av.text}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <span style={{
-                          fontSize: 13.5, fontWeight: 700, color: 'var(--v2-ink-0, #f5f7fb)',
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                          display: 'flex', alignItems: 'center', gap: 6, minWidth: 0,
+                          fontSize: 13.5, fontWeight: 700,
+                          color: (active || unread) ? 'var(--v2-ink-0, #f5f7fb)' : 'var(--v2-ink-1, #aab3c5)',
                         }}>
-                          {t.customer_name || fmtPhone(t.customer_wa_id)}
+                          {unread && !active && (
+                            <span style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--v2-yellow, #FFE600)', flexShrink: 0 }} />
+                          )}
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {t.customer_name || fmtPhone(t.customer_wa_id)}
+                          </span>
                         </span>
                         <span style={{ fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }}>{relTime(t.last_message_at || t.last_inbound_at)}</span>
                       </span>
@@ -869,18 +886,36 @@ export default function CampaignInboxV2() {
                             border: out ? '1px solid rgba(34,197,94,0.34)' : '1px solid var(--v2-line)',
                           }}>
                             <div style={{ fontSize: 13.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                              {isImageMsg(m) && (
-                                <a href={`/api/wa/media?id=${encodeURIComponent(m.media_id)}`} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
-                                  <img
-                                    src={`/api/wa/media?id=${encodeURIComponent(m.media_id)}`}
-                                    alt={m.body || 'photo'} loading="lazy"
-                                    style={{ maxWidth: 220, maxHeight: 260, borderRadius: 8, display: 'block', marginBottom: m.body ? 6 : 0 }}
-                                  />
-                                </a>
-                              )}
+                              {/* Phase 263 — render media we SENT (media_url, e.g. AI
+                                  photo / brochure / attachment) AND media we RECEIVED
+                                  (media_id via the proxy). Image inline; anything else
+                                  as an "Open attachment" link. */}
+                              {(() => {
+                                const isImg = m.type === 'image' || m.type === 'sticker'
+                                // Only trust a stored media_url if it's http(s) (all our
+                                // writers store https URLs; inbound never writes media_url).
+                                const stored = (m.media_url && /^https?:\/\//i.test(m.media_url)) ? m.media_url : null
+                                const proxied = m.media_id ? `/api/wa/media?id=${encodeURIComponent(m.media_id)}` : null
+                                const src = stored || proxied
+                                if (!src) return null
+                                if (isImg) return (
+                                  <a href={src} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
+                                    <img src={src} alt={m.body || 'photo'} loading="lazy"
+                                      style={{ maxWidth: 220, maxHeight: 260, borderRadius: 8, display: 'block', marginBottom: m.body ? 6 : 0 }} />
+                                  </a>
+                                )
+                                return (
+                                  <a href={src} target="_blank" rel="noreferrer" style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: m.body ? 6 : 0,
+                                    color: 'var(--v2-yellow, #FFE600)', fontSize: 12.5, textDecoration: 'underline',
+                                  }}>
+                                    <FileText size={14} strokeWidth={1.6} /> Open attachment
+                                  </a>
+                                )
+                              })()}
                               {m.body
                                 ? m.body
-                                : (!isImageMsg(m) && <em style={{ opacity: 0.7 }}>[{m.type || 'media'}]</em>)}
+                                : (!m.media_url && !m.media_id && <em style={{ opacity: 0.7 }}>[{m.type || 'media'}]</em>)}
                             </div>
                             <div style={{
                               fontSize: 10, marginTop: 3, display: 'flex', alignItems: 'center',

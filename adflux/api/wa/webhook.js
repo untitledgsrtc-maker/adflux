@@ -86,6 +86,20 @@ function clip(s) {
 // Pull the human-readable text out of a Meta inbound message across the
 // common types. Media (image/doc/audio) carries no text → null body, the
 // `type` column still records what arrived.
+// Phase 263 — a shared contact card (m.contacts[]) has no proxiable media;
+// format its name + phone so the inbox shows the details, not a bare [contacts].
+function contactsToText(contacts) {
+  if (!Array.isArray(contacts) || !contacts.length) return null
+  const parts = contacts.map((c) => {
+    const nm = c?.name?.formatted_name
+      || [c?.name?.first_name, c?.name?.last_name].filter(Boolean).join(' ')
+      || ''
+    const ph = c?.phones?.[0]?.phone || c?.phones?.[0]?.wa_id || ''
+    return [nm, ph].filter(Boolean).join(' ')
+  }).filter(Boolean)
+  return parts.length ? 'Contact shared: ' + parts.join('; ') : 'Contact shared'
+}
+
 function messageBody(m) {
   return (
     m.text?.body ??
@@ -96,6 +110,7 @@ function messageBody(m) {
     m.button?.text ??
     m.interactive?.button_reply?.title ??
     m.interactive?.list_reply?.title ??
+    contactsToText(m.contacts) ??
     null
   )
 }

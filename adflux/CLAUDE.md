@@ -9107,3 +9107,79 @@ were queued, undermining the gate's transparency. Fixed to `gated.length`.
   Phase 262 fixed the CODE to not depend on it. If a future path needs "the active
   sender", it must pick by purpose.
 - Optional "send poster once they REPLY" engagement gate (§133) — not built.
+
+
+---
+
+## 135 · Phase 263 — campaign inbox: unread highlight + sent-media renders + AI short/clear (2026-07-27)
+
+Owner flagged 3 inbox issues from screenshots (+ 2 more mid-work). Diagnosed via a
+4-agent workflow, fixed, adversarially reviewed (PASS + P2/P3 applied). Decisions:
+light emoji YES, contact card = name+phone.
+
+### #1 — AI replies short + human (`api/wa/ai-reply.js`, LIVE on both numbers)
+The auto-reply dumped the whole pitch + 2-3 questions per message (brochure, not a
+person). DEFAULT_SYSTEM YOUR JOB rewritten: 2-3 short lines MAX, ONE message, answer
+only what was asked, pitch (why-different/how-it-works/proof/stations) demoted to
+"BACKGROUND — one point only if asked", ONE question at a time. `max_tokens` 400→**300**
+(160 first, bumped: Gujarati/Hindi tokenize ~2-4× heavier → 160 truncated Indic
+replies mid-sentence — review P2). Plus 3 owner-driven rules:
+- **Light emoji** allowed (1-2 natural, e.g. 📍/👍). The old "avoid heavy emoji" line
+  flipped to "1-2 welcome". (§20 no-emoji is the in-app UI rule; WhatsApp = §33 waiver.)
+- **FOOTFALL IS NOT A PRICE** — customers read "~7,514 people/day" as a cost. Rule:
+  phrase as daily AUDIENCE ("about 7,500 people see it there every day"), the ONLY
+  price is "from Rs 75", never a number next to Rs.
+- **Plain WhatsApp text, NO markdown** — the AI output `**Bhavnagar**` and WhatsApp
+  showed the literal asterisks. Rule: no `**`, no `*`, no `#`, plain sentences.
+- Kept intact (review-verified): price-no-total backstop, coverage/impressions
+  injection (§257.7), /led link, customer-language rule.
+
+### #2 — Unread conversations highlighted (`CampaignInboxV2.jsx` thread list)
+A chat where the customer sent last (unanswered) looked identical to every other —
+the only hint (amber "Reply" chip) VANISHED after the 24h window, so old unanswered
+chats hid (§124). Now `const unread = t.last_message_direction === 'in'` (Phase 251
+signal, already loaded via `select('*')`, NOT window-gated) → unread & not-active rows
+get a yellow dot before the name + a left accent + a faint `rgba(255,230,0,0.06)` bg +
+brighter name; read rows dim to `--v2-ink-1`. Display-only, no SQL. The bot's own
+outbound flips direction to 'out' (Phase 251 trigger) → a chat the AI answered is not
+"unread", correct.
+
+### #3 — Sent photos/PDFs render instead of `[image]`/`(attachment)` text
+Root: when we SEND media we logged only a text marker, never the link — the inbox had
+nothing to show (§115 KNOWN gap). Fix = **NEW additive column `whatsapp_messages.media_url`**
+(`supabase_campaign_media_url_column.sql`) holding the sent PUBLIC url (media_id/media_mime
+are the INBOUND Meta-proxy path only — §114 "no media_id column" note is STALE, C5 added
+them). Writers store the url:
+- `ai-reply.js` city photo → `media_url = photoUrl` + caption `📷 <city> station` (was `[image]`).
+- `send-template.js` post-call/brochure PDF → `media_url = tpl.header_doc_url`.
+- `send.js` direct attachment → `media_url = mediaUrl` (host-allowlisted https), **NOT** the
+  quote path (its signed url is 600s-ephemeral → dead if stored; keeps the marker text).
+- `webhook.js` inbound contact card → `contactsToText()` → body `Contact shared: <name> <phone>`
+  (was `[contacts]`).
+- `CampaignInboxV2` render: type image/sticker with media_url|media_id → `<img>`; else with a
+  url → an "Open attachment" `<a>` (FileText); the `[type]` placeholder only when NO body AND
+  no media. Inbound document/video now clickable via the proxy (no sender change).
+
+### CONTRACTS / deploy-order (do NOT regress)
+- **media_url only holds an https URL WE control** (cities.photo_url, our template
+  header_doc_url, send.js host-allowlisted). `webhook.js` NEVER writes media_url on inbound
+  (inbound = media_id + proxy). The render also http(s)-gates the stored url before using it
+  as an `<img src>`/`<a href>` (no javascript:/data: XSS — review P3 hardened). If a NEW media
+  writer appears, it MUST store only an our-host https url.
+- **DEPLOY-ORDER SAFE:** every writer retries WITHOUT media_url if the column 400s
+  (`r.ok===false` for raw-fetch sb; `logErr && logMediaUrl` for supabase-js send.js), and
+  `loadMsgs` falls back to the minimal select on `/error_detail|media_url/i`. So a
+  push-before-SQL can't break a send or blank the pane. Owner SHOULD still run the SQL first.
+- Not §28-frozen (campaign page/endpoints). No APK. The AI change is LIVE on push.
+
+### Owner action
+1. Run `supabase_campaign_media_url_column.sql` in Studio (1 additive column). VERIFY → 1.
+2. Push (I push). 3. Smoke: message the number → reply is 2-3 short lines, one question,
+   1-2 emoji, no `**` asterisks, footfall reads as audience not price; the AI's city photo
+   shows as an IMAGE in the inbox; a sent brochure shows an "Open attachment" link; an
+   inbound contact card shows the name+phone; an unanswered chat shows a yellow dot.
+
+### Known-left (P3, not owner-flagged)
+Sent media double-labels (the inline media + the old "(attachment: name)" body text from
+§252.1/§254) — informative, redundant, harmless; suppress the text marker when media_url is
+present in a future cleanup. §16 scope: left this batch.

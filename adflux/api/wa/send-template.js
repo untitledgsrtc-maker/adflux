@@ -412,13 +412,19 @@ async function sendToLead({ uid, role, callerName, leadId, pickKey = null }) {
       if (tpl.header_doc_url) {
         logBody += `\n\n(attachment: ${tpl.header_doc_name || 'PDF'})`
       }
-      await sb('whatsapp_messages', {
-        method: 'POST',
-        body: JSON.stringify({
-          conversation_id: convId, wamid, direction: 'out', type: 'template',
-          body: logBody, status: 'sent', at: nowIso,
-        }),
-      })
+      // Phase 263 — store the sent PDF link so the inbox shows a real
+      // download, not just "(attachment: ...)" text.
+      const row = {
+        conversation_id: convId, wamid, direction: 'out', type: 'template',
+        body: logBody, status: 'sent', at: nowIso,
+      }
+      if (tpl.header_doc_url) row.media_url = tpl.header_doc_url
+      const r = await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify(row) })
+      // Deploy-order safety: retry without media_url if the column isn't there.
+      if (r && r.ok === false && row.media_url) {
+        delete row.media_url
+        await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify(row) })
+      }
     } catch { /* best-effort */ }
   }
 

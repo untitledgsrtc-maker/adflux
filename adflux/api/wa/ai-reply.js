@@ -53,7 +53,7 @@ THE NETWORK (facts — never invent beyond these):
 - Advertising STARTS AT JUST Rs 75 — the entry price. The exact rate depends on the city, number of screens and duration; our team shares a tailored quote. (Never quote a final total.)
 - Full details, video and a live map: https://app.untitledad.in/led
 
-WHY WE'RE DIFFERENT (this is the main pitch — "a billboard can't tell you who looked; ours can"):
+WHY WE'RE DIFFERENT (BACKGROUND — share the ONE relevant point only if they ask, never all of it. "a billboard can't tell you who looked; ours can"):
 - Ordinary outdoor/hoardings: you print it and hope. No idea how many people saw it, no way to know if it drove a single call, one flat rate, zero reporting.
 - The GSRTC LED Network: you run it AND measure it. AI-verified views (real eyes + real dwell time, not guessed). Every screen shows a QR — one tap opens WhatsApp, no typing — and every scan becomes a tracked lead tagged to the exact station it came from. Advertisers get a per-screen dashboard: scans, leads, city breakdown. It's a funnel you can watch, not "impressions" you estimate.
 
@@ -65,17 +65,20 @@ HOW IT WORKS (4 steps):
 
 PROOF: the funnel is already running live — hundreds of scans have already turned into real, routed leads, each tagged to the exact screen that pulled it in. Real numbers, no estimates.
 
-YOUR JOB:
-- Reply helpfully and briefly (WhatsApp — 2 to 5 short sentences; break longer answers into a couple of short messages of thought).
-- Explain the network, coverage, audience, the measurable/scan-proof advantage, and how it works.
-- Share https://app.untitledad.in/led when it helps (it has the video, live map and full details).
-- Gently find out what they need: which city/stations, what brand or product, and rough timeline — so our team can prepare a tailored quote.
+YOUR JOB — keep it SHORT (this is WhatsApp, not email):
+- Every reply is 2-3 short lines MAX, ONE message. No paragraphs, no lists, no dumping the whole pitch.
+- Answer ONLY what they asked. A first reply covers just: what it is (LED ad screens at Gujarat bus stations), that it starts at just Rs 75, and the link https://app.untitledad.in/led.
+- Ask ONE simple question at a time (e.g. "Which city are you looking at?") — never two questions in one message.
+- Everything above (why we're different, how it works, proof, stations) is BACKGROUND — share ONE relevant point only if they ask, never all of it.
 - Reply in the customer's own language (English, Hindi or Gujarati) matching how they wrote.
+- Add 1-2 light, natural WhatsApp emoji where they fit (e.g. 📍 for a city, 👍 to acknowledge) — warm and human, never spammy.
+- FOOTFALL IS NOT A PRICE. When you mention how many people see a station, say it clearly as the daily AUDIENCE — e.g. "about 7,500 people see it there every day" — NEVER a bare "~7,500/day" that a customer could mistake for a cost. The ONLY price is "starts at just Rs 75"; never write any other number next to Rs, and never frame audience/footfall as money.
+- Plain WhatsApp text ONLY. Do NOT use markdown — no ** for bold, no *, no #, no bullets/asterisks (WhatsApp shows the asterisks literally). Just plain sentences.
 
 HARD RULES:
 - Do NOT quote a final or total price, and do NOT confirm any booking. If they ask exact pricing or want to book, say our team will share a tailored quote shortly and ask for their requirement (city, brand, dates).
 - Do NOT invent screens, cities, guarantees, or numbers beyond the facts above.
-- Calm, precise, professional — never pushy or salesy, avoid heavy emoji. It's completely fine if they don't book; just be genuinely helpful.
+- Calm, warm and human — never pushy or salesy. 1-2 light emoji are welcome; don't overdo it. It's completely fine if they don't book; just be genuinely helpful.
 - If they ask to stop/unsubscribe, apologise briefly and tell them they won't be messaged further.
 - Keep it human. Don't say you are an AI unless asked directly.`
 
@@ -229,7 +232,7 @@ export default async function handler(req) {
     const ar = await fetch(ANTHROPIC, {
       method: 'POST',
       headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 400, system, messages: turns }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 300, system, messages: turns }),
     })
     if (!ar.ok) return nope('claude_' + ar.status, 502)
     const data = await ar.json()
@@ -240,6 +243,7 @@ export default async function handler(req) {
   // WhatsApp image. Strip the marker from the text; resolve to a real city we
   // actually have a photo for (never a made-up url).
   let photoUrl = null
+  let photoCity = null
   const pm = reply.match(/(^|\n)[ \t]*PHOTO:[ \t]*(.*?)[ \t]*$/im)
   if (pm) {
     reply = (reply.slice(0, pm.index) + reply.slice(pm.index + pm[0].length)).trim()  // always strip our control marker
@@ -247,7 +251,7 @@ export default async function handler(req) {
     if (want) {  // empty city → resolve nothing (never default to the first city)
       const hit = cityRows.find((c) => c.name.toLowerCase() === want) ||
                   cityRows.find((c) => want.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(want))
-      if (hit) photoUrl = hit.photo_url
+      if (hit) { photoUrl = hit.photo_url; photoCity = hit.name }
     }
   }
   if (!reply && !photoUrl) return nope('empty_reply')
@@ -283,10 +287,19 @@ export default async function handler(req) {
     if (!gr.ok) throw new Error(gd?.error?.message || ('graph_' + gr.status))
     return gd?.messages?.[0]?.id || null
   }
-  const logOut = async (type, textBody, wamid) => {
+  const logOut = async (type, textBody, wamid, mediaUrl) => {
     const atIso = new Date().toISOString()
+    const row = { conversation_id: convId, wamid, direction: 'out', type, body: textBody, at: atIso }
+    if (mediaUrl) row.media_url = mediaUrl   // Phase 263 — so the inbox renders the sent image
     try {
-      await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify({ conversation_id: convId, wamid, direction: 'out', type, body: textBody, at: atIso }) })
+      const r = await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify(row) })
+      // Deploy-order safety: if the media_url column isn't present yet, retry
+      // WITHOUT it so the message still logs (the url just isn't stored until
+      // supabase_campaign_media_url_column.sql is run).
+      if (r && r.ok === false && mediaUrl) {
+        delete row.media_url
+        await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify(row) })
+      }
       await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ updated_at: atIso }) })
     } catch { /* the message was sent; a log failure is non-fatal */ }
   }
@@ -310,7 +323,7 @@ export default async function handler(req) {
   // Photo is best-effort — the text already went; a bad/unreachable photo_url
   // must not fail the whole reply.
   if (photoUrl) {
-    try { const id = await sendWa({ type: 'image', image: { link: photoUrl } }); await logOut('image', '[image]', id) }
+    try { const id = await sendWa({ type: 'image', image: { link: photoUrl } }); await logOut('image', photoCity ? `📷 ${photoCity} station` : '📷 Photo', id, photoUrl) }
     catch { /* photo skipped — text delivered */ }
   }
 
