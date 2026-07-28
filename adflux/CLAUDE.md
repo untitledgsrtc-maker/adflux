@@ -9348,3 +9348,59 @@ this". NOT fixed — recorded for the next session.
 
 Both are on the campaign inbox (not §28-frozen). No investigation done beyond
 reading the screenshots. Pick up here when unparked.
+
+
+---
+
+## 139 · Phase 266 — fix Phase 264 LED over-tagging (map SPECIFIC Meta ads) (2026-07-28)
+
+Owner clarified: his running Meta ads are **LED-screen** ads (Click-to-WhatsApp);
+social-media-service ads are FUTURE. Phase 264 blanket-attributed EVERY Meta CTWA
+lead to the active 'meta' campaign → tagged 'Social Media' + routed to Dhara — so
+his LED-ad leads were being **mislabeled Social + sent to Dhara**. "From a Meta ad"
+≠ "social offer".
+
+### The fix (attribute by SPECIFIC ad id, not "any Meta ad")
+- NEW `campaigns.meta_ad_ids text[]` (`supabase_phase266_meta_ad_id_map.sql`).
+- `api/wa/webhook.js` (Phase 264 block rewritten): on a CTWA referral, ALWAYS store
+  `ad_headline` (AI opens relevant to the ad), but set `campaign_id` ONLY when the
+  ad's Meta id (`referral.source_id`, numeric-guarded) is in a campaign's
+  `meta_ad_ids`. So: LED ad (not mapped) → stays LED, normal WhatsApp pipeline
+  (owner = account default, source 'WhatsApp'); SOCIAL ad (id mapped) → Social
+  Media + Dhara. **Empty map (today) → NO Meta CTWA lead is Social-tagged** → the
+  over-tag stops immediately.
+- C4.5 UNCHANGED (still: campaign_id set + source_type='meta' → 'Social Media';
+  else 'WhatsApp'). The fix is purely upstream (which leads get a campaign_id).
+- Deploy-order safe: pre-SQL the `.contains` query errors → data null → no
+  campaign_id → LED default (the SAFE direction — can't over-tag).
+
+### When the owner runs a social ad
+He creates the social-media-services ad on Meta, sends me its **ad id**, and we map
+it: `UPDATE campaigns SET meta_ad_ids = ARRAY['<ad_id>'] WHERE source_type='meta'
+AND name ILIKE '%social%';` → from then, only that ad's leads → Social/Dhara.
+Whether the social ad is Click-to-WhatsApp (this same path, no App Review) or a Lead
+FORM (Phase 265 + App Review) is his choice — messaging is the easy path.
+
+### Meta account facts found (browser, §119-style)
+Logged in as Brijesh; 3 businesses — **Untitled Advertising** (2 pages),
+**edigiexpert** (0 pages; holds the WhatsApp `campaign-api` system user + the app),
+**untitledad.in** (2 pages). Current ads run under the edigiexpert ad account
+(`1484122646014945`), objective **Messaging (Click-to-WhatsApp)** = LED. No Lead-FORM
+campaign exists → the Meta Lead Ads (Phase 265) browser setup was NOT needed / not done.
+
+### Heal (optional, owner) — the few LED leads mislabeled since Phase 264 (~today)
+```sql
+-- Count them first:
+SELECT count(*) FROM public.leads
+ WHERE source='Social Media' AND created_at::date >= '2026-07-28'
+   AND campaign_id IN (SELECT id FROM public.campaigns WHERE source_type='meta');
+```
+They're on Dhara tagged Social. Reassign manually if wanted, or un-tag:
+`UPDATE leads SET source='WhatsApp', campaign_id=NULL WHERE ...same filter... AND
+stage NOT IN ('Won','Lost');` (leaves them on Dhara; she can work or you reassign).
+Forward leads are already correct.
+
+### Owner action
+Run `supabase_phase266_meta_ad_id_map.sql` (VERIFY: meta_ad_ids_present=1,
+meta_campaigns_mapped=0 — none mapped yet, so all LED). Push (I push). The over-tag
+stops on deploy + SQL.
