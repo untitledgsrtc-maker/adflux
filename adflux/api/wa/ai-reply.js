@@ -227,6 +227,21 @@ export default async function handler(req) {
   if (videoRows.length) {
     system += `\n\nVIDEOS YOU CAN SHARE — when the customer asks to see a video/reel of one of these stations, include the EXACT link in your reply text (WhatsApp shows a preview):\n${videoRows.map((c) => `- ${c.name}: ${c.youtube_url}`).join('\n')}\nOnly share a link from this list, for the city asked. If they ask for a city not listed, say our team will share a video.`
   }
+
+  // Phase 264 — Meta ad context. If this chat came from a Click-to-WhatsApp ad,
+  // open relevant to the ad they clicked. Best-effort separate query so a missing
+  // ad_headline column (pre-SQL) can never break the reply (§45). The ad is
+  // SOMETIMES the LED screens and SOMETIMES a different offer the AI has no facts
+  // for — so LED ad → pitch LED; other offer → acknowledge + hand to the team.
+  let adHeadline = null
+  try {
+    const ah = await (await sb(`whatsapp_conversations?id=eq.${convId}&select=ad_headline&limit=1`)).json()
+    if (Array.isArray(ah)) adHeadline = ah[0]?.ad_headline || null
+  } catch { /* column not added yet — no ad context */ }
+  if (adHeadline) {
+    system += `\n\nAD CONTEXT — this person clicked a Facebook/Instagram ad titled: "${String(adHeadline).slice(0, 200)}". Open relevant to THAT ad:\n- If the ad is about our GSRTC LED bus-station screens → help them with that using the facts above.\n- If the ad is about a DIFFERENT offer (e.g. social media marketing / ad management / anything that is NOT the LED screens) → warmly acknowledge their interest in THAT, say our team will share the details shortly, and ask one simple question (their business + what they need). Do NOT invent details about that offer, and do NOT pivot to pitching the LED screens.`
+  }
+
   let reply = ''
   try {
     const ar = await fetch(ANTHROPIC, {

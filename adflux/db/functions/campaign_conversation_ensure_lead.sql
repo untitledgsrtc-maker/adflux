@@ -49,6 +49,10 @@
 --                     fallback. Phase 168 dropped it -> every lead showed
 --                     'WhatsApp lead'; RESTORED Phase 191 (3 Jul). Never
 --                     re-hardcode the name.
+--    • Phase 264    — lead source = 'Social Media' when the routing campaign is
+--                     source_type='meta' (a Meta Click-to-WhatsApp ad lead,
+--                     attributed by api/wa/webhook.js reading m.referral); every
+--                     other lead stays source 'WhatsApp' byte-identical.
 --    • Safety       — double EXCEPTION wrap: a race/error must NEVER break the
 --                     whatsapp_conversations store.
 --
@@ -66,6 +70,8 @@ DECLARE
   v_new       uuid;
   v_owner     uuid;
   v_segment   text;
+  v_src_type  text;                   -- Phase 264 — the campaign's source_type
+  v_source    text := 'WhatsApp';     -- lead source; 'Social Media' for a Meta campaign
   v_digits    text;
   v_evt       text := NEW.id::text;   -- one lead-attempt per conversation
 BEGIN
@@ -102,8 +108,8 @@ BEGIN
         FROM public.campaign_locations WHERE id = NEW.location_id;
     END IF;
     IF v_owner IS NULL AND NEW.campaign_id IS NOT NULL THEN
-      SELECT default_telecaller_id, COALESCE(segment, 'PRIVATE')
-        INTO v_owner, v_segment
+      SELECT default_telecaller_id, COALESCE(segment, 'PRIVATE'), source_type
+        INTO v_owner, v_segment, v_src_type
         FROM public.campaigns WHERE id = NEW.campaign_id;
     END IF;
     IF v_owner IS NULL AND NEW.whatsapp_account_id IS NOT NULL THEN
@@ -111,6 +117,9 @@ BEGIN
         FROM public.whatsapp_accounts WHERE id = NEW.whatsapp_account_id;
     END IF;
     v_segment := COALESCE(v_segment, 'PRIVATE');
+    -- Phase 264 — a Meta Click-to-WhatsApp lead (campaign.source_type='meta')
+    -- is tagged 'Social Media'; everything else stays 'WhatsApp' (byte-identical).
+    v_source  := CASE WHEN v_src_type = 'meta' THEN 'Social Media' ELSE 'WhatsApp' END;
 
     -- P0-2 — never a NULL-owner lead; queue for manual review instead.
     IF v_owner IS NULL THEN
@@ -131,7 +140,7 @@ BEGIN
       COALESCE(NULLIF(BTRIM(NEW.customer_name), ''), 'WhatsApp lead'),
       NEW.customer_wa_id,
       v_segment,
-      'WhatsApp',
+      v_source,
       'New',
       v_owner, v_owner, v_owner, 'warm', true, NEW.campaign_id, NEW.location_id
     )
@@ -184,7 +193,7 @@ UPDATE public.leads l
    AND COALESCE(BTRIM(c.customer_name), '') <> '';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All seven must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All eight must be TRUE.
 -- A FALSE means an older copy was re-run and stripped a P0 contract → re-run this.
 -- ============================================================================
 -- SELECT
@@ -193,6 +202,7 @@ UPDATE public.leads l
 --   pg_get_functiondef(p.oid) LIKE '%NEW.location_id%'            AS phase168_location,
 --   pg_get_functiondef(p.oid) LIKE '%''WhatsApp''%'               AS source_whatsapp,
 --   pg_get_functiondef(p.oid) LIKE '%NEW.customer_name%'          AS c11_lead_name,
+--   pg_get_functiondef(p.oid) LIKE '%Social Media%'               AS phase264_meta_source,
 --   pg_get_functiondef(p.oid) LIKE '%inbound_leads%'              AS routing_audit_queue,
 --   pg_get_functiondef(p.oid) LIKE '%EXCEPTION WHEN OTHERS%'      AS never_break_store
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace

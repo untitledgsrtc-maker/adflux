@@ -606,6 +606,28 @@ async function storeInbound(payload) {
             convRow.location_id = loc.id
           }
         }
+        // Phase 264 — Meta Click-to-WhatsApp attribution. A chat opened from an
+        // Instagram/Facebook ad carries m.referral (the ad's headline + platform)
+        // on the FIRST message only. Attach the active Meta campaign so C4.5
+        // routes the lead to that campaign's telecaller (Dhara) + tags source
+        // 'Social Media'. A QR board (above) wins — it's the more specific source.
+        if (!convRow.campaign_id && m.referral) {
+          // Prefer a Meta campaign tied to THIS number; else any active one.
+          let metaCamp = (await admin.from('campaigns')
+            .select('id').eq('source_type', 'meta').eq('is_active', true)
+            .eq('whatsapp_account_id', accountId)
+            .order('created_at', { ascending: false }).limit(1).maybeSingle()).data
+          if (!metaCamp) {
+            metaCamp = (await admin.from('campaigns')
+              .select('id').eq('source_type', 'meta').eq('is_active', true)
+              .order('created_at', { ascending: false }).limit(1).maybeSingle()).data
+          }
+          if (metaCamp?.id) {
+            convRow.campaign_id = metaCamp.id
+            const headline = String(m.referral.headline || m.referral.body || '').slice(0, 300)
+            if (headline) convRow.ad_headline = headline
+          }
+        }
 
         // C7 — detect a NEW conversation (the customer's first-ever message)
         // BEFORE the upsert creates it, so the auto-reply fires exactly once.
@@ -623,10 +645,11 @@ async function storeInbound(payload) {
           convRow,
           { onConflict: 'whatsapp_account_id,customer_wa_id' },
         ).select('id').maybeSingle()
-        // C11 customer_name column not added yet → retry WITHOUT it so the
-        // conversation store never breaks on an optional column (§45).
-        if (conv.error && /customer_name|could not find|column/i.test(conv.error.message || '')) {
-          const { customer_name, ...rest } = convRow   // eslint-disable-line no-unused-vars
+        // C11 customer_name / Phase 264 ad_headline optional columns not added
+        // yet → retry WITHOUT them so the conversation store never breaks on an
+        // optional column (§45). campaign_id/location_id are core → kept.
+        if (conv.error && /customer_name|ad_headline|could not find|column/i.test(conv.error.message || '')) {
+          const { customer_name, ad_headline, ...rest } = convRow   // eslint-disable-line no-unused-vars
           conv = await admin.from('whatsapp_conversations').upsert(
             rest,
             { onConflict: 'whatsapp_account_id,customer_wa_id' },

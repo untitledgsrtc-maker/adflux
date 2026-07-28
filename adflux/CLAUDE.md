@@ -9183,3 +9183,76 @@ them). Writers store the url:
 Sent media double-labels (the inline media + the old "(attachment: name)" body text from
 §252.1/§254) — informative, redundant, harmless; suppress the text marker when media_url is
 present in a future cleanup. §16 scope: left this batch.
+
+
+---
+
+## 136 · Phase 264 — Meta Click-to-WhatsApp ad → auto-attributed to the campaign + routed to Dhara (2026-07-28)
+
+Owner: separate LED-screen leads from social-media-ad leads, assign social to
+Dhara. Answers locked: social media = a lead SOURCE (not a product); entry =
+Click-to-WhatsApp ads on 98982 (marketing); the ad is sometimes LED, sometimes a
+different offer. Built + verified (guardian PASS on the frozen C4.5, security/
+correctness PASS). The `campaigns` infra already carried the routing, so this is
+small.
+
+### How it works (the whole thing reuses existing infra)
+A person taps an Instagram/Facebook **Click-to-WhatsApp** ad → WhatsApp opens to
+98982 → they text → Meta stamps the FIRST message with `referral` (the ad's
+headline + platform) → webhook attaches the active **Meta campaign** to the
+conversation → the EXISTING C4.5 engine routes the lead to the campaign's
+telecaller (**Dhara**), tags it **Social Media**, attributes it to the campaign
+(the Campaigns-page Leads/Won/Conv counters light up), and it's auto-separated
+from LED (QR/organic chats have no referral → untouched).
+
+### The 4 pieces
+1. `supabase_phase264_meta_ad_attribution.sql` — ADD COLUMN `whatsapp_conversations
+   .ad_headline` (additive; campaign_id already existed).
+2. `db/functions/campaign_conversation_ensure_lead.sql` (FROZEN §72/§82) — the ONLY
+   C4.5 change: lead `source` = 'Social Media' when the routing campaign is
+   `source_type='meta'`, else 'WhatsApp' (byte-identical for everything non-meta).
+   New tripwire `phase264_meta_source`. **Routing UNCHANGED** — C4.5 already routed
+   by `campaign.default_telecaller_id`; setting `conversation.campaign_id` is the
+   only new wire. Guardian PASS: all 4 P0 + the C11 name line + 8 tripwires intact.
+3. `api/wa/webhook.js` — after the QR block, `if (!convRow.campaign_id && m.referral)`
+   → look up the active meta campaign (prefer this account, else any) → set
+   `convRow.campaign_id` + `ad_headline`. QR board still wins (more specific).
+4. `api/wa/ai-reply.js` — best-effort loads `conv.ad_headline`; if present, injects
+   an AD CONTEXT block: LED ad → pitch LED; a DIFFERENT offer → acknowledge + hand
+   to the team, never invent, never pivot to LED.
+
+### CONTRACTS / notes (do NOT regress)
+- **Routing is campaign-driven.** A Meta lead routes to Dhara ONLY because the
+  "Social media" campaign has `default_telecaller_id = Dhara` + `source_type='meta'`.
+  If those aren't set on the campaign row, it falls through to the account default.
+- **`m.referral` is advertiser-controlled, not customer-forgeable** (Meta populates
+  it from the owner's own ad; the webhook is HMAC-gated). The ad-headline → AI-prompt
+  injection is bounded (slice 300 store / 200 prompt) + surrounded by don't-invent
+  rules. No SQL injection (supabase-js param write; UUID-validated convId read).
+- **DEPLOY-ORDER SAFE:** webhook conv-upsert retry strips ad_headline on a missing
+  column; ai-reply ad_headline fetch is best-effort (Array.isArray guard, no throw);
+  C4.5 references only campaigns.source_type + campaign_id (both pre-existing) →
+  works pre-column. A push-before-SQL can't break the store, the AI, or lead creation.
+- **P3 edge (working-as-designed):** a lead that is BOTH location(board)-attributed
+  AND on a meta campaign would tag 'WhatsApp' not 'Social Media' (v_src_type only
+  fetched in the campaign branch, which is skipped when a board resolved the owner).
+  Boards vs Meta ads are separate paths (§46) → not a real case today.
+
+### Owner action
+1. Run BOTH SQL in Studio: `db/functions/campaign_conversation_ensure_lead.sql`
+   (the updated C4.5) + `supabase_phase264_meta_ad_attribution.sql` (the column).
+   The C4.5 VERIFY block: 8 tripwires all TRUE.
+2. Confirm the "Social media" campaign row has `source_type='meta'`,
+   `default_telecaller_id=Dhara`, and ideally `whatsapp_account_id`=the 98982
+   marketing account.
+3. On the Meta side: make the ad a **Click-to-WhatsApp** ad → 98982.
+4. Smoke: click your own ad → message → you should land in Dhara's queue, tagged
+   Social Media, under the "Social media" campaign; the AI opens relevant to the ad.
+
+### Not built (owner-aware)
+- Multiple Meta campaigns separated by ad → add a per-campaign "Meta ad id" field
+  (owner pastes from Ads Manager); today any ad-referral maps to the one meta campaign.
+- Selling social-media services THROUGH the AI (facts + pricing) — the AI hands those
+  to the team for now. Give the offer facts when ready to have the AI sell it.
+- Meta Lead FORMS (fill-a-form, no chat) — a separate integration; CTWA covers the
+  "someone texts me" case + reuses the AI.
