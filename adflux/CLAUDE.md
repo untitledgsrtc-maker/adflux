@@ -9256,3 +9256,70 @@ from LED (QR/organic chats have no referral → untouched).
   to the team for now. Give the offer facts when ready to have the AI sell it.
 - Meta Lead FORMS (fill-a-form, no chat) — a separate integration; CTWA covers the
   "someone texts me" case + reuses the AI.
+
+
+---
+
+## 137 · Phase 265 — Meta Lead Ads (lead FORMS) webhook — BUILT, inert until Meta-wired (2026-07-28)
+
+Owner clarified "meta integration" meant the **Meta Lead Ads card** (Integrations
+tab) — auto-pull Facebook/Instagram lead-FORM submissions — NOT the Click-to-
+WhatsApp path (that's Phase 264, already live). The card was a UI stub only
+(`CampaignIntegrationsV2.jsx:98` hardcoded "App Review needed"); zero backend.
+Owner picked "build now in parallel". Built the endpoint; adversarial review PASS
+(P2 + P3s applied).
+
+### What it is
+`api/meta/leadgen.js` (Edge — §219 12-fn cap; a new Node fn would break deploys).
+Meta pings it on each lead-form submit → it fetches the form fields via the Graph
+API → creates a lead DIRECTLY in `leads` (no WhatsApp chat): source 'Social Media',
+attached to the active Meta campaign (source_type='meta'), routed to that campaign's
+telecaller (**Dhara**). SEPARATE endpoint from the WhatsApp webhook (leadgen is on
+the PAGE object, messages on whatsapp_business_account — different Meta products).
+
+### CONTRACTS (mirrors C4.5, review-verified)
+- P0-1 dedup (find_open_lead_id_by_phone before insert), P0-2 both owner cols =
+  Dhara + never a NULL-owner lead, P0-4 stage 'New' + cadence_paused=true, P0-3 no
+  lead_activities. Sets telecaller_id explicitly → lead_auto_assign's §99.B.1 guard
+  SKIPS round-robin (stays with Dhara). The frozen leads_block_dup_phone race is
+  caught (audit-queued, no 500). Idempotent on leadgen_id via inbound_leads
+  (provider='meta_lead', external_event_id) UNIQUE.
+- **P2 fix (review):** fetch-FIRST, claim-AFTER → a Graph-fetch failure never
+  consumes the idempotency claim; a retryable error returns 503 so Meta retries the
+  batch (done ones 409-skip). Without this a transient Graph failure lost the lead
+  forever. No token set → 200 + do nothing (inert, no rows consumed).
+- SECURITY (review PASS): HMAC-SHA256 (Web Crypto, Edge) vs X-Hub-Signature-256,
+  fails closed (401) on missing secret/bad sig; leadgen_id guarded `^\d+$` before
+  path interpolation; PAGE_TOKEN encodeURIComponent'd; field data written as JSON
+  params (no injection).
+
+### ⚠ INERT + UNTESTED — must be validated when Meta is wired
+Deploying it changes NOTHING (no existing flow touched, §45-safe) — Meta hasn't
+subscribed it, and with no token it acks + does nothing. It has NOT been validated
+against a real Meta payload. Test end-to-end (submit a real test lead form) once the
+token + page subscription are live; fix any field-mapping/shape surprises then.
+
+### Owner action — Meta side (the parallel work + the blocker)
+1. **Vercel envs:** `META_LEADS_TOKEN` (Page/System-User token with `leads_retrieval`
+   + `pages_show_list` + `pages_manage_metadata`), `META_LEADS_VERIFY_TOKEN` (any
+   string you pick). `CAMPAIGN_APP_SECRET` already set (same Meta app).
+2. **System User token (try FIRST — likely no App Review, like WhatsApp §119):**
+   Business Settings → the `campaign-api` system user → assign the Facebook Page →
+   Lead Access → generate a token with the perms above → put in META_LEADS_TOKEN.
+   If Meta blocks it → full App Review for leads_retrieval + Business Verification
+   (days-weeks; what the card guessed).
+3. **Subscribe the Page to the `leadgen` webhook field** → callback URL
+   `https://app.untitledad.in/api/meta/leadgen`, verify token = META_LEADS_VERIFY_TOKEN.
+4. **Confirm Dhara's `users.segment_access` is 'PRIVATE' or 'ALL'** — else the
+   PRIVATE lead INSERT RAISEs 42501 (trg_leads_segment_access_ins) and every Meta
+   lead silently error-queues in inbound_leads.
+5. Then submit a test lead form → we confirm it lands in Dhara's queue, tagged
+   Social Media, under the "Social media" campaign.
+
+### Notes
+- Multiple Meta campaigns → picks the newest active one (mirrors §136); add a
+  per-campaign ad-id map if several run.
+- Reuses inbound_leads for idempotency + audit (status: received/converted/
+  duplicate/error) — check that table to see what Meta sent + why any failed.
+- Click-to-WhatsApp (Phase 264) already captures ad→chat leads TODAY; this adds the
+  form-fill path. Both feed Dhara + the "Social media" campaign.
