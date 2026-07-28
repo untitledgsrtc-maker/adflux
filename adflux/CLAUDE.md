@@ -9323,3 +9323,28 @@ token + page subscription are live; fix any field-mapping/shape surprises then.
   duplicate/error) — check that table to see what Meta sent + why any failed.
 - Click-to-WhatsApp (Phase 264) already captures ad→chat leads TODAY; this adds the
   form-fill path. Both feed Dhara + the "Social media" campaign.
+
+
+---
+
+## 138 · PARKED — campaign inbox media-attach errors (2026-07-28)
+
+Owner hit two errors in the inbox composer (MediaPicker / Attach) and said "park
+this". NOT fixed — recorded for the next session.
+
+1. **"The object exceeded the maximum allowed size"** — a media upload
+   (MediaPicker → `campaign-media` bucket, §111/§127) over the bucket's file-size
+   cap. Likely fix: raise the bucket `file_size_limit` and/or client-side
+   compress/reject-with-a-clear-message before upload.
+2. **"new row violates row-level security policy"** — an INSERT blocked by RLS.
+   PROBABLE ROOT (verify first): `campaign_media` RLS is **admin/co_owner only**
+   (`campaign_media_admin_all`, §111), but the INBOX Attach reuses MediaPicker and
+   is used by TELECALLERS (Rima/Dhara) — a rep uploading media → the campaign_media
+   insert is RLS-blocked → this error. Same likely applies to the storage `INSERT`
+   policy on the bucket. Fix (later): widen the media-library write to the roles
+   that use the inbox (sales/telecaller/agency who own the chat), or route rep
+   uploads through a service-role endpoint. Confirm the exact failing insert
+   (campaign_media row vs storage object) before choosing.
+
+Both are on the campaign inbox (not §28-frozen). No investigation done beyond
+reading the screenshots. Pick up here when unparked.
