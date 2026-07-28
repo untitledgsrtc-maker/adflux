@@ -9,6 +9,7 @@
 // The only thing we change is the chrome.
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { usePersistedState } from '../../hooks/usePersistedState'  // Phase 268 — remember filters across Back
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react'
 // Phase 94 — path-param routing replaces the quoteIntent fallback.
@@ -60,7 +61,7 @@ export default function QuotesV2() {
   // ALL reps' quotes (READ-ONLY) via a toggle; default stays her own (RLS).
   // Never for admin (already see all) or a normal rep (no flag → no toggle).
   const canViewTeam = profile?.can_view_team_dashboard === true
-  const [teamView, setTeamView] = useState(false)
+  const [teamView, setTeamView] = usePersistedState('quotesv2.teamView', false)
   const teamViewing = canViewTeam && !isAdmin && teamView
   const refetch = useCallback(() => fetchQuotes({ team: teamViewing }), [fetchQuotes, teamViewing])
 
@@ -128,19 +129,22 @@ export default function QuotesV2() {
     toastSuccess('Quote deleted.')
     refetch()
   }
-  const [searchDraft, setSearchDraft] = useState(filters.search || '')
-  const [sortField, setSortField] = useState('created_at')
-  const [sortDir, setSortDir] = useState('desc')
+  const [searchDraft, setSearchDraft] = useState(filters.search || '')  // store-backed; restores via the filters.search effect below
+  // Phase 268 — persisted so tapping Back into /quotes keeps the sort + these
+  // filters (were plain useState → remount reset them). search/status/date
+  // already survive via the shared useQuotes filters store.
+  const [sortField, setSortField] = usePersistedState('quotesv2.sortField', 'created_at')
+  const [sortDir, setSortDir] = usePersistedState('quotesv2.sortDir', 'desc')
   // Admin-only sales-rep filter — derived from the quotes already
   // loaded so no extra fetch is needed. 'all' shows everyone.
-  const [repFilter, setRepFilter] = useState('all')
+  const [repFilter, setRepFilter] = usePersistedState('quotesv2.rep', 'all')
   // Phase B segment filter — slices the list by Private vs Government.
   // 'all' (default) keeps the historical mixed view. Pre-Phase 4 rows
   // have segment=null, so 'private' must match both 'PRIVATE' and null.
-  const [segmentFilter, setSegmentFilter] = useState('all')
+  const [segmentFilter, setSegmentFilter] = usePersistedState('quotesv2.segment', 'all')
   // Sub-filter for govt quotes — Auto Hood vs GSRTC LED. Only visible
   // when segmentFilter === 'government'. Mirrors the segment pill UI.
-  const [mediaFilter, setMediaFilter] = useState('all')
+  const [mediaFilter, setMediaFilter] = usePersistedState('quotesv2.media', 'all')
 
   useEffect(() => {
     setLoading(true)

@@ -26,10 +26,11 @@
 // is #FFE600 from tokens.css.
 
 import { useEffect, useMemo, useState } from 'react'
+import { usePersistedState } from '../../hooks/usePersistedState'  // Phase 268 — remember filters across Back
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Plus, Search, X, Upload, Users as UsersIcon, AlertTriangle,
-  Sparkles, ArrowRight,
+  Sparkles, ArrowRight, Download,
 } from 'lucide-react'
 // Phase 100.B — inline lane helpers + RPC humanizer below the
 // imports. Mirror the SQL logic from Phase 100.A so the picker UX
@@ -134,7 +135,7 @@ export default function LeadsV2() {
   // ALL reps' leads (READ-ONLY) via a toggle; default stays her own (RLS). Never
   // for admin (they already see all) or a normal rep (no flag → no toggle).
   const canViewTeam = profile?.can_view_team_dashboard === true
-  const [teamView, setTeamView] = useState(false)
+  const [teamView, setTeamView] = usePersistedState('leadsv2.teamView', false)
   const teamViewing = canViewTeam && !isPrivileged && teamView
 
   // Phase 93.10 (25 May 2026) — owner: sales / TC / sales_manager
@@ -160,29 +161,31 @@ export default function LeadsV2() {
   const { leads, loading, error, fetchLeads, reassignBulk, stageBulk, deleteBulk, applyRealtimeChange } = useLeads()
 
   /* ─── Filter state ─── */
-  const [search, setSearch]               = useState('')
-  const [stageFilter, setStageFilter]     = useState('all')
-  const [segmentFilter, setSegmentFilter] = useState('all')
-  const [sourceFilter, setSourceFilter]   = useState('all')
-  const [cityFilter, setCityFilter]       = useState('all')
-  const [industryFilter, setIndustryFilter] = useState('all')   // Phase 19
-  const [repFilter, setRepFilter]         = useState('all')
+  // Phase 268 — persisted in sessionStorage so tapping Back into the list keeps
+  // every filter (was plain useState → remount reset them all). Same API.
+  const [search, setSearch]               = usePersistedState('leadsv2.search', '')
+  const [stageFilter, setStageFilter]     = usePersistedState('leadsv2.stage', 'all')
+  const [segmentFilter, setSegmentFilter] = usePersistedState('leadsv2.segment', 'all')
+  const [sourceFilter, setSourceFilter]   = usePersistedState('leadsv2.source', 'all')
+  const [cityFilter, setCityFilter]       = usePersistedState('leadsv2.city', 'all')
+  const [industryFilter, setIndustryFilter] = usePersistedState('leadsv2.industry', 'all')   // Phase 19
+  const [repFilter, setRepFilter]         = usePersistedState('leadsv2.rep', 'all')
   // Phase 46.1 — filter by latest call outcome (positive / neutral
   // / callback / negative). Built from a one-shot subquery against
   // lead_activities (latest outcome per lead).
-  const [outcomeFilter, setOutcomeFilter] = useState('all')
+  const [outcomeFilter, setOutcomeFilter] = usePersistedState('leadsv2.outcome', 'all')
   const [leadOutcomeMap, setLeadOutcomeMap] = useState({})
   // Phase 72.4 (21 May 2026) — owner asked for "Price problem" filter.
   // Filters to leads whose lost_reason='Price' (lost deals only, not
   // negotiating). Matches LOST_REASONS enum in useLeads.js.
-  const [lostReasonFilter, setLostReasonFilter] = useState('all')
+  const [lostReasonFilter, setLostReasonFilter] = usePersistedState('leadsv2.lostReason', 'all')
   // Phase 34Z.13 — unified DateRangeFilter (Phase 34Z.11's two raw
   // <input type=date> replaced).
   // Phase 136 — default ALL (owner option 1). Was 'this_month', which
   // secretly month-locked the table while the chart + tabs showed more
   // → "filter not working". Now a cold load shows every lead; the date
   // controls NARROW from there.
-  const [dateRange, setDateRange] = useState(() => presetToRange('all'))
+  const [dateRange, setDateRange] = usePersistedState('leadsv2.dateRange', () => presetToRange('all'))
   const dateFrom = dateRange?.from || ''
   const dateTo   = dateRange?.to   || ''
 
@@ -770,6 +773,22 @@ export default function LeadsV2() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {/* Phase 268 — top Export button (admin/co_owner). Same handler as the
+              one in the bottom pagination bar (Phase 62.8.1), surfaced up here so
+              it's findable without scrolling past a long list. Exports selected
+              rows, else ALL currently-filtered rows. */}
+          {isPrivileged && (
+            <button
+              className="lead-btn"
+              onClick={exportSelectedCsv}
+              title={selected.size > 0
+                ? `Export ${selected.size} selected to CSV`
+                : 'Export all filtered leads to CSV'}
+            >
+              <Download size={14} />
+              <span>Export CSV{selected.size > 0 ? ` (${selected.size})` : ''}</span>
+            </button>
+          )}
           {isPrivileged && (
             <button
               className="lead-btn"

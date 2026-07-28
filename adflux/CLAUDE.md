@@ -9408,6 +9408,63 @@ stops on deploy + SQL.
 
 ---
 
+## 141 · §116 team RPCs finally RUN + Phase 268 (filter persistence + top lead export) (2026-07-28)
+
+### §116 leftover CLOSED — team_all_leads + team_all_quotes now live
+Owner reported Jayna (the §84/§247 team viewer) tapping "Team (all)" on /leads +
+/quotes saw ONLY HER OWN. Root: the two team RPCs were the §116 "owner runs these 2
+SQL files" leftover — NEVER run (only `team_all_followups` was, which is why her team
+follow-ups + team dashboard worked). `useQuotes.js:35` on RPC-error does nothing →
+her own quotes stay (silent fallback); `useLeads.js:41` on error empties. Owner RAN
+`supabase_phase247_2_team_leads_rpc.sql` + `supabase_phase247_3_team_quotes_rpc.sql`
+28 Jul; VERIFY `to_regprocedure(...)` → both `true`. Her full read-only team view
+(leads + quotes + follow-ups + dashboard) is now live = the §247 "Sales Head,
+read-only" surface. NOTE the SILENT-FALLBACK foot-gun: a team RPC that 404s makes the
+toggle quietly show own data with no error banner — surface a clear "team view failed"
+message in a future hardening (flagged to owner, not built).
+
+### Phase 268 — remember filters across Back + findable lead export (`<pushed>`)
+Owner: (1) "admin must can download the lead"; (2) "open anyone/lead/quote → go Back →
+lands on main page, filters gone." JS-only, guardian PASS, no SQL, no APK. LeadsV2 +
+QuotesV2 are §28-FROZEN → guardian-audited (PASS, 2 cosmetic P3s).
+- **#1 export ALREADY existed** (LeadsV2:1428, admin-only, in the BOTTOM pagination
+  bar, Phase 62.8.1 — exports selected rows, else ALL filtered) — just buried below a
+  long list. Fix: added a TOP "Export CSV" button in `.lead-page-head` (admin-gated,
+  reuses the SAME `exportSelectedCsv()` handler — no new logic). Now findable.
+- **#2 filter loss = confirmed systemic.** LeadsV2 held ALL ~11 filters in component
+  `useState` → browser Back REMOUNTS the page → every filter reset. (QuotesV2's core
+  search/status/date survive via the shared zustand `filters` store; only its local
+  rep/segment/media/sort reset.) Permanent fix: NEW `src/hooks/usePersistedState.js` —
+  a drop-in `useState` shim backed by **sessionStorage** (session-scoped so a stale
+  filter never sticks across days — avoids re-creating the §136 confusion; try/catch
+  degrades to plain in-memory if storage blocked; supports lazy initial). Swapped the
+  filter/tab/toggle useStates → usePersistedState (keys `leadsv2.*` / `quotesv2.*`):
+  LeadsV2 teamView+search+stage+segment+source+city+industry+rep+outcome+lostReason+
+  dateRange; QuotesV2 teamView+sortField+sortDir+rep+segment+media. LEFT plain: Set
+  `selected`, `page`, `pageSize` (already localStorage), reassign-modal state,
+  QuotesV2 `searchDraft` (store-restored).
+
+### Contracts / notes
+- `usePersistedState(key, initial)` is the standing pattern for "remember this across
+  Back within the session." Reusable on any list page (FollowUpsV2 / team pages next
+  if asked). sessionStorage (NOT localStorage) so it clears on tab close.
+- **Deep-link-wins preserved** (guardian-verified): the Phase 113.10 `?stage=` / Phase
+  122 `?rep=` URL effects run on `location.search` and call the setter AFTER mount, so
+  a param still overrides the persisted value. §136 cold-load default (`presetToRange
+  ('all')`) unchanged on empty storage.
+- Team-view READ-ONLY contract intact (persisting the toggle value touches no gate).
+- P3 (no fix): teamView persists per-tab → two different viewer users sharing one tab
+  could see "Team (all)" pre-selected (cosmetic, RLS+read-only still apply); `search`
+  writes to storage per keystroke (negligible, debounce if revisited).
+
+### Owner action
+Push (I push — JS-only, no SQL, no APK). Reps/admin reopen the app once. Smoke: filter
+/leads → open a lead → Back → filters still set; top "Export CSV" (admin) downloads
+the filtered leads.
+
+
+---
+
 ## 140 · Phase 267 — campaign inbox media Attach: RLS widen + size guard (unparked §138) (2026-07-28)
 
 Unparked the §138 inbox media-attach errors. Root-caused + fixed. JS + SQL, no
