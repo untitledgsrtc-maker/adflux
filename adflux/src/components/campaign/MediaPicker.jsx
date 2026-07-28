@@ -19,6 +19,11 @@ function typeOf(file) {
   return 'document'
 }
 
+// campaign-media bucket cap (Phase 199 file_size_limit = 20 MB). Reject over
+// this CLIENT-side with a clear message — the raw Supabase "object exceeded the
+// maximum allowed size" error is cryptic. Big videos ride as YouTube links (§127.1).
+const MAX_UPLOAD_MB = 20
+
 export default function MediaPicker({
   accept = 'image/*,video/*,application/pdf',
   onSelect,
@@ -52,6 +57,13 @@ export default function MediaPicker({
 
   async function handleUpload(file) {
     if (!file) return
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      toastError(
+        new Error(`This file is ${(file.size / 1048576).toFixed(1)} MB — the limit is ${MAX_UPLOAD_MB} MB. Compress it first, or send a big video as a YouTube link.`),
+        'File too large',
+      )
+      return
+    }
     setBusy(true)
     try {
       const ext = ((file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'bin'

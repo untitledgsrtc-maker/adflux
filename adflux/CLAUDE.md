@@ -9404,3 +9404,57 @@ Forward leads are already correct.
 Run `supabase_phase266_meta_ad_id_map.sql` (VERIFY: meta_ad_ids_present=1,
 meta_campaigns_mapped=0 — none mapped yet, so all LED). Push (I push). The over-tag
 stops on deploy + SQL.
+
+
+---
+
+## 140 · Phase 267 — campaign inbox media Attach: RLS widen + size guard (unparked §138) (2026-07-28)
+
+Unparked the §138 inbox media-attach errors. Root-caused + fixed. JS + SQL, no
+APK. Security audit PASS (no P0/P1; 3 optional P3s out of scope). Not §28-frozen.
+
+### The two errors (root cause)
+The inbox composer "Attach" (`MediaPicker.jsx`) does TWO writes on upload:
+`storage.from('campaign-media').upload()` then `campaign_media` table `.insert()`.
+BOTH the bucket INSERT (Phase 199 `campaign_media_admin_write`) and the table
+INSERT+SELECT (Phase 111 `campaign_media_admin_all` FOR ALL) were **admin/co_owner
+only**. But the inbox is REP-FACING (Phase 205 reps reply / §242 reps see the Inbox
+tab) → a telecaller uploading media = "new row violates row-level security policy",
+and the library grid was EMPTY for them (table SELECT admin-only). The second error
+("object exceeded max size") was a file over the 20 MB bucket cap with NO
+client-side check → the cryptic raw Supabase error.
+
+### The fix
+- `supabase_phase267_campaign_media_inbox_write.sql` (owner RUNS) — widen the media
+  LIBRARY write to any authenticated user: campaign_media table SELECT + INSERT
+  (`TO authenticated`), campaign-media bucket INSERT (`TO authenticated WITH CHECK
+  bucket_id`). **UPDATE/DELETE stay admin-only** (table via the existing
+  `campaign_media_admin_all` FOR ALL; bucket via the preserved Phase 199 `_admin_update`
+  /`_admin_delete`) → a rep can ADD to the shared library but can't edit/delete
+  others' entries. §19 pattern (admin-all + read-all-authenticated + auth write).
+- `MediaPicker.jsx` — a `MAX_UPLOAD_MB = 20` client-side guard rejects an oversize
+  file with a clear message BEFORE upload ("This file is X MB — the limit is 20 MB.
+  Compress it first, or send a big video as a YouTube link.") instead of the cryptic
+  server error. The 20 MB bucket cap is UNCHANGED (WhatsApp video is 16 MB; big
+  videos ride as YouTube links, §127.1).
+
+### Why safe (§45, audit PASS)
+`campaign_media` is a shared, non-sensitive library of PUBLIC media URLs (the bucket
+is already public-read since Phase 199) — reps already SEE this media in the inbox,
+so widening SELECT+INSERT leaks nothing. Storage policy is INSERT-only (a rep can't
+overwrite/delete others' objects; `storage.objects.owner` auto = auth.uid()). All
+policies `TO authenticated` (excludes anon) + literal `USING/WITH CHECK (true)` → no
+NULL-role 3VL fail-open (§41). Idempotent (DROP IF EXISTS + CREATE), preserves the
+Phase 199 public-read + admin update/delete policies. Not §28-frozen, no hot path.
+
+### P3 hardening left for later (out of scope, owner-aware)
+(a) `uploaded_by` not pinned to auth.uid() (a rep could blank/spoof the uploader —
+cosmetic, nothing keys off it); (b) `url` not validated to a campaign-media host (a
+rep could library-inject an external URL — bounded, reps can already attach arbitrary
+media in the composer, admin can DELETE). Neither is a leak; both optional.
+
+### Owner action
+Run `supabase_phase267_campaign_media_inbox_write.sql` in Studio (VERIFY → all 5
+counts 1). Push (I push — JS/SQL, no APK, reaches the APK on next open). Smoke: as a
+telecaller, open the inbox → Attach → the library grid lists media + Upload works (no
+RLS error); a >20 MB file → clear "too large" toast, no upload.
