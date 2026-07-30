@@ -61,7 +61,11 @@ export default function QuotesV2() {
   // ALL reps' quotes (READ-ONLY) via a toggle; default stays her own (RLS).
   // Never for admin (already see all) or a normal rep (no flag → no toggle).
   const canViewTeam = profile?.can_view_team_dashboard === true
-  const [teamView, setTeamView] = usePersistedState('quotesv2.teamView', false)
+  // Phase 269 — team viewer starts ON the team list (see LeadsV2 note).
+  const [teamView, setTeamView] = usePersistedState(
+    'quotesv2.teamView',
+    () => useAuthStore.getState().profile?.can_view_team_dashboard === true,
+  )
   const teamViewing = canViewTeam && !isAdmin && teamView
   const refetch = useCallback(() => fetchQuotes({ team: teamViewing }), [fetchQuotes, teamViewing])
 
@@ -288,6 +292,7 @@ export default function QuotesV2() {
           Hidden for admin + normal reps. */}
       {canViewTeam && !isAdmin && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--v2-ink-1, #a9b3c7)' }}>Showing:</span>
           <div style={{ display: 'inline-flex', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 999, padding: 3 }}>
             {[{ v: false, t: 'My quotes' }, { v: true, t: 'Team (all)' }].map((o) => (
               <button key={o.t} type="button" onClick={() => setTeamView(o.v)}

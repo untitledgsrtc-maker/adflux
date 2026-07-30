@@ -135,7 +135,14 @@ export default function LeadsV2() {
   // ALL reps' leads (READ-ONLY) via a toggle; default stays her own (RLS). Never
   // for admin (they already see all) or a normal rep (no flag → no toggle).
   const canViewTeam = profile?.can_view_team_dashboard === true
-  const [teamView, setTeamView] = usePersistedState('leadsv2.teamView', false)
+  // Phase 269 — a team viewer's whole job IS the team list, so START them on it
+  // (Jayna kept "not finding" the toggle). Non-viewers default to their own — they
+  // never see the toggle anyway (canViewTeam gate below). Read the store directly so
+  // it's right on first mount even before the component `profile` var settles.
+  const [teamView, setTeamView] = usePersistedState(
+    'leadsv2.teamView',
+    () => useAuthStore.getState().profile?.can_view_team_dashboard === true,
+  )
   const teamViewing = canViewTeam && !isPrivileged && teamView
 
   // Phase 93.10 (25 May 2026) — owner: sales / TC / sales_manager
@@ -728,6 +735,7 @@ export default function LeadsV2() {
           Hidden for admin + normal reps. */}
       {canViewTeam && !isPrivileged && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--v2-ink-1, #a9b3c7)' }}>Showing:</span>
           <div style={{ display: 'inline-flex', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 999, padding: 3 }}>
             {[{ v: false, t: 'My leads' }, { v: true, t: 'Team (all)' }].map((o) => (
               <button key={o.t} type="button" onClick={() => setTeamView(o.v)}

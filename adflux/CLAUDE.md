@@ -9465,6 +9465,44 @@ the filtered leads.
 
 ---
 
+## 142 · Phase 269 — team viewer DEFAULTS to the team list + clearer toggle (2026-07-28)
+
+Owner: Jayna (telecaller, `can_view_team_dashboard=true`) "can't find" the team view —
+still saw only her own leads/quotes after reopening. Diagnosed: her flag IS true (owner
+ran the check), `authStore.fetchProfile` uses `select('*')` so the flag IS in the
+profile, TELECALLER_NAV has /leads + /quotes, and the toggle code is correct → so a
+plain reopen not helping means her app is running an OLD cached bundle (the toggle
+shipped 17 Jul, §116/§247; her SW is stuck on old code). Two things blocked her: (a)
+before today's SQL the team RPCs didn't exist → the toggle silently showed her own; (b)
+a subtle "My leads | Team (all)" segmented pill is easy to miss for a non-technical rep.
+
+Fix (JS-only, §28-FROZEN LeadsV2+QuotesV2, guardian PASS): a team viewer now DEFAULTS
+into the team view (`usePersistedState('leadsv2.teamView', () =>
+useAuthStore.getState().profile?.can_view_team_dashboard === true)`), so she opens Leads
+/Quotes and sees the WHOLE TEAM immediately — no hunting. + a "Showing:" label before
+the toggle so it reads as a control. Non-viewers + admin byte-identical (their default
+is false AND the toggle is gated `canViewTeam && !isPrivileged/!isAdmin`). Read-only
+contract intact (teamViewing still forces canReassign/canDeleteQuote=false, hides
+Call/WhatsApp/Edit/Delete). RequireAuth loads the profile before these pages mount, so
+the lazy initial resolves correctly (null → false fallback).
+
+### ⚠ THE REAL BLOCKER = her stale app bundle (not code)
+The code + flag + RPC are all correct now — so if she STILL sees nothing after Phase
+269 deploys, her app is serving old cached JS (SW stuck). A plain reopen didn't refresh
+it. Force it: clear the app's cache/data OR reinstall the APK (live-update, §38 — a
+reinstall pulls the current web bundle). Any frontend fix (this one included) can't
+reach a rep whose SW is stuck until the bundle updates. FOOT-GUN: when a flag+code+RPC
+are all verified correct but a rep "still can't see it", suspect the stale-bundle/SW
+before writing more code.
+
+### Owner action
+Push (I push — JS-only, no SQL, no APK). Jayna: **reinstall the APK** (or clear app
+data) to pull the new bundle → open Leads/Quotes → she now lands on the whole team by
+default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
+
+
+---
+
 ## 140 · Phase 267 — campaign inbox media Attach: RLS widen + size guard (unparked §138) (2026-07-28)
 
 Unparked the §138 inbox media-attach errors. Root-caused + fixed. JS + SQL, no
