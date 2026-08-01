@@ -66,6 +66,59 @@ export default function CampaignQrV2() {
   const [editingId, setEditingId] = useState(null)   // null = create; row id = editing (Phase 232). Code stays FIXED on edit.
   const previewRef = useRef(null)
 
+  // Phase 274.1 — per-board analytics, loaded SEPARATELY from the boards so a
+  // slow/hanging count query can NEVER freeze the render (Phase 274's blocking
+  // RPC await did exactly that). Tries the server-side count RPC (uncapped) with
+  // a 5s timeout; on timeout/error/absent RPC → the proven legacy client counts.
+  async function loadBoardStats(boardIds) {
+    if (!boardIds || !boardIds.length) return
+    const lb = {}, qb = {}, mb = {}, sb = {}
+    const legacy = async () => {
+      const leadToBoard = {}
+      const { data: ld } = await supabase
+        .from('leads').select('id, location_id').in('location_id', boardIds)
+      ;(ld || []).forEach((r) => {
+        if (!r.location_id) return
+        lb[r.location_id] = (lb[r.location_id] || 0) + 1
+        leadToBoard[r.id] = r.location_id
+      })
+      const leadIds = Object.keys(leadToBoard)
+      if (leadIds.length) {
+        const { data: qs } = await supabase.from('quotes').select('lead_id').in('lead_id', leadIds)
+        ;(qs || []).forEach((q) => { const b = leadToBoard[q.lead_id]; if (b) qb[b] = (qb[b] || 0) + 1 })
+      }
+      const { data: convs } = await supabase
+        .from('whatsapp_conversations').select('location_id').in('location_id', boardIds)
+      ;(convs || []).forEach((c) => { if (c.location_id) mb[c.location_id] = (mb[c.location_id] || 0) + 1 })
+      const { data: scans } = await supabase.from('qr_scans').select('location_id').in('location_id', boardIds)
+      ;(scans || []).forEach((s) => { if (s.location_id) sb[s.location_id] = (sb[s.location_id] || 0) + 1 })
+    }
+    try {
+      const timeout = new Promise((res) => setTimeout(() => res({ __timeout: true }), 5000))
+      const raced = await Promise.race([
+        supabase.rpc('qr_board_stats', { p_board_ids: boardIds }),
+        timeout,
+      ])
+      if (!raced?.__timeout && !raced?.error && Array.isArray(raced?.data)) {
+        raced.data.forEach((r) => {
+          if (!r.location_id) return
+          sb[r.location_id] = Number(r.scans)    || 0
+          mb[r.location_id] = Number(r.messaged) || 0
+          lb[r.location_id] = Number(r.leads)    || 0
+          qb[r.location_id] = Number(r.quotes)   || 0
+        })
+      } else {
+        await legacy()
+      }
+    } catch {
+      try { await legacy() } catch { /* analytics best-effort — never break the page */ }
+    }
+    setScansByBoard(sb)
+    setMessagedByBoard(mb)
+    setLeadsByBoard(lb)
+    setQuotesByBoard(qb)
+  }
+
   async function load() {
     setLoading(true)
     try {
@@ -110,50 +163,12 @@ export default function CampaignQrV2() {
       // read-only on live tables). leads (by location_id) + the quotes off
       // those leads + the WhatsApp conversations carrying the board code + the
       // QR scans.
+      // Phase 274.1 — analytics load runs in the BACKGROUND so it can NEVER hang
+      // the boards render (Phase 274's blocking RPC await froze the spinner).
+      // Boards + the table show immediately; the stat numbers fill in when this
+      // resolves. Own try/catch so an analytics failure never breaks the page.
       const boardIds = (locs || []).map((b) => b.id)
-      const lb = {}, qb = {}, mb = {}, sb = {}
-      if (boardIds.length) {
-        // Phase 274 — count per board SERVER-side (GROUP BY) so the totals are
-        // accurate at ANY volume. The old client-side loads capped at
-        // PostgREST's ~1000-row limit → "Total scans" froze at 1000 once
-        // qr_scans crossed it (§66/§85). One uncapped RPC replaces 4 loads.
-        const { data: stats, error: statsErr } = await supabase
-          .rpc('qr_board_stats', { p_board_ids: boardIds })
-        if (!statsErr && Array.isArray(stats)) {
-          stats.forEach((r) => {
-            if (!r.location_id) return
-            sb[r.location_id] = Number(r.scans)    || 0
-            mb[r.location_id] = Number(r.messaged) || 0
-            lb[r.location_id] = Number(r.leads)    || 0
-            qb[r.location_id] = Number(r.quotes)   || 0
-          })
-        } else {
-          // Deploy-order fallback: RPC not created yet → legacy client counts
-          // (capped at ~1000, but keeps the page working before the SQL runs).
-          const leadToBoard = {}
-          const { data: ld } = await supabase
-            .from('leads').select('id, location_id').in('location_id', boardIds)
-          ;(ld || []).forEach((r) => {
-            if (!r.location_id) return
-            lb[r.location_id] = (lb[r.location_id] || 0) + 1
-            leadToBoard[r.id] = r.location_id
-          })
-          const leadIds = Object.keys(leadToBoard)
-          if (leadIds.length) {
-            const { data: qs } = await supabase.from('quotes').select('lead_id').in('lead_id', leadIds)
-            ;(qs || []).forEach((q) => { const b = leadToBoard[q.lead_id]; if (b) qb[b] = (qb[b] || 0) + 1 })
-          }
-          const { data: convs } = await supabase
-            .from('whatsapp_conversations').select('location_id').in('location_id', boardIds)
-          ;(convs || []).forEach((c) => { if (c.location_id) mb[c.location_id] = (mb[c.location_id] || 0) + 1 })
-          const { data: scans } = await supabase.from('qr_scans').select('location_id').in('location_id', boardIds)
-          ;(scans || []).forEach((s) => { if (s.location_id) sb[s.location_id] = (sb[s.location_id] || 0) + 1 })
-        }
-      }
-      setLeadsByBoard(lb)
-      setQuotesByBoard(qb)
-      setMessagedByBoard(mb)
-      setScansByBoard(sb)
+      loadBoardStats(boardIds)
 
       // board → campaign → telecaller name.
       const tcIds = [...new Set((camps || []).map((c) => c.default_telecaller_id).filter(Boolean))]

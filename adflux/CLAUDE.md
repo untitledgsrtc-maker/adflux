@@ -9521,9 +9521,24 @@ Total + per-board scans now AND future-proofs messaged/leads/quotes (all were la
 capped). Security review SAFE (no injection — typed uuid[] bind; no leak; correct
 per-quote attribution, no join fan-out). JS + one SQL file, no APK.
 
+### Phase 274.1 — the RPC await FROZE the page (non-blocking fix)
+Phase 274 awaited the RPC INSIDE `load()`, before `setLoading(false)` — so a slow/
+hanging/absent RPC left the boards panel stuck on its spinner forever (the whole panel
+is gated on `loading`). Owner hit exactly this. Fix: extracted the per-board analytics
+into `loadBoardStats(boardIds)`, called **fire-and-forget** (NOT awaited) from `load()`
+→ boards + table render immediately, `setLoading(false)` runs right after the boards
+load, stats fill in async. `loadBoardStats` races the RPC against a **5s timeout** →
+on timeout/error/absent-RPC it runs the proven legacy client counts. So the page can
+NEVER hang on analytics again, and stats always fill (true count if the RPC works,
+~1000-capped from the fallback until the SQL runs). `npm run build` PASS.
+- FOOT-GUN (§45): never `await` a secondary/analytics query inside a load path whose
+  spinner gates the whole panel — a slow query freezes the page. Load the primary data,
+  drop the spinner, then fill secondary numbers in the background.
+
 ### Owner action
 1. Run `db/functions/qr_board_stats.sql` in Supabase Studio (VERIFY at bottom → total
-   scans should now EXCEED 1000). 2. Push (I push). QR page shows the true scan count.
+   scans should now EXCEED 1000). 2. Push (I push). QR page renders instantly; the true
+   scan count fills in once the RPC exists (until then it shows the capped fallback).
 
 
 ---
