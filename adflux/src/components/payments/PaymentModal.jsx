@@ -345,11 +345,29 @@ export function PaymentModal({
                     min="0"
                     step="1"
                   />
+                  {/* Phase 272 — one-tap govt TDS = 4% of the invoice (2% income
+                      + 2% GST TDS, §23). Editable after — accounts can type the
+                      exact withheld amount if a payment advice differs. */}
+                  {enteredAmt > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => set('tds_amount', String(Math.round(enteredAmt * 0.04)))}
+                      style={{
+                        marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6,
+                        background: 'var(--accent-soft, rgba(255,230,0,0.14))',
+                        color: 'var(--text)', border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm, 6px)', padding: '6px 12px', fontSize: 12.5, fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Auto 4% = {formatCurrency(Math.round(enteredAmt * 0.04))}
+                    </button>
+                  )}
                   {errors.tds_amount && (
                     <span className="field-error">{errors.tds_amount}</span>
                   )}
                   <span className="pm-balance-preview">
-                    Enter the FULL milestone amount above (including TDS).
+                    Govt TDS = 2% income + 2% GST = 4% of the invoice. Tap the Auto 4% button, or type the exact withheld amount.
                     {parseFloat(form.tds_amount) > 0 && enteredAmt > 0 && (
                       <> Cash banked: {formatCurrency(Math.max(0, enteredAmt - (parseFloat(form.tds_amount) || 0)))}</>
                     )}

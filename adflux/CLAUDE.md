@@ -9503,6 +9503,26 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 145 · Phase 272 — one-tap govt TDS auto-fill (4%) (2026-07-28)
+
+Owner: accounts keeps hand-computing govt TDS = 4% (2% income + 2% GST, §23) per
+payment. Added an **"Auto 4% = ₹X" button** in the govt-only TDS block of
+`PaymentModal.jsx` → sets `tds_amount = Math.round(invoiceAmount × 0.04)`. Shows only
+on govt (`isGovt`) when the invoice amount > 0. Field stays fully editable after (type
+the exact withheld amount from a payment advice if it differs). Helper reworded to
+"Govt TDS = 2% income + 2% GST = 4% of the invoice." JS-only, guardian PASS (1 P2
+fixed: off-scale radius 8 → `var(--radius-sm)`), display/input-only — no balance/save/
+validation change (TDS never affects balance; `set('tds_amount', …)` is the existing
+setter). Private quotes never see it.
+
+### Owner action
+Push (I push — JS-only, no SQL, no APK). On a govt payment → tap "Auto 4%" → TDS fills
+(e.g. invoice 10,50,460 → 42,018), cash-banked auto-computes. Fix the current deal too:
+edit → tap Auto 4% (fills 42,018) → Save (balance stays ₹0).
+
+
+---
+
 ## 144 · Phase 271 — govt payment field relabel: "Amount Received" → "Invoice incl. TDS" (2026-07-28)
 
 Owner recorded a WON govt payment and the quote still showed O/S ₹37,908. NOT a bug —
