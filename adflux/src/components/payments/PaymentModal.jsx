@@ -278,7 +278,19 @@ export function PaymentModal({
 
               {/* Amount */}
               <div className="form-group">
-                <label className="form-label">Amount Received (₹) *</label>
+                {/* Phase 271 — on GOVT quotes the client withholds TDS, so this
+                    field takes the GROSS invoice/milestone (incl. TDS), not the
+                    cash. Owner hit an O/S balance from entering the net cash here.
+                    Label + hint spell it out on govt; private is unchanged. */}
+                <label className="form-label">
+                  {isGovt ? 'Invoice / Milestone Amount — incl. TDS (₹) *' : 'Amount Received (₹) *'}
+                </label>
+                {isGovt && (
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5 }}>
+                    Enter the <strong>full invoice amount, including TDS</strong> — not the cash you banked.
+                    The withheld TDS goes in the field below; cash banked is calculated for you.
+                  </div>
+                )}
                 {/* Phase 34Z.44 — pending hint inline above input so
                     rep can't miss it. Owner: "team might forget that
                     partial payment received, requests full again." */}

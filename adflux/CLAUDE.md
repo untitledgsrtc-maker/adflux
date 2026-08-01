@@ -9503,6 +9503,38 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 144 · Phase 271 — govt payment field relabel: "Amount Received" → "Invoice incl. TDS" (2026-07-28)
+
+Owner recorded a WON govt payment and the quote still showed O/S ₹37,908. NOT a bug —
+data entry. `PaymentModal.jsx` "Amount Received" wants the GROSS invoice/milestone
+(incl. TDS) because govt withholds TDS from the invoice (code comment line 51 + §23/§56
+TDS handling; `balance = quote.total_amount − Σ amount_received`). Owner entered the NET
+cash (₹10,80,378) instead of the gross (₹11,18,286) → the ₹37,908 gap = exactly the TDS
+he left out. (It still showed "FULLY PAID" because the payment was ticked Final — the
+badge follows the Final flag, the balance follows the arithmetic; they disagree when the
+amount is under-entered.)
+
+- **Immediate fix (manual, no code):** edit the payment → Amount Received = the full quote
+  total incl. TDS (₹11,18,286), keep TDS 37,908 → balance ₹0, cash-banked auto ₹10,80,378.
+- **Permanent (Phase 271, JS-only, guardian PASS, display-only):** the amount `<label>` is
+  now govt-aware — GOVT quote → "Invoice / Milestone Amount — incl. TDS (₹)" + a muted hint
+  ("enter the full invoice incl. TDS, not the cash banked; TDS goes below"). PRIVATE quote
+  byte-unchanged ("Amount Received"). `isGovt = quote.segment === 'GOVERNMENT'` (already
+  gated the TDS field). ZERO logic/math/save touched — pure label/copy. Not §28-frozen but
+  money-adjacent; guardian confirmed balance/TDS/final-trigger paths untouched.
+
+### Contract
+- Govt payment: **Amount Received field = the FULL invoice/milestone incl. TDS**; the TDS
+  field records what was withheld; cash-banked = amount − TDS (computed). Do NOT enter the
+  net cash. The label now says so on govt quotes.
+
+### Owner action
+Push (I push — JS-only, no SQL, no APK). AND manually fix the affected quote (edit the
+payment → gross ₹11,18,286).
+
+
+---
+
 ## 143 · Phase 270 — salary Rule 3: score above 75% earns FULL variable (2026-07-28)
 
 Owner directive: "if score is above 75% we pay full variable, not % of score." A MONEY
