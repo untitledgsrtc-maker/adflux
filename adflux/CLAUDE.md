@@ -9503,6 +9503,29 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 146 · Phase 273 — Leaves tab: rep + month filters (2026-07-28)
+
+Owner: the Leaves tab (`/people?tab=leaves`, LeavesAdminV2) "filter not working."
+Analysis: the ONLY filter was the status tabs (Pending/Approved/Rejected/All — which
+DO work); there was NO rep filter, NO month filter, and the list loaded a fixed
+**last-60-days** window so older months were invisible. Owner wanted rep + month.
+
+Fix (JS-only, not §28-frozen, HR admin page): added a **Rep dropdown** + **Month
+picker** above the status tabs. The month now DRIVES the load (any month via
+`.or(and(leave_date.gte.MSTART,leave_date.lte.MEND),status.eq.pending)`) — replaces the
+60-day cap; **all still-pending requests always load regardless of month** so the
+approval queue is never hidden. Rep + status narrow client-side; statusCounts respect
+the rep filter. users query widened to include hr + accounts (they take leave → show in
+the table + rep dropdown). Month default = `istCurrentMonthYM()` (IST, §47.9). load()
+re-runs on month change.
+
+### Owner action
+Push (I push — JS-only, no SQL, no APK). `/people?tab=leaves` → pick a Rep + a Month →
+that rep's leaves for that month; pending always visible under the Pending tab.
+
+
+---
+
 ## 145 · Phase 272 — one-tap govt TDS auto-fill (4%) (2026-07-28)
 
 Owner: accounts keeps hand-computing govt TDS = 4% (2% income + 2% GST, §23) per

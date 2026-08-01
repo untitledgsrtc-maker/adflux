@@ -28,6 +28,7 @@ import { useAuthStore } from '../../store/authStore'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { buildLeaveDates } from '../../utils/leaveDates'
+import { istCurrentMonthYM } from '../../utils/istDate'   // Phase 273 — month filter default
 
 const LEAVE_TYPES = [
   { key: 'sick',         label: 'Sick'        },
@@ -73,6 +74,11 @@ export default function LeavesAdminV2({ embedded = false }) {
   // Request Leave on MyOfferV2) land as status='pending'; this
   // page now lets admin Approve or Reject them.
   const [statusFilter, setStatusFilter] = useState('pending')
+  // Phase 273 — review filters: pick a rep + a month. Month drives the LOAD
+  // (any month, not a fixed last-60-days cap that hid older history); rep +
+  // status narrow the loaded rows client-side.
+  const [fRepFilter, setFRepFilter]     = useState('all')
+  const [fMonthFilter, setFMonthFilter] = useState(() => istCurrentMonthYM())
   const [actingOn, setActingOn] = useState(null)  // row id being acted on
 
   // Form state — defaults pick "today" so common case (rep didn't
@@ -92,20 +98,26 @@ export default function LeavesAdminV2({ embedded = false }) {
 
   async function load() {
     setLoading(true)
-    // Pull team users + last 60 days of leaves in parallel.
-    const since = new Date()
-    since.setDate(since.getDate() - 60)
-    const sinceISO = since.toISOString().slice(0, 10)
+    // Phase 273 — load the SELECTED month's leaves + ALL still-pending requests
+    // (any date) so the month filter never hides the approval queue. Replaces
+    // the old fixed last-60-days window that made older months invisible.
+    const mf = fMonthFilter || istCurrentMonthYM()
+    const [y, m] = mf.split('-').map(Number)
+    const monthStart = `${mf}-01`
+    const lastDay = new Date(y, m, 0).getDate()          // day 0 of next month = last day of this
+    const monthEnd = `${mf}-${String(lastDay).padStart(2, '0')}`
 
     const [uRes, lRes] = await Promise.all([
       supabase.from('users')
         .select('id, name, role')
-        // Phase 101.A2 — agency dropped (no leave/payroll, commission-only).
-        .in('role', ['sales', 'telecaller', 'admin', 'co_owner'])
+        // Phase 273 — include hr + accounts (they take leave too → their name
+        // shows in the table + they appear in the rep filter). Agency dropped
+        // (commission-only, no leave/payroll).
+        .in('role', ['sales', 'telecaller', 'admin', 'co_owner', 'hr', 'accounts'])
         .order('name', { ascending: true }),
       supabase.from('leaves')
         .select('id, user_id, leave_date, leave_type, reason, status, is_half_day, is_paid_request, created_at')
-        .gte('leave_date', sinceISO)
+        .or(`and(leave_date.gte.${monthStart},leave_date.lte.${monthEnd}),status.eq.pending`)
         .order('leave_date', { ascending: false })
         .order('created_at', { ascending: false }),
     ])
@@ -114,7 +126,7 @@ export default function LeavesAdminV2({ embedded = false }) {
     setLoading(false)
   }
 
-  useEffect(() => { if (isAdmin) load() }, [isAdmin])
+  useEffect(() => { if (isAdmin) load() }, [isAdmin, fMonthFilter])
 
   // Map user_id → name for the table display.
   const userMap = useMemo(() => {
@@ -252,21 +264,25 @@ export default function LeavesAdminV2({ embedded = false }) {
     load()
   }
 
-  // Filter leaves by status tab.
+  // Filter loaded leaves by rep (Phase 273) then status tab.
   const filteredLeaves = useMemo(() => {
-    if (statusFilter === 'all') return leaves
-    return leaves.filter(l => (l.status || 'approved') === statusFilter)
-  }, [leaves, statusFilter])
+    let rows = leaves
+    if (fRepFilter !== 'all') rows = rows.filter(l => l.user_id === fRepFilter)
+    if (statusFilter !== 'all') rows = rows.filter(l => (l.status || 'approved') === statusFilter)
+    return rows
+  }, [leaves, statusFilter, fRepFilter])
 
-  // Count per status for tab badges.
+  // Count per status for tab badges — respect the rep filter so the badges
+  // match what the table shows when a rep is selected (Phase 273).
   const statusCounts = useMemo(() => {
-    const c = { pending: 0, approved: 0, rejected: 0, all: leaves.length }
-    leaves.forEach(l => {
+    const base = fRepFilter === 'all' ? leaves : leaves.filter(l => l.user_id === fRepFilter)
+    const c = { pending: 0, approved: 0, rejected: 0, all: base.length }
+    base.forEach(l => {
       const s = l.status || 'approved'
       if (c[s] != null) c[s] += 1
     })
     return c
-  }, [leaves])
+  }, [leaves, fRepFilter])
 
   if (!isAdmin) return null
 
@@ -398,6 +414,23 @@ export default function LeavesAdminV2({ embedded = false }) {
             <AlertTriangle size={14} /> {err}
           </div>
         )}
+      </div>
+
+      {/* Phase 273 — rep + month review filters. Month reloads the list (any
+          month); rep + status narrow the loaded rows. Pending requests always
+          show regardless of month so the approval queue is never hidden. */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
+        <div>
+          <label style={labelStyle}>Rep</label>
+          <select value={fRepFilter} onChange={e => setFRepFilter(e.target.value)} style={inputStyle}>
+            <option value="all">All reps</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Month</label>
+          <input type="month" value={fMonthFilter} onChange={e => setFMonthFilter(e.target.value)} style={inputStyle} />
+        </div>
       </div>
 
       {/* Phase 35.0 pass 11 — status filter tabs above the table.
