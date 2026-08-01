@@ -9503,6 +9503,31 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 147 · Phase 274 — QR "Total scans" 1000-cap fixed (server-side count RPC) (2026-07-28)
+
+Owner: QR & Locations "Total scans" stuck at exactly **1000**. Root = the §66/§85/§151
+recurring 1000-row-cap disease: `CampaignQrV2` counted per-board Scans/Messaged/Leads/
+Quotes by loading raw rows client-side (`.select().in('location_id', boardIds)`), and
+PostgREST caps an unpaginated select at ~1000 → the counter froze at 1000 + per-board
+scans under-counted. Not data loss (rows exist); the page stopped counting.
+
+Fix (permanent, not a paginate-thousands patch): NEW `db/functions/qr_board_stats.sql`
+— `qr_board_stats(p_board_ids uuid[])` counts all four per board with GROUP BY, returns
+one small row per board (never loads the rows). **SECURITY INVOKER** (§153 — runs with
+the caller's RLS, exposes nothing new; the page is admin-gated; equal-or-stricter than
+the client queries it replaced). Frontend calls the RPC; on RPC-missing (deploy-before-
+SQL) it FALLS BACK to the legacy capped client loads (§45 deploy-order safe). Fixes
+Total + per-board scans now AND future-proofs messaged/leads/quotes (all were latently
+capped). Security review SAFE (no injection — typed uuid[] bind; no leak; correct
+per-quote attribution, no join fan-out). JS + one SQL file, no APK.
+
+### Owner action
+1. Run `db/functions/qr_board_stats.sql` in Supabase Studio (VERIFY at bottom → total
+   scans should now EXCEED 1000). 2. Push (I push). QR page shows the true scan count.
+
+
+---
+
 ## 146 · Phase 273 — Leaves tab: rep + month filters (2026-07-28)
 
 Owner: the Leaves tab (`/people?tab=leaves`, LeavesAdminV2) "filter not working."
