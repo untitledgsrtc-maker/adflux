@@ -22,15 +22,20 @@
 --      (new_client_revenue + renewal_revenue) >= 3 × monthly_salary earns the
 --      FULL variable cap, score ignored. Other roles never get this override.
 --    • variable_earned (when Rule 1 does NOT apply) — 0 working days → full cap
---      (avg forced 100); avg < 50 → 0; else (avg/100) × cap.
+--      (avg forced 100); avg < 50 → 0; avg > 75 → full cap (Phase 270 Rule 3);
+--      50–75 → (avg/100) × cap.
 --    • avg + working_days from daily_performance WHERE is_excluded = false.
 --    • monthly_salary from staff_incentive_profiles; business from monthly_sales_data.
 --    • _assert_self_or_admin(p_user_id) gate. STABLE SECURITY DEFINER + pg_temp.
 --
 -- PROVENANCE: Phase 184 (2026-07-02) CHANGE — added Rule 1 (3×-business full
---    variable, sales/TC only) to the byte-captured phase97.2 body. Owner-approved,
---    shadow-compared. Single signature (uuid, date) → RETURNS TABLE. To revert the
---    rule, delete the `v_role IN ('sales','telecaller') … >= v_salary * 3` branch.
+--    variable, sales/TC only) to the byte-captured phase97.2 body. Phase 270
+--    (2026-07-28) CHANGE — added Rule 3 (score > 75% → full variable). Both
+--    owner-approved + shadow-compared. Single signature (uuid, date) → RETURNS TABLE.
+--    To revert Rule 3, delete the `ELSIF v_avg > 75 THEN … v_var_cap;` branch.
+--    To revert Rule 1, delete the `v_role IN ('sales','telecaller') … >= v_salary * 3` branch.
+--    RETROACTIVE: no effective-date gate — recomputes live for EVERY month queried
+--    (both rules only RAISE variable for high scorers → no clawback, favorable).
 --
 -- SUPERSEDES (Phase 178 removed the body from each):
 --      supabase_phase33e_performance_score.sql
@@ -89,15 +94,19 @@ BEGIN
   v_var_cap := v_salary * 0.30;
 
   IF v_role IN ('sales','telecaller') AND v_salary > 0 AND v_business >= v_salary * 3 THEN
-    -- Rule 1: 3x-business override — full variable, score ignored (sales/TC only).
+    -- Rule 1 (Phase 184): 3x-business override — full variable, score ignored (sales/TC only).
     v_var_earned := v_var_cap;
   ELSIF v_days = 0 THEN
     v_avg := 100;
     v_var_earned := v_var_cap;
   ELSIF v_avg < 50 THEN
     v_var_earned := 0;
+  ELSIF v_avg > 75 THEN
+    -- Rule 3 (Phase 270): score ABOVE 75% earns the FULL variable cap (owner
+    -- 2026-07-28). 50–75% stays proportional (below); < 50% stays 0 (above).
+    v_var_earned := v_var_cap;
   ELSE
-    v_var_earned := (v_avg / 100.0) * v_var_cap;
+    v_var_earned := (v_avg / 100.0) * v_var_cap;   -- 50–75% → proportional
   END IF;
 
   RETURN QUERY
@@ -119,6 +128,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%* 0.70%'                     AS base_70,
 --   pg_get_functiondef(p.oid) LIKE '%* 0.30%'                     AS variable_cap_30,
 --   pg_get_functiondef(p.oid) LIKE '%v_business >= v_salary * 3%' AS rule1_3x_override,
+--   pg_get_functiondef(p.oid) LIKE '%v_avg > 75%'                 AS rule3_above75_full,
 --   pg_get_functiondef(p.oid) LIKE '%v_avg < 50%'                 AS sub50_zero_variable,
 --   pg_get_functiondef(p.oid) LIKE '%daily_performance%'          AS reads_daily_perf,
 --   pg_get_functiondef(p.oid) LIKE '%staff_incentive_profiles%'   AS reads_salary_profile

@@ -9503,6 +9503,54 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 143 · Phase 270 — salary Rule 3: score above 75% earns FULL variable (2026-07-28)
+
+Owner directive: "if score is above 75% we pay full variable, not % of score." A MONEY
+change to the canonical `db/functions/monthly_score.sql` (§71/§72 — edit-in-place, no new
+copy; feeds compute_monthly_salary → the Salary sheet + payouts). Both adversarial
+reviews PASS (guardian + money-correctness), single-source confirmed (dedup count = 1).
+
+### The rule (FROZEN — the variable-earned tiers)
+```
+Rule 1 (Phase 184): sales/TC business >= 3× salary → FULL cap (score ignored)  [first]
+0 working days                                     → FULL cap
+score < 50%                                        → ₹0
+score > 75%  (Phase 270, NEW)                      → FULL cap (30% of salary)
+score 50–75% (inclusive)                           → (score/100) × cap  [proportional]
+```
+`> 75` is STRICT — exactly 75.0 → proportional. Cap = salary × 0.30. Base = salary × 0.70
+(unchanged). Net = base + variable + incentive + TA/DA − leave deduction (unchanged).
+
+### Impact (verified vs the live Salary sheet)
+Only reps ABOVE 75% change, and ONLY UPWARD (never lowers anyone — no clawback):
+- **Rima** 96.2% → variable ₹5,192 → **₹5,400** (+208).
+- **JAYNA** 83.9% → ₹3,777 → **₹4,500** (+723).
+- **Dhara stays ₹5,004** (72.5% < 75 → still proportional). Mayur/Viral (63.x%), everyone
+  50–75 unchanged; <50 (Kirti/Kamina/Dixita) unchanged at ₹0.
+
+### RETROACTIVE (owner-aware, favorable)
+No effective-date gate — monthly_score computes live for EVERY month queried, so past
+months' variable also recomputes UP for >75 scorers. Because it only RAISES, there's no
+clawback (same posture as §184; owner chose retroactive there too).
+
+### Reviews / tripwire
+Guardian PASS: branch order correct (ELSE now only 50–75, no dead code), all locked
+contracts intact (70/30, Rule 1 first, 0-days, auth gate, SECDEF+pg_temp, GRANT, NOTIFY).
+Money-correctness PASS: traced avg 49.9/50/72.5/75.0/75.1/83.9/96.2/100 → all as intended;
+never lowers (score capped at 100 §121). VERIFY block gained `rule3_above75_full`
+(`v_avg > 75`). Revert = delete the `ELSIF v_avg > 75 THEN … v_var_cap;` branch + re-run.
+
+### Owner action — 2 SQL steps in Supabase Studio
+1. **Preview first (read-only)** — run the shadow query (in chat) to see OLD vs NEW
+   variable + delta per rep BEFORE applying. Expect only Rima + Jayna with a positive
+   delta; everyone else delta = 0.
+2. **Apply** — run `db/functions/monthly_score.sql`. Then the VERIFY block at the bottom
+   (all TRUE incl. `rule3_above75_full`). The Salary sheet recomputes live — Rima/Jayna
+   variable rises. JS-free, no APK. Not mid-payout ideally (it's a raise, low risk).
+
+
+---
+
 ## 140 · Phase 267 — campaign inbox media Attach: RLS widen + size guard (unparked §138) (2026-07-28)
 
 Unparked the §138 inbox media-attach errors. Root-caused + fixed. JS + SQL, no
