@@ -9503,6 +9503,33 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 149 · Phase 276 — Quotes page: Won + Conversion stat cards (2026-08-03)
+
+Owner on /quotes: no "Total Won" card, and "conversion % not accurate." Analysis: the
+summary strip had only Total Quotes / Total Amount / Outstanding — NO won. And the hero
+ring % is COLLECTION rate (collected ÷ total amount = 98%), NOT conversion — there was
+no conversion metric at all; the owner was reading the collection ring as conversion.
+
+Fix (JS-only, §28-FROZEN QuotesV2, guardian PASS, display-only): `totals` memo now also
+computes `wonAmount` (Σ total_amount where status='won'), `wonCount`, `lostCount`, and
+`winRate = won/(won+lost)` rounded. Added two cards to the summary strip: **Won** (value
+of won deals, green, "N won" sub) + **Conversion** (win rate %, "N won · M lost" sub).
+Grid → `auto-fit minmax(150px)` so 5 cards flow/wrap. `TotalCard` gained `sub`, `tint`,
+and a `kind='percent'` branch (existing 3 cards render byte-identical — no sub/tint).
+
+### Conversion definition (locked)
+Conversion = **won / (won + lost)** — the win rate on DECIDED deals. Open quotes
+(draft/sent/negotiating) are excluded (not failures yet); a won/total ratio would
+understate it while deals are in play. The sub-line shows the raw "N won · M lost" so
+the math is transparent. The hero ring stays COLLECTION rate (a separate, valid metric).
+
+### Owner action
+Push (I push — JS-only, no SQL, no APK). /quotes now shows Won (₹ value of won deals) +
+Conversion (win rate). The 98% ring is collection rate, not conversion — separate number.
+
+
+---
+
 ## 148 · Phase 275 — WhatsApp SECOND spam flag: policy-compliance fix (2026-08-03)
 
 Meta flagged the MARKETING number 98982 73686 (WABA 2870129030006085) for "sending

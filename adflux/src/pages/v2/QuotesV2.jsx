@@ -277,12 +277,20 @@ export default function QuotesV2() {
   const totals = useMemo(() => {
     let amount = 0
     let outstanding = 0
+    let wonAmount = 0, wonCount = 0, lostCount = 0   // Phase 276 — Won + Conversion
     displayed.forEach(q => {
       amount += Number(q.total_amount) || 0
       const b = computeBalance(q)
       if (b.kind === 'due') outstanding += b.amount || 0
+      if (q.status === 'won')  { wonCount += 1; wonAmount += Number(q.total_amount) || 0 }
+      else if (q.status === 'lost') { lostCount += 1 }
     })
-    return { count: displayed.length, amount, outstanding }
+    // Conversion = win rate on DECIDED deals (won / won+lost). Open quotes
+    // (draft/sent/negotiating) aren't failures yet, so they're excluded — a
+    // won/total ratio would understate conversion while deals are still in play.
+    const decided = wonCount + lostCount
+    const winRate = decided > 0 ? Math.round((wonCount / decided) * 100) : 0
+    return { count: displayed.length, amount, outstanding, wonAmount, wonCount, lostCount, winRate }
   }, [displayed])
 
   return (
@@ -506,13 +514,17 @@ export default function QuotesV2() {
         className="v2d-totals-strip"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
           gap: 12,
           margin: '0 0 14px',
         }}
       >
         <TotalCard label="Total quotes" value={totals.count} kind="count" />
         <TotalCard label="Total amount" value={totals.amount} kind="money" />
+        {/* Phase 276 — Won (value of won deals) + Conversion (win rate on
+            decided deals). NOT the hero ring, which is COLLECTION rate. */}
+        <TotalCard label="Won" value={totals.wonAmount} kind="money" tint="var(--v2-green, #2BD8A0)" sub={`${totals.wonCount} won`} />
+        <TotalCard label="Conversion" value={totals.winRate} kind="percent" sub={`${totals.wonCount} won · ${totals.lostCount} lost`} />
         <TotalCard label="Outstanding" value={totals.outstanding} kind="money" warn />
       </div>
 
@@ -855,7 +867,7 @@ function FollowUpChip({ date, done }) {
 /* ─── Totals strip card — count or money. `warn` flips the value
        color to the rose accent (used for Outstanding so it reads as
        attention-needed instead of neutral). ─── */
-function TotalCard({ label, value, kind, warn }) {
+function TotalCard({ label, value, kind, warn, sub, tint }) {   // Phase 276 — sub + tint + percent
   // Phase 34Z.40 — reverted Phase 34Z.11 lakh/crore compact-money.
   // DESIGN_SYSTEM.md §3.3 is explicit: "Never truncate to lakh/crore
   // (no `₹1.5L`, no `₹2.3Cr`). The full number IS the design."
@@ -863,6 +875,8 @@ function TotalCard({ label, value, kind, warn }) {
   // grid; numbers stay full.
   const display = kind === 'money'
     ? '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Number(value) || 0))
+    : kind === 'percent'
+    ? (Math.round(Number(value) || 0)) + '%'
     : (Number(value) || 0).toLocaleString('en-IN')
   return (
     <div
@@ -905,7 +919,7 @@ function TotalCard({ label, value, kind, warn }) {
              the full number fits across all phone widths. */
           fontSize: 'clamp(12px, 4vw, 17px)',
           fontWeight: 700,
-          color: warn ? 'var(--v2-amber)' : 'var(--v2-ink-0)',
+          color: warn ? 'var(--v2-amber)' : (tint || 'var(--v2-ink-0)'),
           lineHeight: 1.1,
           minWidth: 0,
           whiteSpace: 'nowrap',
@@ -916,6 +930,12 @@ function TotalCard({ label, value, kind, warn }) {
       >
         {display}
       </div>
+      {sub && (
+        <div style={{
+          fontSize: 'clamp(8px, 2.2vw, 10px)', color: 'var(--v2-ink-2)',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>{sub}</div>
+      )}
     </div>
   )
 }
