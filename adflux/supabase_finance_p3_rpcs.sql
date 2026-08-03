@@ -146,6 +146,16 @@ BEGIN
          WHERE bucket IN ('internal_transfer','loan_in','loan_out','owner_drawings','investment','asset','tax')
            AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
          GROUP BY bucket) e), '{}'::jsonb),
+    -- SIMPLE view: money in/out grouped by the accountant's OWN Excel category (raw_tag)
+    'by_tag', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object('tag', tg, 'inflow', inflow, 'outflow', outflow, 'rows', n) ORDER BY (inflow+outflow) DESC)
+      FROM (SELECT btrim(COALESCE(NULLIF(raw_tag,''),'(untagged)')) tg,
+                   COALESCE(SUM(amount) FILTER (WHERE direction='in'),0) inflow,
+                   COALESCE(SUM(amount) FILTER (WHERE direction='out'),0) outflow,
+                   count(*) n
+              FROM public.finance_transactions
+             WHERE (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+             GROUP BY 1) t), '[]'::jsonb),
     'review', (SELECT jsonb_build_object('count', count(*), 'amount', COALESCE(SUM(amount),0))
         FROM public.finance_transactions WHERE bucket='review'
           AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to))
