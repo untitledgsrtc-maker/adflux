@@ -10160,3 +10160,42 @@ closed on NULL role.
 - `finance_transactions.dedupe_key` UNIQUE (bank||date||ref||amount) → re-importing a
   file adds ZERO rows. All aggregation SERVER-side (§66 — grows monthly).
 - `matched_payment_id` → payments.id is the reconciliation link.
+
+
+---
+
+## 156 · Finance module — front-end state after the 3 Aug iteration (2026-08-03)
+
+Continues §155. Owner iterated hard on FinanceV2 (`/finance`). Final shape after
+commits `5ddd631`→`ac67d17` (all pushed, frontend-only unless noted):
+- **P&L tab = DETAILED** (owner: "old detailed one was good"; rejected the simple
+  cut). Full mockup cards: hero + KPIs + monthly trend SVG + revenue-mix donut +
+  4-line segment×media table + per-company + common-split + loans/transfers +
+  assets + expense-by-head + review flag. Reads `finance_pnl_summary` (bank-income,
+  §155 P3.2). Segment toggle removed; PnlTab called with seg="all".
+- **Register = DETAILED, month-grouped** (owner sent a screenshot "want like this"):
+  rows grouped by month with In/Out/Net subtotals; per-row editable dropdowns
+  Company · Bucket · Segment(+media combined) · Expense Head · Bank; delete (Trash2)
+  per row; live dashboard update. NOT the one-category simplification (reverted).
+- **Import = REAL wizard** (owner: "while import ask everything / not working").
+  Upload .xlsx/.csv → **SheetJS (`xlsx@0.18.5`) lazy-loaded via `await import('xlsx')`
+  (separate chunk, rep bundles untouched)** → auto-detect + user-map every column
+  (date/desc/cr/crtag/dr/drtag/expense-head) + pick bank → preview → classify (same
+  rules as the backfill, `classifyImport`) → row-order date reconstruction (serials
+  untrusted, carry-forward) → `upsert(onConflict:'dedupe_key', ignoreDuplicates)`.
+  ⚠ Import dedupe_key is CONTENT-based (`bank|date|amt|dir|desc26|idx|side`), a
+  DIFFERENT format from the P2 backfill's row-idx key → re-importing the SAME Apr–Jul
+  files via the wizard would DUPLICATE them. Import is for NEW months (Aug+); the
+  backfill already loaded Apr–Jul. (A future hardening: unify the dedupe key or
+  warn/block a same-period re-import.)
+- **New dep `xlsx@0.18.5`** in package.json (npm audit had advisories — accepted for
+  an admin-only, lazy-loaded parser). Full `npm run build` PASS (7.7s).
+
+### Foot-gun / lesson
+- ❌ Over-simplifying on a terse "make it simple" — owner meant simplify the TAGGING
+  (one category picker) NOT strip the detailed P&L. When he says simple, confirm
+  WHICH surface; the detailed dashboard was wanted. Two wrong guesses cost round-trips.
+- The finance module is admin/accounts-only (RequireAccountsOrPrivileged) + Vishal
+  govt-scoped via the RPC gate — NOT a §28 frozen surface, but it IS money display;
+  keep the P&L math server-side (RPC) + verify totals against the plain-SQL query.
+
