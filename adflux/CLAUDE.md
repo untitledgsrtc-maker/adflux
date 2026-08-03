@@ -9970,3 +9970,54 @@ Run `supabase_phase278_co_owner_govt_scope.sql` in Studio. VERIFY block: NO
 `staff_incentive_profiles`/`monthly_sales_data`/`incentive_settings` pg_policies
 check. Smoke: sign in as Vishal → govt quotes/payments visible, PRIVATE hidden, no
 edit/delete on govt rows.
+
+**RUN + VERIFIED live 2026-08-03** — all 10 policies correct (5 admin_all = admin
+only, 5 govt_partner_read present). §150 team-RPC files + inbox owner-stamp also
+run clean. The residual financial-table leak → Phase 279 below.
+
+
+---
+
+## 153 · Phase 279 — co_owner OFF the 3 org-wide financial tables (companion to §152) (2026-08-03)
+
+The residual the §152 security review flagged. The `pg_policies` check (owner ran)
+confirmed **all 3 live co_owner-inclusive**: `staff_incentive_profiles`
+(`sip_admin_all`), `monthly_sales_data` (`msd_admin_all`), `incentive_settings`
+(`is_admin_all`) — each `get_my_role() = ANY('admin','owner','co_owner')`. So Vishal
+(co_owner, govt-partner) read the WHOLE team's salary/incentive config + the
+all-segment sales-revenue ledger via the normal client query → breaks §42 (no
+private financials / no P&L).
+
+### Fix (`supabase_phase279_co_owner_financial_scope.sql`, owner RUNS)
+All 3 `*_admin_all` rewritten `FOR ALL USING (get_my_role() = 'admin')` — drop
+co_owner + dead `owner`. **NO govt_partner_read**: these tables have NO segment
+column (salary/incentive is ONE org-wide payroll, not per-segment — there's no
+"government salary"), and Vishal is a govt partner, not HR/finance/accounts → he
+needs NONE of it. Admin keeps full read+write (WITH CHECK defaults to USING).
+
+### Why SAFE (verified — touches only Vishal's read)
+- **accounts (Diya, §182)** reads/writes payroll via its OWN policies —
+  `staff_incentive_profiles_accounts_all`, `incentive_settings_accounts_all`,
+  `monthly_sales_data_accounts_read` — NOT via `*_admin_all` (accounts was never in
+  the admin_all role array). Untouched.
+- **HR** writes `staff_incentive_profiles` via `sip_hr_write` (§109). Untouched.
+- **`monthly_sales_data`** is written by `rebuild_monthly_sales` (SECURITY DEFINER →
+  runs as postgres, bypasses RLS). No client co_owner write path existed.
+- co_owner never wrote these (Vishal isn't HR/finance). Only his READ closes.
+- The future **P&L module** (Sprint 3, §42) uses its OWN govt-scoped tables — these
+  3 stay admin-only regardless.
+
+### FROZEN CONTRACT
+- `sip_admin_all` / `msd_admin_all` / `is_admin_all` are `= 'admin'` ONLY. co_owner
+  gets NO access to org-wide salary/incentive/sales-ledger (no segment → no
+  govt_partner exception). A diff re-adding co_owner/owner to any of the 3 is a BLOCK.
+- Together with §152, the co_owner private-data doctrine (§42) is now enforced at
+  RLS across: quotes/quote_cities/payments/follow_ups/pdf_share_tokens (govt-scoped
+  read) + staff_incentive_profiles/monthly_sales_data/incentive_settings (no access)
+  + the §42 twelve singular-admin operational tables.
+
+### Owner action
+Run `supabase_phase279_co_owner_financial_scope.sql`. VERIFY: all 3 quals =
+`(get_my_role() = 'admin')`, no co_owner/owner. Smoke: sign in as Vishal → Salary
+sheet / incentive config / sales ledger show nothing (or bounce); admin + accounts
++ HR unchanged.
