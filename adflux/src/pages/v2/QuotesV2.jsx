@@ -44,6 +44,20 @@ function computeBalance(q) {
   return { kind: 'due', amount: balance }
 }
 
+// Phase 277 — friendly labels for the Media filter (media_type → label).
+// Unknown types fall back to the raw code so the filter never hides one.
+const MEDIA_LABELS = {
+  AUTO_HOOD: 'Auto Hood',
+  GSRTC_LED: 'GSRTC LED',
+  LED_OTHER: 'Private LED',
+  OTHER_MEDIA: 'Other Media',
+  HOARDING: 'Hoarding',
+  MALL: 'Mall',
+  CINEMA: 'Cinema',
+  DIGITAL: 'Digital',
+  OTHER: 'Other',
+}
+
 /* ─── Component ────────────────────────────────────── */
 export default function QuotesV2() {
   const navigate = useNavigate()
@@ -146,8 +160,8 @@ export default function QuotesV2() {
   // 'all' (default) keeps the historical mixed view. Pre-Phase 4 rows
   // have segment=null, so 'private' must match both 'PRIVATE' and null.
   const [segmentFilter, setSegmentFilter] = usePersistedState('quotesv2.segment', 'all')
-  // Sub-filter for govt quotes — Auto Hood vs GSRTC LED. Only visible
-  // when segmentFilter === 'government'. Mirrors the segment pill UI.
+  // Phase 277 — Media filter (media_type), cross-segment. Options derive from
+  // the media types present in the active segment; see mediaOptions/segmentPool.
   const [mediaFilter, setMediaFilter] = usePersistedState('quotesv2.media', 'all')
 
   useEffect(() => {
@@ -204,19 +218,36 @@ export default function QuotesV2() {
   // memo (repScoped → counts, sorted → displayed → totals) reads from
   // segmentScoped, so the pill correctly slices status tab counts and
   // totals together.
-  const segmentScoped = useMemo(() => {
-    let pool = quotes
-    if (segmentFilter === 'government') {
-      pool = quotes.filter(q => q.segment === 'GOVERNMENT')
-      // Govt-only sub-filter on media_type. 'all' keeps both AUTO + GSRTC.
-      if (mediaFilter !== 'all') {
-        pool = pool.filter(q => q.media_type === mediaFilter)
-      }
-    } else if (segmentFilter !== 'all') {
-      pool = quotes.filter(q => q.segment !== 'GOVERNMENT')
+  // Phase 277 — segment-only pool (BEFORE the media filter). Drives both the
+  // media dropdown options AND the media-filtered result, so the dropdown only
+  // offers media types that exist in the CURRENT segment — no dead-end combos
+  // (e.g. Private + Auto Hood is always empty; Auto Hood is GOVERNMENT-only, §4).
+  const segmentPool = useMemo(() => {
+    if (segmentFilter === 'government') return quotes.filter(q => q.segment === 'GOVERNMENT')
+    if (segmentFilter !== 'all')        return quotes.filter(q => q.segment !== 'GOVERNMENT')
+    return quotes
+  }, [quotes, segmentFilter])
+
+  // Distinct media types present in the current segment, with friendly labels.
+  const mediaOptions = useMemo(() => {
+    const seen = new Set()
+    segmentPool.forEach(q => { if (q.media_type) seen.add(q.media_type) })
+    return [...seen].sort().map(mt => ({ value: mt, label: MEDIA_LABELS[mt] || mt }))
+  }, [segmentPool])
+
+  // If the selected media isn't available in the current segment, drop it to 'all'.
+  useEffect(() => {
+    if (mediaFilter !== 'all' && !mediaOptions.some(o => o.value === mediaFilter)) {
+      setMediaFilter('all')
     }
-    return pool
-  }, [quotes, segmentFilter, mediaFilter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaOptions])
+
+  // Media filter now applies across ALL segments (was govt-only Auto/GSRTC).
+  const segmentScoped = useMemo(() => {
+    if (mediaFilter === 'all') return segmentPool
+    return segmentPool.filter(q => q.media_type === mediaFilter)
+  }, [segmentPool, mediaFilter])
 
   // Rep-scoped quote pool — used by tab counts so when admin scopes
   // to one rep, the tabs show that rep's status breakdown (otherwise
@@ -276,21 +307,22 @@ export default function QuotesV2() {
   // when admin scopes to one rep they see that rep's totals only.
   const totals = useMemo(() => {
     let amount = 0
+    let sentAmount = 0   // Phase 277 — quotes actually SENT (excludes drafts), for Conversion
     let outstanding = 0
     let wonAmount = 0, wonCount = 0, lostCount = 0   // Phase 276 — Won + Conversion
     displayed.forEach(q => {
-      amount += Number(q.total_amount) || 0
+      const amt = Number(q.total_amount) || 0
+      amount += amt
+      if (q.status !== 'draft') sentAmount += amt
       const b = computeBalance(q)
       if (b.kind === 'due') outstanding += b.amount || 0
-      if (q.status === 'won')  { wonCount += 1; wonAmount += Number(q.total_amount) || 0 }
+      if (q.status === 'won')  { wonCount += 1; wonAmount += amt }
       else if (q.status === 'lost') { lostCount += 1 }
     })
-    // Conversion = win rate on DECIDED deals (won / won+lost). Open quotes
-    // (draft/sent/negotiating) aren't failures yet, so they're excluded — a
-    // won/total ratio would understate conversion while deals are still in play.
-    const decided = wonCount + lostCount
-    const winRate = decided > 0 ? Math.round((wonCount / decided) * 100) : 0
-    return { count: displayed.length, amount, outstanding, wonAmount, wonCount, lostCount, winRate }
+    // Phase 277 — Conversion = won ₹ ÷ quotes-SENT ₹ (owner: "won out of quotes
+    // sent, in amount %"). Drafts aren't sent → excluded from the denominator.
+    const convPct = sentAmount > 0 ? Math.round((wonAmount / sentAmount) * 100) : 0
+    return { count: displayed.length, amount, sentAmount, outstanding, wonAmount, wonCount, lostCount, convPct }
   }, [displayed])
 
   return (
@@ -446,18 +478,16 @@ export default function QuotesV2() {
             Rep. ActiveFilterChips below the row surfaces active
             filters as removable chips, matching LeadsV2. */}
         <FilterDrawer fields={[
-          // Phase 142B — segment moved to the prominent pill; only the
-          // govt media sub-filter stays in the gear popover.
-          // Media sub-filter only shows when segment = government.
-          ...(segmentFilter === 'government' ? [{
+          // Phase 277 — Media filter across ALL segments (was govt-only Auto/GSRTC).
+          // Options derived from the media types actually present in the quotes.
+          ...(mediaOptions.length > 0 ? [{
             key: 'media',
             label: 'Media',
             value: mediaFilter,
             defaultValue: 'all',
             options: [
-              { value: 'all',       label: 'All media' },
-              { value: 'AUTO_HOOD', label: 'Auto Hood' },
-              { value: 'GSRTC_LED', label: 'GSRTC LED' },
+              { value: 'all', label: 'All media' },
+              ...mediaOptions,
             ],
             onChange: setMediaFilter,
           }] : []),
@@ -489,13 +519,10 @@ export default function QuotesV2() {
           filter. Same pattern as LeadsV2. */}
       <ActiveFilterChips fields={[
         // Phase 142B — segment chip dropped (the pill shows + clears it).
-        ...(segmentFilter === 'government' ? [{
+        ...(mediaFilter !== 'all' ? [{
           key: 'media', label: 'Media',
           value: mediaFilter, defaultValue: 'all',
-          options: [
-            { value: 'AUTO_HOOD', label: 'Auto Hood' },
-            { value: 'GSRTC_LED', label: 'GSRTC LED' },
-          ],
+          options: mediaOptions,
           onChange: setMediaFilter,
         }] : []),
         ...(isAdmin && repOptions.length > 0 ? [{
@@ -524,7 +551,7 @@ export default function QuotesV2() {
         {/* Phase 276 — Won (value of won deals) + Conversion (win rate on
             decided deals). NOT the hero ring, which is COLLECTION rate. */}
         <TotalCard label="Won" value={totals.wonAmount} kind="money" tint="var(--v2-green, #2BD8A0)" sub={`${totals.wonCount} won`} />
-        <TotalCard label="Conversion" value={totals.winRate} kind="percent" sub={`${totals.wonCount} won · ${totals.lostCount} lost`} />
+        <TotalCard label="Conversion" value={totals.convPct} kind="percent" sub="won ₹ of sent ₹" />
         <TotalCard label="Outstanding" value={totals.outstanding} kind="money" warn />
       </div>
 

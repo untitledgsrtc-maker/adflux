@@ -9503,6 +9503,31 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 151 · Phase 277 — Quotes: cross-segment Media filter + Conversion redefined (2026-08-03)
+
+Owner on /quotes: (1) the Media filter only showed Auto Hood/GSRTC LED under the
+Government segment — wanted media (auto / led / other) across all segments; (2)
+redefined Conversion: "won out of quotes sent, in amount %".
+
+Fix (JS-only, §28-FROZEN QuotesV2, guardian PASS, display/filter-only):
+- **Media filter cross-segment.** New `segmentPool` (segment-only, before media) drives
+  both a `mediaOptions` memo (DISTINCT media_types present in the CURRENT segment, via
+  `MEDIA_LABELS` map, unknown→raw code) AND the media-filtered `segmentScoped`. The gear
+  Media field now shows whenever mediaOptions exist (was govt-only); an effect resets
+  mediaFilter→'all' if the selected media isn't in the active segment (no dead-end combos
+  like Private + Auto Hood, which is GOVERNMENT-only §4). Chips updated.
+- **Conversion = won ₹ ÷ quotes-SENT ₹** (amount-based). `sentAmount` = Σ total_amount
+  EXCLUDING drafts (drafts aren't "sent"); `convPct = won/sent`. Replaces the Phase 276
+  count-based win-rate. Card sub "won ₹ of sent ₹". The 98% hero ring is still COLLECTION
+  rate (separate). `winRate` fully removed.
+
+### Owner action
+Push (I push — JS-only, no SQL, no APK). /quotes gear → Media filter shows on any segment
+(only the media types that exist there); Conversion = won money ÷ sent money %.
+
+
+---
+
 ## 150 · Bug-hunt fixes: inbox owner-stamp + outcome-filter cap + team-RPC co_owner gate (2026-08-03)
 
 A 5-agent adversarial bug hunt (today's diffs + money + security + WhatsApp + frontend)
