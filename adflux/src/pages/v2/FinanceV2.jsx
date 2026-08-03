@@ -33,6 +33,7 @@ const BUCKETS = [
   ['tax', 'Tax'], ['review', 'Review'],
 ]
 const SEGMENTS = [['GOVERNMENT', 'Government'], ['PRIVATE', 'Private']]
+const MEDIA = [['OTHER_MEDIA', 'Other Media'], ['LED_OTHER', 'LED Cities'], ['GSRTC_LED', 'GSRTC LED'], ['AUTO_HOOD', 'Auto Hood'], ['HOARDING', 'Hoarding'], ['MALL', 'Mall'], ['CINEMA', 'Cinema'], ['DIGITAL', 'Digital'], ['OTHER', 'Other']]
 const MIX_COLORS = ['var(--success, #10B981)', 'var(--blue, #3B82F6)', 'var(--purple, #c084fc)', 'var(--accent, #FFE600)', 'var(--warning, #F59E0B)', 'var(--danger, #EF4444)']
 
 /* ── page shell ── */
@@ -186,7 +187,7 @@ function PnlTab({ seg }) {
             <tbody>
               {(d.by_segment || []).map((s, i) => {
                 const c = +s.direct + +s.common, net = +s.net
-                return <tr key={s.segment}><td style={tdL}><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Dot c={MIX_COLORS[i]} />{s.segment === 'GOVERNMENT' ? 'Government' : 'Private'}</span></td>
+                return <tr key={i}><td style={tdL}><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Dot c={MIX_COLORS[i % MIX_COLORS.length]} />{s.label}</span></td>
                   <td style={tdR}>{fmtINR(s.income)}</td><td style={{ ...tdR, color: 'var(--danger)' }}>{fmtINR(c)}</td>
                   <td style={{ ...tdR, color: net >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtINR(net)}</td></tr>
               })}
@@ -199,7 +200,7 @@ function PnlTab({ seg }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr><th style={thL}>Segment</th><th style={thR}>Income</th><th style={thR}>Share</th><th style={thR}>Common ₹</th></tr></thead>
             <tbody>
-              {(d.by_segment || []).map((s, i) => <tr key={s.segment}><td style={tdL}><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Dot c={MIX_COLORS[i]} />{s.segment === 'GOVERNMENT' ? 'Govt' : 'Pvt'}</span></td>
+              {(d.by_segment || []).map((s, i) => <tr key={i}><td style={tdL}><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Dot c={MIX_COLORS[i % MIX_COLORS.length]} />{s.label}</span></td>
                 <td style={tdR}>{fmtINR(s.income)}</td><td style={tdR}>{s.pct}%</td><td style={{ ...tdR, color: 'var(--warning)' }}>{fmtINR(s.common)}</td></tr>)}
               <tr style={totRow}><td style={tdL}>POOL (common)</td><td style={tdR}></td><td style={tdR}></td><td style={tdR}>{fmtINR(d.common_expense)}</td></tr>
             </tbody>
@@ -473,7 +474,7 @@ function RegisterTab({ seg }) {
       <div style={{ overflowX: 'auto', maxHeight: '70vh', overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 980 }}>
           <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}>
-            <th style={thL}>Date</th><th style={thL}>Description</th><th style={thR}>Amount</th><th style={thL}>Bucket</th><th style={thL}>Segment</th><th style={thL}>Bank</th><th style={thL}>Head</th>
+            <th style={thL}>Date</th><th style={thL}>Description</th><th style={thR}>Amount</th><th style={thL}>Bucket</th><th style={thL}>Segment</th><th style={thL}>Media</th><th style={thL}>Bank</th><th style={thL}>Head</th>
           </tr></thead>
           <tbody>
             {filtered.slice(0, 1500).map(r => (
@@ -483,6 +484,7 @@ function RegisterTab({ seg }) {
                 <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
                 <td style={tdL}><select value={r.bucket} onChange={e => retag(r.id, 'bucket', e.target.value)} style={{ ...selStyle, minWidth: 130 }}>{BUCKETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
                 <td style={tdL}><select value={r.segment || ''} onChange={e => retag(r.id, 'segment', e.target.value || null)} style={{ ...selStyle, minWidth: 105 }}><option value="">—</option>{SEGMENTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
+                <td style={tdL}><select value={r.media_type || ''} onChange={e => retag(r.id, 'media_type', e.target.value || null)} style={{ ...selStyle, minWidth: 105 }}><option value="">—</option>{MEDIA.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
                 <td style={tdL}>{banks[r.bank_account_id] || '—'}</td>
                 <td style={tdL}>{heads[r.expense_head_id] || '—'}</td>
               </tr>

@@ -65,16 +65,36 @@ BEGIN
     'direct_cost', dtot, 'common_expense', ctot,
     'operating_profit', itot-dtot-ctot,
     'margin_pct', CASE WHEN itot>0 THEN round((itot-dtot-ctot)/itot*100,1) ELSE 0 END,
-    'by_segment', jsonb_build_array(
-      jsonb_build_object('segment','GOVERNMENT','company','Untitled Advertising','income',ig,'direct',dg,
-        'common', CASE WHEN itot>0 THEN round(ctot*ig/itot) ELSE 0 END,
-        'net', ig-dg-CASE WHEN itot>0 THEN round(ctot*ig/itot) ELSE 0 END,
-        'pct', CASE WHEN itot>0 THEN round(ig/itot*100) ELSE 0 END),
-      jsonb_build_object('segment','PRIVATE','company','Untitled Adflux Pvt Ltd','income',ip,'direct',dp,
-        'common', CASE WHEN itot>0 THEN round(ctot*ip/itot) ELSE 0 END,
-        'net', ip-dp-CASE WHEN itot>0 THEN round(ctot*ip/itot) ELSE 0 END,
-        'pct', CASE WHEN itot>0 THEN round(ip/itot*100) ELSE 0 END)
-    ),
+    -- by segment × media_type (the 4+ real business lines: Govt·Auto Hood,
+    -- Govt·GSRTC LED, Pvt·Other Media, etc.). Untagged income → "· Other" until
+    -- the accountant sets media_type in the Register.
+    'by_segment', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'label', lbl, 'segment', seg, 'income', inc, 'direct', dcost,
+        'common', CASE WHEN itot>0 THEN round(ctot*inc/itot) ELSE 0 END,
+        'net', inc - dcost - CASE WHEN itot>0 THEN round(ctot*inc/itot) ELSE 0 END,
+        'pct', CASE WHEN itot>0 THEN round(inc/itot*100) ELSE 0 END) ORDER BY inc DESC)
+      FROM (
+        SELECT i.seg,
+               (CASE WHEN i.seg='GOVERNMENT' THEN 'Govt' WHEN i.seg='PRIVATE' THEN 'Pvt' ELSE '—' END)
+                 ||' · '||COALESCE(i.med,'Other') AS lbl,
+               i.inc, COALESCE(c.dcost,0) AS dcost
+        FROM (SELECT COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
+                                                    WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END) AS seg,
+                     media_type AS med, SUM(amount) AS inc
+                FROM public.finance_transactions
+               WHERE bucket='income'
+                 AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+                 AND (v_seg IS NULL OR COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
+                                                                      WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg)
+               GROUP BY 1,2) i
+        LEFT JOIN (SELECT segment AS seg, media_type AS med, SUM(amount) AS dcost
+                     FROM public.finance_transactions
+                    WHERE bucket='direct_cost'
+                      AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+                    GROUP BY 1,2) c
+          ON c.seg=i.seg AND COALESCE(c.med,'~')=COALESCE(i.med,'~')
+      ) x), '[]'::jsonb),
     'per_company', jsonb_build_array(
       jsonb_build_object('company','Untitled Advertising','income',ig,
         'op_pnl', ig-dg-CASE WHEN itot>0 THEN round(ctot*ig/itot) ELSE 0 END,
