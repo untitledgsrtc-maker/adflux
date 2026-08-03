@@ -10061,3 +10061,60 @@ everything personally). More risk than the speed is worth.
 ### Applies going forward
 This batch (278/279) is already done as separate files. From the NEXT batch on,
 default to one combined file unless it's money/security-split territory.
+
+
+---
+
+## 155 · Finance / P&L module — STARTED (spec + P1 foundation), 2026-08-03
+
+Owner shared `_design_reference/finance_module_mockup.html` + his 4 real bank
+statements (Adflux/HDFC/Cosmos/Axis xlsx, ~1,060 txns Apr–Jul 2026) → "analyse then
+wire to real accounts." Full spec: **`docs/FINANCE_MODULE_SPEC.md`** (read it first
+on resume). This is the parked Sprint-3 P&L (§22/§29/§42), now being built.
+
+### Owner decisions LOCKED (do NOT re-litigate)
+- **Income = CRM** (payments/quotes, per segment/company, TDS-aware) — NOT bank
+  credits — **cross-checked** against bank income credits (unmatched credit →
+  "receipt not in CRM" flag). Avoids the double-count; surfaces missed receipts.
+- **Full mockup scope** (all 5 tabs), built in ORDERED PHASES (each ships +
+  owner-verified — §45 live-app-untouchable + his "don't break the live app" rule).
+
+### Key data reality (from the 4 xlsx)
+Gross ₹2.5 Cr out / ₹2.4 Cr in is MISLEADING: **₹1.98 Cr is SWEEP** (internal
+transfers, double-counted, NOT P&L) + ₹38L loan-from-friend + ₹43L personal
+drawings. Real operating money is a small slice — **stripping SWEEP/loans/drawings
+is the module's core value.** The accountant already hand-tags every row, but the
+ONE tag column crams company + segment + bucket together, and the 4 banks differ in
+layout + date format (text dd/mm/yy AND Excel serials). The importer splits that tag
+into proper dimensions; ambiguous → bucket='review' for the Register to fix.
+
+### ADDITIVE + §42/§152/§153 RLS (enforced, do NOT relax)
+All new `finance_*` + `bank_accounts` tables — zero touch to sales/leads/quotes/
+payroll (§45). RLS: admin + **accounts** (Diya, §182) = FULL; co_owner (Vishal,
+government_partner) = GOVERNMENT-segment READ on `finance_transactions` ONLY, NONE on
+the org-wide config tables (heads/rules/tasks/batches/bank_accounts — matches the
+§153 financial-config doctrine); reps/agency/telecaller/hr = none. Every gate fails
+closed on NULL role.
+
+### Phase order (spec §6) + STATUS
+- **P1 foundation — DONE (`supabase_finance_p1_foundation.sql`, owner RUNS).** 6
+  tables (finance_expense_heads · bank_accounts · finance_import_batches ·
+  finance_transactions · finance_rules · finance_tasks) + enums-as-CHECK + RLS +
+  seeds (11 heads, 4 banks, 8 rules, 9 tasks). Bundled one file per §154; VERIFY at
+  bottom (6 tables, RLS on all 6, 2 policies on finance_transactions).
+- P2 import engine (per-bank column map + date normalize serial+text + tag-split
+  classifier + rules + dedupe + backfill the 4 files) — NEXT. **Needs owner to
+  decode ambiguous tags** (AUTO HOOD in/out? Efforts Solar = loan/income? Modern
+  Advertis = loan?) — show real rows, he tells me.
+- P3 Register · P4 Import UI · P5 Owner P&L dashboard (CRM-income + reconcile) ·
+  P6 Accounts Home + Tasks (reuse push pipeline). Route `/finance`, admin+accounts
+  gated, Vishal govt-scoped. Nav = additive V2AppShell (guardian).
+
+### Contracts / foot-guns
+- P&L income = CRM `payments` (approved final) per segment/company; bank credits only
+  RECONCILE. Operating cost = bank debits bucket ∈ (direct_cost, common_expense).
+  EXCLUDE internal_transfer/loan_*/owner_drawings/investment/asset/tax from Operating
+  P&L (separate cards). Common expense allocated to segments by income share.
+- `finance_transactions.dedupe_key` UNIQUE (bank||date||ref||amount) → re-importing a
+  file adds ZERO rows. All aggregation SERVER-side (§66 — grows monthly).
+- `matched_payment_id` → payments.id is the reconciliation link.
