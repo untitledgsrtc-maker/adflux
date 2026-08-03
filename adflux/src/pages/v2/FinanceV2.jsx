@@ -9,11 +9,12 @@ import { useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, ListChecks, Upload, TrendingUp, TrendingDown, BarChart3,
   AlertTriangle, Loader2, Search, IndianRupee, Home, CheckSquare, Clock,
-  RefreshCw, Wallet, PiggyBank, Boxes, ArrowLeftRight,
+  RefreshCw, Wallet, PiggyBank, Boxes, ArrowLeftRight, Trash2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 
 /* ── helpers ── */
 function fmtINR(n) {
@@ -411,53 +412,42 @@ function ImportTab() {
   )
 }
 
-/* ── categories = the accountant's own Excel words (no segment/media asked) ── */
-const CATS = {
-  'GSRTC':                    { in: 'income', out: 'direct_cost', media: 'GSRTC_LED', segment: 'GOVERNMENT' },
-  'Auto Hood':                { in: 'income', out: 'direct_cost', media: 'AUTO_HOOD', segment: 'GOVERNMENT' },
-  'Untitled Advertising':     { in: 'income', out: 'direct_cost', segment: 'GOVERNMENT' },
-  'Untitled Adflux Pvt Ltd':  { in: 'income', out: 'direct_cost', segment: 'PRIVATE' },
-  'Common Expense':           { in: 'common_expense', out: 'common_expense' },
-  'Other Expense':            { in: 'common_expense', out: 'common_expense' },
-  'Personal / Drawings':      { in: 'owner_drawings', out: 'owner_drawings' },
-  'Loan':                     { in: 'loan_in', out: 'loan_out' },
-  'Tax':                      { in: 'tax', out: 'tax' },
-  'Transfer (Sweep)':         { in: 'internal_transfer', out: 'internal_transfer' },
-  'To sort':                  { in: 'review', out: 'review' },
-}
-const CAT_LIST = Object.keys(CATS)
-function currentCat(r) {
-  switch (r.bucket) {
-    case 'income': case 'direct_cost':
-      if (r.media_type === 'GSRTC_LED') return 'GSRTC'
-      if (r.media_type === 'AUTO_HOOD') return 'Auto Hood'
-      if (r.company === 'Untitled Adflux Pvt Ltd') return 'Untitled Adflux Pvt Ltd'
-      return 'Untitled Advertising'
-    case 'common_expense': return 'Common Expense'
-    case 'owner_drawings': return 'Personal / Drawings'
-    case 'loan_in': case 'loan_out': return 'Loan'
-    case 'tax': return 'Tax'
-    case 'internal_transfer': return 'Transfer (Sweep)'
-    default: return 'To sort'
-  }
-}
+/* ── Register (detailed, month-grouped, all dropdowns) ── */
+const COMPANIES = ['Untitled Advertising', 'Untitled Adflux Pvt Ltd', 'Trade Venture']
+const BUCKET_OPTS = [
+  ['income', 'Income'], ['direct_cost', 'Direct Cost'], ['common_expense', 'Common / Overhead'],
+  ['owner_drawings', 'Owner Drawings'], ['investment', 'Investment'], ['asset', 'Asset'],
+  ['loan_in', 'Loan In'], ['loan_out', 'Loan Out'], ['internal_transfer', 'Transfer'], ['tax', 'Tax'], ['review', 'Review'],
+]
+const SEGMED = [
+  ['GOVERNMENT|AUTO_HOOD', 'Government — Auto Hood'],
+  ['GOVERNMENT|GSRTC_LED', 'Government — GSRTC LED'],
+  ['PRIVATE|OTHER_MEDIA', 'Private — Other Media'],
+  ['PRIVATE|LED_OTHER', 'Private — LED Cities'],
+  ['GOVERNMENT|', 'Government — Other'],
+  ['PRIVATE|', 'Private — Other'],
+  ['|', 'Common (all)'],
+]
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+function monthLabel(ym) { const [y, m] = (ym || '').split('-'); return m ? `${MONTHS[+m - 1]}-${y.slice(2)}` : ym }
 
-/* ── Register ── */
 function RegisterTab() {
-  const [rows, setRows] = useState([]); const [banks, setBanks] = useState({}); const [heads, setHeads] = useState({})
-  const [loading, setLoading] = useState(true); const [fCat, setFCat] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
+  const [rows, setRows] = useState([]); const [banks, setBanks] = useState([]); const [heads, setHeads] = useState([])
+  const [loading, setLoading] = useState(true); const [fBucket, setFBucket] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [baRes, hRes] = await Promise.all([supabase.from('bank_accounts').select('id, name'), supabase.from('finance_expense_heads').select('id, name')])
-    setBanks(Object.fromEntries((baRes.data || []).map(b => [b.id, b.name])))
-    setHeads(Object.fromEntries((hRes.data || []).map(h => [h.id, h.name])))
+    const [baRes, hRes] = await Promise.all([
+      supabase.from('bank_accounts').select('id, name').order('display_order'),
+      supabase.from('finance_expense_heads').select('id, name').order('display_order'),
+    ])
+    setBanks(baRes.data || []); setHeads(hRes.data || [])
     const PAGE = 1000; let all = []; let from = 0
     for (;;) {
       const { data, error } = await supabase.from('finance_transactions')
         .select('id, txn_date, description, amount, direction, bucket, company, segment, media_type, expense_head_id, bank_account_id, raw_tag, note')
         .order('txn_date', { ascending: false }).range(from, from + PAGE - 1)
-      if (error) { toastError(error, 'Could not load transactions.'); break }
+      if (error) { toastError(error, 'Could not load.'); break }
       all = all.concat(data || [])
       if (!data || data.length < PAGE) break
       from += PAGE; if (from >= 20000) break
@@ -466,49 +456,77 @@ function RegisterTab() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  const setCategory = async (r, cat) => {
-    const spec = CATS[cat]; const dir = r.direction === 'in' ? 'in' : 'out'
-    const patch = { bucket: spec[dir], media_type: spec.media || null, segment: spec.segment || null }
-    setRows(rs => rs.map(x => x.id === r.id ? { ...x, ...patch } : x))
-    const { error } = await supabase.from('finance_transactions').update(patch).eq('id', r.id)
-    if (error) { toastError(error, 'Could not save.'); load() } else toastSuccess('Saved.')
+  const patch = async (id, obj) => {
+    setRows(rs => rs.map(r => r.id === id ? { ...r, ...obj } : r))
+    const { error } = await supabase.from('finance_transactions').update(obj).eq('id', id)
+    if (error) { toastError(error, 'Could not save.'); load() }
   }
+  const del = async (r) => {
+    if (!(await confirmDialog({ title: 'Delete this transaction?', message: r.description || '', confirmLabel: 'Delete', danger: true }))) return
+    const { error } = await supabase.from('finance_transactions').delete().eq('id', r.id)
+    if (error) toastError(error, 'Could not delete.'); else { setRows(rs => rs.filter(x => x.id !== r.id)); toastSuccess('Deleted.') }
+  }
+
   const filtered = useMemo(() => rows.filter(r => {
-    if (fCat !== 'all' && currentCat(r) !== fCat) return false
+    if (fBucket !== 'all' && r.bucket !== fBucket) return false
     if (fBank !== 'all' && String(r.bank_account_id) !== fBank) return false
     if (q && !(r.description || '').toLowerCase().includes(q.toLowerCase())) return false
     return true
-  }), [rows, fCat, fBank, q])
+  }), [rows, fBucket, fBank, q])
+  const groups = useMemo(() => {
+    const g = {}
+    filtered.forEach(r => { const m = (r.txn_date || '').slice(0, 7); (g[m] = g[m] || []).push(r) })
+    return Object.entries(g).sort((a, b) => b[0].localeCompare(a[0]))
+  }, [filtered])
   const reviewCount = rows.filter(r => r.bucket === 'review').length
   if (loading) return <Spin />
 
   return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: 14, borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>{filtered.length} transactions</div>
-        {reviewCount > 0 && <span onClick={() => setFCat('To sort')} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to sort</span>}
+        <div style={{ fontSize: 13, fontWeight: 600 }}>{filtered.length} transactions <span style={{ color: 'var(--text-subtle)', fontWeight: 400 }}>&middot; edit any dropdown, dashboard updates live</span></div>
+        {reviewCount > 0 && <span onClick={() => setFBucket('review')} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to sort</span>}
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}>
-          <Search size={14} style={{ color: 'var(--text-subtle)' }} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search…" style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, width: 150 }} />
+          <Search size={14} style={{ color: 'var(--text-subtle)' }} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, width: 150 }} />
         </div>
-        <select value={fCat} onChange={e => setFCat(e.target.value)} style={selStyle}><option value="all">Category: All</option>{CAT_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <select value={fBank} onChange={e => setFBank(e.target.value)} style={selStyle}><option value="all">Bank: All</option>{Object.entries(banks).map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select>
+        <select value={fBucket} onChange={e => setFBucket(e.target.value)} style={selStyle}><option value="all">Bucket: All</option>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        <select value={fBank} onChange={e => setFBank(e.target.value)} style={selStyle}><option value="all">Bank: All</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
       </div>
-      <div style={{ overflowX: 'auto', maxHeight: '70vh', overflowY: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 860 }}>
-          <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}>
-            <th style={thL}>Date</th><th style={thL}>Description</th><th style={thR}>Amount</th><th style={thL}>Category</th><th style={thL}>Bank</th>
+      <div style={{ overflowX: 'auto', maxHeight: '72vh', overflowY: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 1180 }}>
+          <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
+            <th style={thL}>Date</th><th style={thL}>Description</th><th style={thR}>Amount</th>
+            <th style={thL}>Company</th><th style={thL}>Bucket</th><th style={thL}>Segment</th><th style={thL}>Expense Head</th><th style={thL}>Bank</th><th style={thL}></th>
           </tr></thead>
           <tbody>
-            {filtered.slice(0, 1500).map(r => (
-              <tr key={r.id} style={{ background: r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
-                <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{r.txn_date}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>≈</span> : ''}</td>
-                <td style={{ ...tdL, maxWidth: 340, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>{r.description}</td>
-                <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
-                <td style={tdL}><select value={currentCat(r)} onChange={e => setCategory(r, e.target.value)} style={{ ...selStyle, minWidth: 170 }}>{CAT_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
-                <td style={tdL}>{banks[r.bank_account_id] || '—'}</td>
-              </tr>
-            ))}
+            {groups.flatMap(([m, rs]) => {
+              const inn = rs.filter(r => r.direction === 'in').reduce((s, r) => s + (+r.amount || 0), 0)
+              const out = rs.filter(r => r.direction === 'out').reduce((s, r) => s + (+r.amount || 0), 0)
+              const head = (
+                <tr key={'h' + m} style={{ background: 'var(--surface-2, #334155)' }}>
+                  <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={3}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 11 }}>&middot; {rs.length} txns</span></td>
+                  <td style={{ ...tdL, fontSize: 11.5 }} colSpan={6}><span style={{ color: 'var(--success)' }}>In {fmtINR(inn)}</span> &nbsp; <span style={{ color: 'var(--danger)' }}>Out {fmtINR(out)}</span> &nbsp; <b>Net {fmtINR(inn - out)}</b></td>
+                </tr>
+              )
+              const trs = rs.map(r => {
+                const segmed = `${r.segment || ''}|${r.media_type || ''}`
+                return (
+                  <tr key={r.id} style={{ background: r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
+                    <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{r.txn_date}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>~</span> : ''}</td>
+                    <td style={{ ...tdL, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>{r.description}</td>
+                    <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
+                    <td style={tdL}><select value={r.company || ''} onChange={e => patch(r.id, { company: e.target.value || null })} style={selStyle}><option value="">-</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                    <td style={tdL}><select value={r.bucket} onChange={e => patch(r.id, { bucket: e.target.value })} style={selStyle}>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
+                    <td style={tdL}><select value={SEGMED.some(([k]) => k === segmed) ? segmed : ''} onChange={e => { const [sg, md] = e.target.value.split('|'); patch(r.id, { segment: sg || null, media_type: md || null }) }} style={selStyle}><option value="">-</option>{SEGMED.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
+                    <td style={tdL}><select value={r.expense_head_id || ''} onChange={e => patch(r.id, { expense_head_id: e.target.value || null })} style={selStyle}><option value="">-</option>{heads.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}</select></td>
+                    <td style={tdL}><select value={r.bank_account_id || ''} onChange={e => patch(r.id, { bank_account_id: e.target.value })} style={selStyle}>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></td>
+                    <td style={tdL}><span onClick={() => del(r)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', display: 'inline-flex' }} title="Delete"><Trash2 size={15} /></span></td>
+                  </tr>
+                )
+              })
+              return [head, ...trs]
+            })}
           </tbody>
         </table>
         {filtered.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-subtle)' }}>No transactions match.</div>}
