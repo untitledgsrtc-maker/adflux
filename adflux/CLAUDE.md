@@ -10020,4 +10020,44 @@ needs NONE of it. Admin keeps full read+write (WITH CHECK defaults to USING).
 Run `supabase_phase279_co_owner_financial_scope.sql`. VERIFY: all 3 quals =
 `(get_my_role() = 'admin')`, no co_owner/owner. Smoke: sign in as Vishal → Salary
 sheet / incentive config / sales ledger show nothing (or bounce); admin + accounts
-+ HR unchanged.
++ HR unchanged. **RUN + VERIFIED live 2026-08-03** (all 3 = admin only).
+
+
+---
+
+## 154 · SQL delivery — ONE combined file per batch by default (owner directive, 2026-08-03)
+
+Owner runs SQL by pasting into Supabase Studio (§14) and got tired/scared of
+running MANY small files one by one (the Phase 278/279 security batch = 8 pastes).
+Decided the workflow, NOT the mechanism: stay in Studio (he SEES each result grid +
+a bad line stays isolated + it's the safer surface than terminal `psql`/CLI on the
+LIVE DB), just cut the paste COUNT.
+
+**Considered + REJECTED the Supabase CLI / `db push` / `psql` one-command path** —
+wrong fit for THIS project: needs the live-DB password on his Mac (one stray
+reset/drop = no undo), his SQL isn't in migration format (hundreds of phase files →
+replay-history risk), and he'd LOSE the per-step VERIFY grid he relies on (he tests
+everything personally). More risk than the speed is worth.
+
+### The rule
+- **DEFAULT: bundle a batch of related SQL into ONE paste-safe file** →
+  `supabase_phaseN_<purpose>.sql` with clearly commented `-- ==== part 1/2/... ====`
+  section markers + ONE VERIFY block at the end. He runs it in ONE Studio paste.
+- **SPLIT into separate files ONLY for big / money / security / risky changes** the
+  owner should verify one at a time (e.g. a salary-function change he shadow-compares,
+  or a multi-table RLS re-scope where each VERIFY matters). When in doubt on a
+  money/security file → split + say why.
+- **Keep every part idempotent** (DROP POLICY IF EXISTS / CREATE OR REPLACE / IF NOT
+  EXISTS / ON CONFLICT) so a re-run of the whole file is safe (§8) — reassures him a
+  re-paste can't break anything.
+- **Do NOT make a giant multi-hundred-line / many-UUID single paste** — Studio's
+  clipboard has truncated a long paste mid-token before (§47). "One file" means one
+  COHESIVE batch, not the whole session's SQL crammed together. If a bundle gets big,
+  keep inline UUID lists on one line and avoid `BEGIN…COMMIT` wrappers that lose the tail.
+- Always give the owner: the ONE filename + exact what-it-does + the expected VERIFY
+  result. Canonical `db/functions/<name>.sql` files (§72) stay their own file (one
+  function = one home) — that rule wins over bundling.
+
+### Applies going forward
+This batch (278/279) is already done as separate files. From the NEXT batch on,
+default to one combined file unless it's money/security-split territory.
