@@ -10138,8 +10138,16 @@ closed on NULL role.
   else '{}'; fails closed on NULL role. P3 P3-note: FinanceV2 cards use global tokens
   (--surface) not --v2-* — cosmetic, polish later. Segment/common allocation for a
   single-segment (Vishal) view is rough in v1 (gives that segment ~100% of common) —
-  refine in P5. NEXT: P4 Import UI (drag-drop monthly import + auto-tag rules) · P5 P&L
-  polish (per-company, monthly trend, CRM reconciliation flags) · P6 Accounts Home + Tasks.
+  refine in P5. P3.1 (owner asked "wire same as the mockup") — FinanceV2 rebuilt to FULL mockup
+  fidelity: 5 tabs (Owner·P&L / Accounts Home / Tasks / Import / Register). P&L tab now
+  has the monthly-trend SVG, revenue-mix donut, per-company table, common-split table,
+  loans&transfers, assets/investments, expense-by-head, review flag. finance_pnl_summary
+  EXPANDED (monthly, revenue_mix by segment+media, per_company, assets) + NEW
+  finance_accounts_home RPC (receivables to-collect from quotes−payments, approvals
+  pending, review count, finance_tasks). Owner RE-RUNS supabase_finance_p3_rpcs.sql
+  (edit-in-place canonical §71, CREATE OR REPLACE both fns). NEXT: P4 real Import
+  (drag-drop + parse + classify in-app) · P5 CRM reconciliation flags · P6 Tasks
+  reminders wired to the push pipeline.
 - P3 Register · P4 Import UI · P5 Owner P&L dashboard (CRM-income + reconcile) ·
   P6 Accounts Home + Tasks (reuse push pipeline). Route `/finance`, admin+accounts
   gated, Vishal govt-scoped. Nav = additive V2AppShell (guardian).
