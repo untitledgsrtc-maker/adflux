@@ -21,7 +21,7 @@ DECLARE
   v_out jsonb;
 BEGIN
   IF NOT (public.is_team_viewer()
-          OR COALESCE(public.get_my_role() IN ('admin', 'co_owner'), false)) THEN
+          OR COALESCE(public.get_my_role() = 'admin', false)) THEN   -- admin only, NOT co_owner (Vishal is govt-scoped, §42)
     RETURN '[]'::jsonb;
   END IF;
 

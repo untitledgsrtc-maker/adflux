@@ -7,7 +7,8 @@
 -- (/follow-ups?rep=:id) — both admin drill-downs. Her own RLS is own-only, so
 -- those pages returned nothing for another rep. These two SECURITY DEFINER RPCs
 -- return exactly what each page loads for one rep, gated on is_team_viewer() OR
--- admin/co_owner (fail-closed on NULL role). READ-ONLY — no writes; she monitors,
+-- admin ONLY (co_owner excluded — Vishal is govt-scoped, §42; fail-closed on NULL
+-- role). READ-ONLY — no writes; she monitors,
 -- she cannot act on another rep's rows (RLS still blocks any write she attempts).
 --
 -- Same MIRROR discipline as Phase 193: the sub-selects below match the two
@@ -31,7 +32,7 @@ AS $function$
 DECLARE v_out jsonb;
 BEGIN
   IF NOT (public.is_team_viewer()
-          OR COALESCE(public.get_my_role() IN ('admin', 'co_owner'), false)) THEN
+          OR COALESCE(public.get_my_role() = 'admin', false)) THEN   -- admin only, NOT co_owner (Vishal is govt-scoped, §42)
     RETURN '{}'::jsonb;
   END IF;
 
@@ -104,7 +105,7 @@ DECLARE
   v_week_end date := ((now() AT TIME ZONE 'Asia/Kolkata')::date + 7);
 BEGIN
   IF NOT (public.is_team_viewer()
-          OR COALESCE(public.get_my_role() IN ('admin', 'co_owner'), false)) THEN
+          OR COALESCE(public.get_my_role() = 'admin', false)) THEN   -- admin only, NOT co_owner (Vishal is govt-scoped, §42)
     RETURN '{}'::jsonb;
   END IF;
 

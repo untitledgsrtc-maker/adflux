@@ -93,8 +93,17 @@ BEGIN
     -- P0-1 DEDUP — attach to an existing OPEN lead, never insert a collider.
     v_existing := public.find_open_lead_id_by_phone(NEW.customer_wa_id);
     IF v_existing IS NOT NULL THEN
+      -- Bug-fix 2026-08-03: also stamp assigned_to = the existing lead's owner so
+      -- the rep who owns this lead can SEE the chat in the inbox (CampaignInboxV2
+      -- filters non-privileged reps on assigned_to). Without it they get the Phase
+      -- 206 push but the thread is invisible. Mirrors the create branch. COALESCE
+      -- so an already-owned conversation is never reassigned (P0-1: never reassign).
+      SELECT COALESCE(telecaller_id, assigned_to) INTO v_owner
+        FROM public.leads WHERE id = v_existing;
       UPDATE public.whatsapp_conversations
-         SET lead_id = v_existing, updated_at = now()
+         SET lead_id = v_existing,
+             assigned_to = COALESCE(assigned_to, v_owner),
+             updated_at = now()
        WHERE id = NEW.id AND lead_id IS NULL;
       INSERT INTO public.inbound_leads (provider, external_event_id, status, norm_phone, dedupe_phone, campaign_id, lead_id)
         VALUES ('whatsapp', v_evt, 'duplicate', NEW.customer_wa_id, v_digits, NEW.campaign_id, v_existing)
@@ -162,8 +171,12 @@ BEGIN
     BEGIN
       v_existing := public.find_open_lead_id_by_phone(NEW.customer_wa_id);
       IF v_existing IS NOT NULL THEN
+        SELECT COALESCE(telecaller_id, assigned_to) INTO v_owner
+          FROM public.leads WHERE id = v_existing;   -- same owner-stamp as the main dedup path
         UPDATE public.whatsapp_conversations
-           SET lead_id = v_existing, updated_at = now()
+           SET lead_id = v_existing,
+               assigned_to = COALESCE(assigned_to, v_owner),
+               updated_at = now()
          WHERE id = NEW.id AND lead_id IS NULL;
         INSERT INTO public.inbound_leads (provider, external_event_id, status, norm_phone, dedupe_phone, campaign_id, lead_id)
           VALUES ('whatsapp', v_evt, 'duplicate', NEW.customer_wa_id, v_digits, NEW.campaign_id, v_existing)
@@ -193,7 +206,7 @@ UPDATE public.leads l
    AND COALESCE(BTRIM(c.customer_name), '') <> '';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All eight must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All NINE must be TRUE.
 -- A FALSE means an older copy was re-run and stripped a P0 contract → re-run this.
 -- ============================================================================
 -- SELECT
@@ -204,6 +217,7 @@ UPDATE public.leads l
 --   pg_get_functiondef(p.oid) LIKE '%NEW.customer_name%'          AS c11_lead_name,
 --   pg_get_functiondef(p.oid) LIKE '%Social Media%'               AS phase264_meta_source,
 --   pg_get_functiondef(p.oid) LIKE '%inbound_leads%'              AS routing_audit_queue,
+--   pg_get_functiondef(p.oid) LIKE '%assigned_to = COALESCE(assigned_to, v_owner)%' AS dedup_stamps_owner,
 --   pg_get_functiondef(p.oid) LIKE '%EXCEPTION WHEN OTHERS%'      AS never_break_store
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'campaign_conversation_ensure_lead';

@@ -9503,6 +9503,70 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 150 · Bug-hunt fixes: inbox owner-stamp + outcome-filter cap + team-RPC co_owner gate (2026-08-03)
+
+A 5-agent adversarial bug hunt (today's diffs + money + security + WhatsApp + frontend)
+came back CLEAN on today's Phases 266-276 + all salary/TDS math. It found 3 confirmed
+P1 bugs, all fixed here (guardian PASS; security review surfaced a bigger 4th — below).
+
+### FIX 1 — WhatsApp dedup didn't stamp the conversation owner (rep couldn't see the chat)
+`db/functions/campaign_conversation_ensure_lead.sql` (§72/§82 FROZEN). A returning
+customer (already a lead) messaging the number → the trigger's DEDUP branch attached the
+chat to the existing lead but set ONLY lead_id, leaving `assigned_to = NULL`. Phase 206
+pushed the owning rep, but CampaignInboxV2 filters non-privileged reps on assigned_to →
+the thread was INVISIBLE to them. The create branch set assigned_to; the dedup branch
+(both main + EXCEPTION handler) forgot. Fix: both dedup branches now
+`SELECT COALESCE(telecaller_id, assigned_to) INTO v_owner FROM leads WHERE id=v_existing`
++ set `assigned_to = COALESCE(assigned_to, v_owner)`. COALESCE → never reassigns an
+already-owned conversation (P0-1 intact). Added a `dedup_stamps_owner` VERIFY tripwire.
+
+### FIX 2 — /leads Outcome filter capped at 1000 (hid leads) + now off the hot path
+`src/pages/v2/LeadsV2.jsx` (§28 FROZEN) loadOutcomes used `.limit(5000)` → silently
+capped at ~1000 by PostgREST (§66/§85), so filtering leads by outcome hid leads whose
+latest outcome activity was older than the newest ~1000 rows (+ wrong tab counts). Fix:
+(a) early-return when `outcomeFilter==='all'` so it costs NOTHING on the default load
+(§45 — was running a query on every /leads mount); (b) paged `.range()` loop when a
+specific outcome is chosen. Dep `[location.key, outcomeFilter]`.
+
+### FIX 3 — team RPCs let a co_owner pull ALL-segment data (Vishal, govt-scoped)
+`supabase_phase247_2/247_3/247_followups/193/194` team-data RPCs (SECURITY DEFINER,
+bypass RLS) were gated `is_team_viewer() OR get_my_role() IN ('admin','co_owner')` — so
+Vishal (co_owner, government_partner, must be GOVT-only per §42) could console-call
+`rpc('team_all_leads')` etc and get all reps' private leads/quotes/amounts. UI hid it
+(isPrivileged toggle off) but the RPC was directly callable. Fix: dropped co_owner →
+gate `is_team_viewer() OR get_my_role() = 'admin'` (matches the functions' own headers).
+Zero legit impact: admins use the client Promise.all path not the RPC (§193); team-
+viewers use is_team_viewer(); no full co_owner exists. NULL-role still fails closed.
+
+### ⚠ OPEN — bigger related leak (security review, PARTIAL): base-table RLS, NOT the RPC
+The RPC fix is necessary but NOT sufficient. The review found co_owner is ALSO admitted
+by broad `admin_all` RLS policies on the BASE tables — `quotes_admin_all` / `qc_admin_all`
+/ `payments_admin_all` (supabase_phase5*), `fu_admin_all` (phase33d4), and
+`pdf_share_tokens_admin_all` (phase85) — several as `get_my_role() IN ('admin','co_owner')`.
+If live, Vishal reads ALL-segment private quotes/line-items/payments/follow-ups/PDF
+tokens via the NORMAL client query, bypassing the RPC gate entirely. LEADS are already
+singular-admin (§42), so leads/activities/calls/sessions stay govt-scoped — that half is
+safe. BUT quotes/payments/follow_ups are NOT in §42's singular-admin list. There's a
+live-vs-snapshot conflict (phase5 files show co_owner-inclusive; the generated dumps show
+admin-only; §72#10 says dumps aren't authoritative). CONFIRM LIVE before acting:
+```sql
+SELECT tablename, policyname, qual FROM pg_policies
+ WHERE schemaname='public'
+   AND tablename IN ('quotes','quote_cities','payments','follow_ups','pdf_share_tokens')
+   AND policyname LIKE '%admin_all%';
+```
+If `qual` contains `co_owner` → re-scope those to `= 'admin'` + add govt_partner SELECT
+policies (mirror §42). This is a §42-doctrine decision (exactly what Vishal may see) →
+owner call, not auto-fixed. NOT done in this batch.
+
+### Owner action
+1. Push (I push). 2. Run in Studio: `db/functions/campaign_conversation_ensure_lead.sql`
+(Fix 1) + the 5 team-RPC files (Fix 2 gate). Fix 2 (LeadsV2) is JS, auto-deploys.
+3. Run the pg_policies query above → paste it back so we decide on the base-table RLS.
+
+
+---
+
 ## 149 · Phase 276 — Quotes page: Won + Conversion stat cards (2026-08-03)
 
 Owner on /quotes: no "Total Won" card, and "conversion % not accurate." Analysis: the

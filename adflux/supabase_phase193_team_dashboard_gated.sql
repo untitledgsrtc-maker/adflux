@@ -82,13 +82,14 @@ AS $function$
 DECLARE
   v_out jsonb;
 BEGIN
-  -- GATE: viewer or admin/co_owner only; else empty object (no data leak).
+  -- GATE: viewer or admin ONLY (co_owner excluded — Vishal is govt-scoped, §42);
+  -- else empty object (no data leak).
   -- COALESCE(..., false) around the IN so a NULL role fails CLOSED — a bare
   -- `NULL IN (...)` yields NULL, and `false OR NULL` → NULL → PL/pgSQL IF treats
   -- NULL as false → the RETURN would be SKIPPED and the full bundle leak. This is
   -- the §41/§97.2 3VL trap; is_team_viewer() is already COALESCE'd to false.
   IF NOT (public.is_team_viewer()
-          OR COALESCE(public.get_my_role() IN ('admin', 'co_owner'), false)) THEN
+          OR COALESCE(public.get_my_role() = 'admin', false)) THEN   -- admin only, NOT co_owner (Vishal is govt-scoped, §42)
     RETURN '{}'::jsonb;
   END IF;
 

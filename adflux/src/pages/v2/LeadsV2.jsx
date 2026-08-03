@@ -247,29 +247,39 @@ export default function LeadsV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search])
 
-  // Phase 46.1 — latest call outcome per lead. One query: pull
-  // lead_activities with outcome set, ordered desc, dedup client-
-  // side (first hit per lead = latest). Cap 5000 to keep payload
-  // bounded; covers ~6 months of activity for an active team.
+  // Phase 46.1 — latest call outcome per lead, for the Outcome filter.
+  // Bug-fix 2026-08-03: (a) only build the map when the Outcome filter is
+  // actually in use — the default 'all' skips it, so zero cost on the hot
+  // /leads load (§45). (b) PAGE the query: the old .limit(5000) was silently
+  // capped at ~1000 by PostgREST (§66/§85), so leads whose latest outcome
+  // activity was older than the newest ~1000 rows were hidden from the filter
+  // AND the tab counts. Ordered desc → first row seen per lead = its latest.
   useEffect(() => {
+    if (outcomeFilter === 'all') return
     let cancelled = false
     async function loadOutcomes() {
-      const { data } = await supabase
-        .from('lead_activities')
-        .select('lead_id, outcome, created_at')
-        .not('outcome', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(5000)
-      if (cancelled) return
+      const PAGE = 1000
+      let from = 0
       const map = {}
-      for (const r of (data || [])) {
-        if (!(r.lead_id in map)) map[r.lead_id] = r.outcome
+      for (;;) {
+        const { data, error } = await supabase
+          .from('lead_activities')
+          .select('lead_id, outcome, created_at')
+          .not('outcome', 'is', null)
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (cancelled) return
+        if (error || !data) break
+        for (const r of data) { if (!(r.lead_id in map)) map[r.lead_id] = r.outcome }
+        if (data.length < PAGE) break
+        from += PAGE
+        if (from >= 50000) break   // safety backstop
       }
-      setLeadOutcomeMap(map)
+      if (!cancelled) setLeadOutcomeMap(map)
     }
     loadOutcomes()
     return () => { cancelled = true }
-  }, [location.key])
+  }, [location.key, outcomeFilter])
 
   // Phase 19 — realtime sync across tabs. Listens for any insert/update/
   // delete on leads; the hook re-fetches the single row with joins so

@@ -27,7 +27,7 @@ DECLARE
   v_week_end date := ((now() AT TIME ZONE 'Asia/Kolkata')::date + 7);
 BEGIN
   IF NOT (public.is_team_viewer()
-          OR COALESCE(public.get_my_role() IN ('admin', 'co_owner'), false)) THEN
+          OR COALESCE(public.get_my_role() = 'admin', false)) THEN   -- admin only, NOT co_owner (Vishal is govt-scoped, §42)
     RETURN '{}'::jsonb;
   END IF;
 
