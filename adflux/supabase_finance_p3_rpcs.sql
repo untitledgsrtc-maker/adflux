@@ -146,13 +146,27 @@ BEGIN
          WHERE bucket IN ('internal_transfer','loan_in','loan_out','owner_drawings','investment','asset','tax')
            AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
          GROUP BY bucket) e), '{}'::jsonb),
-    -- SIMPLE view: money in/out grouped by the accountant's OWN Excel category (raw_tag)
+    -- SIMPLE view: money in/out grouped by CATEGORY (matches the Register dropdown +
+    -- currentCat() in FinanceV2.jsx — derived from bucket so re-tagging moves it).
     'by_tag', COALESCE((
-      SELECT jsonb_agg(jsonb_build_object('tag', tg, 'inflow', inflow, 'outflow', outflow, 'rows', n) ORDER BY (inflow+outflow) DESC)
-      FROM (SELECT btrim(COALESCE(NULLIF(raw_tag,''),'(untagged)')) tg,
-                   COALESCE(SUM(amount) FILTER (WHERE direction='in'),0) inflow,
-                   COALESCE(SUM(amount) FILTER (WHERE direction='out'),0) outflow,
-                   count(*) n
+      SELECT jsonb_agg(jsonb_build_object('tag', cat, 'inflow', inflow, 'outflow', outflow, 'rows', n) ORDER BY (inflow+outflow) DESC)
+      FROM (SELECT
+              CASE
+                WHEN bucket IN ('income','direct_cost') THEN
+                  CASE WHEN media_type='GSRTC_LED' THEN 'GSRTC'
+                       WHEN media_type='AUTO_HOOD' THEN 'Auto Hood'
+                       WHEN company='Untitled Adflux Pvt Ltd' THEN 'Untitled Adflux Pvt Ltd'
+                       ELSE 'Untitled Advertising' END
+                WHEN bucket='common_expense' THEN 'Common Expense'
+                WHEN bucket='owner_drawings' THEN 'Personal / Drawings'
+                WHEN bucket IN ('loan_in','loan_out') THEN 'Loan'
+                WHEN bucket='tax' THEN 'Tax'
+                WHEN bucket='internal_transfer' THEN 'Transfer (Sweep)'
+                ELSE 'To sort'
+              END AS cat,
+              COALESCE(SUM(amount) FILTER (WHERE direction='in'),0) inflow,
+              COALESCE(SUM(amount) FILTER (WHERE direction='out'),0) outflow,
+              count(*) n
               FROM public.finance_transactions
              WHERE (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
              GROUP BY 1) t), '[]'::jsonb),

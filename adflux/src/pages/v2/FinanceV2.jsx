@@ -83,7 +83,7 @@ export default function FinanceV2() {
       {tab === 'home' && <HomeTab onReview={() => setTab('register')} />}
       {tab === 'tasks' && <TasksTab />}
       {tab === 'import' && <ImportTab />}
-      {tab === 'register' && <RegisterTab seg="all" />}
+      {tab === 'register' && <RegisterTab />}
     </div>
   )
 }
@@ -348,10 +348,41 @@ function ImportTab() {
   )
 }
 
+/* ── categories = the accountant's own Excel words (no segment/media asked) ── */
+const CATS = {
+  'GSRTC':                    { in: 'income', out: 'direct_cost', media: 'GSRTC_LED', segment: 'GOVERNMENT' },
+  'Auto Hood':                { in: 'income', out: 'direct_cost', media: 'AUTO_HOOD', segment: 'GOVERNMENT' },
+  'Untitled Advertising':     { in: 'income', out: 'direct_cost', segment: 'GOVERNMENT' },
+  'Untitled Adflux Pvt Ltd':  { in: 'income', out: 'direct_cost', segment: 'PRIVATE' },
+  'Common Expense':           { in: 'common_expense', out: 'common_expense' },
+  'Other Expense':            { in: 'common_expense', out: 'common_expense' },
+  'Personal / Drawings':      { in: 'owner_drawings', out: 'owner_drawings' },
+  'Loan':                     { in: 'loan_in', out: 'loan_out' },
+  'Tax':                      { in: 'tax', out: 'tax' },
+  'Transfer (Sweep)':         { in: 'internal_transfer', out: 'internal_transfer' },
+  'To sort':                  { in: 'review', out: 'review' },
+}
+const CAT_LIST = Object.keys(CATS)
+function currentCat(r) {
+  switch (r.bucket) {
+    case 'income': case 'direct_cost':
+      if (r.media_type === 'GSRTC_LED') return 'GSRTC'
+      if (r.media_type === 'AUTO_HOOD') return 'Auto Hood'
+      if (r.company === 'Untitled Adflux Pvt Ltd') return 'Untitled Adflux Pvt Ltd'
+      return 'Untitled Advertising'
+    case 'common_expense': return 'Common Expense'
+    case 'owner_drawings': return 'Personal / Drawings'
+    case 'loan_in': case 'loan_out': return 'Loan'
+    case 'tax': return 'Tax'
+    case 'internal_transfer': return 'Transfer (Sweep)'
+    default: return 'To sort'
+  }
+}
+
 /* ── Register ── */
-function RegisterTab({ seg }) {
+function RegisterTab() {
   const [rows, setRows] = useState([]); const [banks, setBanks] = useState({}); const [heads, setHeads] = useState({})
-  const [loading, setLoading] = useState(true); const [fBucket, setFBucket] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
+  const [loading, setLoading] = useState(true); const [fCat, setFCat] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -372,18 +403,19 @@ function RegisterTab({ seg }) {
   }, [])
   useEffect(() => { load() }, [load])
 
-  const retag = async (id, field, value) => {
-    setRows(rs => rs.map(r => r.id === id ? { ...r, [field]: value } : r))
-    const { error } = await supabase.from('finance_transactions').update({ [field]: value }).eq('id', id)
-    if (error) { toastError(error, 'Could not save tag.'); load() } else toastSuccess('Tagged.')
+  const setCategory = async (r, cat) => {
+    const spec = CATS[cat]; const dir = r.direction === 'in' ? 'in' : 'out'
+    const patch = { bucket: spec[dir], media_type: spec.media || null, segment: spec.segment || null }
+    setRows(rs => rs.map(x => x.id === r.id ? { ...x, ...patch } : x))
+    const { error } = await supabase.from('finance_transactions').update(patch).eq('id', r.id)
+    if (error) { toastError(error, 'Could not save.'); load() } else toastSuccess('Saved.')
   }
   const filtered = useMemo(() => rows.filter(r => {
-    if (seg !== 'all' && r.segment !== seg) return false
-    if (fBucket !== 'all' && r.bucket !== fBucket) return false
+    if (fCat !== 'all' && currentCat(r) !== fCat) return false
     if (fBank !== 'all' && String(r.bank_account_id) !== fBank) return false
     if (q && !(r.description || '').toLowerCase().includes(q.toLowerCase())) return false
     return true
-  }), [rows, seg, fBucket, fBank, q])
+  }), [rows, fCat, fBank, q])
   const reviewCount = rows.filter(r => r.bucket === 'review').length
   if (loading) return <Spin />
 
@@ -391,30 +423,27 @@ function RegisterTab({ seg }) {
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: 14, borderBottom: '1px solid var(--border)' }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>{filtered.length} transactions</div>
-        {reviewCount > 0 && <span onClick={() => setFBucket('review')} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to review</span>}
+        {reviewCount > 0 && <span onClick={() => setFCat('To sort')} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to sort</span>}
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}>
           <Search size={14} style={{ color: 'var(--text-subtle)' }} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search…" style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, width: 150 }} />
         </div>
-        <select value={fBucket} onChange={e => setFBucket(e.target.value)} style={selStyle}><option value="all">Bucket: All</option>{BUCKETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        <select value={fCat} onChange={e => setFCat(e.target.value)} style={selStyle}><option value="all">Category: All</option>{CAT_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select>
         <select value={fBank} onChange={e => setFBank(e.target.value)} style={selStyle}><option value="all">Bank: All</option>{Object.entries(banks).map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select>
       </div>
       <div style={{ overflowX: 'auto', maxHeight: '70vh', overflowY: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 980 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 860 }}>
           <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}>
-            <th style={thL}>Date</th><th style={thL}>Description</th><th style={thR}>Amount</th><th style={thL}>Bucket</th><th style={thL}>Segment</th><th style={thL}>Media</th><th style={thL}>Bank</th><th style={thL}>Head</th>
+            <th style={thL}>Date</th><th style={thL}>Description</th><th style={thR}>Amount</th><th style={thL}>Category</th><th style={thL}>Bank</th>
           </tr></thead>
           <tbody>
             {filtered.slice(0, 1500).map(r => (
               <tr key={r.id} style={{ background: r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
                 <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{r.txn_date}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>≈</span> : ''}</td>
-                <td style={{ ...tdL, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>{r.description}<div style={{ fontSize: 10.5, color: 'var(--text-subtle)' }}>{r.raw_tag}</div></td>
+                <td style={{ ...tdL, maxWidth: 340, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>{r.description}</td>
                 <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
-                <td style={tdL}><select value={r.bucket} onChange={e => retag(r.id, 'bucket', e.target.value)} style={{ ...selStyle, minWidth: 130 }}>{BUCKETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
-                <td style={tdL}><select value={r.segment || ''} onChange={e => retag(r.id, 'segment', e.target.value || null)} style={{ ...selStyle, minWidth: 105 }}><option value="">—</option>{SEGMENTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
-                <td style={tdL}><select value={r.media_type || ''} onChange={e => retag(r.id, 'media_type', e.target.value || null)} style={{ ...selStyle, minWidth: 105 }}><option value="">—</option>{MEDIA.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
+                <td style={tdL}><select value={currentCat(r)} onChange={e => setCategory(r, e.target.value)} style={{ ...selStyle, minWidth: 170 }}>{CAT_LIST.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
                 <td style={tdL}>{banks[r.bank_account_id] || '—'}</td>
-                <td style={tdL}>{heads[r.expense_head_id] || '—'}</td>
               </tr>
             ))}
           </tbody>
