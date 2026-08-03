@@ -228,6 +228,18 @@ export default async function handler(req) {
     system += `\n\nVIDEOS YOU CAN SHARE — when the customer asks to see a video/reel of one of these stations, include the EXACT link in your reply text (WhatsApp shows a preview):\n${videoRows.map((c) => `- ${c.name}: ${c.youtube_url}`).join('\n')}\nOnly share a link from this list, for the city asked. If they ask for a city not listed, say our team will share a video.`
   }
 
+  // Phase 275 — WhatsApp policy compliance (the marketing number is under a Meta
+  // "sending spam" warning; the enforcement ladder is template-block → all-message
+  // block → account lock → permanent disable). Meta scores by RECIPIENT block/
+  // report rate + messaging non-opted-in people. The top trigger is a cold
+  // QR-scan first-contact getting a sales pitch (§133). So on the customer's VERY
+  // FIRST message, force a minimal, warm, NON-salesy reply — no pitch, no feature
+  // list, no photo — and (below) append an opt-out line. The full AI engages only
+  // once the person replies again (proof of genuine intent).
+  if (firstContact) {
+    system += `\n\nThis is the customer's VERY FIRST message to us. Reply in 1-2 short, warm lines ONLY. Do NOT pitch, do NOT list features or numbers, do NOT push, do NOT send a price. Just greet warmly, answer only what they actually asked (if anything), and — if they gave no detail — ask which city they are interested in. Keep it human and brief. Do NOT add a PHOTO line on this first reply.`
+  }
+
   // Phase 264 — Meta ad context. If this chat came from a Click-to-WhatsApp ad,
   // open relevant to the ad they clicked. Best-effort separate query so a missing
   // ad_headline column (pre-SQL) can never break the reply (§45). The ad is
@@ -284,6 +296,16 @@ export default async function handler(req) {
   if (risky) {
     reply = 'Thanks for your interest! For exact pricing and to book, our team will share a tailored quote. Could you tell me the city/stations, the brand, and your rough timeline?'
     try { await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ ai_paused: true }) }) } catch { /* hand-off is best-effort */ }
+  }
+
+  // Phase 275 — on the FIRST reply: append an opt-out (an opt-out is neutral to
+  // Meta's quality score; a block/report is not — this converts would-be reporters
+  // into clean opt-outs, which honourStopKeyword honors), and send NO image
+  // (unsolicited media to a cold first-contact is the top spam trigger, §133).
+  // Both only on message #1 — normal replies stay unchanged.
+  if (firstContact) {
+    photoUrl = null
+    if (reply && !/\bstop\b/i.test(reply)) reply = `${reply}\n\nReply STOP to opt out.`
   }
 
   // Narrow the double-reply race: re-check right before sending — if an outbound

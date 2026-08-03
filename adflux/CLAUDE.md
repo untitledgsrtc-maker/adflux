@@ -9503,6 +9503,63 @@ default, with a "Showing: My leads | Team (all)" switch to narrow to her own.
 
 ---
 
+## 148 · Phase 275 — WhatsApp SECOND spam flag: policy-compliance fix (2026-08-03)
+
+Meta flagged the MARKETING number 98982 73686 (WABA 2870129030006085) for "sending
+spam" AGAIN (email 1 Aug; first flag was §133, ~27 Jul). Owner: read the policy + act.
+Meta's enforcement ladder (from developers.facebook.com policy-enforcement page):
+**template block (1/3d) → all-message block (5/7/30d) → account LOCK (indefinite) →
+PERMANENTLY DISABLED**; appeal via Business Support Home (24-48h) but "not all spam
+violations can be appealed." We got the WARNING = the step before a block.
+
+### Root cause (3-agent deep-dive, ranked)
+1. **DOMINANT — cold QR-scan → AI auto-reply on a young, already-flagged number.**
+   §119 (20 Jul) re-pointed ALL 22 hoarding QR boards to this ~2-week-old number →
+   200-327 cold strangers/day scan → the AI instantly replies with a sales message →
+   some Block/Report. Meta scores by RECIPIENT block/report rate + messaging
+   non-opted-in people, NOT message count. Number is young + flagged once 6 days
+   prior + ~5,600 old Cronberry blasts → near-zero tolerance → re-trips on a tiny rate.
+2. Residual reputational debt (27 Jul→1 Aug is inside the recovery window).
+3. (ruled out) Business-initiated templates: post-call §120 are opt-OUT-gated Utility;
+   broadcast = **0 rows ever** (opt-in gate §262 solid). Confirm via the diagnostic.
+CONFIRMED NOT the cause: the auto welcome-IMAGE was already removed §133/Phase 261
+(first contact is text-only). DO NOT re-add it.
+
+### What shipped (Phase 275, `api/wa/ai-reply.js`, Edge, live on BOTH AI numbers)
+On the customer's VERY FIRST message (`firstContact` = no prior outbound on the thread):
+- **System-prompt injection** forces a minimal, warm, NON-salesy reply — no pitch, no
+  feature list, no price, no photo. Full AI engages only on message #2+ (proof of intent).
+- **Programmatic opt-out** appended to the first reply ("Reply STOP to opt out.") —
+  an opt-out is neutral to quality; a report is not; honourStopKeyword (§126/§253)
+  honors STOP. + **`photoUrl = null` on first contact** (no image to a cold first
+  contact, the §133 top trigger — belt-and-suspenders on top of the removed auto-image).
+Additive: only the firstContact path changes; normal replies + the price/booking
+backstop + media-on-request (message #2+) unchanged. Parse OK.
+
+### Owner actions (the code fix alone is NOT enough — recovery is behavioral)
+1. **APPEAL / acknowledge** in WhatsApp Manager → Business Support Home (24-48h).
+2. **Watch WhatsApp Manager → 98982 → Quality** climb back toward High. The true
+   block/report rate lives ONLY there, not in our DB.
+3. **Let it warm ~1-2 weeks:** keep outbound low, send ZERO marketing/utility templates
+   from this number during recovery (pause the §120 post-call sends on it if volume is
+   high), don't broadcast.
+4. **Optionally spread the cold load:** move a batch of the 22 boards back to the aged
+   SERVICE number 95815 78261 (purpose='service', longer clean history) — re-point via
+   `campaign_locations.qr_text`, NO reprinting (§119). Tradeoff: risks the service
+   number too, so only if marketing stays hot.
+5. **See the real pattern:** run `db/diagnostics/wa_marketing_spam_diagnostic.sql`
+   (READ-ONLY, 7 queries: outbound/day by type, in-vs-out ratio, first-contact
+   auto-replies, template sends, broadcast=0 check, opt-in health).
+
+### FROZEN (do not regress)
+- Phase 261 no-auto-image + Phase 275 first-contact soften + opt-out are the anti-spam
+  contract on the AI. Never re-add an auto-pitch or auto-image to a cold first-contact.
+- FOOT-GUN: pointing many cold-scan QR boards at ONE young number + auto-replying to
+  every scan is a spam-flag machine. Warm numbers, spread load, soften first touch.
+
+
+---
+
 ## 147 · Phase 274 — QR "Total scans" 1000-cap fixed (server-side count RPC) (2026-07-28)
 
 Owner: QR & Locations "Total scans" stuck at exactly **1000**. Root = the §66/§85/§151
