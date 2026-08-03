@@ -10124,7 +10124,22 @@ closed on NULL role.
   · direct ₹40L · common ₹13L · drawings ₹44L · loans net +₹5L · tax ₹10L · review 131
   rows (₹49.8L, tag in Register). Date foot-gun (for the P4 monthly importer): Axis
   typed slash dates are US mm/dd/yy, other banks dd/mm; serials are always corrupt →
-  reconstruct from row-order. NEXT: P3 Register + P4 Import UI + P5 P&L (CRM reconcile).
+  reconstruct from row-order.
+- **P3 route + module + P&L RPC — DONE (owner RUNS `supabase_finance_p3_rpcs.sql`).**
+  `src/pages/v2/FinanceV2.jsx` (new) at `/finance`, gated RequireAccountsOrPrivileged
+  (admin+co_owner+accounts). Nav entry in ADMIN_NAV + ACCOUNTS_NAV (V2AppShell frozen —
+  guardian PASS, additive). Tabs: **Owner·P&L** (hero + KPIs + by-segment net + expense-
+  by-head + cash-movements-excluded + review flag; reads `finance_pnl_summary(from,to,
+  segment)` RPC) · **Register** (all txns, filter bucket/bank/search, inline bucket+segment
+  retag, review-highlight; client `.range()` paged §66) · **Import** (Phase-4 placeholder).
+  RPC `finance_pnl_summary`: SECURITY DEFINER, income=CRM approved payments by quote
+  segment, cost=finance_transactions direct+common, excluded buckets separate, common
+  allocated by income share; role gate admin/accounts full, Vishal FORCED GOVERNMENT,
+  else '{}'; fails closed on NULL role. P3 P3-note: FinanceV2 cards use global tokens
+  (--surface) not --v2-* — cosmetic, polish later. Segment/common allocation for a
+  single-segment (Vishal) view is rough in v1 (gives that segment ~100% of common) —
+  refine in P5. NEXT: P4 Import UI (drag-drop monthly import + auto-tag rules) · P5 P&L
+  polish (per-company, monthly trend, CRM reconciliation flags) · P6 Accounts Home + Tasks.
 - P3 Register · P4 Import UI · P5 Owner P&L dashboard (CRM-income + reconcile) ·
   P6 Accounts Home + Tasks (reuse push pipeline). Route `/finance`, admin+accounts
   gated, Vishal govt-scoped. Nav = additive V2AppShell (guardian).

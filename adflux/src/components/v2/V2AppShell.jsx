@@ -63,6 +63,7 @@ import {
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
   Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone, MessageCircle,
+  IndianRupee,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -96,6 +97,8 @@ const ADMIN_NAV = [
   // (/team, /incentives, /admin/leaves, /admin/salary, /admin/ta-
   // payouts) still work as deep-links.
   { to: '/people',            label: 'People',         icon: Users },
+  // Finance module (CLAUDE.md §155) — bank-ledger P&L. admin + accounts.
+  { to: '/finance',           label: 'Finance',        icon: IndianRupee },
   // Phase 101.A3 JSX (2026-05-29) — agency commission payout ledger.
   // Standalone admin page distinct from People → Salary (which is rep
   // payroll). Backed by Phase 101.A3 SQL agency_commission_payouts
@@ -239,6 +242,7 @@ const HR_NAV = [
 // is the whole finance surface. Routes guarded by RequireAccountsOrPrivileged.
 const ACCOUNTS_NAV = [
   { to: '/people',            label: 'Payroll',        icon: Wallet },
+  { to: '/finance',           label: 'Finance',        icon: IndianRupee },
 ]
 
 const MOBILE_NAV_ADMIN = [

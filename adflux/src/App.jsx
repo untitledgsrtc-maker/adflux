@@ -35,6 +35,8 @@ import LeavesAdminV2     from './pages/v2/LeavesAdminV2'
 import SalaryAdminV2     from './pages/v2/SalaryAdminV2'
 // Phase 38 — People module (Team + Incentives + Salary + Leaves tabs).
 import PeopleV2          from './pages/v2/PeopleV2'
+// Finance module (CLAUDE.md §155) — P&L + Register + Import. admin+accounts+co_owner.
+import FinanceV2         from './pages/v2/FinanceV2'
 // Phase 90 (2026-05-23) — admin rep profile drill-down.
 import RepProfileV2      from './pages/v2/RepProfileV2'
 // Phase 33H — admin TA Payouts (GPS-driven travel allowance).
@@ -408,6 +410,7 @@ export default function App() {
           {/* Phase 38 — People (consolidated). Old routes above stay
               as deep-links; sidebar uses /people. */}
           <Route path="/people"                    element={<RequireAccountsOrPrivileged><PeopleV2 /></RequireAccountsOrPrivileged>} />
+          <Route path="/finance"                   element={<RequireAccountsOrPrivileged><FinanceV2 /></RequireAccountsOrPrivileged>} />
           {/* Phase 90 (2026-05-23) — rep profile drill-down. Specific
               before parameterized would matter only if /people/new
               existed; it doesn't, so /people/:userId catches all
