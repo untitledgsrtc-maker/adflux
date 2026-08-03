@@ -10102,10 +10102,25 @@ closed on NULL role.
   finance_transactions · finance_rules · finance_tasks) + enums-as-CHECK + RLS +
   seeds (11 heads, 4 banks, 8 rules, 9 tasks). Bundled one file per §154; VERIFY at
   bottom (6 tables, RLS on all 6, 2 policies on finance_transactions).
-- P2 import engine (per-bank column map + date normalize serial+text + tag-split
-  classifier + rules + dedupe + backfill the 4 files) — NEXT. **Needs owner to
-  decode ambiguous tags** (AUTO HOOD in/out? Efforts Solar = loan/income? Modern
-  Advertis = loan?) — show real rows, he tells me.
+- P2 import engine — **classifier BUILT + validated** in sandbox (deterministic by
+  tag+direction: SWEEP→internal_transfer, Personal→owner_drawings, LOAN→loan_in/out
+  by direction, GSRTC/AUTO_HOOD→income if credit / direct_cost if debit + GOVERNMENT
+  segment, company-name credits→income, company-name debits + untagged→review for the
+  Register). No owner tag-decode needed (AUTO HOOD = a segment: ₹47L IN = govt Pay &
+  Accounts Office receipt = income; OUT = vendor cost. LOAN/Efforts Solar/Modern
+  Advertis already tagged LOAN by the accountant → loan by direction). Classification
+  totals over the 4 files: sweep ₹1.98Cr (excluded) · income ₹1.03Cr · direct ₹40L ·
+  common ₹13L · drawings ₹44L · loans net +₹5L · tax ₹10L · review 131 rows.
+  **BLOCKED on clean date re-export (owner decision 2026-08-03).** The 4 xlsx have
+  ~487/1060 rows (46%) with CORRUPTED date serials (decode Jan–Dec 2026 incl. future,
+  but the file's real period is Apr–Jul — the good typed dates prove it; serials span
+  11mo inside a 4mo file = corrupt, from hand-building the sheets). Owner chose:
+  **re-download the 4 statements clean from net-banking** (real machine dates) rather
+  than estimate-from-row-order. So the backfill waits on clean CSV/Excel exports.
+  NEXT: owner sends ONE clean bank file → I map its real columns → build the importer
+  to that format (which also becomes the going-forward monthly-import path, P4) →
+  load all 4. Date foot-gun: Axis typed slash dates are US mm/dd/yy; other banks dd/mm
+  — but this is moot once clean exports replace the corrupt serials.
 - P3 Register · P4 Import UI · P5 Owner P&L dashboard (CRM-income + reconcile) ·
   P6 Accounts Home + Tasks (reuse push pipeline). Route `/finance`, admin+accounts
   gated, Vishal govt-scoped. Nav = additive V2AppShell (guardian).
