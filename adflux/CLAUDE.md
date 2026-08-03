@@ -9889,3 +9889,84 @@ Run `supabase_phase267_campaign_media_inbox_write.sql` in Studio (VERIFY → all
 counts 1). Push (I push — JS/SQL, no APK, reaches the APK on next open). Smoke: as a
 telecaller, open the inbox → Attach → the library grid lists media + Upload works (no
 RLS error); a >20 MB file → clear "too large" toast, no upload.
+
+
+---
+
+## 152 · Phase 278 — co_owner (Vishal) scoped GOVERNMENT read-only on quotes/payments/etc — the §150 base-table leak CLOSED (2026-08-03)
+
+Closes the bigger leak §150 flagged. §150 fixed the team-RPC gate (dropped
+co_owner), but Vishal (the ONLY co_owner, `team_role='government_partner'`, meant
+GOVERNMENT-only per §42) could still read ALL-segment PRIVATE data via the NORMAL
+client query, because 5 base tables carried `*_admin_all` RLS policies that
+INCLUDED co_owner. Owner confirmed live via pg_policies (all 5 listed co_owner) +
+chose **read-only Government** for Vishal (AskUserQuestion). Both audits PASS
+(security review SAFE + guardian PASS).
+
+### The fix (`supabase_phase278_co_owner_govt_scope.sql`, owner RUNS)
+For **quotes · quote_cities · payments · follow_ups · pdf_share_tokens**:
+- `*_admin_all` rewritten `FOR ALL USING (public.get_my_role() = 'admin')` — drops
+  co_owner AND the dead `'owner'` literal (§8). Admin keeps FULL read+write on BOTH
+  segments (no explicit WITH CHECK → defaults to USING → admin writes preserved).
+- + a `*_govt_partner_read` **FOR SELECT** policy per table, scoped to GOVERNMENT,
+  mirroring the live `leads_govt_partner_read` (§42, phase12:397):
+  `EXISTS(users u WHERE u.id=auth.uid() AND u.team_role='government_partner')` AND
+  the row is GOVERNMENT (quotes: `segment='GOVERNMENT'`; quote_cities/payments/
+  pdf_share_tokens: via `EXISTS(quotes q WHERE q.id=<child>.quote_id AND
+  q.segment='GOVERNMENT')`; follow_ups: quote→GOVT OR lead→GOVT).
+
+### Why SAFE (security review verified)
+- **Closes the leak fully**: every govt_partner_read clause fails closed on
+  PRIVATE **and NULL** (3VL: `NULL='GOVERNMENT'`→NULL→excluded; NULL quote_id →
+  EXISTS empty). No path to a private/NULL-segment row on any of the 5 tables. The
+  other policies on these tables (`*_sales_own`, `payments_accounts_read`,
+  `pdf_share_tokens_self_read`, etc.) grant co_owner nothing → removing co_owner
+  from `*_admin_all` genuinely leaves him no private read path.
+- **Admin unaffected**; **non-partner + NULL-role fail closed** (EXISTS is 2-valued
+  → false → the additive SELECT grants zero rows, can't widen anyone); **no
+  SECURITY DEFINER / service-role write path breaks** (only a logged-in co_owner's
+  DIRECT client writes change — intended). **Perf** (§45): the users-EXISTS hoists
+  to an InitPlan (auth.uid() stable) → short-circuits for every non-partner; the
+  per-row quote EXISTS is a PK lookup on the single partner (Vishal). Same shape as
+  the accepted `leads_govt_partner_read`.
+- LEADS were already singular-`admin` + govt_partner (§42) → leads/activities/
+  calls/sessions stay govt-scoped; this migration makes quotes/payments/follow_ups/
+  pdf_share_tokens match that doctrine.
+
+### ⚠ WRITE implication (flagged to owner) — read-only means Vishal can't CREATE/EDIT govt quotes either
+co_owner's ONLY write path on these tables was `*_admin_all` (now admin-only);
+`quotes_sales_own` is role-scoped to `('sales','agency')` so it never covered
+co_owner. So after this, Vishal can SEE all govt quotes/line-items/payments/
+follow-ups/PDF tokens but can NOT insert/update/delete them. That matches the
+owner's explicit "See only (read-only)" choice. **If Vishal does data entry
+himself** (creates/edits govt proposals), tell me → I add a creator-scoped
+`quotes_govt_partner_write` (WITH CHECK created_by=auth.uid() AND
+segment='GOVERNMENT'). Co-signing a proposal is a `signing_authority` flag read by
+the renderer, NOT a quote INSERT — so signing is unaffected.
+
+### Residual scope (owner-aware, NOT in this migration — §42 doctrine call)
+Security review found `staff_incentive_profiles` (`sip_admin_all`),
+`monthly_sales_data` (`msd_admin_all`), `incentive_settings` (`is_admin_all`)
+still carry co_owner-inclusive admin policies (all-staff salary/sales-ledger, no
+segment column) — if live co_owner-inclusive, Vishal reads all-staff financials
+(contradicts §42 "GOVT-only, no P&L"). NOT fixed here (separate `pg_policies`
+confirm + straight admin-only re-scope — no govt_partner_read since there's no
+segment; Vishal should see none of the private-side salary/sales). Confirmed NOT
+leaking: `clients_admin_all` (admin-only) + the §42 twelve singular-`admin` tables.
+
+### FROZEN CONTRACT (do NOT regress)
+- co_owner ≠ full admin on quotes/quote_cities/payments/follow_ups/pdf_share_tokens.
+  These `*_admin_all` are `= 'admin'` ONLY; Vishal's access is the additive
+  GOVERNMENT-scoped `*_govt_partner_read` (SELECT). A diff re-adding co_owner to any
+  `*_admin_all`, or dropping a `*_govt_partner_read` segment clause, is a BLOCK.
+- If a NON-partner co_owner is ever added, revisit (§42) — the design depends on
+  co_owner ⇒ government_partner.
+
+### Owner action
+Run `supabase_phase278_co_owner_govt_scope.sql` in Studio. VERIFY block: NO
+`co_owner`/`owner` in any `*_admin_all` qual (all `= 'admin'`); 5
+`*_govt_partner_read` policies present. Then the still-pending §150 bug-fix files
+(`campaign_conversation_ensure_lead.sql` + the 5 team-RPC files) + the
+`staff_incentive_profiles`/`monthly_sales_data`/`incentive_settings` pg_policies
+check. Smoke: sign in as Vishal → govt quotes/payments visible, PRIVATE hidden, no
+edit/delete on govt rows.
