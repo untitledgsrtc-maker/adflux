@@ -155,7 +155,7 @@ function PnlTab({ seg }) {
       </div>
 
       <div style={g4}>
-        <Kpi label="Operating Income" value={fmtINR(income)} sub="CRM approved payments" Icon={TrendingUp} color="var(--success, #10B981)" tint="var(--success-soft, rgba(16,185,129,.12))" />
+        <Kpi label="Operating Income" value={fmtINR(income)} sub="money received (bank)" Icon={TrendingUp} color="var(--success, #10B981)" tint="var(--success-soft, rgba(16,185,129,.12))" />
         <Kpi label="Operating Costs" value={fmtINR(cost)} sub="direct + common" Icon={TrendingDown} color="var(--danger)" tint="var(--danger-soft, rgba(239,68,68,.12))" />
         <Kpi label="Operating P&L" value={fmtINR(profit)} sub={profit >= 0 ? 'profit' : 'loss'} Icon={BarChart3} color={profit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)'} tint="var(--success-soft, rgba(16,185,129,.12))" />
         <Kpi label="Margin" value={`${d.margin_pct}%`} sub="income → profit" Icon={IndianRupee} color="var(--accent, #FFE600)" tint="var(--accent-soft, rgba(255,230,0,.14))" />
