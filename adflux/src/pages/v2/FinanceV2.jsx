@@ -390,7 +390,7 @@ function TasksTab() {
 
 /* ── Import (real: upload → map columns → classify → save) ── */
 const IMP_HCAT = { 'Vehicle Expense': 'Vehicle Expense', 'Refreshments': 'Refreshments', 'Travel & Transportation': 'Travel & Conveyance', 'Office Expense': 'Office Expense', 'Labour charges': 'Labour charges', 'Rent Expense': 'Rent & Utilities' }
-function classifyImport(tag, dir, desc, hcat, bankco) {
+function classifyImport(tag, dir, desc, hcat, bankco, rules) {
   const t = (tag || '').toUpperCase().trim(), du = (desc || '').toUpperCase()
   let b = 'review', co = null, seg = null, media = null, head = null
   if (t === 'SWEEP') b = 'internal_transfer'
@@ -407,6 +407,11 @@ function classifyImport(tag, dir, desc, hcat, bankco) {
     if (du.includes('SALARY')) { head = 'Staff Salaries & Benefits'; if (b === 'review') b = 'common_expense' }
     else if (du.includes('FACEBOOK') || du.includes('GOOGLE')) head = 'Marketing & Promotion'
     else if (du.includes('TORRENT POWER')) head = 'Rent & Utilities'
+  }
+  // your own rules — only rescue rows the tag left as 'review'
+  if (b === 'review' && rules && rules.length) {
+    const hit = rules.find(rl => rl.is_active !== false && rl.pattern && du.includes(String(rl.pattern).toUpperCase()))
+    if (hit) { if (hit.set_bucket) b = hit.set_bucket; if (hit.set_head) head = hit.set_head; if (hit.set_segment) seg = hit.set_segment }
   }
   if (!co && ['income', 'direct_cost', 'common_expense', 'tax'].includes(b)) co = bankco
   return { bucket: b, company: co, segment: seg, media_type: media, head }
@@ -430,11 +435,35 @@ function ImportTab() {
   const [raw, setRaw] = useState(null); const [hdr, setHdr] = useState(0)
   const [map, setMap] = useState({}); const [bankId, setBankId] = useState('')
   const [busy, setBusy] = useState(false); const [result, setResult] = useState(null); const [err, setErr] = useState(null)
+  const [rules, setRules] = useState([]); const [impCompany, setImpCompany] = useState('')
+  const [nkw, setNkw] = useState(''); const [nbucket, setNbucket] = useState('common_expense'); const [nhead, setNhead] = useState('')
+  const loadRules = useCallback(() => { supabase.from('finance_rules').select('*').order('priority').then(({ data }) => setRules(data || [])) }, [])
 
   useEffect(() => {
     supabase.from('bank_accounts').select('id, name').order('display_order').then(({ data }) => { setBanks(data || []); if (data && data[0]) setBankId(data[0].id) })
     supabase.from('finance_expense_heads').select('id, name').then(({ data }) => setHeads(data || []))
-  }, [])
+    loadRules()
+  }, [loadRules])
+
+  const addRule = async () => {
+    const kw = nkw.trim(); if (!kw) return
+    const { error } = await supabase.from('finance_rules').insert({ pattern: kw.toUpperCase(), match_type: 'contains', priority: 50, set_bucket: nbucket, set_head: nhead || null, is_active: true })
+    if (error) return toastError(error, 'Could not add rule.')
+    setNkw(''); setNhead(''); loadRules(); toastSuccess('Rule added.')
+  }
+  const delRule = async (id) => { await supabase.from('finance_rules').delete().eq('id', id); loadRules() }
+  const reapply = async () => {
+    setBusy(true)
+    const { data } = await supabase.from('finance_transactions').select('id, description').eq('bucket', 'review').limit(5000)
+    const headByName = Object.fromEntries(heads.map(h => [h.name, h.id]))
+    let n = 0
+    for (const r of (data || [])) {
+      const du = (r.description || '').toUpperCase()
+      const hit = rules.find(rl => rl.is_active !== false && rl.pattern && du.includes(String(rl.pattern).toUpperCase()))
+      if (hit && hit.set_bucket) { await supabase.from('finance_transactions').update({ bucket: hit.set_bucket, segment: hit.set_segment || null, expense_head_id: hit.set_head ? (headByName[hit.set_head] || null) : null }).eq('id', r.id); n++ }
+    }
+    setBusy(false); toastSuccess(`Re-tagged ${n} rows.`)
+  }
 
   const onFile = async (file) => {
     setErr(null); setResult(null)
@@ -461,7 +490,7 @@ function ImportTab() {
     setBusy(true); setErr(null)
     try {
       const bank = banks.find(b => b.id === bankId)
-      const bankco = /adflux/i.test(bank && bank.name || '') ? 'Untitled Adflux Pvt Ltd' : 'Untitled Advertising'
+      const bankco = impCompany || (/adflux/i.test(bank && bank.name || '') ? 'Untitled Adflux Pvt Ltd' : 'Untitled Advertising')
       const headByName = Object.fromEntries(heads.map(h => [h.name, h.id]))
       const data = raw.slice(hdr + 1)
       let last = null; const dates = data.map(r => { const gd = impDate(r[map.date], last); if (gd) last = gd; return gd })
@@ -479,7 +508,7 @@ function ImportTab() {
         if (map.dr !== '' && num(r[map.dr])) sides.push(['out', num(r[map.dr]), map.drtag !== '' ? String(r[map.drtag] == null ? '' : r[map.drtag]) : ''])
         if (map.cr !== '' && num(r[map.cr])) sides.push(['in', num(r[map.cr]), map.crtag !== '' ? String(r[map.crtag] == null ? '' : r[map.crtag]) : ''])
         sides.forEach(([dir, amt, tag], si) => {
-          const c = classifyImport(tag, dir, desc, hcat, bankco)
+          const c = classifyImport(tag, dir, desc, hcat, bankco, rules)
           out.push({ bank_account_id: bankId, txn_date: impIso(d), description: desc, amount: amt, direction: dir,
             bucket: c.bucket, company: c.company, segment: c.segment, media_type: c.media_type,
             expense_head_id: c.head ? (headByName[c.head] || null) : null, raw_tag: tag || null, source: 'import',
@@ -509,6 +538,28 @@ function ImportTab() {
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Smart auto-tagging <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>keyword → category, applied on every import</span></div>
+          <button onClick={reapply} disabled={busy} style={{ background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: busy ? 'default' : 'pointer' }}>{busy ? 'Working…' : 'Re-apply to Review rows'}</button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          {rules.map(rl => (
+            <span key={rl.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+              {rl.pattern} → {(BUCKET_OPTS.find(([k]) => k === rl.set_bucket) || [null, rl.set_bucket || '?'])[1]}{rl.set_head ? ' · ' + rl.set_head : ''}
+              <span onClick={() => delRule(rl.id)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', display: 'inline-flex' }}><Trash2 size={12} /></span>
+            </span>
+          ))}
+          {rules.length === 0 && <span style={{ color: 'var(--text-subtle)', fontSize: 12.5 }}>No custom rules yet — built-in keyword rules still apply.</span>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input value={nkw} onChange={e => setNkw(e.target.value)} placeholder="Keyword in description (e.g. ZERODHA)" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text)', fontSize: 13, minWidth: 210 }} />
+          <span style={{ color: 'var(--text-subtle)' }}>→</span>
+          <select value={nbucket} onChange={e => setNbucket(e.target.value)} style={selStyle}>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+          <select value={nhead} onChange={e => setNhead(e.target.value)} style={selStyle}><option value="">Head (optional)</option>{heads.map(h => <option key={h.id} value={h.name}>{h.name}</option>)}</select>
+          <button onClick={addRule} style={{ background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', border: 'none', borderRadius: 999, padding: '7px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Add rule</button>
+        </div>
+      </Card>
       {!raw && (
         <label style={{ border: '2px dashed var(--border-strong, #475569)', borderRadius: 14, padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--surface)', cursor: 'pointer', display: 'block' }}>
           <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => e.target.files[0] && onFile(e.target.files[0])} />
@@ -527,6 +578,8 @@ function ImportTab() {
               <div><ColSel field="dr" label="Money Out (Debit)" /><ColSel field="drtag" label="Out category" /><ColSel field="cat" label="Expense head column (optional)" />
                 <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Which bank</label>
                   <select value={bankId} onChange={e => setBankId(e.target.value)} style={{ ...selStyle, width: '100%' }}>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+                <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Company</label>
+                  <select value={impCompany} onChange={e => setImpCompany(e.target.value)} style={{ ...selStyle, width: '100%' }}><option value="">Auto (from bank / tag)</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
               </div>
             </div>
           </Card>
@@ -580,6 +633,7 @@ function monthLabel(ym) { const [y, m] = (ym || '').split('-'); return m ? `${MO
 function RegisterTab() {
   const [rows, setRows] = useState([]); const [banks, setBanks] = useState([]); const [heads, setHeads] = useState([])
   const [loading, setLoading] = useState(true); const [fBucket, setFBucket] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
+  const [fCompany, setFCompany] = useState('all'); const [fSegment, setFSegment] = useState('all'); const [fMonth, setFMonth] = useState('all')
   const [selected, setSelected] = useState(() => new Set())
 
   const load = useCallback(async () => {
@@ -625,12 +679,16 @@ function RegisterTab() {
     setRows(rs => rs.filter(x => !gone.has(x.id))); setSelected(new Set()); toastSuccess(`Deleted ${ids.length}.`)
   }
 
+  const months = useMemo(() => [...new Set(rows.map(r => (r.txn_date || '').slice(0, 7)).filter(Boolean))].sort((a, b) => b.localeCompare(a)), [rows])
   const filtered = useMemo(() => rows.filter(r => {
     if (fBucket !== 'all' && r.bucket !== fBucket) return false
     if (fBank !== 'all' && String(r.bank_account_id) !== fBank) return false
+    if (fCompany !== 'all' && r.company !== fCompany) return false
+    if (fSegment !== 'all' && r.segment !== fSegment) return false
+    if (fMonth !== 'all' && (r.txn_date || '').slice(0, 7) !== fMonth) return false
     if (q && !(r.description || '').toLowerCase().includes(q.toLowerCase())) return false
     return true
-  }), [rows, fBucket, fBank, q])
+  }), [rows, fBucket, fBank, fCompany, fSegment, fMonth, q])
   const groups = useMemo(() => {
     const g = {}
     filtered.forEach(r => { const m = (r.txn_date || '').slice(0, 7); (g[m] = g[m] || []).push(r) })
@@ -656,6 +714,9 @@ function RegisterTab() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}>
           <Search size={14} style={{ color: 'var(--text-subtle)' }} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, width: 150 }} />
         </div>
+        <select value={fMonth} onChange={e => setFMonth(e.target.value)} style={selStyle}><option value="all">Month: All</option>{months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}</select>
+        <select value={fCompany} onChange={e => setFCompany(e.target.value)} style={selStyle}><option value="all">Company: All</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <select value={fSegment} onChange={e => setFSegment(e.target.value)} style={selStyle}><option value="all">Segment: All</option>{SEGMENTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         <select value={fBucket} onChange={e => setFBucket(e.target.value)} style={selStyle}><option value="all">Bucket: All</option>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         <select value={fBank} onChange={e => setFBank(e.target.value)} style={selStyle}><option value="all">Bank: All</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
       </div>
