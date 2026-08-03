@@ -579,6 +579,7 @@ function monthLabel(ym) { const [y, m] = (ym || '').split('-'); return m ? `${MO
 function RegisterTab() {
   const [rows, setRows] = useState([]); const [banks, setBanks] = useState([]); const [heads, setHeads] = useState([])
   const [loading, setLoading] = useState(true); const [fBucket, setFBucket] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
+  const [selected, setSelected] = useState(() => new Set())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -609,7 +610,18 @@ function RegisterTab() {
   const del = async (r) => {
     if (!(await confirmDialog({ title: 'Delete this transaction?', message: r.description || '', confirmLabel: 'Delete', danger: true }))) return
     const { error } = await supabase.from('finance_transactions').delete().eq('id', r.id)
-    if (error) toastError(error, 'Could not delete.'); else { setRows(rs => rs.filter(x => x.id !== r.id)); toastSuccess('Deleted.') }
+    if (error) toastError(error, 'Could not delete.'); else { setRows(rs => rs.filter(x => x.id !== r.id)); setSelected(s => { const n = new Set(s); n.delete(r.id); return n }); toastSuccess('Deleted.') }
+  }
+  const toggle = (id) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const bulkDel = async () => {
+    const ids = [...selected]; if (!ids.length) return
+    if (!(await confirmDialog({ title: `Delete ${ids.length} transactions?`, message: 'This permanently removes them. Cannot be undone.', confirmLabel: `Delete ${ids.length}`, danger: true }))) return
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await supabase.from('finance_transactions').delete().in('id', ids.slice(i, i + 200))
+      if (error) { toastError(error, 'Could not delete.'); load(); setSelected(new Set()); return }
+    }
+    const gone = new Set(ids)
+    setRows(rs => rs.filter(x => !gone.has(x.id))); setSelected(new Set()); toastSuccess(`Deleted ${ids.length}.`)
   }
 
   const filtered = useMemo(() => rows.filter(r => {
@@ -631,6 +643,14 @@ function RegisterTab() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: 14, borderBottom: '1px solid var(--border)' }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>{filtered.length} transactions <span style={{ color: 'var(--text-subtle)', fontWeight: 400 }}>&middot; edit any dropdown, dashboard updates live</span></div>
         {reviewCount > 0 && <span onClick={() => setFBucket('review')} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to sort</span>}
+        {selected.size > 0 ? (
+          <>
+            <button onClick={bulkDel} style={{ background: 'var(--danger, #EF4444)', color: '#fff', border: 'none', borderRadius: 999, padding: '5px 13px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', gap: 6, alignItems: 'center' }}><Trash2 size={13} />Delete {selected.size}</button>
+            <span onClick={() => setSelected(new Set())} style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}>clear</span>
+          </>
+        ) : (
+          <span onClick={() => setSelected(new Set(filtered.map(r => r.id)))} style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-subtle)' }}>select all ({filtered.length})</span>
+        )}
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}>
           <Search size={14} style={{ color: 'var(--text-subtle)' }} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, width: 150 }} />
@@ -641,6 +661,7 @@ function RegisterTab() {
       <div style={{ overflowX: 'auto', maxHeight: '72vh', overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 1180 }}>
           <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
+            <th style={{ ...thL, width: 30 }}><input type="checkbox" checked={filtered.length > 0 && filtered.every(r => selected.has(r.id))} onChange={e => setSelected(e.target.checked ? new Set(filtered.map(r => r.id)) : new Set())} /></th>
             <th style={thL}>Date</th><th style={thL}>Description</th><th style={thR}>Amount</th>
             <th style={thL}>Company</th><th style={thL}>Bucket</th><th style={thL}>Segment</th><th style={thL}>Expense Head</th><th style={thL}>Bank</th><th style={thL}></th>
           </tr></thead>
@@ -650,14 +671,15 @@ function RegisterTab() {
               const out = rs.filter(r => r.direction === 'out').reduce((s, r) => s + (+r.amount || 0), 0)
               const head = (
                 <tr key={'h' + m} style={{ background: 'var(--surface-2, #334155)' }}>
-                  <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={3}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 11 }}>&middot; {rs.length} txns</span></td>
+                  <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={4}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 11 }}>&middot; {rs.length} txns</span></td>
                   <td style={{ ...tdL, fontSize: 11.5 }} colSpan={6}><span style={{ color: 'var(--success)' }}>In {fmtINR(inn)}</span> &nbsp; <span style={{ color: 'var(--danger)' }}>Out {fmtINR(out)}</span> &nbsp; <b>Net {fmtINR(inn - out)}</b></td>
                 </tr>
               )
               const trs = rs.map(r => {
                 const segmed = `${r.segment || ''}|${r.media_type || ''}`
                 return (
-                  <tr key={r.id} style={{ background: r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
+                  <tr key={r.id} style={{ background: selected.has(r.id) ? 'rgba(255,230,0,.08)' : r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
+                    <td style={tdL}><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></td>
                     <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{r.txn_date}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>~</span> : ''}</td>
                     <td style={{ ...tdL, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>{r.description}</td>
                     <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
