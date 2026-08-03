@@ -482,7 +482,7 @@ function ImportTab() {
       setMap({ date: find('date', 'tran date'), desc: find('narration', 'particular', 'description'),
         dr: drI[0] == null ? '' : drI[0], drtag: tyI[0] == null ? '' : tyI[0],
         cr: crI[0] == null ? '' : crI[0], crtag: (tyI[1] == null ? tyI[0] : tyI[1]) == null ? '' : (tyI[1] == null ? tyI[0] : tyI[1]),
-        cat: find('category', 'expense catego') })
+        cat: find('category', 'expense catego'), receipt: find('receipt', 'chqno', 'cheque', 'ref') })
     } catch (e) { setErr('Could not read the file: ' + (e.message || e)) }
   }
 
@@ -509,7 +509,7 @@ function ImportTab() {
         if (map.cr !== '' && num(r[map.cr])) sides.push(['in', num(r[map.cr]), map.crtag !== '' ? String(r[map.crtag] == null ? '' : r[map.crtag]) : ''])
         sides.forEach(([dir, amt, tag], si) => {
           const c = classifyImport(tag, dir, desc, hcat, bankco, rules)
-          out.push({ bank_account_id: bankId, txn_date: impIso(d), description: desc, amount: amt, direction: dir,
+          out.push({ bank_account_id: bankId, txn_date: impIso(d), ref_no: map.receipt !== '' ? (String(r[map.receipt] == null ? '' : r[map.receipt]).trim() || null) : null, description: desc, amount: amt, direction: dir,
             bucket: c.bucket, company: c.company, segment: c.segment, media_type: c.media_type,
             expense_head_id: c.head ? (headByName[c.head] || null) : null, raw_tag: tag || null, source: 'import',
             dedupe_key: `${bank && bank.name}|${impIso(d)}|${amt}|${dir}|${desc.slice(0, 26)}|${idx}|${si}`,
@@ -575,7 +575,7 @@ function ImportTab() {
             <CH>Tell me which column is which</CH>
             <div style={g2}>
               <div><ColSel field="date" label="Date" /><ColSel field="desc" label="Description" /><ColSel field="cr" label="Money In (Credit)" /><ColSel field="crtag" label="In category" /></div>
-              <div><ColSel field="dr" label="Money Out (Debit)" /><ColSel field="drtag" label="Out category" /><ColSel field="cat" label="Expense head column (optional)" />
+              <div><ColSel field="dr" label="Money Out (Debit)" /><ColSel field="drtag" label="Out category" /><ColSel field="cat" label="Expense head column (optional)" /><ColSel field="receipt" label="Receipt No (optional)" />
                 <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Which bank</label>
                   <select value={bankId} onChange={e => setBankId(e.target.value)} style={{ ...selStyle, width: '100%' }}>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
                 <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Company</label>
@@ -646,7 +646,7 @@ function RegisterTab() {
     const PAGE = 1000; let all = []; let from = 0
     for (;;) {
       const { data, error } = await supabase.from('finance_transactions')
-        .select('id, txn_date, description, amount, direction, bucket, company, segment, media_type, expense_head_id, bank_account_id, raw_tag, note')
+        .select('id, txn_date, ref_no, description, amount, direction, bucket, company, segment, media_type, expense_head_id, bank_account_id, raw_tag, note')
         .order('txn_date', { ascending: false }).range(from, from + PAGE - 1)
       if (error) { toastError(error, 'Could not load.'); break }
       all = all.concat(data || [])
@@ -686,7 +686,7 @@ function RegisterTab() {
     if (fCompany !== 'all' && r.company !== fCompany) return false
     if (fSegment !== 'all' && r.segment !== fSegment) return false
     if (fMonth !== 'all' && (r.txn_date || '').slice(0, 7) !== fMonth) return false
-    if (q && !(r.description || '').toLowerCase().includes(q.toLowerCase())) return false
+    if (q && !((r.description || '') + ' ' + (r.ref_no || '')).toLowerCase().includes(q.toLowerCase())) return false
     return true
   }), [rows, fBucket, fBank, fCompany, fSegment, fMonth, q])
   const groups = useMemo(() => {
@@ -743,7 +743,7 @@ function RegisterTab() {
                   <tr key={r.id} style={{ background: selected.has(r.id) ? 'rgba(255,230,0,.08)' : r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
                     <td style={tdL}><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></td>
                     <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{fmtDate(r.txn_date)}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>~</span> : ''}</td>
-                    <td style={{ ...tdL, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>{r.description}</td>
+                    <td style={{ ...tdL, maxWidth: 260 }} title={r.description}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>{r.ref_no ? <div style={{ fontSize: 10.5, color: 'var(--text-subtle)' }}>Receipt {r.ref_no}</div> : null}</td>
                     <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
                     <td style={tdL}><select value={r.company || ''} onChange={e => patch(r.id, { company: e.target.value || null })} style={selStyle}><option value="">-</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
                     <td style={tdL}><select value={r.bucket} onChange={e => patch(r.id, { bucket: e.target.value })} style={selStyle}>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
