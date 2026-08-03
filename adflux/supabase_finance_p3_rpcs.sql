@@ -191,6 +191,11 @@ GRANT EXECUTE ON FUNCTION public.finance_accounts_home() TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
 
--- VERIFY (returns '{}' with no login in the SQL editor — real data only via the app JWT)
-SELECT public.finance_pnl_summary(NULL,NULL,NULL) ? 'monthly' AS pnl_ok,
-       public.finance_accounts_home() ? 'to_collect'          AS home_ok;
+-- VERIFY — your real P&L (plain query, no login needed, works right here):
+SELECT
+  (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket='income')  AS income,
+  (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS cost,
+  (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket='income')
+    - (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS operating_profit,
+  (SELECT count(*) FROM public.finance_transactions WHERE bucket='review')      AS review_rows;
+-- (The RPCs are already installed from the CREATE OR REPLACE above — no re-run needed.)
