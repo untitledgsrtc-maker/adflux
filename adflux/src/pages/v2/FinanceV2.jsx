@@ -9,7 +9,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, ListChecks, Upload, TrendingUp, TrendingDown, BarChart3,
   AlertTriangle, Loader2, Search, IndianRupee, Home, CheckSquare, Clock,
-  RefreshCw, Wallet, PiggyBank, Boxes, ArrowLeftRight, Trash2,
+  RefreshCw, Wallet, PiggyBank, Boxes, ArrowLeftRight, Trash2, CheckCircle2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -387,27 +387,172 @@ function TasksTab() {
   )
 }
 
-/* ── Import (Phase 4 placeholder, mockup shell) ── */
+/* ── Import (real: upload → map columns → classify → save) ── */
+const IMP_HCAT = { 'Vehicle Expense': 'Vehicle Expense', 'Refreshments': 'Refreshments', 'Travel & Transportation': 'Travel & Conveyance', 'Office Expense': 'Office Expense', 'Labour charges': 'Labour charges', 'Rent Expense': 'Rent & Utilities' }
+function classifyImport(tag, dir, desc, hcat, bankco) {
+  const t = (tag || '').toUpperCase().trim(), du = (desc || '').toUpperCase()
+  let b = 'review', co = null, seg = null, media = null, head = null
+  if (t === 'SWEEP') b = 'internal_transfer'
+  else if (t === 'PERSONAL') b = 'owner_drawings'
+  else if (t === 'LOAN FROM FRIEND') b = dir === 'in' ? 'loan_in' : 'loan_out'
+  else if (t === 'TAX') { b = 'tax'; head = 'Duties & Taxes' }
+  else if (t === 'COMMON EXPENSE') { b = 'common_expense'; head = IMP_HCAT[hcat] || null }
+  else if (t === 'GSRTC') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'GSRTC_LED' }
+  else if (t === 'AUTO HOOD') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'AUTO_HOOD'; if (dir === 'out') head = 'Vendor Payment' }
+  else if (t === 'UNTITLED ADVERTISING') { co = 'Untitled Advertising'; b = dir === 'in' ? 'income' : 'review' }
+  else if (t === 'UNTITLED ADFLUX PVT LTD') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'review' }
+  else if (t === 'OTHER EXPENSE') { b = 'common_expense'; head = IMP_HCAT[hcat] || 'Other' }
+  if (!head && (b === 'common_expense' || b === 'direct_cost' || b === 'review')) {
+    if (du.includes('SALARY')) { head = 'Staff Salaries & Benefits'; if (b === 'review') b = 'common_expense' }
+    else if (du.includes('FACEBOOK') || du.includes('GOOGLE')) head = 'Marketing & Promotion'
+    else if (du.includes('TORRENT POWER')) head = 'Rent & Utilities'
+  }
+  if (!co && ['income', 'direct_cost', 'common_expense', 'tax'].includes(b)) co = bankco
+  return { bucket: b, company: co, segment: seg, media_type: media, head }
+}
+function impDate(v, last) {
+  if (v == null || v === '') return null
+  if (typeof v === 'number') return null // serial → untrusted, carry forward from neighbours
+  const m = String(v).trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+  if (!m) return null
+  let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000
+  const today = new Date(); const cands = []
+  for (const [mo, d] of [[b, a], [a, b]]) { const dt = new Date(y, mo - 1, d); if (dt.getMonth() === mo - 1 && dt <= today) cands.push(dt) }
+  if (!cands.length) return null
+  if (last) cands.sort((p, q) => ((p < last) - (q < last)) || (Math.abs(p - last) - Math.abs(q - last)))
+  return cands[0]
+}
+const impIso = (dt) => dt ? `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}` : null
+
 function ImportTab() {
-  const chips = ['SALARY → Staff Salaries', 'FACEBOOK → Marketing', 'TORRENT POWER → GSRTC · Rent', 'BRIJESH self → Internal Transfer', 'EMI → Owner Drawings', 'SWEEP → Transfer']
+  const [banks, setBanks] = useState([]); const [heads, setHeads] = useState([])
+  const [raw, setRaw] = useState(null); const [hdr, setHdr] = useState(0)
+  const [map, setMap] = useState({}); const [bankId, setBankId] = useState('')
+  const [busy, setBusy] = useState(false); const [result, setResult] = useState(null); const [err, setErr] = useState(null)
+
+  useEffect(() => {
+    supabase.from('bank_accounts').select('id, name').order('display_order').then(({ data }) => { setBanks(data || []); if (data && data[0]) setBankId(data[0].id) })
+    supabase.from('finance_expense_heads').select('id, name').then(({ data }) => setHeads(data || []))
+  }, [])
+
+  const onFile = async (file) => {
+    setErr(null); setResult(null)
+    try {
+      const XLSX = await import('xlsx')
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false })
+      let h = 0
+      for (let i = 0; i < Math.min(rows.length, 8); i++) { if ((rows[i] || []).filter(c => String(c == null ? '' : c).trim()).length >= 4) { h = i; break } }
+      const header = (rows[h] || []).map(c => String(c == null ? '' : c).toLowerCase())
+      const find = (...kw) => { const i = header.findIndex(c => kw.some(k => c.includes(k))); return i < 0 ? '' : i }
+      const findAll = (...kw) => header.map((c, i) => (kw.some(k => c.includes(k)) ? i : -1)).filter(i => i >= 0)
+      const drI = findAll('dr', 'debit'), crI = findAll('cr', 'credit'), tyI = findAll('expense type', 'type')
+      setRaw(rows); setHdr(h)
+      setMap({ date: find('date', 'tran date'), desc: find('narration', 'particular', 'description'),
+        dr: drI[0] == null ? '' : drI[0], drtag: tyI[0] == null ? '' : tyI[0],
+        cr: crI[0] == null ? '' : crI[0], crtag: (tyI[1] == null ? tyI[0] : tyI[1]) == null ? '' : (tyI[1] == null ? tyI[0] : tyI[1]),
+        cat: find('category', 'expense catego') })
+    } catch (e) { setErr('Could not read the file: ' + (e.message || e)) }
+  }
+
+  const doImport = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const bank = banks.find(b => b.id === bankId)
+      const bankco = /adflux/i.test(bank && bank.name || '') ? 'Untitled Adflux Pvt Ltd' : 'Untitled Advertising'
+      const headByName = Object.fromEntries(heads.map(h => [h.name, h.id]))
+      const data = raw.slice(hdr + 1)
+      let last = null; const dates = data.map(r => { const gd = impDate(r[map.date], last); if (gd) last = gd; return gd })
+      const filled = dates.slice(); let lg = null
+      for (let i = 0; i < filled.length; i++) { if (filled[i]) lg = filled[i]; else if (lg) filled[i] = lg }
+      let ng = null; for (let i = filled.length - 1; i >= 0; i--) { if (filled[i]) ng = filled[i]; else if (ng) filled[i] = ng }
+      const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(n) ? n : 0 }
+      const out = []
+      data.forEach((r, idx) => {
+        const d = filled[idx]; if (!d) return
+        const desc = String(r[map.desc] == null ? '' : r[map.desc])
+        const hcat = map.cat !== '' ? String(r[map.cat] == null ? '' : r[map.cat]) : ''
+        const est = dates[idx] == null
+        const sides = []
+        if (map.dr !== '' && num(r[map.dr])) sides.push(['out', num(r[map.dr]), map.drtag !== '' ? String(r[map.drtag] == null ? '' : r[map.drtag]) : ''])
+        if (map.cr !== '' && num(r[map.cr])) sides.push(['in', num(r[map.cr]), map.crtag !== '' ? String(r[map.crtag] == null ? '' : r[map.crtag]) : ''])
+        sides.forEach(([dir, amt, tag], si) => {
+          const c = classifyImport(tag, dir, desc, hcat, bankco)
+          out.push({ bank_account_id: bankId, txn_date: impIso(d), description: desc, amount: amt, direction: dir,
+            bucket: c.bucket, company: c.company, segment: c.segment, media_type: c.media_type,
+            expense_head_id: c.head ? (headByName[c.head] || null) : null, raw_tag: tag || null, source: 'import',
+            dedupe_key: `${bank && bank.name}|${impIso(d)}|${amt}|${dir}|${desc.slice(0, 26)}|${idx}|${si}`,
+            note: est ? 'date estimated (statement order)' : null })
+        })
+      })
+      if (!out.length) { setErr('No rows found with that mapping — check the Date + Money In/Out columns.'); setBusy(false); return }
+      for (let i = 0; i < out.length; i += 200) {
+        const { error } = await supabase.from('finance_transactions').upsert(out.slice(i, i + 200), { onConflict: 'dedupe_key', ignoreDuplicates: true })
+        if (error) throw error
+      }
+      setResult({ total: out.length }); toastSuccess(`Imported ${out.length} rows.`)
+    } catch (e) { setErr(e.message || String(e)) }
+    setBusy(false)
+  }
+
+  const cols = raw ? (raw[hdr] || []).map((c, i) => ({ i, name: String(c == null ? '' : c) || `Col ${i + 1}` })) : []
+  const ColSel = ({ field, label }) => (
+    <div style={{ marginBottom: 9 }}>
+      <label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>{label}</label>
+      <select value={map[field] === '' || map[field] == null ? '' : map[field]} onChange={e => setMap(m => ({ ...m, [field]: e.target.value === '' ? '' : +e.target.value }))} style={{ ...selStyle, width: '100%' }}>
+        <option value="">— none —</option>{cols.map(c => <option key={c.i} value={c.i}>{c.name}</option>)}
+      </select>
+    </div>
+  )
+
   return (
     <div style={{ display: 'grid', gap: 14 }}>
-      <div style={{ display: 'flex', gap: 22, marginBottom: 4 }}>
-        {['Upload', 'Map columns', 'Review & classify'].map((s, i) => <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600, color: i === 0 ? 'var(--text)' : 'var(--text-subtle)' }}>
-          <b style={{ width: 22, height: 22, borderRadius: 7, background: i === 0 ? 'var(--accent, #FFE600)' : 'var(--surface-2)', color: i === 0 ? 'var(--accent-fg)' : 'inherit', display: 'grid', placeItems: 'center', fontFamily: 'Space Grotesk' }}>{i + 1}</b>{s}</div>)}
-      </div>
-      <div style={{ border: '2px dashed var(--border-strong, #475569)', borderRadius: 14, padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--surface)' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 14, margin: '0 auto 14px', display: 'grid', placeItems: 'center', background: 'var(--accent-soft, rgba(255,230,0,.14))', color: 'var(--accent, #FFE600)' }}><Upload size={30} /></div>
-        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>Statement import — coming next (Phase 4)</div>
-        <div style={{ fontSize: 12.5, marginTop: 6 }}>Your 4 statements (Apr–Jul) are already loaded. Monthly drag-&amp;-drop lands here next.</div>
-      </div>
-      <Card>
-        <CH>Smart auto-tagging</CH>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {chips.map(c => <span key={c} style={{ fontSize: 11, fontWeight: 600, padding: '4px 9px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{c}</span>)}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 10 }}>Rules learn over time — you only correct what it gets wrong.</div>
-      </Card>
+      {!raw && (
+        <label style={{ border: '2px dashed var(--border-strong, #475569)', borderRadius: 14, padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--surface)', cursor: 'pointer', display: 'block' }}>
+          <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => e.target.files[0] && onFile(e.target.files[0])} />
+          <div style={{ width: 64, height: 64, borderRadius: 14, margin: '0 auto 14px', display: 'grid', placeItems: 'center', background: 'var(--accent-soft, rgba(255,230,0,.14))', color: 'var(--accent, #FFE600)' }}><Upload size={30} /></div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>Click to choose a bank statement</div>
+          <div style={{ fontSize: 12.5, marginTop: 6 }}>Excel (.xlsx / .xls) or CSV &middot; already-imported rows are skipped automatically</div>
+          {err && <div style={{ color: 'var(--danger)', fontSize: 13, marginTop: 10 }}>{err}</div>}
+        </label>
+      )}
+      {raw && !result && (
+        <>
+          <Card>
+            <CH>Tell me which column is which</CH>
+            <div style={g2}>
+              <div><ColSel field="date" label="Date" /><ColSel field="desc" label="Description" /><ColSel field="cr" label="Money In (Credit)" /><ColSel field="crtag" label="In category" /></div>
+              <div><ColSel field="dr" label="Money Out (Debit)" /><ColSel field="drtag" label="Out category" /><ColSel field="cat" label="Expense head column (optional)" />
+                <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Which bank</label>
+                  <select value={bankId} onChange={e => setBankId(e.target.value)} style={{ ...selStyle, width: '100%' }}>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+              </div>
+            </div>
+          </Card>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px 0', fontSize: 12, color: 'var(--text-subtle)' }}>Preview (first 6 rows)</div>
+            <div style={{ overflowX: 'auto', padding: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead><tr>{cols.map(c => <th key={c.i} style={thL}>{c.name}</th>)}</tr></thead>
+                <tbody>{raw.slice(hdr + 1, hdr + 7).map((r, i) => <tr key={i}>{cols.map(c => <td key={c.i} style={tdL}>{String(r[c.i] == null ? '' : r[c.i]).slice(0, 18)}</td>)}</tr>)}</tbody>
+              </table>
+            </div>
+          </Card>
+          {err && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</div>}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={doImport} disabled={busy || map.date === '' || (map.dr === '' && map.cr === '')} style={{ background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', border: 'none', borderRadius: 999, padding: '10px 20px', fontWeight: 700, fontSize: 14, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Importing…' : 'Import transactions'}</button>
+            <button onClick={() => { setRaw(null); setErr(null) }} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>Choose another file</button>
+          </div>
+        </>
+      )}
+      {result && (
+        <Card style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ color: 'var(--success)', marginBottom: 10 }}><CheckCircle2 size={40} /></div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Imported {result.total} rows</div>
+          <div style={{ fontSize: 13, color: 'var(--text-subtle)', marginTop: 6 }}>Open the Register to review + tag. Duplicates were skipped automatically.</div>
+          <button onClick={() => { setRaw(null); setResult(null) }} style={{ marginTop: 16, background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', border: 'none', borderRadius: 999, padding: '9px 18px', fontWeight: 700, cursor: 'pointer' }}>Import another</button>
+        </Card>
+      )}
     </div>
   )
 }
