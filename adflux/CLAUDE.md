@@ -10111,16 +10111,20 @@ closed on NULL role.
   Advertis already tagged LOAN by the accountant → loan by direction). Classification
   totals over the 4 files: sweep ₹1.98Cr (excluded) · income ₹1.03Cr · direct ₹40L ·
   common ₹13L · drawings ₹44L · loans net +₹5L · tax ₹10L · review 131 rows.
-  **BLOCKED on clean date re-export (owner decision 2026-08-03).** The 4 xlsx have
-  ~487/1060 rows (46%) with CORRUPTED date serials (decode Jan–Dec 2026 incl. future,
-  but the file's real period is Apr–Jul — the good typed dates prove it; serials span
-  11mo inside a 4mo file = corrupt, from hand-building the sheets). Owner chose:
-  **re-download the 4 statements clean from net-banking** (real machine dates) rather
-  than estimate-from-row-order. So the backfill waits on clean CSV/Excel exports.
-  NEXT: owner sends ONE clean bank file → I map its real columns → build the importer
-  to that format (which also becomes the going-forward monthly-import path, P4) →
-  load all 4. Date foot-gun: Axis typed slash dates are US mm/dd/yy; other banks dd/mm
-  — but this is moot once clean exports replace the corrupt serials.
+  ~487/1060 rows (46%) had CORRUPTED date serials (decode Jan–Dec 2026 incl. future;
+  real period is Apr–Jul, proven by the good typed dates). Owner first said re-download
+  clean, then re-sent the SAME files → RECONSTRUCTED dates from statement ROW-ORDER
+  (files are chronological; carry the nearest good typed date onto each serial row).
+  Validated CLEAN: all 4 files → Apr 13–Jul 27 2026, monotonic, ZERO future dates.
+  Serial rows get correct MONTH + nearest day, flagged note='date estimated (statement
+  order)' for the accountant to refine exact days. No re-download needed.
+  **P2 backfill GENERATED: `supabase_finance_p2_backfill.sql` (1060 rows, owner RUNS
+  after P1).** Idempotent (per-source-row dedupe_key → re-run adds 0, never collapses
+  two genuine same-amount entries). Totals: sweep ₹1.98Cr (excluded) · income ₹1.03Cr
+  · direct ₹40L · common ₹13L · drawings ₹44L · loans net +₹5L · tax ₹10L · review 131
+  rows (₹49.8L, tag in Register). Date foot-gun (for the P4 monthly importer): Axis
+  typed slash dates are US mm/dd/yy, other banks dd/mm; serials are always corrupt →
+  reconstruct from row-order. NEXT: P3 Register + P4 Import UI + P5 P&L (CRM reconcile).
 - P3 Register · P4 Import UI · P5 Owner P&L dashboard (CRM-income + reconcile) ·
   P6 Accounts Home + Tasks (reuse push pipeline). Route `/finance`, admin+accounts
   gated, Vishal govt-scoped. Nav = additive V2AppShell (guardian).
