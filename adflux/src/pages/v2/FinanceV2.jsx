@@ -22,6 +22,7 @@ function fmtINR(n) {
   const v = Math.round(Number(n))
   return (v < 0 ? '−₹' : '₹') + new Intl.NumberFormat('en-IN').format(Math.abs(v))
 }
+function fmtDate(s) { if (!s) return '—'; const [y, m, d] = String(s).split('-'); return d ? `${d}/${m}/${y}` : s }
 function fmtL(n) { // compact ₹..L / ₹..Cr
   const v = Math.abs(Number(n) || 0)
   const s = v >= 1e7 ? `₹${(v / 1e7).toFixed(1)}Cr` : v >= 1e5 ? `₹${(v / 1e5).toFixed(1)}L` : fmtINR(v)
@@ -236,7 +237,7 @@ function PnlTab({ seg }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead><tr><th style={thL}>Date</th><th style={thL}>Remark</th><th style={thR}>Amount</th></tr></thead>
               <tbody>
-                {assets.map((a, i) => <tr key={i}><td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{a.date}</td>
+                {assets.map((a, i) => <tr key={i}><td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{fmtDate(a.date)}</td>
                   <td style={{ ...tdL, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.remark}>{a.remark}</td><td style={tdR}>{fmtINR(a.amount)}</td></tr>)}
                 <tr style={totRow}><td style={tdL} colSpan={2}>Total capital</td><td style={tdR}>{fmtINR(assets.reduce((s, a) => s + (+a.amount || 0), 0))}</td></tr>
               </tbody>
@@ -680,7 +681,7 @@ function RegisterTab() {
                 return (
                   <tr key={r.id} style={{ background: selected.has(r.id) ? 'rgba(255,230,0,.08)' : r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
                     <td style={tdL}><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></td>
-                    <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{r.txn_date}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>~</span> : ''}</td>
+                    <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{fmtDate(r.txn_date)}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>~</span> : ''}</td>
                     <td style={{ ...tdL, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description}>{r.description}</td>
                     <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
                     <td style={tdL}><select value={r.company || ''} onChange={e => patch(r.id, { company: e.target.value || null })} style={selStyle}><option value="">-</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
