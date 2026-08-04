@@ -122,7 +122,7 @@ function lastSixMonths() {
 export default function TaPayoutsAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isAdmin = ['admin', 'co_owner', 'accounts'].includes(profile?.role) // Phase 182 — accounts = payroll access
+  const isAdmin = ['admin', 'co_owner', 'accounts', 'hr'].includes(profile?.role) // Phase 182 accounts + 2026-08-03 HR (approve TA/DA)
 
   useEffect(() => {
     if (profile && !isAdmin) navigate('/work')

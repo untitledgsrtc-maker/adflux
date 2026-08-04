@@ -136,6 +136,19 @@ function RequireAccountsOrPrivileged({ children }) {
   return children
 }
 
+/* Back-office guard (2026-08-03) — admin / co_owner / accounts / hr. Used ONLY on
+   the shared people-ops surfaces HR is now allowed into: Leaves, TA/DA claims,
+   Team roster. Kept SEPARATE from RequireAccountsOrPrivileged so HR does NOT reach
+   the salary sheet / incentives / P&L those still gate. Sales + money stay blocked
+   by RLS (HR has no leads/quotes/payments/salary policy). */
+function RequireBackOffice({ children }) {
+  const { isPrivileged, profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  const ok = isPrivileged || ['accounts', 'hr'].includes(profile?.role)
+  if (!ok) return <Navigate to="/quotes" replace />
+  return children
+}
+
 /* Phase 61 (19 May 2026) — Manager guard. Gates `/manager` route to
    team leads (team_role='sales_manager') and admins. Non-managers
    bounce to their role's home via RootRedirect. */
@@ -157,7 +170,11 @@ function RequireManager({ children }) {
 function RequireTeamView({ children }) {
   const { isPrivileged, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (!isPrivileged && !profile?.can_view_team_dashboard) return <Navigate to="/" replace />
+  // 2026-08-03: HR admitted for attendance/GPS (view only). HR has RLS on
+  // gps_pings/work_sessions/users but NOT leads/quotes/payments, so the sales
+  // cards on the dashboard return empty for HR — attendance shows, money doesn't.
+  const ok = isPrivileged || profile?.role === 'hr' || profile?.can_view_team_dashboard
+  if (!ok) return <Navigate to="/" replace />
   return children
 }
 
@@ -383,7 +400,7 @@ export default function App() {
           <Route path="/cities"                    element={<RequirePrivileged><CitiesV2 /></RequirePrivileged>} />
           <Route path="/auto-districts"            element={<RequirePrivileged><AutoDistrictsV2 /></RequirePrivileged>} />
           <Route path="/gsrtc-stations"            element={<RequirePrivileged><GsrtcStationsV2 /></RequirePrivileged>} />
-          <Route path="/team"                      element={<RequireAccountsOrPrivileged><TeamV2 /></RequireAccountsOrPrivileged>} />
+          <Route path="/team"                      element={<RequireBackOffice><TeamV2 /></RequireBackOffice>} />
           <Route path="/incentives"                element={<RequireAccountsOrPrivileged><IncentivesV2 /></RequireAccountsOrPrivileged>} />
           <Route path="/pending-approvals"         element={<RequirePrivileged><PendingApprovalsV2 /></RequirePrivileged>} />
           {/* Phase 109 — HR login. These 3 routes admit role='hr' as well
@@ -395,11 +412,11 @@ export default function App() {
           {/* Phase 33G.8 — admin Leaves CRUD. Excluded days for the
               monthly performance score now come from a real table
               instead of the work_sessions.is_off_day proxy. */}
-          <Route path="/admin/leaves"              element={<RequireAccountsOrPrivileged><LeavesAdminV2 /></RequireAccountsOrPrivileged>} />
+          <Route path="/admin/leaves"              element={<RequireBackOffice><LeavesAdminV2 /></RequireBackOffice>} />
           {/* Phase 33H — TA (travel allowance) computed from GPS pings.
               Per-day DA + bike + hotel, approval workflow, CSV export
               for finance. */}
-          <Route path="/admin/ta-payouts"          element={<RequireAccountsOrPrivileged><TaPayoutsAdminV2 /></RequireAccountsOrPrivileged>} />
+          <Route path="/admin/ta-payouts"          element={<RequireBackOffice><TaPayoutsAdminV2 /></RequireBackOffice>} />
           {/* Phase 36 — Salary Sheet. Per-rep monthly breakdown with
               auto leave deduction. Admin / co_owner only. */}
           <Route path="/admin/salary"              element={<RequireAccountsOrPrivileged><SalaryAdminV2 /></RequireAccountsOrPrivileged>} />

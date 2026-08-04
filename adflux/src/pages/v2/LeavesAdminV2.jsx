@@ -56,7 +56,7 @@ function fmtDate(iso) {
 export default function LeavesAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isAdmin = ['admin', 'co_owner', 'accounts'].includes(profile?.role) // Phase 182 — accounts = payroll access
+  const isAdmin = ['admin', 'co_owner', 'accounts', 'hr'].includes(profile?.role) // Phase 182 accounts + 2026-08-03 HR (approve leaves)
 
   // Role gate — only admin / co_owner see this page.
   useEffect(() => {

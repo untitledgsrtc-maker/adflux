@@ -235,6 +235,11 @@ const MANAGER_NAV = [
 const HR_NAV = [
   { to: '/hr',                label: 'HR Home',        icon: UserCircle2 },
   { to: '/hr/new-user',       label: 'Add Member',     icon: UserPlus },
+  // 2026-08-03 — HR back-office: approve leaves + TA/DA, see team roster + attendance.
+  { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
+  { to: '/admin/ta-payouts',  label: 'TA Claims',      icon: Wallet },
+  { to: '/team',              label: 'Team',           icon: Users },
+  { to: '/team-dashboard',    label: 'Attendance',     icon: MapPin },
 ]
 
 // Phase 182 (2026-07-01) — Accounts login. Payroll-only nav: the People

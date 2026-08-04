@@ -141,8 +141,14 @@ export default function TeamDashboardV2() {
   // (role='telecaller' + team_role='sales_manager') were both
   // BLOCKED from a page they're supposed to access. Now accepts
   // either signal.
+  // 2026-08-03: HR added for ATTENDANCE view. HR takes the same client-side
+  // Promise.all path (NOT the sales-bearing team_dashboard_bundle RPC), and HR's
+  // RLS only covers gps_pings/work_sessions/users — leads/quotes/payments/calls
+  // return EMPTY for HR, so the map + attendance render but the sales/revenue
+  // cards stay blank. Admin actions (push/reassign) are blocked by RLS + the
+  // §97.A2 enqueue_push revoke even though the buttons render.
   const isPrivileged =
-    ['admin', 'co_owner'].includes(profile?.role)
+    ['admin', 'co_owner', 'hr'].includes(profile?.role)
     || profile?.team_role === 'sales_manager'
 
   // Phase 193 — a per-user viewer (e.g. a telecaller the owner grants
