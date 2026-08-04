@@ -413,7 +413,7 @@ function classifyImport(tag, dir, desc, hcat, bankco, rules) {
     const hit = rules.find(rl => rl.is_active !== false && rl.pattern && du.includes(String(rl.pattern).toUpperCase()))
     if (hit) { if (hit.set_bucket) b = hit.set_bucket; if (hit.set_head) head = hit.set_head; if (hit.set_segment) seg = hit.set_segment }
   }
-  if (!co && ['income', 'direct_cost', 'common_expense', 'tax'].includes(b)) co = bankco
+  if (!co) co = bankco   // every row in this account belongs to the account's company
   return { bucket: b, company: co, segment: seg, media_type: media, head }
 }
 function impDate(v, last) {
@@ -678,6 +678,16 @@ function RegisterTab() {
     const gone = new Set(ids)
     setRows(rs => rs.filter(x => !gone.has(x.id))); setSelected(new Set()); toastSuccess(`Deleted ${ids.length}.`)
   }
+  const bulkSet = async (obj) => {
+    const ids = [...selected]; if (!ids.length) return
+    const sel = new Set(ids)
+    setRows(rs => rs.map(r => sel.has(r.id) ? { ...r, ...obj } : r))
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await supabase.from('finance_transactions').update(obj).in('id', ids.slice(i, i + 200))
+      if (error) { toastError(error, 'Could not update.'); load(); return }
+    }
+    toastSuccess(`Updated ${ids.length}.`)
+  }
 
   const months = useMemo(() => [...new Set(rows.map(r => (r.txn_date || '').slice(0, 7)).filter(Boolean))].sort((a, b) => b.localeCompare(a)), [rows])
   const filtered = useMemo(() => rows.filter(r => {
@@ -704,6 +714,10 @@ function RegisterTab() {
         {reviewCount > 0 && <span onClick={() => setFBucket('review')} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to sort</span>}
         {selected.size > 0 ? (
           <>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent, #FFE600)' }}>{selected.size} selected:</span>
+            <select value="" onChange={e => { if (e.target.value) bulkSet({ company: e.target.value === '__none__' ? null : e.target.value }) }} style={selStyle}><option value="">Set company…</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}<option value="__none__">— clear —</option></select>
+            <select value="" onChange={e => { if (e.target.value) bulkSet({ bucket: e.target.value }) }} style={selStyle}><option value="">Set bucket…</option>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+            <select value="" onChange={e => { if (e.target.value) { const [sg, md] = e.target.value.split('|'); bulkSet({ segment: sg || null, media_type: md || null }) } }} style={selStyle}><option value="">Set segment…</option>{SEGMED.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
             <button onClick={bulkDel} style={{ background: 'var(--danger, #EF4444)', color: '#fff', border: 'none', borderRadius: 999, padding: '5px 13px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', gap: 6, alignItems: 'center' }}><Trash2 size={13} />Delete {selected.size}</button>
             <span onClick={() => setSelected(new Set())} style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}>clear</span>
           </>
