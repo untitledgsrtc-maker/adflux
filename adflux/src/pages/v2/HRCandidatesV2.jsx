@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Plus, Phone, FileText, Upload, Star, Trash2, UserPlus, X,
-  ClipboardList, Loader2, Search,
+  ClipboardList, Loader2, Search, Sparkles,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -267,8 +267,49 @@ function AddForm({ profile, onClose, onAdded }) {
   const [f, setF] = useState({ name: '', phone: '', email: '', role_applied: '', source: '', notes: '' })
   const [file, setFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [parsing, setParsing] = useState(false)
   const savingRef = useRef(false)
   const set = (k, v) => setF(o => ({ ...o, [k]: v }))
+
+  // Phase 283 — read a resume PDF / platform screenshot with Claude and pre-fill
+  // the empty fields. HR reviews + edits + saves; the file still uploads on save.
+  async function parseFile() {
+    if (!file || parsing) return
+    const okType = file.type === 'application/pdf' || file.type.startsWith('image/')
+    if (!okType) { toastError(null, 'Auto-fill needs a PDF or an image screenshot.'); return }
+    if (file.size > 4.5 * 1024 * 1024) { toastError(null, 'File too large to read (4.5 MB max) — compress it first.'); return }
+    setParsing(true)
+    try {
+      const dataUrl = await new Promise((res, rej) => {
+        const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file)
+      })
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/hr/parse-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ fileBase64: dataUrl, mediaType: file.type }),
+      })
+      const j = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        toastError(null, j?.error === 'too_large' ? 'File too large to read.'
+          : j?.error === 'unsupported_type' ? 'Auto-fill needs a PDF or image.'
+          : j?.error === 'rate_limited' ? 'Too many reads — wait a minute and retry.'
+          : 'Could not read the file — fill in manually.')
+        return
+      }
+      setF(o => ({
+        ...o,
+        name:         o.name         || j.name || '',
+        phone:        o.phone        || j.phone || '',
+        email:        o.email        || j.email || '',
+        role_applied: o.role_applied || j.role_applied || '',
+      }))
+      const got = [j.name, j.phone, j.email, j.role_applied].filter(Boolean).length
+      if (got) toastSuccess(`Filled ${got} field${got > 1 ? 's' : ''} — review, then save.`)
+      else toastError(null, 'Nothing readable found — fill in manually.')
+    } catch { toastError(null, 'Could not read the file.') }
+    finally { setParsing(false) }
+  }
 
   async function save() {
     if (savingRef.current || saving) return
@@ -308,7 +349,14 @@ function AddForm({ profile, onClose, onAdded }) {
           <datalist id="role-opts">{ROLE_SUGGESTIONS.map(r => <option key={r} value={r} />)}</datalist>
         </Field>
         <Field label="Source"><input value={f.source} onChange={e => set('source', e.target.value)} style={inp} placeholder="Referral / Naukri / Walk-in" /></Field>
-        <Field label="Resume (PDF/doc)"><input type="file" accept=".pdf,.doc,.docx,image/*" onChange={e => setFile(e.target.files?.[0] || null)} style={{ ...inp, padding: 6 }} /></Field>
+        <Field label="Resume / screenshot (PDF or image)">
+          <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={e => setFile(e.target.files?.[0] || null)} style={{ ...inp, padding: 6 }} />
+          {file && (file.type === 'application/pdf' || file.type.startsWith('image/')) && (
+            <button type="button" onClick={parseFile} disabled={parsing} style={{ ...actBtn, marginTop: 6, borderColor: 'var(--accent, #FFE600)' }}>
+              {parsing ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />} Auto-fill from file
+            </button>
+          )}
+        </Field>
       </div>
       <Field label="Notes"><textarea value={f.notes} onChange={e => set('notes', e.target.value)} style={{ ...inp, minHeight: 60, resize: 'vertical' }} /></Field>
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

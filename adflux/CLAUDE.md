@@ -10427,3 +10427,48 @@ auto-extract name/phone/email/role → pre-fill the candidate form. Feasible via
 ANTHROPIC_API_KEY already in Vercel §115) through a NEW Edge endpoint (§219 12-fn cap — Edge,
 not Node): accept the file (PDF text or image), return structured fields, form pre-fills, HR
 reviews + saves. Build next.
+
+
+## 160 · Phase 283 — Recruit: resume / screenshot AUTO-FILL (Claude vision) (2026-08-04)
+
+Owner (mid-§159, live on the Recruit page): "cant we add resume or screenshot of
+other platform? it auto-fetches the details and we save." Built it. Additive,
+§45-safe (parse-only, no DB write), no APK. Security-reviewed (general-purpose
+adversarial agent) → CLEAN, no P0/P1/P2; the 2 low notes it raised were applied.
+
+### What shipped
+- NEW `api/hr/parse-resume.js` — **EDGE** fn (§219: the project is AT the 12-Node
+  Hobby cap — a Node fn here would break EVERY deploy; this is Edge → doesn't count).
+  Verifies the caller's Supabase JWT + gates to role hr/admin/co_owner (fail-closed:
+  null/unknown role → 403), light per-instance rate limit (20/min), size cap 4.5 MB
+  BEFORE the AI call, PDF+image types only. Sends the file to the Anthropic messages
+  API as a `document` (PDF) or `image` block + an extraction instruction; returns
+  `{name, phone, email, role_applied}` (each `clean()`'d to string|null). Uses the
+  `ANTHROPIC_API_KEY` already in Vercel (§115); model `claude-sonnet-5` (override via
+  `ANTHROPIC_MODEL`). Parse-ONLY — writes nothing.
+- `src/pages/v2/HRCandidatesV2.jsx` AddForm — when a PDF/image is chosen, an
+  "Auto-fill from file" button (Sparkles) → `FileReader.readAsDataURL` → POST with
+  the session JWT → **pre-fills only the EMPTY fields** (never overwrites what HR
+  typed) → HR reviews + edits + Saves. The file still uploads as the resume on save
+  (existing flow unchanged).
+
+### Contracts / notes
+- **Auth is real** (JWT verified via /auth/v1/user, not presence-checked) + role
+  gate mirrors api/email/send.js. **No SSRF** (only Supabase + the constant Anthropic
+  host are fetched; the file rides as base64, no user URL). **No injection/proto-
+  pollution** (JSON.parse output is whitelisted to 4 fields + coerced; the frontend
+  only setStates + renders into React-escaped inputs). Error bodies are bounded
+  snippets — no key leakage.
+- The `document` PDF block + `image/jpg→image/jpeg` remap are the correct Anthropic
+  shapes. The data: URL prefix is stripped server-side.
+- Applied from the review: 8 MB → **4.5 MB** cap (keeps the clean too_large 413
+  reachable under Edge's body limit) + the 20/min throttle.
+- Do NOT convert this endpoint to Node (breaks deploys, §219). Do NOT write to any
+  table from it (parse-only by design — the Save flow does the DB write with the
+  candidate RLS).
+
+### Owner action
+Push (I push — JS/Edge, no SQL, no APK; the ANTHROPIC_API_KEY is already set). HR
+reopens the app once. Smoke: /hr/candidates → Add candidate → choose a resume PDF or
+a Naukri/other-platform screenshot → "Auto-fill from file" → name/phone/email/role
+populate → review + Save. A non-HR user cannot call the endpoint (403).
