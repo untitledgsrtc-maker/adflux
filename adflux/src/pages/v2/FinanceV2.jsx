@@ -362,28 +362,59 @@ function HomeTab({ onReview }) {
   )
 }
 
-/* ── Tasks ── */
+/* ── Tasks (add / delete / mark done) ── */
 function TasksTab() {
   const [tasks, setTasks] = useState([]); const [loading, setLoading] = useState(true)
-  useEffect(() => { supabase.from('finance_tasks').select('*').order('frequency').then(({ data }) => { setTasks(data || []); setLoading(false) }) }, [])
+  const [nt, setNt] = useState(''); const [nfreq, setNfreq] = useState('monthly'); const [nchan, setNchan] = useState('push'); const [ndue, setNdue] = useState('')
+  const load = useCallback(() => { supabase.from('finance_tasks').select('*').order('frequency').then(({ data }) => { setTasks(data || []); setLoading(false) }) }, [])
+  useEffect(() => { load() }, [load])
+
+  const addTask = async () => {
+    const title = nt.trim(); if (!title) return
+    const { error } = await supabase.from('finance_tasks').insert({ title, frequency: nfreq, reminder_channel: nchan, next_due: ndue || null, status: 'open', is_active: true })
+    if (error) return toastError(error, 'Could not add — maybe a task with that name already exists.')
+    setNt(''); setNdue(''); load(); toastSuccess('Task added.')
+  }
+  const delTask = async (id) => { await supabase.from('finance_tasks').delete().eq('id', id); load() }
+  const toggleStatus = async (t) => {
+    const st = t.status === 'done' ? 'open' : 'done'
+    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, status: st } : x))
+    const { error } = await supabase.from('finance_tasks').update({ status: st }).eq('id', t.id); if (error) load()
+  }
   if (loading) return <Spin />
   const recurring = tasks.filter(t => t.frequency !== 'oneoff')
   const oneoff = tasks.filter(t => t.frequency === 'oneoff')
+  const Pill = ({ t }) => <span onClick={() => toggleStatus(t)} style={{ cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: t.status === 'done' ? 'var(--success-soft, rgba(16,185,129,.12))' : 'var(--surface-2)', color: t.status === 'done' ? 'var(--success)' : 'var(--text-muted)' }}>{t.status === 'done' ? 'done' : 'open'}</span>
+  const DelBtn = ({ id }) => <span onClick={() => delTask(id)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', display: 'inline-flex' }} title="Delete"><Trash2 size={14} /></span>
+
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <Card>
+        <CH>Add a task or reminder</CH>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input value={nt} onChange={e => setNt(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="Task (e.g. Pay electricity bill)" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 11px', color: 'var(--text)', fontSize: 13, minWidth: 240 }} />
+          <select value={nfreq} onChange={e => setNfreq(e.target.value)} style={selStyle}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="oneoff">One-off</option></select>
+          <select value={nchan} onChange={e => setNchan(e.target.value)} style={selStyle}><option value="push">Push</option><option value="push_wa">Push + WhatsApp</option></select>
+          <input type="date" value={ndue} onChange={e => setNdue(e.target.value)} style={{ ...selStyle, colorScheme: 'dark' }} />
+          <button onClick={addTask} style={{ background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', border: 'none', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Add task</button>
+        </div>
+      </Card>
+
+      <Card>
         <CH><RefreshCw size={15} style={{ verticalAlign: -2 }} /> Recurring</CH>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead><tr><th style={thL}>Task</th><th style={thL}>Frequency</th><th style={thL}>Reminder</th><th style={thR}>Status</th></tr></thead>
+          <thead><tr><th style={thL}>Task</th><th style={thL}>Frequency</th><th style={thL}>Reminder</th><th style={thR}>Status</th><th style={thL}></th></tr></thead>
           <tbody>
             {recurring.map(t => <tr key={t.id}><td style={tdL}>{t.title}</td><td style={tdL}>{t.frequency}</td>
               <td style={tdL}><span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{t.reminder_channel === 'push_wa' ? 'Push + WA' : 'Push'}</span></td>
-              <td style={tdR}><span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{t.status}</span></td></tr>)}
+              <td style={tdR}><Pill t={t} /></td><td style={tdL}><DelBtn id={t.id} /></td></tr>)}
+            {recurring.length === 0 && <tr><td colSpan={5} style={{ ...tdL, color: 'var(--text-subtle)' }}>No recurring tasks yet.</td></tr>}
           </tbody>
         </table>
-        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 10 }}>Starter set — reminders fire as app notifications; key ones also ping WhatsApp. Editing/toggling lands in a later phase.</div>
+        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 10 }}>Add / delete / tap Status to mark done. Auto-reminders (push / WhatsApp) get wired to the notification pipeline in a later phase.</div>
       </Card>
-      {oneoff.length > 0 && <Card><CH>One-off</CH>{oneoff.map(t => <div key={t.id} style={{ padding: '10px 2px', borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))', fontSize: 13.5 }}>{t.title}</div>)}</Card>}
+
+      {oneoff.length > 0 && <Card><CH>One-off</CH>{oneoff.map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))' }}><div style={{ flex: 1, fontSize: 13.5, textDecoration: t.status === 'done' ? 'line-through' : 'none', color: t.status === 'done' ? 'var(--text-subtle)' : 'var(--text)' }}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 8 }}>{fmtDate(t.next_due)}</span> : ''}</div><Pill t={t} /><DelBtn id={t.id} /></div>)}</Card>}
     </div>
   )
 }
