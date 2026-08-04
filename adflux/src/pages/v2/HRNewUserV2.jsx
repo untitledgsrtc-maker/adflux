@@ -20,7 +20,7 @@
 // Role gate: admin / co_owner / hr only.
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { UserPlus, Save, AlertTriangle, CheckCircle2, ArrowLeft, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -41,6 +41,9 @@ const SEGMENTS = [
 
 export default function HRNewUserV2() {
   const navigate = useNavigate()
+  const location = useLocation()
+  // Phase 281 — convert-to-hire: HRCandidatesV2 sends {prefill:{name,email,phone,candidate_id}}.
+  const prefill = location.state?.prefill || null
   const profile = useAuthStore(s => s.profile)
   const isAuthorized = ['admin', 'co_owner', 'hr'].includes(profile?.role)
 
@@ -81,6 +84,17 @@ export default function HRNewUserV2() {
   useEffect(() => {
     if (profile && !isAuthorized) navigate('/dashboard', { replace: true })
   }, [profile, isAuthorized, navigate])
+
+  // Phase 281 — seed name/email/phone from the candidate being converted (once).
+  useEffect(() => {
+    if (!prefill) return
+    setForm(f => ({
+      ...f,
+      name:  f.name  || prefill.name  || '',
+      email: f.email || prefill.email || '',
+      phone: f.phone || prefill.phone || '',
+    }))
+  }, [prefill])
 
   useEffect(() => {
     if (!isAuthorized) return
@@ -191,7 +205,17 @@ export default function HRNewUserV2() {
       return
     }
 
-    const userRow = { id: created?.id, email: created?.email }
+    // The admin_create_user RPC returns only { id, email }; the success view +
+    // toast also read name/role/team_role — fill them from the in-scope form +
+    // picked designation so the confirmation screen shows the real member (not
+    // "Created undefined."). Phase 281 convert-to-hire terminates on this screen.
+    const userRow = {
+      id:        created?.id,
+      email:     created?.email,
+      name:      form.name.trim(),
+      role:      pickedDesignation.auth_role,
+      team_role: pickedDesignation.team_role,
+    }
 
     // 2. INSERT staff_incentive_profile (so salary tab works).
     if (form.monthly_salary && Number(form.monthly_salary) > 0) {
@@ -217,6 +241,16 @@ export default function HRNewUserV2() {
           effective_from:        form.join_date,
         }])
       if (tgtErr) console.warn('[hr-create] target insert failed:', tgtErr.message)
+    }
+
+    // Phase 281 — if converting a recruit candidate, link it to the new login
+    // (candidate card then shows "Login created"). Best-effort.
+    if (prefill?.candidate_id && userRow.id) {
+      const { error: linkErr } = await supabase
+        .from('hr_candidates')
+        .update({ converted_user_id: userRow.id, stage: 'hired' })
+        .eq('id', prefill.candidate_id)
+      if (linkErr) console.warn('[hr-create] candidate link failed:', linkErr.message)
     }
 
     setSaving(false)

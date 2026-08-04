@@ -17,20 +17,23 @@ import { useAuthStore } from '../../store/authStore'
 export default function HRHomeV2() {
   const nav = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const [c, setC] = useState({ leaves: 0, ta: 0, team: 0, offers: 0 })
+  const [c, setC] = useState({ leaves: 0, ta: 0, team: 0, offers: 0, candidates: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [lv, ta, tm, of] = await Promise.all([
+      const [lv, ta, tm, of, cand] = await Promise.all([
         supabase.from('leaves').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('ta_da_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('users').select('id', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('hr_offers').select('id', { count: 'exact', head: true }).in('status', ['draft', 'sent', 'filled']),
+        // Phase 281 — new candidates to review. Errors (returns null count) until
+        // the Recruit SQL is applied → shows 0, never breaks the cockpit.
+        supabase.from('hr_candidates').select('id', { count: 'exact', head: true }).eq('stage', 'applied'),
       ])
       if (!alive) return
-      setC({ leaves: lv.count || 0, ta: ta.count || 0, team: tm.count || 0, offers: of.count || 0 })
+      setC({ leaves: lv.count || 0, ta: ta.count || 0, team: tm.count || 0, offers: of.count || 0, candidates: cand.count || 0 })
       setLoading(false)
     })()
     return () => { alive = false }
@@ -39,7 +42,7 @@ export default function HRHomeV2() {
   const name = (profile?.name || 'there').split(' ')[0]
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const pending = c.leaves + c.ta
+  const pending = c.leaves + c.ta + c.candidates
 
   return (
     <div className="v2d-page">
@@ -53,6 +56,7 @@ export default function HRHomeV2() {
 
       {/* pending actions */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 18 }}>
+        <Kpi label="New candidates" value={loading ? '…' : c.candidates} accent={c.candidates > 0} onClick={() => nav('/hr/candidates')} Icon={ClipboardList} />
         <Kpi label="Leaves to approve" value={loading ? '…' : c.leaves} accent={c.leaves > 0} onClick={() => nav('/admin/leaves')} Icon={CalendarCheck} />
         <Kpi label="TA/DA to approve" value={loading ? '…' : c.ta} accent={c.ta > 0} onClick={() => nav('/admin/ta-payouts')} Icon={Wallet} />
         <Kpi label="Open offers" value={loading ? '…' : c.offers} onClick={() => nav('/hr/offers')} Icon={FileText} />
@@ -61,7 +65,7 @@ export default function HRHomeV2() {
 
       {/* lifecycle sections */}
       <Section title="1 · Recruit" sub="find + shortlist candidates">
-        <Tile title="Candidates" sub="resumes · shortlist · calls" Icon={ClipboardList} soon />
+        <Tile title="Candidates" sub="resumes · shortlist · calls" Icon={ClipboardList} onClick={() => nav('/hr/candidates')} badge={c.candidates} />
       </Section>
 
       <Section title="2 · Hire" sub="make them official">

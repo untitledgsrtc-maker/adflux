@@ -10258,3 +10258,85 @@ HR-verified questionnaires (Sales/Telecaller/Accounts drafted at
 questionnaires for HR/Designer/Video Editor/Admin. Then build Recruit
 (candidates + resume + shortlist + call log) → Onboard (templates + runs +
 tests + material) per the spec.
+
+
+## 158 · Phase 281 — HR module: Recruit (candidates + resumes + shortlist + call log) (2026-08-04)
+
+Second HR-module stage after §157 HR Home. Spec: docs/HR_ONBOARDING_RECRUITMENT_SPEC.md §B (P1).
+Additive, HR-only, §45-safe (new hr_* tables + a private bucket; ZERO touch to
+leads/quotes/payroll/any live flow). Ran an adversarial 4-lens review workflow
+(security/RLS · frozen-V2AppShell guardian · role/routing · correctness) with
+per-finding verification BEFORE commit — 3 confirmed findings, all fixed below.
+
+### What shipped
+- `supabase_hr_recruit_p1.sql` (owner RUNS — bundled one file per §154):
+  - `hr_candidates` (name/phone/email/role_applied/stage/resume_path/source/notes/
+    rating 1-5/converted_user_id/created_by/created_at/updated_at). stage CHECK
+    ∈ applied/shortlisted/interview/hired/rejected. touch_updated_at trigger.
+  - `hr_candidate_calls` (candidate_id CASCADE/called_by/call_at/duration_seconds/
+    outcome/notes) — recruitment call LOGS, NO audio (mirrors telecaller).
+  - RLS: `*_hr_all` FOR ALL USING/WITH CHECK `get_my_role() IN ('admin','co_owner',
+    'hr')`. In an RLS predicate a NULL role → NULL → excluded = fail-CLOSED
+    (correct; §41's OPEN trap is the PL/pgSQL IF form, not RLS). Reps/agency/
+    telecaller/accounts get NOTHING.
+  - **`candidate-resumes` PRIVATE bucket** (public=false, 10 MB) + 4 storage
+    policies (SELECT/INSERT/UPDATE/DELETE) HR-only. Downloads via `createSignedUrl`
+    (needs the HR SELECT policy); NO public URL ever minted (resume = PII).
+  - `hr_candidate_call_counts()` RPC — SECURITY INVOKER, GROUP BY server-side count
+    + latest outcome per candidate. The §66/§274 fix (see review below).
+- `src/pages/v2/HRCandidatesV2.jsx` (NEW, `/hr/candidates`) — stage-filter pipeline
+  + counts, add form (name*/phone/email/role/source/resume), star rating, per-card
+  stage move / Call (dial + log modal) / resume upload+view / delete / Create-login,
+  search (name/role/number), save latches (§47) on Add + Call. v2 tokens, Lucide,
+  dd/mm/yyyy, empty/loading/error states.
+- `HRHomeV2.jsx` — 5th KPI "New candidates" (applied count) + Recruit tile now live
+  (nav /hr/candidates + badge). Count query degrades to 0 pre-SQL (deploy-safe).
+- `HRNewUserV2.jsx` — convert-to-hire: reads `location.state.prefill` (name/email/
+  phone) once, and on create writes `hr_candidates.converted_user_id` + stage=hired
+  back (candidate card then shows "Login created").
+- `App.jsx` — `/hr/candidates` route, RequireHROrPrivileged (hr+admin+co_owner). No
+  shadow with `/hr/offer/:userId` (literal `candidates` ≠ param, §10).
+- `V2AppShell.jsx` (§28 FROZEN, guardian PASS) — HR_NAV "Recruit" entry (Contact2,
+  already imported). Purely additive; no other nav array touched.
+
+### Review findings fixed (all confirmed + verified by the workflow)
+1. **P2** HRNewUserV2 — `userRow = {id, email}` only, but the success view + toast
+   read `.name/.role/.team_role` (the `admin_create_user` RPC returns only id+email)
+   → "Created undefined." / blank Role·Team on the confirmation screen (the terminal
+   step of convert-to-hire). PRE-EXISTING, but the new flow lands there. Fixed:
+   populate userRow from `form.name` + `pickedDesignation.auth_role/team_role`
+   (in scope at submit). No RPC/schema change.
+2/3. **P3** the call-count query pulled raw `hr_candidate_calls` rows with
+   `.limit(4000)` and counted client-side → the ~1000-row PostgREST cap (§66/§85;
+   a .limit above the cap does NOT override it) silently undercounts once total
+   calls exceed ~1000. Fixed PERMANENTLY (not a bigger limit): the
+   `hr_candidate_call_counts()` server-side GROUP BY RPC (INVOKER + RLS) — the
+   §274 pattern. hr_candidates list stays `.limit(1000)` (a real display bound; a
+   >1000 open pipeline wants filter UI, not paging — deferred).
+
+### Contracts / notes
+- Recruitment data is admin+co_owner+hr ONLY (RLS + route guard + nav gating).
+  Resumes are PII → private bucket + signed URLs, never public.
+- Call counts come from `hr_candidate_call_counts()` — do NOT revert to a raw
+  client-side count (the 1000-cap disease). hr_candidate_calls is NOT in
+  check-query-cap.mjs's table list, so that guard won't catch a regression here.
+- Deploy-before-SQL safe: every hr_* query (cockpit count, candidate list, calls
+  RPC) errors → empty/0, never crashes, until the owner runs the SQL.
+- convert-to-hire link needs `prefill.candidate_id` — best-effort loop-back
+  (console.warn on failure; the login is still created via `created.id`).
+
+### Owner action
+1. Run `supabase_hr_recruit_p1.sql` in Supabase Studio. VERIFY (bottom): tables=2,
+   rls_on=2, table_policies=2, private_bucket=1, storage_policies=4, count_rpc=1.
+2. Push is already done from the sandbox (JS reaches the APK on next open; no APK
+   rebuild). Reps/HR reopen the app once.
+3. Smoke as Riya (hr): /hr → "New candidates" KPI + Recruit tile → /hr/candidates
+   → Add candidate + upload a resume (View opens the signed PDF) → Call (dial +
+   log) → move to Hired → Create login prefills Add Member → after create the
+   candidate shows "Login created". A sales/telecaller user cannot reach
+   /hr/candidates (guard bounces) and sees no recruitment data.
+
+### Next (owner to send content)
+Onboarding & Training (spec §A, P2-P6): per-role step templates (HR-tick vs
+hire-tick), in-app material, real tests. Owner sends the HR-verified questionnaires
+(Sales/Telecaller/Accounts draft at ~/Desktop) + step lists + the remaining roles.

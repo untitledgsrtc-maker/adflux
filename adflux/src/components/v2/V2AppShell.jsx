@@ -234,6 +234,7 @@ const MANAGER_NAV = [
 // sidebar AND mobile bottom-nav (HR_NAV reused in both picks below).
 const HR_NAV = [
   { to: '/hr',                label: 'HR Home',        icon: UserCircle2 },
+  { to: '/hr/candidates',     label: 'Recruit',        icon: Contact2 },
   { to: '/hr/new-user',       label: 'Add Member',     icon: UserPlus },
   // 2026-08-03 — HR back-office: approve leaves + TA/DA, see team roster + attendance.
   { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
