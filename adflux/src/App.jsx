@@ -28,6 +28,9 @@ import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
 import HRV2               from './pages/v2/HRV2'
 import HRHomeV2           from './pages/v2/HRHomeV2'
 import HRCandidatesV2     from './pages/v2/HRCandidatesV2'
+import HROnboardTemplatesV2 from './pages/v2/HROnboardTemplatesV2'
+import HROnboardingV2     from './pages/v2/HROnboardingV2'
+import MyOnboardingV2     from './pages/v2/MyOnboardingV2'
 import HRNewUserV2        from './pages/v2/HRNewUserV2'
 import HROfferLetterV2    from './pages/v2/HROfferLetterV2'
 import CallLogsV2         from './pages/v2/CallLogsV2'
@@ -395,6 +398,8 @@ export default function App() {
           {/* Sales-only */}
           <Route path="/my-performance"            element={<MyPerformanceV2 />} />
           <Route path="/my-offer"                  element={<MyOfferV2 />} />
+          {/* Phase 282 — every role's own onboarding (empty state if none assigned). */}
+          <Route path="/my-onboarding"             element={<MyOnboardingV2 />} />
           {/* Phase 103.F — rep's saved admin messages (push tap target) */}
           <Route path="/messages"                  element={<MessagesV2 />} />
 
@@ -412,6 +417,11 @@ export default function App() {
               The offer/invite list moved to /hr/offers. */}
           <Route path="/hr"                        element={<RequireHROrPrivileged><HRHomeV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/candidates"             element={<RequireHROrPrivileged><HRCandidatesV2 /></RequireHROrPrivileged>} />
+          {/* Phase 282 — HR Onboard & train. /hr/onboarding/templates BEFORE
+              /hr/onboarding (specific-before-less-specific, §10). /my-onboarding
+              is a bare child (all roles) further below. */}
+          <Route path="/hr/onboarding/templates"   element={<RequireHROrPrivileged><HROnboardTemplatesV2 /></RequireHROrPrivileged>} />
+          <Route path="/hr/onboarding"             element={<RequireHROrPrivileged><HROnboardingV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/offers"                 element={<RequireHROrPrivileged><HRV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/new-user"               element={<RequireHROrPrivileged><HRNewUserV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/offer/:userId"          element={<RequireHROrPrivileged><HROfferLetterV2 /></RequireHROrPrivileged>} />

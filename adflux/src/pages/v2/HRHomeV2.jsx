@@ -74,7 +74,8 @@ export default function HRHomeV2() {
       </Section>
 
       <Section title="3 · Onboard & train" sub="first days — no doubts">
-        <Tile title="Onboarding timeline" sub="role steps · training · tests" Icon={GraduationCap} soon />
+        <Tile title="Onboarding timeline" sub="who's onboarding · who's stuck" Icon={GraduationCap} onClick={() => nav('/hr/onboarding')} />
+        <Tile title="Build templates" sub="role steps · material · tests" Icon={ClipboardList} onClick={() => nav('/hr/onboarding/templates')} />
       </Section>
 
       <Section title="4 · Manage" sub="day-to-day people ops">

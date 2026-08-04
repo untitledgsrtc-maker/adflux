@@ -10340,3 +10340,90 @@ per-finding verification BEFORE commit — 3 confirmed findings, all fixed below
 Onboarding & Training (spec §A, P2-P6): per-role step templates (HR-tick vs
 hire-tick), in-app material, real tests. Owner sends the HR-verified questionnaires
 (Sales/Telecaller/Accounts draft at ~/Desktop) + step lists + the remaining roles.
+
+
+## 159 · Phase 282 — HR module: Onboard & Train (per-role templates + tests + timeline) (2026-08-04)
+
+Third HR stage after §157 HR Home + §158 Recruit. Spec: docs/HR_ONBOARDING_RECRUITMENT_SPEC.md §A.
+The full loop: HR authors a per-role step TEMPLATE (steps + material + tests) → assigns a
+hire (a RUN + seeded PROGRESS) → the hire opens material, passes tests (auto-scored,
+answers NEVER exposed), ticks their own steps → HR watches the timeline. Additive, §45-safe
+(5 new onboarding_* tables + a private bucket + 3 RPCs; zero live-flow touch). Ran an
+adversarial 4-lens review (security/RLS-answers · frozen guardian · role/routing ·
+correctness) with per-finding verification — 8 confirmed → 5 distinct, 4 fixed + 1 accepted.
+
+### What shipped
+- `supabase_hr_onboard_p1.sql` (owner RUNS):
+  - Tables: `onboarding_templates` (one active per role, partial-unique) · `onboarding_steps`
+    (owner hr|hire|manager, material_url + type, has_test) · `onboarding_step_questions`
+    (question/options jsonb/**correct_index — HR-only, never served raw**) · `onboarding_runs`
+    (one active per hire, unique user_id) · `onboarding_progress` (status/done_by/test_score,
+    unique run+step).
+  - RLS: templates/steps/runs/progress managed by admin+co_owner+hr; the HIRE reads own run +
+    active-template steps + own progress, and may UPDATE **only own owner='hire' has_test=false**
+    progress (own_tick policy). questions = HR-only (no hire SELECT).
+  - `onboarding-material` PRIVATE bucket (50 MB); read=authenticated, write=HR (signed-URL view).
+  - 3 RPCs: `create_onboarding_run` (HR-gated §41 NULL-guard; re-runnable backfill) ·
+    `get_onboarding_step_quiz` (returns questions WITHOUT correct_index; gated to HR or the
+    step's own hire) · `submit_onboarding_test` (own-run + **owner='hire'+has_test** gated;
+    scores server-side vs correct_index; ≥70% marks done).
+  - `trg_onboarding_step_seed_runs` — AFTER INSERT on steps auto-seeds the new step into every
+    active run of its template (keeps a live hire's checklist complete).
+- Pages: `/hr/onboarding/templates` (HROnboardTemplatesV2 — author steps/material/questions,
+  reorder, has_test) · `/hr/onboarding` (HROnboardingV2 — timeline X/Y + assign a hire) ·
+  `/my-onboarding` (MyOnboardingV2 — the HIRE, ALL roles: open material, take test, tick own).
+- Wiring: App.jsx routes (HR pages HR-gated; /my-onboarding bare child = all roles; §10
+  order); V2AppShell (§28 FROZEN, guardian PASS) HR_NAV "Onboarding" entry + a `withOnboarding`
+  sidebar append gated on an active run (mount count query, deploy-before-SQL safe, sidebar
+  only — not the mobile bottom bar); HRHomeV2 Onboard tiles wired; HRNewUserV2 auto-starts
+  the hire's run on create (best-effort).
+
+### THE #1 SECURITY INVARIANT (verified by the review)
+The hire can NEVER read a test's correct answer. Paths closed: questions table = HR-only RLS
+(no hire policy); `get_onboarding_step_quiz` RETURNS id/q_order/question/options ONLY (no
+correct_index); scoring is server-side in `submit_onboarding_test` (DEFINER). Do NOT add a
+hire SELECT policy on onboarding_step_questions, and do NOT add correct_index to the quiz
+RPC's RETURNS — either would leak every answer.
+
+### Review findings — 4 fixed
+1. **P1** MyOnboardingV2.tick() crashed (`prog[step.id].id` on undefined) when HR added a step
+   AFTER a run started (no progress row) → hire stuck one step short. Cure = the seed trigger
+   (auto-backfill) + create_onboarding_run re-runnable backfill + a client null-guard + button
+   gating on `prog[s.id]` existing ("being set up" otherwise).
+2. **P2** submit_onboarding_test lacked an owner='hire'+has_test gate → a hire could `rpc()` a
+   manager/HR-owned test step and self-sign-off, bypassing the own_tick RLS intent. Added the
+   mirror gate (RAISE 'step is not a self-test step').
+3. **P2** the question editor stored correct_index against the RAW options array while saving
+   the FILTERED array → a blank option before the answer shifted the correct index → mis-graded.
+   Fixed: map the selected text → indexOf in cleanOpts; reject if not found.
+4. **P3** HR mark-done never recorded done_by (`undefined` omits the column) → wired to the
+   acting HR user's profile.id.
+
+### Accepted (not fixed) — documented v1 limitation
+- **P3 unlimited-retake oracle:** a hire can retake a test unlimited times and the response
+  returns the correct-count → answers are inferable / brute-forceable to the 70% pass. Accepted
+  for v1 — this is INTERNAL onboarding, retaking until you pass IS the feature (they learn the
+  material); HR sees the completion time. If exam integrity ever matters, add an attempts cap
+  (needs an `attempts_count` column) + drop the exact `correct` count from the response.
+
+### Contracts / notes
+- Deploy-before-SQL safe: every onboarding query/RPC errors → empty/0/graceful, never crashes,
+  until the owner runs the SQL. The V2AppShell mount query → count null → no nav item.
+- create_onboarding_run needs an ACTIVE template for the role, else returns null (no run) — so
+  build the role template BEFORE onboarding people (or the seed trigger backfills on later edits).
+
+### Owner action
+1. Run `supabase_hr_onboard_p1.sql` in Studio. VERIFY (bottom): tables=5, rls_on=5,
+   table_policies=10, private_bucket=1, storage_policies=4, rpcs=3.
+2. Push (I push — JS reaches the APK on next open; no APK rebuild). Reps/HR reopen once.
+3. Smoke as Riya (hr): /hr → Onboard tiles → Build templates → pick a role → add steps
+   (set who does it, attach a PDF/link, tick Has test → add MCQs) → /hr/onboarding → Onboard
+   someone → they appear on the timeline. As that hire: /my-onboarding → open material, take
+   the test (pass ≥70% → step done), tick own steps → HR sees X/Y climb.
+
+### Next (owner asked mid-build 4 Aug) — Recruit resume auto-parse
+Owner (on the live Recruit page): upload a resume PDF OR a Naukri/other-platform screenshot →
+auto-extract name/phone/email/role → pre-fill the candidate form. Feasible via Claude (the
+ANTHROPIC_API_KEY already in Vercel §115) through a NEW Edge endpoint (§219 12-fn cap — Edge,
+not Node): accept the file (PDF text or image), return structured fields, form pre-fills, HR
+reviews + saves. Build next.

@@ -253,6 +253,13 @@ export default function HRNewUserV2() {
       if (linkErr) console.warn('[hr-create] candidate link failed:', linkErr.message)
     }
 
+    // Phase 282 — auto-start the new hire's onboarding from their role template.
+    // Best-effort: no template for the role yet → RPC returns null, no run, no error.
+    if (userRow.id) {
+      const { error: obErr } = await supabase.rpc('create_onboarding_run', { p_user_id: userRow.id })
+      if (obErr) console.warn('[hr-create] onboarding run failed:', obErr.message)
+    }
+
     setSaving(false)
     setCreatedUser(userRow)
     toastSuccess(`Created ${userRow.name}. Generate offer letter next →`)

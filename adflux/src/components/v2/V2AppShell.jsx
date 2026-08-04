@@ -63,7 +63,7 @@ import {
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
   Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone, MessageCircle,
-  IndianRupee,
+  IndianRupee, GraduationCap,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -235,6 +235,7 @@ const MANAGER_NAV = [
 const HR_NAV = [
   { to: '/hr',                label: 'HR Home',        icon: UserCircle2 },
   { to: '/hr/candidates',     label: 'Recruit',        icon: Contact2 },
+  { to: '/hr/onboarding',     label: 'Onboarding',     icon: GraduationCap },
   { to: '/hr/new-user',       label: 'Add Member',     icon: UserPlus },
   // 2026-08-03 — HR back-office: approve leaves + TA/DA, see team roster + attendance.
   { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
@@ -568,7 +569,24 @@ export function V2AppShell() {
   const withTeam = (arr) =>
     canTeamView && !arr.some((n) => n.to === '/team-dashboard')
       ? [...arr, teamItem] : arr
-  const nav = withTeam(baseNav)
+  // Phase 282 — a hire with an ACTIVE onboarding run gets a "My Onboarding" link
+  // appended to their sidebar (mirrors withTeam). One indexed count query on
+  // mount; deploy-before-SQL safe (missing table → count null → flag stays false
+  // → no item). Sidebar/hamburger only — the tight mobile bottom bar is untouched.
+  const [hasOnboarding, setHasOnboarding] = useState(false)
+  useEffect(() => {
+    if (!profile?.id) return
+    let alive = true
+    supabase.from('onboarding_runs')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', profile.id).eq('status', 'active')
+      .then(({ count }) => { if (alive) setHasOnboarding((count || 0) > 0) })
+    return () => { alive = false }
+  }, [profile?.id])
+  const withOnboarding = (arr) =>
+    hasOnboarding && !arr.some((n) => n.to === '/my-onboarding')
+      ? [...arr, { to: '/my-onboarding', label: 'My Onboarding', icon: GraduationCap }] : arr
+  const nav = withOnboarding(withTeam(baseNav))
   const mobileNav = withTeam(baseMobileNav)
 
   // Topbar search — commits to the shared quote-filter store and
