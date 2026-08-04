@@ -10199,3 +10199,62 @@ commits `5ddd631`→`ac67d17` (all pushed, frontend-only unless noted):
   govt-scoped via the RPC gate — NOT a §28 frozen surface, but it IS money display;
   keep the P&L math server-side (RPC) + verify totals against the plain-SQL query.
 
+
+
+## 157 · Phase 280 — HR module STARTED: HR Home cockpit + /hr restructure (2026-08-04)
+
+Owner locked the HR module structure (AskUserQuestion): the 5-stage people
+lifecycle **Recruit → Hire → Onboard → Manage → Exit + an HR Home cockpit**
+("Yes, this is it"), build order **"HR Home first"**. Full plan:
+`docs/HR_ONBOARDING_RECRUITMENT_SPEC.md`. This ships the cockpit only — the
+Recruit + Onboard surfaces are placeholders until built.
+
+### What shipped (frontend-only, additive, no SQL, no APK)
+- NEW `src/pages/v2/HRHomeV2.jsx` — HR's daily landing cockpit. Reads HR's OWN
+  RLS (§30 `leaves_hr_all` / `ta_da_requests_hr_all` / `users_hr_read` /
+  `hr_offers_hr_all`) via 4 count-head queries:
+  - Leaves to approve = `leaves` status='pending'
+  - TA/DA to approve = `ta_da_requests` status='pending'
+  - Team members = `users` is_active=true
+  - Open offers = `hr_offers` status IN (draft,sent,filled) — **matches HRV2's
+    own "open" filter byte-for-byte** (HRV2.jsx:32) so the count agrees with the
+    offers list.
+  Plus the 5 lifecycle sections as tiles (Recruit=Candidates `soon` · Hire=Add
+  Member + Offers · Onboard=timeline `soon` · Manage=Leaves/TA/Team/Attendance ·
+  Exit=Offboarding `soon`). Amber accent when a pending count > 0.
+- **ROUTE RESTRUCTURE (App.jsx):** `/hr` is now the **HR Home cockpit**
+  (HRHomeV2); the old offer/invite list (HRV2) moved to **`/hr/offers`**. Both
+  stay `RequireHROrPrivileged` (hr + admin/co_owner). RootRedirect still lands
+  role='hr' on `/hr` → now the cockpit. `/hr/new-user` + `/hr/offer/:userId`
+  unchanged. §10: `/hr/offers` (literal) does not shadow `/hr/offer/:userId`.
+
+### Contracts / notes
+- **`/hr` = the cockpit; the offers list lives at `/hr/offers`.** The cockpit's
+  "Offers / invites" tile is the entry to it; V2AppShell HR_NAV still has
+  "HR Home" (/hr) + "Add Member" + the §30 back-office entries (Leaves / TA /
+  Team / Attendance) — no separate Offers nav entry (reach it via the cockpit).
+- Open-offers status set = `['draft','sent','filled']` — keep in lockstep with
+  HRV2.jsx:32/65 if the offer enum changes.
+- Recruit (Candidates) + Onboard (timeline) + Exit (Offboarding) tiles are inert
+  `soon` placeholders — the tables/pages don't exist yet (spec P1-P6). Build
+  order per owner: HR Home (done) → Recruit → Onboard & Train → Exit later.
+- V2AppShell untouched this phase (HR_NAV already had HR Home → /hr). No frozen
+  file touched; parse-check + full build PASS.
+
+### Owner action
+Push (JS-only, no SQL, no APK — reaches the APK on next open):
+```
+cd ~/Documents/untitled-os2/Untitled/adflux
+git push origin untitled-os
+```
+Smoke: Riya (hr) logs in → lands on `/hr` = the cockpit with live pending
+counts + lifecycle tiles; tap "Offers / invites" → the offer list at
+`/hr/offers`; "Add Member" → the create flow. Leaves/TA/Team/Attendance tiles
+open her §30 back-office pages.
+
+### Next (owner to send content)
+HR-verified questionnaires (Sales/Telecaller/Accounts drafted at
+`~/Desktop/onboarding_questionnaire_draft.md`) + per-role step lists +
+questionnaires for HR/Designer/Video Editor/Admin. Then build Recruit
+(candidates + resume + shortlist + call log) → Onboard (templates + runs +
+tests + material) per the spec.

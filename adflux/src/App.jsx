@@ -26,6 +26,7 @@ import IncentivesV2       from './pages/v2/IncentivesV2'
 import RenewalToolsV2     from './pages/v2/RenewalToolsV2'
 import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
 import HRV2               from './pages/v2/HRV2'
+import HRHomeV2           from './pages/v2/HRHomeV2'
 import HRNewUserV2        from './pages/v2/HRNewUserV2'
 import HROfferLetterV2    from './pages/v2/HROfferLetterV2'
 import CallLogsV2         from './pages/v2/CallLogsV2'
@@ -406,7 +407,10 @@ export default function App() {
           {/* Phase 109 — HR login. These 3 routes admit role='hr' as well
               as admin/co_owner via RequireHROrPrivileged. Every OTHER
               admin route stays RequirePrivileged (admin+co_owner only). */}
-          <Route path="/hr"                        element={<RequireHROrPrivileged><HRV2 /></RequireHROrPrivileged>} />
+          {/* Phase 280 — /hr is now the HR Home cockpit (HRHomeV2).
+              The offer/invite list moved to /hr/offers. */}
+          <Route path="/hr"                        element={<RequireHROrPrivileged><HRHomeV2 /></RequireHROrPrivileged>} />
+          <Route path="/hr/offers"                 element={<RequireHROrPrivileged><HRV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/new-user"               element={<RequireHROrPrivileged><HRNewUserV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/offer/:userId"          element={<RequireHROrPrivileged><HROfferLetterV2 /></RequireHROrPrivileged>} />
           {/* Phase 33G.8 — admin Leaves CRUD. Excluded days for the
