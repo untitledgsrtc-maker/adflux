@@ -10472,3 +10472,65 @@ Push (I push — JS/Edge, no SQL, no APK; the ANTHROPIC_API_KEY is already set).
 reopens the app once. Smoke: /hr/candidates → Add candidate → choose a resume PDF or
 a Naukri/other-platform screenshot → "Auto-fill from file" → name/phone/email/role
 populate → review + Save. A non-HR user cannot call the endpoint (403).
+
+
+## 161 · Phase 284 — Recruit: HR calls AUTO-FETCH from the device call log (2026-08-05)
+
+Owner (§158 Recruit, live, AskUserQuestion): "we will able to fetch their calls?"
+→ picked **Full auto-fetch calls** — HR's phone call log auto-syncs into the
+candidate; HR just taps Call + dials, no manual logging. Additive, HR-only,
+§45-safe (writes ONLY hr_candidate_calls, matches CANDIDATES not leads, ZERO touch
+to the frozen sales/TC call pipeline). Focused security+correctness review → CLEAN
+(no P0/P1/P2); the 2 low notes applied.
+
+### What shipped
+- `supabase_hr_recruit_p2_callsync.sql` (owner RUNS) — additive on hr_candidate_calls:
+  `source` ('manual'|'device', default manual) + `direction` (incoming/outgoing/
+  missed, nullable) + UNIQUE INDEX (candidate_id, call_at) = the device-scan dedup
+  key. VERIFY: new_cols=2, dedup_index=1.
+- NEW `src/utils/hrCandidateCallSync.js` — `syncCandidateCalls(candidates, userId)`:
+  native-only (Capacitor.isNativePlatform, else returns 0), reads the device log via
+  the EXISTING `CallLogReader.scanRecentCalls({sinceTimestamp:-7d, limit:300})` (the
+  same plugin the sales/TC flow uses, READ-ONLY reuse), matches each device call to a
+  candidate BY NUMBER (last-10), upserts a 'device' row (onConflict candidate_id,
+  call_at, ignoreDuplicates). Best-effort (try/caught, never throws to the page).
+- `src/pages/v2/HRCandidatesV2.jsx` — extracted `loadCallCounts()`; `load()` now runs
+  `syncCandidateCalls` (best-effort) THEN loads counts; a document `visibilitychange`
+  effect re-syncs on app-foreground (so a just-ended call appears without a manual
+  refresh). The **Call button is now dial-only** (auto-scan captures the call); a
+  separate small **Note** button opens the manual CallLogModal (source='manual', for
+  HR to annotate/set shortlisted/rejected). §47 save latch preserved on Add + Note.
+
+### §92 COMPLIANCE (the call-log patch-magnet rule) — do NOT regress
+The sync matches a device call to a candidate BY NUMBER and captures its DURATION;
+`outcome` is derived from **duration alone** (`dur>=1 → connected, else no_answer`),
+NEVER from the OEM call-TYPE integer. `direction` is stored informational only —
+nothing gates on it. No per-brand type casing. (This is the strict-purity version;
+the review's borderline note about `direction==='missed'` gating outcome was removed.)
+
+### Contracts / notes (do NOT regress)
+- **Privacy:** only calls whose number matches a CANDIDATE are stored; HR's personal
+  calls are never written (match-by-number gate). It READS the whole device log but
+  WRITES only matched rows.
+- **Native-only + best-effort:** on web / no-permission / plugin-missing → returns 0,
+  never throws; the candidates page never breaks. The device read only works on the
+  APK with READ_CALL_LOG granted (the same §92/§95 dependency) — the manual Note is
+  the reliable fallback on any phone.
+- **Deploy-before-SQL safe (§45):** the device sync degrades silently (missing
+  source/direction/index → error → returns 0). The manual Note insert RETRIES without
+  `source` on a 42703/'source' error, so it saves even before the p2 SQL runs.
+- **Dedup:** upsert onConflict (candidate_id, call_at) with the plain (non-partial)
+  UNIQUE index → re-scans never duplicate; the device epoch (call_at) is deterministic
+  per physical call.
+- hr_candidate_calls is NOT in check-query-cap.mjs's table list; the counts come from
+  the §158 `hr_candidate_call_counts()` RPC (server-side GROUP BY), never a raw client
+  count.
+
+### Owner action
+1. Run `supabase_hr_recruit_p2_callsync.sql` in Studio (VERIFY new_cols=2, dedup_index=1).
+2. Push is done (JS reaches the APK on next open; no APK rebuild — the CallLogReader
+   plugin is already in 96018). HR reopens the app once.
+3. Smoke (on the APK, HR): /hr/candidates → tap **Call** on a candidate → dial +
+   return to the app → after a moment the call appears on the card (device-captured
+   duration + connected/no_answer). **Note** button still opens the manual log for a
+   shortlisted/rejected judgment. On web the Call button just dials (no device capture).

@@ -16,6 +16,7 @@ import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { dialPhone } from '../../utils/openExternal'
+import { syncCandidateCalls } from '../../utils/hrCandidateCallSync'
 
 const STAGES = [
   { key: 'applied',     label: 'Applied',     color: 'var(--blue, #3B82F6)' },
@@ -48,6 +49,16 @@ export default function HRCandidatesV2() {
   const [showAdd, setShowAdd] = useState(false)
   const [callFor, setCallFor] = useState(null)  // candidate being logged
 
+  // call counts + latest outcome per candidate — server-side aggregate RPC
+  // (§66/§274: never pull raw call rows to count client-side; the ~1000-row cap
+  // would silently undercount). Errors → empty map (deploy-before-SQL).
+  async function loadCallCounts() {
+    const { data: counts } = await supabase.rpc('hr_candidate_call_counts')
+    const m = {}
+    for (const c of counts || []) m[c.candidate_id] = { count: Number(c.call_count) || 0, last: c.last_outcome }
+    setCallMap(m)
+  }
+
   async function load() {
     setLoading(true); setErr(null)
     const { data, error } = await supabase
@@ -58,16 +69,24 @@ export default function HRCandidatesV2() {
     if (error) { setErr(error.message); setLoading(false); return }
     const list = data || []
     setRows(list)
-    // call counts + latest outcome per candidate — server-side aggregate RPC
-    // (§66/§274: never pull raw call rows to count client-side; the ~1000-row
-    // cap would silently undercount). Errors → empty map (deploy-before-SQL).
-    const { data: counts } = await supabase.rpc('hr_candidate_call_counts')
-    const m = {}
-    for (const c of counts || []) m[c.candidate_id] = { count: Number(c.call_count) || 0, last: c.last_outcome }
-    setCallMap(m)
+    // Phase 284 — auto-fetch device calls to these candidates (native-only,
+    // best-effort), THEN load the counts so they reflect the fresh device rows.
+    try { await syncCandidateCalls(list, profile?.id) } catch { /* best-effort */ }
+    await loadCallCounts()
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  // Phase 284 — when HR returns from a call (app foregrounds), re-scan the device
+  // log so the just-ended call appears without a manual refresh.
+  useEffect(() => {
+    function onVis() {
+      if (document.visibilityState !== 'visible') return
+      ;(async () => { try { await syncCandidateCalls(rows, profile?.id) } catch { /* noop */ } await loadCallCounts() })()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [rows, profile?.id])
 
   const counts = useMemo(() => {
     const c = { all: rows.length }
@@ -225,7 +244,12 @@ function CandidateCard({ r, calls, onPatch, onDelete, onCall, onConvert, onReloa
       {/* actions */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
         {r.phone && (
-          <button onClick={() => { dialPhone(r.phone); onCall() }} style={actBtn}><Phone size={14} /> Call</button>
+          <button onClick={() => dialPhone(r.phone)} style={actBtn}><Phone size={14} /> Call</button>
+        )}
+        {r.phone && (
+          <button onClick={onCall} style={{ ...actBtn, borderColor: 'transparent', color: 'var(--text-subtle)' }} title="Add a note about a call">
+            <FileText size={14} /> Note
+          </button>
         )}
         {r.resume_path
           ? <button onClick={viewResume} style={actBtn}><FileText size={14} /> Resume</button>
@@ -377,10 +401,13 @@ function CallLogModal({ candidate, profile, onClose, onLogged }) {
   async function save() {
     if (savingRef.current || saving) return
     savingRef.current = true; setSaving(true)
-    const { error } = await supabase.from('hr_candidate_calls').insert({
-      candidate_id: candidate.id, called_by: profile?.id || null,
-      outcome, notes: notes.trim() || null,
-    })
+    const row = { candidate_id: candidate.id, called_by: profile?.id || null, outcome, notes: notes.trim() || null }
+    let { error } = await supabase.from('hr_candidate_calls').insert({ ...row, source: 'manual' })
+    // deploy-before-SQL: the `source` column ships in phase-p2; if it isn't run
+    // yet the insert 400s on the unknown column — retry without it (§45).
+    if (error && (error.code === '42703' || /source/i.test(error.message || ''))) {
+      ;({ error } = await supabase.from('hr_candidate_calls').insert(row))
+    }
     if (error) { setSaving(false); savingRef.current = false; toastError(error, 'Could not log call.'); return }
     // convenience: shortlisted/rejected outcome nudges the candidate stage
     if (outcome === 'shortlisted' && candidate.stage === 'applied') await supabase.from('hr_candidates').update({ stage: 'shortlisted' }).eq('id', candidate.id)
