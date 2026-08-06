@@ -95,6 +95,11 @@ export default function CampaignInboxV2() {
   // sees only their assigned chats (RLS-scoped) and replies, no reassign.
   const profile = useAuthStore((s) => s.profile)
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role) || profile?.team_role === 'sales_manager'
+  // Sales Head (can_view_team_dashboard) READS every rep's chats (RLS wa_conv_team_viewer),
+  // but stays read-only: writes below stay gated on isPrivileged / own-thread. NOT the
+  // same as isPrivileged (that gates reassign + the team-filter dropdown).
+  const isTeamViewer = profile?.can_view_team_dashboard === true
+  const canSeeAll = isPrivileged || isTeamViewer
   const canInbox = isPrivileged || ['sales', 'telecaller', 'agency'].includes(profile?.role)
 
   const [loading, setLoading] = useState(true)
@@ -165,7 +170,7 @@ export default function CampaignInboxV2() {
       // Phase 243 — a rep sees only their own conversations. RLS already scopes
       // this, but filter in the UI too so the intent is explicit and a rep never
       // relies solely on RLS. Admin / co_owner / manager see every thread.
-      if (!isPrivileged && profile?.id) q = q.eq('assigned_to', profile.id)
+      if (!canSeeAll && profile?.id) q = q.eq('assigned_to', profile.id)   // Sales Head sees all
       const { data, error: pageErr } = await q
       if (pageErr) { error = pageErr; break }
       rows = rows.concat(data || [])
@@ -305,6 +310,14 @@ export default function CampaignInboxV2() {
   }, [isPrivileged])
 
   const sel = threads.find((t) => t.id === selId) || null
+  // Phase 205 read-only gate — a Sales Head (team viewer, can_view_team_dashboard)
+  // READS every rep's chat but may only WRITE on their own assigned thread. Admin /
+  // co_owner / sales_manager write anywhere. All writes are already server-gated
+  // (api/wa/send §205, send-template §120, reassign RLS); this only hides the
+  // composer / template / reassign so a Sales Head on someone else's chat doesn't
+  // see controls that would 403.
+  const ownThread = !!(sel && profile?.id && sel.assigned_to === profile.id)
+  const canWriteThread = isPrivileged || ownThread
   const openCount = threads.filter((t) => windowOpen(t.window_expires_at)).length
 
   // Phase 258 — filter the loaded threads by the search box (name OR number)
@@ -454,7 +467,7 @@ export default function CampaignInboxV2() {
     { key: 'nurture',  label: 'Stay in touch' },
     { key: 'negative', label: 'Polite sign-off' },
   ]
-  const canCompanySend = isPrivileged || profile?.role === 'telecaller'
+  const canCompanySend = canWriteThread && (isPrivileged || profile?.role === 'telecaller')
 
   async function openTplPanel() {
     setTplPanelOpen((o) => !o)
@@ -838,8 +851,15 @@ export default function CampaignInboxV2() {
                       )}
                     </div>
                     )}
-                    <button type="button" onClick={() => navigate(`/leads/${sel.lead_id}`)} style={btnGhost}>Open lead</button>
-                    <button type="button" onClick={createQuote} style={btnY}><FileText size={14} strokeWidth={1.6} /> Create quote</button>
+                    {/* Phase 205: Open lead + Create quote only on a writable thread —
+                        inert for a Sales Head viewing someone else's chat (leads RLS
+                        returns nothing / quote wizard no-ops). */}
+                    {canWriteThread && (
+                      <>
+                        <button type="button" onClick={() => navigate(`/leads/${sel.lead_id}`)} style={btnGhost}>Open lead</button>
+                        <button type="button" onClick={createQuote} style={btnY}><FileText size={14} strokeWidth={1.6} /> Create quote</button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -962,8 +982,12 @@ export default function CampaignInboxV2() {
                   : '24h window CLOSED · needs an approved template'}
               </div>
 
-              {/* composer — free-form text + attachments, only inside the 24h window */}
+              {/* composer — free-form text + attachments, only inside the 24h window.
+                  Phase 205: only when the viewer can WRITE this thread (own chat, or
+                  admin/co_owner/manager). A Sales Head on someone else's open chat
+                  sees a read-only note instead — writes would 403 server-side. */}
               {windowOpen(sel.window_expires_at) ? (
+                canWriteThread ? (
                 <div style={{ padding: '10px 12px', borderTop: '1px solid var(--v2-line)', background: 'var(--v2-bg-2)' }}>
                   {/* quick-reply chips (mockup) — click fills the box for editing.
                       Phase 254: Rate card also stages the real brochure PDF when
@@ -1144,6 +1168,14 @@ export default function CampaignInboxV2() {
                     </button>
                   </div>
                 </div>
+                ) : (
+                <div style={{
+                  padding: 12, borderTop: '1px solid var(--v2-line)', background: 'var(--v2-bg-2)',
+                  textAlign: 'center', fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)',
+                }}>
+                  Read-only — you're viewing this as a Sales Head. Replies work only on your own chats.
+                </div>
+                )
               ) : (
                 <div style={{ padding: '12px 16px', borderTop: '1px solid var(--v2-line)', background: 'var(--v2-bg-2)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

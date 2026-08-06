@@ -10668,3 +10668,63 @@ Effect: Dhara 36→~2, Kirti 14→~8, Rima 5→3, Jayna 1→0; genuine skips sta
   in the data; those still resolve via the card). Also the ±45min window can rarely
   hide a genuinely-separate resolved call to the same lead — accepted (documented
   in-code), the dominant case is duplicate taps.
+
+
+## 164 · Sales Head — read-only whole-team WhatsApp chats (2026-08-06)
+
+Owner: build a "Sales Head" who sees EVERYTHING of sales + TC — leads, quotes,
+follow-ups, GPS, AND chats — read-only. Approved: **reuse the `can_view_team_dashboard`
+flag** (the §84/§116/§247 team viewer), NO new DB role. She ALREADY had all-team
+read-only leads/quotes/follow-ups/GPS (gated `is_team_viewer()` RPCs). **The only gap
+was chats** — the campaign WhatsApp inbox was RLS-scoped to her own threads (§243).
+Spec: `docs/SALES_HEAD_SPEC.md`. Guardian PASS (no P0/P1) + adversarial security trace.
+
+### What shipped (2 files)
+- `supabase_sales_head_team_chats.sql` (owner RUNS) — ONE policy:
+  `wa_conv_team_viewer ON whatsapp_conversations FOR SELECT USING (is_team_viewer())`.
+  **Messages inherit** — the existing `wa_msg_via_conv` is `EXISTS(SELECT 1 FROM
+  whatsapp_conversations c WHERE c.id=conversation_id)`, a PLAIN (non-DEFINER)
+  subquery that runs under the caller's conv-RLS, so widening conversation visibility
+  auto-widens message-body visibility. No message policy needed. VERIFY: policy=1.
+- `src/pages/v2/CampaignInboxV2.jsx` — `isTeamViewer = can_view_team_dashboard`,
+  `canSeeAll = isPrivileged || isTeamViewer` drops the `.eq('assigned_to')` read
+  filter for her (loadThreads → she loads ALL threads). WRITES stay locked:
+  `canWriteThread = isPrivileged || (sel.assigned_to === profile.id)` gates the
+  composer (else a "Read-only — viewing as Sales Head" note), `canCompanySend =
+  canWriteThread && (isPrivileged || role==='telecaller')` gates the closed-window
+  template picker, "Open lead"/"Create quote" gated on canWriteThread, reassign is
+  already isPrivileged-only.
+
+### SECURITY CONTRACTS (do NOT regress)
+- **Fail-closed:** `is_team_viewer()` = `COALESCE(users.can_view_team_dashboard, false)`
+  (LANGUAGE sql, no 3VL trap) → NULL role / no auth.uid() / unflagged rep → false.
+- **Leak-bounded (NOT the §84 leads trap):** the ONLY non-admin readers of
+  whatsapp_conversations/messages are the inbox + the campaign tab-bar count
+  (CampaignChrome). CampaignQr/Integrations/Segments/Broadcast/Chatbot are all
+  RequirePrivileged → a Sales Head can't open them. So the broad SELECT is scoped to
+  the campaign surface she's entitled to — it can't bleed into /work,/leads,dashboards
+  the way a broad `leads` policy did. (This single-rep-reader property is WHY broad RLS
+  is acceptable here but was rejected for leads in §84.)
+- **Read-only holds three ways:** (1) no write POLICY on whatsapp_conversations except
+  `wa_conv_admin` (admin only); (2) `api/wa/send` server-gates a non-admin to
+  own-assigned/own-lead (§205) + `api/wa/send-template` gates on lead ownership (§120)
+  → a Sales Head sending on another rep's chat 403s regardless of the flag; (3) the UI
+  hides composer/template/reassign/open-lead on non-own threads. A normal telecaller
+  (flag=false) is byte-unchanged (own threads, full reply); admin unchanged.
+
+### GOVERNANCE (P3, operational — not code)
+`is_team_viewer()` gates purely on the boolean, no role restriction — so flagging an
+AGENCY (external) user true would give them full-team chat read the same way. Same as
+the existing /leads,/quotes team-view pattern (§84). RULE: only flip
+`can_view_team_dashboard=true` for a TRUSTED internal Sales-Head user, NEVER agency/
+external.
+
+### Owner action
+Run `supabase_sales_head_team_chats.sql` (VERIFY policy=1), push, Jayna reinstalls/
+refreshes her app → her inbox shows all reps' chats, read-only; her own chats she still
+replies to normally. No new role, no APK.
+
+### Foot-gun
+- ❌ Broad `FOR SELECT USING(is_team_viewer())` is a LEAK on a table read by many
+  rep-facing pages (leads). It's only safe when the table has a SINGLE rep-facing
+  reader (conversations = the inbox) — verify the reader set before using this pattern.
