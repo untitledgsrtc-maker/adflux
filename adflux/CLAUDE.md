@@ -10728,3 +10728,29 @@ replies to normally. No new role, no APK.
 - ❌ Broad `FOR SELECT USING(is_team_viewer())` is a LEAK on a table read by many
   rep-facing pages (leads). It's only safe when the table has a SINGLE rep-facing
   reader (conversations = the inbox) — verify the reader set before using this pattern.
+
+
+## 165 · WhatsApp billing-failure banner (Meta 131042) (2026-08-06)
+
+Owner saw a post-call template send show red **"failed · 131042 · Business eligibility
+payment issue"** in the inbox. That's a **Meta billing error, not a code bug** — the
+marketing WABA (98982 73686 / `2870129030006085`) had no valid payment method, so Meta
+blocks business-initiated (paid) template sends. Fix = owner adds a card in
+**Meta → Billing → Payment methods → WhatsApp Business accounts tab** (§119 gotcha: the
+"Accounts" tab greys out "Add payment method"; the "Payment methods" tab enables it).
+Separate from the §148 spam-flag on the same number (quality, not billing).
+
+Owner ask: "whenever we find this issue just show a notification like [the payment-
+approval banner]." Built (`NEW src/components/v2/WaBillingBanner.jsx`, mounted top of
+`AdminDashboardDesktop`): a read-only bounded SELECT on `whatsapp_messages`
+(`status='failed'` + `error_detail ILIKE '%131042%'/'%payment%'/'%eligibility%'`, last
+7d, limit 1); if any → a rose banner "WhatsApp sending is blocked — payment issue" with
+a **Fix billing** button → `openExternalUrl(META_BILLING_URL)`. Session-dismissible,
+renders null when clean. §45-safe, no SQL (`error_detail` already live, §126.1).
+- **The billing link drops the session token.** The owner's copied Meta URL had
+  `external_flow_id=SU-...` (a session id that EXPIRES). The banner stores only the
+  stable `payment_account_id + asset_id + business_id` → lands on the same WABA billing
+  page. If the marketing WABA/business ids ever change, update `META_BILLING_URL`.
+- Reusable pattern for "surface an API/payment failure to the admin": query the
+  failure's persisted error row + a top banner with a fix link. Extend the `.or()` codes
+  (or add more banners) for other Meta/API payment classes as owner asks.
