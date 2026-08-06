@@ -10613,3 +10613,58 @@ reminder_channel `push_wa` fires a push in v1 (WhatsApp reminders later).
   cron still runs it as postgres). GRANT-authenticated is only OK for push-ONLY fns.
 - ❌ A dedupe key built on the sheet ROW INDEX breaks on any row-reorder / partial
   re-import → dupes. Key on content + an in-import occurrence counter instead.
+
+
+## 163 · Phase 237 pending-outcome ORPHANS — read-side sibling exclusion (2026-08-06)
+
+Owner: Dhara/Rima/Jayna + sales team see "N calls need an outcome" (§105/§237 card)
+STILL showing calls they ALREADY filed the outcome on. Deep analysis + a live
+diagnostic (owner ran) proved the root: **one call routinely spawns MORE than one
+`lead_activities` outcome=NULL 'call' row**, but the outcome modal patches only ONE
+(`pendingActivityId`) → the duplicates linger forever as "pending". Diagnostic (3-day):
+Dhara 36 pending / **34 had a resolved sibling** (0 from leads-list) · Kirti 14/4/2 ·
+Rima 5/2 · Jayna 1/1 · Mayur 1/0 · Viral 1/0. So ~41 of 58 were orphans of RESOLVED
+calls; the rest (Kirti ~8, Rima 3, Mayur/Viral 1) are genuine skips (card working).
+
+### The orphan producers (why >1 NULL 'call' row per call)
+- **Re-dial across a minute boundary** — 1st tap survives the Phase 68.2 same-minute
+  dedupe, next-minute tap inserts a fresh row; the modal patches the latest, the 1st
+  orphans.
+- **Rapid-dialing** overwrites the ONE shared `pendingActivityId` React state before
+  earlier modals save.
+- **The modal's fresh-insert fork** (`PostCallOutcomeModal:439` — when pendingActivityId
+  is null it INSERTs a new row WITH the outcome, never clearing the original tel-tap
+  NULL row).
+- **LeadsV2 side-door** (`LeadsV2:1273`, §57 Truth 3e) inserts a NULL 'call' row and
+  NEVER opens the modal — permanent orphan (only 2 rows in the data; deferred).
+
+### THE MONEY TRAP (do NOT "fix" by filling the outcome)
+My first plan — set the orphan's outcome to its sibling's — is a **pay bug**.
+`compute_daily_score`'s CALL branch is **`COUNT(*)` on `(outcome IS NOT NULL OR ≥10s)`**
+(`db/functions/compute_daily_score.sql:133-146`), NOT distinct-lead. So filling a
+duplicate's outcome makes it COUNT → double-counts the call → inflates the TC score →
+inflates incentive. **Never mutate an orphan's outcome. Never DELETE it (touches the
+§113 calls-counter delete-drift + audit).** The row must stay outcome=NULL forever.
+
+### The fix (SHIPPED — read-side only, zero data mutation, zero score impact)
+`src/hooks/usePendingOutcomes.js`: a null-outcome 'call' row is HIDDEN from the card
+when the same **(lead_id, created_by)** has a RESOLVED 'call' row (outcome NOT NULL)
+within **±45 min**. New shared exports `applyResolvedCallFilters(qb)` +
+`excludeResolvedSiblings(pendingActs, resolvedActs)` (pure). `load()` fetches pending +
+resolved in ONE `Promise.all`, filters `acts`→`survivors`. `TeamDashboardV2` manager
+count imports + applies the SAME `excludeResolvedSiblings` (§71 lockstep — one rule,
+two call sites, can't drift). Guardian PASS (read-only, no frozen chain touched, no
+cross-rep leak — key is `lead_id|created_by`, fail-open if the resolved fetch nulls).
+Effect: Dhara 36→~2, Kirti 14→~8, Rima 5→3, Jayna 1→0; genuine skips stay.
+
+### CONTRACTS / notes
+- The exclusion is **read-side**. The orphan row keeps outcome=NULL and never counts.
+  Do NOT convert this to an outcome-fill or a DELETE (money + trigger risk above).
+- `excludeResolvedSiblings` is the ONE rule for both the rep card AND the manager
+  count — change it in usePendingOutcomes.js and both move.
+- Deploy-safe: pure JS, no SQL, no APK. `excludeResolvedSiblings(acts, null)` returns
+  acts unchanged (fail-open to pre-fix behavior).
+- DEFERRED (minor): wiring LeadsV2's leads-list Call to open the outcome modal (2 rows
+  in the data; those still resolve via the card). Also the ±45min window can rarely
+  hide a genuinely-separate resolved call to the same lead — accepted (documented
+  in-code), the dominant case is duplicate taps.

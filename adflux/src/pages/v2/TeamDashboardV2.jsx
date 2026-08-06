@@ -33,7 +33,7 @@ import { formatCurrency } from '../../utils/formatters'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import AdminPushModal from '../../components/v2/AdminPushModal'
 import { presetToday, thisMonth } from '../../utils/period'
-import { applyPendingOutcomeFilters, PENDING_CLOSED_STAGES } from '../../hooks/usePendingOutcomes'
+import { applyPendingOutcomeFilters, PENDING_CLOSED_STAGES, applyResolvedCallFilters, excludeResolvedSiblings } from '../../hooks/usePendingOutcomes'
 
 // Phase 87.6 — avatar marker helpers. Owner directive 24 May 2026:
 // reference Pimpri-Chinchwad map pin with profile pic. Renders the
@@ -804,16 +804,22 @@ export default function TeamDashboardV2() {
       // Won/Lost exclusion) so the manager count == the sum of what reps see
       // as pending — never a second definition (§69/§71).
       const { data: acts } = await applyPendingOutcomeFilters(
-        supabase.from('lead_activities').select('created_by, lead_id')
+        supabase.from('lead_activities').select('created_by, lead_id, created_at')
       ).limit(2000)   // §66/§85 cap — 22 reps × today's null-outcome calls is well under
       if (cancelled) return
       if (!acts || acts.length === 0) { setPendingOutcomesByUser({}); return }
-      const leadIds = [...new Set(acts.map(a => a.lead_id))]
+      // Drop orphan taps whose call was resolved (SAME shared rule as the rep card, §71).
+      const { data: resolved } = await applyResolvedCallFilters(
+        supabase.from('lead_activities').select('lead_id, created_by, created_at')
+      ).order('created_at', { ascending: false }).limit(4000)
+      if (cancelled) return
+      const survivors = excludeResolvedSiblings(acts, resolved || [])
+      const leadIds = [...new Set(survivors.map(a => a.lead_id))]
       const { data: leads } = await supabase.from('leads').select('id, stage').in('id', leadIds)
       if (cancelled) return
       const closed = new Set((leads || []).filter(l => PENDING_CLOSED_STAGES.includes(l.stage)).map(l => l.id))
       const m = {}
-      acts.forEach(a => { if (a.created_by && !closed.has(a.lead_id)) m[a.created_by] = (m[a.created_by] || 0) + 1 })
+      survivors.forEach(a => { if (a.created_by && !closed.has(a.lead_id)) m[a.created_by] = (m[a.created_by] || 0) + 1 })
       setPendingOutcomesByUser(m)
     })()
     return () => { cancelled = true }
