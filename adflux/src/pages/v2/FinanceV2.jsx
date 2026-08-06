@@ -317,10 +317,11 @@ function MixDonut({ mix, total }) {
 
 /* ── Accounts Home ── */
 function HomeTab({ onReview }) {
-  const [d, setD] = useState(null); const [loading, setLoading] = useState(true)
+  const [d, setD] = useState(null); const [loading, setLoading] = useState(true); const [recon, setRecon] = useState(null)
   useEffect(() => {
     let alive = true
     supabase.rpc('finance_accounts_home').then(({ data }) => { if (alive) { setD(data || {}); setLoading(false) } })
+    supabase.rpc('finance_reconcile').then(({ data, error }) => { if (alive && !error && data) setRecon(data) })
     return () => { alive = false }
   }, [])
   if (loading) return <Spin />
@@ -358,6 +359,29 @@ function HomeTab({ onReview }) {
           {(tc.rows || []).length === 0 && <div style={{ color: 'var(--text-subtle)', fontSize: 13, marginTop: 8 }}>Nothing outstanding.</div>}
         </Card>
       </div>
+      {recon && recon.bank_income_total != null && (
+        <Card>
+          <CH>Bank vs CRM <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>money received in the bank but not recorded in the CRM</span></CH>
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 12, fontSize: 13 }}>
+            <span>Bank received <b style={{ fontFamily: 'Space Grotesk' }}>{fmtINR(recon.bank_income_total || 0)}</b></span>
+            <span>CRM recorded <b style={{ fontFamily: 'Space Grotesk' }}>{fmtINR(recon.crm_receipts_total || 0)}</b></span>
+            <span style={{ color: Math.round(recon.gap || 0) !== 0 ? 'var(--warning)' : 'var(--success)' }}>Gap <b style={{ fontFamily: 'Space Grotesk' }}>{fmtINR(recon.gap || 0)}</b></span>
+          </div>
+          {(recon.unmatched || []).length > 0 ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead><tr><th style={thL}>Date</th><th style={thL}>Bank entry</th><th style={thL}>Segment</th><th style={thR}>Amount</th></tr></thead>
+              <tbody>
+                {recon.unmatched.slice(0, 12).map((u, i) => <tr key={i}>
+                  <td style={tdL}>{fmtDate(u.date)}</td>
+                  <td style={tdL}>{u.description || '—'}</td>
+                  <td style={tdL}>{u.segment || '—'}</td>
+                  <td style={tdR}>{fmtINR(u.amount)}</td></tr>)}
+              </tbody>
+            </table>
+          ) : <div style={{ color: 'var(--success)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={15} /> Every bank receipt matches a CRM payment.</div>}
+          {(recon.unmatched || []).length > 12 && <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 8 }}>+ {recon.unmatched.length - 12} more — open the Register to tag them.</div>}
+        </Card>
+      )}
     </div>
   )
 }
@@ -405,13 +429,13 @@ function TasksTab() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead><tr><th style={thL}>Task</th><th style={thL}>Frequency</th><th style={thL}>Reminder</th><th style={thR}>Status</th><th style={thL}></th></tr></thead>
           <tbody>
-            {recurring.map(t => <tr key={t.id}><td style={tdL}>{t.title}</td><td style={tdL}>{t.frequency}</td>
+            {recurring.map(t => <tr key={t.id}><td style={tdL}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 8 }}>next {fmtDate(t.next_due)}</span> : <span style={{ color: 'var(--warning)', fontSize: 11, marginLeft: 8 }}>set a date to arm</span>}</td><td style={tdL}>{t.frequency}</td>
               <td style={tdL}><span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{t.reminder_channel === 'push_wa' ? 'Push + WA' : 'Push'}</span></td>
               <td style={tdR}><Pill t={t} /></td><td style={tdL}><DelBtn id={t.id} /></td></tr>)}
             {recurring.length === 0 && <tr><td colSpan={5} style={{ ...tdL, color: 'var(--text-subtle)' }}>No recurring tasks yet.</td></tr>}
           </tbody>
         </table>
-        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 10 }}>Add / delete / tap Status to mark done. Auto-reminders (push / WhatsApp) get wired to the notification pipeline in a later phase.</div>
+        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 10 }}>Set a due date to arm a reminder — a push fires at 10 AM IST on the due date to admins + accounts, and recurring tasks roll to the next date automatically. (WhatsApp reminders come later.)</div>
       </Card>
 
       {oneoff.length > 0 && <Card><CH>One-off</CH>{oneoff.map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))' }}><div style={{ flex: 1, fontSize: 13.5, textDecoration: t.status === 'done' ? 'line-through' : 'none', color: t.status === 'done' ? 'var(--text-subtle)' : 'var(--text)' }}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 8 }}>{fmtDate(t.next_due)}</span> : ''}</div><Pill t={t} /><DelBtn id={t.id} /></div>)}</Card>}
@@ -529,7 +553,7 @@ function ImportTab() {
       for (let i = 0; i < filled.length; i++) { if (filled[i]) lg = filled[i]; else if (lg) filled[i] = lg }
       let ng = null; for (let i = filled.length - 1; i >= 0; i--) { if (filled[i]) ng = filled[i]; else if (ng) filled[i] = ng }
       const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(n) ? n : 0 }
-      const out = []
+      const out = []; const occ = {}
       data.forEach((r, idx) => {
         const d = filled[idx]; if (!d) return
         const desc = String(r[map.desc] == null ? '' : r[map.desc])
@@ -540,14 +564,35 @@ function ImportTab() {
         if (map.cr !== '' && num(r[map.cr])) sides.push(['in', num(r[map.cr]), map.crtag !== '' ? String(r[map.crtag] == null ? '' : r[map.crtag]) : ''])
         sides.forEach(([dir, amt, tag], si) => {
           const c = classifyImport(tag, dir, desc, hcat, bankco, rules)
+          // P4 — content-based occurrence key (NOT the ephemeral row index): the Nth
+          // identical (date, amount, direction, desc) row keeps the same key on every
+          // import, so re-importing the SAME statement is idempotent (ignoreDuplicates
+          // skips it) while two genuinely-different same-content rows both survive.
+          const ck = `${impIso(d)}|${amt}|${dir}|${desc.slice(0, 26)}|${si}`
+          const occN = occ[ck] || 0; occ[ck] = occN + 1
           out.push({ bank_account_id: bankId, txn_date: impIso(d), ref_no: map.receipt !== '' ? (String(r[map.receipt] == null ? '' : r[map.receipt]).trim() || null) : null, description: desc, amount: amt, direction: dir,
             bucket: c.bucket, company: c.company, segment: c.segment, media_type: c.media_type,
             expense_head_id: c.head ? (headByName[c.head] || null) : null, raw_tag: tag || null, source: 'import',
-            dedupe_key: `${bank && bank.name}|${impIso(d)}|${amt}|${dir}|${desc.slice(0, 26)}|${idx}|${si}`,
+            dedupe_key: `${bank && bank.name}|${ck}|${occN}`,
             note: est ? 'date estimated (statement order)' : null })
         })
       })
       if (!out.length) { setErr('No rows found with that mapping — check the Date + Money In/Out columns.'); setBusy(false); return }
+      // P4 overlap guard — the occurrence key only de-dupes a re-import of the SAME
+      // file; rows already loaded (P2 backfill / a prior import) carry a different key,
+      // so warn loudly before risking a double-count on an overlapping statement.
+      const isos = out.map(o => o.txn_date).sort()
+      const { count: existing } = await supabase.from('finance_transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('bank_account_id', bankId).gte('txn_date', isos[0]).lte('txn_date', isos[isos.length - 1])
+      if (existing && existing > 0) {
+        const ok = await confirmDialog({
+          title: 'Possible duplicate import',
+          message: `This account already has ${existing} transaction${existing > 1 ? 's' : ''} between ${fmtDate(isos[0])} and ${fmtDate(isos[isos.length - 1])}. Re-importing the same statement can double-count. Import anyway?`,
+          confirmLabel: 'Import anyway', cancelLabel: 'Cancel', danger: true,
+        })
+        if (!ok) { setBusy(false); return }
+      }
       for (let i = 0; i < out.length; i += 200) {
         const { error } = await supabase.from('finance_transactions').upsert(out.slice(i, i + 200), { onConflict: 'dedupe_key', ignoreDuplicates: true })
         if (error) throw error
