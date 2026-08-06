@@ -10534,3 +10534,82 @@ the review's borderline note about `direction==='missed'` gating outcome was rem
    return to the app → after a moment the call appears on the card (device-captured
    duration + connected/no_answer). **Note** button still opens the manual log for a
    shortlisted/rejected judgment. On web the Call button just dials (no device capture).
+
+
+## 162 · Finance module P4/P5/P6 — import dedupe guard + bank↔CRM reconcile + task reminders (2026-08-06, `0f8831a`)
+
+Finished the finance module's last three phases (§155/§156 phase plan). Additive,
+admin/accounts-only (`/finance`, RequireAccountsOrPrivileged), §45-safe (zero touch
+to sales/leads/quotes/payroll/any hot path). Adversarial security+correctness review
+PASS (1 P3 fixed pre-commit). Two files: `FinanceV2.jsx` + NEW
+`supabase_finance_p5_p6.sql` (owner RUNS — one combined file per §154).
+
+### P4 — Import wizard: content dedupe key + overlap guard (JS, FinanceV2 `doImport`)
+The old `dedupe_key` was `bank|date|amt|dir|desc26|idx|si` — `idx` = the ephemeral
+row position in the sheet, so re-importing overlapping rows minted NEW keys →
+duplicated rows (the §156 flagged risk vs the P2 backfill). Fixed two ways:
+- **Content-based occurrence key** `bank|date|amt|dir|desc26|si|occN` where `occN`
+  counts prior identical-content rows in the SAME import. Re-importing the SAME file →
+  same occ counts → identical keys → `ignoreDuplicates` skips them; two genuinely-
+  different same-content rows both survive (occ 0,1). Robust to row-reordering.
+- **Pre-import overlap guard**: before upsert, `count:'exact',head:true` of existing
+  rows for that bank in the incoming date range; if >0 → `confirmDialog` "This account
+  already has N transactions between X and Y — re-importing can double-count. Import
+  anyway?". Catches the cross-source case (wizard re-import of a period the backfill/
+  a prior import already loaded, where the KEYS don't match).
+- **CONTRACT:** the occurrence key only de-dupes a same-FILE re-import; overlap across
+  sources is caught by the guard, not the key. Both together = the owner can't
+  accidentally double-count without an explicit "yes". Do NOT revert the key to a
+  row-index form.
+
+### P5 — bank↔CRM reconciliation (SQL RPC + Accounts-Home card)
+`finance_reconcile(p_from, p_to)` (SECURITY DEFINER STABLE, read-only). Returns
+`{bank_income_total, crm_receipts_total, gap, unmatched[], unmatched_count}`.
+- **bank income** = `finance_transactions` bucket='income' dir='in' (segment derived
+  segment/company→segment). **CRM receipts** = every approved `payments` row
+  (amount_received, joined to quotes for segment). **unmatched** = bank credits with
+  NO approved payment of a near-equal amount (±₹50 or ±1%) within ±7 days AND
+  `matched_payment_id IS NULL` = "money in the bank not recorded in the CRM" (the §155
+  owner-locked flag). The unmatched match is segment-scoped (P3 review fix) so Vishal's
+  list ↔ gap stay consistent.
+- **The live P&L income source is UNCHANGED** (still the bank ledger, owner-verified).
+  This is an ADDITIVE reconciliation view, NOT a switch to CRM income. Do not conflate.
+- **Role gate** = the `finance_pnl_summary` reference (§155 P3.2): admin/accounts full;
+  co_owner+`team_role='government_partner'` (Vishal) FORCED GOVERNMENT (both branches +
+  the unmatched match); everyone else + NULL role → `'{}'` (fails closed, §152 doctrine).
+- Home tab: `supabase.rpc('finance_reconcile')` (all-time, no args) on mount; the "Bank
+  vs CRM" card renders only when `recon.bank_income_total != null` → a `'{}'` no-access
+  response or a pre-SQL missing RPC hides the card, never crashes (deploy-safe).
+
+### P6 — finance-task push reminders (SQL cron + Tasks-tab wiring)
+`push_finance_task_reminders()` (SECURITY DEFINER) + cron `untitled-finance-task-
+reminders` at `'30 4 * * *'` (10:00 IST, 30 min after the §34Z.61 rep morning push).
+For each active/not-done `finance_tasks` with `next_due <= today(IST)`: enqueue_push
+to every active admin+accounts user (tag `fin-task-<id>-<date>`, per-day dedup §97.A400,
+url `/finance?tab=tasks`), then advance recurring next_due to the next future occurrence
+(WHILE-loop: daily +1 / weekly +7 / monthly +1mo; one-off re-reminds daily until done).
+reminder_channel `push_wa` fires a push in v1 (WhatsApp reminders later).
+- **REVOKEd from PUBLIC/anon/authenticated** — it MUTATES next_due + pushes, so a
+  logged-in rep must not call it. The cron runs as postgres (superuser/owner → executes
+  regardless of GRANT) so it still fires. This is the §97.A2 posture for a push+mutate
+  fn. (Contrast the §34Z.61 template which GRANTs authenticated — it only pushes.)
+- Tasks tab now shows each recurring task's `next_due` ("next DD/MM" or amber "set a
+  date to arm") + copy: a task needs a due date to arm its reminder.
+
+### Owner action
+1. Run `supabase_finance_p5_p6.sql` in Supabase Studio (ONE file). VERIFY block:
+   functions=2, cron_job=1, + a live reconcile snapshot (bank_income vs crm_receipts +
+   bank_receipts_not_in_crm count).
+2. Push `0f8831a` (JS reaches the app on deploy; the P4 guard + P5 card + P6 tab text
+   are frontend). No APK rebuild.
+3. Smoke (as admin/accounts): /finance → Accounts Home shows the "Bank vs CRM" card
+   (gap + any unmatched bank receipts). Import → re-import an already-loaded statement
+   → the "Possible duplicate import" confirm fires. Tasks → set a due date on a task →
+   at 10 AM IST the reminder pushes to admin+accounts. As Vishal → reconcile shows
+   GOVERNMENT only.
+
+### Foot-gun
+- ❌ A cron/DEFINER fn that MUTATES + pushes must be REVOKEd from client roles (the
+  cron still runs it as postgres). GRANT-authenticated is only OK for push-ONLY fns.
+- ❌ A dedupe key built on the sheet ROW INDEX breaks on any row-reorder / partial
+  re-import → dupes. Key on content + an in-import occurrence counter instead.
