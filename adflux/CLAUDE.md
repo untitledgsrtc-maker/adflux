@@ -11072,3 +11072,16 @@ new value to correct, or fix in DB. Chose deploy-safety over supporting edit-to-
 - ❌ A new nullable column the frontend ALWAYS writes (even null) breaks EVERY insert on
   that table if pushed before the column exists. Drop the key from the spread + add it
   conditionally so only the new-feature path depends on the new column.
+
+### 273.2 — TDS + commission shown on the Payments section (display, `<next>`)
+Owner: "all details here — TDS, commission." QuoteDetail Payments surface now shows the
+govt money breakdown (display-only, no SQL — `fetchPayments` selects `*` so the columns
+are already on each row):
+- **Per payment row** (`PaymentHistory.jsx`): a detail line under the meta — `TDS ₹X ·
+  Cash banked ₹Y` and `Commission N% ₹Z`. Only when set (govt).
+- **Status card** (`PaymentSummary.jsx`, now takes `payments`): deal-level totals **TDS
+  withheld** + **Commission (our cost)** summed over APPROVED payments, shown under the
+  Quote Total / Received / Balance row when non-zero. Both `<PaymentSummary>` call sites in
+  QuoteDetail pass `payments`.
+- Existing payments recorded before Phase 273 show nothing extra until edited to add the %
+  (their commission_amount is null). Not §28-frozen; parse-clean.

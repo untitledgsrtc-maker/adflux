@@ -805,7 +805,7 @@ export default function QuoteDetail() {
           </div>
 
           {/* Payment Summary */}
-          <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} />
+          <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} payments={payments} />
 
           {/* Phase 34D — incentive forecast. Hidden for admin + for
               already-won/lost quotes. Tells the rep how much closing
@@ -840,7 +840,7 @@ export default function QuoteDetail() {
       {/* ── Payments Tab ── */}
       {activeTab === 'payments' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} />
+          <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} payments={payments} />
           <PaymentHistory
             payments={payments}
             loading={paymentsLoading}

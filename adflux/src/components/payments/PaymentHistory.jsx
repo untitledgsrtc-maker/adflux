@@ -123,6 +123,24 @@ export function PaymentHistory({ payments = [], loading, onEdit, onDelete }) {
                 {p.users?.name && <> · by {p.users.name}</>}
                 {isApproved && p.approver?.name && <> · approved by {p.approver.name}</>}
               </div>
+              {/* Phase 273.2 — govt money breakdown on the row: TDS + cash
+                  banked + commission (our cost). Only shows when set. */}
+              {(Number(p.tds_amount) > 0 || Number(p.commission_amount) > 0) && (
+                <div className="ph-meta" style={{ marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {Number(p.tds_amount) > 0 && (
+                    <span>
+                      <strong style={{ color: 'var(--text)', fontWeight: 600 }}>TDS</strong> {formatCurrency(p.tds_amount)}
+                      {' · '}Cash banked {formatCurrency(Math.max(0, Number(p.amount_received) - Number(p.tds_amount)))}
+                    </span>
+                  )}
+                  {Number(p.commission_amount) > 0 && (
+                    <span>
+                      <strong style={{ color: 'var(--text)', fontWeight: 600 }}>Commission</strong>
+                      {p.commission_pct != null ? ` ${Number(p.commission_pct)}%` : ''} {formatCurrency(p.commission_amount)}
+                    </span>
+                  )}
+                </div>
+              )}
               {p.payment_notes && (
                 <div className="ph-notes">{p.payment_notes}</div>
               )}

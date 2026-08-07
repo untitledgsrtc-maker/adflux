@@ -2,10 +2,16 @@
 import { CheckCircle2, AlertCircle } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
 
-export function PaymentSummary({ totalAmount = 0, totalPaid = 0, hasFinalPayment = false }) {
+export function PaymentSummary({ totalAmount = 0, totalPaid = 0, hasFinalPayment = false, payments = [] }) {
   const balance = Math.max(0, totalAmount - totalPaid)
   const pct = totalAmount > 0 ? Math.min((totalPaid / totalAmount) * 100, 100) : 0
   const isFullyPaid = hasFinalPayment || balance <= 0
+
+  // Phase 273.2 — deal-level TDS + commission (our cost), summed over
+  // APPROVED payments. Only rendered when non-zero (govt deals).
+  const approved = payments.filter(p => p.approval_status === 'approved')
+  const totalTds  = approved.reduce((s, p) => s + (Number(p.tds_amount) || 0), 0)
+  const totalComm = approved.reduce((s, p) => s + (Number(p.commission_amount) || 0), 0)
 
   return (
     <div className="ps-card">
@@ -50,6 +56,25 @@ export function PaymentSummary({ totalAmount = 0, totalPaid = 0, hasFinalPayment
           </span>
         </div>
       </div>
+
+      {/* Phase 273.2 — TDS withheld + commission (our cost) on this deal.
+          Govt-only in practice; hidden when both are zero. */}
+      {(totalTds > 0 || totalComm > 0) && (
+        <div className="ps-figures" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          {totalTds > 0 && (
+            <div className="ps-figure">
+              <span className="ps-figure-label">TDS withheld</span>
+              <span className="ps-figure-value" style={{ color: 'var(--warning)' }}>{formatCurrency(totalTds)}</span>
+            </div>
+          )}
+          {totalComm > 0 && (
+            <div className="ps-figure">
+              <span className="ps-figure-label">Commission (our cost)</span>
+              <span className="ps-figure-value" style={{ color: 'var(--danger)' }}>{formatCurrency(totalComm)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hint: revenue only counts after Final Payment is ticked */}
       {!hasFinalPayment && (
