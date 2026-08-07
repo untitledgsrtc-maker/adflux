@@ -10754,3 +10754,56 @@ renders null when clean. §45-safe, no SQL (`error_detail` already live, §126.1
 - Reusable pattern for "surface an API/payment failure to the admin": query the
   failure's persisted error row + a top banner with a fix link. Extend the `.or()` codes
   (or add more banners) for other Meta/API payment classes as owner asks.
+
+
+## 166 · Phase 285 — channel-based lead source: QR Board / Meta Ad / WhatsApp differentiated (2026-08-06)
+
+Owner: "we have an active meta campaign + landed into WhatsApp API, how can we
+differentiate both leads? ... both a+b if possibel." A = channel label (the real
+differentiator). B = per-ad ROI ($ attribution).
+
+### A — SHIPPED + LIVE (Phase 285, `3ad299e`, frozen C4.5 canonical §28/§72, guardian PASS, owner ran the SQL)
+`db/functions/campaign_conversation_ensure_lead.sql` — the `v_source` label is now
+CHANNEL-based so every inbound lead is distinguishable by `leads.source`:
+```
+CASE
+  WHEN NEW.location_id IS NOT NULL THEN 'QR Board'      -- a hoarding-board QR scan
+  WHEN v_src_type = 'meta'         THEN 'Social Media'  -- ad MAPPED to a source_type='meta' campaign (Phase 264, PRESERVED)
+  WHEN NEW.ad_headline IS NOT NULL THEN 'Meta Ad'       -- any other CTWA ad = the LED ads today
+  ELSE 'WhatsApp'                                        -- organic
+END
+```
+Order is FIXED — a QR scan wins over any ad attribution (§136 "QR wins"). This ADDS
+'QR Board' + 'Meta Ad'; it does NOT drop the §136/Phase 264 'Social Media' path (its
+tripwire `phase264_meta_source` still holds) and does NOT change routing (§139 Phase
+266 campaign-driven owner/telecaller is untouched — **display-label only**).
+- Preconditions live: `whatsapp_conversations.ad_headline` (Phase 264 §136) + the
+  webhook always stores it on a CTWA referral (§139). The new NEW.ad_headline read
+  sits inside the double EXCEPTION wrap, so a missing column would degrade to the
+  error-queue (guardian P3) — column is confirmed live (webhook has written it since
+  28 Jul).
+- VERIFY block now ELEVEN checks (added phase285_qr_source '%QR Board%' +
+  phase285_metaad_source '%Meta Ad%'). Owner re-runs the canonical → "Success. No rows
+  returned" (CREATE + NOTIFY only; the SELECT tripwire is commented — run it to prove
+  all eleven TRUE).
+- **A alone satisfies the differentiation ask** — filter /leads by source = 'Meta Ad'
+  (all Meta-ad leads), 'QR Board' (board scans), 'WhatsApp' (organic). No ad-id mapping
+  needed for the label. (Historic leads keep their old 'WhatsApp' source — this labels
+  NEW leads from here on; a one-time backfill of recent ad_headline/location_id rows is
+  possible if the owner wants the past re-labelled.)
+
+### B — per-ad ROI ($ attribution) — NOT built; needs owner Chrome + a routing decision
+B = roll a specific ad's leads under a campaign so the Campaigns-page Leads/Won/Conv
+counters attribute ad spend per-ad. **THE NUANCE (do NOT get this wrong):** §139 Phase
+266 sets `campaign_id` only when the ad id ∈ `campaigns.meta_ad_ids`, and C4.5 reads
+that campaign's `source_type`. If the mapped campaign is `source_type='meta'`, the
+LED-ad lead FLIPS to 'Social Media' + routes to that campaign's default_telecaller
+(Dhara) — the exact §139 anti-pattern the owner wanted to avoid (LED ≠ social). So for
+LED-ad ROI the mapped campaign must be `source_type` != 'meta' so the lead stays 'Meta
+Ad' + routes normally.
+- Needs: (1) the running LED ad's Meta ad-level id from Ads Manager
+  (act=1484122646014945) — an interactive Claude-in-Chrome session on the owner's real
+  logged-in Chrome; (2) a routing/type decision for the "Meta Ad — LED" campaign;
+  (3) SQL to create the campaign + set meta_ad_ids=[ad id].
+- PARKED pending owner: A already differentiates the leads by channel, so B is an
+  optional per-ad $-ROI add-on, not required for the differentiation goal.
