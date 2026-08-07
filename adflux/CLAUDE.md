@@ -10844,6 +10844,12 @@ the only missing piece.
 - **Not §28 frozen** (finance is admin/accounts-only, §155/§156). §45-safe (no
   live sales/hot-path). Parse-check PASS; each row simulated against the classifier.
   No SQL, no APK — JS-only, reaches the app on deploy.
-- If the owner later wants **Private LED** income split out too, add a second branch
-  `t === 'PRIVATE LED'` → `media = 'LED_OTHER'` (the "Private — LED Cities" SEGMED row
-  already exists). Not built — he asked only for Other Media.
+### Phase 167.1 — PRIVATE LED tag (`c1e43d4`, same day)
+Owner "uu do" → added the second private-media branch: `t === 'PRIVATE LED' || t ===
+'LED' || t === 'LED CITIES'` → income/direct_cost, PRIVATE, media `LED_OTHER`
+("Private — LED Cities"), Untitled Adflux Pvt Ltd, Vendor Payment on debit. Same
+one-line pattern; SEGMED `PRIVATE|LED_OTHER` + MEDIA `LED_OTHER` already existed.
+
+Private-media tag set now: **Other Media** (`OTHER_MEDIA`) + **Private LED** / LED /
+LED CITIES (`LED_OTHER`). Government set unchanged: GSRTC + AUTO HOOD. To add any
+further media split, one branch → an enum already in `MEDIA`/`SEGMED`.
