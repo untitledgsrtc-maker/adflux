@@ -50,7 +50,7 @@ DECLARE
   -- as its own Money-Out line). Owner spec 2026-08-07 (§168).
   v_loan_in numeric; v_loan_out numeric; v_draw numeric; v_tax numeric;
   v_sweep numeric; v_asset numeric; v_comm numeric; v_review_out numeric; v_review_in numeric;
-  v_govt_comm numeric;
+  v_govt_comm numeric; v_agency_comm numeric;
   v_tin numeric; v_tout numeric; v_bprofit numeric;
   v_out jsonb;
 BEGIN
@@ -118,6 +118,27 @@ BEGIN
      AND (p_from IS NULL OR p.payment_date>=p_from) AND (p_to IS NULL OR p.payment_date<=p_to);
   IF v_seg = 'PRIVATE' THEN v_govt_comm := 0; END IF;
 
+  -- AGENCY commission (owner 2026-08-07, chose "as the client pays" — accrued
+  -- proportional to collection, like govt). On WON AGENCY-CREATED quotes:
+  -- (payment ÷ deal total) × (subtotal × the agency user's %). XOR with
+  -- v_govt_comm (that requires created_by NOT agency; this requires = agency)
+  -- → a quote is counted in exactly one. Segment-scoped (an agency deal can be
+  -- PRIVATE or GOVERNMENT), so a filtered view only counts that segment. Default
+  -- 5% when the agency user has no rate set (AgencyEarningsView precedent).
+  SELECT COALESCE(SUM(
+           (p.amount_received / NULLIF(q.total_amount,0))
+           * (q.subtotal * COALESCE(u.agency_commission_percent, 5) / 100.0)
+         ),0)
+    INTO v_agency_comm
+    FROM public.payments p
+    JOIN public.quotes q ON q.id = p.quote_id
+    JOIN public.users  u ON u.id = q.created_by
+   WHERE q.status = 'won'
+     AND COALESCE(u.role,'') = 'agency'
+     AND p.approval_status = 'approved'
+     AND (v_seg IS NULL OR q.segment = v_seg)
+     AND (p_from IS NULL OR p.payment_date>=p_from) AND (p_to IS NULL OR p.payment_date<=p_to);
+
   -- excluded-from-profit scalars for the cash view
   SELECT
     COALESCE(SUM(amount) FILTER (WHERE bucket='loan_in'),0),
@@ -132,14 +153,15 @@ BEGIN
     FROM public.finance_transactions
    WHERE (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
 
-  -- COMMISSION MODEL (owner 2026-08-07): the govt-team % ACCRUAL (v_govt_comm) is the
-  -- single commission COST. A bank "Commission" debit (v_comm, tagged OR narration-matched)
-  -- is a SETTLEMENT of that already-booked cost, NOT a second cost — so it is netted out of
-  -- Business Profit (add v_comm back) and out of cash-out (drop it from v_tout), leaving the
-  -- accrual as the one commission figure everywhere. No double-count, no manual guard.
-  v_bprofit := itot - dtot - ctot + v_comm - v_govt_comm;            -- revenue − running costs (bank commission = settlement, added back; accrual is the cost)
+  -- COMMISSION MODEL (owner 2026-08-07): the commission COST = the two accruals
+  -- (v_govt_comm + v_agency_comm). A bank "Commission" debit (v_comm, tagged OR
+  -- narration-matched) is a SETTLEMENT of an already-booked accrual, NOT a second
+  -- cost — netted out of Business Profit (add v_comm back) and out of cash-out
+  -- (drop it from v_tout), leaving the accruals as the commission figure
+  -- everywhere. No double-count, no manual guard.
+  v_bprofit := itot - dtot - ctot + v_comm - v_govt_comm - v_agency_comm;  -- revenue − running costs (bank commission = settlement, added back; both accruals are the cost)
   v_tin     := itot + v_loan_in + v_review_in;                       -- cash IN  (revenue + borrowed + unsorted credits)
-  v_tout    := dtot + (ctot - v_comm) + v_govt_comm + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (bank commission netted; accrual stands in; SWEEP excluded)
+  v_tout    := dtot + (ctot - v_comm) + v_govt_comm + v_agency_comm + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (bank commission netted; accruals stand in; SWEEP excluded)
 
   v_out := jsonb_build_object(
     'income', itot, 'income_gov', ig, 'income_pvt', ip,
@@ -149,7 +171,7 @@ BEGIN
     'margin_pct', CASE WHEN itot>0 THEN round(v_bprofit/itot*100,1) ELSE 0 END,
     -- ---- CASH VIEW (owner spec §168): money in / out / net cash + commission + sweep ----
     'total_in', v_tin, 'total_out', v_tout, 'net_cash', v_tin - v_tout,
-    'commission', v_govt_comm, 'sweep', v_sweep,
+    'commission', v_govt_comm + v_agency_comm, 'commission_govt', v_govt_comm, 'commission_agency', v_agency_comm, 'sweep', v_sweep,
     'money_in', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt) ORDER BY amt DESC)
       FROM (
@@ -179,7 +201,8 @@ BEGIN
            WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
              AND (v_seg IS NULL OR segment=v_seg)
           UNION ALL SELECT 'Common expense', ctot - v_comm
-          UNION ALL SELECT 'Commission', v_govt_comm
+          UNION ALL SELECT 'Commission — govt team', v_govt_comm
+          UNION ALL SELECT 'Commission — agency', v_agency_comm
           UNION ALL SELECT 'Assets / equipment', v_asset
           UNION ALL SELECT 'Loan repaid', v_loan_out
           UNION ALL SELECT 'Personal', v_draw
@@ -360,3 +383,18 @@ SELECT
     - (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS operating_profit,
   (SELECT count(*) FROM public.finance_transactions WHERE bucket='review')      AS review_rows;
 -- (The RPCs are already installed from the CREATE OR REPLACE above — no re-run needed.)
+
+-- VERIFY 2 — the commission the RPC now books (accruals from the CRM, not the bank):
+--   govt_team  = SUM payments.commission_amount on won GOVERNMENT non-agency deals
+--   agency     = SUM (payment ÷ total) × (subtotal × agency %) on won AGENCY-created deals
+-- These reduce the app's Business Profit (below the bank-only operating_profit above).
+SELECT
+  (SELECT COALESCE(SUM(p.commission_amount),0)
+     FROM public.payments p JOIN public.quotes q ON q.id=p.quote_id
+     LEFT JOIN public.users u ON u.id=q.created_by
+    WHERE q.segment='GOVERNMENT' AND q.status='won' AND COALESCE(p.commission_amount,0)>0
+      AND COALESCE(u.role,'')<>'agency' AND p.approval_status='approved')                    AS commission_govt_team,
+  (SELECT COALESCE(SUM((p.amount_received/NULLIF(q.total_amount,0))*(q.subtotal*COALESCE(u.agency_commission_percent,5)/100.0)),0)
+     FROM public.payments p JOIN public.quotes q ON q.id=p.quote_id
+     JOIN public.users u ON u.id=q.created_by
+    WHERE q.status='won' AND COALESCE(u.role,'')='agency' AND p.approval_status='approved')  AS commission_agency;

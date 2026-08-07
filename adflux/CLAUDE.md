@@ -11085,3 +11085,52 @@ are already on each row):
   QuoteDetail pass `payments`.
 - Existing payments recorded before Phase 273 show nothing extra until edited to add the %
   (their commission_amount is null). Not §28-frozen; parse-clean.
+
+
+---
+
+## 171 · Finance — AGENCY commission now in the P&L (accrued, like govt) (2026-08-07)
+
+Owner: "in commission why agency commission not there?" The §169/§273 Commission line only
+had the **govt-team** commission; **agency** commission (paid to external agency partners)
+was a separate, older ledger never wired into the finance P&L. Added it. Owner chose (via
+AskUserQuestion) **"as the client pays"** — accrued proportional to collection, same model
+as govt.
+
+### The two commission worlds (now both in the P&L)
+- **Govt-team** (§273): `v_govt_comm` = SUM(payments.commission_amount) on WON GOVERNMENT
+  deals created by OUR TEAM (created_by NOT agency). Entered per payment.
+- **Agency** (NEW): `v_agency_comm` = SUM over WON AGENCY-CREATED deals' approved payments of
+  `(payment ÷ deal total) × (subtotal × the agency user's %)`. The agency rate =
+  `COALESCE(users.agency_commission_percent, 5)` on `quote.subtotal` (pre-GST) — the SAME
+  formula `AgencyEarningsView` uses for "earned". Segment-scoped (an agency deal can be
+  PRIVATE or GOVERNMENT), so a filtered view only counts that segment's agency deals.
+
+### XOR — no double-count (by CREATOR ROLE)
+`v_govt_comm` requires `created_by role <> 'agency'`; `v_agency_comm` requires
+`created_by role = 'agency'`. So every quote lands in exactly one (or neither). An
+agency-created GOVT deal → agency commission (not govt); a team-created GOVT deal with a
+per-payment % → govt commission (not agency). The bank "Commission" head (`v_comm`, §169.1)
+still nets as the SETTLEMENT of EITHER accrual — no double-count.
+
+### Where it feeds (finance_pnl_summary, edit-in-place canonical)
+`v_bprofit := itot − dtot − ctot + v_comm − v_govt_comm − v_agency_comm` (agency = another
+running cost). `v_tout := … + v_govt_comm + v_agency_comm + …`. Reconciliation HOLDS: Σ
+money-out lines == v_tout (the two commission lines sum to v_govt_comm + v_agency_comm).
+Money-out now shows **"Commission — govt team"** + **"Commission — agency"** as separate
+lines (FinanceV2 renders money_out generically by label — no frontend change needed). New
+scalars `commission_govt` / `commission_agency` on the RPC output (+ `commission` = sum).
+
+### NOT zero-regression (unlike §273) — expect the number to move
+`v_agency_comm` reads existing agency-created won quotes, so if any have collected payments,
+the app's **Business Profit DROPS** by that agency commission (previously uncounted). That is
+the fix working, not a bug. The file's **VERIFY 2** block prints `commission_govt_team` +
+`commission_agency` so the owner sees the exact ₹ booked (the bank-only VERIFY 1
+`-114378.95` doesn't include either accrual — it's finance_transactions only, not payments).
+
+### Ship
+Pure SQL (no frontend, no new column — `agency_commission_percent` + `agency_commission_
+payouts` exist since Phase 101.A1/A3). Owner RE-RUNS `supabase_finance_p3_rpcs.sql`
+(CREATE OR REPLACE) → the P&L picks up agency commission immediately. Not §28-frozen. Money
+math hand-verified (XOR by creator role, reconciliation Σ money_out=v_tout, formula matches
+AgencyEarningsView, segment-scoped, §42 Vishal sees only govt-segment agency commission).
