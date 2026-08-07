@@ -10807,3 +10807,43 @@ Ad' + routes normally.
   (3) SQL to create the campaign + set meta_ad_ids=[ad id].
 - PARKED pending owner: A already differentiates the leads by channel, so B is an
   optional per-ad $-ROI add-on, not required for the differentiation goal.
+
+
+## 167 · Finance import — OTHER MEDIA tag (private income + expense) (2026-08-07, `3ce18fb`)
+
+Owner (after aligning the import tags to his accountant dropdown, §166): "Other
+media income & expense too needed." His dropdown had GSRTC + AUTO HOOD (both
+GOVERNMENT media) but no PRIVATE-media tag. Added one classifier branch, mirroring
+the AUTO HOOD pattern.
+
+### The change (`src/pages/v2/FinanceV2.jsx` `classifyImport`, additive)
+`else if (t === 'OTHER MEDIA') { co = 'Untitled Adflux Pvt Ltd'; b = dir==='in' ?
+'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'OTHER_MEDIA'; if (dir==='out')
+head = 'Vendor Payment' }` — a credit → private income, a debit → private direct
+cost. The accountant adds **"Other Media"** to his Type dropdown; case/space-
+insensitive (`tag.toUpperCase().trim()`).
+
+### Why it needed only ONE line (verified against the live RPC + Register)
+Everything downstream was already wired: `MEDIA` has `OTHER_MEDIA`, the Register
+`SEGMED` retag list has `PRIVATE|OTHER_MEDIA` = "Private — Other Media", and
+`finance_pnl_summary` (`supabase_finance_p3_rpcs.sql`) reads `segment` + `media_type`
+off `finance_transactions` for BOTH the income split (COALESCE(segment, company→seg))
+AND the direct-cost `by_segment`/`revenue_mix` — so a row tagged PRIVATE + OTHER_MEDIA
+lands as "Pvt · OTHER_MEDIA" income/cost with zero further change. The classifier was
+the only missing piece.
+
+### Contracts / notes
+- The finance import tags (§166) = the accountant's exact dropdown: Untitled
+  Advertising · GSRTC · AUTO HOOD · **Other Media** (new) · Personal · Other Expense ·
+  Common Expense · SWEEP · LOAN FROM FRIEND · TAX. All are `===` exact-string matches
+  in `classifyImport` (upper+trim). Adding a NEW media/segment tag = one branch that
+  sets `seg` + `media` to an enum already in `MEDIA`/`SEGMED` (else the P&L can't read it).
+- OTHER MEDIA forces `co = 'Untitled Adflux Pvt Ltd'` (§4 private company); GSRTC/AUTO
+  HOOD leave `co = bankco`. Cosmetic (Register company display) — the segment is set
+  explicitly so the P&L split doesn't depend on `co`.
+- **Not §28 frozen** (finance is admin/accounts-only, §155/§156). §45-safe (no
+  live sales/hot-path). Parse-check PASS; each row simulated against the classifier.
+  No SQL, no APK — JS-only, reaches the app on deploy.
+- If the owner later wants **Private LED** income split out too, add a second branch
+  `t === 'PRIVATE LED'` → `media = 'LED_OTHER'` (the "Private — LED Cities" SEGMED row
+  already exists). Not built — he asked only for Other Media.
