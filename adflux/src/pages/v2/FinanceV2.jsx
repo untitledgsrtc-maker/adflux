@@ -766,7 +766,7 @@ function RegisterTab() {
   const [rows, setRows] = useState([]); const [banks, setBanks] = useState([]); const [heads, setHeads] = useState([])
   const [loading, setLoading] = useState(true); const [fBucket, setFBucket] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
   const [fCompany, setFCompany] = useState('all'); const [fSegment, setFSegment] = useState('all'); const [fMonth, setFMonth] = useState('all')
-  const [hideSweep, setHideSweep] = useState(true)
+  const [hideSweep, setHideSweep] = useState(false)   // show all by default (hiding all-transfer imports looked empty); chip to declutter
   const [selected, setSelected] = useState(() => new Set())
   const EMPTY_AF = { date: istTodayISO(), desc: '', amount: '', dir: 'out', tag: '', bank: '' }
   const [addOpen, setAddOpen] = useState(false); const [af, setAf] = useState(EMPTY_AF)
