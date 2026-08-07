@@ -49,10 +49,12 @@
 --                     fallback. Phase 168 dropped it -> every lead showed
 --                     'WhatsApp lead'; RESTORED Phase 191 (3 Jul). Never
 --                     re-hardcode the name.
---    • Phase 264    — lead source = 'Social Media' when the routing campaign is
---                     source_type='meta' (a Meta Click-to-WhatsApp ad lead,
---                     attributed by api/wa/webhook.js reading m.referral); every
---                     other lead stays source 'WhatsApp' byte-identical.
+--    • Phase 264/285 — CHANNEL-based lead source (do NOT collapse back to a single
+--                     label): NEW.location_id → 'QR Board'; a source_type='meta'
+--                     campaign (v_src_type='meta') → 'Social Media' (Phase 264,
+--                     preserved); NEW.ad_headline → 'Meta Ad' (Phase 285, the LED
+--                     CTWA ads today); else → 'WhatsApp'. Order is fixed (QR wins).
+--                     m.referral / ad_headline are stamped by api/wa/webhook.js.
 --    • Safety       — double EXCEPTION wrap: a race/error must NEVER break the
 --                     whatsapp_conversations store.
 --
@@ -71,7 +73,7 @@ DECLARE
   v_owner     uuid;
   v_segment   text;
   v_src_type  text;                   -- Phase 264 — the campaign's source_type
-  v_source    text := 'WhatsApp';     -- lead source; 'Social Media' for a Meta campaign
+  v_source    text := 'WhatsApp';     -- lead source channel (Phase 285: QR Board / Meta Ad / Social Media / WhatsApp)
   v_digits    text;
   v_evt       text := NEW.id::text;   -- one lead-attempt per conversation
 BEGIN
@@ -126,9 +128,26 @@ BEGIN
         FROM public.whatsapp_accounts WHERE id = NEW.whatsapp_account_id;
     END IF;
     v_segment := COALESCE(v_segment, 'PRIVATE');
-    -- Phase 264 — a Meta Click-to-WhatsApp lead (campaign.source_type='meta')
-    -- is tagged 'Social Media'; everything else stays 'WhatsApp' (byte-identical).
-    v_source  := CASE WHEN v_src_type = 'meta' THEN 'Social Media' ELSE 'WhatsApp' END;
+    -- Phase 285 — CHANNEL-based lead source so the leads list can tell apart a
+    -- QR-board scan, a Meta ad, and an organic WhatsApp inbound (owner ask
+    -- 2026-08-06: "we have an active meta campaign + landed into WhatsApp API,
+    -- how can we differentiate both leads"). ORDER matters — a board scan wins
+    -- over any ad attribution (§136 "QR wins, more specific"):
+    --   • NEW.location_id present  → 'QR Board'     (a hoarding-board QR scan)
+    --   • v_src_type = 'meta'      → 'Social Media' (an ad MAPPED to a source_type='meta'
+    --       campaign — §139/Phase 266 sets campaign_id, hence v_src_type, only for a
+    --       mapped ad; today that stays a FUTURE social-service offer, not the LED ads)
+    --   • NEW.ad_headline present  → 'Meta Ad'      (any other Click-to-WhatsApp ad —
+    --       the LED ads today; webhook §139 ALWAYS stores ad_headline on a CTWA referral)
+    --   • else                     → 'WhatsApp'     (organic inbound)
+    -- Phase 264's 'Social Media' path is PRESERVED (its tripwire still holds); this
+    -- only ADDS 'QR Board' + 'Meta Ad' so the channels are distinguishable by source.
+    v_source := CASE
+      WHEN NEW.location_id IS NOT NULL THEN 'QR Board'
+      WHEN v_src_type = 'meta'         THEN 'Social Media'
+      WHEN NEW.ad_headline IS NOT NULL THEN 'Meta Ad'
+      ELSE 'WhatsApp'
+    END;
 
     -- P0-2 — never a NULL-owner lead; queue for manual review instead.
     IF v_owner IS NULL THEN
@@ -206,7 +225,7 @@ UPDATE public.leads l
    AND COALESCE(BTRIM(c.customer_name), '') <> '';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All NINE must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All ELEVEN must be TRUE.
 -- A FALSE means an older copy was re-run and stripped a P0 contract → re-run this.
 -- ============================================================================
 -- SELECT
@@ -216,6 +235,8 @@ UPDATE public.leads l
 --   pg_get_functiondef(p.oid) LIKE '%''WhatsApp''%'               AS source_whatsapp,
 --   pg_get_functiondef(p.oid) LIKE '%NEW.customer_name%'          AS c11_lead_name,
 --   pg_get_functiondef(p.oid) LIKE '%Social Media%'               AS phase264_meta_source,
+--   pg_get_functiondef(p.oid) LIKE '%QR Board%'                   AS phase285_qr_source,
+--   pg_get_functiondef(p.oid) LIKE '%Meta Ad%'                    AS phase285_metaad_source,
 --   pg_get_functiondef(p.oid) LIKE '%inbound_leads%'              AS routing_audit_queue,
 --   pg_get_functiondef(p.oid) LIKE '%assigned_to = COALESCE(assigned_to, v_owner)%' AS dedup_stamps_owner,
 --   pg_get_functiondef(p.oid) LIKE '%EXCEPTION WHEN OTHERS%'      AS never_break_store
