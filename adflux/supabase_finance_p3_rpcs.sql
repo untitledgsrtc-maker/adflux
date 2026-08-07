@@ -290,7 +290,9 @@ BEGIN
                     WHERE p.quote_id=q.id AND p.approval_status='approved'),0)) outstanding,
                q.created_at::date created_date
           FROM public.quotes q
-         WHERE q.status IN ('sent','negotiating','won') AND (NOT v_gov_only OR q.segment='GOVERNMENT')
+         -- §168.2: TRUE receivables = WON deals with money still outstanding
+         -- (was sent/negotiating/won → that counted un-won quotes = overstated).
+         WHERE q.status = 'won' AND (NOT v_gov_only OR q.segment='GOVERNMENT')
       ) r WHERE outstanding > 0), '{}'::jsonb),
     'approvals_pending', (SELECT count(*) FROM public.payments WHERE approval_status='pending'),
     'review_count', (SELECT count(*) FROM public.finance_transactions WHERE bucket='review'),

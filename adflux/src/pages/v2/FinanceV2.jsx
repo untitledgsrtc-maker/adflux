@@ -368,7 +368,7 @@ function HomeTab({ onReview }) {
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <div style={g4}>
-        <Kpi label="To collect" value={fmtINR(tc.total || 0)} sub={`${tc.count || 0} clients`} Icon={IndianRupee} color="var(--danger)" tint="var(--danger-soft, rgba(239,68,68,.12))" />
+        <Kpi label="To collect" value={fmtINR(tc.total || 0)} sub={`${tc.count || 0} won deals, unpaid`} Icon={IndianRupee} color="var(--danger)" tint="var(--danger-soft, rgba(239,68,68,.12))" />
         <Kpi label="Approvals pending" value={d?.approvals_pending ?? 0} sub="payments from reps" Icon={CheckSquare} color="var(--warning)" tint="var(--warning-soft, rgba(245,158,11,.12))" />
         <Kpi label="REVIEW to tag" value={d?.review_count ?? 0} sub="unclassified entries" Icon={AlertTriangle} color="var(--purple, #c084fc)" tint="var(--purple-soft, rgba(192,132,252,.14))" />
         <Kpi label="Reminders" value={tasks.length} sub="active tasks" Icon={Clock} color="var(--blue)" tint="var(--blue-soft, rgba(59,130,246,.12))" />
@@ -384,7 +384,7 @@ function HomeTab({ onReview }) {
           {today.length === 0 && <div style={{ color: 'var(--text-subtle)', fontSize: 13 }}>Nothing due.</div>}
         </Card>
         <Card>
-          <CH>Money to collect <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>oldest first</span></CH>
+          <CH>Money to collect <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>won deals, unpaid · oldest first</span></CH>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr><th style={thL}>Client</th><th style={thR}>Overdue</th><th style={thR}>Amount</th></tr></thead>
             <tbody>
@@ -403,9 +403,9 @@ function HomeTab({ onReview }) {
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 12, fontSize: 13 }}>
             <span>Bank received <b style={{ fontFamily: 'Space Grotesk' }}>{fmtINR(recon.bank_income_total || 0)}</b></span>
             <span>CRM recorded <b style={{ fontFamily: 'Space Grotesk' }}>{fmtINR(recon.crm_receipts_total || 0)}</b></span>
-            <span style={{ color: Math.round(recon.gap || 0) !== 0 ? 'var(--warning)' : 'var(--success)' }}>Gap <b style={{ fontFamily: 'Space Grotesk' }}>{fmtINR(recon.gap || 0)}</b></span>
+            {recon.bank_income_total > 0 && <span style={{ color: Math.round(recon.gap || 0) !== 0 ? 'var(--warning)' : 'var(--success)' }}>Gap <b style={{ fontFamily: 'Space Grotesk' }}>{fmtINR(recon.gap || 0)}</b></span>}
           </div>
-          {(recon.unmatched || []).length > 0 ? (
+          {recon.bank_income_total > 0 ? ((recon.unmatched || []).length > 0 ? (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead><tr><th style={thL}>Date</th><th style={thL}>Bank entry</th><th style={thL}>Segment</th><th style={thR}>Amount</th></tr></thead>
               <tbody>
@@ -416,8 +416,10 @@ function HomeTab({ onReview }) {
                   <td style={tdR}>{fmtINR(u.amount)}</td></tr>)}
               </tbody>
             </table>
-          ) : <div style={{ color: 'var(--success)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={15} /> Every bank receipt matches a CRM payment.</div>}
-          {(recon.unmatched || []).length > 12 && <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 8 }}>+ {recon.unmatched.length - 12} more — open the Register to tag them.</div>}
+          ) : <div style={{ color: 'var(--success)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={15} /> Every bank receipt matches a CRM payment.</div>) : (
+            <div style={{ color: 'var(--text-subtle)', fontSize: 13 }}>No bank statements loaded yet — import your statements (Import tab) to reconcile bank receipts against the CRM.</div>
+          )}
+          {recon.bank_income_total > 0 && (recon.unmatched || []).length > 12 && <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 8 }}>+ {recon.unmatched.length - 12} more — open the Register to tag them.</div>}
         </Card>
       )}
     </div>
