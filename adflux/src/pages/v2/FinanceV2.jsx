@@ -516,7 +516,8 @@ function classifyImport(tag, dir, desc, hcat, bankco, rules) {
 }
 function impDate(v, last) {
   if (v == null || v === '') return null
-  if (typeof v === 'number') return null // serial → untrusted, carry forward from neighbours
+  if (v instanceof Date) return (isNaN(v) || v > new Date()) ? null : v  // cellDates:true → real date; trust it (skip future/invalid)
+  if (typeof v === 'number') return null // bare serial → untrusted, carry forward from neighbours
   const m = String(v).trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
   if (!m) return null
   let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000
@@ -567,7 +568,7 @@ function ImportTab() {
     setErr(null); setResult(null)
     try {
       const XLSX = await import('xlsx')
-      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true })  // date cells → real Date objects (not corrupt serials)
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false })
       let h = 0
@@ -765,6 +766,7 @@ function RegisterTab() {
   const [rows, setRows] = useState([]); const [banks, setBanks] = useState([]); const [heads, setHeads] = useState([])
   const [loading, setLoading] = useState(true); const [fBucket, setFBucket] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
   const [fCompany, setFCompany] = useState('all'); const [fSegment, setFSegment] = useState('all'); const [fMonth, setFMonth] = useState('all')
+  const [hideSweep, setHideSweep] = useState(true)
   const [selected, setSelected] = useState(() => new Set())
   const EMPTY_AF = { date: istTodayISO(), desc: '', amount: '', dir: 'out', tag: '', bank: '' }
   const [addOpen, setAddOpen] = useState(false); const [af, setAf] = useState(EMPTY_AF)
@@ -862,6 +864,7 @@ function RegisterTab() {
 
   const months = useMemo(() => [...new Set(rows.map(r => (r.txn_date || '').slice(0, 7)).filter(Boolean))].sort((a, b) => b.localeCompare(a)), [rows])
   const filtered = useMemo(() => rows.filter(r => {
+    if (hideSweep && fBucket !== 'internal_transfer' && r.bucket === 'internal_transfer') return false  // own-account transfers = noise, hidden by default
     if (fBucket !== 'all' && r.bucket !== fBucket) return false
     if (fBank !== 'all' && String(r.bank_account_id) !== fBank) return false
     if (fCompany !== 'all' && r.company !== fCompany) return false
@@ -869,7 +872,8 @@ function RegisterTab() {
     if (fMonth !== 'all' && (r.txn_date || '').slice(0, 7) !== fMonth) return false
     if (q && !((r.description || '') + ' ' + (r.ref_no || '')).toLowerCase().includes(q.toLowerCase())) return false
     return true
-  }), [rows, fBucket, fBank, fCompany, fSegment, fMonth, q])
+  }), [rows, hideSweep, fBucket, fBank, fCompany, fSegment, fMonth, q])
+  const sweepCount = rows.filter(r => r.bucket === 'internal_transfer').length
   const groups = useMemo(() => {
     const g = {}
     filtered.forEach(r => { const m = (r.txn_date || '').slice(0, 7); (g[m] = g[m] || []).push(r) })
@@ -883,6 +887,7 @@ function RegisterTab() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: 14, borderBottom: '1px solid var(--border)' }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>{filtered.length} transactions <span style={{ color: 'var(--text-subtle)', fontWeight: 400 }}>&middot; edit any dropdown, dashboard updates live</span></div>
         {reviewCount > 0 && <span onClick={() => setFBucket('review')} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to sort</span>}
+        {sweepCount > 0 && <span onClick={() => setHideSweep(h => !h)} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{hideSweep ? `${sweepCount} transfers hidden · show` : 'hide transfers'}</span>}
         {selected.size > 0 ? (
           <>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent, #FFE600)' }}>{selected.size} selected:</span>
