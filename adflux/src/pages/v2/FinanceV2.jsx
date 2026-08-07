@@ -735,19 +735,28 @@ const COMPANIES = ['Untitled Advertising', 'Untitled Adflux Pvt Ltd', 'Trade Ven
 // manual add-transaction: the accountant's Type dropdown (classifyImport derives the rest)
 const MANUAL_TAGS = ['Untitled Advertising', 'GSRTC', 'AUTO HOOD', 'Other Media', 'Private LED',
   'Personal', 'Common Expense', 'Other Expense', 'Commission', 'SWEEP', 'LOAN FROM FRIEND', 'TAX']
+// reverse of classifyImport: a row's bucket/media/company/head → its Type tag (for the Register's one-column view)
+function tagOf(r, headName) {
+  const b = r.bucket, m = r.media_type
+  if (b === 'internal_transfer') return 'SWEEP'
+  if (b === 'owner_drawings') return 'Personal'
+  if (b === 'loan_in' || b === 'loan_out') return 'LOAN FROM FRIEND'
+  if (b === 'tax') return 'TAX'
+  if (b === 'income' || b === 'direct_cost') {
+    if (m === 'GSRTC_LED') return 'GSRTC'
+    if (m === 'AUTO_HOOD') return 'AUTO HOOD'
+    if (m === 'OTHER_MEDIA') return 'Other Media'
+    if (m === 'LED_OTHER') return 'Private LED'
+    if (r.company === 'Untitled Advertising') return 'Untitled Advertising'
+    return ''
+  }
+  if (b === 'common_expense') return headName === 'Commission' ? 'Commission' : 'Common Expense'
+  return ''
+}
 const BUCKET_OPTS = [
   ['income', 'Income'], ['direct_cost', 'Direct Cost'], ['common_expense', 'Common / Overhead'],
   ['owner_drawings', 'Owner Drawings'], ['investment', 'Investment'], ['asset', 'Asset'],
   ['loan_in', 'Loan In'], ['loan_out', 'Loan Out'], ['internal_transfer', 'Transfer'], ['tax', 'Tax'], ['review', 'Review'],
-]
-const SEGMED = [
-  ['GOVERNMENT|AUTO_HOOD', 'Government — Auto Hood'],
-  ['GOVERNMENT|GSRTC_LED', 'Government — GSRTC LED'],
-  ['PRIVATE|OTHER_MEDIA', 'Private — Other Media'],
-  ['PRIVATE|LED_OTHER', 'Private — LED Cities'],
-  ['GOVERNMENT|', 'Government — Other'],
-  ['PRIVATE|', 'Private — Other'],
-  ['|', 'Common (all)'],
 ]
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 function monthLabel(ym) { const [y, m] = (ym || '').split('-'); return m ? `${MONTHS[+m - 1]}-${y.slice(2)}` : ym }
@@ -803,16 +812,6 @@ function RegisterTab() {
     const gone = new Set(ids)
     setRows(rs => rs.filter(x => !gone.has(x.id))); setSelected(new Set()); toastSuccess(`Deleted ${ids.length}.`)
   }
-  const bulkSet = async (obj) => {
-    const ids = [...selected]; if (!ids.length) return
-    const sel = new Set(ids)
-    setRows(rs => rs.map(r => sel.has(r.id) ? { ...r, ...obj } : r))
-    for (let i = 0; i < ids.length; i += 200) {
-      const { error } = await supabase.from('finance_transactions').update(obj).in('id', ids.slice(i, i + 200))
-      if (error) { toastError(error, 'Could not update.'); load(); return }
-    }
-    toastSuccess(`Updated ${ids.length}.`)
-  }
 
   const saveAdd = async () => {
     if (savingRef.current || saving) return
@@ -835,6 +834,30 @@ function RegisterTab() {
     savingRef.current = false; setSaving(false)
     if (error) { toastError(error, 'Could not add transaction.'); return }
     setRows(rs => [data, ...rs]); setAf({ ...EMPTY_AF }); setAddOpen(false); toastSuccess('Transaction added.')
+  }
+
+  const headById = useMemo(() => Object.fromEntries(heads.map(h => [h.id, h.name])), [heads])
+  const bulkRetag = async (tag) => {   // Set Type on all selected (per-row derive: direction/bank differ)
+    const ids = [...selected]; if (!ids.length) return
+    const headByName = Object.fromEntries(heads.map(h => [h.name, h.id])); const sel = new Set(ids)
+    const upd = rows.filter(r => sel.has(r.id)).map(r => {
+      const bank = banks.find(b => String(b.id) === String(r.bank_account_id))
+      const bankco = /adflux/i.test((bank && bank.name) || '') ? 'Untitled Adflux Pvt Ltd' : 'Untitled Advertising'
+      const c = classifyImport(tag, r.direction, r.description, '', bankco, [])
+      return { id: r.id, bucket: c.bucket, company: c.company, segment: c.segment, media_type: c.media_type, expense_head_id: c.head ? (headByName[c.head] || null) : null, raw_tag: tag || null }
+    })
+    const byId = Object.fromEntries(upd.map(u => [u.id, u]))
+    setRows(rs => rs.map(r => byId[r.id] ? { ...r, ...byId[r.id] } : r))
+    for (const u of upd) { const { id, ...obj } = u; const { error } = await supabase.from('finance_transactions').update(obj).eq('id', id); if (error) { toastError(error, 'Could not update.'); load(); return } }
+    toastSuccess(`Re-tagged ${upd.length}.`)
+  }
+  const retag = (r, tag) => {   // one Type dropdown → re-derive bucket/segment/company/media/head
+    const bank = banks.find(b => String(b.id) === String(r.bank_account_id))
+    const bankco = /adflux/i.test((bank && bank.name) || '') ? 'Untitled Adflux Pvt Ltd' : 'Untitled Advertising'
+    const c = classifyImport(tag, r.direction, r.description, '', bankco, [])
+    const headByName = Object.fromEntries(heads.map(h => [h.name, h.id]))
+    patch(r.id, { bucket: c.bucket, company: c.company, segment: c.segment, media_type: c.media_type,
+      expense_head_id: c.head ? (headByName[c.head] || null) : null, raw_tag: tag || null })
   }
 
   const months = useMemo(() => [...new Set(rows.map(r => (r.txn_date || '').slice(0, 7)).filter(Boolean))].sort((a, b) => b.localeCompare(a)), [rows])
@@ -863,9 +886,7 @@ function RegisterTab() {
         {selected.size > 0 ? (
           <>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent, #FFE600)' }}>{selected.size} selected:</span>
-            <select value="" onChange={e => { if (e.target.value) bulkSet({ company: e.target.value === '__none__' ? null : e.target.value }) }} style={selStyle}><option value="">Set company…</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}<option value="__none__">— clear —</option></select>
-            <select value="" onChange={e => { if (e.target.value) bulkSet({ bucket: e.target.value }) }} style={selStyle}><option value="">Set bucket…</option>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-            <select value="" onChange={e => { if (e.target.value) { const [sg, md] = e.target.value.split('|'); bulkSet({ segment: sg || null, media_type: md || null }) } }} style={selStyle}><option value="">Set segment…</option>{SEGMED.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+            <select value="" onChange={e => { if (e.target.value) bulkRetag(e.target.value === '__rev__' ? '' : e.target.value) }} style={selStyle}><option value="">Set type…</option>{MANUAL_TAGS.map(t => <option key={t} value={t}>{t}</option>)}<option value="__rev__">Review / to sort</option></select>
             <button onClick={bulkDel} style={{ background: 'var(--danger, #EF4444)', color: '#fff', border: 'none', borderRadius: 999, padding: '5px 13px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', gap: 6, alignItems: 'center' }}><Trash2 size={13} />Delete {selected.size}</button>
             <span onClick={() => setSelected(new Set())} style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}>clear</span>
           </>
@@ -901,11 +922,11 @@ function RegisterTab() {
         )
       })()}
       <div style={{ overflowX: 'auto', maxHeight: '72vh', overflowY: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 1180 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 780 }}>
           <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
             <th style={{ ...thL, width: 30 }}><input type="checkbox" checked={filtered.length > 0 && filtered.every(r => selected.has(r.id))} onChange={e => setSelected(e.target.checked ? new Set(filtered.map(r => r.id)) : new Set())} /></th>
             <th style={thL}>Date</th><th style={thL}>Description</th><th style={thR}>Amount</th>
-            <th style={thL}>Company</th><th style={thL}>Bucket</th><th style={thL}>Segment</th><th style={thL}>Expense Head</th><th style={thL}>Bank</th><th style={thL}></th>
+            <th style={thL}>Type</th><th style={thL}>Bank</th><th style={thL}></th>
           </tr></thead>
           <tbody>
             {groups.flatMap(([m, rs]) => {
@@ -914,21 +935,23 @@ function RegisterTab() {
               const head = (
                 <tr key={'h' + m} style={{ background: 'var(--surface-2, #334155)' }}>
                   <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={4}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 11 }}>&middot; {rs.length} txns</span></td>
-                  <td style={{ ...tdL, fontSize: 11.5 }} colSpan={6}><span style={{ color: 'var(--success)' }}>In {fmtINR(inn)}</span> &nbsp; <span style={{ color: 'var(--danger)' }}>Out {fmtINR(out)}</span> &nbsp; <b>Net {fmtINR(inn - out)}</b></td>
+                  <td style={{ ...tdL, fontSize: 11.5 }} colSpan={3}><span style={{ color: 'var(--success)' }}>In {fmtINR(inn)}</span> &nbsp; <span style={{ color: 'var(--danger)' }}>Out {fmtINR(out)}</span> &nbsp; <b>Net {fmtINR(inn - out)}</b></td>
                 </tr>
               )
               const trs = rs.map(r => {
-                const segmed = `${r.segment || ''}|${r.media_type || ''}`
+                const bLbl = (BUCKET_OPTS.find(([k]) => k === r.bucket) || [, '—'])[1]
+                const segTxt = r.segment ? (r.segment === 'GOVERNMENT' ? 'Govt' : 'Pvt') + (r.media_type ? '·' + r.media_type : '') : ''
+                const bHint = bLbl + (segTxt ? ' · ' + segTxt : '')
                 return (
                   <tr key={r.id} style={{ background: selected.has(r.id) ? 'rgba(255,230,0,.08)' : r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
                     <td style={tdL}><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></td>
                     <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{fmtDate(r.txn_date)}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>~</span> : ''}</td>
                     <td style={{ ...tdL, maxWidth: 260 }} title={r.description}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>{r.ref_no ? <div style={{ fontSize: 10.5, color: 'var(--text-subtle)' }}>Receipt {r.ref_no}</div> : null}</td>
                     <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
-                    <td style={tdL}><select value={r.company || ''} onChange={e => patch(r.id, { company: e.target.value || null })} style={selStyle}><option value="">-</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
-                    <td style={tdL}><select value={r.bucket} onChange={e => patch(r.id, { bucket: e.target.value })} style={selStyle}>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
-                    <td style={tdL}><select value={SEGMED.some(([k]) => k === segmed) ? segmed : ''} onChange={e => { const [sg, md] = e.target.value.split('|'); patch(r.id, { segment: sg || null, media_type: md || null }) }} style={selStyle}><option value="">-</option>{SEGMED.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
-                    <td style={tdL}><select value={r.expense_head_id || ''} onChange={e => patch(r.id, { expense_head_id: e.target.value || null })} style={selStyle}><option value="">-</option>{heads.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}</select></td>
+                    <td style={tdL}>
+                      <select value={tagOf(r, headById[r.expense_head_id])} onChange={e => retag(r, e.target.value)} style={selStyle}><option value="">Review / to sort</option>{MANUAL_TAGS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                      <div style={{ fontSize: 10.5, color: 'var(--text-subtle)', marginTop: 2 }}>{bHint}</div>
+                    </td>
                     <td style={tdL}><select value={r.bank_account_id || ''} onChange={e => patch(r.id, { bank_account_id: e.target.value })} style={selStyle}>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></td>
                     <td style={tdL}><span onClick={() => del(r)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', display: 'inline-flex' }} title="Delete"><Trash2 size={15} /></span></td>
                   </tr>
