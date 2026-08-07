@@ -510,13 +510,13 @@ function classifyImport(tag, dir, desc, hcat, bankco, rules) {
   else if (t === 'LOAN FROM FRIEND') b = dir === 'in' ? 'loan_in' : 'loan_out'
   else if (t === 'TAX') { b = 'tax'; head = 'Duties & Taxes' }
   else if (t === 'COMMON EXPENSE') { b = 'common_expense'; head = IMP_HCAT[hcat] || null }
-  // 4 fixed segments (owner 2026-08-07): media type sets segment + company.
-  //   Govt = Untitled Advertising : GSRTC_LED, AUTO_HOOD
-  //   Pvt  = Untitled Adflux Pvt Ltd : LED_OTHER, OTHER_MEDIA
+  // Segment is fixed by media type; company assignment per owner 2026-08-07:
+  //   GSRTC_LED / AUTO_HOOD   -> Govt, company = Untitled Advertising (fixed)
+  //   OTHER_MEDIA / LED_OTHER -> Pvt,  company = the bank account selected (co→bankco, line 531)
   else if (t === 'GSRTC') { co = 'Untitled Advertising'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'GSRTC_LED' }
   else if (t === 'AUTO HOOD') { co = 'Untitled Advertising'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'AUTO_HOOD'; if (dir === 'out') head = 'Vendor Payment' }
-  else if (t === 'OTHER MEDIA') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'OTHER_MEDIA'; if (dir === 'out') head = 'Vendor Payment' }
-  else if (t === 'PRIVATE LED' || t === 'LED' || t === 'LED CITIES') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'LED_OTHER'; if (dir === 'out') head = 'Vendor Payment' }
+  else if (t === 'OTHER MEDIA') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'OTHER_MEDIA'; if (dir === 'out') head = 'Vendor Payment' }
+  else if (t === 'PRIVATE LED' || t === 'LED' || t === 'LED CITIES') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'LED_OTHER'; if (dir === 'out') head = 'Vendor Payment' }
   else if (t === 'COMMISSION') { b = 'common_expense'; head = 'Commission' }  // §168 real running cost, own Money-Out line
   else if (t === 'UNTITLED ADVERTISING') { co = 'Untitled Advertising'; b = dir === 'in' ? 'income' : 'review' }
   else if (t === 'UNTITLED ADFLUX PVT LTD') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'review' }

@@ -184,14 +184,27 @@ BEGIN
                     GROUP BY 1,2) c
           ON c.seg=i.seg AND COALESCE(c.med,'~')=COALESCE(i.med,'~')
       ) x), '[]'::jsonb),
-    'per_company', jsonb_build_array(
-      jsonb_build_object('company','Untitled Advertising','income',ig,
-        'op_pnl', ig-dg-CASE WHEN itot>0 THEN round(ctot*ig/itot) ELSE 0 END,
-        'margin', CASE WHEN ig>0 THEN round((ig-dg-CASE WHEN itot>0 THEN ctot*ig/itot ELSE 0 END)/ig*100,1) ELSE NULL END),
-      jsonb_build_object('company','Untitled Adflux Pvt Ltd','income',ip,
-        'op_pnl', ip-dp-CASE WHEN itot>0 THEN round(ctot*ip/itot) ELSE 0 END,
-        'margin', CASE WHEN ip>0 THEN round((ip-dp-CASE WHEN itot>0 THEN ctot*ip/itot ELSE 0 END)/ip*100,1) ELSE NULL END)
-    ),
+    -- Per company = grouped by the REAL company column (owner 2026-08-07): GSRTC/Auto
+    -- are pinned to Untitled Advertising; Other Media / Pvt LED carry the bank account's
+    -- company. Common expense allocated by that company's income share. (by_segment above
+    -- stays segment-based, so Pvt·Other Media can sit under the Untitled Advertising company.)
+    'per_company', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'company', comp, 'income', inc,
+        'op_pnl', inc - dcost - CASE WHEN itot>0 THEN round(ctot*inc/itot) ELSE 0 END,
+        'margin', CASE WHEN inc>0 THEN round((inc - dcost - CASE WHEN itot>0 THEN ctot*inc/itot ELSE 0 END)/inc*100,1) ELSE NULL END
+      ) ORDER BY inc DESC)
+      FROM (
+        SELECT COALESCE(company,'Unassigned') AS comp,
+               COALESCE(SUM(amount) FILTER (WHERE bucket='income'),0) AS inc,
+               COALESCE(SUM(amount) FILTER (WHERE bucket='direct_cost'),0) AS dcost
+          FROM public.finance_transactions
+         WHERE bucket IN ('income','direct_cost')
+           AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+           AND (v_seg IS NULL OR COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
+                                                                WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg)
+         GROUP BY 1
+      ) pc), '[]'::jsonb),
     'revenue_mix', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt,
                'pct', CASE WHEN itot>0 THEN round(amt/itot*100) ELSE 0 END) ORDER BY amt DESC)
