@@ -10853,3 +10853,70 @@ one-line pattern; SEGMED `PRIVATE|LED_OTHER` + MEDIA `LED_OTHER` already existed
 Private-media tag set now: **Other Media** (`OTHER_MEDIA`) + **Private LED** / LED /
 LED CITIES (`LED_OTHER`). Government set unchanged: GSRTC + AUTO HOOD. To add any
 further media split, one branch → an enum already in `MEDIA`/`SEGMED`.
+
+
+## 168 · Finance — cash-view P&L (Business Profit + Money In/Out) + Commission + manual add (2026-08-07)
+
+Owner iteratively designed the P&L layout he wanted, then "go". Built + adversarially
+verified (3-lens workflow: money/security/contract). All on origin. **1 SQL to run**
+(`supabase_finance_p3_rpcs.sql`, re-run — CREATE OR REPLACE + Commission head seed);
+JS auto-deploys; no APK. Admin/accounts-only, NOT §28 frozen.
+
+### The two-report structure (owner spec — do NOT merge them)
+- **TOP · Business Profit** = revenue − running costs (direct media cost + common +
+  **commission**). Ignores loan / personal / assets / tax / sweep. "Does the ads
+  business earn?" (== operating_profit numerically; commission ⊂ common.)
+- **BELOW · Cash In vs Money Out** (owner's literal list):
+  - Money In = 4 media income lines (Govt·GSRTC / Govt·Auto / Pvt·Other Media /
+    Pvt·LED) + **Loan from friend** + unsorted review credits.
+  - Money Out = GSRTC (govt+pvt ONE line) · Auto Hood · Other Media · Common ·
+    **Commission** · Assets · Loan repaid · Personal · Tax · Review. (Pvt LED has no
+    cost line — his own screens; a zero group drops via WHERE amt>0, honest if ever nonzero.)
+  - **Net Cash = In − Out.** **SWEEP shown SEPARATE, net-zero** (own-account transfer;
+    counting only the out-leg = the ₹1.98Cr fake-outflow trap → excluded from both).
+
+### Locked owner decisions (§168 spec)
+- GSRTC can be **both govt AND private** on the EXPENSE side → money_out groups
+  direct cost BY MEDIA across segments (GSRTC one combined line). (Finance-only; does
+  NOT touch the §4 quote/proposal GSRTC=govt lock.)
+- **Assets reduce Net Cash but NOT Business Profit** (capex = money out, not a P&L cost).
+- **Loan-from-friend = a Money-In line** (borrowed cash), NOT revenue → excluded from
+  Business Profit.
+- **Commission** = a REAL running cost → a `common_expense` with a dedicated
+  **`Commission` expense head** (seeded). It reduces Business Profit (inside common)
+  AND shows as its own Money-Out line, with NO double-count (Common line = ctot − comm).
+  Chosen over a new bucket to avoid a CHECK-constraint change on the live table.
+
+### THE RECONCILIATION CONTRACT (adversarial-verify P2 fix — do NOT regress)
+`itot`/`dtot` MUST be the FULL in-range income/direct sums (same row set money_in/
+money_out scan), NOT the segment-filtered `ig+ip`/`dg+dp`. Reason: a row retagged to
+income/direct_cost in the Register but left segment=NULL was counted in money_in/out
+but dropped from itot/dtot → Σ money_in ≠ total_in, business_profit + net_cash
+overstated. Now: itot = full income sum; dtot = full direct sum; ig/ip/dg/dp stay the
+Govt/Pvt display split. Proven: Σ money_in == total_in, Σ money_out == total_out,
+net_cash == in−out hold even with a NULL-segment income/cost, a review credit, and an
+asset-disposal credit. review-in added to Money In (symmetry); v_asset = direction='out'
+only (an asset-disposal credit is no longer mis-signed as an outflow).
+
+### §168.1 — manual add-transaction (Register tab, `c3948e9`)
+"+ Add transaction" on the Register: Date · In/Out · Amount · Type tag · Bank ·
+Description → `classifyImport` derives bucket/segment/media/head from the tag → insert
+`source='manual'` + a unique `dedupe_key = manual|<uuid>` (never collides → always
+inserts). §47 useRef save-latch. NO SQL (source='manual' + admin/accounts write RLS +
+unique dedupe_key all pre-existed in the P1 schema).
+
+### Verify verdicts (workflow wf_72c23556)
+security PASS (role gate unchanged, fail-closed on NULL, no new leak — new keys are
+parity with the pre-existing `excluded`/`assets` exposure) · contract PASS (every key
+PnlTab reads is emitted; deploy-before-SQL fallbacks correct: business_profit→
+operating_profit, arrays→[]) · money PASS after the itot/dtot reconciliation fix.
+
+### Foot-guns
+- ❌ Counting SWEEP as an expense (own-account transfer, both legs → net zero). Keep
+  it a separate net-zero line.
+- ❌ A totals scalar (itot/dtot) filtering a different row set than the line-item
+  scan (money_in/out) → the report stops reconciling on a NULL-segment/NULL-derived
+  row. Totals and lines MUST sum the same rows.
+- ❌ A new tag that needs its own P&L line via a new BUCKET = a CHECK-constraint change
+  on the live table. Prefer an expense HEAD within common_expense (Commission) — additive
+  seed, no constraint change.
