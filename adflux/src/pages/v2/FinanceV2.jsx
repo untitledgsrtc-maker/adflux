@@ -149,9 +149,17 @@ function PnlTab({ seg }) {
       {/* hero */}
       <div style={{ position: 'relative', overflow: 'hidden', border: '1px solid var(--border-strong, #475569)', borderRadius: 20, padding: '24px 26px',
         background: 'radial-gradient(480px 220px at 92% -10%, rgba(255,230,0,.16), transparent 60%), linear-gradient(160deg,#10192e,#0c1424)' }}>
-        <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Business Profit / (Loss){seg !== 'all' ? ` · ${seg === 'GOVERNMENT' ? 'Government' : 'Private'}` : ''}</div>
-        <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 46, lineHeight: 1.05, margin: '8px 0 4px', color: bprofit >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)' }}>{fmtINR(bprofit)}</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Revenue {fmtINR(income)} · Running costs {fmtINR(cost)} · Margin {d.margin_pct}%</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Business Profit / (Loss){seg !== 'all' ? ` · ${seg === 'GOVERNMENT' ? 'Government' : 'Private'}` : ''}</div>
+            <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 46, lineHeight: 1.05, margin: '8px 0 4px', color: bprofit >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)' }}>{fmtINR(bprofit)}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Revenue {fmtINR(income)} · Running costs {fmtINR(cost)}</div>
+          </div>
+          <div style={{ textAlign: 'right', minWidth: 110 }}>
+            <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Profit Margin</div>
+            <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 46, lineHeight: 1.05, margin: '8px 0 0', color: bprofit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)' }}>{d.margin_pct == null ? '—' : `${d.margin_pct}%`}</div>
+          </div>
+        </div>
       </div>
 
       <div style={g4}>
