@@ -122,12 +122,13 @@ const Dot = ({ c }) => <span style={{ width: 9, height: 9, borderRadius: 9, back
 /* ── P&L dashboard ── */
 function PnlTab({ seg }) {
   const [d, setD] = useState(null); const [loading, setLoading] = useState(true); const [err, setErr] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
   useEffect(() => {
     let alive = true; setLoading(true); setErr(null)
     supabase.rpc('finance_pnl_summary', { p_from: null, p_to: null, p_segment: seg === 'all' ? null : seg })
       .then(({ data, error }) => { if (!alive) return; if (error) setErr(error.message); else setD(data || {}); setLoading(false) })
     return () => { alive = false }
-  }, [seg])
+  }, [seg, refreshKey])
 
   if (loading) return <Spin />
   if (err) return <Card style={{ borderColor: 'var(--danger)' }}><span style={{ color: 'var(--danger)' }}>Could not load P&amp;L: {err}</span></Card>
@@ -146,6 +147,14 @@ function PnlTab({ seg }) {
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={() => setRefreshKey(k => k + 1)} disabled={loading}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
+            padding: '7px 12px', borderRadius: 10, cursor: loading ? 'default' : 'pointer',
+            color: 'var(--text-muted)', background: 'var(--surface, #1e293b)', border: '1px solid var(--border-strong, #475569)' }}>
+          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
+        </button>
+      </div>
       {/* hero */}
       <div style={{ position: 'relative', overflow: 'hidden', border: '1px solid var(--border-strong, #475569)', borderRadius: 20, padding: '24px 26px',
         background: 'radial-gradient(480px 220px at 92% -10%, rgba(255,230,0,.16), transparent 60%), linear-gradient(160deg,#10192e,#0c1424)' }}>
