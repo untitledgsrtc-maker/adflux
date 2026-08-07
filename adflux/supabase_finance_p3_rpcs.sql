@@ -134,9 +134,14 @@ BEGIN
     FROM public.finance_transactions
    WHERE (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
 
-  v_bprofit := itot - dtot - ctot - v_govt_comm;                     -- revenue − running costs (bank commission ⊂ ctot; + govt-team commission)
+  -- COMMISSION MODEL (owner 2026-08-07): the govt-team % ACCRUAL (v_govt_comm) is the
+  -- single commission COST. A bank "Commission" debit (v_comm, tagged OR narration-matched)
+  -- is a SETTLEMENT of that already-booked cost, NOT a second cost — so it is netted out of
+  -- Business Profit (add v_comm back) and out of cash-out (drop it from v_tout), leaving the
+  -- accrual as the one commission figure everywhere. No double-count, no manual guard.
+  v_bprofit := itot - dtot - ctot + v_comm - v_govt_comm;            -- revenue − running costs (bank commission = settlement, added back; accrual is the cost)
   v_tin     := itot + v_loan_in + v_review_in;                       -- cash IN  (revenue + borrowed + unsorted credits)
-  v_tout    := dtot + ctot + v_govt_comm + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (SWEEP excluded → net-zero)
+  v_tout    := dtot + (ctot - v_comm) + v_govt_comm + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (bank commission netted; accrual stands in; SWEEP excluded)
 
   v_out := jsonb_build_object(
     'income', itot, 'income_gov', ig, 'income_pvt', ip,
@@ -146,7 +151,7 @@ BEGIN
     'margin_pct', CASE WHEN itot>0 THEN round(v_bprofit/itot*100,1) ELSE 0 END,
     -- ---- CASH VIEW (owner spec §168): money in / out / net cash + commission + sweep ----
     'total_in', v_tin, 'total_out', v_tout, 'net_cash', v_tin - v_tout,
-    'commission', v_comm + v_govt_comm, 'sweep', v_sweep,
+    'commission', v_govt_comm, 'sweep', v_sweep,
     'money_in', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt) ORDER BY amt DESC)
       FROM (
@@ -176,7 +181,7 @@ BEGIN
            WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
              AND (v_seg IS NULL OR segment=v_seg)
           UNION ALL SELECT 'Common expense', ctot - v_comm
-          UNION ALL SELECT 'Commission', v_comm + v_govt_comm
+          UNION ALL SELECT 'Commission', v_govt_comm
           UNION ALL SELECT 'Assets / equipment', v_asset
           UNION ALL SELECT 'Loan repaid', v_loan_out
           UNION ALL SELECT 'Personal', v_draw

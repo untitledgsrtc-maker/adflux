@@ -10984,3 +10984,23 @@ deploy-order (H, below). NOT §28-frozen (finance admin/accounts-only + govt wiz
 ### Foot-gun
 - ❌ A new column the frontend always writes + read by a re-run RPC = a hard deploy-order
   dependency. Run the schema SQL before the frontend deploys, or the save breaks (§45).
+
+### 169.1 — bank commission = SETTLEMENT (narration-matched, no double-count) (2026-08-07)
+Owner: "can't we match by particulars/narration?" + "commission" + "accrual is truth."
+So the govt % ACCRUAL (v_govt_comm) is the ONE commission cost; a bank "Commission" debit
+is the SETTLEMENT of that already-booked cost, NOT a second cost. Two changes:
+- **Classifier (FinanceV2 classifyImport):** a DEBIT whose particulars contain "COMMISSION"
+  auto-routes to `common_expense` head `Commission` (no manual tag needed) — narration match.
+- **RPC (finance_pnl_summary, re-run):** the Commission head (v_comm) is netted out — added
+  BACK in Business Profit (`v_bprofit = itot − dtot − ctot + v_comm − v_govt_comm`) and dropped
+  from cash-out (`v_tout = dtot + (ctot − v_comm) + v_govt_comm + …`). The `commission` scalar
+  + the money-out **Commission** line now = `v_govt_comm` (the accrual). Common line stays
+  `ctot − v_comm`. Reconciliation holds: Σ money_out == v_tout.
+- **CONTRACT (frozen):** the commission COST everywhere = the accrual (v_govt_comm). Bank
+  "Commission" debits (tagged or narration-matched) are settlements, netted — never a 2nd cost.
+- **BEHAVIOR CHANGE to flag:** a bank commission with NO govt % accrual (private/ad-hoc) now
+  shows as neither a cost nor a money-out line (it's netted assuming an accrual represents it).
+  Fine for the govt-commission-only world; a non-govt commission needs the % on its deal to be
+  counted. Zero-regression when v_comm=0 AND v_govt_comm=0 (bprofit = itot−dtot−ctot).
+- Owner RE-RUNS `supabase_finance_p3_rpcs.sql` + push. Verified: parse OK, reconciliation
+  by hand (money_out lines sum to v_tout), zero-regression at all-zero.
