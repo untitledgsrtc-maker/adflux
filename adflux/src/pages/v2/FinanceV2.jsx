@@ -157,7 +157,7 @@ function PnlTab({ seg }) {
       <div style={g4}>
         <Kpi label="Revenue" value={fmtINR(income)} sub="ads income (bank)" Icon={TrendingUp} color="var(--success, #10B981)" tint="var(--success-soft, rgba(16,185,129,.12))" />
         <Kpi label="Running Costs" value={fmtINR(cost)} sub="media + common + commission" Icon={TrendingDown} color="var(--danger)" tint="var(--danger-soft, rgba(239,68,68,.12))" />
-        <Kpi label="Business Profit" value={fmtINR(bprofit)} sub={bprofit >= 0 ? 'the ads business earns' : 'loss'} Icon={BarChart3} color={bprofit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)'} tint="var(--success-soft, rgba(16,185,129,.12))" />
+        <Kpi label="Business Profit" value={fmtINR(bprofit)} sub={bprofit >= 0 ? `${d.margin_pct}% profit margin` : 'loss'} Icon={BarChart3} color={bprofit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)'} tint="var(--success-soft, rgba(16,185,129,.12))" />
         <Kpi label="Net Cash" value={fmtINR(netCash)} sub="in − out (money position)" Icon={IndianRupee} color={netCash >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)'} tint="var(--accent-soft, rgba(255,230,0,.14))" />
       </div>
 
