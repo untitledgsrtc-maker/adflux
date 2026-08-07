@@ -11134,3 +11134,16 @@ payouts` exist since Phase 101.A1/A3). Owner RE-RUNS `supabase_finance_p3_rpcs.s
 (CREATE OR REPLACE) → the P&L picks up agency commission immediately. Not §28-frozen. Money
 math hand-verified (XOR by creator role, reconciliation Σ money_out=v_tout, formula matches
 AgencyEarningsView, segment-scoped, §42 Vishal sees only govt-segment agency commission).
+
+### RAN + verified live (2026-08-07) — the ₹20.29 lakh is REAL, do NOT "fix" it
+Owner re-ran the RPC. VERIFY 2 → `commission_govt_team = 3,11,577` · `commission_agency =
+20,29,080`. The ENTIRE agency figure = ONE agency user **Hamesh Modi at 40%** on TWO
+agency-created GOVERNMENT deals (UA/AUTO/2026-27/0118 subtotal 41,25,000 → 16,50,000;
+UA/GSRTC/2026-27/0127 subtotal 9,47,700 → 3,79,080). 40% is far above the 5% default →
+flagged as a likely typo; **owner CONFIRMED 40% is genuinely correct (2026-08-07).** So
+`users.agency_commission_percent = 40` for Hamesh Modi is intentional — do NOT reset it to
+4/5 as a "bug." Diagnostic: `finance_agency_commission_breakdown.sql` (untracked, throwaway).
+KNOWN modeling note: agency commission is CRM-payment-derived (all-time when unfiltered)
+while the P&L income is bank-based (finance_transactions, Apr–Jul 2026) — the two sources/
+periods don't fully align; a date-scoped P&L view scopes the commission by payment_date but
+the income by txn_date. Owner accepts for now; refine if a period view looks off.
