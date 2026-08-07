@@ -24,6 +24,12 @@ INSERT INTO public.finance_expense_heads (name, kind, display_order) VALUES
   ('Commission','operating',35)
 ON CONFLICT (name) DO NOTHING;
 
+-- Govt-team commission (owner 2026-08-07): per-deal % on the pre-GST subtotal of a
+-- WON GOVERNMENT quote created by OUR TEAM (created_by NOT agency — agency deals ride
+-- agency_commission_payouts, XOR no double-count). Additive nullable column on quotes;
+-- the two govt wizards write it, finance_pnl_summary reads it (proportional to payments).
+ALTER TABLE public.quotes ADD COLUMN IF NOT EXISTS govt_commission_percent numeric(5,2);
+
 CREATE OR REPLACE FUNCTION public.finance_pnl_summary(
   p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_segment text DEFAULT NULL
 ) RETURNS jsonb
@@ -40,6 +46,7 @@ DECLARE
   -- as its own Money-Out line). Owner spec 2026-08-07 (§168).
   v_loan_in numeric; v_loan_out numeric; v_draw numeric; v_tax numeric;
   v_sweep numeric; v_asset numeric; v_comm numeric; v_review_out numeric; v_review_in numeric;
+  v_govt_comm numeric;
   v_tin numeric; v_tout numeric; v_bprofit numeric;
   v_out jsonb;
 BEGIN
@@ -83,12 +90,35 @@ BEGIN
   SELECT COALESCE(SUM(amount),0) INTO ctot FROM public.finance_transactions
    WHERE bucket='common_expense' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
 
-  -- commission = common_expense rows tagged head 'Commission' (real running cost)
+  -- commission = common_expense rows tagged head 'Commission' (real running cost, from the bank)
   SELECT COALESCE(SUM(ft.amount),0) INTO v_comm
     FROM public.finance_transactions ft
     JOIN public.finance_expense_heads h ON h.id=ft.expense_head_id
    WHERE ft.bucket='common_expense' AND h.name='Commission'
      AND (p_from IS NULL OR ft.txn_date>=p_from) AND (p_to IS NULL OR ft.txn_date<=p_to);
+
+  -- GOVT-TEAM commission (owner 2026-08-07) — a REAL running cost derived from the CRM
+  -- (NOT the bank), so a team-won govt deal shows its commission even before it's paid.
+  -- Per-deal % (quotes.govt_commission_percent) on the pre-GST subtotal, recognized
+  -- PROPORTIONAL to collection: each approved payment books (payment ÷ deal total) ×
+  -- (subtotal × %) = that payment's pre-GST base × %. WON GOVERNMENT quotes only, and
+  -- ONLY when created_by is NOT an agency (agency deals use agency_commission_payouts →
+  -- XOR, no double-count). Govt-only → 0 in a PRIVATE-scoped view. Bank-tagged Commission
+  -- (v_comm) must NOT also cover these payouts or it double-counts (owner guard).
+  SELECT COALESCE(SUM(
+           (p.amount_received / NULLIF(q.total_amount,0))
+           * (q.subtotal * q.govt_commission_percent / 100.0)
+         ),0)
+    INTO v_govt_comm
+    FROM public.payments p
+    JOIN public.quotes q  ON q.id = p.quote_id
+    LEFT JOIN public.users u ON u.id = q.created_by
+   WHERE q.segment = 'GOVERNMENT' AND q.status = 'won'
+     AND COALESCE(q.govt_commission_percent,0) > 0
+     AND COALESCE(u.role,'') <> 'agency'
+     AND p.approval_status = 'approved'
+     AND (p_from IS NULL OR p.payment_date>=p_from) AND (p_to IS NULL OR p.payment_date<=p_to);
+  IF v_seg = 'PRIVATE' THEN v_govt_comm := 0; END IF;
 
   -- excluded-from-profit scalars for the cash view
   SELECT
@@ -104,19 +134,19 @@ BEGIN
     FROM public.finance_transactions
    WHERE (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
 
-  v_bprofit := itot - dtot - ctot;                                   -- revenue − running costs (commission ⊂ ctot)
+  v_bprofit := itot - dtot - ctot - v_govt_comm;                     -- revenue − running costs (bank commission ⊂ ctot; + govt-team commission)
   v_tin     := itot + v_loan_in + v_review_in;                       -- cash IN  (revenue + borrowed + unsorted credits)
-  v_tout    := dtot + ctot + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (SWEEP excluded → net-zero)
+  v_tout    := dtot + ctot + v_govt_comm + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (SWEEP excluded → net-zero)
 
   v_out := jsonb_build_object(
     'income', itot, 'income_gov', ig, 'income_pvt', ip,
     'direct_cost', dtot, 'common_expense', ctot,
-    'operating_profit', itot-dtot-ctot,
+    'operating_profit', v_bprofit,
     'business_profit', v_bprofit,
-    'margin_pct', CASE WHEN itot>0 THEN round((itot-dtot-ctot)/itot*100,1) ELSE 0 END,
+    'margin_pct', CASE WHEN itot>0 THEN round(v_bprofit/itot*100,1) ELSE 0 END,
     -- ---- CASH VIEW (owner spec §168): money in / out / net cash + commission + sweep ----
     'total_in', v_tin, 'total_out', v_tout, 'net_cash', v_tin - v_tout,
-    'commission', v_comm, 'sweep', v_sweep,
+    'commission', v_comm + v_govt_comm, 'sweep', v_sweep,
     'money_in', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt) ORDER BY amt DESC)
       FROM (
@@ -146,7 +176,7 @@ BEGIN
            WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
              AND (v_seg IS NULL OR segment=v_seg)
           UNION ALL SELECT 'Common expense', ctot - v_comm
-          UNION ALL SELECT 'Commission', v_comm
+          UNION ALL SELECT 'Commission', v_comm + v_govt_comm
           UNION ALL SELECT 'Assets / equipment', v_asset
           UNION ALL SELECT 'Loan repaid', v_loan_out
           UNION ALL SELECT 'Personal', v_draw

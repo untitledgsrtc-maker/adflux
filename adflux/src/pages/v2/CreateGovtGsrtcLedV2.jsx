@@ -59,6 +59,8 @@ export default function CreateGovtGsrtcLedV2() {
     proposal_date: new Date().toISOString().slice(0, 10),
     // Phase 140 — letter language (gu default, en opt-in).
     proposal_language: 'gu',
+    // Govt-team commission % (our cost) — blank unless set. Our-team deals only.
+    govt_commission_percent: '',
     // Phase 101.C.JSX — agency seeds from profile.default_signer_user_id
     // (Phase 101.C SQL column). Non-agency starts blank. Edit-mode
     // useEffect below overrides with saved q.signer_user_id (owner C-5).
@@ -127,6 +129,7 @@ export default function CreateGovtGsrtcLedV2() {
                           : prev.proposal_date,
         signer_user_id: q.signer_user_id || null,
         proposal_language: q.proposal_language || 'gu',
+        govt_commission_percent: q.govt_commission_percent ?? '',
         selected_station_ids: stationIds,
         station_overrides:    overrides,
         gsrtc_campaign_months: Number(q.gsrtc_campaign_months || q.duration_months || 1),
@@ -207,6 +210,10 @@ export default function CreateGovtGsrtcLedV2() {
       proposal_date:  data.proposal_date,
       // Phase 140 — chosen letter language (default Gujarati).
       proposal_language: data.proposal_language || 'gu',
+      // Govt-team commission % (our cost); '' → null. Finance reads it on won-quote payments.
+      govt_commission_percent:
+        data.govt_commission_percent === '' || data.govt_commission_percent == null
+          ? null : Number(data.govt_commission_percent),
       // Phase 29a — only stamp created_by on INSERT; on UPDATE we
       // leave it alone so RLS continues to match (created_by =
       // auth.uid()) and so the original creator stays attributed.

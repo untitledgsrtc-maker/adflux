@@ -10920,3 +10920,67 @@ operating_profit, arrays→[]) · money PASS after the itot/dtot reconciliation 
 - ❌ A new tag that needs its own P&L line via a new BUCKET = a CHECK-constraint change
   on the live table. Prefer an expense HEAD within common_expense (Commission) — additive
   seed, no constraint change.
+
+
+## 169 · Finance — govt-team commission (CRM-derived, per-deal %) (2026-08-07)
+
+Owner: "every govt WON quote we also pay commission, it's our cost." Two commission
+worlds (§168 analysis): agency commission is fully tracked already
+(`users.agency_commission_percent` + `agency_commission_payouts`, per-quote); govt
+commission had NO home. Built it. Adversarial verify PASS (A–G); the one gate is
+deploy-order (H, below). NOT §28-frozen (finance admin/accounts-only + govt wizards),
+§45-safe (additive nullable column + additive RPC term).
+
+### Owner-locked spec (do NOT re-litigate)
+- **Per-deal %** typed on each govt quote (NOT a global rate).
+- Base = **pre-GST subtotal**.
+- Basis = **proportional to collection**: each approved payment books
+  `(payment ÷ deal total) × (subtotal × pct)` = that payment's pre-GST base × %. On
+  full payment the total = `subtotal × pct`. (Owner's words: "each payment × base amount
+  × commission %".)
+- **XOR — one deal, one commission, never both:** a govt quote **created by an agency**
+  (`quotes.created_by` = a `role='agency'` user) rides `agency_commission_payouts` →
+  **skip govt commission**. Created by OUR TEAM → govt commission applies. Enforced in
+  the RPC (`COALESCE(u.role,'') <> 'agency'`) AND at entry (the % field is hidden for
+  agency creators in Step2DateSigner via `!agencyLocked`).
+- **Double-count guard (owner-aware, P2):** the CRM accrual (`v_govt_comm`) and the
+  bank-tagged `Commission` head (`v_comm`) can BOTH count the same deal if the actual
+  commission bank-payout is later tagged "Commission." So with this feature, do NOT
+  bank-tag a govt-team commission payout "Commission" — the CRM number is the source.
+  It can't fire until a deal is both won-with-pct AND separately bank-tagged; not
+  code-enforced yet (a reconcile warning or excluding these from the bank head is the
+  future fix).
+
+### Files
+- `supabase_finance_p3_rpcs.sql` (canonical, edit-in-place §71; owner RE-RUNS): ADD
+  COLUMN `quotes.govt_commission_percent numeric(5,2)`; new `v_govt_comm` = SUM over
+  approved payments on WON GOVERNMENT non-agency quotes of the proportional formula,
+  govt-only (`v_seg='PRIVATE' → 0`). Folded into `v_bprofit` (− v_govt_comm), `v_tout`
+  (+ v_govt_comm), `operating_profit`/`business_profit`/`margin_pct` (all now use
+  v_bprofit), the `commission` scalar (+ v_govt_comm), and the **Commission** money-out
+  line (+ v_govt_comm). Reconciliation holds: Σ money_out == v_tout (Common line stays
+  `ctot − v_comm`; the extra v_govt_comm appears once in Commission + once in v_tout).
+- `FinanceV2.jsx`: `const cost = income − bprofit` (was `direct_cost + common_expense`)
+  so "Running Costs" includes the govt commission. Byte-identical when v_govt_comm=0.
+- `Step2DateSigner.jsx`: a `govt_commission_percent` % input, gated `!agencyLocked`.
+- `CreateGovtGsrtcLedV2.jsx` + `CreateGovtAutoHoodV2.jsx`: state init `''` / restore
+  `q.govt_commission_percent ?? ''` / payload `''→null else Number`.
+
+### ZERO-REGRESSION (verified) + the DEPLOY-ORDER GATE
+- When NO quote has a `govt_commission_percent` (current live state) → v_govt_comm=0 →
+  the RPC output + FinanceV2 `cost` are byte-identical to before. Nothing changes until
+  a % is set on a won govt deal.
+- ⚠ **P0 deploy-order: run the SQL FIRST, then push.** The govt wizard payloads ALWAYS
+  include `govt_commission_percent`, so if the frontend deploys before the column
+  exists, every govt Auto Hood + GSRTC quote save errors (42703). Reverse order is safe.
+
+### Owner action
+1. Run `supabase_finance_p3_rpcs.sql` in Supabase Studio (adds the column + updates the
+   P&L RPC). 2. Confirm → then I push the frontend. Smoke: create/edit a govt (Auto Hood
+   or GSRTC) quote by a team user → Step 2 shows "Govt commission % (our cost)"; agency
+   creators don't see it. Set 10%, win it, add a payment → finance P&L Commission line +
+   Running Costs rise, Business Profit drops by the proportional amount.
+
+### Foot-gun
+- ❌ A new column the frontend always writes + read by a re-run RPC = a hard deploy-order
+  dependency. Run the schema SQL before the frontend deploys, or the save breaks (§45).

@@ -135,8 +135,8 @@ function PnlTab({ seg }) {
   if (!d || d.operating_profit == null) return <Card>No finance data yet — run the Phase 1–3 SQL.</Card>
 
   const profit = Number(d.operating_profit) || 0, income = Number(d.income) || 0
-  const cost = Number(d.direct_cost) + Number(d.common_expense)
-  const bprofit = d.business_profit != null ? Number(d.business_profit) : profit   // revenue − running costs (§168)
+  const bprofit = d.business_profit != null ? Number(d.business_profit) : profit   // revenue − running costs (§168, incl govt-team commission)
+  const cost = income - bprofit                                                    // media + common + all commission (bank + govt-team)
   const moneyIn = d.money_in || [], moneyOut = d.money_out || []
   const totalIn = Number(d.total_in) || 0, totalOut = Number(d.total_out) || 0
   const netCash = d.net_cash != null ? Number(d.net_cash) : totalIn - totalOut
