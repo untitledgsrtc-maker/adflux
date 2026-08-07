@@ -531,11 +531,10 @@ function classifyImport(tag, dir, desc, hcat, bankco, rules) {
   if (!co) co = bankco   // every row in this account belongs to the account's company
   return { bucket: b, company: co, segment: seg, media_type: media, head }
 }
-function impDate(v, last) {
-  if (v == null || v === '') return null
-  if (v instanceof Date) return (isNaN(v) || v > new Date()) ? null : v  // cellDates:true → real date; trust it (skip future/invalid)
-  if (typeof v === 'number') return null // bare serial → untrusted, carry forward from neighbours
-  const m = String(v).trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+// text date "dd/mm/yyyy" (or mm/dd) → Date. dd/mm tried first (Indian banks); `last`
+// disambiguates the ambiguous ones by chronology. Returns null for non-text (Date/number).
+function impDateText(v, last) {
+  const m = String(v == null ? '' : v).trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
   if (!m) return null
   let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000
   const today = new Date(); const cands = []
@@ -543,6 +542,12 @@ function impDate(v, last) {
   if (!cands.length) return null
   if (last) cands.sort((p, q) => ((p < last) - (q < last)) || (Math.abs(p - last) - Math.abs(q - last)))
   return cands[0]
+}
+function impDate(v, last) {
+  if (v == null || v === '') return null
+  if (v instanceof Date) return (isNaN(v) || v > new Date()) ? null : v  // cellDates:true → real date; trust it (skip future/invalid)
+  if (typeof v === 'number') return null // bare serial → untrusted, carry forward from neighbours
+  return impDateText(v, last)
 }
 const impIso = (dt) => dt ? `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}` : null
 
@@ -609,7 +614,29 @@ function ImportTab() {
       const bankco = impCompany || (/adflux/i.test(bank && bank.name || '') ? 'Untitled Adflux Pvt Ltd' : 'Untitled Advertising')
       const headByName = Object.fromEntries(heads.map(h => [h.name, h.id]))
       const data = raw.slice(hdr + 1)
-      let last = null; const dates = data.map(r => { const gd = impDate(r[map.date], last); if (gd) last = gd; return gd })
+      const dcol = map.date
+      // DATES — text cells are literal + reliable; some banks export CORRUPT serials that
+      // SheetJS decodes to garbage Date objects (e.g. 1-Apr stored as the 3-Jan serial).
+      // Anchor on the text dates, then pick the reading of the serial cells that keeps the
+      // whole statement ASCENDING (bank rows are date-sorted): trust as-is (clean file) →
+      // else reverse the DD/MM export swap (recovers exact dates) → else carry as estimated.
+      let lastT = null
+      const textDates = data.map(r => { const dt = impDateText(r[dcol], lastT); if (dt) lastT = dt; return dt })
+      const nowD = new Date()
+      const buildSeq = ms => data.map((r, i) => {
+        if (textDates[i]) return textDates[i]
+        const v = r[dcol]; if (!(v instanceof Date) || isNaN(v)) return null
+        const o = ms(v); return (o && !isNaN(o) && o <= nowD) ? o : null
+      })
+      const isAsc = arr => { let p = null; for (const d of arr) { if (d) { if (p && d < p) return false; p = d } } return true }
+      let dates
+      if (textDates.some(Boolean)) {
+        const trust = buildSeq(v => v)
+        const unswap = buildSeq(v => new Date(v.getFullYear(), v.getDate(), v.getMonth() + 1))
+        dates = isAsc(trust) ? trust : isAsc(unswap) ? unswap : buildSeq(() => null)
+      } else {
+        let last = null; dates = data.map(r => { const gd = impDate(r[dcol], last); if (gd) last = gd; return gd })
+      }
       const filled = dates.slice(); let lg = null
       for (let i = 0; i < filled.length; i++) { if (filled[i]) lg = filled[i]; else if (lg) filled[i] = lg }
       let ng = null; for (let i = filled.length - 1; i >= 0; i--) { if (filled[i]) ng = filled[i]; else if (ng) filled[i] = ng }
