@@ -24,11 +24,15 @@ INSERT INTO public.finance_expense_heads (name, kind, display_order) VALUES
   ('Commission','operating',35)
 ON CONFLICT (name) DO NOTHING;
 
--- Govt-team commission (owner 2026-08-07): per-deal % on the pre-GST subtotal of a
--- WON GOVERNMENT quote created by OUR TEAM (created_by NOT agency — agency deals ride
--- agency_commission_payouts, XOR no double-count). Additive nullable column on quotes;
--- the two govt wizards write it, finance_pnl_summary reads it (proportional to payments).
-ALTER TABLE public.quotes ADD COLUMN IF NOT EXISTS govt_commission_percent numeric(5,2);
+-- Govt-team commission (owner 2026-08-07). ENTERED AT PAYMENT TIME (owner revised):
+-- when recording a payment on a WON GOVERNMENT deal created by OUR TEAM, the user types
+-- a commission % → the modal computes + stores the ₹ on THAT payment. finance_pnl_summary
+-- SUMS payments.commission_amount (below). quotes.govt_commission_percent is now UNUSED
+-- (kept, harmless — the quote-time field was removed). Agency deals ride
+-- agency_commission_payouts → excluded here (created_by role), XOR no double-count.
+ALTER TABLE public.quotes   ADD COLUMN IF NOT EXISTS govt_commission_percent numeric(5,2);
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS commission_pct    numeric(5,2);
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS commission_amount numeric;
 
 CREATE OR REPLACE FUNCTION public.finance_pnl_summary(
   p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_segment text DEFAULT NULL
@@ -97,24 +101,18 @@ BEGIN
    WHERE ft.bucket='common_expense' AND h.name='Commission'
      AND (p_from IS NULL OR ft.txn_date>=p_from) AND (p_to IS NULL OR ft.txn_date<=p_to);
 
-  -- GOVT-TEAM commission (owner 2026-08-07) — a REAL running cost derived from the CRM
-  -- (NOT the bank), so a team-won govt deal shows its commission even before it's paid.
-  -- Per-deal % (quotes.govt_commission_percent) on the pre-GST subtotal, recognized
-  -- PROPORTIONAL to collection: each approved payment books (payment ÷ deal total) ×
-  -- (subtotal × %) = that payment's pre-GST base × %. WON GOVERNMENT quotes only, and
-  -- ONLY when created_by is NOT an agency (agency deals use agency_commission_payouts →
-  -- XOR, no double-count). Govt-only → 0 in a PRIVATE-scoped view. Bank-tagged Commission
-  -- (v_comm) must NOT also cover these payouts or it double-counts (owner guard).
-  SELECT COALESCE(SUM(
-           (p.amount_received / NULLIF(q.total_amount,0))
-           * (q.subtotal * q.govt_commission_percent / 100.0)
-         ),0)
+  -- GOVT-TEAM commission (owner 2026-08-07, payment-entry) — the REAL commission COST,
+  -- entered per payment: SUM payments.commission_amount over APPROVED payments on WON
+  -- GOVERNMENT deals created by OUR TEAM (created_by NOT agency — agency deals use
+  -- agency_commission_payouts → XOR, no double-count). Govt-only → 0 in a PRIVATE view.
+  -- Bank-tagged/narration Commission (v_comm) is a SETTLEMENT of this, netted below (§169.1).
+  SELECT COALESCE(SUM(p.commission_amount),0)
     INTO v_govt_comm
     FROM public.payments p
     JOIN public.quotes q  ON q.id = p.quote_id
     LEFT JOIN public.users u ON u.id = q.created_by
    WHERE q.segment = 'GOVERNMENT' AND q.status = 'won'
-     AND COALESCE(q.govt_commission_percent,0) > 0
+     AND COALESCE(p.commission_amount,0) > 0
      AND COALESCE(u.role,'') <> 'agency'
      AND p.approval_status = 'approved'
      AND (p_from IS NULL OR p.payment_date>=p_from) AND (p_to IS NULL OR p.payment_date<=p_to);

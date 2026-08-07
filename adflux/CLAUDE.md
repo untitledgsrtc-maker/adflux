@@ -11004,3 +11004,70 @@ is the SETTLEMENT of that already-booked cost, NOT a second cost. Two changes:
   counted. Zero-regression when v_comm=0 AND v_govt_comm=0 (bprofit = itot−dtot−ctot).
 - Owner RE-RUNS `supabase_finance_p3_rpcs.sql` + push. Verified: parse OK, reconciliation
   by hand (money_out lines sum to v_tout), zero-regression at all-zero.
+
+
+---
+
+## 170 · Phase 273 — govt commission moved to PAYMENT-time (SUPERSEDES §169's quote-% entry) (2026-08-07)
+
+Owner revised §169 same day: "when we add payment ask that time, not while create quote."
+Decisions (AskUserQuestion): entry = **"Type the % — it computes the ₹"**; wizard field =
+**"Remove it — payment only."** So the govt-team commission % is now typed on the **Add
+Payment** screen (per payment), NOT on the quote wizard. **This SUPERSEDES the §169
+quote-time `govt_commission_percent` field + its proportional formula.**
+
+### The model now
+- Add a payment on a WON GOVERNMENT deal → the modal shows a govt-only **"Commission % —
+  our cost"** field → `commission_amount = round(amount_received × pct / 100)` = % of THIS
+  payment (gross, incl. GST) → stored on the payment row.
+- `finance_pnl_summary.v_govt_comm` = **SUM(payments.commission_amount)** over APPROVED
+  payments on WON GOVERNMENT deals created by OUR TEAM (`created_by` role ≠ agency — XOR,
+  §169). Govt-only (`v_seg='PRIVATE'→0`). Everything else in the RPC (§169.1 settlement:
+  bank v_comm netted, v_bprofit/v_tin/v_tout, Commission money-out line) is UNCHANGED —
+  only the SOURCE of v_govt_comm changed (quote-% proportional → SUM of the stored ₹).
+
+### Files
+- `supabase_finance_p3_rpcs.sql` (canonical, edit-in-place): ADD `payments.commission_pct`
+  + `payments.commission_amount`; v_govt_comm = SUM(p.commission_amount) with
+  `COALESCE(p.commission_amount,0)>0` + the same won/GOVERNMENT/non-agency/approved gates.
+  `quotes.govt_commission_percent` KEPT but now **UNUSED** (vestigial — the RPC no longer
+  reads it; harmless).
+- `src/components/payments/PaymentModal.jsx` + `WonPaymentModal.jsx`: govt-only Commission %
+  field + live "Commission booked: ₹X" preview; payload **conditionally** adds
+  `commission_pct`+`commission_amount` ONLY when a real commission is present, and **drops
+  `commission_pct` from the `...form` spread** (see deploy-safety below).
+- `Step2DateSigner.jsx` + `CreateGovtGsrtcLedV2.jsx` + `CreateGovtAutoHoodV2.jsx`: the §169
+  quote-time % field REVERTED (state init / edit-restore / payload all removed). Zero stray
+  `govt_commission_percent` refs left in `src/`.
+
+### Payload flow (verified — all 3 write paths carry commission)
+`addPayment` spreads `...paymentData` → insert; `updatePayment` spreads `updates` → update;
+`QuoteDetail.handleWonWithPayment` destructures only campaign dates + is_final, so
+commission stays in `...paymentFields` → `addPayment`. So PaymentModal add + edit AND
+WonPaymentModal mark-won all persist the commission.
+
+### DEPLOY-ORDER GATE (§45 — the important bit)
+A new column the frontend writes = a hard deploy-order dependency: **run the SQL BEFORE the
+frontend deploys.** BUT the conditional-spread shrinks the blast radius — a plain payment
+(private LED, or govt with no commission) does NOT write the new columns, so it works even
+pre-SQL. Only a **govt-payment-WITH-a-commission-%** (the brand-new path nobody uses until
+the SQL runs) touches the columns. Still: owner runs the SQL first, then push (the §169
+precedent — held the push until the column existed).
+
+### Base-of-% (owner-confirmable) — GROSS payment, deviates from §169's "pre-GST subtotal"
+`commission_amount = amount_received × pct/100` uses the GROSS payment (incl. GST) as the
+base — the intuitive, eyeball-verifiable "type % → see ₹" the owner picked at the payment
+screen. §169 had locked "pre-GST subtotal" as the base; this is a small deviation (gross =
+subtotal + GST, so gross-based is ~1.8% of subtotal higher at 18% GST + 10% commission). If
+the owner wants ex-GST, change the compute to `amount_received × (subtotal/total) × pct/100`
+in both modals (needs a subtotal/total guard). Flagged to owner.
+
+### Known minor gap (accepted, §16)
+Editing a payment to CLEAR a previously-set commission (blank the %) won't null the stored
+value (conditional-spread omits the key → `updatePayment` doesn't clear it). Rare; set a
+new value to correct, or fix in DB. Chose deploy-safety over supporting edit-to-clear.
+
+### Foot-gun
+- ❌ A new nullable column the frontend ALWAYS writes (even null) breaks EVERY insert on
+  that table if pushed before the column exists. Drop the key from the spread + add it
+  conditionally so only the new-feature path depends on the new column.

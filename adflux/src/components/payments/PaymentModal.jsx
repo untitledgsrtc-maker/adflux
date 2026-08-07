@@ -61,6 +61,7 @@ export function PaymentModal({
     payment_notes:     initialPayment.payment_notes   ?? '',
     is_final_payment:  !!initialPayment.is_final_payment,
     tds_amount:        initialPayment.tds_amount ?? '',
+    commission_pct:    initialPayment.commission_pct ?? '',
   } : {
     // Phase 34Z.44 — pre-fill amount with effective outstanding so
     // the rep sees what's actually owed before they type. Forces
@@ -72,6 +73,7 @@ export function PaymentModal({
     payment_notes: '',
     is_final_payment: false,
     tds_amount: '',
+    commission_pct: '',
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -161,11 +163,24 @@ export function PaymentModal({
 
     setSaving(true)
     setGlobalError('')
+    // Phase 273 — govt-team commission entered AT PAYMENT time: type a %, we
+    // store the ₹ on THIS payment (% of the amount received). finance P&L SUMs
+    // payments.commission_amount. Govt only; blank = no commission on this row.
+    // Drop commission_pct from the spread + only ADD the commission columns when
+    // there's a real commission — so a plain (private / no-commission) payment
+    // never writes the new columns. Deploy-window blast radius = only a
+    // govt-payment-with-commission (the new path), never existing payments.
+    const _amt  = parseFloat(form.amount_received)
+    const _cpct = parseFloat(form.commission_pct) || 0
+    const _camt = isGovt && _cpct > 0 && _amt > 0 ? Math.round(_amt * _cpct / 100) : null
+    const { commission_pct: _dropCpct, ...formRest } = form
+    const commFields = _camt != null ? { commission_pct: _cpct, commission_amount: _camt } : {}
     const { error } = await onSave({
-      ...form,
-      amount_received: parseFloat(form.amount_received),
+      ...formRest,
+      amount_received: _amt,
       // gross stays in amount_received; TDS is the withheld breakdown
       tds_amount: form.tds_amount === '' ? null : parseFloat(form.tds_amount),
+      ...commFields,
     })
     setSaving(false)
     if (error) {
@@ -184,6 +199,10 @@ export function PaymentModal({
 
   const enteredAmt = parseFloat(form.amount_received) || 0
   const newBalance = balance - enteredAmt
+  // Phase 273 — live preview of the govt-team commission booked on this payment
+  const commPct = parseFloat(form.commission_pct) || 0
+  const commAmount = isGovt && commPct > 0 && enteredAmt > 0
+    ? Math.round(enteredAmt * commPct / 100) : 0
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -371,6 +390,32 @@ export function PaymentModal({
                     {parseFloat(form.tds_amount) > 0 && enteredAmt > 0 && (
                       <> Cash banked: {formatCurrency(Math.max(0, enteredAmt - (parseFloat(form.tds_amount) || 0)))}</>
                     )}
+                  </span>
+                </div>
+              )}
+
+              {/* Commission (Govt quotes only) — Phase 273. Our cost on a
+                  govt deal: type the % we pay as commission on THIS payment,
+                  it computes the ₹ booked. finance P&L sums these. Leave blank
+                  if there's no commission. Agency-created deals ride agency
+                  commission — the P&L already excludes them, so a value here
+                  won't double-count. */}
+              {isGovt && (
+                <div className="form-group">
+                  <label className="form-label">Commission % — our cost (optional)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={form.commission_pct}
+                    onChange={e => set('commission_pct', e.target.value)}
+                    placeholder="e.g. 10"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                  />
+                  <span className="pm-balance-preview">
+                    The % we pay as commission on this payment. Leave blank if none.
+                    {commAmount > 0 && <> Commission booked: {formatCurrency(commAmount)}</>}
                   </span>
                 </div>
               )}

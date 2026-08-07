@@ -83,26 +83,8 @@ export function Step2DateSigner({
         </div>
       </div>
 
-      {/* Govt-team commission (owner 2026-08-07). Our-team deals only — an agency
-          deal carries agency commission instead (XOR), so hide it for agency. */}
-      {!agencyLocked && (
-        <div className="govt-field-row">
-          <div className="govt-field">
-            <label className="govt-field__label">Govt commission % (our cost)</label>
-            <input
-              type="number" min="0" max="100" step="0.01"
-              className="govt-field__input"
-              value={data.govt_commission_percent ?? ''}
-              onChange={e => set('govt_commission_percent', e.target.value)}
-              placeholder="e.g. 10"
-            />
-            <div className="govt-field__hint">
-              % of the deal value (pre-GST) we pay as commission on this govt deal.
-              Books as a cost in Finance as payments come in. Leave blank if none.
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Govt-team commission moved to the payment screen (owner 2026-08-07):
+          the % is entered when a payment is added, not at quote-create. */}
 
       <div className="govt-field-row govt-field-row--2">
         <div className="govt-field">

@@ -93,6 +93,8 @@ export function WonPaymentModal({
     // Money Truth — Govt clients deduct TDS. Gross goes in amount_received
     // (closes the deal at quote total); the withheld part is recorded here.
     tds_amount: '',
+    // Phase 273 — govt-team commission % typed at payment time (our cost).
+    commission_pct: '',
   })
   const isGovt = quote?.segment === 'GOVERNMENT'
 
@@ -376,6 +378,30 @@ export function WonPaymentModal({
                 </div>
               )}
 
+              {/* Commission (Govt only) — Phase 273. Type the % we pay as
+                  commission on this payment; it computes the ₹ booked. Leave
+                  blank if none. Agency-created deals are excluded by the P&L,
+                  so a value here won't double-count. */}
+              {isGovt && newAmount > 0 && (
+                <div className="fg">
+                  <label>Commission % — our cost (optional)</label>
+                  <input
+                    type="number"
+                    value={form.commission_pct}
+                    onChange={e => set('commission_pct', e.target.value)}
+                    placeholder="e.g. 10"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                  />
+                  {(Number(form.commission_pct) || 0) > 0 && (
+                    <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
+                      Commission booked: ₹{Math.round(newAmount * (Number(form.commission_pct) || 0) / 100).toLocaleString('en-IN')}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="fg">
                 <label>Payment Date</label>
                 <input type="date" value={form.payment_date} onChange={e => set('payment_date', e.target.value)} />
@@ -427,13 +453,25 @@ export function WonPaymentModal({
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-y"
-            onClick={() => onConfirm({
-              ...form,
-              // numeric-or-null so the payments insert never sees '' in a
-              // numeric column; TDS capped at the gross it is part of
-              tds_amount: form.tds_amount === '' ? null
-                : Math.min(Number(form.tds_amount) || 0, Number(form.amount_received) || 0),
-            })}
+            onClick={() => {
+              // Phase 273 — govt-team commission on this payment (our cost).
+              // Only ADD the commission columns when there's a real commission,
+              // and drop commission_pct from the spread — so a plain won-payment
+              // never writes the new columns (deploy-window safe, see PaymentModal).
+              const _cpct = Number(form.commission_pct) || 0
+              const _camt = isGovt && _cpct > 0 && newAmount > 0
+                ? Math.round(newAmount * _cpct / 100) : null
+              const { commission_pct: _dropCpct, ...formRest } = form
+              const commFields = _camt != null ? { commission_pct: _cpct, commission_amount: _camt } : {}
+              onConfirm({
+                ...formRest,
+                // numeric-or-null so the payments insert never sees '' in a
+                // numeric column; TDS capped at the gross it is part of
+                tds_amount: form.tds_amount === '' ? null
+                  : Math.min(Number(form.tds_amount) || 0, Number(form.amount_received) || 0),
+                ...commFields,
+              })
+            }}
             disabled={!canConfirm}
             title={
               !campaignDatesValid
