@@ -247,7 +247,7 @@ function PnlTab({ seg }) {
             <thead><tr><th style={thL}>Company</th><th style={thR}>Income</th><th style={thR}>Op P&amp;L</th><th style={thR}>Margin</th></tr></thead>
             <tbody>
               {(d.per_company || []).map(c => <tr key={c.company}><td style={tdL}>{c.company}</td><td style={tdR}>{fmtINR(c.income)}</td>
-                <td style={{ ...tdR, color: +c.op_pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtINR(c.op_pnl)}</td><td style={tdR}>{c.margin}%</td></tr>)}
+                <td style={{ ...tdR, color: +c.op_pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtINR(c.op_pnl)}</td><td style={tdR}>{c.margin == null ? '—' : `${c.margin}%`}</td></tr>)}
               <tr style={totRow}><td style={tdL}>GROUP</td><td style={tdR}>{fmtINR(income)}</td><td style={{ ...tdR, color: profit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtINR(profit)}</td><td style={tdR}>{d.margin_pct}%</td></tr>
             </tbody>
           </table>

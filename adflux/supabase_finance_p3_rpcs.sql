@@ -187,10 +187,10 @@ BEGIN
     'per_company', jsonb_build_array(
       jsonb_build_object('company','Untitled Advertising','income',ig,
         'op_pnl', ig-dg-CASE WHEN itot>0 THEN round(ctot*ig/itot) ELSE 0 END,
-        'margin', CASE WHEN ig>0 THEN round((ig-dg-CASE WHEN itot>0 THEN ctot*ig/itot ELSE 0 END)/ig*100,1) ELSE 0 END),
+        'margin', CASE WHEN ig>0 THEN round((ig-dg-CASE WHEN itot>0 THEN ctot*ig/itot ELSE 0 END)/ig*100,1) ELSE NULL END),
       jsonb_build_object('company','Untitled Adflux Pvt Ltd','income',ip,
         'op_pnl', ip-dp-CASE WHEN itot>0 THEN round(ctot*ip/itot) ELSE 0 END,
-        'margin', CASE WHEN ip>0 THEN round((ip-dp-CASE WHEN itot>0 THEN ctot*ip/itot ELSE 0 END)/ip*100,1) ELSE 0 END)
+        'margin', CASE WHEN ip>0 THEN round((ip-dp-CASE WHEN itot>0 THEN ctot*ip/itot ELSE 0 END)/ip*100,1) ELSE NULL END)
     ),
     'revenue_mix', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt,
