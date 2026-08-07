@@ -456,6 +456,7 @@ function classifyImport(tag, dir, desc, hcat, bankco, rules) {
   else if (t === 'GSRTC') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'GSRTC_LED' }
   else if (t === 'AUTO HOOD') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'AUTO_HOOD'; if (dir === 'out') head = 'Vendor Payment' }
   else if (t === 'OTHER MEDIA') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'OTHER_MEDIA'; if (dir === 'out') head = 'Vendor Payment' }
+  else if (t === 'PRIVATE LED' || t === 'LED' || t === 'LED CITIES') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'LED_OTHER'; if (dir === 'out') head = 'Vendor Payment' }
   else if (t === 'UNTITLED ADVERTISING') { co = 'Untitled Advertising'; b = dir === 'in' ? 'income' : 'review' }
   else if (t === 'UNTITLED ADFLUX PVT LTD') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'review' }
   else if (t === 'OTHER EXPENSE') { b = 'common_expense'; head = IMP_HCAT[hcat] || 'Other' }
