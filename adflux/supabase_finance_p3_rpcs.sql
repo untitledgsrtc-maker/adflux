@@ -17,6 +17,13 @@
 -- (Vishal) FORCED GOVERNMENT; else '{}'. Fail closed on NULL role.
 -- =====================================================================
 
+-- Commission head (§168) — a real running cost; classifier tags 'Commission' rows
+-- as common_expense + this head, so it reduces Business Profit yet shows as its
+-- own Money-Out line. Additive seed (no bucket CHECK change).
+INSERT INTO public.finance_expense_heads (name, kind, display_order) VALUES
+  ('Commission','operating',35)
+ON CONFLICT (name) DO NOTHING;
+
 CREATE OR REPLACE FUNCTION public.finance_pnl_summary(
   p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_segment text DEFAULT NULL
 ) RETURNS jsonb
@@ -28,6 +35,12 @@ DECLARE
   v_seg  text := p_segment;
   ig numeric; ip numeric; itot numeric;
   dg numeric; dp numeric; dtot numeric; ctot numeric;
+  -- cash-view scalars (money in/out + net cash + business profit; commission = a
+  -- common_expense with head 'Commission' so it reduces Business Profit yet shows
+  -- as its own Money-Out line). Owner spec 2026-08-07 (§168).
+  v_loan_in numeric; v_loan_out numeric; v_draw numeric; v_tax numeric;
+  v_sweep numeric; v_asset numeric; v_comm numeric; v_review_out numeric; v_review_in numeric;
+  v_tin numeric; v_tout numeric; v_bprofit numeric;
   v_out jsonb;
 BEGIN
   IF COALESCE(v_role,'') NOT IN ('admin','accounts') THEN
@@ -47,7 +60,12 @@ BEGIN
    WHERE bucket = 'income'
      AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
   IF v_seg='GOVERNMENT' THEN ip:=0; ELSIF v_seg='PRIVATE' THEN ig:=0; END IF;
-  itot := ig+ip;
+  -- itot = FULL income in range (same row set money_in scans, so Σ money_in ties to
+  -- total_in even for a NULL-derived-segment credit); ig/ip stay the Govt/Pvt split.
+  SELECT COALESCE(SUM(amount),0) INTO itot FROM public.finance_transactions
+   WHERE bucket='income' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+     AND (v_seg IS NULL OR COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
+                                                          WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg);
 
   SELECT COALESCE(SUM(amount) FILTER (WHERE segment='GOVERNMENT'),0),
          COALESCE(SUM(amount) FILTER (WHERE segment='PRIVATE'),0)
@@ -55,16 +73,87 @@ BEGIN
     FROM public.finance_transactions
    WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
      AND (v_seg IS NULL OR segment=v_seg);
-  dtot := dg+dp;
+  -- dtot = FULL direct cost in range (same row set money_out groups, so a NULL-segment
+  -- direct_cost row can't overstate business_profit or break Σ money_out=total_out);
+  -- dg/dp stay the Govt/Pvt split for by_segment/per_company.
+  SELECT COALESCE(SUM(amount),0) INTO dtot FROM public.finance_transactions
+   WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+     AND (v_seg IS NULL OR segment=v_seg);
 
   SELECT COALESCE(SUM(amount),0) INTO ctot FROM public.finance_transactions
    WHERE bucket='common_expense' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
+
+  -- commission = common_expense rows tagged head 'Commission' (real running cost)
+  SELECT COALESCE(SUM(ft.amount),0) INTO v_comm
+    FROM public.finance_transactions ft
+    JOIN public.finance_expense_heads h ON h.id=ft.expense_head_id
+   WHERE ft.bucket='common_expense' AND h.name='Commission'
+     AND (p_from IS NULL OR ft.txn_date>=p_from) AND (p_to IS NULL OR ft.txn_date<=p_to);
+
+  -- excluded-from-profit scalars for the cash view
+  SELECT
+    COALESCE(SUM(amount) FILTER (WHERE bucket='loan_in'),0),
+    COALESCE(SUM(amount) FILTER (WHERE bucket='loan_out'),0),
+    COALESCE(SUM(amount) FILTER (WHERE bucket='owner_drawings'),0),
+    COALESCE(SUM(amount) FILTER (WHERE bucket='tax'),0),
+    COALESCE(SUM(amount) FILTER (WHERE bucket='internal_transfer'),0),
+    COALESCE(SUM(amount) FILTER (WHERE bucket IN ('investment','asset') AND direction='out'),0),
+    COALESCE(SUM(amount) FILTER (WHERE bucket='review' AND direction='out'),0),
+    COALESCE(SUM(amount) FILTER (WHERE bucket='review' AND direction='in'),0)
+    INTO v_loan_in, v_loan_out, v_draw, v_tax, v_sweep, v_asset, v_review_out, v_review_in
+    FROM public.finance_transactions
+   WHERE (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
+
+  v_bprofit := itot - dtot - ctot;                                   -- revenue − running costs (commission ⊂ ctot)
+  v_tin     := itot + v_loan_in + v_review_in;                       -- cash IN  (revenue + borrowed + unsorted credits)
+  v_tout    := dtot + ctot + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (SWEEP excluded → net-zero)
 
   v_out := jsonb_build_object(
     'income', itot, 'income_gov', ig, 'income_pvt', ip,
     'direct_cost', dtot, 'common_expense', ctot,
     'operating_profit', itot-dtot-ctot,
+    'business_profit', v_bprofit,
     'margin_pct', CASE WHEN itot>0 THEN round((itot-dtot-ctot)/itot*100,1) ELSE 0 END,
+    -- ---- CASH VIEW (owner spec §168): money in / out / net cash + commission + sweep ----
+    'total_in', v_tin, 'total_out', v_tout, 'net_cash', v_tin - v_tout,
+    'commission', v_comm, 'sweep', v_sweep,
+    'money_in', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt) ORDER BY amt DESC)
+      FROM (
+        SELECT lbl, SUM(amt) amt FROM (
+          SELECT CASE WHEN media_type IS NOT NULL
+                      THEN (CASE WHEN COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
+                                                                    WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)='GOVERNMENT' THEN 'Govt' ELSE 'Pvt' END)||' · '||media_type
+                      ELSE COALESCE(company,'Other income') END AS lbl,
+                 amount AS amt
+            FROM public.finance_transactions
+           WHERE bucket='income' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+             AND (v_seg IS NULL OR COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
+                                                                  WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg)
+          UNION ALL SELECT 'Loan from friend', v_loan_in
+          UNION ALL SELECT 'Unsorted credits (review)', v_review_in
+        ) mi GROUP BY lbl
+      ) z WHERE amt > 0), '[]'::jsonb),
+    'money_out', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt) ORDER BY amt DESC)
+      FROM (
+        SELECT lbl, SUM(amt) amt FROM (
+          SELECT CASE media_type WHEN 'GSRTC_LED' THEN 'GSRTC' WHEN 'AUTO_HOOD' THEN 'Auto Hood'
+                                 WHEN 'OTHER_MEDIA' THEN 'Other Media' WHEN 'LED_OTHER' THEN 'Pvt LED'
+                                 ELSE COALESCE(media_type,'Other direct cost') END AS lbl,
+                 amount AS amt
+            FROM public.finance_transactions
+           WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+             AND (v_seg IS NULL OR segment=v_seg)
+          UNION ALL SELECT 'Common expense', ctot - v_comm
+          UNION ALL SELECT 'Commission', v_comm
+          UNION ALL SELECT 'Assets / equipment', v_asset
+          UNION ALL SELECT 'Loan repaid', v_loan_out
+          UNION ALL SELECT 'Personal', v_draw
+          UNION ALL SELECT 'Tax', v_tax
+          UNION ALL SELECT 'Review (to sort)', v_review_out
+        ) mo GROUP BY lbl
+      ) z WHERE amt > 0), '[]'::jsonb),
     -- by segment × media_type (the 4+ real business lines: Govt·Auto Hood,
     -- Govt·GSRTC LED, Pvt·Other Media, etc.). Untagged income → "· Other" until
     -- the accountant sets media_type in the Register.

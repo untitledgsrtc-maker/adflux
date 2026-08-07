@@ -134,6 +134,11 @@ function PnlTab({ seg }) {
 
   const profit = Number(d.operating_profit) || 0, income = Number(d.income) || 0
   const cost = Number(d.direct_cost) + Number(d.common_expense)
+  const bprofit = d.business_profit != null ? Number(d.business_profit) : profit   // revenue − running costs (§168)
+  const moneyIn = d.money_in || [], moneyOut = d.money_out || []
+  const totalIn = Number(d.total_in) || 0, totalOut = Number(d.total_out) || 0
+  const netCash = d.net_cash != null ? Number(d.net_cash) : totalIn - totalOut
+  const sweep = Number(d.sweep) || 0
   const excl = d.excluded || {}, byHead = d.by_head || [], mix = d.revenue_mix || [], monthly = d.monthly || []
   const assets = d.assets || [], review = d.review || { count: 0, amount: 0 }
   const maxHead = byHead.reduce((m, h) => Math.max(m, +h.amount || 0), 0) || 1
@@ -143,16 +148,48 @@ function PnlTab({ seg }) {
       {/* hero */}
       <div style={{ position: 'relative', overflow: 'hidden', border: '1px solid var(--border-strong, #475569)', borderRadius: 20, padding: '24px 26px',
         background: 'radial-gradient(480px 220px at 92% -10%, rgba(255,230,0,.16), transparent 60%), linear-gradient(160deg,#10192e,#0c1424)' }}>
-        <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Operating Profit / (Loss){seg !== 'all' ? ` · ${seg === 'GOVERNMENT' ? 'Government' : 'Private'}` : ''}</div>
-        <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 46, lineHeight: 1.05, margin: '8px 0 4px', color: profit >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)' }}>{fmtINR(profit)}</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Income {fmtINR(income)} · Costs {fmtINR(cost)} · Margin {d.margin_pct}%</div>
+        <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Business Profit / (Loss){seg !== 'all' ? ` · ${seg === 'GOVERNMENT' ? 'Government' : 'Private'}` : ''}</div>
+        <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 46, lineHeight: 1.05, margin: '8px 0 4px', color: bprofit >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)' }}>{fmtINR(bprofit)}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Revenue {fmtINR(income)} · Running costs {fmtINR(cost)} · Margin {d.margin_pct}%</div>
       </div>
 
       <div style={g4}>
-        <Kpi label="Operating Income" value={fmtINR(income)} sub="money received (bank)" Icon={TrendingUp} color="var(--success, #10B981)" tint="var(--success-soft, rgba(16,185,129,.12))" />
-        <Kpi label="Operating Costs" value={fmtINR(cost)} sub="direct + common" Icon={TrendingDown} color="var(--danger)" tint="var(--danger-soft, rgba(239,68,68,.12))" />
-        <Kpi label="Operating P&L" value={fmtINR(profit)} sub={profit >= 0 ? 'profit' : 'loss'} Icon={BarChart3} color={profit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)'} tint="var(--success-soft, rgba(16,185,129,.12))" />
-        <Kpi label="Margin" value={`${d.margin_pct}%`} sub="income → profit" Icon={IndianRupee} color="var(--accent, #FFE600)" tint="var(--accent-soft, rgba(255,230,0,.14))" />
+        <Kpi label="Revenue" value={fmtINR(income)} sub="ads income (bank)" Icon={TrendingUp} color="var(--success, #10B981)" tint="var(--success-soft, rgba(16,185,129,.12))" />
+        <Kpi label="Running Costs" value={fmtINR(cost)} sub="media + common + commission" Icon={TrendingDown} color="var(--danger)" tint="var(--danger-soft, rgba(239,68,68,.12))" />
+        <Kpi label="Business Profit" value={fmtINR(bprofit)} sub={bprofit >= 0 ? 'the ads business earns' : 'loss'} Icon={BarChart3} color={bprofit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)'} tint="var(--success-soft, rgba(16,185,129,.12))" />
+        <Kpi label="Net Cash" value={fmtINR(netCash)} sub="in − out (money position)" Icon={IndianRupee} color={netCash >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)'} tint="var(--accent-soft, rgba(255,230,0,.14))" />
+      </div>
+
+      {/* CASH VIEW — money in vs money out (§168) */}
+      <div style={g2}>
+        <Card>
+          <CH><TrendingUp size={15} style={{ verticalAlign: -2, color: 'var(--success)' }} /> Money In <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>bank credits + borrowed</span></CH>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}><tbody>
+            {moneyIn.length === 0 ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No income in range.</td></tr> :
+              moneyIn.map((r, i) => <tr key={i}><td style={tdL}>{r.label}</td><td style={{ ...tdR, color: 'var(--success)' }}>{fmtINR(r.amount)}</td></tr>)}
+            <tr style={totRow}><td style={tdL}>TOTAL IN</td><td style={{ ...tdR, color: 'var(--success)' }}>{fmtINR(totalIn)}</td></tr>
+          </tbody></table>
+        </Card>
+        <Card>
+          <CH><TrendingDown size={15} style={{ verticalAlign: -2, color: 'var(--danger)' }} /> Money Out <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>every rupee out</span></CH>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}><tbody>
+            {moneyOut.length === 0 ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No spending in range.</td></tr> :
+              moneyOut.map((r, i) => <tr key={i}><td style={tdL}>{r.label}</td><td style={{ ...tdR, color: 'var(--danger)' }}>{fmtINR(r.amount)}</td></tr>)}
+            <tr style={totRow}><td style={tdL}>TOTAL OUT</td><td style={{ ...tdR, color: 'var(--danger)' }}>{fmtINR(totalOut)}</td></tr>
+          </tbody></table>
+        </Card>
+      </div>
+
+      {/* net cash + sweep (net-zero) */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
+        border: '1px solid var(--border-strong, #475569)', borderRadius: 14, padding: '14px 18px', background: 'var(--surface, #1e293b)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <span style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Net Cash · In − Out</span>
+          <span style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 26, color: netCash >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtINR(netCash)}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+          <ArrowLeftRight size={14} /> Own-account transfers (SWEEP) {fmtINR(sweep)} · net zero, not counted in / out
+        </div>
       </div>
 
       {/* trend + mix */}
@@ -457,6 +494,7 @@ function classifyImport(tag, dir, desc, hcat, bankco, rules) {
   else if (t === 'AUTO HOOD') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'AUTO_HOOD'; if (dir === 'out') head = 'Vendor Payment' }
   else if (t === 'OTHER MEDIA') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'OTHER_MEDIA'; if (dir === 'out') head = 'Vendor Payment' }
   else if (t === 'PRIVATE LED' || t === 'LED' || t === 'LED CITIES') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'LED_OTHER'; if (dir === 'out') head = 'Vendor Payment' }
+  else if (t === 'COMMISSION') { b = 'common_expense'; head = 'Commission' }  // §168 real running cost, own Money-Out line
   else if (t === 'UNTITLED ADVERTISING') { co = 'Untitled Advertising'; b = dir === 'in' ? 'income' : 'review' }
   else if (t === 'UNTITLED ADFLUX PVT LTD') { co = 'Untitled Adflux Pvt Ltd'; b = dir === 'in' ? 'income' : 'review' }
   else if (t === 'OTHER EXPENSE') { b = 'common_expense'; head = IMP_HCAT[hcat] || 'Other' }
