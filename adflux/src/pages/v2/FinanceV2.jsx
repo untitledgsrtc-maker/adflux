@@ -4,17 +4,18 @@
 // Home · Tasks · Import · Register. admin + accounts + co_owner(Vishal govt-scoped).
 // P&L + Home totals come from server RPCs (§66); Register pages raw rows via .range().
 // =============================================================================
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, ListChecks, Upload, TrendingUp, TrendingDown, BarChart3,
   AlertTriangle, Loader2, Search, IndianRupee, Home, CheckSquare, Clock,
-  RefreshCw, Wallet, PiggyBank, Boxes, ArrowLeftRight, Trash2, CheckCircle2,
+  RefreshCw, Wallet, PiggyBank, Boxes, ArrowLeftRight, Trash2, CheckCircle2, Plus,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { istTodayISO } from '../../utils/istDate'
 
 /* ── helpers ── */
 function fmtINR(n) {
@@ -729,6 +730,9 @@ function ImportTab() {
 
 /* ── Register (detailed, month-grouped, all dropdowns) ── */
 const COMPANIES = ['Untitled Advertising', 'Untitled Adflux Pvt Ltd', 'Trade Venture']
+// manual add-transaction: the accountant's Type dropdown (classifyImport derives the rest)
+const MANUAL_TAGS = ['Untitled Advertising', 'GSRTC', 'AUTO HOOD', 'Other Media', 'Private LED',
+  'Personal', 'Common Expense', 'Other Expense', 'Commission', 'SWEEP', 'LOAN FROM FRIEND', 'TAX']
 const BUCKET_OPTS = [
   ['income', 'Income'], ['direct_cost', 'Direct Cost'], ['common_expense', 'Common / Overhead'],
   ['owner_drawings', 'Owner Drawings'], ['investment', 'Investment'], ['asset', 'Asset'],
@@ -751,6 +755,9 @@ function RegisterTab() {
   const [loading, setLoading] = useState(true); const [fBucket, setFBucket] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
   const [fCompany, setFCompany] = useState('all'); const [fSegment, setFSegment] = useState('all'); const [fMonth, setFMonth] = useState('all')
   const [selected, setSelected] = useState(() => new Set())
+  const EMPTY_AF = { date: istTodayISO(), desc: '', amount: '', dir: 'out', tag: '', bank: '' }
+  const [addOpen, setAddOpen] = useState(false); const [af, setAf] = useState(EMPTY_AF)
+  const [saving, setSaving] = useState(false); const savingRef = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -805,6 +812,29 @@ function RegisterTab() {
     toastSuccess(`Updated ${ids.length}.`)
   }
 
+  const saveAdd = async () => {
+    if (savingRef.current || saving) return
+    const amt = parseFloat(String(af.amount).replace(/,/g, ''))
+    if (!af.date || !isFinite(amt) || amt <= 0 || !af.bank) { toastError(null, 'Enter date, amount, and bank.'); return }
+    savingRef.current = true; setSaving(true)
+    const bank = banks.find(b => String(b.id) === String(af.bank))
+    const bankco = /adflux/i.test((bank && bank.name) || '') ? 'Untitled Adflux Pvt Ltd' : 'Untitled Advertising'
+    const c = classifyImport(af.tag, af.dir, af.desc, '', bankco, [])   // derive bucket/segment/media/head from the tag
+    const headByName = Object.fromEntries(heads.map(h => [h.name, h.id]))
+    const uid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
+    const row = {
+      bank_account_id: af.bank, txn_date: af.date, description: af.desc || null, amount: amt, direction: af.dir,
+      bucket: c.bucket, company: c.company, segment: c.segment, media_type: c.media_type,
+      expense_head_id: c.head ? (headByName[c.head] || null) : null,
+      raw_tag: af.tag || null, source: 'manual', dedupe_key: `manual|${uid}`,
+    }
+    const { data, error } = await supabase.from('finance_transactions').insert(row)
+      .select('id, txn_date, ref_no, description, amount, direction, bucket, company, segment, media_type, expense_head_id, bank_account_id, raw_tag, note').single()
+    savingRef.current = false; setSaving(false)
+    if (error) { toastError(error, 'Could not add transaction.'); return }
+    setRows(rs => [data, ...rs]); setAf({ ...EMPTY_AF }); setAddOpen(false); toastSuccess('Transaction added.')
+  }
+
   const months = useMemo(() => [...new Set(rows.map(r => (r.txn_date || '').slice(0, 7)).filter(Boolean))].sort((a, b) => b.localeCompare(a)), [rows])
   const filtered = useMemo(() => rows.filter(r => {
     if (fBucket !== 'all' && r.bucket !== fBucket) return false
@@ -841,6 +871,7 @@ function RegisterTab() {
           <span onClick={() => setSelected(new Set(filtered.map(r => r.id)))} style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-subtle)' }}>select all ({filtered.length})</span>
         )}
         <div style={{ flex: 1 }} />
+        <button onClick={() => setAddOpen(o => !o)} style={{ background: addOpen ? 'var(--surface-2)' : 'var(--accent, #FFE600)', color: addOpen ? 'var(--text)' : 'var(--accent-fg, #0f172a)', border: '1px solid ' + (addOpen ? 'var(--border)' : 'transparent'), borderRadius: 999, padding: '6px 13px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', gap: 6, alignItems: 'center' }}><Plus size={14} />{addOpen ? 'Close' : 'Add transaction'}</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}>
           <Search size={14} style={{ color: 'var(--text-subtle)' }} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search..." style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, width: 150 }} />
         </div>
@@ -850,6 +881,23 @@ function RegisterTab() {
         <select value={fBucket} onChange={e => setFBucket(e.target.value)} style={selStyle}><option value="all">Bucket: All</option>{BUCKET_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         <select value={fBank} onChange={e => setFBank(e.target.value)} style={selStyle}><option value="all">Bank: All</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
       </div>
+      {addOpen && (() => {
+        const inp = { background: 'var(--surface, #1e293b)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', color: 'var(--text)', fontSize: 13, outline: 'none' }
+        const lbl = { display: 'block', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }
+        const dirBtn = (v, txt) => <button onClick={() => setAf(a => ({ ...a, dir: v }))} style={{ flex: 1, padding: '7px 0', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border)', background: af.dir === v ? (v === 'in' ? 'var(--success)' : 'var(--danger)') : 'transparent', color: af.dir === v ? '#fff' : 'var(--text-muted)', borderRadius: v === 'in' ? '8px 0 0 8px' : '0 8px 8px 0' }}>{txt}</button>
+        return (
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', padding: '13px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2, #334155)' }}>
+            <div><label style={lbl}>Date</label><input type="date" value={af.date} onChange={e => setAf(a => ({ ...a, date: e.target.value }))} style={{ ...inp, width: 150 }} /></div>
+            <div><label style={lbl}>Money in / out</label><div style={{ display: 'flex', width: 140 }}>{dirBtn('in', 'In')}{dirBtn('out', 'Out')}</div></div>
+            <div><label style={lbl}>Amount ₹</label><input inputMode="decimal" value={af.amount} onChange={e => setAf(a => ({ ...a, amount: e.target.value }))} placeholder="0" style={{ ...inp, width: 130, fontFamily: 'Space Grotesk' }} /></div>
+            <div><label style={lbl}>Type (tag)</label><select value={af.tag} onChange={e => setAf(a => ({ ...a, tag: e.target.value }))} style={{ ...selStyle, minWidth: 160 }}><option value="">— review (sort later) —</option>{MANUAL_TAGS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div><label style={lbl}>Bank</label><select value={af.bank} onChange={e => setAf(a => ({ ...a, bank: e.target.value }))} style={{ ...selStyle, minWidth: 150 }}><option value="">— pick bank —</option>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+            <div style={{ flex: 1, minWidth: 180 }}><label style={lbl}>Description</label><input value={af.desc} onChange={e => setAf(a => ({ ...a, desc: e.target.value }))} placeholder="what was it for" style={{ ...inp, width: '100%' }} /></div>
+            <button onClick={saveAdd} disabled={saving} style={{ background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', border: 'none', borderRadius: 999, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
+            <button onClick={() => { setAddOpen(false); setAf({ ...EMPTY_AF }) }} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 999, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          </div>
+        )
+      })()}
       <div style={{ overflowX: 'auto', maxHeight: '72vh', overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 1180 }}>
           <thead><tr style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
