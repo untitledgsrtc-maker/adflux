@@ -11054,13 +11054,14 @@ pre-SQL. Only a **govt-payment-WITH-a-commission-%** (the brand-new path nobody 
 the SQL runs) touches the columns. Still: owner runs the SQL first, then push (the §169
 precedent — held the push until the column existed).
 
-### Base-of-% (owner-confirmable) — GROSS payment, deviates from §169's "pre-GST subtotal"
-`commission_amount = amount_received × pct/100` uses the GROSS payment (incl. GST) as the
-base — the intuitive, eyeball-verifiable "type % → see ₹" the owner picked at the payment
-screen. §169 had locked "pre-GST subtotal" as the base; this is a small deviation (gross =
-subtotal + GST, so gross-based is ~1.8% of subtotal higher at 18% GST + 10% commission). If
-the owner wants ex-GST, change the compute to `amount_received × (subtotal/total) × pct/100`
-in both modals (needs a subtotal/total guard). Flagged to owner.
+### Base-of-% = QUOTE BASE (pre-GST subtotal), proportional per payment (owner-confirmed, `69f2c5c`→next)
+Owner 2026-08-07: "Quote base amount × %." So the compute is
+`commission_amount = round(amount_received × (subtotal / total_amount) × pct/100)` — the
+ex-GST SHARE of THIS payment × %. On full collection the sum = `subtotal × pct` = quote base
+× % (honors the §169 pre-GST-subtotal lock). Guard: `subtotal>0 && total>0 ? subtotal/total
+: 1` (falls back to gross if a quote has no subtotal on file). Both modals compute the same
+ratio (`commBaseRatio`); the RPC is UNCHANGED (it just SUMs the stored `commission_amount`,
+which is now already ex-GST-based). Superseded the initial gross-based ship (`69f2c5c`).
 
 ### Known minor gap (accepted, §16)
 Editing a payment to CLEAR a previously-set commission (blank the %) won't null the stored

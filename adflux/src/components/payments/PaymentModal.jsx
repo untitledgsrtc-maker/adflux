@@ -172,7 +172,10 @@ export function PaymentModal({
     // govt-payment-with-commission (the new path), never existing payments.
     const _amt  = parseFloat(form.amount_received)
     const _cpct = parseFloat(form.commission_pct) || 0
-    const _camt = isGovt && _cpct > 0 && _amt > 0 ? Math.round(_amt * _cpct / 100) : null
+    const _sub  = Number(quote?.subtotal) || 0
+    const _tot  = Number(quote?.total_amount) || 0
+    const _ratio = _sub > 0 && _tot > 0 ? _sub / _tot : 1   // ex-GST share of the payment
+    const _camt = isGovt && _cpct > 0 && _amt > 0 ? Math.round(_amt * _ratio * _cpct / 100) : null
     const { commission_pct: _dropCpct, ...formRest } = form
     const commFields = _camt != null ? { commission_pct: _cpct, commission_amount: _camt } : {}
     const { error } = await onSave({
@@ -199,10 +202,15 @@ export function PaymentModal({
 
   const enteredAmt = parseFloat(form.amount_received) || 0
   const newBalance = balance - enteredAmt
-  // Phase 273 — live preview of the govt-team commission booked on this payment
+  // Phase 273 — commission on THIS payment = its ex-GST share of the quote
+  // base × % (owner: "quote base amount × %"). commBaseRatio = subtotal /
+  // total = the pre-GST portion of a gross payment; on full collection the
+  // sum equals subtotal × %. Falls back to 1 (gross) if no subtotal on file.
   const commPct = parseFloat(form.commission_pct) || 0
+  const commBaseRatio = (Number(quote?.subtotal) || 0) > 0 && (Number(quote?.total_amount) || 0) > 0
+    ? (Number(quote.subtotal) / Number(quote.total_amount)) : 1
   const commAmount = isGovt && commPct > 0 && enteredAmt > 0
-    ? Math.round(enteredAmt * commPct / 100) : 0
+    ? Math.round(enteredAmt * commBaseRatio * commPct / 100) : 0
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -402,7 +410,7 @@ export function PaymentModal({
                   won't double-count. */}
               {isGovt && (
                 <div className="form-group">
-                  <label className="form-label">Commission % — our cost (optional)</label>
+                  <label className="form-label">Commission % — our cost, on the quote base (optional)</label>
                   <input
                     type="number"
                     className="form-input"
@@ -414,7 +422,7 @@ export function PaymentModal({
                     step="0.01"
                   />
                   <span className="pm-balance-preview">
-                    The % we pay as commission on this payment. Leave blank if none.
+                    % of the quote base (pre-GST) — books this payment's share of it. Leave blank if none.
                     {commAmount > 0 && <> Commission booked: {formatCurrency(commAmount)}</>}
                   </span>
                 </div>

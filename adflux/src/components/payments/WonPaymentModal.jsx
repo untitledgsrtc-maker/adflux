@@ -143,6 +143,10 @@ export function WonPaymentModal({
   const balance = Number(quote.total_amount || 0) - Number(totalPaid || 0) - (Number(form.amount_received) || 0)
   const campaignDatesValid = form.campaign_start_date && form.campaign_end_date
   const newAmount = Number(form.amount_received) || 0
+  // Phase 273 — commission books this payment's ex-GST share of the quote
+  // base (subtotal/total); on full collection the sum = subtotal × %.
+  const commBaseRatio = (Number(quote?.subtotal) || 0) > 0 && (Number(quote?.total_amount) || 0) > 0
+    ? (Number(quote.subtotal) / Number(quote.total_amount)) : 1
   // Won is allowed with no payment at all — a "client said yes,
   // money still pending" state. Campaign dates remain mandatory
   // because they're what schedules the spot.
@@ -384,7 +388,7 @@ export function WonPaymentModal({
                   so a value here won't double-count. */}
               {isGovt && newAmount > 0 && (
                 <div className="fg">
-                  <label>Commission % — our cost (optional)</label>
+                  <label>Commission % — our cost, on the quote base (optional)</label>
                   <input
                     type="number"
                     value={form.commission_pct}
@@ -396,7 +400,7 @@ export function WonPaymentModal({
                   />
                   {(Number(form.commission_pct) || 0) > 0 && (
                     <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
-                      Commission booked: ₹{Math.round(newAmount * (Number(form.commission_pct) || 0) / 100).toLocaleString('en-IN')}
+                      Commission booked: ₹{Math.round(newAmount * commBaseRatio * (Number(form.commission_pct) || 0) / 100).toLocaleString('en-IN')}
                     </div>
                   )}
                 </div>
@@ -460,7 +464,7 @@ export function WonPaymentModal({
               // never writes the new columns (deploy-window safe, see PaymentModal).
               const _cpct = Number(form.commission_pct) || 0
               const _camt = isGovt && _cpct > 0 && newAmount > 0
-                ? Math.round(newAmount * _cpct / 100) : null
+                ? Math.round(newAmount * commBaseRatio * _cpct / 100) : null
               const { commission_pct: _dropCpct, ...formRest } = form
               const commFields = _camt != null ? { commission_pct: _cpct, commission_amount: _camt } : {}
               onConfirm({
