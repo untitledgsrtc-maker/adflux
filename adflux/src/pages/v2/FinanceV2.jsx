@@ -510,11 +510,12 @@ function classifyImport(tag, dir, desc, hcat, bankco, rules) {
   else if (t === 'LOAN FROM FRIEND') b = dir === 'in' ? 'loan_in' : 'loan_out'
   else if (t === 'TAX') { b = 'tax'; head = 'Duties & Taxes' }
   else if (t === 'COMMON EXPENSE') { b = 'common_expense'; head = IMP_HCAT[hcat] || null }
-  // Segment is fixed by media type; company assignment per owner 2026-08-07:
-  //   GSRTC_LED / AUTO_HOOD   -> Govt, company = Untitled Advertising (fixed)
-  //   OTHER_MEDIA / LED_OTHER -> Pvt,  company = the bank account selected (co→bankco, line 531)
-  else if (t === 'GSRTC') { co = 'Untitled Advertising'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'GSRTC_LED' }
-  else if (t === 'AUTO HOOD') { co = 'Untitled Advertising'; b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'AUTO_HOOD'; if (dir === 'out') head = 'Vendor Payment' }
+  // Media type fixes the SEGMENT; company ALWAYS follows the bank account (owner 2026-08-07):
+  //   GSRTC_LED / AUTO_HOOD   -> Govt
+  //   OTHER_MEDIA / LED_OTHER -> Pvt
+  // co stays null → defaults to the selected bank account's company (line 531).
+  else if (t === 'GSRTC') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'GSRTC_LED' }
+  else if (t === 'AUTO HOOD') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'GOVERNMENT'; media = 'AUTO_HOOD'; if (dir === 'out') head = 'Vendor Payment' }
   else if (t === 'OTHER MEDIA') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'OTHER_MEDIA'; if (dir === 'out') head = 'Vendor Payment' }
   else if (t === 'PRIVATE LED' || t === 'LED' || t === 'LED CITIES') { b = dir === 'in' ? 'income' : 'direct_cost'; seg = 'PRIVATE'; media = 'LED_OTHER'; if (dir === 'out') head = 'Vendor Payment' }
   else if (t === 'COMMISSION') { b = 'common_expense'; head = 'Commission' }  // §168 real running cost, own Money-Out line
