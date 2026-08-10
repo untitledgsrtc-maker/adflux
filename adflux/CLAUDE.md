@@ -11228,11 +11228,41 @@ gate), edit a won quote, or change owner/lead/segment/media/number. NO insert/de
   (no editingId) still bounces her — she sees the quote in the QuotesV2 team list. Small
   follow-up if wanted.
 
-### Still to build (this module)
-- **P2 cockpit** (per-rep target vs actual; reads score from `daily_performance`, NEVER
-  monthly_score/compute_monthly_salary — pay stays invisible) · **P3 approvals** (leaves + TA
-  via gated RPCs + a new discount gate `quotes.discount_approval_status` + a Sales-Head approval
-  queue page). Both mapped.
+### P2 — cockpit (DELIVERED by the existing dashboard, 2026-08-07)
+No new code. TeamDashboardV2 already renders per-rep target-vs-actual (calls vs target, quotes,
+won, meetings, live map) and Jayna reaches it via `can_view_team_dashboard` (the BOTH-flags
+grant) → that IS the "per-rep performance view." A Sales Head grant sets BOTH flags in one
+UPDATE. (No score column added — the existing KPIs suffice; adding one would touch
+compute-heavy per-rep render on a complex file for marginal gain.)
+
+### P3a — leaves + TA approvals (hand-verified; agent audits hit the session limit, 2026-08-07)
+A Sales Head approves her team's leaves + TA/DA via **gated DEFINER RPCs** (not a broad
+leaves/daily_ta/ta_da_requests write policy — the §84/§150 trap). admin/accounts/hr keep their
+EXISTING direct-UPDATE path BYTE-UNCHANGED (§45); the frontend handlers branch
+`if (isSalesHead && !isAdmin) → RPC, else direct`.
+- SQL: `db/functions/approve_leave.sql` gate widened (`... AND NOT public.is_sales_head()`, §41
+  NULL fail-closed kept) · NEW `db/functions/reject_leave.sql` · NEW
+  `supabase_sales_head_manager_p3_approvals.sql` (3 TA RPCs: `sales_head_approve_ta_rows(uuid[])`
+  / `sales_head_approve_ta_request(uuid)` / `sales_head_reject_ta_request(uuid,text)`). All 5
+  fail-closed (`role IS NULL OR (role NOT IN (admin,co_owner) AND NOT is_sales_head())`), record
+  auth.uid() as approver.
+- Route guard: NEW `RequireApprovals` (App.jsx) = privileged/accounts/hr/**is_sales_head** for
+  /admin/leaves + /admin/ta-payouts ONLY. `RequireBackOffice` (which also guards /team = TeamV2 =
+  incentive-profile config, the §8 salary boundary) was NOT widened → a Sales Head is bounced
+  from /team. **Boundary holds.**
+- Frontend: LeavesAdminV2 (not frozen) + TaPayoutsAdminV2 (§28 FROZEN — `useAutoRefresh(loadRows)`
+  mount kept UNCONDITIONAL §29) gate+handlers widened; V2AppShell (FROZEN) sidebar gains "Leaves"
+  + "TA Claims" for a Sales Head (additive `withSalesHeadApprovals`, mobileNav untouched).
+- **Verified by hand** (the two audit agents died on a session limit, not on findings): additive
+  for is_sales_head=false, §29 useAutoRefresh intact, 5 gates fail-closed, /team boundary holds,
+  no broad RLS write. Same patterns as the P1a/b/c audits. **Re-run the two audits after 3:30pm
+  IST for belt-and-suspenders** (guardian on TaPayouts+V2AppShell; security on the 5 RPCs).
+
+### Still to build
+- **P3b discount gate** — the LAST piece: `quotes.discount_approval_status` column + WizardShell
+  flags it on save (offered_rate < the city `offer_rate` standard) + QuoteDetail/QuotesV2 "pending"
+  chip + a NEW Sales-Head DiscountApprovalsV2 queue page + `sales_head_set_discount_decision` RPC.
+  Mapped. Deploy-order: the column SQL runs BEFORE the WizardShell deploy (payload writes it).
 
 ### Owner action (P1)
 Run `supabase_sales_head_manager_p1.sql` (grant + 12-pin policy), then re-run

@@ -30,9 +30,12 @@ DECLARE
 BEGIN
   -- §41 NULL-guard (Phase 209): a NULL-role caller must NOT slip through the
   -- 3-valued-logic hole (NULL NOT IN (...) → NULL → IF skips). Fail closed.
+  -- Sales Head (manager P3) may also approve her team's leaves (is_sales_head()
+  -- is fail-closed COALESCE→false; the `role IS NULL OR` short-circuit keeps a
+  -- NULL-role caller blocked). Admin/co_owner unchanged.
   IF public.get_my_role() IS NULL
-     OR public.get_my_role() NOT IN ('admin', 'co_owner') THEN
-    RAISE EXCEPTION 'Only admin/co_owner can approve leaves'
+     OR (public.get_my_role() NOT IN ('admin', 'co_owner') AND NOT public.is_sales_head()) THEN
+    RAISE EXCEPTION 'Only admin/co_owner/sales-head can approve leaves'
       USING ERRCODE = '42501';
   END IF;
 
@@ -46,9 +49,10 @@ BEGIN
 END $function$;
 
 NOTIFY pgrst, 'reload schema';
--- VERIFY (all TRUE): gate present · recompute present · NULL-guard present.
+-- VERIFY (all TRUE): gate present · sales-head widen · recompute · NULL-guard.
 SELECT
-  position('admin/co_owner can approve' in pg_get_functiondef(oid)) > 0 AS has_gate,
-  position('compute_daily_score'        in pg_get_functiondef(oid)) > 0 AS has_recompute,
-  position('get_my_role() IS NULL'      in pg_get_functiondef(oid)) > 0 AS has_null_guard
+  position('can approve leaves'    in pg_get_functiondef(oid)) > 0 AS has_gate,
+  position('NOT public.is_sales_head' in pg_get_functiondef(oid)) > 0 AS admits_sales_head,
+  position('compute_daily_score'   in pg_get_functiondef(oid)) > 0 AS has_recompute,
+  position('get_my_role() IS NULL' in pg_get_functiondef(oid)) > 0 AS has_null_guard
 FROM pg_proc WHERE proname = 'approve_leave' LIMIT 1;

@@ -154,6 +154,19 @@ function RequireBackOffice({ children }) {
   return children
 }
 
+/* Sales Head (manager P3) — approvals-only guard for /admin/leaves +
+   /admin/ta-payouts. A DEDICATED guard (not a RequireBackOffice widen) so a
+   Sales Head does NOT also reach /team (TeamV2 shows incentive profiles = the
+   §8 salary/HR boundary she must not cross). Adds is_sales_head alongside the
+   back-office roles, never replacing them. */
+function RequireApprovals({ children }) {
+  const { isPrivileged, profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  const ok = isPrivileged || ['accounts', 'hr'].includes(profile?.role) || profile?.is_sales_head === true
+  if (!ok) return <Navigate to="/quotes" replace />
+  return children
+}
+
 /* Phase 61 (19 May 2026) — Manager guard. Gates `/manager` route to
    team leads (team_role='sales_manager') and admins. Non-managers
    bounce to their role's home via RootRedirect. */
@@ -437,11 +450,11 @@ export default function App() {
           {/* Phase 33G.8 — admin Leaves CRUD. Excluded days for the
               monthly performance score now come from a real table
               instead of the work_sessions.is_off_day proxy. */}
-          <Route path="/admin/leaves"              element={<RequireBackOffice><LeavesAdminV2 /></RequireBackOffice>} />
+          <Route path="/admin/leaves"              element={<RequireApprovals><LeavesAdminV2 /></RequireApprovals>} />
           {/* Phase 33H — TA (travel allowance) computed from GPS pings.
               Per-day DA + bike + hotel, approval workflow, CSV export
               for finance. */}
-          <Route path="/admin/ta-payouts"          element={<RequireBackOffice><TaPayoutsAdminV2 /></RequireBackOffice>} />
+          <Route path="/admin/ta-payouts"          element={<RequireApprovals><TaPayoutsAdminV2 /></RequireApprovals>} />
           {/* Phase 36 — Salary Sheet. Per-rep monthly breakdown with
               auto leave deduction. Admin / co_owner only. */}
           <Route path="/admin/salary"              element={<RequireAccountsOrPrivileged><SalaryAdminV2 /></RequireAccountsOrPrivileged>} />

@@ -123,10 +123,14 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
   const isAdmin = ['admin', 'co_owner', 'accounts', 'hr'].includes(profile?.role) // Phase 182 accounts + 2026-08-03 HR (approve TA/DA)
+  // Sales Head (manager P3) — approves her team's TA/DA via the gated
+  // sales_head_* RPCs (her RLS denies the direct UPDATE). Page via RequireApprovals.
+  const isSalesHead = profile?.is_sales_head === true
+  const canApprove = isAdmin || isSalesHead
 
   useEffect(() => {
-    if (profile && !isAdmin) navigate('/work')
-  }, [profile, isAdmin, navigate])
+    if (profile && !canApprove) navigate('/work')
+  }, [profile, canApprove, navigate])
 
   const [users, setUsers]       = useState([])
   const [rows, setRows]         = useState([])
@@ -156,7 +160,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
 
   // Load rep list once.
   useEffect(() => {
-    if (!isAdmin) return
+    if (!canApprove) return
     ;(async () => {
       const { data } = await supabase.from('users')
         .select('id, name, role')
@@ -170,7 +174,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       // Default filter is 'ALL' (see fUser useState) — no auto-select-first-rep.
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin])
+  }, [canApprove])
 
   // Load TA rows whenever rep or month changes.
   // Phase 87.1 — fUser='ALL' loads rows across every active rep.
@@ -225,7 +229,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     const nameById = Object.fromEntries((usersRows || []).map(u => [u.id, u.name]))
     setPendingRequests(reqs.map(r => ({ ...r, users: { name: nameById[r.user_id] || '—' } })))
   }
-  useEffect(() => { if (isAdmin) loadRequests() }, [isAdmin])
+  useEffect(() => { if (canApprove) loadRequests() }, [canApprove])
   // Phase 34Z.70 — refetch on tab-resume so admin sees newly-pinged
   // rows the moment they switch back from another tab.
   // Phase 34Z.88 — dropped enabled gate. loadRows itself returns early
@@ -306,11 +310,18 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     }))) return
     setBulkBusy(true)
     const ids = targets.map(r => r.id)
-    const { error } = await supabase.from('daily_ta').update({
-      status: 'approved',
-      approved_by: profile?.id,
-      approved_at: new Date().toISOString(),
-    }).in('id', ids)
+    let error
+    if (isSalesHead && !isAdmin) {
+      const r = await supabase.rpc('sales_head_approve_ta_rows', { p_ids: ids })
+      error = r.error
+    } else {
+      const r = await supabase.from('daily_ta').update({
+        status: 'approved',
+        approved_by: profile?.id,
+        approved_at: new Date().toISOString(),
+      }).in('id', ids)
+      error = r.error
+    }
     setBulkBusy(false)
     if (error) { toastError(error, 'Bulk approve failed: ' + error.message); return }
     toastSuccess('Pending rows approved.')
@@ -337,11 +348,18 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   // can read approved requests on a follow-up commit.
   async function handleApproveRequest(req) {
     setRequestActingOn(req.id)
-    const { error } = await supabase.from('ta_da_requests').update({
-      status: 'approved',
-      decided_at: new Date().toISOString(),
-      decided_by: profile?.id,
-    }).eq('id', req.id)
+    let error
+    if (isSalesHead && !isAdmin) {
+      const r = await supabase.rpc('sales_head_approve_ta_request', { p_id: req.id })
+      error = r.error
+    } else {
+      const r = await supabase.from('ta_da_requests').update({
+        status: 'approved',
+        decided_at: new Date().toISOString(),
+        decided_by: profile?.id,
+      }).eq('id', req.id)
+      error = r.error
+    }
     setRequestActingOn(null)
     if (error) { toastError(error, 'Approve failed: ' + error.message); return }
     loadRequests()
@@ -350,12 +368,19 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     const note = prompt(`Reject ${req.users?.name || 'this'} claim — note for the rep (optional):`)
     if (note === null) return
     setRequestActingOn(req.id)
-    const { error } = await supabase.from('ta_da_requests').update({
-      status: 'rejected',
-      admin_note: note?.trim() || null,
-      decided_at: new Date().toISOString(),
-      decided_by: profile?.id,
-    }).eq('id', req.id)
+    let error
+    if (isSalesHead && !isAdmin) {
+      const r = await supabase.rpc('sales_head_reject_ta_request', { p_id: req.id, p_note: note?.trim() || null })
+      error = r.error
+    } else {
+      const r = await supabase.from('ta_da_requests').update({
+        status: 'rejected',
+        admin_note: note?.trim() || null,
+        decided_at: new Date().toISOString(),
+        decided_by: profile?.id,
+      }).eq('id', req.id)
+      error = r.error
+    }
     setRequestActingOn(null)
     if (error) { toastError(error, 'Reject failed: ' + error.message); return }
     loadRequests()
@@ -446,7 +471,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     URL.revokeObjectURL(url)
   }
 
-  if (!isAdmin) return null
+  if (!canApprove) return null
 
   // Phase 34R+ — rep name + month label for the hero.
   const selectedRepName = useMemo(

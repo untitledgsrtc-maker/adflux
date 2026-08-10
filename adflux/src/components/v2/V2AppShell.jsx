@@ -586,7 +586,18 @@ export function V2AppShell() {
   const withOnboarding = (arr) =>
     hasOnboarding && !arr.some((n) => n.to === '/my-onboarding')
       ? [...arr, { to: '/my-onboarding', label: 'My Onboarding', icon: GraduationCap }] : arr
-  const nav = withOnboarding(withTeam(baseNav))
+  // Sales Head (manager P3) — sidebar links to her team's approval queues
+  // (leaves + TA claims). Additive + gated on is_sales_head; every role's base
+  // nav is byte-unchanged when the flag is off. Same pattern as withTeam.
+  // NOT for privileged users — they reach these via the People module already.
+  const withSalesHeadApprovals = (arr) => {
+    if (profile?.is_sales_head !== true || isPrivileged) return arr
+    const extra = []
+    if (!arr.some((n) => n.to === '/admin/leaves')) extra.push({ to: '/admin/leaves', label: 'Leaves', icon: CheckSquare })
+    if (!arr.some((n) => n.to === '/admin/ta-payouts')) extra.push({ to: '/admin/ta-payouts', label: 'TA Claims', icon: Wallet })
+    return [...arr, ...extra]
+  }
+  const nav = withOnboarding(withTeam(withSalesHeadApprovals(baseNav)))
   const mobileNav = withTeam(baseMobileNav)
 
   // Topbar search — commits to the shared quote-filter store and

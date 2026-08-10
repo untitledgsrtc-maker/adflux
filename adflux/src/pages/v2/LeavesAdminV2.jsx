@@ -57,11 +57,16 @@ export default function LeavesAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
   const isAdmin = ['admin', 'co_owner', 'accounts', 'hr'].includes(profile?.role) // Phase 182 accounts + 2026-08-03 HR (approve leaves)
+  // Sales Head (manager P3) — approves her team's leaves. She's NOT admin/accounts/hr,
+  // so her writes go through the gated approve_leave / reject_leave RPCs (below), not
+  // the direct UPDATE (which her RLS would deny). Page access via RequireApprovals.
+  const isSalesHead = profile?.is_sales_head === true
+  const canApprove = isAdmin || isSalesHead
 
-  // Role gate — only admin / co_owner see this page.
+  // Role gate — admin / co_owner / accounts / hr / sales-head see this page.
   useEffect(() => {
-    if (profile && !isAdmin) navigate('/work')
-  }, [profile, isAdmin, navigate])
+    if (profile && !canApprove) navigate('/work')
+  }, [profile, canApprove, navigate])
 
   const [users, setUsers]       = useState([])
   const [leaves, setLeaves]     = useState([])
@@ -224,19 +229,21 @@ export default function LeavesAdminV2({ embedded = false }) {
   // score so the change is immediately reflected in /my-performance.
   async function handleApprove(row) {
     setActingOn(row.id)
-    const { error } = await supabase.from('leaves')
-      .update({ status: 'approved' })
-      .eq('id', row.id)
-    setActingOn(null)
-    if (error) {
-      setErr('Approve failed: ' + error.message)
-      return
+    let error
+    if (isSalesHead && !isAdmin) {
+      // Sales Head → gated RPC (does the flip + recompute atomically, is_sales_head-gated).
+      const r = await supabase.rpc('approve_leave', { p_leave_id: row.id })
+      error = r.error
+    } else {
+      const r = await supabase.from('leaves').update({ status: 'approved' }).eq('id', row.id)
+      error = r.error
+      if (!error) {
+        try { await supabase.rpc('compute_daily_score', { p_user_id: row.user_id, p_date: row.leave_date }) }
+        catch (_) { /* ignore */ }
+      }
     }
-    try {
-      await supabase.rpc('compute_daily_score', {
-        p_user_id: row.user_id, p_date: row.leave_date,
-      })
-    } catch (_) { /* ignore */ }
+    setActingOn(null)
+    if (error) { setErr('Approve failed: ' + error.message); return }
     load()
   }
   async function handleReject(row) {
@@ -247,20 +254,21 @@ export default function LeavesAdminV2({ embedded = false }) {
       danger: true,
     }))) return
     setActingOn(row.id)
-    const { error } = await supabase.from('leaves')
-      .update({ status: 'rejected' })
-      .eq('id', row.id)
-    setActingOn(null)
-    if (error) {
-      setErr('Reject failed: ' + error.message)
-      return
+    let error
+    if (isSalesHead && !isAdmin) {
+      const r = await supabase.rpc('reject_leave', { p_leave_id: row.id, p_note: null })
+      error = r.error
+    } else {
+      const r = await supabase.from('leaves').update({ status: 'rejected' }).eq('id', row.id)
+      error = r.error
+      if (!error) {
+        // Re-score with rejected status so the day counts again.
+        try { await supabase.rpc('compute_daily_score', { p_user_id: row.user_id, p_date: row.leave_date }) }
+        catch (_) { /* ignore */ }
+      }
     }
-    // Re-score with rejected status so the day counts again.
-    try {
-      await supabase.rpc('compute_daily_score', {
-        p_user_id: row.user_id, p_date: row.leave_date,
-      })
-    } catch (_) { /* ignore */ }
+    setActingOn(null)
+    if (error) { setErr('Reject failed: ' + error.message); return }
     load()
   }
 
@@ -284,7 +292,7 @@ export default function LeavesAdminV2({ embedded = false }) {
     return c
   }, [leaves, fRepFilter])
 
-  if (!isAdmin) return null
+  if (!canApprove) return null
 
   return (
     <div className="v2d-leaves" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
