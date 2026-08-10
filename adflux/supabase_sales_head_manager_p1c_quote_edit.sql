@@ -17,6 +17,27 @@
 -- Prerequisite: supabase_sales_head_manager_p1.sql (defines is_sales_head()).
 -- =====================================================================
 
+-- DEFINER pin-checker — reads the OLD quote bypassing RLS so the edit policy's
+-- WITH CHECK does NOT self-query quotes (a correlated self-subquery trips the RLS
+-- recursion guard on EVERY quotes UPDATE — the 2026-08-10 live regression;
+-- see supabase_sales_head_manager_p1c_recursion_hotfix.sql). Returns whether every
+-- immutable NEW value matches the stored one; NULL row → true.
+CREATE OR REPLACE FUNCTION public.sh_quote_unchanged(
+  p_id uuid, p_created_by uuid, p_segment text, p_media text, p_lead uuid, p_qnum text
+) RETURNS boolean
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $$
+  SELECT COALESCE((
+    SELECT p_created_by IS NOT DISTINCT FROM q.created_by
+       AND p_segment    IS NOT DISTINCT FROM q.segment
+       AND p_media      IS NOT DISTINCT FROM q.media_type
+       AND p_lead       IS NOT DISTINCT FROM q.lead_id
+       AND p_qnum       IS NOT DISTINCT FROM q.quote_number
+    FROM public.quotes q WHERE q.id = p_id
+  ), true)
+$$;
+GRANT EXECUTE ON FUNCTION public.sh_quote_unchanged(uuid,uuid,text,text,uuid,text) TO authenticated;
+
 -- ── quotes: read any, edit CONTENT of any non-won quote ──
 DROP POLICY IF EXISTS quotes_sales_head_read ON public.quotes;
 CREATE POLICY quotes_sales_head_read ON public.quotes
@@ -31,19 +52,12 @@ CREATE POLICY quotes_sales_head_edit ON public.quotes
     public.is_sales_head()
     -- status: she may edit + move a quote through non-won stages (the wizards
     -- legitimately promote draft→sent on edit), but can NEVER mark it 'won'
-    -- (won triggers incentive/payment — an owner/admin gate, §6). NOT pinned to
-    -- the old value (that would block the normal draft→sent edit); just blocked
-    -- from becoming 'won'. The §11b one-way-status trigger still backstops the rest.
+    -- (won triggers incentive/payment — an owner/admin gate, §6).
     AND status <> 'won'
-    -- PIN the true identity/immutable columns to their CURRENT value (MVCC
-    -- snapshot in WITH CHECK returns the OLD committed row). All are INSERT-only
-    -- or constant-per-wizard in the edit payloads, so a legit edit passes; a
-    -- Sales Head cannot move ownership, re-point the lead, or change identity.
-    AND created_by   IS NOT DISTINCT FROM (SELECT q.created_by   FROM public.quotes q WHERE q.id = quotes.id)
-    AND segment      IS NOT DISTINCT FROM (SELECT q.segment      FROM public.quotes q WHERE q.id = quotes.id)
-    AND media_type   IS NOT DISTINCT FROM (SELECT q.media_type   FROM public.quotes q WHERE q.id = quotes.id)
-    AND lead_id      IS NOT DISTINCT FROM (SELECT q.lead_id      FROM public.quotes q WHERE q.id = quotes.id)
-    AND quote_number IS NOT DISTINCT FROM (SELECT q.quote_number FROM public.quotes q WHERE q.id = quotes.id)
+    -- Pin the identity/immutable columns via the DEFINER checker (NOT a self-
+    -- subquery — that recurses, §hotfix). She cannot move ownership, re-point
+    -- the lead, or change segment/media/number.
+    AND public.sh_quote_unchanged(id, created_by, segment, media_type, lead_id, quote_number)
   );
 
 -- ── quote_cities: read any; the wizard's city-replace (delete+insert) only

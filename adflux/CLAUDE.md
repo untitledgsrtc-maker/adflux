@@ -11227,6 +11227,18 @@ gate), edit a won quote, or change owner/lead/segment/media/number. NO insert/de
 - KNOWN minor gap: a Sales Head can EDIT a govt quote but the read-only `/proposal/:id` VIEW
   (no editingId) still bounces her — she sees the quote in the QuotesV2 team list. Small
   follow-up if wanted.
+- ⚠ HOTFIX 2026-08-10 — `quotes_sales_head_edit`'s original WITH CHECK pinned the identity
+  columns with a CORRELATED self-subquery (`<col> IS NOT DISTINCT FROM (SELECT q.<col> FROM
+  public.quotes q WHERE q.id = quotes.id)`). A correlated read of the SAME table inside its own
+  RLS policy trips Postgres's recursion guard → **"infinite recursion detected in policy for
+  relation quotes" on EVERY quotes UPDATE (mark-won, edit) for EVERY role** — it broke the live
+  quote flow the moment the P1c SQL ran. FIX (`supabase_sales_head_manager_p1c_recursion_hotfix.sql`
+  + the canonical): move the pin-compare into a SECURITY DEFINER helper `sh_quote_unchanged(...)`
+  (reads the OLD row bypassing RLS → the inner read isn't policy-evaluated → no recursion),
+  passing the NEW values as args. FOOT-GUN: an RLS policy WITH CHECK/USING must NEVER contain a
+  correlated subquery on its OWN table — use a SECURITY DEFINER function to read the old/other row.
+  (The §172 users_self_update_avatar pin does NOT recurse only because its subquery filters on the
+  CONSTANT auth.uid(), not the correlated outer row — a non-obvious distinction.)
 
 ### P2 — cockpit (DELIVERED by the existing dashboard, 2026-08-07)
 No new code. TeamDashboardV2 already renders per-rep target-vs-actual (calls vs target, quotes,
