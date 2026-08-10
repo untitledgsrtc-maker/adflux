@@ -59,6 +59,10 @@ import LogMeetingModal from '../../components/leads/LogMeetingModal'
 // stage-aware WhatsApp prompt fires.
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
+// Phase 285 — after >5 calls to one lead, suggest handing it off.
+import ReassignSuggestModal from '../../components/leads/ReassignSuggestModal'
+import ReassignModal from '../../components/leads/ReassignModal'
+import { checkReassignNudge, dismissReassignNudge } from '../../utils/reassignNudge'
 import { useLeadTasks } from '../../hooks/useLeadTasks'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { logCallAudit } from '../../utils/callAudit'
@@ -197,6 +201,9 @@ export default function WorkV2() {
   // TelecallerV2). Stops a WebView ghost-click double-firing quickLogCall.
   const callingRef = useRef(false)
   const [waPrompt, setWaPrompt] = useState(null)
+  // Phase 285 — reassign nudge (>5 calls) + the reassign modal it opens.
+  const [reassignSuggest, setReassignSuggest] = useState(null)
+  const [reassignLead, setReassignLead] = useState(null)
   // Phase 34Z.54 — track which smart-task row triggered the call so
   // we can close it from the outcome modal's onSaved callback. Owner
   // reported the task stayed on /work after capturing the outcome.
@@ -1324,6 +1331,13 @@ export default function WorkV2() {
             if (callLead?.id) navigate(`/leads/${callLead.id}`)
             return
           }
+          // Phase 285 — after >5 calls to this lead with no close, suggest a
+          // reassign INSTEAD of the WA prompt this turn (handing off is the
+          // priority action). Additive early-return; the chain above is intact.
+          if (callLead?.id && profile?.id) {
+            const nudge = await checkReassignNudge(supabase, { leadId: callLead.id, userId: profile.id })
+            if (nudge != null) { setReassignSuggest({ lead: callLead, count: nudge }); return }
+          }
           // Refetch stage so WA prompt picks the right template
           // (PostCallOutcomeModal may have flipped New → Working
           // or set Nurture, which changes the canned message).
@@ -1354,6 +1368,27 @@ export default function WorkV2() {
         profile={profile}
         onClose={() => setWaPrompt(null)}
       />
+
+      {/* Phase 285 — post-call reassign nudge (>5 calls to one lead). "Hand
+          off" opens the existing ReassignModal; "Keep working it" remembers
+          for 24h so it doesn't nag on every call. */}
+      <ReassignSuggestModal
+        open={!!reassignSuggest}
+        lead={reassignSuggest?.lead}
+        count={reassignSuggest?.count}
+        onReassign={() => { setReassignLead(reassignSuggest.lead); setReassignSuggest(null) }}
+        onKeep={() => {
+          if (reassignSuggest?.lead && profile?.id) dismissReassignNudge(profile.id, reassignSuggest.lead.id)
+          setReassignSuggest(null)
+        }}
+      />
+      {reassignLead && (
+        <ReassignModal
+          lead={reassignLead}
+          onClose={() => setReassignLead(null)}
+          onSaved={() => { setReassignLead(null); load(true) }}
+        />
+      )}
     </div>
   )
 }

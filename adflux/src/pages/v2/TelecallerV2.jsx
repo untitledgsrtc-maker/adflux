@@ -56,6 +56,10 @@ import { pushToast } from '../../components/v2/Toast'
 import WhatsAppSendModal from '../../components/leads/WhatsAppSendModal'
 // Phase 113.8 — post-call WhatsApp follow-up prompt (parity with /work).
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
+// Phase 285 — after >5 calls to one lead, suggest handing it off.
+import ReassignSuggestModal from '../../components/leads/ReassignSuggestModal'
+import ReassignModal from '../../components/leads/ReassignModal'
+import { checkReassignNudge, dismissReassignNudge } from '../../utils/reassignNudge'
 
 function cleanPhone(raw) {
   if (!raw) return null
@@ -112,6 +116,9 @@ export default function TelecallerV2() {
   const [waOpen, setWaOpen] = useState(false)
   // Phase 113.8 — post-call WhatsApp prompt state (mirror of WorkV2).
   const [waPrompt, setWaPrompt] = useState(null)
+  // Phase 285 — reassign nudge (>5 calls) + the reassign modal it opens.
+  const [reassignSuggest, setReassignSuggest] = useState(null)
+  const [reassignLead, setReassignLead] = useState(null)
   // Phase 47.2 — call scripts master + collapsible script panel.
   const [scripts, setScripts] = useState([])
   const [scriptOpen, setScriptOpen] = useState(false)
@@ -1331,6 +1338,13 @@ export default function TelecallerV2() {
           // unmounted-setState warning. Sending a meeting confirmation needs the
           // prompt raised where the rep LANDS (lead detail), not here.
           if (nextAction === 'meeting') return
+          // Phase 285 — after >5 calls to this lead with no close, suggest a
+          // reassign INSTEAD of the WA prompt this turn (handing off is the
+          // priority action). Additive early-return; the chain above is intact.
+          if (callLead?.id && profile?.id) {
+            const nudge = await checkReassignNudge(supabase, { leadId: callLead.id, userId: profile.id })
+            if (nudge != null) { setReassignSuggest({ lead: callLead, count: nudge }); return }
+          }
           // Pure check (no toast side-effect) — blockedByWaOptOut() toasts,
           // which would surface a stray "opted out" message after save.
           if (callLead?.id && !callLead?.wa_opt_out) {
@@ -1360,6 +1374,27 @@ export default function TelecallerV2() {
         profile={profile}
         onClose={() => setWaPrompt(null)}
       />
+
+      {/* Phase 285 — post-call reassign nudge (>5 calls to one lead). "Hand
+          off" opens the existing ReassignModal; "Keep working it" remembers
+          for 24h so it doesn't nag on every call. */}
+      <ReassignSuggestModal
+        open={!!reassignSuggest}
+        lead={reassignSuggest?.lead}
+        count={reassignSuggest?.count}
+        onReassign={() => { setReassignLead(reassignSuggest.lead); setReassignSuggest(null) }}
+        onKeep={() => {
+          if (reassignSuggest?.lead && profile?.id) dismissReassignNudge(profile.id, reassignSuggest.lead.id)
+          setReassignSuggest(null)
+        }}
+      />
+      {reassignLead && (
+        <ReassignModal
+          lead={reassignLead}
+          onClose={() => setReassignLead(null)}
+          onSaved={() => { setReassignLead(null); load(true) }}
+        />
+      )}
 
       {/* Phase 47.1 — WhatsApp 1-click send modal. */}
       <WhatsAppSendModal
