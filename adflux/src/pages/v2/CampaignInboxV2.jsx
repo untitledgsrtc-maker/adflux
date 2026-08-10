@@ -99,7 +99,11 @@ export default function CampaignInboxV2() {
   // but stays read-only: writes below stay gated on isPrivileged / own-thread. NOT the
   // same as isPrivileged (that gates reassign + the team-filter dropdown).
   const isTeamViewer = profile?.can_view_team_dashboard === true
-  const canSeeAll = isPrivileged || isTeamViewer
+  // Sales Head (manager module P1) — reads all threads AND replies on any thread.
+  // Chat READ needs can_view_team_dashboard (RLS wa_conv_team_viewer via is_team_viewer);
+  // a write-capable Sales Head carries BOTH flags (grant model, supabase_sales_head_manager_p1.sql).
+  const isSalesHead = profile?.is_sales_head === true
+  const canSeeAll = isPrivileged || isTeamViewer || isSalesHead
   const canInbox = isPrivileged || ['sales', 'telecaller', 'agency'].includes(profile?.role)
 
   const [loading, setLoading] = useState(true)
@@ -317,7 +321,8 @@ export default function CampaignInboxV2() {
   // composer / template / reassign so a Sales Head on someone else's chat doesn't
   // see controls that would 403.
   const ownThread = !!(sel && profile?.id && sel.assigned_to === profile.id)
-  const canWriteThread = isPrivileged || ownThread
+  // Sales Head replies on ANY thread (server-gated in api/wa/send*.js on is_sales_head).
+  const canWriteThread = isPrivileged || isSalesHead || ownThread
   const openCount = threads.filter((t) => windowOpen(t.window_expires_at)).length
 
   // Phase 258 — filter the loaded threads by the search box (name OR number)
@@ -467,7 +472,7 @@ export default function CampaignInboxV2() {
     { key: 'nurture',  label: 'Stay in touch' },
     { key: 'negative', label: 'Polite sign-off' },
   ]
-  const canCompanySend = canWriteThread && (isPrivileged || profile?.role === 'telecaller')
+  const canCompanySend = canWriteThread && (isPrivileged || isSalesHead || profile?.role === 'telecaller')
 
   async function openTplPanel() {
     setTplPanelOpen((o) => !o)

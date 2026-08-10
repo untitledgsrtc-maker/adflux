@@ -243,8 +243,14 @@ BEGIN
     );
   END IF;
 
-  -- Non-admin must currently own the lead.
-  IF v_caller_lane <> 'admin' THEN
+  -- Non-admin must currently own the lead — EXCEPT a Sales Head (manager
+  -- module P1, 2026-08-07), who may reassign any-rep→any-rep. is_sales_head()
+  -- is fail-closed (COALESCE→false) and reads the CALLER's auth.uid() even
+  -- inside this DEFINER helper (JWT GUC is request-scoped, not owner-scoped).
+  -- Every OTHER guard below still applies to her (Won/Lost block, target
+  -- segment, sales→TC stage gate, cross-team reason, govt_partner scope) —
+  -- she is NOT the 'admin' lane, so this only lifts the own-lead restriction.
+  IF v_caller_lane <> 'admin' AND NOT public.is_sales_head() THEN
     IF v_lead_owner_tc IS DISTINCT FROM p_caller
        AND v_lead_owner_sa IS DISTINCT FROM p_caller THEN
       RETURN jsonb_build_object(

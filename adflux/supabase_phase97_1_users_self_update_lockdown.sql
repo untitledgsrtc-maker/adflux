@@ -75,30 +75,14 @@
 --   • F-104 — get_my_role() missing search_path
 -- Those land in separate future phase migrations.
 
-DROP POLICY IF EXISTS users_self_update_avatar ON public.users;
-
-CREATE POLICY users_self_update_avatar ON public.users
-  FOR UPDATE
-  USING (id = auth.uid())
-  WITH CHECK (
-    -- id is implicitly pinned: if NEW.id ≠ auth.uid(), the
-    -- equality fails and the row is rejected. No additional
-    -- subquery needed for id.
-    id = auth.uid()
-    -- The 7 other privileged columns. Subquery reads the
-    -- caller's current row through their own SELECT RLS path
-    -- (users_self_select / users_read_all). MVCC statement
-    -- snapshot returns the OLD value during WITH CHECK
-    -- evaluation, so NEW vs OLD comparison is well-defined.
-    -- IS NOT DISTINCT FROM handles NULL-vs-NULL as a match.
-    AND role              IS NOT DISTINCT FROM (SELECT u.role              FROM public.users u WHERE u.id = auth.uid())
-    AND team_role         IS NOT DISTINCT FROM (SELECT u.team_role         FROM public.users u WHERE u.id = auth.uid())
-    AND segment_access    IS NOT DISTINCT FROM (SELECT u.segment_access    FROM public.users u WHERE u.id = auth.uid())
-    AND manager_id        IS NOT DISTINCT FROM (SELECT u.manager_id        FROM public.users u WHERE u.id = auth.uid())
-    AND is_active         IS NOT DISTINCT FROM (SELECT u.is_active         FROM public.users u WHERE u.id = auth.uid())
-    AND email             IS NOT DISTINCT FROM (SELECT u.email             FROM public.users u WHERE u.id = auth.uid())
-    AND signing_authority IS NOT DISTINCT FROM (SELECT u.signing_authority FROM public.users u WHERE u.id = auth.uid())
-  );
+-- ⚠ NEUTRALIZED 2026-08-07 (Sales Head P1, §72 consolidation). The original
+-- Phase 97.1 F-100 lockdown (this 7-pin blocklist) has been superseded — the
+-- users_self_update_avatar policy now lives in ONE canonical place:
+-- supabase_sales_head_manager_p1.sql, which pins these 7 columns PLUS the
+-- Phase 87.5b hr_* columns PLUS can_view_team_dashboard + is_sales_head.
+-- Re-running this OLD 7-pin CREATE would REVERT the newer pins and re-open the
+-- F-100 self-grant exploit, so the DROP+CREATE is removed here. The design
+-- notes above stay as the F-100 record. Edit the pin set in the canonical file.
 
 NOTIFY pgrst, 'reload schema';
 

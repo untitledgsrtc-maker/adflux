@@ -134,7 +134,10 @@ export default function LeadsV2() {
   // Phase 247.2 — a per-user team viewer (can_view_team_dashboard) can flip to
   // ALL reps' leads (READ-ONLY) via a toggle; default stays her own (RLS). Never
   // for admin (they already see all) or a normal rep (no flag → no toggle).
-  const canViewTeam = profile?.can_view_team_dashboard === true
+  // Sales Head (manager module P1) — a write-capable head; carries the team
+  // toggle even if she lacks the read-only viewer flag, and reassigns any rep's lead.
+  const isSalesHead = profile?.is_sales_head === true
+  const canViewTeam = profile?.can_view_team_dashboard === true || isSalesHead
   // Phase 269 — a team viewer's whole job IS the team list, so START them on it
   // (Jayna kept "not finding" the toggle). Non-viewers default to their own — they
   // never see the toggle anyway (canViewTeam gate below). Read the store directly so
@@ -155,11 +158,16 @@ export default function LeadsV2() {
   // Per-row check used to decide whether to render the checkbox.
   function canReassign(l) {
     if (!l || !profile) return false
-    if (teamViewing) return false   // Phase 247.2 — team view is READ-ONLY (no checkboxes → no bulk actions)
+    // Phase 247.2 — team view is READ-ONLY for a pure viewer. A Sales Head
+    // (manager P1) writes from the team view, so she's exempt from this.
+    if (teamViewing && !isSalesHead) return false
     // Phase 100.B — non-admin cannot reassign Won/Lost (RPC blocks
     // it server-side; hide the checkbox so UX doesn't dangle). Admin
-    // and co_owner can still flip closed leads if needed.
+    // and co_owner can still flip closed leads if needed. A Sales Head is
+    // NOT privileged → she also cannot reassign a closed lead (stage guard kept).
     if (['Won', 'Lost'].includes(l.stage) && !isPrivileged) return false
+    // Sales Head reassigns any rep's non-closed lead (RPC admits is_sales_head()).
+    if (isSalesHead) return true
     if (isPrivileged) return true
     if (profile.team_role === 'sales_manager') return true
     return l.assigned_to === profile.id

@@ -62,9 +62,11 @@ export default async function handler(req, res) {
   const { data: ures, error: uerr } = await admin.auth.getUser(token)
   const uid = ures?.user?.id
   if (uerr || !uid) return res.status(401).json({ error: 'bad_auth' })
-  const { data: me } = await admin.from('users').select('role').eq('id', uid).maybeSingle()
+  const { data: me } = await admin.from('users').select('role, is_sales_head').eq('id', uid).maybeSingle()
   if (!me) return res.status(403).json({ error: 'not_allowed' })
   const isAdmin = ['admin', 'co_owner'].includes(me.role)   // Phase 205
+  // Sales Head (manager module P1) — replies on ANY thread, like admin here.
+  const isSalesHead = me.is_sales_head === true
 
   // ── body ──
   let body = req.body
@@ -110,7 +112,7 @@ export default async function handler(req, res) {
   // Phase 205 — a non-admin may reply ONLY to a chat assigned to them (or on a
   // lead they own). Admin/co_owner reply to any. Server-enforced — the send runs
   // as service-role, so this gate IS the access control, not the RLS.
-  if (!isAdmin) {
+  if (!isAdmin && !isSalesHead) {
     let ok = conv.assigned_to === uid
     if (!ok && conv.lead_id) {
       const { data: ld } = await admin.from('leads').select('assigned_to, telecaller_id').eq('id', conv.lead_id).maybeSingle()
@@ -137,7 +139,7 @@ export default async function handler(req, res) {
     if (qErr || !q) return res.status(404).json({ error: 'quote_not_found' })
     // The quote must be tied to THIS chat's lead, or be the caller's own.
     const tiedToConv = !!conv.lead_id && q.lead_id === conv.lead_id
-    if (!tiedToConv && q.created_by !== uid && !isAdmin) {
+    if (!tiedToConv && q.created_by !== uid && !isAdmin && !isSalesHead) {
       return res.status(403).json({ error: 'not_allowed', detail: 'That quote is not linked to this chat.' })
     }
     // The stored PDF is the artifact (§44.9: uploadQuotePDFHtml writes

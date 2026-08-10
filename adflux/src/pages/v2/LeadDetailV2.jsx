@@ -136,6 +136,8 @@ export default function LeadDetailV2() {
   // rest of the app uses (admin || co_owner). If sales_manager is
   // ever added as a real role, do it once in useAuth.js, not here.
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+  // Sales Head (manager module P1) — reassigns any rep's lead (RPC admits is_sales_head()).
+  const isSalesHead = profile?.is_sales_head === true
 
   // Phase 114 — "field sales" gate. Only sales reps who actually go to
   // site need GPS. Drives (a) the GPS-off banner, (b) skipping the
@@ -162,6 +164,8 @@ export default function LeadDetailV2() {
     // failure. Admin / co_owner can still flip closed leads if a
     // mis-classification needs to be undone.
     if (['Won', 'Lost'].includes(l.stage) && !isPrivileged) return false
+    // Sales Head reassigns any rep's non-closed lead (stage guard above kept).
+    if (isSalesHead) return true
     if (isPrivileged) return true
     if (profile.team_role === 'sales_manager') return true
     return l.assigned_to === profile.id

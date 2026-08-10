@@ -11147,3 +11147,74 @@ KNOWN modeling note: agency commission is CRM-payment-derived (all-time when unf
 while the P&L income is bank-based (finance_transactions, Apr–Jul 2026) — the two sources/
 periods don't fully align; a date-scoped P&L view scopes the commission by payment_date but
 the income by txn_date. Owner accepts for now; refine if a period view looks off.
+
+
+---
+
+## 172 · Sales Head MANAGER module — P1 (reassign + reply) + F-100 lockdown (2026-08-07)
+
+Owner: evolve the read-only Sales Head (§164, a `can_view_team_dashboard` watcher) into a
+real **working manager** with write powers, a cockpit, and approvals. Spec:
+`docs/SALES_HEAD_MANAGER_SPEC.md`. Building in audited sub-phases; **P1 = reassign + reply**
+here. Jayna is the first Sales Head; she stays a `telecaller` (keeps her own queue/target/
+incentive — player-coach). Every phase: guardian + adversarial-security audited before commit.
+
+### The grant (foundation) — `supabase_sales_head_manager_p1.sql` (NEW, owner RUNS)
+- `users.is_sales_head boolean DEFAULT false` + `public.is_sales_head()` (SECURITY DEFINER,
+  fail-closed `COALESCE(...,false)`, byte-mirrors `is_team_viewer()`). Additive → §45-safe,
+  nothing changes until a user is granted.
+- **GRANT MODEL = BOTH flags.** A write-capable Sales Head carries `can_view_team_dashboard=true`
+  (v1 team READS, unchanged RPCs) AND `is_sales_head=true` (the WRITE powers). Reads keep
+  flowing through the existing `is_team_viewer()` RPCs (no churn); `is_sales_head()` gates only
+  writes. Grant Jayna = one UPDATE `is_sales_head=true` (she already has can_view_team_dashboard).
+
+### ⚠ F-100 SELF-GRANT LOCKDOWN (security P0 the audit caught — do NOT regress)
+`users_self_update_avatar` is a **BLOCKLIST** (pins listed columns, allows the rest), so a
+NEW privileged `users` column is self-grantable unless pinned. A rep could
+`UPDATE users SET is_sales_head=true WHERE id=auth.uid()` → self-promote. FIX: the grant file
+now holds the **SINGLE CANONICAL** `users_self_update_avatar` with a **12-pin** WITH CHECK —
+the 10 prior pins + `is_sales_head` + `can_view_team_dashboard` (the §84 read grant was ALSO
+never pinned → also self-grantable, now closed). **Three stale copies neutralized to pointers**
+(`supabase_phase97_1`, `supabase_phase87_5b`, `supabase_phase87_user_avatars`) so re-running an
+old file can't revert the pins. CONTRACT: exactly ONE active `CREATE POLICY
+users_self_update_avatar` (the grant file); **every future privileged `users` column MUST add
+its pin THERE** (a blocklist silently re-opens F-100 otherwise). Verified: 1 active CREATE, no
+orphan DROP.
+
+### P1a — reassign (guardian + security PASS)
+- `supabase_phase100_a_reassign_rpc.sql` `_reassign_lead_apply` (edit-in-place §71): the
+  ownership gate `IF v_caller_lane <> 'admin' THEN` → `... AND NOT public.is_sales_head() THEN`
+  — a Sales Head reassigns any-rep→any-rep. NO signature change → §211 REVOKE untouched.
+  EVERY other guard still fires for her (Won/Lost block, cannot-pick-admin, target segment,
+  sales→TC stage, cross-team reason, govt_partner) — she is NOT the 'admin' lane.
+- `LeadsV2.jsx` + `LeadDetailV2.jsx` (§28 FROZEN, guardian PASS): `canReassign` adds
+  `if (isSalesHead) return true` AFTER the Won/Lost guard (kept), and lifts the team-view
+  read-only gate for her. Bulk stage-change + delete stay `isPrivileged`-only (boundary holds).
+- KNOWN P1 gap: opening a cross-owner lead's DETAIL page (`LeadDetailV2` direct base-table
+  read) still 404s — the LIST reassign (team_all_leads RPC) is the working path. A gated
+  single-lead read RPC is a P1 follow-up.
+
+### P1b — reply in any chat (guardian + security PASS)
+- `CampaignInboxV2.jsx`: `canSeeAll`/`canWriteThread`/`canCompanySend` add `|| isSalesHead`
+  (reply on any thread). Reassign dropdown stays `isPrivileged`-only (she replies, not reassign
+  from the inbox). Chat READ still needs `can_view_team_dashboard` (RLS wa_conv_team_viewer) —
+  hence the BOTH-flags model.
+- `api/wa/send.js` (Node) + `api/wa/send-template.js` (Edge): read `is_sales_head` SERVER-side
+  by uid (not request-forgeable), fail-closed; the own-thread / lead-ownership gates add
+  `|| isSalesHead`. 24h-window, opt-out, do_not_call, per-lead throttle all UNCHANGED — a
+  Sales Head is NOT exempt from those.
+
+### Still to build (this module)
+- **P1c edit-any-quote** — 2 NEW gated DEFINER RPCs (`sales_head_get_quote_for_edit` +
+  `sales_head_update_quote`, both fail-closed is_sales_head, enforce won/locked guards inside);
+  QuotesV2 Edit gate + the 4 frozen wizards branch to the RPCs on a cross-owner quote +
+  App.jsx RequireGovtAccess widen. NO broad RLS write policy (the §84/§150 trap). Mapped, queued.
+- **P2 cockpit** (per-rep target vs actual, no pay figures) · **P3 approvals** (leaves + TA +
+  a new discount gate). Mapped.
+
+### Owner action (P1)
+Run `supabase_sales_head_manager_p1.sql` (grant + 12-pin policy), then re-run
+`supabase_phase100_a_reassign_rpc.sql` (reassign gate). Then `UPDATE users SET
+is_sales_head=true` for Jayna. Push (JS reaches the APK on next open). Smoke: as Jayna,
+/leads Team-view → select a rep's lead → Reassign works; inbox → reply on any rep's chat.
+A normal rep is byte-unchanged (is_sales_head false).

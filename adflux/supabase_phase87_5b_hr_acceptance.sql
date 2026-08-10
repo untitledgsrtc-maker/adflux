@@ -77,29 +77,14 @@ ALTER TABLE public.users
 
 
 -- ─── 2. Extend Phase 97.1 column-pin policy ────────────────────────
--- 8 original pins + 3 new HR-acceptance pins = 11 total. Subquery
--- pattern + IS NOT DISTINCT FROM preserves Phase 97.1 semantics for
--- the 8 existing columns byte-identical; only the 3 acceptance pins
--- are added.
-DROP POLICY IF EXISTS users_self_update_avatar ON public.users;
-
-CREATE POLICY users_self_update_avatar ON public.users
-  FOR UPDATE
-  USING (id = auth.uid())
-  WITH CHECK (
-    id = auth.uid()
-    AND role              IS NOT DISTINCT FROM (SELECT u.role              FROM public.users u WHERE u.id = auth.uid())
-    AND team_role         IS NOT DISTINCT FROM (SELECT u.team_role         FROM public.users u WHERE u.id = auth.uid())
-    AND segment_access    IS NOT DISTINCT FROM (SELECT u.segment_access    FROM public.users u WHERE u.id = auth.uid())
-    AND manager_id        IS NOT DISTINCT FROM (SELECT u.manager_id        FROM public.users u WHERE u.id = auth.uid())
-    AND is_active         IS NOT DISTINCT FROM (SELECT u.is_active         FROM public.users u WHERE u.id = auth.uid())
-    AND email             IS NOT DISTINCT FROM (SELECT u.email             FROM public.users u WHERE u.id = auth.uid())
-    AND signing_authority IS NOT DISTINCT FROM (SELECT u.signing_authority FROM public.users u WHERE u.id = auth.uid())
-    -- Phase 87.5b — HR sign-off fields cannot be self-flipped.
-    AND hr_accepted_at     IS NOT DISTINCT FROM (SELECT u.hr_accepted_at     FROM public.users u WHERE u.id = auth.uid())
-    AND hr_accepted_by     IS NOT DISTINCT FROM (SELECT u.hr_accepted_by     FROM public.users u WHERE u.id = auth.uid())
-    AND hr_acceptance_note IS NOT DISTINCT FROM (SELECT u.hr_acceptance_note FROM public.users u WHERE u.id = auth.uid())
-  );
+-- ⚠ NEUTRALIZED 2026-08-07 (Sales Head P1, §72 consolidation). The
+-- users_self_update_avatar column-pin (F-100 lockdown) is now defined in
+-- ONE canonical place: supabase_sales_head_manager_p1.sql (it pins the same
+-- 10 columns PLUS can_view_team_dashboard + is_sales_head). This copy was a
+-- 10-pin blocklist; re-running it would REVERT the two newer pins and
+-- re-open the self-grant exploit — so the DROP+CREATE is removed here.
+-- To change the pin set, edit the canonical file. (See supabase_phase97_1
+-- for the original F-100 note; both copies are neutralized.)
 
 
 -- ─── 3. RPC: accept_user_profile ───────────────────────────────────

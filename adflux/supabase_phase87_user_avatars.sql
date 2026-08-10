@@ -84,14 +84,15 @@ CREATE POLICY user_avatars_self_delete ON storage.objects
 
 -- ─────────────────────────────────────────────────────────────────
 -- users.profile_image_url — let rep update OWN row's URL.
--- Existing users RLS likely already allows self UPDATE (Phase 12);
--- this is a defensive add to keep the policy explicit.
+-- ⚠ NEUTRALIZED 2026-08-07 (Sales Head P1, §72 consolidation). This was
+-- the ORIGINAL NO-PIN policy (WITH CHECK id=auth.uid() only) — re-running
+-- it would DROP the 12-pin canonical and re-open the F-100 self-grant P0
+-- (a rep could then self-set role='admin', is_sales_head, everything). The
+-- pinned column-lockdown is now the SINGLE canonical policy in
+-- supabase_sales_head_manager_p1.sql. DROP+CREATE removed here so this
+-- file can be safely re-run to re-provision the user-avatars bucket without
+-- touching the users self-update policy.
 -- ─────────────────────────────────────────────────────────────────
-DROP POLICY IF EXISTS users_self_update_avatar ON public.users;
-CREATE POLICY users_self_update_avatar ON public.users
-  FOR UPDATE
-  USING (id = auth.uid())
-  WITH CHECK (id = auth.uid());
 
 NOTIFY pgrst, 'reload schema';
 

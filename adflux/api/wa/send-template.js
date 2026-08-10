@@ -107,14 +107,15 @@ export default async function handler(req) {
   if (!uid) return json({ error: 'bad_auth' }, 401)
 
   // ── caller's row (fail closed on NULL, §41) ──
-  let role = null, callerName = null
+  let role = null, callerName = null, isSalesHead = false
   try {
-    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role,name`, {
+    const rr = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${uid}&select=role,name,is_sales_head`, {
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     })
     const rows = await rr.json().catch(() => [])
     role = Array.isArray(rows) && rows[0] ? rows[0].role : null
     callerName = Array.isArray(rows) && rows[0] ? rows[0].name : null
+    isSalesHead = Array.isArray(rows) && rows[0] ? rows[0].is_sales_head === true : false
   } catch { /* role unknown → refused below */ }
 
   // ── body ──
@@ -135,7 +136,7 @@ export default async function handler(req) {
   // throttle, conversation writes) is identical.
   if (body?.lead_id) {
     return await sendToLead({
-      uid, role, callerName,
+      uid, role, callerName, isSalesHead,
       leadId: String(body.lead_id),
       pickKey: body.template_key ? String(body.template_key) : null,
     })
@@ -213,9 +214,10 @@ export default async function handler(req) {
 // last_contact_at, which re-sorts the TC queue and would deprioritise the lead
 // the rep just messaged.
 // ─────────────────────────────────────────────────────────────────────────
-async function sendToLead({ uid, role, callerName, leadId, pickKey = null }) {
+async function sendToLead({ uid, role, callerName, isSalesHead = false, leadId, pickKey = null }) {
   // Pilot gate: telecallers + admins only (§ plan P5 — widen after the pilot).
-  if (!['admin', 'co_owner', 'telecaller'].includes(role)) {
+  // A Sales Head (manager P1) is admitted too (she messages any rep's lead).
+  if (!['admin', 'co_owner', 'telecaller'].includes(role) && !isSalesHead) {
     return json({ error: 'not_allowed', detail: 'Telecallers only during the pilot.' }, 403)
   }
   if (!/^[0-9a-f-]{36}$/i.test(leadId)) return json({ error: 'bad_lead_id' }, 400)
@@ -223,8 +225,8 @@ async function sendToLead({ uid, role, callerName, leadId, pickKey = null }) {
   const lead = await one(`leads?id=eq.${leadId}&select=id,name,phone,stage,wa_opt_out,do_not_call,assigned_to,telecaller_id&limit=1`)
   if (!lead) return json({ error: 'lead_not_found' }, 404)
 
-  // Ownership — the caller must own the lead, unless privileged.
-  const privileged = ['admin', 'co_owner'].includes(role)
+  // Ownership — the caller must own the lead, unless privileged OR a Sales Head.
+  const privileged = ['admin', 'co_owner'].includes(role) || isSalesHead
   if (!privileged && lead.assigned_to !== uid && lead.telecaller_id !== uid) {
     return json({ error: 'not_your_lead' }, 403)
   }
