@@ -11282,3 +11282,59 @@ Run `supabase_sales_head_manager_p1.sql` (grant + 12-pin policy), then re-run
 is_sales_head=true` for Jayna. Push (JS reaches the APK on next open). Smoke: as Jayna,
 /leads Team-view → select a rep's lead → Reassign works; inbox → reply on any rep's chat.
 A normal rep is byte-unchanged (is_sales_head false).
+
+
+---
+
+## 173 · Post-call reassign nudge — >5 calls to one lead → hand-off popup (2026-08-10, `888bd26`)
+
+Owner: "when a telecaller calls more than 5 times per lead, a popup should let
+them reassign the lead to another person." Owner picked (AskUserQuestion) the
+**popup-after-the-call** form (over a lead-page banner). Additive, §45-safe,
+guardian PASS (no P0/P1). JS-only — no SQL, no APK.
+
+⚠ **PHASE-NUMBER COLLISION (§52): this reused "Phase 285", already taken by §166
+(channel-based lead source, SHAs 3ad299e / 3316c34 / fe36e3a).** Disambiguate by
+SHA — THIS one is the reassign nudge = `888bd26`. Next free number is **286+**;
+do not reuse 285 again.
+
+### What shipped
+- NEW `src/utils/reassignNudge.js` — `checkReassignNudge(supabase,{leadId,userId})`
+  returns the rep's `call_logs` count for `(lead_id, user_id)` when it's **>5**
+  (owner's threshold, strict) AND the lead is not Won/Lost, else null. Best-effort
+  (any query error / missing lead → null → no nudge). 24h **localStorage dismiss
+  memory** (`dismissReassignNudge`) so "Keep working it" doesn't nag on every
+  subsequent call. READ-ONLY — no score/pay impact (only reads leads.stage +
+  counts call_logs; call_logs count is server-side `head:true`, §66-safe).
+- NEW `src/components/leads/ReassignSuggestModal.jsx` — presentational nudge card
+  (`.lead-modal-*` chrome = same as ReassignModal, z 9000 existing tier; Lucide
+  UserPlus/X; v2 tokens; calm §20 copy). "Hand off" → onReassign, "Keep working
+  it" → onKeep.
+- EDIT `WorkV2.jsx` + `TelecallerV2.jsx` (§28 FROZEN, guardian PASS) — ADDITIVE:
+  3 imports + 2 useState (reassignSuggest, reassignLead) + in the
+  PostCallOutcomeModal `onSaved`, AFTER the `if (nextAction==='meeting') return`
+  and BEFORE the WhatsApp-prompt block, a guarded early-return:
+  `if (callLead?.id && profile?.id) { const nudge = await checkReassignNudge(...);
+  if (nudge != null) { setReassignSuggest({lead, count}); return } }` (the nudge
+  takes that turn over the WA prompt — handing off is the priority action) + two
+  modal mounts after `<WhatsAppPromptModal>`. Reuses the EXISTING `ReassignModal`
+  + `reassign_lead` RPC UNCHANGED (no new write policy).
+
+### Contracts / notes
+- **The tel:→1.5s→PostCallOutcomeModal save chain is byte-unchanged** (guardian
+  git-diff verified: PostCallOutcomeModal / useAutoRefresh / push / sw.js all zero
+  diff). The nudge is post-save only, mirroring the WA-prompt insertion pattern.
+- A "call" = a `call_logs` row (tel-tap audit, §35/§170-deduped) → the count is the
+  rep's real attempts to THIS lead. After a reassign the new owner starts at 0 for
+  that lead → they get their own nudge later (per-owner, correct).
+- Only ONE modal open at a time (nudge early-returns before the WA prompt; the
+  outcome modal is already closed by onSaved).
+- Mounted on /work (sales+agency) + /telecaller only — the queue call pages. Not
+  LeadDetailV2 (§16 scope — owner's ask was the queue call flow).
+- Threshold const `CALL_THRESHOLD = 5` in reassignNudge.js; dismiss TTL 24h.
+
+### Owner action
+Already pushed (`888bd26`, on origin, verified). Reps reopen the app once (SW).
+Smoke: call the same lead a 6th time → save the outcome → "Hand this lead off?"
+popup ("called N times") → Hand off opens the reassign picker; Keep working it
+suppresses it for 24h. A Won/Lost lead never nudges. No SQL, no APK.
