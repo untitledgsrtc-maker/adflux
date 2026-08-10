@@ -11204,13 +11204,35 @@ orphan DROP.
   `|| isSalesHead`. 24h-window, opt-out, do_not_call, per-lead throttle all UNCHANGED — a
   Sales Head is NOT exempt from those.
 
+### P1c — edit any quote (guardian + security/functional PASS, 2026-08-07)
+Chosen delivery = **PINNED RLS, not DEFINER RPCs** (the map's RPC path needed branching all
+4 FROZEN quote wizards + a generic-column update RPC — high §45 risk + a missed-column bug
+class). `supabase_sales_head_manager_p1c_quote_edit.sql` (owner RUNS) adds 5 additive policies
+gated `public.is_sales_head()`: quotes `_read`(SELECT any) + `_edit`(UPDATE `USING status<>'won'`,
+`WITH CHECK status<>'won'` + created_by/segment/media_type/lead_id/quote_number each
+`IS NOT DISTINCT FROM` the OLD row — the §172 self-referential pin), and quote_cities
+`_read`/`_insert`/`_delete` (parent non-won). So the EXISTING wizard code (fetchQuoteById +
+updateQuote + quote_cities replace) works UNCHANGED for a Sales Head cross-owner edit — **no
+frozen-wizard edits**. She edits CONTENT of any non-won quote; cannot promote to won (incentive
+gate), edit a won quote, or change owner/lead/segment/media/number. NO insert/delete on quotes.
+- **status is NOT pinned** (only `<> 'won'`) — the wizards legitimately promote draft→sent on
+  edit; pinning status exactly would silently break her save (the make-or-break the audit
+  verified: all 4 wizards re-send segment/media hardcoded=stored, created_by/lead_id INSERT-only,
+  quote_number never carried → every pin passes).
+- Frontend: `QuotesV2.jsx` (§28 FROZEN, guardian PASS) Edit gate widened for a Sales Head in
+  team view, still won-blocked (`isSalesHead ? status!=='won'` — mirrors the RLS). `App.jsx`
+  `RequireGovtAccess` widened but **edit-only** (`is_sales_head && location.state?.editingId`) —
+  she reaches the govt wizard to EDIT, never to CREATE a govt quote (the quotes INSERT policy is
+  segment-blind → an unscoped bypass = a §8 segment breach; the guardian caught it, fixed).
+- KNOWN minor gap: a Sales Head can EDIT a govt quote but the read-only `/proposal/:id` VIEW
+  (no editingId) still bounces her — she sees the quote in the QuotesV2 team list. Small
+  follow-up if wanted.
+
 ### Still to build (this module)
-- **P1c edit-any-quote** — 2 NEW gated DEFINER RPCs (`sales_head_get_quote_for_edit` +
-  `sales_head_update_quote`, both fail-closed is_sales_head, enforce won/locked guards inside);
-  QuotesV2 Edit gate + the 4 frozen wizards branch to the RPCs on a cross-owner quote +
-  App.jsx RequireGovtAccess widen. NO broad RLS write policy (the §84/§150 trap). Mapped, queued.
-- **P2 cockpit** (per-rep target vs actual, no pay figures) · **P3 approvals** (leaves + TA +
-  a new discount gate). Mapped.
+- **P2 cockpit** (per-rep target vs actual; reads score from `daily_performance`, NEVER
+  monthly_score/compute_monthly_salary — pay stays invisible) · **P3 approvals** (leaves + TA
+  via gated RPCs + a new discount gate `quotes.discount_approval_status` + a Sales-Head approval
+  queue page). Both mapped.
 
 ### Owner action (P1)
 Run `supabase_sales_head_manager_p1.sql` (grant + 12-pin policy), then re-run

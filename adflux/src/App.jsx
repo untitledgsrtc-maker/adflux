@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { V2AppShell } from './components/v2/V2AppShell'
 import Login from './pages/Login'
@@ -186,9 +186,18 @@ function RequireTeamView({ children }) {
 /* Govt-segment guard. Used by the Government wizard so a Private-only
    sales rep can't reach it via direct URL. ALL or GOVERNMENT is OK. */
 function RequireGovtAccess({ children }) {
-  const { segmentAccess, loading } = useAuth()
+  const { segmentAccess, profile, loading } = useAuth()
+  const location = useLocation()
   if (loading) return <LoadingScreen />
-  if (segmentAccess !== 'ALL' && segmentAccess !== 'GOVERNMENT') {
+  // Sales Head (manager P1c) may reach the govt quote wizards to EDIT any rep's
+  // govt proposal, even though her base segment_access is PRIVATE — but ONLY to
+  // EDIT (state.editingId set, §94 govt edit is state-based), never to CREATE a
+  // new govt quote (the same route serves both; the quotes INSERT policy is
+  // segment-blind, so an unscoped bypass would let a PRIVATE-segment head
+  // originate a GOVERNMENT quote — a §8 segment-boundary breach). Added alongside
+  // the segment gate, never replacing it.
+  const salesHeadEditing = !!profile?.is_sales_head && !!location.state?.editingId
+  if (segmentAccess !== 'ALL' && segmentAccess !== 'GOVERNMENT' && !salesHeadEditing) {
     return <Navigate to="/quotes" replace />
   }
   return children

@@ -74,7 +74,10 @@ export default function QuotesV2() {
   // Phase 247.3 — a per-user team viewer (can_view_team_dashboard) can flip to
   // ALL reps' quotes (READ-ONLY) via a toggle; default stays her own (RLS).
   // Never for admin (already see all) or a normal rep (no flag → no toggle).
-  const canViewTeam = profile?.can_view_team_dashboard === true
+  // Sales Head (manager P1c) — edits any rep's quote (pinned RLS: content only,
+  // no won/status/owner change). Carries the team toggle + the Edit button in team view.
+  const isSalesHead = profile?.is_sales_head === true
+  const canViewTeam = profile?.can_view_team_dashboard === true || isSalesHead
   // Phase 269 — team viewer starts ON the team list (see LeadsV2 note).
   const [teamView, setTeamView] = usePersistedState(
     'quotesv2.teamView',
@@ -654,7 +657,7 @@ export default function QuotesV2() {
                         so these don't double-fire navigate. */}
                     <td>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {!teamViewing && q.status !== 'lost' && (
+                        {(!teamViewing || isSalesHead) && q.status !== 'lost' && (isSalesHead ? q.status !== 'won' : true) && (
                           <button
                             type="button"
                             className="v2d-ghost"
@@ -757,7 +760,7 @@ export default function QuotesV2() {
                       borderTop: '1px solid var(--v2-line, #1f2741)',
                       paddingTop: 10,
                     }}>
-                      {!teamViewing && q.status !== 'lost' && (
+                      {(!teamViewing || isSalesHead) && q.status !== 'lost' && (isSalesHead ? q.status !== 'won' : true) && (
                         <button
                           type="button"
                           className="v2d-ghost"
