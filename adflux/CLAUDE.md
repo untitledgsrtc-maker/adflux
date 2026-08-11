@@ -11338,3 +11338,50 @@ Already pushed (`888bd26`, on origin, verified). Reps reopen the app once (SW).
 Smoke: call the same lead a 6th time → save the outcome → "Hand this lead off?"
 popup ("called N times") → Hand off opens the reassign picker; Keep working it
 suppresses it for 24h. A Won/Lost lead never nudges. No SQL, no APK.
+
+
+---
+
+## 174 · Phase 286 — plain Income − Expenses = Profit statement on the P&L tab (2026-08-10, `ced54e5`)
+
+Owner: "I want [the P&L] like this — income - gsrtc, govt hood, pvt led other /
+less expens." He wants the P&L shown as a simple accountant statement, not only
+the cards/donut. Owner "no preference" on placement (AskUserQuestion) → I chose
+**add-on-top** (removes nothing — §156 "detailed was good"). Display-only,
+FinanceV2 (admin/accounts-only, NOT §28 frozen). No SQL, no APK.
+
+### What shipped (`src/pages/v2/FinanceV2.jsx`, PnlTab)
+A **Profit Statement** card at the top of the P&L tab (below the hero + KPI
+strip, above the cash + detail cards; the detailed cards stay below):
+```
+INCOME
+  <revenue_mix lines: Govt·GSRTC / Govt·Auto Hood / Pvt·LED / Pvt·Other Media>
+  Total income            = d.income
+LESS EXPENSES
+  Media / vendor cost     = d.direct_cost
+  Common (office) expense = cost − media − commission   (reconciling remainder)
+  Commission              = d.commission   (shown only when > 0)
+  Total expenses          = cost  (= income − business_profit)
+= PROFIT                  = d.business_profit
+```
+
+### The reconciliation contract (why Common = remainder, do NOT "simplify" it)
+The Common line is deliberately `cost − direct_cost − commission`, NOT the raw
+`d.common_expense`. Reason: the §169.1 bank-commission head is NETTED inside
+`business_profit` (so `cost = income − bprofit` already excludes the settlement),
+while `d.commission` is the govt+agency ACCRUAL. Summing raw
+`direct + common_expense + commission` would **double-count** the bank
+commission. The remainder makes the three expense lines ALWAYS sum to
+`cost` (= Total expenses) and Profit = `business_profit` exactly. If a future
+edit shows raw common_expense here, it re-introduces the §169 double-count.
+
+### Notes
+- Income lines = `revenue_mix` (`{label, amount, pct}`) — the same source as the
+  donut (§71 one source). Empty → "No income in range."
+- Reads the EXISTING `finance_pnl_summary` RPC — no RPC change, no new column.
+- Respects the segment scope the RPC already applies (Vishal govt-only, §152).
+- Money numbers Space Grotesk, expenses in `--danger`, profit `--success`/`--danger`.
+
+### Owner action
+Already pushed (`ced54e5`, on origin). Vercel auto-deploys. Open /finance →
+Owner·P&L tab → the statement sits at the top; the detailed cards are still below.
