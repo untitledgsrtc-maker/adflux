@@ -144,6 +144,14 @@ function PnlTab({ seg }) {
   const excl = d.excluded || {}, byHead = d.by_head || [], mix = d.revenue_mix || [], monthly = d.monthly || []
   const assets = d.assets || [], review = d.review || { count: 0, amount: 0 }
   const maxHead = byHead.reduce((m, h) => Math.max(m, +h.amount || 0), 0) || 1
+  // Phase 286 — plain P&L statement lines (owner 2026-08-10). Common =
+  // reconciling remainder so the three expense lines ALWAYS sum to `cost` and
+  // Profit = bprofit exactly (the §169 bank-commission settlement is netted
+  // inside `cost`, so summing direct + gross-common + commission would
+  // double-count it; the remainder avoids that).
+  const stMedia = Number(d.direct_cost) || 0
+  const stComm = Number(d.commission) || 0
+  const stCommon = Math.round(cost - stMedia - stComm)
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -177,6 +185,31 @@ function PnlTab({ seg }) {
         <Kpi label="Business Profit" value={fmtINR(bprofit)} sub={bprofit >= 0 ? `${d.margin_pct}% profit margin` : 'loss'} Icon={BarChart3} color={bprofit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)'} tint="var(--success-soft, rgba(16,185,129,.12))" />
         <Kpi label="Net Cash" value={fmtINR(netCash)} sub="in − out (money position)" Icon={IndianRupee} color={netCash >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)'} tint="var(--accent-soft, rgba(255,230,0,.14))" />
       </div>
+
+      {/* Phase 286 — plain Income − Expenses = Profit statement (owner ask
+          2026-08-10). Income lines from revenue_mix (segment × media); the
+          three expense lines reconcile to `cost`; = Profit is business_profit. */}
+      <Card>
+        <CH><LayoutDashboard size={15} style={{ verticalAlign: -2, color: 'var(--accent, #FFE600)' }} /> Profit Statement <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>income − expenses = profit</span></CH>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}><tbody>
+          <tr><td colSpan={2} style={{ padding: '10px 0 4px', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Income</td></tr>
+          {mix.length === 0
+            ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No income in range.</td><td style={tdR}></td></tr>
+            : mix.map((m, i) => <tr key={i}><td style={tdL}>{m.label}</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600 }}>{fmtINR(m.amount)}</td></tr>)}
+          <tr style={totRow}><td style={tdL}>Total income</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 700 }}>{fmtINR(income)}</td></tr>
+
+          <tr><td colSpan={2} style={{ padding: '14px 0 4px', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Less expenses</td></tr>
+          <tr><td style={tdL}>Media / vendor cost</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(stMedia)}</td></tr>
+          <tr><td style={tdL}>Common (office) expense</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(stCommon)}</td></tr>
+          {stComm > 0 && <tr><td style={tdL}>Commission</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(stComm)}</td></tr>}
+          <tr style={totRow}><td style={tdL}>Total expenses</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 700, color: 'var(--danger)' }}>{fmtINR(cost)}</td></tr>
+
+          <tr style={{ borderTop: '2px solid var(--border-strong, #475569)' }}>
+            <td style={{ ...tdL, fontSize: 15, fontWeight: 700, paddingTop: 12 }}>= PROFIT</td>
+            <td style={{ ...tdR, paddingTop: 12, fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 18, color: bprofit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)' }}>{fmtINR(bprofit)}</td>
+          </tr>
+        </tbody></table>
+      </Card>
 
       {/* CASH VIEW — money in vs money out (§168) */}
       <div style={g2}>
