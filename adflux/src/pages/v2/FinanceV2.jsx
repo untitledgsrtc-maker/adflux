@@ -144,14 +144,15 @@ function PnlTab({ seg }) {
   const excl = d.excluded || {}, byHead = d.by_head || [], mix = d.revenue_mix || [], monthly = d.monthly || []
   const assets = d.assets || [], review = d.review || { count: 0, amount: 0 }
   const maxHead = byHead.reduce((m, h) => Math.max(m, +h.amount || 0), 0) || 1
-  // Phase 286 — plain P&L statement lines (owner 2026-08-10). Common =
-  // reconciling remainder so the three expense lines ALWAYS sum to `cost` and
-  // Profit = bprofit exactly (the §169 bank-commission settlement is netted
-  // inside `cost`, so summing direct + gross-common + commission would
-  // double-count it; the remainder avoids that).
-  const stMedia = Number(d.direct_cost) || 0
-  const stComm = Number(d.commission) || 0
-  const stCommon = Math.round(cost - stMedia - stComm)
+  // Phase 286.1 — expense breakdown by type (owner 2026-08-10): reuse the
+  // money_out P&L-cost lines (GSRTC govt+pvt combined, Auto Hood, Other Media,
+  // Pvt LED, Common, Commission govt/agency) and DROP the cash-out lines
+  // (assets / loans / personal / tax / review — they move cash but aren't a
+  // P&L cost). The kept lines sum to `cost` exactly (the §169 bank-commission
+  // settlement is already netted inside the money_out "Common expense" line),
+  // so Total expenses = cost and Profit = business_profit reconcile.
+  const CASH_OUT_LABELS = new Set(['Assets / equipment', 'Loan repaid', 'Personal', 'Tax', 'Review (to sort)'])
+  const expLines = moneyOut.filter(l => !CASH_OUT_LABELS.has(l.label))
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -199,9 +200,9 @@ function PnlTab({ seg }) {
           <tr style={totRow}><td style={tdL}>Total income</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 700 }}>{fmtINR(income)}</td></tr>
 
           <tr><td colSpan={2} style={{ padding: '14px 0 4px', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Less expenses</td></tr>
-          <tr><td style={tdL}>Media / vendor cost</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(stMedia)}</td></tr>
-          <tr><td style={tdL}>Common (office) expense</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(stCommon)}</td></tr>
-          {stComm > 0 && <tr><td style={tdL}>Commission</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(stComm)}</td></tr>}
+          {expLines.length === 0
+            ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No expenses in range.</td><td style={tdR}></td></tr>
+            : expLines.map((l, i) => <tr key={i}><td style={tdL}>{l.label}</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(l.amount)}</td></tr>)}
           <tr style={totRow}><td style={tdL}>Total expenses</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 700, color: 'var(--danger)' }}>{fmtINR(cost)}</td></tr>
 
           <tr style={{ borderTop: '2px solid var(--border-strong, #475569)' }}>
