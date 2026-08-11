@@ -11385,3 +11385,19 @@ edit shows raw common_expense here, it re-introduces the §169 double-count.
 ### Owner action
 Already pushed (`ced54e5`, on origin). Vercel auto-deploys. Open /finance →
 Owner·P&L tab → the statement sits at the top; the detailed cards are still below.
+
+### Phase 286.1 (`beb67cf`) — expenses broken down by type
+Owner: show the expense side by type like income, not one "Media / vendor cost"
+line. The statement's "Less expenses" section now reuses the `money_out` P&L-cost
+lines (already grouped in the RPC: **GSRTC = govt+pvt combined** by media_type,
+Auto Hood, Other Media, Pvt LED, Common expense, Commission — govt team,
+Commission — agency) and DROPS the cash-out lines (`Assets / equipment`,
+`Loan repaid`, `Personal`, `Tax`, `Review (to sort)`) via a `CASH_OUT_LABELS`
+Set — those move cash but aren't a P&L cost. The kept lines sum to `cost` exactly
+(the §169 bank-commission settlement is already netted inside the money_out
+"Common expense" line = `ctot − v_comm`), so Total expenses = cost and
+Profit = business_profit still reconcile. Replaced the 3 static Phase-286 lines.
+- ⚠ The expense lines are filtered by LABEL — if a future RPC edit renames a
+  `money_out` label, update `CASH_OUT_LABELS` in FinanceV2 to match (or a cash-out
+  line leaks into the P&L expense list). Total/Profit stay right regardless (both
+  read the authoritative `cost`/`business_profit` scalars).
