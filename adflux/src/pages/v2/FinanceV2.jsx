@@ -120,6 +120,10 @@ const totRow = { fontWeight: 700, background: 'var(--surface-2, #334155)' }
 const STMT_MEDIA_LABEL = { AUTO_HOOD: 'Auto Hood', OTHER_MEDIA: 'Other Media', GSRTC_LED: 'GSRTC', LED_OTHER: 'Pvt LED' }
 const prettyStmtLbl = (s) => String(s == null ? '' : s).replace(/AUTO_HOOD|OTHER_MEDIA|GSRTC_LED|LED_OTHER/g, m => STMT_MEDIA_LABEL[m])
 const g2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }
+// Phase 286.3 — Profit Statement + Money In + Money Out in one row. auto-fit so
+// it's 3 cols on desktop and wraps on narrow screens; align:start so the short
+// cash cards don't stretch to the tall statement's height.
+const g3row = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 14, alignItems: 'start' }
 const g4 = { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }
 const selStyle = { background: 'var(--surface-2, #334155)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', fontSize: 12.5, color: 'var(--text)', cursor: 'pointer' }
 const Dot = ({ c }) => <span style={{ width: 9, height: 9, borderRadius: 9, background: c, display: 'inline-block' }} />
@@ -192,9 +196,10 @@ function PnlTab({ seg }) {
         <Kpi label="Net Cash" value={fmtINR(netCash)} sub="in − out (money position)" Icon={IndianRupee} color={netCash >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)'} tint="var(--accent-soft, rgba(255,230,0,.14))" />
       </div>
 
-      {/* Phase 286 — plain Income − Expenses = Profit statement (owner ask
-          2026-08-10). Income lines from revenue_mix (segment × media); the
-          three expense lines reconcile to `cost`; = Profit is business_profit. */}
+      {/* Phase 286.3 — Profit Statement + Money In + Money Out in ONE row
+          (owner ask 2026-08-10). Responsive: 3 cols on desktop, wraps narrow.
+          Income lines from revenue_mix; expense lines reconcile to `cost`. */}
+      <div style={g3row}>
       <Card>
         <CH><LayoutDashboard size={15} style={{ verticalAlign: -2, color: 'var(--accent, #FFE600)' }} /> Profit Statement <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>income − expenses = profit</span></CH>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}><tbody>
@@ -217,13 +222,12 @@ function PnlTab({ seg }) {
         </tbody></table>
       </Card>
 
-      {/* CASH VIEW — money in vs money out (§168) */}
-      <div style={g2}>
-        <Card>
+      {/* CASH VIEW — money in vs money out (§168), now in the same row */}
+      <Card>
           <CH><TrendingUp size={15} style={{ verticalAlign: -2, color: 'var(--success)' }} /> Money In <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>bank credits + borrowed</span></CH>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}><tbody>
             {moneyIn.length === 0 ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No income in range.</td></tr> :
-              moneyIn.map((r, i) => <tr key={i}><td style={tdL}>{r.label}</td><td style={{ ...tdR, color: 'var(--success)' }}>{fmtINR(r.amount)}</td></tr>)}
+              moneyIn.map((r, i) => <tr key={i}><td style={tdL}>{prettyStmtLbl(r.label)}</td><td style={{ ...tdR, color: 'var(--success)' }}>{fmtINR(r.amount)}</td></tr>)}
             <tr style={totRow}><td style={tdL}>TOTAL IN</td><td style={{ ...tdR, color: 'var(--success)' }}>{fmtINR(totalIn)}</td></tr>
           </tbody></table>
         </Card>
@@ -231,7 +235,7 @@ function PnlTab({ seg }) {
           <CH><TrendingDown size={15} style={{ verticalAlign: -2, color: 'var(--danger)' }} /> Money Out <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>every rupee out</span></CH>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}><tbody>
             {moneyOut.length === 0 ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No spending in range.</td></tr> :
-              moneyOut.map((r, i) => <tr key={i}><td style={tdL}>{r.label}</td><td style={{ ...tdR, color: 'var(--danger)' }}>{fmtINR(r.amount)}</td></tr>)}
+              moneyOut.map((r, i) => <tr key={i}><td style={tdL}>{prettyStmtLbl(r.label)}</td><td style={{ ...tdR, color: 'var(--danger)' }}>{fmtINR(r.amount)}</td></tr>)}
             <tr style={totRow}><td style={tdL}>TOTAL OUT</td><td style={{ ...tdR, color: 'var(--danger)' }}>{fmtINR(totalOut)}</td></tr>
           </tbody></table>
         </Card>
