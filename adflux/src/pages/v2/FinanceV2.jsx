@@ -120,10 +120,11 @@ const totRow = { fontWeight: 700, background: 'var(--surface-2, #334155)' }
 const STMT_MEDIA_LABEL = { AUTO_HOOD: 'Auto Hood', OTHER_MEDIA: 'Other Media', GSRTC_LED: 'GSRTC', LED_OTHER: 'Pvt LED' }
 const prettyStmtLbl = (s) => String(s == null ? '' : s).replace(/AUTO_HOOD|OTHER_MEDIA|GSRTC_LED|LED_OTHER/g, m => STMT_MEDIA_LABEL[m])
 const g2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }
-// Phase 286.3 — Profit Statement + Money In + Money Out in one row. auto-fit so
-// it's 3 cols on desktop and wraps on narrow screens; align:start so the short
-// cash cards don't stretch to the tall statement's height.
-const g3row = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 14, alignItems: 'start' }
+// Phase 286.4 — Profit Statement on the left, Money In + Money Out STACKED on
+// the right → two even halves in one line (statement height ≈ the two stacked
+// cash cards, so no ragged bottoms). auto-fit collapses to 1 col on narrow.
+const g3row = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14, alignItems: 'start' }
+const cashStack = { display: 'grid', gap: 14, minWidth: 0 }
 const g4 = { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }
 const selStyle = { background: 'var(--surface-2, #334155)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', fontSize: 12.5, color: 'var(--text)', cursor: 'pointer' }
 const Dot = ({ c }) => <span style={{ width: 9, height: 9, borderRadius: 9, background: c, display: 'inline-block' }} />
@@ -222,7 +223,8 @@ function PnlTab({ seg }) {
         </tbody></table>
       </Card>
 
-      {/* CASH VIEW — money in vs money out (§168), now in the same row */}
+      {/* CASH VIEW — money in vs money out (§168), stacked in the right half */}
+      <div style={cashStack}>
       <Card>
           <CH><TrendingUp size={15} style={{ verticalAlign: -2, color: 'var(--success)' }} /> Money In <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>bank credits + borrowed</span></CH>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}><tbody>
@@ -239,6 +241,7 @@ function PnlTab({ seg }) {
             <tr style={totRow}><td style={tdL}>TOTAL OUT</td><td style={{ ...tdR, color: 'var(--danger)' }}>{fmtINR(totalOut)}</td></tr>
           </tbody></table>
         </Card>
+      </div>
       </div>
 
       {/* net cash + sweep (net-zero) */}
