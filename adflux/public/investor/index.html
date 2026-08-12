@@ -215,7 +215,7 @@
   <h2 class="rise">We already make money. That's the starting line, not the goal.</h2>
   <p class="lead rise">Most people raising money are chasing their first profit. We're not. Here is the honest current picture — the good and the thin.</p>
   <div class="grid2">
-    <div class="card rise"><div class="bignum ink">₹1.0 L<span style="font-size:15px;color:var(--ink2)"> /mo</span></div><h3 style="margin-top:8px">Existing 20 stations (LED)</h3><p>Income ₹10.1 L/mo, costs ₹9.1 L/mo. Real, but thin — about ₹12-13 L a year. Electricity is ₹650/screen/mo, paid to the state board.</p></div>
+    <div class="card rise"><div class="bignum ink">₹1.8 L<span style="font-size:15px;color:var(--ink2)"> /mo</span></div><h3 style="margin-top:8px">Existing 20 stations (LED)</h3><p>Income ₹10.1 L/mo, costs ₹8.3 L/mo — about ₹21 L a year. Real, but still thin against the auto-hood engine. Electricity is ₹450/screen/mo, paid to the state board.</p></div>
     <div class="card rise"><div class="bignum">₹1.8 Cr<span style="font-size:15px;color:var(--ink2)"> /yr net</span></div><h3 style="margin-top:8px">Auto-hood (bus branding)</h3><p>Our real profit engine — physical branding across the GSRTC fleet, ~₹15 L/month net. <b style="color:var(--ink1)">A separate business we already run</b>, independent of the new tender.</p></div>
     <div class="card rise"><div class="bignum red">2%</div><h3 style="margin-top:8px">Of screen slots sold</h3><p>We sell about 2% of the ad-time our screens can carry. The upside isn't more screens — it's <b style="color:var(--ink1)">filling the ones we have</b>. Growth is a demand problem, not a capacity one.</p></div>
   </div>
@@ -533,7 +533,7 @@
     var autohoodNet = (ahGross*12/100) * (ahMargin/100);        // ₹ Cr/yr net (separate)
     var rows=[], cum=0;
     for(var y=0;y<5;y++){
-      var exLedRev=1.22*Math.pow(1.03,y), exOpex=1.09*Math.pow(1.03,y);
+      var exLedRev=1.22*Math.pow(1.03,y), exOpex=1.00*Math.pow(1.03,y);   // ₹8.35 L/mo actual (elec ₹450/screen)
       var newRev=newRevMature*ramp[y];
       var led = exLedRev - exOpex + newRev - newOpex;
       var total = led + autohoodNet;
