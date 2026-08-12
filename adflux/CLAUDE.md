@@ -11492,3 +11492,18 @@ Pushed (`2724fd9`). Vercel auto-deploys → open `app.untitledad.in/investor`, p
 ranges on the built page. Not-built (v1): server-side password auth, PDF export of a
 filled calculator, fresh LED-screen photos. The spec + the two source files hold the
 detail.
+
+### Phase 287.1 (`c565592`) — old-vs-new tender slide viewer
+Owner sent the 2025-26 vs 2026-27 GSRTC tender diff, wanted it "as a presentation,
+change slide by button, useful only." Added a **"The tender — then & now"** section
+(after the 98-station bet) = a 6-slide button-nav viewer: Previous/Next + dot
+indicators + "N/6" counter + keyboard arrows (skipped when a calc slider is focused,
+so the two don't fight). Six USEFUL comparisons only: scale (20→98) · EMD (₹20L→₹80L,
+4×) · upset price (₹35.1L→₹49.4L/yr = ₹50,400/yr/station) · per-station spec (10
+screens, 4×3ft, ₹4,200/mo) · eligibility (₹3Cr→₹1Cr turnover, barrier now capital) ·
+station mix (district HQs→taluka towns). Dropped admin/blank rows (tender no, email,
+fee, dates). Verified live in the browser pane (6 slides, nav works, boots clean).
+Self-contained, display-only. ⚠ FLAGGED (not changed): the tender's real UPSET
+licence is ₹49.4L/yr (₹50,400/yr × 98) and the spec is **10 screens/station** — the
+investor calculator defaults to a conservative ₹2.17Cr licence + 13.2 screens (both
+sliders); the true floor is far more favourable, owner can slide to it.
