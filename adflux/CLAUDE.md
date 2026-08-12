@@ -11433,3 +11433,62 @@ Out STACKED in the right cell (`cashStack` grid). The statement height ≈ the t
 stacked cash cards, so the columns bottom-align cleanly, and the statement gets
 half-width (roomy numbers) instead of a third. `g3row` now `minmax(360px,1fr)`
 auto-fit → 2 cols on desktop, collapses to 1 on narrow. Display-only.
+
+
+---
+
+## 175 · Phase 287 — investor pitch page + live forecast calculator (`/investor`) (2026-08-12, `2724fd9`)
+
+Owner wants an HNI investor deck as a landing page at `app.untitledad.in/investor`,
+built from `Untitled_Adflux_Investor_Deck.pptx` + `GSRTC_98_Station_Model.xlsx`
+(in `~/Downloads/files 2/`). Full brainstorm (4 rounds of questions) → spec at
+`docs/superpowers/specs/2026-08-12-investor-deck-design.md` (untracked, local —
+sensitive financials). Built like `/led` (§98/§129): `public/investor/index.html`,
+self-contained, password-gated. Additive, §45-safe (new public page, zero CRM touch).
+
+### Owner decisions (locked, do NOT re-litigate)
+- Audience **HNIs/angels** · **password-gated** · **full transparency** (leads with
+  the hard truth) · **live-slider calculator** · **bold /led look** · reuse /deck assets.
+- **Financial truth reconciled** (deck vs model contradicted): existing 20 = ~₹1 L/mo
+  LED profit (Monthly-Bill = electricity, already in opex; the model's "₹12 L loss /
+  survival" narrative is STALE — do not use). **Auto-hood = SEPARATE existing business
+  (~₹1.8 Cr/yr net at 25% margin), NOT granted by the tender.** So the 98-station bid
+  stands on LED alone, and LED-only payback runs PAST the 5-yr term — the page says it
+  out loud. Three reasons to expand: fill upside (2% today) + concession moat + auto-hood
+  scale. Valuation is investor-set in the calculator (not fixed). Funding: honest stack
+  (₹5 Cr equity + ₹2.5 Cr receivables-debt + ₹1 Cr accrual, phased; debt = a condition).
+
+### The page (10 sections)
+hero → today (honest economics) → record (4× growth) → the 98-station bet → the honest
+math → revenue plan → **★ live calculator** → the ask + funding → risks → contact.
+
+### The calculator (the standout — `public/investor/index.html`, pure inline JS)
+The Excel model, live. Sliders: fill/demand · auto-hood gross (₹L/mo) · auto-hood net
+margin · GSRTC licence (₹Cr/yr) · Year-1 ramp · screens/station · valuation. Toggle
+LED-only vs total. Outputs: 5-yr revenue/profit/cumulative-cash SVG chart + payback year
++ investor equity% (`5/(val+5)`) + illustrative Y5 return (Y5 profit × 6 × equity% ÷ 5).
+**Defaults reproduce the management base case — verified live: Y5 ₹2.5 Cr · cash-positive
+Y4 · 25% at ₹15 Cr val · 0.75× return · table = model.** Formulas: newRevMature =
+scr×98×(3263+578)×12/1e7×fill; newOpex = 2.96 + licence; autohoodNet = gross×12/100×margin;
+led = exLedRev(1.22×1.03^y) − exOpex(1.09×1.03^y) + newRev(×ramp[0.6,0.85,1,1,1]) − newOpex;
+capex 6.11 in Y1.
+
+### Contracts / notes
+- **Password gate is CLIENT-SIDE** (`CODE='untitled2026'` in the file — owner changes it;
+  `sessionStorage` persists per session). NOT real auth — keeps public/competitors out.
+  A real server-gate (Edge fn) is a later upgrade if wanted.
+- **sw.js denylist** gained `/^\/investor(?:[/?#]|$)/` (§76/§181/§223/§224) so the SW
+  serves the static page, not the SPA login shell. Same commit. §224 build tripwire green
+  (static folder, not a vercel.json rewrite).
+- **Reveal**: sweep + interval + **4s force-reveal-all safety** (§129 — no section can
+  ever stay invisible; the JS-scroll blank in the browser pane was a screenshot desync,
+  DOM confirmed present). No CDN `<script>` (CSP §129); charts = inline SVG.
+- Reuses `/deck/station-hero.mp4` + `/deck/dashboard-real.png`.
+- All figures labelled unaudited; audits + entity consolidation = condition precedent.
+
+### Owner action
+Pushed (`2724fd9`). Vercel auto-deploys → open `app.untitledad.in/investor`, password
+`untitled2026` (change the `CODE` var / ask me to). Review the actual figures + slider
+ranges on the built page. Not-built (v1): server-side password auth, PDF export of a
+filled calculator, fresh LED-screen photos. The spec + the two source files hold the
+detail.
