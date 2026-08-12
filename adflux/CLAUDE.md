@@ -11401,3 +11401,17 @@ Profit = business_profit still reconcile. Replaced the 3 static Phase-286 lines.
   `money_out` label, update `CASH_OUT_LABELS` in FinanceV2 to match (or a cash-out
   line leaks into the P&L expense list). Total/Profit stay right regardless (both
   read the authoritative `cost`/`business_profit` scalars).
+
+### Phase 286.2 (`d091688`) — friendly income line labels
+Income lines came from `revenue_mix` with raw media codes (`Govt · AUTO_HOOD`,
+`Pvt · OTHER_MEDIA`, `Govt · GSRTC_LED`) while the expense side already read
+clean (the RPC relabels money_out). Added `prettyStmtLbl` (maps AUTO_HOOD→Auto
+Hood, OTHER_MEDIA→Other Media, GSRTC_LED→GSRTC, LED_OTHER→Pvt LED), applied to
+BOTH income + expense statement labels (no-op on the already-clean expense side).
+Display-only. Owner-verified live 2026-08-10: the statement reconciles on real
+data (income ₹1.02Cr − expenses ₹1.26Cr = −₹24.55L = the Business Profit hero;
+expense lines sum to Total expenses exactly). The −₹24.55L is a real LOSS driven
+by the ₹20.29L agency commission (Hamesh Modi 40%, §171) + bank-based income
+Apr–Jul vs wider-window commission accrual — known modeling mismatch (§171), not
+a statement bug. Owner said "do your best" → kept the statement (he asked for it
+across several messages), fixed only the raw-code labels.
