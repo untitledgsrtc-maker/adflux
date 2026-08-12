@@ -11424,3 +11424,12 @@ stretch to the tall statement. Replaced the full-width statement + separate
 `g2` cash row. Also applied `prettyStmtLbl` to the Money In / Money Out labels
 (were still raw `Govt · AUTO_HOOD` / `GSRTC_LED`) so all three cards read
 consistently now that they sit side by side. Display-only, no SQL, no APK.
+
+### Phase 286.4 (`66943d2`) — one-row layout fixed (statement left, cash stacked right)
+Owner: the 286.3 equal-thirds "alignment is not good" (tall statement next to
+short cash cards = ragged bottoms, numbers cramped at 1/3 width). Reworked to
+TWO even halves in one row: Profit Statement in the left cell; Money In + Money
+Out STACKED in the right cell (`cashStack` grid). The statement height ≈ the two
+stacked cash cards, so the columns bottom-align cleanly, and the statement gets
+half-width (roomy numbers) instead of a third. `g3row` now `minmax(360px,1fr)`
+auto-fit → 2 cols on desktop, collapses to 1 on narrow. Display-only.
