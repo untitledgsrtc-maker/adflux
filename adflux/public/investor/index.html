@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>Untitled Adflux — Investor Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script>document.documentElement.className += ' js'</script>
+<style>
+  :root{
+    --navy:#0A0E1A; --navy2:#0d1424; --panel:#111a2e; --panel2:#16203a;
+    --yellow:#FFE600; --yellow-dim:#c9b600;
+    --ink0:#f5f7fb; --ink1:#c3cbe0; --ink2:#8b96b4; --line:rgba(255,255,255,.09);
+    --green:#38d39f; --red:#ff5d6c; --blue:#5aa9ff;
+    --disp:'Space Grotesk',system-ui,sans-serif; --body:'DM Sans',system-ui,sans-serif; --mono:'Space Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--navy);color:var(--ink1);font-family:var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  body{line-height:1.55}
+  h1,h2,h3,.disp{font-family:var(--disp);color:var(--ink0);letter-spacing:-.02em;line-height:1.08;margin:0}
+  a{color:var(--yellow);text-decoration:none}
+  .num{font-family:var(--mono)}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 22px}
+  .yellow{color:var(--yellow)}
+  .muted{color:var(--ink2)}
+
+  /* ---------- password gate ---------- */
+  #gate{position:fixed;inset:0;z-index:1000;background:radial-gradient(680px 300px at 50% 12%,rgba(255,230,0,.12),transparent 60%),var(--navy);
+    display:flex;align-items:center;justify-content:center;padding:24px}
+  #gate .box{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:30px 28px;text-align:center}
+  #gate .mark{width:52px;height:52px;border-radius:13px;background:var(--yellow);color:var(--navy);font-family:var(--disp);font-weight:700;font-size:22px;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+  #gate h2{font-size:20px;margin-bottom:4px}
+  #gate p{font-size:13px;color:var(--ink2);margin:0 0 20px}
+  #gate input{width:100%;background:var(--navy2);border:1px solid var(--line);border-radius:11px;padding:13px 14px;color:var(--ink0);font-size:15px;font-family:var(--body);text-align:center;letter-spacing:.06em}
+  #gate input:focus{outline:none;border-color:var(--yellow)}
+  #gate button{width:100%;margin-top:12px;background:var(--yellow);color:var(--navy);border:none;border-radius:11px;padding:13px;font-family:var(--disp);font-weight:700;font-size:15px;cursor:pointer}
+  #gate .err{color:var(--red);font-size:12.5px;margin-top:12px;min-height:16px}
+  #gate .foot{font-size:11px;color:var(--ink2);margin-top:18px;letter-spacing:.03em}
+
+  #app{display:none}
+  #app.on{display:block}
+
+  /* ---------- LED dot backdrop ---------- */
+  .leddots{position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:radial-gradient(rgba(255,230,0,.16) 1px,transparent 1.4px);
+    background-size:18px 18px;mask-image:linear-gradient(180deg,#000,transparent 70%)}
+
+  /* ---------- header ---------- */
+  header{position:sticky;top:0;z-index:40;background:rgba(10,14,26,.82);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .m{width:32px;height:32px;border-radius:9px;background:var(--yellow);color:var(--navy);font-family:var(--disp);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .brand b{font-family:var(--disp);color:var(--ink0);font-size:15px;letter-spacing:.02em}
+  .tag{font-size:10px;color:var(--ink2);letter-spacing:.16em;text-transform:uppercase}
+  .hbtn{font-family:var(--disp);font-weight:600;font-size:13px;background:var(--yellow);color:var(--navy);padding:8px 15px;border-radius:9px}
+
+  /* ---------- hero ---------- */
+  .hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+  .hero-media{position:absolute;inset:0;z-index:0;object-fit:cover;width:100%;height:100%;opacity:.28;filter:saturate(.7)}
+  .hero-grad{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,14,26,.55),var(--navy) 88%),radial-gradient(700px 320px at 82% -8%,rgba(255,230,0,.16),transparent 60%)}
+  .hero .wrap{position:relative;z-index:3;padding:66px 22px 54px}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--yellow);font-weight:600;margin-bottom:18px}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--yellow);box-shadow:0 0 10px var(--yellow);animation:blink 2s infinite}
+  @keyframes blink{50%{opacity:.35}}
+  .hero h1{font-size:clamp(30px,5.4vw,54px);font-weight:700;max-width:16ch}
+  .hero .sub{font-size:clamp(15px,2vw,19px);color:var(--ink1);margin-top:16px;max-width:52ch}
+  .hero-stats{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+  .hstat{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:13px;padding:13px 16px;min-width:120px}
+  .hstat .v{font-family:var(--disp);font-weight:700;color:var(--ink0);font-size:23px}
+  .hstat .l{font-size:11px;color:var(--ink2);letter-spacing:.04em;margin-top:2px}
+  .hstat.k .v{color:var(--yellow)}
+
+  /* ---------- sections ---------- */
+  section{position:relative}
+  .sec{padding:58px 0;border-bottom:1px solid var(--line)}
+  .kicker{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--yellow);font-weight:600;margin-bottom:12px}
+  .sec h2{font-size:clamp(23px,3.4vw,34px);font-weight:700;max-width:20ch}
+  .lead{font-size:16px;color:var(--ink1);margin-top:14px;max-width:62ch}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:26px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .card h3{font-size:16px;margin-bottom:6px}
+  .card p{font-size:13.5px;color:var(--ink2);margin:0}
+  .bignum{font-family:var(--disp);font-weight:700;font-size:30px;color:var(--yellow);line-height:1}
+  .bignum.red{color:var(--red)} .bignum.green{color:var(--green)} .bignum.ink{color:var(--ink0)}
+  .statrow{display:flex;flex-wrap:wrap;gap:22px;margin-top:24px}
+  .statrow .s .l{font-size:12px;color:var(--ink2);margin-top:4px}
+  .photo{border-radius:16px;border:1px solid var(--line);width:100%;height:100%;min-height:200px;object-fit:cover}
+  .truth{background:linear-gradient(160deg,rgba(255,93,108,.08),transparent),var(--panel);border:1px solid rgba(255,93,108,.28);border-radius:16px;padding:22px;margin-top:22px}
+  .truth b{color:var(--ink0)}
+  .pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,230,0,.1);border:1px solid rgba(255,230,0,.32);color:var(--yellow);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;margin:4px 6px 0 0}
+  ul.clean{list-style:none;padding:0;margin:14px 0 0}
+  ul.clean li{position:relative;padding:7px 0 7px 22px;font-size:14px;color:var(--ink1);border-top:1px solid var(--line)}
+  ul.clean li:before{content:'';position:absolute;left:2px;top:14px;width:7px;height:7px;border-radius:2px;background:var(--yellow)}
+
+  /* ---------- calculator ---------- */
+  .calc{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:20px;padding:22px;margin-top:26px}
+  .calc-grid{display:grid;grid-template-columns:300px 1fr;gap:24px}
+  .levers .lv{margin-bottom:15px}
+  .levers label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink1);margin-bottom:6px}
+  .levers label .val{font-family:var(--mono);color:var(--yellow);font-weight:700}
+  input[type=range]{-webkit-appearance:none;width:100%;height:5px;border-radius:5px;background:var(--navy2);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:var(--yellow);cursor:pointer;box-shadow:0 0 0 4px rgba(255,230,0,.15)}
+  input[type=range]::-moz-range-thumb{width:17px;height:17px;border:none;border-radius:50%;background:var(--yellow);cursor:pointer}
+  .toggle{display:flex;gap:6px;margin-top:6px}
+  .toggle button{flex:1;background:var(--navy2);color:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:8px;font-family:var(--disp);font-size:12px;font-weight:600;cursor:pointer}
+  .toggle button.on{background:var(--yellow);color:var(--navy);border-color:var(--yellow)}
+  .out-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+  .okpi{background:var(--navy2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .okpi .v{font-family:var(--disp);font-weight:700;font-size:22px;color:var(--ink0)}
+  .okpi .l{font-size:11px;color:var(--ink2);margin-top:2px}
+  .chartwrap{background:var(--navy2);border:1px solid var(--line);border-radius:13px;padding:14px 12px 8px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--ink2);margin:8px 0 0 4px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  table.ft{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:14px}
+  table.ft th,table.ft td{padding:7px 8px;text-align:right;border-top:1px solid var(--line)}
+  table.ft th:first-child,table.ft td:first-child{text-align:left;color:var(--ink2)}
+  table.ft td{font-family:var(--mono)}
+  table.ft thead th{color:var(--ink2);font-weight:600;font-family:var(--body);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .disc{font-size:11px;color:var(--ink2);margin-top:12px;line-height:1.5}
+
+  .askgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:22px}
+  .ask{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .ask .a{font-family:var(--disp);font-weight:700;font-size:24px;color:var(--yellow)}
+  .ask .b{font-size:12.5px;color:var(--ink2);margin-top:4px}
+  .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
+  .cta a{font-family:var(--disp);font-weight:700;font-size:15px;padding:13px 22px;border-radius:12px}
+  .cta .p{background:var(--yellow);color:var(--navy)}
+  .cta .g{background:transparent;color:var(--ink0);border:1px solid var(--line)}
+  footer{padding:40px 0;text-align:center;color:var(--ink2);font-size:12.5px}
+
+  /* reveal */
+  .js .rise{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+  .js .rise.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){.js .rise{opacity:1;transform:none;transition:none}}
+  @media (max-width:760px){
+    .calc-grid{grid-template-columns:1fr}
+    .hero .wrap{padding:48px 22px 40px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ PASSWORD GATE ============ -->
+<div id="gate">
+  <div class="box">
+    <div class="mark">UA</div>
+    <h2>Investor Room</h2>
+    <p>Untitled Adflux Pvt Ltd · confidential</p>
+    <input id="pw" type="password" placeholder="Enter access code" autocomplete="off" autocapitalize="off"/>
+    <button id="pwbtn">Enter</button>
+    <div class="err" id="pwerr"></div>
+    <div class="foot">Figures unaudited · management estimates · not an offer of securities</div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+
+<header>
+  <div class="wrap">
+    <div class="brand"><div class="m">UA</div><div><b>Untitled Adflux</b><div class="tag">Investor Room</div></div></div>
+    <a class="hbtn" href="#ask">The ask</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <video class="hero-media" src="/deck/station-hero.mp4" autoplay muted loop playsinline></video>
+  <div class="hero-grad"></div>
+  <div class="leddots"></div>
+  <div class="wrap">
+    <div class="eyebrow rise"><span class="dot"></span>Series A · Seeking ₹5 Crore</div>
+    <h1 class="rise">The proven operator on Gujarat's transit network — ready to scale 5×.</h1>
+    <p class="sub rise">We run digital LED screens inside GSRTC bus stations. Ten years, built from ₹0, already profitable. Now bidding for 98 more stations — and inviting a small circle of investors in.</p>
+    <div class="hero-stats">
+      <div class="hstat k rise"><div class="v num">₹8.8 Cr</div><div class="l">FY25-26 turnover</div></div>
+      <div class="hstat rise"><div class="v num">264</div><div class="l">LED screens live</div></div>
+      <div class="hstat rise"><div class="v num">20</div><div class="l">GSRTC stations</div></div>
+      <div class="hstat rise"><div class="v num">98</div><div class="l">stations bidding for</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- TODAY -->
+<section class="sec"><div class="wrap">
+  <div class="kicker rise">Where we stand today</div>
+  <h2 class="rise">We already make money. That's the starting line, not the goal.</h2>
+  <p class="lead rise">Most people raising money are chasing their first profit. We're not. Here is the honest current picture — the good and the thin.</p>
+  <div class="grid2">
+    <div class="card rise"><div class="bignum ink">₹1.0 L<span style="font-size:15px;color:var(--ink2)"> /mo</span></div><h3 style="margin-top:8px">Existing 20 stations (LED)</h3><p>Income ₹10.1 L/mo, costs ₹9.1 L/mo. Real, but thin — about ₹12-13 L a year. Electricity is ₹650/screen/mo, paid to the state board.</p></div>
+    <div class="card rise"><div class="bignum">₹1.8 Cr<span style="font-size:15px;color:var(--ink2)"> /yr net</span></div><h3 style="margin-top:8px">Auto-hood (bus branding)</h3><p>Our real profit engine — physical branding across the GSRTC fleet, ~₹15 L/month net. <b style="color:var(--ink1)">A separate business we already run</b>, independent of the new tender.</p></div>
+    <div class="card rise"><div class="bignum red">2%</div><h3 style="margin-top:8px">Of screen slots sold</h3><p>We sell about 2% of the ad-time our screens can carry. The upside isn't more screens — it's <b style="color:var(--ink1)">filling the ones we have</b>. Growth is a demand problem, not a capacity one.</p></div>
+  </div>
+</div></section>
+
+<!-- RECORD -->
+<section class="sec"><div class="wrap">
+  <div class="kicker rise">The record</div>
+  <h2 class="rise">Ten years. ₹0 to ₹8.8 Crore. 4× in the last five.</h2>
+  <p class="lead rise">Founded in Vadodara in 2015. Revenue is taxable turnover from GST filings — not projections. Government advertising anchors the network; it's cyclical, and we manage it (see risks).</p>
+  <div class="chartwrap rise" style="margin-top:24px;max-width:640px"><div id="recordChart"></div>
+    <div class="legend"><span><i style="background:var(--yellow)"></i>Turnover (₹ Cr, GST-filed)</span></div>
+  </div>
+  <div class="statrow">
+    <div class="s rise"><div class="bignum ink">2015</div><div class="l">founded, from ₹0</div></div>
+    <div class="s rise"><div class="bignum ink">4×</div><div class="l">revenue growth, 5 years</div></div>
+    <div class="s rise"><div class="bignum ink">Govt + private</div><div class="l">advertiser base (DAVP + brands)</div></div>
+  </div>
+</div></section>
+
+<!-- THE BET -->
+<section class="sec"><div class="wrap">
+  <div class="kicker rise">The bet</div>
+  <h2 class="rise">A tender for 98 more stations — 5× the network.</h2>
+  <p class="lead rise">Same operating model, same government relationship, applied to a network five times larger — Gujarat's busiest transit hubs.</p>
+  <div class="grid2">
+    <div class="card rise"><div class="bignum ink">98</div><h3 style="margin-top:8px">new bus stations</h3><p>≈ 1,294 new LED screens.</p></div>
+    <div class="card rise"><div class="bignum ink">₹6.1 Cr</div><h3 style="margin-top:8px">one-time build capex</h3><p>Screens, electrification, meters, cameras, DAVP file. Bottom-up costed.</p></div>
+    <div class="card rise"><div class="bignum ink">5 yr</div><h3 style="margin-top:8px">contract term</h3><p>A scarce, multi-year concession.</p></div>
+    <div class="card rise"><div class="bignum">The moat</div><h3 style="margin-top:8px">who can't bid</h3><p>₹80 L EMD, a 10% bank guarantee, and 3 years of audited financials — barriers that keep small, unproven bidders out.</p></div>
+  </div>
+</div></section>
+
+<!-- HONEST MATH -->
+<section class="sec"><div class="wrap">
+  <div class="kicker rise">The honest math</div>
+  <h2 class="rise">On LED rates alone, the 98 stations don't pay back inside the contract. We'll say it out loud.</h2>
+  <div class="truth rise">
+    <p style="margin:0;font-size:15px;color:var(--ink1)"><b>The uncomfortable number:</b> at today's fill and LED rates, the new network matures to roughly ₹1 Cr/year of operating profit — and its ₹6.1 Cr build takes <b>longer than the 5-year term</b> to recover on LED alone. Auto-hood, our real profit engine, is a <b>separate</b> business and is not granted by this tender. So we don't hide behind it.</p>
+  </div>
+  <p class="lead rise" style="margin-top:22px">So why do it? Three reasons — and the calculator below lets you test every one of them yourself:</p>
+  <div class="grid2">
+    <div class="card rise"><h3>1 · Fill the empty inventory</h3><p>We sell 2% of our slots. Every point of fill is almost pure margin — the screens already exist. Move the "fill" slider below and watch the forecast turn. This is the whole thesis: convert unused screen-time into private-brand demand.</p></div>
+    <div class="card rise"><h3>2 · Lock the concession (the moat)</h3><p>Winning grabs a multi-year exclusive on Gujarat's busiest transit hubs. The barriers that make it hard to win are the same ones that make it hard to take from us. The network itself is the asset.</p></div>
+    <div class="card rise"><h3>3 · Scale the auto-hood engine</h3><p>5× more stations is 5× the canvas for the bus-branding business that already nets ₹1.8 Cr/year — even where those rights are negotiated separately.</p></div>
+  </div>
+</div></section>
+
+<!-- REVENUE PLAN -->
+<section class="sec"><div class="wrap">
+  <div class="kicker rise">The revenue plan</div>
+  <h2 class="rise">How we get fill off 2%.</h2>
+  <p class="lead rise">The screens are the cheap part. The plan puts the money into <b style="color:var(--ink1)">demand</b>:</p>
+  <div class="grid2">
+    <div class="card rise"><h3>Private-brand sales team</h3><p>Reps selling empty screen-time directly to local + national brands — the higher-margin demand. We already run a CRM built for exactly this pipeline.</p></div>
+    <div class="card rise"><h3>Agency & programmatic tie-ups</h3><p>Media agencies fill inventory in bulk — lower margin, real volume, fast to light up.</p></div>
+    <div class="card rise"><h3>Government (DAVP) volume</h3><p>Lean harder on the campaigns that already anchor the network and pay reliably.</p></div>
+  </div>
+  <img class="photo rise" src="/deck/dashboard-real.png" alt="Live audience dashboard" style="margin-top:20px;max-height:340px" loading="lazy"/>
+  <p class="muted rise" style="font-size:12.5px;margin-top:10px">Live AI-based audience analytics — impressions and demographics per screen. Proof we can report what advertisers buy.</p>
+</div></section>
+
+<!-- CALCULATOR -->
+<section class="sec" id="calc"><div class="wrap">
+  <div class="kicker rise">Forecast calculator</div>
+  <h2 class="rise">Don't take our word for it. Move the levers.</h2>
+  <p class="lead rise">This is our actual five-year model, live. Change the assumptions and the forecast, payback, and your own stake all recompute. The defaults are our base case.</p>
+
+  <div class="calc rise">
+    <div class="calc-grid">
+      <div class="levers">
+        <div class="lv"><label>New-station fill / demand <span class="val" id="v-fill">1.0×</span></label><input type="range" id="s-fill" min="0.5" max="3" step="0.1" value="1"></div>
+        <div class="lv"><label>Auto-hood gross <span class="val" id="v-ah">₹50 L/mo</span></label><input type="range" id="s-ah" min="40" max="70" step="1" value="50"></div>
+        <div class="lv"><label>Auto-hood net margin <span class="val" id="v-ahm">25%</span></label><input type="range" id="s-ahm" min="10" max="50" step="1" value="25"></div>
+        <div class="lv"><label>GSRTC new licence /yr <span class="val" id="v-lic">₹2.17 Cr</span></label><input type="range" id="s-lic" min="1.5" max="5" step="0.05" value="2.17"></div>
+        <div class="lv"><label>Year-1 ramp <span class="val" id="v-ramp">60%</span></label><input type="range" id="s-ramp" min="40" max="100" step="5" value="60"></div>
+        <div class="lv"><label>Screens per station <span class="val" id="v-scr">13.2</span></label><input type="range" id="s-scr" min="10" max="14" step="0.2" value="13.2"></div>
+        <div class="lv"><label>Company valuation <span class="val" id="v-val">₹15 Cr</span></label><input type="range" id="s-val" min="8" max="30" step="0.5" value="15"></div>
+        <div class="lv"><label style="margin-bottom:8px">View</label>
+          <div class="toggle"><button id="t-total" class="on">Total (incl auto-hood)</button><button id="t-led">LED only</button></div>
+        </div>
+      </div>
+
+      <div class="output">
+        <div class="out-kpis">
+          <div class="okpi"><div class="v num" id="o-y5">—</div><div class="l">Year-5 operating profit</div></div>
+          <div class="okpi"><div class="v num" id="o-pay">—</div><div class="l">Cash-positive by</div></div>
+          <div class="okpi"><div class="v num" id="o-eq">—</div><div class="l">Your ₹5 Cr buys</div></div>
+          <div class="okpi"><div class="v num" id="o-ret">—</div><div class="l">Illustrative Y5 return</div></div>
+        </div>
+        <div class="chartwrap"><div id="calcChart"></div>
+          <div class="legend"><span><i style="background:var(--blue)"></i>Revenue</span><span><i style="background:var(--yellow)"></i>Operating profit</span><span><i style="background:var(--green)"></i>Cumulative cash</span></div>
+        </div>
+        <table class="ft"><thead><tr><th>₹ Cr</th><th>Y1</th><th>Y2</th><th>Y3</th><th>Y4</th><th>Y5</th></tr></thead><tbody id="ftbody"></tbody></table>
+      </div>
+    </div>
+    <p class="disc">Model reproduces our management base case at default settings. "Your ₹5 Cr buys" = 5 ÷ (valuation + 5), post-money. "Illustrative Y5 return" values your stake at Year-5 operating profit × 6 (a directional earnings multiple, not a promise) ÷ ₹5 Cr. Auto-hood shown in "Total" is our existing separate business, not funded by this raise. Unaudited; audits + entity consolidation in progress — a condition precedent to funding.</p>
+  </div>
+</div></section>
+
+<!-- ASK -->
+<section class="sec" id="ask"><div class="wrap">
+  <div class="kicker rise">The ask</div>
+  <h2 class="rise">₹5 Crore equity, toward an ₹8.5 Crore program.</h2>
+  <div class="askgrid">
+    <div class="ask rise"><div class="a">₹5.0 Cr</div><div class="b">Equity — absorbs the tender's upfront cash + the Year-1 ramp</div></div>
+    <div class="ask rise"><div class="a">₹2.5 Cr</div><div class="b">Working-capital debt against government receivables (a condition — to be secured)</div></div>
+    <div class="ask rise"><div class="a">₹1.0 Cr</div><div class="b">Internal accrual over the build period</div></div>
+  </div>
+  <p class="lead rise" style="margin-top:22px"><b style="color:var(--ink0)">Straight about the gap:</b> the tender's true upfront need is ~₹9.5 Cr, but most of that isn't a hard spend — the ₹80 L EMD is refundable, the bank guarantee is an instrument (not cash), and the build is <b style="color:var(--ink1)">phased to GSRTC's batch handover</b>, not paid on day one. Equity + a receivables-backed facility + internal cash cover it — provided the bank facility lands. We don't pretend ₹5 Cr alone does it.</p>
+  <div class="grid2">
+    <div class="card rise"><h3>Why equity, not all debt</h3><p>The upfront EMD, guarantee, and the Year-1 revenue ramp can't be debt-serviced from day one. Equity absorbs the launch; debt funds the self-liquidating receivables.</p></div>
+    <div class="card rise"><h3>What you're backing</h3><p>A cash-generating operator with a 10-year record and a government-anchored moat — making a measured, staged bet on a 5× network. Set your own valuation in the calculator above; the terms are a conversation.</p></div>
+  </div>
+</div></section>
+
+<!-- RISKS -->
+<section class="sec"><div class="wrap">
+  <div class="kicker rise">Assumptions & risks — stated plainly</div>
+  <h2 class="rise">What has to be true.</h2>
+  <ul class="clean">
+    <li class="rise"><b style="color:var(--ink0)">Government concentration.</b> Most revenue is government today. We're diversifying into private LED and private-brand auto-hood.</li>
+    <li class="rise"><b style="color:var(--ink0)">Election cyclicality.</b> Peak years coincide with election spend. The forecast uses conservative, off-peak run-rates.</li>
+    <li class="rise"><b style="color:var(--ink0)">Fill is demand-led.</b> We sell ~2% of inventory. The upside is real but has to be sold — the plan funds a private-brand sales team.</li>
+    <li class="rise"><b style="color:var(--ink0)">Auto-hood attribution.</b> The forecast's "total" leans on auto-hood, which is a separate business. Whether its rights extend to the 98 new stations is being confirmed pre-close.</li>
+    <li class="rise"><b style="color:var(--ink0)">Capital intensity.</b> LED payback is long; auto-hood shortens the blended picture. Equity is sized to absorb the Year-1 ramp.</li>
+    <li class="rise"><b style="color:var(--ink0)">Unaudited accounts.</b> FY24-25 & FY25-26 audits and the two-entity consolidation are in progress — a condition precedent to funding.</li>
+  </ul>
+</div></section>
+
+<!-- CLOSE -->
+<section class="sec" style="border-bottom:none"><div class="wrap" style="text-align:center;padding:20px 0">
+  <div class="leddots" style="opacity:.35"></div>
+  <h2 class="rise" style="margin:0 auto;max-width:22ch">The proven operator on Gujarat's transit network, ready to scale 5×.</h2>
+  <div class="cta rise" style="justify-content:center">
+    <a class="p" href="https://wa.me/919898273686" target="_blank" rel="noopener">Talk on WhatsApp</a>
+    <a class="g" href="tel:+919898273686">Call Brijesh</a>
+  </div>
+  <p class="muted rise" style="margin-top:20px">Brijesh · Founder, Untitled Adflux Pvt Ltd · Vadodara, Gujarat</p>
+</div></section>
+
+<footer><div class="wrap">Figures unaudited; audits and consolidation in progress. Projections are management estimates, not guarantees. This page is confidential and is not an offer of securities.</div></footer>
+
+</div><!-- /app -->
+
+<script>
+(function(){
+  'use strict';
+  /* ---------- password gate (client-side; keeps public/casual out, not real auth) ---------- */
+  var CODE = 'untitled2026';               // owner changes this
+  var gate = document.getElementById('gate'), app = document.getElementById('app');
+  function unlock(){ gate.style.display='none'; app.classList.add('on'); try{sessionStorage.setItem('inv_ok','1')}catch(e){} boot(); }
+  function tryPw(){
+    var v = (document.getElementById('pw').value||'').trim();
+    if(v.toLowerCase()===CODE){ unlock(); }
+    else { document.getElementById('pwerr').textContent='Wrong code. Ask Brijesh for access.'; }
+  }
+  document.getElementById('pwbtn').addEventListener('click', tryPw);
+  document.getElementById('pw').addEventListener('keydown', function(e){ if(e.key==='Enter') tryPw(); });
+  try{ if(sessionStorage.getItem('inv_ok')==='1'){ unlock(); } }catch(e){}
+
+  var booted=false;
+  function boot(){
+    if(booted) return; booted=true;
+    drawRecord(); wireCalc(); recompute(); revealInit();
+  }
+
+  /* ---------- reveal: sweep + interval + .js guard (never IntersectionObserver-only) ---------- */
+  function sweep(){ var els=document.querySelectorAll('.rise:not(.in)'), vh=window.innerHeight; for(var i=0;i<els.length;i++){ if(els[i].getBoundingClientRect().top < vh*0.92) els[i].classList.add('in'); } }
+  function revealInit(){
+    sweep();
+    window.addEventListener('scroll', function(){ requestAnimationFrame(sweep); }, {passive:true});
+    window.addEventListener('resize', sweep);
+    var n=0, iv=setInterval(function(){ sweep(); if(++n>20) clearInterval(iv); }, 300);
+    // §129 safety: content reveal must NEVER depend on scroll/interval delivery.
+    // After 4s, force-reveal everything so no section can ever stay invisible.
+    setTimeout(function(){ var e=document.querySelectorAll('.rise'); for(var i=0;i<e.length;i++) e[i].classList.add('in'); }, 4000);
+  }
+
+  /* ---------- helpers ---------- */
+  function cr(x){ return '₹'+(Math.round(x*100)/100).toFixed(2)+' Cr'; }
+  function crShort(x){ var v=Math.round(x*10)/10; return (v<0?'-':'')+'₹'+Math.abs(v).toFixed(1); }
+
+  /* ---------- record chart (revenue history) ---------- */
+  function drawRecord(){
+    var data=[{y:'FY21-22',v:2.2},{y:'FY22-23',v:3.6},{y:'FY23-24',v:5.4},{y:'FY24-25',v:8.6},{y:'FY25-26',v:8.8}];
+    var W=600,H=220,pad=30,bw=W/data.length, max=10;
+    var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">';
+    for(var i=0;i<data.length;i++){ var h=(data[i].v/max)*(H-pad*2), x=i*bw+bw*0.2, y=H-pad-h, w=bw*0.6;
+      s+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="4" fill="var(--yellow)" opacity="'+(0.55+0.09*i)+'"/>';
+      s+='<text x="'+(x+w/2)+'" y="'+(y-7)+'" fill="#f5f7fb" font-size="13" font-family="Space Mono" text-anchor="middle">'+data[i].v+'</text>';
+      s+='<text x="'+(x+w/2)+'" y="'+(H-10)+'" fill="#8b96b4" font-size="10" text-anchor="middle">'+data[i].y+'</text>';
+    }
+    s+='</svg>'; document.getElementById('recordChart').innerHTML=s;
+  }
+
+  /* ---------- the model ---------- */
+  var view='total';
+  function model(){
+    var fill=+val('s-fill'), ahGross=+val('s-ah'), ahMargin=+val('s-ahm'), lic=+val('s-lic'),
+        rampY1=+val('s-ramp')/100, scr=+val('s-scr'), valuation=+val('s-val');
+    var ramp=[rampY1, rampY1+(1-rampY1)*0.625, 1,1,1];         // Y2 tracks Y1 (0.6 -> 0.85)
+    var newRevMature = scr*98*(3263+578)*12/1e7 * fill;         // ₹ Cr/yr at 100% ramp
+    var newOpex = 2.96 + lic;                                   // base ₹2.96 Cr + licence slider
+    var autohoodNet = (ahGross*12/100) * (ahMargin/100);        // ₹ Cr/yr net (separate)
+    var rows=[], cum=0;
+    for(var y=0;y<5;y++){
+      var exLedRev=1.22*Math.pow(1.03,y), exOpex=1.09*Math.pow(1.03,y);
+      var newRev=newRevMature*ramp[y];
+      var led = exLedRev - exOpex + newRev - newOpex;
+      var total = led + autohoodNet;
+      var profit = (view==='total')? total : led;
+      var revenue = exLedRev + newRev + (view==='total'? ahGross*12/100 : 0);
+      var capex = (y===0)? 6.11 : 0;
+      var net = profit - capex;
+      cum += net;
+      rows.push({rev:revenue, profit:profit, led:led, total:total, net:net, cum:cum});
+    }
+    var payback=0; for(var k=0;k<5;k++){ if(rows[k].cum>=0){ payback=k+1; break; } }
+    var eqPct = 5/(valuation+5)*100;
+    var y5val = Math.max(0, rows[4].profit) * 6 * (eqPct/100);  // illustrative stake value at Y5
+    var ret = y5val/5;
+    return {rows:rows, payback:payback, eqPct:eqPct, ret:ret, valuation:valuation};
+  }
+  function val(id){ return document.getElementById(id).value; }
+
+  /* ---------- render ---------- */
+  function recompute(){
+    // slider labels
+    lbl('v-fill', (+val('s-fill')).toFixed(1)+'×');
+    lbl('v-ah', '₹'+val('s-ah')+' L/mo');
+    lbl('v-ahm', val('s-ahm')+'%');
+    lbl('v-lic', '₹'+(+val('s-lic')).toFixed(2)+' Cr');
+    lbl('v-ramp', val('s-ramp')+'%');
+    lbl('v-scr', (+val('s-scr')).toFixed(1));
+    lbl('v-val', '₹'+val('s-val')+' Cr');
+
+    var m=model(), r=m.rows;
+    lbl('o-y5', crShort(r[4].profit)+' Cr');
+    document.getElementById('o-y5').style.color = r[4].profit>=0?'var(--green)':'var(--red)';
+    lbl('o-pay', m.payback? 'Year '+m.payback : '> Year 5');
+    lbl('o-eq', m.eqPct.toFixed(1)+'%');
+    lbl('o-ret', m.ret.toFixed(2)+'×');
+    document.getElementById('o-ret').style.color = m.ret>=1?'var(--green)':'var(--red)';
+
+    // table
+    var b=''; var lbls=['Revenue','Op profit','Net cash','Cumulative'];
+    var keys=['rev','profit','net','cum'];
+    for(var i=0;i<keys.length;i++){ b+='<tr><td>'+lbls[i]+'</td>'; for(var y=0;y<5;y++){ var v=r[y][keys[i]]; var col=(keys[i]==='profit'||keys[i]==='cum'||keys[i]==='net')?(v<0?'color:var(--red)':'color:var(--green)'):''; b+='<td style="'+col+'">'+crShort(v)+'</td>'; } b+='</tr>'; }
+    document.getElementById('ftbody').innerHTML=b;
+
+    drawCalc(r);
+  }
+  function lbl(id,t){ document.getElementById(id).textContent=t; }
+
+  function drawCalc(r){
+    var W=620,H=250,padL=34,padB=24,padT=14, n=5, gw=(W-padL)/n;
+    var lo=0,hi=0; for(var i=0;i<n;i++){ lo=Math.min(lo,r[i].cum,r[i].profit); hi=Math.max(hi,r[i].rev,r[i].cum,r[i].profit); }
+    hi=Math.max(hi,1); lo=Math.min(lo,0);
+    function Y(v){ return padT + (hi-v)/(hi-lo)*(H-padT-padB); }
+    var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">';
+    // zero line
+    s+='<line x1="'+padL+'" x2="'+W+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="rgba(255,255,255,.14)"/>';
+    // bars: revenue (blue) + profit (yellow)
+    for(var i=0;i<n;i++){ var x=padL+i*gw;
+      var rb=Math.abs(Y(r[i].rev)-Y(0)); s+='<rect x="'+(x+gw*0.16)+'" y="'+Math.min(Y(r[i].rev),Y(0))+'" width="'+(gw*0.3)+'" height="'+rb+'" fill="var(--blue)" opacity=".8" rx="2"/>';
+      var pb=Math.abs(Y(r[i].profit)-Y(0)); s+='<rect x="'+(x+gw*0.5)+'" y="'+Math.min(Y(r[i].profit),Y(0))+'" width="'+(gw*0.3)+'" height="'+pb+'" fill="var(--yellow)" rx="2"/>';
+      s+='<text x="'+(x+gw*0.5)+'" y="'+(H-8)+'" fill="#8b96b4" font-size="10" text-anchor="middle">Y'+(i+1)+'</text>';
+    }
+    // cumulative line (green)
+    var pts=''; for(var i=0;i<n;i++){ pts+=(padL+i*gw+gw*0.5)+','+Y(r[i].cum)+' '; }
+    s+='<polyline points="'+pts+'" fill="none" stroke="var(--green)" stroke-width="2.5"/>';
+    for(var i=0;i<n;i++){ s+='<circle cx="'+(padL+i*gw+gw*0.5)+'" cy="'+Y(r[i].cum)+'" r="3.5" fill="var(--green)"/>'; }
+    s+='</svg>'; document.getElementById('calcChart').innerHTML=s;
+  }
+
+  function wireCalc(){
+    ['s-fill','s-ah','s-ahm','s-lic','s-ramp','s-scr','s-val'].forEach(function(id){
+      document.getElementById(id).addEventListener('input', recompute);
+    });
+    var tt=document.getElementById('t-total'), tl=document.getElementById('t-led');
+    tt.addEventListener('click', function(){ view='total'; tt.classList.add('on'); tl.classList.remove('on'); recompute(); });
+    tl.addEventListener('click', function(){ view='led'; tl.classList.add('on'); tt.classList.remove('on'); recompute(); });
+  }
+})();
+</script>
+</body>
+</html>

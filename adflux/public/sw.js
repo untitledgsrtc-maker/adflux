@@ -69,6 +69,10 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
     // previewing) must get the landing, not the login shell. Prospects (no SW)
     // hit the static file directly. Mirrors the /deck + /pdf fix.
     /^\/led(?:[/?#]|$)/,
+    // Phase 287 — the password-gated investor page (public/investor/index.html)
+    // is a static file, not the SPA. Must serve the page, not the login shell.
+    // Mirrors the /led + /deck fix.
+    /^\/investor(?:[/?#]|$)/,
   ],
 }))
 
