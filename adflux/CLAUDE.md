@@ -11507,3 +11507,17 @@ Self-contained, display-only. ⚠ FLAGGED (not changed): the tender's real UPSET
 licence is ₹49.4L/yr (₹50,400/yr × 98) and the spec is **10 screens/station** — the
 investor calculator defaults to a conservative ₹2.17Cr licence + 13.2 screens (both
 sliders); the true floor is far more favourable, owner can slide to it.
+
+### Phase 287.2 (`8237b51`) — real current expenses (existing 20)
+Owner gave the corrected current cost structure: **electricity ₹450/screen** (not
+₹650), rent ₹4.10L, and NO hidden "Monthly Bill" (the model's §Funding "existing
+20 lose ₹12L/mo survival question" was based on a phantom ₹10.8L bill — it doesn't
+exist). Real opex = **₹8.35 L/mo**, one-time capex **₹1.82 Cr**. Against unchanged
+income ₹10.14L/mo (govt ₹8.6L + private ₹1.5L, from the xlsx), the existing 20 make
+**~₹1.8 L/mo (~₹21 L/yr)** — not ₹1.0L. Updated: the "Today" card (₹1.0→₹1.8L,
+cost ₹9.1→₹8.3L, ₹12-13L→₹21L/yr, elec ₹650→₹450) + the calculator existing-opex
+constant (1.09→1.00 Cr/yr). Narrative kept ("still thin vs the auto-hood engine").
+⚠ OPEN (owner decision, NOT changed): the calculator's new-98 forecast opex
+(₹2.96 Cr, `newOpex` in the calc JS) still assumes ₹650/screen elec for the 1,294
+new screens; at the real ₹450 it drops ~₹0.31 Cr/yr and improves the forecast —
+left conservative pending the owner's call (his whole deck is deliberately honest).
