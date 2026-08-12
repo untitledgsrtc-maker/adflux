@@ -114,6 +114,11 @@ const thR = { ...thL, textAlign: 'right' }
 const tdL = { padding: '9px 10px', verticalAlign: 'middle', borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))' }
 const tdR = { ...tdL, textAlign: 'right', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600 }
 const totRow = { fontWeight: 700, background: 'var(--surface-2, #334155)' }
+// Phase 286.2 — friendly media labels for the P&L statement. Income lines come
+// from revenue_mix with raw media codes (AUTO_HOOD…); the expense side is already
+// relabelled by the RPC, so this is a no-op there — applied to both for safety.
+const STMT_MEDIA_LABEL = { AUTO_HOOD: 'Auto Hood', OTHER_MEDIA: 'Other Media', GSRTC_LED: 'GSRTC', LED_OTHER: 'Pvt LED' }
+const prettyStmtLbl = (s) => String(s == null ? '' : s).replace(/AUTO_HOOD|OTHER_MEDIA|GSRTC_LED|LED_OTHER/g, m => STMT_MEDIA_LABEL[m])
 const g2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }
 const g4 = { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }
 const selStyle = { background: 'var(--surface-2, #334155)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', fontSize: 12.5, color: 'var(--text)', cursor: 'pointer' }
@@ -196,13 +201,13 @@ function PnlTab({ seg }) {
           <tr><td colSpan={2} style={{ padding: '10px 0 4px', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Income</td></tr>
           {mix.length === 0
             ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No income in range.</td><td style={tdR}></td></tr>
-            : mix.map((m, i) => <tr key={i}><td style={tdL}>{m.label}</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600 }}>{fmtINR(m.amount)}</td></tr>)}
+            : mix.map((m, i) => <tr key={i}><td style={tdL}>{prettyStmtLbl(m.label)}</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600 }}>{fmtINR(m.amount)}</td></tr>)}
           <tr style={totRow}><td style={tdL}>Total income</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 700 }}>{fmtINR(income)}</td></tr>
 
           <tr><td colSpan={2} style={{ padding: '14px 0 4px', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Less expenses</td></tr>
           {expLines.length === 0
             ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No expenses in range.</td><td style={tdR}></td></tr>
-            : expLines.map((l, i) => <tr key={i}><td style={tdL}>{l.label}</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(l.amount)}</td></tr>)}
+            : expLines.map((l, i) => <tr key={i}><td style={tdL}>{prettyStmtLbl(l.label)}</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(l.amount)}</td></tr>)}
           <tr style={totRow}><td style={tdL}>Total expenses</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 700, color: 'var(--danger)' }}>{fmtINR(cost)}</td></tr>
 
           <tr style={{ borderTop: '2px solid var(--border-strong, #475569)' }}>
