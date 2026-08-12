@@ -11415,3 +11415,12 @@ by the ₹20.29L agency commission (Hamesh Modi 40%, §171) + bank-based income
 Apr–Jul vs wider-window commission accrual — known modeling mismatch (§171), not
 a statement bug. Owner said "do your best" → kept the statement (he asked for it
 across several messages), fixed only the raw-code labels.
+
+### Phase 286.3 (`fa34bdc`) — Profit Statement + Money In + Money Out in one row
+Owner: "align this 3 box in one line." Wrapped the three cards in ONE responsive
+grid `g3row` (`repeat(auto-fit, minmax(340px, 1fr))`, `alignItems:start`) — 3
+columns on desktop, wraps to 2/1 on narrow screens; short cash cards don't
+stretch to the tall statement. Replaced the full-width statement + separate
+`g2` cash row. Also applied `prettyStmtLbl` to the Money In / Money Out labels
+(were still raw `Govt · AUTO_HOOD` / `GSRTC_LED`) so all three cards read
+consistently now that they sit side by side. Display-only, no SQL, no APK.
