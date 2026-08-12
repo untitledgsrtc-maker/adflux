@@ -146,6 +146,22 @@
   .dots i{width:8px;height:8px;border-radius:50%;background:var(--ink2);opacity:.4;cursor:pointer;transition:.2s}
   .dots i.on{background:var(--yellow);opacity:1;width:22px;border-radius:4px}
   .scount{font-size:12px;color:var(--ink2);font-family:var(--mono);text-align:center;margin-top:12px}
+  /* cost tables + inventory inside slides */
+  .ctbl{width:100%;border-collapse:collapse;font-size:13px;text-align:left;margin:4px 0}
+  .ctbl th{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);font-weight:600;padding:8px 4px;border-bottom:1px solid var(--line)}
+  .ctbl td{padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--ink1)}
+  .ctbl td.n{text-align:right;font-family:var(--mono);white-space:nowrap;color:var(--ink0)}
+  .ctbl tr.sub td{border-top:1px solid var(--line);font-weight:600;color:var(--ink1)}
+  .ctbl tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:700;color:var(--ink0);padding-top:10px}
+  .ctbl tr.tot td.n{color:var(--yellow);font-family:var(--disp);font-size:16px}
+  .stitle{font-family:var(--disp);font-weight:700;color:var(--ink0);font-size:18px;margin:2px 0 10px}
+  .invgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:6px 0 14px}
+  .invcell{background:var(--navy2);border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center}
+  .invcell .iv{font-family:var(--disp);font-weight:700;font-size:22px;color:var(--ink0)}
+  .invcell .iv.y{color:var(--yellow)}
+  .invcell .il{font-size:11px;color:var(--ink2);margin-top:3px}
+  .privin{width:66px;background:var(--navy);border:1px solid var(--line);border-radius:7px;color:var(--yellow);font-family:var(--mono);font-size:14px;padding:4px 8px;text-align:right;margin:0 2px}
+  .privin:focus{outline:none;border-color:var(--yellow)}
   .askgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:22px}
   .ask{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
   .ask .a{font-family:var(--disp);font-weight:700;font-size:24px;color:var(--yellow)}
@@ -328,11 +344,11 @@
       </div>
     </div>
 
-    <div class="scount" id="tcount"></div>
+    <div class="scount s-count"></div>
     <div class="slide-nav">
-      <button id="tprev">← Previous</button>
-      <div class="dots" id="tdots"></div>
-      <button id="tnext">Next →</button>
+      <button class="s-prev">← Previous</button>
+      <div class="dots s-dots"></div>
+      <button class="s-next">Next →</button>
     </div>
   </div>
 </div></section>
@@ -364,6 +380,91 @@
   </div>
   <img class="photo rise" src="/deck/dashboard-real.png" alt="Live audience dashboard" style="margin-top:20px;max-height:340px" loading="lazy"/>
   <p class="muted rise" style="font-size:12.5px;margin-top:10px">Live AI-based audience analytics — impressions and demographics per screen. Proof we can report what advertisers buy.</p>
+</div></section>
+
+<!-- COST & INVENTORY DETAIL (slide viewer) -->
+<section class="sec"><div class="wrap">
+  <div class="kicker rise">The numbers, in detail</div>
+  <h2 class="rise">Every rupee — cost and inventory.</h2>
+  <p class="lead rise">Bottom-up build cost, monthly running cost, and the full ad inventory. Tap through.</p>
+  <div class="slides rise">
+
+    <div class="slide on">
+      <div class="stitle">Existing 20 stations — one-time build (capex)</div>
+      <table class="ctbl"><thead><tr><th>Cost head</th><th style="text-align:right">Amount</th></tr></thead><tbody>
+        <tr><td>LED screens (264 × ₹30,303)</td><td class="n">₹80.0 L</td></tr>
+        <tr><td>Bank guarantee</td><td class="n">₹23.2 L</td></tr>
+        <tr><td>DAVP file (20 × ₹1,00,000)</td><td class="n">₹20.0 L</td></tr>
+        <tr><td>Jethva Sir</td><td class="n">₹20.0 L</td></tr>
+        <tr><td>Electrification &amp; cabling (20 × ₹81,000)</td><td class="n">₹16.2 L</td></tr>
+        <tr><td>GEB meters (20 × ₹23,100)</td><td class="n">₹4.6 L</td></tr>
+        <tr><td>AI software (new)</td><td class="n">₹4.5 L</td></tr>
+        <tr><td>Software (existing)</td><td class="n">₹3.9 L</td></tr>
+        <tr><td>Internet setup (20 × ₹10,500)</td><td class="n">₹2.1 L</td></tr>
+        <tr><td>REKI / survey (2)</td><td class="n">₹1.8 L</td></tr>
+        <tr><td>Camera</td><td class="n">₹1.5 L</td></tr>
+        <tr><td>Internet cabling (additional)</td><td class="n">₹1.5 L</td></tr>
+        <tr><td>Bank-guarantee fee</td><td class="n">₹1.5 L</td></tr>
+        <tr><td>Other + REKI (1)</td><td class="n">₹1.7 L</td></tr>
+        <tr class="tot"><td>Total one-time capex</td><td class="n">₹1.82 Cr</td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="slide">
+      <div class="stitle">Monthly running cost (opex)</div>
+      <table class="ctbl"><thead><tr><th>Cost head</th><th style="text-align:right">Per month</th></tr></thead><tbody>
+        <tr><td>Rent (20 × ₹20,500)</td><td class="n">₹4.10 L</td></tr>
+        <tr><td>Sales salary (7 × ₹25,000)</td><td class="n">₹1.75 L</td></tr>
+        <tr><td>Electricity (264 × ₹450)</td><td class="n">₹1.19 L</td></tr>
+        <tr><td>Operations salary (3 × ₹17,000)</td><td class="n">₹0.51 L</td></tr>
+        <tr><td>Other monthly</td><td class="n">₹0.40 L</td></tr>
+        <tr><td>Repair &amp; maintenance</td><td class="n">₹0.40 L</td></tr>
+        <tr class="tot"><td>Total opex / month</td><td class="n">₹8.35 L</td></tr>
+      </tbody></table>
+      <div class="ttake" style="text-align:left;margin:12px 0 0">Against ₹10.14 L/mo income, the existing 20 net ~₹1.8 L/month.</div>
+    </div>
+
+    <div class="slide">
+      <div class="stitle">New 98 stations — build cost (980 screens)</div>
+      <table class="ctbl"><thead><tr><th>Cost head</th><th style="text-align:right">Amount</th></tr></thead><tbody>
+        <tr><td>LED screens (980 × ₹30,303)</td><td class="n">₹2.97 Cr</td></tr>
+        <tr><td>DAVP file (98 × ₹1,00,000)</td><td class="n">₹98.0 L</td></tr>
+        <tr><td>Electrification &amp; cabling (98 × ₹81,000)</td><td class="n">₹79.4 L</td></tr>
+        <tr><td>Survey / facilitation / misc</td><td class="n">₹30.0 L</td></tr>
+        <tr><td>GEB meters (98 × ₹23,100)</td><td class="n">₹22.6 L</td></tr>
+        <tr><td>Internet setup (98 × ₹10,500)</td><td class="n">₹10.3 L</td></tr>
+        <tr><td>Cameras (98 × ₹7,563)</td><td class="n">₹7.4 L</td></tr>
+        <tr><td>AI / software (incremental)</td><td class="n">₹4.5 L</td></tr>
+        <tr><td>Bank-guarantee fee</td><td class="n">₹1.4 L</td></tr>
+        <tr class="sub"><td>Subtotal</td><td class="n">₹5.51 Cr</td></tr>
+        <tr><td>+ 5% wastage (spare / damaged screens)</td><td class="n">₹14.8 L</td></tr>
+        <tr class="tot"><td>Total new-98 capex</td><td class="n">₹5.65 Cr</td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="slide">
+      <div class="stitle">Total ad inventory — the asset</div>
+      <div class="invgrid">
+        <div class="invcell"><div class="iv">264</div><div class="il">screens now</div></div>
+        <div class="invcell"><div class="iv">+980</div><div class="il">new (98 × 10)</div></div>
+        <div class="invcell"><div class="iv y">1,244</div><div class="il">total screens</div></div>
+        <div class="invcell"><div class="iv">1.51 L</div><div class="il">slots / screen / mo</div></div>
+        <div class="invcell"><div class="iv y">18.8 Cr</div><div class="il">total slots / month</div></div>
+      </div>
+      <table class="ctbl"><thead><tr><th>Rate card (per 10-sec slot)</th><th style="text-align:right">Value / month @ 100% fill</th></tr></thead><tbody>
+        <tr><td>Government — ₹1 / slot</td><td class="n">₹18.8 Cr</td></tr>
+        <tr><td>Private — ₹<input class="privin" id="privRate" type="number" min="0" step="0.5" value="1"> / slot</td><td class="n" id="privVal">—</td></tr>
+      </tbody></table>
+      <div class="ttake" style="text-align:left;margin:12px 0 0">These are <b style="color:var(--ink1)">100%-fill ceilings</b> — the size of the asset, not today's revenue. We sell ~2% of inventory now. The screens exist; the opportunity is filling them, not building more. <span style="color:var(--ink2)">(Type your real private slot rate above.)</span></div>
+    </div>
+
+    <div class="scount s-count"></div>
+    <div class="slide-nav">
+      <button class="s-prev">← Previous</button>
+      <div class="dots s-dots"></div>
+      <button class="s-next">Next →</button>
+    </div>
+  </div>
 </div></section>
 
 <!-- CALCULATOR -->
@@ -468,29 +569,43 @@
   var booted=false;
   function boot(){
     if(booted) return; booted=true;
-    drawRecord(); wireCalc(); recompute(); initTender(); revealInit();
+    drawRecord(); wireCalc(); recompute(); initSlides(); wireInventory(); revealInit();
   }
 
-  /* ---------- tender slide viewer (button / dot nav) ---------- */
-  function initTender(){
-    var wrap=document.getElementById('tslides'); if(!wrap) return;
-    var slides=wrap.querySelectorAll('.slide'), idx=0, dots=document.getElementById('tdots');
-    var d=''; for(var i=0;i<slides.length;i++) d+='<i data-i="'+i+'"></i>'; dots.innerHTML=d;
-    var dotEls=dots.querySelectorAll('i');
-    function show(n){
-      idx=(n+slides.length)%slides.length;
-      for(var i=0;i<slides.length;i++){ slides[i].classList.toggle('on',i===idx); dotEls[i].classList.toggle('on',i===idx); }
-      document.getElementById('tcount').textContent=(idx+1)+' / '+slides.length;
+  /* ---------- slide viewers (button / dot nav) — drives every .slides block ---------- */
+  function initSlides(){
+    var viewers=document.querySelectorAll('.slides');
+    for(var v=0; v<viewers.length; v++){ (function(wrap){
+      var slides=wrap.querySelectorAll('.slide'), idx=0;
+      var dots=wrap.querySelector('.s-dots'), cnt=wrap.querySelector('.s-count');
+      var d=''; for(var i=0;i<slides.length;i++) d+='<i data-i="'+i+'"></i>'; if(dots) dots.innerHTML=d;
+      var dotEls=dots?dots.querySelectorAll('i'):[];
+      function show(n){
+        idx=(n+slides.length)%slides.length;
+        for(var i=0;i<slides.length;i++){ slides[i].classList.toggle('on',i===idx); if(dotEls[i]) dotEls[i].classList.toggle('on',i===idx); }
+        if(cnt) cnt.textContent=(idx+1)+' / '+slides.length;
+      }
+      var pv=wrap.querySelector('.s-prev'), nx=wrap.querySelector('.s-next');
+      if(pv) pv.addEventListener('click',function(){show(idx-1)});
+      if(nx) nx.addEventListener('click',function(){show(idx+1)});
+      for(var j=0;j<dotEls.length;j++) dotEls[j].addEventListener('click',function(e){show(+e.currentTarget.getAttribute('data-i'))});
+      show(0);
+    })(viewers[v]); }
+  }
+
+  /* ---------- inventory slide: private rate → live full-fill value ---------- */
+  function invMoney(x){ // x in ₹ / month
+    if(x>=1e7) return '₹'+(Math.round(x/1e6)/10).toFixed(1)+' Cr';
+    return '₹'+(Math.round(x/1e4)/10).toFixed(1)+' L';
+  }
+  function wireInventory(){
+    var inp=document.getElementById('privRate'); if(!inp) return;
+    var SLOTS=188092800; // 1,244 screens × 151,200 slots/screen/month
+    function calc(){
+      var r=parseFloat(inp.value); if(isNaN(r)||r<0) r=0;
+      document.getElementById('privVal').textContent=invMoney(r*SLOTS)+' /mo';
     }
-    document.getElementById('tprev').addEventListener('click',function(){show(idx-1)});
-    document.getElementById('tnext').addEventListener('click',function(){show(idx+1)});
-    for(var j=0;j<dotEls.length;j++) dotEls[j].addEventListener('click',function(e){show(+e.currentTarget.getAttribute('data-i'))});
-    // keyboard arrows, but never when a slider/input is focused (avoids the calc sliders)
-    document.addEventListener('keydown',function(e){
-      if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
-      if(e.key==='ArrowLeft') show(idx-1); else if(e.key==='ArrowRight') show(idx+1);
-    });
-    show(0);
+    inp.addEventListener('input',calc); calc();
   }
 
   /* ---------- reveal: sweep + interval + .js guard (never IntersectionObserver-only) ---------- */
