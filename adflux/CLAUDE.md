@@ -11521,3 +11521,20 @@ constant (1.09→1.00 Cr/yr). Narrative kept ("still thin vs the auto-hood engin
 (₹2.96 Cr, `newOpex` in the calc JS) still assumes ₹650/screen elec for the 1,294
 new screens; at the real ₹450 it drops ~₹0.31 Cr/yr and improves the forecast —
 left conservative pending the owner's call (his whole deck is deliberately honest).
+### Phase 287.3 (`251be6f`) — detailed cost & inventory slide viewer
+Owner: add detailed cost + an inventory calculator in the slide format. Added a
+SECOND slide viewer ("The numbers, in detail", before the calculator) — refactored
+the slide JS so ONE `initSlides()` drives EVERY `.slides` block via class-scoped nav
+(`.s-prev/.s-next/.s-dots/.s-count`); tender viewer converted to the same classes.
+4 slides: existing-20 capex (15 lines, ₹1.82 Cr) · monthly opex (6 lines, ₹8.35 L) ·
+new-98 capex (980 screens = 98×10 scaled from per-unit costs, ₹5.51 Cr + 5% wastage
+on spare/damaged screens = ₹5.65 Cr) · inventory (264+980=1,244 screens, 18.8 cr
+slots/mo; rate card govt ₹1/slot→₹18.8 Cr/mo at 100% fill, private ₹[owner types]/slot
+→ live value via `wireInventory`, honest ~2% fill note). Owner picked (AskUserQuestion):
+private rate = a number he types (editable input, default ₹1); 5% wastage = on new capex.
+Verified live in the browser pane (DOM: 2 viewers, nav+counter+inventory recompute work).
+⚠ STILL OPEN (owner decisions, forecast NOT synced): the detailed new-98 capex is now
+₹5.65 Cr (980 screens) but the forecast calculator still uses ₹6.11 Cr (old 1293.6
+screens); and the new-98 forecast elec is still ₹650/screen (real ₹450). Syncing both
+makes the forecast rosier — left for the owner's call (deck is deliberately conservative).
+
