@@ -11538,3 +11538,60 @@ Verified live in the browser pane (DOM: 2 viewers, nav+counter+inventory recompu
 screens); and the new-98 forecast elec is still ₹650/screen (real ₹450). Syncing both
 makes the forecast rosier — left for the owner's call (deck is deliberately conservative).
 
+
+---
+
+## 176 · Phase 288 — investor page cinematic LED-only redesign (fill/DAVP thesis) (2026-08-12, `fc5fd16`)
+
+Owner directive: drop auto-hood entirely (LED screens only), redesign the investor
+page (`app.untitledad.in/investor`) cinematic + animated (invoked `ui-ux-pro-max` +
+`superpowers:brainstorming`), make FILL the thesis, fix the investor-narrative
+sequence. Full rewrite of `public/investor/index.html` (standalone public page,
+§98 pattern — password-gated `untitled2026`, noindex).
+
+### The strategic pivot (why it matters)
+Auto-hood was the deck's PAYBACK ENGINE (~₹1.8 Cr/yr). Removing it, LED-only doesn't
+pay back inside the 5-yr contract at today's 2% fill. So the deck was rebuilt around
+the ONE honest lever: FILL. Thesis = "scarce built asset, we sell 2% of the ad-time,
+fund the fill." Owner's catalyst (AskUserQuestion): **10% fill within 6 months once
+DAVP (govt rate card) prices land** — departments can't book at scale until DAVP
+pricing is set; the moment it is, govt demand fills the screens. That's the core new
+narrative section ("The unlock: 2% → DAVP → 10%").
+
+### Sequence (investor-standard, auto-hood stripped throughout)
+What we are → The record (₹0→₹8.8Cr) → The asset + the 2% gap → The unlock (DAVP→10%)
+→ The expansion (98 stations) → Tender then/now (slide viewer) → Cost & inventory
+(slide viewer) → Forecast calculator → The ask → Risks → Close.
+
+### Calculator = fill-driven (rebuilt, no auto-hood)
+Hero slider = ad-slot FILL % (2-12%, default 5%, DAVP target 10%). Other levers: new
+stations won, govt rate ₹/slot, private rate ₹/slot, private share of sold, licence
+bid, valuation. `model()`: screens=264+newSt×10, revenue = capacity×fill×blendedRate,
+opex = existing ₹1.00Cr + newSt×₹0.027Cr + licence, capex=(newSt/98)×₹5.65Cr, Y1 ramps
+(60% of target = DAVP mid-year), 5-yr table + cumulative-cash chart + payback + stake.
+Honest disclaimer: "capacity math on real costs — assumes the demand exists to buy the
+slots." ⚠ The fill-math is inherently optimistic (5× screens × rising fill → revenue
+multiples of today: 5%→₹13.5Cr, 10%→₹27Cr). That's the growth story; the disclaimer +
+the slider keep it honest. Owner should sanity-check the DEFAULT fill (5% shows revenue
+> current ₹8.8Cr) + set the real private rate.
+
+### UI (ui-ux-pro-max: cinematic dark, motion 8/10)
+CSP blocks external JS (§98/§129 — no GSAP CDN), so all motion is CSS/vanilla: ambient
+glow blobs (drift keyframes) + LED dot-grid backdrop, gradient headline, count-up
+numbers (rAF), animated 2%-fill bar, glassmorphism stat/cards, hover lift+glow,
+expo.out reveals, blinking live dot. `prefers-reduced-motion` respected. Kept navy +
+brand yellow #FFE600. Reused verified gate, reveal-sweep (§129 pattern: sweep+interval
++js-guard, never IO-only), both slide viewers (initSlides drives every `.slides`),
+inventory calc, record chart.
+
+### Verified live (browser pane)
+Boots clean (no NaN, no JS error — initial NaN was a test race, real default = ₹13.54Cr),
+2 viewers (6 tender + 4 cost/inventory slides), fill calc recomputes, inventory input,
+count-ups land on 264/20/98, fill bar animates to 2%. Self-contained, no SQL/APK.
+Owner reopens once (SW) after deploy; the page needs a wi-fi load once for the SW cache.
+
+### Source material (owner-provided, in `~/Downloads/files 2/`)
+`Untitled_Adflux_Investor_Deck.pptx` (the 12-slide deck) + `GSRTC_98_Station_Model.xlsx`
+(the financial model). Both read + reflected. The pptx still MENTIONS auto-hood — the
+web page deliberately does NOT (owner: LED only).
+
