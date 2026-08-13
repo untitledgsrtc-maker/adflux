@@ -12233,3 +12233,91 @@ into ONE slide (#9).
 11 tender-98 (capex/opex) · 12 inventory/rates · 13 forecast · 14 roadmap · 15 ask ·
 16 risks · 17 team. Still to lift: inventory/rates, forecast, ask, risks, team + the
 record-slide private/govt turnover split when owner sends per-year ₹.
+
+
+---
+
+## 191 · Phase 304 — investor deck: ONE combined cost slide + regenerated inventory (fill gauge + rate ladder) (2026-08-12)
+
+Owner: "slide 12 combine opex and capex / slide 13 all screen combine slots in
+detailed with animation and vector / deep analysis and regenerate good one, our
+theme aligned." Ran a 2-direction design panel → synthesized build spec, grounded
+every figure via a 2-extractor reconcile Workflow (§177 real-numbers rule). Two
+slides rebuilt in `public/investor/index.html` (standalone deck, §98). Deck stays
+17→**16 slides** (the two separate cost slides §188/§189 merged into one).
+
+### Slide A — "The cost picture" (ONE combined cost slide, replaces proven-20 + tender-98)
+Merged the two §188/§189 cost slides into a side-by-side `.costgrid` comparison:
+kicker "The cost picture — proven, then 5× it" · compact h2 "We built 20 at a
+profit. The 98 is the same build, 5× the scale." · a **scale ribbon** (20→98·4.9× /
+264→1,244·4.7× / ₹1.82→₹5.65 Cr build · only 3.1× the cost) · two `.calc.cost`
+panels (Proven-20 | Tender-98), each with a Build (one-time) block + a Run
+(per-month) block, each block an animated **`.costbar` proportion bar** (segments
+grow from 0 on slide entry) + a count-up total. Every ₹ RECONCILES (§177):
+- Proven CAPEX ₹1.82 Cr = LED ₹80.0L + Bank ₹24.7L + Electrification ₹24.4L +
+  Facilitation·DAVP·AI ₹53.4L. Proven OPEX ₹8.35 L/mo = GSRTC ₹4.10L + Sales ₹1.75L
+  + Electricity·ops·upkeep ₹2.50L.
+- Tender CAPEX ₹5.65 Cr = LED ₹2.97Cr + DAVP ₹98.0L + Electrification ₹79.4L +
+  Survey·AI·5% wastage ₹90.1L. Tender OPEX ₹24.75 L/mo (≈₹2.97Cr/yr) = Sales ₹8.57L
+  + Electricity+GSRTC rent ₹8.53L + Ops·upkeep·site visits ₹7.65L.
+- ⚠ Each panel = exactly **14 direct children** (ch·csub·bar·4 crow·ceq·csub·bar·3
+  crow·ceq) → the `.calc > *` reveal-stagger MUST cover nth-child(14) (extended, else
+  the tail renders invisible or pops at delay-0). Run rows use 3 crows (not 4) — the
+  §169-style small remainders are folded into the shown rows so 3 rows SUM to the
+  total, keeping 14 children. DECK build (980 screens / ₹450 elec / ₹4,200 GSRTC
+  rent), NOT the xlsx pessimistic critic build (1,293.6 / ₹650 / ₹18.1L) — keep it.
+
+### Slide B — "The asset, priced" (regenerated inventory, replaces the old rates slide)
+kicker "The asset, priced" · compact h2 "1,244 screens. 18.8 crore ad-slots a month.
+We sell 2%." · a `.split` [LEFT calc+ladder+ceiling | RIGHT vertical fill-gauge]:
+- LEFT `.calc`: 1,244 screens × 5,040 slots/day × 30 = **18.8 Cr** ten-second
+  ad-slots/month (§181/§183 5,040 basis) + a `.ladder` rate comparison — **Govt
+  ₹1.00/slot** (100% yellow bar, shield icon, "the value driver — 5× the private
+  rate · govt is also the buyer") vs **Private ₹0.18/slot** (18% blue bar, "early
+  line · ₹5.76 L booked · a growing supplement") — the §177 real won-LED rates (govt
+  is HIGHER, private is the small early line) + a `.ceiling` ("Full-fill @ ₹1/slot:
+  ₹18.8 Cr/month. We collect ~2% today. The prize is fill, not more build.").
+- RIGHT `.gaugewrap`/`.gauge`: a tall tank (`.gtank` `min(52vh,410px)`) with a slot-
+  grid texture, a 2% yellow **`.glit` sliver** that rises on entry
+  (`.slide.on .gauge .glit{height:2%}`) with a "sell 2%" marker, "98% empty ≈ ₹18.4
+  Cr of slot value on the table, every month."
+
+### Reusable deck patterns added (for future slides)
+- `.calc.cost` two-block cost panel + `.costbar`/`.seg` animated proportion bar
+  (segment `--w` grows on slide entry via `.slide.on .costbar .seg{width:var(--w)}`;
+  segments MUST sum to 100).
+- `.costgrid` (two equal calc panels side-by-side).
+- `.scaleribbon`/`.sr` compact before→after chip row.
+- `.ladder`/`.lr`/`.lr-bar`/`.lr-fill`(.g/.p) animated rate-comparison bars
+  (`.slide.on .lr-bar .lr-fill{width:var(--w)}`).
+- `.gaugewrap`/`.gauge`/`.gtank`/`.glit`/`.gmark`/`.gempty` vertical fill gauge
+  (sliver rises via `.slide.on .gauge .glit{height:2%}`).
+- `.h2c` compact-h2 class (`clamp(21px,2.9vw,31px)`, max-width 30ch) for dense slides.
+- `countUpsIn` now honors `data-dec` (decimal count-ups, §298) + en-IN commas on
+  integers (§293).
+
+### FIT / trim (the important gotcha)
+The combined two-panel cost slide is DENSE. Trimmed to fit: compact h2, dropped the
+closing footer (redundant with the ribbon's "only 3.1× the cost" chip), tighter
+crow padding (4px), smaller cost-panel ceq font (32px), tighter ribbon/ladder/
+ceiling/split margins. Verified in the browser pane (screenshot-authoritative — see
+foot-gun): both slides render with animation, count-ups (1.82/5.65/8.35/24.75/18.8),
+cost bars filled, gauge sliver + ladder bars, at real presentation resolution.
+- ⚠ **FOOT-GUN (browser pane): `innerWidth/innerHeight` report 0×0 for JS even though
+  the pane RENDERS at 800×450** → every `getBoundingClientRect()` height is computed
+  against a 0×0 viewport for vw/vh units and is GARBAGE (measured the same slide at
+  868px then 2076px — both meaningless). The SCREENSHOT is the only authoritative
+  signal on these dark full-screen decks (matches §180/§185). Don't trust
+  getBoundingClientRect measurements in this pane.
+- At the pathological 800×**450** pane (lowest-res 16:9) the cost slide's final ceq
+  peeks ~30px below the fold; the `.slide` is `overflow-y:auto` so it scrolls, and at
+  any real ≥768px-tall 16:9 screen the fixed-px rows occupy a smaller fraction and it
+  fits. If the owner reports clipping on HIS screen, split the two panels back to two
+  slides or drop the per-row unit subtitles (`small.d`).
+
+### Investor-deck order now (16 slides)
+1 hero · 2 what-we-are · 3 product · 4 audience · 5 record · 6 2%-gap · 7 economics ·
+8 DAVP-unlock · 9 concession+expansion · **10 the cost picture (proven|tender, combined
+capex+opex)** · **11 the asset priced (fill gauge + rate ladder)** · 12 forecast ·
+13 roadmap · 14 ask · 15 risks · 16 team. Still to lift: forecast, ask, risks, team +
+the record-slide private/govt turnover split when owner sends per-year ₹.
