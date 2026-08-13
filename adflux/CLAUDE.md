@@ -12115,3 +12115,70 @@ Done: 1 hero · 2-3 · 4 · 5 record · 6 (5,040+1.98%) · 7 economics · 8 leve
 (bigger) · 10 expansion 20→118 (bigger). Both maps now render reliably + larger. Still to
 lift: tender then/now, competition, inventory/cost viewers, build cost, ask, risks, team +
 the record-slide private/govt turnover split when owner sends per-year ₹.
+
+
+---
+
+## 188 · Phase 301 — investor tender slide: drop eligibility + vectors/motion + detailed CAPEX/OPEX (2026-08-12, `279a34c`)
+
+Owner (screenshot of the tender slide): "remove the ₹3 Cr → ₹1 Cr eligibility card ·
+add animation and vector · and a detailed CAPEX + OPEX calculation."
+
+### Grounding the financials FIRST (real numbers, reconciled — §177)
+Ran a background **Workflow** (2 independent extractors → reconcile) to pull the detailed
+CAPEX + OPEX line items from the source model so the calc is real, not invented:
+- Agent A parsed `~/Downloads/files 2/GSRTC_98_Station_Model.xlsx` (openpyxl) + the pptx.
+- Agent B recovered the existing-20 detailed lines from the deck's git history + the
+  New98 sheets' per-unit drivers.
+- Reconcile agent merged → EVERY line reconciles to the known deck totals.
+- ⚠ The live xlsx is the PESSIMISTIC critic build (1,293.6 screens, ₹650/screen elec,
+  full ₹18.1L/mo GSRTC licence → new-98 capex ₹6.11 Cr / opex ₹42.7L). The DECK uses the
+  original pitch build (980 screens = 98×10, ₹450/screen, GSRTC tender rent ₹4,200/mo/
+  station → capex ₹5.65 Cr / opex ₹24.75L). The reconcile re-derived every line from the
+  real per-unit drivers re-scaled to the 98×10 tender spec. Keep the DECK build; don't
+  swap in the xlsx pessimistic totals without owner sign-off.
+
+The reconciled detail (frozen — all sums verified):
+- **New-98 CAPEX ₹5.65 Cr**: LED 980×₹30,303=₹2.97 Cr · DAVP 98×₹1L=₹98L · electrification
+  98×₹81k=₹79.4L · survey/meters/internet/cameras/AI ₹75.3L · +5% wastage ₹14.8L.
+- **New-98 OPEX ₹24.75 L/mo (₹2.97 Cr/yr)**: sales ₹8.57L · electricity 980×₹450=₹4.41L ·
+  GSRTC rent 98×₹4,200=₹4.12L · ops ₹2.50L · R&M ₹1.96L · internet/content ₹1.96L · site
+  visits ₹1.23L.
+- **Existing-20 CAPEX ₹1.82 Cr**: LED 264×₹30,303=₹80L · bank guarantee+fee ₹24.7L ·
+  electrification/meters/internet ₹24.4L · facilitation/liaison/survey ₹23.5L · DAVP
+  20×₹1L=₹20L · AI/software/cameras ₹9.9L.
+- **Existing-20 OPEX ₹8.35 L/mo**: GSRTC rent 20×₹20,500=₹4.10L · sales 7×₹25k=₹1.75L ·
+  electricity 264×₹450=₹1.19L · ops 3×₹17k=₹0.51L · R&M ₹0.40L · other ₹0.40L.
+
+### What shipped (`public/investor/index.html`)
+- **Tender slide (10):** eligibility card REMOVED (3 cards left). Each fact card now has an
+  inline-SVG **vector icon** (network / rupee-shield / map-pins) that glows (`an-glow`).
+  Added a 2-panel **detailed CAPEX (build the 98) + OPEX (run the 98)** calc (`.calc.cost`
+  in a `.costgrid`) — each with an **animated cost-proportion bar** (`.costbar .seg`,
+  widths grow from 0 on slide entry via `.slide.on .costbar .seg{width:var(--w)}`) + a
+  count-up total (₹5.65 Cr / ₹24.75 L ≈ ₹2.97 Cr/yr).
+- **Build-cost slide (13)** was now a DUPLICATE of the tender ₹5.65 Cr capex → repurposed
+  into the **existing-20** detailed CAPEX (₹1.82 Cr) + OPEX (₹8.35 L/mo), same style. The
+  pair now reads proven-20 → tender-98 ("same build, 5× the scale, priced from the exact
+  per-unit costs"). Deck stays 19 slides (repurposed, not added/removed).
+- Extended the `.calc > *` row-reveal stagger to nth-child(11) so the 7-row opex panel
+  reveals cleanly (was only 1-6; rows past 6 animated at delay 0 = out of sequence).
+
+### Verified live (browser pane)
+eligibility gone, 3 vector cards animate, both slides' capex/opex panels + proportion bars
++ count-up totals render (5.65 Cr / 24.75 L / 1.82 Cr / 8.35 L), no overflow, 0 console
+errors. (Local server has no CSP header — §297 foot-gun — but this slide is CSP-safe:
+inline SVG + CSS only, no external assets.)
+
+### CONTRACT / foot-gun
+- The deck's cost figures are the ORIGINAL pitch build (980 screens / ₹450 elec / ₹4,200
+  GSRTC rent), NOT the xlsx pessimistic build. All 4 totals + every line reconcile — a
+  future edit must keep them reconciling (lines sum to the total).
+- New reusable deck patterns: `.calc.cost` panel + `.costbar`/`.seg` animated proportion
+  bar (segment `--w` grows on slide entry) + `.costgrid` (two equal calc panels).
+
+### Investor-deck chain
+Done: 1 hero · 2-3 · 4 · 5 record · 6 (5,040+1.98%) · 7 economics · 8 levers · 9 real map ·
+10 expansion 20→118 · 10-tender (this: 3 vector cards + 98 capex/opex) · 13→existing-20
+capex/opex (this). Still to lift: competition, inventory/rates, forecast, ask, risks, team
++ the record-slide private/govt turnover split when owner sends per-year ₹.
