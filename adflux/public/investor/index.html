@@ -258,19 +258,49 @@
   .rtable tr.tot td{border-top:2px solid var(--line);border-bottom:none;font-weight:700;color:var(--ink0);padding-top:11px}
   .rtable tr.tot td.n{color:var(--yellow);font-family:var(--disp);font-size:17px}
 
-  .fc{display:grid;grid-template-columns:270px 1fr;gap:24px;margin-top:22px}
-  .lv{margin-bottom:12px} .lv.hero{background:rgba(255,230,0,.06);border:1px solid rgba(255,230,0,.28);border-radius:12px;padding:11px 13px;margin-bottom:15px}
+  /* forecast slide (operating-leverage crossover) */
+  .fkpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:14px}
+  .fkpi{background:var(--navy2);border:1px solid var(--line);border-radius:13px;padding:12px 14px}
+  .fkpi .v{font-family:var(--disp);font-weight:700;font-size:clamp(19px,2.4vw,28px);line-height:1;color:var(--ink0)}
+  .fkpi .v.y{color:var(--yellow)} .fkpi .v.g{color:var(--green)} .fkpi .v.b{color:var(--blue)}
+  .fkpi .l{font-size:11px;color:var(--ink2);margin-top:6px;line-height:1.25}
+  .fkpi .s{font-size:10.5px;color:var(--ink2);margin-top:5px} .fkpi .s b{color:var(--green)} .fkpi .s b.r{color:#ff5c6c}
+  .fmain{display:grid;grid-template-columns:.84fr 1.16fr;gap:clamp(16px,2.4vw,32px);margin-top:14px;align-items:start}
+  @media(max-width:900px){.fkpis{grid-template-columns:repeat(2,1fr)}.fmain{grid-template-columns:1fr}}
+  .fdial{background:var(--navy2);border:1px solid rgba(255,230,0,.22);border-radius:14px;padding:14px 15px}
+  .fdial .dl{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px;color:var(--ink1)}
+  .fdial .dl b{font-family:var(--disp);color:var(--yellow);font-size:20px}
+  .ftrack{position:relative;margin:13px 0 3px}
+  .fbe{position:absolute;top:-4px;height:13px;width:2px;background:#ff5c6c;border-radius:2px;box-shadow:0 0 8px rgba(255,92,108,.7);pointer-events:none}
+  .fticks{position:relative;height:15px;margin-top:2px;font-size:10px;color:var(--ink2)}
+  .fticks span{position:absolute;white-space:nowrap}
+  .fbenote{font-size:10.5px;color:#ff8791;margin-top:1px}
+  .fread{font-family:var(--mono);font-size:12px;color:var(--ink1);margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)}
+  .fread .yv{color:var(--yellow)} .fread b.g{color:var(--green)} .fread b.r{color:#ff5c6c}
+  .fchips{display:flex;gap:8px;margin-top:10px}
+  .fchip{flex:1;text-align:center;font-size:11.5px;padding:7px 6px;border-radius:9px;border:1px solid var(--line);background:var(--navy);color:var(--ink1);cursor:pointer;transition:.15s;font-family:var(--body)}
+  .fchip:hover{border-color:var(--border-strong,#475569)} .fchip.g{border-color:rgba(56,211,159,.4);color:var(--green)}
+  .fladder{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}
+  .frung{background:var(--navy);border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center}
+  .frung .f{font-size:11px;color:var(--ink2)} .frung .p{font-family:var(--disp);font-weight:700;font-size:15px;margin-top:3px} .frung .p.r{color:#ff5c6c} .frung .p.g{color:var(--green)}
+  .fassump{margin-top:11px}
+  .fassump summary{font-size:11.5px;color:var(--ink2);cursor:pointer;list-style:none;padding:4px 0} .fassump summary::-webkit-details-marker{display:none}
+  .fchart{background:var(--navy2);border:1px solid var(--line);border-radius:14px;padding:10px 12px 6px}
+  .fchart svg{width:100%;height:auto;display:block}
+  .fchart .wedge{clip-path:inset(0 100% 0 0);transition:clip-path .75s cubic-bezier(.16,1,.3,1) .45s}
+  .slide.on .fchart .wedge{clip-path:inset(0 0 0 0)}
+  .flegend{display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--ink2);margin:7px 0 0 2px}
+  .flegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .fpay{font-size:12px;color:var(--ink1);margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07);line-height:1.45}
+  .fpay b{font-family:var(--disp);color:var(--green)} .fpay b.r{color:#ff5c6c}
+  .fcaveat{font-size:10.5px;color:var(--ink2);margin-top:12px;line-height:1.5;display:flex;gap:8px;align-items:flex-start}
+  .fcaveat svg{flex:none;color:var(--warning,#F59E0B);margin-top:1px} .fcaveat b{color:var(--ink1)}
+  .lv{margin-bottom:12px}
   .lv label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink1);margin-bottom:6px}
   .lv label .val{font-family:var(--mono);color:var(--yellow);font-weight:700}
   input[type=range]{-webkit-appearance:none;width:100%;height:5px;border-radius:5px;background:var(--navy2);outline:none}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--yellow);cursor:pointer;box-shadow:0 0 0 4px rgba(255,230,0,.15)}
   input[type=range]::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;background:var(--yellow);cursor:pointer}
-  .okpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin-bottom:13px}
-  .okpi{background:var(--navy2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
-  .okpi .v{font-family:var(--disp);font-weight:700;font-size:21px;color:var(--ink0)} .okpi .v.y{color:var(--yellow)} .okpi .v.g{color:var(--green)} .okpi .v.r{color:var(--red)}
-  .okpi .l{font-size:11px;color:var(--ink2);margin-top:2px}
-  .cw{background:var(--navy2);border:1px solid var(--line);border-radius:13px;padding:12px 10px 6px}
-  .disc{font-size:11px;color:var(--ink2);margin-top:10px;line-height:1.5}
 
   .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
   .cta a{font-family:var(--disp);font-weight:700;font-size:15px;padding:14px 26px;border-radius:12px}
@@ -1664,30 +1694,47 @@ svg.leaflet-image-layer.leaflet-interactive path {
     </div>
   </section>
 
-  <!-- 14 FORECAST -->
+  <!-- 14 FORECAST (operating-leverage crossover) -->
   <section class="slide">
-    <div class="kicker anim">The forecast — you drive it</div>
-    <h2 class="anim">Fill is the dial. Move it and watch the business turn.</h2>
-    <div class="fc anim">
-      <div class="levers">
-        <div class="lv hero"><label>Ad-slot fill <span class="val" id="v-fill">2%</span></label><input type="range" id="s-fill" min="2" max="12" step="0.5" value="2"><div style="font-size:11px;color:var(--ink2);margin-top:6px">Today 2% (real) · DAVP 6-month target 10%</div></div>
-        <div class="lv"><label>New stations won <span class="val" id="v-new">98</span></label><input type="range" id="s-new" min="0" max="98" step="1" value="98"></div>
-        <div class="lv"><label>Govt rate <span class="val" id="v-grate">₹1.0/slot</span></label><input type="range" id="s-grate" min="1" max="3" step="0.5" value="1"></div>
-        <div class="lv"><label>Private share of fill <span class="val" id="v-pshare">20%</span></label><input type="range" id="s-pshare" min="0" max="60" step="5" value="20"></div>
-        <div class="lv"><label>Licence bid <span class="val" id="v-lic">₹0.49 Cr/yr</span></label><input type="range" id="s-lic" min="0.49" max="2.5" step="0.1" value="0.49"></div>
+    <div class="kicker anim" style="display:flex;align-items:center;gap:9px"><svg viewBox="0 0 40 40" width="24" height="24" fill="none" stroke="#FFE600" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="an-glow"><line x1="6" y1="27" x2="34" y2="15"/><path d="M20 21 L15 32 L25 32 Z" stroke-linejoin="round"/><rect x="4" y="24" width="5" height="5" rx="1"/><rect x="29" y="9" width="8" height="8" rx="1.5" fill="#FFE600" stroke="none"/></svg><span>Operating leverage</span></div>
+    <h2 class="anim h2c">Break-even is <span style="color:var(--yellow)">2.19%</span> fill. We're already at 2%.</h2>
+    <p class="lead anim" style="margin-top:8px;font-size:clamp(14px,1.7vw,17px)">Our cost is fixed at <b class="yellow">&#8377;4.14&#8201;Cr/yr</b>. Every <b class="yellow">+1% fill</b> past break-even drops <b class="yellow">&#8377;1.89&#8201;Cr</b> straight to profit &mdash; and government DAVP demand is the switch that fills the screens.</p>
+    <div class="fkpis anim">
+      <div class="fkpi"><div class="v y">&#8776;<span data-count="2.19" data-dec="2">0</span>%</div><div class="l">Break-even fill</div></div>
+      <div class="fkpi"><div class="v y">+&#8377;<span data-count="1.89" data-dec="2">0</span> Cr</div><div class="l">Op profit per +1% fill</div></div>
+      <div class="fkpi"><div class="v g">&#8377;<span data-count="14.73" data-dec="2">0</span> Cr</div><div class="l">Op profit / yr at 10% DAVP target</div><div class="s">vs <b class="r">&minus;&#8377;0.36 Cr</b> at 2% today</div></div>
+      <div class="fkpi"><div class="v g"><span data-count="9.4" data-dec="1">0</span> mo</div><div class="l">Capex payback at 10% fill</div><div class="s"><b>+&#8377;60.5 Cr</b> cash by Year 5</div></div>
+    </div>
+    <div class="fmain anim">
+      <div>
+        <div class="fdial">
+          <div class="dl"><span>Ad-slot fill &mdash; drag up to watch it turn green</span><b><span id="v-fill">2.0</span>%</b></div>
+          <div class="ftrack"><input type="range" id="s-fill" min="2" max="12" step="0.1" value="2"><div class="fbe" id="fbeMark"></div></div>
+          <div class="fticks"><span style="left:0">Today &middot; 2%</span><span class="g" style="left:80%;transform:translateX(-70%)">DAVP target &middot; 10%</span></div>
+          <div class="fbenote">&#9650; break-even 2.19% &mdash; today&#39;s 2% sits right at the line</div>
+          <div class="fread" id="fRead"></div>
+          <div class="fchips"><button class="fchip" id="chipToday">Today 2%</button><button class="fchip g" id="chipTarget">DAVP target 10%</button></div>
+        </div>
+        <div class="fladder">
+          <div class="frung"><div class="f">2% fill</div><div class="p r">&minus;&#8377;0.36 Cr</div></div>
+          <div class="frung"><div class="f">5% fill</div><div class="p g">+&#8377;5.30 Cr</div></div>
+          <div class="frung"><div class="f">10% fill</div><div class="p g">+&#8377;14.73 Cr</div></div>
+        </div>
+        <details class="fassump">
+          <summary>&#9662; Model assumptions (stations &middot; rates &middot; licence)</summary>
+          <div class="lv"><label>New stations won <span class="val" id="v-new">98</span></label><input type="range" id="s-new" min="0" max="98" step="1" value="98"></div>
+          <div class="lv"><label>Govt rate <span class="val" id="v-grate">&#8377;1.0/slot</span></label><input type="range" id="s-grate" min="1" max="3" step="0.5" value="1"></div>
+          <div class="lv"><label>Private share of fill <span class="val" id="v-pshare">20%</span></label><input type="range" id="s-pshare" min="0" max="60" step="5" value="20"><div style="font-size:10px;color:var(--ink2);margin-top:4px">Private earns &#8377;0.18 vs govt &#8377;1 &mdash; raising this <i>lowers</i> blended revenue. Held at 20% as a floor; the thesis is govt DAVP fill.</div></div>
+          <div class="lv"><label>Licence bid <span class="val" id="v-lic">&#8377;0.49 Cr/yr</span></label><input type="range" id="s-lic" min="0.49" max="2.5" step="0.1" value="0.49"></div>
+        </details>
       </div>
-      <div class="out">
-        <div class="okpis">
-          <div class="okpi"><div class="v y" id="o-rev">—</div><div class="l">revenue / yr (mature)</div></div>
-          <div class="okpi"><div class="v" id="o-profit">—</div><div class="l">operating profit / yr</div></div>
-          <div class="okpi"><div class="v" id="o-pay">—</div><div class="l">payback on ₹5.65 Cr</div></div>
-        </div>
-        <div class="cw"><div id="fcChart"></div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--ink2);margin:6px 0 0 4px"><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--yellow);margin-right:5px;vertical-align:-1px"></i>Revenue</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--green);margin-right:5px;vertical-align:-1px"></i>Op. profit</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--blue);margin-right:5px;vertical-align:-1px"></i>Cumulative cash</span></div>
-        </div>
-        <div class="disc" id="fcDisc"></div>
+      <div>
+        <div class="fchart"><div id="fcChart"></div></div>
+        <div class="flegend"><span><i style="background:var(--yellow)"></i>Revenue (rises with fill)</span><span><i style="background:var(--blue)"></i>Fixed cost &#8377;4.14 Cr/yr</span><span><i style="background:var(--green)"></i>Profit zone</span></div>
+        <div class="fpay" id="fPay"></div>
       </div>
     </div>
+    <div class="fcaveat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg><div><b>Assumes DAVP government demand exists to buy the slots.</b> Fill is the only driver against a fixed &#8377;4.14 Cr cost &mdash; the Government DAVP rate card now being finalised is the engine that lifts fill from today&#39;s 2% toward the 10% target. Below 2.19% fill the build does not recover its capex inside the 5-year term. Unaudited.</div></div>
   </section>
 
   <!-- 15 ROADMAP -->
@@ -1967,50 +2014,64 @@ svg.leaflet-image-layer.leaflet-interactive path {
     updateExpStats(full);
   }
 
-  function val(id){ return +document.getElementById(id).value; }
-  function cr(x){ return '₹'+(Math.round(x*100)/100).toFixed(2)+' Cr'; }
-  function crShort(x){ var v=Math.round(x*10)/10; return (v<0?'-':'')+'₹'+Math.abs(v).toFixed(1); }
-  var SLOTS_YR=151200*12, PRIV_RATE=0.18;
-  function model(){
-    var fill=val('s-fill')/100, newSt=val('s-new'), gRate=val('s-grate'), pShare=val('s-pshare')/100, lic=val('s-lic');
-    var screens=264+newSt*10, blended=(1-pShare)*gRate + pShare*PRIV_RATE, capacityYr=screens*SLOTS_YR;
-    var opexYr=1.00 + newSt*0.027 + lic, capex=(newSt/98)*5.65;
-    var yrFill=[fill*0.6, fill, fill, fill, fill], rows=[], cum=0, payback=0;
-    for(var y=0;y<5;y++){ var rev=capacityYr*yrFill[y]*blended/1e7, prof=rev-opexYr, cx=(y===0)?capex:0, net=prof-cx;
-      cum+=net; if(payback===0 && cum>=0) payback=y+1; rows.push({rev:rev,prof:prof,cum:cum}); }
-    return {rows:rows, revM:rows[4].rev, profM:rows[4].prof, payback:payback, screens:screens, fill:fill, blended:blended};
+  function valF(id){ var el=document.getElementById(id); return el?+el.value:0; }
+  /* SLOTS_YR (=151200*12) + PRIV_RATE (=0.18) are hoisted early (top of the IIFE) so the
+     sessionStorage auto-unlock -> boot() -> recompute() call does not see them undefined. */
+  function fModel(){
+    var fill=valF('s-fill'), newSt=valF('s-new'), gRate=valF('s-grate'), pShare=valF('s-pshare')/100, lic=valF('s-lic');
+    var screens=264+newSt*10, blended=(1-pShare)*gRate + pShare*PRIV_RATE;
+    var lev=screens*SLOTS_YR*blended/1e7/100;        /* Cr op-rev per +1% fill */
+    var opex=1.00 + newSt*0.027 + lic, capex=(newSt/98)*5.65, be=opex/lev;
+    function rev(f){ return lev*f; } function op(f){ return lev*f-opex; }
+    function paybackMo(f){ var yF=[f*0.6,f,f,f,f], cum=0; for(var y=0;y<5;y++){ var pr=rev(yF[y])-opex, st=cum; cum+=pr; if(st<capex && cum>=capex && pr>0) return (y*12)+(capex-st)/pr*12; } return null; }
+    function cumY5(f){ var yF=[f*0.6,f,f,f,f], c=0; for(var y=0;y<5;y++){ c+=(rev(yF[y])-opex)-(y===0?capex:0); } return c; }
+    return { fill:fill, lev:lev, opex:opex, capex:capex, be:be, rev:rev, op:op, paybackMo:paybackMo, cumY5:cumY5, screens:screens, blended:blended };
   }
-  function drawFc(rows){
-    var W=560,H=150,pad=22, vals=[]; for(var i=0;i<5;i++){ vals.push(rows[i].rev,rows[i].prof,rows[i].cum); }
-    var max=Math.max.apply(null,vals.concat([1])), min=Math.min.apply(null,vals.concat([0])), range=max-min||1;
-    function yOf(v){ return H-pad-((v-min)/range)*(H-pad*2); }
-    var zero=yOf(0), bw=W/5, s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">';
-    s+='<line x1="0" y1="'+zero+'" x2="'+W+'" y2="'+zero+'" stroke="rgba(255,255,255,.12)"/>';
-    for(var i=0;i<5;i++){ var cx=i*bw+bw/2;
-      var rh=Math.abs(yOf(rows[i].rev)-zero), ry=Math.min(yOf(rows[i].rev),zero);
-      s+='<rect x="'+(cx-20)+'" y="'+ry+'" width="16" height="'+rh+'" rx="3" fill="var(--yellow)" opacity="0.85"/>';
-      var ph=Math.abs(yOf(rows[i].prof)-zero), py=Math.min(yOf(rows[i].prof),zero);
-      s+='<rect x="'+(cx-2)+'" y="'+py+'" width="16" height="'+ph+'" rx="3" fill="var(--green)" opacity="0.9"/>';
-      s+='<text x="'+cx+'" y="'+(H-6)+'" fill="#8b96b4" font-size="10" text-anchor="middle">Y'+(i+1)+'</text>'; }
-    var pts=''; for(var j=0;j<5;j++) pts+=(j*bw+bw/2)+','+yOf(rows[j].cum)+' ';
-    s+='<polyline points="'+pts+'" fill="none" stroke="var(--blue)" stroke-width="2.5"/>';
-    for(var k=0;k<5;k++) s+='<circle cx="'+(k*bw+bw/2)+'" cy="'+yOf(rows[k].cum)+'" r="3.5" fill="var(--blue)"/>';
-    s+='</svg>'; document.getElementById('fcChart').innerHTML=s;
+  function drawForecastChart(m){
+    var W=640,H=320,L=54,R=612,B=284,T=24,cmax=24;
+    function px(f){ return L+(Math.max(0,Math.min(f,12))/12)*(R-L); } function py(c){ return B-(Math.max(0,Math.min(c,cmax))/cmax)*(B-T); }
+    var costY=py(m.opex), beX=px(m.be), revEndY=py(m.rev(12)), zeroY=py(0);
+    var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+    for(var c=4;c<=20;c+=4){ var gy=py(c); s+='<line x1="'+L+'" y1="'+gy+'" x2="'+R+'" y2="'+gy+'" stroke="#1c2740"/><text x="'+(L-6)+'" y="'+(gy+3)+'" fill="#5b6684" font-size="9" text-anchor="end">'+c+'</text>'; }
+    s+='<line x1="'+L+'" y1="'+B+'" x2="'+R+'" y2="'+B+'" stroke="rgba(255,255,255,.14)"/>';
+    for(var f=0;f<=12;f+=2){ var fx=px(f); s+='<text x="'+fx+'" y="'+(B+15)+'" fill="#5b6684" font-size="9" text-anchor="middle">'+f+'%</text>'; }
+    s+='<text x="'+((L+R)/2)+'" y="'+(B+29)+'" fill="#8b96b4" font-size="9.5" text-anchor="middle">ad-slot fill %</text>';
+    s+='<polygon points="'+L+','+costY+' '+L+','+B+' '+beX+','+costY+'" fill="#ff5c6c" opacity="0.12"/>';
+    s+='<defs><linearGradient id="fwg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38d39f" stop-opacity="0.32"/><stop offset="1" stop-color="#38d39f" stop-opacity="0.05"/></linearGradient></defs>';
+    s+='<polygon class="wedge" points="'+beX+','+costY+' '+R+','+revEndY+' '+R+','+costY+'" fill="url(#fwg)"/>';
+    s+='<line x1="'+L+'" y1="'+costY+'" x2="'+R+'" y2="'+costY+'" stroke="#5aa9ff" stroke-width="1.6" stroke-dasharray="5 4"/>';
+    s+='<text x="'+(R-4)+'" y="'+(costY-6)+'" fill="#5aa9ff" font-size="10" text-anchor="end">Fixed cost &#8377;'+m.opex.toFixed(2)+' Cr/yr</text>';
+    s+='<line x1="'+L+'" y1="'+zeroY+'" x2="'+R+'" y2="'+revEndY+'" stroke="#FFE600" stroke-width="2.6"/>';
+    s+='<text x="'+(R-4)+'" y="'+(revEndY+13)+'" fill="#FFE600" font-size="10" text-anchor="end">Revenue</text>';
+    s+='<circle cx="'+beX+'" cy="'+costY+'" r="4.5" fill="#38d39f" stroke="#0d1424" stroke-width="1.5"/>';
+    s+='<text x="'+beX+'" y="'+(costY-9)+'" fill="#38d39f" font-size="9.5" text-anchor="middle">break-even '+m.be.toFixed(2)+'%</text>';
+    var dx=px(m.fill), dy=py(m.rev(m.fill)), win=m.fill>=m.be, dc=win?'#FFE600':'#ff5c6c';
+    s+='<line x1="'+dx+'" y1="'+B+'" x2="'+dx+'" y2="'+dy+'" stroke="'+dc+'" stroke-width="1" stroke-dasharray="2 3" opacity="0.55"/>';
+    s+='<circle cx="'+dx+'" cy="'+dy+'" r="6.5" fill="'+dc+'"><animate attributeName="r" values="6.5;8.6;6.5" dur="2s" repeatCount="indefinite"/></circle>';
+    s+='<circle cx="'+dx+'" cy="'+dy+'" r="6.5" fill="none" stroke="'+dc+'" stroke-opacity="0.45" stroke-width="1.5"/>';
+    s+='</svg>'; var el=document.getElementById('fcChart'); if(el) el.innerHTML=s;
   }
   function recompute(){
-    var m=model();
-    document.getElementById('v-fill').textContent=(Math.round(val('s-fill')*10)/10)+'%';
-    document.getElementById('v-new').textContent=val('s-new');
-    document.getElementById('v-grate').textContent='₹'+val('s-grate').toFixed(1)+'/slot';
-    document.getElementById('v-pshare').textContent=val('s-pshare')+'%';
-    document.getElementById('v-lic').textContent='₹'+val('s-lic').toFixed(2)+' Cr/yr';
-    document.getElementById('o-rev').textContent=cr(m.revM);
-    var pe=document.getElementById('o-profit'); pe.textContent=cr(m.profM); pe.className='v '+(m.profM>=0?'g':'r');
-    document.getElementById('o-pay').textContent=m.payback?(m.payback+' yr'+(m.payback>1?'s':'')):'>5 yrs';
-    drawFc(m.rows);
-    document.getElementById('fcDisc').textContent='Capacity math on real costs: '+m.screens+' screens, '+(Math.round(m.fill*1000)/10)+'% fill, blended ₹'+m.blended.toFixed(2)+'/slot (govt ₹'+val('s-grate').toFixed(1)+', private ₹0.18 real). Year 1 ramps (DAVP mid-year). Assumes demand exists to buy the slots. Unaudited.';
+    var m=fModel();
+    var vf=document.getElementById('v-fill'); if(vf) vf.textContent=m.fill.toFixed(1);
+    var e; e=document.getElementById('v-new'); if(e) e.textContent=valF('s-new');
+    e=document.getElementById('v-grate'); if(e) e.textContent='\u20B9'+valF('s-grate').toFixed(1)+'/slot';
+    e=document.getElementById('v-pshare'); if(e) e.textContent=valF('s-pshare')+'%';
+    e=document.getElementById('v-lic'); if(e) e.textContent='\u20B9'+valF('s-lic').toFixed(2)+' Cr/yr';
+    var bm=document.getElementById('fbeMark'); if(bm){ var pos=(Math.min(m.be,12)-2)/10*100; bm.style.left=Math.max(0,Math.min(pos,100))+'%'; }
+    var op=m.op(m.fill), win=op>=0, rd=document.getElementById('fRead');
+    if(rd) rd.innerHTML='Fill <span class="yv">'+m.fill.toFixed(1)+'%</span> &nbsp;\u00B7&nbsp; Rev <span class="yv">\u20B9'+m.rev(m.fill).toFixed(2)+' Cr</span> &nbsp;\u00B7&nbsp; Op profit <b class="'+(win?'g':'r')+'">'+(op>=0?'+':'\u2212')+'\u20B9'+Math.abs(op).toFixed(2)+' Cr/yr</b>';
+    var mo=m.paybackMo(m.fill), pe=document.getElementById('fPay');
+    if(pe){ if(mo!==null){ var c5=m.cumY5(m.fill); pe.innerHTML='Capex \u20B9'+m.capex.toFixed(2)+' Cr recovered in <b>'+(mo<12?mo.toFixed(1)+' months':(mo/12).toFixed(1)+' years')+'</b> &nbsp;\u00B7&nbsp; cumulative cash <b>'+(c5>=0?'+':'\u2212')+'\u20B9'+Math.abs(c5).toFixed(1)+' Cr</b> by Year 5.'; }
+      else{ pe.innerHTML='<b class="r">At '+m.fill.toFixed(1)+'% fill the build does not recover its capex inside the 5-year term.</b> Drag up \u2014 break-even is '+m.be.toFixed(2)+'%.'; } }
+    drawForecastChart(m);
   }
-  function wireCalc(){ ['s-fill','s-new','s-grate','s-pshare','s-lic'].forEach(function(id){ document.getElementById(id).addEventListener('input',recompute); }); }
+  function glideFill(target){ var el=document.getElementById('s-fill'); if(!el) return; var cur=+el.value, steps=16, i=0;
+    var iv=setInterval(function(){ i++; el.value=(cur+(target-cur)*i/steps).toFixed(1); recompute(); if(i>=steps) clearInterval(iv); },22); }
+  function wireCalc(){ ['s-fill','s-new','s-grate','s-pshare','s-lic'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input',recompute); });
+    var ct=document.getElementById('chipToday'); if(ct) ct.addEventListener('click',function(){ glideFill(2); });
+    var cg=document.getElementById('chipTarget'); if(cg) cg.addEventListener('click',function(){ glideFill(10); });
+  }
 })();
 </script>
 </body>

@@ -12321,3 +12321,80 @@ cost bars filled, gauge sliver + ladder bars, at real presentation resolution.
 capex+opex)** · **11 the asset priced (fill gauge + rate ladder)** · 12 forecast ·
 13 roadmap · 14 ask · 15 risks · 16 team. Still to lift: forecast, ask, risks, team +
 the record-slide private/govt turnover split when owner sends per-year ₹.
+
+
+---
+
+## 192 · Phase 305 — investor FORECAST slide rebuilt: operating-leverage crossover (2026-08-12)
+
+Owner: "this is very imp to recover ... make it so perfect we can convince them this
+is the best opportunity" + animation + vectors + deep analysis. Ran a
+brainstorming + Workflow (5 agents: accuracy audit vs the xlsx → persuasion →
+2 chart directions → synthesis). Rebuilt slide 12 (forecast) of
+`public/investor/index.html`. Committed + pushed.
+
+### THE PROBLEM (workflow verdict): framing, NOT math
+The math was ALREADY accurate to the rupee (auditor confirmed every figure, cross-
+checked vs `~/Downloads/files 2/GSRTC_98_Station_Model.xlsx` — nothing needed
+correcting). But the slide DEFAULTED to 2% fill = the ONE scenario that LOSES money
+(op profit −₹0.36 Cr/yr, cumulative cash DECLINING forever, payback ">5 yrs"), with
+a bars+declining-line chart. The opening frame literally argued AGAINST investing;
+the winning case was hidden behind a slider nobody drags.
+
+### THE VERIFIED NUMBERS (frozen — reconcile to the rupee, blended rate 0.836)
+- max revenue @100% fill = **₹188.69 Cr/yr** (1244 screens × 1,814,400 slots/yr × 0.836)
+- fixed opex = **₹4.136 Cr/yr** → **break-even fill = 2.19%** (today's 2% is 0.19 pts below)
+- operating leverage = **₹1.887 Cr op-profit per +1% fill** (costs are FIXED = the story)
+- @2% → −₹0.36 Cr · @5% → +₹5.30 Cr · @10% (DAVP target) → **+₹14.73 Cr/yr, payback
+  9.4 months, +₹60.47 Cr cumulative cash by Y5** (10.7× on ₹5.65 Cr).
+The xlsx (pessimistic critic build: 1293.6 screens/₹650 elec/₹18.1L licence) confirms
+the SHAPE (break-even 2.185%, same inflection) but its heavier totals must NOT replace
+the deck's pitch build (1244 screens/₹450/₹0.49Cr licence). §177 real-numbers rule holds.
+
+### THE REDESIGN — "operating leverage, not growth"
+- **Kicker** "Operating leverage" + a lever-on-fulcrum inline-SVG vector (an-glow).
+- **H2** "Break-even is 2.19% fill. We're already at 2%." (h2c compact).
+- **4 KPI cards** (count-up on entry): 2.19% break-even · +₹1.89 Cr per +1% fill ·
+  ₹14.73 Cr at 10% (sub "vs −₹0.36 Cr at 2% today") · 9.4-mo payback (sub "+₹60.5 Cr
+  cash by Y5").
+- **Chart = leverage crossover** (replaces bars): a flat blue "Fixed cost ₹4.14 Cr/yr"
+  line, a rising yellow revenue line crossing it at 2.19% (a tiny red loss sliver at
+  the base), a green profit **wedge** that sweeps open on entry (`.slide.on .fchart
+  .wedge{clip-path}`), a break-even dot, and a scenario dot that CLIMBS the revenue
+  line as the dial moves.
+- **The fill dial** (owner-chosen DEFAULT = honest 2%, drag UP to reveal): ticks
+  Today 2% / red break-even 2.19% marker / DAVP target 10%; live readout goes green
+  above break-even; two snap chips (Today 2% / DAVP target 10%, glideFill animates);
+  a live payback line (red "does not recover in 5-yr term" at 2% → green "recovered in
+  9.4 months" at 10%); a 2%/5%/10% → ₹ ladder; secondary levers (stations/rate/
+  private-share/licence) collapsed in `<details>` with the private-share dilution
+  annotation (private ₹0.18 < govt ₹1 → raising it LOWERS blended revenue; held at 20%).
+- **Honest DAVP caveat** visible in every state ("assumes DAVP govt demand exists to
+  buy the slots... below 2.19% fill the build does not recover its capex in 5 yrs").
+- Owner DECISION (AskUserQuestion): default fill = **2% honest floor** (not 10%);
+  private-share kept at 20% so every headline number stays frozen/consistent deck-wide.
+
+### THE BUG THAT BIT (and the original author already fixed once) — REMEMBER
+`var F_SLOTS_YR=151200*12, F_PRIV=0.18` declared inside my JS block (~line 1970) →
+NaN chart at boot. Root: the sessionStorage auto-unlock (`if(inv_ok==='1') unlock()`
+→ `boot()` → `recompute()`) runs at ~line 1817, BEFORE those `var`s are assigned →
+`SLOTS_YR` undefined → lev NaN → be NaN → `<polygon points="…NaN…">`. The deck ALREADY
+hoists `var SLOTS_YR=151200*12, PRIV_RATE=0.18` early (line ~1809, comment "hoisted:
+needed by model() on sessionStorage auto-unlock") for exactly this. FIX: reuse the
+early-hoisted `SLOTS_YR`/`PRIV_RATE` (same values), drop the late `F_` duplicates.
+- ⚠ FOOT-GUN: any `var` a boot/auto-unlock path reads MUST be declared ABOVE the
+  auto-unlock call (line ~1817), not just hoisted — a hoisted `var` is `undefined`
+  until its assignment line executes. Function declarations are safe (fully hoisted);
+  `var` initializers are not. (Same class as §180 Phase 292's forecast-NaN fix.)
+
+### Verified (browser, screenshot-authoritative per §191)
+Boot render no NaN · KPI count-ups settle to 2.19/1.89/14.73/9.4 · chart crossover +
+wedge + break-even dot render · dial drag: dot climbs into the green wedge, readout
++ payback flip green (10% → +₹14.73 Cr, 9.4 months, +₹60.5 Cr Y5; verified exact) ·
+secondary lever (govt rate ₹2 → ₹36.93 Cr @10%, no NaN) · caveat present · zero
+JS/SVG console errors. Fits the 800×450 worst-case pane (caveat at the fold; full on
+any real ≥768px screen, §191).
+
+### Investor-deck order (16 slides, forecast = 12)
+Same as §191; slide 12 forecast is now the leverage-crossover. Still to lift: roadmap,
+ask, risks, team + the record-slide private/govt turnover split (owner sends per-year ₹).
