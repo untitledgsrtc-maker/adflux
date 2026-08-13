@@ -11837,3 +11837,64 @@ Slides done to the sales-deck bar: 1 (video hero §179), 2-3 (animated §180), 6
 Remaining to roll the §180 motion layer + the same visual quality onto: Record chart,
 DAVP unlock, expansion, competition, roadmap, inventory/rates, build cost, ask, risks,
 team. Owner iterates one-by-one.
+
+
+---
+
+## 182 · Phase 294 — investor deck: real 264 badge · slide 4 animated · slide 5 interactive turnover (2026-08-12, `433367e`)
+
+Owner feedback on the investor deck (slides 2/4/5): "still old logo visible · not 1240
+screen, 264 screen we already have · screen 4 no animation, add animation as every slide
+has · screen 5 turnover page is not good, add more info, if possible private + give
+revenue split, and I want an arrow — I click it and next year revenue shows, 5-year
+revenue I punch every time so its line shows — what you suggest?"
+
+### What shipped (`public/investor/index.html`, static deck, no SQL/APK)
+- **Slide 2 badge fix:** the LED-screen showpiece badge said "1,240 seen today" — the
+  owner read 1,240 as a screen count. Changed to **"264 screens live"** (data-count=264,
+  the real network size). Numbers on this deck must be real + unambiguous.
+- **Slide 4 (Audience) animated** — was a static bus-stop SVG. Added the §180 motion
+  layer: the LED screen's play button glows (`an-glow`), broadcast waves radiate
+  (`an-wave`), the on-screen chart bars grow in sequence (NEW `an-bar` — `scaleY` from
+  `transform-origin:bottom`, staggered), an AI reticle locks a waiting commuter
+  (`an-lock`), and the bus ARRIVES (NEW `an-bus` — `translateX` slide-in). Every slide
+  now moves.
+- **Slide 5 (Record) = INTERACTIVE turnover** (the owner's main ask). Press → / tap the
+  "Reveal next year ▸" button and the 5 years build ONE AT A TIME: unrevealed years show
+  as dashed ghost outlines, a blue trend line grows through the revealed bar tops, and an
+  info panel updates per year (value · YoY % · ×-since-FY21-22 · CAGR · "2% network
+  full"). Real figures: 2.2/3.6/5.4/8.6/8.8 ₹Cr (GST-filed). Verified single-step
+  1→2→3→4→5, clamps at 5, button locks "All five years ✓".
+
+### The nav intercept contract (`advance(dir)`)
+`advance(dir)` replaces the raw `go(idx±1)` on ALL nav paths (prev/next buttons, arrow
+keys, swipe). On the record slide (`RECORD_IDX`, computed by finding the slide that
+contains `#recordChart` — reorder-safe), a forward advance REVEALS the next year until
+all 5, THEN continues to the next slide; a backward advance UN-reveals. Everywhere else
+`advance` just calls `go`. `go(RECORD_IDX)` resets `recordStep=1` on ENTRY (so re-entering
+replays the build). Keydown ignores INPUT+BUTTON targets (stops Space double-firing the
+focused reveal button); the button `.blur()`s after each click so → keeps working. Any
+future in-slide stepped reveal should reuse this `advance()` pattern, not a second key
+handler.
+
+### OPEN — private/govt revenue split (owner asked, NOT built — needs real data)
+Owner wants the turnover split private vs government. The deck rule is REAL numbers only
+(§177) — the CRM won-LED value (₹5.76 L, §177) is a tiny slice of the ₹8.8 Cr company
+turnover (most is govt auto-hood + GSRTC, not in the CRM), so it can't be derived cleanly.
+**Do NOT fabricate a split.** Asked the owner for the per-year private vs govt ₹; the
+`drawRecord`/`RECORD` structure is ready to stack two series (add `.priv`/`.govt` to each
+RECORD row + stacked rects) the moment he provides them.
+
+### Logo — it IS the owner's file (byte-identical), the "old logo" = browser cache
+The `logo-mark.svg` the owner re-attached is byte-identical (4688 bytes) to the live
+`/led/logo-mark.svg` the deck already references (verified `diff`). So "still old logo
+visible" is a PWA/browser-cache display of the pre-update page, not a wrong asset. Kept
+the `/led/` path (§291.1 reliability — a `/investor/` copy 404'd once) + the §293
+`object-fit:contain`. Told the owner to hard-refresh. If he wants a genuinely DIFFERENT
+logo design, he must send that specific file.
+
+### Investor-deck chain (running, one-by-one)
+Done to sales-deck bar: 1 (video hero §179) · 2-3 (animated §180) · 6 (5,040 calc §181) ·
+2-badge/4/5 (this §182). Remaining to lift with the motion layer + quality: DAVP unlock,
+expansion, competition, tender/cost viewers, inventory, build cost, ask, risks, team.
+Plus the private/govt split once the owner sends the numbers.
