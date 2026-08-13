@@ -250,6 +250,34 @@
   .reason h3{font-family:var(--disp);font-weight:700;font-size:14.5px;margin:0 0 5px;color:var(--ink0);letter-spacing:-.01em;line-height:1.15}
   .reason p{font-size:11.5px;color:var(--ink2);line-height:1.44;margin:0}
   .rmore{margin-top:14px;background:rgba(255,230,0,.05);border:1px solid rgba(255,230,0,.2);border-radius:12px;padding:11px 16px;font-size:13px;color:var(--ink1);line-height:1.5}
+  /* unit-economics: today vs at scale */
+  .uecon{margin-top:18px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--navy2)}
+  .ue-head,.ue-row{display:grid;grid-template-columns:1.35fr 1fr 1fr;align-items:center}
+  .ue-head{background:rgba(255,255,255,.03);border-bottom:1px solid var(--line)}
+  .ue-hc{padding:12px 18px;font-family:var(--disp);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink1);font-weight:700}
+  .ue-hc.fc{color:var(--yellow)}
+  .ue-hc span{display:block;font-size:10px;letter-spacing:.02em;text-transform:none;color:var(--ink2);font-weight:400;margin-top:2px}
+  .ue-row{border-bottom:1px solid var(--line)} .ue-row:last-child{border-bottom:0}
+  .ue-row.hot{background:rgba(255,230,0,.05)}
+  .ue-m{padding:14px 18px;font-size:13px;color:var(--ink1)} .ue-m small{display:block;font-size:10.5px;color:var(--ink2);margin-top:2px}
+  .ue-v{padding:14px 18px;font-family:var(--disp);font-weight:700;font-size:clamp(17px,2.3vw,23px);color:var(--ink0)}
+  .ue-v.y{color:var(--yellow)}
+  .ue-v small{font-family:var(--body);font-weight:400;font-size:10.5px;color:var(--ink2);display:block;margin-top:2px}
+  .ue-x{font-family:var(--body);font-size:10.5px;font-weight:600;color:var(--ink1);background:rgba(255,255,255,.07);border-radius:999px;padding:2px 8px;margin-left:6px;white-space:nowrap;vertical-align:middle}
+  .ue-note{margin-top:13px;background:rgba(255,230,0,.05);border:1px solid rgba(255,230,0,.2);border-radius:12px;padding:11px 16px;font-size:12.5px;color:var(--ink1);line-height:1.5} .ue-note b{color:var(--yellow)}
+  /* risks — animated vector cards */
+  .risks{margin-top:20px;display:flex;flex-direction:column;gap:9px}
+  .risk{display:flex;gap:14px;align-items:flex-start;background:var(--navy2);border:1px solid var(--line);border-left:3px solid rgba(255,230,0,.4);border-radius:12px;padding:12px 16px}
+  .risk .ri{flex:0 0 auto;color:var(--yellow);margin-top:1px}
+  .risk .ri svg{width:24px;height:24px;display:block}
+  .risk .rt{font-size:12.5px;color:var(--ink2);line-height:1.46}
+  .risk .rt b{color:var(--ink0);font-family:var(--disp);font-weight:700;font-size:13px;display:block;margin-bottom:2px}
+  /* closing — handshake */
+  .close-wrap{display:flex;flex-direction:column;align-items:center;gap:11px;justify-content:center;min-height:74vh;text-align:center}
+  .close-hs{color:var(--yellow);margin-bottom:2px}
+  .close-hs svg{width:clamp(104px,15vw,146px);height:auto;display:block}
+  .close-h1{font-family:var(--disp);font-weight:800;font-size:clamp(38px,7vw,74px);letter-spacing:-.02em;line-height:1;color:var(--ink0);margin:0}
+  .close-h1 .y{color:var(--yellow)}
   /* persistent brand mark top-right (every slide except the hero) */
   .corner-logo{position:fixed;top:14px;right:20px;z-index:15;display:flex;align-items:center;gap:8px;pointer-events:none}
   .corner-logo img{height:22px;width:auto;max-width:130px;object-fit:contain;opacity:.96}
@@ -1812,7 +1840,40 @@ svg.leaflet-image-layer.leaflet-interactive path {
   </section>
 
   <!-- 14 FORECAST (operating-leverage crossover) -->
+    <!-- UNIT ECONOMICS -->
   <section class="slide">
+    <div class="kicker anim">The unit economics</div>
+    <h2 class="anim h2c">What each screen costs, earns and reaches &mdash; today and at scale.</h2>
+    <div class="uecon anim">
+      <div class="ue-head">
+        <div class="ue-hc"></div>
+        <div class="ue-hc">Today<span>264 screens, live</span></div>
+        <div class="ue-hc fc">Forecast<span>1,244 screens</span></div>
+      </div>
+      <div class="ue-row">
+        <div class="ue-m">Screens live</div>
+        <div class="ue-v"><span data-count="264">0</span></div>
+        <div class="ue-v y"><span data-count="1244">0</span><span class="ue-x">&times;4.7</span></div>
+      </div>
+      <div class="ue-row">
+        <div class="ue-m">Operating cost / month</div>
+        <div class="ue-v">&#8377;8.35 L</div>
+        <div class="ue-v y">&#8377;34.5 L</div>
+      </div>
+      <div class="ue-row">
+        <div class="ue-m">Revenue / screen / month</div>
+        <div class="ue-v">&#8377;3,840<small>at today&rsquo;s 2% fill</small></div>
+        <div class="ue-v y">&#8377;12,640<small>at the 10% DAVP fill</small></div>
+      </div>
+      <div class="ue-row hot">
+        <div class="ue-m">Ad impressions / month<small>AI camera-measured</small></div>
+        <div class="ue-v"><span data-count="31.2" data-dec="1">0</span> lakh</div>
+        <div class="ue-v y"><span data-count="1.47" data-dec="2">0</span> crore<span class="ue-x">&times;4.7</span></div>
+      </div>
+    </div>
+    <div class="ue-note anim">The impressions are real &mdash; our cameras counted <b>31,16,459 people</b> across the 264 screens in July 2026 (&asymp; 10 lakh unique). Everything else scales on the same measured per-screen economics.</div>
+  </section>
+<section class="slide">
     <div class="kicker anim" style="display:flex;align-items:center;gap:9px"><svg viewBox="0 0 40 40" width="24" height="24" fill="none" stroke="#FFE600" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="an-glow"><line x1="6" y1="27" x2="34" y2="15"/><path d="M20 21 L15 32 L25 32 Z" stroke-linejoin="round"/><rect x="4" y="24" width="5" height="5" rx="1"/><rect x="29" y="9" width="8" height="8" rx="1.5" fill="#FFE600" stroke="none"/></svg><span>Operating leverage</span></div>
     <h2 class="anim h2c">Break-even is <span style="color:var(--yellow)"><span id="fHeadBe">2.19</span>%</span> fill. We're already at 2%.</h2>
     <p class="lead anim" style="margin-top:8px;font-size:clamp(14px,1.7vw,17px)">Our cost is fixed at <b class="yellow" id="leadCost">&#8377;4.14&#8201;Cr/yr</b>. Every <b class="yellow">+1% fill</b> past break-even drops <b class="yellow" id="leadStep">&#8377;1.89&#8201;Cr</b> straight to profit &mdash; and government DAVP demand is the switch that fills the screens.</p>
@@ -1950,13 +2011,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <section class="slide">
     <div class="kicker anim">Stated plainly</div>
     <h2 class="anim">What has to be true — the honest read.</h2>
-    <ul class="clean anim">
-      <li><b>DAVP timing.</b> The 5× rests on the government rate card being notified. We don't control the date and won't pretend one; a delay compounds slower, it doesn't zero the asset.</li>
-      <li><b>Fill is demand-led.</b> The screens exist; the ad-time has to be sold. The plan funds a sales team precisely for this.</li>
-      <li><b>Government concentration.</b> One buyer, one rate mechanism, one state concession. The cushion is a recurring public-information budget — and we're building a private second leg (still small at ₹5.76 L).</li>
-      <li><b>Payback needs fill.</b> At 2%, the 20-station LED unit makes ~₹1.8 L/mo — not enough to service ₹5 Cr. It stands on its own near the 10% target. That is the bet we're asking you to underwrite.</li>
-      <li><b>Unaudited accounts.</b> FY24-25 &amp; FY25-26 audits and entity consolidation are in progress — a condition precedent to funding.</li>
-    </ul>
+    <div class="risks anim">
+      <div class="risk"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle class="an-glow" cx="12" cy="12" r="9"/><path d="M12 7.5v4.5l3 2"/></svg></div><div class="rt"><b>DAVP timing</b>The 5&times; rests on the government rate card being notified. We don&rsquo;t control the date and won&rsquo;t pretend one; a delay compounds slower, it doesn&rsquo;t zero the asset.</div></div>
+      <div class="risk"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16a8 8 0 0 1 16 0"/><line class="an-glow" x1="12" y1="16" x2="16.5" y2="10.5"/><circle cx="12" cy="16" r="1.4" fill="currentColor" stroke="none"/></svg></div><div class="rt"><b>Fill is demand-led</b>The screens exist; the ad-time has to be sold. The plan funds a sales team precisely for this.</div></div>
+      <div class="risk"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="an-glow" d="M4 20V8.5L12 4l8 4.5V20"/><line x1="9" y1="20" x2="9" y2="13"/><line x1="15" y1="20" x2="15" y2="13"/><line x1="3" y1="20" x2="21" y2="20"/></svg></div><div class="rt"><b>Government concentration</b>One buyer, one rate mechanism, one state concession. The cushion is a recurring public-information budget &mdash; and we&rsquo;re building a private second leg (still small at &#8377;5.76 L).</div></div>
+      <div class="risk"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle class="an-glow" cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><div class="rt"><b>Payback needs fill</b>At 2%, the 20-station LED unit makes ~&#8377;1.8 L/mo &mdash; not enough to service &#8377;5 Cr. It stands on its own near the 10% target. That is the bet we&rsquo;re asking you to underwrite.</div></div>
+      <div class="risk"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/><path class="an-glow" d="M9.5 13.5l2 2 4-4"/></svg></div><div class="rt"><b>Unaudited accounts</b>FY24-25 &amp; FY25-26 audits and entity consolidation are in progress &mdash; a condition precedent to funding.</div></div>
+    </div>
   </section>
 
   <!-- 18 TEAM + CLOSE -->
@@ -1968,11 +2029,23 @@ svg.leaflet-image-layer.leaflet-interactive path {
       <li><b>~22 people</b> running sales, operations, creative and on-ground screen upkeep across 20 stations, every day.</li>
       <li><b>Not a pitch for a plan.</b> The network exists, the revenue is filed, the team already operates it.</li>
     </ul>
-    <div class="cta anim">
-      <a class="p" href="https://wa.me/919898273686" target="_blank" rel="noopener">Talk on WhatsApp</a>
-      <a class="g" href="tel:+919898273686">Call Brijesh</a>
+    
+    
+  </section>
+
+  <!-- CLOSING -->
+  <section class="slide">
+    <div class="close-wrap anim">
+      <div class="close-hs"><svg class="hs" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle class="an-wave w1" cx="24" cy="24" r="15" stroke-opacity=".35"/><circle class="an-wave w2" cx="24" cy="24" r="20" stroke-opacity=".18"/><g class="an-glow" transform="translate(12,12)"><path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></g></svg></div>
+      <div class="kicker" style="color:var(--yellow);letter-spacing:.18em">The invitation</div>
+      <h2 class="close-h1">Let&rsquo;s grow <span class="y">together.</span></h2>
+      <p class="lead" style="max-width:60ch;margin:4px auto 0">A proven &#8377;8.8 Cr operator, a government concession no rival can rebuild, and 5&times; the network one tender away. &#8377;5 Crore takes it there.</p>
+      <div class="cta" style="justify-content:center;margin-top:8px">
+        <a class="p" href="https://wa.me/919898273686" target="_blank" rel="noopener">Talk on WhatsApp</a>
+        <a class="g" href="tel:+919898273686">Call Brijesh</a>
+      </div>
+      <p class="small" style="margin-top:16px">Untitled Adflux Pvt Ltd &middot; Vadodara, Gujarat. Figures unaudited; projections are fill-driven management estimates, not guarantees. Confidential &mdash; not an offer of securities.</p>
     </div>
-    <p class="small anim">Untitled Adflux Pvt Ltd · Vadodara, Gujarat. Figures unaudited; projections are fill-driven management estimates, not guarantees. Confidential — not an offer of securities.</p>
   </section>
 
 </div>
@@ -2157,6 +2230,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       var target=+el.getAttribute('data-count'), dec=+(el.getAttribute('data-dec')||0), t0=null, dur=1000;
       function step(ts){ if(!t0)t0=ts; var p=Math.min(1,(ts-t0)/dur); var v=target*(1-Math.pow(1-p,3)); el.textContent = dec>0 ? v.toFixed(dec) : Math.round(v).toLocaleString('en-IN'); if(p<1) requestAnimationFrame(step); }
       requestAnimationFrame(step);
+      setTimeout(function(){ el.textContent = dec>0 ? target.toFixed(dec) : Math.round(target).toLocaleString('en-IN'); }, dur+180);
     })(els[i]); }
   }
 

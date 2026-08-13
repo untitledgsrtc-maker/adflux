@@ -12783,3 +12783,29 @@ already reads UNTITLED; `.lock img` 40×40-square → `height:30/width:auto` for
 wordmark), corner (unchanged). `logo-mark.svg` refs now 0; all 3 = the white wordmark,
 consistent + visible on the dark deck. Scoped to the investor deck; /led + /deck + the app
 untouched. Verified gate + hero + corner all render the wordmark, no console errors.
+
+### Phase 309.7 — unit-economics slide + risks vectors + handshake closing + count-up fix (owner)
+Three owner asks + a robustness fix.
+- **NEW slide "The unit economics"** (before the forecast/Operating-leverage slide): a
+  Today-vs-Forecast table (`.uecon`, 4 rows) — Screens 264→1,244 (×4.7) · Opex/mo ₹8.35 L
+  →₹34.5 L · Revenue/screen/mo ₹3,840 (2% fill)→₹12,640 (10% DAVP) · **AI-measured ad
+  impressions/mo 31.2 lakh→1.47 crore** (highlighted row). All reconcile to the deck
+  (§287.2 opex/revenue, §304 scale) + the owner's REAL camera dashboard (Jul 2026:
+  3,116,459 people across 264 screens ≈ 31.2 lakh; forecast = per-screen × 1,244). The
+  impressions are the star — real measured, not the old "29L+" estimate.
+- **Risks slide** ("Stated plainly") — the plain `<ul>` → 5 animated vector cards
+  (`.risks`/`.risk`: clock / gauge / building / target / doc-check icons, each with a
+  subtle `an-glow`; yellow left-border card). Same honest copy.
+- **NEW closing slide** ("Let's grow together") — big centered headline + an animated
+  **handshake** vector (Lucide handshake in `an-glow` + radiating `an-wave` rings) + the
+  ₹5 Cr one-liner + the WhatsApp/Call CTAs + disclaimer. **Moved the CTAs+disclaimer off
+  the team slide** to here (team = credibility, closing = the action) — so they're not
+  duplicated. Deck 18→20 (unit-econ + closing added).
+- **count-up robustness (deck-wide fix):** `countUpsIn` was rAF-only → throttled/stuck at
+  ~15% in an idle tab (the §192/§306.1 trap). Added a `setTimeout(dur+180)` that force-
+  sets the final value (en-IN commas / `toFixed(dec)`). Guarantees every `data-count`
+  lands (264/1,244/31.2/1.47 verified) regardless of rAF throttling — helps ALL slides.
+  RULE (restated): never rely on rAF alone for a value that MUST be correct; back it with
+  a setTimeout.
+- Verified from public/ root: unit-econ numbers settle, risks cards animate, handshake
+  closing renders, only console errors = the `/api/deck-videos` 404 (resolves on Vercel).
