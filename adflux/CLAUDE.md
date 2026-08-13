@@ -12648,3 +12648,28 @@ his view.
   (200 image/jpeg = server OK → it's client cache, tell them to hard-refresh); add an
   `onerror` cache-bust retry on demo-critical images so it self-heals without a manual
   refresh.
+
+### Phase 309.2 — the REAL root cause: RELATIVE image paths (309.1 was WRONG)
+The 309.1 "client-cached transient" diagnosis was WRONG — owner reported "still same
+issues" with the images still broken. Real root cause: the 10 `<img>` used **RELATIVE**
+paths (`src="workorders/woN.jpg"`) while EVERYTHING else on the deck uses ABSOLUTE
+(`/led/logo-mark.svg`, `/deck/veraval-hero.mp4`). The deck is opened at
+`app.untitledad.in/investor` (**no trailing slash** — the natural URL; `curl /investor`
+→ 200, NO redirect to `/investor/`), so the document base URL is `/investor` and a
+relative `workorders/wo1.jpg` resolves to `/workorders/wo1.jpg` (the last path segment
+"investor" is replaced) → the vercel.json SPA rewrite `/((?!api/|pdf/).*) → /` serves
+the app HTML for that path (`curl /workorders/wo1.jpg` → **200 text/html**) → the `<img>`
+gets HTML → broken image + alt text. My local test masked it because the http.server
+ROOT was the investor dir (relative `workorders/` resolved correctly there); the 309.1
+self-heal retried the SAME relative path → same HTML → "still same issues."
+- FIX (`309.2`): all 10 → **absolute** `src="/investor/workorders/woN.jpg"` — resolves
+  correctly whether the URL is `/investor` or `/investor/`, matching how the deck refs
+  `/led/` + `/deck/`. Verified by serving from the `public/` ROOT (mimics Vercel):
+  loaded 10 / broken 0, firstSrc `/investor/workorders/wo1.jpg`.
+- FOOT-GUN (the real lesson): on a static page reachable **without a trailing slash**
+  (Vercel serves `/investor` AND `/investor/` for `public/investor/index.html`, no
+  redirect), a RELATIVE sub-resource path breaks on the no-slash URL (resolves one dir
+  too high → the SPA-rewrite HTML). ALWAYS use ABSOLUTE asset paths (`/investor/...`) on
+  these standalone public pages — never relative. Test by serving from the deploy ROOT
+  (not the page's own dir) so the path structure matches Vercel; testing from the page's
+  own dir hides the bug. Applies to /led + /deck + /investor equally.
