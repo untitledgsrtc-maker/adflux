@@ -12208,3 +12208,28 @@ Owner: "remove slide 12 (Competition); slide 14 → slot 11."
 **12 tender-98 (capex/opex)** · 13 inventory/rates · 14 forecast · 15 roadmap · 16 ask ·
 17 risks · 18 team. Still to lift: inventory/rates, forecast, ask, risks, team + the
 record-slide private/govt turnover split when owner sends per-year ₹.
+
+
+---
+
+## 190 · Phase 303 — investor deck: merge concession + expansion into one slide (2026-08-12, `6c908b5`)
+
+Owner: "merge slide 9 & 10." Both were map slides — #9 concession (static 20-station
+`#gjmap` + moat bullets), #10 expansion (toggle map `#gjmap2` 20↔118 + stats). Merged
+into ONE slide (#9).
+- Kept the TOGGLE map (`#gjmap2` — its Today view already shows the 20, so the static
+  `#gjmap` was redundant → removed). Folded the 3 concession moat bullets into the stats
+  panel (`.expstats.merged` + new `.moat` bullet CSS).
+- **All toggle/stats IDs preserved** (esStations/esScreens/esCity/esNote/esJump/expbtn) →
+  setExpFull()/updateExpStats() unchanged. Removing `#gjmap` is safe: initMap() does
+  `var el=getElementById('gjmap'); if(!el) return;` (no-op) and GJ_IDX resolves to -1
+  (never matches in go()). Zero console errors confirmed.
+- Deck **18 → 17 slides**; counter/dots auto-recount. Verified live: #9 shows the moat +
+  toggle map, 20 markers → After-tender → 118 (1,244 screens · 33 districts), no overflow.
+
+### Investor-deck order now (17 slides)
+1 hero · 2 what-we-are · 3 product · 4 audience · 5 record · 6 2%-gap · 7 economics ·
+8 DAVP-unlock · **9 concession+expansion (merged map/toggle)** · 10 proven-20 (capex/opex) ·
+11 tender-98 (capex/opex) · 12 inventory/rates · 13 forecast · 14 roadmap · 15 ask ·
+16 risks · 17 team. Still to lift: inventory/rates, forecast, ask, risks, team + the
+record-slide private/govt turnover split when owner sends per-year ₹.
