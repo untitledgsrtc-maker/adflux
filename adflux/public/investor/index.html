@@ -95,7 +95,22 @@
   .slide.on .calc > *:nth-child(4){animation-delay:.46s}
   .slide.on .calc > *:nth-child(5){animation-delay:.58s}
   .slide.on .calc > *:nth-child(6){animation-delay:.70s}
+  .slide.on .calc > *:nth-child(7){animation-delay:.80s}
+  .slide.on .calc > *:nth-child(8){animation-delay:.90s}
+  .slide.on .calc > *:nth-child(9){animation-delay:1.00s}
+  .slide.on .calc > *:nth-child(10){animation-delay:1.10s}
+  .slide.on .calc > *:nth-child(11){animation-delay:1.20s}
   @media (prefers-reduced-motion:reduce){.slide.on .calc > *{animation:none;opacity:1}}
+  /* animated cost-proportion bar (tender capex/opex) */
+  .costbar{display:flex;height:11px;border-radius:999px;overflow:hidden;margin:2px 0 12px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+  .costbar .seg{width:0;height:100%;transition:width 1.15s cubic-bezier(.16,1,.3,1) .35s}
+  .slide.on .costbar .seg{width:var(--w)}
+  .calc.cost{max-width:none}
+  .calc.cost .crow{padding:7px 0} .calc.cost .cv{font-size:17px}
+  .calc.cost .cl small.d{font-family:var(--body);color:var(--ink2);font-size:11px}
+  .costgrid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,3vw,30px);margin-top:20px;align-items:start}
+  @media (max-width:820px){.costgrid{grid-template-columns:1fr}}
+  .col .ic .an-glow{transform-origin:center}
   .calc .ch{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--yellow);font-weight:600;margin-bottom:6px}
   .calc .crow{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:9px 0;border-top:1px solid rgba(255,255,255,.06)}
   .calc .cl{font-size:13.5px;color:var(--ink1)} .calc .cl small{display:block;color:var(--ink2);font-size:11.5px;margin-top:2px;font-family:var(--mono)}
@@ -1518,11 +1533,45 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <section class="slide">
     <div class="kicker anim">The tender — then &amp; now</div>
     <h2 class="anim">Bigger, and harder to win — exactly what we want.</h2>
-    <div class="cols anim" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
-      <div class="col"><div class="n">20 → 98</div><h3>stations</h3><p>≈ 5× the network vs last year.</p></div>
-      <div class="col"><div class="n">₹20 L → ₹80 L</div><h3>deposit (EMD)</h3><p>4× — thins the field to funded operators.</p></div>
-      <div class="col"><div class="n">₹3 Cr → ₹1 Cr</div><h3>eligibility</h3><p>Bar lowered; the real gate is capital, which we clear.</p></div>
-      <div class="col"><div class="n">City → talukas</div><h3>where</h3><p>Smaller towns, more of them — less competition.</p></div>
+    <div class="cols anim" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:20px">
+      <div class="col">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle class="an-glow" cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><circle cx="4" cy="6" r="1.4"/><circle cx="20" cy="6" r="1.4"/><circle cx="4" cy="18" r="1.4"/><circle cx="20" cy="18" r="1.4"/><path d="M12 12 4 6M12 12 20 6M12 12 4 18M12 12 20 18" opacity=".5"/></svg></div>
+        <div class="n">20 → 98</div><h3>stations</h3><p>≈ 5× the network vs last year.</p>
+      </div>
+      <div class="col">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path class="an-glow" d="M12 2 20 5v6c0 5-3.4 8.3-8 11-4.6-2.7-8-6-8-11V5z" fill="rgba(255,230,0,.10)"/><path d="M9.5 13h5M12 9v-.6c0-.9.8-1.6 1.9-1.4.9.1 1.4.8 1.4 1.5M12 9c-1.2 0-2 .7-2 1.6s.8 1.4 2 1.4 2 .6 2 1.5-.9 1.6-2.2 1.4c-.9-.1-1.4-.8-1.4-1.5"/></svg></div>
+        <div class="n">₹20 L → ₹80 L</div><h3>deposit (EMD)</h3><p>4× — thins the field to funded operators.</p>
+      </div>
+      <div class="col">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20 3 22V6l6-2 6 2 6-2v12" opacity=".55"/><path d="M9 4v16M15 6v6"/><path class="an-glow" d="M18 20a2.6 2.6 0 1 0 0-5.2A2.6 2.6 0 0 0 18 20z" fill="rgba(255,230,0,.14)"/><circle cx="18" cy="17.4" r=".7" fill="currentColor" stroke="none"/></svg></div>
+        <div class="n">City → talukas</div><h3>where</h3><p>Smaller towns, more of them — less competition.</p>
+      </div>
+    </div>
+
+    <div class="costgrid">
+      <div class="calc cost anim">
+        <div class="ch">Capex — build the 98 <span class="realchip">one-time</span></div>
+        <div class="costbar"><span class="seg" style="--w:53%;background:#FFE600"></span><span class="seg" style="--w:17%;background:rgba(255,230,0,.6)"></span><span class="seg" style="--w:14%;background:rgba(255,230,0,.4)"></span><span class="seg" style="--w:13%;background:rgba(255,230,0,.26)"></span><span class="seg" style="--w:3%;background:rgba(255,230,0,.14)"></span></div>
+        <div class="crow"><span class="cl">LED screens <small class="d">980 × ₹30,303</small></span><span class="cv">₹2.97 Cr</span></div>
+        <div class="crow"><span class="cl">DAVP file <small class="d">98 × ₹1,00,000</small></span><span class="cv">₹98.0 L</span></div>
+        <div class="crow"><span class="cl">Electrification &amp; cabling <small class="d">98 × ₹81,000</small></span><span class="cv">₹79.4 L</span></div>
+        <div class="crow"><span class="cl">Survey · meters · internet · cameras · AI</span><span class="cv">₹75.3 L</span></div>
+        <div class="crow"><span class="cl">+ 5% wastage <small class="d">spare / damaged screens</small></span><span class="cv">₹14.8 L</span></div>
+        <div class="ceq"><span class="cl">Total to build</span><b>₹<span data-count="5.65" data-dec="2">0</span> Cr</b></div>
+      </div>
+
+      <div class="calc cost anim">
+        <div class="ch">Opex — run the 98 <span class="realchip">per month</span></div>
+        <div class="costbar"><span class="seg" style="--w:34%;background:#FFE600"></span><span class="seg" style="--w:18%;background:#5aa9ff"></span><span class="seg" style="--w:17%;background:#38d39f"></span><span class="seg" style="--w:10%;background:rgba(255,230,0,.5)"></span><span class="seg" style="--w:8%;background:rgba(147,162,184,.8)"></span><span class="seg" style="--w:8%;background:rgba(147,162,184,.55)"></span><span class="seg" style="--w:5%;background:rgba(147,162,184,.35)"></span></div>
+        <div class="crow"><span class="cl">Sales team <small class="d">scaled to 98 stations</small></span><span class="cv">₹8.57 L</span></div>
+        <div class="crow"><span class="cl">Electricity <small class="d">980 screens × ₹450</small></span><span class="cv">₹4.41 L</span></div>
+        <div class="crow"><span class="cl">GSRTC rent <small class="d">98 × ₹4,200/mo</small></span><span class="cv">₹4.12 L</span></div>
+        <div class="crow"><span class="cl">Operations team</span><span class="cv">₹2.50 L</span></div>
+        <div class="crow"><span class="cl">Repair · maintenance · spares</span><span class="cv">₹1.96 L</span></div>
+        <div class="crow"><span class="cl">Internet · content · misc</span><span class="cv">₹1.96 L</span></div>
+        <div class="crow"><span class="cl">Site visits · servicing</span><span class="cv">₹1.23 L</span></div>
+        <div class="ceq"><span class="cl">Total to run</span><b>₹<span data-count="24.75" data-dec="2">0</span> L<em>≈ ₹2.97 Cr / year</em></b></div>
+      </div>
     </div>
   </section>
 
@@ -1557,19 +1606,36 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <p class="small anim">Government demand (₹1/slot) is the value driver — 5× the private per-slot rate. Private LED is early: ₹5.76 L booked so far, a growing supplementary line.</p>
   </section>
 
-  <!-- 13 BUILD COST -->
+  <!-- 13 EXISTING-20 COST DETAIL (proven builder) -->
   <section class="slide">
-    <div class="kicker anim">The build, in detail</div>
-    <h2 class="anim">₹5.65 Crore to build the 98 stations.</h2>
-    <table class="rtable anim">
-      <tr><td>LED screens (980 × ₹30,303)</td><td class="n">₹2.97 Cr</td></tr>
-      <tr><td>DAVP file (98 × ₹1,00,000)</td><td class="n">₹98.0 L</td></tr>
-      <tr><td>Electrification &amp; cabling</td><td class="n">₹79.4 L</td></tr>
-      <tr><td>Survey / meters / internet / cameras / AI</td><td class="n">₹75.3 L</td></tr>
-      <tr><td>+ 5% wastage (spare / damaged screens)</td><td class="n">₹14.8 L</td></tr>
-      <tr class="tot"><td>Total new-98 capex</td><td class="n">₹5.65 Cr</td></tr>
-    </table>
-    <p class="small anim">Existing 20 stations: ₹8.35 L/mo running cost (electricity ₹450/screen), ~₹1.8 L/mo profit at today's 2% fill.</p>
+    <div class="kicker anim">Proven — the 20 we already built</div>
+    <h2 class="anim">₹1.82 Cr built the first 20. ₹8.35 L/mo runs them.</h2>
+    <div class="costgrid">
+      <div class="calc cost anim">
+        <div class="ch">Capex — the 20 we built <span class="realchip">one-time · done</span></div>
+        <div class="costbar"><span class="seg" style="--w:44%;background:#FFE600"></span><span class="seg" style="--w:14%;background:rgba(255,230,0,.6)"></span><span class="seg" style="--w:13%;background:rgba(255,230,0,.42)"></span><span class="seg" style="--w:13%;background:rgba(255,230,0,.3)"></span><span class="seg" style="--w:11%;background:rgba(255,230,0,.2)"></span><span class="seg" style="--w:5%;background:rgba(255,230,0,.12)"></span></div>
+        <div class="crow"><span class="cl">LED screens <small class="d">264 × ₹30,303</small></span><span class="cv">₹80.0 L</span></div>
+        <div class="crow"><span class="cl">Bank guarantee + fee</span><span class="cv">₹24.7 L</span></div>
+        <div class="crow"><span class="cl">Electrification · meters · internet</span><span class="cv">₹24.4 L</span></div>
+        <div class="crow"><span class="cl">Facilitation · liaison · survey</span><span class="cv">₹23.5 L</span></div>
+        <div class="crow"><span class="cl">DAVP file <small class="d">20 × ₹1,00,000</small></span><span class="cv">₹20.0 L</span></div>
+        <div class="crow"><span class="cl">AI · software · cameras</span><span class="cv">₹9.9 L</span></div>
+        <div class="ceq"><span class="cl">Total already invested</span><b>₹<span data-count="1.82" data-dec="2">0</span> Cr</b></div>
+      </div>
+
+      <div class="calc cost anim">
+        <div class="ch">Opex — running the 20 <span class="realchip">per month</span></div>
+        <div class="costbar"><span class="seg" style="--w:49%;background:#FFE600"></span><span class="seg" style="--w:21%;background:#5aa9ff"></span><span class="seg" style="--w:14%;background:#38d39f"></span><span class="seg" style="--w:6%;background:rgba(255,230,0,.5)"></span><span class="seg" style="--w:5%;background:rgba(147,162,184,.7)"></span><span class="seg" style="--w:5%;background:rgba(147,162,184,.45)"></span></div>
+        <div class="crow"><span class="cl">GSRTC rent <small class="d">20 × ₹20,500/mo</small></span><span class="cv">₹4.10 L</span></div>
+        <div class="crow"><span class="cl">Sales team <small class="d">7 × ₹25,000</small></span><span class="cv">₹1.75 L</span></div>
+        <div class="crow"><span class="cl">Electricity <small class="d">264 screens × ₹450</small></span><span class="cv">₹1.19 L</span></div>
+        <div class="crow"><span class="cl">Operations team</span><span class="cv">₹0.51 L</span></div>
+        <div class="crow"><span class="cl">Repair · maintenance</span><span class="cv">₹0.40 L</span></div>
+        <div class="crow"><span class="cl">Other monthly</span><span class="cv">₹0.40 L</span></div>
+        <div class="ceq"><span class="cl">Total to run</span><b>₹<span data-count="8.35" data-dec="2">0</span> L<em>~ ₹1.8 L/mo profit at 2% fill</em></b></div>
+      </div>
+    </div>
+    <p class="small anim" style="margin-top:16px">We have already done this once. The ₹5.65 Cr for the 98 is the <b class="yellow">same build, 5× the scale</b> — priced from the exact per-unit costs above.</p>
   </section>
 
   <!-- 14 FORECAST -->
