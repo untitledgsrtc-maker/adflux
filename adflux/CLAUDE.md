@@ -12465,3 +12465,16 @@ swaps every number/chart/legend/brief/lead/fbenote/ladder (break-even 2.50 model
 (2.19, ₹4.14, −₹0.36 at 2%) · zero JS/SVG errors. Default = Combined (keeps §192's first-paint;
 Existing is one tap away — the safe framing). Fits the 800×450 worst-case pane (toggle+brief
 add ~62px, absorbed by tightened margins; caveat at the fold, full on any real ≥768px screen).
+
+### Phase 306.1 — KPI card 3 (op profit) now LIVE-tracks the dial
+Owner: the op-profit KPI (₹14.73 Cr) should CHANGE as the fill dial changes, like the readout
+below it. Made it live: KPI card 3's big number = `op(fill)` (green/red by sign), label "Op
+profit / yr at [X]% fill", updated in `recompute()` (ids `#fK3v`/`#fK3f`; no longer a data-count
+count-up → excluded from fCountKpis). The sub keeps the fixed **"→ ₹14.73 Cr at the 10% DAVP
+target"** anchor (existing mode: "measured +₹0.22 Cr/yr at 2% today"), so the opportunity stays
+on screen even at the honest 2% default where the big number reads −₹0.36 (red) and turns green
+as you drag up. Verified: 2%→−0.36(r) · 5%→+5.30(g) · 10%→+14.73(g) · existing 2%→−0.20(r), sub
+anchor intact. Cards 1/2 (break-even, leverage) are fill-independent constants; card 4 (payback)
+stays the 10%-target anchor (live payback is the #fPay line under the chart). This intentionally
+re-shows a red op-profit at the 2% open (the §192 concern) — accepted per the owner's explicit
+ask; the sub anchor + break-even/leverage/ladder/chart still carry the upside.

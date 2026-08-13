@@ -1733,7 +1733,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <div class="fkpis anim">
       <div class="fkpi"><div class="v y">&#8776;<span data-count="2.19" data-dec="2">0</span>%</div><div class="l">Break-even fill</div></div>
       <div class="fkpi"><div class="v y">+&#8377;<span data-count="1.89" data-dec="2">0</span> Cr</div><div class="l">Op profit per +1% fill</div></div>
-      <div class="fkpi"><div class="v g">&#8377;<span data-count="14.73" data-dec="2">0</span> Cr</div><div class="l">Op profit / yr at 10% DAVP target</div><div class="s">vs <b class="r">&minus;&#8377;0.36 Cr</b> at 2% today</div></div>
+      <div class="fkpi"><div class="v g" id="fK3v">+&#8377;14.73 Cr</div><div class="l">Op profit / yr <span id="fK3f">at 10% fill</span></div><div class="s" id="fK3s">&rarr; <b class="g">&#8377;14.73 Cr</b> at the 10% DAVP target</div></div>
       <div class="fkpi"><div class="v g"><span data-count="9.4" data-dec="1">0</span> mo</div><div class="l">Capex payback at 10% fill</div><div class="s"><b>+&#8377;60.5 Cr</b> cash by Year 5</div></div>
     </div>
     <div class="fmain anim">
@@ -2094,6 +2094,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
     var bm=document.getElementById('fbeMark'); if(bm){ var pos=(Math.min(m.be,12)-2)/10*100; bm.style.left=Math.max(0,Math.min(pos,100))+'%'; }
     var op=m.op(m.fill), win=op>=0, rd=document.getElementById('fRead');
     if(rd) rd.innerHTML='Fill <span class="yv">'+m.fill.toFixed(1)+'%</span> &nbsp;\u00B7&nbsp; Rev <span class="yv">\u20B9'+m.rev(m.fill).toFixed(2)+' Cr</span> &nbsp;\u00B7&nbsp; Op profit <b class="'+(win?'g':'r')+'">'+(op>=0?'+':'\u2212')+'\u20B9'+Math.abs(op).toFixed(2)+' Cr/yr</b>';
+    var k3=document.getElementById('fK3v'); if(k3){ k3.className='v '+(win?'g':'r'); k3.innerHTML=(op>=0?'+':'\u2212')+'\u20B9'+Math.abs(op).toFixed(2)+' Cr'; }
+    var k3f=document.getElementById('fK3f'); if(k3f) k3f.textContent='at '+m.fill.toFixed(1)+'% fill';
     var mo=m.paybackMo(m.fill), pe=document.getElementById('fPay');
     if(pe){ if(mo!==null){ var c5=m.cumY5(m.fill); pe.innerHTML='Capex \u20B9'+m.capex.toFixed(2)+' Cr recovered in <b>'+(mo<12?mo.toFixed(1)+' months':(mo/12).toFixed(1)+' years')+'</b> &nbsp;\u00B7&nbsp; cumulative cash <b>'+(c5>=0?'+':'\u2212')+'\u20B9'+Math.abs(c5).toFixed(1)+' Cr</b> by Year 5.'; }
       else{ pe.innerHTML='<b class="r">At '+m.fill.toFixed(1)+'% fill the build does not recover its capex inside the 5-year term.</b> Drag up \u2014 break-even is '+m.be.toFixed(2)+'%.'; } }
@@ -2109,7 +2111,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     combined:{
       kpis:'<div class="fkpi"><div class="v y">&#8776;<span data-count="2.19" data-dec="2">0</span>%</div><div class="l">Break-even fill</div></div>'
         +'<div class="fkpi"><div class="v y">+&#8377;<span data-count="1.89" data-dec="2">0</span> Cr</div><div class="l">Op profit per +1% fill</div></div>'
-        +'<div class="fkpi"><div class="v g">&#8377;<span data-count="14.73" data-dec="2">0</span> Cr</div><div class="l">Op profit / yr at 10% DAVP target</div><div class="s">vs <b class="r">&minus;&#8377;0.36 Cr</b> at 2% today</div></div>'
+        +'<div class="fkpi"><div class="v g" id="fK3v">+&#8377;14.73 Cr</div><div class="l">Op profit / yr <span id="fK3f">at 10% fill</span></div><div class="s" id="fK3s">&rarr; <b class="g">&#8377;14.73 Cr</b> at the 10% DAVP target</div></div>'
         +'<div class="fkpi"><div class="v g"><span data-count="9.4" data-dec="1">0</span> mo</div><div class="l">Capex payback at 10% fill</div><div class="s"><b>+&#8377;60.5 Cr</b> cash by Year 5</div></div>',
       brief:'Capex <b>&#8377;5.65 Cr</b> <span class="mute">(the &#8377;5 Cr ask)</span> &nbsp;&middot;&nbsp; Opex <b>&#8377;4.14 Cr/yr</b> &nbsp;&middot;&nbsp; <span class="mute">&#8377;7.47 Cr total incl. the 20 already built</span>',
       leadCost:'&#8377;4.14&#8201;Cr/yr', leadStep:'&#8377;1.89&#8201;Cr', legCost:'Fixed cost &#8377;4.14 Cr/yr', headBe:'2.19',
@@ -2119,7 +2121,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     existing:{
       kpis:'<div class="fkpi"><div class="v y">&#8776;<span data-count="2.50" data-dec="2">0</span>%</div><div class="l">Break-even fill <span style="color:var(--ink2)">(model)</span></div></div>'
         +'<div class="fkpi"><div class="v y">+&#8377;<span data-count="0.40" data-dec="2">0</span> Cr</div><div class="l">Op profit per +1% fill</div></div>'
-        +'<div class="fkpi"><div class="v g">+&#8377;<span data-count="3.00" data-dec="2">0</span> Cr</div><div class="l">Op profit / yr at 10% fill</div><div class="s">measured <b class="g">+&#8377;0.22 Cr/yr</b> at 2% today</div></div>'
+        +'<div class="fkpi"><div class="v g" id="fK3v">+&#8377;3.00 Cr</div><div class="l">Op profit / yr <span id="fK3f">at 10% fill</span></div><div class="s" id="fK3s">measured <b class="g">+&#8377;0.22 Cr/yr</b> at 2% today</div></div>'
         +'<div class="fkpi"><div class="v y">&#8377;<span data-count="1.82" data-dec="2">0</span> Cr</div><div class="l">Capex &mdash; already spent</div><div class="s">sunk &middot; cash-positive now, no forward payback</div></div>',
       brief:'Capex <b>&#8377;1.82 Cr</b> <span class="mute">&mdash; already spent (sunk)</span> &nbsp;&middot;&nbsp; Opex <b>&#8377;1.00 Cr/yr</b> &nbsp;&middot;&nbsp; <b class="g">+&#8377;0.22 Cr/yr operating profit today (real)</b>',
       leadCost:'&#8377;1.00&#8201;Cr/yr', leadStep:'&#8377;0.40&#8201;Cr', legCost:'Fixed cost &#8377;1.00 Cr/yr', headBe:'2.50',
