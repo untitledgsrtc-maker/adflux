@@ -12182,3 +12182,29 @@ Done: 1 hero · 2-3 · 4 · 5 record · 6 (5,040+1.98%) · 7 economics · 8 leve
 10 expansion 20→118 · 10-tender (this: 3 vector cards + 98 capex/opex) · 13→existing-20
 capex/opex (this). Still to lift: competition, inventory/rates, forecast, ask, risks, team
 + the record-slide private/govt turnover split when owner sends per-year ₹.
+
+
+---
+
+## 189 · Phase 302 — investor deck: remove Competition slide + reorder Proven-20 → slot 11 (2026-08-12, `9276f0c`)
+
+Owner: "remove slide 12 (Competition); slide 14 → slot 11."
+- Removed the **Competition** slide ("Why us / Everyone else sells space", displayed #12).
+- Moved the **Existing-20 proven** slide (§188, "₹1.82 Cr built the first 20") from #14 to
+  **#11** — now BEFORE the tender capex/opex slide (#12). Reads proven-20 → tender-98.
+- Deck 19 → **18 slides**; counter/dots auto-recount (dynamic — counts `.slide` elements).
+- Done as a Python structural move on the section comment-anchors (delete 2 sections /
+  reinsert 1) — reliable vs giant fragile Edit strings; verified live (18 dots, #11 =
+  Proven-20, #12 = Tender, counter "11 / 18", Competition gone).
+- ⚠ Slide-comment numbers (`<!-- N ... -->`) are STALE (the §298 economics insert + this
+  reorder shifted everything) — go by CONTENT / the live displayed number, never the
+  comment number. The deck's HERO is `<section class="slide on hero1">` (not plain
+  `class="slide"`) so a bare `grep 'class="slide"'` undercounts by 1 — use `grep
+  '<section class="slide'`.
+
+### Investor-deck order now (18 slides)
+1 hero · 2 what-we-are · 3 product · 4 audience · 5 record · 6 2%-gap · 7 economics ·
+8 DAVP-unlock · 9 concession · 10 expansion(20→118) · **11 proven-20 (capex/opex)** ·
+**12 tender-98 (capex/opex)** · 13 inventory/rates · 14 forecast · 15 roadmap · 16 ask ·
+17 risks · 18 team. Still to lift: inventory/rates, forecast, ask, risks, team + the
+record-slide private/govt turnover split when owner sends per-year ₹.
