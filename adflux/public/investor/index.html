@@ -112,6 +112,24 @@
   .occgrid svg{width:100%;max-width:300px;display:block;margin:0 auto}
   .occgrid .occcap{font-size:11.5px;color:var(--ink2);text-align:center;margin-top:8px}
   .occgrid .occcap b{color:var(--yellow)}
+  /* ---------- growth levers (slide 7) ---------- */
+  .levers{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:22px}
+  @media(max-width:900px){.levers{grid-template-columns:1fr}}
+  .lever{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent),var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 17px;transition:transform .25s,border-color .25s}
+  .lever:hover{transform:translateY(-3px);border-color:rgba(255,230,0,.3)}
+  .lever .lv-ill{height:116px;display:flex;align-items:center;justify-content:center;margin-bottom:13px;border-bottom:1px solid var(--line);padding-bottom:12px}
+  .lever .lv-ill svg{width:auto;height:100%;max-width:100%}
+  .lever .lv-tag{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow);font-weight:600}
+  .lever h3{font-size:16px;margin:5px 0 6px}
+  .lever p{font-size:12.5px;color:var(--ink2);margin:0 0 11px;line-height:1.45}
+  .lever .lv-metric{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--ink1);border-top:1px solid var(--line);padding-top:10px}
+  .lever .lv-metric span{color:var(--yellow)}
+  .target{display:flex;align-items:center;justify-content:center;gap:clamp(12px,3vw,34px);flex-wrap:wrap;margin-top:18px;background:var(--navy2);border:1px solid var(--line);border-radius:16px;padding:15px 20px}
+  .target .tstep{text-align:center}
+  .target .tstep .tv{font-family:var(--disp);font-weight:700;font-size:clamp(26px,4vw,40px);color:var(--yellow);line-height:1;text-shadow:0 0 24px rgba(255,230,0,.3)}
+  .target .tstep .tv.ink{color:var(--ink0);text-shadow:none;font-size:clamp(15px,1.8vw,19px);max-width:12ch}
+  .target .tstep .tl{font-size:10px;color:var(--ink2);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+  .target .tarr{color:var(--ink2);font-size:22px}
   ul.clean{list-style:none;padding:0;margin:18px 0 0} ul.clean li{position:relative;padding:9px 0 9px 22px;font-size:14.5px;color:var(--ink1);border-top:1px solid var(--line)}
   ul.clean li:before{content:'';position:absolute;left:2px;top:16px;width:7px;height:7px;border-radius:2px;background:var(--yellow)}
   ul.clean li b{color:var(--ink0)}
@@ -203,7 +221,8 @@
   .ibadge{position:absolute;z-index:2;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--navy);background:var(--yellow);border-radius:8px;padding:4px 10px;box-shadow:0 8px 20px rgba(255,230,0,.4);display:flex;align-items:center;gap:6px;white-space:nowrap}
   .ibadge .rd{width:6px;height:6px;border-radius:50%;background:var(--navy);animation:blink 1.4s infinite}
   .ibadge.g{background:var(--green);color:#05221a}.ibadge.g .rd{background:#05221a}
-  .illwrap svg [class*="an-"]{transform-box:fill-box;transform-origin:center}
+  svg [class*="an-"]{transform-box:fill-box}
+  svg .an-dbox,svg .an-pop,svg .an-lock{transform-origin:center}
   .an-beam{stroke-dasharray:7 6}
   .slide.on .an-beam{animation:march 1s linear infinite}
   @keyframes march{to{stroke-dashoffset:-13}}
@@ -623,16 +642,88 @@
   <!-- 7 DAVP UNLOCK -->
   <section class="slide">
     <div class="kicker anim">The unlock</div>
-    <h2 class="anim">Why 2% — and what takes it to 10%.</h2>
-    <p class="lead anim">We're at 2% because the government rate card (DAVP pricing) for these screens is still being finalised — departments can't book at scale until the price is set. When DAVP prices land, the government demand already flowing through GSRTC can be booked against our screens, at <b class="yellow">₹1 per slot</b> — five times the private per-slot rate.</p>
-    <div class="flowrow anim">
-      <div><div class="lbl">today</div><div class="big" style="font-size:clamp(44px,9vw,100px)">2%</div><div class="muted">DAVP pending</div></div>
-      <div class="arrowbig">→</div>
-      <div><div class="lbl">catalyst</div><div style="font-family:var(--disp);font-weight:700;font-size:19px;color:var(--yellow);max-width:12ch">DAVP rate card set</div></div>
-      <div class="arrowbig">→</div>
-      <div><div class="lbl">6-month target</div><div class="big" style="font-size:clamp(44px,9vw,100px)">10%</div><div class="muted">= 5× revenue</div></div>
+    <h2 class="anim">Why 2% today — and the three levers that take it to 10%+.</h2>
+    <p class="lead anim" style="max-width:64ch">We're at 2% only because the government rate card (DAVP) isn't set yet. Three levers — already in motion — fill the empty 98%:</p>
+    <div class="levers anim">
+
+      <div class="lever">
+        <div class="lv-ill"><svg viewBox="0 0 200 130" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="34" y="12" width="98" height="106" rx="7" fill="#0b1120" stroke="#c3cbe0" stroke-width="2"/>
+          <rect x="46" y="24" width="52" height="8" rx="4" fill="#FFE600"/>
+          <rect x="46" y="38" width="36" height="5" rx="2.5" fill="#8b96b4"/>
+          <rect class="an-dbox d1" x="46" y="52" width="74" height="12" rx="3" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1"/>
+          <rect class="an-dbox d2" x="46" y="70" width="74" height="12" rx="3" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1"/>
+          <rect class="an-dbox d3" x="46" y="88" width="74" height="12" rx="3" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1"/>
+          <text class="an-dbox d1" x="114" y="61" fill="#FFE600" font-family="Space Grotesk" font-size="9" font-weight="700" text-anchor="end">₹1</text>
+          <text class="an-dbox d2" x="114" y="79" fill="#FFE600" font-family="Space Grotesk" font-size="9" font-weight="700" text-anchor="end">₹1</text>
+          <text class="an-dbox d3" x="114" y="97" fill="#FFE600" font-family="Space Grotesk" font-size="9" font-weight="700" text-anchor="end">₹1</text>
+          <g class="an-glow">
+            <circle cx="142" cy="94" r="21" fill="#0b1120" stroke="#FFE600" stroke-width="2"/>
+            <path d="M142 82 l9 3.5 v7 c0 5.5 -3.6 9 -9 10.8 c-5.4 -1.8 -9 -5.3 -9 -10.8 v-7 z" fill="#FFE600" fill-opacity="0.18" stroke="#FFE600" stroke-width="1.5"/>
+            <path d="M137.5 93 l3 3 l6 -6.5" stroke="#FFE600" stroke-width="1.8" fill="none"/>
+          </g>
+        </svg></div>
+        <div class="lv-tag">Lever 1 · government</div>
+        <h3>DAVP rate card set</h3>
+        <p>Once the government rate card lands, departments already advertising through GSRTC book our screens at scale.</p>
+        <div class="lv-metric"><span>₹1 / slot</span> — 5× the private rate · 2% → <span>10%</span></div>
+      </div>
+
+      <div class="lever">
+        <div class="lv-ill"><svg viewBox="0 0 200 130" fill="none">
+          <line class="an-beam" x1="100" y1="65" x2="34" y2="22" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.6"/>
+          <line class="an-beam" x1="100" y1="65" x2="27" y2="65" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.6"/>
+          <line class="an-beam" x1="100" y1="65" x2="40" y2="108" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.6"/>
+          <line class="an-beam" x1="100" y1="65" x2="166" y2="22" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.6"/>
+          <line class="an-beam" x1="100" y1="65" x2="173" y2="65" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.6"/>
+          <line class="an-beam" x1="100" y1="65" x2="160" y2="108" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.6"/>
+          <rect class="an-dbox d1" x="22" y="10" width="22" height="22" rx="6" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/>
+          <rect class="an-dbox d2" x="14" y="54" width="22" height="22" rx="6" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/>
+          <rect class="an-dbox d3" x="28" y="98" width="22" height="22" rx="6" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/>
+          <rect class="an-dbox d2" x="156" y="10" width="22" height="22" rx="6" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/>
+          <rect class="an-dbox d3" x="162" y="54" width="22" height="22" rx="6" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/>
+          <rect class="an-dbox d1" x="148" y="98" width="22" height="22" rx="6" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/>
+          <g class="an-glow">
+            <circle cx="100" cy="65" r="26" fill="#0b1120" stroke="#FFE600" stroke-width="2.5"/>
+            <rect x="87" y="55" width="26" height="18" rx="2.5" fill="#FFE600" fill-opacity="0.2" stroke="#FFE600" stroke-width="1.6"/>
+            <path d="M97 60 l7 4 l-7 4 z" fill="#FFE600"/>
+          </g>
+        </svg></div>
+        <div class="lv-tag">Lever 2 · private</div>
+        <h3>Agency onboarding</h3>
+        <p>Ad agencies bring many brands at once. Onboarding them channels private demand straight onto the empty inventory.</p>
+        <div class="lv-metric"><span>700+</span> brands run · agencies scale the private side</div>
+      </div>
+
+      <div class="lever">
+        <div class="lv-ill"><svg viewBox="0 0 200 130" fill="none">
+          <ellipse cx="100" cy="66" rx="84" ry="52" fill="rgba(255,230,0,0.03)" stroke="rgba(255,255,255,0.13)" stroke-width="1.4" stroke-dasharray="3 4"/>
+          <line class="an-beam" x1="100" y1="66" x2="50" y2="34" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <line class="an-beam" x1="100" y1="66" x2="150" y2="40" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <line class="an-beam" x1="100" y1="66" x2="56" y2="96" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <line class="an-beam" x1="100" y1="66" x2="148" y2="94" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <line class="an-beam" x1="100" y1="66" x2="104" y2="26" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <g class="an-dbox d1"><circle cx="50" cy="34" r="7" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/><circle cx="50" cy="34" r="2.5" fill="#FFE600"/></g>
+          <g class="an-dbox d2"><circle cx="150" cy="40" r="7" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/><circle cx="150" cy="40" r="2.5" fill="#FFE600"/></g>
+          <g class="an-dbox d3"><circle cx="56" cy="96" r="7" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/><circle cx="56" cy="96" r="2.5" fill="#FFE600"/></g>
+          <g class="an-dbox d1"><circle cx="148" cy="94" r="7" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/><circle cx="148" cy="94" r="2.5" fill="#FFE600"/></g>
+          <g class="an-dbox d2"><circle cx="104" cy="26" r="7" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.6"/><circle cx="104" cy="26" r="2.5" fill="#FFE600"/></g>
+          <g class="an-glow"><circle cx="100" cy="66" r="11" fill="#0b1120" stroke="#FFE600" stroke-width="2.2"/><path d="M100 58 c-6 5 -6 12 0 18 c6 -6 6 -13 0 -18 z" fill="#FFE600"/><circle cx="100" cy="65" r="3" fill="#0b1120"/></g>
+        </svg></div>
+        <div class="lv-tag">Lever 3 · footprint</div>
+        <h3>Team across Gujarat</h3>
+        <p>Sales and operations expanding station by station — more feet on the ground means more stations sold and run statewide.</p>
+        <div class="lv-metric"><span>20 stations</span> today · expanding across Gujarat</div>
+      </div>
+
     </div>
-    <p class="small anim">10% fill is still 90% empty — room far beyond it. The entire 5× rests on that one event, and we're not hiding it.</p>
+    <div class="target anim">
+      <div class="tstep"><div class="tv">2%</div><div class="tl">Today · DAVP pending</div></div>
+      <div class="tarr">→</div>
+      <div class="tstep"><div class="tv ink">The three levers, in motion</div><div class="tl">Catalyst</div></div>
+      <div class="tarr">→</div>
+      <div class="tstep"><div class="tv">10%+</div><div class="tl">= 5× revenue · still 90% empty</div></div>
+    </div>
   </section>
 
   <!-- 8 WHY GSRTC -->
