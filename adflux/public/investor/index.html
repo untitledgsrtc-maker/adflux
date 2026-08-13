@@ -131,8 +131,8 @@
   .target .tstep .tl{font-size:10px;color:var(--ink2);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
   .target .tarr{color:var(--ink2);font-size:22px}
   /* ---------- real Gujarat tile maps (Leaflet + dark tiles) ---------- */
-  #gjmap{width:100%;height:min(54vh,410px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
-  #gjmap2{width:100%;height:min(56vh,440px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
+  #gjmap{width:100%;height:min(66vh,540px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
+  #gjmap2{width:100%;height:min(68vh,580px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
   [id^="gjmap"] .leaflet-container{background:#0b1120;font-family:var(--body)}
   [id^="gjmap"] .leaflet-control-zoom{border:none!important;box-shadow:none!important;margin:12px}
   [id^="gjmap"] .leaflet-control-zoom a{background:rgba(20,28,48,.92);color:var(--ink1);border:1px solid var(--line);width:26px;height:26px;line-height:24px;font-size:16px;border-radius:7px;margin-bottom:5px}
@@ -1491,7 +1491,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
           <li>Government is also a <b>customer</b> here — departments advertise on the same screens through DAVP. We sit on both sides of the desk.</li>
         </ul>
       </div>
-      <div class="anim" style="width:100%;max-width:540px;margin:0 auto"><div id="gjmap"></div><div class="small" style="text-align:center;margin-top:10px">20 GSRTC stations live across Gujarat — real locations. <b class="yellow">98 more</b> in the tender.</div></div>
+      <div class="anim" style="width:100%;max-width:720px;margin:0 auto"><div id="gjmap"></div><div class="small" style="text-align:center;margin-top:10px">20 GSRTC stations live across Gujarat — real locations. <b class="yellow">98 more</b> in the tender.</div></div>
     </div>
   </section>
 
@@ -1701,6 +1701,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     var _gj2=document.getElementById('gjmap2'); GJ2_IDX=_gj2?[].indexOf.call(slides,_gj2.closest('.slide')):-1;
     var expbs=document.querySelectorAll('.expbtn'); for(var eb=0;eb<expbs.length;eb++) expbs[eb].addEventListener('click',function(e){ setExpFull(e.currentTarget.getAttribute('data-full')==='1'); });
     drawRecord(recordStep); wireCalc(); recompute(); tickLive();
+    setTimeout(function(){ try{ initMap(); }catch(e){} try{ initMap2(); }catch(e){} }, 350);
     go(0,true);
   }
 
@@ -1731,8 +1732,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(n===0) buildReticles();
     var fs=slides[n].querySelector('#fillSold'); if(fs){ fs.style.width='0%'; setTimeout(function(){ fs.style.width='2%'; },250); }
     if(n===RECORD_IDX){ recordStep=1; drawRecord(1); updateRecordInfo(); updateRecBtn(); }
-    if(n===GJ_IDX){ if(!GJ_MAP){ initMap(); } else { setTimeout(function(){ try{ GJ_MAP.invalidateSize(); }catch(e){} },60); } }
-    if(n===GJ2_IDX){ if(!GJ2){ initMap2(); } else { setTimeout(function(){ try{ GJ2.invalidateSize(); }catch(e){} },60); } }
+    if(n===GJ_IDX){ if(!GJ_MAP){ initMap(); } [80,360,720].forEach(function(t){ setTimeout(function(){ try{ GJ_MAP&&GJ_MAP.invalidateSize(); }catch(e){} },t); }); }
+    if(n===GJ2_IDX){ if(!GJ2){ initMap2(); } [80,360,720].forEach(function(t){ setTimeout(function(){ try{ GJ2&&GJ2.invalidateSize(); }catch(e){} },t); }); }
   }
 
   function countUpsIn(slide){
