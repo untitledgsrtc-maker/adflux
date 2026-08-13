@@ -130,14 +130,27 @@
   .target .tstep .tv.ink{color:var(--ink0);text-shadow:none;font-size:clamp(15px,1.8vw,19px);max-width:12ch}
   .target .tstep .tl{font-size:10px;color:var(--ink2);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
   .target .tarr{color:var(--ink2);font-size:22px}
-  /* ---------- real Gujarat tile map (slide 8 · Leaflet + dark tiles) ---------- */
+  /* ---------- real Gujarat tile maps (Leaflet + dark tiles) ---------- */
   #gjmap{width:100%;height:min(54vh,410px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
-  #gjmap .leaflet-container{background:#0b1120;font-family:var(--body)}
-  #gjmap .leaflet-control-zoom{border:none!important;box-shadow:none!important;margin:12px}
-  #gjmap .leaflet-control-zoom a{background:rgba(20,28,48,.92);color:var(--ink1);border:1px solid var(--line);width:26px;height:26px;line-height:24px;font-size:16px;border-radius:7px;margin-bottom:5px}
-  #gjmap .leaflet-control-zoom a:hover{background:#1b2540;color:var(--yellow)}
-  #gjmap .gj-tip{background:#0b1120;border:1px solid var(--line);color:var(--ink0);font-family:var(--body);font-size:11.5px;font-weight:600;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.55);padding:4px 9px}
-  #gjmap .gj-tip::before{border-top-color:var(--line)}
+  #gjmap2{width:100%;height:min(56vh,440px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
+  [id^="gjmap"] .leaflet-container{background:#0b1120;font-family:var(--body)}
+  [id^="gjmap"] .leaflet-control-zoom{border:none!important;box-shadow:none!important;margin:12px}
+  [id^="gjmap"] .leaflet-control-zoom a{background:rgba(20,28,48,.92);color:var(--ink1);border:1px solid var(--line);width:26px;height:26px;line-height:24px;font-size:16px;border-radius:7px;margin-bottom:5px}
+  [id^="gjmap"] .leaflet-control-zoom a:hover{background:#1b2540;color:var(--yellow)}
+  [id^="gjmap"] .gj-tip{background:#0b1120;border:1px solid var(--line);color:var(--ink0);font-family:var(--body);font-size:11.5px;font-weight:600;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.55);padding:4px 9px}
+  [id^="gjmap"] .gj-tip::before{border-top-color:var(--line)}
+  /* expansion toggle + stats (slide 10) */
+  .exptoggle{display:inline-flex;gap:0;background:var(--navy2);border:1px solid var(--line);border-radius:12px;padding:4px;margin-top:16px}
+  .expbtn{font-family:var(--disp);font-weight:700;font-size:13px;padding:9px 16px;border:none;background:transparent;color:var(--ink2);border-radius:9px;cursor:pointer;transition:.2s;white-space:nowrap}
+  .expbtn.on{background:var(--yellow);color:var(--navy);box-shadow:0 0 20px rgba(255,230,0,.28)}
+  .expstats{background:var(--navy2);border:1px solid var(--line);border-radius:16px;padding:22px 24px;align-self:stretch;display:flex;flex-direction:column;justify-content:center}
+  .expstats .es-big{font-family:var(--disp);font-weight:700;font-size:clamp(46px,7vw,74px);line-height:1;color:var(--yellow);text-shadow:0 0 30px rgba(255,230,0,.3);display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .expstats .es-big em{font-style:normal;font-size:18px;color:var(--ink1);font-weight:500}
+  .expstats .es-chip{font-size:14px;font-weight:700;color:#05221a;background:var(--green);border-radius:999px;padding:3px 11px;font-family:var(--disp);align-self:center}
+  .expstats .es-row{font-family:var(--disp);font-weight:700;font-size:clamp(18px,2.4vw,24px);color:var(--ink0);margin-top:14px}
+  .expstats .es-row span{color:var(--yellow)}
+  .expstats .es-note{font-size:13.5px;color:var(--ink2);margin-top:14px;line-height:1.5}
+  .expstats .es-jump{font-size:12.5px;color:var(--yellow);margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07);font-weight:600}
   /* ---------- current economics (slide 6b) ---------- */
   .ecobox{background:var(--navy2);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
   .ecobox .ch{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--yellow);font-weight:600;margin-bottom:14px}
@@ -1484,30 +1497,20 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
   <!-- 9 EXPANSION -->
   <section class="slide">
-    <div class="split">
-      <div>
-        <div class="kicker anim">The expansion</div>
-        <h2 class="anim">A tender for 98 more stations — 5× the network.</h2>
-        <div class="cols anim" style="grid-template-columns:1fr 1fr">
-          <div class="col"><div class="n ink" data-count="98">98</div><h3>new stations</h3><p>≈ 980 new screens (10 per station).</p></div>
-          <div class="col"><div class="n ink">₹5.65 Cr</div><h3>build capex</h3><p>Bottom-up, incl. 5% wastage.</p></div>
-          <div class="col"><div class="n ink">5 yr</div><h3>contract</h3><p>Scarce, multi-year concession.</p></div>
-          <div class="col"><div class="n">The moat</div><h3>who can't bid</h3><p>₹80 L deposit + guarantee + audited books.</p></div>
-        </div>
+    <div class="kicker anim">The expansion</div>
+    <h2 class="anim">One tender turns 20 stations into 118.</h2>
+    <div class="exptoggle anim">
+      <button class="expbtn on" data-full="0">Today · 20 stations</button>
+      <button class="expbtn" data-full="1">After the tender · 118</button>
+    </div>
+    <div class="split anim" style="margin-top:14px;align-items:stretch;grid-template-columns:1.2fr .8fr">
+      <div><div id="gjmap2"></div></div>
+      <div class="expstats" id="expStats">
+        <div class="es-big"><span id="esStations">20</span> <em>stations</em></div>
+        <div class="es-row"><span id="esScreens">264</span> screens · <span id="esCity">20</span> districts</div>
+        <div class="es-note" id="esNote">The live network we run today — 20 GSRTC stations, 264 LED screens.</div>
+        <div class="es-jump" id="esJump">Tap “After the tender” → 98 new stations light up across Gujarat.</div>
       </div>
-      <div class="illus anim sm"><svg viewBox="0 0 340 240" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M40 20 V204 M40 204 H322" stroke="#c3cbe0" stroke-width="2"/>
-  <g fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.5">
-    <rect x="56" y="160" width="36" height="44" rx="4"/>
-    <rect x="110" y="128" width="36" height="76" rx="4"/>
-    <rect x="164" y="96" width="36" height="108" rx="4"/>
-    <rect x="218" y="60" width="36" height="144" rx="4"/>
-    <rect x="272" y="26" width="36" height="178" rx="4"/>
-  </g>
-  <polyline points="74,150 128,120 182,88 236,52 292,24" stroke="#FFE600" stroke-width="3.5"/>
-  <path d="M292 24 L280 20 M292 24 L286 33" stroke="#FFE600" stroke-width="3.5"/>
-  <g fill="#FFE600"><circle cx="74" cy="150" r="3"/><circle cx="128" cy="120" r="3"/><circle cx="182" cy="88" r="3"/><circle cx="236" cy="52" r="3"/><circle cx="292" cy="24" r="3"/></g>
-</svg></div>
     </div>
   </section>
 
@@ -1695,6 +1698,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
     st.addEventListener('touchstart',function(e){ x0=e.touches[0].clientX; },{passive:true});
     st.addEventListener('touchend',function(e){ if(x0===null) return; var dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>60) advance(dx<0?1:-1); x0=null; },{passive:true});
     var _gj=document.getElementById('gjmap'); GJ_IDX=_gj?[].indexOf.call(slides,_gj.closest('.slide')):-1;
+    var _gj2=document.getElementById('gjmap2'); GJ2_IDX=_gj2?[].indexOf.call(slides,_gj2.closest('.slide')):-1;
+    var expbs=document.querySelectorAll('.expbtn'); for(var eb=0;eb<expbs.length;eb++) expbs[eb].addEventListener('click',function(e){ setExpFull(e.currentTarget.getAttribute('data-full')==='1'); });
     drawRecord(recordStep); wireCalc(); recompute(); tickLive();
     go(0,true);
   }
@@ -1727,6 +1732,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     var fs=slides[n].querySelector('#fillSold'); if(fs){ fs.style.width='0%'; setTimeout(function(){ fs.style.width='2%'; },250); }
     if(n===RECORD_IDX){ recordStep=1; drawRecord(1); updateRecordInfo(); updateRecBtn(); }
     if(n===GJ_IDX){ if(!GJ_MAP){ initMap(); } else { setTimeout(function(){ try{ GJ_MAP.invalidateSize(); }catch(e){} },60); } }
+    if(n===GJ2_IDX){ if(!GJ2){ initMap2(); } else { setTimeout(function(){ try{ GJ2.invalidateSize(); }catch(e){} },60); } }
   }
 
   function countUpsIn(slide){
@@ -1818,6 +1824,54 @@ svg.leaflet-image-layer.leaflet-interactive path {
     GJ_MAP=map;
     var b=L.latLngBounds(pts);
     setTimeout(function(){ try{ map.invalidateSize(); map.fitBounds(b,{padding:[26,26],maxZoom:8}); }catch(e){} },90);
+  }
+
+  /* expansion map — 20 existing (yellow) + toggle to add the 98 tender stations (green) */
+  var GJ2=null, GJ2_IDX=-1, gj2Full=false, gj2New=[];
+  var NEW98=[[23.08,72.60],[23.17,72.82],[22.99,72.38],[23.12,72.03],[22.72,72.44],[22.38,71.99],[21.60,71.22],[21.33,71.30],[21.33,71.02],[21.49,70.96],[20.82,71.03],[20.79,70.70],[21.05,71.44],[22.99,74.15],[22.50,73.47],[22.61,73.46],[23.13,73.61],[22.81,73.99],[23.15,73.89],[21.93,69.78],[22.20,69.65],[22.47,69.07],[21.12,70.12],[21.74,70.28],[21.75,70.62],[21.73,70.45],[21.90,70.65],[21.70,69.75],[21.30,70.25],[21.49,70.06],[21.05,70.50],[22.69,72.86],[22.41,72.90],[22.95,73.33],[22.48,72.80],[22.75,73.15],[22.31,72.62],[23.02,73.07],[24.17,72.43],[24.33,72.85],[24.59,72.71],[23.92,72.38],[24.25,72.18],[23.83,71.60],[21.70,72.98],[21.63,73.00],[21.87,73.50],[21.83,73.72],[22.05,72.80],[21.73,73.13],[22.02,71.57],[22.36,71.87],[21.53,71.83],[21.53,71.58],[21.09,71.77],[21.35,72.03],[23.11,70.02],[22.83,69.35],[23.35,69.26],[22.84,69.72],[23.59,72.37],[23.70,72.55],[23.79,72.64],[23.30,72.33],[23.69,71.90],[23.80,72.39],[23.53,72.18],[23.56,72.75],[22.28,70.78],[21.96,70.80],[22.42,71.20],[22.03,71.21],[22.61,70.94],[22.33,73.18],[22.31,73.17],[22.18,73.42],[22.28,73.68],[22.31,73.40],[22.57,73.22],[22.30,74.01],[22.24,73.09],[22.05,73.13],[20.95,72.92],[20.77,72.96],[20.75,73.69],[20.37,72.90],[20.53,73.16],[21.24,72.97],[21.12,72.93],[21.12,73.11],[21.17,73.57],[21.11,73.40],[21.33,72.75],[23.43,72.66],[23.77,73.16],[23.83,73.00],[24.03,73.05],[23.24,73.22]];
+  function initMap2(){
+    if(GJ2 || !window.L) return;
+    var el=document.getElementById('gjmap2'); if(!el) return;
+    var map=L.map(el,{center:[22.4,71.6],zoom:7,minZoom:6,maxZoom:8,
+      maxBounds:L.latLngBounds([19.6,67.2],[25.4,75.6]),maxBoundsViscosity:0.9,
+      zoomControl:true,scrollWheelZoom:false,attributionControl:false,zoomSnap:0.25,keyboard:false});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',minZoom:6,maxZoom:8}).addTo(map);
+    GJCITIES.forEach(function(c){
+      var m=L.circleMarker([c[1],c[2]],{radius:6,color:'#fff',weight:1.2,opacity:0.9,fillColor:'#FFE600',fillOpacity:0.92}).addTo(map);
+      if(m._path) m._path.style.filter='drop-shadow(0 0 6px #FFE600)';
+      m.bindTooltip(c[0]+' · existing',{className:'gj-tip',direction:'top',offset:[0,-8]});
+    });
+    GJ2=map;
+    setTimeout(function(){ try{ map.invalidateSize(); map.fitBounds(L.latLngBounds(GJCITIES.map(function(c){return [c[1],c[2]];})),{padding:[24,24],maxZoom:8}); }catch(e){} },90);
+  }
+  function updateExpStats(full){
+    var st=document.getElementById('esStations'), sc=document.getElementById('esScreens'), ci=document.getElementById('esCity'), no=document.getElementById('esNote'), ju=document.getElementById('esJump');
+    if(!st) return;
+    if(full){
+      st.innerHTML='118 <span class="es-chip">+98</span>'; sc.textContent='1,244'; ci.textContent='33';
+      no.textContent='After this one tender: 118 stations, 1,244 LED screens — roughly 5× the network, across every district of Gujarat.';
+      ju.textContent='98 new stations · 980 screens · ₹49.4 L / year rent · a 5-year concession no rival can rebuild.';
+    } else {
+      st.innerHTML='20'; sc.textContent='264'; ci.textContent='20';
+      no.textContent='The live network we run today — 20 GSRTC stations, 264 LED screens.';
+      ju.textContent='Tap “After the tender” → 98 new stations light up across Gujarat.';
+    }
+  }
+  function setExpFull(full){
+    gj2Full=full;
+    var bs=document.querySelectorAll('.expbtn');
+    for(var i=0;i<bs.length;i++) bs[i].classList.toggle('on',(bs[i].getAttribute('data-full')==='1')===full);
+    if(!GJ2) initMap2();
+    if(full && GJ2){
+      if(gj2New.length===0){
+        NEW98.forEach(function(c,i){ setTimeout(function(){ if(!GJ2)return; var m=L.circleMarker([c[0],c[1]],{radius:4,color:'#38d39f',weight:1,opacity:0.85,fillColor:'#38d39f',fillOpacity:0.55}).addTo(GJ2); if(m._path) m._path.style.filter='drop-shadow(0 0 4px #38d39f)'; gj2New.push(m); }, i*13); });
+      } else { gj2New.forEach(function(m){ m.addTo(GJ2); }); }
+      setTimeout(function(){ try{ GJ2.fitBounds(L.latLngBounds(GJCITIES.map(function(c){return [c[1],c[2]];}).concat(NEW98)),{padding:[18,18],maxZoom:8}); }catch(e){} }, NEW98.length*13+140);
+    } else if(GJ2){
+      gj2New.forEach(function(m){ try{ GJ2.removeLayer(m); }catch(e){} });
+      setTimeout(function(){ try{ GJ2.fitBounds(L.latLngBounds(GJCITIES.map(function(c){return [c[1],c[2]];})),{padding:[24,24],maxZoom:8}); }catch(e){} },60);
+    }
+    updateExpStats(full);
   }
 
   function val(id){ return +document.getElementById(id).value; }
