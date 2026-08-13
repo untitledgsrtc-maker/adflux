@@ -12839,3 +12839,18 @@ Owner ran a full QA pass. Fixed the real ones:
   bar (owner explicitly wanted it slide-1-only, §309.4); #10 work-order redaction — the
   deck is password-gated + noindex so not public; the owner wanted them shown as proof.
 - countUpsIn fallback (§309.7) still landing all numbers. Verified from public/ root.
+
+### Phase 309.9 — DOOH market-tailwind slide + corner-logo margin (owner)
+- **NEW "The tide is rising" slide** (before the Record slide): India's DOOH market grows
+  ~14%/yr while print/TV shrink. Big "~14% a year" count-up + a 4-bar growth chart
+  ($0.28B 2024 → $0.62B 2030) + DOOH↑/Print↓/TV↓ chips + sources (MarkNtel ~14% CAGR,
+  IMARC 11.4% CAGR — real, WebSearch-sourced §177). Deck 20→21.
+- **Corner-logo margin** — was fixed `top:14px;right:20px` (misaligned with the content
+  edge on wide screens); now `top:clamp(14px,3vh,26px);right:clamp(16px,4vw,44px)`, scales
+  with the viewport + aligns with the deck's top padding.
+- **LOGO — STILL PENDING the owner's actual file.** Owner: "you didn't use the logo I
+  gave you." He keeps pasting a white wordmark as a CHAT IMAGE, which CANNOT be saved to
+  disk (no tool for it). The deck uses `/led/logo.svg` (emblem + "UNTITLED" lockup); repo
+  also has `/led/logo-word.svg` (clean "UNTITLED" wordmark, no emblem) + `/led/logo-mark.svg`
+  (emblem only). To wire his EXACT logo he must drop the .svg/.png in Downloads (or give a
+  path). FOOT-GUN: a chat-attached image is not a wireable asset — always get the file path.
