@@ -12034,3 +12034,39 @@ Done: 1 (video hero §179) · 2-3 (§180) · 4/5+264 (§182) · 6 (5,040 + 1.98%
 (current economics §185/298) · 8 (3 levers §184/296, was slide 7) · 9 (real map §185/297, was
 slide 8). Still to lift: expansion, competition, tender/cost viewers, inventory, build cost, ask,
 risks, team. Plus the record-slide private/govt turnover split once the owner sends per-year ₹.
+
+
+---
+
+## 186 · Phase 299 — investor expansion slide: before/after network map (20 → 118) (2026-08-12, `cbc3228`)
+
+Owner gave the full tender Annexure-A (98 new stations, 980 screens, ₹49.4L/yr rent) and
+asked: show the 98 as map pins like the real-map slide, with a "today 20 → after tender
+118" toggle + animation, proper alignment.
+
+### What shipped (`public/investor/index.html`)
+Rebuilt the expansion slide into a SECOND Leaflet map (`#gjmap2`, reuses the §297
+inlined Leaflet + CartoDB dark tiles) with a segmented toggle:
+- **Today · 20 stations** — the 20 existing pins (yellow, bigger), 264 screens, 20 districts.
+- **After the tender · 118** — the 98 new stations (green, smaller) **cascade in** across
+  Gujarat (staggered `addTo` at 13ms each = a "network lights up" reveal), `fitBounds` to
+  the full 118. Stats flip to 118 (+98 green chip) · 1,244 screens · 33 districts + the
+  rent/moat line.
+- All 98 Annexure towns geocoded to approximate lat/lng (`NEW98` array — coverage map, not
+  survey-grade). Toggle works both directions (removeLayer on back-toggle).
+- Alignment: `.split` 1.2fr/.8fr (map left, stats right), clean.
+
+### Contracts / reuse
+- The map CSS is now `[id^="gjmap"]` so `#gjmap` (slide 9) + `#gjmap2` (slide 10) share
+  styling. `GJ2_IDX`/`GJ2` mirror the §297 `GJ_IDX`/`GJ_MAP` lazy-init-on-entry pattern;
+  toggle buttons wired in boot. `countUpsIn` data-dec (§298) unrelated here (stats set via
+  textContent). Zero console errors.
+- FOOT-GUN (same as §297): CartoDB tiles are external — the local python test has no CSP
+  header, so live-CSP is verified by reasoning (img-src 'https:' + inline Leaflet) + the
+  §297 precedent. Owner should confirm both maps load on `app.untitledad.in/investor`.
+
+### Investor-deck chain
+Done: 1 hero · 2-3 · 4 · 5 record · 6 (5,040+1.98%) · 7 economics · 8 levers · 9 real map
+· 10 expansion (this, 20→118). Deck is 19 slides. Still to lift: tender then/now,
+competition, inventory/cost viewers, build cost, ask, risks, team. Plus the record-slide
+private/govt turnover split when owner sends per-year ₹.
