@@ -11976,3 +11976,61 @@ Done: 1 (video hero §179) · 2-3 (§180) · 4/5+264 (§182) · 6 (5,040 calc §
 derivation §183) · 7 (3 levers §184). Still to lift: 8 (Why GSRTC) · expansion ·
 competition · tender/cost viewers · inventory · build cost · ask · risks · team. Plus the
 private/govt turnover split on slide 5 once the owner sends per-year ₹ (§182 OPEN).
+
+
+---
+
+## 185 · Phase 297–298 — investor deck: REAL Gujarat tile map + current-economics slide (2026-08-12, `abde8dc` + `ffa5733`)
+
+Two owner asks on the investor deck (`public/investor/index.html`).
+
+### Phase 297 — slide 8 uses the REAL map (inline Leaflet + dark tiles)
+Owner: "use the real map — we already have it wired at /present page 4", not a hand-drawn
+Gujarat blob. The sales deck (`public/deck/led-deck-final.html`) map is **Leaflet** (raster
+tiles), NOT a vector — so it can't be lifted as SVG. Solution: **inline Leaflet into the
+investor deck** (it's CSP-safe — `script-src` has `'unsafe-inline'`, and the sales deck already
+runs inline Leaflet under the same app CSP) + **live CartoDB dark tiles** (`img-src 'https:'`
+allows them; no need for the sales deck's heavy frozen base64 tiles since the deck is viewed
+online).
+- Lifted Leaflet 1.9.4 CSS (sales-deck lines 192-853) + JS (line 860, 147KB) inline via a
+  line-based Python splice. Deck grows to ~248KB — fine for a one-load pitch deck.
+- `initMap()` replaces the SVG `drawGujarat()`: `L.map(#gjmap)` + `L.tileLayer(cartocdn
+  dark_all)` + `L.circleMarker` for the **real station lat/lngs** (20 cities from the sales
+  deck's CITIES array — Grade A/B/C color + screen-count-sized + yellow `drop-shadow` glow) +
+  `fitBounds` to Gujarat, zoomControl on, scrollWheelZoom off. Matches page 4.
+- Lazy init on first entry to the map slide; `invalidateSize()` on re-entry. `GJ_IDX` computed
+  by finding the slide containing `#gjmap` (reorder-safe). Verified live: 9 dark tiles load, 20
+  markers render, zero console errors.
+- ⚠ CSP is applied by Vercel headers (NOT the local python test server), so the local test
+  can't prove the live CSP. Confidence is from: `img-src 'https:'` explicitly allows CartoDB
+  tiles + inline scripts run (the deck's own JS runs) + the sales deck runs inline Leaflet under
+  the same CSP. If tiles ever fail live, the fix is a `vercel.json` CSP tweak, not the code.
+- FOOT-GUN: a local `python -m http.server` sends NO CSP header — CSP-dependent behavior
+  (tile/script blocking) can ONLY be verified on the Vercel deploy. Don't declare CSP-safe from
+  a localhost render alone; reason from the header + a same-CSP precedent.
+
+### Phase 298 — new "current LED economics" slide (inserted between 6 and 7)
+Owner: add a slide with current LED CAPEX/OPEX vs revenue + **private/govt revenue split**,
+animated. Real figures (from the owner's xlsx, §287.2): CAPEX **₹1.82 Cr** one-time · revenue
+**₹10.1 L/mo** (Govt/DAVP **₹8.6L = 85%** + Private **₹1.5L = 15%**) · OPEX **₹8.3 L/mo** ·
+profit **₹1.8 L/mo** (~18% margin), all at 2% fill.
+- 4 count-up KPI cards + a govt/private revenue **donut** (SVG two-arc, sweeps in) + a "where it
+  goes" **P&L bar** (82% cost striped / 18% profit green, widths animate via `.slide.on .pnlbar
+  .opex/.profit{width:…}`). Framed "at 2% fill → DAVP lifts it several times over."
+- `countUpsIn` gained **`data-dec`** support (decimal count-ups like 1.82 / 10.1) — reads
+  `data-dec`, uses `toFixed(dec)` else `toLocaleString`.
+- Slide count 18→19; the counter/dots/`RECORD_IDX`/`GJ_IDX` all auto-adjust (computed
+  dynamically from the `.slide` NodeList, never hardcoded) — inserting a slide is safe.
+
+### KNOWN tension (flag to owner if he asks)
+The deck is LED-only (§176, auto-hood dropped) so the current-economics slide shows LED revenue
+₹10.1L/mo ≈ ₹1.22 Cr/yr, while the Record slide (5) shows ₹8.8 Cr company turnover (all media,
+incl. non-LED). Not wrong, but a reader could ask why the "record" is ₹8.8 Cr yet current LED is
+₹1.2 Cr/yr. Owner-aware framing choice. The govt/private monthly split (₹8.6L/₹1.5L) is the key
+new number — worth the owner confirming.
+
+### Investor-deck chain
+Done: 1 (video hero §179) · 2-3 (§180) · 4/5+264 (§182) · 6 (5,040 + 1.98% §181/§183) · NEW 7
+(current economics §185/298) · 8 (3 levers §184/296, was slide 7) · 9 (real map §185/297, was
+slide 8). Still to lift: expansion, competition, tender/cost viewers, inventory, build cost, ask,
+risks, team. Plus the record-slide private/govt turnover split once the owner sends per-year ₹.
