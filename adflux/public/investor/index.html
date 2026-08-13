@@ -167,6 +167,44 @@
   .navbtns button:hover{border-color:var(--yellow);color:var(--yellow)} .navbtns button:disabled{opacity:.35;cursor:default}
   .progress{position:fixed;top:0;left:0;height:3px;background:var(--yellow);z-index:30;transition:width .4s ease;box-shadow:0 0 12px rgba(255,230,0,.5)}
   @media (max-width:760px){.slide{padding:8vh 7vw 12vh}.fc{grid-template-columns:1fr}.dots{display:none}}
+
+  /* ---------- live motion — plays only on the ACTIVE slide (like the sales deck) ---------- */
+  .illwrap{position:relative;display:flex;justify-content:center}
+  .illwrap svg{width:100%;max-width:520px;height:auto;filter:drop-shadow(0 0 42px rgba(255,230,0,.12))}
+  .illwrap.sm svg{max-width:340px}
+  .ibadge{position:absolute;z-index:2;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--navy);background:var(--yellow);border-radius:8px;padding:4px 10px;box-shadow:0 8px 20px rgba(255,230,0,.4);display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .ibadge .rd{width:6px;height:6px;border-radius:50%;background:var(--navy);animation:blink 1.4s infinite}
+  .ibadge.g{background:var(--green);color:#05221a}.ibadge.g .rd{background:#05221a}
+  .illwrap svg [class*="an-"]{transform-box:fill-box;transform-origin:center}
+  .an-beam{stroke-dasharray:7 6}
+  .slide.on .an-beam{animation:march 1s linear infinite}
+  @keyframes march{to{stroke-dashoffset:-13}}
+  .an-wave{opacity:0}
+  .slide.on .an-wave{animation:sigwave 2.6s ease-out infinite}
+  .slide.on .an-wave.w2{animation-delay:.55s}.slide.on .an-wave.w3{animation-delay:1.1s}
+  @keyframes sigwave{0%{opacity:0}22%{opacity:.95}100%{opacity:0}}
+  .slide.on .an-glow{animation:gpulse 1.9s ease-in-out infinite}
+  @keyframes gpulse{0%,100%{opacity:.55}50%{opacity:1;filter:drop-shadow(0 0 7px rgba(255,230,0,.85))}}
+  .an-dbox{opacity:0}
+  .slide.on .an-dbox{animation:dbox 2.7s ease-in-out infinite}
+  .slide.on .an-dbox.d2{animation-delay:.45s}.slide.on .an-dbox.d3{animation-delay:.9s}
+  @keyframes dbox{0%,6%{opacity:0;transform:scale(.6)}16%,58%{opacity:1;transform:scale(1)}74%,100%{opacity:0;transform:scale(.6)}}
+  .slide.on .an-scan{animation:scanY 3.2s ease-in-out infinite}
+  @keyframes scanY{0%{transform:translateY(-4px);opacity:0}12%{opacity:.85}86%{opacity:.85}100%{transform:translateY(150px);opacity:0}}
+  .an-frame{opacity:0}
+  .slide.on .an-frame.f1{animation:frame 6s ease-in-out infinite}
+  .slide.on .an-frame.f2{animation:frame 6s ease-in-out infinite;animation-delay:3s}
+  @keyframes frame{0%,2%{opacity:0}8%,44%{opacity:1}50%,100%{opacity:0}}
+  .an-pop{opacity:0}
+  .slide.on .an-pop{animation:leadpop 3.2s cubic-bezier(.16,1,.3,1) infinite}
+  @keyframes leadpop{0%,34%{opacity:0;transform:scale(.72)}48%,90%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.72)}}
+  .an-lock{opacity:0}
+  .slide.on .an-lock{animation:lockon 3s ease-in-out infinite}
+  @keyframes lockon{0%,18%{opacity:0;transform:scale(1.35)}30%,88%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
+  .an-rise{opacity:0}
+  .slide.on .an-rise{animation:risebub 3s ease-out infinite}
+  @keyframes risebub{0%{opacity:0;transform:translateY(8px)}18%{opacity:1}70%{opacity:1}100%{opacity:0;transform:translateY(-28px)}}
+  @media (prefers-reduced-motion:reduce){.slide.on [class*="an-"]{animation:none!important;opacity:1!important}}
 </style>
 </head>
 <body>
@@ -220,12 +258,55 @@
   <!-- 2 WHAT WE ARE -->
   <section class="slide">
     <div class="kicker anim">What we are</div>
-    <h2 class="anim">Measured LED advertising screens inside Gujarat's GSRTC bus stations.</h2>
-    <p class="lead anim">264 screens across 20 GSRTC bus stations, selling ad-time to government departments (via DAVP) and private brands. AI cameras at each screen count real impressions and audience — so advertisers buy proven reach on a captive commuter, not an estimate on a painted board.</p>
-    <div class="cols anim">
-      <div class="col"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="9" y1="20.5" x2="15" y2="20.5"/><line x1="12" y1="17" x2="12" y2="20.5"/><line x1="6.5" y1="8" x2="12" y2="8"/><line x1="6.5" y1="11.5" x2="10" y2="11.5"/></svg></div><h3>Captive attention</h3><p>A commuter waiting at a bus station, phone down, with minutes to spare — the one audience Google and Meta can't reach.</p></div>
-      <div class="col"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg></div><h3>Measured, not estimated</h3><p>Every screen carries an AI camera reporting real impressions and demographics. We sell a count, not a guess.</p></div>
-      <div class="col"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5c0 4.5 3 7.5 7.5 9 4.5-1.5 7.5-4.5 7.5-9V6L12 3Z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Concession-locked</h3><p>Screens sit inside GSRTC property under a multi-year concession. A rival can build next to a station — not inside it.</p></div>
+    <h2 class="anim">Measured LED screens inside Gujarat's GSRTC bus stations.</h2>
+    <div class="split anim" style="margin-top:24px">
+      <div class="illwrap">
+        <span class="ibadge" style="top:4%;right:2%"><span class="rd"></span><span data-count="1240">0</span> seen today</span>
+        <svg viewBox="0 0 480 356" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="20" y1="322" x2="460" y2="322" stroke="#2a3348" stroke-width="2"/>
+          <rect x="228" y="214" width="14" height="108" fill="#151d30" stroke="#3a465f" stroke-width="1.5"/>
+          <rect x="118" y="40" width="234" height="178" rx="12" fill="#0b1120" stroke="#c3cbe0" stroke-width="2"/>
+          <rect x="128" y="50" width="214" height="158" rx="7" fill="#FFE600" fill-opacity=".08" stroke="#FFE600" stroke-width="2.5"/>
+          <g class="an-frame f1">
+            <circle cx="168" cy="94" r="17" fill="#FFE600"/>
+            <rect x="196" y="84" width="118" height="11" rx="5" fill="#c3cbe0"/>
+            <rect x="196" y="103" width="80" height="8" rx="4" fill="#8b96b4"/>
+            <rect x="150" y="130" width="176" height="58" rx="6" fill="#FFE600" fill-opacity=".2" stroke="#FFE600" stroke-width="1.4"/>
+            <path d="M222 146 L250 159 L222 173 Z" fill="#FFE600"/>
+          </g>
+          <g class="an-frame f2">
+            <rect x="150" y="70" width="180" height="66" rx="8" fill="#FFE600" fill-opacity=".18" stroke="#FFE600" stroke-width="1.4"/>
+            <rect x="164" y="88" width="120" height="12" rx="6" fill="#f5f7fb"/>
+            <rect x="164" y="110" width="78" height="9" rx="4" fill="#c3cbe0"/>
+            <rect x="150" y="156" width="118" height="30" rx="15" fill="#FFE600"/>
+            <rect x="282" y="156" width="46" height="30" rx="8" fill="#FFE600" fill-opacity=".25" stroke="#FFE600" stroke-width="1.4"/>
+          </g>
+          <circle cx="352" cy="58" r="4" fill="#FFE600" class="an-glow"/>
+          <path class="an-wave w1" d="M352 38 A20 20 0 0 1 372 58" stroke="#FFE600" stroke-width="2.6"/>
+          <path class="an-wave w2" d="M352 28 A30 30 0 0 1 382 58" stroke="#FFE600" stroke-width="2.2"/>
+          <path class="an-wave w3" d="M352 18 A40 40 0 0 1 392 58" stroke="#FFE600" stroke-width="1.8"/>
+          <g stroke="#7f8ba8" stroke-width="2.6">
+            <circle cx="152" cy="262" r="10"/><line x1="152" y1="272" x2="152" y2="300"/><line x1="152" y1="300" x2="144" y2="320"/><line x1="152" y1="300" x2="160" y2="320"/><line x1="152" y1="282" x2="140" y2="294"/><line x1="152" y1="282" x2="164" y2="294"/>
+            <circle cx="200" cy="262" r="10"/><line x1="200" y1="272" x2="200" y2="300"/><line x1="200" y1="300" x2="192" y2="320"/><line x1="200" y1="300" x2="208" y2="320"/>
+          </g>
+          <g class="an-lock" stroke="#FFE600" stroke-width="2.4">
+            <path d="M130 244 v-10 h10"/><path d="M174 234 h10 v10"/><path d="M184 290 v10 h-10"/><path d="M140 300 h-10 v-10"/>
+          </g>
+          <text class="an-rise" x="210" y="250" fill="#38d39f" font-family="Space Mono" font-size="15" font-weight="700">+1</text>
+        </svg>
+      </div>
+      <div>
+        <ul class="clean">
+          <li><b>Captive audience.</b> Commuters waiting, phones down — reach Google and Meta can't buy.</li>
+          <li><b>Measured, not guessed.</b> An AI camera on every screen counts who actually looked.</li>
+          <li><b>Concession-locked.</b> Inside GSRTC property on a multi-year deal — a rival builds outside, not in.</li>
+        </ul>
+        <div class="stats" style="margin-top:20px">
+          <div class="st"><div class="v y" data-count="264">0</div><div class="l">LED screens</div></div>
+          <div class="st"><div class="v" data-count="20">0</div><div class="l">Bus stations</div></div>
+          <div class="st"><div class="v">700<span class="yellow">+</span></div><div class="l">Brands run</div></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -234,75 +315,70 @@
     <div class="kicker anim">How it works</div>
     <h2 class="anim">A screen you can measure — not a wall you rent.</h2>
     <div class="cols anim">
-      <div class="col"><div class="illus sm" style="margin:0 0 10px"><svg viewBox="0 0 360 360" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <!-- stand -->
+      <div class="col"><div class="illwrap sm" style="margin:0 0 10px">
+        <span class="ibadge" style="top:2px;right:8px">5,040 slots / day</span>
+        <svg viewBox="0 0 360 360" fill="none" stroke-linecap="round" stroke-linejoin="round">
   <rect x="172" y="230" width="16" height="54" fill="#2a3348" stroke="#c3cbe0" stroke-width="1.5"/>
   <path d="M142 300 L218 300 L204 284 L156 284 Z" fill="#2a3348" stroke="#c3cbe0" stroke-width="1.5"/>
-
-  <!-- bezel + 4:3 screen -->
   <rect x="60" y="46" width="240" height="184" rx="12" stroke="#c3cbe0" stroke-width="2"/>
   <rect x="68" y="54" width="224" height="168" rx="8" fill="#FFE600" fill-opacity="0.12" stroke="#FFE600" stroke-width="3"/>
-
-  <!-- abstract ad -->
-  <circle cx="104" cy="92" r="16" fill="#FFE600"/>
-  <rect x="132" y="82" width="120" height="10" rx="5" fill="#c3cbe0"/>
-  <rect x="132" y="100" width="84" height="8" rx="4" fill="#8b96b4"/>
-  <rect x="90" y="126" width="180" height="64" rx="6" fill="#FFE600" fill-opacity="0.22" stroke="#FFE600" stroke-width="1.5"/>
-  <path d="M160 142 L188 158 L160 174 Z" fill="#FFE600"/>
-  <rect x="90" y="200" width="108" height="8" rx="4" fill="#c3cbe0"/>
-  <rect x="210" y="197" width="60" height="14" rx="7" fill="#FFE600"/>
-
-  <!-- broadcast / signal waves -->
-  <circle cx="300" cy="64" r="4" fill="#FFE600"/>
-  <path d="M300 44 A 20 20 0 0 1 320 64" stroke="#FFE600" stroke-width="2.5"/>
-  <path d="M300 34 A 30 30 0 0 1 330 64" stroke="#FFE600" stroke-width="2.2" stroke-opacity="0.7"/>
-  <path d="M300 24 A 40 40 0 0 1 340 64" stroke="#FFE600" stroke-width="2" stroke-opacity="0.45"/>
-</svg></div><h3>Play</h3><p>Ten-second ad slots run on LED screens inside the stations. Each screen holds 5,040 slots a day, scheduled by software.</p></div>
-      <div class="col"><div class="illus sm" style="margin:0 0 10px"><svg viewBox="0 0 420 340" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <g class="an-frame f1">
+    <circle cx="104" cy="92" r="16" fill="#FFE600"/>
+    <rect x="132" y="82" width="120" height="10" rx="5" fill="#c3cbe0"/>
+    <rect x="132" y="100" width="84" height="8" rx="4" fill="#8b96b4"/>
+    <rect x="90" y="126" width="180" height="64" rx="6" fill="#FFE600" fill-opacity="0.22" stroke="#FFE600" stroke-width="1.5"/>
+    <path d="M160 142 L188 158 L160 174 Z" fill="#FFE600"/>
+    <rect x="90" y="200" width="108" height="8" rx="4" fill="#c3cbe0"/>
+    <rect x="210" y="197" width="60" height="14" rx="7" fill="#FFE600"/>
+  </g>
+  <g class="an-frame f2">
+    <rect x="90" y="72" width="180" height="72" rx="6" fill="#FFE600" fill-opacity="0.2" stroke="#FFE600" stroke-width="1.5"/>
+    <rect x="106" y="92" width="120" height="12" rx="6" fill="#f5f7fb"/>
+    <rect x="106" y="114" width="84" height="9" rx="4" fill="#c3cbe0"/>
+    <rect x="90" y="164" width="120" height="30" rx="15" fill="#FFE600"/>
+    <rect x="224" y="164" width="46" height="30" rx="8" fill="#FFE600" fill-opacity="0.25" stroke="#FFE600" stroke-width="1.5"/>
+  </g>
+  <circle cx="300" cy="64" r="4" fill="#FFE600" class="an-glow"/>
+  <path class="an-wave w1" d="M300 44 A 20 20 0 0 1 320 64" stroke="#FFE600" stroke-width="2.5"/>
+  <path class="an-wave w2" d="M300 34 A 30 30 0 0 1 330 64" stroke="#FFE600" stroke-width="2.2"/>
+  <path class="an-wave w3" d="M300 24 A 40 40 0 0 1 340 64" stroke="#FFE600" stroke-width="2"/>
+</svg></div><h3>Play</h3><p>10-second slots run software-scheduled inside the stations.</p></div>
+      <div class="col"><div class="illwrap sm" style="margin:0 0 10px">
+        <span class="ibadge" style="top:2px;right:8px"><span class="rd"></span><span data-count="312">0</span> counted</span>
+        <svg viewBox="0 0 420 340" fill="none" stroke-linecap="round" stroke-linejoin="round">
   <line x1="30" y1="300" x2="400" y2="300" stroke="#c3cbe0" stroke-width="2"/>
-
-  <!-- screen + pole -->
   <line x1="108" y1="188" x2="108" y2="300" stroke="#c3cbe0" stroke-width="3"/>
   <rect x="48" y="96" width="120" height="92" rx="6" fill="#FFE600" fill-opacity="0.12" stroke="#FFE600" stroke-width="2.5"/>
   <circle cx="72" cy="118" r="9" fill="#FFE600"/>
   <rect x="90" y="112" width="64" height="7" rx="3" fill="#c3cbe0"/>
   <rect x="90" y="126" width="44" height="6" rx="3" fill="#8b96b4"/>
   <rect x="60" y="142" width="96" height="34" rx="4" fill="#FFE600" fill-opacity="0.2" stroke="#FFE600" stroke-width="1"/>
-
-  <!-- AI camera -->
   <line x1="108" y1="96" x2="108" y2="80" stroke="#c3cbe0" stroke-width="2"/>
   <rect x="104" y="54" width="8" height="6" rx="2" stroke="#c3cbe0" stroke-width="1.5"/>
   <rect x="92" y="60" width="40" height="20" rx="5" stroke="#c3cbe0" stroke-width="2"/>
-  <circle cx="132" cy="72" r="7" fill="#FFE600" fill-opacity="0.2" stroke="#FFE600" stroke-width="2"/>
+  <circle cx="132" cy="72" r="7" fill="#FFE600" fill-opacity="0.2" stroke="#FFE600" stroke-width="2" class="an-glow"/>
   <circle cx="132" cy="72" r="2" fill="#FFE600"/>
-
-  <!-- measurement cone -->
   <path d="M136 74 L214 300 L384 300 Z" fill="#FFE600" fill-opacity="0.06"/>
-  <line x1="136" y1="74" x2="214" y2="300" stroke="#FFE600" stroke-width="1.5" stroke-dasharray="6 6" stroke-opacity="0.8"/>
-  <line x1="136" y1="74" x2="384" y2="300" stroke="#FFE600" stroke-width="1.5" stroke-dasharray="6 6" stroke-opacity="0.8"/>
-  <line x1="176" y1="180" x2="248" y2="180" stroke="#FFE600" stroke-width="1.2" stroke-dasharray="4 5" stroke-opacity="0.5"/>
-  <line x1="197" y1="240" x2="314" y2="240" stroke="#FFE600" stroke-width="1.2" stroke-dasharray="4 5" stroke-opacity="0.5"/>
-
-  <!-- detection boxes -->
-  <g stroke="#FFE600" stroke-width="1.5" stroke-dasharray="4 4">
-    <rect x="206" y="216" width="32" height="32" rx="4"/>
-    <rect x="246" y="216" width="32" height="32" rx="4"/>
-    <rect x="280" y="216" width="32" height="32" rx="4"/>
+  <line class="an-beam" x1="136" y1="74" x2="214" y2="300" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.85"/>
+  <line class="an-beam" x1="136" y1="74" x2="384" y2="300" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.85"/>
+  <line class="an-scan" x1="150" y1="150" x2="300" y2="150" stroke="#FFE600" stroke-width="2.4" stroke-opacity="0.9"/>
+  <g stroke="#FFE600" stroke-width="1.6">
+    <rect class="an-dbox d1" x="206" y="216" width="32" height="32" rx="4"/>
+    <rect class="an-dbox d2" x="246" y="216" width="32" height="32" rx="4"/>
+    <rect class="an-dbox d3" x="280" y="216" width="32" height="32" rx="4"/>
   </g>
-
-  <!-- measured figures -->
   <g stroke="#c3cbe0" stroke-width="2.5">
     <circle cx="222" cy="232" r="9"/><line x1="222" y1="241" x2="222" y2="286"/><line x1="222" y1="286" x2="214" y2="300"/><line x1="222" y1="286" x2="230" y2="300"/><line x1="222" y1="252" x2="232" y2="266"/>
     <circle cx="262" cy="232" r="9"/><line x1="262" y1="241" x2="262" y2="286"/><line x1="262" y1="286" x2="254" y2="300"/><line x1="262" y1="286" x2="270" y2="300"/><line x1="262" y1="252" x2="252" y2="266"/>
     <circle cx="296" cy="232" r="9"/><line x1="296" y1="241" x2="296" y2="286"/><line x1="296" y1="286" x2="288" y2="300"/><line x1="296" y1="286" x2="304" y2="300"/><line x1="296" y1="252" x2="306" y2="266"/>
   </g>
-</svg></div><h3>Measure</h3><p>An AI camera on every screen counts who actually looked — real impressions and audience, not a traffic estimate.</p></div>
-      <div class="col"><div class="illus sm" style="margin:0 0 10px"><svg viewBox="0 0 460 300" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <!-- QR screen -->
+</svg></div><h3>Measure</h3><p>An AI camera counts who actually looked — a real number, not a guess.</p></div>
+      <div class="col"><div class="illwrap sm" style="margin:0 0 10px">
+        <span class="ibadge g" style="top:2px;right:8px"><span class="rd"></span>→ 1 lead</span>
+        <svg viewBox="0 0 460 300" fill="none" stroke-linecap="round" stroke-linejoin="round">
   <line x1="111" y1="224" x2="111" y2="244" stroke="#c3cbe0" stroke-width="3"/>
   <line x1="88" y1="246" x2="134" y2="246" stroke="#c3cbe0" stroke-width="3"/>
   <rect x="36" y="54" width="150" height="170" rx="8" fill="#FFE600" fill-opacity="0.1" stroke="#FFE600" stroke-width="2.5"/>
-  <!-- finder patterns -->
   <g stroke="#FFE600" stroke-width="4">
     <rect x="64" y="80" width="30" height="30"/>
     <rect x="128" y="80" width="30" height="30"/>
@@ -310,22 +386,17 @@
   </g>
   <g fill="#FFE600">
     <rect x="74" y="90" width="10" height="10"/><rect x="138" y="90" width="10" height="10"/><rect x="74" y="154" width="10" height="10"/>
-    <!-- data modules -->
     <rect x="100" y="84" width="8" height="8"/><rect x="112" y="84" width="8" height="8"/><rect x="100" y="96" width="8" height="8"/>
     <rect x="64" y="118" width="8" height="8"/><rect x="78" y="118" width="8" height="8"/><rect x="92" y="118" width="8" height="8"/><rect x="120" y="118" width="8" height="8"/><rect x="134" y="118" width="8" height="8"/><rect x="148" y="118" width="8" height="8"/>
     <rect x="100" y="130" width="8" height="8"/><rect x="114" y="130" width="8" height="8"/><rect x="128" y="130" width="8" height="8"/><rect x="142" y="130" width="8" height="8"/>
     <rect x="100" y="150" width="8" height="8"/><rect x="114" y="150" width="8" height="8"/><rect x="128" y="150" width="8" height="8"/><rect x="150" y="150" width="8" height="8"/>
     <rect x="112" y="162" width="8" height="8"/><rect x="140" y="162" width="8" height="8"/>
   </g>
-
-  <!-- scan beam -->
   <path d="M231 124 L188 96 L188 150 L231 158 Z" fill="#FFE600" fill-opacity="0.05"/>
-  <line x1="231" y1="124" x2="188" y2="96" stroke="#FFE600" stroke-width="1.5" stroke-dasharray="6 6" stroke-opacity="0.7"/>
-  <line x1="231" y1="158" x2="188" y2="150" stroke="#FFE600" stroke-width="1.5" stroke-dasharray="6 6" stroke-opacity="0.7"/>
-
-  <!-- phone -->
+  <line class="an-beam" x1="231" y1="124" x2="188" y2="96" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.8"/>
+  <line class="an-beam" x1="231" y1="158" x2="188" y2="150" stroke="#FFE600" stroke-width="1.6" stroke-opacity="0.8"/>
   <rect x="214" y="78" width="74" height="140" rx="14" stroke="#c3cbe0" stroke-width="2.5"/>
-  <rect x="222" y="92" width="58" height="108" rx="6" fill="#FFE600" fill-opacity="0.08" stroke="#FFE600" stroke-width="1.2"/>
+  <rect x="222" y="92" width="58" height="108" rx="6" fill="#FFE600" fill-opacity="0.08" stroke="#FFE600" stroke-width="1.2" class="an-glow"/>
   <circle cx="251" cy="86" r="2" fill="#c3cbe0"/>
   <line x1="240" y1="210" x2="262" y2="210" stroke="#c3cbe0" stroke-width="2"/>
   <g stroke="#FFE600" stroke-width="2.5">
@@ -336,23 +407,21 @@
   </g>
   <rect x="242" y="130" width="9" height="9" stroke="#FFE600" stroke-width="2"/>
   <g fill="#FFE600"><rect x="256" y="130" width="5" height="5"/><rect x="242" y="146" width="5" height="5"/><rect x="256" y="146" width="5" height="5"/></g>
-
-  <!-- arrow -->
-  <line x1="292" y1="148" x2="330" y2="148" stroke="#FFE600" stroke-width="3"/>
-  <path d="M330 148 L320 142 L320 154 Z" fill="#FFE600"/>
-
-  <!-- lead card -->
-  <rect x="344" y="100" width="88" height="96" rx="10" stroke="#c3cbe0" stroke-width="2.5"/>
-  <circle cx="388" cy="128" r="16" fill="#FFE600" fill-opacity="0.12" stroke="#FFE600" stroke-width="2.5"/>
-  <circle cx="388" cy="123" r="6" fill="#FFE600"/>
-  <path d="M378 140 Q388 130 398 140 Z" fill="#FFE600"/>
-  <rect x="360" y="156" width="56" height="7" rx="3" fill="#c3cbe0"/>
-  <rect x="360" y="170" width="40" height="6" rx="3" fill="#8b96b4"/>
-  <circle cx="420" cy="110" r="9" fill="#FFE600"/>
-  <path d="M416 110 l3 3 l5 -6" stroke="#0d1424" stroke-width="2" fill="none"/>
-</svg></div><h3>Prove</h3><p>A QR code turns a viewer into a scan, and a scan into a lead. The advertiser sees the response, not a rate card.</p></div>
+  <line x1="292" y1="148" x2="330" y2="148" stroke="#FFE600" stroke-width="3" class="an-glow"/>
+  <path d="M330 148 L320 142 L320 154 Z" fill="#FFE600" class="an-glow"/>
+  <g class="an-pop">
+    <rect x="344" y="100" width="88" height="96" rx="10" fill="#0b1120" stroke="#c3cbe0" stroke-width="2.5"/>
+    <circle cx="388" cy="128" r="16" fill="#FFE600" fill-opacity="0.12" stroke="#FFE600" stroke-width="2.5"/>
+    <circle cx="388" cy="123" r="6" fill="#FFE600"/>
+    <path d="M378 140 Q388 130 398 140 Z" fill="#FFE600"/>
+    <rect x="360" y="156" width="56" height="7" rx="3" fill="#c3cbe0"/>
+    <rect x="360" y="170" width="40" height="6" rx="3" fill="#8b96b4"/>
+    <circle cx="420" cy="110" r="9" fill="#FFE600"/>
+    <path d="M416 110 l3 3 l5 -6" stroke="#0d1424" stroke-width="2" fill="none"/>
+  </g>
+</svg></div><h3>Prove</h3><p>A QR turns a viewer into a scan, and a scan into a lead.</p></div>
     </div>
-    <p class="small anim">A hoarding cannot tell you who saw it. Our screen can — that is the line between renting space and selling attention.</p>
+    <p class="small anim">A hoarding can't tell you who saw it. Our screen can — that's the line between renting space and selling attention.</p>
   </section>
 
   <!-- 4 AUDIENCE -->
@@ -697,6 +766,7 @@
 (function(){
   'use strict';
   var CODE='untitled2026';
+  var SLOTS_YR=151200*12, PRIV_RATE=0.18;  /* hoisted: needed by model() on sessionStorage auto-unlock */
   var gate=document.getElementById('gate'), deck=document.getElementById('deck');
   function unlock(){ gate.style.display='none'; deck.classList.add('on'); try{sessionStorage.setItem('inv_ok','1')}catch(e){} boot(); }
   function tryPw(){ var v=(document.getElementById('pw').value||'').trim(); if(v.toLowerCase()===CODE) unlock(); else document.getElementById('pwerr').textContent='Wrong code. Ask Brijesh for access.'; }
