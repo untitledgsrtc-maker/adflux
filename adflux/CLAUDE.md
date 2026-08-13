@@ -12809,3 +12809,33 @@ Three owner asks + a robustness fix.
   a setTimeout.
 - Verified from public/ root: unit-econ numbers settle, risks cards animate, handshake
   closing renders, only console errors = the `/api/deck-videos` 404 (resolves on Vercel).
+
+### Phase 309.8 — QA-review fixes (owner's slide-by-slide review) (2026-08-12)
+Owner ran a full QA pass. Fixed the real ones:
+- **#1 Cost slide cut off below the fold** — the two cost cards were taller than the
+  viewport (run-cost breakdown hidden). Compressed `.calc.cost` (crow padding 4→2,
+  cv 17→13.5px, ceq 26-32→18-23px, costbar 11→8px, tighter ch/csub/cl). Now fits one
+  screen, both cards fully visible.
+- **#2 Record-slide nav conflict** — the Next arrow stepped the year-reveal instead of
+  advancing (counter stuck on 5). Removed the `advance()` RECORD_IDX intercept →
+  arrows ALWAYS `go(idx+dir)`; the 5 years now **auto-reveal staggered on entry**
+  (setTimeout chain); hid the "Reveal next year" button; dropped the "Press →" line
+  from the lead. Verified: on record, Next → next slide; all 5 years show automatically.
+- **#3 Slide-transition overlap** — outgoing+incoming text jumbled mid-crossfade (the
+  translateX). `.slide` transition → **opacity-only .3s** (dropped the transform) +
+  `.slide.on{z-index:2}` so the incoming sits on top. Clean fade, no sliding overlap.
+- **#4 Age inconsistency** — "Ten years" (slide 5) clashed with "12 years" (slide 15/
+  team) + 2015 founding. Dropped the number from slide 5 → **"From ₹0 to ₹8.8 Crore."**
+  (kept "12 years" on why-us — owner's stated figure). FLAG to owner: 2015 = ~11 yrs,
+  he says 12 (his industry experience) — confirm the exact number.
+- **#5 Multiplier arithmetic** — slide 10 said "20 → 98 · 4.9×" (wrong: 20→118 total).
+  Fixed to **"20 → 118 · 5.9×"** (stations); screens stay 4.7× (264→1,244). Slide 9's
+  qualitative "roughly 5×" now sits correctly between them.
+- **#8 Low-visibility 2% sliver** — the `.glit` on the "98% empty" gauge got a crisp
+  white top edge + brighter glow + min-height 6px so it reads.
+- **NOT bugs (verified):** #6 the occupancy grid IS 5×10 = 50 cells (49 unlit + 1 lit),
+  matches the caption — the reviewer miscounted. #7 slides already `justify-content:
+  center` (vertically centered). **Owner's calls (not touched):** #9 persistent stat
+  bar (owner explicitly wanted it slide-1-only, §309.4); #10 work-order redaction — the
+  deck is password-gated + noindex so not public; the owner wanted them shown as proof.
+- countUpsIn fallback (§309.7) still landing all numbers. Verified from public/ root.
