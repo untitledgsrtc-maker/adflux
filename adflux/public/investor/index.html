@@ -166,6 +166,12 @@
   .expstats .es-row span{color:var(--yellow)}
   .expstats .es-note{font-size:13.5px;color:var(--ink2);margin-top:14px;line-height:1.5}
   .expstats .es-jump{font-size:12.5px;color:var(--yellow);margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07);font-weight:600}
+  .expstats.merged{justify-content:flex-start}
+  .expstats.merged .es-big{font-size:clamp(38px,5vw,54px)}
+  .expstats .moat{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .expstats .moat li{font-size:12.5px;color:var(--ink1);line-height:1.45;padding-left:16px;position:relative}
+  .expstats .moat li::before{content:"";position:absolute;left:0;top:6px;width:6px;height:6px;border-radius:2px;background:var(--yellow)}
+  .expstats .moat li b{color:var(--ink0)}
   /* ---------- current economics (slide 6b) ---------- */
   .ecobox{background:var(--navy2);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
   .ecobox .ch{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--yellow);font-weight:600;margin-bottom:14px}
@@ -1494,35 +1500,24 @@ svg.leaflet-image-layer.leaflet-interactive path {
     </div>
   </section>
 
-  <!-- 8 WHY GSRTC -->
+  <!-- 8+9 MERGED: THE CONCESSION + THE EXPANSION -->
   <section class="slide">
-    <div class="split">
-      <div>
-        <div class="kicker anim">The concession</div>
-        <h2 class="anim">Exclusive rights on infrastructure no competitor can rebuild.</h2>
-        <ul class="clean anim">
-          <li>GSRTC is Gujarat's state road transport corporation. Its bus stations are <b>public infrastructure</b> — nobody can put a second one next door.</li>
-          <li>Our screens sit inside that infrastructure under a <b>multi-year concession</b>. The relationship is the barrier, not the hardware.</li>
-          <li>Government is also a <b>customer</b> here — departments advertise on the same screens through DAVP. We sit on both sides of the desk.</li>
-        </ul>
-      </div>
-      <div class="anim" style="width:100%;max-width:720px;margin:0 auto"><div id="gjmap"></div><div class="small" style="text-align:center;margin-top:10px">20 GSRTC stations live across Gujarat — real locations. <b class="yellow">98 more</b> in the tender.</div></div>
-    </div>
-  </section>
-
-  <!-- 9 EXPANSION -->
-  <section class="slide">
-    <div class="kicker anim">The expansion</div>
-    <h2 class="anim">One tender turns 20 stations into 118.</h2>
+    <div class="kicker anim">The concession — and the tender to scale it</div>
+    <h2 class="anim">Exclusive rights no rival can rebuild — one tender turns 20 into 118.</h2>
     <div class="exptoggle anim">
       <button class="expbtn on" data-full="0">Today · 20 stations</button>
       <button class="expbtn" data-full="1">After the tender · 118</button>
     </div>
     <div class="split anim" style="margin-top:14px;align-items:stretch;grid-template-columns:1.2fr .8fr">
       <div><div id="gjmap2"></div></div>
-      <div class="expstats" id="expStats">
+      <div class="expstats merged" id="expStats">
         <div class="es-big"><span id="esStations">20</span> <em>stations</em></div>
         <div class="es-row"><span id="esScreens">264</span> screens · <span id="esCity">20</span> districts</div>
+        <ul class="moat">
+          <li><b>Public infrastructure</b> — GSRTC bus stations; nobody builds a second one next door.</li>
+          <li><b>Multi-year concession</b> — the relationship is the barrier, not the hardware.</li>
+          <li><b>Government is also the customer</b> — departments advertise via DAVP. We sit on both sides of the desk.</li>
+        </ul>
         <div class="es-note" id="esNote">The live network we run today — 20 GSRTC stations, 264 LED screens.</div>
         <div class="es-jump" id="esJump">Tap “After the tender” → 98 new stations light up across Gujarat.</div>
       </div>
