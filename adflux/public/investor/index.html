@@ -212,6 +212,30 @@
   .budyr2{font-family:var(--disp);font-weight:700;font-size:22px;color:var(--ink0);margin-top:15px;padding-top:13px;border-top:1px solid var(--line)}
   .budtake{margin-top:15px;background:rgba(255,230,0,.05);border:1px solid rgba(255,230,0,.2);border-radius:14px;padding:13px 18px;font-size:14px;color:var(--ink1);line-height:1.5} .budtake b{color:var(--yellow)}
   .budsrc{font-size:10.5px;color:var(--ink2);margin-top:11px;line-height:1.6} .budsrc a{color:var(--ink2);text-decoration:underline} .budsrc a:hover{color:var(--yellow)}
+  /* work-order proof pile (slide) */
+  .wowrap{display:grid;grid-template-columns:.94fr 1.06fr;gap:clamp(18px,3vw,46px);align-items:center;margin-top:6px}
+  @media(max-width:900px){.wowrap{grid-template-columns:1fr;gap:20px}}
+  .woleft .lead{margin-top:8px}
+  .wochips{display:flex;flex-direction:column;gap:8px;margin:15px 0 2px}
+  .wochip{display:flex;align-items:baseline;gap:11px;background:var(--navy2);border:1px solid var(--line);border-left:3px solid var(--ink2);border-radius:10px;padding:8px 13px}
+  .wochip.on{border-left-color:var(--yellow);background:rgba(255,230,0,.06)}
+  .wochip b{font-family:var(--disp);font-weight:700;font-size:16px;color:var(--ink0);min-width:70px}
+  .wochip span{font-size:11.5px;color:var(--ink2);line-height:1.3}
+  .wonav{display:flex;align-items:center;gap:11px;margin-top:15px}
+  .wobtn{border:1px solid var(--line);background:var(--navy2);color:var(--ink1);border-radius:10px;padding:9px 13px;font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;transition:border-color .2s,color .2s,background .2s}
+  .wobtn:hover{border-color:var(--ink2);color:var(--ink0)}
+  .wobtn-y{background:var(--yellow);color:#0b1120;border-color:var(--yellow)}
+  .wobtn-y:hover{background:#fff;border-color:#fff}
+  .wocount{font-family:var(--disp);font-size:13px;color:var(--ink2)}
+  .wocount span{color:var(--ink0)}
+  .wotake{margin-top:15px;font-size:13.5px;color:var(--ink1);border-top:1px solid var(--line);padding-top:11px}
+  .woright{display:flex;flex-direction:column;align-items:center;gap:11px}
+  .wopile{position:relative;width:min(70%,300px);height:min(60vh,470px);margin:0 auto}
+  .wocard{position:absolute;top:50%;left:50%;width:100%;transform:translate(-50%,-50%);border-radius:7px;overflow:hidden;background:#fff;border:1px solid rgba(255,255,255,.16);box-shadow:0 16px 40px rgba(0,0,0,.5);transition:transform .55s cubic-bezier(.2,.85,.25,1),opacity .45s ease;will-change:transform,opacity}
+  .wocard img{display:block;width:100%;height:auto}
+  .wocard.front{box-shadow:0 26px 62px rgba(0,0,0,.62),0 0 0 2px rgba(255,230,0,.4)}
+  .wohint{font-size:11px;color:var(--ink2);letter-spacing:.02em}
+  @media(prefers-reduced-motion:reduce){.wocard{transition:none}}
   /* ---------- real Gujarat tile maps (Leaflet + dark tiles) ---------- */
   #gjmap{width:100%;height:min(66vh,540px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
   #gjmap2{width:100%;height:min(68vh,580px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
@@ -1844,6 +1868,33 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <div class="budsrc anim">Sources — Central (DAVP/CBC, official data via Lok Sabha): <a href="https://www.nationalheraldindia.com/politics/centres-advertising-budget-up-by-84-pc-since-2020-21-trinamool-congress-quotes-official-data" target="_blank" rel="noopener">National Herald</a> · <a href="https://www.deccanherald.com/india/govt-spent-rs-96746-crore-on-advertisements-in-print-media-from-2019-20-to-2023-24-2817557" target="_blank" rel="noopener">Deccan Herald</a>. &nbsp; Gujarat (RTI, Oct 2024): <a href="https://english.gujaratsamachar.com/news/gujarat/gujarat-government-spent-880-cr-on-ads-over-11-years-reveals-rti" target="_blank" rel="noopener">Gujarat Samachar</a> · <a href="https://m.thewire.in/article/government/gujarat-government-spent-rs-8-81-crore-on-ads-celebrating-23-years-of-modi-in-public-office-report" target="_blank" rel="noopener">The Wire</a>.</div>
   </section>
 
+  <!-- WORK ORDERS (proof of demand) -->
+  <section class="slide">
+    <div class="wowrap">
+      <div class="woleft">
+        <div class="kicker anim">Proof, not projection</div>
+        <h2 class="anim h2c">The government already writes us the cheques.</h2>
+        <p class="lead anim" style="max-width:52ch">Real advertising work orders won by Untitled through the government DAVP channel &mdash; <b>&#8377;15 lakh to &#8377;1.65 crore</b> each. The same public demand that books these fills the screens.</p>
+        <div class="wochips anim">
+          <div class="wochip"><b>&#8377;1.65 Cr</b><span>Directorate of Information &middot; Vikas Saptah campaign</span></div>
+          <div class="wochip"><b>&#8377;78 L</b><span>Building &amp; Construction Workers Welfare Board</span></div>
+          <div class="wochip"><b>&#8377;66 L</b><span>Swachh Bharat Mission &middot; Municipal Finance Board</span></div>
+          <div class="wochip on"><b>&#8377;15 L</b><span>GSRTC &mdash; already on the LED screens</span></div>
+        </div>
+        <div class="wonav anim">
+          <button class="wobtn" id="woPrev" aria-label="Previous work order">&lsaquo; Prev</button>
+          <span class="wocount"><span id="woNow">1</span> / 10</span>
+          <button class="wobtn wobtn-y" id="woNext" aria-label="Next work order">Next order &rsaquo;</button>
+        </div>
+        <div class="wotake anim">Payback isn&rsquo;t a forecast &mdash; it&rsquo;s demand we already invoice.</div>
+      </div>
+      <div class="woright anim">
+        <div class="wopile" id="wopile"><div class="wocard" data-i="1"><img loading="lazy" src="workorders/wo1.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="2"><img loading="lazy" src="workorders/wo2.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="3"><img loading="lazy" src="workorders/wo3.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="4"><img loading="lazy" src="workorders/wo4.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="5"><img loading="lazy" src="workorders/wo5.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="6"><img loading="lazy" src="workorders/wo6.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="7"><img loading="lazy" src="workorders/wo7.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="8"><img loading="lazy" src="workorders/wo8.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="9"><img loading="lazy" src="workorders/wo9.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="10"><img loading="lazy" src="workorders/wo10.jpg" alt="Government advertising work order issued to Untitled Advertising"></div></div>
+        <div class="wohint">Signed government work orders &middot; tap Next to flip through all 10</div>
+      </div>
+    </div>
+  </section>
+
   <!-- 16 ASK -->
   <section class="slide">
     <div class="kicker anim">Use of funds</div>
@@ -1904,6 +1955,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
   var SLOTS_YR=151200*12, PRIV_RATE=0.18;  /* hoisted: needed by model() on sessionStorage auto-unlock */
   var RECORD=[{y:'FY21-22',v:2.2},{y:'FY22-23',v:3.6},{y:'FY23-24',v:5.4},{y:'FY24-25',v:8.6},{y:'FY25-26',v:8.8}];
   var recordStep=1, RECORD_IDX=-1;
+  var WO_IDX=-1, woTop=0, woN=10;
+  var WOSC=[[-6,-14,-8],[5,16,-11],[-4,-20,7],[7,17,-6],[-8,11,12],[4,-13,-13],[-5,21,9],[6,-17,10],[-7,13,-12],[3,-9,14]];
   var gate=document.getElementById('gate'), deck=document.getElementById('deck');
   function unlock(){ gate.style.display='none'; deck.classList.add('on'); try{sessionStorage.setItem('inv_ok','1')}catch(e){} boot(); }
   function tryPw(){ var v=(document.getElementById('pw').value||'').trim(); if(v.toLowerCase()===CODE) unlock(); else document.getElementById('pwerr').textContent='Wrong code. Ask Brijesh for access.'; }
@@ -1933,6 +1986,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
     st.addEventListener('touchend',function(e){ if(x0===null) return; var dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>60) advance(dx<0?1:-1); x0=null; },{passive:true});
     var _gj=document.getElementById('gjmap'); GJ_IDX=_gj?[].indexOf.call(slides,_gj.closest('.slide')):-1;
     var _gj2=document.getElementById('gjmap2'); GJ2_IDX=_gj2?[].indexOf.call(slides,_gj2.closest('.slide')):-1;
+    var _wo=document.getElementById('wopile'); WO_IDX=_wo?[].indexOf.call(slides,_wo.closest('.slide')):-1;
+    var _wp=document.getElementById('woPrev'); if(_wp) _wp.addEventListener('click',function(){ woGo(-1); });
+    var _wn=document.getElementById('woNext'); if(_wn) _wn.addEventListener('click',function(){ woGo(1); });
+    try{ woLayout(); }catch(e){}
     var expbs=document.querySelectorAll('.expbtn'); for(var eb=0;eb<expbs.length;eb++) expbs[eb].addEventListener('click',function(e){ setExpFull(e.currentTarget.getAttribute('data-full')==='1'); });
     drawRecord(recordStep); wireCalc(); recompute(); tickLive();
     setTimeout(function(){ try{ initMap(); }catch(e){} try{ initMap2(); }catch(e){} }, 350);
@@ -1954,6 +2011,29 @@ svg.leaflet-image-layer.leaflet-interactive path {
     setInterval(function(){ var hd=document.querySelector('.hero1'); if(hd && hd.classList.contains('on')){ n+=Math.floor(Math.random()*6)+1; el.textContent=n.toLocaleString('en-IN'); } }, 2600);
   }
 
+  function woLayoutCard(el,i){
+    var d=(i-woTop+woN)%woN, sc=WOSC[i%WOSC.length];
+    if(d===0){ el.style.zIndex='300'; el.style.opacity='1'; el.classList.add('front');
+      el.style.transform='translate(-50%,-50%) rotate(-1deg) scale(1.03)'; }
+    else { el.classList.remove('front'); el.style.zIndex=String(240-d*12);
+      el.style.opacity = d<=4 ? (0.6 - d*0.09).toFixed(2) : '0';
+      el.style.transform='translate(calc(-50% + '+sc[1]+'px), calc(-50% + '+sc[2]+'px)) rotate('+sc[0]+'deg) scale('+(0.92-d*0.015).toFixed(3)+')'; }
+  }
+  function woLayout(){ var c=document.querySelectorAll('#wopile .wocard'); for(var i=0;i<c.length;i++) woLayoutCard(c[i],i); }
+  function woReplay(){
+    var c=document.querySelectorAll('#wopile .wocard'); if(!c.length) return;
+    woTop=0; var nw=document.getElementById('woNow'); if(nw) nw.textContent='1';
+    for(var i=0;i<c.length;i++){ c[i].style.transition='none'; c[i].style.opacity='0';
+      c[i].style.transform='translate(-50%,-192%) rotate('+(WOSC[i%WOSC.length][0]*2)+'deg) scale(.85)'; }
+    var pile=document.getElementById('wopile'); if(pile) void pile.offsetWidth;
+    for(var j=0;j<c.length;j++) c[j].style.transition='';
+    var order=[]; for(var k=0;k<c.length;k++){ order.push({i:k,d:(k-woTop+woN)%woN}); }
+    order.sort(function(a,b){ return b.d-a.d; });
+    order.forEach(function(o,idx){ setTimeout(function(){ woLayoutCard(c[o.i],o.i); }, 140+idx*115); });
+  }
+  function woGo(dir){ woTop=(woTop+dir+woN)%woN; woLayout();
+    var nw=document.getElementById('woNow'); if(nw) nw.textContent=String((woTop%woN)+1); }
+
   function go(n, first){
     n=Math.max(0,Math.min(slides.length-1,n)); if(n===idx && !first) return;
     for(var i=0;i<slides.length;i++){ slides[i].classList.toggle('on',i===n); slides[i].classList.toggle('past',i<n); }
@@ -1968,6 +2048,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(n===RECORD_IDX){ recordStep=1; drawRecord(1); updateRecordInfo(); updateRecBtn(); }
     if(n===GJ_IDX){ if(!GJ_MAP){ initMap(); } [80,360,720].forEach(function(t){ setTimeout(function(){ try{ GJ_MAP&&GJ_MAP.invalidateSize(); }catch(e){} },t); }); }
     if(n===GJ2_IDX){ if(!GJ2){ initMap2(); } [80,360,720].forEach(function(t){ setTimeout(function(){ try{ GJ2&&GJ2.invalidateSize(); }catch(e){} },t); }); }
+    if(n===WO_IDX){ woReplay(); }
   }
 
   function countUpsIn(slide){

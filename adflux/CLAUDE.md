@@ -12544,3 +12544,78 @@ AskUserQuestion): show **State + Central**, and **replace** the roadmap slide. N
   `.slide.on .budbar i{height:var(--h)}` (the §191 transition pattern, not the looping `.an-bar`).
   Static slide, no SQL/APK, 16 slides unchanged (replace, not add). Verified in-browser (bars grow,
   count-ups land 347/656/644/880/80, source links, fits the slide, no errors).
+
+
+---
+
+## 194 · Phase 309 — investor deck: real government work-order PROOF slide (drop-in pile) (2026-08-12)
+
+Owner: "page 14 — remove all data, add the 10 work orders I shared, tagline to convey we
+already get big work orders → easy payback; all pages in animation, dropping one by one
+unevenly (one page on top of another, a little uneven), with next/next option." Built a
+document-pile slide in `public/investor/index.html` (standalone deck, §98, password
+`untitled2026`).
+
+### THE ASK WAS PRESERVED (do NOT read "remove page 14" as "delete the ask")
+Slide 14 WAS the ₹5 Cr ASK ("Use of funds" / equity to fund the 5× build) — the single
+most important investor slide. I did NOT delete it. The work-order proof was INSERTED as
+the new slide 14 (proof → then ask, the correct order); the ask shifted to slide 15, risks
+16, team 17. **Deck 16 → 17 slides.** Read intent (§2): his intent is "add a work-order
+proof slide near the end," not "throw away my funding ask." If the owner later says drop
+the ask, it's a one-section delete.
+
+### The 10 work orders — REAL, verified, big (§177, no fabrication)
+Source: `~/Downloads/reworkorder_10file/` — 10 real Gujarat-government advertising work
+orders ISSUED TO **Untitled Advertising** (via the DAVP channel). Verified 4 by reading
+the scans (the filename numbers are rickshaw QUANTITIES, NOT ₹ amounts):
+- **₹1.65 Cr** — Directorate of Information (Mahiti Niyamak), Vikas Saptah, 20,000 rickshaws, 33 districts.
+- **₹78 L** — Building & Construction Workers Welfare Board (8,000 rickshaws, DAVP ₹825).
+- **₹66 L** — Swachh Bharat Mission / Gujarat Municipal Finance Board (8,000 rickshaws).
+- **₹15 L** — GSRTC / Swachh Bharat, **LED screens across 19 depots** (₹12,77,250 + 18% GST) — directly ON-THESIS.
+Most are auto-rickshaw hood orders (the media the deck de-emphasized, §176). The slide
+does NOT claim they're all LED — it frames them honestly as **government DAVP advertising
+work orders** that prove the demand + Untitled's execution track record, with the GSRTC
+one highlighted as already on the LED screens. Tagline: "Payback isn't a forecast — it's
+demand we already invoice." Do NOT relabel the rickshaw orders as LED.
+
+### Images: compressed + served same-origin (NOT base64)
+`sips -Z 1100 -s formatOptions 68` shrank the 10 scans 6 MB → **1.4 MB total** (104-212K
+each), copied to `public/investor/workorders/wo1..wo10.jpg` (impact order: GSRTC LED, then
+₹1.65Cr, ₹78L, ₹66L, then the rest). Referenced by relative path (CSP `img-src 'self'`
+allows same-origin; keeps the HTML small, unlike embedding). To reorder/replace: swap the
+`woN.jpg` files (the pile reads wo1..wo10 in order).
+
+### The pile (drop-in cascade + Next/Prev flip)
+`.wopile` holds 10 absolutely-positioned `.wocard` (static `<img>` markup — no-JS shows the
+stack, never blank, §129). JS (mirrors the RECORD_IDX/GJ_IDX per-slide-entry pattern):
+- `woLayout()` positions each card by depth `d=(i-woTop+10)%10` from the front — front card
+  upright+lifted (rotate -1°, scale 1.03, yellow ring, z 300), the rest fan behind at
+  deterministic scatter `WOSC[i]` (rot/x/y), dimmed + tucked = the uneven pile.
+- `woReplay()` (fired from `go()` on `if(n===WO_IDX)`) resets to the top, sets every card to
+  a pre-drop state (translateY -192%, opacity 0, exaggerated rotate), forces a reflow, then
+  drops them **back-to-front staggered** (140 + k*115 ms) so the pile builds one-by-one and
+  the front lands last on top.
+- `woGo(±1)` (on-slide **Prev / Next order** buttons, NOT the deck arrows) advances `woTop`,
+  glides the cards to new positions, updates the "N / 10" counter. Arrow keys still move
+  SLIDES; the on-slide buttons flip the pages — clean separation (unlike the §182 record
+  `advance()` intercept, which wasn't needed here).
+- `WO_IDX` detected in `boot()` (slide containing `#wopile`), buttons wired there, `woLayout()`
+  called once at boot so a dot-jump shows an arranged pile.
+
+### Verified in-browser (screenshot-authoritative, §191)
+17 slides, work orders = 14/17 (ask 15/17), 10 cards, cascade drop-in fires on entry, Next
+flips 1→2 (2nd doc to top, previous card peeks behind = the uneven pile reads), 4 proof
+chips, front document readable, no JS errors. The 5×404 are the known benign cross-path
+`/deck/*.mp4|png` + `/led/logo-mark.svg` (404 on the /investor-only local server, resolve
+on Vercel, §175/§291) — not the wo images (those 200 + render). Static slide, no SQL/APK.
+
+### Reusable deck pattern
+`.wopile`/`.wocard` document-stack + `woLayout`/`woReplay`/`woGo` (depth-from-top layout +
+back-to-front staggered drop-in + on-slide flip buttons) — reuse for any "flip through N
+documents/cards" slide. `countUpsIn` unrelated here (no data-count on this slide).
+
+### Investor-deck order now (17 slides)
+1 hero · 2 what-we-are · 3 product · 4 audience · 5 record · 6 2%-gap · 7 economics ·
+8 DAVP-unlock (4 levers) · 9 concession+expansion · 10 cost picture · 11 asset priced ·
+12 forecast · 13 govt ad budget · **14 work orders (proof, this)** · 15 ask · 16 risks ·
+17 team. Still open: the record-slide private/govt turnover split when owner sends per-year ₹.
