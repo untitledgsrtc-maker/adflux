@@ -12070,3 +12070,48 @@ Done: 1 hero · 2-3 · 4 · 5 record · 6 (5,040+1.98%) · 7 economics · 8 leve
 · 10 expansion (this, 20→118). Deck is 19 slides. Still to lift: tender then/now,
 competition, inventory/cost viewers, build cost, ask, risks, team. Plus the record-slide
 private/govt turnover split when owner sends per-year ₹.
+
+
+---
+
+## 187 · Phase 300 — investor maps: bigger + eager-init (fix "not showing") (2026-08-12, `a42db13`)
+
+Owner (screenshots of BOTH map slides showing empty bordered boxes on the live deploy):
+"map is not showing and make bigger map in both."
+
+### The not-showing root (fixed) — lazy-init timing on live
+Both Leaflet maps (§297 #gjmap concession slide 9, §299 #gjmap2 expansion slide 10) were
+inited ONLY on first slide entry (`if(n===GJ_IDX){ if(!GJ_MAP) initMap(); }`). On the live
+deploy the init could miss (slide-transition/layout timing) → an empty bordered box.
+- **CSP is NOT the cause** — re-read the full vercel.json CSP: `img-src ... https:` allows
+  CartoDB tiles, `script-src 'unsafe-inline'` runs inline Leaflet; the sales deck runs the
+  same setup under the same CSP. So the empty box = init timing, not a block.
+- **Fix:** eager-init BOTH maps at boot (`setTimeout(()=>{ initMap(); initMap2(); }, 350)`
+  after unlock) so they build while the deck is on slide 1 (opacity-0 slides still have
+  layout → Leaflet sizes correctly), + fire `invalidateSize()` 3× (80/360/720ms) on every
+  entry to those slides. So the frame paints regardless of transition timing.
+
+### bigger (owner's 2nd ask)
+`#gjmap` min(54vh,410) → **min(66vh,540)**; `#gjmap2` min(56vh,440) → **min(68vh,580)**;
+concession map container `max-width:540` → **720**. Map CSS selector generalized to
+`[id^="gjmap"]` so both share styling.
+
+### Verified locally (browser pane)
+Both maps eager-init at boot BEFORE either slide is visited: gjmap 535px / 12 tiles / 20
+markers · gjmap2 574px / 9 tiles / 20 markers (Today view). Both render on their slides,
+the expansion Today/After-tender toggle intact, zero console errors.
+- ⚠ Local python server sends NO CSP header (§297/§299 foot-gun) — live-CSP behaviour is
+  reasoned (img-src https: + inline Leaflet + sales-deck precedent), owner confirms on
+  `app.untitledad.in/investor`.
+
+### CONTRACT / foot-gun
+- Any Leaflet map in this deck must be **eager-inited at boot + invalidateSize on entry**,
+  never lazy-init-only — a lazy-only init can silently miss on the live deploy and leave an
+  empty box. Map containers must have an explicit CSS height (they do) so boot-time init on
+  an opacity-0 slide sizes correctly.
+
+### Investor-deck chain
+Done: 1 hero · 2-3 · 4 · 5 record · 6 (5,040+1.98%) · 7 economics · 8 levers · 9 real map
+(bigger) · 10 expansion 20→118 (bigger). Both maps now render reliably + larger. Still to
+lift: tender then/now, competition, inventory/cost viewers, build cost, ask, risks, team +
+the record-slide private/govt turnover split when owner sends per-year ₹.
