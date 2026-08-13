@@ -11898,3 +11898,37 @@ Done to sales-deck bar: 1 (video hero §179) · 2-3 (animated §180) · 6 (5,040
 2-badge/4/5 (this §182). Remaining to lift with the motion layer + quality: DAVP unlock,
 expansion, competition, tender/cost viewers, inventory, build cost, ask, risks, team.
 Plus the private/govt split once the owner sends the numbers.
+
+
+---
+
+## 183 · Phase 295 — investor slide 6: derive the 1.98% occupancy (two receipts) (2026-08-12, `2c0b5e7`)
+
+Owner on the 2%-gap slide: "how you come up with 2% occupancy? add that and make it
+more attractive." The slide already showed the 5,040 CAPACITY build (§181) but not how
+the 2% itself is derived.
+
+### The 1.98% occupancy derivation (real, from §155/§177)
+- Slots sold / day = **100** (avg across the **29 won LED deals**, GST-filed — the same
+  won-quote data that gave `avg slots_per_day=100` in §177).
+- Screen capacity / day = **5,040** (the §181 build).
+- Occupancy = **100 ÷ 5,040 = 1.98%** → **50× headroom** (5040÷100).
+CONTRACT: 2% is MEASURED (100 sold ÷ 5,040 capacity across 29 real deals), not assumed.
+Do not restate it as a guess.
+
+### What shipped (`public/investor/index.html`)
+Rebuilt slide 6 into TWO matching `.calc` receipts side by side:
+- **Panel 1 · capacity** = the 5,040 build (14h → 30 slots × 168 loops), footer bridges
+  to panel 2 ("that's the ceiling … how much do we actually sell? →").
+- **Panel 2 · occupancy (NEW)** = 100 slots sold/day (avg · 29 won LED deals) ÷ 5,040 =
+  **1.98%** big yellow, "50× headroom", a green **"● real deals"** chip in the header, the
+  50-cell grid (1 lit, pulsing) moved here as the visual with "each cell ≈ 100 slots · 1
+  lit = what we sell · 49 empty", and a "Measured, not projected — GST-filed won deals ·
+  98% empty" footer. Full-width fill bar kept as the closer. Verified live (2 panels,
+  100/5,040 rows, 1.98% eq, grid glowing, zero console errors).
+
+### Investor-deck chain
+Done: 1 (video hero §179) · 2-3 (animated §180) · 4/5 + 264 badge (§182) · 6 (5,040 calc
+§181 + 1.98% derivation §183). Still to lift: DAVP unlock, expansion, competition,
+tender/cost viewers, inventory, build cost, ask, risks, team. Plus the private/govt
+turnover split on slide 5 once the owner sends the per-year ₹ (§182 OPEN).
