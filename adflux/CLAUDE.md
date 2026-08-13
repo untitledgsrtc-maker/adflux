@@ -11932,3 +11932,47 @@ Done: 1 (video hero §179) · 2-3 (animated §180) · 4/5 + 264 badge (§182) ·
 §181 + 1.98% derivation §183). Still to lift: DAVP unlock, expansion, competition,
 tender/cost viewers, inventory, build cost, ask, risks, team. Plus the private/govt
 turnover split on slide 5 once the owner sends the per-year ₹ (§182 OPEN).
+
+
+---
+
+## 184 · Phase 296 — investor slide 7 (the unlock): 3 animated illustrated growth levers (2026-08-12, `956a237`)
+
+Owner on the DAVP-unlock slide: "no animation in this slide, UI is not good, no vector,
+make it fine-tune. I want many factors shown — DAVP rate card → enhance govt business,
+agency onboarding, team expansion across Gujarat." The slide was flat text + a plain
+2%→10% row.
+
+### What shipped (`public/investor/index.html`)
+Rebuilt slide 7 into THREE animated illustrated lever cards (`.lever` grid) + a target
+strip:
+- **Lever 1 · Government — DAVP rate card set**: an inline SVG rate-card document with
+  ₹1 rows blinking on in sequence (`an-dbox d1/d2/d3`) + a govt shield "approved" stamp
+  pulsing (`an-glow`). Metric: ₹1/slot = 5× private, 2% → 10%.
+- **Lever 2 · Private — Agency onboarding**: a central screen HUB (`an-glow`) with six
+  brand nodes blinking in (`an-dbox`) and connecting lines marching inward (`an-beam`).
+  Metric: 700+ brands, agencies scale the private side.
+- **Lever 3 · Footprint — Team across Gujarat**: a faint dashed state region ellipse
+  with 5 location pins popping across it (`an-dbox`, ring+dot markers) + a central hub
+  map-pin (`an-glow`) + marching connector lines. Metric: 20 stations today, expanding
+  statewide. (Stylised network, not a literal Gujarat outline — reads as statewide reach
+  without a wonky map.)
+- **Target strip**: 2% (today · DAVP pending) → the three levers, in motion (catalyst)
+  → 10%+ (= 5× revenue · still 90% empty).
+
+### CONTRACT — the transform-box fill-box rule is now GLOBAL for svg
+The §180 motion layer scoped `transform-box:fill-box;transform-origin:center` to
+`.illwrap svg` — so the scale animations (`an-dbox`/`an-pop`/`an-lock`) did NOT work in
+SVGs outside `.illwrap` (the lever cards). Broadened to:
+`svg [class*="an-"]{transform-box:fill-box}` +
+`svg .an-dbox,svg .an-pop,svg .an-lock{transform-origin:center}` +
+`.an-bar` keeps `transform-origin:bottom` (bar-grow). Verified live that slides 3/4
+origins stayed correct (an-bar bottom-anchored `8px 24px`, an-pop/dbox centered). Any
+future animated SVG anywhere in the deck now inherits the correct transform-box — no need
+to wrap it in `.illwrap`.
+
+### Investor-deck chain
+Done: 1 (video hero §179) · 2-3 (§180) · 4/5+264 (§182) · 6 (5,040 calc §181 + 1.98%
+derivation §183) · 7 (3 levers §184). Still to lift: 8 (Why GSRTC) · expansion ·
+competition · tender/cost viewers · inventory · build cost · ask · risks · team. Plus the
+private/govt turnover split on slide 5 once the owner sends per-year ₹ (§182 OPEN).
