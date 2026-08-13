@@ -1556,12 +1556,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <section class="slide">
     <div class="kicker anim">The record</div>
     <h2 class="anim">From ₹0 to ₹8.8 Crore.</h2>
-    <p class="lead anim" style="max-width:60ch">Founded in Vadodara, 2015, from zero — government and private advertisers. Five years of filed, growing revenue.</p>
+    <p class="lead anim" style="max-width:60ch">Founded in Vadodara, 2015, from zero — government and private advertisers. <b class="yellow">Press → (or the button) to build the last five years, one at a time.</b></p>
     <div class="split" style="margin-top:16px;align-items:start">
       <div class="anim" style="max-width:640px">
         <div id="recordChart"></div>
         <div style="font-size:12px;color:var(--ink2);margin-top:8px"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--yellow);margin-right:6px;vertical-align:-1px"></span>Turnover (₹ Cr, GST-filed — real revenue, not projections)</div>
-        <button id="recNext" class="recbtn" style="display:none">Reveal next year &#9656;</button>
+        <button id="recNext" class="recbtn">Reveal next year &#9656;</button>
       </div>
       <div class="anim recinfo" id="recInfo"></div>
     </div>
@@ -2269,7 +2269,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     countUpsIn(slides[n]);
     if(n===0) buildReticles();
     var fs=slides[n].querySelector('#fillSold'); if(fs){ fs.style.width='0%'; setTimeout(function(){ fs.style.width='2%'; },250); }
-    if(n===RECORD_IDX){ recordStep=1; drawRecord(1); updateRecordInfo(); updateRecBtn(); for(var _k=1;_k<RECORD.length;_k++){ (function(kk){ setTimeout(function(){ if(idx===RECORD_IDX && recordStep<kk+1){ recordStep=kk+1; drawRecord(recordStep); updateRecordInfo(); updateRecBtn(); } }, 500+kk*500); })(_k); } }
+    if(n===RECORD_IDX){ recordStep=1; drawRecord(1); updateRecordInfo(); updateRecBtn(); }
     if(n===GJ_IDX){ if(!GJ_MAP){ initMap(); } [80,360,720].forEach(function(t){ setTimeout(function(){ try{ GJ_MAP&&GJ_MAP.invalidateSize(); }catch(e){} },t); }); }
     if(n===GJ2_IDX){ if(!GJ2){ initMap2(); } [80,360,720].forEach(function(t){ setTimeout(function(){ try{ GJ2&&GJ2.invalidateSize(); }catch(e){} },t); }); }
     if(n===WO_IDX){ woReplay(); }
@@ -2327,7 +2327,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(recordStep>=RECORD.length){ b.innerHTML='All five years ✓'; b.classList.add('done'); b.disabled=true; }
     else { b.innerHTML='Reveal next year ▸'; b.classList.remove('done'); b.disabled=false; }
   }
-  function advance(dir){ go(idx+dir); }
+  function advance(dir){
+    if(idx===RECORD_IDX){
+      if(dir>0 && recordStep<RECORD.length){ recordStep++; drawRecord(recordStep); updateRecordInfo(); updateRecBtn(); return; }
+      if(dir<0 && recordStep>1){ recordStep--; drawRecord(recordStep); updateRecordInfo(); updateRecBtn(); return; }
+    }
+    go(idx+dir);
+  }
 
   /* real Gujarat map — inlined Leaflet + live dark tiles + actual station markers */
   var GJ_MAP=null, GJ_IDX=-1;
