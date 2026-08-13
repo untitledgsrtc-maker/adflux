@@ -11642,3 +11642,49 @@ slots_per_day, slot_seconds, screens, duration_months, campaign_total).
 forecast recompute, no NaN. Self-contained, no SQL/APK. The scrolling Phase-288
 version is gone (replaced — owner chose "replace /investor with the deck").
 
+
+---
+
+## 178 · Phase 290 — investor deck upgrade: real logo + illustrations + GSRTC positioning + more content (2026-08-12, `868bd1d`)
+
+Owner: "use Untitled Logo, add clip-arts + animation (not attractive), it's not
+'transit LED' it's GSRTC LED screens AT bus stations, add more content — not
+enough." Used a **Workflow** (3 parallel agents: slide copy · SVG illustrations ·
+positioning/competition/investor-Q&A) then integrated into the full-screen deck
+(`public/investor/index.html`).
+
+### What changed
+- **Real logo**: `public/investor/logo.svg` (official UNTITLED wordmark, copied
+  self-contained from /led) in the gate, title slide, and nav bar. White-on-
+  transparent → renders on navy.
+- **Positioning FIXED everywhere** (owner correction): "LED advertising screens
+  inside Gujarat's GSRTC bus stations", "every impression measured" — the phrase
+  "transit LED network" is GONE. Do not reintroduce it.
+- **7 custom inline SVG illustrations** (brand navy/yellow, CSP-safe, no external):
+  bus-station-with-glowing-screens (hero, used on title + audience), LED-screen-ad,
+  AI-camera-measure, QR-scan-lead, fill-grid, Gujarat-map-with-station-pins,
+  growth-arrow + 6 line icons (screen/target/shield/rupee/deal/bus). Injected into
+  `<!--SVG:NAME-->` / `<!--ICON:name-->` placeholders via a build script (cleaner
+  than hand-pasting 17KB) — reusable pattern.
+- **12 → 18 slides**: added Product (play/measure/prove) · Audience (captive
+  commuter) · Why-GSRTC (concession moat) · Competition (vs hoardings/OOH/Google,
+  the measurability moat) · Roadmap (4 steps: DAVP→win→build→fill) · Team.
+- Copy is investor-grade + honest, real numbers (occupancy 1.98%, govt ₹1 vs
+  private ₹0.18/slot, private LED ₹5.76 L booked). The **₹5 Cr raise sits just
+  below the ₹5.65 Cr build capex** — the ~₹65 L gap is flagged on the ask slide
+  (owner to confirm operating-cash/debt bridge before showing an investor).
+- Full-screen /present-format kept (arrow/button/dot nav, progress bar, per-slide
+  count-ups, swipe, interactive fill calc on a slide).
+
+### Verified live (browser pane)
+18 slides, real logo loads (gate+title+nav), 16 SVGs render (yellow on navy),
+nav (buttons/dots/keys), calc (2%→₹3.77Cr, 10%→₹18.87Cr), no NaN. Self-contained,
+no SQL/APK. The workflow drafts are in the run journal (wf_e3953dc9-e17); the SVG
+set was saved to /tmp/svg/ during the build.
+
+### Investor deck — the running phase chain (for future sessions)
+The `/investor` page evolved: §174 statement → §176 cinematic scroll (288) → §177
+full-screen deck (289, real LED numbers from won quotes) → §178 illustrated 18-slide
+upgrade (290). It is a full-screen slide PRESENTATION (like /present), not a scroll
+page. Password `untitled2026`. LED-only, fill/DAVP thesis, GSRTC-bus-station wording.
+
