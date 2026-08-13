@@ -12478,3 +12478,30 @@ anchor intact. Cards 1/2 (break-even, leverage) are fill-independent constants; 
 stays the 10%-target anchor (live payback is the #fPay line under the chart). This intentionally
 re-shows a red op-profit at the 2% open (the §192 concern) — accepted per the owner's explicit
 ask; the sub anchor + break-even/leverage/ladder/chart still carry the upside.
+
+### Phase 306.2 — EVERY forecast number now scales with screens + toggle-box UI fix
+Owner: "i think you changed the real number ... as if new screens are added the revenue multiplies
+accordingly, so it['s] not changing." DEEP-ANALYSIS (verified in-browser, 98→49 stations): the real
+numbers were intact (op-profit DID scale: 98 stn → +₹14.73 Cr, 49 stn → +₹8.62 Cr), BUT the bug he
+caught was real — break-even, leverage (+₹/1%), payback, the capex/opex brief, and the legend were
+STATIC (only refreshed on the mode toggle, NOT when the stations/rate/licence sliders moved). So half
+the numbers scaled with screens and half froze.
+- FIX (owner picked "all numbers live"): **`recompute()` is now the SINGLE renderer** — every number
+  (all 4 KPI cards + labels + subs, the capex/opex brief, lead cost/step, legend, h2 break-even,
+  fbenote, caveat, dial readout, payback line, ladder, chart) derives from `fModel()` live and updates
+  together on ANY lever change. Verified 98→49 stn: break-even 2.19→2.46%, leverage ₹1.89→₹1.14,
+  payback 9.4→8.4 mo, Y5 cash ₹60.5→₹35.7 Cr, capex/opex ₹5.65/₹4.14→₹2.83/₹2.81, legend + h2be all
+  scale. Default (98 stn) unchanged. Combined total capex = `m.capex + 1.82`.
+- REMOVED `FMODES` config + `applyModeCopy()` + `fCountKpis()` (~55 lines): mode is now just a
+  `FMODE` flag that `recompute()` branches on, so there's no separate mode-text copy to drift.
+  `setFMode()` = toggle visual + `recompute()` + `replayWedge()`. The KPI markup is now id'd SHELLS
+  (`#fK1v/#fK1l … #fK4v/#fK4l/#fK4s`) that `recompute()` fills.
+- Trade-off: the KPI **digit count-up is gone** (can't cleanly count-up 4 different-format live values
+  that also update on drag) — cards still fade/rise in via `.anim`, and the chart wedge sweep / dot
+  climb / break-even glide remain. Re-addable on entry if the owner asks.
+- ⚠ Boot-safe: `recompute()` reads `FMODE` (a string; `undefined==='existing'` → false → combined
+  path) so the line-1817 auto-unlock render can't throw (unlike the removed `FMODES` object which
+  did — §193). No markup pre-fill dependency anymore; `recompute()` renders from the shells at boot.
+- **Toggle box UI fix**: the sliding `.fpill` was a fixed 50%-width highlight on two UNEQUAL-width
+  buttons ("Existing 20" vs the longer "Existing + Tender · 118") → misaligned. Replaced with a
+  direct **`.fopt.on` active-button highlight** (each button's own width) — clean on any width.
