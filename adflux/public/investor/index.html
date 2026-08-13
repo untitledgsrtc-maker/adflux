@@ -1864,9 +1864,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if(!GJ2) initMap2();
     if(full && GJ2){
       if(gj2New.length===0){
-        NEW98.forEach(function(c){ var m=L.circleMarker([c[0],c[1]],{radius:4,color:'#38d39f',weight:1,opacity:0.85,fillColor:'#38d39f',fillOpacity:0.55}).addTo(GJ2); if(m._path) m._path.style.filter='drop-shadow(0 0 4px #38d39f)'; gj2New.push(m); });
+        NEW98.forEach(function(c,i){ setTimeout(function(){ if(!GJ2)return; var m=L.circleMarker([c[0],c[1]],{radius:4,color:'#38d39f',weight:1,opacity:0.85,fillColor:'#38d39f',fillOpacity:0.55}).addTo(GJ2); if(m._path) m._path.style.filter='drop-shadow(0 0 4px #38d39f)'; gj2New.push(m); }, i*45); });
       } else { gj2New.forEach(function(m){ m.addTo(GJ2); }); }
-      setTimeout(function(){ try{ GJ2.fitBounds(L.latLngBounds(GJCITIES.map(function(c){return [c[1],c[2]];}).concat(NEW98)),{padding:[18,18],maxZoom:8}); }catch(e){} }, 120);
+      setTimeout(function(){ try{ GJ2.fitBounds(L.latLngBounds(GJCITIES.map(function(c){return [c[1],c[2]];}).concat(NEW98)),{padding:[18,18],maxZoom:8}); }catch(e){} }, 200);
     } else if(GJ2){
       gj2New.forEach(function(m){ try{ GJ2.removeLayer(m); }catch(e){} });
       setTimeout(function(){ try{ GJ2.fitBounds(L.latLngBounds(GJCITIES.map(function(c){return [c[1],c[2]];})),{padding:[24,24],maxZoom:8}); }catch(e){} },60);
