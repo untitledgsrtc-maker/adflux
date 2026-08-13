@@ -12876,3 +12876,29 @@ Owner ran a full QA pass. Fixed the real ones:
   hero's HTML tagline (this logo carries its own). LESSON: when the owner says "you didn't
   use my logo" but you did, check ~/Downloads for near-identical variants — he may mean a
   different export (the " 2" file).
+
+### Phase 309.12–.14 — investor deck iterations (2026-08-14)
+- **309.12 (`5020039`)** — unit-economics slide (13): added a **Cost / screen /
+  month** row (₹3,163 at 264 → ₹2,773 at 1,244, "drops as we scale"), above the
+  Revenue/screen row so the per-screen margin reads directly.
+- **309.13 (`89fcf2e`)** — record slide (6): REVERTED the §309.8 auto-reveal back to
+  MANUAL (owner: "I'll next by click, don't showcase by yourself"). Restored the
+  `advance()` RECORD_IDX intercept (→ / the "Reveal next year" button steps the 5
+  years one at a time, then advances; ← un-steps), dropped the on-entry auto-reveal
+  setTimeout chain, restored the "Press →" hint, un-hid the button. Verified in-browser:
+  Next reveals FY22-23 and the deck stays on slide 6.
+- **309.14 (`8ae9ae9`)** — video slide (2, "See it live"): the city tabs now build from
+  the FULL 20-station list (`STATIONS` = the map's GJCITIES names, self-contained in the
+  video IIFE — NOT referencing GJCITIES to avoid the late-var boot trap §180/§192/§193),
+  so it always shows 20 city tabs (was 3-4 local fallbacks). Each tab plays its own clip
+  when the Cities master has a `youtube_url` (`/api/deck-videos` still upgrades them live
+  on Vercel via `buildThumbs(map)`), else the hero station footage tagged with that city.
+  `buildThumbs(null)` at boot = 20 tabs immediately; the delegated click handler + the
+  `__vidCtl` reset both work with the rebuilt pills. Data path preserved (§71 one source):
+  add a YouTube link to a city in Master → Cities and its tab auto-upgrades (same source
+  as /led + the WhatsApp AI). Verified: 21 pills render (2 rows), tapping Junagadh swaps
+  the badge to "JUNAGADH · LIVE" + plays the hero fallback.
+- Owner NOTE resolved this session: "slide 14 default 20 city tab" — slide 14 is the
+  forecast (no tabs); the "20" concept lives on slide 10 (map, ALREADY defaults to
+  "Today · 20 stations") + slide 2 (video tabs). Owner "no preference" on which → wired
+  the video slide to 20 tabs (309.14).
