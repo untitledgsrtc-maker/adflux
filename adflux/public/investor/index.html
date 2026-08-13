@@ -275,6 +275,25 @@
   .fticks{position:relative;height:15px;margin-top:2px;font-size:10px;color:var(--ink2)}
   .fticks span{position:absolute;white-space:nowrap}
   .fbenote{font-size:10.5px;color:#ff8791;margin-top:1px}
+  .fopts{margin-top:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .foptseg{position:relative;display:inline-flex;background:var(--navy2);border:1px solid var(--line);border-radius:12px;padding:4px}
+  .fpill{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:rgba(255,230,0,.14);border:1px solid rgba(255,230,0,.4);border-radius:9px;transition:transform .45s cubic-bezier(.16,1,.3,1);z-index:0}
+  .foptseg[data-mode="combined"] .fpill{transform:translateX(100%)}
+  .fopt{position:relative;z-index:1;border:0;background:none;cursor:pointer;font-family:var(--body);font-size:12.5px;color:var(--ink1);padding:8px 15px;border-radius:9px;line-height:1.15;text-align:left}
+  .fopt.on{color:var(--ink0)}
+  .fopt em{font-style:normal;display:block;margin-top:2px;font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink2)}
+  .fopt.on em{color:var(--yellow)}
+  .fscale{display:flex;align-items:center;gap:9px}
+  .fscale .fscap{font-size:9.5px;color:var(--ink2);letter-spacing:.05em}
+  .fscale .new circle{opacity:.12;transition:opacity .5s ease,filter .5s ease}
+  .fscale.full .new circle{opacity:.85;filter:drop-shadow(0 0 3px var(--green))}
+  .fscale.full .new circle:nth-child(n+6){transition-delay:.06s}
+  .fscale.full .new circle:nth-child(n+11){transition-delay:.12s}
+  .fbrief{margin-top:9px;font-size:12px;color:var(--ink1);font-family:var(--mono)}
+  .fbrief b{color:var(--ink0)} .fbrief .g{color:var(--green)} .fbrief .mute{color:var(--ink2)}
+  #fbeMark{transition:left .5s cubic-bezier(.16,1,.3,1)}
+  .fassump.existing .lv-combined{display:none}
+  .fkpis{margin-top:10px} .fmain{margin-top:12px}
   .fread{font-family:var(--mono);font-size:12px;color:var(--ink1);margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07)}
   .fread .yv{color:var(--yellow)} .fread b.g{color:var(--green)} .fread b.r{color:#ff5c6c}
   .fchips{display:flex;gap:8px;margin-top:10px}
@@ -1697,8 +1716,20 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <!-- 14 FORECAST (operating-leverage crossover) -->
   <section class="slide">
     <div class="kicker anim" style="display:flex;align-items:center;gap:9px"><svg viewBox="0 0 40 40" width="24" height="24" fill="none" stroke="#FFE600" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="an-glow"><line x1="6" y1="27" x2="34" y2="15"/><path d="M20 21 L15 32 L25 32 Z" stroke-linejoin="round"/><rect x="4" y="24" width="5" height="5" rx="1"/><rect x="29" y="9" width="8" height="8" rx="1.5" fill="#FFE600" stroke="none"/></svg><span>Operating leverage</span></div>
-    <h2 class="anim h2c">Break-even is <span style="color:var(--yellow)">2.19%</span> fill. We're already at 2%.</h2>
-    <p class="lead anim" style="margin-top:8px;font-size:clamp(14px,1.7vw,17px)">Our cost is fixed at <b class="yellow">&#8377;4.14&#8201;Cr/yr</b>. Every <b class="yellow">+1% fill</b> past break-even drops <b class="yellow">&#8377;1.89&#8201;Cr</b> straight to profit &mdash; and government DAVP demand is the switch that fills the screens.</p>
+    <h2 class="anim h2c">Break-even is <span style="color:var(--yellow)"><span id="fHeadBe">2.19</span>%</span> fill. We're already at 2%.</h2>
+    <p class="lead anim" style="margin-top:8px;font-size:clamp(14px,1.7vw,17px)">Our cost is fixed at <b class="yellow" id="leadCost">&#8377;4.14&#8201;Cr/yr</b>. Every <b class="yellow">+1% fill</b> past break-even drops <b class="yellow" id="leadStep">&#8377;1.89&#8201;Cr</b> straight to profit &mdash; and government DAVP demand is the switch that fills the screens.</p>
+    <div class="fopts anim">
+      <div class="foptseg" data-mode="combined" role="tablist" aria-label="Investment option">
+        <span class="fpill" aria-hidden="true"></span>
+        <button class="fopt" id="optExisting" data-mode="existing" role="tab" aria-selected="false">Existing&nbsp;20 <em>proven &middot; real</em></button>
+        <button class="fopt on" id="optCombined" data-mode="combined" role="tab" aria-selected="true">Existing&nbsp;+&nbsp;Tender &middot; 118 <em>projection</em></button>
+      </div>
+      <div class="fscale full" id="fScale" aria-hidden="true">
+        <svg viewBox="0 0 168 20" width="150" height="18"><g fill="#FFE600"><circle cx="4" cy="10" r="3"/><circle cx="12" cy="10" r="3"/><circle cx="20" cy="10" r="3"/><circle cx="28" cy="10" r="3"/><circle cx="36" cy="10" r="3"/><circle cx="44" cy="10" r="3"/><circle cx="52" cy="10" r="3"/></g><g class="new" fill="#38d39f"><circle cx="64" cy="10" r="2"/><circle cx="71" cy="10" r="2"/><circle cx="78" cy="10" r="2"/><circle cx="85" cy="10" r="2"/><circle cx="92" cy="10" r="2"/><circle cx="99" cy="10" r="2"/><circle cx="106" cy="10" r="2"/><circle cx="113" cy="10" r="2"/><circle cx="120" cy="10" r="2"/><circle cx="127" cy="10" r="2"/><circle cx="134" cy="10" r="2"/><circle cx="141" cy="10" r="2"/><circle cx="148" cy="10" r="2"/><circle cx="155" cy="10" r="2"/></g></svg>
+        <span class="fscap">20 built&nbsp;&rarr;&nbsp;118 after tender</span>
+      </div>
+    </div>
+    <div class="fbrief anim" id="fBrief">Capex <b>&#8377;5.65 Cr</b> <span class="mute">(the &#8377;5 Cr ask)</span> &nbsp;&middot;&nbsp; Opex <b>&#8377;4.14 Cr/yr</b> &nbsp;&middot;&nbsp; <span class="mute">&#8377;7.47 Cr total incl. the 20 already built</span></div>
     <div class="fkpis anim">
       <div class="fkpi"><div class="v y">&#8776;<span data-count="2.19" data-dec="2">0</span>%</div><div class="l">Break-even fill</div></div>
       <div class="fkpi"><div class="v y">+&#8377;<span data-count="1.89" data-dec="2">0</span> Cr</div><div class="l">Op profit per +1% fill</div></div>
@@ -1711,30 +1742,30 @@ svg.leaflet-image-layer.leaflet-interactive path {
           <div class="dl"><span>Ad-slot fill &mdash; drag up to watch it turn green</span><b><span id="v-fill">2.0</span>%</b></div>
           <div class="ftrack"><input type="range" id="s-fill" min="2" max="12" step="0.1" value="2"><div class="fbe" id="fbeMark"></div></div>
           <div class="fticks"><span style="left:0">Today &middot; 2%</span><span class="g" style="left:80%;transform:translateX(-70%)">DAVP target &middot; 10%</span></div>
-          <div class="fbenote">&#9650; break-even 2.19% &mdash; today&#39;s 2% sits right at the line</div>
+          <div class="fbenote" id="fBeNote">&#9650; break-even 2.19% &mdash; today&#39;s 2% sits right at the line</div>
           <div class="fread" id="fRead"></div>
           <div class="fchips"><button class="fchip" id="chipToday">Today 2%</button><button class="fchip g" id="chipTarget">DAVP target 10%</button></div>
         </div>
         <div class="fladder">
-          <div class="frung"><div class="f">2% fill</div><div class="p r">&minus;&#8377;0.36 Cr</div></div>
-          <div class="frung"><div class="f">5% fill</div><div class="p g">+&#8377;5.30 Cr</div></div>
-          <div class="frung"><div class="f">10% fill</div><div class="p g">+&#8377;14.73 Cr</div></div>
+          <div class="frung" data-fill="2"><div class="f">2% fill</div><div class="p r">&minus;&#8377;0.36 Cr</div></div>
+          <div class="frung" data-fill="5"><div class="f">5% fill</div><div class="p g">+&#8377;5.30 Cr</div></div>
+          <div class="frung" data-fill="10"><div class="f">10% fill</div><div class="p g">+&#8377;14.73 Cr</div></div>
         </div>
         <details class="fassump">
           <summary>&#9662; Model assumptions (stations &middot; rates &middot; licence)</summary>
-          <div class="lv"><label>New stations won <span class="val" id="v-new">98</span></label><input type="range" id="s-new" min="0" max="98" step="1" value="98"></div>
+          <div class="lv lv-combined"><label>New stations won <span class="val" id="v-new">98</span></label><input type="range" id="s-new" min="0" max="98" step="1" value="98"></div>
           <div class="lv"><label>Govt rate <span class="val" id="v-grate">&#8377;1.0/slot</span></label><input type="range" id="s-grate" min="1" max="3" step="0.5" value="1"></div>
           <div class="lv"><label>Private share of fill <span class="val" id="v-pshare">20%</span></label><input type="range" id="s-pshare" min="0" max="60" step="5" value="20"><div style="font-size:10px;color:var(--ink2);margin-top:4px">Private earns &#8377;0.18 vs govt &#8377;1 &mdash; raising this <i>lowers</i> blended revenue. Held at 20% as a floor; the thesis is govt DAVP fill.</div></div>
-          <div class="lv"><label>Licence bid <span class="val" id="v-lic">&#8377;0.49 Cr/yr</span></label><input type="range" id="s-lic" min="0.49" max="2.5" step="0.1" value="0.49"></div>
+          <div class="lv lv-combined"><label>Licence bid <span class="val" id="v-lic">&#8377;0.49 Cr/yr</span></label><input type="range" id="s-lic" min="0.49" max="2.5" step="0.1" value="0.49"></div>
         </details>
       </div>
       <div>
         <div class="fchart"><div id="fcChart"></div></div>
-        <div class="flegend"><span><i style="background:var(--yellow)"></i>Revenue (rises with fill)</span><span><i style="background:var(--blue)"></i>Fixed cost &#8377;4.14 Cr/yr</span><span><i style="background:var(--green)"></i>Profit zone</span></div>
+        <div class="flegend"><span><i style="background:var(--yellow)"></i>Revenue (rises with fill)</span><span><i style="background:var(--blue)"></i><span id="fLegCost">Fixed cost &#8377;4.14 Cr/yr</span></span><span><i style="background:var(--green)"></i>Profit zone</span></div>
         <div class="fpay" id="fPay"></div>
       </div>
     </div>
-    <div class="fcaveat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg><div><b>Assumes DAVP government demand exists to buy the slots.</b> Fill is the only driver against a fixed &#8377;4.14 Cr cost &mdash; the Government DAVP rate card now being finalised is the engine that lifts fill from today&#39;s 2% toward the 10% target. Below 2.19% fill the build does not recover its capex inside the 5-year term. Unaudited.</div></div>
+    <div class="fcaveat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg><div id="fCaveat"><b>Assumes DAVP government demand exists to buy the slots.</b> Fill is the only driver against a fixed &#8377;4.14 Cr cost &mdash; the Government DAVP rate card now being finalised is the engine that lifts fill from today&#39;s 2% toward the 10% target. Below 2.19% fill the build does not recover its capex inside the 5-year term. Unaudited.</div></div>
   </section>
 
   <!-- 15 ROADMAP -->
@@ -2017,22 +2048,24 @@ svg.leaflet-image-layer.leaflet-interactive path {
   function valF(id){ var el=document.getElementById(id); return el?+el.value:0; }
   /* SLOTS_YR (=151200*12) + PRIV_RATE (=0.18) are hoisted early (top of the IIFE) so the
      sessionStorage auto-unlock -> boot() -> recompute() call does not see them undefined. */
+  var FMODE='combined';
   function fModel(){
-    var fill=valF('s-fill'), newSt=valF('s-new'), gRate=valF('s-grate'), pShare=valF('s-pshare')/100, lic=valF('s-lic');
-    var screens=264+newSt*10, blended=(1-pShare)*gRate + pShare*PRIV_RATE;
-    var lev=screens*SLOTS_YR*blended/1e7/100;        /* Cr op-rev per +1% fill */
-    var opex=1.00 + newSt*0.027 + lic, capex=(newSt/98)*5.65, be=opex/lev;
+    var fill=valF('s-fill'), gRate=valF('s-grate'), pShare=valF('s-pshare')/100;
+    var blended=(1-pShare)*gRate + pShare*PRIV_RATE, screens, opex, capex, cmax;
+    if(FMODE==='existing'){ screens=264; opex=1.00; capex=1.82; cmax=6; }
+    else { var newSt=valF('s-new'), lic=valF('s-lic'); screens=264+newSt*10; opex=1.00+newSt*0.027+lic; capex=(newSt/98)*5.65; cmax=24; }
+    var lev=screens*SLOTS_YR*blended/1e7/100, be=opex/lev;
     function rev(f){ return lev*f; } function op(f){ return lev*f-opex; }
     function paybackMo(f){ var yF=[f*0.6,f,f,f,f], cum=0; for(var y=0;y<5;y++){ var pr=rev(yF[y])-opex, st=cum; cum+=pr; if(st<capex && cum>=capex && pr>0) return (y*12)+(capex-st)/pr*12; } return null; }
     function cumY5(f){ var yF=[f*0.6,f,f,f,f], c=0; for(var y=0;y<5;y++){ c+=(rev(yF[y])-opex)-(y===0?capex:0); } return c; }
-    return { fill:fill, lev:lev, opex:opex, capex:capex, be:be, rev:rev, op:op, paybackMo:paybackMo, cumY5:cumY5, screens:screens, blended:blended };
+    return { fill:fill, lev:lev, opex:opex, capex:capex, be:be, rev:rev, op:op, paybackMo:paybackMo, cumY5:cumY5, screens:screens, blended:blended, cmax:cmax };
   }
   function drawForecastChart(m){
-    var W=640,H=320,L=54,R=612,B=284,T=24,cmax=24;
+    var W=640,H=320,L=54,R=612,B=284,T=24,cmax=(m.cmax||24),gstep=Math.max(1,Math.round(cmax/6));
     function px(f){ return L+(Math.max(0,Math.min(f,12))/12)*(R-L); } function py(c){ return B-(Math.max(0,Math.min(c,cmax))/cmax)*(B-T); }
     var costY=py(m.opex), beX=px(m.be), revEndY=py(m.rev(12)), zeroY=py(0);
     var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
-    for(var c=4;c<=20;c+=4){ var gy=py(c); s+='<line x1="'+L+'" y1="'+gy+'" x2="'+R+'" y2="'+gy+'" stroke="#1c2740"/><text x="'+(L-6)+'" y="'+(gy+3)+'" fill="#5b6684" font-size="9" text-anchor="end">'+c+'</text>'; }
+    for(var c=gstep;c<=cmax-gstep+0.001;c+=gstep){ var gy=py(c); s+='<line x1="'+L+'" y1="'+gy+'" x2="'+R+'" y2="'+gy+'" stroke="#1c2740"/><text x="'+(L-6)+'" y="'+(gy+3)+'" fill="#5b6684" font-size="9" text-anchor="end">'+c+'</text>'; }
     s+='<line x1="'+L+'" y1="'+B+'" x2="'+R+'" y2="'+B+'" stroke="rgba(255,255,255,.14)"/>';
     for(var f=0;f<=12;f+=2){ var fx=px(f); s+='<text x="'+fx+'" y="'+(B+15)+'" fill="#5b6684" font-size="9" text-anchor="middle">'+f+'%</text>'; }
     s+='<text x="'+((L+R)/2)+'" y="'+(B+29)+'" fill="#8b96b4" font-size="9.5" text-anchor="middle">ad-slot fill %</text>';
@@ -2064,13 +2097,74 @@ svg.leaflet-image-layer.leaflet-interactive path {
     var mo=m.paybackMo(m.fill), pe=document.getElementById('fPay');
     if(pe){ if(mo!==null){ var c5=m.cumY5(m.fill); pe.innerHTML='Capex \u20B9'+m.capex.toFixed(2)+' Cr recovered in <b>'+(mo<12?mo.toFixed(1)+' months':(mo/12).toFixed(1)+' years')+'</b> &nbsp;\u00B7&nbsp; cumulative cash <b>'+(c5>=0?'+':'\u2212')+'\u20B9'+Math.abs(c5).toFixed(1)+' Cr</b> by Year 5.'; }
       else{ pe.innerHTML='<b class="r">At '+m.fill.toFixed(1)+'% fill the build does not recover its capex inside the 5-year term.</b> Drag up \u2014 break-even is '+m.be.toFixed(2)+'%.'; } }
+    Array.prototype.forEach.call(document.querySelectorAll('.fladder .frung'),function(rg){
+      var f=+rg.getAttribute('data-fill'), o=m.op(f), pill=rg.querySelector('.p');
+      if(pill){ pill.className='p '+(o>=0?'g':'r'); pill.textContent=(o>=0?'+':'\u2212')+'\u20B9'+Math.abs(o).toFixed(2)+' Cr'; }
+    });
     drawForecastChart(m);
   }
   function glideFill(target){ var el=document.getElementById('s-fill'); if(!el) return; var cur=+el.value, steps=16, i=0;
     var iv=setInterval(function(){ i++; el.value=(cur+(target-cur)*i/steps).toFixed(1); recompute(); if(i>=steps) clearInterval(iv); },22); }
+  var FMODES={
+    combined:{
+      kpis:'<div class="fkpi"><div class="v y">&#8776;<span data-count="2.19" data-dec="2">0</span>%</div><div class="l">Break-even fill</div></div>'
+        +'<div class="fkpi"><div class="v y">+&#8377;<span data-count="1.89" data-dec="2">0</span> Cr</div><div class="l">Op profit per +1% fill</div></div>'
+        +'<div class="fkpi"><div class="v g">&#8377;<span data-count="14.73" data-dec="2">0</span> Cr</div><div class="l">Op profit / yr at 10% DAVP target</div><div class="s">vs <b class="r">&minus;&#8377;0.36 Cr</b> at 2% today</div></div>'
+        +'<div class="fkpi"><div class="v g"><span data-count="9.4" data-dec="1">0</span> mo</div><div class="l">Capex payback at 10% fill</div><div class="s"><b>+&#8377;60.5 Cr</b> cash by Year 5</div></div>',
+      brief:'Capex <b>&#8377;5.65 Cr</b> <span class="mute">(the &#8377;5 Cr ask)</span> &nbsp;&middot;&nbsp; Opex <b>&#8377;4.14 Cr/yr</b> &nbsp;&middot;&nbsp; <span class="mute">&#8377;7.47 Cr total incl. the 20 already built</span>',
+      leadCost:'&#8377;4.14&#8201;Cr/yr', leadStep:'&#8377;1.89&#8201;Cr', legCost:'Fixed cost &#8377;4.14 Cr/yr', headBe:'2.19',
+      beNote:'&#9650; break-even 2.19% &mdash; today&#39;s 2% sits right at the line',
+      caveat:'<b>Assumes DAVP government demand exists to buy the slots.</b> Fill is the only driver against a fixed &#8377;4.14 Cr cost &mdash; the Government DAVP rate card now being finalised is the engine that lifts fill from today&#39;s 2% toward the 10% target. Below 2.19% fill the build does not recover its capex inside the 5-year term. Unaudited.'
+    },
+    existing:{
+      kpis:'<div class="fkpi"><div class="v y">&#8776;<span data-count="2.50" data-dec="2">0</span>%</div><div class="l">Break-even fill <span style="color:var(--ink2)">(model)</span></div></div>'
+        +'<div class="fkpi"><div class="v y">+&#8377;<span data-count="0.40" data-dec="2">0</span> Cr</div><div class="l">Op profit per +1% fill</div></div>'
+        +'<div class="fkpi"><div class="v g">+&#8377;<span data-count="3.00" data-dec="2">0</span> Cr</div><div class="l">Op profit / yr at 10% fill</div><div class="s">measured <b class="g">+&#8377;0.22 Cr/yr</b> at 2% today</div></div>'
+        +'<div class="fkpi"><div class="v y">&#8377;<span data-count="1.82" data-dec="2">0</span> Cr</div><div class="l">Capex &mdash; already spent</div><div class="s">sunk &middot; cash-positive now, no forward payback</div></div>',
+      brief:'Capex <b>&#8377;1.82 Cr</b> <span class="mute">&mdash; already spent (sunk)</span> &nbsp;&middot;&nbsp; Opex <b>&#8377;1.00 Cr/yr</b> &nbsp;&middot;&nbsp; <b class="g">+&#8377;0.22 Cr/yr operating profit today (real)</b>',
+      leadCost:'&#8377;1.00&#8201;Cr/yr', leadStep:'&#8377;0.40&#8201;Cr', legCost:'Fixed cost &#8377;1.00 Cr/yr', headBe:'2.50',
+      beNote:'&#9650; break-even 2.50% (model) &mdash; the real 20 already beat this today',
+      caveat:'<b>Measured, not modelled.</b> The 20 stations we&#39;ve already built earn <b class="g">+&#8377;0.22 Cr/yr</b> at today&#39;s ~2% fill &mdash; beating our own conservative capacity model (&minus;&#8377;0.20 Cr at 2%). The &#8377;1.82 Cr capex is already spent, so it needs no forward payback; it is the proof the unit economics work, not the return. Unaudited.'
+    }
+  };
+  function applyModeCopy(mode){
+    var c=FMODES&&FMODES[mode], e; if(!c) return;
+    e=document.querySelector('.fkpis'); if(e) e.innerHTML=c.kpis;
+    e=document.getElementById('fBrief'); if(e) e.innerHTML=c.brief;
+    e=document.getElementById('leadCost'); if(e) e.innerHTML=c.leadCost;
+    e=document.getElementById('leadStep'); if(e) e.innerHTML=c.leadStep;
+    e=document.getElementById('fLegCost'); if(e) e.innerHTML=c.legCost;
+    e=document.getElementById('fHeadBe'); if(e) e.textContent=c.headBe;
+    e=document.getElementById('fBeNote'); if(e) e.innerHTML=c.beNote;
+    e=document.getElementById('fCaveat'); if(e) e.innerHTML=c.caveat;
+  }
+  function replayWedge(){ var w=document.querySelector('.fchart .wedge'); if(!w) return; w.style.clipPath='inset(0 100% 0 0)'; try{ w.getBBox(); }catch(x){} w.style.clipPath=''; }
+  function fCountKpis(){ /* rAF animate + setTimeout guarantee (pane may throttle rAF when idle) */
+    Array.prototype.forEach.call(document.querySelectorAll('.fkpis [data-count]'),function(el){
+      var target=+el.getAttribute('data-count'), dec=+(el.getAttribute('data-dec')||0), t0=null, dur=800;
+      function fmt(v){ return dec>0 ? v.toFixed(dec) : Math.round(v).toLocaleString('en-IN'); }
+      function step(ts){ if(!t0)t0=ts; var p=Math.min(1,(ts-t0)/dur); el.textContent=fmt(target*(1-Math.pow(1-p,3))); if(p<1) requestAnimationFrame(step); }
+      requestAnimationFrame(step);
+      setTimeout(function(){ el.textContent=fmt(target); }, dur+140);
+    });
+  }
+  function setFMode(mode){
+    if(mode===FMODE) return; FMODE=mode;
+    var seg=document.querySelector('.foptseg'); if(seg) seg.setAttribute('data-mode',mode);
+    var ex=document.getElementById('optExisting'), co=document.getElementById('optCombined');
+    if(ex){ ex.classList.toggle('on',mode==='existing'); ex.setAttribute('aria-selected',mode==='existing'); }
+    if(co){ co.classList.toggle('on',mode==='combined'); co.setAttribute('aria-selected',mode==='combined'); }
+    var fa=document.querySelector('.fassump'); if(fa) fa.classList.toggle('existing',mode==='existing');
+    var fsc=document.getElementById('fScale'); if(fsc) fsc.classList.toggle('full',mode==='combined');
+    applyModeCopy(mode);
+    fCountKpis();
+    recompute(); replayWedge();
+  }
   function wireCalc(){ ['s-fill','s-new','s-grate','s-pshare','s-lic'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input',recompute); });
     var ct=document.getElementById('chipToday'); if(ct) ct.addEventListener('click',function(){ glideFill(2); });
     var cg=document.getElementById('chipTarget'); if(cg) cg.addEventListener('click',function(){ glideFill(10); });
+    var oe=document.getElementById('optExisting'); if(oe) oe.addEventListener('click',function(){ setFMode('existing'); });
+    var oc=document.getElementById('optCombined'); if(oc) oc.addEventListener('click',function(){ setFMode('combined'); });
   }
 })();
 </script>

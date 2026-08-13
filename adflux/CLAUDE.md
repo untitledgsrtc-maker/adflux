@@ -12398,3 +12398,70 @@ any real ≥768px screen, §191).
 ### Investor-deck order (16 slides, forecast = 12)
 Same as §191; slide 12 forecast is now the leverage-crossover. Still to lift: roadmap,
 ask, risks, team + the record-slide private/govt turnover split (owner sends per-year ₹).
+
+
+---
+
+## 193 · Phase 306 — forecast slide: 2-option toggle (Existing 20 vs Combined 118) with capex/opex/payback (2026-08-12)
+
+Owner: "existing + combine, 2 options, capex + opex per year, and payback." Added a
+segmented toggle to the forecast slide (§192) that switches the WHOLE forecast (chart +
+KPIs + dial break-even + capex/opex readout) between two investment cases. Reconciled
+via a Workflow (audit vs the xlsx → design → synthesis, all verified against the live
+file). Committed + pushed.
+
+### The two options (VERIFIED to the rupee — frozen)
+- **Existing 20** (264 screens, PROVEN): capex **₹1.82 Cr (sunk)**, opex **₹1.00 Cr/yr**,
+  break-even **2.50% (model)**, +₹0.40 Cr per +1% fill, @10% +₹3.00 Cr/yr. The MEASURED
+  reality (§287.2): revenue ₹1.22 Cr/yr, **+₹0.22 Cr/yr op profit at today's 2%** — which
+  BEATS the same-method capacity model (−₹0.20 Cr at 2%) because its real effective rate
+  (~₹1.27/slot) exceeds the conservative blended ₹0.836. Payback is N/A (capex sunk) — it's
+  the PROOF the unit economics work, not the return engine.
+- **Combined 118** (1244 screens, the current default/projection): capex **₹5.65 Cr new**
+  (₹7.47 Cr total incl. the built 20), opex **₹4.14 Cr/yr**, break-even 2.19%, @10% +₹14.73
+  Cr/yr, **payback 9.4 months**, +₹60.47 Cr cash by Y5. The investor's ~₹5 Cr funds the new
+  build; existing 20 is the de-risking proof.
+
+### THE HONESTY CONTRACT (do NOT blend the two sources)
+Existing chart/dial/ladder use the **capacity MODEL** (same method as combined: blended
+₹0.836, break-even 2.50%, −₹0.20 at 2%). The **real measured +₹0.22 Cr** is shown SEPARATELY
+as a proof anchor (KPI card 3 sub + brief + caveat), NEVER blended into the modeled line.
+Frame: "the 20 we already built beat our own conservative model." This kills the cherry-pick
+objection AND proves the combined forecast is conservative (understated). The DAVP-demand
+caveat stays verbatim on Combined. The xlsx pessimistic build is a downside floor only —
+never wired into the deck.
+
+### How it's built (reuses fModel — one config switch, not a 2nd calculator)
+`fModel()` already derives everything from screens/opex/capex. Added `var FMODE` + a branch:
+existing → {264, 1.00, 1.82, cmax:6}; combined → the current slider-driven path (cmax:24).
+`drawForecastChart` takes `m.cmax` + adaptive `gstep` so existing's smaller numbers aren't a
+floor line. `recompute()` recomputes the 3 ladder rungs (data-fill 2/5/10) from `m.op(f)`.
+`applyModeCopy(mode)` (FMODES config) swaps: 4 KPI cards, the capex+opex `.fbrief` line, the
+lead cost/step spans, the h2 break-even number, the legend cost, the fbenote, and the caveat.
+`setFMode` slides the pill, dims/lights the 20→118 scale-vector pins, glides the #fbeMark
+break-even marker, re-sweeps the chart wedge (replayWedge), re-counts the KPIs, and recomputes.
+Toggle buttons wired in wireCalc. Not a §28 surface; no SQL/APK.
+
+### TWO bugs fixed (both browser-pane / boot-timing traps)
+1. **`var FMODES` defined late** (in the JS block, AFTER the line-1817 sessionStorage
+   auto-unlock → boot → wireCalc) → `applyModeCopy('combined')` at boot hit `undefined[mode]`
+   → threw, silently swallowed by the auto-unlock's `catch`, brief left empty. THE SAME §192
+   late-`var` class. FIX: the markup is already fully combined, so **pre-fill `#fBrief` in the
+   markup** + **drop the boot-time applyModeCopy call** (boot renders from markup, no FMODES
+   needed) + guard `applyModeCopy` (`if(!FMODES) return`). The toggle runs post-boot when
+   FMODES is assigned. FOOT-GUN (restated from §192): a `var` a boot/auto-unlock path reads
+   must be declared ABOVE line 1817, or don't call the code that reads it at boot.
+2. **`countUpsIn` rAF throttled when the pane is idle** → on toggle the KPI spans got
+   `data-done='1'` but `requestAnimationFrame` never advanced → stuck at "0". FIX: a dedicated
+   `fCountKpis()` that animates via rAF AND sets the final value via `setTimeout(…, dur+140)`
+   (setTimeout fires even when rAF is throttled) → the number always lands. FOOT-GUN: don't
+   rely on rAF alone for a value that MUST be correct after an interaction — guarantee the end
+   state with a setTimeout, or set it directly.
+
+### Verified (browser, screenshot + DOM authoritative per §191)
+Initial combined correct (brief ₹5.65/₹4.14/₹7.47, break-even 2.19, no NaN) · toggle→Existing
+swaps every number/chart/legend/brief/lead/fbenote/ladder (break-even 2.50 model, cost line
+₹1.00, KPIs settle 2.50/0.40/3.00/1.82, measured +₹0.22 shown) · toggle→Combined restores
+(2.19, ₹4.14, −₹0.36 at 2%) · zero JS/SVG errors. Default = Combined (keeps §192's first-paint;
+Existing is one tap away — the safe framing). Fits the 800×450 worst-case pane (toggle+brief
+add ~62px, absorbed by tightened margins; caveat at the fold, full on any real ≥768px screen).
