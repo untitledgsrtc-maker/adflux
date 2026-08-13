@@ -11718,3 +11718,75 @@ Verified live (browser): video bg loads, logo-mark renders, 10 reticles, live
 counter tick, no revenue, 18 slides intact. Owner is iterating slide-by-slide to
 match the sales-deck quality — this is slide 1; expect slides 2+ next.
 
+
+
+---
+
+## 180 · Phase 292 — investor deck slides 2-3 ANIMATED + forecast NaN fix (2026-08-12, `4c6bb9d`)
+
+Owner (frustrated, two screenshots of MY slides 2 & 3): "use the same format as
+[the sales] presentation, why you putting your extra mind, all the content looks
+like only writing / no animation anywhere / no efforts no animation why?" His sales
+deck (`public/deck/led-deck-final.html`) runs continuous motion on EVERY slide
+(scanning cameras `s5cam`/`s5beam`/`s5ping`, rising bubbles `s5rise`/`s5wa`, pulsing
+`s4-pulse`/`s6pulse`, hardware count-ups). My investor slides 2-18 faded in ONCE
+then sat dead with static SVGs. Fixed the two slides he showed + built a reusable
+motion layer for the rest. Verified live in the browser pane.
+
+### The motion layer (reusable — roll across slides 4-18 next)
+A CSS animation library in `public/investor/index.html` scoped to `.slide.on
+[class*="an-"]` so motion plays ONLY on the ACTIVE slide (matches his deck: replays
+on re-entry, zero CPU on off-screen slides). The vocabulary (add these classes to
+any slide's inline SVG elements):
+- `.an-beam` — marching-ant scan/measure beam (`stroke-dashoffset` march). His `s5`
+  beam feel. Use on dashed measurement/scan lines.
+- `.an-wave .w1/.w2/.w3` — radiating signal/broadcast waves (staggered opacity).
+- `.an-glow` — pulsing glow (lens, play button, phone screen, dot).
+- `.an-dbox .d1/.d2/.d3` — detection boxes blinking in SEQUENCE (AI detecting each
+  person).
+- `.an-scan` — a scanner line sweeping down a cone (`translateY`).
+- `.an-frame .f1/.f2` — two ad frames cycling on an LED screen (the screen "plays").
+- `.an-pop` — a lead card / check scaling in on a loop.
+- `.an-lock` — an AI reticle locking onto a commuter.
+- `.an-rise` — a "+1" bubble rising and fading.
+- `.ibadge` (+ `.g` green) — an absolute count/live badge over an `.illwrap`; put a
+  `data-count` span inside → counts up on slide entry via the existing `countUpsIn`.
+- `.illwrap` (+ `.sm`) — position-relative SVG wrapper for badges.
+`prefers-reduced-motion` → all `an-*` freeze visible (opacity:1). Transforms use
+`transform-box:fill-box;transform-origin:center` so scale/rotate work on SVG children.
+
+### Slides rebuilt (less writing, more visual — his ask)
+- **Slide 2 "What we are":** dropped the 3 flat text cards + the long paragraph.
+  Now a split: an animated LED-screen-at-a-bus-station showpiece (ad frames cycle,
+  broadcast waves, an AI reticle LOCKS a commuter, a live "1,240 seen today" badge
+  counting, a "+1" rising) + 3 TIGHT one-line points (`ul.clean`) + a 264/20/700+
+  stat strip.
+- **Slide 3 "How it works":** kept the Play/Measure/Prove SVGs but made them MOVE —
+  Play (screen plays + waves broadcast, "5,040 slots/day" badge), Measure (marching
+  cone beams + camera lens pulse + detection boxes blink in sequence + a scanner
+  sweeps + "312 counted" live badge), Prove (marching scan beams + phone glow + lead
+  card POPS + "→ 1 lead" green badge). Each paragraph cut to one line.
+
+### FORECAST NaN fix (pre-existing bug, real, owner-hit)
+The forecast calculator (slide 14) showed **"₹NaN Cr"** on every RETURN visit. Root:
+the `sessionStorage` auto-unlock (`if(sessionStorage.getItem('inv_ok')==='1')
+unlock()`) runs `boot()→recompute()→model()` DURING the IIFE — before
+`var SLOTS_YR=151200*12, PRIV_RATE=0.18;` (declared ~140 lines lower) is assigned →
+`capacityYr = screens × undefined = NaN`. First visit (typed password) worked because
+the button-click fires after the script finishes. The owner reopens via sessionStorage
+→ he'd see NaN. FIX: hoisted the two constants to the top of the IIFE (right after
+`var CODE`). Verified: return-visit auto-unlock now computes ₹3.77 Cr, zero console
+errors (was 30+ NaN).
+- FOOT-GUN: a `sessionStorage` auto-unlock that boots the app mid-IIFE runs before
+  later `var` assignments execute (hoisted = `undefined`). Any constant a boot path
+  reads MUST be declared/assigned ABOVE the auto-unlock trigger, not just hoisted.
+
+### Where the investor deck stands (the running chain)
+`/investor` = a full-screen slide PRESENTATION (like /present), password `untitled2026`,
+noindex, LED-only + fill/DAVP thesis, GSRTC-bus-station wording, REAL numbers (won-LED
+occupancy 1.98%, govt ₹1 vs private ₹0.18/slot). Chain: §174 statement → §176 cinematic
+scroll (288) → §177 full-screen deck (289) → §178 illustrated 18-slide (290) → §179
+slide-1 video hero (291) → §180 slides 2-3 animated (292, THIS). Owner iterates
+slide-by-slide ("we'll change one by one") — slides 4-18 still need the motion layer
+rolled onto them (Record chart, 2%-gap, DAVP, expansion, competition, roadmap, etc.).
+Static `public/deck/` assets (station-*.jpg, *-hero.mp4) are the real footage source.
