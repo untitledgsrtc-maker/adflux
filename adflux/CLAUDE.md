@@ -11790,3 +11790,50 @@ slide-1 video hero (291) → §180 slides 2-3 animated (292, THIS). Owner iterat
 slide-by-slide ("we'll change one by one") — slides 4-18 still need the motion layer
 rolled onto them (Record chart, 2%-gap, DAVP, expansion, competition, roadmap, etc.).
 Static `public/deck/` assets (station-*.jpg, *-hero.mp4) are the real footage source.
+
+
+---
+
+## 181 · Phase 293 — investor 2%-gap slide: show the 5,040 calculation + logo contained (2026-08-12, `ab5dc2e`)
+
+Owner (on the 2%-gap slide, slide 6): "how this 5040 slots comes / show the
+calculation — 14 hour play, 5 min loop time, 10 sec slots, morning 7am to 9pm.
+Use attached logo." Mid-turn: "contain hide or cutout."
+
+### The 5,040 math (verified, both derivations agree — keep it consistent)
+From the owner's params:
+- Play window 7 AM → 9 PM = **14 hours**.
+- Content runs a **5-min loop** of **10-sec slots** → 300 s ÷ 10 s = **30 slots per loop**.
+- **168 loops/day** = 14 h × 60 ÷ 5 min = 840 min ÷ 5 min.
+- **30 slots × 168 loops = 5,040** ten-second airings / screen / day.
+- Equivalently 14 h × 3,600 s ÷ 10 s = 50,400 s ÷ 10 s = **5,040** (the §155 basis — same number).
+- A standard booking = ~**100** airings → **1.98%** filled (matches the real won-LED
+  occupancy, §177) → **50×** headroom (5040 ÷ 100 = 50.4).
+CONTRACT: 5,040 = total 10-sec airings/screen/day; occupancy = sold ÷ 5,040. Do NOT
+conflate "loop position" (30 of them, each plays 168×/day) with "airing" — the deck
+counts airings, and the won-quote `slots_per_day` (avg 100) is airings/day.
+
+### What shipped (`public/investor/index.html`, static deck, no SQL/APK)
+- An animated **"How 5,040 is built"** `.calc` panel on the 2%-gap slide: 3 rows
+  (14 hrs / 30 slots / 168 loops, each with the sub-formula in mono) → an equals row
+  `30 slots × 168 loops = 5,040` (counts up) → footer "we sell ~100 → 1.98% filled,
+  50× headroom." Rows reveal in sequence (`.slide.on .calc > * nth-child` staggered).
+- Restructured the slide: full-width headline + one-line lead, then a `.split`
+  [calc | 50-cell grid with 1 lit slot pulsing (`an-glow`)], then the 2% fill bar.
+  Grid caption "each cell ≈ 100 slots · 1 lit = the ~100 we sell · 49 empty."
+- **Logo:** the owner's attached `logo-mark.svg` is BYTE-IDENTICAL (4688 bytes) to the
+  live `/led/logo-mark.svg` the deck already uses — so no asset swap needed. Added
+  `object-fit:contain` to the gate/hero/nav logo `<img>`s so the round mark always
+  renders as a full contained disc, never clipped (his "contain / cutout" note). The
+  SVG is square 888×888 → contain = the complete round cutout mark.
+- `countUpsIn` now formats with `toLocaleString('en-IN')` → "5,040" / "1,240" (the
+  <1000 counts like 264/20 are unchanged).
+Verified live in the browser pane: calc rows = 14 hrs / 30 slots / 168 loops / 5,040,
+lit slot pulses, fill 2%, all 3 logos load (888×888, object-fit contain), zero console
+errors.
+
+### Investor-deck chain (running)
+Slides done to the sales-deck bar: 1 (video hero §179), 2-3 (animated §180), 6 (this).
+Remaining to roll the §180 motion layer + the same visual quality onto: Record chart,
+DAVP unlock, expansion, competition, roadmap, inventory/rates, build cost, ask, risks,
+team. Owner iterates one-by-one.
