@@ -12854,6 +12854,20 @@ Owner ran a full QA pass. Fixed the real ones:
   also has `/led/logo-word.svg` (clean "UNTITLED" wordmark, no emblem) + `/led/logo-mark.svg`
   (emblem only). To wire his EXACT logo he must drop the .svg/.png in Downloads (or give a
   path). FOOT-GUN: a chat-attached image is not a wireable asset — always get the file path.
+### Phase 309.11 — 2nd-review fixes: slide-3 caption baseline + empty-band padding (2026-08-12)
+- **#3 slide-3 "How it works" caption misalignment** — the 3 illustrations had different
+  aspect viewBoxes (360² / 420×340 / 460×300) → at `max-width:340px` they rendered at
+  different HEIGHTS (340/275/222px) → the Play/Measure/Prove captions below started at
+  different y. Fixed: `.illwrap.sm` now a fixed-height flex box (`clamp(126px,19vh,168px)`,
+  align-items:center) + svg `max-height:100%;width:auto` → all 3 illustrations equal
+  height → captions share a baseline. `.illwrap.sm` is slide-3-only (verified), so safe.
+- **#7 empty vertical band** — `.slide` bottom padding was `11vh` (vs 6vh top) → the
+  asymmetry pushed content up, leaving a band below. Cut to `clamp(80px,9vh,98px)` (still
+  clears the ~66px bottom bar) + top 6vh→5vh → content centers better; dense slides also
+  gain a little room. Global, helps every slide.
+- **"12 years" (reviewer re-flagged)** — LEFT AS-IS: owner explicitly confirmed "12 year
+  ok". The "over a decade" phrasing is consistent (>10). Not a bug; owner's number.
+
   RESOLVED (309.10): found his logos in ~/Downloads — `01. UNTITLED LOGO_FULL.svg`
   (byte-identical md5 to the `/led/logo.svg` the deck already used = I WAS using his logo)
   + a fuller `01. UNTITLED LOGO_FULL 2.svg` (9333b, with a tagline line) + a ROUND mark.
