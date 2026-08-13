@@ -12505,3 +12505,19 @@ the numbers scaled with screens and half froze.
 - **Toggle box UI fix**: the sliding `.fpill` was a fixed 50%-width highlight on two UNEQUAL-width
   buttons ("Existing 20" vs the longer "Existing + Tender · 118") → misaligned. Replaced with a
   direct **`.fopt.on` active-button highlight** (each button's own width) — clean on any width.
+
+### Phase 307 — investor "The unlock" slide: added a 4th lever (Central govt / BOC)
+Owner: "add 4th option BOC BUSINESS." Clarified (AskUserQuestion): **BOC = Bureau of Outreach
+Communication**, the CENTRAL-government ad bureau (successor to DAVP) — a separate, bigger public ad
+pool (central ministries) on top of the STATE-level DAVP demand (Lever 1). Added a 4th `.lever` card
+to the DAVP-unlock slide (`public/investor/index.html`, slide 8): tag "Lever 4 · central govt", title
+"Central government (BOC)", body "The Centre's Bureau of Outreach Communication (BOC) runs outdoor for
+national ministries — a far bigger public ad pool onto the same empty screens", metric "Central budget
+· books via BOC · on top of state demand", with a NEW government-building inline-SVG vector (columns +
+pediment + flag + radiating ministry nodes, an-glow/an-beam/an-dbox motion). Also: **relabeled Lever 1
+"government" → "state govt"** so the state/central pair reads clean; swapped "three levers" → "four" in
+the h2, intro, and the 2%→levers→10%+ summary strip. `.levers` grid 3→**4 columns** + tightened card
+padding/fonts/illustration height to fit; added a `@media(max-width:880px)` 2-col fallback. Static
+slide, no SQL/APK. Verified in-browser (4 cards, govt-building vector, fits the slide, no errors). §177
+real-numbers: no fabricated figure on the BOC card — the metric is qualitative (central budget via the
+BOC single window), accurate to how central-govt outdoor is booked.

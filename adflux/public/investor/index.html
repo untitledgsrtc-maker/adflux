@@ -174,16 +174,17 @@
   .occgrid .occcap{font-size:11.5px;color:var(--ink2);text-align:center;margin-top:8px}
   .occgrid .occcap b{color:var(--yellow)}
   /* ---------- growth levers (slide 7) ---------- */
-  .levers{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:22px}
+  .levers{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+  @media(max-width:880px){.levers{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:900px){.levers{grid-template-columns:1fr}}
-  .lever{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent),var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 17px;transition:transform .25s,border-color .25s}
+  .lever{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent),var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 14px;transition:transform .25s,border-color .25s}
   .lever:hover{transform:translateY(-3px);border-color:rgba(255,230,0,.3)}
-  .lever .lv-ill{height:116px;display:flex;align-items:center;justify-content:center;margin-bottom:13px;border-bottom:1px solid var(--line);padding-bottom:12px}
+  .lever .lv-ill{height:96px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:10px}
   .lever .lv-ill svg{width:auto;height:100%;max-width:100%}
   .lever .lv-tag{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow);font-weight:600}
-  .lever h3{font-size:16px;margin:5px 0 6px}
-  .lever p{font-size:12.5px;color:var(--ink2);margin:0 0 11px;line-height:1.45}
-  .lever .lv-metric{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--ink1);border-top:1px solid var(--line);padding-top:10px}
+  .lever h3{font-size:15px;margin:4px 0 5px}
+  .lever p{font-size:11.5px;color:var(--ink2);margin:0 0 9px;line-height:1.42}
+  .lever .lv-metric{font-family:var(--disp);font-weight:700;font-size:11.5px;color:var(--ink1);border-top:1px solid var(--line);padding-top:9px}
   .lever .lv-metric span{color:var(--yellow)}
   .target{display:flex;align-items:center;justify-content:center;gap:clamp(12px,3vw,34px);flex-wrap:wrap;margin-top:18px;background:var(--navy2);border:1px solid var(--line);border-radius:16px;padding:15px 20px}
   .target .tstep{text-align:center}
@@ -1510,8 +1511,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <!-- 7 DAVP UNLOCK -->
   <section class="slide">
     <div class="kicker anim">The unlock</div>
-    <h2 class="anim">Why 2% today — and the three levers that take it to 10%+.</h2>
-    <p class="lead anim" style="max-width:64ch">We're at 2% only because the government rate card (DAVP) isn't set yet. Three levers — already in motion — fill the empty 98%:</p>
+    <h2 class="anim">Why 2% today — and the four levers that take it to 10%+.</h2>
+    <p class="lead anim" style="max-width:64ch">We're at 2% only because the government rate card (DAVP) isn't set yet. Four levers — already in motion — fill the empty 98%:</p>
     <div class="levers anim">
 
       <div class="lever">
@@ -1531,7 +1532,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
             <path d="M137.5 93 l3 3 l6 -6.5" stroke="#FFE600" stroke-width="1.8" fill="none"/>
           </g>
         </svg></div>
-        <div class="lv-tag">Lever 1 · government</div>
+        <div class="lv-tag">Lever 1 · state govt</div>
         <h3>DAVP rate card set</h3>
         <p>Once the government rate card lands, departments already advertising through GSRTC book our screens at scale.</p>
         <div class="lv-metric"><span>₹1 / slot</span> — 5× the private rate · 2% → <span>10%</span></div>
@@ -1584,11 +1585,40 @@ svg.leaflet-image-layer.leaflet-interactive path {
         <div class="lv-metric"><span>20 stations</span> today · expanding across Gujarat</div>
       </div>
 
+      <div class="lever">
+        <div class="lv-ill"><svg viewBox="0 0 200 130" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <line class="an-beam" x1="100" y1="66" x2="34" y2="26" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <line class="an-beam" x1="100" y1="66" x2="166" y2="26" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <line class="an-beam" x1="100" y1="66" x2="30" y2="104" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <line class="an-beam" x1="100" y1="66" x2="170" y2="104" stroke="#FFE600" stroke-width="1.4" stroke-opacity="0.5"/>
+          <rect class="an-dbox d1" x="24" y="16" width="20" height="20" rx="5" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.5"/>
+          <rect class="an-dbox d2" x="156" y="16" width="20" height="20" rx="5" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.5"/>
+          <rect class="an-dbox d3" x="20" y="96" width="20" height="20" rx="5" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.5"/>
+          <rect class="an-dbox d1" x="160" y="96" width="20" height="20" rx="5" fill="#FFE600" fill-opacity="0.16" stroke="#FFE600" stroke-width="1.5"/>
+          <g class="an-glow">
+            <line x1="100" y1="30" x2="100" y2="20" stroke="#FFE600" stroke-width="1.6"/>
+            <path d="M100 20 l10 3 l-10 3 z" fill="#FFE600"/>
+            <path d="M70 46 L100 30 L130 46 Z" fill="#FFE600" fill-opacity="0.18" stroke="#FFE600" stroke-width="2"/>
+            <rect x="68" y="46" width="64" height="7" rx="1.5" fill="#0b1120" stroke="#FFE600" stroke-width="1.8"/>
+            <rect x="76" y="55" width="7" height="33" fill="#0b1120" stroke="#FFE600" stroke-width="1.6"/>
+            <rect x="88" y="55" width="7" height="33" fill="#0b1120" stroke="#FFE600" stroke-width="1.6"/>
+            <rect x="100" y="55" width="7" height="33" fill="#0b1120" stroke="#FFE600" stroke-width="1.6"/>
+            <rect x="112" y="55" width="7" height="33" fill="#0b1120" stroke="#FFE600" stroke-width="1.6"/>
+            <rect x="66" y="89" width="68" height="6" rx="1.5" fill="#0b1120" stroke="#FFE600" stroke-width="1.8"/>
+            <rect x="60" y="96" width="80" height="6" rx="1.5" fill="#0b1120" stroke="#FFE600" stroke-width="1.6"/>
+          </g>
+        </svg></div>
+        <div class="lv-tag">Lever 4 · central govt</div>
+        <h3>Central government (BOC)</h3>
+        <p>The Centre's Bureau of Outreach Communication (BOC) runs outdoor for national ministries — a far bigger public ad pool onto the same empty screens.</p>
+        <div class="lv-metric"><span>Central budget</span> · books via BOC · on top of state demand</div>
+      </div>
+
     </div>
     <div class="target anim">
       <div class="tstep"><div class="tv">2%</div><div class="tl">Today · DAVP pending</div></div>
       <div class="tarr">→</div>
-      <div class="tstep"><div class="tv ink">The three levers, in motion</div><div class="tl">Catalyst</div></div>
+      <div class="tstep"><div class="tv ink">The four levers, in motion</div><div class="tl">Catalyst</div></div>
       <div class="tarr">→</div>
       <div class="tstep"><div class="tv">10%+</div><div class="tl">= 5× revenue · still 90% empty</div></div>
     </div>
