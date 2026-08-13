@@ -11688,3 +11688,33 @@ full-screen deck (289, real LED numbers from won quotes) → §178 illustrated 1
 upgrade (290). It is a full-screen slide PRESENTATION (like /present), not a scroll
 page. Password `untitled2026`. LED-only, fill/DAVP thesis, GSRTC-bus-station wording.
 
+
+---
+
+## 179 · Phase 291 — investor deck slide 1 rebuilt to match the GSRTC sales-deck hero (2026-08-12, `743feee`)
+
+Owner sent a screenshot of his polished GSRTC sales deck's title slide: "1st page
+should look like this, animation not there, logo broken, remove the revenue, UI
+not attractive as our presentation — we'll change one by one." Rebuilt ONLY slide 1
+of the investor deck to match it (slides 2-18 untouched).
+
+- Full-bleed real station VIDEO bg = **`/deck/veraval-hero.mp4`** (muted autoplay
+  loop, poster `/deck/station-1.jpg`, dark gradient overlay). Referenced cross-path
+  from `/investor/` — same origin, media-src 'self'. Real station assets live in
+  `public/deck/` (station-1/2.jpg, *-hero.mp4, bhavnagar/gandhinagar.mp4) — NOT the
+  owner's Desktop; use these.
+- Logo FIX: owner said use **`/led/logo-mark.svg`** (the round emblem), not the
+  wordmark `logo.svg`. Copied to `public/investor/logo-mark.svg`; used as mark +
+  "UNTITLED" text + "Outdoor·Indoor·Social·Print/TV" tagline on the hero, gate, nav.
+- Live **"AI Verifying · LIVE"** glass card (top-right): people-seen counter ticks
+  up every 2.6s (only while slide 1 is active) + faces/age-gender/QR-scan chips.
+- **10 animated AI face-detection reticles** (yellow SVG corner-brackets + M/F·age
+  labels, staggered `retin` animation, rebuilt on every slide-1 entry).
+- Headline "We don't hope your ad was seen. We prove it." + soundless-LED subline +
+  Government-Approved shield badge + stat row **264 / 20 / 29L+ views / 700+ brands**
+  (REVENUE ₹8.8Cr removed from slide 1 per owner).
+
+Verified live (browser): video bg loads, logo-mark renders, 10 reticles, live
+counter tick, no revenue, 18 slides intact. Owner is iterating slide-by-slide to
+match the sales-deck quality — this is slide 1; expect slides 2+ next.
+
