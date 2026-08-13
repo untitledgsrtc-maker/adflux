@@ -107,6 +107,11 @@
   .calc .ceq b em{font-style:normal;font-size:12px;color:var(--ink2);font-weight:500;display:block;margin-top:4px;text-align:right}
   .calc .cfoot{font-size:13.5px;color:var(--ink1);margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
   .calc .cfoot b{color:var(--ink0)} .calc .cfoot b.yellow{color:var(--yellow)}
+  .calc .ch .realchip{font-family:var(--body);font-size:9.5px;letter-spacing:.02em;color:var(--green);background:rgba(56,211,159,.12);border:1px solid rgba(56,211,159,.32);border-radius:6px;padding:2px 7px;margin-left:9px;text-transform:none;font-weight:600;vertical-align:middle}
+  .occgrid{margin-top:13px;padding-top:13px;border-top:1px solid rgba(255,255,255,.06)}
+  .occgrid svg{width:100%;max-width:300px;display:block;margin:0 auto}
+  .occgrid .occcap{font-size:11.5px;color:var(--ink2);text-align:center;margin-top:8px}
+  .occgrid .occcap b{color:var(--yellow)}
   ul.clean{list-style:none;padding:0;margin:18px 0 0} ul.clean li{position:relative;padding:9px 0 9px 22px;font-size:14.5px;color:var(--ink1);border-top:1px solid var(--line)}
   ul.clean li:before{content:'';position:absolute;left:2px;top:16px;width:7px;height:7px;border-radius:2px;background:var(--yellow)}
   ul.clean li b{color:var(--ink0)}
@@ -575,18 +580,23 @@
   <section class="slide">
     <div class="kicker anim">The asset — and the gap</div>
     <h2 class="anim">Every screen can run 5,040 ads a day. We run 100.</h2>
-    <p class="lead anim" style="max-width:58ch">A screen plays 14 hours a day. Here is exactly where 5,040 comes from — and why 98% of it sits empty on assets we already own.</p>
-    <div class="split" style="margin-top:22px;align-items:start">
+    <p class="lead anim" style="max-width:62ch">A screen plays 14 hours a day. Here's exactly how both numbers come out — the <b class="yellow">5,040</b> a screen can run, and the <b class="yellow">1.98%</b> we actually sell — measured on real deals, not a guess.</p>
+    <div class="split" style="margin-top:20px;align-items:start">
       <div class="calc anim">
-        <div class="ch">How 5,040 is built</div>
+        <div class="ch">1 · How 5,040 is built · capacity</div>
         <div class="crow"><span class="cl">Play window<small>7:00 AM → 9:00 PM</small></span><span class="cv">14 <em>hrs</em></span></div>
         <div class="crow"><span class="cl">Slots in one loop<small>5-min loop ÷ 10-sec slot</small></span><span class="cv">30 <em>slots</em></span></div>
         <div class="crow"><span class="cl">Loops in a day<small>840 min ÷ 5-min loop</small></span><span class="cv">168 <em>loops</em></span></div>
         <div class="ceq"><span class="cl">30 slots × 168 loops</span><b><span data-count="5040">0</span><em>10-sec airings / screen / day</em></b></div>
-        <div class="cfoot">We sell about <b>100</b> of them → <b class="yellow">1.98%</b> filled, <b class="yellow">50×</b> headroom on every screen.</div>
+        <div class="cfoot">That's the <b>ceiling</b> — every screen can run this today. So how much do we <em style="font-style:normal;color:var(--ink0)">actually</em> sell? &rarr;</div>
       </div>
-      <div class="illwrap anim" style="flex-direction:column;gap:12px">
-        <svg viewBox="0 0 360 200" fill="none" style="max-width:440px">
+      <div class="calc anim">
+        <div class="ch">2 · How we get 1.98% <span class="realchip">&#9679; real deals</span></div>
+        <div class="crow"><span class="cl">Slots sold / day<small>avg across 29 won LED deals</small></span><span class="cv">100</span></div>
+        <div class="crow"><span class="cl">Screen capacity / day<small>the 5,040 from panel 1</small></span><span class="cv">5,040</span></div>
+        <div class="ceq"><span class="cl">100 &divide; 5,040</span><b>1.98%<em>real occupancy &middot; 50&times; headroom</em></b></div>
+        <div class="occgrid">
+          <svg viewBox="0 0 360 200" fill="none">
   <g stroke="#3a4258" stroke-width="1.5">
     <rect x="12" y="12" width="26" height="26" rx="5"/><rect x="46" y="12" width="26" height="26" rx="5"/><rect x="80" y="12" width="26" height="26" rx="5"/><rect x="114" y="12" width="26" height="26" rx="5"/><rect x="148" y="12" width="26" height="26" rx="5"/><rect x="182" y="12" width="26" height="26" rx="5"/><rect x="216" y="12" width="26" height="26" rx="5"/><rect x="250" y="12" width="26" height="26" rx="5"/><rect x="284" y="12" width="26" height="26" rx="5"/><rect x="318" y="12" width="26" height="26" rx="5"/>
     <rect x="12" y="46" width="26" height="26" rx="5"/><rect x="46" y="46" width="26" height="26" rx="5"/><rect x="80" y="46" width="26" height="26" rx="5"/><rect x="114" y="46" width="26" height="26" rx="5"/><rect x="148" y="46" width="26" height="26" rx="5"/><rect x="182" y="46" width="26" height="26" rx="5"/><rect x="216" y="46" width="26" height="26" rx="5"/><rect x="250" y="46" width="26" height="26" rx="5"/><rect x="284" y="46" width="26" height="26" rx="5"/><rect x="318" y="46" width="26" height="26" rx="5"/>
@@ -599,7 +609,9 @@
     <rect x="114" y="80" width="26" height="26" rx="5" fill="#FFE600" stroke="#FFE600" stroke-width="1.5"/>
   </g>
 </svg>
-        <span class="small" style="margin:0;text-align:center;max-width:440px">Each cell ≈ 100 slots. <b class="yellow">1 lit</b> = the ~100 we sell today · <b style="color:var(--ink1)">49 empty</b>.</span>
+          <div class="occcap">Each cell &asymp; 100 slots &middot; <b>1 lit</b> = what we sell &middot; 49 empty</div>
+        </div>
+        <div class="cfoot"><b class="yellow">Measured</b>, not projected &mdash; from GST-filed won deals. <b>98%</b> of every screen sits empty today.</div>
       </div>
     </div>
     <div class="fillbar anim" style="margin-top:20px">
