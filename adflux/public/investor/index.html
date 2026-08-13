@@ -192,6 +192,26 @@
   .target .tstep .tv.ink{color:var(--ink0);text-shadow:none;font-size:clamp(15px,1.8vw,19px);max-width:12ch}
   .target .tstep .tl{font-size:10px;color:var(--ink2);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
   .target .tarr{color:var(--ink2);font-size:22px}
+  /* government ad-budget slide (the demand) */
+  .budwrap{display:grid;grid-template-columns:1.12fr .88fr;gap:clamp(18px,2.6vw,40px);margin-top:20px;align-items:stretch}
+  @media(max-width:860px){.budwrap{grid-template-columns:1fr}}
+  .budcard{background:var(--navy2);border:1px solid var(--line);border-radius:16px;padding:17px 20px}
+  .budcard .bhead{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--yellow);font-weight:600}
+  .budcard .bsub{font-size:12px;color:var(--ink2);margin:3px 0 15px}
+  .budbars{display:flex;align-items:flex-end;justify-content:space-around;gap:12px;height:186px}
+  .budcol{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+  .budval{font-family:var(--disp);font-weight:700;font-size:clamp(15px,1.9vw,20px);color:var(--ink0);margin-bottom:7px;white-space:nowrap}
+  .budbar{width:62%;max-width:74px;flex:1;display:flex;align-items:flex-end;border-bottom:1px solid var(--line)}
+  .budbar i{display:block;width:100%;height:0;border-radius:8px 8px 0 0;background:linear-gradient(180deg,var(--yellow),var(--yellow-dim));box-shadow:0 0 22px rgba(255,230,0,.28);transition:height 1.05s cubic-bezier(.16,1,.3,1) .25s}
+  .budbar i.dim{background:linear-gradient(180deg,rgba(255,230,0,.5),rgba(255,230,0,.22));box-shadow:none}
+  .slide.on .budbar i{height:var(--h)}
+  .budyr{font-size:11px;color:var(--ink2);margin-top:8px;font-family:var(--mono)}
+  .budnote{font-size:12.5px;color:var(--ink1);margin-top:13px;padding-top:11px;border-top:1px solid var(--line)} .budnote b{color:var(--yellow)}
+  .budbig{font-family:var(--disp);font-weight:700;font-size:clamp(42px,7vw,72px);color:var(--yellow);line-height:.95;text-shadow:0 0 30px rgba(255,230,0,.3)}
+  .budbig-l{font-size:13px;color:var(--ink1);margin-top:7px} .budbig-l b{color:var(--ink0)}
+  .budyr2{font-family:var(--disp);font-weight:700;font-size:22px;color:var(--ink0);margin-top:15px;padding-top:13px;border-top:1px solid var(--line)}
+  .budtake{margin-top:15px;background:rgba(255,230,0,.05);border:1px solid rgba(255,230,0,.2);border-radius:14px;padding:13px 18px;font-size:14px;color:var(--ink1);line-height:1.5} .budtake b{color:var(--yellow)}
+  .budsrc{font-size:10.5px;color:var(--ink2);margin-top:11px;line-height:1.6} .budsrc a{color:var(--ink2);text-decoration:underline} .budsrc a:hover{color:var(--yellow)}
   /* ---------- real Gujarat tile maps (Leaflet + dark tiles) ---------- */
   #gjmap{width:100%;height:min(66vh,540px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
   #gjmap2{width:100%;height:min(68vh,580px);border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#0b1120}
@@ -1796,16 +1816,32 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <div class="fcaveat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg><div id="fCaveat"><b>Assumes DAVP government demand exists to buy the slots.</b> Fill is the only driver against a fixed &#8377;4.14 Cr cost &mdash; the Government DAVP rate card now being finalised is the engine that lifts fill from today&#39;s 2% toward the 10% target. Below 2.19% fill the build does not recover its capex inside the 5-year term. Unaudited.</div></div>
   </section>
 
-  <!-- 15 ROADMAP -->
+  <!-- 15 GOVERNMENT AD BUDGET (the demand pool) -->
   <section class="slide">
-    <div class="kicker anim">The path from here</div>
-    <h2 class="anim">Four steps from 2% today to 10% filled.</h2>
-    <div class="steps anim">
-      <div class="step"><div class="num">1</div><h4>DAVP price lands</h4><p>The government rate card for these screens is finalised — departments can book at scale.</p></div>
-      <div class="step"><div class="num">2</div><h4>Win the tender</h4><p>Add 98 stations, ≈ 980 more screens. Five times the current network.</p></div>
-      <div class="step"><div class="num">3</div><h4>Build the 98</h4><p>₹5.65 Cr of hardware installed and brought live.</p></div>
-      <div class="step"><div class="num">4</div><h4>Fill to 10%</h4><p>A six-month target. Government demand at ₹1/slot moves revenue five times.</p></div>
+    <div class="kicker anim">The demand is public money</div>
+    <h2 class="anim">Government advertising is a real, growing budget.</h2>
+    <p class="lead anim" style="max-width:66ch">Public money is already spent on ads every year — the exact pool our screens capture. Two governments, two levers.</p>
+    <div class="budwrap anim">
+      <div class="budcard">
+        <div class="bhead">Central government · via DAVP / BOC</div>
+        <div class="bsub">Lever 4 — the national pool the Bureau books from</div>
+        <div class="budbars">
+          <div class="budcol"><div class="budval">₹<span data-count="347">0</span> Cr</div><div class="budbar"><i class="dim" style="--h:52%"></i></div><div class="budyr">2022-23</div></div>
+          <div class="budcol"><div class="budval">₹<span data-count="656">0</span> Cr</div><div class="budbar"><i style="--h:90%"></i></div><div class="budyr">2023-24</div></div>
+          <div class="budcol"><div class="budval">₹<span data-count="644">0</span> Cr</div><div class="budbar"><i style="--h:88%"></i></div><div class="budyr">2024-25</div></div>
+        </div>
+        <div class="budnote">Peak <b>₹656 Cr</b> (2023-24) · still ₹644 Cr in 2024-25 — the demand holds year on year</div>
+      </div>
+      <div class="budcard" style="display:flex;flex-direction:column;justify-content:center">
+        <div class="bhead">Gujarat state government</div>
+        <div class="bsub">Lever 1 — its own ad budget, via state DAVP</div>
+        <div class="budbig">₹<span data-count="880">0</span> Cr</div>
+        <div class="budbig-l">on advertising &amp; publicity in <b>11 years</b> (RTI, 2024)</div>
+        <div class="budyr2">≈ ₹<span data-count="80">0</span> Cr / year</div>
+      </div>
     </div>
+    <div class="budtake anim">This money is <b>already being spent on advertising</b> — every year. Our screens are a new, camera-measured place to put it. We need only a <b>sliver</b> of it to fill.</div>
+    <div class="budsrc anim">Sources — Central (DAVP/CBC, official data via Lok Sabha): <a href="https://www.nationalheraldindia.com/politics/centres-advertising-budget-up-by-84-pc-since-2020-21-trinamool-congress-quotes-official-data" target="_blank" rel="noopener">National Herald</a> · <a href="https://www.deccanherald.com/india/govt-spent-rs-96746-crore-on-advertisements-in-print-media-from-2019-20-to-2023-24-2817557" target="_blank" rel="noopener">Deccan Herald</a>. &nbsp; Gujarat (RTI, Oct 2024): <a href="https://english.gujaratsamachar.com/news/gujarat/gujarat-government-spent-880-cr-on-ads-over-11-years-reveals-rti" target="_blank" rel="noopener">Gujarat Samachar</a> · <a href="https://m.thewire.in/article/government/gujarat-government-spent-rs-8-81-crore-on-ads-celebrating-23-years-of-modi-in-public-office-report" target="_blank" rel="noopener">The Wire</a>.</div>
   </section>
 
   <!-- 16 ASK -->

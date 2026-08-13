@@ -12521,3 +12521,26 @@ padding/fonts/illustration height to fit; added a `@media(max-width:880px)` 2-co
 slide, no SQL/APK. Verified in-browser (4 cards, govt-building vector, fits the slide, no errors). §177
 real-numbers: no fabricated figure on the BOC card — the metric is qualitative (central budget via the
 BOC single window), accurate to how central-govt outdoor is booked.
+
+### Phase 308 — investor slide 13: roadmap REPLACED with "Government ad budget" (sourced demand data)
+Owner: "page 13 remove · add Gujarat govt yearly advertising budget, last 3 years, with source link."
+Researched via WebSearch/WebFetch (real, sourced figures — §177, no fabrication). Owner picked (via
+AskUserQuestion): show **State + Central**, and **replace** the roadmap slide. New slide 13
+(`public/investor/index.html`) = "Government advertising is a real, growing budget":
+- **Central government (DAVP/CBC) — Lever 4**, a 3-bar chart (grow-on-`.slide.on` + count-ups):
+  2022-23 **₹347 Cr**, 2023-24 **₹656 Cr**, 2024-25 **₹644 Cr**. Note: "Peak ₹656 Cr (2023-24), still
+  ₹644 Cr in 2024-25 — demand holds." Verified from DAVP data cited in a Lok Sabha reply.
+- **Gujarat state government — Lever 1**: **₹880 Cr on advertising+publicity over 11 years** (FY15–FY25),
+  **~₹80 Cr/yr** (RTI, Oct 2024). Big count-up number.
+- Takeaway strip + **clickable source links** (`target=_blank`): Central = National Herald + Deccan
+  Herald; Gujarat = Gujarat Samachar + The Wire.
+- ⚠ THE DATA CONSTRAINT (for future edits): a clean YEAR-WISE Gujarat-state ad breakdown for the last 3
+  years is NOT publicly available — only the 11-year RTI aggregate (₹880 Cr) + the ~₹80 Cr/yr average.
+  The clean year-wise figures that DO exist are CENTRAL (DAVP/CBC), so the slide pairs the Gujarat
+  aggregate with the central year-wise (both are the govt demand the screens capture). Do NOT invent a
+  Gujarat year-wise split. Central figures (full): 2020-21 ₹349.24, 2021-22 ₹274.87, 2022-23 ₹347.38,
+  2023-24 ₹656.08, 2024-25 ₹643.63 Cr (avg ₹454/yr, 84% up since 2020-21) — DAVP data via National Herald.
+- New `.budwrap/.budcard/.budbars/.budbar/.budbig/.budtake/.budsrc` CSS; bars grow via
+  `.slide.on .budbar i{height:var(--h)}` (the §191 transition pattern, not the looping `.an-bar`).
+  Static slide, no SQL/APK, 16 slides unchanged (replace, not add). Verified in-browser (bars grow,
+  count-ups land 347/656/644/880/80, source links, fits the slide, no errors).
