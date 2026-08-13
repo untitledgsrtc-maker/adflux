@@ -12902,3 +12902,25 @@ Owner ran a full QA pass. Fixed the real ones:
   forecast (no tabs); the "20" concept lives on slide 10 (map, ALREADY defaults to
   "Today · 20 stations") + slide 2 (video tabs). Owner "no preference" on which → wired
   the video slide to 20 tabs (309.14).
+
+### Phase 309.15 — investor deck: the LOGO, finally right (root cause) (`424f227`, 2026-08-14)
+Owner (10th+ time, frustrated): "still using another logo, use the attached one."
+ROOT CAUSE (found by rendering EVERY candidate side-by-side on dark): the deck's
+`brandmark.svg` (§309.10's "FULL 2") was a genuinely DIFFERENT variant — plain US
+mark + a stacked **"ADVERTISING"** tagline. The logo the owner keeps attaching is the
+**filled-circle US emblem + "UNTITLED" + "OUTDOOR | INDOOR | SOCIAL | PRINT/TV"**
+horizontal lockup. So I really WAS using a different logo — §309.10 wired the wrong
+file. FIX: wired his actual file — `~/Desktop/logo.png` (white, high-res 1493×305,
+transparent; == the `~/Downloads/download (1).png` he attaches) — as
+`public/investor/brandmark.png` across gate/hero/corner; deleted the wrong
+`brandmark.svg`. CSS was already `width:auto` + `object-fit:contain` → the wide
+lockup scales clean at 40/30/22px. Verified all 3 spots in-browser.
+- THE LESSON (do NOT repeat): "use the attached logo" = a CHAT IMAGE I cannot save to
+  disk. When the owner says the logo is wrong, do NOT re-wire another guess — RENDER
+  every on-disk logo candidate (investor/*, led/*, ~/Downloads/*, ~/Desktop/*) on a
+  dark bg side-by-side, screenshot, and MATCH the exact one to what he attached
+  (emblem style + tagline text + layout all matter). His real logo lives at
+  `~/Desktop/logo.png` / `~/Downloads/download (1).png` = brandmark.png. The prior
+  disk variants (`brandmark.svg` FULL 2 = "ADVERTISING" tagline; `led/logo.svg` =
+  emblem+UNTITLED no tagline; `led/logo-word.svg` = wordmark only; `led/logo-mark.svg`
+  = circled emblem only) are NOT it.
