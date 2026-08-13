@@ -1889,7 +1889,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
         <div class="wotake anim">Payback isn&rsquo;t a forecast &mdash; it&rsquo;s demand we already invoice.</div>
       </div>
       <div class="woright anim">
-        <div class="wopile" id="wopile"><div class="wocard" data-i="1"><img loading="lazy" src="workorders/wo1.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="2"><img loading="lazy" src="workorders/wo2.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="3"><img loading="lazy" src="workorders/wo3.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="4"><img loading="lazy" src="workorders/wo4.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="5"><img loading="lazy" src="workorders/wo5.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="6"><img loading="lazy" src="workorders/wo6.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="7"><img loading="lazy" src="workorders/wo7.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="8"><img loading="lazy" src="workorders/wo8.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="9"><img loading="lazy" src="workorders/wo9.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="10"><img loading="lazy" src="workorders/wo10.jpg" alt="Government advertising work order issued to Untitled Advertising"></div></div>
+        <div class="wopile" id="wopile"><div class="wocard" data-i="1"><img src="workorders/wo1.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="2"><img src="workorders/wo2.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="3"><img src="workorders/wo3.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="4"><img src="workorders/wo4.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="5"><img src="workorders/wo5.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="6"><img src="workorders/wo6.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="7"><img src="workorders/wo7.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="8"><img src="workorders/wo8.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="9"><img src="workorders/wo9.jpg" alt="Government advertising work order issued to Untitled Advertising"></div><div class="wocard" data-i="10"><img src="workorders/wo10.jpg" alt="Government advertising work order issued to Untitled Advertising"></div></div>
         <div class="wohint">Signed government work orders &middot; tap Next to flip through all 10</div>
       </div>
     </div>
@@ -1989,7 +1989,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     var _wo=document.getElementById('wopile'); WO_IDX=_wo?[].indexOf.call(slides,_wo.closest('.slide')):-1;
     var _wp=document.getElementById('woPrev'); if(_wp) _wp.addEventListener('click',function(){ woGo(-1); });
     var _wn=document.getElementById('woNext'); if(_wn) _wn.addEventListener('click',function(){ woGo(1); });
-    try{ woLayout(); }catch(e){}
+    try{ woLayout(); }catch(e){} try{ woImgHeal(); }catch(e){}
     var expbs=document.querySelectorAll('.expbtn'); for(var eb=0;eb<expbs.length;eb++) expbs[eb].addEventListener('click',function(e){ setExpFull(e.currentTarget.getAttribute('data-full')==='1'); });
     drawRecord(recordStep); wireCalc(); recompute(); tickLive();
     setTimeout(function(){ try{ initMap(); }catch(e){} try{ initMap2(); }catch(e){} }, 350);
@@ -2020,8 +2020,14 @@ svg.leaflet-image-layer.leaflet-interactive path {
       el.style.transform='translate(calc(-50% + '+sc[1]+'px), calc(-50% + '+sc[2]+'px)) rotate('+sc[0]+'deg) scale('+(0.92-d*0.015).toFixed(3)+')'; }
   }
   function woLayout(){ var c=document.querySelectorAll('#wopile .wocard'); for(var i=0;i<c.length;i++) woLayoutCard(c[i],i); }
+  function woImgHeal(){ var im=document.querySelectorAll('#wopile .wocard img'); for(var i=0;i<im.length;i++){ (function(x){
+    if(x._woWired) return; x._woWired=1;
+    x.addEventListener('error',function(){ if(x._woR) return; x._woR=1; var b=x.getAttribute('src').split('?')[0]; x.src=b+'?r='+(+new Date()); });
+    if(x.complete && x.naturalWidth===0 && !x._woR){ x._woR=1; var b=x.getAttribute('src').split('?')[0]; x.src=b+'?r='+(+new Date()); }
+  })(im[i]); } }
   function woReplay(){
     var c=document.querySelectorAll('#wopile .wocard'); if(!c.length) return;
+    woImgHeal();
     woTop=0; var nw=document.getElementById('woNow'); if(nw) nw.textContent='1';
     for(var i=0;i<c.length;i++){ c[i].style.transition='none'; c[i].style.opacity='0';
       c[i].style.transform='translate(-50%,-192%) rotate('+(WOSC[i%WOSC.length][0]*2)+'deg) scale(.85)'; }

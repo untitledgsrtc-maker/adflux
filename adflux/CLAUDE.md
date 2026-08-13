@@ -12619,3 +12619,32 @@ documents/cards" slide. `countUpsIn` unrelated here (no data-count on this slide
 8 DAVP-unlock (4 levers) · 9 concession+expansion · 10 cost picture · 11 asset priced ·
 12 forecast · 13 govt ad budget · **14 work orders (proof, this)** · 15 ask · 16 risks ·
 17 team. Still open: the record-slide private/govt turnover split when owner sends per-year ₹.
+
+### Phase 309.1 — work-order images self-heal (owner saw broken images once)
+Owner's first live view showed the 10 cards as broken (alt text), while the server
+served them fine — curl `app.untitledad.in/investor/workorders/wo1.jpg` → **200
+image/jpeg 215510 bytes**, and the new HTML (`id="wopile"`) was live. Diagnosis
+(ruled out in order): the jpgs ARE real binaries in the pushed commit
+(`git cat-file -s` = 215510); no `.gitignore`/`.vercelignore` excludes them; the
+vercel.json SPA rewrite `/((?!api/|pdf/).*) → /` only catches paths with NO physical
+file (static files win), and the files exist; the **sw.js has NO route matching
+`/investor/workorders/*.jpg`** — the NavigationRoute→index.html only fires on
+`mode==='navigate'` (an `<img>` is not), and the fonts/tiles/supabase/`/deck/`
+runtime routes + the precache don't match it → the image request passes through to
+network → 200. So it was NOT a code/server/SW bug — it was the owner's **client
+cache of a transient failure** (a 404 during the brief deploy-propagation window
+before the push finished, negatively-cached by the browser). A hard-refresh fixes
+his view.
+- FIX (defensive, so a broken image can NEVER show mid-pitch to an investor): the
+  10 `.wocard img` are now **eager** (dropped `loading="lazy"` → all load on deck
+  open, slide 14 is instant + fully populated, no lazy flash when flipping) + an
+  **`onerror` self-heal** (`woImgHeal()`, called in boot + `woReplay`): on an image
+  error it retries ONCE with a `?r=<ts>` cache-bust — a fresh URL bypasses any
+  browser-cached 404 and re-fetches the now-present file. Verified locally:
+  loaded 10 / broken 0, no JS errors.
+- FOOT-GUN: a static asset added in the SAME commit as its HTML can still 404 on a
+  viewer who loaded during deploy propagation, and the browser negative-caches it →
+  looks like a missing file when the server is fine. Curl the live URL first
+  (200 image/jpeg = server OK → it's client cache, tell them to hard-refresh); add an
+  `onerror` cache-bust retry on demo-critical images so it self-heals without a manual
+  refresh.
