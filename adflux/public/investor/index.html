@@ -227,7 +227,24 @@
   .an-rise{opacity:0}
   .slide.on .an-rise{animation:risebub 3s ease-out infinite}
   @keyframes risebub{0%{opacity:0;transform:translateY(8px)}18%{opacity:1}70%{opacity:1}100%{opacity:0;transform:translateY(-28px)}}
+  .an-bar{transform-box:fill-box;transform-origin:bottom}
+  .slide.on .an-bar{animation:bargrow 3s ease-in-out infinite}
+  .slide.on .an-bar.b2{animation-delay:.2s}.slide.on .an-bar.b3{animation-delay:.4s}
+  @keyframes bargrow{0%,8%{transform:scaleY(.18)}22%,78%{transform:scaleY(1)}92%,100%{transform:scaleY(.18)}}
+  .slide.on .an-bus{animation:busin 4.6s cubic-bezier(.16,1,.3,1) infinite}
+  @keyframes busin{0%{transform:translateX(78px);opacity:0}15%,85%{transform:translateX(0);opacity:1}100%{transform:translateX(78px);opacity:0}}
   @media (prefers-reduced-motion:reduce){.slide.on [class*="an-"]{animation:none!important;opacity:1!important}}
+  /* ---------- record (slide 5) interactive reveal ---------- */
+  .recbtn{margin-top:16px;background:var(--yellow);color:var(--navy);border:none;border-radius:11px;padding:11px 20px;font-family:var(--disp);font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 0 24px rgba(255,230,0,.28)}
+  .recbtn:hover{background:#fff}
+  .recbtn.done{background:rgba(255,255,255,.05);color:var(--ink2);box-shadow:none;cursor:default}
+  .recinfo{background:var(--navy2);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:230px}
+  .recinfo .ry{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+  .recinfo .rv{font-family:var(--disp);font-weight:700;color:var(--yellow);font-size:clamp(34px,4.6vw,48px);line-height:1;margin:5px 0;text-shadow:0 0 26px rgba(255,230,0,.3)}
+  .recinfo .ryoy{font-size:14px;color:var(--green);font-weight:600}
+  .recinfo .rrow{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)}
+  .recinfo .rchip{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
+  .recinfo .rchip b{font-family:var(--disp);color:var(--ink0);font-size:16px;display:block;line-height:1.1} .recinfo .rchip span{font-size:10.5px;color:var(--ink2)}
 </style>
 </head>
 <body>
@@ -284,7 +301,7 @@
     <h2 class="anim">Measured LED screens inside Gujarat's GSRTC bus stations.</h2>
     <div class="split anim" style="margin-top:24px">
       <div class="illwrap">
-        <span class="ibadge" style="top:4%;right:2%"><span class="rd"></span><span data-count="1240">0</span> seen today</span>
+        <span class="ibadge" style="top:4%;right:2%"><span class="rd"></span><span data-count="264">0</span> screens live</span>
         <svg viewBox="0 0 480 356" fill="none" stroke-linecap="round" stroke-linejoin="round">
           <line x1="20" y1="322" x2="460" y2="322" stroke="#2a3348" stroke-width="2"/>
           <rect x="228" y="214" width="14" height="108" fill="#151d30" stroke="#3a465f" stroke-width="1.5"/>
@@ -485,15 +502,21 @@
   <rect x="172" y="126" width="88" height="8" rx="4" fill="#c3cbe0"/>
   <rect x="172" y="140" width="64" height="6" rx="3" fill="#8b96b4"/>
   <rect x="136" y="160" width="128" height="44" rx="4" fill="#FFE600" fill-opacity="0.22" stroke="#FFE600" stroke-width="1.5"/>
-  <path d="M186 172 L206 182 L186 192 Z" fill="#FFE600"/>
+  <path d="M186 172 L206 182 L186 192 Z" fill="#FFE600" class="an-glow"/>
 
-  <!-- second LED screen (screen 3) -->
+  <!-- broadcast from the hero screen -->
+  <circle cx="288" cy="112" r="3" fill="#FFE600" class="an-glow"/>
+  <path class="an-wave w1" d="M288 96 A16 16 0 0 1 304 112" stroke="#FFE600" stroke-width="2.2"/>
+  <path class="an-wave w2" d="M288 86 A26 26 0 0 1 314 112" stroke="#FFE600" stroke-width="1.9"/>
+  <path class="an-wave w3" d="M288 76 A36 36 0 0 1 324 112" stroke="#FFE600" stroke-width="1.6"/>
+
+  <!-- second LED screen (screen 3) — live chart -->
   <rect x="316" y="116" width="120" height="92" rx="6" fill="#FFE600" fill-opacity="0.12" stroke="#FFE600" stroke-width="2.5"/>
   <rect x="328" y="128" width="60" height="7" rx="3" fill="#c3cbe0"/>
   <line x1="328" y1="192" x2="420" y2="192" stroke="#c3cbe0" stroke-width="1.5"/>
-  <rect x="336" y="166" width="16" height="24" fill="#FFE600" fill-opacity="0.85"/>
-  <rect x="362" y="150" width="16" height="40" fill="#FFE600" fill-opacity="0.85"/>
-  <rect x="388" y="132" width="16" height="58" fill="#FFE600" fill-opacity="0.85"/>
+  <rect class="an-bar b1" x="336" y="166" width="16" height="24" fill="#FFE600" fill-opacity="0.85"/>
+  <rect class="an-bar b2" x="362" y="150" width="16" height="40" fill="#FFE600" fill-opacity="0.85"/>
+  <rect class="an-bar b3" x="388" y="132" width="16" height="58" fill="#FFE600" fill-opacity="0.85"/>
 
   <!-- commuters -->
   <g stroke="#c3cbe0" stroke-width="2.5">
@@ -511,8 +534,13 @@
     <line x1="382" y1="296" x2="391" y2="324"/>
     <line x1="382" y1="270" x2="396" y2="286"/>
   </g>
+  <!-- AI reticle locking a waiting commuter -->
+  <g class="an-lock" stroke="#FFE600" stroke-width="2.4">
+    <path d="M318 232 v-9 h9"/><path d="M356 223 h9 v9"/><path d="M365 302 v9 h-9"/><path d="M320 311 h-9 v-9"/>
+  </g>
 
-  <!-- stylised bus -->
+  <!-- stylised bus (arrives) -->
+  <g class="an-bus">
   <rect x="486" y="238" width="126" height="74" rx="14" stroke="#c3cbe0" stroke-width="2.5"/>
   <rect x="496" y="250" width="82" height="26" rx="5" fill="#FFE600" fill-opacity="0.12" stroke="#FFE600" stroke-width="1.5"/>
   <line x1="524" y1="250" x2="524" y2="276" stroke="#FFE600" stroke-width="1" stroke-opacity="0.5"/>
@@ -523,6 +551,7 @@
   <circle cx="516" cy="314" r="5" fill="#2a3348"/>
   <circle cx="584" cy="314" r="14" stroke="#c3cbe0" stroke-width="3"/>
   <circle cx="584" cy="314" r="5" fill="#2a3348"/>
+  </g>
 </svg></div>
     </div>
   </section>
@@ -530,11 +559,16 @@
   <!-- 5 RECORD -->
   <section class="slide">
     <div class="kicker anim">The record</div>
-    <h2 class="anim">Ten years. ₹0 to ₹8.8 Crore. 4× in five years.</h2>
-    <div class="anim" style="margin-top:24px;max-width:640px"><div id="recordChart"></div>
-      <div style="font-size:12px;color:var(--ink2);margin-top:8px"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--yellow);margin-right:6px;vertical-align:-1px"></span>Turnover (₹ Cr, GST-filed — real revenue, not projections)</div>
+    <h2 class="anim">Ten years. ₹0 to ₹8.8 Crore.</h2>
+    <p class="lead anim" style="max-width:60ch">Founded in Vadodara, 2015, from zero — government and private advertisers. <b class="yellow">Press → (or tap the button) to build the last five years, one year at a time.</b></p>
+    <div class="split" style="margin-top:16px;align-items:start">
+      <div class="anim" style="max-width:640px">
+        <div id="recordChart"></div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:8px"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--yellow);margin-right:6px;vertical-align:-1px"></span>Turnover (₹ Cr, GST-filed — real revenue, not projections)</div>
+        <button id="recNext" class="recbtn">Reveal next year &#9656;</button>
+      </div>
+      <div class="anim recinfo" id="recInfo"></div>
     </div>
-    <p class="small anim">Founded in Vadodara, 2015, from zero. Government and private advertisers — and the network is still only 2% full.</p>
   </section>
 
   <!-- 6 THE 2% GAP -->
@@ -800,6 +834,8 @@
   'use strict';
   var CODE='untitled2026';
   var SLOTS_YR=151200*12, PRIV_RATE=0.18;  /* hoisted: needed by model() on sessionStorage auto-unlock */
+  var RECORD=[{y:'FY21-22',v:2.2},{y:'FY22-23',v:3.6},{y:'FY23-24',v:5.4},{y:'FY24-25',v:8.6},{y:'FY25-26',v:8.8}];
+  var recordStep=1, RECORD_IDX=-1;
   var gate=document.getElementById('gate'), deck=document.getElementById('deck');
   function unlock(){ gate.style.display='none'; deck.classList.add('on'); try{sessionStorage.setItem('inv_ok','1')}catch(e){} boot(); }
   function tryPw(){ var v=(document.getElementById('pw').value||'').trim(); if(v.toLowerCase()===CODE) unlock(); else document.getElementById('pwerr').textContent='Wrong code. Ask Brijesh for access.'; }
@@ -814,18 +850,20 @@
     for(var i=0;i<slides.length;i++) d+='<i data-i="'+i+'"></i>'; dc.innerHTML=d;
     var dotEls=dc.querySelectorAll('i');
     for(var j=0;j<dotEls.length;j++) dotEls[j].addEventListener('click',function(e){ go(+e.currentTarget.getAttribute('data-i')); });
-    document.getElementById('prev').addEventListener('click',function(){ go(idx-1); });
-    document.getElementById('next').addEventListener('click',function(){ go(idx+1); });
+    RECORD_IDX=[].indexOf.call(slides, document.getElementById('recordChart').closest('.slide'));
+    var rb=document.getElementById('recNext'); if(rb) rb.addEventListener('click',function(){ advance(1); this.blur(); });
+    document.getElementById('prev').addEventListener('click',function(){ advance(-1); });
+    document.getElementById('next').addEventListener('click',function(){ advance(1); });
     document.addEventListener('keydown',function(e){
-      if(e.target && e.target.tagName==='INPUT') return;
-      if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){ e.preventDefault(); go(idx+1); }
-      else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); go(idx-1); }
+      if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')) return;
+      if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){ e.preventDefault(); advance(1); }
+      else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); advance(-1); }
       else if(e.key==='Home'){ go(0); } else if(e.key==='End'){ go(slides.length-1); }
     });
     var x0=null, st=document.getElementById('stage');
     st.addEventListener('touchstart',function(e){ x0=e.touches[0].clientX; },{passive:true});
-    st.addEventListener('touchend',function(e){ if(x0===null) return; var dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>60) go(idx+(dx<0?1:-1)); x0=null; },{passive:true});
-    drawRecord(); wireCalc(); recompute(); tickLive();
+    st.addEventListener('touchend',function(e){ if(x0===null) return; var dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>60) advance(dx<0?1:-1); x0=null; },{passive:true});
+    drawRecord(recordStep); wireCalc(); recompute(); tickLive();
     go(0,true);
   }
 
@@ -855,6 +893,7 @@
     countUpsIn(slides[n]);
     if(n===0) buildReticles();
     var fs=slides[n].querySelector('#fillSold'); if(fs){ fs.style.width='0%'; setTimeout(function(){ fs.style.width='2%'; },250); }
+    if(n===RECORD_IDX){ recordStep=1; drawRecord(1); updateRecordInfo(); updateRecBtn(); }
   }
 
   function countUpsIn(slide){
@@ -867,15 +906,53 @@
     })(els[i]); }
   }
 
-  function drawRecord(){
-    var data=[{y:'FY21-22',v:2.2},{y:'FY22-23',v:3.6},{y:'FY23-24',v:5.4},{y:'FY24-25',v:8.6},{y:'FY25-26',v:8.8}];
-    var W=600,H=210,pad=28,bw=W/data.length,max=10;
+  /* interactive turnover — press -> to reveal each year (RECORD_IDX + recordStep declared up top) */
+  function drawRecord(step){
+    step=step||1; var el=document.getElementById('recordChart'); if(!el) return;
+    var W=600,H=232,padT=34,padB=30,bw=W/RECORD.length,max=10;
+    function yOf(v){ return H-padB-(v/max)*(H-padT-padB); }
     var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">';
-    for(var i=0;i<data.length;i++){ var h=(data[i].v/max)*(H-pad*2), x=i*bw+bw*0.2, y=H-pad-h, w=bw*0.6;
-      s+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="4" fill="var(--yellow)" opacity="'+(0.55+0.09*i)+'"/>';
-      s+='<text x="'+(x+w/2)+'" y="'+(y-7)+'" fill="#f5f7fb" font-size="13" font-family="Space Mono" text-anchor="middle">'+data[i].v+'</text>';
-      s+='<text x="'+(x+w/2)+'" y="'+(H-9)+'" fill="#8b96b4" font-size="10" text-anchor="middle">'+data[i].y+'</text>'; }
-    s+='</svg>'; document.getElementById('recordChart').innerHTML=s;
+    s+='<line x1="0" y1="'+(H-padB)+'" x2="'+W+'" y2="'+(H-padB)+'" stroke="rgba(255,255,255,.1)"/>';
+    var pts=[];
+    for(var i=0;i<RECORD.length;i++){
+      var x=i*bw+bw*0.22, w=bw*0.56, top=yOf(RECORD[i].v), h=(H-padB)-top, on=i<step;
+      if(on){
+        s+='<rect x="'+x+'" y="'+top+'" width="'+w+'" height="'+h+'" rx="4" fill="var(--yellow)" opacity="'+(0.62+0.075*i)+'"/>';
+        s+='<text x="'+(x+w/2)+'" y="'+(top-9)+'" fill="#f5f7fb" font-size="14" font-family="Space Grotesk" font-weight="700" text-anchor="middle">'+RECORD[i].v+'</text>';
+        pts.push((x+w/2)+','+top);
+      } else {
+        s+='<rect x="'+x+'" y="'+top+'" width="'+w+'" height="'+h+'" rx="4" fill="none" stroke="rgba(255,255,255,.13)" stroke-dasharray="4 4"/>';
+      }
+      s+='<text x="'+(x+w/2)+'" y="'+(H-9)+'" fill="'+(on?'#c3cbe0':'#5b6480')+'" font-size="10" text-anchor="middle">'+RECORD[i].y+'</text>';
+    }
+    if(pts.length>1) s+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"/>';
+    for(var j=0;j<pts.length;j++){ var xy=pts[j].split(','); s+='<circle cx="'+xy[0]+'" cy="'+xy[1]+'" r="4" fill="var(--blue)"/>'; }
+    s+='</svg>'; el.innerHTML=s;
+  }
+  function updateRecordInfo(){
+    var el=document.getElementById('recInfo'); if(!el) return;
+    var i=recordStep-1, cur=RECORD[i], first=RECORD[0].v;
+    var yoy=i>0?Math.round((cur.v/RECORD[i-1].v-1)*100):null;
+    var cagr=i>0?Math.round((Math.pow(cur.v/first,1/i)-1)*100):null;
+    var h='<div class="ry">'+cur.y+' turnover</div><div class="rv">₹'+cur.v+' Cr</div>';
+    h+=(yoy!=null)?'<div class="ryoy">▲ '+yoy+'% vs last year</div>':'<div class="ryoy" style="color:var(--ink2)">the starting line</div>';
+    h+='<div class="rrow"><div class="rchip"><b>'+recordStep+' / 5</b><span>years shown</span></div>';
+    h+='<div class="rchip"><b>'+(Math.round(cur.v/first*10)/10)+'×</b><span>vs FY21-22</span></div>';
+    if(cagr!=null) h+='<div class="rchip"><b>'+cagr+'%</b><span>CAGR</span></div>';
+    h+='<div class="rchip"><b>2%</b><span>network full</span></div></div>';
+    el.innerHTML=h;
+  }
+  function updateRecBtn(){
+    var b=document.getElementById('recNext'); if(!b) return;
+    if(recordStep>=RECORD.length){ b.innerHTML='All five years ✓'; b.classList.add('done'); b.disabled=true; }
+    else { b.innerHTML='Reveal next year ▸'; b.classList.remove('done'); b.disabled=false; }
+  }
+  function advance(dir){
+    if(idx===RECORD_IDX){
+      if(dir>0 && recordStep<RECORD.length){ recordStep++; drawRecord(recordStep); updateRecordInfo(); updateRecBtn(); return; }
+      if(dir<0 && recordStep>1){ recordStep--; drawRecord(recordStep); updateRecordInfo(); updateRecBtn(); return; }
+    }
+    go(idx+dir);
   }
 
   function val(id){ return +document.getElementById(id).value; }
