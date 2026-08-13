@@ -419,6 +419,41 @@
   .navbtns .c{font-family:var(--mono);font-size:12px;color:var(--ink2);margin-right:6px}
   .navbtns button{width:36px;height:36px;border-radius:10px;background:var(--navy2);color:var(--ink0);border:1px solid var(--line);font-size:16px;cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center}
   .navbtns button:hover{border-color:var(--yellow);color:var(--yellow)} .navbtns button:disabled{opacity:.35;cursor:default}
+  /* --- sales-deck-style bottom bar: gov mark + stats + controls --- */
+  .navbar{height:66px;gap:14px;justify-content:flex-start}
+  .nb-left{display:flex;align-items:center;min-width:0;overflow:hidden;flex:1}
+  .govmark{display:flex;align-items:center;gap:10px;padding-right:18px;margin-right:18px;border-right:1px solid rgba(255,255,255,.10);flex:0 0 auto}
+  .gseal{width:36px;height:36px;border-radius:50%;border:1.6px solid var(--yellow);color:var(--yellow);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .gseal svg{width:19px;height:19px;display:block}
+  .gtxt{line-height:1.18}
+  .gtxt b{display:block;font-family:var(--disp);font-size:12px;font-weight:600;color:var(--ink0);letter-spacing:.2px}
+  .gtxt span{display:block;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+  .nbstats{display:flex;align-items:center;min-width:0;overflow:hidden}
+  .nbstat{display:flex;flex-direction:column;gap:1px;flex:0 0 auto}
+  .nbn{font-family:var(--disp);font-weight:700;font-size:24px;line-height:1;letter-spacing:-.5px;color:var(--ink0)}
+  .nbn .y{color:var(--yellow)}
+  .nbl{font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+  .nbdiv{width:1px;height:30px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.16),transparent);margin:0 16px;flex:0 0 auto}
+  .navbtns{flex:0 0 auto}
+  .navbtns button svg{width:18px;height:18px;display:block}
+  .dots{display:none}
+  .hero-stats{display:none} /* stats now live in the persistent bottom bar */
+  @media (max-width:1080px){ .nbstats{display:none} }
+  @media (max-width:720px){ .govmark{display:none} .navbar{height:56px} }
+  /* overview grid (jump to any slide) */
+  .deck-overview{position:fixed;inset:0;z-index:40;display:none;padding:clamp(24px,5vh,52px);background:rgba(6,8,16,.94);backdrop-filter:blur(8px);overflow-y:auto}
+  .deck-overview.open{display:block}
+  .ov-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+  .ov-title{font-family:var(--disp);font-size:13px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--yellow)}
+  .ovclose{width:38px;height:38px;border-radius:10px;background:var(--navy2);border:1px solid var(--line);color:var(--ink0);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .ovclose:hover{border-color:var(--yellow);color:var(--yellow)} .ovclose svg{width:18px;height:18px}
+  .ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .ov-cell{position:relative;aspect-ratio:16/9;border-radius:12px;background:var(--navy2);border:1px solid var(--line);cursor:pointer;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:13px;transition:border-color .16s,transform .16s}
+  .ov-cell:hover{border-color:rgba(255,230,0,.6);transform:translateY(-2px)}
+  .ov-cell.current{border-color:var(--yellow);box-shadow:0 0 0 1px var(--yellow) inset}
+  .ov-num{position:absolute;top:11px;left:13px;font-family:var(--disp);font-size:20px;font-weight:700;color:rgba(255,255,255,.16)}
+  .ov-cell.current .ov-num{color:var(--yellow)}
+  .ov-label{font-family:var(--disp);font-size:12.5px;font-weight:600;color:var(--ink1);line-height:1.3}
   .progress{position:fixed;top:0;left:0;height:3px;background:var(--yellow);z-index:30;transition:width .4s ease;box-shadow:0 0 12px rgba(255,230,0,.5)}
   @media (max-width:760px){.slide{padding:8vh 7vw 12vh}.fc{grid-template-columns:1fr}.dots{display:none}}
 
@@ -1940,9 +1975,35 @@ svg.leaflet-image-layer.leaflet-interactive path {
 </div>
 
 <div class="navbar">
-  <div class="lg"><img src="/led/logo-mark.svg" alt="Untitled"/><b>UNTITLED</b></div>
+  <div class="nb-left">
+    <div class="govmark">
+      <div class="gseal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+      <div class="gtxt"><b>Government-Approved</b><span>GSRTC Authorised Media</span></div>
+    </div>
+    <div class="nbstats">
+      <div class="nbstat"><div class="nbn">264</div><div class="nbl">Screens</div></div>
+      <span class="nbdiv"></span>
+      <div class="nbstat"><div class="nbn">20</div><div class="nbl">Bus Stations</div></div>
+      <span class="nbdiv"></span>
+      <div class="nbstat"><div class="nbn">29<span class="y">L+</span></div><div class="nbl">Monthly Views</div></div>
+      <span class="nbdiv"></span>
+      <div class="nbstat"><div class="nbn">700<span class="y">+</span></div><div class="nbl">Brands</div></div>
+    </div>
+  </div>
   <div class="dots" id="dots"></div>
-  <div class="navbtns"><span class="c" id="counter">1 / 18</span><button id="prev" aria-label="Previous">‹</button><button id="next" aria-label="Next">›</button></div>
+  <div class="navbtns">
+    <span class="c" id="counter">1 / 17</span>
+    <button id="prev" aria-label="Previous" title="Previous (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <button id="next" aria-label="Next" title="Next (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+    <button id="btnGrid" aria-label="Overview" title="Overview (G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/></svg></button>
+    <button id="btnFull" aria-label="Fullscreen" title="Fullscreen (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+    <button id="btnPdf" aria-label="Download PDF" title="Print / PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+    <button id="btnEmail" aria-label="Email" title="Email"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button>
+  </div>
+</div>
+<div class="deck-overview" id="deckOverview">
+  <div class="ov-head"><div class="ov-title">All slides &mdash; jump to any</div><button class="ovclose" id="btnGridClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+  <div class="ov-grid" id="ovGrid"></div>
 </div>
 
 <script>/* Leaflet 1.9.4 (inlined) */
@@ -1975,6 +2036,19 @@ svg.leaflet-image-layer.leaflet-interactive path {
     var rb=document.getElementById('recNext'); if(rb) rb.addEventListener('click',function(){ advance(1); this.blur(); });
     document.getElementById('prev').addEventListener('click',function(){ advance(-1); });
     document.getElementById('next').addEventListener('click',function(){ advance(1); });
+    (function(){
+      var ovEl=document.getElementById('deckOverview'), ovGrid=document.getElementById('ovGrid');
+      function slideTitle(sl){ var e=sl.querySelector('h2,.s1-headline,.hero-h1,.hero-btm,.kicker'); var t=e?e.textContent.replace(/\s+/g,' ').trim():''; return (t.slice(0,64)||'Slide'); }
+      function buildOverview(){ if(!ovGrid) return; var h=''; for(var i=0;i<slides.length;i++){ var num=(i+1<10?'0':'')+(i+1); h+='<div class="ov-cell" data-i="'+i+'"><span class="ov-num">'+num+'</span><span class="ov-label">'+slideTitle(slides[i]).replace(/</g,'&lt;')+'</span></div>'; } ovGrid.innerHTML=h; var cs=ovGrid.querySelectorAll('.ov-cell'); for(var k=0;k<cs.length;k++) cs[k].addEventListener('click',function(e){ go(+e.currentTarget.getAttribute('data-i')); ovToggle(false); }); }
+      function ovToggle(open){ if(!ovEl) return; if(open===undefined) open=!ovEl.classList.contains('open'); ovEl.classList.toggle('open',open); if(open){ var cs=ovGrid.querySelectorAll('.ov-cell'); for(var i=0;i<cs.length;i++) cs[i].classList.toggle('current',i===idx); } }
+      var bg=document.getElementById('btnGrid'); if(bg) bg.addEventListener('click',function(){ ovToggle(); });
+      var bc=document.getElementById('btnGridClose'); if(bc) bc.addEventListener('click',function(){ ovToggle(false); });
+      var bf=document.getElementById('btnFull'); if(bf) bf.addEventListener('click',function(){ var d=document.documentElement; if(!document.fullscreenElement && !document.webkitFullscreenElement){ (d.requestFullscreen||d.webkitRequestFullscreen||function(){}).call(d); } else { (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); } });
+      var bp=document.getElementById('btnPdf'); if(bp) bp.addEventListener('click',function(){ try{ window.print(); }catch(e){} });
+      var be=document.getElementById('btnEmail'); if(be) be.addEventListener('click',function(){ var u=location.href.split('#')[0]; location.href='mailto:?subject='+encodeURIComponent('Untitled Adflux — Investor Deck')+'&body='+encodeURIComponent('The GSRTC LED investor deck:\n'+u+'\n\nPasscode: untitled2026'); });
+      document.addEventListener('keydown',function(e){ var k=(e.key||'').toLowerCase(); if(k==='g'){ e.preventDefault(); ovToggle(); } else if(k==='escape'){ ovToggle(false); } else if(k==='f'){ var b2=document.getElementById('btnFull'); if(b2) b2.click(); } });
+      buildOverview();
+    })();
     document.addEventListener('keydown',function(e){
       if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')) return;
       if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){ e.preventDefault(); advance(1); }

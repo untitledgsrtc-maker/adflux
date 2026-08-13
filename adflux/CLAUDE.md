@@ -12673,3 +12673,34 @@ self-heal retried the SAME relative path → same HTML → "still same issues."
   these standalone public pages — never relative. Test by serving from the deploy ROOT
   (not the page's own dir) so the path structure matches Vercel; testing from the page's
   own dir hides the bug. Applies to /led + /deck + /investor equally.
+
+### Phase 309.3 — investor deck bottom bar = the sales-deck bar (shield + stats + controls)
+Owner (screenshot of the sales deck `public/deck/led-deck-final.html` slide-1 bottom):
+"bottom i want exactly like this same." Replaced the investor deck's plain bottom
+navbar (logo + dots + counter + prev/next) with a persistent bar mirroring the sales
+deck: LEFT = the Government-Approved shield (`.govmark` — gseal SVG + "GSRTC Authorised
+Media"), CENTER = the stat strip **264 SCREENS · 20 BUS STATIONS · 29L+ MONTHLY VIEWS ·
+700+ BRANDS** (`.nbstats`, dividers), RIGHT = counter + prev + next + **grid (overview)
++ fullscreen + PDF/print + email** (`.navbtns`, 6 icon buttons, SVGs lifted from the
+sales deck's `.deck-controls`). Adapted the sales-deck CSS tokens (`--t1/2/3`, `--card`,
+`--border`) → investor tokens (`--ink0/1/2`, `--navy2`, `--line`). Bar height 54→66px
+(56px + govmark hidden < 720px; stats hidden < 1080px).
+- NEW **overview grid** (`#deckOverview`/`#ovGrid`, the sales deck's `.deck-overview`):
+  `buildOverview()` makes one `.ov-cell` per slide (number + `slideTitle()` from
+  `h2/.hero-btm/.kicker`), click → `go(i)` + close; current cell highlighted. Wired:
+  grid → `ovToggle()`, fullscreen → `requestFullscreen`/`exitFullscreen`, PDF →
+  `window.print()`, email → `mailto:` (deck link + passcode). Keys: g=overview,
+  Esc=close, f=fullscreen (additive keydown; doesn't touch the arrow nav / record
+  `advance()` intercept).
+- **Slide-1 collision fix:** the §294 hero cycling stat row (`.hero-stats`) duplicated +
+  overlapped the new persistent stats bar → `.hero-stats{display:none}` (the sales-deck
+  reference has stats ONLY in the bottom bar, no separate hero stat row). The hero keeps
+  its video/reticles/AI-panel/headline.
+- **The `#dots` element is KEPT in the DOM (`display:none`)** — the boot code does
+  `dc.innerHTML=...` on it, so removing it would throw; hiding satisfies both the sales-
+  deck look (no dots) and the existing build. `go()`'s `#dots i` loop tolerates the empty
+  set. Jumping now happens via the overview grid, not dots.
+- Verified in-browser (served from `public/` ROOT so /deck + /led + /investor/workorders
+  all resolve, mimicking Vercel): bar matches the reference on slide 1 (no collision) +
+  every slide, overview opens with 17 labeled cells + current highlight, work-orders slide
+  renders with no content clip, zero JS/console errors.
