@@ -12854,3 +12854,11 @@ Owner ran a full QA pass. Fixed the real ones:
   also has `/led/logo-word.svg` (clean "UNTITLED" wordmark, no emblem) + `/led/logo-mark.svg`
   (emblem only). To wire his EXACT logo he must drop the .svg/.png in Downloads (or give a
   path). FOOT-GUN: a chat-attached image is not a wireable asset — always get the file path.
+  RESOLVED (309.10): found his logos in ~/Downloads — `01. UNTITLED LOGO_FULL.svg`
+  (byte-identical md5 to the `/led/logo.svg` the deck already used = I WAS using his logo)
+  + a fuller `01. UNTITLED LOGO_FULL 2.svg` (9333b, with a tagline line) + a ROUND mark.
+  Owner insisted "use the logo I gave you"; wired the fuller **FULL 2** as
+  `public/investor/brandmark.svg` across all 3 deck spots (gate/hero/corner), dropped the
+  hero's HTML tagline (this logo carries its own). LESSON: when the owner says "you didn't
+  use my logo" but you did, check ~/Downloads for near-identical variants — he may mean a
+  different export (the " 2" file).
