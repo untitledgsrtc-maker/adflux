@@ -398,8 +398,8 @@
   .hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
   .hero-ov{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(8,11,22,.5) 0%,rgba(8,11,22,.18) 38%,rgba(8,11,22,.94) 100%),linear-gradient(90deg,rgba(8,11,22,.62),transparent 58%)}
   .hero-top{position:absolute;top:0;left:0;right:0;z-index:4;display:flex;align-items:flex-start;justify-content:space-between;padding:clamp(15px,3vw,28px) clamp(16px,4vw,44px);gap:14px}
-  .lock{display:flex;align-items:center;gap:11px}
-  .lock img{height:40px;width:40px}
+  .lock{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+  .lock img{height:30px;width:auto;max-width:200px}
   .lock b{font-family:var(--disp);font-weight:700;color:#fff;font-size:19px;letter-spacing:.14em;display:block;line-height:1}
   .lock span{font-size:9px;color:var(--ink2);letter-spacing:.16em;text-transform:uppercase;margin-top:4px;display:block}
   .toplabel{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#fff;font-weight:600;display:flex;align-items:center;gap:8px;margin-top:11px}
@@ -1207,7 +1207,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
 <div id="gate">
   <div class="box">
-    <img src="/led/logo-mark.svg" alt="Untitled" style="height:52px;width:52px"/>
+    <img src="/led/logo.svg" alt="Untitled" style="height:40px;width:auto;max-width:220px"/>
     <h2>Investor Deck</h2>
     <p>Untitled Adflux Pvt Ltd · confidential</p>
     <input id="pw" type="password" placeholder="Enter access code" autocomplete="off" autocapitalize="off"/>
@@ -1229,7 +1229,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <video class="hero-vid" autoplay muted loop playsinline poster="/deck/station-1.jpg"><source src="/deck/veraval-hero.mp4" type="video/mp4"></video>
     <div class="hero-ov"></div>
     <div class="hero-top">
-      <div class="lock"><img src="/led/logo-mark.svg" alt="Untitled"/><div><b>UNTITLED</b><span>Outdoor · Indoor · Social · Print/TV</span></div></div>
+      <div class="lock"><img src="/led/logo.svg" alt="Untitled"/><span>Outdoor · Indoor · Social · Print/TV</span></div>
       <div class="toplabel"><span class="d"></span> GSRTC LED Screen Media</div>
       <div class="livecard">
         <div class="lh"><span class="rec"></span> AI Verifying · Live</div>

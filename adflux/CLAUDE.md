@@ -12771,3 +12771,15 @@ logo top-right on every slide, no font overlap."
   overhaul done (owner is iterating slide-by-slide). Candidate polish if asked: unify the
   hero top-left logo to the same wordmark SVG; per-slide corner-logo overlap spot-check on
   the two Leaflet map slides.
+
+### Phase 309.6 — one logo everywhere (white wordmark `/led/logo.svg`) (owner)
+Owner sent the white wordmark + "use this logo everywhere." (A chat image can't be saved
+to disk — the actionable read is the existing white wordmark file `/led/logo.svg`, fill
+`#FEFEFE`, 2:1, which matches.) The deck had THREE logo spots: gate + hero top-left still
+used the round `logo-mark.svg` while the §309.5 corner already used the wordmark. Swapped
+ALL to `/led/logo.svg`: gate (height 40 / `width:auto`), hero top-left (`.lock` now stacks
+the wordmark over the tagline; dropped the redundant `<b>UNTITLED</b>` since the wordmark
+already reads UNTITLED; `.lock img` 40×40-square → `height:30/width:auto` for the 2:1
+wordmark), corner (unchanged). `logo-mark.svg` refs now 0; all 3 = the white wordmark,
+consistent + visible on the dark deck. Scoped to the investor deck; /led + /deck + the app
+untouched. Verified gate + hero + corner all render the wordmark, no console errors.
