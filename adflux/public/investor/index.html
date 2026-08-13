@@ -213,7 +213,7 @@
   .budtake{margin-top:15px;background:rgba(255,230,0,.05);border:1px solid rgba(255,230,0,.2);border-radius:14px;padding:13px 18px;font-size:14px;color:var(--ink1);line-height:1.5} .budtake b{color:var(--yellow)}
   .budsrc{font-size:10.5px;color:var(--ink2);margin-top:11px;line-height:1.6} .budsrc a{color:var(--ink2);text-decoration:underline} .budsrc a:hover{color:var(--yellow)}
   /* work-order proof pile (slide) */
-  .wowrap{display:grid;grid-template-columns:.94fr 1.06fr;gap:clamp(18px,3vw,46px);align-items:center;margin-top:6px}
+  .wowrap{display:grid;grid-template-columns:.78fr 1.22fr;gap:clamp(16px,2.6vw,40px);align-items:center;margin-top:6px}
   @media(max-width:900px){.wowrap{grid-template-columns:1fr;gap:20px}}
   .woleft .lead{margin-top:8px}
   .wochips{display:flex;flex-direction:column;gap:8px;margin:15px 0 2px}
@@ -230,7 +230,16 @@
   .wocount span{color:var(--ink0)}
   .wotake{margin-top:15px;font-size:13.5px;color:var(--ink1);border-top:1px solid var(--line);padding-top:11px}
   .woright{display:flex;flex-direction:column;align-items:center;gap:11px}
-  .wopile{position:relative;width:min(70%,300px);height:min(60vh,470px);margin:0 auto}
+  .wopile{position:relative;width:min(98%,480px);height:min(80vh,660px);margin:0 auto}
+  /* --- slide 2 video showcase (ported from /led) --- */
+  .vshow{margin-top:16px;display:flex;flex-direction:column;gap:13px;align-items:center}
+  .vscreen{position:relative;height:min(56vh,520px);aspect-ratio:16/9;max-width:100%;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#05070d;box-shadow:0 30px 60px -30px #000}
+  .vscreen video,.vscreen iframe{width:100%;height:100%;object-fit:cover;display:block;border:0}
+  .vtag{position:absolute;top:12px;left:12px;z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.14em;background:rgba(0,0,0,.55);border:1px solid var(--line);border-radius:7px;padding:6px 10px;color:var(--yellow)}
+  .vthumbs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:940px}
+  .vthumb{font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;color:var(--ink1);background:var(--navy2);border:1px solid var(--line);border-radius:999px;padding:8px 13px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+  .vthumb:hover{border-color:var(--yellow)}
+  .vthumb.active{background:var(--yellow);color:#0b1120;border-color:var(--yellow)}
   .wocard{position:absolute;top:50%;left:50%;width:100%;transform:translate(-50%,-50%);border-radius:7px;overflow:hidden;background:#fff;border:1px solid rgba(255,255,255,.16);box-shadow:0 16px 40px rgba(0,0,0,.5);transition:transform .55s cubic-bezier(.2,.85,.25,1),opacity .45s ease;will-change:transform,opacity}
   .wocard img{display:block;width:100%;height:auto}
   .wocard.front{box-shadow:0 26px 62px rgba(0,0,0,.62),0 0 0 2px rgba(255,230,0,.4)}
@@ -395,7 +404,7 @@
   .ret svg{width:100%;height:100%;filter:drop-shadow(0 0 4px rgba(255,230,0,.5))}
   .ret .lbl{position:absolute;bottom:-16px;left:-1px;font-family:var(--mono);font-size:9px;color:var(--navy);background:var(--yellow);border-radius:3px;padding:1px 5px;white-space:nowrap;font-weight:700}
   @keyframes retin{to{opacity:1;transform:none}}
-  .hero-btm{position:relative;z-index:4;padding:0 clamp(16px,4vw,44px) clamp(18px,4vh,40px)}
+  .hero-btm{position:relative;z-index:4;padding:0 clamp(16px,4vw,44px) clamp(84px,13vh,104px)}
   .hero1 h1{font-size:clamp(30px,5.4vw,58px);font-weight:700;color:#fff;max-width:20ch;text-shadow:0 2px 30px rgba(0,0,0,.5)}
   .hero1 h1 .g{color:var(--yellow);-webkit-text-fill-color:var(--yellow)}
   .hero1 .hsub{font-size:clamp(14px,1.7vw,18px);color:var(--ink1);margin-top:14px;max-width:58ch}
@@ -421,7 +430,9 @@
   .navbtns button:hover{border-color:var(--yellow);color:var(--yellow)} .navbtns button:disabled{opacity:.35;cursor:default}
   /* --- sales-deck-style bottom bar: gov mark + stats + controls --- */
   .navbar{height:66px;gap:14px;justify-content:flex-start}
-  .nb-left{display:flex;align-items:center;min-width:0;overflow:hidden;flex:1}
+  .nb-left{display:none;align-items:center;min-width:0;overflow:hidden;flex:1}
+  .navbar.hero .nb-left{display:flex}
+  .navbtns{margin-left:auto}
   .govmark{display:flex;align-items:center;gap:10px;padding-right:18px;margin-right:18px;border-right:1px solid rgba(255,255,255,.10);flex:0 0 auto}
   .gseal{width:36px;height:36px;border-radius:50%;border:1.6px solid var(--yellow);color:var(--yellow);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
   .gseal svg{width:19px;height:19px;display:block}
@@ -1228,55 +1239,19 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
   <!-- 2 WHAT WE ARE -->
   <section class="slide">
-    <div class="kicker anim">What we are</div>
-    <h2 class="anim">Measured LED screens inside Gujarat's GSRTC bus stations.</h2>
-    <div class="split anim" style="margin-top:24px">
-      <div class="illwrap">
-        <span class="ibadge" style="top:4%;right:2%"><span class="rd"></span><span data-count="264">0</span> screens live</span>
-        <svg viewBox="0 0 480 356" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="20" y1="322" x2="460" y2="322" stroke="#2a3348" stroke-width="2"/>
-          <rect x="228" y="214" width="14" height="108" fill="#151d30" stroke="#3a465f" stroke-width="1.5"/>
-          <rect x="118" y="40" width="234" height="178" rx="12" fill="#0b1120" stroke="#c3cbe0" stroke-width="2"/>
-          <rect x="128" y="50" width="214" height="158" rx="7" fill="#FFE600" fill-opacity=".08" stroke="#FFE600" stroke-width="2.5"/>
-          <g class="an-frame f1">
-            <circle cx="168" cy="94" r="17" fill="#FFE600"/>
-            <rect x="196" y="84" width="118" height="11" rx="5" fill="#c3cbe0"/>
-            <rect x="196" y="103" width="80" height="8" rx="4" fill="#8b96b4"/>
-            <rect x="150" y="130" width="176" height="58" rx="6" fill="#FFE600" fill-opacity=".2" stroke="#FFE600" stroke-width="1.4"/>
-            <path d="M222 146 L250 159 L222 173 Z" fill="#FFE600"/>
-          </g>
-          <g class="an-frame f2">
-            <rect x="150" y="70" width="180" height="66" rx="8" fill="#FFE600" fill-opacity=".18" stroke="#FFE600" stroke-width="1.4"/>
-            <rect x="164" y="88" width="120" height="12" rx="6" fill="#f5f7fb"/>
-            <rect x="164" y="110" width="78" height="9" rx="4" fill="#c3cbe0"/>
-            <rect x="150" y="156" width="118" height="30" rx="15" fill="#FFE600"/>
-            <rect x="282" y="156" width="46" height="30" rx="8" fill="#FFE600" fill-opacity=".25" stroke="#FFE600" stroke-width="1.4"/>
-          </g>
-          <circle cx="352" cy="58" r="4" fill="#FFE600" class="an-glow"/>
-          <path class="an-wave w1" d="M352 38 A20 20 0 0 1 372 58" stroke="#FFE600" stroke-width="2.6"/>
-          <path class="an-wave w2" d="M352 28 A30 30 0 0 1 382 58" stroke="#FFE600" stroke-width="2.2"/>
-          <path class="an-wave w3" d="M352 18 A40 40 0 0 1 392 58" stroke="#FFE600" stroke-width="1.8"/>
-          <g stroke="#7f8ba8" stroke-width="2.6">
-            <circle cx="152" cy="262" r="10"/><line x1="152" y1="272" x2="152" y2="300"/><line x1="152" y1="300" x2="144" y2="320"/><line x1="152" y1="300" x2="160" y2="320"/><line x1="152" y1="282" x2="140" y2="294"/><line x1="152" y1="282" x2="164" y2="294"/>
-            <circle cx="200" cy="262" r="10"/><line x1="200" y1="272" x2="200" y2="300"/><line x1="200" y1="300" x2="192" y2="320"/><line x1="200" y1="300" x2="208" y2="320"/>
-          </g>
-          <g class="an-lock" stroke="#FFE600" stroke-width="2.4">
-            <path d="M130 244 v-10 h10"/><path d="M174 234 h10 v10"/><path d="M184 290 v10 h-10"/><path d="M140 300 h-10 v-10"/>
-          </g>
-          <text class="an-rise" x="210" y="250" fill="#38d39f" font-family="Space Mono" font-size="15" font-weight="700">+1</text>
-        </svg>
+    <div class="kicker anim">See it live</div>
+    <h2 class="anim h2c">Real screens. Real stations.</h2>
+    <p class="lead anim" style="max-width:58ch">264 LED screens across 20 GSRTC bus stations, measured by an AI camera on every screen &mdash; the live network, playing today. Not a render.</p>
+    <div class="vshow anim">
+      <div class="vscreen">
+        <span class="vtag" id="vtag">STATION &middot; LIVE</span>
+        <video id="mainVideo" src="/deck/station-hero.mp4" poster="/deck/station-1.jpg" muted loop playsinline preload="metadata"></video>
       </div>
-      <div>
-        <ul class="clean">
-          <li><b>Captive audience.</b> Commuters waiting, phones down — reach Google and Meta can't buy.</li>
-          <li><b>Measured, not guessed.</b> An AI camera on every screen counts who actually looked.</li>
-          <li><b>Concession-locked.</b> Inside GSRTC property on a multi-year deal — a rival builds outside, not in.</li>
-        </ul>
-        <div class="stats" style="margin-top:20px">
-          <div class="st"><div class="v y" data-count="264">0</div><div class="l">LED screens</div></div>
-          <div class="st"><div class="v" data-count="20">0</div><div class="l">Bus stations</div></div>
-          <div class="st"><div class="v">700<span class="yellow">+</span></div><div class="l">Brands run</div></div>
-        </div>
+      <div class="thumbs" id="vthumbs">
+        <button class="vthumb active" data-src="/deck/station-hero.mp4" data-tag="STATION &middot; LIVE" type="button">Station</button>
+        <button class="vthumb" data-src="/deck/veraval-hero.mp4" data-tag="VERAVAL &middot; LIVE" type="button">Veraval</button>
+        <button class="vthumb" data-src="/deck/bhavnagar.mp4" data-tag="BHAVNAGAR &middot; LIVE" type="button">Bhavnagar</button>
+        <button class="vthumb" data-src="/deck/gandhinagar.mp4" data-tag="GANDHINAGAR &middot; LIVE" type="button">Gandhinagar</button>
       </div>
     </div>
   </section>
@@ -2049,6 +2024,18 @@ svg.leaflet-image-layer.leaflet-interactive path {
       document.addEventListener('keydown',function(e){ var k=(e.key||'').toLowerCase(); if(k==='g'){ e.preventDefault(); ovToggle(); } else if(k==='escape'){ ovToggle(false); } else if(k==='f'){ var b2=document.getElementById('btnFull'); if(b2) b2.click(); } });
       buildOverview();
     })();
+    (function(){
+      var mainVideo=document.getElementById('mainVideo'), vtag=document.getElementById('vtag');
+      var screenBox=mainVideo?mainVideo.parentElement:null, thumbsRow=document.getElementById('vthumbs');
+      if(!mainVideo||!thumbsRow) return;
+      function ytId(u){ var m=String(u||'').match(/(?:youtu\.be\/|v=|shorts\/|embed\/|live\/)([\w-]{6,})/); return m?m[1]:null; }
+      function showLocal(src,tag){ var fr=document.getElementById('ytFrame'); if(fr) fr.remove(); mainVideo.style.display=''; if(src) mainVideo.src=src; if(vtag&&tag) vtag.textContent=tag; mainVideo.play().catch(function(){}); }
+      function showYouTube(url,tag){ var id=ytId(url); if(!id||!screenBox) return; mainVideo.pause(); mainVideo.style.display='none'; var fr=document.getElementById('ytFrame'); if(!fr){ fr=document.createElement('iframe'); fr.id='ytFrame'; fr.allow='autoplay; encrypted-media; picture-in-picture'; fr.allowFullscreen=true; screenBox.appendChild(fr); } fr.src='https://www.youtube-nocookie.com/embed/'+id+'?autoplay=1&mute=1&playsinline=1&rel=0&loop=1&playlist='+id; if(vtag&&tag) vtag.textContent=tag; }
+      function titleCase(x){ return String(x||'').toLowerCase().replace(/\b\w/g,function(c){return c.toUpperCase();}); }
+      thumbsRow.addEventListener('click',function(ev){ var t=ev.target.closest('.vthumb'); if(!t) return; thumbsRow.querySelectorAll('.vthumb').forEach(function(x){x.classList.remove('active');}); t.classList.add('active'); var yt=t.getAttribute('data-yt'); if(yt) showYouTube(yt,t.getAttribute('data-tag')); else showLocal(t.getAttribute('data-src'),t.getAttribute('data-tag')); });
+      fetch('/api/deck-videos').then(function(r){return r.ok?r.json():null;}).then(function(map){ if(!map||!thumbsRow) return; var cities=Object.keys(map).filter(function(k){return ytId(map[k]);}).sort(); if(!cities.length) return; var html='<button class="vthumb active" data-src="/deck/station-hero.mp4" data-tag="STATION · LIVE" type="button">Station</button>'; cities.forEach(function(c){ var esc=c.replace(/[^A-Z0-9 ]/gi,''); html+='<button class="vthumb" data-yt="'+String(map[c]).replace(/"/g,'&quot;')+'" data-tag="'+esc+' · LIVE" type="button">'+titleCase(esc)+'</button>'; }); thumbsRow.innerHTML=html; }).catch(function(){});
+      window.__vidCtl=function(active){ if(active){ if(!document.getElementById('ytFrame')) mainVideo.play().catch(function(){}); } else { mainVideo.pause(); var fr=document.getElementById('ytFrame'); if(fr){ fr.remove(); mainVideo.style.display=''; thumbsRow.querySelectorAll('.vthumb').forEach(function(x,idx){ x.classList.toggle('active',idx===0); }); if(vtag) vtag.textContent='STATION · LIVE'; } } };
+    })();
     document.addEventListener('keydown',function(e){
       if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')) return;
       if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){ e.preventDefault(); advance(1); }
@@ -2120,6 +2107,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
     idx=n;
     var dots=document.querySelectorAll('#dots i'); for(var k=0;k<dots.length;k++) dots[k].classList.toggle('on',k===n);
     document.getElementById('counter').textContent=(n+1)+' / '+slides.length;
+    var _nb=document.querySelector('.navbar'); if(_nb) _nb.classList.toggle('hero',n===0);
+    if(window.__vidCtl) window.__vidCtl(!!slides[n].querySelector('#mainVideo'));
     document.getElementById('prev').disabled=(n===0); document.getElementById('next').disabled=(n===slides.length-1);
     document.getElementById('prog').style.width=((n+1)/slides.length*100)+'%';
     countUpsIn(slides[n]);

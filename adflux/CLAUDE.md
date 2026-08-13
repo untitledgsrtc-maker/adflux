@@ -12704,3 +12704,37 @@ sales deck's `.deck-controls`). Adapted the sales-deck CSS tokens (`--t1/2/3`, `
   all resolve, mimicking Vercel): bar matches the reference on slide 1 (no collision) +
   every slide, overview opens with 17 labeled cells + current highlight, work-orders slide
   renders with no content clip, zero JS/console errors.
+
+### Phase 309.4 — video showcase on slide 2 + 3 bar/pile fixes (owner mid-turn)
+Owner: "wired all city videos [on /led] — integrate that in page 2" + 3 fixes to the
+§309.3 bar ("font is cutting", "workorder side bigger as much as possible", "i don't
+want [the shield+stats] in every page footer").
+- **Slide 2 = the /led video showcase** (ported from `public/led/index.html`): kicker
+  "See it live" + "Real screens. Real stations." + a `.vscreen` 16/9 video (`#mainVideo`
+  `/deck/station-hero.mp4`, STATION·LIVE badge) + `.vthumbs` city pills. JS ports the
+  /led `showLocal`/`showYouTube`/`ytId` + a delegated pill click + the **`/api/deck-videos`
+  fetch** that rebuilds the pills from the cities master (every city with a `youtube_url`
+  — §221/§256, the SAME source the deck+AI+/led use). Tapping a city swaps to a muted
+  youtube-nocookie iframe; the 4 local-mp4 pills are the graceful fallback when the
+  fetch fails (local server / offline). Namespaced `.vshow/.vscreen/.vtag/.vthumb`
+  (avoid collisions). A `go()` hook (`window.__vidCtl`) plays the video on slide-2 entry
+  and PAUSES it + removes any yt iframe on leave (no background YouTube). REPLACED the
+  old "What we are" slide-2 (its bullets are covered by later slides). Deck stays 17.
+  CSP already allows it (media-src 'self' for /deck/*.mp4, frame-src youtube-nocookie
+  §221, connect-src 'self' for the fetch) — same as /led.
+- **Fix (stats only on slide 1):** the §309.3 persistent bar showed the shield+stats on
+  EVERY footer; owner wants them slide-1-only (the sales-deck reference has `.s1-stats`
+  hero-only). Gated `.nb-left{display:none}` + `.navbar.hero .nb-left{display:flex}`;
+  `go()` toggles `.navbar.hero` on `n===0`; `.navbtns{margin-left:auto}` keeps the nav
+  controls right when the stats are hidden. So non-hero footers = nav controls only.
+- **Fix (hero font cutting):** the taller 66px bar clipped the hero subline. `.hero-btm`
+  bottom padding `clamp(18px,4vh,40px)` → `clamp(84px,13vh,104px)` so the subline clears
+  the bar (verified both lines visible).
+- **Fix (work-order bigger):** `.wopile` `min(70%,300px)/min(60vh,470px)` →
+  `min(98%,480px)/min(80vh,660px)` + `.wowrap` cols `.94fr 1.06fr` → `.78fr 1.22fr` (more
+  room for the pile). The document now fills the right half (480px, readable).
+- Verified from public/ root (mimics Vercel): slide 1 subline clears bar + stats show;
+  slide 2 video + pills, no stats footer; slide 14 document big; every non-hero footer =
+  nav only; only console error = the local `/api/deck-videos` 404 (Edge fn, resolves on
+  Vercel → all cities). FOOT-GUN restated: reference /deck + /api by ABSOLUTE path (§309.2)
+  — the video srcs use `/deck/...` so they resolve at `/investor` with no trailing slash.
