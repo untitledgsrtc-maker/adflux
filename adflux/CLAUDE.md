@@ -11595,3 +11595,50 @@ Owner reopens once (SW) after deploy; the page needs a wi-fi load once for the S
 (the financial model). Both read + reflected. The pptx still MENTIONS auto-hood — the
 web page deliberately does NOT (owner: LED only).
 
+
+---
+
+## 177 · Phase 289 — investor deck as a full-screen slide presentation + REAL numbers (2026-08-12, `46dad53`)
+
+Owner: rebuild `/investor` as a full-screen click-through deck like `/present`
+(one slide at a time, arrow/button nav — the GSRTC-deck format), and use REAL
+private rate + occupancy from won LED quotes, not guesses. Replaced the Phase-288
+scrolling page with a **12-slide full-screen deck** (`public/investor/index.html`,
+standalone, password `untitled2026`).
+
+### Format (the /present-style deck)
+Full-viewport slides, only the active one visible (opacity/translateX transition,
+`.past` for the ones behind), staggered `.anim` entrance, per-slide count-ups.
+Nav: ArrowLeft/Right + Space/PageDn/Home/End, on-screen prev/next buttons,
+clickable progress dots, "N/12" counter, top progress bar, mobile touch-swipe.
+Slides: Title · What we are · Record · The 2% gap · DAVP unlock · Expansion ·
+Tender then/now · Inventory+rates · Build cost · Forecast (interactive fill calc
+on a slide) · Ask · Risks+Close.
+
+### REAL numbers (owner ran `investor_led_real_economics.sql` on won LED quotes)
+Won private-LED (media_type LED_OTHER): 29 quotes, 64 line items, avg rate ₹529/
+screen/month, avg 100 slots/day, total won value **₹5.76 L**.
+- **Occupancy = 1.98%** real = 100 of 5,040 daily slots per screen (capacity =
+  14h×3600÷10s = 5,040/day = 151,200/mo). Confirms "we sell 2%" = per-screen
+  airtime utilisation → "50× headroom per screen". Base fill defaults to 2%.
+- **Private rate = ₹0.18/slot** real (₹529 ÷ (100×30)) — **LOWER than govt
+  ₹1/slot**. So the deck now correctly frames **GOVT demand via DAVP as the value
+  driver** (5× the private per-slot rate); private LED is a small, early line
+  (₹5.76 L won), not a "higher-margin" headline. `PRIV_RATE=0.18` baked into the
+  calculator; blended rate = (1−pShare)×govt + pShare×0.18. Forecast at real
+  rates: 2%→₹3.77Cr, 10%→₹18.87Cr (grounded, vs the earlier ₹27Cr that assumed a
+  ₹2 private rate).
+
+### Data-fetch pattern (can't query live DB from sandbox)
+The sandbox has no Supabase keys → owner runs a read-only diagnostic SQL in
+Studio + pastes the result; I compute the deck numbers from it. `investor_led_
+real_economics.sql` (Part 1 = LED media types in won quotes; Part 2 = the
+LED_OTHER rate/occupancy aggregates) is the reusable query — throwaway, not
+committed. LED quote pricing lives in `quote_cities` (offered_rate ₹/screen/mo,
+slots_per_day, slot_seconds, screens, duration_months, campaign_total).
+
+### Verified live (browser pane)
+12 slides, all nav (buttons/dots/keys), progress bar, count-ups, fill bar,
+forecast recompute, no NaN. Self-contained, no SQL/APK. The scrolling Phase-288
+version is gone (replaced — owner chose "replace /investor with the deck").
+
