@@ -53,6 +53,32 @@ const ADD_DAYS  = (iso, n) => {
   return d.toISOString().slice(0, 10)
 }
 
+// Phase 310 — which open follow-ups belong in the ACTIVE queue.
+//   • Lost lead        → never (frontend backstop; DB triggers close them too).
+//   • Nurture lead     → only its 'nurture'-cadence check-in. When a rep parks a
+//                        lead, the call-outcome / stage-change flow leaves TWO open
+//                        rows on it: the 30-day auto "nurture" check-in AND a
+//                        near-term "After call" next-action (cadence_type ≠ 'nurture').
+//                        That near-term row dragged the parked lead back into the
+//                        queue within days — the owner's "put it in nurture but it
+//                        comes back before 30 days" bug. Keeping only the nurture
+//                        row means the date-bucketing (>today+7 not surfaced) hides
+//                        the lead until its ~30-day check-in comes due, so it
+//                        reappears on time. The near-term row stays OPEN in the DB
+//                        (unchanged, no data mutation); the lead is never hidden from
+//                        the app — it stays in the Nurture stage + the dedicated
+//                        Nurture-revisits section (revisit_date). Same row shape in
+//                        the own-view select and the team RPCs (both carry
+//                        cadence_type + lead.stage), so this is safe at every
+//                        setRows() site.
+//   • Everything else  → keep.
+function keepInFollowupQueue(r) {
+  const stage = r.lead?.stage
+  if (stage === 'Lost') return false
+  if (stage === 'Nurture') return r.cadence_type === 'nurture'
+  return true
+}
+
 export default function FollowUpsV2() {
   const { profile, isPrivileged } = useAuth()
   const navigate = useNavigate()
@@ -115,7 +141,7 @@ export default function FollowUpsV2() {
         ? await supabase.rpc('team_all_followups')
         : await supabase.rpc('team_rep_followups', { p_rep_id: repParam })
       if (bErr) { setError(bErr.message); setLoading(false); return }
-      setRows(((b?.follow_ups) || []).filter(r => r.lead?.stage !== 'Lost'))
+      setRows(((b?.follow_ups) || []).filter(keepInFollowupQueue))
       setNurtureRows((b?.nurture_leads) || [])
       setLoading(false)
       return
@@ -178,7 +204,7 @@ export default function FollowUpsV2() {
     // Phase 176.1 — frontend backstop: never show a follow-up on a LOST lead,
     // whatever the DB triggers did (lead-linked rows carry lead.stage; quote-
     // linked rows have lead null and pass through, closed DB-side).
-    setRows((fuRes.data || []).filter(r => r.lead?.stage !== 'Lost'))
+    setRows((fuRes.data || []).filter(keepInFollowupQueue))
     setNurtureRows(nuRes.data || [])
     setLoading(false)
   }, [profile?.id, isPrivileged, repParam, viewingOther, teamViewing])
