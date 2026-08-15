@@ -12983,3 +12983,27 @@ closing — no splits, no clip, no buttons. Sent the owner the PDF.
 - The §309.17 `?pdf` print mode stays for the owner's self-serve Cmd+P (less pretty, but
   he can regenerate anytime). The pretty image-PDF needs my headless+Pillow pipeline — I
   regenerate it when the deck changes.
+
+### Phase 309.19 — investor PDF: full-load capture + 2-part map/forecast (2026-08-14)
+Owner review of the §309.18 PDF: pages 6/7/11 "not fully loaded", page 10 "2 part",
+page 11 "not all data", page 14 "2 part + default 10% occupancy". ROOT of the "not
+loaded" pages = slides captured MID-ANIMATION (count-ups still counting → 4,720 vs
+5,040; `.calc`/`.anim` rows reveal in sequence → only the first 2 cost rows shown).
+Fixes in the `?shot` build path (index.html):
+- shotmode CSS forces `.anim`/`[class*=an-]`/`.calc > *`/`.risk`/`.reason`/`.lever`/
+  `.risks`/`.reasons`/`.levers` to `opacity:1 !important; animation:none !important`
+  (NOT `.wocard` — it self-manages depth-opacity).
+- `_finalizeCounts()` sets `data-done='1'` so `countUpsIn`'s rAF (which throttles in
+  headless and overwrites finals) SKIPS them; called BEFORE `go(_sn)`.
+- `_shotFit` top-aligns + scales from the TOP (`justifyContent:flex-start`,
+  `transform-origin:top center`, `scale((vh-26)/h)`) for overflowing slides — center-
+  justify was pushing the kicker above the viewport (the forecast "OPERATING LEVERAGE"
+  clip). Nothing clips now.
+- `?shot=N` gained state params: `&exp=1` → `setExpFull(true)` (map After-tender·118),
+  `&fmode=existing|combined` → `setFMode`, `&fill=N` → `#s-fill.value + recompute()`.
+Capture list makes the MAP 2 pages (Today·20 + After·118) and the FORECAST 2 pages
+(Existing + Combined, BOTH at fill=10 = the owner's "default 10% occupancy"). Final PDF
+= 23 clean pages, verified page-by-page + a 6×4 contact sheet. FOOT-GUN: a headless
+screenshot of an animated deck catches mid-animation — force all reveals to final +
+kill count-up rAF (data-done) before shooting, and top-align dense slides so scaling
+can't clip the top.
