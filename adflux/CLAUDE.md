@@ -13007,3 +13007,23 @@ Capture list makes the MAP 2 pages (Today·20 + After·118) and the FORECAST 2 p
 screenshot of an animated deck catches mid-animation — force all reveals to final +
 kill count-up rAF (data-done) before shooting, and top-align dense slides so scaling
 can't clip the top.
+
+### Phase 309.21 — investor deck RESPONSIVE (mobile/portrait) (2026-08-14)
+Owner: "i want app.untitledad.in/investor to be responsive." The deck is a fixed-16:9
+full-screen slide deck; on a portrait phone the landscape content clipped. Added a
+`@media (max-width:760px)` block (index.html): `.slide{justify-content:flex-start;
+overflow-y:auto}` (center-justify was the flexbox-overflow top/side-clip), every
+multi-col grid → 1 column (split, costgrid, budwrap, wowrap, fmain, g3row, reasons,
+levers, risks, **.fkpis → 1fr**, **.scaleribbon → column**), hero `h1`/`h2`/big-number
+font clamps reduced, `#gjmap/#gjmap2` → 42vh, `.fscale` (forecast dot decoration) hidden,
+long mono lines `white-space:normal`, `*{overflow-wrap:break-word}`. Also `?goto=N`
+(jump-to-slide deep link + test hook, post-unlock, harmless).
+- FOOT-GUN that cost an hour: **headless Chrome clamps its window to a ~500px minimum
+  width.** `--window-size=390,844` still renders at innerWidth=500, so a 390-wide
+  `--screenshot` shows 390px of 500px content = FALSE "clipping." Verify mobile by (a) an
+  in-page diag (`document.querySelectorAll('.slide.on *')` → any `getBoundingClientRect().
+  right > innerWidth`), and (b) screenshotting at 500 (the honored width). At 500 the diag
+  showed ZERO overflow → the CSS is correct; real phones (device-width 360-430) get the
+  same mobile rules. Don't trust a sub-500 headless screenshot's right-edge.
+- The `?pdf` scroll view (§309.17) + the image PDF remain the other phone paths; the main
+  deck is now itself responsive.
