@@ -575,6 +575,30 @@
   .slide.on .an-bus{animation:busin 4.6s cubic-bezier(.16,1,.3,1) infinite}
   @keyframes busin{0%{transform:translateX(78px);opacity:0}15%,85%{transform:translateX(0);opacity:1}100%{transform:translateX(78px);opacity:0}}
   @media (prefers-reduced-motion:reduce){.slide.on [class*="an-"]{animation:none!important;opacity:1!important}}
+  /* ===== FULL-DECK / RESPONSIVE PDF VIEW =====
+     pdfmode stacks every slide vertically (scrollable on any screen); print = one 16:9 page each */
+  html.pdfmode,html.pdfmode body{ overflow:auto !important; height:auto !important; }
+  html.pdfmode #gate,html.pdfmode .navbar,html.pdfmode .deck-overview,html.pdfmode .corner-logo,html.pdfmode .blob{ display:none !important; }
+  html.pdfmode #deck{ position:static !important; height:auto !important; overflow:visible !important; }
+  html.pdfmode .stage{ position:static !important; inset:auto !important; height:auto !important; }
+  html.pdfmode .slide{ padding-top:2.4vh !important; padding-bottom:2.4vh !important;
+position:relative !important; inset:auto !important; left:auto !important; top:auto !important;
+    width:100% !important; min-height:100vh; height:auto !important; opacity:1 !important; transform:none !important;
+    z-index:auto !important; overflow:visible !important; pointer-events:auto !important;
+    page-break-after:always; break-after:page; border-bottom:1px solid rgba(255,255,255,.05); }
+  html.pdfmode .slide:last-of-type{ page-break-after:auto; break-after:auto; border-bottom:0; }
+  html.pdfmode .slide *,html.pdfmode .slide [class*="an-"],html.pdfmode .slide .anim{ animation:none !important; transition:none !important; }
+  html.pdfmode .slide .anim,html.pdfmode .slide [class*="an-"],html.pdfmode .slide .calc>*,html.pdfmode .slide .reason,
+  html.pdfmode .slide .risk,html.pdfmode .slide .lever,html.pdfmode .slide .wocard,html.pdfmode .slide .risks,
+  html.pdfmode .slide .reasons,html.pdfmode .slide .levers{ opacity:1 !important; }
+  html.pdfmode .wocard{ position:relative !important; transform:none !important; opacity:1 !important; display:none; margin:0 auto; }
+  html.pdfmode .wocard:first-child{ display:block; }
+  html.pdfmode .hero-media video{ position:absolute; }
+  @media print{
+    @page{ size:1600px 900px; margin:0; }
+    html,body{ background:#0b1020 !important; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+  }
   /* ---------- record (slide 5) interactive reveal ---------- */
   .recbtn{margin-top:16px;background:var(--yellow);color:var(--navy);border:none;border-radius:11px;padding:11px 20px;font-family:var(--disp);font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 0 24px rgba(255,230,0,.28)}
   .recbtn:hover{background:#fff}
@@ -2174,6 +2198,14 @@ svg.leaflet-image-layer.leaflet-interactive path {
       var bc=document.getElementById('btnGridClose'); if(bc) bc.addEventListener('click',function(){ ovToggle(false); });
       var bf=document.getElementById('btnFull'); if(bf) bf.addEventListener('click',function(){ var d=document.documentElement; if(!document.fullscreenElement && !document.webkitFullscreenElement){ (d.requestFullscreen||d.webkitRequestFullscreen||function(){}).call(d); } else { (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); } });
       var bp=document.getElementById('btnPdf'); if(bp) bp.addEventListener('click',function(){ try{ window.print(); }catch(e){} });
+      function _finalizeCounts(){ var els=document.querySelectorAll('[data-count]'); for(var i=0;i<els.length;i++){ var el=els[i], t=parseFloat(el.getAttribute('data-count'))||0, d=parseInt(el.getAttribute('data-dec')||'0',10); el.textContent = d>0 ? t.toFixed(d) : Math.round(t).toLocaleString('en-IN'); } }
+      function _preppdf(){ try{ recordStep=RECORD.length; drawRecord(recordStep); if(typeof updateRecordInfo==='function') updateRecordInfo(); }catch(e){} try{ _finalizeCounts(); }catch(e){} var sl=document.querySelectorAll('.slide'); for(var i=0;i<sl.length;i++) sl[i].classList.add('on'); try{ GJ_MAP&&GJ_MAP.invalidateSize(); }catch(e){} try{ GJ2&&GJ2.invalidateSize(); }catch(e){} }
+      function _fitSlides(){ var PH=720, sl=document.querySelectorAll('.slide'); for(var i=0;i<sl.length;i++){ var e=sl[i]; e.style.zoom=''; e.style.minHeight=''; e.style.height='auto'; var h=e.scrollHeight; var z = h>PH+6 ? (PH/h) : 1; e.style.zoom=z; e.style.minHeight=(PH/z)+'px'; e.style.height='auto'; } }
+      function _unfit(){ var sl=document.querySelectorAll('.slide'); for(var i=0;i<sl.length;i++){ sl[i].style.zoom=''; sl[i].style.height=''; sl[i].style.minHeight=''; } }
+      function _unprep(){ _unfit(); var sl=document.querySelectorAll('.slide'); for(var i=0;i<sl.length;i++) sl[i].classList.toggle('on', i===idx); }
+      window.addEventListener('beforeprint', function(){ document.documentElement.classList.add('pdfmode'); _preppdf(); });
+      window.addEventListener('afterprint', function(){ document.documentElement.classList.remove('pdfmode'); _unprep(); });
+      if(location.search.indexOf('pdf')>=0){ document.documentElement.classList.add('pdfmode'); setTimeout(_preppdf, 700); }
       var be=document.getElementById('btnEmail'); if(be) be.addEventListener('click',function(){ var u=location.href.split('#')[0]; location.href='mailto:?subject='+encodeURIComponent('Untitled Adflux — Investor Deck')+'&body='+encodeURIComponent('The GSRTC LED investor deck:\n'+u+'\n\nPasscode: untitled2026'); });
       document.addEventListener('keydown',function(e){ var k=(e.key||'').toLowerCase(); if(k==='g'){ e.preventDefault(); ovToggle(); } else if(k==='escape'){ ovToggle(false); } else if(k==='f'){ var b2=document.getElementById('btnFull'); if(b2) b2.click(); } });
       buildOverview();
