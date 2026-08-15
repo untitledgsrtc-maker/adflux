@@ -12924,3 +12924,37 @@ lockup scales clean at 40/30/22px. Verified all 3 spots in-browser.
   disk variants (`brandmark.svg` FULL 2 = "ADVERTISING" tagline; `led/logo.svg` =
   emblem+UNTITLED no tagline; `led/logo-word.svg` = wordmark only; `led/logo-mark.svg`
   = circled emblem only) are NOT it.
+
+### Phase 309.17 — investor deck: full-deck PDF export + responsive scroll (`<pushed>`, 2026-08-14)
+Owner: "full presentation in pdf, all points covered, responsive." Added `pdfmode`
+(a class on <html>) that un-pins the deck + stacks EVERY slide as a landscape 16:9
+page. Mechanism (all in `public/investor/index.html`):
+- `@media print{ @page{ size:1600px 900px; margin:0 } ... }` + `html.pdfmode` rules
+  (media all) that make `.slide` position:relative, min-height:100vh, page-break-
+  after:always, freeze animations, hide gate/navbar/overview/corner-logo, and
+  **un-pin `.stage`** (`.stage{position:fixed;inset:0}` was THE clip — a fixed
+  element never grows the document; slides live in `#deck > #stage > .slide`, NOT
+  directly in #deck — that mismatch was the first dead-end).
+- `beforeprint` → add pdfmode + `_preppdf()` (finalize count-ups, fully reveal the
+  record via `drawRecord(RECORD.length)`, mark every slide `.on` so the `.slide.on`
+  end-state CSS applies, invalidateSize both Leaflet maps); `afterprint` restores.
+  So the "Download PDF" button AND a raw Cmd/Ctrl+P both export the whole deck.
+- `/investor?pdf` = the same stacked view on load = a responsive, scrollable,
+  all-slides page (works on phone) that also saves to PDF.
+VERIFIED with headless Chrome print-to-pdf (`/Applications/Google Chrome.app/...
+--headless=new --print-to-pdf`, `?pdf` + injected `sessionStorage inv_ok=1` to
+bypass the gate for the test copy only): 29 pages, landscape (MediaBox 1200×675pt),
+correct logo, REAL CartoDB map tiles render (Chrome had network), full cost/
+economics tables — nothing clipped. Sent the owner the generated PDF.
+- WHY 29 not 21: ~8 data-dense slides (cost, DAVP levers, forecast, asset-priced…)
+  are genuinely >1 viewport (they scroll on the live deck too) → they continue onto
+  a short 2nd page. Chose this over clipping (owner's hard rule = "all points
+  covered"). Tried `height:100vh;overflow:hidden` (clean 21 pages but CLIPS the
+  dense slides — rejected) and a `zoom`-to-fit `_fitSlides()` (Chrome print didn't
+  honor zoom for pagination — left defined but uncalled). A taller page doesn't
+  converge (the deck's vh-content scales WITH the page). One-slide-per-page-no-clip
+  would need trimming those ~8 slides' content — a separate design pass.
+- FOOT-GUN: Chrome `--print-to-pdf` does NOT fire `beforeprint` reliably in headless
+  → verify print CSS via a `?pdf`-on-load prep path, not by relying on beforeprint.
+  And a malformed `@page{ size:1600 900px px }` (bad regex) silently falls back to
+  Letter portrait — the MediaBox (`/MediaBox` in the PDF) is the check.
