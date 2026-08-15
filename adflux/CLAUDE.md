@@ -13027,3 +13027,12 @@ long mono lines `white-space:normal`, `*{overflow-wrap:break-word}`. Also `?goto
   same mobile rules. Don't trust a sub-500 headless screenshot's right-edge.
 - The `?pdf` scroll view (§309.17) + the image PDF remain the other phone paths; the main
   deck is now itself responsive.
+
+### Phase 309.16 + 309.20 — investor deck small fixes (backfill, 2026-08-14)
+- **309.16 (`68daf2f`)** — logo a bit bigger everywhere: gate 40→50px, hero `.lock` 30→38px,
+  corner 22→28px, with the `max-width` caps raised (260/240/168) so the wide horizontal
+  wordmark lockup isn't clipped.
+- **309.20 (`d1acaa7`)** — image-PDF page 7 (the 5,040/2% gap slide) bottom fill bar was
+  cropped: bumped `_shotFit` bottom clearance for overflowing slides `(vh-26)→(vh-64)/h`
+  so the last element clears. Forecast + other dense slides still complete (more margin
+  only). All other pages unchanged.
