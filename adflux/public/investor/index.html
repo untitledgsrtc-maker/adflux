@@ -2212,7 +2212,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       window.addEventListener('beforeprint', function(){ document.documentElement.classList.add('pdfmode'); _preppdf(); });
       window.addEventListener('afterprint', function(){ document.documentElement.classList.remove('pdfmode'); _unprep(); });
       if(location.search.indexOf('pdf')>=0){ document.documentElement.classList.add('pdfmode'); setTimeout(_preppdf, 700); }
-      function _shotFit(n){ var e=slides[n]; e.style.transform=''; e.style.transformOrigin=''; e.style.justifyContent=''; var vh=window.innerHeight||900, h=e.scrollHeight; if(h>vh-16){ e.style.justifyContent='flex-start'; e.style.transformOrigin='top center'; e.style.transform='scale('+((vh-26)/h)+')'; } }
+      function _shotFit(n){ var e=slides[n]; e.style.transform=''; e.style.transformOrigin=''; e.style.justifyContent=''; var vh=window.innerHeight||900, h=e.scrollHeight; if(h>vh-16){ e.style.justifyContent='flex-start'; e.style.transformOrigin='top center'; e.style.transform='scale('+((vh-64)/h)+')'; } }
       var _sm=location.search.match(/shot=(\d+)/);
       if(_sm){ var _sn=+_sm[1]; document.documentElement.classList.add('shotmode'); setTimeout(function(){
         try{ _finalizeCounts(); }catch(e){}
