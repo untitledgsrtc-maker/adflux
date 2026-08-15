@@ -12958,3 +12958,28 @@ economics tables — nothing clipped. Sent the owner the generated PDF.
   → verify print CSS via a `?pdf`-on-load prep path, not by relying on beforeprint.
   And a malformed `@page{ size:1600 900px px }` (bad regex) silently falls back to
   Letter portrait — the MediaBox (`/MediaBox` in the PDF) is the check.
+
+### Phase 309.18 — investor deck: PRESENTABLE one-slide-per-page PDF (`<pushed>`, 2026-08-14)
+Owner: the §309.17 print PDF "not presentable" — data-dense slides (cost, DAVP levers,
+forecast, asset-priced) split across 2 pages. FIX = stop fighting print pagination;
+IMAGE-capture each slide at 1600x900 and assemble one image per page. `?shot=N` mode
+(added to index.html, post-unlock-gated so harmless on the live gated deck): shows slide
+N alone, `_finalizeCounts()` + full record reveal + map invalidateSize, hides interactive
+chrome (`html.shotmode` hides gate/navbar/corner-logo/#recNext/.wonav + JS hides the
+record "Press ->" hint), and **`_shotFit(n)` scale-to-fits** any slide taller than the
+viewport (`transform:scale(vh/scrollHeight)`, origin center) so it fits ONE 16:9 page,
+nothing clipped. Build pipeline (NOT owner-runnable — my headless+Pillow):
+```
+for N in 0..20: chrome --headless=new --hide-scrollbars --window-size=1600,900 \
+  --virtual-time-budget=6500 --screenshot=NN.png ".../_shot.html?shot=$N"   # _shot.html = index + injected sessionStorage inv_ok
+python: Image.convert('RGB') x21 -> save(save_all, append_images) = 21-page PDF (~1.7MB)
+```
+Result verified page-by-page: 21 clean pages, landscape, correct logo, REAL CartoDB map
+tiles, final count-ups (264/1,244/31.2 lakh/1.47 crore etc.), record fully built, handshake
+closing — no splits, no clip, no buttons. Sent the owner the PDF.
+- COUNT-UP TIMING FOOT-GUN: `go(N)` re-triggers `countUpsIn` (animates from 0); screenshot
+  caught mid-animation (256 vs 264). Fix = finalize counts ~1900ms after go() (after the
+  §309.7 dur+180 fallback settles) right before the shot.
+- The §309.17 `?pdf` print mode stays for the owner's self-serve Cmd+P (less pretty, but
+  he can regenerate anytime). The pretty image-PDF needs my headless+Pillow pipeline — I
+  regenerate it when the deck changes.
