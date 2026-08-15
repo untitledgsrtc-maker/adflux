@@ -577,6 +577,8 @@
   @media (prefers-reduced-motion:reduce){.slide.on [class*="an-"]{animation:none!important;opacity:1!important}}
   /* ===== FULL-DECK / RESPONSIVE PDF VIEW =====
      pdfmode stacks every slide vertically (scrollable on any screen); print = one 16:9 page each */
+  html.shotmode #gate,html.shotmode .navbar,html.shotmode .corner-logo,html.shotmode .deck-overview,html.shotmode .blob{ display:none !important; }
+  html.shotmode #recNext,html.shotmode .wonav{ display:none !important; }
   html.pdfmode,html.pdfmode body{ overflow:auto !important; height:auto !important; }
   html.pdfmode #gate,html.pdfmode .navbar,html.pdfmode .deck-overview,html.pdfmode .corner-logo,html.pdfmode .blob{ display:none !important; }
   html.pdfmode #deck{ position:static !important; height:auto !important; overflow:visible !important; }
@@ -2206,6 +2208,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
       window.addEventListener('beforeprint', function(){ document.documentElement.classList.add('pdfmode'); _preppdf(); });
       window.addEventListener('afterprint', function(){ document.documentElement.classList.remove('pdfmode'); _unprep(); });
       if(location.search.indexOf('pdf')>=0){ document.documentElement.classList.add('pdfmode'); setTimeout(_preppdf, 700); }
+      function _shotFit(n){ var e=slides[n]; e.style.transform=''; e.style.transformOrigin=''; var vh=window.innerHeight||900, h=e.scrollHeight; if(h>vh+6){ e.style.transformOrigin='center center'; e.style.transform='scale('+(vh/h)+')'; } }
+      var _sm=location.search.match(/shot=(\d+)/);
+      if(_sm){ var _sn=+_sm[1]; document.documentElement.classList.add('shotmode'); setTimeout(function(){ try{ go(_sn); }catch(e){} try{ _finalizeCounts(); }catch(e){} try{ if(_sn===RECORD_IDX){ recordStep=RECORD.length; drawRecord(recordStep); if(typeof updateRecordInfo==='function') updateRecordInfo(); } }catch(e){} try{ if(_sn===RECORD_IDX){ var _rc=document.getElementById('recordChart'); if(_rc){ var _lb=_rc.closest('.slide').querySelector('.lead b.yellow'); if(_lb) _lb.style.display='none'; } } }catch(e){} try{ GJ_MAP&&GJ_MAP.invalidateSize(); }catch(e){} try{ GJ2&&GJ2.invalidateSize(); }catch(e){} setTimeout(function(){ try{ _finalizeCounts(); }catch(e){} try{ _shotFit(_sn); }catch(e){} }, 1900); }, 600); }
       var be=document.getElementById('btnEmail'); if(be) be.addEventListener('click',function(){ var u=location.href.split('#')[0]; location.href='mailto:?subject='+encodeURIComponent('Untitled Adflux — Investor Deck')+'&body='+encodeURIComponent('The GSRTC LED investor deck:\n'+u+'\n\nPasscode: untitled2026'); });
       document.addEventListener('keydown',function(e){ var k=(e.key||'').toLowerCase(); if(k==='g'){ e.preventDefault(); ovToggle(); } else if(k==='escape'){ ovToggle(false); } else if(k==='f'){ var b2=document.getElementById('btnFull'); if(b2) b2.click(); } });
       buildOverview();
