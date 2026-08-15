@@ -579,6 +579,10 @@
      pdfmode stacks every slide vertically (scrollable on any screen); print = one 16:9 page each */
   html.shotmode #gate,html.shotmode .navbar,html.shotmode .corner-logo,html.shotmode .deck-overview,html.shotmode .blob{ display:none !important; }
   html.shotmode #recNext,html.shotmode .wonav{ display:none !important; }
+  html.shotmode .slide .anim,html.shotmode .slide [class*="an-"],html.shotmode .slide .calc > *,
+  html.shotmode .slide .risk,html.shotmode .slide .reason,html.shotmode .slide .lever,
+  html.shotmode .slide .budcard,html.shotmode .slide .risks,html.shotmode .slide .reasons,
+  html.shotmode .slide .levers{ opacity:1 !important; animation:none !important; }
   html.pdfmode,html.pdfmode body{ overflow:auto !important; height:auto !important; }
   html.pdfmode #gate,html.pdfmode .navbar,html.pdfmode .deck-overview,html.pdfmode .corner-logo,html.pdfmode .blob{ display:none !important; }
   html.pdfmode #deck{ position:static !important; height:auto !important; overflow:visible !important; }
@@ -2200,7 +2204,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       var bc=document.getElementById('btnGridClose'); if(bc) bc.addEventListener('click',function(){ ovToggle(false); });
       var bf=document.getElementById('btnFull'); if(bf) bf.addEventListener('click',function(){ var d=document.documentElement; if(!document.fullscreenElement && !document.webkitFullscreenElement){ (d.requestFullscreen||d.webkitRequestFullscreen||function(){}).call(d); } else { (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); } });
       var bp=document.getElementById('btnPdf'); if(bp) bp.addEventListener('click',function(){ try{ window.print(); }catch(e){} });
-      function _finalizeCounts(){ var els=document.querySelectorAll('[data-count]'); for(var i=0;i<els.length;i++){ var el=els[i], t=parseFloat(el.getAttribute('data-count'))||0, d=parseInt(el.getAttribute('data-dec')||'0',10); el.textContent = d>0 ? t.toFixed(d) : Math.round(t).toLocaleString('en-IN'); } }
+      function _finalizeCounts(){ var els=document.querySelectorAll('[data-count]'); for(var i=0;i<els.length;i++){ var el=els[i], t=parseFloat(el.getAttribute('data-count'))||0, d=parseInt(el.getAttribute('data-dec')||'0',10); el.setAttribute('data-done','1'); el.textContent = d>0 ? t.toFixed(d) : Math.round(t).toLocaleString('en-IN'); } }
       function _preppdf(){ try{ recordStep=RECORD.length; drawRecord(recordStep); if(typeof updateRecordInfo==='function') updateRecordInfo(); }catch(e){} try{ _finalizeCounts(); }catch(e){} var sl=document.querySelectorAll('.slide'); for(var i=0;i<sl.length;i++) sl[i].classList.add('on'); try{ GJ_MAP&&GJ_MAP.invalidateSize(); }catch(e){} try{ GJ2&&GJ2.invalidateSize(); }catch(e){} }
       function _fitSlides(){ var PH=720, sl=document.querySelectorAll('.slide'); for(var i=0;i<sl.length;i++){ var e=sl[i]; e.style.zoom=''; e.style.minHeight=''; e.style.height='auto'; var h=e.scrollHeight; var z = h>PH+6 ? (PH/h) : 1; e.style.zoom=z; e.style.minHeight=(PH/z)+'px'; e.style.height='auto'; } }
       function _unfit(){ var sl=document.querySelectorAll('.slide'); for(var i=0;i<sl.length;i++){ sl[i].style.zoom=''; sl[i].style.height=''; sl[i].style.minHeight=''; } }
@@ -2208,9 +2212,19 @@ svg.leaflet-image-layer.leaflet-interactive path {
       window.addEventListener('beforeprint', function(){ document.documentElement.classList.add('pdfmode'); _preppdf(); });
       window.addEventListener('afterprint', function(){ document.documentElement.classList.remove('pdfmode'); _unprep(); });
       if(location.search.indexOf('pdf')>=0){ document.documentElement.classList.add('pdfmode'); setTimeout(_preppdf, 700); }
-      function _shotFit(n){ var e=slides[n]; e.style.transform=''; e.style.transformOrigin=''; var vh=window.innerHeight||900, h=e.scrollHeight; if(h>vh+6){ e.style.transformOrigin='center center'; e.style.transform='scale('+(vh/h)+')'; } }
+      function _shotFit(n){ var e=slides[n]; e.style.transform=''; e.style.transformOrigin=''; e.style.justifyContent=''; var vh=window.innerHeight||900, h=e.scrollHeight; if(h>vh-16){ e.style.justifyContent='flex-start'; e.style.transformOrigin='top center'; e.style.transform='scale('+((vh-26)/h)+')'; } }
       var _sm=location.search.match(/shot=(\d+)/);
-      if(_sm){ var _sn=+_sm[1]; document.documentElement.classList.add('shotmode'); setTimeout(function(){ try{ go(_sn); }catch(e){} try{ _finalizeCounts(); }catch(e){} try{ if(_sn===RECORD_IDX){ recordStep=RECORD.length; drawRecord(recordStep); if(typeof updateRecordInfo==='function') updateRecordInfo(); } }catch(e){} try{ if(_sn===RECORD_IDX){ var _rc=document.getElementById('recordChart'); if(_rc){ var _lb=_rc.closest('.slide').querySelector('.lead b.yellow'); if(_lb) _lb.style.display='none'; } } }catch(e){} try{ GJ_MAP&&GJ_MAP.invalidateSize(); }catch(e){} try{ GJ2&&GJ2.invalidateSize(); }catch(e){} setTimeout(function(){ try{ _finalizeCounts(); }catch(e){} try{ _shotFit(_sn); }catch(e){} }, 1900); }, 600); }
+      if(_sm){ var _sn=+_sm[1]; document.documentElement.classList.add('shotmode'); setTimeout(function(){
+        try{ _finalizeCounts(); }catch(e){}
+        try{ go(_sn); }catch(e){}
+        try{ _finalizeCounts(); }catch(e){}
+        try{ if(_sn===RECORD_IDX){ recordStep=RECORD.length; drawRecord(recordStep); if(typeof updateRecordInfo==='function') updateRecordInfo(); var _rc=document.getElementById('recordChart'); if(_rc){ var _lb=_rc.closest('.slide').querySelector('.lead b.yellow'); if(_lb) _lb.style.display='none'; } } }catch(e){}
+        try{ var _fm=location.search.match(/fmode=(\w+)/); if(_fm && typeof setFMode==='function') setFMode(_fm[1]); }catch(e){}
+        try{ var _fl=location.search.match(/fill=(\d+)/); if(_fl){ var _fe=document.getElementById('s-fill'); if(_fe && typeof recompute==='function'){ _fe.value=_fl[1]; recompute(); } } }catch(e){}
+        try{ if(/exp=1/.test(location.search) && typeof setExpFull==='function') setExpFull(true); }catch(e){}
+        try{ GJ_MAP&&GJ_MAP.invalidateSize(); }catch(e){}
+        try{ GJ2&&GJ2.invalidateSize(); }catch(e){}
+        setTimeout(function(){ try{ _finalizeCounts(); }catch(e){} try{ _shotFit(_sn); }catch(e){} }, 750); }, 600); }
       var be=document.getElementById('btnEmail'); if(be) be.addEventListener('click',function(){ var u=location.href.split('#')[0]; location.href='mailto:?subject='+encodeURIComponent('Untitled Adflux — Investor Deck')+'&body='+encodeURIComponent('The GSRTC LED investor deck:\n'+u+'\n\nPasscode: untitled2026'); });
       document.addEventListener('keydown',function(e){ var k=(e.key||'').toLowerCase(); if(k==='g'){ e.preventDefault(); ovToggle(); } else if(k==='escape'){ ovToggle(false); } else if(k==='f'){ var b2=document.getElementById('btnFull'); if(b2) b2.click(); } });
       buildOverview();
