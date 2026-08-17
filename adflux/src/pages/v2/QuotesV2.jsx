@@ -268,12 +268,18 @@ export default function QuotesV2() {
   ), [repScoped])
 
   const sorted = useMemo(() => {
+    const onWon = filters.status === 'won'
     return [...segmentScoped].sort((a, b) => {
       let va = a[sortField]
       let vb = b[sortField]
       if (sortField === 'total_amount' || sortField === 'subtotal') {
         va = Number(va) || 0
         vb = Number(vb) || 0
+      } else if (sortField === 'created_at') {
+        // Phase 311 — sort the Date column by the SAME date it displays
+        // (won_at on the Won tab), so the row order matches the visible dates.
+        va = String((onWon && a.won_at) ? a.won_at : a.created_at)
+        vb = String((onWon && b.won_at) ? b.won_at : b.created_at)
       } else {
         va = String(va || '').toLowerCase()
         vb = String(vb || '').toLowerCase()
@@ -282,7 +288,7 @@ export default function QuotesV2() {
       if (va > vb) return sortDir === 'asc' ? 1 : -1
       return 0
     })
-  }, [segmentScoped, sortField, sortDir])
+  }, [segmentScoped, sortField, sortDir, filters.status])
 
   // Build the rep dropdown options from quotes already on screen —
   // saves an extra users fetch and keeps the list in sync with what
@@ -327,6 +333,11 @@ export default function QuotesV2() {
     const convPct = sentAmount > 0 ? Math.round((wonAmount / sentAmount) * 100) : 0
     return { count: displayed.length, amount, sentAmount, outstanding, wonAmount, wonCount, lostCount, convPct }
   }, [displayed])
+
+  // Phase 311 — on the Won tab, the DATE column shows the WON date (won_at);
+  // every other tab shows created_at (unchanged). Mirrors the useQuotes Won-tab
+  // date filter so the date shown == the date filtered on.
+  const quoteDateOf = (q) => (filters.status === 'won' && q?.won_at) ? q.won_at : q.created_at
 
   return (
     <div className="v2d-quotes">
@@ -642,7 +653,7 @@ export default function QuotesV2() {
                         return <span className="v2d-warn">{formatCurrency(b.amount)}</span>
                       })()}
                     </td>
-                    <td>{formatDate(q.created_at)}</td>
+                    <td>{formatDate(quoteDateOf(q))}</td>
                     <td>
                       {(() => {
                         const fu = nextFollowUp(q)
@@ -749,7 +760,7 @@ export default function QuotesV2() {
                     </div>
                     <div>
                       <div className="v2d-qcard-k">Date</div>
-                      <div className="v2d-qcard-v">{formatDate(q.created_at)}</div>
+                      <div className="v2d-qcard-v">{formatDate(quoteDateOf(q))}</div>
                     </div>
                   </div>
                   {/* Phase 29c — mobile inline actions. Same gating as

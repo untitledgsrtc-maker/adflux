@@ -66,8 +66,13 @@ export function useQuotes() {
           `client_name.ilike.%${filters.search}%,client_company.ilike.%${filters.search}%,quote_number.ilike.%${filters.search}%`
         )
       }
-      if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom)
-      if (filters.dateTo)   q = q.lte('created_at', filters.dateTo + 'T23:59:59')
+      // Phase 311 — the Won tab attributes deals by the WON date (won_at), not
+      // the sent date (created_at): a quote sent in July but marked Won in
+      // August shows under August. Every other tab keeps dating by created_at
+      // (byte-unchanged). Requires supabase_phase311_quote_won_at.sql (SQL-first).
+      const dateCol = filters.status === 'won' ? 'won_at' : 'created_at'
+      if (filters.dateFrom) q = q.gte(dateCol, filters.dateFrom)
+      if (filters.dateTo)   q = q.lte(dateCol, filters.dateTo + 'T23:59:59')
       return q
     }
 
