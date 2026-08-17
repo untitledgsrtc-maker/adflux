@@ -13218,6 +13218,49 @@ Claude, now with "business this month").
   trusted users only); `safeRef` collision (shared with send.js); non-constant-time
   secret compare; the pg_net secret → Supabase Vault before scaling.
 
+### P3 — DONE (2026-08-17, `<pushed>`, shipped INERT until the owner runs the SQL)
+The every-2-hour pending-items nudge. A cron fires an Edge endpoint 6×/day during
+work hours; for each mapped rep who has (a) ≥1 open follow-up due-today/overdue AND
+(b) an OPEN 24h WhatsApp window (messaged the 95 number in the last 24h), it sends a
+short FREE-TEXT reminder from the number they messaged, to their own number. v1 =
+free-text ONLY — a rep who hasn't messaged in 24h (window closed) is SKIPPED (no
+template — that's P4). So the reps who say "hi" each morning get the day's nudges;
+the silent ones don't (yet). ₹0 messaging (inside the open service window).
+- `api/wa/team-nudge.js` (**EDGE**, §219) — `x-ta-secret` gated + fail-closed; IST
+  work-hours gate (09:00–20:00, **skips Sunday**, which the every-2h cron can't
+  express); loads mapped active reps (`users.whatsapp_number` not null); per rep
+  counts open follow-ups (`follow_ups?assigned_to=eq.<uid>&is_done=eq.false&
+  follow_up_date=lte.<istToday>`), skips if 0; window = a `team_assistant_requests`
+  row for that uid within 24h (their last inbound) → sends from THAT row's
+  `phone_number_id` to its `wa_from`, else skip. Returns `{reps, sent, window_closed,
+  no_pending}`.
+- `supabase_wa_team_assistant_p3.sql` — `team_assistant_nudge_dispatch()` (SECURITY
+  DEFINER, pg_net POST with `x-ta-secret`, EXCEPTION-wrapped, **REVOKEd from
+  PUBLIC/anon/authenticated** — it fires a WhatsApp send, so no client role may call
+  it; the cron runs as postgres → executes regardless, §162 pattern) + a pg_cron job
+  `team-assistant-nudge` at `'30 3,5,7,9,11,13 * * *'` UTC = **9/11/13/15/17/19 IST**
+  (6 fires, work hours). The Edge fn re-gates IST + skips Sunday.
+- WhatsApp-compliant: only sends INSIDE the rep's open 24h service window (the window
+  check IS the gate — free-text needs no template there). Sends every 2h if pending>0
+  + window open (the intended reminder cadence; self-clears at 0 pending).
+- **Deploy-order/§45 safe:** additive (a NEW dispatch fn + a NEW cron only; zero touch
+  to leads/quotes/the customer bot/any existing cron). Inert until BOTH the SQL runs
+  AND `api/wa/team-nudge.js` is live with `TEAM_ASSISTANT_SECRET` set. A dispatch
+  failure can never surface (EXCEPTION-wrapped). Reads follow_ups/users/
+  team_assistant_requests only (no writes, no hot-path load).
+- ⚠ SECRET: replace `<TEAM_ASSISTANT_SECRET>` in the SQL with the SAME value already
+  in Vercel env `TEAM_ASSISTANT_SECRET` (the one P1/P2 use) BEFORE running.
+- ⚠ Known P3-tail (later): a genuine-just-closed-window race (rep messaged 23h59m ago
+  → passes our check → Meta rejects at 24h01m) fails gracefully (per-rep try/catch,
+  skip); no per-rep de-dup beyond the 2h cadence; the pg_net secret → Supabase Vault
+  before scaling (§115 precedent).
+- **To ACTIVATE:** (1) put the real secret in the SQL, (2) run
+  `supabase_wa_team_assistant_p3.sql` in Studio (VERIFY: dispatch fn present +
+  not client-executable, cron job scheduled once), (3) it's live — the cron fires
+  9–19 IST. Test now: `SELECT public.team_assistant_nudge_dispatch();` (returns
+  `{skipped}` off-hours, safe). No new env (reuses TEAM_ASSISTANT_SECRET), no APK.
+
 ### NEXT (not built)
-- **P3** — the every-2-hour pending-items cron (free-text, window-open only; §130 pattern).
-- **P4 (optional)** — one fallback template for a rep silent >24h.
+- **P4 (optional)** — one fallback TEMPLATE for a rep silent >24h (window closed), so
+  the daily nudge reaches reps who don't message first. Needs an approved template +
+  its own opt-in/quiet-hours discipline (the §120/§133 spam lessons).
