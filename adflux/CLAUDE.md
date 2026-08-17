@@ -13186,7 +13186,14 @@ owner runs the SQL + sets the secret). Two adversarial reviews (security + blast
 - ⚠ pg_net secret is a plaintext literal in the trigger (readable via `run_select`, §115
   precedent) — acceptable for the pilot; move to Supabase Vault before scaling.
 
-### ACTIVATION (owner — the code is live but inert until ALL of this)
+### ACTIVATION — DONE + LIVE (2026-08-17)
+Owner ran the SQL (9 reps mapped: the 7 + Brijesh/admin + Vishal/co_owner — Phase 313.1
+`240ce75`), set Vercel env `TEAM_ASSISTANT_SECRET`, redeployed → **smoke test PASSED**
+(Brijesh texted "hi" to 95 → got his day snapshot). P1 is LIVE. The secret was baked into
+the local SQL to run it, then reverted to the `<TEAM_ASSISTANT_SECRET>` placeholder in git
+(the real value lives only in Supabase + Vercel, never committed).
+
+### ACTIVATION steps (for reference / re-runs)
 1. Pick a long random secret. Put it in BOTH: the SQL (replace `<TEAM_ASSISTANT_SECRET>`)
    AND Vercel env `TEAM_ASSISTANT_SECRET` (untitled-os project, Production) → redeploy.
 2. Run `supabase_wa_team_assistant_p1.sql` in Studio; run the VERIFY block (7 reps mapped
