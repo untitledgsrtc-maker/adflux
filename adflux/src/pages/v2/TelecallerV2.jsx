@@ -36,6 +36,7 @@ import V2Hero from '../../components/v2/V2Hero'
 // as WorkV2 mount from Phase 76.4. Card has its own 7 PM IST gate +
 // role gate so admin / co_owner don't see it.
 import DaySummaryCard from '../../components/work/DaySummaryCard'
+import MorningGreetGate from '../../components/work/MorningGreetGate'
 import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 // Phase 113.7 — MissedCallsCard + RepMapPanel mounts removed from the TC
 // Today page per owner (declutter). Missed-call rescue was padded by the
@@ -753,6 +754,10 @@ export default function TelecallerV2() {
           to DaySummaryCard below. Sits above DaySummaryCard so it
           can't be missed on first scroll. */}
       <EveningWrapBanner />
+
+      {/* Phase 314 — message-first greet gate (see WorkV2 / §198). TC has no
+          check-in step, so it shows on open until they greet today. */}
+      <MorningGreetGate />
 
       {/* Phase 83 — evening day summary card. Auto-shows after 7 PM
           IST. Mounted above V2Hero so it's the first thing the TC

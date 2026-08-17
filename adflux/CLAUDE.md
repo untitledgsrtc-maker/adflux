@@ -13273,3 +13273,77 @@ the silent ones don't (yet). ₹0 messaging (inside the open service window).
 - **P4 (optional)** — one fallback TEMPLATE for a rep silent >24h (window closed), so
   the daily nudge reaches reps who don't message first. Needs an approved template +
   its own opt-in/quiet-hours discipline (the §120/§133 spam lessons).
+
+---
+
+## 198 · Phase 314 — message-first check-in gate (assistant greeting opens the window) (2026-08-17)
+
+Owner: "when they open the app for check-in, first they message [the assistant]."
+Purpose = force the morning WhatsApp greeting so the 24h window is open and the
+§197 P3 every-2h nudge actually reaches reps (nudges are free-text → need an open
+window; a rep who never messages gets nothing). Reviewed by 3 parallel agents
+(sales-module-guardian on the frozen pages + security + correctness) → all
+PASS/FLAG, no P0/P1; the P2/P3 findings were applied before commit.
+
+### What it does
+A mapped field rep opening /work (before check-in) or /telecaller who has NOT
+messaged the assistant TODAY gets a full-screen blocking overlay: "Good morning!
+Say good morning to your assistant to start the day." One tap →
+`openWhatsApp('9581578261','Good morning')` (APK-safe via openExternalUrl) → they
+send → the assistant replies with their day snapshot AND the 24h window opens →
+the P3 nudges flow all day. The overlay auto-closes the instant their message
+lands (a visibilitychange/focus re-check fires when they switch back from WhatsApp).
+
+### The safety contracts (FROZEN — do not weaken)
+- **FAIL-OPEN.** If the `assistant_greeted_today()` RPC errors, the gate does NOT
+  show — a backend hiccup can NEVER block a rep from starting work. A transient
+  blip RETRIES (poll every 4s) so a recovered connection still surfaces the gate;
+  a persistent failure gives up fail-open after `ERR_CAP` (4) errors (bounds the
+  poll). Deploy-before-SQL safe (§45) — before the SQL ran, the RPC errored → gate
+  inert.
+- **MAPPED reps only.** The gate shows only when `users.whatsapp_number` has ≥10
+  digits (matches the webhook's last-10 match). CRITICAL: an UNMAPPED (or garbage-
+  number) user messaging the 95 number hits the CUSTOMER flow (creates a lead + the
+  customer AI replies) — so we must NEVER prompt an unmapped rep. The last-10 test
+  (not a bare truthiness check — security P3 fix) also rejects a malformed row.
+- **Field roles only** — sales / telecaller / agency. Admin/co_owner/hr/accounts
+  never see it (they don't check in).
+- **Safety valve** — "Start my day without it" appears after they tap Good morning
+  + 20s (message didn't register), OR a hard 60s after mount (WhatsApp won't even
+  open). A used valve sets a per-IST-day localStorage bypass → no re-nag that day.
+- **Self-hides** once greeted today (`assistant_greeted_today` = messaged since IST
+  midnight → re-shows each morning; a yesterday message does NOT count).
+
+### Files
+- NEW `supabase_wa_team_assistant_greet_gate.sql` — `assistant_greeted_today()`
+  RPC: SECURITY DEFINER, STABLE, search_path pinned, returns a BARE BOOLEAN for
+  `auth.uid()` ONLY (reps can't read `team_assistant_requests` directly — RLS is
+  admin-only, §197; the DEFINER fn is the only safe read). "Today" = created_at >=
+  IST-midnight-today-as-UTC-instant. REVOKE from PUBLIC/anon, GRANT authenticated.
+  **Owner RAN it 2026-08-17** ("Success. No rows returned").
+- NEW `src/components/work/MorningGreetGate.jsx` — the self-contained overlay
+  (reads authStore, role+mapped gate, poll+visibility re-check, valve, per-day
+  bypass, all the fail-safes above). z-index 9000 (the §29 Modal-primitive tier,
+  reuses `.lead-modal-back`).
+- FROZEN §28 (guardian PASS, purely additive — 1 import + 1 mount each):
+  `WorkV2.jsx` (`<MorningGreetGate enabled={!checkedIn} />`) +
+  `TelecallerV2.jsx` (`<MorningGreetGate />` — TC has no check-in step, shows on
+  open until greeted). NO check-in / PostCallOutcomeModal / useAutoRefresh / push
+  / render logic touched.
+
+### Foot-guns
+- ❌ A blocking overlay on a frozen check-in flow MUST be fail-open + have a valve —
+  never let a backend error or WhatsApp failure strand a rep from starting work.
+- ❌ Prompting a rep to message the assistant number when they're NOT mapped (or the
+  mapped value is garbage) routes their message to the CUSTOMER flow. Gate on the
+  same last-10-digit match the webhook uses.
+- ❌ Fail-open that LATCHES on the first error permanently skips the greeting for a
+  rep whose field phone blipped at app-open (window never opens → no nudges that
+  day). Retry, cap the retries, then give up fail-open.
+
+### Owner action
+SQL already run. Once the frontend deploys (Vercel), the gate is live: a mapped rep
+opens /work or /telecaller in the morning → greet card → tap → WhatsApp → send →
+gate clears + window opens + nudges flow. Verify: as Rima/Dhara, open /work having
+NOT messaged today → the card blocks check-in; tap Say good morning → send in
+WhatsApp → return to the app → card auto-closes.

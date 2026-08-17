@@ -75,6 +75,7 @@ import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../compone
 // mounts; no productive flow is gated in this phase (button-blocking
 // deferred to Phase 76.4b pending owner sign-off).
 import DaySummaryCard from '../../components/work/DaySummaryCard'
+import MorningGreetGate from '../../components/work/MorningGreetGate'
 import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 import GpsOffBanner from '../../components/work/GpsOffBanner'
 import MissedCallsCard from '../../components/work/MissedCallsCard'
@@ -1011,6 +1012,12 @@ export default function WorkV2() {
             in sessionStorage with today's IST date so it returns
             tomorrow. Zero push dependency. */}
         <EveningWrapBanner />
+
+        {/* Phase 314 — message-first: a mapped field rep greets the WhatsApp
+            assistant before check-in (opens the 24h window so the P3 every-2h
+            nudge reaches them). Fail-open overlay; self-hides once greeted
+            today. §197/§198. */}
+        <MorningGreetGate enabled={!checkedIn} />
 
         {/* Phase 35.0 pass 4 — owner directive: Log meeting + Log lead
             buttons sit BETWEEN the purple Incentive card (rendered in
