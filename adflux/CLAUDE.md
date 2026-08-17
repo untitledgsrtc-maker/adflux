@@ -13036,3 +13036,80 @@ long mono lines `white-space:normal`, `*{overflow-wrap:break-word}`. Also `?goto
   cropped: bumped `_shotFit` bottom clearance for overflowing slides `(vh-26)→(vh-64)/h`
   so the last element clears. Forecast + other dense slides still complete (more margin
   only). All other pages unchanged.
+
+
+---
+
+## 195 · Phase 312 — call-duration blank fix: resume-sweep fires late enough (2026-08-17, `16a216a`)
+
+The recurring call-capture pain (§92 STOP rule · §94 Phase 228 incoming listener ·
+§95 Phase 229 outgoing sweep · §96 the ≥10s pay-gate) got a FLEET-DATA diagnosis + a
+small permanent fix. Owner (17 Aug): "how many times did we solve this + why does it
+come back?" (He'd pasted an Android call-AUDIO-recording writeup — reframed: the app
+does NOT record audio, it reads the device call LOG; §92.) JS-only, guardian PASS, on
+origin, no APK, no SQL.
+
+### THE DIAGNOSIS (`call_capture_log` + `call_logs`, 7-day fleet read) — read before touching calls again
+Rules OUT everything patched before and pins the real cause:
+- **NOT permission** — `perm_denied = 0` for everyone; the call-log permission is granted.
+- **NOT battery / OEM-won't-return-the-call** — `device_read_found ≈ 98%` (the phone
+  hands the call back almost every time).
+- **NOT a new brand TYPE patch** — §92's whack-a-mole is genuinely closed by the Phase
+  228 listener (all reps on 96018, owner-confirmed 17 Aug).
+- **ROOT = READ TIMING.** Android writes the outgoing call-log row at call START with
+  duration 0 and fills the real length only ~seconds AFTER hangup. The two early reads
+  fire too soon:
+  | read moment | phone HAD the length | saved blank |
+  |---|---|---|
+  | `modal_save` (rep taps save at hangup) | **28%** | 68% |
+  | `auto60` (60s after dial) | **28%** | 68% |
+  | `resume_sweep` (later, after app-resume) | **88%** | **0%** |
+  `read_good_but_lost = 0` → ZERO wiring bug: whenever the phone HAS the length we save
+  it 100%. It's purely that the early reads catch a not-yet-finalized 0.
+- **Why telecallers lose 60-69% and sales only 6-28%:** TCs machine-gun calls and STAY
+  in-app → the one read that works (`resume_sweep`, on app-resume) fired ONCE per return,
+  often the instant they returned (still pre-finalization), and the 90s interval PAUSES
+  while they're on the dialer. Sales put the phone down between calls → more app-resumes
+  land after finalization.
+
+### THE FIX (`src/utils/callResumeSync.js` ONLY)
+`initCallResumeSync` — the `appResumedCallSync` (native MainActivity.onResume) listener
+now fires `reconcileRecentCalls()` IMMEDIATELY **and again at +10s and +30s**
+(`setTimeout`), instead of once. The +10s/+30s passes run while the app is FOREGROUND
+(rep logging the outcome / on the queue) → those timers fire reliably → they catch the
+just-ended call AFTER it finalizes. Same read that already works 88%; it just wasn't
+firing late enough for stay-in-app telecallers. Additive, native-only, off the hot path;
+90s interval kept. Guardian PASS (6/6 invariants; lone P3 = 3× reconcile traffic per
+resume, justified by 28%→88%). Idempotent: the sweep's SELECT self-filters
+`duration is null/0`, so once pass 1 heals a row the +10s/+30s passes don't re-fetch it
+→ no double-count, no clobber.
+
+**Expected:** telecaller blank durations ~60% → ~12% (the residual = calls the phone
+genuinely records as 0). Rima's real captured calls ~327 → ~900.
+
+### CONTRACT + foot-gun (do NOT regress)
+- The fix is TIMING (read the device duration LATER), NEVER a brand TYPE case — fully
+  consistent with the §92 ban. `reconcileRecentCalls` (`resume_sweep`) is the ONE read
+  that works; keep it firing a few seconds AFTER the rep returns, not only on the instant
+  of return.
+- ❌ FOOT-GUN: an on-return / at-hangup call-log read fires BEFORE Android finalizes the
+  just-ended call's DURATION (the row sits at duration 0 for ~seconds post-hangup) → reads
+  0 → the call saves blank. Read AGAIN a short delay later — a foreground `setTimeout`
+  chained off `appResumedCallSync` is reliable; the §116 away-timer is NOT (different signal).
+- §229 contract intact: OUTGOING-only, real talk-time ≥1s, Phase 185
+  `findOutgoingCallSeconds` nearest-to-tap reader, no-clobber write, outcome never flipped.
+
+### MONEY (§71 rule 3, owner-aware)
+More captured durations → more calls cross the ≥10s bar → some telecaller daily scores +
+incentive will RISE — correctly (real calls that were dropped now count; §96: "the ONLY
+honest way to raise the count is fix capture"). A correction, not inflation. Owner told
+before ship.
+
+### STILL OPEN (unchanged by this)
+- `compute_daily_score`'s loose call gate (`outcome IS NOT NULL OR ≥10s`, §96) stays —
+  tightening to ≥10s-only is still deferred until this fix proves out fleet-wide.
+- **Verify it worked:** re-run the diagnostics in a few days — the `call_logs` symptom
+  query's blank rate should drop toward ~12%, and `call_capture_log.patch_path` should
+  show far more `resume_sweep` heals. Reusable read-only queries: Q1 (symptom, per rep) +
+  Q3/Q4 (by patch_path) from the 17 Aug session; schema in
+  `supabase_phase138_call_capture_log.sql`.
