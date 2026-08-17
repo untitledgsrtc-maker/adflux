@@ -13357,3 +13357,61 @@ P1 (identity + "hi → your day") + P2 (Claude Q&A + send quote PDF) + P3 (every
 pending-follow-up nudge) + Phase 314 (message-first greet gate that keeps the 24h
 window open so the nudges land). Only P4 (a fallback template for reps who never
 message) remains optional/unbuilt.
+
+
+---
+
+## 199 · Phase 315 — perf pass #1: 5 missing indexes (zero-risk speed) (2026-08-17)
+
+Owner directive after the deep perf audit: "start … make sure all my team using
+this and current flow doesn't affect — all must be working as it is, just speed up
+superfast." First move = the audit's index gaps: pure additive, `CONCURRENTLY`
+(no lock — team keeps working), zero code, zero behavior change. An index is
+invisible to the app; it can only make reads faster.
+
+### The 5 indexes (`supabase_phase315_perf_indexes.sql`, owner RUNS ONE LINE AT A TIME)
+Grep-confirmed all 5 gaps are real (none exists):
+- **CRITICAL** `idx_quote_cities_quote_id` ON quote_cities(quote_id) — the most-joined
+  child FK in the app has NO index (only `idx_qc_ref_kind`). Speeds EVERY quotes-list
+  load (the `quote_cities(*)` embed, useQuotes:57) + the per-quote scan in
+  `team_all_quotes()` (§116, up to 20k quotes, quadratic without it).
+- **HIGH** `idx_follow_ups_quote_id ... WHERE quote_id IS NOT NULL` — embedded in the
+  quotes list + scanned per-quote by team_all_quotes. Partial (only collection FUs carry
+  a quote_id).
+- **MEDIUM** `idx_finance_txn_bucket_date (bucket, txn_date)` — the §155 P&L runs dozens
+  of `WHERE bucket=X AND txn_date BETWEEN…` scans/load.
+- **MEDIUM** `idx_finance_txn_bank_date (bank_account_id, txn_date)` — bank-import
+  overlap check (§162 P4) + per-account register.
+- **MEDIUM** `idx_wa_conv_assigned_last_msg (assigned_to, last_message_at DESC NULLS
+  LAST)` — a TC inbox is `WHERE assigned_to=me ORDER BY last_message_at DESC` (§251);
+  one index serves both filter + sort.
+
+### CONTRACT / how to run (§85/§197 CONCURRENTLY rule)
+`CREATE INDEX CONCURRENTLY` CANNOT run inside a transaction → Supabase Studio wraps a
+multi-statement paste in one → "cannot run inside a transaction block". So the owner
+runs EACH `CREATE INDEX` line SEPARATELY (select one line → Run → wait Success → next).
+Re-running a line is a no-op (`IF NOT EXISTS`). Additive only (no DROP) — a redundant
+single-col `idx_finance_txn_bucket` stays (harmless; a future DROP CONCURRENTLY could
+reclaim it, not this pass).
+
+### §45-safe (the whole point)
+CONCURRENTLY builds WITHOUT locking writes → the team keeps calling/adding leads/saving
+quotes while each index builds. Zero code touched, zero frozen file, zero behavior
+change — the SAME queries just run faster. Nothing to smoke-test; nothing can break.
+
+### NEXT (the bigger rep-facing wins, after these land)
+2. **Route code-splitting** (App.jsx ~60 static imports → one 1.26 MB gz chunk shipped
+   to every rep on every cold load; React.lazy + Suspense + vite manualChunks). Touches
+   App.jsx + frozen pages → **sales-module-guardian PASS + a build check required**.
+3. **Filter the useAutoRefresh realtime subscription** (§57 — unfiltered
+   lead_activities/follow_ups → any rep's change reloads every open /work + /telecaller
+   → continuous churn during calling; add `created_by=eq.<uid>`/`assigned_to=eq.<uid>`).
+Both are the highest-value speed wins but touch §28-frozen surfaces → each gets a
+guardian PASS + before/after check before commit (§45 no-slowdown gate). The indexes
+are done first because they're the only zero-risk item.
+
+### Owner action
+1. Run `supabase_phase315_perf_indexes.sql` in Supabase Studio — **each CREATE INDEX
+   line one at a time** (5 lines), then the VERIFY select (expect 5 rows).
+2. That's it — no push needed for the speedup (indexes are DB-only). The SQL file +
+   this log are committed for the record; push when convenient.
