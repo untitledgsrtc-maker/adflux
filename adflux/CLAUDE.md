@@ -13386,13 +13386,24 @@ Grep-confirmed all 5 gaps are real (none exists):
   LAST)` — a TC inbox is `WHERE assigned_to=me ORDER BY last_message_at DESC` (§251);
   one index serves both filter + sort.
 
-### CONTRACT / how to run (§85/§197 CONCURRENTLY rule)
-`CREATE INDEX CONCURRENTLY` CANNOT run inside a transaction → Supabase Studio wraps a
-multi-statement paste in one → "cannot run inside a transaction block". So the owner
-runs EACH `CREATE INDEX` line SEPARATELY (select one line → Run → wait Success → next).
-Re-running a line is a no-op (`IF NOT EXISTS`). Additive only (no DROP) — a redundant
-single-col `idx_finance_txn_bucket` stays (harmless; a future DROP CONCURRENTLY could
-reclaim it, not this pass).
+### CONTRACT / how to run — SUPERSEDES the §85/§197 CONCURRENTLY-in-Studio rule
+⚠ **Supabase Studio now wraps EVERY statement (even a single one) in a transaction, so
+`CREATE INDEX CONCURRENTLY` errors with 25001 "cannot run inside a transaction block" —
+the old §85/§197 "run one CONCURRENTLY line at a time in Studio" trick NO LONGER WORKS.**
+Owner hit it 2026-08-17. Fix (rev, `<315.1>`): dropped CONCURRENTLY → plain
+`CREATE INDEX IF NOT EXISTS` (runs fine in a txn; paste the whole file, Run once).
+- Plain CREATE INDEX briefly LOCKS WRITES to that one table while it builds — but these
+  5 tables are SMALL (finance_transactions ~1k rows, quote_cities/follow_ups/
+  whatsapp_conversations a few thousand) → the build is MILLISECONDS → a rep saving in
+  that split-second waits a few ms, no data loss, invisible. Reads never blocked. Run
+  off-peak to be extra safe. §45-safe on tables this size.
+- **NEW RULE for future index handoffs:** on a SMALL table → plain `CREATE INDEX`
+  (paste-and-run, ms lock). On a LARGE/hot table where a lock matters → CONCURRENTLY is
+  needed, but Studio can't run it → the owner must use `psql`/the Supabase CLI (a direct
+  connection, no txn wrapper), NOT the Studio SQL editor. Don't hand a CONCURRENTLY file
+  for Studio.
+- Additive only (no DROP) — a redundant single-col `idx_finance_txn_bucket` stays
+  (harmless; a future DROP could reclaim it, not this pass).
 
 ### §45-safe (the whole point)
 CONCURRENTLY builds WITHOUT locking writes → the team keeps calling/adding leads/saving
