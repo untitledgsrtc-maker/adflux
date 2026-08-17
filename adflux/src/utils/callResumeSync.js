@@ -37,8 +37,9 @@
 //     stay frozen.
 //   • no clobber — the patch re-asserts duration is still null/0, so it can
 //     never overwrite a good value the modal-save path already wrote.
-//   • best-effort, off the hot path — runs on resume + a 90s foreground
-//     interval, never on the dial/save path. Web build is a no-op.
+//   • best-effort, off the hot path — runs on resume (+10s/+30s follow-ups,
+//     Phase 312) + a 90s foreground interval, never on the dial/save path.
+//     Web build is a no-op.
 
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
@@ -121,7 +122,26 @@ function initCallResumeSync() {
   if (started || !Capacitor.isNativePlatform()) return
   started = true
   // Primary: native MainActivity.onResume → reliable on every foreground.
-  try { CallLogReader.addListener('appResumedCallSync', () => { reconcileRecentCalls() }) } catch {}
+  // Phase 312 — fire reconcile IMMEDIATELY (heals older calls) AND again at +10s
+  // and +30s. The immediate read fires the instant the rep returns from a call,
+  // often BEFORE Android has finalized that call's duration (the device call-log
+  // row exists with duration 0 until ~seconds after hangup) → the just-ended call
+  // reads 0 and gets skipped. call_capture_log PROVED this: the early reads
+  // (modal_save / auto60) get a real length only 28% of the time; this later
+  // sweep 88%. The +10s / +30s passes run while the app is FOREGROUND (the rep is
+  // logging the outcome / on the queue), so those timers fire reliably — catching
+  // the just-ended call after it finalizes. This is exactly what high-volume
+  // telecallers were missing: they stay in-app, so a single on-return sweep + the
+  // 90s interval rarely landed AFTER finalization → 60-69% blank durations.
+  // Idempotent: reconcile's no-clobber `.or(duration is null/0)` guard means an
+  // already-healed row is never re-written, so 3 passes can't double-count.
+  try {
+    CallLogReader.addListener('appResumedCallSync', () => {
+      reconcileRecentCalls()
+      setTimeout(reconcileRecentCalls, 10_000)
+      setTimeout(reconcileRecentCalls, 30_000)
+    })
+  } catch {}
   // Backup: a slow foreground interval in case the native event is missed.
   // Pauses automatically while the WebView is backgrounded.
   setInterval(() => { reconcileRecentCalls() }, 90_000)
