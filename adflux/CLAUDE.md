@@ -13142,3 +13142,61 @@ changed — §119/§232 contract).
 - FOOT-GUN (this whole thing): a board-routing note in CLAUDE.md drifted from the live
   DB (§119 said 22/0, live was 11/11). Verify `campaign_locations.qr_text` against the DB
   before quoting which number the boards use — §17 memory-goes-stale, confirmed here.
+
+
+---
+
+## 197 · Phase 313 — WhatsApp INTERNAL team-assistant, P1 (2026-08-17, `974d0e1`)
+
+The 95 number (95 815 78261) becomes an internal assistant: a rep texts it → gets their
+own day. Spec: `docs/WHATSAPP_INTERNAL_ASSISTANT_SPEC.md`. **P1 = identity + "hi → your
+day"** (calls vs target · follow-ups due today + overdue · renewals due in 30d). No Claude
+in P1 — just formats the rep's scoped data + sends. Shipped INERT (does nothing until the
+owner runs the SQL + sets the secret). Two adversarial reviews (security + blast-radius) =
+**SHIP, no P0/P1**; the flagged hardening was applied before commit.
+
+### The 3 files
+- `supabase_wa_team_assistant_p1.sql` — `users.whatsapp_number` (partial-UNIQUE) + seed 7
+  reps by name-ILIKE; `team_assistant_requests` queue (RLS: admin/co_owner/accounts read
+  only; UNIQUE(wamid) for Meta re-delivery dedup); pg_net dispatch trigger
+  `team_assistant_dispatch` (mirrors `wa_ai_reply_dispatch` §246, `x-ta-secret` header).
+- `api/wa/team-assistant.js` (**EDGE**, §219 — not a Node fn) — dispatched per request;
+  `x-ta-secret` gated + fail-closed; EVERY query scoped to the webhook-resolved `user_id`
+  (never message content); Graph send to `wa_from` from `phone_number_id`; idempotent
+  (`handled_at`) + 90s per-rep debounce.
+- `api/wa/webhook.js` — rep-fork in the inbound loop (search "Phase 313"): a message FROM
+  a known rep number → insert ONE `team_assistant_requests` row + `continue` → SKIPS the
+  customer flow entirely (no conversation, no lead, no customer AI). Rep map loaded lazily
+  once/webhook; cached ONLY on a clean read (a users-read error leaves it null → retry, so
+  a transient failure never mis-routes a rep to the customer funnel).
+
+### FROZEN / contracts
+- **Deploy-order safe (proven):** before the SQL, `users.whatsapp_number` doesn't exist →
+  the rep-map query errors → repMap stays null → repUid null → every message stays a
+  customer → **customer WhatsApp flow byte-for-byte unchanged.** Push-before-SQL is safe.
+- **Identity is server-resolved from the sender's number → users.whatsapp_number, NEVER
+  from message content.** Every data query `=eq.${uid}` on an owner column. A rep can only
+  ever get THEIR own data, sent to THEIR own number.
+- Rep messages NEVER create a lead / hit the customer AI / enter the customer inbox (the
+  `continue` fires before the conversation upsert).
+- ⚠ **SECURITY P2 (must verify at activation):** the seed maps by first-name ILIKE. Run the
+  SQL VERIFY block and EYEBALL that the 7 rows are the RIGHT reps with the RIGHT numbers —
+  a wrong name-match would cross-map one rep's private snapshot to another. The partial
+  UNIQUE on whatsapp_number makes a 2-row match FAIL LOUD instead of silently colliding.
+- ⚠ pg_net secret is a plaintext literal in the trigger (readable via `run_select`, §115
+  precedent) — acceptable for the pilot; move to Supabase Vault before scaling.
+
+### ACTIVATION (owner — the code is live but inert until ALL of this)
+1. Pick a long random secret. Put it in BOTH: the SQL (replace `<TEAM_ASSISTANT_SECRET>`)
+   AND Vercel env `TEAM_ASSISTANT_SECRET` (untitled-os project, Production) → redeploy.
+2. Run `supabase_wa_team_assistant_p1.sql` in Studio; run the VERIFY block (7 reps mapped
+   + table + policy + trigger); **confirm the 7 names↔numbers are correct** (P2 above).
+3. Smoke: a rep texts "hi" to 95 815 78261 → gets their day snapshot within a few seconds.
+
+### NEXT (not built)
+- **P2** — plain-language questions + send a quote PDF (Claude interprets; reuse §127
+  quote-PDF-to-WhatsApp). + a dedicated meetings breakdown + incentive line (P1 folds
+  meetings into follow-ups; incentive deferred to avoid the compute_monthly_salary auth
+  gate service-side).
+- **P3** — the every-2-hour pending-items cron (free-text, window-open only; §130 pattern).
+- **P4 (optional)** — one fallback template for a rep silent >24h.
