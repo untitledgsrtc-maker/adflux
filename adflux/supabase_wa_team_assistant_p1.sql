@@ -35,7 +35,9 @@ UPDATE public.users SET whatsapp_number = '8866273686' WHERE name ILIKE '%rima%'
 UPDATE public.users SET whatsapp_number = '9974073686' WHERE name ILIKE '%kirti%'  AND is_active;
 UPDATE public.users SET whatsapp_number = '9974173686' WHERE name ILIKE '%viral%'  AND is_active;
 UPDATE public.users SET whatsapp_number = '9601673686' WHERE name ILIKE '%mayur%'  AND is_active;
-UPDATE public.users SET whatsapp_number = '9898173686' WHERE name ILIKE '%kamina%' AND is_active;
+UPDATE public.users SET whatsapp_number = '9898173686' WHERE name ILIKE '%kamina%'  AND is_active;
+UPDATE public.users SET whatsapp_number = '9428273686' WHERE name ILIKE '%brijesh%' AND is_active;   -- owner (admin)
+UPDATE public.users SET whatsapp_number = '9924350285' WHERE name ILIKE '%vishal%'  AND is_active;   -- co_owner (govt partner)
 
 -- ── 2. request queue (the webhook writes here; the Edge fn drains it) ────────
 CREATE TABLE IF NOT EXISTS public.team_assistant_requests (
