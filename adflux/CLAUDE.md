@@ -13218,8 +13218,17 @@ Claude, now with "business this month").
   trusted users only); `safeRef` collision (shared with send.js); non-constant-time
   secret compare; the pg_net secret → Supabase Vault before scaling.
 
-### P3 — DONE (2026-08-17, `<pushed>`, shipped INERT until the owner runs the SQL)
-The every-2-hour pending-items nudge. A cron fires an Edge endpoint 6×/day during
+### P3 — DONE + ACTIVATED + verified live (2026-08-17, `7837305`)
+The every-2-hour pending-items nudge. **ACTIVATION-DONE:** owner ran the SQL (cron
+`team-assistant-nudge` scheduled, jobid 15, at 9/11/13/15/17/19 IST, skips Sunday);
+the p3 dispatch fn had the secret substituted to the real `TEAM_ASSISTANT_SECRET`
+(`still_placeholder=false`); Vercel manual-deployed `7837305` to Production (GitHub
+outage still blocked auto-deploy). Verified END-TO-END: a `SELECT
+public.team_assistant_nudge_dispatch();` test hit `/api/wa/team-nudge` via
+`User-Agent: pg_net/0.20.3` → **200 in 295ms** (200 not 403 = secret accepted; fired
+at 20:10 IST → correctly `skipped:off_hours`, past the 19:00 last slot). First real
+nudges fire the next 9 AM IST slot. The whole internal assistant (P1 identity + P2
+Claude Q&A/PDF + P3 nudge) is now LIVE. A cron fires an Edge endpoint 6×/day during
 work hours; for each mapped rep who has (a) ≥1 open follow-up due-today/overdue AND
 (b) an OPEN 24h WhatsApp window (messaged the 95 number in the last 24h), it sends a
 short FREE-TEXT reminder from the number they messaged, to their own number. v1 =
