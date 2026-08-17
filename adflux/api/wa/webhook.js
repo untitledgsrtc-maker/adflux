@@ -499,6 +499,8 @@ async function storeInbound(payload) {
     await writeBotNode(convId, wait)
   }
 
+  let repMap = null   // Phase 313 — internal team-assistant rep-number map (lazy)
+
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       const v = change.value || {}
@@ -577,6 +579,39 @@ async function storeInbound(payload) {
         if (stored >= STORE_CAP) return { ok: true, stored }
         const customerWaId = m.from
         if (!customerWaId) continue
+        // Phase 313 — internal team-assistant fork. A message FROM a known rep
+        // number is internal, not a customer: route it to the assistant (one
+        // insert → the pg_net trigger fires the Edge fn) and SKIP the customer
+        // flow entirely — no conversation, no lead, no customer AI. The rep map
+        // loads once per webhook; before the P1 SQL adds users.whatsapp_number
+        // the query returns nothing → empty map → every message stays a customer
+        // (existing behaviour), so this is INERT until that SQL runs (§45).
+        if (repMap === null) {
+          const { data: reps, error: repErr } = await admin.from('users')
+            .select('id, whatsapp_number').not('whatsapp_number', 'is', null).eq('is_active', true)
+          // Only CACHE on a clean read. On a query error (incl. the column not
+          // existing pre-SQL) leave repMap null so the next message retries — a
+          // transient users-read failure must never mis-route a rep into the
+          // customer funnel for the rest of this webhook (review finding F4).
+          if (!repErr) {
+            repMap = {}
+            for (const rr of (reps || [])) {
+              const k = String(rr.whatsapp_number).replace(/\D/g, '').slice(-10)
+              if (k) repMap[k] = rr.id
+            }
+          }
+        }
+        const repUid = repMap ? repMap[String(customerWaId).replace(/\D/g, '').slice(-10)] : null
+        if (repUid) {
+          // upsert(onConflict wamid) so a Meta re-delivery (same wamid) can't
+          // queue a second request → the rep never gets their snapshot twice (F1).
+          await admin.from('team_assistant_requests').upsert({
+            user_id: repUid, account_id: accountId, wa_from: customerWaId,
+            phone_number_id: phoneNumberId, message_text: messageBody(m) || null,
+            message_type: m.type || null, wamid: m.id || null,
+          }, { onConflict: 'wamid', ignoreDuplicates: true })
+          continue   // handled internally — never stored as a customer conversation
+        }
         const customerName = nameByWa[String(customerWaId).replace(/\D/g, '')] || null
 
         // Conversation: the (account, customer) UNIQUE index is NOT partial →
