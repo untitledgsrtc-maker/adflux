@@ -13200,10 +13200,24 @@ the local SQL to run it, then reverted to the `<TEAM_ASSISTANT_SECRET>` placehol
    + table + policy + trigger); **confirm the 7 names↔numbers are correct** (P2 above).
 3. Smoke: a rep texts "hi" to 95 815 78261 → gets their day snapshot within a few seconds.
 
+### P2 — DONE + LIVE (2026-08-17, `ccecf94`, JS-only, reviewed SHIP)
+`api/wa/team-assistant.js` extended: a plain-language QUESTION → Claude (claude-sonnet-5)
+answers from the rep's OWN scoped data (calls/target · follow-ups · renewals · business
+this month via `monthly_sales_data` · their 30 recent quotes). "send X's quote" → Claude
+emits `SENDPDF: <quote id>`; the endpoint RE-VERIFIES the id is one of the rep's own
+`quotes.find`, signs `quote-pdfs/<safeRef>.pdf` (600s, §127 shape) + sends it as a
+WhatsApp document. A plain greeting ("hi", emoji) still → the free fixed snapshot (no
+Claude, now with "business this month").
+- SECURITY (2 adversarial reviews, SHIP, no P0/P1/P2): cross-rep DATA closed (Claude's
+  context is 100% uid-scoped → a jailbreak can't reveal what isn't in-context), cross-rep
+  PDF closed (SENDPDF re-verified against the rep's own quotes), injection-clean,
+  fail-closed on `x-ta-secret`. Applied: emoji-greeting→snapshot, uid UUID-validate.
+- No SQL, no new env (`ANTHROPIC_API_KEY` already set for ai-reply); `message_text` was
+  already stored by the P1 fork. **Customer flow untouched.**
+- ⚠ Known P3 (later hardening): questions aren't debounced (per-rep Anthropic cost, ~9
+  trusted users only); `safeRef` collision (shared with send.js); non-constant-time
+  secret compare; the pg_net secret → Supabase Vault before scaling.
+
 ### NEXT (not built)
-- **P2** — plain-language questions + send a quote PDF (Claude interprets; reuse §127
-  quote-PDF-to-WhatsApp). + a dedicated meetings breakdown + incentive line (P1 folds
-  meetings into follow-ups; incentive deferred to avoid the compute_monthly_salary auth
-  gate service-side).
 - **P3** — the every-2-hour pending-items cron (free-text, window-open only; §130 pattern).
 - **P4 (optional)** — one fallback template for a rep silent >24h.
