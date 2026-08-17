@@ -13341,9 +13341,19 @@ lands (a visibilitychange/focus re-check fires when they switch back from WhatsA
   rep whose field phone blipped at app-open (window never opens → no nudges that
   day). Retry, cap the retries, then give up fail-open.
 
-### Owner action
-SQL already run. Once the frontend deploys (Vercel), the gate is live: a mapped rep
-opens /work or /telecaller in the morning → greet card → tap → WhatsApp → send →
-gate clears + window opens + nudges flow. Verify: as Rima/Dhara, open /work having
-NOT messaged today → the card blocks check-in; tap Say good morning → send in
-WhatsApp → return to the app → card auto-closes.
+### SHIPPED + LIVE (2026-08-17)
+Committed `1be060f`, pushed, RPC RUN by owner, and **deployed to Production**
+(`1be060f` = Ready + Production on Vercel; auto-deploy landed after an
+outage-throttled queue wait — the actual build was 39s). The gate is live for
+mapped field reps. No APK rebuild (JS + RPC only; reaches the APK on next open).
+Smoke (tomorrow morning): as Rima/Dhara, open /work or /telecaller having NOT
+messaged the assistant today → the "Good morning" card blocks check-in → tap Say
+good morning → send in WhatsApp → return to the app → card auto-closes, their day
+comes back, window opens, the P3 nudges flow. Reps reopen the app once for the new
+bundle.
+
+### The whole WhatsApp internal assistant is now COMPLETE + LIVE
+P1 (identity + "hi → your day") + P2 (Claude Q&A + send quote PDF) + P3 (every-2h
+pending-follow-up nudge) + Phase 314 (message-first greet gate that keeps the 24h
+window open so the nudges land). Only P4 (a fallback template for reps who never
+message) remains optional/unbuilt.
