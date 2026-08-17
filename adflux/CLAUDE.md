@@ -13113,3 +13113,32 @@ before ship.
   show far more `resume_sweep` heals. Reusable read-only queries: Q1 (symptom, per rep) +
   Q3/Q4 (by patch_path) from the 17 Aug session; schema in
   `supabase_phase138_call_capture_log.sql`.
+
+
+---
+
+## 196 · Campaign QR boards → ALL on marketing number 98982 73686 (2026-08-17)
+
+Owner directive: "every lead must come on 98982 73686." All 22 QR-board redirects
+consolidated onto the marketing number. **Live state had DRIFTED from the doc:** §119
+recorded 22/0 (all on marketing, 20 Jul) but a live check 17 Aug showed an **11/11
+split** with the service number 95815 78261 — almost certainly the §148 spam-mitigation
+spread (move a batch back to the aged service number after the 2nd flag) that never got
+recorded. Repointed the 11 back via
+`UPDATE campaign_locations SET qr_text = replace(qr_text,'919581578261','919898273686')
+WHERE qr_text LIKE '%919581578261%' AND client_name IS NULL;` → VERIFY on_marketing=22,
+on_service=0. **No reprinting** (the printed QR encodes `/api/q/<code>`; only `qr_text`
+changed — §119/§232 contract).
+- **Now: all QR boards + /led website + Meta CTWA ads → 98982 (marketing) → Rima's
+  queue.** Service number 95815 78261 stays LIVE for existing/direct chats + its own AI
+  inbox (can't force people who already have it saved to switch).
+- ⚠ SPAM RISK (owner-accepted, flagged before running): 98982 was spam-flagged TWICE
+  (§133 27 Jul · §148 1 Aug) from cold QR-scan volume. Consolidating all boards back
+  RE-CONCENTRATES that load on the flagged number. Anti-spam fixes are live (§261 no
+  auto-image on first contact · §275 soft first-reply + opt-out). **WATCH 98982's quality
+  rating in WhatsApp Manager**; if it dips toward a 3rd flag (→ block/lock risk), spread
+  boards back across both numbers (reverse the UPDATE for a subset).
+- The 2 CLIENT QRs (`client_name IS NOT NULL`) were NOT moved — owner not asked yet.
+- FOOT-GUN (this whole thing): a board-routing note in CLAUDE.md drifted from the live
+  DB (§119 said 22/0, live was 11/11). Verify `campaign_locations.qr_text` against the DB
+  before quoting which number the boards use — §17 memory-goes-stale, confirmed here.
