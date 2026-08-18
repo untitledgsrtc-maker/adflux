@@ -405,7 +405,7 @@ export default function TelecallerV2() {
   // Phase 43.1 — match sales-frozen contract: auto-refresh queue.
   // Phase 65 — 20s poll so call counters + connect-rate update
   // without waiting for tab-resume.
-  useAutoRefresh(() => load(true), { pollSeconds: 20 })  // Phase 71 — silent background refresh
+  useAutoRefresh(() => load(true), { enabled: !!profile?.id, pollSeconds: 20, userId: profile?.id })  // Phase 71 — silent background refresh
 
   // Phase 47.2 — fetch active call scripts once. Cheap; admin
   // edits don't fire often. Frontend picks the best-match script

@@ -467,7 +467,7 @@ export default function WorkV2() {
   // in-app router navigation, not on browser-level resume.
   // Phase 65 (20 May 2026) — 20s poll so /work picks up calls
   // logged in last minute (Today's Tasks + call counters).
-  useAutoRefresh(() => load(true), { enabled: !!profile?.id, pollSeconds: 20 })  // Phase 71 — silent background refresh
+  useAutoRefresh(() => load(true), { enabled: !!profile?.id, pollSeconds: 20, userId: profile?.id })  // Phase 71 — silent background refresh
 
   // Phase 34Z.70 — fix #17: ensurePushOnLogin call moved to
   // V2AppShell (Phase 34Z.69) so every rep-facing page enrolls,

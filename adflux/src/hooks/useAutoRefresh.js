@@ -35,6 +35,12 @@ import { supabase } from '../lib/supabase'
 export default function useAutoRefresh(loadFn, {
   enabled = true,
   pollSeconds = 0,
+  // Phase 318 — when set, the Realtime sub fires ONLY on this user's rows
+  // (their activities + follow-ups) instead of every rep's, so a rep's /work or
+  // /telecaller page isn't yanked to refetch on every OTHER rep's punch (§57 —
+  // the mid-call reload churn). Admin/all-rep pages pass no userId → global sub
+  // (unchanged behaviour). Visibility + focus refresh still cover the rest.
+  userId = null,
 } = {}) {
   const fnRef     = useRef(loadFn)
   const lastRunRef = useRef(0)
@@ -72,12 +78,15 @@ export default function useAutoRefresh(loadFn, {
     // - Table not in publication → silent no-op, fire() still
     //   covered by visibility/focus listeners.
     // - WebSocket disconnect → Supabase reconnects automatically.
+    // Phase 318 — own-rows filter when userId is set (rep call pages).
+    const laF = userId ? { filter: `created_by=eq.${userId}` } : {}
+    const fuF = userId ? { filter: `assigned_to=eq.${userId}` } : {}
     const channel = supabase
       .channel(`auto-refresh-${Math.random().toString(36).slice(2, 10)}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lead_activities' }, fire)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lead_activities' }, fire)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follow_ups' }, fire)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'follow_ups' }, fire)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lead_activities', ...laF }, fire)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lead_activities', ...laF }, fire)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follow_ups', ...fuF }, fire)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'follow_ups', ...fuF }, fire)
       .subscribe()
 
     return () => {
@@ -86,5 +95,5 @@ export default function useAutoRefresh(loadFn, {
       if (pollId) clearInterval(pollId)
       try { supabase.removeChannel(channel) } catch { /* */ }
     }
-  }, [enabled, pollSeconds])
+  }, [enabled, pollSeconds, userId])
 }

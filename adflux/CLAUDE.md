@@ -13526,3 +13526,32 @@ unchanged, time-to-interactive drops.
   split bundle. No SQL, no APK.
 - FOOT-GUN: a new heavy static top-level import in App.jsx re-bloats the entry chunk.
   Keep pages lazy; import heavy libs only inside the page that uses them.
+
+
+---
+
+## 202 · Phase 318 — Realtime sub scoped to own rows on the call pages (2026-08-18)
+
+Owner: kill the mid-call reload churn (SS57). `useAutoRefresh`'s Supabase Realtime sub
+listened to ALL lead_activities + follow_ups INSERT/UPDATE globally -> every rep's punch
+fired a refetch on every open /work + /telecaller (page yanked mid-call).
+
+### Fix (opt-in, backward-compatible, guardian PASS)
+- `src/hooks/useAutoRefresh.js` (SS28 FROZEN) - new optional `userId` option. When set, the
+  4 realtime subs get `filter: 'created_by=eq.<uid>'` (lead_activities) /
+  `filter: 'assigned_to=eq.<uid>'` (follow_ups). When unset -> `{}` spread -> byte-identical
+  global sub, so every OTHER caller (FollowUpsV2, QuotesV2, MyPerformanceV2, LeadDetailV2,
+  TaPayoutsAdminV2, admin pages) is UNCHANGED. `userId` added to the effect deps (a late
+  profile.id re-subscribes).
+- `WorkV2.jsx` + `TelecallerV2.jsx` (SS28 FROZEN) - pass `userId: profile?.id` (TelecallerV2
+  also gains `enabled: !!profile?.id` for mount parity with WorkV2). A rep's page now
+  refetches only on THEIR activity/follow-up change, not every rep's.
+
+### Safety / contract
+- SAFE-BY-DEGRADATION: a Realtime `filter` ever rejected just delivers nothing -> the page
+  still refreshes on visibility/focus (pre-88.6 fallback). No white screen, no data loss.
+- own-rows is correct for a rep: calls = created_by=self, queue = assigned_to=self, a
+  reassign TO them (new assigned_to=self) still fires.
+- tel:->modal chain, push, alarms, the mount itself - untouched. Deploy: push, no SQL/APK
+  (both tables already in supabase_realtime, SS88.6).
+- CONTRACT: to scope a NEW rep page, pass `userId: profile.id`; admin/all-rep pages pass none.
