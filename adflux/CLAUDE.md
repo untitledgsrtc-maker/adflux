@@ -13656,3 +13656,71 @@ fewer round-trips / re-renders.
 - Display/write-batching only — no schema, RPC, frozen surface, or hot rep path.
   Build-verified. Left (lower priority): xlsx main-thread parse (worker), the inbox
   select('*') column trim (risky), dashboard count-queries at >1000 rows.
+
+
+---
+
+## 206 · Phase 322 — after-presentation thank-you WhatsApp (owner's real meeting flow) (2026-08-18)
+
+Owner's backlog item 6 ("meeting-confirmation template"), done — but at the RIGHT
+point once he described the real field flow: **log meeting → present → END
+presentation → outcome.** So the confirmation is NOT the outcome-step "schedule a
+meeting" appointment (my first plan — guardian-BLOCKED, §120/§249.4, because
+PostCallOutcomeModal fires onSaved unawaited then onLogMeeting navigates + unmounts).
+Owner picked (AskUserQuestion) **"When end presentation"**: the moment the rep taps
+"End Presentation", offer a one-tap WhatsApp thank-you + brochure to the customer.
+
+### Why this design is clean (off the frozen call-chain)
+The presentation flow is `PresentView.jsx` (Phase 181/§77) — NOT a §28 frozen file,
+and `api/wa/send-template.js` is a campaign endpoint (not frozen). So this touches
+ZERO frozen sales contract, needs NO guardian, and cannot regress the tel:→modal
+chain. The whole thing rides the existing §128 PICK-mode (`template_key`).
+
+### What shipped (`5 files`, JS + SQL + a Meta script)
+- `src/pages/v2/PresentView.jsx` — `end()` now takes `offerThanks`. Only the explicit
+  **End Presentation** button (`end(true)`) opens an INLINE "Send a thank-you?" modal
+  after logging the session; the **Back arrow** (`end(false)`) + the unmount safety-net
+  just log + leave (no customer message on an accidental/exit path). Confirm → POST
+  `{lead_id, template_key:'meeting_done'}` with the session JWT → toast. INLINE modal
+  (z 9100) because `ConfirmDialogViewport` lives in V2AppShell and /present is OUTSIDE
+  it (its toasts show on the lead page after nav — same reason).
+- `api/wa/send-template.js` — (a) `'meeting_done'` added to the PICK-mode allowlist;
+  (b) role gate WIDENED for `pickKey==='meeting_done'` ONLY to include **sales + agency**
+  (field reps present in person — the post-call pilot was telecaller/admin). Every
+  other gate (ownership, opt-out, phone, per-lead 24h throttle, the 3 conversation
+  writes) is byte-unchanged. The inbox picker (§128, 4 keys) is unaffected.
+- `supabase_phase322_meeting_thanks_template.sql` (owner RUNS **after** the Meta
+  template is Active) — extends the `outcome` CHECK to include `meeting`+`meeting_done`
+  (superset, safe whether or not phase249_3 ran) + inserts the `meeting_done` row →
+  `post_meeting_thanks`, gu, brochure PDF (the SAME brochure URL as the other PDF
+  templates), preview_body = the gu thank-you.
+- `scripts/create-meeting-thanks-template.py` (owner RUNS with a FRESH token) — creates
+  the gu `post_meeting_thanks` template (DOCUMENT header via the tiny-sample-PDF trick,
+  §203.1) with a 2-var reply-first body (name + rep, bold on the network name + reply
+  CTA). Body is byte-identical to the SQL `preview_body` (§125.1 lockstep).
+
+### Contracts / notes
+- `meeting_done` (this thank-you, 2 vars, brochure) is DISTINCT from `meeting`
+  (post_call_meeting, the §249.3 appointment-confirm, 4 date/time vars, no brochure).
+- The Meta template is Gujarati (consistent with the §203 reply-first set). Flip later
+  by editing the template + the row's language (no app deploy — send-template.js reads
+  `tpl.language`).
+- Both fire on a real presentation only (`dur >= 3` + a lead). No phone / opted-out →
+  send-template.js 409s and the toast explains; the prompt still showed (acceptable).
+- ⚠ RUN ORDER (§126.1): create the Meta template → wait for **Active** → THEN run the
+  SQL. Row-before-Active = every "Send thank-you" tap fails. If the SQL ever runs before
+  the template exists, the tap 409s `no_template_for_outcome` (harmless, just no send).
+
+### Owner action (2 steps, both his by nature — §14 SQL / §119 Meta token)
+1. `TOKEN='<fresh System User token>' python3 scripts/create-meeting-thanks-template.py`
+   → watch WhatsApp Manager → Message templates until `post_meeting_thanks` is Active.
+2. Run `supabase_phase322_meeting_thanks_template.sql` in Supabase Studio (VERIFY:
+   meeting_done row, gu, has_pdf=true, has_preview=true).
+Frontend + endpoint are PUSHED (JS reaches the APK on next open; no APK rebuild). The
+prompt is live now; the SEND works once steps 1+2 are done.
+
+### Foot-gun
+- ❌ Wiring a "meeting confirmation" to the PostCallOutcomeModal 'meeting' next-action —
+  the modal fires onSaved unawaited then navigates/unmounts, so a prompt there never
+  renders (guardian-BLOCKED, §249.4). Fire it where the rep LANDS / on a stable page
+  event (here: the presentation-End button), never inside the unmounting outcome modal.

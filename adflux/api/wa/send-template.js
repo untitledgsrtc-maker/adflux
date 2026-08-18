@@ -217,8 +217,17 @@ export default async function handler(req) {
 async function sendToLead({ uid, role, callerName, isSalesHead = false, leadId, pickKey = null }) {
   // Pilot gate: telecallers + admins only (§ plan P5 — widen after the pilot).
   // A Sales Head (manager P1) is admitted too (she messages any rep's lead).
-  if (!['admin', 'co_owner', 'telecaller'].includes(role) && !isSalesHead) {
-    return json({ error: 'not_allowed', detail: 'Telecallers only during the pilot.' }, 403)
+  //
+  // Phase 322 — the presentation thank-you (pickKey='meeting_done') is a FIELD
+  // SALES action: a rep who just presented in person taps "End presentation"
+  // and offers the customer a thank-you + brochure. So 'sales' + 'agency' are
+  // allowed for THAT key only, on top of the telecaller/admin post-call set.
+  const isMeetingDone = pickKey === 'meeting_done'
+  const allowedRoles = isMeetingDone
+    ? ['admin', 'co_owner', 'telecaller', 'sales', 'agency']
+    : ['admin', 'co_owner', 'telecaller']
+  if (!allowedRoles.includes(role) && !isSalesHead) {
+    return json({ error: 'not_allowed', detail: 'Not allowed to send from the company number.' }, 403)
   }
   if (!/^[0-9a-f-]{36}$/i.test(leadId)) return json({ error: 'bad_lead_id' }, 400)
 
@@ -242,7 +251,10 @@ async function sendToLead({ uid, role, callerName, isSalesHead = false, leadId, 
   // a specific time, which the picker path does not have).
   let outcome
   if (pickKey) {
-    const PICKABLE = ['positive', 'neutral', 'nurture', 'negative']
+    // Phase 322 adds 'meeting_done' (the presentation thank-you) to the
+    // pickable set. Still NOT the date-confirming callback/meeting templates
+    // (they need a fresh saved time the picker path does not carry).
+    const PICKABLE = ['positive', 'neutral', 'nurture', 'negative', 'meeting_done']
     if (!PICKABLE.includes(pickKey)) {
       return json({ error: 'bad_template_key', detail: 'That template cannot be sent from the inbox.' }, 400)
     }
