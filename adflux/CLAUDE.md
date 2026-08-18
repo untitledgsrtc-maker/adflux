@@ -13555,3 +13555,38 @@ fired a refetch on every open /work + /telecaller (page yanked mid-call).
 - tel:->modal chain, push, alarms, the mount itself - untouched. Deploy: push, no SQL/APK
   (both tables already in supabase_realtime, SS88.6).
 - CONTRACT: to scope a NEW rep page, pass `userId: profile.id`; admin/all-rep pages pass none.
+
+
+---
+
+## 203 · Phase 319 — post-call templates -> GUJARATI (reply-first, bold) (2026-08-18)
+
+Owner (via /brainstorming): the 5 post-call WhatsApp templates -> Gujarati, goal = get
+the customer to REPLY (re-opens the 24h window for the rep/AI), bold on key details
+(Meta's own tip), keep them Utility.
+
+### How it wires (NO app deploy - send-template.js already reads tpl.language)
+1. `scripts/create-post-call-templates-gu.sh` - CREATEs the 5 gu-language templates on
+   the marketing WABA (same names, language 'gu'; Meta allows the added language). Bash
+   uploads the brochure + python builds the Gujarati JSON (ensure_ascii -> \uXXXX, valid).
+   PDF (DOCUMENT header) on good/maybe/nurture; NONE on callback + lost. Owner runs it
+   with a FRESH Meta System User token (SS119) + BROCHURE_URL.
+2. Meta reviews (Utility, usually quick) -> all 5 gu versions go Active.
+3. `supabase_phase319_gu_templates.sql` - flips wa_outcome_templates.language 'en'->'gu'
+   + sets preview_body to the Gujarati text + NULLs the callback brochure. Run ONLY
+   AFTER step 2 (SS126.1 - the en versions keep sending until then; flipping early makes
+   every post-call send FAIL). send-template.js picks up gu instantly (reads tpl.language).
+
+### Decisions
+- Call-later (callback) DROPS the brochure (was +PDF since SS253b) -> back to an
+  appointment-confirmation with no attachment (owner-approved wording). good/maybe/nurture
+  keep it. The SQL nulls callback's header_doc_url (the gu callback template has no
+  doc-header slot; a set header_doc_url would fail the send).
+- Bold `*...*` on: date/time (callback), the network name, the reply CTA. Not overused.
+- Same variable order ({{1}} name, {{2}} rep, {{3}} date, {{4}} time) - no send-code change.
+
+### Rollback / lockstep
+Rollback = `UPDATE wa_outcome_templates SET language='en'` + restore en preview_body +
+callback header_doc_url; the en templates never left Meta. LOCKSTEP: the Meta template
+body and the DB preview_body (SS125.1) must match - edit both together. To add any other
+language later: create the templates in that language + flip tpl.language. No code change.
