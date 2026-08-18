@@ -21,7 +21,7 @@
 //   • Won today value from quotes status='won' + payments today (rough)
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { isSystemClose } from '../../utils/followups'
+import { isSystemClose, keepInFollowupQueue } from '../../utils/followups'
 import { useNavigate } from 'react-router-dom'
 import { Users as UsersIcon, MapPin, Mic, Loader2 } from 'lucide-react'
 import { Loader } from '@googlemaps/js-api-loader'
@@ -500,7 +500,7 @@ export default function TeamDashboardV2() {
         // overdue is always-now). Pulled separately from fuRes which
         // is window-gated. Pending only.
         supabase.from('follow_ups')
-          .select('assigned_to')
+          .select('assigned_to, cadence_type, lead:leads(stage)')
           .lt('follow_up_date', today)
           .eq('is_done', false),
 
@@ -668,7 +668,10 @@ export default function TeamDashboardV2() {
       // replace empty Quote Chase tile for TC reps.
       const odMap = {}
       ;(overdueFuRes?.data || []).forEach((r) => {
-        if (!r.assigned_to) return
+        // Phase 316 — count only what the FollowUpsV2 list shows (§71 one rule):
+        // a parked Nurture lead's near-term row is hidden there, so it must not
+        // count as "overdue" here either (the card-vs-list mismatch, §133/§163).
+        if (!r.assigned_to || !keepInFollowupQueue(r)) return
         odMap[r.assigned_to] = (odMap[r.assigned_to] || 0) + 1
       })
       setOverdueFuByUser(odMap)

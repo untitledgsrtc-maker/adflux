@@ -219,8 +219,17 @@ BEGIN
     'overdue_fu', COALESCE((
       SELECT jsonb_agg(to_jsonb(o))
       FROM (
-        SELECT assigned_to FROM public.follow_ups
-        WHERE follow_up_date < p_today AND is_done = false
+        SELECT f.assigned_to FROM public.follow_ups f
+        LEFT JOIN public.leads l ON l.id = f.lead_id
+        WHERE f.follow_up_date < p_today AND f.is_done = false
+          -- Phase 316 — match keepInFollowupQueue (§71): hide parked-Nurture +
+          -- Lost rows so the card count == the FollowUpsV2 list (§133/§163).
+          AND COALESCE(l.stage, '') <> 'Lost'
+          -- COALESCE(...,false): a lead_id-NULL row (e.g. payment-collection
+          -- follow-ups) has l.stage NULL → the Nurture test is NULL → keep it,
+          -- matching the JS keepInFollowupQueue (undefined stage → true). Without
+          -- this, NULL→false→row silently dropped → count-vs-list mismatch returns.
+          AND NOT COALESCE(l.stage = 'Nurture' AND COALESCE(f.cadence_type, '') <> 'nurture', false)
       ) o
     ), '[]'::jsonb),
 

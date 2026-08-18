@@ -26,3 +26,23 @@ const SYSTEM_CLOSE_RE = /auto-closed|auto-skipped|retro-closed|heal|cancelled by
 export function isSystemClose(note) {
   return !!note && SYSTEM_CLOSE_RE.test(note)
 }
+
+// Phase 316 (Consolidation) — ONE definition of "does this OPEN follow-up belong
+// in the active queue?". The follow-ups LIST and every per-rep overdue/pending
+// COUNT must agree, or a parked Nurture lead shows "N overdue" on the dashboard
+// card with nothing in the list (the recurring count-vs-list bug, §133/§163).
+// Phase 310 added this rule inside FollowUpsV2 but the TeamDashboard overdue count
+// (JS) + the team_dashboard_bundle RPC (SQL) were never updated — this brings all
+// three to one source. Mirror any change here in the RPC's overdue_fu subquery.
+//   • Lost lead     → never in the queue (terminal).
+//   • Nurture lead  → ONLY its 30-day 'nurture' check-in (cadence_type==='nurture').
+//                     A parked lead's near-term "after call" next-action stays OPEN
+//                     in the DB but must not nag the rep or inflate counts.
+//   • everything else → in the queue.
+// Row must carry lead.stage (embed lead:leads(stage)) + cadence_type.
+export function keepInFollowupQueue(row) {
+  const stage = row?.lead?.stage
+  if (stage === 'Lost') return false
+  if (stage === 'Nurture') return row?.cadence_type === 'nurture'
+  return true
+}

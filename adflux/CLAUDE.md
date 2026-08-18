@@ -13426,3 +13426,50 @@ are done first because they're the only zero-risk item.
    line one at a time** (5 lines), then the VERIFY select (expect 5 rows).
 2. That's it — no push needed for the speedup (indexes are DB-only). The SQL file +
    this log are committed for the record; push when convenient.
+
+
+---
+
+## 200 · Phase 316 — OVERDUE F-UP count ≠ list (one shared keepInFollowupQueue) (2026-08-18)
+
+Owner: Rima's Team Dashboard card showed "2 overdue follow-ups" but clicking through
+showed none — "you broke something yesterday." **ROOT: not yesterday.** Phase 310
+(2026-08-15, "nurtured leads leave the active follow-up queue until due") added
+`keepInFollowupQueue` (hide a Nurture lead's non-nurture rows + Lost) to the
+**FollowUpsV2 LIST only**; the TeamDashboardV2 overdue **COUNT** + the
+team_dashboard_bundle RPC still counted every open past-dated follow-up → the
+recurring count-vs-list divergence (§133/§163). (A Lost-row version predates 310 —
+the count never filtered stage at all.)
+
+### Fix (§71 ONE definition)
+`keepInFollowupQueue(row)` moved to `src/utils/followups.js` (the §175 canonical),
+now used by ALL three surfaces:
+- `FollowUpsV2.jsx` (§28 FROZEN, guardian PASS) — local dup REMOVED, imports the
+  shared util. List behavior byte-identical (the two `.filter(keepInFollowupQueue)`
+  sites unchanged).
+- `TeamDashboardV2.jsx` — overdue query now selects `cadence_type, lead:leads(stage)`;
+  the odMap count loop skips `!keepInFollowupQueue(r)`. **Admin path** — push fixes it.
+- `supabase_phase193_team_dashboard_gated.sql` — the overdue_fu subquery LEFT JOINs
+  leads + excludes Lost + Nurture-non-nurture (mirrors the JS). **Team-viewer path
+  (Jayna)** — owner RE-RUNS the SQL.
+
+### GUARDIAN P1 (caught + fixed pre-commit) — the NULL-join trap
+First SQL had a 3-valued-logic bug: a lead_id-NULL follow-up (payment-collection
+rows, spawned lead_id-NULL — common, every WON quote spawns some) made
+`l.stage = 'Nurture'` → NULL → `NOT NULL` → WHERE-false → the row was silently
+DROPPED from the team-viewer count, re-creating the mismatch for Jayna on exactly
+the rows the JS KEEPS. Fixed: `AND NOT COALESCE(<nurture test>, false)` so a NULL
+join fails toward KEEP (matches the JS `row?.lead?.stage === undefined → true`).
+The Lost check already NULL-safe via `COALESCE(l.stage,'') <> 'Lost'`.
+- ❌ FOOT-GUN: an RLS/RPC WHERE clause that folds a LEFT-JOIN column into a `NOT(...)`
+  test silently drops NULL-join rows — COALESCE the whole test to false, or the count
+  under-reports on the lead-blind rows the frontend still shows.
+
+### CONTRACT
+`keepInFollowupQueue` in `utils/followups.js` is the ONE definition — the follow-ups
+list, the dashboard overdue count, and the RPC MUST agree. The SQL can't import JS, so
+any change to the rule mirrors into the RPC's overdue_fu subquery in the same commit.
+
+### Deploy
+Push → fixes the ADMIN dashboard (JS only, no SQL). Owner RE-RUNS
+`supabase_phase193_team_dashboard_gated.sql` to fix the team-viewer (Jayna) card. No APK.

@@ -45,6 +45,7 @@ import { istTodayISO } from '../../utils/istDate'
 // path cancelled alarms; a manual Done/Snooze left the old alarm armed →
 // phantom reminder fired for work already finished.
 import { scheduleFollowUpAlarm, cancelFollowUpAlarm } from '../../utils/scheduleFollowUpAlarm'
+import { keepInFollowupQueue } from '../../utils/followups'
 
 const TODAY_ISO = () => new Date().toISOString().slice(0, 10)
 const ADD_DAYS  = (iso, n) => {
@@ -72,12 +73,9 @@ const ADD_DAYS  = (iso, n) => {
 //                        cadence_type + lead.stage), so this is safe at every
 //                        setRows() site.
 //   • Everything else  → keep.
-function keepInFollowupQueue(r) {
-  const stage = r.lead?.stage
-  if (stage === 'Lost') return false
-  if (stage === 'Nurture') return r.cadence_type === 'nurture'
-  return true
-}
+// keepInFollowupQueue moved to src/utils/followups.js (Phase 316, §71 one
+// definition — the TeamDashboard overdue count + the team RPC now share it, so
+// the list and the card can never disagree again). Imported above.
 
 export default function FollowUpsV2() {
   const { profile, isPrivileged } = useAuth()
