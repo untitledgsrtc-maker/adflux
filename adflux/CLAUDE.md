@@ -13600,3 +13600,31 @@ REAL brochure is still attached per-send from wa_outcome_templates.header_doc_ur
 reruns it (TOKEN still in env; BROCHURE_URL not needed). FOOT-GUN: a large PDF sample can
 be rejected as an invalid handle — use a small placeholder sample for template creation,
 keep the real doc for the send.
+
+
+---
+
+## 204 · Phase 320 — hand-off nudge also fires on 5+ follow-ups (2026-08-18)
+
+Owner: the "hand this lead off?" popup (SS173/Phase 285, fired after >5 CALLS to a lead)
+should ALSO fire after the rep has followed up 5+ times with no result. Buttons stay
+Hand off / Keep (owner declined Mark Lost/Nurture — kept simple).
+
+### Change (NO frozen file touched)
+- `src/utils/reassignNudge.js` (util, not frozen) — checkReassignNudge now trips on
+  >5 calls OR >5 REAL completed follow-ups. Follow-up count = follow_ups (lead_id,
+  assigned_to=rep, is_done=true) MINUS system auto-closes (SS175 shared isSystemClose),
+  so it counts times the rep actually followed up, not heals/stage-cancels. Returns
+  max(calls, followups); one nudge, either signal.
+- `src/components/leads/ReassignSuggestModal.jsx` (not frozen) — "called N times" ->
+  "followed up on N times" (generic for both signals).
+- WorkV2 + TelecallerV2 (SS28 FROZEN) UNCHANGED — they already call checkReassignNudge in
+  PostCallOutcomeModal onSaved + show the modal (SS173). Only the util's count widened;
+  no new mount, no chain change -> the popup can't double (one check).
+
+### Notes
+- Trigger is still the call-outcome save. A lead with 5+ follow-ups gets the nudge on the
+  rep's next call to it. Marking a follow-up done in FollowUpsV2 WITHOUT a call does not
+  itself pop the nudge (needs a frozen mount) — deferred.
+- Dismiss memory (24h, SS173) unchanged -> "Keep working it" won't nag every call.
+- No score/pay impact (reads call_logs + follow_ups + leads). Build-verified.

@@ -17,7 +17,9 @@
 // in localStorage for 24h so we don't nag on every subsequent call. Reassign
 // itself needs no memory — the lead leaves this rep's queue.
 
-// Owner's threshold: strictly MORE than 5 → suggest at the 6th call.
+import { isSystemClose } from './followups'
+
+// Owner's threshold: strictly MORE than 5 → suggest at the 6th call/follow-up.
 const CALL_THRESHOLD = 5
 const DISMISS_TTL_MS = 24 * 60 * 60 * 1000 // re-offer the next day
 const DISMISS_KEY = 'reassignNudgeDismissed'
@@ -62,7 +64,8 @@ export function dismissReassignNudge(userId, leadId) {
   }
 }
 
-// Returns the call count (>5) when a reassign should be suggested, else null.
+// Returns the count (>5 calls OR >5 real completed follow-ups) when a reassign
+// should be suggested, else null. Phase 320 added the follow-up signal.
 // Best-effort: any query error or a closed/missing lead → null (no nudge).
 export async function checkReassignNudge(supabase, { leadId, userId }) {
   if (!supabase || !leadId || !userId) return null
@@ -78,14 +81,30 @@ export async function checkReassignNudge(supabase, { leadId, userId }) {
     if (leadErr || !lead) return null
     if (lead.stage === 'Won' || lead.stage === 'Lost') return null
 
-    const { count, error } = await supabase
+    // calls this rep made to this lead (Phase 285)
+    const { count: callCount } = await supabase
       .from('call_logs')
       .select('id', { count: 'exact', head: true })
       .eq('lead_id', leadId)
       .eq('user_id', userId)
-    if (error) return null
+    const nCalls = callCount || 0
 
-    const n = count || 0
+    // Phase 320 — follow-ups the rep ACTUALLY completed on this lead (is_done,
+    // minus system auto-closes via the §175 shared isSystemClose), so "you've
+    // followed up 5+ times, hand it off" fires on real work, not auto-closes.
+    let nFollowups = 0
+    const { data: fus } = await supabase
+      .from('follow_ups')
+      .select('done_note')
+      .eq('lead_id', leadId)
+      .eq('assigned_to', userId)
+      .eq('is_done', true)
+      .limit(100)
+    if (Array.isArray(fus)) nFollowups = fus.filter((r) => !isSystemClose(r.done_note)).length
+
+    // ONE nudge, either signal: 5+ calls OR 5+ real follow-ups. Show the bigger
+    // count so the message reflects how much this lead has been worked.
+    const n = Math.max(nCalls, nFollowups)
     return n > CALL_THRESHOLD ? n : null
   } catch {
     return null

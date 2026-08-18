@@ -40,7 +40,7 @@ export default function ReassignSuggestModal({ open, lead, count, onReassign, on
 
         <div className="lead-modal-body">
           <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--v2-ink-1, #a9b3c7)' }}>
-            You've called {name} <strong style={{ color: 'var(--v2-ink-0, #f5f7fb)' }}>{count} times</strong> with no
+            You've followed up on {name} <strong style={{ color: 'var(--v2-ink-0, #f5f7fb)' }}>{count} times</strong> with no
             close yet. A teammate with fresh eyes may land it. Reassign, or keep working it?
           </div>
         </div>
