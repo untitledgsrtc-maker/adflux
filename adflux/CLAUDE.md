@@ -13471,5 +13471,13 @@ list, the dashboard overdue count, and the RPC MUST agree. The SQL can't import 
 any change to the rule mirrors into the RPC's overdue_fu subquery in the same commit.
 
 ### Deploy
-Push → fixes the ADMIN dashboard (JS only, no SQL). Owner RE-RUNS
-`supabase_phase193_team_dashboard_gated.sql` to fix the team-viewer (Jayna) card. No APK.
+Push → fixes the ADMIN dashboard (JS only, no SQL). For the team-viewer (Jayna) path,
+run **`supabase_phase316_team_bundle_fn.sql`** (a FUNCTION-ONLY `CREATE OR REPLACE` of
+team_dashboard_bundle) — NOT the full `supabase_phase193_team_dashboard_gated.sql`. No APK.
+- ⚠ **DEADLOCK LESSON (2026-08-18):** re-running phase193 to update the function hit
+  `40P01 deadlock` on `DROP POLICY … ON public.gps_pings` — gps_pings is written every
+  few seconds by field reps, so the policy DROP's exclusive lock fought the live INSERTs.
+  A `CREATE OR REPLACE FUNCTION` locks only pg_proc, never gps_pings → no deadlock, safe
+  during business hours. FOOT-GUN: to change ONE function that lives in a big migration
+  file, extract + run the function alone — never re-run a file whose DDL drops/creates
+  policies on a hot table (gps_pings, call_logs, lead_activities) while reps are active.
