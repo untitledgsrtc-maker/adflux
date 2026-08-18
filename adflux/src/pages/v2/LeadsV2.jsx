@@ -123,6 +123,15 @@ const VISIBLE_GROUPS = ALL_STAGE_GROUPS.filter(g => g.key !== 'in_progress')
 // (no dead-var) for that.
 const SHOW_LEADS_AI_CARD = false
 
+// Phase 323 — mm:ss for the presentation-time column (from presentation_sessions).
+function fmtPresentSecs(secs) {
+  const s = Number(secs) || 0
+  if (s <= 0) return '—'
+  const m = Math.floor(s / 60)
+  const ss = s % 60
+  return `${m}:${String(ss).padStart(2, '0')}`
+}
+
 export default function LeadsV2() {
   const navigate = useNavigate()
   // Phase 34Z.43 — refresh leads list on every navigation back so
@@ -218,6 +227,11 @@ export default function LeadsV2() {
     return [50, 100, 200, 500].includes(saved) ? saved : 50
   })
   const [page, setPage] = useState(1)
+
+  // Phase 323 — per-lead engagement stats (calls + presentation time) for the
+  // two extra columns. Fetched lazily for the VISIBLE page only (never all
+  // rows), so the list load is unchanged (§45). Cached by lead id.
+  const [statsMap, setStatsMap] = useState({})
 
   /* ─── Reassign modal ─── */
   const [reassignOpen, setReassignOpen] = useState(false)
@@ -425,6 +439,30 @@ export default function LeadsV2() {
     const start = (page - 1) * pageSize
     return filtered.slice(start, start + pageSize)
   }, [filtered, page, pageSize])
+
+  // Phase 323 — load calls + presentation-time for the leads on THIS page only.
+  // Lazy + cached: never aggregates over the whole (6000+) list, so the main
+  // load stays unchanged (§45). RPC is SECURITY INVOKER → RLS scopes it, and it
+  // no-ops (columns show "—") if the RPC isn't deployed yet (deploy-order safe).
+  useEffect(() => {
+    const ids = paged.map(l => l.id).filter(id => id && !(id in statsMap))
+    if (ids.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      const { data, error } = await supabase.rpc('lead_engagement_stats', { p_lead_ids: ids })
+      if (cancelled || error || !Array.isArray(data)) return
+      setStatsMap(prev => {
+        const next = { ...prev }
+        ids.forEach(id => { if (!(id in next)) next[id] = { calls: 0, secs: 0 } })
+        data.forEach(r => { next[r.lead_id] = { calls: r.call_count || 0, secs: r.presentation_seconds || 0 } })
+        return next
+      })
+    })()
+    return () => { cancelled = true }
+    // statsMap is READ inside to skip cached ids — intentionally NOT a dep, else
+    // every merge re-runs the effect (loop). paged changes on page/filter only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paged])
 
   // Phase 62.8 — CSV export of currently selected rows. If nothing
   // selected, falls back to exporting the FILTERED set (so admin
@@ -1169,6 +1207,8 @@ export default function LeadsV2() {
                 <th>Source</th>
                 {(isPrivileged || teamViewing) && <th>Assigned</th>}
                 <th>Last</th>
+                <th style={{ textAlign: 'center' }} title="Total calls to this lead">Calls</th>
+                <th style={{ textAlign: 'center' }} title="Total in-app presentation time">Pres.</th>
                 <th style={{ textAlign: 'right' }}>Value</th>
               </tr>
             </thead>
@@ -1418,6 +1458,12 @@ export default function LeadsV2() {
                   )}
                   <td className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {l.last_contact_at ? formatRelative(l.last_contact_at) : '—'}
+                  </td>
+                  <td className="mono" style={{ fontSize: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {statsMap[l.id] ? (statsMap[l.id].calls || '—') : '—'}
+                  </td>
+                  <td className="mono" style={{ fontSize: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {statsMap[l.id] ? fmtPresentSecs(statsMap[l.id].secs) : '—'}
                   </td>
                   <td className="mono" style={{ fontWeight: 600, fontFamily: 'var(--font-display)', textAlign: 'right' }}>
                     {l.expected_value ? formatCurrency(l.expected_value) : '—'}

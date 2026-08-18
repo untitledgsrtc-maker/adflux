@@ -13724,3 +13724,64 @@ prompt is live now; the SEND works once steps 1+2 are done.
   the modal fires onSaved unawaited then navigates/unmounts, so a prompt there never
   renders (guardian-BLOCKED, §249.4). Fire it where the rep LANDS / on a stable page
   event (here: the presentation-End button), never inside the unmounting outcome modal.
+
+
+---
+
+## 207 · Phase 323 — /leads two new columns: Calls + Presentation time (2026-08-18)
+
+Owner (on the /leads list): "open more thing presentation time / total call attpt."
+Decisions (AskUserQuestion): placement = **list columns**; call count = **calls only**.
+Two new columns on `LeadsV2` between Last and Value: **Calls** (total calls to the
+lead) + **Pres.** (total in-app GSRTC presentation time, mm:ss). Guardian PASS +
+adversarial security/perf review PASS. On origin, no APK.
+
+### The §45-safe design (the key)
+A 6000+-row list can't aggregate per row. So a **SECURITY INVOKER RPC**
+`lead_engagement_stats(p_lead_ids uuid[])` (`supabase_phase323_lead_engagement_stats.sql`,
+owner RAN it) returns `(lead_id, call_count, presentation_seconds)` — unnest + two
+grouped LEFT JOINs (`count(*)` from call_logs.lead_id, `sum(duration_seconds)` from
+presentation_sessions.lead_id). Both hit an existing index (`idx_call_logs_lead`
+partial + `ps_lead_idx`) → no new index. `LeadsV2` fetches it for the **VISIBLE PAGE
+only** (~50 ids, `paged`, never all rows), lazily, cached in a `statsMap`, non-blocking
+→ the main list load is byte-unchanged (columns show "—" then fill). Deploy-before-SQL
+safe: the effect no-ops on RPC error → columns show "—".
+
+### Frozen-file (§28) changes — all ADDITIVE (guardian PASS)
+`LeadsV2.jsx`: a module helper `fmtPresentSecs` + `statsMap` state + one useEffect
+(deps `[paged]` only; statsMap read-not-dep to avoid a merge loop, documented) + 2 th +
+2 td. Nothing existing edited. No stage/cadence/activity/push/score/TA/useAutoRefresh
+touched. New SQL is a read-only INVOKER RPC (RLS scopes it — same pattern as run_select
+§72#14; GRANT authenticated, no REVOKE needed since INVOKER means anon sees nothing).
+
+### ⚠ F1 (CONFIRMED caveat — the columns are ADMIN-accurate, PERSONAL-scoped for others)
+Because the RPC is INVOKER, each column runs under the caller's RLS:
+- **admin (Brijesh)** → TRUE team totals (`call_logs_admin_all` + `ps_admin_all`). The
+  owner's own view is correct — this is what the screenshot request was.
+- **plain rep** → own calls/presentations (intended for their own leads).
+- **Sales Head / team viewer (Jayna, §164/§172)** → in Team-view /leads she sees all
+  reps' leads, but these two columns render only HER engagement (~0 on a lead another
+  rep worked 20×). NOT a leak — an under-report that could mislead.
+- **co_owner (Vishal)** → §42-CORRECT that he can't see private call data; INVOKER
+  auto-enforces it (Calls own-only, Pres team-total → the two disagree, but that's the
+  right scope, do NOT "fix" it by widening him).
+Making the columns team-accurate for Jayna needs a DEFINER RPC gated (admin/co_owner-
+govt-scoped/is_sales_head → team totals; rep → own) — the §172/§193 team-RPC pattern +
+a §42 decision on Vishal. Deliberately NOT built (the author correctly avoided the
+gating complexity for a v1 the owner sees accurately). **Offer it as a follow-up if the
+owner wants Jayna's team-view columns accurate.**
+- F2 (info): "Calls" = total attempts incl. the tel-tap AUDIT rows (§92) — matches
+  "total call attempts", reads higher than "times we actually spoke."
+- F3 (fixed): 0-calls now renders "—" (was "0") to match the Pres/Value convention.
+
+### Owner action
+Run `supabase_phase323_lead_engagement_stats.sql` (DONE — "Success. No rows returned").
+Push carries the LeadsV2 columns. They light up on the admin view immediately; other
+roles see own-scoped counts (F1).
+
+### Foot-gun
+- ❌ Aggregating engagement per row over a 6000-row frozen list = a slowdown. Fetch a
+  small per-visible-page RPC lazily, cache by id, never block the main load (§45/§66).
+- ❌ An INVOKER stats RPC on a leads LIST reads as "true totals" but is actually
+  per-caller-RLS-scoped — accurate for admin, personal for everyone else. If a team
+  viewer needs true totals, it's a DEFINER RPC + gating, not INVOKER.
