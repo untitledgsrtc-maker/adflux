@@ -72,4 +72,22 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Phase 317 — manualChunks pairs with the route code-splitting in App.jsx:
+  // the heavy, page-specific libs each get their own cached chunk so they load
+  // ONLY with the pages that import them (a rep never downloads reactflow, the
+  // PDF stack, xlsx, or the map loader) and stay cached across app updates.
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'supabase': ['@supabase/supabase-js'],
+          'pdf': ['@react-pdf/renderer', 'html2canvas', 'jspdf'],
+          'maps': ['leaflet', '@googlemaps/js-api-loader'],
+          'flow': ['reactflow'],
+          'sheet': ['xlsx'],
+        },
+      },
+    },
+  },
 })

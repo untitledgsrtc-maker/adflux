@@ -13481,3 +13481,48 @@ team_dashboard_bundle) — NOT the full `supabase_phase193_team_dashboard_gated.
   during business hours. FOOT-GUN: to change ONE function that lives in a big migration
   file, extract + run the function alone — never re-run a file whose DDL drops/creates
   policies on a hot table (gps_pings, call_logs, lead_activities) while reps are active.
+
+
+---
+
+## 201 · Phase 317 — route code-splitting (app-open speed) (2026-08-18)
+
+Owner: "app-open speed." Root: every page was a static import in App.jsx -> the whole
+app shipped in ONE ~1.3 MB gz chunk on every cold open, even pages a rep never sees
+(Finance, HR, Campaign, the PDF stack, reactflow, xlsx). Now each page loads on demand.
+
+### What shipped (build-verified + guardian PASS, no findings)
+- `src/App.jsx` (SS 28 FROZEN) - all 66 `import X from './pages/...'` ->
+  `const X = lazyWithRetry(() => import('./pages/...'))`; `<Suspense fallback>` around
+  `<Routes>`. INFRA kept STATIC (router, useAuth, V2AppShell, CheckInGate, ErrorBoundary,
+  the in-file guards + RootRedirect + LoadingScreen). Every route path/element/guard/ORDER
+  byte-unchanged - ONLY the import mechanism.
+- `src/components/v2/V2AppShell.jsx` (SS 28 FROZEN) - `<Outlet/>` wrapped in `<Suspense>` so
+  the sidebar/topbar STAY during a page-chunk load (no shell flash on navigation).
+- `vite.config.js` - `build.rollupOptions.output.manualChunks`: react-vendor / supabase /
+  pdf / maps / flow / sheet each their own cached chunk. PWA/injectManifest untouched.
+
+### lazyWithRetry - the deploy-safety piece, do NOT remove
+On a dynamic-import failure it reloads ONCE (10s-windowed sessionStorage guard): a rep
+whose browser cached an OLD index.html gets 404s on old chunk URLs after a deploy -> the
+reload pulls the fresh build instead of a WHITE SCREEN. The 10s window stops a reload loop
+on a genuinely-broken chunk (then it surfaces the error). Hoisted `function` decl -> safe
+to call at module-eval before its textual line (avoids the SS180/192/193 late-var trap).
+
+### Result
+Cold open ~= entry(53 gz) + react-vendor(53) + supabase(53) + the landing page chunk -
+down from the ~1.3 MB monolith. Heavy libs now OFF the cold path, loaded only when a page
+needs them: pdf 602 kB gz (react-pdf + html2canvas + jspdf), sheet 143 kB (xlsx), flow
+47 kB (reactflow). `npm run build` splits into per-page + vendor chunks; the built app
+renders. PWA precache still covers all chunks (background, offline-safe) - total bytes
+unchanged, time-to-interactive drops.
+
+### Contracts / notes
+- TWO Suspense boundaries: outer (around Routes -> login/present/non-shell lazy routes) +
+  inner (V2AppShell, around Outlet -> keeps the shell during page loads). Every lazy route
+  has a fallback ancestor.
+- Frozen chain (PostCallOutcomeModal, useAutoRefresh, push, sw.js) untouched.
+- Deploy: push -> Vercel builds -> reps hard-refresh ONCE (or the PWA auto-updates) for the
+  split bundle. No SQL, no APK.
+- FOOT-GUN: a new heavy static top-level import in App.jsx re-bloats the entry chunk.
+  Keep pages lazy; import heavy libs only inside the page that uses them.

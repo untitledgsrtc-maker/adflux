@@ -25,7 +25,7 @@
 // (hamburger) + a fixed 4-item bottom nav. This mirrors the
 // Dashboard pages so the two halves of the app feel consistent.
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import CopilotModal from '../copilot/CopilotModal'
 import GlobalSearchBar from './GlobalSearchBar'
@@ -917,7 +917,9 @@ export function V2AppShell() {
               <ProposedIncentiveCard compact={false} />
             </div>
           )}
-          <Outlet />
+          <Suspense fallback={<div style={{ minHeight: '50vh', display: 'grid', placeItems: 'center' }}><div className="spinner" /></div>}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
 

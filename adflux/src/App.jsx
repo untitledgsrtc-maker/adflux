@@ -1,91 +1,110 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { V2AppShell } from './components/v2/V2AppShell'
-import Login from './pages/Login'
+const Login = lazyWithRetry(() => import('./pages/Login'))
 // Public candidate-facing offer form — NO auth, NO shell.
-import OfferForm from './pages/OfferForm'
+const OfferForm = lazyWithRetry(() => import('./pages/OfferForm'))
 // Quote detail was preserved as-is (837-line payment approval logic
 // must not be refactored with the shell cut-over).
-import QuoteDetail from './pages/QuoteDetail'
+const QuoteDetail = lazyWithRetry(() => import('./pages/QuoteDetail'))
 // v2 dashboard switcher (owns its own chrome; not under V2AppShell).
-import DashboardV2 from './pages/v2/DashboardV2'
+const DashboardV2 = lazyWithRetry(() => import('./pages/v2/DashboardV2'))
 // v2 inner pages — all share V2AppShell via react-router Outlet.
-import QuotesV2           from './pages/v2/QuotesV2'
-import MyPerformanceV2    from './pages/v2/MyPerformanceV2'
-import CheckInV2          from './pages/v2/CheckInV2'   // Phase 60
-import PresentView        from './pages/v2/PresentView'  // Phase 181 — in-app deck + timer
+const QuotesV2 = lazyWithRetry(() => import('./pages/v2/QuotesV2'))
+const MyPerformanceV2 = lazyWithRetry(() => import('./pages/v2/MyPerformanceV2'))
+const CheckInV2 = lazyWithRetry(() => import('./pages/v2/CheckInV2'))   // Phase 60
+const PresentView = lazyWithRetry(() => import('./pages/v2/PresentView'))  // Phase 181 — in-app deck + timer
 import CheckInGate        from './components/v2/CheckInGate'   // Phase 60
-import ManagerDashboardV2 from './pages/v2/ManagerDashboardV2' // Phase 61
-import TeamManagerAssignV2 from './pages/v2/TeamManagerAssignV2' // Phase 61
-import MyOfferV2          from './pages/v2/MyOfferV2'
-import CreateQuoteV2      from './pages/v2/CreateQuoteV2'
-import CreateQuoteOtherMediaV2 from './pages/v2/CreateQuoteOtherMediaV2'
-import CitiesV2           from './pages/v2/CitiesV2'
-import TeamV2             from './pages/v2/TeamV2'
-import IncentivesV2       from './pages/v2/IncentivesV2'
-import RenewalToolsV2     from './pages/v2/RenewalToolsV2'
-import PendingApprovalsV2 from './pages/v2/PendingApprovalsV2'
-import HRV2               from './pages/v2/HRV2'
-import HRHomeV2           from './pages/v2/HRHomeV2'
-import HRCandidatesV2     from './pages/v2/HRCandidatesV2'
-import HROnboardTemplatesV2 from './pages/v2/HROnboardTemplatesV2'
-import HROnboardingV2     from './pages/v2/HROnboardingV2'
-import MyOnboardingV2     from './pages/v2/MyOnboardingV2'
-import HRNewUserV2        from './pages/v2/HRNewUserV2'
-import HROfferLetterV2    from './pages/v2/HROfferLetterV2'
-import CallLogsV2         from './pages/v2/CallLogsV2'
+const ManagerDashboardV2 = lazyWithRetry(() => import('./pages/v2/ManagerDashboardV2')) // Phase 61
+const TeamManagerAssignV2 = lazyWithRetry(() => import('./pages/v2/TeamManagerAssignV2')) // Phase 61
+const MyOfferV2 = lazyWithRetry(() => import('./pages/v2/MyOfferV2'))
+const CreateQuoteV2 = lazyWithRetry(() => import('./pages/v2/CreateQuoteV2'))
+const CreateQuoteOtherMediaV2 = lazyWithRetry(() => import('./pages/v2/CreateQuoteOtherMediaV2'))
+const CitiesV2 = lazyWithRetry(() => import('./pages/v2/CitiesV2'))
+const TeamV2 = lazyWithRetry(() => import('./pages/v2/TeamV2'))
+const IncentivesV2 = lazyWithRetry(() => import('./pages/v2/IncentivesV2'))
+const RenewalToolsV2 = lazyWithRetry(() => import('./pages/v2/RenewalToolsV2'))
+const PendingApprovalsV2 = lazyWithRetry(() => import('./pages/v2/PendingApprovalsV2'))
+const HRV2 = lazyWithRetry(() => import('./pages/v2/HRV2'))
+const HRHomeV2 = lazyWithRetry(() => import('./pages/v2/HRHomeV2'))
+const HRCandidatesV2 = lazyWithRetry(() => import('./pages/v2/HRCandidatesV2'))
+const HROnboardTemplatesV2 = lazyWithRetry(() => import('./pages/v2/HROnboardTemplatesV2'))
+const HROnboardingV2 = lazyWithRetry(() => import('./pages/v2/HROnboardingV2'))
+const MyOnboardingV2 = lazyWithRetry(() => import('./pages/v2/MyOnboardingV2'))
+const HRNewUserV2 = lazyWithRetry(() => import('./pages/v2/HRNewUserV2'))
+const HROfferLetterV2 = lazyWithRetry(() => import('./pages/v2/HROfferLetterV2'))
+const CallLogsV2 = lazyWithRetry(() => import('./pages/v2/CallLogsV2'))
 // Phase 33G.8 — admin Leaves page (item 82 real leaves table).
-import LeavesAdminV2     from './pages/v2/LeavesAdminV2'
+const LeavesAdminV2 = lazyWithRetry(() => import('./pages/v2/LeavesAdminV2'))
 // Phase 36 — per-rep monthly salary breakdown.
-import SalaryAdminV2     from './pages/v2/SalaryAdminV2'
+const SalaryAdminV2 = lazyWithRetry(() => import('./pages/v2/SalaryAdminV2'))
 // Phase 38 — People module (Team + Incentives + Salary + Leaves tabs).
-import PeopleV2          from './pages/v2/PeopleV2'
+const PeopleV2 = lazyWithRetry(() => import('./pages/v2/PeopleV2'))
 // Finance module (CLAUDE.md §155) — P&L + Register + Import. admin+accounts+co_owner.
-import FinanceV2         from './pages/v2/FinanceV2'
+const FinanceV2 = lazyWithRetry(() => import('./pages/v2/FinanceV2'))
 // Phase 90 (2026-05-23) — admin rep profile drill-down.
-import RepProfileV2      from './pages/v2/RepProfileV2'
+const RepProfileV2 = lazyWithRetry(() => import('./pages/v2/RepProfileV2'))
 // Phase 33H — admin TA Payouts (GPS-driven travel allowance).
-import TaPayoutsAdminV2  from './pages/v2/TaPayoutsAdminV2'
+const TaPayoutsAdminV2 = lazyWithRetry(() => import('./pages/v2/TaPayoutsAdminV2'))
 // Phase 101.A3 JSX — agency commission payout admin page.
-import AgencyCommissionAdminV2 from './pages/v2/AgencyCommissionAdminV2'
-import ClientsV2          from './pages/v2/ClientsV2'
+const AgencyCommissionAdminV2 = lazyWithRetry(() => import('./pages/v2/AgencyCommissionAdminV2'))
+const ClientsV2 = lazyWithRetry(() => import('./pages/v2/ClientsV2'))
 // ── Phase 12 — M1 Sales/Lead module ─────────────────────────────────
-import LeadsV2             from './pages/v2/LeadsV2'
-import LeadDashboardV2     from './pages/v2/LeadDashboardV2'
-import TeamDashboardV2     from './pages/v2/TeamDashboardV2'
-import LeadDetailV2        from './pages/v2/LeadDetailV2'
-import LeadFormV2          from './pages/v2/LeadFormV2'
-import LeadUploadV2        from './pages/v2/LeadUploadV2'
-import CampaignQrV2        from './pages/v2/CampaignQrV2'
-import CampaignClientQrV2  from './pages/v2/CampaignClientQrV2'
-import CampaignInboxV2     from './pages/v2/CampaignInboxV2'
-import CampaignsV2         from './pages/v2/CampaignsV2'
-import CampaignSegmentsV2  from './pages/v2/CampaignSegmentsV2'
-import CampaignBroadcastV2 from './pages/v2/CampaignBroadcastV2'
-import CampaignIntegrationsV2 from './pages/v2/CampaignIntegrationsV2'
-import CampaignChatbotV2   from './pages/v2/CampaignChatbotV2'
-import WorkV2              from './pages/v2/WorkV2'
-import MessagesV2          from './pages/v2/MessagesV2'
-import PushDebugV2         from './pages/v2/PushDebugV2'
-import TelecallerV2        from './pages/v2/TelecallerV2'
+const LeadsV2 = lazyWithRetry(() => import('./pages/v2/LeadsV2'))
+const LeadDashboardV2 = lazyWithRetry(() => import('./pages/v2/LeadDashboardV2'))
+const TeamDashboardV2 = lazyWithRetry(() => import('./pages/v2/TeamDashboardV2'))
+const LeadDetailV2 = lazyWithRetry(() => import('./pages/v2/LeadDetailV2'))
+const LeadFormV2 = lazyWithRetry(() => import('./pages/v2/LeadFormV2'))
+const LeadUploadV2 = lazyWithRetry(() => import('./pages/v2/LeadUploadV2'))
+const CampaignQrV2 = lazyWithRetry(() => import('./pages/v2/CampaignQrV2'))
+const CampaignClientQrV2 = lazyWithRetry(() => import('./pages/v2/CampaignClientQrV2'))
+const CampaignInboxV2 = lazyWithRetry(() => import('./pages/v2/CampaignInboxV2'))
+const CampaignsV2 = lazyWithRetry(() => import('./pages/v2/CampaignsV2'))
+const CampaignSegmentsV2 = lazyWithRetry(() => import('./pages/v2/CampaignSegmentsV2'))
+const CampaignBroadcastV2 = lazyWithRetry(() => import('./pages/v2/CampaignBroadcastV2'))
+const CampaignIntegrationsV2 = lazyWithRetry(() => import('./pages/v2/CampaignIntegrationsV2'))
+const CampaignChatbotV2 = lazyWithRetry(() => import('./pages/v2/CampaignChatbotV2'))
+const WorkV2 = lazyWithRetry(() => import('./pages/v2/WorkV2'))
+const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
+const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
+const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
 import ErrorBoundary       from './components/v2/ErrorBoundary'
-import VoiceLogV2          from './pages/v2/VoiceLogV2'
-import FollowUpsV2         from './pages/v2/FollowUpsV2'
-import EveningVoiceV2      from './pages/v2/EveningVoiceV2'
+const VoiceLogV2 = lazyWithRetry(() => import('./pages/v2/VoiceLogV2'))
+const FollowUpsV2 = lazyWithRetry(() => import('./pages/v2/FollowUpsV2'))
+const EveningVoiceV2 = lazyWithRetry(() => import('./pages/v2/EveningVoiceV2'))
 // Phase 12 rev3 — CockpitV2 retired; widgets folded into AdminDashboardDesktop.
 
 // ── Government module (Phase 6) ─────────────────────────────────────
-import CreateQuoteChooserV2  from './pages/v2/CreateQuoteChooserV2'
-import CreateGovtAutoHoodV2  from './pages/v2/CreateGovtAutoHoodV2'
-import CreateGovtGsrtcLedV2  from './pages/v2/CreateGovtGsrtcLedV2'
-import AutoDistrictsV2       from './pages/v2/AutoDistrictsV2'
-import GsrtcStationsV2       from './pages/v2/GsrtcStationsV2'
-import GovtProposalDetailV2  from './pages/v2/GovtProposalDetailV2'
-import GpsTrackV2            from './pages/v2/GpsTrackV2'
-import MasterV2              from './pages/v2/MasterV2'
+const CreateQuoteChooserV2 = lazyWithRetry(() => import('./pages/v2/CreateQuoteChooserV2'))
+const CreateGovtAutoHoodV2 = lazyWithRetry(() => import('./pages/v2/CreateGovtAutoHoodV2'))
+const CreateGovtGsrtcLedV2 = lazyWithRetry(() => import('./pages/v2/CreateGovtGsrtcLedV2'))
+const AutoDistrictsV2 = lazyWithRetry(() => import('./pages/v2/AutoDistrictsV2'))
+const GsrtcStationsV2 = lazyWithRetry(() => import('./pages/v2/GsrtcStationsV2'))
+const GovtProposalDetailV2 = lazyWithRetry(() => import('./pages/v2/GovtProposalDetailV2'))
+const GpsTrackV2 = lazyWithRetry(() => import('./pages/v2/GpsTrackV2'))
+const MasterV2 = lazyWithRetry(() => import('./pages/v2/MasterV2'))
 // Phase 35 PR 1 — admin-only primitives demo (sign-off gate before PR 2).
-import PrimitivesDemoV2      from './pages/v2/PrimitivesDemoV2'
-import SettingsV2            from './pages/v2/SettingsV2'
+const PrimitivesDemoV2 = lazyWithRetry(() => import('./pages/v2/PrimitivesDemoV2'))
+const SettingsV2 = lazyWithRetry(() => import('./pages/v2/SettingsV2'))
+
+// Route code-splitting (Phase 317) — each page loads on demand instead of
+// shipping the whole app in one chunk on every cold open. lazyWithRetry reloads
+// ONCE on a dynamic-import failure: a rep whose browser cached an old index.html
+// gets 404s on the old chunk URLs after a deploy — a single reload pulls the fresh
+// build instead of a white screen. The 10s window stops a reload loop on a
+// genuinely-broken chunk (it then surfaces the error).
+function lazyWithRetry(factory) {
+  return lazy(() => factory().catch((err) => {
+    const last = Number(sessionStorage.getItem('chunkReloadAt')) || 0
+    if (Date.now() - last > 10000) {
+      sessionStorage.setItem('chunkReloadAt', String(Date.now()))
+      window.location.reload()
+      return new Promise(() => {})   // hold render until the reload takes over
+    }
+    throw err
+  }))
+}
 
 function LoadingScreen() {
   return <div className="loading-screen"><div className="spinner" /></div>
@@ -291,6 +310,7 @@ export default function App() {
   useAuth()
   return (
     <BrowserRouter>
+      <Suspense fallback={<LoadingScreen />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         {/* Public candidate-facing offer form — NO AppShell, NO auth. */}
@@ -483,6 +503,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }
