@@ -13590,3 +13590,13 @@ Rollback = `UPDATE wa_outcome_templates SET language='en'` + restore en preview_
 callback header_doc_url; the en templates never left Meta. LOCKSTEP: the Meta template
 body and the DB preview_body (SS125.1) must match - edit both together. To add any other
 language later: create the templates in that language + flip tpl.language. No code change.
+
+### 203.1 — retry: 7 MB brochure = invalid SAMPLE handle (2026-08-18)
+First gu run: callback + lost (no PDF) created ✓; good/maybe/nurture (PDF) FAILED with
+"Uploaded media handle is invalid" (131009/2494102) — the 7.3 MB brochure made a bad
+sample handle at approval time. FIX = `scripts/create-gu-pdf-templates-retry.py` uploads
+a tiny self-generated 1-page PDF as the SAMPLE (Meta only needs a sample at approval; the
+REAL brochure is still attached per-send from wa_outcome_templates.header_doc_url). Owner
+reruns it (TOKEN still in env; BROCHURE_URL not needed). FOOT-GUN: a large PDF sample can
+be rejected as an invalid handle — use a small placeholder sample for template creation,
+keep the real doc for the send.
