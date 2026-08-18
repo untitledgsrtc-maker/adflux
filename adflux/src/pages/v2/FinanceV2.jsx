@@ -632,11 +632,27 @@ function ImportTab() {
     setBusy(true)
     const { data } = await supabase.from('finance_transactions').select('id, description').eq('bucket', 'review').limit(5000)
     const headByName = Object.fromEntries(heads.map(h => [h.name, h.id]))
-    let n = 0
+    // Phase 321 — group review rows by the target (bucket/segment/head) their
+    // matching rule assigns, then ONE update per distinct set (chunked) instead
+    // of one update per row (was up to 5000 sequential round-trips).
+    const groups = new Map()
     for (const r of (data || [])) {
       const du = (r.description || '').toUpperCase()
       const hit = rules.find(rl => rl.is_active !== false && rl.pattern && du.includes(String(rl.pattern).toUpperCase()))
-      if (hit && hit.set_bucket) { await supabase.from('finance_transactions').update({ bucket: hit.set_bucket, segment: hit.set_segment || null, expense_head_id: hit.set_head ? (headByName[hit.set_head] || null) : null }).eq('id', r.id); n++ }
+      if (!hit || !hit.set_bucket) continue
+      const vals = { bucket: hit.set_bucket, segment: hit.set_segment || null, expense_head_id: hit.set_head ? (headByName[hit.set_head] || null) : null }
+      const key = `${vals.bucket}|${vals.segment || ''}|${vals.expense_head_id || ''}`
+      let g = groups.get(key)
+      if (!g) { g = { vals, ids: [] }; groups.set(key, g) }
+      g.ids.push(r.id)
+    }
+    let n = 0
+    for (const { vals, ids } of groups.values()) {
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200)
+        const { error } = await supabase.from('finance_transactions').update(vals).in('id', chunk)
+        if (!error) n += chunk.length
+      }
     }
     setBusy(false); toastSuccess(`Re-tagged ${n} rows.`)
   }
@@ -949,7 +965,23 @@ function RegisterTab() {
     })
     const byId = Object.fromEntries(upd.map(u => [u.id, u]))
     setRows(rs => rs.map(r => byId[r.id] ? { ...r, ...byId[r.id] } : r))
-    for (const u of upd) { const { id, ...obj } = u; const { error } = await supabase.from('finance_transactions').update(obj).eq('id', id); if (error) { toastError(error, 'Could not update.'); load(); return } }
+    // Phase 321 — group by the derived value-set (rows with the same direction/
+    // bank classify identically) → one update per distinct set (chunked) instead
+    // of one update per selected row.
+    const groups = new Map()
+    for (const u of upd) {
+      const { id, ...obj } = u
+      const key = JSON.stringify(obj)
+      let g = groups.get(key)
+      if (!g) { g = { obj, ids: [] }; groups.set(key, g) }
+      g.ids.push(id)
+    }
+    for (const { obj, ids: gids } of groups.values()) {
+      for (let i = 0; i < gids.length; i += 200) {
+        const { error } = await supabase.from('finance_transactions').update(obj).in('id', gids.slice(i, i + 200))
+        if (error) { toastError(error, 'Could not update.'); load(); return }
+      }
+    }
     toastSuccess(`Re-tagged ${upd.length}.`)
   }
   const retag = (r, tag) => {   // one Type dropdown → re-derive bucket/segment/company/media/head

@@ -149,6 +149,7 @@ export default function CampaignInboxV2() {
   const [outTemplates, setOutTemplates] = useState(null) // null = not loaded yet
   const [tplLoading, setTplLoading] = useState(false)
 
+  const lastSigRef = useRef(null)
   const loadThreads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     // Phase 251 — sort by last MESSAGE (in OR out), not last inbound. A thread
@@ -199,6 +200,12 @@ export default function CampaignInboxV2() {
       }
       return
     }
+    // Phase 321 — on a silent poll, skip the re-render + preview refetch when
+    // nothing changed (an idle inbox otherwise re-rendered every tick). Signature
+    // = the fields that drive the list: sort/preview time, owner, unread marker.
+    const sig = rows.map(r => `${r.id}:${r.last_message_at || r.last_inbound_at || ''}:${r.assigned_to || ''}:${r.last_message_direction || ''}`).join('|')
+    if (silent && sig === lastSigRef.current) return
+    lastSigRef.current = sig
     setThreads(rows)
     if (!silent) setLoading(false)
 
@@ -262,7 +269,7 @@ export default function CampaignInboxV2() {
       loadThreads(true)
       if (selId) loadMsgs(selId, true)
     }
-    const iv = setInterval(tick, 7000)
+    const iv = setInterval(tick, 12000)
     const onFocus = () => { if (document.visibilityState === 'visible') tick() }
     document.addEventListener('visibilitychange', onFocus)
     window.addEventListener('focus', onFocus)

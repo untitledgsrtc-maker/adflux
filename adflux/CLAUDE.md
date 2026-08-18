@@ -13628,3 +13628,31 @@ Hand off / Keep (owner declined Mark Lost/Nurture — kept simple).
   itself pop the nudge (needs a frozen mount) — deferred.
 - Dismiss memory (24h, SS173) unchanged -> "Keep working it" won't nag every call.
 - No score/pay impact (reads call_logs + follow_ups + leads). Build-verified.
+
+
+---
+
+## 205 · Phase 321 — admin-page speed: Finance batch-update + inbox re-render skip (2026-08-18)
+
+Owner backlog item 4 (admin-only speed). No frozen file, no behavior change — same data,
+fewer round-trips / re-renders.
+
+### FinanceV2 (admin/accounts)
+- `reapply()` — was up to 5000 sequential UPDATEs (one per 'review' row). Now groups rows
+  by the target (bucket/segment/head) their matching rule assigns -> ONE update per
+  distinct set, chunked 200 ids via `.in('id', …)`. Same values written.
+- `bulkRetag()` — was one UPDATE per selected row. Now groups by the derived value-set
+  (rows with the same direction/bank classify identically) -> one update per set (chunked).
+  Optimistic setRows + error-handling (toastError + load + return) preserved.
+
+### CampaignInboxV2 (admin + reps)
+- The 7s silent poll re-fetched ALL conversations + setThreads every tick -> the whole
+  list re-rendered even when idle. Added a signature (id : last_message_at/last_inbound_at
+  : assigned_to : last_message_direction); on a silent poll, unchanged signature -> skip
+  setThreads + the preview refetch (no re-render). Interval 7s -> 12s. Any user action /
+  non-silent load still refreshes; RLS + the §243 own-filter unchanged.
+
+### Notes
+- Display/write-batching only — no schema, RPC, frozen surface, or hot rep path.
+  Build-verified. Left (lower priority): xlsx main-thread parse (worker), the inbox
+  select('*') column trim (risky), dashboard count-queries at >1000 rows.
