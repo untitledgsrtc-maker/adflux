@@ -64,9 +64,13 @@ BEGIN
       -- caller-supplied p_caller_role → rep could pass 'admin'). Step 2's
       -- blanket grant would re-open it; re-lock here. No client calls it
       -- directly (only the reassign_lead / reassign_leads_bulk wrappers).
+      -- ai_build_quote (§325) + flag_lead_hot_from_wa (§324): SECURITY DEFINER,
+      -- REVOKED from authenticated (only ai-reply.js with the service key calls
+      -- them). Step 2's blanket grant would re-open them; re-lock here.
       AND p.proname IN ('enqueue_push', 'dedupe_all_phone_groups',
                         'dedupe_phone_lead_group', 'regen_payment_fu_notes',
-                        '_reassign_lead_apply')
+                        '_reassign_lead_apply',
+                        'ai_build_quote', 'flag_lead_hot_from_wa')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
   END LOOP;
@@ -121,7 +125,8 @@ SELECT 'D. locked holes stay locked (expect all false)' AS check,
 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public'
   AND p.proname IN ('enqueue_push','dedupe_all_phone_groups','dedupe_phone_lead_group',
-                    'regen_payment_fu_notes','_reassign_lead_apply')
+                    'regen_payment_fu_notes','_reassign_lead_apply',
+                    'ai_build_quote','flag_lead_hot_from_wa')
 ORDER BY p.proname;
 
 SELECT 'Phase 211 anon-execute sweep applied' AS status;

@@ -29,6 +29,8 @@ const AI_SECRET    = process.env.AI_REPLY_SECRET
 const MODEL        = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5'
 const GRAPH        = 'https://graph.facebook.com/v21.0'
 const ANTHROPIC    = 'https://api.anthropic.com/v1/messages'
+// Phase 2 — the Edge PDF renderer (same deploy). Reuses AI_REPLY_SECRET.
+const RENDER_URL   = process.env.QUOTE_RENDER_URL || 'https://app.untitledad.in/api/quote/render'
 
 const ok  = (obj = {}) => new Response(JSON.stringify({ ok: true, ...obj }), { status: 200, headers: { 'content-type': 'application/json' } })
 const nope = (reason, status = 200) => new Response(JSON.stringify({ ok: false, reason }), { status, headers: { 'content-type': 'application/json' } })
@@ -50,7 +52,7 @@ THE NETWORK (facts — never invent beyond these):
 - Screens are 43" and 55" high-brightness LED — clear even in bright daylight — graded A / B / C by footfall.
 - Each screen reaches 1000+ people a day, plays your ad ~14 hours a day, with AI-tracked daily impressions.
 - The 20 live stations: Anand, Ankleshwar, Bhachau, Bhavnagar, Botad, Chikhli, Dahod, Dwarka, Gandhinagar, Godhra, Himmatnagar, Jamnagar, Junagadh, Kheda, Morbi, Porbandar, Surat, Surendranagar, Valsad, Veraval. NO other city has screens today — Vadodara, Ahmedabad and Rajkot are NOT covered (Vadodara is only our office city).
-- Advertising STARTS AT JUST Rs 75 — the entry price. The exact rate depends on the city, number of screens and duration; our team shares a tailored quote. (Never quote a final total.)
+- A city is sold as its FULL screen combo — all of that station's screens together, for the months chosen (we do not sell a partial handful of a station's screens). The exact package price is shared only in a formal quote, NEVER stated in chat. To show VALUE, talk in CPM — the cost to put an ad in front of 1,000 people — which is a fraction of a hoarding or newspaper (per-city figures are given below). Never state a package total in chat.
 - Full details, video and a live map: https://app.untitledad.in/led
 
 WHY WE'RE DIFFERENT (BACKGROUND — share the ONE relevant point only if they ask, never all of it. "a billboard can't tell you who looked; ours can"):
@@ -67,12 +69,12 @@ PROOF: the funnel is already running live — hundreds of scans have already tur
 
 YOUR JOB — keep it SHORT (this is WhatsApp, not email):
 - Every reply is 2-3 short lines MAX, ONE message. No paragraphs, no lists, no dumping the whole pitch.
-- Answer ONLY what they asked. A first reply covers just: what it is (LED ad screens at Gujarat bus stations), that it starts at just Rs 75, and the link https://app.untitledad.in/led.
+- Answer ONLY what they asked. A first reply covers just: what it is (LED ad screens at Gujarat bus stations) and the link https://app.untitledad.in/led. Do NOT state a price or a starting rate in chat.
 - Ask ONE simple question at a time (e.g. "Which city are you looking at?") — never two questions in one message.
 - Everything above (why we're different, how it works, proof, stations) is BACKGROUND — share ONE relevant point only if they ask, never all of it.
 - Reply in the customer's own language (English, Hindi or Gujarati) matching how they wrote.
 - Add 1-2 light, natural WhatsApp emoji where they fit (e.g. 📍 for a city, 👍 to acknowledge) — warm and human, never spammy.
-- FOOTFALL IS NOT A PRICE. When you mention how many people see a station, say it clearly as the daily AUDIENCE — e.g. "about 7,500 people see it there every day" — NEVER a bare "~7,500/day" that a customer could mistake for a cost. The ONLY price is "starts at just Rs 75"; never write any other number next to Rs, and never frame audience/footfall as money.
+- FOOTFALL IS NOT A PRICE. When you mention how many people see a station, say it clearly as the daily AUDIENCE — e.g. "about 7,500 people see it there every day" — NEVER a bare "~7,500/day" that a customer could mistake for a cost. Do NOT put a package price or starting rate in chat at all (that lives only in the formal quote/PDF). The ONLY rupee figure allowed in chat is an explicit CPM — "about Rs X to reach 1,000 people" — taken from the CPM list; never write any other number next to Rs, and never frame audience/footfall as money.
 - Plain WhatsApp text ONLY. Do NOT use markdown — no ** for bold, no *, no #, no bullets/asterisks (WhatsApp shows the asterisks literally). Just plain sentences.
 
 HARD RULES:
@@ -163,7 +165,7 @@ export default async function handler(req) {
   // never fail because of a media lookup.
   let allCities = []
   try {
-    allCities = ((await (await sb(`cities?select=name,photo_url,youtube_url,impressions_day,impressions_month&is_active=eq.true&limit=300`)).json()) || []).filter((c) => c && c.name)
+    allCities = ((await (await sb(`cities?select=name,photo_url,youtube_url,impressions_day,impressions_month,offer_rate,screens&is_active=eq.true&limit=300`)).json()) || []).filter((c) => c && c.name)
   } catch { /* no media catalog → text-only */ }
   const cityRows = allCities.filter((c) => c.photo_url && String(c.photo_url).trim())
   const photoCities = cityRows.map((c) => c.name)
@@ -221,6 +223,27 @@ export default async function handler(req) {
     system += `\n\nNOTE: the live station list could not be loaded right now — do NOT name or confirm specific covered cities; say the team will confirm coverage for their city.`
   }
 
+  // Phase 2 — per-city CPM (cost to reach 1,000 people), DB-COMPUTED (never model math) so the
+  // AI can justify value without stating a package total (owner: price only in the quote/PDF).
+  // CPM = round((offer_rate × screens) / impressions_month × 1000). Shown ONLY in a sane band
+  // [1..500] — this self-guards the impressions_month interpretation: if the column turns out to
+  // be per-SCREEN (→ an absurd <Rs 1 CPM) the figure is DROPPED, never shown as nonsense.
+  // ⚠ SMOKE-VERIFY on the live number: confirm a real city's "about Rs X to reach 1,000 people"
+  // reads sane (a competitive Rs ~10-40), which also confirms impressions_month is per-CITY.
+  const cpmRows = allCities
+    .map((c) => {
+      const rate = Number(c.offer_rate) || 0
+      const scr  = Math.max(Number(c.screens) || 0, 0)
+      const im   = Number(c.impressions_month) || 0
+      if (rate <= 0 || scr <= 0 || im <= 0) return null
+      const cpm = Math.round((rate * scr) / im * 1000)
+      return cpm >= 1 && cpm <= 500 ? { name: c.name, cpm } : null
+    })
+    .filter(Boolean)
+  if (cpmRows.length) {
+    system += `\n\nCPM — VALUE (cost to reach 1,000 people; a LOWER number is better; ours is a fraction of a hoarding/newspaper). Use ONLY the exact per-city figure below, ONLY to justify value; frame it as cost-efficiency, NOT a package price, and never add/multiply it into a total or reveal it as "the cost":\n${cpmRows.map((c) => `- ${c.name}: about Rs ${c.cpm} to reach 1,000 people`).join('\n')}`
+  }
+
   if (photoCities.length) {
     system += `\n\nPHOTOS YOU CAN SEND: ${photoCities.join(', ')}.\nIf the customer asks to see a photo, the screens, or what it looks like in ONE of these cities, add a FINAL separate line exactly in this form:\nPHOTO: <city name>\nUse the exact city name from the list, ONE city only, and ONLY if it is in the list. If they ask about a city not in the list, do NOT add the line — say our team will share photos.`
   }
@@ -237,7 +260,7 @@ export default async function handler(req) {
   // list, no photo — and (below) append an opt-out line. The full AI engages only
   // once the person replies again (proof of genuine intent).
   if (firstContact) {
-    system += `\n\nThis is the customer's VERY FIRST message to us. Reply in 1-2 short, warm lines ONLY. Do NOT pitch, do NOT list features or numbers, do NOT push, do NOT send a price. Just greet warmly, answer only what they actually asked (if anything), and — if they gave no detail — ask which city they are interested in. Keep it human and brief. Do NOT add a PHOTO line on this first reply.`
+    system += `\n\nThis is the customer's VERY FIRST message to us. Reply in 1-2 short, warm lines ONLY. Do NOT pitch, do NOT list features or numbers, do NOT push, do NOT send a price. Just greet warmly, answer only what they actually asked (if anything), and — if they gave no detail — ask which city they are interested in. Keep it human and brief. Do NOT add a PHOTO line on this first reply. Do NOT add a QUOTE line on this first reply — never build or send a quote before the customer has engaged.`
   }
 
   // Phase 264 — Meta ad context. If this chat came from a Click-to-WhatsApp ad,
@@ -258,6 +281,11 @@ export default async function handler(req) {
   // hidden control marker (same mechanism as PHOTO). The endpoint parses + strips it,
   // flags the lead hot, and drops a HOT task on the owning rep (docs/PLAN_hot_lead_routing).
   system += `\n\nBUYING-INTENT SIGNAL (hidden — for our team only, the customer NEVER sees this):\n- If the customer asks for a PRICE, a QUOTE, rates, or specific booking details → add, as the VERY LAST line, exactly: HOT: quote  (and keep helping/warming them normally — you still NEVER state a final price).\n- If the customer asks to TALK TO A PERSON / your team / a callback / "connect me" → add, as the VERY LAST line, exactly: HOT: human  (and tell them our team will contact them shortly).\n- Add AT MOST ONE such line, only when the intent is clear, always as the final line. It is stripped before sending — never mention it, never explain it.`
+
+  // Phase 2 — AI standard-rate quote. UNDERSTAND → EXPLAIN → CPM → whole-city combo →
+  // multi-city QUOTE marker → govt gate. PRIVATE only; GOVERNMENT handed to the team (§4).
+  // The DB builds + the endpoint renders + auto-SENDS a formal PDF — the AI never states a price.
+  system += `\n\nSTANDARD QUOTE (private customers only) — follow this order:\n1. UNDERSTAND the need first, ONE warm question at a time: what are they promoting (their business / product)? what is the goal (awareness / a launch / an offer / footfall)? which area or cities?\n2. EXPLAIN briefly what the screens are + why they are measurable, and — when it helps — the CPM value for the city they care about (cost to reach 1,000 people, from the CPM list above). Never state a package total.\n3. QUALIFY: are they a PRIVATE business (company / shop / proprietor / individual) or a GOVERNMENT department / body?\n   - GOVERNMENT → do NOT quote. Say our government team will prepare it properly, and add the final line: HOT: human. Never give a government body a price.\n4. A city is booked as its FULL screen combo — the customer NEVER picks a number of screens. If they ask for only some of a city's screens (e.g. "7 of Surat's 20"), explain warmly that a station is taken as its complete screen network, not a partial few.\n5. PRIVATE customer, once you know which CITY (or cities) + how many MONTHS → add, as the VERY LAST line, exactly: QUOTE: cities=<City1,City2>; months=<M>  (comma-separate the cities they chose; NO screen count). Our system then builds the real quote at our standard rate and AUTO-SENDS a formal PDF — so keep YOUR text short and warm ("Let me prepare your detailed quote") and do NOT state any price, rate, or total yourself. The marker is stripped before sending; never mention it.`
 
   let reply = ''
   try {
@@ -307,7 +335,28 @@ export default async function handler(req) {
     }
   }
 
-  if (!reply && !photoUrl) return nope('empty_reply')
+  // Phase 2 — QUOTE marker (MULTI-CITY, whole-city combo — NO screen count). Extract
+  // {cities[], months} + strip it. The build + render + send is DEFERRED to after the main
+  // reply sends (below) so a superseded/failed reply never mints an orphan quote. Screens +
+  // rate come only from the DB rate card (cities.screens / cities.offer_rate), never the AI.
+  let quoteReq = null
+  const qm = reply.match(/(^|\n)[ \t]*QUOTE:[ \t]*(.+?)[ \t]*$/im)
+  if (qm) {
+    reply = reply.replace(/(^|\n)[ \t]*QUOTE:[ \t]*.+$/gim, '').trim()  // strip every QUOTE marker
+    const spec = qm[2]
+    const citiesRaw = (spec.match(/cities?\s*=\s*([^;]+)/i) || [])[1] || ''
+    const months = parseInt((spec.match(/months?\s*=\s*(\d+)/i) || [])[1], 10)
+    // Dedup case-insensitively — a repeated city (Surat,Surat or Surat,SURAT) would
+    // otherwise double-charge the quote + list the city twice on the PDF (the RPC
+    // dedups too, but keep the marker clean at the source).
+    const seen = new Set()
+    const cities = citiesRaw.split(',').map((s) => s.trim()).filter(Boolean)
+      .filter((c) => { const k = c.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+      .slice(0, 8)
+    if (cities.length && months > 0) quoteReq = { cities, months }
+  }
+
+  if (!reply && !photoUrl && !quoteReq) return nope('empty_reply')
 
   // ── backstop the two HARD rules (no final price, no booking confirmation) ──
   // The system prompt is the primary guard; this catches a jailbreak BEFORE it
@@ -331,6 +380,7 @@ export default async function handler(req) {
   // Both only on message #1 — normal replies stay unchanged.
   if (firstContact) {
     photoUrl = null
+    quoteReq = null   // never auto-build/send a quote PDF to a cold first-contact (unsolicited media → spam, §133/§275)
     if (reply && !/\bstop\b/i.test(reply)) reply = `${reply}\n\nReply STOP to opt out.`
   }
 
@@ -390,5 +440,40 @@ export default async function handler(req) {
     catch { /* photo skipped — text delivered */ }
   }
 
-  return ok({ photo: !!photoUrl })
+  // Phase 2 — build + render + auto-SEND the standard quote PDF (deferred here so a
+  // superseded/failed reply never mints an orphan quote). Best-effort: the warm reply already
+  // went; a quote failure just means no PDF this turn (the AI re-engages next turn). The RPC is
+  // the §4 hard-gate (refuses GOVERNMENT) + the ONLY source of the price (cities rate card);
+  // NO price is ever put in chat — it lives only in the PDF (owner: price via quote, not chat).
+  let quoteSent = false
+  if (quoteReq && conv.lead_id) {
+    try {
+      const qr = await (await sb('rpc/ai_build_quote', { method: 'POST', body: JSON.stringify({ p_lead_id: conv.lead_id, p_cities: quoteReq.cities, p_months: quoteReq.months }) })).json()
+      if (qr && qr.ok && qr.ref) {
+        // render the PDF server-side (Edge, api/quote/render) → short-lived signed URL
+        let pdfUrl = null
+        try {
+          const rr = await (await fetch(RENDER_URL, { method: 'POST', headers: { 'content-type': 'application/json', 'x-render-secret': AI_SECRET }, body: JSON.stringify({ ref: qr.ref }) })).json()
+          if (rr && rr.ok && rr.url) pdfUrl = rr.url
+        } catch { /* render is best-effort */ }
+        if (pdfUrl) {
+          try {
+            const id = await sendWa({ type: 'document', document: { link: pdfUrl, filename: `${qr.ref}.pdf`, caption: 'Your GSRTC LED quotation' } })
+            await logOut('document', `📄 Quotation ${qr.ref}`, id, pdfUrl)
+            quoteSent = true
+          } catch { /* document send failed — the quote still exists in the pipeline for the rep */ }
+        }
+        // NO priced summary in chat — the package price lives only in the PDF.
+      } else if (qr && qr.error === 'govt_blocked') {
+        // §4 — a government lead slipped past the AI's question; hand to the team, go silent.
+        const handoff = 'Thank you! For a government project our dedicated team will prepare this properly and reach out to you shortly.'
+        const id = await sendWa({ type: 'text', text: { body: handoff } })
+        await logOut('text', handoff, id)
+        try { await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ ai_paused: true }) }) } catch { /* best-effort */ }
+      }
+      // city_not_found / no_rate / no_owner / internal → send nothing; the AI re-engages next turn.
+    } catch { /* quote is best-effort — the reply already went */ }
+  }
+
+  return ok({ photo: !!photoUrl, quote: quoteSent })
 }

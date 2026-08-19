@@ -13923,3 +13923,101 @@ round before any build (which rate card, the qualifying script, the guardrails).
 - ❌ A hidden AI control marker (HOT:/PHOTO:) must be stripped with a GLOBAL regex (or
   a post-strip re-scan) — a single-match slice leaks a second stray marker to the
   customer if the model ever emits two. `/…/gim` on the strip, match-once for the kind.
+
+
+---
+
+## 210 · Phase 2 — AI standard-rate quote (understand → CPM in chat → auto-send PDF) (2026-08-19)
+
+The parked Phase 2 (docs/superpowers/specs/2026-08-19-ai-quote-phase2-design.md). The
+live WhatsApp AI now QUALIFIES a private customer, EXPLAINS value via CPM in chat, and —
+once it knows the city(ies) + months — builds a REAL standard-rate quote and AUTO-SENDS
+the formal PDF itself. Owner decisions LOCKED (do NOT re-litigate): NO "starts at ₹75"
+anywhere · understand-the-need FIRST, one warm question at a time · price ONLY via the
+quote PDF, NEVER a package total in chat · CPM (₹/1000 people) IS stated in chat (owner's
+explicit choice, DB-computed) · whole-city combo (a city = ALL its screens, `cities.screens`,
+never a customer input) · multiple cities per quote · the AI auto-sends the PDF · government
+→ never quote, hand to the team. Built + a 4-lens adversarial review (security · §4/money ·
+ai-flow · deploy-blast) → 0 P0, 1 P1, 3 P2 (one dup), 2 P3; every P1/P2 + the P3-gst applied.
+
+### THE RENDERER DECISION — Edge pdf-lib (improves on the parked "consolidate a function" plan)
+`api/quote/render.js` (NEW) is an **EDGE** function using **pdf-lib** (already a dep). This
+is strictly lower blast-radius than the parked plan: Edge fns do NOT count against the Vercel
+Hobby 12-Node cap (§219), so **NO media-sample→templates consolidation is needed** (the parked
+plan's live-endpoint risk is gone), AND a runtime failure is recoverable (caught → the AI falls
+back to a text reply), not a deploy-break. pdf-lib = pure-JS StandardFonts (Helvetica), "Rs."
+labels (WinAnsi can't encode ₹), TEXT-ONLY (no image fetch → Edge-safe). ASCII-sanitizes every
+drawn string (`replace(/[^\x20-\x7E]/g,'')`) so a Gujarati/emoji client name can't crash it.
+Secret-gated (`x-render-secret == AI_REPLY_SECRET`), ref-regex injection guard, uploads to
+`quote-pdfs/<safeRef>.pdf` (Storage REST upsert) → signs 600s → returns the signed URL. The AI
+sends that URL directly as a WhatsApp document (never the `/pdf/<ref>` share link).
+
+### CPM — the owner's "you changed the real number" push-back, RESOLVED from code (§17 verify)
+The AI states the CPM per city, DB-computed, in a sane band [1..500]. VERIFIED it is the
+IDENTICAL Phase-212 owner-approved formula the rep's PDF already shows: `QuotePDFHtml`
+(`cityMonthlyImpressions` returns `impressions_month` directly, no ×screens; fallback
+`screens × 5200`) proves **`cities.impressions_month` is WHOLE-CITY (all screens), not
+per-screen**, and the canonical CPM = `(Σ offered_rate×screens) / (Σ impressions_month) × 1000`
+(QuotePDFHtml:1006). The AI block (`round((offer_rate × screens) / impressions_month × 1000)`)
+is the per-city instance of that. It is **screen-invariant exactly as the owner said** — add a
+screen → numerator rises AND the real measured `impressions_month` rises proportionally → CPM
+stable. So the number is NOT changed; it matches the live rep-facing PDF CPM. CONTRACT: the AI
+CPM must stay in lockstep with the Phase-212 QuotePDFHtml formula; `impressions_month` is
+per-city; the [1..500] band self-guards the (never-hit-for-a-real-city) per-screen case.
+
+### The pieces
+- `supabase_phase325_ai_build_quote.sql` (NEW, owner RUNS) — `ai_build_quote(p_lead_id uuid,
+  p_cities text[], p_months integer)`: whole-city combo (`round(offer_rate × cities.screens ×
+  months)` per city, same as Step2Campaign calcTotal), GST=`round(subtotal×0.18)`, ref# via the
+  BEFORE-INSERT trigger (LED_OTHER → UA-2026-NNNN), advisory lock + 10-min same-config
+  idempotency, EXACT case-insensitive city match only (unknown → refuse `city_not_found`, never
+  mis-price), §4 GOVERNMENT hard-gate (`govt_blocked` before any insert), NULL owner →
+  `no_owner`, `source='ai_quote'`, §11 lead advance (stage QuoteSent + quote_id + heat=hot, does
+  NOT touch cadence_paused §53), SECURITY DEFINER + `search_path=public, pg_temp`,
+  EXCEPTION-wrapped, REVOKE PUBLIC/anon/authenticated + GRANT service_role. `ALTER TABLE quotes
+  ADD COLUMN IF NOT EXISTS source text` first.
+- `api/wa/ai-reply.js` (Edge, LIVE) — DEFAULT_SYSTEM: ₹75 removed everywhere; understand →
+  explain + CPM-in-chat → qualify govt/private → whole-city-combo explanation → the hidden final
+  marker `QUOTE: cities=<City1,City2>; months=<M>` (NO screen count). Parse is multi-city (comma
+  split + slice 8), stripped globally. Deferred build (after the reply sends) → `rpc/ai_build_quote`
+  → on ok+ref → `POST RENDER_URL {ref}` → `sendWa({type:'document', document:{link, filename,
+  caption}})`. NO package price in chat, only CPM. govt → hand-off. All steps best-effort/try-caught.
+- `supabase_phase211_anon_execute_sweep.sql` (M) — added `ai_build_quote` + `flag_lead_hot_from_wa`
+  to the §211 re-lock DO-loop (a blanket GRANT-authenticated would re-open the REVOKE, §86/§206).
+
+### Review fixes applied (P1 + both P2 + P3-gst)
+- **P1 (money/§4) — duplicate city → double-charge.** `Surat,Surat` (or `Surat,SURAT`) both
+  resolved → subtotal + quote_cities doubled (no unique(quote_id,city_id)). Fixed in BOTH: the
+  ai-reply marker parse dedups case-insensitively before the RPC, AND the RPC FOREACH skips a
+  city whose resolved `lower(name)` is already priced (`= ANY(v_names)`; catches aliases too).
+- **P2 (§4/§18) — render.js hard-fail only checked co.name.** Now also hard-fails on missing
+  GSTIN + bank_acc_number/bank_ifsc (named errors) → never ships a GSTIN-less / bank-less
+  PRIVATE quotation (the conditional GSTIN/bank blocks are now always satisfied).
+- **P2 (ai-flow) — firstContact suppressed photoUrl but NOT quoteReq** → the AI could auto-send
+  a quote PDF as the VERY FIRST outbound to a cold contact (the §133/§275 unsolicited-media spam
+  trigger on the flagged number). Fixed: `quoteReq = null` in the firstContact block + a
+  "Do NOT add a QUOTE line on this first reply" prompt guard (mirrors the PHOTO handling).
+- **P3 (money) — render.js gst/subtotal/total fallback** used `Number(x) || fallback` (a legit 0
+  → re-applied 18%). Now `x != null ? Number(x) : fallback`.
+- **P3 (deploy-blast)** — unrelated Phase 311 AdminDashboardDesktop.jsx + wonDate.js sit in the
+  tree; committed ONLY the Phase 2 files explicitly (never `git add -A`).
+
+### Owner action
+1. Run `supabase_phase325_ai_build_quote.sql` in Supabase Studio (VERIFY: source_col=1,
+   prosecdef=t, svc_can=t, auth_can=f + the govt-gate smoke). 2. Re-run the §211 sweep file
+   (adds the 2 re-locks). 3. Env is UNCHANGED — the renderer reuses `AI_REPLY_SECRET`;
+   `QUOTE_RENDER_URL` defaults to app.untitledad.in/api/quote/render (no new env). 4. Push
+   (ai-reply.js + render.js are Edge → LIVE on deploy; no APK). Deploy-order-safe either way: if
+   ai-reply deploys before the SQL, `rpc/ai_build_quote` errors → caught → text reply still sent;
+   if the renderer 404s → caught → no PDF, text intact.
+5. **SMOKE the CPM on a real city** — confirm "about Rs X to reach 1,000 people" reads sane
+   (competitive ₹~10-40) against a live station; a per-screen `impressions_month` would read <₹1
+   and be auto-dropped by the band (that's the self-guard, not a bug).
+
+### Foot-gun
+- ❌ A quote-building path that trusts a city list without dedup double-charges on a repeated
+  city (the model can emit `Surat,Surat`). Dedup at BOTH the marker parse AND the money boundary.
+- ❌ An AI auto-sending media/a PDF on a cold first-contact is the top WhatsApp spam-flag trigger
+  — suppress quoteReq AND photoUrl on `firstContact`, not just the photo.
+- ❌ A PDF renderer that hard-fails only on the company NAME can still ship a GSTIN-less/bank-less
+  quotation — §4/§18 require a hard-fail on every mandated field (name + GSTIN + bank).
