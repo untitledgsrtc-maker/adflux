@@ -254,6 +254,11 @@ export default async function handler(req) {
     system += `\n\nAD CONTEXT — this person clicked a Facebook/Instagram ad titled: "${String(adHeadline).slice(0, 200)}". Open relevant to THAT ad:\n- If the ad is about our GSRTC LED bus-station screens → help them with that using the facts above.\n- If the ad is about a DIFFERENT offer (e.g. social media marketing / ad management / anything that is NOT the LED screens) → warmly acknowledge their interest in THAT, say our team will share the details shortly, and ask one simple question (their business + what they need). Do NOT invent details about that offer, and do NOT pivot to pitching the LED screens.`
   }
 
+  // Phase 324 — hot-lead routing. Teach the AI to flag real buying intent with a
+  // hidden control marker (same mechanism as PHOTO). The endpoint parses + strips it,
+  // flags the lead hot, and drops a HOT task on the owning rep (docs/PLAN_hot_lead_routing).
+  system += `\n\nBUYING-INTENT SIGNAL (hidden — for our team only, the customer NEVER sees this):\n- If the customer asks for a PRICE, a QUOTE, rates, or specific booking details → add, as the VERY LAST line, exactly: HOT: quote  (and keep helping/warming them normally — you still NEVER state a final price).\n- If the customer asks to TALK TO A PERSON / your team / a callback / "connect me" → add, as the VERY LAST line, exactly: HOT: human  (and tell them our team will contact them shortly).\n- Add AT MOST ONE such line, only when the intent is clear, always as the final line. It is stripped before sending — never mention it, never explain it.`
+
   let reply = ''
   try {
     const ar = await fetch(ANTHROPIC, {
@@ -281,6 +286,27 @@ export default async function handler(req) {
       if (hit) { photoUrl = hit.photo_url; photoCity = hit.name }
     }
   }
+
+  // Phase 324 — HOT buying-intent marker. Strip it, flag the lead hot (best-effort,
+  // EXCEPTION-wrapped RPC → never blocks the reply), and on `human` hand the thread to
+  // the rep (ai_paused). Reuses leads.heat='hot' (§71) + the §106 follow-up push.
+  const hm = reply.match(/(^|\n)[ \t]*HOT:[ \t]*(quote|human)[ \t]*$/im)
+  if (hm) {
+    const hotKind = hm[2].toLowerCase()
+    reply = reply.replace(/(^|\n)[ \t]*HOT:[ \t]*(quote|human)[ \t]*$/gim, '').trim()  // strip EVERY marker line — never leak a stray HOT: to the customer
+    if (conv.lead_id) {
+      const p_reason = hotKind === 'human' ? 'wants to talk to the team' : 'asked for a quote'
+      try {
+        await sb('rpc/flag_lead_hot_from_wa', { method: 'POST', body: JSON.stringify({ p_lead_id: conv.lead_id, p_reason }) })
+      } catch { /* hot-flag is best-effort — never block the reply */ }
+    }
+    if (hotKind === 'human') {
+      // hand the thread to the rep: this reply (the hand-off line) still sends; ai_paused
+      // just stops FUTURE AI replies so a human closes.
+      try { await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ ai_paused: true }) }) } catch { /* best-effort */ }
+    }
+  }
+
   if (!reply && !photoUrl) return nope('empty_reply')
 
   // ── backstop the two HARD rules (no final price, no booking confirmation) ──

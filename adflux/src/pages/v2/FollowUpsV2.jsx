@@ -27,7 +27,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Phone, MessageCircle, CheckCircle2, Loader2,
-  Inbox, AlertTriangle, Clock, RefreshCw,
+  Inbox, AlertTriangle, Clock, RefreshCw, Flame,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -165,7 +165,7 @@ export default function FollowUpsV2() {
           total_amount, status,
           payments ( amount_received, approval_status )
         ),
-        lead:leads   ( id, name, company, phone, segment, stage )
+        lead:leads   ( id, name, company, phone, segment, stage, heat )
       `)
       .eq('is_done', false)
       .order('follow_up_date', { ascending: true })
@@ -218,7 +218,7 @@ export default function FollowUpsV2() {
     const today    = TODAY_ISO()
     const tomorrow = ADD_DAYS(today, 1)
     const weekEnd  = ADD_DAYS(today, 7)
-    const out = { overdue: [], today: [], tomorrow: [], week: [] }
+    const out = { hot: [], overdue: [], today: [], tomorrow: [], week: [] }
     // Phase 34Z.63 / 34Z.85 — filter modes from TodaySummaryCard
     // cell taps. Each restricts the queue to a specific bucket.
     //   meetings    → note starts with "Meeting" (Phase 34Z.60 prefix)
@@ -244,6 +244,9 @@ export default function FollowUpsV2() {
       return rows
     })()
     filtered.forEach(r => {
+      // Phase 324 — additive HOT re-list: a hot lead's row ALSO shows in the pinned
+      // Hot section (it stays in its date bucket too — this doesn't remove it elsewhere).
+      if (r.lead?.heat === 'hot') out.hot.push(r)
       const d = r.follow_up_date
       if (!d) return
       if (d < today)            out.overdue.push(r)
@@ -731,6 +734,18 @@ export default function FollowUpsV2() {
         </div>
       )}
 
+      {/* Phase 324 — Hot-lead routing: AI-flagged buying-intent leads, pinned
+          to the very top. Section hides itself when there are none (rows=[]). */}
+      <Section
+        title="Hot"
+        rows={buckets.hot}
+        tone="danger"
+        icon={<Flame size={14} strokeWidth={2} />}
+        defaultOpen={true}
+        onCall={openCall} onWhatsApp={openWhatsApp} onDone={markDone} onSnooze={snooze} onPushDays={pushDays} busyId={busyId}
+        navigate={navigate}
+        readOnly={viewReadOnly}
+      />
       <Section
         title="Overdue"
         rows={buckets.overdue}

@@ -13785,3 +13785,141 @@ roles see own-scoped counts (F1).
 - ❌ An INVOKER stats RPC on a leads LIST reads as "true totals" but is actually
   per-caller-RLS-scoped — accurate for admin, personal for everyone else. If a team
   viewer needs true totals, it's a DEFINER RPC + gating, not INVOKER.
+
+
+---
+
+## 208 · Phase 319 confirmed LIVE (english report = old history) + Phase 322 SQL run (2026-08-19)
+
+Owner: "still getting english templates." Investigated — it was a MISREAD, not a bug.
+No code changed this session; run-state + a diagnosis recorded so it isn't re-dug.
+
+### Phase 319 (§203) Gujarati flip IS live + delivering — the "english" was old history
+- `wa_outcome_templates` all 5 rows = `language='gu'` + `preview_body` Gujarati
+  (positive/neutral/callback/nurture/negative). The DB + `send-template.js` (line 373,
+  `tpl.language || 'en'`) request `gu`. Meta CANNOT fall back to English on a `gu`
+  request (errors 132xxx on a missing gu version) → English delivery is impossible from
+  this path.
+- 3-day outbound `type='template'` (marketing number 98982): **547 total → 158
+  delivered + 272 READ + 48 sent + 69 failed.** Customers are receiving + READING
+  Gujarati. Proof rows `delivered`/`read` with `નમસ્તે …` bodies.
+- The English the owner saw = **pre-flip history**: every old `Hi X, thank you for your…`
+  row is dated 17–18 Aug (before the flip) AND they all `131026`-failed too. Dead
+  history sitting in the chats.
+- The 69 failures (12.6%) = **65× `131026`** (recipient not on WhatsApp / bad number =
+  NORMAL for a lead DB, no charge, no bug) + **3× `131049`** (per-user marketing pacing
+  cap) + **1× `130472`** (marketing holdout experiment). The spam-quality signal
+  (131049+130472) = only **4** → 98982 is NOT in a deliverability crisis. Do NOT
+  over-weight the §133/§148 spam flags for this batch — the failures are bad numbers.
+  (I over-weighted spam mid-diagnosis before seeing the 65/4 split — corrected.)
+- FOOT-GUN: a "wrong language / wrong content" WhatsApp report is often OLD chat
+  history, not a live bug. Check `whatsapp_messages` recent OUTBOUND `status`+`body`+`at`
+  FIRST — the DB proves what actually sent + WHEN, vs what's scrolled up in the chat.
+  `preview_body` is the inbox LOG (§125.1) — if it were stale-English while the Meta
+  template was gu, the inbox would show English while the customer got Gujarati; here
+  both are gu, so that trap didn't apply.
+
+### Phase 322 (§206) — SQL RUN, `meeting_done` mapped; Meta-Active still unconfirmed
+- `supabase_phase322_meeting_thanks_template.sql` **RUN 19 Aug**. VERIFY returned 1 row:
+  `meeting_done · post_meeting_thanks · gu · has_pdf=true · has_preview=true`. Frontend
+  (PresentView End-Presentation prompt) + `send-template.js` PICK-mode allowlist already
+  deployed (§206/§322).
+- **STILL UNCONFIRMED: the Meta `post_meeting_thanks` template Active status.** No
+  End-Presentation thank-you has fired yet (`whatsapp_messages` body LIKE '%રૂબરૂ%'
+  ["in person", unique to this template] → 0 rows). The mapping is harmless if the Meta
+  template isn't Active — that one send just fails (no other flow touched, §322).
+- TO CONFIRM: do ONE real End-Presentation → "Send a thank-you?" → then
+  `SELECT at,status,error_detail,body FROM whatsapp_messages WHERE type='template' AND
+  body LIKE '%રૂબરૂ%' ORDER BY at DESC` → `delivered`/`sent` = Active + Phase 322 fully
+  live; `failed`+132xxx = Meta version not Active yet (wait, re-test; mapping stays).
+- Reusable: to read the live Meta send-status of a template WITHOUT WhatsApp Manager,
+  fire one real send + read the `whatsapp_messages` row's `status`+`error_detail`
+  (Supabase can't hold Meta's approval state; a delivered row IS the proof of Active).
+
+
+---
+
+## 209 · Phase 324 — Phase 1 HOT-LEAD ROUTING: AI buy-intent → hot bucket + rep alert (2026-08-19)
+
+Owner's parked Phase 1 (docs/PLAN_hot_lead_routing.md). The WhatsApp AI spots
+buying intent → flags the lead hot → drops a "HOT — respond now" task + fires ONE
+push to the owning rep → a red **Hot** bucket pinned to the top of Follow-ups. The
+"hot bucket + team connect" ask. **ASSISTED close (never autonomous)** — the AI keeps
+warming, a human closes. Built + parse-clean + a 3-agent adversarial review (guardian
++ security + correctness) = **all PASS, zero P0/P1/P2** (only P3 nits, 2 applied).
+
+### The 3 pieces (all additive, §45-safe)
+- **`supabase_phase324_hot_lead_routing.sql`** (owner RUNS) — `flag_lead_hot_from_wa(
+  p_lead_id uuid, p_reason text)`. (1) `UPDATE leads SET heat='hot' WHERE COALESCE(
+  heat,'')<>'hot'` — idempotent, **does NOT touch cadence_paused** (§53 — waking the
+  auto-chase/auto-Lost is the exact bug the plan forbids). (2) owner =
+  `COALESCE(telecaller_id, assigned_to)` (§113 TC-first), RETURN on NULL (never a
+  NULL-owner task). (3) spawns ONE follow_up (`follow_up_date=IST today`,
+  **`follow_up_time=NULL`** → single §106 push, no §106 cron double-ping;
+  `auto_generated=false`, `cadence_type=NULL`, `note='HOT — '||reason`) ONLY when no
+  open HOT task exists (`note LIKE 'HOT —%'`, em-dash U+2014). SECURITY DEFINER +
+  `search_path=public, pg_temp` (§72), **REVOKE PUBLIC/anon/authenticated + GRANT
+  service_role** (only caller = ai-reply.js with the service key), whole body
+  EXCEPTION-wrapped → a hot-flag failure can NEVER break the AI reply (§45/§46).
+- **`api/wa/ai-reply.js`** (Edge, LIVE on both AI numbers — NOT frozen, careful) —
+  (A) a system-prompt append teaches the AI a hidden final-line marker: `HOT: quote`
+  (asked price/quote/rates) or `HOT: human` (wants a person/callback). (B) after the
+  PHOTO parse + BEFORE the empty-reply check: match the marker for kind, **strip EVERY
+  marker line** (`/…/gim` global — never leak a stray `HOT:` to the customer), then if
+  `conv.lead_id` best-effort try/catch `sb('rpc/flag_lead_hot_from_wa', {p_lead_id,
+  p_reason})`; on `human` best-effort PATCH `ai_paused=true` (hand the thread to the
+  rep — this reply's hand-off line STILL sends; ai_paused only mutes FUTURE replies).
+  Text path byte-preserved.
+- **`src/pages/v2/FollowUpsV2.jsx`** (§28 FROZEN, guardian PASS) — `heat` added to the
+  `lead:leads(...)` embed; a `hot: []` bucket + `if (r.lead?.heat==='hot') out.hot.
+  push(r)` at the TOP of `filtered.forEach` (a hot lead's row is ADDITIVELY re-listed —
+  it STAYS in its date bucket too); a pinned **Hot** `<Section>` (Flame icon) BEFORE
+  Overdue. `Section` returns null on `rows.length===0` → self-hides when no hot leads.
+
+### FROZEN contracts (guardian-verified — do NOT regress)
+- The RPC **must NOT touch cadence_paused**; must stay REVOKEd from client roles +
+  service_role-only; must stay EXCEPTION-wrapped (fail-closed). Reuses `leads.heat='hot'`
+  (§71 — the ONE hot flag; the §47.4 auto-heat trigger uses the same value). The
+  quote-vs-human split lives ONLY on the conversation's `ai_paused`, never on the lead.
+- The HOT task is `follow_up_time=NULL` (§106 single-push) — any same-day follow_up
+  INSERT must set time NULL or the §106 cron double-pings (§100.E foot-gun).
+- FollowUpsV2 bucket math: `hot` is a SUPERSET re-list — `total`/`grandTotal`/V2Hero
+  count only overdue+today+tomorrow+week+nurture, NOT hot → the hero counter can't
+  double-count (guardian-confirmed lines 609/613).
+- The tel:→1.5s→PostCallOutcomeModal chain + markDone/snooze/pushDays + useAutoRefresh
+  mount are UNTOUCHED (only the buckets memo + the render list changed).
+
+### Review verdicts (workflow wg95taqcl, 3× PASS)
+guardian PASS (all §28/§29/§31 contracts intact) · security PASS (8/8 hard checks;
+fail-closed exposure complete, cadence_paused untouched, em-dash LIKE byte-verified,
+injection-safe VALUE concat) · correctness PASS (7/7; marker strip clean, regex can't
+false-match a sentence 'hot', flag fires before the empty-reply return, ai_paused
+doesn't suppress the hand-off line).
+
+### OPEN (P3, owner decision — NOT built)
+Team-view Hot-section parity: the team RPCs (`team_rep_followups` §194 admin drill,
+`team_all_followups` §247 Sales-Head "Team (all)") select the lead sub-object WITHOUT
+`heat` → `r.lead?.heat` is undefined there → the Hot section self-hides (graceful, not
+a crash). Phase 1 = the REP's OWN view. To give admin-drill + Jayna's team view the
+Hot bucket too, add `heat` to those 2 SQL `jsonb_build_object` lead sub-objects — a
+1-line-each follow-up. Left as-is (scope).
+
+### Owner action
+1. Run `supabase_phase324_hot_lead_routing.sql` in Supabase Studio (VERIFY block:
+   prosecdef=t, svc_can=t, auth_can=f). 2. Push (ai-reply.js is Edge → LIVE on deploy;
+   FollowUpsV2 reaches the APK on next open — reps reopen once). No APK rebuild, no new
+   env. Smoke: from your phone, message the AI number → ask "what's the price?" → the
+   lead goes hot + a "HOT — asked for a quote" task lands in the owning rep's Follow-ups
+   (red Hot bucket at top) + they get ONE push; ask "can someone call me?" → HOT: human
+   → same, plus the AI goes silent on that thread (ai_paused) for a human to close.
+
+### Phase 2 (separate, NOT started — §4 money risk)
+AI standard-rate quote (qualify → govt never quote/hand to team; private → ask city/
+media/screens/months → generate a standard-rate PDF → send). Needs a new server
+quote-builder + tight guardrails on the AI stating standard rates only. Its own detail
+round before any build (which rate card, the qualifying script, the guardrails).
+
+### Foot-gun
+- ❌ A hidden AI control marker (HOT:/PHOTO:) must be stripped with a GLOBAL regex (or
+  a post-strip re-scan) — a single-match slice leaks a second stray marker to the
+  customer if the model ever emits two. `/…/gim` on the strip, match-once for the kind.
