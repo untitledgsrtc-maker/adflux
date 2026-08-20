@@ -299,6 +299,13 @@ export default async function handler(req) {
     reply = (data?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim()
   } catch (e) { return nope('claude_error', 502) }
 
+  // Phase 261.1 — keep the model's raw text so a control marker (PHOTO/HOT/QUOTE) that
+  // strips the reply to empty can NEVER silently ghost the customer (§133 "not responding
+  // to everyone" — the AI went dark at the private-qualify turn when the model emitted a
+  // bare QUOTE marker). If rawReply was non-empty but reply is empty after stripping, we
+  // fall back to a warm line below instead of returning empty_reply.
+  const rawReply = reply
+
   // Phase 246.1 — a `PHOTO: <city>` marker means send that city's photo as a
   // WhatsApp image. Strip the marker from the text; resolve to a real city we
   // actually have a photo for (never a made-up url).
@@ -354,6 +361,18 @@ export default async function handler(req) {
       .filter((c) => { const k = c.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
       .slice(0, 8)
     if (cities.length && months > 0) quoteReq = { cities, months }
+  }
+
+  // Phase 261.1 — NEVER GHOST. A control marker (PHOTO/HOT/QUOTE) can strip the
+  // model's whole reply to empty. If there's still an action to send (a photo or a
+  // deferred quote) OR the model actually produced text that got stripped, send a
+  // warm line so the customer never gets silence (§133 — the AI went dark at the
+  // private-qualify turn on a bare QUOTE marker). A genuinely empty rawReply with no
+  // action still falls through to the empty_reply return below.
+  if (!reply && (quoteReq || photoUrl || rawReply)) {
+    reply = quoteReq
+      ? 'One moment — I\'m putting your quote together and will send it across right away.'
+      : 'Sharing that with you now.'
   }
 
   if (!reply && !photoUrl && !quoteReq) return nope('empty_reply')
