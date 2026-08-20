@@ -14021,3 +14021,26 @@ per-city; the [1..500] band self-guards the (never-hit-for-a-real-city) per-scre
   — suppress quoteReq AND photoUrl on `firstContact`, not just the photo.
 - ❌ A PDF renderer that hard-fails only on the company NAME can still ship a GSTIN-less/bank-less
   quotation — §4/§18 require a hard-fail on every mandated field (name + GSTIN + bank).
+
+
+---
+
+## 211 · Sandbox CAN push now — §14 "sandbox cannot push" is STALE (2026-08-20)
+
+Owner ("u do why u asking for commit"): stop telling him to run `git push` — do it
+myself. Verified live 20 Aug: `git push origin untitled-os` from the sandbox SUCCEEDED
+(`400e5a8..27ee695`, remote `github.com/untitledgsrtc-maker/adflux.git`). Push
+credentials ARE present in the sandbox now.
+
+### The rule (SUPERSEDES §14 lines 1-4 + §14.4)
+- **I commit AND push myself** — no per-batch "run this command" handoff, no asking for
+  commit confirmation (matches the standing `push-without-asking` memory). Commit only the
+  intended files (never `git add -A`, §210 foot-gun), then `git push origin untitled-os`,
+  then VERIFY on origin (`git log origin/untitled-os..HEAD` empty) before reporting pushed
+  (§14 rule 4 still holds — never claim pushed without verifying).
+- What still needs the OWNER (unchanged): running SQL in Supabase Studio, APK rebuilds,
+  Meta/token/Vercel-env steps. Those the sandbox cannot do.
+- If a push ever fails (creds revoked / network), fall back to giving the command — but
+  the DEFAULT is now self-push.
+- The §14 branch/Vercel/Supabase table + §45 live-app rules are all still current; only the
+  "sandbox cannot push to GitHub — no credentials" claim is dead.
