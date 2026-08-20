@@ -645,7 +645,7 @@ const LAST_PAGE_FOOTER     = 280   // totals + bank + prepared-by
  *   • Continuation pages = 18 cities.
  *   • Last page = remaining cities + totals + bank.
  */
-function paginateCities(cities) {
+export function paginateCities(cities) {
   const SAFE_FIRST_AND_LAST_ROWS = Math.floor(
     (PAGE_BUDGET_PX - FIRST_PAGE_OVERHEAD - LAST_PAGE_FOOTER) / ROW_HEIGHT_PX
   ) // ≈ 4
@@ -679,7 +679,7 @@ function paginateCities(cities) {
  * @param {number} p.pageIndex   1-based
  * @param {number} p.totalPages
  */
-function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, pageIndex, totalPages }) {
+export function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, pageIndex, totalPages }) {
   const letterheadOn = !!company.letterhead_url
   const subtotal     = Number(quote?.subtotal) || 0
   const gstRate      = quote?.gst_rate !== null && quote?.gst_rate !== undefined ? Number(quote.gst_rate) : 0.18
@@ -1076,7 +1076,7 @@ function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLast, page
 // canvas-per-page exactly A4-sized avoids the slicer chopping a photo
 // across page boundaries.
 
-function CityPhotoPage({ city /*, quote */ }) {
+export function CityPhotoPage({ city /*, quote */ }) {
   // Phase 81.2.1 — owner directive 22 May 2026: "you dont need to
   // write anything in photo just attach photo". City photo PNGs
   // already have city name + screens + impressions burned in. The
@@ -1107,7 +1107,7 @@ function CityPhotoPage({ city /*, quote */ }) {
   )
 }
 
-function ThankYouPage({ url }) {
+export function ThankYouPage({ url }) {
   return (
     <div style={{
       width:    '794px',
@@ -1157,8 +1157,8 @@ async function enrichCitiesWithPhotos(cities) {
 
 /* ─── Snapshot helper (mirrors GovtProposalDetailV2 combined-pdf) ─── */
 
-const A4_WIDTH_PX  = 794
-const A4_HEIGHT_PX = 1123
+export const A4_WIDTH_PX  = 794
+export const A4_HEIGHT_PX = 1123
 
 /**
  * Render a React tree into an off-screen wrapper, capture with

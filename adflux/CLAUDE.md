@@ -14044,3 +14044,116 @@ credentials ARE present in the sandbox now.
   the DEFAULT is now self-push.
 - The §14 branch/Vercel/Supabase table + §45 live-app rules are all still current; only the
   "sandbox cannot push to GitHub — no credentials" claim is dead.
+
+
+---
+
+## 212 · Phase 261.1 (never-ghost) + AI quote → REAL branded PDF via headless Chromium (2026-08-20)
+
+Two ships this session. Self-pushed (§211). Second one needs owner deploy steps.
+
+### Phase 261.1 — WhatsApp AI never-ghost fix (`27ee695`, LIVE)
+`api/wa/ai-reply.js`: capture `rawReply` before the PHOTO/QUOTE/HOT markers strip the
+reply; if a marker strips it to empty but there's still an action (quoteReq/photoUrl)
+or the model produced text, send a warm line instead of returning `empty_reply` — the
+customer NEVER gets silence (§133). Guard sits BEFORE the §115 price/booking backstop;
+the two canned lines carry no rupee/commitment word so the backstop can't fire on them.
+Pushed + verified live on origin.
+
+### AI quote → REAL branded PDF (the big one — 5 pieces, app-side SHIPPED)
+**The problem** (owner: "when ai send quote this is [plain] format but when i download
+it its different — i want the actual real format"): the AI's auto-sent quote used the
+plain pdf-lib text renderer (§210, `api/quote/render.js` — "Rs." text, no logo/
+AT-A-GLANCE/photo/thankyou). The REAL PDF (`QuotePDFHtml.renderToPdfBlob`) renders via
+html2canvas IN A BROWSER on a rep's device → the AI is server-side (Edge, no browser)
+→ can't run it. Owner chose (locked): **instant AI-send + real format via SERVER-SIDE
+HEADLESS CHROMIUM**, host = **a 2nd Vercel project**. Chromium `page.pdf()` renders the
+live HTML natively = crisper than html2canvas (vector text) + reuses the rep's exact
+components 100% (no rebuild). Also sends the city photo page + thankyou page.
+
+**The 5 pieces (spec: `docs/superpowers/specs/2026-08-20-ai-quote-real-pdf-render.md`):**
+1. `api/quote-render-data.js` — NEW **Edge** fn. `GET ?ref=&t=<RENDER_SECRET>` →
+   validate secret (fail-closed) → service-role fetch quote + quote_cities + company
+   (by segment) → returns `{quote, cities, company}` JSON, cities pre-enriched with the
+   master `photo_url` (mirrors `enrichCitiesWithPhotos`). §4 govt-blocked. Edge → doesn't
+   count toward the §219 12-Node-fn cap.
+2. `QuotePDFHtml.jsx` — additive `export` on `QuotePage` / `CityPhotoPage` /
+   `ThankYouPage` / `paginateCities` / `A4_WIDTH_PX` / `A4_HEIGHT_PX`
+   (`QuotePDFHtmlDocument` already exported). **The rep's html2canvas path
+   (`renderToPdfBlob` / `uploadQuotePDFHtml` / `downloadQuotePDFHtml`) is byte-unchanged
+   — money flow untouched, only the `export` keyword added.** The components are
+   props-PURE (verified: the only supabase call in the component region is inside the
+   `enrichCitiesWithPhotos` helper, which the Edge endpoint replaces server-side) — so
+   they render standalone in the print page.
+3. `/quote-print/:ref` route (App.jsx, §28 FROZEN, additive, login-less) +
+   `src/pages/QuotePrintDoc.jsx` — the print page fetches `/api/quote-render-data` and
+   renders the SAME components as one A4-paginated print document, mirroring
+   `renderToPdfBlob`'s exact page order + props (letterhead → `paginateCities` →
+   `QuotePage` per chunk; else `QuotePDFHtmlDocument`; then per-photo `CityPhotoPage`;
+   then `ThankYouPage`). Each component self-sizes to exactly 794×1123 `overflow:hidden`,
+   so each is one page; `break-after:page` on all but the last (no trailing blank). CSS
+   `@page{size:794px 1123px;margin:0}`. Sets `data-quote-ready="1"` (or `"error"`) on
+   `<html>` = the readiness handshake for the Chromium service.
+4. `quote-render-service/` — NEW **2nd Vercel project** (owner deploys). One Node fn
+   `api/render.js`: POST `{ref}` + `x-render-secret` → puppeteer-core +
+   @sparticuz/chromium → `page.emulateMediaType('screen')` → goto
+   `APP_BASE_URL/quote-print/<ref>?t=RENDER_SECRET` → wait `data-quote-ready` + fonts +
+   all images → `page.pdf({width:'794px',height:'1123px',printBackground:true})` → upload
+   to `quote-pdfs/<ref>.pdf` (service-role upsert, SAME path as `uploadQuotePDFHtml` §44.9
+   so the stable `app.untitledad.in/pdf/<ref>` link keeps working) → sign 600s → return
+   `{url}`. Its own package.json + vercel.json (1024MB, 60s) + envs. Isolated 12-fn
+   budget → can't affect the app's deploys.
+5. `api/wa/ai-reply.js` (Edge, LIVE, additive) — after `ai_build_quote` returns a ref:
+   PRIMARY = POST `QUOTE_RENDER_URL` (the Chromium service) with `x-render-secret:
+   RENDER_SECRET` → send the real PDF; FALLBACK = the pdf-lib `PDFLIB_RENDER_URL`
+   (hardcoded same-deploy `/api/quote/render`) so the AI **never ghosts / never breaks**.
+   Whole block try/caught; the text reply always sends. **Renamed the old
+   `QUOTE_RENDER_URL`-env-for-pdf-lib collision: `QUOTE_RENDER_URL` now means the Chromium
+   service; the pdf-lib URL is the hardcoded `PDFLIB_RENDER_URL` const.**
+
+**ZERO-REGRESSION deploy order (the whole point — §45):**
+1. App-side (pieces 1-3 + 5) is SHIPPED + pushed. Because `QUOTE_RENDER_URL` is UNSET on
+   the app, the AI keeps sending the plain pdf-lib PDF (the fallback fires) → NOTHING
+   changes for the customer. `/quote-print` is live but only ever loaded by the (not-yet-
+   deployed) service.
+2. Owner deploys the 2nd project + sets its 4 envs.
+3. Owner sets `QUOTE_RENDER_URL` + `RENDER_SECRET` on the APP → the AI starts sending the
+   REAL PDF. Instant switch, reversible (unset `QUOTE_RENDER_URL` → back to pdf-lib).
+
+**Env the owner sets:**
+- Main app (Vercel): `RENDER_SECRET` (a new long random string — gates
+  `/api/quote-render-data` + ai-reply→service) + `QUOTE_RENDER_URL` (the 2nd project's
+  `/api/render` URL, set LAST to flip the switch).
+- 2nd project (Vercel): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `APP_BASE_URL`=`https://app.untitledad.in`, `RENDER_SECRET` (SAME value as the app).
+
+**Contracts / notes:**
+- ONE `RENDER_SECRET` gates all three hops (app data endpoint `?t`, ai-reply→service
+  `x-render-secret`, service→print-page `?t`). It's a server secret; the print page is
+  only ever loaded by the headless browser (a real user without `?t` → the data endpoint
+  403s → "unauthorized").
+- The service uploads to `quote-pdfs/<ref>.pdf` (the rep-flow path) → returns a 600s
+  signed URL, matching how the pdf-lib path feeds ai-reply's document send.
+- `/quote-print/:ref` is an SPA route (wants the app shell) → NOT a SW-denylist entry,
+  NOT a vercel.json rewrite → the §224 tripwire is unaffected (build passed).
+- Chromium version pin: `@sparticuz/chromium@131.0.0` + `puppeteer-core@23.9.0`. If the
+  2nd-project deploy fails on a Chromium/puppeteer mismatch, bump the pair together (they
+  must be compatible — e.g. chromium@123 ↔ puppeteer-core@22.x is the other known-good).
+
+**Gates:** all 6 files parse-clean (esbuild + node --check); `npm run build` PASS (route
++ exports resolve; §224 tripwire green). sales-module-guardian ran on the frozen touches
+(App.jsx route + QuotePDFHtml.jsx exports + ai-reply.js). Self-pushed.
+
+**Owner action to go LIVE (after the app push deploys):**
+1. Create the 2nd Vercel project from the `quote-render-service/` folder (owner deploys —
+   I can't create a Vercel project). Set its 4 envs (SUPABASE_URL /
+   SUPABASE_SERVICE_ROLE_KEY / APP_BASE_URL / RENDER_SECRET).
+2. Set `RENDER_SECRET` (same value) + `QUOTE_RENDER_URL` (the 2nd project's
+   `https://<proj>.vercel.app/api/render`) on the MAIN app project → redeploy.
+3. Smoke: message the AI number → ask for a quote for a city → the WhatsApp document is
+   the REAL branded PDF (logo + AT-A-GLANCE + photo page + thankyou). Kill/unset the
+   service → it falls back to the plain PDF (never ghosts).
+
+**Foot-gun:** an env name reused for a new meaning (`QUOTE_RENDER_URL` was the pdf-lib
+override, now the Chromium service) collides — rename the old use (→ `PDFLIB_RENDER_URL`
+hardcoded) so the two renderers can't cross-wire.

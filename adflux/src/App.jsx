@@ -15,6 +15,7 @@ const QuotesV2 = lazyWithRetry(() => import('./pages/v2/QuotesV2'))
 const MyPerformanceV2 = lazyWithRetry(() => import('./pages/v2/MyPerformanceV2'))
 const CheckInV2 = lazyWithRetry(() => import('./pages/v2/CheckInV2'))   // Phase 60
 const PresentView = lazyWithRetry(() => import('./pages/v2/PresentView'))  // Phase 181 — in-app deck + timer
+const QuotePrintDoc = lazyWithRetry(() => import('./pages/QuotePrintDoc'))  // AI real-PDF — login-less print page for the headless-Chromium render service
 import CheckInGate        from './components/v2/CheckInGate'   // Phase 60
 const ManagerDashboardV2 = lazyWithRetry(() => import('./pages/v2/ManagerDashboardV2')) // Phase 61
 const TeamManagerAssignV2 = lazyWithRetry(() => import('./pages/v2/TeamManagerAssignV2')) // Phase 61
@@ -329,6 +330,13 @@ export default function App() {
             Specific before parameterized (§10). */}
         <Route path="/present" element={<RequireAuth><PresentView /></RequireAuth>} />
         <Route path="/present/:leadId" element={<RequireAuth><PresentView /></RequireAuth>} />
+
+        {/* AI real-PDF — login-less print page rendered by the headless-Chromium
+            render service (a 2nd Vercel project). NOT wrapped in RequireAuth: it
+            is data-driven + gated by the ?t=RENDER_SECRET secret at the
+            /api/quote-render-data endpoint, and is only ever loaded by the
+            server-side headless browser. Specific literal, no shadow (§10). */}
+        <Route path="/quote-print/:ref" element={<QuotePrintDoc />} />
 
         {/* ─── v2 inner pages (share V2AppShell chrome) ───
             Phase 18 — /dashboard moved INSIDE V2AppShell so it shares

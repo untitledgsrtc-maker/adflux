@@ -29,8 +29,15 @@ const AI_SECRET    = process.env.AI_REPLY_SECRET
 const MODEL        = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5'
 const GRAPH        = 'https://graph.facebook.com/v21.0'
 const ANTHROPIC    = 'https://api.anthropic.com/v1/messages'
-// Phase 2 — the Edge PDF renderer (same deploy). Reuses AI_REPLY_SECRET.
-const RENDER_URL   = process.env.QUOTE_RENDER_URL || 'https://app.untitledad.in/api/quote/render'
+// AI real-PDF — the headless-Chromium render service (a 2nd Vercel project).
+// When QUOTE_RENDER_URL is set, the AI sends the REAL branded 3-page PDF (the
+// exact rep-download format). Unset → the pdf-lib fallback below fires, so
+// nothing changes for the customer until the owner deploys the service +
+// sets the env (zero-regression deploy order).
+const QUOTE_RENDER_URL  = process.env.QUOTE_RENDER_URL || ''
+const RENDER_SECRET     = process.env.RENDER_SECRET || ''
+// Fallback — the Edge pdf-lib text renderer (same deploy). Reuses AI_REPLY_SECRET.
+const PDFLIB_RENDER_URL = 'https://app.untitledad.in/api/quote/render'
 
 const ok  = (obj = {}) => new Response(JSON.stringify({ ok: true, ...obj }), { status: 200, headers: { 'content-type': 'application/json' } })
 const nope = (reason, status = 200) => new Response(JSON.stringify({ ok: false, reason }), { status, headers: { 'content-type': 'application/json' } })
@@ -469,12 +476,24 @@ export default async function handler(req) {
     try {
       const qr = await (await sb('rpc/ai_build_quote', { method: 'POST', body: JSON.stringify({ p_lead_id: conv.lead_id, p_cities: quoteReq.cities, p_months: quoteReq.months }) })).json()
       if (qr && qr.ok && qr.ref) {
-        // render the PDF server-side (Edge, api/quote/render) → short-lived signed URL
+        // render the PDF server-side → short-lived signed URL.
         let pdfUrl = null
-        try {
-          const rr = await (await fetch(RENDER_URL, { method: 'POST', headers: { 'content-type': 'application/json', 'x-render-secret': AI_SECRET }, body: JSON.stringify({ ref: qr.ref }) })).json()
-          if (rr && rr.ok && rr.url) pdfUrl = rr.url
-        } catch { /* render is best-effort */ }
+        // PRIMARY: the REAL branded PDF via the headless-Chromium render service
+        // (2nd Vercel project). Only when QUOTE_RENDER_URL is configured.
+        if (QUOTE_RENDER_URL) {
+          try {
+            const rr = await (await fetch(QUOTE_RENDER_URL, { method: 'POST', headers: { 'content-type': 'application/json', 'x-render-secret': RENDER_SECRET }, body: JSON.stringify({ ref: qr.ref }) })).json()
+            if (rr && rr.ok && rr.url) pdfUrl = rr.url
+          } catch { /* real render is best-effort — fall through to the pdf-lib fallback */ }
+        }
+        // FALLBACK: the pdf-lib text renderer (Edge, api/quote/render). The AI
+        // never ghosts — if the Chromium service is down/unset, the plain PDF sends.
+        if (!pdfUrl) {
+          try {
+            const rr = await (await fetch(PDFLIB_RENDER_URL, { method: 'POST', headers: { 'content-type': 'application/json', 'x-render-secret': AI_SECRET }, body: JSON.stringify({ ref: qr.ref }) })).json()
+            if (rr && rr.ok && rr.url) pdfUrl = rr.url
+          } catch { /* render is best-effort */ }
+        }
         if (pdfUrl) {
           try {
             const id = await sendWa({ type: 'document', document: { link: pdfUrl, filename: `${qr.ref}.pdf`, caption: 'Your GSRTC LED quotation' } })

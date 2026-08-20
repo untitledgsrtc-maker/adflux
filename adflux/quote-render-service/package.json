@@ -1,0 +1,14 @@
+{
+  "name": "quote-render-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless-Chromium render service for the AdFlux AI real-PDF pipeline. Renders /quote-print/<ref> to the exact branded quote PDF and uploads it to Supabase. Deployed as a SEPARATE Vercel project (isolated 12-fn budget; Chromium is a heavy Node process that must not touch the main app's deploys).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "131.0.0",
+    "puppeteer-core": "23.9.0"
+  }
+}
