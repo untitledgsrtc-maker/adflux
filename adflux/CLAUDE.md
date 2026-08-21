@@ -14198,3 +14198,125 @@ Commits: `bde00a2` (feature) · `2410d6c` (README, triggers first untitled-os bu
 `450cdfb` (setupLambdaEnvironment) · `f613065` (v149 + puppeteer-core 25 + headless shell).
 No APK, no SQL. The AI now auto-sends the real PDF; unset QUOTE_RENDER_URL on the app to
 revert to the pdf-lib plain PDF (instant, reversible).
+
+
+---
+
+## 213 · WhatsApp AI quote FOLLOW-UP shipped (OFF/held) + ALL 7 templates reclassified to Marketing (2026-08-21)
+
+Auto-chase a customer who got an AI quote (§210) and went silent, so the reactive
+AI closer can re-engage. Built spam-conservative for the twice-flagged (§133/§148)
+marketing number 98982 73686. SHIPPED but **HELD OFF** — see the reclassification below.
+
+### What it is (all additive, §45/§46-safe)
+- `supabase_ai_quote_followup.sql` (RUN 21 Aug): `whatsapp_accounts.ai_followup_enabled`
+  (DEFAULT false = global off + kill switch) · `ai_quote_followups` throttle table
+  (lead_id PK, sent_count) · `ai_quote_followup_candidates()` (qualifying: latest AI
+  quote 2–10d old, silent since, stage NOT Won/Lost, opt-out/DNC/rep-paused excluded,
+  sent_count<2, an INDEPENDENT `NOT EXISTS type='template' outbound in last 3 days`
+  guard, touch-1 at 2–4d / touch-2 at 6–9d) · `ai_quote_followup_mark()` · a
+  `wa_outcome_templates` row `outcome='quote_followup'` (gu, reply-first, NO price/pitch)
+  · `ai_quote_followup_dispatch()` (pg_net → the endpoint) · pg_cron `ai-quote-followup`
+  `'30 5 * * 1-6'` = 11:00 IST Mon–Sat.
+- `api/wa/ai-followup.js` (**Edge**, §219): `x-ai-secret==AI_REPLY_SECRET` gate,
+  IST quiet-hours 09:30–19:30 + skip Sunday, sends the Utility template, then TWO
+  independent throttle writes (whatsapp_messages log + mark) — a re-send needs BOTH
+  missing. Reuses the §246 secret — NO new env.
+- `scripts/create-quote-followup-template.py` — creates the Meta template (WABA
+  `2870129030006085` marketing).
+
+### THE SECRET-PULL TRICK (do NOT hand-paste a dispatch secret)
+`ai_quote_followup_dispatch` needs `x-ai-secret = AI_REPLY_SECRET`. Instead of pasting
+the secret (Vercel's is unreadable, §119), a DO-block EXTRACTS it from the LIVE
+`wa_ai_reply_dispatch` (§246, same secret) via `pg_get_functiondef` + a regex
+(`substring(def from $re$x-ai-secret'[^']*'([^']+)'$re$)`) and rebuilds the fn with
+`format(%L)`. Zero secret handling. `SELECT position('<AI_REPLY_SECRET>' in
+pg_get_functiondef(...))` = 0 confirms no literal placeholder left. Reuse this for any
+new pg_net dispatch fn that shares an existing secret.
+
+### ⚠ ALL 7 "did-you-get-it / reply" TEMPLATES RECLASSIFIED Utility → Marketing
+On approval Meta reclassified `ai_quote_followup` to **Marketing** (not Utility) →
+~₹0.8/send (8×) + marketing-category scrutiny. It ALSO batch-reclassified the 6 LIVE
+post-call templates (`post_call_callback/good/maybe/lost/nurture`, `post_meeting_thanks`)
+— so the §120/§206/§322 post-call sends are billing at ~8× RIGHT NOW.
+- **All 7 APPEALED** (21 Aug) via WhatsApp Manager → the flagged-templates banner →
+  **Business Support Home → Template category updates → select → Request review** →
+  all 7 moved to **In review** (window ~18–21 Oct, i.e. 60 days from reclassification,
+  NOT 24h). Watch the **Reversed** tab; a reversed one goes back to Utility (cheap).
+- **Follow-up feature HELD**: `UPDATE whatsapp_accounts SET ai_followup_enabled=false
+  WHERE purpose='marketing'` (owner ran it). Turn back ON only if/when `ai_quote_followup`
+  reverts to Utility. Everything else (cron jobid 16, secret, endpoint `a9bb2e9`) is
+  wired + ready — the flag is the only gate.
+- **FOOT-GUN:** a "did you get your X — reply to us" WhatsApp template reads as
+  Marketing to Meta, not Utility, and gets reclassified ON APPROVAL. After a template
+  goes Active, CHECK its Category column; if Marketing, appeal within 60 days; and NEVER
+  run a business-initiated chase at 8× on a spam-flagged number.
+
+### To go live later (only after it's Utility again)
+Template Category = Utility + Active → `UPDATE whatsapp_accounts SET
+ai_followup_enabled=true WHERE purpose='marketing'`. Watch 98982 quality a few days;
+dip → flip false (kill switch). Utility-vs-Marketing before enabling: the whole point.
+
+
+---
+
+## 214 · Phase 311 FINAL — "This month + Won" filter fix, quotes + leads (2026-08-21, `7dc229c`)
+
+Owner: "quote and lead filter not working — This month + Won shows wrong/empty."
+Two bugs under one symptom. Pushed + on origin; owner runs ONE SQL.
+
+### Root cause
+- **Quotes** — Phase 311 (`d471d8f`, 17 Aug) shipped the JS LIVE (`useQuotes.js` Won tab
+  date-filters on a new `won_at` column) but the SQL that CREATES `won_at` + `wonDate.js`
+  + the dashboard wiring were left **uncommitted / unrun** → the Won+date fetch
+  `.gte('won_at',…)` 400s → empty/stale list. Half-shipped.
+- **Leads** — LeadsV2 dated leads by `created_at`, not a won date (leads had none) →
+  "This month + Won" = leads *created* this month that are *now* won ≠ leads *won* this month.
+- **Conversion card** read a false **100%** on the Won tab (won ₹ / sent ₹ over an
+  all-won pool).
+
+### The fix (`7dc229c`)
+- `supabase_phase311_final.sql` (owner RUNS — idempotent, re-run-safe): adds `quotes.won_at`
+  + `leads.won_at`, a BEFORE trigger on each that stamps `won_at = now()` the FIRST time a
+  quote hits `status='won'` / a lead hits `stage='Won'` (guarded `NEW.won_at IS NULL` →
+  never re-dates), + a backfill `won_at = COALESCE(updated_at, created_at) WHERE won_at IS
+  NULL`. Consolidates + supersedes phase311 + phase311b (both neutralized/deleted).
+- `useQuotes.js` — Won tab filters on `won_at`; NEW resilience: on a `won_at` query error
+  (column absent / mid-deploy) it retries dating by `created_at` so the Won list is NEVER
+  empty (degrades to pre-311). Deploy-order safe.
+- `LeadsV2.jsx` — Won tab (`filtered`, stageFilter==='won') + Won badge (`tabCounts`,
+  per-lead stage==='Won') date by `won_at`; BOTH bucket the basis by **IST** via
+  `istDayOf()` (new `istDate.js` helper) — raw `.slice(0,10)` buckets by UTC and diverged
+  from /quotes' IST server filter at the 00:00–05:30 IST boundary.
+- `QuotesV2.jsx` — Conversion card renders only on the All view (`!filters.status`).
+- `AdminDashboardDesktop.jsx` + `wonDate.js` — dashboards attribute the won month via
+  `wonDate(q)` (won_at || updated_at || created_at).
+
+### FROZEN CONTRACTS / foot-guns
+- `won_at` = the FIRST won-transition timestamp, **immutable** (trigger `NEW.won_at IS
+  NULL` guard). Existing rows = `updated_at` proxy (the value dashboards already used → NO
+  historical monthly total moves).
+- ❌ A won_at backfill "correction" that OVERWRITES won_at is NOT re-run-safe:
+  `update_updated_at` (quotes) / `touch_updated_at` (leads) bump `updated_at` on every
+  edit, so a re-paste re-dates every edited-after-win row to its last-edit month. **Gate
+  every backfill on `won_at IS NULL`** (sets only never-set values). The old phase311b
+  "SET won_at = updated_at WHERE won_at IS DISTINCT FROM updated_at" was exactly this
+  landmine — dropped.
+- ❌ Client `iso.slice(0,10)` buckets by **UTC**; a bare date literal in a PostgREST
+  filter is parsed in the DB session tz = **Asia/Kolkata** (§42/§98 F-D001). The two
+  diverge at the day boundary. Use `istDayOf()` client-side to match the server.
+- ❌ A JS-live/SQL-unrun deploy 400s the Won filter → empty list. Keep the `created_at`
+  fallback AND treat the SQL's VERIFY (`q_missing`/`l_missing` = 0) as a MANDATORY gate
+  (a clipboard-truncated backfill leaves NULLs → the Won tab silently drops those rows,
+  which the error-only fallback does NOT catch).
+- Process: 3-lens adversarial review (guardian PASS · correctness + deploy-safety FLAG →
+  all 3 hazards fixed: 311b re-run, leads UTC-vs-IST, partial-migration NULL) + a final
+  sales-module-guardian PASS. No frozen sales contract touched (all additive).
+
+### OWNER ACTION
+Run `supabase_phase311_final.sql` in Supabase Studio → run its VERIFY SELECT
+(`q_missing` AND `l_missing` MUST be 0). **If you EVER ran the old
+`supabase_phase311_quote_won_at.sql` before, tell me** — a few PAID deals may be dated by
+their settlement month and need a separate one-time correction (the consolidated file
+deliberately does NOT auto-correct that, to stay re-run-safe). Frontend is pushed
+(`7dc229c`); reps reopen the app once. No APK.
