@@ -14417,3 +14417,10 @@ A Utility WhatsApp template reclassified to Marketing on approval is often **app
 fast** (hours, via Business Support Home → Template category updates → select → Request review).
 Don't abandon a Utility follow-up because Meta bumped it to Marketing — appeal it; the 60-day
 window + the quick reversals here show it usually flips back.
+
+### CURRENT STATE (end of 2026-08-21) — both flags OFF (owner's call)
+After enabling both, the owner flipped **both back OFF** (`ai_followup_enabled=false` AND
+`ai_nudge_enabled=false` on 98982) — a deliberate hold to watch quality first. So as of now
+BOTH follow-ups are BUILT + WIRED + verified but **NOT sending**. The flags are the only
+switch; flip either `true` to activate (start with the free §215 nudge; hold the §213 chase
+until 98982 quality is comfortable). Do NOT assume either is live — check the flags.
