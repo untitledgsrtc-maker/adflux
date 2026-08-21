@@ -14320,3 +14320,66 @@ Run `supabase_phase311_final.sql` in Supabase Studio → run its VERIFY SELECT
 their settlement month and need a separate one-time correction (the consolidated file
 deliberately does NOT auto-correct that, to stay re-run-safe). Frontend is pushed
 (`7dc229c`); reps reopen the app once. No APK.
+
+
+---
+
+## 215 · Same-day OPEN-WINDOW quote nudge — SHIPPED + LIVE (2026-08-21, `3ca350a`)
+
+Owner asked: after the AI sends a quote, is there a same-day follow-up inside the open
+window? There wasn't — the §213 chase is days-later + a paid template. Built the gap:
+a FREE-TEXT nudge inside the customer's own 24h window. **LIVE on 98982** (owner ran the
+SQL, cron jobid 17, `enabled_accts=1`). Sidesteps the whole §213 template-reclassification
+mess (it is NOT a template).
+
+### What it does
+AI auto-builds + sends a quote (§210, `quotes.source='ai_quote'`) → if the customer stays
+SILENT ~2–4h but their 24h service window is STILL OPEN → ONE gentle free-text nudge
+(same proven wording as the §213 template, but plain text). The reactive AI (§246) closes
+when they reply. One nudge per customer, ever.
+
+### Files (mirrors the §213 pattern; additive, §45/§46-safe)
+- `supabase_quote_nudge.sql` (idempotent, ships OFF): `whatsapp_accounts.ai_nudge_enabled`
+  (DEFAULT false = kill switch) + `whatsapp_conversations.quote_nudge_at` (one-nudge marker)
+  + `quote_nudge_candidates()` / `quote_nudge_mark()` / `quote_nudge_dispatch()` (secret
+  PULLED from the live `wa_ai_reply_dispatch` via a DO-block regex — no literal secret in
+  the file, self-contained, no placeholder to replace) + hourly `cron.schedule('quote-nudge',
+  '7 * * * *', ...)`. All 3 fns REVOKE PUBLIC/anon/authenticated + GRANT service_role
+  (candidates/mark) / postgres-only (dispatch). Added to the §211 anon-execute re-lock.
+- `api/wa/quote-nudge.js` (**Edge**, §219): `x-ai-secret == AI_REPLY_SECRET` fail-closed,
+  IST 09:30–19:30 + skip Sunday, sends `type='text'`, reuses the §246 secret (NO new env).
+
+### FROZEN CONTRACT — MARK-then-SEND (the review P1; do NOT reorder)
+The one-nudge guarantee rests on ONE throttle (`quote_nudge_at`) — a free-text nudge has
+no distinguishing marker for a message-based dedup. So the endpoint **claims the throttle
+(`quote_nudge_mark`) BEFORE the Graph send.** A lost/failed write can then never cause a
+DUPLICATE nudge on the twice-flagged (§133/§148) number; the worst case is a rare MISSED
+nudge (a send that fails after the claim) — the right trade on a spam-flagged number.
+Do NOT flip it back to send-then-mark (that's the bug the review caught: a mark failure
+after a successful send → the next hourly cron re-sends a duplicate).
+
+### Candidate gates (quote_nudge_candidates)
+`ai_nudge_enabled=true` · phone_number_id present · customer_wa_id `~ '^[0-9]{10,15}$'` ·
+`quote_nudge_at IS NULL` · `ai_paused=false` (rep hasn't taken over) · `window_expires_at >
+now()` (window OPEN) · latest `source='ai_quote'` quote for the lead created 2–4h ago ·
+`last_inbound_at <= that quote` (silent since) · not `wa_opt_out` / `do_not_call`.
+
+### Why spam-safe (the whole point)
+Free text INSIDE an OPEN 24h service window (customer messaged us <24h ago) is NOT a
+business-initiated paid template → ₹0, Meta-policy-safe, no reclassification risk. This is
+why it can run LIVE on the flagged number while the §213 template chase stays HELD.
+
+### The two follow-ups now (do not confuse)
+- **§215 same-day nudge** — ~2–4h, window OPEN, FREE text, **LIVE**.
+- **§213 chase** — days later, window CLOSED, paid template, **HELD** until its template
+  reverts to Utility.
+
+### State / kill switch
+LIVE on the marketing account (98982). Off: `UPDATE whatsapp_accounts SET
+ai_nudge_enabled=false WHERE purpose='marketing'`. 3-lens review: security PASS; the
+duplicate-send P1 (correctness + spam-safety) fixed via mark-then-send.
+
+### Foot-gun
+- ❌ A one-shot throttle that stamps AFTER the irreversible action (the send) re-fires on
+  a lost write → duplicate. When a duplicate is worse than a miss (a spam-flagged number),
+  CLAIM the throttle BEFORE the send, not after.
