@@ -14418,9 +14418,16 @@ fast** (hours, via Business Support Home → Template category updates → selec
 Don't abandon a Utility follow-up because Meta bumped it to Marketing — appeal it; the 60-day
 window + the quick reversals here show it usually flips back.
 
-### CURRENT STATE (end of 2026-08-21) — both flags OFF (owner's call)
-After enabling both, the owner flipped **both back OFF** (`ai_followup_enabled=false` AND
-`ai_nudge_enabled=false` on 98982) — a deliberate hold to watch quality first. So as of now
-BOTH follow-ups are BUILT + WIRED + verified but **NOT sending**. The flags are the only
-switch; flip either `true` to activate (start with the free §215 nudge; hold the §213 chase
-until 98982 quality is comfortable). Do NOT assume either is live — check the flags.
+### CURRENT STATE — the FLAGS are the live switch (check them, don't trust a pinned value)
+Both follow-ups are BUILT + WIRED + verified. Whether they are SENDING is controlled entirely
+by two flags on the marketing account (98982): `ai_followup_enabled` (§213 days-later chase)
+and `ai_nudge_enabled` (§215 same-day nudge). These get toggled operationally (the owner
+flipped them off→on→off→on during setup 21 Aug), so **do NOT trust any on/off state written
+here — query the live values:**
+```sql
+SELECT display_number, ai_followup_enabled, ai_nudge_enabled FROM whatsapp_accounts WHERE purpose='marketing';
+```
+Turn on:  `UPDATE whatsapp_accounts SET ai_followup_enabled=true,  ai_nudge_enabled=true  WHERE purpose='marketing';`
+Kill:     `UPDATE whatsapp_accounts SET ai_followup_enabled=false, ai_nudge_enabled=false WHERE purpose='marketing';`
+Guidance: the §215 nudge is the safe one (free text, open window); the §213 chase is cheap
+Utility but business-initiated on the twice-flagged number — watch 98982 quality when it runs.
