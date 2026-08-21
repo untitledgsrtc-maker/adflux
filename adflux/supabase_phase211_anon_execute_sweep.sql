@@ -67,10 +67,14 @@ BEGIN
       -- ai_build_quote (§325) + flag_lead_hot_from_wa (§324): SECURITY DEFINER,
       -- REVOKED from authenticated (only ai-reply.js with the service key calls
       -- them). Step 2's blanket grant would re-open them; re-lock here.
+      -- ai_quote_followup_* (AI quote follow-up): SECURITY DEFINER, REVOKED —
+      -- only api/wa/ai-followup.js with the service key reaches them.
       AND p.proname IN ('enqueue_push', 'dedupe_all_phone_groups',
                         'dedupe_phone_lead_group', 'regen_payment_fu_notes',
                         '_reassign_lead_apply',
-                        'ai_build_quote', 'flag_lead_hot_from_wa')
+                        'ai_build_quote', 'flag_lead_hot_from_wa',
+                        'ai_quote_followup_candidates', 'ai_quote_followup_mark',
+                        'ai_quote_followup_dispatch')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
   END LOOP;
@@ -126,7 +130,9 @@ FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public'
   AND p.proname IN ('enqueue_push','dedupe_all_phone_groups','dedupe_phone_lead_group',
                     'regen_payment_fu_notes','_reassign_lead_apply',
-                    'ai_build_quote','flag_lead_hot_from_wa')
+                    'ai_build_quote','flag_lead_hot_from_wa',
+                    'ai_quote_followup_candidates','ai_quote_followup_mark',
+                    'ai_quote_followup_dispatch')
 ORDER BY p.proname;
 
 SELECT 'Phase 211 anon-execute sweep applied' AS status;
