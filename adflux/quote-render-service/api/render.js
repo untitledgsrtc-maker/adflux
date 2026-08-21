@@ -65,9 +65,9 @@ export default async function handler(req, res) {
     // Call it explicitly to prepend the extracted lib dir to LD_LIBRARY_PATH.
     setupLambdaEnvironment(join(tmpdir(), 'al2023', 'lib'))
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: await puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
       executablePath: execPath,
-      headless: chromium.headless,
+      headless: 'shell',
       defaultViewport: { width: 794, height: 1123, deviceScaleFactor: 2 },
     })
     const page = await browser.newPage()

@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@sparticuz/chromium": "131.0.0",
-    "puppeteer-core": "23.9.0"
+    "@sparticuz/chromium": "149.0.0",
+    "puppeteer-core": "25.8.0"
   }
 }
