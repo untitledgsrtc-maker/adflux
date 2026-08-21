@@ -23,8 +23,10 @@
 // app uses).
 // ─────────────────────────────────────────────────────────────────────────
 
-import chromium from '@sparticuz/chromium'
+import chromium, { setupLambdaEnvironment } from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 
 const SUPABASE_URL  = process.env.SUPABASE_URL
 const SERVICE_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -56,9 +58,15 @@ export default async function handler(req, res) {
 
   let browser
   try {
+    // Extract the bundled Chromium binary + its shared libs to /tmp.
+    const execPath = await chromium.executablePath()
+    // Vercel isn't detected as AWS Lambda, so @sparticuz/chromium's auto
+    // env-setup is skipped → the child process can't find libnss3.so etc.
+    // Call it explicitly to prepend the extracted lib dir to LD_LIBRARY_PATH.
+    setupLambdaEnvironment(join(tmpdir(), 'al2023', 'lib'))
     browser = await puppeteer.launch({
       args: chromium.args,
-      executablePath: await chromium.executablePath(),
+      executablePath: execPath,
       headless: chromium.headless,
       defaultViewport: { width: 794, height: 1123, deviceScaleFactor: 2 },
     })
