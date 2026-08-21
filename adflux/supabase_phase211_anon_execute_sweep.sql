@@ -74,7 +74,9 @@ BEGIN
                         '_reassign_lead_apply',
                         'ai_build_quote', 'flag_lead_hot_from_wa',
                         'ai_quote_followup_candidates', 'ai_quote_followup_mark',
-                        'ai_quote_followup_dispatch')
+                        'ai_quote_followup_dispatch',
+                        'quote_nudge_candidates', 'quote_nudge_mark',
+                        'quote_nudge_dispatch')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
   END LOOP;
@@ -132,7 +134,8 @@ WHERE n.nspname = 'public'
                     'regen_payment_fu_notes','_reassign_lead_apply',
                     'ai_build_quote','flag_lead_hot_from_wa',
                     'ai_quote_followup_candidates','ai_quote_followup_mark',
-                    'ai_quote_followup_dispatch')
+                    'ai_quote_followup_dispatch',
+                    'quote_nudge_candidates','quote_nudge_mark','quote_nudge_dispatch')
 ORDER BY p.proname;
 
 SELECT 'Phase 211 anon-execute sweep applied' AS status;
