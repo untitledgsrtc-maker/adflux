@@ -565,7 +565,12 @@ export default function QuotesV2() {
         {/* Phase 276 — Won (value of won deals) + Conversion (win rate on
             decided deals). NOT the hero ring, which is COLLECTION rate. */}
         <TotalCard label="Won" value={totals.wonAmount} kind="money" tint="var(--v2-green, #2BD8A0)" sub={`${totals.wonCount} won`} />
-        <TotalCard label="Conversion" value={totals.convPct} kind="percent" sub="won ₹ of sent ₹" />
+        {/* Phase 311 — Conversion (won ₹ / sent ₹) is only meaningful across ALL
+            statuses. On a single-status tab the loaded pool IS that status, so
+            e.g. the Won tab made it read a false 100%. Show it on the All view only. */}
+        {!filters.status && (
+          <TotalCard label="Conversion" value={totals.convPct} kind="percent" sub="won ₹ of sent ₹" />
+        )}
         <TotalCard label="Outstanding" value={totals.outstanding} kind="money" warn />
       </div>
 

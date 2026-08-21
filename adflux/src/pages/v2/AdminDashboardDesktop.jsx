@@ -49,6 +49,7 @@ import WaBillingBanner from '../../components/v2/WaBillingBanner'
 import {
   LeadPipelinePanel, TeamActivityPanel,
 } from '../../components/dashboard/CockpitWidgets'
+import { wonDate } from '../../utils/wonDate'
 import '../../styles/v2.css'
 
 /* ─── Money display: full Indian-format number with lakh/crore grouping.
@@ -366,7 +367,7 @@ export default function AdminDashboardDesktop() {
     // what was committed. Gap = collections still owed.
     const wonValue = quotes.reduce((sum, q) => {
       if (q.status !== 'won') return sum
-      const ts = q.updated_at || q.created_at || ''
+      const ts = wonDate(q)  // Phase 311 — won month, not sent/edit month
       if (ts < monthStartIso || ts >= monthEndIso) return sum
       return sum + (q.total_amount || 0)
     }, 0)
@@ -398,7 +399,7 @@ export default function AdminDashboardDesktop() {
     // Won + pipeline quote counts (used as subtitle on the KPI cells)
     const wonCount = quotes.filter(q => {
       if (q.status !== 'won') return false
-      const ts = q.updated_at || q.created_at || ''
+      const ts = wonDate(q)  // Phase 311 — won month
       return ts >= monthStartIso && ts < monthEndIso
     }).length
     const pipelineCount = quotes.filter(q =>
@@ -430,7 +431,7 @@ export default function AdminDashboardDesktop() {
       const qs = quotes.filter(q => {
         if (q.status !== s) return false
         if (!isTerminal) return true
-        return inPeriod(q.updated_at || q.created_at)
+        return inPeriod(s === 'won' ? wonDate(q) : (q.updated_at || q.created_at))  // Phase 311 — won by won_at, lost by updated_at
       })
       return {
         status: s,
@@ -463,7 +464,7 @@ export default function AdminDashboardDesktop() {
       }
       // Won bucket (kept for reference / future split)
       if (q.status === 'won') {
-        const ts = q.updated_at || q.created_at || ''
+        const ts = wonDate(q)  // Phase 311 — won month, consistent with wonValue/wonCount above
         if (ts >= monthStartIso && ts < monthEndIso) {
           wonByUser[q.created_by] = (wonByUser[q.created_by] || 0) + (q.total_amount || 0)
         }

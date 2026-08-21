@@ -62,6 +62,26 @@ export function istNowPlusHoursDateTime(hours) {
   }
 }
 
+/**
+ * The IST calendar day (YYYY-MM-DD) for any ISO / timestamp string.
+ * Phase 311 — used to bucket a row's won_at / created_at by IST so client-side
+ * date-range filters (LeadsV2) agree with the server-side IST filter on /quotes
+ * (a bare date literal is parsed in the DB session tz = Asia/Kolkata). Raw
+ * `iso.slice(0,10)` buckets by UTC and diverges at the 00:00–05:30 IST boundary.
+ * Empty / invalid in → '' out (safe for string compare callers).
+ */
+export function istDayOf(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(d)
+  const m = Object.fromEntries(parts.map(p => [p.type, p.value]))
+  return `${m.year}-${m.month}-${m.day}`
+}
+
 /** IST day + N days as YYYY-MM-DD. */
 export function istTodayPlusDays(days) {
   const future = new Date(Date.now() + days * 24 * 60 * 60 * 1000)

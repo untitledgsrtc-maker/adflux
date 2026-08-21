@@ -51,9 +51,14 @@ export function useQuotes() {
     // (or a rep) with >1000 quotes would silently load only the first 1000
     // — the same trap just fixed for leads (Phase 151). Quotes are ~300
     // today, so this is ONE request now; it just future-proofs the list.
-    const buildQuery = () => {
+    // Phase 311 — the Won tab attributes deals by the WON date (won_at), not the
+    // sent date (created_at): a quote sent in July but marked Won in August shows
+    // under August. Every other tab keeps dating by created_at (byte-unchanged).
+    // `dateColOverride` lets the caller force created_at as a fallback (below).
+    const buildQuery = (dateColOverride) => {
       let q = supabase
         .from('quotes')
+        // cap-ok — paginated by runPaged() below (§66/§152), not a bare unbounded select
         .select('*, quote_cities(*), payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
         .order('created_at', { ascending: false })
       // Phase 11g — agency behaves like sales: own quotes only; admin sees all.
@@ -66,30 +71,41 @@ export function useQuotes() {
           `client_name.ilike.%${filters.search}%,client_company.ilike.%${filters.search}%,quote_number.ilike.%${filters.search}%`
         )
       }
-      // Phase 311 — the Won tab attributes deals by the WON date (won_at), not
-      // the sent date (created_at): a quote sent in July but marked Won in
-      // August shows under August. Every other tab keeps dating by created_at
-      // (byte-unchanged). Requires supabase_phase311_quote_won_at.sql (SQL-first).
-      const dateCol = filters.status === 'won' ? 'won_at' : 'created_at'
+      const dateCol = dateColOverride || (filters.status === 'won' ? 'won_at' : 'created_at')
       if (filters.dateFrom) q = q.gte(dateCol, filters.dateFrom)
       if (filters.dateTo)   q = q.lte(dateCol, filters.dateTo + 'T23:59:59')
       return q
     }
 
-    const PAGE = 1000
-    let all = []
-    let from = 0
-    let lastErr = null
-    for (;;) {
-      const { data, error } = await buildQuery().range(from, from + PAGE - 1)
-      if (error) { lastErr = error; break }
-      all = all.concat(data || [])
-      if (!data || data.length < PAGE) break
-      from += PAGE
-      if (from >= 20000) break
+    // Phase 152 — paginate in 1000-row chunks (PostgREST caps a bare .select()
+    // at ~1000). Returns { data, error }; a page error short-circuits the loop.
+    const runPaged = async (dateColOverride) => {
+      const PAGE = 1000
+      let all = []
+      let from = 0
+      for (;;) {
+        const { data, error } = await buildQuery(dateColOverride).range(from, from + PAGE - 1)
+        if (error) return { data: all, error }
+        all = all.concat(data || [])
+        if (!data || data.length < PAGE) break
+        from += PAGE
+        if (from >= 20000) break
+      }
+      return { data: all, error: null }
     }
-    if (!lastErr) store.setQuotes(all)
-    return { data: all, error: lastErr }
+
+    let res = await runPaged()
+    // Phase 311 resilience — the Won tab filters on won_at (Phase 311 SQL). If
+    // that column isn't there yet (migration not run / mid-deploy), the fetch
+    // 400s. Do NOT leave the Won list empty: retry dating by created_at (the
+    // pre-311 behaviour) so the filter still works. Once supabase_phase311_final.sql
+    // is run, won_at exists and this fallback never fires.
+    if (res.error && filters.status === 'won' && (filters.dateFrom || filters.dateTo)) {
+      console.warn('[useQuotes] won_at filter failed — falling back to created_at. Run supabase_phase311_final.sql.', res.error?.message || res.error)
+      res = await runPaged('created_at')
+    }
+    if (!res.error) store.setQuotes(res.data)
+    return { data: res.data, error: res.error }
   }, [profile?.id, store.filters])
 
   const fetchQuoteById = async (id) => {

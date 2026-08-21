@@ -107,6 +107,7 @@ import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import V2Hero from '../../components/v2/V2Hero'
 import SegmentToggle from '../../components/v2/SegmentToggle'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
+import { istDayOf } from '../../utils/istDate'  // Phase 311 — IST-bucket won_at/created_at to match /quotes' server IST filter
 import FilterDrawer, { ActiveFilterChips } from '../../components/v2/FilterDrawer'
 // Phase 44.1 — daily leads-collected bar chart at top of /leads.
 import LeadsCollectedChart from '../../components/leads/LeadsCollectedChart'
@@ -411,7 +412,11 @@ export default function LeadsV2() {
       // Phase 72.4 — lost-reason filter ("Price problem" etc.).
       if (lostReasonFilter !== 'all' && l.lost_reason !== lostReasonFilter) return false
       if (fromIso || toIso) {
-        const created = (l.created_at || '').slice(0, 10)
+        // Phase 311 (leads) — the Won tab dates by the WON date (won_at), not the
+        // captured date (created_at): a lead captured in July but Won in August
+        // shows under August. Every other tab keeps created_at. Mirrors QuotesV2.
+        const basis = (stageFilter === 'won' && l.won_at) ? l.won_at : l.created_at
+        const created = istDayOf(basis)  // Phase 311 — IST day, matches /quotes' server IST filter
         if (fromIso && created < fromIso) return false
         if (toIso   && created > toIso)   return false
       }
@@ -424,7 +429,7 @@ export default function LeadsV2() {
         (l.industry || '').toLowerCase().includes(q)
       )
     })
-  }, [leads, queueIds, search, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, leadOutcomeMap, lostReasonFilter, dateFrom, dateTo])
+  }, [leads, queueIds, search, stageFilter, stagesInGroup, segmentFilter, sourceFilter, cityFilter, industryFilter, repFilter, outcomeFilter, leadOutcomeMap, lostReasonFilter, dateFrom, dateTo])
 
   // Phase 62.8 — paginated slice. Filter computes the full set; the
   // table only renders one page worth. Reset to page 1 whenever the
@@ -549,7 +554,11 @@ export default function LeadsV2() {
       if (outcomeFilter    !== 'all' && (leadOutcomeMap[l.id] || '') !== outcomeFilter) return false
       if (lostReasonFilter !== 'all' && l.lost_reason !== lostReasonFilter) return false
       if (fromIso || toIso) {
-        const created = (l.created_at || '').slice(0, 10)
+        // Phase 311 (leads) — a Won lead is dated by won_at, everything else by
+        // created_at, so the Won tab badge counts leads WON in range (matching
+        // the Won-tab list, which dates Won by won_at).
+        const basis = (l.stage === 'Won' && l.won_at) ? l.won_at : l.created_at
+        const created = istDayOf(basis)  // Phase 311 — IST day, matches /quotes' server IST filter
         if (fromIso && created < fromIso) return false
         if (toIso   && created > toIso)   return false
       }
