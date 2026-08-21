@@ -14383,3 +14383,37 @@ duplicate-send P1 (correctness + spam-safety) fixed via mark-then-send.
 - ❌ A one-shot throttle that stamps AFTER the irreversible action (the send) re-fires on
   a lost write → duplicate. When a duplicate is worse than a miss (a spam-flagged number),
   CLAIM the throttle BEFORE the send, not after.
+
+
+---
+
+## 216 · Template appeals RESOLVED (4/7 reversed) — BOTH follow-ups now LIVE (2026-08-21)
+
+SUPERSEDES the §213 "HELD" state. The 7-template category appeal (§213) resolved **within
+~1 hour** — Meta reversed **4 of 7** back to Utility:
+
+| Reversed → Utility (Approved) ✅ | Still In review ⏳ |
+|---|---|
+| **ai_quote_followup** · post_meeting_thanks · post_call_maybe · post_call_lost | post_call_nurture · post_call_good · post_call_callback |
+
+- **`ai_quote_followup` is Utility again** → the §213 follow-up is UN-held. Owner enabled it:
+  `ai_followup_enabled=true` on the marketing account (98982). So the §213 days-later chase
+  is now **LIVE** (cheap Utility ~₹0.11, 2-touch max, all opt-out/DNC/silent gates).
+- The §215 same-day nudge is also LIVE (`ai_nudge_enabled=true`).
+- **BOTH follow-ups now run on 98982** (verified: `919898273686 · ai_followup_enabled=true
+  · ai_nudge_enabled=true`). Kill switches = flip either flag false. Trim volume = kill the
+  §213 chase FIRST (business-initiated template), keep the free §215 nudge.
+- The 3 still-in-review templates are the LIVE post-call feature (§120) — those 3 outcomes
+  (`nurture/good/callback`) bill at ~8× Marketing until Meta reverses them too (watch the
+  Business Support Home → Template category updates → **Reversed** tab).
+
+### WATCH (standing)
+98982 was spam-flagged twice (§133/§148). Business-initiated Utility volume (the §213 chase)
+now flows again — **watch WhatsApp Manager → 98982 → Quality** for a few days. Dip → kill the
+§213 flag. The §215 nudge (free text, open window) is the safe one to keep.
+
+### LESSON
+A Utility WhatsApp template reclassified to Marketing on approval is often **appeal-reversible
+fast** (hours, via Business Support Home → Template category updates → select → Request review).
+Don't abandon a Utility follow-up because Meta bumped it to Marketing — appeal it; the 60-day
+window + the quick reversals here show it usually flips back.
