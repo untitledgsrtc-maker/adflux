@@ -14157,3 +14157,44 @@ components 100% (no rebuild). Also sends the city photo page + thankyou page.
 **Foot-gun:** an env name reused for a new meaning (`QUOTE_RENDER_URL` was the pdf-lib
 override, now the Chromium service) collides — rename the old use (→ `PDFLIB_RENDER_URL`
 hardcoded) so the two renderers can't cross-wire.
+
+### §212 addendum — DEPLOYED + LIVE + PROVEN (2026-08-20, same session)
+
+The 2nd Vercel project + the env wiring were done via Claude-in-Chrome on the
+owner's Vercel; the AI real-PDF is **live and verified end-to-end**.
+
+- **2nd project `quote-render-service`** created (Hobby team `untitledgsrtc-makers-projects`),
+  Root Directory `adflux/quote-render-service`, **Production branch = `untitled-os`**
+  (Vercel now sets this under Settings → Environments → Production → Branch Tracking,
+  NOT Settings → Git). Envs: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / APP_BASE_URL /
+  RENDER_SECRET. App (`untitled-os` project) got QUOTE_RENDER_URL
+  (`https://quote-render-service.vercel.app/api/render`) + RENDER_SECRET (same value).
+- **Proven:** `POST /api/render {ref:UA-2026-0303}` → a valid **3-page A4 branded PDF**
+  (Producer `Skia/PDF` = native Chromium vector, 767 KB): page 1 MEDIA QUOTATION (logo,
+  CAMPAIGN AT A GLANCE, LOCATION BREAKDOWN, GST, CPM, Total-in-Words, both-offices
+  footer), page 2 the real KHEDA station photo, page 3 the thank-you page. Exactly the
+  rep-download format, crisper.
+
+**Two build failures fixed on the way (do NOT regress the versions):**
+1. **`@sparticuz/chromium@131.0.0` has NO `setupLambdaEnvironment` named export** →
+   `import { setupLambdaEnvironment }` crashed the fn at load (FUNCTION_INVOCATION_FAILED).
+   Bumped to **`@sparticuz/chromium@149.0.0`** (exports it) + **`puppeteer-core@25.8.0`**.
+   The §212 "@sparticuz/chromium@131.0.0 + puppeteer-core@23.9.0" pin is SUPERSEDED.
+2. **`libnss3.so: cannot open shared object file`** — on Vercel (not detected as AWS
+   Lambda) @sparticuz/chromium skips its auto env-setup, so LD_LIBRARY_PATH never points
+   at the extracted libs. FIX (per the @sparticuz docs): after `chromium.executablePath()`,
+   call `setupLambdaEnvironment(join(tmpdir(), 'al2023', 'lib'))` explicitly.
+   Also: **v149 `chromium.headless` is `undefined`** → launch with `headless: 'shell'` +
+   `args: await puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' })`.
+
+**FOOT-GUN (serverless Chromium):** the `@sparticuz/chromium` API + exports change fast.
+Before pinning, verify the target version actually exports what the code imports
+(`node -e "import('@sparticuz/chromium').then(m=>console.log(Object.keys(m)))"`) and that
+`chromium.headless` isn't undefined (v149 dropped it → pass `headless:'shell'` yourself).
+On Vercel specifically, ALWAYS call `setupLambdaEnvironment(join(tmpdir(),'al2023','lib'))`
+— the auto-setup only fires when it detects a real Lambda env.
+
+Commits: `bde00a2` (feature) · `2410d6c` (README, triggers first untitled-os build) ·
+`450cdfb` (setupLambdaEnvironment) · `f613065` (v149 + puppeteer-core 25 + headless shell).
+No APK, no SQL. The AI now auto-sends the real PDF; unset QUOTE_RENDER_URL on the app to
+revert to the pdf-lib plain PDF (instant, reversible).
