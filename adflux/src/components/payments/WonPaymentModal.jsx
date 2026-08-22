@@ -12,7 +12,7 @@
 // so flipping a quote to Won with an outstanding balance won't pay out
 // incentive until that final tick happens.
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { CheckCircle2, Paperclip, Upload, Trophy } from 'lucide-react'
 import { formatCurrency, todayISO } from '../../utils/formatters'
 import V2Hero from '../v2/V2Hero'
@@ -97,6 +97,37 @@ export function WonPaymentModal({
     commission_pct: '',
   })
   const isGovt = quote?.segment === 'GOVERNMENT'
+
+  // ── Phase 274 · govt TDS entry (mirror of PaymentModal) ────────────────
+  // Govt withholds TDS, so the rep enters NET cash + a rate; the app derives
+  // amount_received = net + tds (the gross that closes the deal). Stored value +
+  // is_final + every calc stay the gross — only the input changes. Inert on private.
+  const govtBaseRatioW = (Number(quote?.subtotal) || 0) > 0 && (Number(quote?.total_amount) || 0) > 0
+    ? Number(quote.subtotal) / Number(quote.total_amount) : 1        // ex-GST base share
+  const govtBaseRemW = Number(quote.total_amount || 0) - Number(totalPaid || 0)  // remaining to close, before this payment
+  // Mirror the amount_received pre-fill (line ~81): on a govt quote with an
+  // existing partial, seed net = remaining balance so the sync effect keeps the
+  // pre-filled "settle the balance + auto-final" convenience instead of blanking it.
+  const [govtNet, setGovtNet] = useState(() =>
+    (quote?.segment === 'GOVERNMENT' && hasExistingPayment && remainingBalance > 0)
+      ? String(remainingBalance) : '')
+  const [tdsRate, setTdsRate] = useState('')
+  useEffect(() => {
+    if (!isGovt) return
+    const net = parseFloat(govtNet) || 0
+    const tds = parseFloat(form.tds_amount) || 0
+    const gross = net + tds
+    const nextAmt = gross > 0 ? String(gross) : ''
+    const total = Number(quote.total_amount) || 0
+    const covers = total > 0 && gross > 0 && gross + Number(totalPaid || 0) >= total
+    setForm(f => (f.amount_received === nextAmt && f.is_final === covers ? f : { ...f, amount_received: nextAmt, is_final: covers }))
+  }, [isGovt, govtNet, form.tds_amount])
+  function applyTdsRate(r) {
+    setTdsRate(String(r))
+    const tds = Math.round((r / 100) * govtBaseRemW * govtBaseRatioW)
+    setForm(f => ({ ...f, tds_amount: String(tds) }))
+    setGovtNet(String(Math.max(0, govtBaseRemW - tds)))
+  }
 
   function set(k, v) {
     const updated = { ...form, [k]: v }
@@ -344,15 +375,31 @@ export function WonPaymentModal({
 
               <div className="grid2">
                 <div className="fg">
-                  <label>
-                    {hasExistingPayment ? 'Additional Payment (₹) — optional' : 'Amount Received (₹) — optional'}
-                  </label>
-                  <input
-                    type="number"
-                    value={form.amount_received}
-                    onChange={e => set('amount_received', e.target.value)}
-                    placeholder="Leave blank to mark Won only"
-                  />
+                  {!isGovt ? (
+                    <>
+                      <label>
+                        {hasExistingPayment ? 'Additional Payment (₹) — optional' : 'Amount Received (₹) — optional'}
+                      </label>
+                      <input
+                        type="number"
+                        value={form.amount_received}
+                        onChange={e => set('amount_received', e.target.value)}
+                        placeholder="Leave blank to mark Won only"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      {/* Phase 274 — GOVT: net cash; amount_received (gross) = net + TDS below. */}
+                      <label>Cash received — net of TDS (₹) — optional</label>
+                      <input
+                        type="number"
+                        value={govtNet}
+                        onChange={e => { setTdsRate(''); setGovtNet(e.target.value) }}
+                        placeholder="Leave blank to mark Won only"
+                        min="0"
+                      />
+                    </>
+                  )}
                 </div>
                 <div className="fg">
                   <label>Payment Mode</label>
@@ -362,23 +409,42 @@ export function WonPaymentModal({
                 </div>
               </div>
 
-              {/* TDS (Govt only) — record the withheld part; the FULL
-                  milestone (incl. TDS) goes in Amount Received above. */}
-              {isGovt && newAmount > 0 && (
+              {/* Phase 274 — GOVT TDS: pick 4%/3% (or type) → TDS + net auto-fill;
+                  amount_received (gross) = net + TDS closes the deal to Fully Paid. */}
+              {isGovt && (parseFloat(govtNet) > 0 || newAmount > 0) && (
                 <div className="fg">
-                  <label>TDS deducted (₹) — part of the amount above</label>
+                  <label>TDS the government deducted (₹)</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {[4, 3].map(r => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => applyTdsRate(r)}
+                        style={{
+                          flex: '1 1 0', minWidth: 90,
+                          background: tdsRate === String(r) ? 'var(--accent, #FFE600)' : 'var(--accent-soft, rgba(255,230,0,0.14))',
+                          color: tdsRate === String(r) ? 'var(--accent-fg, #0f172a)' : 'var(--text)',
+                          border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 6px)',
+                          padding: '8px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        {r}% = {formatCurrency(Math.round((r / 100) * govtBaseRemW * govtBaseRatioW))}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     type="number"
                     value={form.tds_amount}
-                    onChange={e => set('tds_amount', e.target.value)}
-                    placeholder="e.g. 4% of the milestone"
+                    onChange={e => { setTdsRate(''); setForm(f => ({ ...f, tds_amount: e.target.value })) }}
+                    placeholder="TDS amount (₹) — or tap a rate above"
                     min="0"
                   />
-                  {Number(form.tds_amount) > 0 && (
-                    <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
-                      Cash banked: ₹{Math.max(0, newAmount - (Number(form.tds_amount) || 0)).toLocaleString('en-IN')}
-                    </div>
-                  )}
+                  <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
+                    Govt TDS = 4% (2% income + 2% GST), sometimes 3%, of the pre-GST base — still counts as paid (govt deposits it to your PAN).
+                    {newAmount > 0 && (
+                      <> · Invoice applied: ₹{newAmount.toLocaleString('en-IN')} (cash ₹{(parseFloat(govtNet) || 0).toLocaleString('en-IN')} + TDS ₹{(parseFloat(form.tds_amount) || 0).toLocaleString('en-IN')})</>
+                    )}
+                  </div>
                 </div>
               )}
 

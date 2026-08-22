@@ -81,6 +81,42 @@ export function PaymentModal({
   const [dupConfirmed, setDupConfirmed] = useState(false) // has user acked the soft-warn?
   const [submittedPending, setSubmittedPending] = useState(false) // sales success state
 
+  // ── Phase 274 · government TDS entry UX ────────────────────────────────
+  // Govt clients withhold TDS, so the NATURAL entry is the NET cash + a rate.
+  // The rep enters cash + picks 4% / 3% (or custom); the app DERIVES the stored
+  // amount_received = net + tds (the GROSS that closes the deal at the quote
+  // total). So amount_received, the balance formula, is_final, reporting — all
+  // stay the gross exactly as §271 designed; only the INPUT changes. Private
+  // renders byte-identical (this whole block is inert when !isGovt).
+  const govtBaseRatio = (Number(quote?.subtotal) || 0) > 0 && (Number(quote?.total_amount) || 0) > 0
+    ? Number(quote.subtotal) / Number(quote.total_amount) : 1   // ex-GST base share (TDS is on the base)
+  const govtBaseRemaining = isEdit ? balance : effectiveOutstanding
+  const [govtNet, setGovtNet] = useState(() => {
+    if (!isGovt) return ''
+    if (isEdit) {
+      const g = Number(initialPayment?.amount_received) || 0
+      const t = Number(initialPayment?.tds_amount) || 0
+      return g > 0 ? String(Math.max(0, g - t)) : ''
+    }
+    return effectiveOutstanding > 0 ? String(effectiveOutstanding) : ''
+  })
+  const [tdsRate, setTdsRate] = useState('')
+  // Keep amount_received (the GROSS) = net + tds on govt.
+  useEffect(() => {
+    if (!isGovt) return
+    const net = parseFloat(govtNet) || 0
+    const tds = parseFloat(form.tds_amount) || 0
+    const gross = net + tds
+    const next = gross > 0 ? String(gross) : ''
+    setForm(f => (f.amount_received === next ? f : { ...f, amount_received: next }))
+  }, [isGovt, govtNet, form.tds_amount])
+  function applyTdsRate(rate) {
+    setTdsRate(String(rate))
+    const tds = Math.round((rate / 100) * govtBaseRemaining * govtBaseRatio)  // rate% of the ex-GST base
+    set('tds_amount', String(tds))
+    setGovtNet(String(Math.max(0, govtBaseRemaining - tds)))                    // net = what actually hits the bank
+  }
+
   // Auto-check final if amount fills the balance.
   // Guard on `total > 0` — if `quote.total_amount` is ever 0, null, or
   // undefined (hydration race on a freshly-created quote for a new
@@ -303,103 +339,114 @@ export function PaymentModal({
                 </div>
               )}
 
-              {/* Amount */}
-              <div className="form-group">
-                {/* Phase 271 — on GOVT quotes the client withholds TDS, so this
-                    field takes the GROSS invoice/milestone (incl. TDS), not the
-                    cash. Owner hit an O/S balance from entering the net cash here.
-                    Label + hint spell it out on govt; private is unchanged. */}
-                <label className="form-label">
-                  {isGovt ? 'Invoice / Milestone Amount — incl. TDS (₹) *' : 'Amount Received (₹) *'}
-                </label>
-                {isGovt && (
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5 }}>
-                    Enter the <strong>full invoice amount, including TDS</strong> — not the cash you banked.
-                    The withheld TDS goes in the field below; cash banked is calculated for you.
-                  </div>
-                )}
-                {/* Phase 34Z.44 — pending hint inline above input so
-                    rep can't miss it. Owner: "team might forget that
-                    partial payment received, requests full again." */}
-                {!isEdit && pendingAmount > 0 && (
-                  <div style={{
-                    fontSize: 11.5,
-                    color: 'var(--warning)',
-                    background: 'rgba(245,158,11,0.10)',
-                    border: '1px solid rgba(245,158,11,0.35)',
-                    borderRadius: 8,
-                    padding: '6px 10px',
-                    marginBottom: 8,
-                    lineHeight: 1.5,
-                  }}>
-                    <strong>{formatCurrency(pendingAmount)}</strong> already submitted (pending admin approval).
-                    Only <strong>{formatCurrency(effectiveOutstanding)}</strong> left to collect on this quote.
-                    Pre-filled below.
-                  </div>
-                )}
-                <input
-                  type="number"
-                  className={`form-input${errors.amount_received ? ' input-error' : ''}`}
-                  value={form.amount_received}
-                  onChange={e => set('amount_received', e.target.value)}
-                  placeholder={`Max: ${formatCurrency(isEdit ? balance : effectiveOutstanding)}`}
-                  min="1"
-                  step="1"
-                  autoFocus
-                />
-                {errors.amount_received && (
-                  <span className="field-error">{errors.amount_received}</span>
-                )}
-                {enteredAmt > 0 && newBalance >= 0 && (
-                  <span className="pm-balance-preview">
-                    Remaining balance after this: {formatCurrency(newBalance)}
-                  </span>
-                )}
-              </div>
+              {/* Phase 34Z.44 — pending hint above the amount so the rep can't
+                  miss it. Owner: "team might forget a partial was received." */}
+              {!isEdit && pendingAmount > 0 && (
+                <div style={{
+                  fontSize: 11.5,
+                  color: 'var(--warning)',
+                  background: 'rgba(245,158,11,0.10)',
+                  border: '1px solid rgba(245,158,11,0.35)',
+                  borderRadius: 8,
+                  padding: '6px 10px',
+                  marginBottom: 8,
+                  lineHeight: 1.5,
+                }}>
+                  <strong>{formatCurrency(pendingAmount)}</strong> already submitted (pending admin approval).
+                  Only <strong>{formatCurrency(effectiveOutstanding)}</strong> left to collect on this quote. Pre-filled below.
+                </div>
+              )}
 
-              {/* TDS (Govt quotes only) — gross goes above; the withheld
-                  part is recorded here so the deal still closes at the
-                  quote total and TDS is on record for accounts. */}
-              {isGovt && (
+              {/* Amount — PRIVATE: gross received directly. */}
+              {!isGovt && (
                 <div className="form-group">
-                  <label className="form-label">TDS deducted (₹)</label>
+                  <label className="form-label">Amount Received (₹) *</label>
                   <input
                     type="number"
-                    className={`form-input${errors.tds_amount ? ' input-error' : ''}`}
-                    value={form.tds_amount}
-                    onChange={e => set('tds_amount', e.target.value)}
-                    placeholder="e.g. 4% of the milestone"
-                    min="0"
+                    className={`form-input${errors.amount_received ? ' input-error' : ''}`}
+                    value={form.amount_received}
+                    onChange={e => set('amount_received', e.target.value)}
+                    placeholder={`Max: ${formatCurrency(isEdit ? balance : effectiveOutstanding)}`}
+                    min="1"
                     step="1"
+                    autoFocus
                   />
-                  {/* Phase 272 — one-tap govt TDS = 4% of the invoice (2% income
-                      + 2% GST TDS, §23). Editable after — accounts can type the
-                      exact withheld amount if a payment advice differs. */}
-                  {enteredAmt > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => set('tds_amount', String(Math.round(enteredAmt * 0.04)))}
-                      style={{
-                        marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6,
-                        background: 'var(--accent-soft, rgba(255,230,0,0.14))',
-                        color: 'var(--text)', border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius-sm, 6px)', padding: '6px 12px', fontSize: 12.5, fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Auto 4% = {formatCurrency(Math.round(enteredAmt * 0.04))}
-                    </button>
+                  {errors.amount_received && (
+                    <span className="field-error">{errors.amount_received}</span>
                   )}
-                  {errors.tds_amount && (
-                    <span className="field-error">{errors.tds_amount}</span>
+                  {enteredAmt > 0 && newBalance >= 0 && (
+                    <span className="pm-balance-preview">
+                      Remaining balance after this: {formatCurrency(newBalance)}
+                    </span>
                   )}
-                  <span className="pm-balance-preview">
-                    Govt TDS = 2% income + 2% GST = 4% of the invoice. Tap the Auto 4% button, or type the exact withheld amount.
-                    {parseFloat(form.tds_amount) > 0 && enteredAmt > 0 && (
-                      <> Cash banked: {formatCurrency(Math.max(0, enteredAmt - (parseFloat(form.tds_amount) || 0)))}</>
-                    )}
-                  </span>
                 </div>
+              )}
+
+              {/* Phase 274 — GOVT: enter NET cash + a TDS rate. The government
+                  withholds TDS (4% = 2% income + 2% GST, sometimes 3%) on the
+                  pre-GST base and deposits it to your PAN — so it still counts as
+                  paid. Pick a rate → TDS + net auto-fill; the app records the gross
+                  (net + TDS) so the deal closes to Fully Paid. Both editable. */}
+              {isGovt && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">TDS the government deducted (₹)</label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {[4, 3].map(r => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => applyTdsRate(r)}
+                          style={{
+                            flex: '1 1 0', minWidth: 90,
+                            background: tdsRate === String(r) ? 'var(--accent, #FFE600)' : 'var(--accent-soft, rgba(255,230,0,0.14))',
+                            color: tdsRate === String(r) ? 'var(--accent-fg, #0f172a)' : 'var(--text)',
+                            border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 6px)',
+                            padding: '8px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                          }}
+                        >
+                          {r}% = {formatCurrency(Math.round((r / 100) * govtBaseRemaining * govtBaseRatio))}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      className={`form-input${errors.tds_amount ? ' input-error' : ''}`}
+                      value={form.tds_amount}
+                      onChange={e => { setTdsRate(''); set('tds_amount', e.target.value) }}
+                      placeholder="TDS amount (₹) — or tap a rate above"
+                      min="0"
+                      step="1"
+                    />
+                    {errors.tds_amount && (
+                      <span className="field-error">{errors.tds_amount}</span>
+                    )}
+                    <span className="pm-balance-preview">
+                      Govt TDS = 4% (2% income + 2% GST), sometimes 3%, of the pre-GST base. The government keeps it (deposited to your PAN) — it still counts as paid.
+                    </span>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Cash received — net of TDS (₹) *</label>
+                    <input
+                      type="number"
+                      className={`form-input${errors.amount_received ? ' input-error' : ''}`}
+                      value={govtNet}
+                      onChange={e => { setTdsRate(''); setGovtNet(e.target.value); setErrors(er => ({ ...er, amount_received: '' })) }}
+                      placeholder={`Cash banked · closes at ${formatCurrency(govtBaseRemaining)}`}
+                      min="0"
+                      step="1"
+                      autoFocus
+                    />
+                    {errors.amount_received && (
+                      <span className="field-error">{errors.amount_received}</span>
+                    )}
+                    <span className="pm-balance-preview">
+                      Invoice applied: <strong>{formatCurrency(enteredAmt)}</strong> (cash {formatCurrency(parseFloat(govtNet) || 0)} + TDS {formatCurrency(parseFloat(form.tds_amount) || 0)})
+                      {enteredAmt > 0 && newBalance >= 0 && <> · remaining {formatCurrency(newBalance)}</>}
+                    </span>
+                  </div>
+                </>
               )}
 
               {/* Commission (Govt quotes only) — Phase 273. Our cost on a
