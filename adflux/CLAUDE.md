@@ -14431,3 +14431,61 @@ Turn on:  `UPDATE whatsapp_accounts SET ai_followup_enabled=true,  ai_nudge_enab
 Kill:     `UPDATE whatsapp_accounts SET ai_followup_enabled=false, ai_nudge_enabled=false WHERE purpose='marketing';`
 Guidance: the §215 nudge is the safe one (free text, open window); the §213 chase is cheap
 Utility but business-initiated on the twice-flagged number — watch 98982 quality when it runs.
+
+
+---
+
+## 217 · Phase 274 — govt payment = NET cash + TDS rate (no fake "partial") (2026-08-21, `8d2c876`)
+
+Owner: a fully-paid GOVERNMENT deal (e.g. UA/AUTO/2026-27/0048) showed **PARTIAL** because
+the payment was entered as the **net cash** (after the govt withheld TDS), so the TDS looked
+like an unpaid balance. TDS is withheld + deposited to the vendor's PAN — not a shortfall.
+
+### THE MODEL (unchanged — do NOT touch computeBalance)
+`balance = total_amount − Σ approved amount_received` (§9). **TDS is NOT subtracted.** A govt
+deal closes only when `amount_received = the GROSS invoice`. The natural entry (net cash)
+under-filled it → fake partial. The considered-and-REJECTED alternative was making balance
+subtract TDS — rejected because existing govt data is entered inconsistently (some gross per
+§271, some net), so a formula change would mis-state whichever convention it doesn't match.
+
+### THE FIX — change the INPUT, keep the stored value = gross
+`PaymentModal.jsx` + `WonPaymentModal.jsx`: on a GOVERNMENT quote the rep now enters **NET
+cash received** + picks a **TDS rate (4% / 3%)** or types the TDS. The app DERIVES the stored
+`amount_received = net + tds` (the gross that closes the deal). So `amount_received`, the
+balance formula, `is_final`, commission (§273, on the ex-GST base), and all reporting stay
+EXACTLY as before — **only the input changed.** Private flow renders + behaves byte-identical.
+- TDS rate = **% of the pre-GST base (subtotal)**, not the GST total. `tds = round(rate% ×
+  baseRemaining × (subtotal/total))`; the rate button also fills net = baseRemaining − tds.
+  (₹99,000 = exactly 3% of the ₹33L base of a ₹38.94L-incl-GST deal.)
+- Mechanics: a `govtNet` state + a `useEffect` that keeps `form.amount_received = net + tds`.
+
+### FROZEN CONTRACT / foot-guns
+- ❌ Do NOT change `computeBalance` (QuotesV2) to subtract TDS. `amount_received` is the GROSS
+  (net + tds) by design; the net+TDS is an INPUT transform only. The balance/reporting model
+  is untouched.
+- ❌ A sync `useEffect` that DERIVES a field can WIPE a pre-filled value on mount if the
+  derived SOURCE starts empty. WonPaymentModal's `govtNet` started '' → the effect computed
+  gross 0 → blanked the govt partial-payment pre-fill (a rep could Confirm Won with no
+  payment). Fix: seed the derived source (`govtNet`) to match the field's pre-fill
+  (remainingBalance) on the hasExistingPayment path.
+- Commission stays per-payment % on the pre-GST base (§273) — unchanged.
+
+### BACKFILL — existing mis-entered deals (`supabase_phase274_govt_tds_net_backfill.sql`)
+One-time, owner-run, **diagnostic-first** (PART 1 SELECT is live; PART 2 UPDATE is commented so
+a paste can't apply it unreviewed). Fixes only a **single approved payment** on a GOVT won deal
+where `net < total` AND `net + tds ≈ total` → sets `amount_received = net + tds` AND
+`is_final_payment = true`. Multi-milestone deals (net+tds ≠ full total per row) are NOT touched
+— fix those in the UI (edit → tap rate → Save). Idempotent (post-fix amount_received=total → no
+re-match). ⚠ MONEY MOVES: it raises recorded revenue + incentive/salary for those months by the
+withheld TDS — this is the CORRECT value (gross = the deal's true worth), not a bug; owner-aware.
+
+### Review
+3-lens adversarial (money math PASS · regression + data-safety FLAG → all 3 fixes applied:
+WonPaymentModal govtNet pre-fill, backfill single-payment guard + is_final + diagnostic-first +
+revenue-movement doc). Frontend auto-deploys; the SQL is the owner's (run PART 1, review, then
+uncomment + run PART 2).
+
+### Owner action
+Frontend is pushed (auto-deploy). Run `supabase_phase274_govt_tds_net_backfill.sql` PART 1 in
+Studio → review the deals → uncomment + run PART 2 → re-run PART 1 (expect 0). Going forward,
+enter govt payments as NET cash + a TDS rate; the deal auto-closes to Fully Paid.
