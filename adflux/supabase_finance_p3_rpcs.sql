@@ -3,13 +3,17 @@
 -- 2026-08-03 · spec docs/FINANCE_MODULE_SPEC.md · needs P1 + P2 run first.
 -- Edit-in-place canonical (§71). Re-run after any change (CREATE OR REPLACE).
 --
--- P3.2 (owner: "analyse the excel + make accordingly") — INCOME now = the BANK
--- LEDGER (finance_transactions bucket='income', the accountant's tagged credits),
--- NOT CRM payments (the CRM is empty → the CRM-income P&L was blank). The CRM
--- cross-check becomes a later reconciliation feature. Income segment derived:
--- GSRTC/AUTO rows carry segment; generic company credits → Untitled Advertising =
--- GOVERNMENT, Untitled Adflux Pvt Ltd = PRIVATE.
---   Real Apr–Jul: income ₹1.03Cr · cost ₹53L · OPERATING PROFIT ₹49.15L (47.9%).
+-- P3.3 (owner 2026-08-22: "income = won/collected CRM deals, not bank credits")
+-- — INCOME now = the CRM won deals: SUM(approved payments.amount_received) on
+-- WON quotes, split by the quote's segment + media_type, dated by payment_date,
+-- via finance_crm_income_rows() (defined below; birthplace =
+-- supabase_finance_crm_income_shadow.sql). Same won-deal population the
+-- commission uses (§171) → revenue and its commission cost finally reconcile
+-- (the −₹34.66L "loss" with ₹0 income was: commission was CRM, income was bank).
+-- Bank income credits are no longer the P&L income source; they become a
+-- reconciliation check (finance_reconcile, §162: a bank credit with no CRM
+-- payment → "receipt not in CRM"). COSTS stay bank-based (media/vendor + common
+-- are paid from the bank). SUPERSEDES P3.2 bank-income everywhere below.
 --
 -- finance_accounts_home() → receivables (CRM quotes−payments) + approvals + review
 -- + finance_tasks. (Receivables stay CRM-based; empty until quotes/payments exist.)
@@ -33,6 +37,40 @@ ON CONFLICT (name) DO NOTHING;
 ALTER TABLE public.quotes   ADD COLUMN IF NOT EXISTS govt_commission_percent numeric(5,2);
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS commission_pct    numeric(5,2);
 ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS commission_amount numeric;
+
+-- CRM income source (P3.3, canonical home here; also in the shadow file). One row
+-- per APPROVED payment on a WON quote, shaped like the P&L income reads:
+-- (segment, media_type, company, amount, txn_date). Same population the commission
+-- uses → revenue + commission reconcile. Govt amount_received = gross incl. TDS
+-- (§274) = the deal's true collected worth.
+CREATE OR REPLACE FUNCTION public.finance_crm_income_rows(
+  p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_seg text DEFAULT NULL
+) RETURNS TABLE(segment text, media_type text, company text, amount numeric, txn_date date)
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public','pg_temp'
+AS $crm$
+  SELECT
+    q.segment,
+    q.media_type,
+    CASE q.segment WHEN 'GOVERNMENT' THEN 'Untitled Advertising'
+                   WHEN 'PRIVATE'    THEN 'Untitled Adflux Pvt Ltd'
+                   ELSE NULL END,
+    p.amount_received,
+    p.payment_date
+  FROM public.payments p
+  JOIN public.quotes   q ON q.id = p.quote_id
+  WHERE p.approval_status = 'approved'
+    AND q.status = 'won'
+    AND COALESCE(p.amount_received, 0) > 0
+    AND (p_from IS NULL OR p.payment_date >= p_from)
+    AND (p_to   IS NULL OR p.payment_date <= p_to)
+    AND (p_seg  IS NULL OR q.segment = p_seg);
+$crm$;
+-- SECURITY DEFINER + role-blind → do NOT expose to clients. finance_pnl_summary
+-- (SECURITY DEFINER, same owner) calls it internally with the owner's privilege,
+-- so no client GRANT is needed. REVOKE closes the §8/§152 all-segment revenue leak
+-- (a rep could otherwise rpc() it directly). §211/§72 posture.
+REVOKE EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.finance_pnl_summary(
   p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_segment text DEFAULT NULL
@@ -58,25 +96,17 @@ BEGIN
     IF v_gp THEN v_seg := 'GOVERNMENT'; ELSE RETURN '{}'::jsonb; END IF;
   END IF;
 
-  -- INCOME from the bank ledger, segment derived (GSRTC/AUTO carry it; company → segment)
+  -- INCOME from the CRM won/collected deals (approved payments on WON quotes),
+  -- split by the quote's segment (P3.3). Bank income credits → reconciliation only.
   SELECT
-    COALESCE(SUM(amount) FILTER (WHERE COALESCE(segment,
-        CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                     WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END) = 'GOVERNMENT'),0),
-    COALESCE(SUM(amount) FILTER (WHERE COALESCE(segment,
-        CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                     WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END) = 'PRIVATE'),0)
+    COALESCE(SUM(amount) FILTER (WHERE segment = 'GOVERNMENT'),0),
+    COALESCE(SUM(amount) FILTER (WHERE segment = 'PRIVATE'),0)
     INTO ig, ip
-    FROM public.finance_transactions
-   WHERE bucket = 'income'
-     AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
+    FROM public.finance_crm_income_rows(p_from, p_to, NULL);
   IF v_seg='GOVERNMENT' THEN ip:=0; ELSIF v_seg='PRIVATE' THEN ig:=0; END IF;
-  -- itot = FULL income in range (same row set money_in scans, so Σ money_in ties to
-  -- total_in even for a NULL-derived-segment credit); ig/ip stay the Govt/Pvt split.
-  SELECT COALESCE(SUM(amount),0) INTO itot FROM public.finance_transactions
-   WHERE bucket='income' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
-     AND (v_seg IS NULL OR COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                                                          WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg);
+  -- itot = FULL CRM income in range (same row set money_in scans, so Σ money_in
+  -- still ties to total_in); ig/ip stay the Govt/Pvt split.
+  SELECT COALESCE(SUM(amount),0) INTO itot FROM public.finance_crm_income_rows(p_from, p_to, v_seg);
 
   SELECT COALESCE(SUM(amount) FILTER (WHERE segment='GOVERNMENT'),0),
          COALESCE(SUM(amount) FILTER (WHERE segment='PRIVATE'),0)
@@ -177,14 +207,10 @@ BEGIN
       FROM (
         SELECT lbl, SUM(amt) amt FROM (
           SELECT CASE WHEN media_type IS NOT NULL
-                      THEN (CASE WHEN COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                                                                    WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)='GOVERNMENT' THEN 'Govt' ELSE 'Pvt' END)||' · '||media_type
+                      THEN (CASE WHEN segment='GOVERNMENT' THEN 'Govt' ELSE 'Pvt' END)||' · '||media_type
                       ELSE COALESCE(company,'Other income') END AS lbl,
                  amount AS amt
-            FROM public.finance_transactions
-           WHERE bucket='income' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
-             AND (v_seg IS NULL OR COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                                                                  WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg)
+            FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
           UNION ALL SELECT 'Loan from friend', v_loan_in
           UNION ALL SELECT 'Unsorted credits (review)', v_review_in
         ) mi GROUP BY lbl
@@ -224,14 +250,8 @@ BEGIN
                (CASE WHEN i.seg='GOVERNMENT' THEN 'Govt' WHEN i.seg='PRIVATE' THEN 'Pvt' ELSE '—' END)
                  ||' · '||COALESCE(i.med,'Other') AS lbl,
                i.inc, COALESCE(c.dcost,0) AS dcost
-        FROM (SELECT COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                                                    WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END) AS seg,
-                     media_type AS med, SUM(amount) AS inc
-                FROM public.finance_transactions
-               WHERE bucket='income'
-                 AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
-                 AND (v_seg IS NULL OR COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                                                                      WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg)
+        FROM (SELECT segment AS seg, media_type AS med, SUM(amount) AS inc
+                FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
                GROUP BY 1,2) i
         LEFT JOIN (SELECT segment AS seg, media_type AS med, SUM(amount) AS dcost
                      FROM public.finance_transactions
@@ -251,15 +271,18 @@ BEGIN
         'margin', CASE WHEN inc>0 THEN round((inc - dcost - CASE WHEN itot>0 THEN ctot*inc/itot ELSE 0 END)/inc*100,1) ELSE NULL END
       ) ORDER BY inc DESC)
       FROM (
-        SELECT COALESCE(company,'Unassigned') AS comp,
-               COALESCE(SUM(amount) FILTER (WHERE bucket='income'),0) AS inc,
-               COALESCE(SUM(amount) FILTER (WHERE bucket='direct_cost'),0) AS dcost
-          FROM public.finance_transactions
-         WHERE bucket IN ('income','direct_cost')
-           AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
-           AND (v_seg IS NULL OR COALESCE(segment, CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                                                                WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg)
-         GROUP BY 1
+        SELECT COALESCE(comp,'Unassigned') AS comp,
+               COALESCE(SUM(inc),0) AS inc, COALESCE(SUM(dcost),0) AS dcost
+          FROM (
+            SELECT company AS comp, amount AS inc, 0::numeric AS dcost   -- CRM income
+              FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
+            UNION ALL
+            SELECT company AS comp, 0::numeric AS inc, amount AS dcost   -- bank direct cost
+              FROM public.finance_transactions
+             WHERE bucket='direct_cost'
+               AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+               AND (v_seg IS NULL OR segment=v_seg)
+          ) u GROUP BY 1
       ) pc), '[]'::jsonb),
     'revenue_mix', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt,
@@ -269,23 +292,21 @@ BEGIN
                    THEN (CASE WHEN segment='GOVERNMENT' THEN 'Govt' ELSE 'Pvt' END)||' · '||media_type
                    ELSE COALESCE(company,'Other') END AS lbl,
               SUM(amount) amt
-              FROM public.finance_transactions
-             WHERE bucket='income'
-               AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
-               AND (v_seg IS NULL OR COALESCE(segment,
-                     CASE company WHEN 'Untitled Advertising' THEN 'GOVERNMENT'
-                                  WHEN 'Untitled Adflux Pvt Ltd' THEN 'PRIVATE' END)=v_seg)
+              FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
              GROUP BY 1) m), '[]'::jsonb),
     'monthly', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('month', mth, 'income', COALESCE(inc,0), 'cost', COALESCE(cst,0)) ORDER BY mth)
-      FROM (SELECT to_char(txn_date,'YYYY-MM') mth,
-                   SUM(amount) FILTER (WHERE bucket='income') inc,
-                   SUM(amount) FILTER (WHERE bucket IN ('direct_cost','common_expense')) cst
-              FROM public.finance_transactions
-             WHERE bucket IN ('income','direct_cost','common_expense')
-               AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
-               AND (v_seg IS NULL OR segment=v_seg OR segment IS NULL)
-             GROUP BY 1) mm), '[]'::jsonb),
+      FROM (SELECT to_char(m,'YYYY-MM') mth, SUM(inc) inc, SUM(cst) cst
+              FROM (
+                SELECT txn_date AS m, amount AS inc, 0::numeric AS cst   -- CRM income
+                  FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
+                UNION ALL
+                SELECT txn_date AS m, 0::numeric AS inc, amount AS cst   -- bank costs
+                  FROM public.finance_transactions
+                 WHERE bucket IN ('direct_cost','common_expense')
+                   AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+                   AND (v_seg IS NULL OR segment=v_seg OR segment IS NULL)
+              ) x GROUP BY 1) mm), '[]'::jsonb),
     'by_head', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('head', COALESCE(h.name,'Unclassified'), 'amount', s.amt) ORDER BY s.amt DESC)
       FROM (SELECT expense_head_id, SUM(amount) amt FROM public.finance_transactions
@@ -308,26 +329,39 @@ BEGIN
     -- currentCat() in FinanceV2.jsx — derived from bucket so re-tagging moves it).
     'by_tag', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('tag', cat, 'inflow', inflow, 'outflow', outflow, 'rows', n) ORDER BY (inflow+outflow) DESC)
-      FROM (SELECT
-              CASE
-                WHEN bucket IN ('income','direct_cost') THEN
-                  CASE WHEN media_type='GSRTC_LED' THEN 'GSRTC'
-                       WHEN media_type='AUTO_HOOD' THEN 'Auto Hood'
-                       WHEN company='Untitled Adflux Pvt Ltd' THEN 'Untitled Adflux Pvt Ltd'
-                       ELSE 'Untitled Advertising' END
-                WHEN bucket='common_expense' THEN 'Common Expense'
-                WHEN bucket='owner_drawings' THEN 'Personal / Drawings'
-                WHEN bucket IN ('loan_in','loan_out') THEN 'Loan'
-                WHEN bucket='tax' THEN 'Tax'
-                WHEN bucket='internal_transfer' THEN 'Transfer (Sweep)'
-                ELSE 'To sort'
-              END AS cat,
-              COALESCE(SUM(amount) FILTER (WHERE direction='in'),0) inflow,
-              COALESCE(SUM(amount) FILTER (WHERE direction='out'),0) outflow,
-              count(*) n
-              FROM public.finance_transactions
-             WHERE (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
-             GROUP BY 1) t), '[]'::jsonb),
+      FROM (SELECT cat,
+              COALESCE(SUM(inflow),0) inflow, COALESCE(SUM(outflow),0) outflow, SUM(n) n
+              FROM (
+                -- CRM income → inflow, categorized by media/company (same label as its direct_cost)
+                SELECT CASE WHEN media_type='GSRTC_LED' THEN 'GSRTC'
+                            WHEN media_type='AUTO_HOOD' THEN 'Auto Hood'
+                            WHEN company='Untitled Adflux Pvt Ltd' THEN 'Untitled Adflux Pvt Ltd'
+                            ELSE 'Untitled Advertising' END AS cat,
+                       amount AS inflow, 0::numeric AS outflow, 1 AS n
+                  FROM public.finance_crm_income_rows(p_from, p_to, v_seg)   -- §152: scope to the caller's segment
+                UNION ALL
+                -- everything EXCEPT income, from the bank ledger
+                SELECT CASE
+                         WHEN bucket='direct_cost' THEN
+                           CASE WHEN media_type='GSRTC_LED' THEN 'GSRTC'
+                                WHEN media_type='AUTO_HOOD' THEN 'Auto Hood'
+                                WHEN company='Untitled Adflux Pvt Ltd' THEN 'Untitled Adflux Pvt Ltd'
+                                ELSE 'Untitled Advertising' END
+                         WHEN bucket='common_expense' THEN 'Common Expense'
+                         WHEN bucket='owner_drawings' THEN 'Personal / Drawings'
+                         WHEN bucket IN ('loan_in','loan_out') THEN 'Loan'
+                         WHEN bucket='tax' THEN 'Tax'
+                         WHEN bucket='internal_transfer' THEN 'Transfer (Sweep)'
+                         ELSE 'To sort'
+                       END AS cat,
+                       CASE WHEN direction='in'  THEN amount ELSE 0 END AS inflow,
+                       CASE WHEN direction='out' THEN amount ELSE 0 END AS outflow,
+                       1 AS n
+                  FROM public.finance_transactions
+                 WHERE bucket <> 'income'
+                   AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+                   AND (v_seg IS NULL OR segment=v_seg OR segment IS NULL)   -- §152: keep org-wide (null-seg) rows, drop other-segment
+              ) u GROUP BY 1) t), '[]'::jsonb),
     'review', (SELECT jsonb_build_object('count', count(*), 'amount', COALESCE(SUM(amount),0))
         FROM public.finance_transactions WHERE bucket='review'
           AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to))
@@ -375,13 +409,16 @@ GRANT EXECUTE ON FUNCTION public.finance_accounts_home() TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
 
--- VERIFY — your real P&L (plain query, no login needed, works right here):
+-- VERIFY — your real P&L (plain query, matches what the app now shows):
+--   income  = CRM won/collected deals (P3.3)   ·  cost = bank media + common
+--   Business Profit below = income − cost − the commission accruals (VERIFY 2).
 SELECT
-  (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket='income')  AS income,
-  (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS cost,
-  (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket='income')
-    - (SELECT SUM(amount) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS operating_profit,
-  (SELECT count(*) FROM public.finance_transactions WHERE bucket='review')      AS review_rows;
+  (SELECT COALESCE(SUM(amount),0) FROM public.finance_crm_income_rows())                                   AS crm_income,
+  (SELECT COALESCE(SUM(amount),0) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS bank_cost,
+  (SELECT COALESCE(SUM(amount),0) FROM public.finance_crm_income_rows())
+    - (SELECT COALESCE(SUM(amount),0) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS before_commission,
+  (SELECT COALESCE(SUM(amount),0) FROM public.finance_transactions WHERE bucket='income')                  AS bank_income_credits_reconcile_only,
+  (SELECT count(*) FROM public.finance_transactions WHERE bucket='review')                                 AS review_rows;
 -- (The RPCs are already installed from the CREATE OR REPLACE above — no re-run needed.)
 
 -- VERIFY 2 — the commission the RPC now books (accruals from the CRM, not the bank):

@@ -48,7 +48,10 @@ AS $fn$
     AND (p_to   IS NULL OR p.payment_date <= p_to)
     AND (p_seg  IS NULL OR q.segment = p_seg);
 $fn$;
-GRANT EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) TO authenticated;
+-- SECURITY DEFINER + role-blind → NOT client-callable. finance_pnl_summary calls
+-- it internally (same owner). REVOKE closes the §8/§152 all-segment revenue leak.
+REVOKE EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) TO service_role;
 
 NOTIFY pgrst, 'reload schema';
 
