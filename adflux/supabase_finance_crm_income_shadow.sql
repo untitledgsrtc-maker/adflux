@@ -37,7 +37,8 @@ AS $fn$
     CASE q.segment WHEN 'GOVERNMENT' THEN 'Untitled Advertising'
                    WHEN 'PRIVATE'    THEN 'Untitled Adflux Pvt Ltd'
                    ELSE NULL END,
-    p.amount_received,
+    -- EX-GST revenue (strip output GST via subtotal/total, §273); TDS stays in.
+    round(p.amount_received * COALESCE(NULLIF(q.subtotal,0) / NULLIF(q.total_amount,0), 1)),
     p.payment_date
   FROM public.payments p
   JOIN public.quotes   q ON q.id = p.quote_id

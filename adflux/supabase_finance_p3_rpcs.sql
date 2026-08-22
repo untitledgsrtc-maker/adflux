@@ -3,9 +3,12 @@
 -- 2026-08-03 · spec docs/FINANCE_MODULE_SPEC.md · needs P1 + P2 run first.
 -- Edit-in-place canonical (§71). Re-run after any change (CREATE OR REPLACE).
 --
--- P3.3 (owner 2026-08-22: "income = won/collected CRM deals, not bank credits")
--- — INCOME now = the CRM won deals: SUM(approved payments.amount_received) on
--- WON quotes, split by the quote's segment + media_type, dated by payment_date,
+-- P3.3 (owner 2026-08-22: "income = won/collected CRM deals, not bank credits";
+-- refined: EX-GST) — INCOME now = the CRM won deals: SUM(approved payments,
+-- EX-GST = amount_received × subtotal/total) on WON quotes, split by the quote's
+-- segment + media_type, dated by payment_date. GST is a govt pass-through (not
+-- revenue) so it is stripped on the same ratio commission uses (§273); TDS stays
+-- IN (your PAN tax credit).
 -- via finance_crm_income_rows() (defined below; birthplace =
 -- supabase_finance_crm_income_shadow.sql). Same won-deal population the
 -- commission uses (§171) → revenue and its commission cost finally reconcile
@@ -54,7 +57,11 @@ AS $crm$
     CASE q.segment WHEN 'GOVERNMENT' THEN 'Untitled Advertising'
                    WHEN 'PRIVATE'    THEN 'Untitled Adflux Pvt Ltd'
                    ELSE NULL END,
-    p.amount_received,
+    -- EX-GST revenue: strip output GST via subtotal/total (same ratio commission
+    -- uses, §273) so income sits on the same base as commission. GST is a govt
+    -- pass-through, not revenue. TDS stays IN (it's your PAN tax credit). Fall back
+    -- to gross when a deal has no subtotal/total on file.
+    round(p.amount_received * COALESCE(NULLIF(q.subtotal,0) / NULLIF(q.total_amount,0), 1)),
     p.payment_date
   FROM public.payments p
   JOIN public.quotes   q ON q.id = p.quote_id
@@ -413,7 +420,7 @@ NOTIFY pgrst, 'reload schema';
 --   income  = CRM won/collected deals (P3.3)   ·  cost = bank media + common
 --   Business Profit below = income − cost − the commission accruals (VERIFY 2).
 SELECT
-  (SELECT COALESCE(SUM(amount),0) FROM public.finance_crm_income_rows())                                   AS crm_income,
+  (SELECT COALESCE(SUM(amount),0) FROM public.finance_crm_income_rows())                                   AS crm_income_ex_gst,
   (SELECT COALESCE(SUM(amount),0) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS bank_cost,
   (SELECT COALESCE(SUM(amount),0) FROM public.finance_crm_income_rows())
     - (SELECT COALESCE(SUM(amount),0) FROM public.finance_transactions WHERE bucket IN ('direct_cost','common_expense')) AS before_commission,

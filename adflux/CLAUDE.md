@@ -14566,3 +14566,20 @@ Run `supabase_finance_p3_rpcs.sql` in Studio → VERIFY 1 shows `crm_income ≈ 
 ₹34.66L). Open `/finance` → Owner·P&L: income **₹1.14 Cr**, Business Profit **+₹79.2L**
 — the "won amount" now shows. (Owner ran Step 2 + confirmed commission 2026-08-22;
 /finance eyeball pending.)
+
+### Ex-GST refinement (same day) — income is NET of GST
+Owner: "does profit include GST and TDS?" Correct catch — the first cut counted
+`amount_received` = the GST-INCLUSIVE amount → overstated revenue ~18% (GST is a govt
+pass-through, not the company's money) AND sat on a different base than commission
+(which is ex-GST, §273). Fixed: `finance_crm_income_rows.amount` = `round(amount_received
+× COALESCE(NULLIF(subtotal,0)/NULLIF(total_amount,0), 1))` — strip output GST on the
+SAME subtotal/total ratio commission uses; fall back to gross when a deal has no
+subtotal/total. **TDS stays IN** (govt amount_received = gross incl. TDS per §274; TDS
+is the company's PAN tax credit = real revenue, only GST is the pass-through). Result:
+income ₹1.14 Cr gross → ~₹96–97L ex-GST; revenue + commission now on the same ex-GST
+base. Costs stay bank-gross (vendor input-GST is a separate, messier strip — the output
+GST in revenue was the dominant distortion). Both SQL files updated identically; VERIFY 1
+label → `crm_income_ex_gst`.
+- ❌ FOOT-GUN: CRM `amount_received` is GST-INCLUSIVE (customer pays the GST invoice) —
+  using it raw as P&L revenue overstates ~18% AND mismatches the ex-GST commission base.
+  Strip GST via `× subtotal/total` (the commission ratio); keep TDS.
