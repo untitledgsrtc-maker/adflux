@@ -161,8 +161,11 @@ function PnlTab({ seg }) {
   // P&L cost). The kept lines sum to `cost` exactly (the §169 bank-commission
   // settlement is already netted inside the money_out "Common expense" line),
   // so Total expenses = cost and Profit = business_profit reconcile.
+  // P3.4 — the RPC now tags each money_out line `pnl` (true = a real P&L cost).
+  // Read it directly; fall back to the label denylist only until the RPC is re-run
+  // (deploy-order safe: a line missing `pnl` uses the old classification).
   const CASH_OUT_LABELS = new Set(['Assets / equipment', 'Loan repaid', 'Personal', 'Tax', 'Review (to sort)'])
-  const expLines = moneyOut.filter(l => !CASH_OUT_LABELS.has(l.label))
+  const expLines = moneyOut.filter(l => (l.pnl != null ? l.pnl : !CASH_OUT_LABELS.has(l.label)))
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -226,7 +229,7 @@ function PnlTab({ seg }) {
       {/* CASH VIEW — money in vs money out (§168), stacked in the right half */}
       <div style={cashStack}>
       <Card>
-          <CH><TrendingUp size={15} style={{ verticalAlign: -2, color: 'var(--success)' }} /> Money In <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>bank credits + borrowed</span></CH>
+          <CH><TrendingUp size={15} style={{ verticalAlign: -2, color: 'var(--success)' }} /> Money In <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>collections + borrowed</span></CH>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}><tbody>
             {moneyIn.length === 0 ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No income in range.</td></tr> :
               moneyIn.map((r, i) => <tr key={i}><td style={tdL}>{prettyStmtLbl(r.label)}</td><td style={{ ...tdR, color: 'var(--success)' }}>{fmtINR(r.amount)}</td></tr>)}
@@ -737,20 +740,30 @@ function ImportTab() {
         })
       })
       if (!out.length) { setErr('No rows found with that mapping — check the Date + Money In/Out columns.'); setBusy(false); return }
-      // P4 overlap guard — the occurrence key only de-dupes a re-import of the SAME
-      // file; rows already loaded (P2 backfill / a prior import) carry a different key,
-      // so warn loudly before risking a double-count on an overlapping statement.
+      // P1 re-import guard — the dedupe_key changed since the old backfill (content
+      // vs row-index), so re-importing the SAME statement would NOT dedupe on the
+      // key → silent double-count. Make it deterministic: if this bank already has
+      // rows in the incoming date range, REPLACE that period (delete the prior
+      // imported rows for this bank+range, keep the accountant's manual entries)
+      // before inserting fresh. No "import anyway" click-through → no duplication.
       const isos = out.map(o => o.txn_date).sort()
       const { count: existing } = await supabase.from('finance_transactions')
         .select('id', { count: 'exact', head: true })
         .eq('bank_account_id', bankId).gte('txn_date', isos[0]).lte('txn_date', isos[isos.length - 1])
       if (existing && existing > 0) {
         const ok = await confirmDialog({
-          title: 'Possible duplicate import',
-          message: `This account already has ${existing} transaction${existing > 1 ? 's' : ''} between ${fmtDate(isos[0])} and ${fmtDate(isos[isos.length - 1])}. Re-importing the same statement can double-count. Import anyway?`,
-          confirmLabel: 'Import anyway', cancelLabel: 'Cancel', danger: true,
+          title: 'This period is already loaded',
+          message: `This account already has ${existing} transaction${existing > 1 ? 's' : ''} between ${fmtDate(isos[0])} and ${fmtDate(isos[isos.length - 1])}. Replace that period with this import? Manually-added rows are kept.`,
+          confirmLabel: 'Replace this period', cancelLabel: 'Cancel', danger: true,
         })
         if (!ok) { setBusy(false); return }
+        // Clear prior imported/backfilled rows for this bank+range; keep manual entries.
+        const { error: delErr } = await supabase.from('finance_transactions')
+          .delete()
+          .eq('bank_account_id', bankId)
+          .gte('txn_date', isos[0]).lte('txn_date', isos[isos.length - 1])
+          .or('source.neq.manual,source.is.null')
+        if (delErr) throw delErr
       }
       for (let i = 0; i < out.length; i += 200) {
         const { error } = await supabase.from('finance_transactions').upsert(out.slice(i, i + 200), { onConflict: 'dedupe_key', ignoreDuplicates: true })

@@ -222,25 +222,29 @@ BEGIN
           UNION ALL SELECT 'Unsorted credits (review)', v_review_in
         ) mi GROUP BY lbl
       ) z WHERE amt > 0), '[]'::jsonb),
+    -- P3.4 — each line carries `pnl` (true = a real running COST that reduces
+    -- Business Profit; false = a cash movement that is NOT a P&L cost). The Profit
+    -- Statement (§286) reads `pnl` directly instead of a fragile JS label denylist,
+    -- so a renamed label can never leak a cash line into "Less expenses".
     'money_out', COALESCE((
-      SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt) ORDER BY amt DESC)
+      SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt, 'pnl', pnl) ORDER BY amt DESC)
       FROM (
-        SELECT lbl, SUM(amt) amt FROM (
+        SELECT lbl, SUM(amt) amt, bool_or(pnl) pnl FROM (
           SELECT CASE media_type WHEN 'GSRTC_LED' THEN 'GSRTC' WHEN 'AUTO_HOOD' THEN 'Auto Hood'
                                  WHEN 'OTHER_MEDIA' THEN 'Other Media' WHEN 'LED_OTHER' THEN 'Pvt LED'
                                  ELSE COALESCE(media_type,'Other direct cost') END AS lbl,
-                 amount AS amt
+                 amount AS amt, true AS pnl
             FROM public.finance_transactions
            WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
              AND (v_seg IS NULL OR segment=v_seg)
-          UNION ALL SELECT 'Common expense', ctot - v_comm
-          UNION ALL SELECT 'Commission — govt team', v_govt_comm
-          UNION ALL SELECT 'Commission — agency', v_agency_comm
-          UNION ALL SELECT 'Assets / equipment', v_asset
-          UNION ALL SELECT 'Loan repaid', v_loan_out
-          UNION ALL SELECT 'Personal', v_draw
-          UNION ALL SELECT 'Tax', v_tax
-          UNION ALL SELECT 'Review (to sort)', v_review_out
+          UNION ALL SELECT 'Common expense',          ctot - v_comm, true
+          UNION ALL SELECT 'Commission — govt team',  v_govt_comm,   true
+          UNION ALL SELECT 'Commission — agency',     v_agency_comm, true
+          UNION ALL SELECT 'Assets / equipment',      v_asset,       false
+          UNION ALL SELECT 'Loan repaid',             v_loan_out,    false
+          UNION ALL SELECT 'Personal',                v_draw,        false
+          UNION ALL SELECT 'Tax',                     v_tax,         false
+          UNION ALL SELECT 'Review (to sort)',        v_review_out,  false
         ) mo GROUP BY lbl
       ) z WHERE amt > 0), '[]'::jsonb),
     -- by segment × media_type (the 4+ real business lines: Govt·Auto Hood,
@@ -252,20 +256,27 @@ BEGIN
         'common', CASE WHEN itot>0 THEN round(ctot*inc/itot) ELSE 0 END,
         'net', inc - dcost - CASE WHEN itot>0 THEN round(ctot*inc/itot) ELSE 0 END,
         'pct', CASE WHEN itot>0 THEN round(inc/itot*100) ELSE 0 END) ORDER BY inc DESC)
+      -- P3.4 — total-preserving: UNION income + direct cost (was a LEFT JOIN from
+      -- income, which DROPPED a direct cost whose (segment,media) had no won-deal
+      -- income that period — e.g. a GSRTC vendor payment in a month with no GSRTC
+      -- receipt, or a NULL-segment cost). Now every cost surfaces; Σ direct == dtot.
+      -- A cost-only line shows inc=0 → net = −cost (an honest loss line, not hidden).
       FROM (
-        SELECT i.seg,
-               (CASE WHEN i.seg='GOVERNMENT' THEN 'Govt' WHEN i.seg='PRIVATE' THEN 'Pvt' ELSE '—' END)
-                 ||' · '||COALESCE(i.med,'Other') AS lbl,
-               i.inc, COALESCE(c.dcost,0) AS dcost
-        FROM (SELECT segment AS seg, media_type AS med, SUM(amount) AS inc
-                FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
-               GROUP BY 1,2) i
-        LEFT JOIN (SELECT segment AS seg, media_type AS med, SUM(amount) AS dcost
-                     FROM public.finance_transactions
-                    WHERE bucket='direct_cost'
-                      AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
-                    GROUP BY 1,2) c
-          ON c.seg=i.seg AND COALESCE(c.med,'~')=COALESCE(i.med,'~')
+        SELECT seg,
+               (CASE WHEN seg='GOVERNMENT' THEN 'Govt' WHEN seg='PRIVATE' THEN 'Pvt' ELSE 'Unassigned' END)
+                 ||' · '||COALESCE(med,'Other') AS lbl,
+               SUM(inc) AS inc, SUM(dcost) AS dcost
+        FROM (
+          SELECT segment AS seg, media_type AS med, amount AS inc, 0::numeric AS dcost   -- CRM income
+            FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
+          UNION ALL
+          SELECT segment AS seg, media_type AS med, 0::numeric AS inc, amount AS dcost   -- bank direct cost
+            FROM public.finance_transactions
+           WHERE bucket='direct_cost'
+             AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
+             AND (v_seg IS NULL OR segment=v_seg)
+        ) u
+        GROUP BY seg, med
       ) x), '[]'::jsonb),
     -- Per company = grouped by the REAL company column (owner 2026-08-07): GSRTC/Auto
     -- are pinned to Untitled Advertising; Other Media / Pvt LED carry the bank account's

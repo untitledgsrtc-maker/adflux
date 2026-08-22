@@ -14613,3 +14613,69 @@ LED · Other Media) over a mixed 4th segment tab. Guardian PASS.
 - Display-only (no money/DB/frozen-contract touch). Pattern: to add a pill filter on
   ANY axis, reuse `SegmentToggle` with a custom `opts` array — don't duplicate the
   pill markup.
+
+
+---
+
+## 220 · Finance P3.4 — complete-P&L Phase 1: cost attribution + re-import guard + pnl tag (2026-08-22)
+
+After P3.3 (§218 income = CRM), COSTS are still bank-based but the owner deleted his
+bank Excel → P&L = "revenue − commission only". Phase 1 (of the finance-recon work)
+makes the P&L trustworthy + re-import SAFE so he can re-import his bank COSTS and the
+P&L completes. 3-lens adversarial review (money/regression/SQL) = all **SHIP, money
+CLEAN**. All §45-additive, admin/accounts only. Commits: `<sha>`.
+
+### The 3 changes
+1. **by_segment total-preserving** (`supabase_finance_p3_rpcs.sql`) — was a LEFT JOIN
+   from CRM income → DROPPED a direct_cost whose (segment,media) had no won-deal income
+   that period (e.g. a GSRTC vendor payment in a month with no GSRTC receipt) + every
+   NULL-segment cost. Now a UNION ALL of income + direct_cost, `GROUP BY (seg,med)`,
+   NULL segment → an **"Unassigned"** line. Σ per-segment direct == dtot; a cost-only
+   line shows inc=0 → net = −cost (an honest loss line, not hidden). (per_company was
+   already UNION-based from P3.3.)
+2. **money_out `pnl` tag** (RPC) — each money_out line now carries `pnl` (true = a real
+   P&L cost: direct/common/commission; false = cash-only: assets/loan/personal/tax/
+   review) via a 3rd UNION column + `bool_or(pnl)`. The Profit Statement (§286) reads
+   `pnl` directly (deploy-safe fallback to the §286.1 `CASH_OUT_LABELS` denylist until
+   the RPC re-runs) → a renamed label can NEVER leak a cash line into "Less expenses".
+   Σ(pnl=true) == the cost base (income − business_profit).
+3. **Re-import guard** (`FinanceV2.jsx` doImport) — the soft "Import anyway?" DUPLICATED
+   on click-through (the wizard's content `dedupe_key` differs from the old row-index
+   backfill key → `ON CONFLICT` never fired). Now a hard **"Replace this period"**: on
+   confirm, DELETE prior rows for `(bank_account_id, txn_date ∈ [min,max])` with
+   `.or('source.neq.manual,source.is.null')` (keeps the accountant's manual entries),
+   then insert fresh → deterministic, no duplication. + label "bank credits" →
+   "collections".
+
+### Contracts / notes
+- ALL display/import-safety — **ZERO scalar total changed** (itot/dtot/ctot/
+  business_profit/total_out/net_cash). Income still CRM, costs still bank.
+  finance_accounts_home + finance_reconcile untouched.
+- **KNOWN-ACCEPTED (P3):** the Replace-this-period delete+insert is NOT atomic. A
+  mid-import failure leaves the period partially loaded — but RECOVERABLE (re-import
+  the same statement → Replace deletes the partial + inserts full; the bank file is the
+  source of truth), manual-preserving, RLS-gated (admin/accounts). Hardening later = a
+  server-side delete+insert RPC (one transaction). Reviewer confirmed self-healing.
+- ❌ FOOT-GUN: a per-segment cost display that LEFT-JOINs cost onto income DROPS any
+  cost with no matching income → the P&L understates costs on some lines while the
+  scalar total is right (silent). UNION income+cost + GROUP BY the axis so every cost
+  surfaces (total-preserving).
+- ❌ FOOT-GUN: a re-import "warn but allow" guard duplicates once the dedupe-key format
+  changed. Make re-import deterministic — REPLACE the period (delete old range, keep
+  manual) before inserting.
+
+### Owner action
+1. Run `supabase_finance_p3_rpcs.sql` in Supabase Studio (re-run — CREATE OR REPLACE;
+   the by_segment + money_out changes). 2. Re-import the 4 bank statements via /finance →
+   Import (upload → map → the "Replace this period" guard is now safe). 3. Costs appear
+   on the P&L; check the numbers.
+
+### Phase 2 (planned, NOT built) — the two-way reconciliation
+`finance_reconcile` two-way: add "**recorded in CRM, not seen in the bank**" (approved
+payments on WON quotes with no near-matching bank credit — the PRIMARY integrity check
+now that revenue = CRM; matched on GROSS `amount_received`, bank is GST-inclusive)
+alongside the existing "banked but not in CRM"; add `crm_income_won_total` beside the
+all-receipts scalar; wire (p_from,p_to). + a NEW gated write RPC `finance_match_txn`
+(sets `matched_payment_id` or an ignore flag so a resolved row drops off both lists).
++ a **Reconcile tab** on /finance (period picker + two lists + per-row Match / Ignore).
+Full map: the finance-recon-understand workflow (2026-08-22).
