@@ -14489,3 +14489,80 @@ uncomment + run PART 2).
 Frontend is pushed (auto-deploy). Run `supabase_phase274_govt_tds_net_backfill.sql` PART 1 in
 Studio → review the deals → uncomment + run PART 2 → re-run PART 1 (expect 0). Going forward,
 enter govt payments as NET cash + a TDS rate; the deal auto-closes to Fully Paid.
+
+
+---
+
+## 218 · Finance P&L income = CRM won deals, not bank credits (P3.3) (2026-08-22)
+
+Owner: "why is the won amount not there?" — the P&L showed a **−₹34.66L "loss" with
+₹0 income** after he deleted the bank-statement Excel. ROOT: income read the BANK
+ledger (`finance_transactions` bucket='income') while commission read the CRM (won
+deals) → deleting the bank zeroed income but left the ₹34.66L commission orphaned →
+a fake loss. Owner directive: **income = CRM won/collected deals.** Shadow-compared +
+adversarially reviewed (money/regression/SQL, §71 rule 3) before the swap. Both SQL
+files pushed (sandbox self-push, §211): `3320340` (shadow) + `b06de25` (swap). No
+frontend change (FinanceV2 reads the same jsonb keys), no APK.
+
+### The change
+- NEW **`finance_crm_income_rows(p_from,p_to,p_seg)`** — SUM(approved
+  `payments.amount_received`) on **WON** quotes, split by the quote's `segment` +
+  `media_type`, dated by `payment_date`. Same won-deal population the commission uses
+  (§171) → revenue + commission finally reconcile. Govt `amount_received` = gross
+  incl. TDS (§274) = the deal's true collected worth. Canonical home =
+  `supabase_finance_p3_rpcs.sql` (defined before `finance_pnl_summary`); birthplace +
+  one-time owner-verify shadow = `supabase_finance_crm_income_shadow.sql`.
+- **`finance_pnl_summary`: ALL 8 income blocks** (ig/ip, itot, money_in, by_segment,
+  per_company, revenue_mix, monthly, by_tag) swapped bank → the CRM helper. **COSTS
+  (direct_cost, common_expense) STAY bank-based** — vendors/media/common are paid from
+  the bank → a coherent P&L: **CRM revenue − bank costs − CRM commission.** Bank income
+  credits become a reconciliation check only (finance_reconcile §162: a bank credit
+  with no CRM payment → "receipt not in CRM").
+- **Real data:** income ₹0 → **₹1.14 Cr** (₹1,13,87,666); business profit −₹34.66L →
+  **+₹79.2L** (= 1,13,87,666 − 14,37,213 govt-comm − 20,29,080 agency-comm).
+
+### Invariants preserved (adversarial review — MONEY MATH CLEAN)
+`Σ money_in == total_in` (income lines + itot both scan the helper with the SAME v_seg)
+· `Σ money_out == total_out` (money_out untouched, bank-based) · `business_profit =
+itot − dtot − ctot + v_comm − v_govt_comm − v_agency_comm` · every `/itot` and `/inc`
+is `>0`-guarded (no divide-by-zero) · no double-count (multiple approved payments =
+installments/collected-to-date; non-won excluded).
+
+### Two SECURITY fixes (review findings, both applied — the SQL, not the math)
+- **P1** — `finance_crm_income_rows` is SECURITY DEFINER + was `GRANT ... TO
+  authenticated` with no role gate → any rep could `rpc('finance_crm_income_rows')`
+  and read ALL-segment collected revenue, bypassing the finance role gate (§8/§152).
+  **REVOKED from PUBLIC/anon/authenticated + GRANT service_role** (finance_pnl_summary
+  calls it as OWNER, so no client GRANT is needed). Applied in BOTH the canonical AND
+  the shadow (re-running the shadow can't re-open it). ⚠ The shadow ran with the old
+  GRANT → the leak was LIVE until the Step-2 REVOKE (p3_rpcs) ran.
+- **P2** — `by_tag` called the helper with `NULL` not `v_seg` → a govt-partner (Vishal,
+  §152) got PRIVATE income in the response payload (latent — by_tag has no frontend
+  consumer). Scoped the income arm to `v_seg`, and the by_tag expense arm too
+  (`v_seg IS NULL OR segment=v_seg OR segment IS NULL` — the `monthly` pattern: keep
+  org-wide null-segment rows, drop other-segment). ig/ip's helper(NULL) call is
+  correct + safe (it computes the split then zeroes the non-matching one; nothing
+  private is emitted).
+
+### CONTRACT / foot-guns
+- P&L income = CRM won/collected deals via `finance_crm_income_rows`; the bank income
+  bucket is **reconciliation ONLY**. Do NOT revert income to `finance_transactions
+  bucket='income'` (that was the P3.2 bank-income model, superseded).
+- The helper is SECURITY DEFINER + role-blind → MUST stay REVOKEd from client roles
+  (only `finance_pnl_summary`, as owner, calls it). §211/§72 posture.
+- ❌ A new SECURITY DEFINER helper GRANTed to `authenticated` exposes its data ungated
+  even when the CALLER (finance_pnl_summary) is role-gated — the gate is per-function.
+  REVOKE the helper; the definer caller reaches it as owner regardless.
+- ❌ A per-block scan that passes `NULL` segment inside a `v_seg`-scoped RPC leaks
+  other-segment data to a scoped viewer (Vishal, §152). Thread `v_seg` into EVERY
+  income/cost block.
+- Costs are still bank-based → until the accountant re-imports bank costs (media/
+  common), business profit reads high (revenue − ₹0 costs − commission). Re-importing
+  drops it by those costs. Not a bug.
+
+### Owner smoke
+Run `supabase_finance_p3_rpcs.sql` in Studio → VERIFY 1 shows `crm_income ≈ ₹1.14 Cr`
++ `bank_cost` + `before_commission`; VERIFY 2 shows the commission accruals (unchanged
+₹34.66L). Open `/finance` → Owner·P&L: income **₹1.14 Cr**, Business Profit **+₹79.2L**
+— the "won amount" now shows. (Owner ran Step 2 + confirmed commission 2026-08-22;
+/finance eyeball pending.)
