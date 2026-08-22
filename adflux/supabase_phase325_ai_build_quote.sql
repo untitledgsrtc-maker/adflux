@@ -51,6 +51,8 @@ DECLARE
   v_months     integer;
   v_c          text;
   v_city       record;
+  v_found      boolean;
+  v_match_n    integer;
   v_line       numeric;
   v_subtotal   numeric := 0;
   v_gst        numeric;
@@ -92,17 +94,36 @@ BEGIN
 
   v_months := LEAST(GREATEST(COALESCE(p_months, 1), 1), 12);
 
-  -- Resolve EVERY city by EXACT (case-insensitive) name — NO fuzzy match (the review's
-  -- mis-price fix: a wrong city = real money on the live number). Each line = the city's FULL
-  -- SCREEN COMBO. If ANY city is unknown / has no rate, refuse the WHOLE quote.
+  -- Resolve EVERY city. EXACT (case-insensitive) name first; then a SAFE forgiving
+  -- fallback for master-name vs spoken-name drift ("SURAT (CITY)" vs "Surat", case,
+  -- spacing) — strip a trailing "(...)" qualifier + collapse spaces, and accept ONLY
+  -- when it resolves to EXACTLY ONE active city (never guess between two → no mis-price
+  -- on the live number). NO loose fuzzy/substring (would risk Surat→Surendranagar).
+  -- Still unresolved → refuse (the endpoint then hands off gracefully, not silently).
   FOREACH v_c IN ARRAY p_cities LOOP
     IF btrim(COALESCE(v_c, '')) = '' THEN CONTINUE; END IF;
     SELECT id, name, grade, screens, monthly_rate, offer_rate, impressions_day, impressions_month
       INTO v_city
       FROM public.cities
-     WHERE is_active = true AND lower(name) = lower(btrim(v_c))
+     WHERE is_active = true AND lower(btrim(name)) = lower(btrim(v_c))
      LIMIT 1;
-    IF NOT FOUND THEN
+    v_found := FOUND;
+    IF NOT v_found THEN
+      SELECT count(*) INTO v_match_n
+        FROM public.cities
+       WHERE is_active = true
+         AND lower(regexp_replace(btrim(name), '\s*\(.*\)\s*$', '')) = lower(btrim(v_c));
+      IF v_match_n = 1 THEN
+        SELECT id, name, grade, screens, monthly_rate, offer_rate, impressions_day, impressions_month
+          INTO v_city
+          FROM public.cities
+         WHERE is_active = true
+           AND lower(regexp_replace(btrim(name), '\s*\(.*\)\s*$', '')) = lower(btrim(v_c))
+         LIMIT 1;
+        v_found := FOUND;
+      END IF;
+    END IF;
+    IF NOT v_found THEN
       RETURN jsonb_build_object('ok', false, 'error', 'city_not_found', 'city', v_c);
     END IF;
     IF COALESCE(v_city.offer_rate, 0) <= 0 THEN

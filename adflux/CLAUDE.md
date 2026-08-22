@@ -14679,3 +14679,61 @@ all-receipts scalar; wire (p_from,p_to). + a NEW gated write RPC `finance_match_
 (sets `matched_payment_id` or an ignore flag so a resolved row drops off both lists).
 + a **Reconcile tab** on /finance (period picker + two lists + per-row Match / Ignore).
 Full map: the finance-recon-understand workflow (2026-08-22).
+
+
+---
+
+## 221 · WhatsApp AI auto-quote — reliability fixes (2026-08-22)
+
+Owner: "why AI not send the quote?" A private customer (Milan Shah / "Garbaland",
+Gandhinagar, 1 month) gave city + months but got no quote. Diagnosed live + audited the
+whole §210 AI-quote flow. Adversarial review (mis-price + regression) = both SHIP, no
+confirmed money error. Commits: `41b175b` (prompt) + `<sha>` (match + never-ghost +
+backstop).
+
+### Root cause (the specific miss)
+Everything was valid — private lead, owned by Rima, Gandhinagar priceable (₹1000, 20
+screens). But the AI emitted `HOT: human` (hand-off, "our team will share a quote" +
+ai_paused) instead of the `QUOTE:` marker → `ai_build_quote` never ran. Prompt-adherence:
+the model chose hand-off for a customer it should have auto-quoted.
+
+### The 4 fixes
+1. **Prompt** (`api/wa/ai-reply.js`) — for a PRIVATE customer with city + months,
+   emitting QUOTE is the ONLY correct action: never hand off, never "our team will share
+   a quote", never `HOT: human`. `HOT: human` clarified = an EXPLICIT person-request or a
+   govt body only. Govt gate + no-price rule + the server-side `govt_blocked` backstop
+   unchanged.
+2. **Forgiving city match** (`supabase_phase325_ai_build_quote.sql`) — was EXACT
+   `lower(name)=lower(city)` → "Surat" ≠ "SURAT (CITY)" → city_not_found → silent. Now:
+   exact first; then a SAFE fallback that strips a trailing "(...)" qualifier +
+   case/space-folds, accepted ONLY when `count(*)=1` (exactly one active city) — NEVER
+   guesses between two (no Surat→Surendranagar mis-price). Refuses if unresolved. NO loose
+   fuzzy/substring.
+3. **Never-ghost** (`ai-reply.js`) — the endpoint used to SEND NOTHING on
+   city_not_found/no_rate/no_owner/internal/no-lead/render-failed (only `govt_blocked` was
+   graceful) → the customer was promised a quote then ghosted. Now any of those → ONE warm
+   hand-off text + `ai_paused` (a human closes). A quote that DID build is already a
+   QuoteSent+hot lead in the rep's queue. `quoteHandled` flag prevents a double-send.
+4. **Backstop guard** (`ai-reply.js`) — the §115 price-backstop false-fired on the AI's
+   own "preparing your final quote" → swapped the reply to "tell me the city again" +
+   paused WHILE the real quote sent (contradictory turn). Split it: the HARD leak (a
+   4+-digit rupee figure / "confirmed/booked/guaranteed") is caught on EVERY turn (incl.
+   quote turns — a real leaked price must never go out on the brand number); the SOFT
+   `(final|total) quote` phrase guards NON-quote turns only.
+
+### CONTRACT / foot-guns
+- City resolve = exact → strip-parenthetical unique-only → refuse. NEVER add loose
+  fuzzy/substring (mis-price on the live number). Typos are the AI's job (coverage list
+  injected §257.7), not the DB's.
+- A PROMISED quote must NEVER ghost — every failure path hands off gracefully + pauses.
+  Only `govt_blocked` had this before; now all do (`quoteHandled` gates the fallback).
+- ❌ FOOT-GUN: gating an ENTIRE safety backstop off for a case (quote turns) can silently
+  disable its OTHER clauses (the real-price-leak detector). Split hard-vs-soft signals;
+  keep the hard guard universal — the fix both reviewers independently prescribed.
+
+### Deploy
+`ai-reply.js` deploys on push (helps even before the SQL — the graceful fallback replaces
+silence). Owner runs `supabase_phase325_ai_build_quote.sql` (re-run — CREATE OR REPLACE,
+the forgiving match) so qualifier-name cities ("Surat"→"SURAT (CITY)") resolve. The Milan
+Shah quote was built manually (`SELECT ai_build_quote(...)` → UA-2026-0316); Rima sends it
+from the inbox.

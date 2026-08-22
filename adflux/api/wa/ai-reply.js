@@ -389,12 +389,19 @@ export default async function handler(req) {
   // goes out on the live brand number. On a hit, swap in a safe hand-off line
   // and pause the AI so a human closes. Indicative rates are 3-digit (650-850);
   // any 4+-digit rupee figure or a commitment word is treated as out-of-bounds.
-  const risky =
+  // HARD out-of-bounds: a real 4+-digit rupee figure or a booking-confirmation. The
+  // package price lives ONLY in the PDF and the AI never confirms a booking, so this is
+  // caught on EVERY turn — INCLUDING a quote turn (a leaked price must never go out on
+  // the brand number, even while the real quote PDF is being sent).
+  const hardLeak =
     /(₹|rs\.?|inr)\s?[\d][\d,]{3,}/i.test(reply) ||
     /\b(confirmed|guarantee[d]?|booked)\b/i.test(reply) ||
-    /\bbooking\s+(is\s+)?(confirm|done|complete)/i.test(reply) ||
-    /\b(final|total)\s+(price|cost|amount|quote)\b/i.test(reply)
-  if (risky) {
+    /\bbooking\s+(is\s+)?(confirm|done|complete)/i.test(reply)
+  // SOFT phrase: "your final / total quote" trips this benignly on a legit quote turn,
+  // so it guards NON-quote turns only — a quote turn's warm "preparing your quote" text
+  // must not be swapped for "tell me the city again" + paused while the quote sends.
+  const softPrice = /\b(final|total)\s+(price|cost|amount|quote)\b/i.test(reply)
+  if (hardLeak || (softPrice && !quoteReq)) {
     reply = 'Thanks for your interest! For exact pricing and to book, our team will share a tailored quote. Could you tell me the city/stations, the brand, and your rough timeline?'
     try { await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ ai_paused: true }) }) } catch { /* hand-off is best-effort */ }
   }
@@ -472,6 +479,7 @@ export default async function handler(req) {
   // the §4 hard-gate (refuses GOVERNMENT) + the ONLY source of the price (cities rate card);
   // NO price is ever put in chat — it lives only in the PDF (owner: price via quote, not chat).
   let quoteSent = false
+  let quoteHandled = false   // a graceful hand-off already went (e.g. govt) — don't double-send
   if (quoteReq && conv.lead_id) {
     try {
       const qr = await (await sb('rpc/ai_build_quote', { method: 'POST', body: JSON.stringify({ p_lead_id: conv.lead_id, p_cities: quoteReq.cities, p_months: quoteReq.months }) })).json()
@@ -508,9 +516,23 @@ export default async function handler(req) {
         const id = await sendWa({ type: 'text', text: { body: handoff } })
         await logOut('text', handoff, id)
         try { await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ ai_paused: true }) }) } catch { /* best-effort */ }
+        quoteHandled = true
       }
-      // city_not_found / no_rate / no_owner / internal → send nothing; the AI re-engages next turn.
+      // city_not_found / no_rate / no_owner / internal → handled by the graceful fallback below.
     } catch { /* quote is best-effort — the reply already went */ }
+  }
+
+  // NEVER GHOST a promised quote (§133). The customer was just told the quote is coming.
+  // If we could NOT send it — an unresolved/bad city, no rate, no owner, no linked lead,
+  // or the render/send failed — send ONE warm hand-off + pause so a human closes. A quote
+  // that DID build is already a QuoteSent+hot lead in the rep's queue.
+  if (quoteReq && !quoteSent && !quoteHandled) {
+    try {
+      const h = 'Thank you! Let me get our team to prepare and share your detailed quote with you shortly.'
+      const id = await sendWa({ type: 'text', text: { body: h } })
+      await logOut('text', h, id)
+      await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ ai_paused: true }) })
+    } catch { /* best-effort — never break the turn */ }
   }
 
   return ok({ photo: !!photoUrl, quote: quoteSent })
