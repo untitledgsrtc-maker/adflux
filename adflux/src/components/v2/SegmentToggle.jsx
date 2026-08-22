@@ -20,7 +20,11 @@ const OPTS = [
   { k: 'government', label: 'Government' },
 ]
 
-export default function SegmentToggle({ value = 'all', onChange, style }) {
+// `opts` defaults to the segment options (All/Private/Government). Pass a custom
+// [{ k, label }] array to reuse the exact pill look for another axis — e.g. a
+// Media pill row on /quotes (Phase 279). Backward-compatible: existing callers
+// omit `opts` and get the segment toggle unchanged.
+export default function SegmentToggle({ value = 'all', onChange, style, opts = OPTS }) {
   return (
     <div style={{
       display: 'inline-flex', gap: 4, padding: 4,
@@ -28,7 +32,7 @@ export default function SegmentToggle({ value = 'all', onChange, style }) {
       borderRadius: 999, marginBottom: 16,
       ...style,
     }}>
-      {OPTS.map(o => {
+      {opts.map(o => {
         const on = value === o.k
         return (
           <button

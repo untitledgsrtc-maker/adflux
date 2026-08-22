@@ -14583,3 +14583,33 @@ label → `crm_income_ex_gst`.
 - ❌ FOOT-GUN: CRM `amount_received` is GST-INCLUSIVE (customer pays the GST invoice) —
   using it raw as P&L revenue overstates ~18% AND mismatches the ex-GST commission base.
   Strip GST via `× subtotal/total` (the commission ratio); keep TDS.
+
+
+---
+
+## 219 · Phase 279 — /quotes Media pill row (Other Media one-tap) (2026-08-22)
+
+Owner: "want this filter with other media too" (screenshot of the /quotes
+All/Private/Government segment toggle). The §277 Media filter already existed but was
+buried in the gear popover. Surfaced it as a visible pill row next to the segment
+toggle. Owner picked (AskUserQuestion) a **media pill row** (All · Auto Hood · GSRTC ·
+LED · Other Media) over a mixed 4th segment tab. Guardian PASS.
+
+- `src/components/v2/SegmentToggle.jsx` (shared) — added optional `opts = OPTS` prop
+  (default = the existing All/Private/Government). Backward-compatible: LeadsV2 /
+  AdminDashboardDesktop / the QuotesV2 segment-pill caller omit it → byte-identical
+  render. Lets the exact pill look drive ANY axis.
+- `src/pages/v2/QuotesV2.jsx` (§28 FROZEN, guardian PASS) — a 2nd `<SegmentToggle>`
+  renders the MEDIA pill row, driven by the EXISTING §277 `mediaFilter`/`mediaOptions`/
+  `segmentScoped` (unchanged), gated `admin || segment_access==='ALL'` +
+  `mediaOptions.length>0` (no dead-end). Removed the now-duplicate Media field from the
+  gear FilterDrawer + the Media chip from ActiveFilterChips — the §142B pattern (the
+  pill shows + clears it). ZERO logic change: state, drop-to-'all' effect, segmentScoped,
+  tab counts, totals, reset all intact.
+- `mediaOptions` derive from the media types present in the ACTIVE segment (§277) →
+  Private shows LED/Other Media, Government shows Auto Hood/GSRTC → no dead-end combos.
+- `.v2d-filter-row` already `flex-wrap: wrap` → the media pill wraps below on mobile
+  (guardian P3 handled by existing CSS, no change needed).
+- Display-only (no money/DB/frozen-contract touch). Pattern: to add a pill filter on
+  ANY axis, reuse `SegmentToggle` with a custom `opts` array — don't duplicate the
+  pill markup.

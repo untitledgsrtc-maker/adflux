@@ -488,23 +488,24 @@ export default function QuotesV2() {
           />
         )}
 
-        {/* Phase 34Z.68 — gear-button popover for Segment / Media /
-            Rep. ActiveFilterChips below the row surfaces active
-            filters as removable chips, matching LeadsV2. */}
+        {/* Phase 279 — Media pill row (Auto Hood / GSRTC / LED / Other Media),
+            surfaced next to the segment toggle so Other Media is one tap (was
+            buried in the gear, Phase 277). Reuses SegmentToggle's pill look via
+            `opts`. Options derive from the media types present in the active
+            segment (mediaOptions) → no dead-end combos. */}
+        {(isAdmin || (profile?.segment_access || 'ALL') === 'ALL') && mediaOptions.length > 0 && (
+          <SegmentToggle
+            value={mediaFilter}
+            onChange={setMediaFilter}
+            style={{ marginBottom: 0 }}
+            opts={[{ k: 'all', label: 'All media' }, ...mediaOptions.map(o => ({ k: o.value, label: o.label }))]}
+          />
+        )}
+
+        {/* Phase 34Z.68 — gear-button popover for Rep. ActiveFilterChips below
+            the row surfaces active filters as removable chips, matching LeadsV2.
+            Phase 279 — Media moved out to the visible pill row above. */}
         <FilterDrawer fields={[
-          // Phase 277 — Media filter across ALL segments (was govt-only Auto/GSRTC).
-          // Options derived from the media types actually present in the quotes.
-          ...(mediaOptions.length > 0 ? [{
-            key: 'media',
-            label: 'Media',
-            value: mediaFilter,
-            defaultValue: 'all',
-            options: [
-              { value: 'all', label: 'All media' },
-              ...mediaOptions,
-            ],
-            onChange: setMediaFilter,
-          }] : []),
           // Admin-only rep filter.
           ...(isAdmin && repOptions.length > 0 ? [{
             key: 'rep',
@@ -533,12 +534,7 @@ export default function QuotesV2() {
           filter. Same pattern as LeadsV2. */}
       <ActiveFilterChips fields={[
         // Phase 142B — segment chip dropped (the pill shows + clears it).
-        ...(mediaFilter !== 'all' ? [{
-          key: 'media', label: 'Media',
-          value: mediaFilter, defaultValue: 'all',
-          options: mediaOptions,
-          onChange: setMediaFilter,
-        }] : []),
+        // Phase 279 — media chip dropped too (now a visible pill row, same reason).
         ...(isAdmin && repOptions.length > 0 ? [{
           key: 'rep', label: 'Sales rep',
           value: repFilter, defaultValue: 'all',
