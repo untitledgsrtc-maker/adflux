@@ -66,9 +66,19 @@ export default async function handler(req) {
     const pnid = String(c.phone_number_id || '')
     if (to.length < 10 || !/^\d+$/.test(pnid)) { failed++; continue }
     const first = cleanFirstName(c.lead_name)
-    // Same proven, on-brand wording as the §213 template — but FREE text, because the
-    // 24h window is open. Reply-first, NO price/pitch. Single *bold* = WhatsApp bold.
-    const body = `નમસ્તે${first ? ' ' + first : ''} 👋 તમને GSRTC LED સ્ક્રીન નું *ભાવપત્રક* મળ્યું? કોઈ પ્રશ્ન હોય તો આ મેસેજ પર *જવાબ* આપો — અમે મદદ કરીશું.`
+    const name = first ? ' ' + first : ''
+    // §226 — up to 2 same-day FREE-TEXT touches (window OPEN). Reply-first, NO price/pitch.
+    // 4 DISTINCT messages by touch (1|2) × has_quote so nothing repeats. *bold* = WhatsApp bold.
+    let body
+    if (c.has_quote) {
+      body = Number(c.touch) >= 2
+        ? `નમસ્તે${name} 🙏 તમારા GSRTC LED *ભાવપત્રક* વિશે કોઈ પ્રશ્ન હોય તો જણાવો — હું અત્યારે ઓનલાઈન છું. કઈ સિટી કે કેટલા મહિના, એ પસંદ કરવામાં પણ મદદ કરું? 👍`
+        : `નમસ્તે${name} 👋 તમને GSRTC LED સ્ક્રીન નું *ભાવપત્રક* મળ્યું? કોઈ પ્રશ્ન હોય તો આ મેસેજ પર *જવાબ* આપો — અમે મદદ કરીશું.`
+    } else {
+      body = Number(c.touch) >= 2
+        ? `નમસ્તે${name} 🙏 GSRTC LED સ્ક્રીન નું *ભાવપત્રક* જોઈતું હોય તો — કઈ *સિટી* + કેટલા *મહિના*, એટલું જણાવો, હું તરત મોકલી આપું 👍`
+        : `નમસ્તે${name} 👋 તમે GSRTC બસ સ્ટેશન LED સ્ક્રીન વિશે પૂછ્યું હતું — હજુ કોઈ પ્રશ્ન હોય તો આ મેસેજ પર *જવાબ* આપો, હું મદદ કરીશ. 🙂`
+    }
 
     try {
       // MARK-then-SEND (review P1) — CLAIM the one-nudge throttle BEFORE sending. The

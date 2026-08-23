@@ -14944,3 +14944,46 @@ the open window + a small number of template touches, tapering), then HANDS the 
 follow-up to a REP (calls + personal WhatsApp via the §209/§324 hot task) — human follow-up doesn't
 burn the number's spam score and closes warm leads better. Not-interested/Lost/opt-out → no
 follow-up (already enforced). Awaiting owner's OK on the safe cadence before building Batch 3.
+
+
+---
+
+## 226 · WhatsApp Agent v2 — Batch 3: same-day 2-touch nudge (quoted + un-quoted) (2026-08-23)
+
+Owner chose (AskUserQuestion, after the §225 stress-test) **"My exact 13-touch schedule"** over the
+safe/tightest options, and "all templates must be different." Built the DELIVERABLE, SAFE half now
+(the same-day free-text part = Day 1 of his schedule); the Day-2→30 closed-window part is Meta-gated
+(templates + approval) and carries the ban risk he accepted.
+
+### Shipped — same-day engine (extends §215 in place, §72; owner RE-RUNS `supabase_quote_nudge.sql`)
+- `quote_nudge_candidates()` widened from 1 touch (quoted only) → **up to 2 same-day touches, quoted
+  AND un-quoted engaged leads**. Touch 1 (~2h+ silent) → Touch 2 (~5h+ silent, only if STILL no
+  reply). Window OPEN (free text, ₹0, no template, spam-safe). NEW `whatsapp_conversations
+  .quote_nudge_count` (backfilled 1 for already-nudged rows → no duplicate touch-1). Skips
+  Lost/Won/opt-out/DNC (owner: not-interested/lost → no follow-up). "Engaged" = the AI already
+  replied (a real inquiry, not a cold silent scan). Returns `touch` (1|2) + `has_quote`.
+- `quote_nudge_mark()` → increments the counter (mark-then-send, the §215 P1: claim BEFORE send so a
+  lost write can never DOUBLE-send on the flagged number; worst case a rare miss).
+- `api/wa/quote-nudge.js` — **4 DISTINCT** Gujarati messages (touch 1|2 × has_quote), reply-first, no
+  price/pitch. Cron/dispatch/flag UNCHANGED (reuses the `quote-nudge` job + `ai_nudge_enabled` flag =
+  the kill switch). ⚠ This WIDENS auto-outbound volume on the twice-flagged number (2 touches + all
+  engaged leads, not just quoted) — free-text/in-window is the safe kind, but WATCH quality; kill =
+  `UPDATE whatsapp_accounts SET ai_nudge_enabled=false WHERE purpose='marketing'`.
+
+### THE WHATSAPP REALITY that shapes the rest (told owner — facts, not opinions)
+- After 24h you can ONLY send Meta-APPROVED TEMPLATES, and **each different message = its own
+  template** Meta must approve (2-3 days). His ~13-touch varied schedule ≈ 6-8 distinct templates.
+- **Meta caps marketing frequency per recipient** — 2 templates/day (morning+evening) get REJECTED
+  (`131049` pacing cap, §208). So morning+evening days deliver ~1, not 2.
+- So the dense Day-2→30 schedule is a multi-week (Meta approval) build that Meta then throttles ~1/day.
+
+### Day-2 template prepped (owner SUBMITS to Meta) — `scripts/create-followup-day2-template.py`
+`followup_day2` (UTILITY, gu, reply-first, {{1}}=name, DISTINCT from ai_quote_followup). Owner runs it
+with a FRESH token (§119), watches for ACTIVE, appeals if Meta reclassifies to Marketing (§216).
+
+### NEXT (Batch 4, not built) — the closed-window cadence engine
+The Day-2→30 schedule needs: (a) the rest of the distinct templates (Day 4/7/9/15/25/30 + nurture,
+each different — a batch create script so they approve together), (b) a scheduling ENGINE that maps
+day-since-last-message → the matching approved template, closed-window, ≤1 template/lead/day, all the
+§213-style opt-out/silent/Won/Lost gates + stop-on-reply. This is where the ban risk concentrates →
+build it WITH the §225 quality-rating auto-pause watcher (Batch 2b) so it self-protects.
