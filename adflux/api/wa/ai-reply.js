@@ -258,6 +258,29 @@ export default async function handler(req) {
     system += `\n\nVIDEOS YOU CAN SHARE — when the customer asks to see a video/reel of one of these stations, include the EXACT link in your reply text (WhatsApp shows a preview):\n${videoRows.map((c) => `- ${c.name}: ${c.youtube_url}`).join('\n')}\nOnly share a link from this list, for the city asked. If they ask for a city not listed, say our team will share a video.`
   }
 
+  // Phase 2 (WhatsApp Agent v2, §225) — FAQ knowledge (owner-editable ai_faq master). Injected like the
+  // coverage list so the AI answers real closing questions (creative, go-live, payment, GST) from
+  // grounded owner-approved answers instead of guessing or handing off. Best-effort — a missing table
+  // degrades to no FAQ (deploy-before-SQL safe).
+  let faqs = []
+  try {
+    faqs = ((await (await sb(`ai_faq?select=question,answer&is_active=eq.true&order=display_order.asc&limit=40`)).json()) || []).filter((f) => f && f.question && f.answer)
+  } catch { /* no ai_faq table yet → skip */ }
+  if (faqs.length) {
+    system += `\n\nFAQ — owner-approved answers; use them when the customer asks, keep it short and in their language:\n${faqs.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join('\n')}`
+  }
+
+  // Phase 2 (WhatsApp Agent v2, §225) — media_types awareness. The business sells more than the LED
+  // screens (hoarding, mall, cinema, etc.). Inject the active list so the AI acknowledges + routes a
+  // non-LED ask to the team instead of going blank or inventing. Best-effort.
+  let mediaTypes = []
+  try {
+    mediaTypes = ((await (await sb(`media_types?select=name&is_active=eq.true&limit=50`)).json()) || []).map((m) => m.name).filter(Boolean)
+  } catch { /* no media_types → skip */ }
+  if (mediaTypes.length) {
+    system += `\n\nOTHER MEDIA — besides the GSRTC LED screens, Untitled Advertising also does: ${mediaTypes.join(', ')}. YOUR quotes cover the LED screens only. If a customer asks about a DIFFERENT medium (hoarding, mall, cinema, etc.), warmly acknowledge it, say our team will share those details, and ask their requirement — do NOT invent rates or specs for it, and do NOT auto-quote it.`
+  }
+
   // Phase 275 — WhatsApp policy compliance (the marketing number is under a Meta
   // "sending spam" warning; the enforcement ladder is template-block → all-message
   // block → account lock → permanent disable). Meta scores by RECIPIENT block/
@@ -347,9 +370,10 @@ export default async function handler(req) {
   // Phase 324 — HOT buying-intent marker. Strip it, flag the lead hot (best-effort,
   // EXCEPTION-wrapped RPC → never blocks the reply), and on `human` hand the thread to
   // the rep (ai_paused). Reuses leads.heat='hot' (§71) + the §106 follow-up push.
+  let hotKind = null
   const hm = reply.match(/(^|\n)[ \t]*HOT:[ \t]*(quote|human)[ \t]*$/im)
   if (hm) {
-    const hotKind = hm[2].toLowerCase()
+    hotKind = hm[2].toLowerCase()
     reply = reply.replace(/(^|\n)[ \t]*HOT:[ \t]*(quote|human)[ \t]*$/gim, '').trim()  // strip EVERY marker line — never leak a stray HOT: to the customer
     if (conv.lead_id) {
       const p_reason = hotKind === 'human' ? 'wants to talk to the team' : 'asked for a quote'
@@ -400,6 +424,26 @@ export default async function handler(req) {
       .filter((c) => { const k = c.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
       .slice(0, 8)
     if (cities.length && months > 0) quoteReq = { cities, months }
+  }
+
+  // Phase 2 (WhatsApp Agent v2, §225) — READY-TO-QUOTE server net. Batch-1's prompt pushes the AI to
+  // emit QUOTE once it has a covered city + months; this is the belt-and-suspenders for when it STALLS
+  // anyway (the §221 "HOT:human instead of QUOTE" miss). Fires ONLY when: the AI flagged explicit price
+  // intent (HOT: quote) but produced NO QUOTE, it is NOT a cold first contact, AND a covered city + a
+  // single "N months" are BOTH clearly present in the customer's OWN words. It then synthesises quoteReq
+  // → the SAME deferred ai_build_quote path, which REFUSES on any ambiguity (unknown/duplicate city,
+  // government, no rate) → it can never mint a WRONG quote (§210/§221). Misses (Gujarati-script city,
+  // no explicit month) fall through to the normal reply + the same-day nudge — a miss, never a mis-quote.
+  if (!quoteReq && hotKind === 'quote' && !firstContact && conv.lead_id && allCities.length) {
+    const said = rows.filter((m) => m.direction === 'in').map((m) => String(m.body || '')).join(' \n ')
+    const netSeen = new Set()
+    const netCities = allCities.map((c) => c.name).filter(Boolean)
+      .filter((n) => { try { return new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(said) } catch { return false } })
+      .filter((n) => { const k = n.toLowerCase(); if (netSeen.has(k)) return false; netSeen.add(k); return true })
+      .slice(0, 8)
+    const mm2 = said.match(/(\d{1,2})\s*(months?|mahin[ao]|mahine|મહિન[ાો]|महीन[ेाो])/i)
+    const netMonths = mm2 ? parseInt(mm2[1], 10) : 0
+    if (netCities.length && netMonths > 0 && netMonths <= 12) quoteReq = { cities: netCities, months: netMonths }
   }
 
   // Phase 261.1 — NEVER GHOST. A control marker (PHOTO/HOT/QUOTE) can strip the

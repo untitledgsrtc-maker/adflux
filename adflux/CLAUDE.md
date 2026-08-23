@@ -14893,3 +14893,54 @@ Owner's asset, explicit informed sign-off → built with a KILL SWITCH + risk lo
   Not built yet.
 - Flags are toggled operationally (§216) — query the live values, don't trust a pinned state:
   `SELECT display_number, ai_followup_enabled, ai_nudge_enabled FROM whatsapp_accounts WHERE purpose='marketing';`
+
+
+---
+
+## 225 · WhatsApp Agent v2 — Batch 2: FAQ knowledge + media awareness + ready-to-quote net (2026-08-23)
+
+Owner approved A-E "in one go" (§223). Batch 2 = the AI-brain upgrades. Additive, §45-safe;
+`ai-reply.js` is Edge (LIVE on deploy). Owner runs ONE SQL file.
+
+- **FAQ knowledge** (`supabase_wa_agent_v2_faq.sql` — owner RUNS): NEW owner-editable `ai_faq`
+  master (question/answer/is_active/display_order) + RLS (admin/co_owner write, read-all-auth,
+  §19). `ai-reply.js` injects the active rows into the system prompt (like the §257.7 coverage
+  list) so the AI answers real closing questions (creative, go-live, payment, GST) from grounded
+  owner-approved answers instead of guessing/handing off. Seeded 4 accurate-from-facts answers;
+  the file has commented templates for the business-specifics (payment terms / go-live /
+  cancellation / minimum) the owner fills — I don't have those, do NOT invent them.
+- **media_types awareness** (`ai-reply.js`): injects the active `media_types` names so the AI
+  knows the business also does hoarding/mall/cinema and ROUTES a non-LED ask to the team (never
+  invents rates/specs, never auto-quotes non-LED). Best-effort.
+- **Ready-to-quote server net** (`ai-reply.js`): the belt-and-suspenders for the §221 "AI has
+  city+months but stalls (HOT:human instead of QUOTE)" miss. Fires ONLY when the AI emitted
+  `HOT: quote` (explicit price intent) but NO QUOTE, it's not a cold first contact, AND a covered
+  city (word-boundary match on the master names) + a single "N months" (≤12) are BOTH in the
+  customer's own words → synthesises `quoteReq` → the SAME deferred `ai_build_quote` path, which
+  REFUSES on any ambiguity (unknown/duplicate city, government, no rate) → **can never mint a
+  WRONG quote**. A miss (Gujarati-script city, no explicit month) falls through to the normal
+  reply — a miss, never a mis-quote.
+- All three are best-effort try/caught + deploy-before-SQL safe (a missing table/column → no
+  injection, never a crash). `hotKind` was lifted to an outer `let` so the net can read it.
+
+### DEFERRED to Batch 2b (told owner) — the number-protection infra
+Each is a cron + Edge endpoint, its own careful build: **quality-rating watcher + auto-pause**
+(poll Meta's phone_number quality_rating → auto-pause risky sends on a dip), **global per-number
+send throttle** (a burst of QR scans can't fire a burst), **ghosted-inbound recovery** (re-send
+once on a dropped dispatch), **NULL-owner HOT fallback** (route the HOT task to a default rep when
+the lead has no owner — touches the §209 frozen `flag_lead_hot_from_wa`, needs the guardian).
+Interim protection for the number = the §224 manual kill switch (unset `ai_welcome_image_url`) +
+watching WhatsApp Manager → 98982 → Quality.
+
+### ⚠ Batch 3/4 follow-up CADENCE — owner proposed a 13-touch/30-day schedule (2026-08-23)
+Owner's cadence: Day1 2 (2-3h + 5-7h) · Day2 morning+evening · Day4 midday · Day7 m+e · Day9 m+e ·
+Day15 midday · Day25 midday · Day30 m+e · then every 30d a nurture. ~13 touches in 30 days.
+**STRESS-TESTED + pushed back (NOT built as-is):** ~13 business-initiated WhatsApp messages to one
+lead — most as approved TEMPLATES after the 24h window — on the TWICE-flagged (§133/§148) number
+98982 is a near-certain 3rd flag → account lock. Meta caps marketing FREQUENCY per recipient
+(§208 saw `131049` = pacing cap); 2 templates/day will be throttled/rejected AND spike block/report.
+The SAFE design that keeps the persistence: AI does a FEW touches (2 same-day free-text nudges in
+the open window + a small number of template touches, tapering), then HANDS the persistent
+follow-up to a REP (calls + personal WhatsApp via the §209/§324 hot task) — human follow-up doesn't
+burn the number's spam score and closes warm leads better. Not-interested/Lost/opt-out → no
+follow-up (already enforced). Awaiting owner's OK on the safe cadence before building Batch 3.
