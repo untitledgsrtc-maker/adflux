@@ -14853,3 +14853,43 @@ The agent CONVERTS the leads it receives; it doesn't create demand. This maxes c
 (more chats → quotes → hot handoffs). Hitting 50-100 also needs enough INBOUND (QR scans + ad
 leads) AND reps CLOSING the hot handoffs. Watch two numbers once shipped: **quotes sent** and
 **hot handoffs closed** — that tells whether the ceiling is the agent or the funnel.
+
+
+---
+
+## 224 · WhatsApp AI — generic welcome image RE-ENABLED on first message (owner override, 2026-08-23)
+
+Owner (AskUserQuestion, after TWO explicit spam warnings) chose **"On the first message"** over the
+safe "after they reply" option → send one generic welcome poster on the customer's FIRST message.
+This DIRECTLY re-adds the §133/§261 auto-image that got 98982 spam-flagged twice (27 Jul + 1 Aug).
+Owner's asset, explicit informed sign-off → built with a KILL SWITCH + risk logging.
+
+- `api/wa/ai-reply.js` — on `firstContact`, after the text send (which carries the STOP opt-out
+  line, §275), send `acct.ai_welcome_image_url` as an image. Best-effort (a bad url never fails the
+  reply). **Gated ENTIRELY on the URL** — set = on, unset = off, instant, no deploy. The §261
+  comment block was updated to reflect the re-enable.
+- **KILL SWITCH (instant off, no deploy):**
+  `UPDATE whatsapp_accounts SET ai_welcome_image_url=NULL WHERE purpose='marketing';`
+  Turn back on by setting the URL. Check current state:
+  `SELECT display_number, ai_welcome_image_url FROM whatsapp_accounts WHERE purpose='marketing';`
+- **⚠ RESIDUAL RISK (owner-accepted):** an unsolicited first-message image is the top Meta
+  block/report trigger (§133). WATCH WhatsApp Manager → 98982 → Quality. A 3rd flag → account
+  lock = the whole WhatsApp funnel dies. If quality dips → unset the URL (the safe "after they
+  reply" variant is one edit away — send the poster on the 2nd inbound instead of the 1st).
+- The §133 FROZEN CONTRACT ("do NOT re-add an auto-image without owner sign-off") is HONORED —
+  this IS the sign-off clause being exercised. Do NOT re-add on a DIFFERENT number, or without a
+  fresh owner sign-off.
+
+### Follow-up picture (answered for the owner, 2026-08-23) — no new build, current state
+- **Same-day nudge** (§215, `ai_nudge_enabled`): 2–4h after an AI quote, if silent, window OPEN →
+  1 free-text nudge (₹0). Cron hourly :07, IST 09:30–19:30, skip Sunday.
+- **Quote chase** (§213, `ai_followup_enabled`): touch-1 day 2–4, touch-2 day 6–9 (max 2), closed
+  window OK (approved Utility template ~₹0.11). Cron 11:00 IST Mon–Sat.
+- Both stop on reply / Won / Lost / opt-out; **both require `quotes.source='ai_quote'`** (the lead
+  GOT a quote).
+- **THE GAP** = the owner's "not even follow up": an engaged-but-UNQUOTED lead (chatted, gave a
+  city but no months → no quote) gets NOTHING. Closing it = **Batch 3** (same-day chase for
+  un-quoted, free text, open window) + **Batch 4** (a closed-window Utility template for un-quoted).
+  Not built yet.
+- Flags are toggled operationally (§216) — query the live values, don't trust a pinned state:
+  `SELECT display_number, ai_followup_enabled, ai_nudge_enabled FROM whatsapp_accounts WHERE purpose='marketing';`

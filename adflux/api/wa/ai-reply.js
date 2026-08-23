@@ -483,22 +483,27 @@ export default async function handler(req) {
     } catch { /* the message was sent; a log failure is non-fatal */ }
   }
 
-  // Phase 261 (2026-07-27) — auto welcome-POSTER on first contact REMOVED to
-  // protect the marketing number's WhatsApp quality rating. Meta flagged
-  // 98982 73686 for "sending spam" (07-27): the number does 200-327 auto-
-  // messages/day from cold QR-scan first-contacts, and an unsolicited IMAGE
-  // before the person says a word is the top block/report trigger. The AI now
-  // opens with TEXT ONLY (its reply already shares the app.untitledad.in/led
-  // link, which carries the poster + video + map). The poster/photo is still
-  // sent CONTEXTUALLY below — only when the customer asks to see a specific
-  // city (the engagement-gated `photoUrl` path). `firstContact` (line ~183) is
-  // retained for a possible future "send poster once they reply" gate.
-  // DO NOT re-add an auto-image on firstContact without owner sign-off — it is
-  // the exact signal this removal exists to stop (§115 live-AI change).
+  // Phase 261 (2026-07-27) — auto welcome-POSTER on first contact was REMOVED to protect the
+  // marketing number's quality rating (Meta flagged 98982 73686 for "sending spam" 07-27: an
+  // unsolicited IMAGE before the person engages is the top block/report trigger). RE-ENABLED
+  // 23-08-2026 on explicit owner sign-off (§224) — see the firstContact welcome-image send above,
+  // gated on ai_welcome_image_url (text-first + opt-out line; kill switch = unset the URL). The
+  // spam risk that drove the removal STANDS; the URL gate is the instant off. The contextual
+  // city photo (`photoUrl`, engagement-gated) is still suppressed on firstContact.
 
   try {
     if (reply) { const id = await sendWa({ type: 'text', text: { body: reply } }); await logOut('text', reply, id) }
   } catch (e) { return nope('send_failed:' + String(e?.message || e), 502) }
+  // Phase 2 (WhatsApp Agent v2, owner sign-off 23-08-2026, §224) — send ONE generic welcome poster
+  // on the customer's FIRST message. Controlled entirely by whatsapp_accounts.ai_welcome_image_url:
+  // set = on, unset = off (instant kill switch, no deploy). Text (carrying the STOP opt-out line)
+  // is sent FIRST so a would-be reporter can opt out cleanly. Best-effort — a bad url never fails
+  // the reply. ⚠ SPAM RISK: an unsolicited first-message image is the top block/report trigger that
+  // got 98982 flagged twice (§133); owner accepted it — WATCH the quality rating, unset the URL if it dips.
+  if (firstContact && acct.ai_welcome_image_url) {
+    try { const id = await sendWa({ type: 'image', image: { link: acct.ai_welcome_image_url } }); await logOut('image', '📷 GSRTC LED poster', id, acct.ai_welcome_image_url) }
+    catch { /* welcome poster skipped — text already delivered */ }
+  }
   // Photo is best-effort — the text already went; a bad/unreachable photo_url
   // must not fail the whole reply.
   if (photoUrl) {
