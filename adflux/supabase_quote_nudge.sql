@@ -29,6 +29,10 @@ COMMENT ON COLUMN public.whatsapp_accounts.ai_nudge_enabled IS
 -- (free text, ₹0, no template). Skips Lost/Won/opted-out/DNC (owner: not-interested / lost →
 -- no follow-up). "Engaged" = the AI has already replied at least once (a real inquiry, not a
 -- cold silent scan). `touch` (1|2) + `has_quote` drive which of 4 messages the endpoint sends.
+-- DROP first: the RETURNS TABLE gained columns vs the §215 version → Postgres can't
+-- CREATE OR REPLACE a changed return type (42P13). Only the Edge endpoint calls this at
+-- runtime; no view/trigger depends on it, so a drop-recreate is safe.
+DROP FUNCTION IF EXISTS public.quote_nudge_candidates();
 CREATE OR REPLACE FUNCTION public.quote_nudge_candidates()
 RETURNS TABLE (conversation_id uuid, customer_wa_id text, phone_number_id text, lead_name text, touch int, has_quote boolean)
 LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
