@@ -104,7 +104,7 @@ export default async function handler(req) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(convId)) return nope('bad_conversation')
 
   // ── load conversation + account ──
-  const conv = (await (await sb(`whatsapp_conversations?id=eq.${convId}&select=id,customer_wa_id,whatsapp_account_id,window_expires_at,ai_paused,lead_id&limit=1`)).json())?.[0]
+  const conv = (await (await sb(`whatsapp_conversations?id=eq.${convId}&select=id,customer_wa_id,whatsapp_account_id,window_expires_at,ai_paused,lead_id,location_id&limit=1`)).json())?.[0]
   if (!conv) return nope('conv_not_found')
   if (conv.window_expires_at && new Date(conv.window_expires_at).getTime() < Date.now()) return nope('window_closed')  // 24h policy window
 
@@ -293,6 +293,14 @@ export default async function handler(req) {
   // multi-city QUOTE marker → govt gate. PRIVATE only; GOVERNMENT handed to the team (§4).
   // The DB builds + the endpoint renders + auto-SENDS a formal PDF — the AI never states a price.
   system += `\n\nSTANDARD QUOTE (private customers only) — follow this order:\n1. UNDERSTAND the need first, ONE warm question at a time: what are they promoting (their business / product)? what is the goal (awareness / a launch / an offer / footfall)? which area or cities?\n2. EXPLAIN briefly what the screens are + why they are measurable, and — when it helps — the CPM value for the city they care about (cost to reach 1,000 people, from the CPM list above). Never state a package total.\n3. QUALIFY: are they a PRIVATE business (company / shop / proprietor / individual) or a GOVERNMENT department / body?\n   - GOVERNMENT → do NOT quote. Say our government team will prepare it properly, and add the final line: HOT: human. Never give a government body a price.\n4. A city is booked as its FULL screen combo — the customer NEVER picks a number of screens. If they ask for only some of a city's screens (e.g. "7 of Surat's 20"), explain warmly that a station is taken as its complete screen network, not a partial few.\n5. PRIVATE customer, once you know which CITY (or cities) + how many MONTHS → add, as the VERY LAST line, exactly: QUOTE: cities=<City1,City2>; months=<M>  (comma-separate the cities they chose; NO screen count). Our system then builds the real quote at our standard rate and AUTO-SENDS a formal PDF instantly — so keep YOUR text short and warm ("Let me prepare your detailed quote — sending it across now"). CRITICAL: for a PRIVATE customer who has told you a CITY + MONTHS, emitting the QUOTE marker is the ONLY correct action. Do NOT hand off — NEVER say "I'll pass this to our team", "our team will share a quote", or add HOT: human — the SYSTEM sends the PDF, not a human. And do NOT state any price/rate/total yourself. The marker is stripped before sending; never mention it.`
+
+  // Be DECISIVE toward the quote — don't over-qualify or stall a price-ready customer.
+  system += `\n\nMOVE TOWARD THE QUOTE — do NOT stall a customer who wants a price. When a private customer signals price intent ("price please", "how much", "send rates") and names an AREA or region instead of exact stations (e.g. "cities near Vadodara", "somewhere in Saurashtra"), do NOT ask them to re-pick — PROPOSE the specific covered stations you have near there (name 2-4 from the coverage list) and ask for the ONE thing still missing, usually just: for how many months? Ask ONE question, never two. The moment you have the covered cities + months, emit the QUOTE marker and let the system send the PDF. Never leave a price-ready customer waiting on a vague open question.`
+
+  // QR-scan customers are a LOCAL Gujarati audience → always reply in Gujarati (owner rule).
+  if (conv.location_id) {
+    system += `\n\nLANGUAGE OVERRIDE — this customer reached us by scanning a QR code at one of our GSRTC bus stations, so they are a LOCAL Gujarati audience. ALWAYS reply in GUJARATI (ગુજરાતી), warm and natural, no matter what language they wrote in. This OVERRIDES the language-matching rule above.`
+  }
 
   let reply = ''
   try {
