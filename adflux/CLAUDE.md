@@ -14977,13 +14977,20 @@ safe/tightest options, and "all templates must be different." Built the DELIVERA
   (`131049` pacing cap, §208). So morning+evening days deliver ~1, not 2.
 - So the dense Day-2→30 schedule is a multi-week (Meta approval) build that Meta then throttles ~1/day.
 
-### Day-2 template prepped (owner SUBMITS to Meta) — `scripts/create-followup-day2-template.py`
-`followup_day2` (UTILITY, gu, reply-first, {{1}}=name, DISTINCT from ai_quote_followup). Owner runs it
-with a FRESH token (§119), watches for ACTIVE, appeals if Meta reclassifies to Marketing (§216).
+### ALL cadence templates prepped (owner SUBMITS to Meta) — `scripts/create-followup-cadence-templates.py`
+**8 DISTINCT** UTILITY gu templates, one per day-slot (Meta caps ~1 template/recipient/day so
+morning+evening days need only one): `followup_day2 / _day4 / _day7 / _day9 / _day15 / _day25 /
+_day30 / _nurture`. Each reply-first, {{1}}=name, a different angle. Owner runs the ONE script with a
+FRESH token (§119) → all 8 submit → approve in parallel (~2-3d); appeals any Meta reclassifies to
+Marketing (§216). (The standalone `create-followup-day2-template.py` is now redundant — the cadence
+script includes day2; an "already exists" on it is harmless.)
 
-### NEXT (Batch 4, not built) — the closed-window cadence engine
-The Day-2→30 schedule needs: (a) the rest of the distinct templates (Day 4/7/9/15/25/30 + nurture,
-each different — a batch create script so they approve together), (b) a scheduling ENGINE that maps
-day-since-last-message → the matching approved template, closed-window, ≤1 template/lead/day, all the
-§213-style opt-out/silent/Won/Lost gates + stop-on-reply. This is where the ban risk concentrates →
-build it WITH the §225 quality-rating auto-pause watcher (Batch 2b) so it self-protects.
+### NEXT (Batch 4, not built) — the closed-window cadence ENGINE
+Build the scheduling engine that maps **day-since-last-inbound → the matching approved template**
+(followup_day2/4/7/9/15/25/30 + nurture-every-30d), closed-window, **≤1 template/lead/day**, all the
+§213-style opt-out/silent/Won/Lost gates + **stop-on-reply**. This is where the ban risk concentrates
+→ build it WITH the §225 quality-rating auto-pause watcher (Batch 2b) so it self-protects. Mirror the
+§213 ai_quote_followup pattern (candidate fn → pg_net dispatch → Edge endpoint → send-template + mark;
+secret PULLED from wa_ai_reply_dispatch). A per-lead `followup_stage`/`followup_last_at` marker tracks
+where each lead is in the schedule. Templates must be ACTIVE before the engine sends (an unapproved
+template send fails gracefully — safe to build the engine before Meta finishes).
