@@ -304,6 +304,11 @@ export default async function handler(req) {
     system += `\n\nQR SCAN — the customer scanned the QR AT a specific station; their FIRST message names it (e.g. "Bhavnagar bus station"). That station's CITY is the city they want — you ALREADY know it, so do NOT ask "which city?". Move fast: reply warmly, and as soon as you know how many MONTHS, emit QUOTE: cities=<that station's city>; months=<M> and let the system send the PDF. If months are not clear yet, ask ONLY "for how many months would you like it?" — nothing else. A religious mission / temple / trust / NGO / charity is a PRIVATE customer → quote them normally; ONLY an actual GOVERNMENT department or body is treated as government (hand-off, no quote).`
   }
 
+  // Phase 2 (WhatsApp Agent v2) — OBJECTIONS, HESITATION, CLOSE + a hidden lead-note marker.
+  system += `\n\nOBJECTIONS & HESITATION — answer warmly, never hand off or discount:\n- "Too expensive" / "costly" → do NOT apologise or offer a discount. Reframe to value using the CPM ("about Rs X to put your ad in front of 1,000 people — a fraction of a hoarding you can't even measure"), and that they pay to actually REACH people and can SEE it working. Rates are standard and shared only in the quote.\n- "Does it really work?" / trust → the proof: AI-verified views, and every screen's QR turns a viewer into a tracked lead with a per-screen dashboard. A funnel you watch, not impressions you guess.\n- "Will my ad actually run?" → each screen plays ~14 hours a day with AI-tracked daily impressions.\n- "Just looking" / "I'll think about it" / "let me discuss" → warm, zero pressure ("totally fine 👍"). Offer ONE small next step only — a city photo, or "I can prepare a quote so you have the exact numbers to decide" — then let it rest.\n- Discount / "can you do better" → the quote is our standard rate; a bigger/volume plan our team can discuss. Never promise a discount or a lower number yourself.`
+  system += `\n\nMOVE TO THE QUOTE — you do NOT need their business type or goal to quote; a covered CITY + how many MONTHS is enough. As soon as a private customer gives the city + months, emit the QUOTE marker. After the quote PDF is sent, add ONE soft closing line on the next turn: "Shall I have our team reserve these screens for you?" — a yes is strong intent (you may add HOT: human so a person closes). Never state a price yourself.`
+  system += `\n\nLEAD NOTE (hidden — our team only, the customer NEVER sees it): once you understand what they want, add as a line exactly: SUMMARY: <one short line — what they promote, the city/cities, months, any key detail>. Example: SUMMARY: garba event organiser, Gandhinagar, 1 month, wants launch reach. Add at most one; it is stripped before sending; never mention it.`
+
   let reply = ''
   try {
     const ar = await fetch(ANTHROPIC, {
@@ -359,6 +364,23 @@ export default async function handler(req) {
     }
   }
 
+  // Phase 2 (WhatsApp Agent v2) — SUMMARY marker → persist a one-line brief to the lead so a rep
+  // who picks up a hot AI lead sees WHY without reading the whole chat. Strip it always. Best-effort,
+  // and it NEVER overwrites a rep's own note (only writes when notes are empty or a prior [AI] note).
+  const sm2 = reply.match(/(^|\n)[ \t]*SUMMARY:[ \t]*(.+?)[ \t]*$/im)
+  if (sm2) {
+    reply = reply.replace(/(^|\n)[ \t]*SUMMARY:[ \t]*.+$/gim, '').trim()  // strip every SUMMARY line
+    const note = sm2[2].trim().slice(0, 300)
+    if (note && conv.lead_id) {
+      try {
+        const cur = (await (await sb(`leads?id=eq.${conv.lead_id}&select=notes&limit=1`)).json())?.[0]?.notes
+        if (!cur || /^\[AI\]/.test(String(cur).trim())) {
+          await sb(`leads?id=eq.${conv.lead_id}`, { method: 'PATCH', body: JSON.stringify({ notes: `[AI] ${note}` }) })
+        }
+      } catch { /* best-effort — a note write must never block the reply */ }
+    }
+  }
+
   // Phase 2 — QUOTE marker (MULTI-CITY, whole-city combo — NO screen count). Extract
   // {cities[], months} + strip it. The build + render + send is DEFERRED to after the main
   // reply sends (below) so a superseded/failed reply never mints an orphan quote. Screens +
@@ -407,11 +429,12 @@ export default async function handler(req) {
     /(₹|rs\.?|inr)\s?[\d][\d,]{3,}/i.test(reply) ||
     /\b(confirmed|guarantee[d]?|booked)\b/i.test(reply) ||
     /\bbooking\s+(is\s+)?(confirm|done|complete)/i.test(reply)
-  // SOFT phrase: "your final / total quote" trips this benignly on a legit quote turn,
-  // so it guards NON-quote turns only — a quote turn's warm "preparing your quote" text
-  // must not be swapped for "tell me the city again" + paused while the quote sends.
-  const softPrice = /\b(final|total)\s+(price|cost|amount|quote)\b/i.test(reply)
-  if (hardLeak || (softPrice && !quoteReq)) {
+  // Phase 2 (WhatsApp Agent v2) — the SOFT "(final|total) price" phrase was tripping when the AI
+  // CORRECTLY declines ("I can't share the final price here, but the value works out to…") on a
+  // NON-quote turn → it discarded a useful reply AND paused the thread mid-price-conversation.
+  // Only a HARD leak (a real 4+-digit rupee figure or a booking confirmation) now swaps + pauses;
+  // hardLeak already catches any actual leaked NUMBER, so the benign phrase no longer kills the chat.
+  if (hardLeak) {
     reply = 'Thanks for your interest! For exact pricing and to book, our team will share a tailored quote. Could you tell me the city/stations, the brand, and your rough timeline?'
     try { await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ ai_paused: true }) }) } catch { /* hand-off is best-effort */ }
   }

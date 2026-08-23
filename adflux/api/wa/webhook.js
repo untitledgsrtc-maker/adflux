@@ -159,6 +159,12 @@ const STOP_PHRASES = [
   'DONT CALL ME', 'DO NOT CALL ME', 'STOP CALLING', 'DONT CONTACT ME',
   'DO NOT CONTACT ME', 'DONT MESSAGE ME', 'DO NOT MESSAGE ME',
   'REMOVE MY NUMBER', 'DONT SEND ME', 'DO NOT SEND ME', 'LEAVE ME ALONE',
+  // Phase 2 (WhatsApp Agent v2) — the agent speaks Gujarati/Hindi, so honour a refusal in
+  // those too (native script + common romanised). Same terse-refusal bar as the English set;
+  // native script is unaffected by the toUpperCase/apostrophe-strip normalisation above.
+  'ફોન ના કરો', 'મને ફોન ના કરો', 'મેસેજ ના કરો', 'મને હેરાન ના કરો', 'મને મેસેજ ના કરો',
+  'फोन मत करो', 'मुझे फोन मत करो', 'मैसेज मत करो', 'मुझे मत बुलाओ', 'मुझे परेशान मत करो',
+  'PHONE NA KARO', 'PHONE MAT KARO', 'MESSAGE NA KARO', 'MESSAGE MAT KARO', 'MANE FONE NA KARO',
 ]
 async function honourStopKeyword(admin, convId, text) {
   try {

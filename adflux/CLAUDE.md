@@ -14789,3 +14789,67 @@ security) = both SHIP. §45-additive, admin/accounts only. Commit: `<sha>`.
 1. Run `supabase_finance_p7_reconcile.sql` (VERIFY: has_ignore_col=1, reconcile_ok=t,
    match_fn_ok=t). 2. Re-import bank statements (§220 Phase 1). 3. /finance → Reconcile tab
    → work the two lists (Match / Ignore).
+
+
+---
+
+## 223 · WhatsApp Agent v2 — Batch 1: conversion prompt layer + guards (2026-08-23)
+
+Owner: "go from a to e in one go, i want atlist 50-100 sales/month." A full 7-lane
+adversarial audit of the LIVE agent (`api/wa/ai-reply.js` + webhook + RPCs + crons) ran
+first (§210/§215/§221 hardened the quote path already). Verdict: agent is GOOD not broken;
+6/8 dimensions partial. Building the A-E upgrade as ONE coherent module in 4 safe batches
+(§45/§3 — not a patch chain). **Batch 1 = the prompt + guard layer** (ships on deploy, NO
+SQL, no APK). Committed + self-pushed (§211).
+
+### The 4 edits
+- `api/wa/ai-reply.js` — a **v2 prompt block** (added after the QR block, before the model
+  call): OBJECTIONS + HESITATION handling ("too expensive" → CPM reframe, no discount ·
+  "does it work?" → the AI-verified/QR-lead proof · "just looking / I'll think about it" →
+  warm + ONE small next step, no chase) · a MOVE-TO-THE-QUOTE line (**city + months is
+  ENOUGH — do NOT need business/goal to quote**) + a soft-close ("Shall I have our team
+  reserve these screens?" on the post-PDF turn) · and a hidden **`SUMMARY:` lead-note
+  marker**.
+- `api/wa/ai-reply.js` — **SUMMARY parse** (after the HOT parse): strip the marker, persist a
+  one-line `[AI] <brief>` to `leads.notes` so a rep who picks up a hot AI lead sees WHY
+  without reading the chat. Best-effort; **NEVER clobbers a rep's own note** (writes only
+  when notes are empty OR already start with `[AI]`).
+- `api/wa/ai-reply.js` — **price-guard fix**: dropped the SOFT `(final|total) price` swap+pause.
+  It was firing when the AI CORRECTLY declines ("I can't share the final price here, but the
+  value works out to…") on a NON-quote turn → discarded a useful reply + took the thread
+  dark mid-price-conversation. **`hardLeak` (a real 4+-digit rupee figure / a booking
+  confirmation) is now the SOLE swap+pause trigger** — it already catches any actual leaked
+  NUMBER, so the benign phrase no longer kills the conversation. SUPERSEDES the §221 soft/hard
+  split (softPrice retired).
+- `api/wa/webhook.js` — **multilingual STOP**: added Gujarati + Hindi opt-out phrases (native
+  script + common romanised) to `STOP_PHRASES`. The agent speaks Gujarati/Hindi but only
+  understood "stop" in English → a customer typing "ફોન ના કરો" / "मुझे फोन मत करो" / "phone
+  na karo" now opts out. Deliberately EXCLUDES bare "band karo/બંધ કરો" (a paying client's
+  "campaign band karo" is not a full opt-out — mirrors the §154 "not interested" exclusion).
+
+### Contracts / notes
+- Deploy-safe: all prompt-only or additive/best-effort; the QUOTE/HOT/PHOTO marker machinery,
+  the deferred quote-build+send, the govt gate, and the never-ghost fallback (§221/§261.1) are
+  UNTOUCHED. node --check PASS both files.
+- The SUMMARY note write guards against clobbering a rep note via the `[AI]` prefix check.
+- ❌ FOOT-GUN: a phrase-only price backstop ("final/total price") pauses the AI when it is
+  CORRECTLY declining to quote — gate the pause on an actual leaked NUMBER (hardLeak), never
+  the words alone.
+
+### Still to ship (Batch 2-4, owner-approved A-E)
+- **Batch 2 (SQL)**: FAQ table (owner-editable, injected like cities §257.7) · media_types
+  injection · NULL-owner HOT fallback (§ the audit's `flag_lead_hot_from_wa` gap) · global
+  per-number send throttle · Graph quality-rating watcher + auto-pause · ghosted-inbound
+  recovery cron · a server-side **ready-to-quote safety net** (private + covered city + months
+  known but no marker → build anyway; the biggest A item, deferred for its own careful design).
+- **Batch 3 (SQL)**: same-day chase for engaged-but-UNQUOTED leads (the §215 nudge only targets
+  `ai_quote` leads — an interested-but-unpriced lead gets nothing).
+- **Batch 4 (Meta template)**: closed-window re-engagement for unquoted leads.
+- Deferred from Batch 1: SAFETY_SUFFIX (guardrails always-appended even under a DB
+  `ai_system_prompt` override — latent, the override is NULL on both accounts §257.7).
+
+### Straight talk on the 50-100 sales/month target (told owner)
+The agent CONVERTS the leads it receives; it doesn't create demand. This maxes conversion
+(more chats → quotes → hot handoffs). Hitting 50-100 also needs enough INBOUND (QR scans + ad
+leads) AND reps CLOSING the hot handoffs. Watch two numbers once shipped: **quotes sent** and
+**hot handoffs closed** — that tells whether the ceiling is the agent or the funnel.
