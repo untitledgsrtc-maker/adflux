@@ -14737,3 +14737,55 @@ silence). Owner runs `supabase_phase325_ai_build_quote.sql` (re-run — CREATE O
 the forgiving match) so qualifier-name cities ("Surat"→"SURAT (CITY)") resolve. The Milan
 Shah quote was built manually (`SELECT ai_build_quote(...)` → UA-2026-0316); Rima sends it
 from the inbox.
+
+
+---
+
+## 222 · Finance Phase 2 — two-way bank↔CRM reconcile + match/ignore (2026-08-22)
+
+The finance-recon Phase 2 (after §220 Phase 1). Post-P3.3 (income = CRM), reconciliation
+FLIPPED: the primary check is now "does every CRM receipt I count as revenue have a
+matching bank credit?" (revenue counted that never hit the bank). 2-lens review (money +
+security) = both SHIP. §45-additive, admin/accounts only. Commit: `<sha>`.
+
+### What shipped
+- `supabase_finance_p7_reconcile.sql` (owner RUNS) — the CANONICAL `finance_reconcile`
+  (moved here from p5_p6):
+  - ADD `finance_transactions.reconcile_ignored boolean DEFAULT false`.
+  - `finance_reconcile` now **TWO-WAY**: adds `unmatched_crm[]` (approved payments on WON
+    quotes with no hand-linked `matched_payment_id` AND no near bank credit — the primary
+    check; matched on GROSS `amount_received`, bank is GST-inclusive) + `crm_income_won_total`
+    (the P&L-tying number) beside `crm_receipts_total` (all approved). `gap = bank −
+    crm_won`. bank `unmatched[]` now excludes `reconcile_ignored` + returns the txn `id`.
+    Segment-scoped (Vishal govt).
+  - NEW `finance_match_txn(p_txn_id, p_payment_id, p_ignore)` — SECURITY DEFINER, role-gated
+    (admin/accounts, or a govt_partner limited to GOVERNMENT txns; **fail-closed on NULL
+    role**), REVOKE public/anon + GRANT authenticated. Sets `matched_payment_id` (link a
+    bank credit to a CRM payment) or `reconcile_ignored` (not a sales receipt). A match
+    clears the row from BOTH lists.
+- `src/pages/v2/FinanceV2.jsx` — a new **Reconcile tab**: period date filter + summary
+  (bank / CRM-won / gap) + two lists, per-row **Match** (pick a nearest-amount candidate
+  from the other list) / **Ignore** → `finance_match_txn` → reload. Deploy-order-safe:
+  before the SQL run the old one-way RPC → empty CRM list (no crash), the buttons
+  toast-error gracefully.
+- p5_p6's `finance_reconcile` **NEUTERED (§72)** — renamed to a dead
+  `finance_reconcile_superseded_oneway` so re-running p5_p6 can NEVER revert the two-way
+  canonical (the review flagged the earlier comment-banner as an insufficient §72 supersede).
+
+### Contracts / notes
+- **The gap = bank_income_total − crm_income_won_total is the source of truth** — two
+  independent GROSS sums, INDEPENDENT of any match/ignore (matches only clean the work
+  LISTS, never the gap). A match can't hide a real gap.
+- Match on GROSS both sides; ±₹50/±1% within ±7d.
+- ACCEPTED P3s (reviewer, non-blocking — none change the gap): (a) the ±1% base differs per
+  direction → a ~0.01% boundary item can sit in one list but not its mirror; (b)
+  `matched_payment_id` isn't unique → one payment can clear multiple list rows
+  (over-clears the LIST, not the gap); (c) an Ignored bank credit stays in
+  bank_income_total → the gap doesn't drop on Ignore (defensible: it hit the bank, just
+  isn't CRM-backed; re-tag it in the Register to remove from income). Left as-is.
+- Only useful AFTER the owner re-imports bank statements (bank credits must exist to match).
+
+### Owner action
+1. Run `supabase_finance_p7_reconcile.sql` (VERIFY: has_ignore_col=1, reconcile_ok=t,
+   match_fn_ok=t). 2. Re-import bank statements (§220 Phase 1). 3. /finance → Reconcile tab
+   → work the two lists (Match / Ignore).

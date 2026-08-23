@@ -4,7 +4,7 @@
 // Home · Tasks · Import · Register. admin + accounts + co_owner(Vishal govt-scoped).
 // P&L + Home totals come from server RPCs (§66); Register pages raw rows via .range().
 // =============================================================================
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, ListChecks, Upload, TrendingUp, TrendingDown, BarChart3,
@@ -52,6 +52,7 @@ export default function FinanceV2() {
   const TABS = [
     { key: 'pnl', label: 'Owner · P&L', icon: LayoutDashboard },
     { key: 'home', label: 'Accounts Home', icon: Home },
+    { key: 'reconcile', label: 'Reconcile', icon: ArrowLeftRight },
     { key: 'tasks', label: 'Tasks', icon: CheckSquare },
     { key: 'import', label: 'Import', icon: Upload },
     { key: 'register', label: 'Register', icon: ListChecks },
@@ -84,6 +85,7 @@ export default function FinanceV2() {
 
       {tab === 'pnl' && <PnlTab seg="all" />}
       {tab === 'home' && <HomeTab onReview={() => setTab('register')} />}
+      {tab === 'reconcile' && <ReconcileTab />}
       {tab === 'tasks' && <TasksTab />}
       {tab === 'import' && <ImportTab />}
       {tab === 'register' && <RegisterTab />}
@@ -488,6 +490,152 @@ function HomeTab({ onReview }) {
           {recon.bank_income_total > 0 && (recon.unmatched || []).length > 12 && <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 8 }}>+ {recon.unmatched.length - 12} more — open the Register to tag them.</div>}
         </Card>
       )}
+    </div>
+  )
+}
+
+/* ── Reconcile (two-way bank ↔ CRM, P7) ── */
+function ReconcileTab() {
+  const [recon, setRecon] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [pick, setPick] = useState(null)   // { key } — which row is choosing a match
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    supabase.rpc('finance_reconcile', { p_from: from || null, p_to: to || null })
+      .then(({ data, error }) => { if (!error) setRecon(data || {}); setLoading(false) })
+  }, [from, to])
+  useEffect(() => { load() }, [load])
+
+  const bank = recon?.unmatched || []
+  const crm = recon?.unmatched_crm || []
+
+  async function apply(txnId, paymentId, ignore) {
+    if (!txnId || busy) return
+    setBusy(true)
+    const { data, error } = await supabase.rpc('finance_match_txn', { p_txn_id: txnId, p_payment_id: paymentId || null, p_ignore: !!ignore })
+    setBusy(false)
+    if (error || !(data && data.ok)) { toastError(error || new Error((data && data.error) || 'failed'), 'Could not update.'); return }
+    toastSuccess(ignore ? 'Marked as not a sales receipt.' : 'Matched.')
+    setPick(null); load()
+  }
+  const near = (arr, amt, k) => [...arr].sort((a, b) => Math.abs(a[k] - amt) - Math.abs(b[k] - amt)).slice(0, 6)
+
+  const sg = { fontFamily: 'Space Grotesk, sans-serif' }
+  const sub = { color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }
+  const okLine = { color: 'var(--success)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }
+  const tbl = { width: '100%', borderCollapse: 'collapse', fontSize: 13 }
+  const dateInp = { fontSize: 12, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }
+  const linkBtn = { background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', padding: 0 }
+  const ghostBtn = { ...linkBtn, color: 'var(--text-subtle)' }
+  const candBtn = { display: 'block', width: '100%', textAlign: 'left', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', margin: '3px 0', cursor: 'pointer', fontSize: 12, color: 'var(--text)', fontFamily: 'inherit' }
+  const picker = { padding: '4px 8px', background: 'var(--surface-2, rgba(255,255,255,.03))' }
+
+  if (loading && !recon) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-subtle)' }}><Loader2 size={20} className="spin" /></div>
+  if (recon && Object.keys(recon).length === 0) return <div style={{ color: 'var(--text-subtle)', fontSize: 13, padding: 20 }}>No access.</div>
+
+  const bankTotal = recon?.bank_income_total || 0
+  const noBank = bankTotal === 0 && bank.length === 0
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <Card>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <CH>Bank ↔ CRM reconciliation</CH>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', fontSize: 12 }}>
+            <span style={{ color: 'var(--text-subtle)' }}>From</span>
+            <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={dateInp} />
+            <span style={{ color: 'var(--text-subtle)' }}>To</span>
+            <input type="date" value={to} onChange={e => setTo(e.target.value)} style={dateInp} />
+            {(from || to) && <button onClick={() => { setFrom(''); setTo('') }} style={ghostBtn}>All time</button>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', fontSize: 13, marginTop: 8 }}>
+          <span>Bank received <b style={sg}>{fmtINR(bankTotal)}</b></span>
+          <span>CRM won-receipts <b style={sg}>{fmtINR(recon?.crm_income_won_total || 0)}</b></span>
+          <span style={{ color: Math.round(recon?.gap || 0) !== 0 ? 'var(--warning)' : 'var(--success)' }}>Gap <b style={sg}>{fmtINR(recon?.gap || 0)}</b></span>
+        </div>
+      </Card>
+
+      <Card>
+        <CH>Recorded in the CRM, not seen in the bank <span style={sub}>revenue you're counting with no matching bank credit</span></CH>
+        {crm.length === 0 ? (
+          <div style={okLine}><CheckCircle2 size={15} /> Every CRM receipt has a matching bank credit.</div>
+        ) : (
+          <table style={tbl}>
+            <thead><tr><th style={thL}>Date</th><th style={thL}>Quote</th><th style={thL}>Client</th><th style={thR}>Amount</th><th style={thR}></th></tr></thead>
+            <tbody>
+              {crm.slice(0, 25).map((r) => (
+                <Fragment key={r.payment_id}>
+                  <tr>
+                    <td style={tdL}>{fmtDate(r.date)}</td>
+                    <td style={tdL}>{r.ref || '—'}</td>
+                    <td style={tdL}>{r.client}</td>
+                    <td style={tdR}>{fmtINR(r.amount)}</td>
+                    <td style={tdR}>{bank.length > 0
+                      ? <button onClick={() => setPick(pick === 'c' + r.payment_id ? null : 'c' + r.payment_id)} style={linkBtn}>Match a bank credit</button>
+                      : <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>no bank rows</span>}</td>
+                  </tr>
+                  {pick === 'c' + r.payment_id && (
+                    <tr><td colSpan={5} style={picker}>
+                      <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginBottom: 4 }}>Pick the bank credit for this receipt:</div>
+                      {near(bank, r.amount, 'amount').map(b => (
+                        <button key={b.id} disabled={busy} onClick={() => apply(b.id, r.payment_id, false)} style={candBtn}>
+                          {fmtDate(b.date)} · {b.description || '—'} · <b style={sg}>{fmtINR(b.amount)}</b>
+                        </button>
+                      ))}
+                    </td></tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {crm.length > 25 && <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 8 }}>+ {crm.length - 25} more.</div>}
+      </Card>
+
+      <Card>
+        <CH>In the bank, not in the CRM <span style={sub}>bank credits with no matching CRM payment</span></CH>
+        {noBank ? (
+          <div style={{ color: 'var(--text-subtle)', fontSize: 13 }}>No bank statements loaded — import your statements (Import tab) to reconcile.</div>
+        ) : bank.length === 0 ? (
+          <div style={okLine}><CheckCircle2 size={15} /> Every bank receipt matches a CRM payment.</div>
+        ) : (
+          <table style={tbl}>
+            <thead><tr><th style={thL}>Date</th><th style={thL}>Bank entry</th><th style={thL}>Segment</th><th style={thR}>Amount</th><th style={thR}></th></tr></thead>
+            <tbody>
+              {bank.slice(0, 25).map((u) => (
+                <Fragment key={u.id}>
+                  <tr>
+                    <td style={tdL}>{fmtDate(u.date)}</td>
+                    <td style={tdL}>{u.description || '—'}</td>
+                    <td style={tdL}>{u.segment || '—'}</td>
+                    <td style={tdR}>{fmtINR(u.amount)}</td>
+                    <td style={tdR}>
+                      {crm.length > 0 && <button onClick={() => setPick(pick === 'b' + u.id ? null : 'b' + u.id)} style={linkBtn}>Match</button>}
+                      <button disabled={busy} onClick={() => apply(u.id, null, true)} style={{ ...ghostBtn, marginLeft: 10 }}>Ignore</button>
+                    </td>
+                  </tr>
+                  {pick === 'b' + u.id && (
+                    <tr><td colSpan={5} style={picker}>
+                      <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginBottom: 4 }}>Pick the CRM receipt for this bank credit:</div>
+                      {near(crm, u.amount, 'amount').map(c => (
+                        <button key={c.payment_id} disabled={busy} onClick={() => apply(u.id, c.payment_id, false)} style={candBtn}>
+                          {fmtDate(c.date)} · {c.ref} · {c.client} · <b style={sg}>{fmtINR(c.amount)}</b>
+                        </button>
+                      ))}
+                    </td></tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {bank.length > 25 && <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 8 }}>+ {bank.length - 25} more.</div>}
+      </Card>
     </div>
   )
 }

@@ -14,6 +14,11 @@
 
 
 -- ==== part 1/2 · P5 — finance_reconcile(from, to) ====================
+-- ⚠ SUPERSEDED (2026-08-22, §72) — the CANONICAL finance_reconcile now lives in
+-- supabase_finance_p7_reconcile.sql (two-way: unmatched_crm[] + crm_income_won_total
+-- + the reconcile_ignored exclusion). This one-way body is NEUTERED: it now creates a
+-- dead `finance_reconcile_superseded_oneway` (nothing calls it) instead of the real
+-- `finance_reconcile`, so re-running THIS file can NO LONGER revert the canonical.
 -- Owner-locked (§155): income is CRM; bank income credits are CROSS-CHECKED,
 -- and any bank receipt with no matching CRM payment is flagged "not in CRM".
 -- The live P&L keeps reading the bank ledger (owner-verified) — this is an
@@ -27,7 +32,7 @@
 --                      near-equal amount (±₹50 or ±1%) within ±7 days, and not
 --                      already hand-linked via matched_payment_id.
 --   unmatched_count
-CREATE OR REPLACE FUNCTION public.finance_reconcile(
+CREATE OR REPLACE FUNCTION public.finance_reconcile_superseded_oneway(
   p_from date DEFAULT NULL, p_to date DEFAULT NULL
 ) RETURNS jsonb
   LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public','pg_temp'
@@ -94,7 +99,7 @@ BEGIN
     'unmatched_count',    jsonb_array_length(v_un)
   );
 END $fn$;
-GRANT EXECUTE ON FUNCTION public.finance_reconcile(date,date) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.finance_reconcile_superseded_oneway(date,date) TO authenticated;
 
 
 -- ==== part 2/2 · P6 — push_finance_task_reminders() + daily cron ======
