@@ -297,9 +297,11 @@ export default async function handler(req) {
   // Be DECISIVE toward the quote — don't over-qualify or stall a price-ready customer.
   system += `\n\nMOVE TOWARD THE QUOTE — do NOT stall a customer who wants a price. When a private customer signals price intent ("price please", "how much", "send rates") and names an AREA or region instead of exact stations (e.g. "cities near Vadodara", "somewhere in Saurashtra"), do NOT ask them to re-pick — PROPOSE the specific covered stations you have near there (name 2-4 from the coverage list) and ask for the ONE thing still missing, usually just: for how many months? Ask ONE question, never two. The moment you have the covered cities + months, emit the QUOTE marker and let the system send the PDF. Never leave a price-ready customer waiting on a vague open question.`
 
-  // QR-scan customers are a LOCAL Gujarati audience → always reply in Gujarati (owner rule).
+  // QR-scan customers are a LOCAL Gujarati audience → always Gujarati, AND the city is
+  // already known (the station they scanned) → quote fast, don't re-qualify (owner rule).
   if (conv.location_id) {
     system += `\n\nLANGUAGE OVERRIDE — this customer reached us by scanning a QR code at one of our GSRTC bus stations, so they are a LOCAL Gujarati audience. ALWAYS reply in GUJARATI (ગુજરાતી), warm and natural, no matter what language they wrote in. This OVERRIDES the language-matching rule above.`
+    system += `\n\nQR SCAN — the customer scanned the QR AT a specific station; their FIRST message names it (e.g. "Bhavnagar bus station"). That station's CITY is the city they want — you ALREADY know it, so do NOT ask "which city?". Move fast: reply warmly, and as soon as you know how many MONTHS, emit QUOTE: cities=<that station's city>; months=<M> and let the system send the PDF. If months are not clear yet, ask ONLY "for how many months would you like it?" — nothing else. A religious mission / temple / trust / NGO / charity is a PRIVATE customer → quote them normally; ONLY an actual GOVERNMENT department or body is treated as government (hand-off, no quote).`
   }
 
   let reply = ''
