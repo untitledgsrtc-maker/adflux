@@ -18,6 +18,12 @@
 -- only if no open HOT task exists for the lead → repeated hot signals don't pile
 -- up tasks or double-push.
 --
+-- §225 Batch 2b: a lead that reaches here OWNER-LESS (its rep's user was deleted →
+-- FK SET NULL, §113 GAP-2) no longer loses the hot signal — it's re-routed to the
+-- WhatsApp account's default telecaller (else any marketing default) and the orphan
+-- lead is adopted (BOTH owner cols set, §53 P0-2). If genuinely nobody, it gives up
+-- (the old RETURN behavior). See the NULL-owner fallback block below.
+--
 -- §71 ONE meaning of "hot": reuses leads.heat='hot' (auto-heat trigger §47.4 uses
 -- the same value). Does NOT invent a second flag. The quote-vs-human split lives
 -- only on the conversation's ai_paused (set by ai-reply.js), not on the lead.
@@ -45,7 +51,54 @@ BEGIN
   -- lives on telecaller_id, §113/§243). Never route a HOT task to nobody.
   SELECT COALESCE(telecaller_id, assigned_to) INTO v_owner
     FROM public.leads WHERE id = p_lead_id;
-  IF v_owner IS NULL THEN RETURN; END IF;
+
+  -- §225 Batch 2b — NULL-owner FALLBACK. A lead can reach here owner-less (e.g. its
+  -- rep's user row was deleted → FK SET NULL, §113 GAP-2), and the old code RETURNed
+  -- here → the hot buying-intent signal was silently LOST. Instead, route to a default
+  -- rep so a hot lead is never dropped: first the lead's WhatsApp-account default
+  -- telecaller (the rep it SHOULD have been routed to, §53 P0-2), else any marketing
+  -- account's default. If genuinely nobody → give up (no worse than the old RETURN;
+  -- never dump a customer lead on an admin who doesn't work the queue).
+  IF v_owner IS NULL THEN
+    -- Tier 1: the lead's WhatsApp-account default telecaller — but ONLY if that rep is
+    -- an ACTIVE user. A deactivated rep left configured as a default must not silently
+    -- receive orphan HOT tasks nobody can action (guardian §225 — false confidence is
+    -- worse than the old give-up).
+    SELECT wa.default_telecaller_id INTO v_owner
+      FROM public.whatsapp_conversations c
+      JOIN public.whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+     WHERE c.lead_id = p_lead_id AND wa.default_telecaller_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = wa.default_telecaller_id AND u.is_active = true)
+     ORDER BY c.last_message_at DESC NULLS LAST
+     LIMIT 1;
+    IF v_owner IS NULL THEN
+      -- Tier 2: any marketing account's default (also active-checked).
+      SELECT wa.default_telecaller_id INTO v_owner
+        FROM public.whatsapp_accounts wa
+       WHERE wa.default_telecaller_id IS NOT NULL
+         AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = wa.default_telecaller_id AND u.is_active = true)
+       ORDER BY (wa.purpose = 'marketing') DESC
+       LIMIT 1;
+    END IF;
+    IF v_owner IS NULL THEN RETURN; END IF;
+    -- Adopt the orphan: set BOTH owner columns (§53 P0-2 round-robin-safe) so the lead
+    -- isn't owner-less going forward + the rep sees it in /leads. This UPDATE also fires
+    -- the §243 conversation-owner sync (the chat lands in the rep's inbox) and a no-op
+    -- §130 follow-up transfer; it does NOT re-fire the INSERT-only round-robin (§99.B.1).
+    UPDATE public.leads
+       SET telecaller_id = v_owner, assigned_to = v_owner, updated_at = now()
+     WHERE id = p_lead_id
+       AND telecaller_id IS NULL AND assigned_to IS NULL;
+    IF NOT FOUND THEN
+      -- Race: a concurrent process assigned a REAL owner between the SELECT above and
+      -- this UPDATE (0 rows matched — the both-NULL guard protected the real owner). Use
+      -- the real owner, not the stale fallback rep, for the HOT task (guardian §225).
+      -- A deleted lead → no row → v_owner NULL → give up (no worse than the old RETURN).
+      SELECT COALESCE(telecaller_id, assigned_to) INTO v_owner
+        FROM public.leads WHERE id = p_lead_id;
+      IF v_owner IS NULL THEN RETURN; END IF;
+    END IF;
+  END IF;
 
   -- 2. One-off HOT task, ONLY if no open HOT task already exists for this lead
   --    (idempotency — repeated hot signals don't pile up tasks / double-push).

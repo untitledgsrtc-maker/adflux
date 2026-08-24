@@ -15047,3 +15047,114 @@ Run in Studio, in order: (1) `supabase_wa_cadence.sql` (creates ai_cadence_enabl
 `UPDATE whatsapp_accounts SET ai_cadence_enabled=true WHERE purpose='marketing'` (this AUTO-disables
 §213 via fix 3; optionally also set ai_followup_enabled=false + `SELECT cron.unschedule('ai-quote-
 followup')`). KILL SWITCH: `ai_cadence_enabled=false`. The quality watcher auto-pauses everything on RED.
+
+
+---
+
+## 228 · WhatsApp cadence templates landed MARKETING, not UTILITY — appeal is moot (2026-08-23)
+
+Owner ran `scripts/list-wa-templates.py` (new) 23 Aug → all 8 `followup_*` cadence templates
+(day2/4/7/9/15/25/30 + nurture) are **APPROVED**, but **all 8 are MARKETING category, not the
+UTILITY the §226 script requested.** Meta reclassifies by CONTENT: a follow-up nudge about a
+campaign is genuinely promotional → Marketing. day2 threw the §226 "category doesn't match …
+MARKETING" error for the same reason (it already existed as Marketing from the earlier standalone
+day-2 script).
+
+### What MARKETING (vs the planned UTILITY) means — SUPERSEDES the §226/§227 "UTILITY" wording
+- **Cost**: ~₹0.8/send vs ~₹0.11 (8×). Small money, but it's marketing-rate.
+- **Frequency cap**: Marketing templates hit Meta's per-recipient marketing pacing cap (`131049`,
+  §208) — the morning+evening days deliver ~1, and the 13-touch/30-day cadence is aggressive.
+- **Quality signal**: Marketing sends push block/report harder → faster quality drop on the
+  TWICE-flagged (§133/§148) number 98982.
+- **Do NOT chase a UTILITY appeal for these 8.** Unlike the §216 post-call reversals (those read
+  as transactional), a campaign follow-up is genuinely marketing content — Meta will keep it
+  Marketing. Appealing wastes the 60-day window.
+
+### State + the only remaining step
+The §227 cadence ENGINE is built + OFF (`ai_cadence_enabled=false`). Templates are now ACTIVE, so
+the deploy gate is met. Turn the cadence ON = the §227 flip:
+`UPDATE whatsapp_accounts SET ai_cadence_enabled=true WHERE purpose='marketing';`
+Given MARKETING + twice-flagged: flip it on, then watch `wa_quality_log` (the §227 4-hourly
+watcher auto-pauses everything on the first RED). Kill = flag false.
+
+**FLIPPED LIVE 2026-08-23** — all four flags true on 98982 (`ai_enabled` / `ai_cadence_enabled` /
+`ai_followup_enabled` / `ai_nudge_enabled`). The §213 quote-chase flag stays true but is
+CODE-suppressed by the §227 fix-3 cadence guard (`ai_quote_followup_candidates` gates on
+`ai_cadence_enabled=false`) → NO double-send. Nothing blasts on the flip: the first cadence cron
+run is 10:00 IST the next Mon–Sat; already-chased leads were backfilled to stage 9. Whole WhatsApp
+Agent v2 (A→E) is shipped + ON.
+
+### `scripts/list-wa-templates.py` (new tool)
+`TOKEN='<fresh Meta System User token>' python3 scripts/list-wa-templates.py` → lists every
+template on the marketing WABA (2870129030006085) with STATUS + CATEGORY + language. Reuse it to
+read a template's live Meta approval/category state (§119 — Vercel's token is unreadable; generate
+a fresh System User token, never "Revoke tokens").
+
+
+---
+
+## 229 · WhatsApp Agent v2 — Batch 2b: NULL-owner hot fallback + ghosted-inbound recovery (2026-08-23)
+
+The two owner-picked pending items from the §223 audit's number-protection infra (the owner
+DEFERRED the 3rd, "send throttle + YELLOW auto-pause"). Additive, §45/§46-safe. 3-lens
+adversarial review (guardian on the frozen fn + security + correctness): security SHIP; guardian
++ correctness FIX_THEN_SHIP → all 3 findings applied before commit.
+
+### 1 · NULL-owner HOT fallback (edited into the canonical `flag_lead_hot_from_wa`, §71/§72)
+`supabase_phase324_hot_lead_routing.sql` (owner RE-RUNS — CREATE OR REPLACE, idempotent). The
+§209 fn RETURNed (lost the hot signal) when a lead reached it OWNER-LESS (its rep's user deleted
+→ FK SET NULL, §113 GAP-2). Now it re-routes: Tier 1 = the lead's WhatsApp-account
+`default_telecaller_id`, Tier 2 = any marketing account's default; each gated on the rep being an
+ACTIVE user (guardian: a deactivated default must NOT get orphan HOT tasks nobody can action —
+false confidence is worse than giving up). If genuinely nobody → RETURN (old behavior). On a hit
+it ADOPTS the orphan (sets BOTH telecaller_id + assigned_to, §53 P0-2 round-robin-safe → the §243
+conv-owner sync lands the chat in the rep's inbox; no-op §130 transfer; UPDATE ≠ the INSERT-only
+round-robin §99.B.1). Race guard: if the adoption UPDATE matches 0 rows (a concurrent real owner
+was assigned, or the lead was deleted), it re-resolves `COALESCE(telecaller_id, assigned_to)` so
+the HOT task goes to the REAL owner, not the stale fallback (guardian P2). Every §209 invariant
+preserved (heat idempotent · cadence_paused untouched · ONE 'HOT —%' task time-NULL · DEFINER +
+REVOKED + service_role + EXCEPTION-wrapped). Already in the §211 re-lock (line 141).
+
+### 2 · Ghosted-inbound recovery (`supabase_wa_ai_recovery.sql`, NEW — owner RUNS)
+`whatsapp_conversations.ai_recovery_at` + `wa_ai_recovery_dispatch()` (SECURITY DEFINER, secret
+PULLED from `wa_ai_reply_dispatch` §246, REVOKED, EXCEPTION-wrapped) + cron `wa-ai-recovery` every
+5 min. Catches a DROPPED normal dispatch: it finds an inbound with NO reply (`last_message_direction
+='in'`, in-window, 4min–3h old, ai_enabled + not-paused + not opted-out/DNC) and re-fires the SAME
+`/api/wa/ai-reply` with `{conversation_id}` — ai-reply re-checks EVERY gate itself (esp. the
+newest-inbound gate ai-reply.js:186) so a re-fire can never double-reply. ONE shot per stuck
+inbound via the `ai_recovery_at` marker (claimed BEFORE the async POST, §215; a new inbound
+re-qualifies it). No new Edge endpoint (reuses ai-reply), no ai-reply-input change. Added to the
+§211 re-lock (both the REVOKE loop + VERIFY-D).
+
+### 3 · The double-reply fix (correctness P2 — the important one, on the flagged number)
+`api/wa/ai-reply.js` `logOut`: the recovery trusts `last_message_direction`, but if ai-reply SENT
+a reply and its outbound-log INSERT transiently failed, the row (and the §251 trigger that flips
+`last_message_direction` to 'out') never fired → the recovery couldn't tell "dropped" from
+"replied-but-unlogged" → it would re-fire → a DUPLICATE reply on the live twice-flagged number.
+Fix: `logOut` now PATCHes the conversation (`last_message_direction='out'`, `last_message_at`,
+`updated_at`) INDEPENDENTLY of + BEFORE the message-row insert, so a failed log still marks the
+thread answered → the recovery excludes it. Idempotent with the §251 trigger. FOOT-GUN: a
+recovery/retry that keys off a trigger-maintained column double-fires when the row that feeds the
+trigger fails to insert — record the "handled" state on a write that does NOT depend on that
+insert.
+
+### Accepted P3 (not fixed)
+`wa_ai_recovery_dispatch`'s `EXCEPTION WHEN OTHERS THEN NULL` hides a silent disablement (a future
+column rename → the whole dispatch no-ops forever, undetected). Left as-is: matches every other
+dispatch fn (§227 quality-watch / §215 nudge / §213 cadence); worst case is the safety-net stops
+recovering = back to the pre-fix state, no NEW harm. pg_cron's `cron.job_run_details` still records
+the run.
+
+### Owner run steps (JS is pushed; SQL is manual)
+1. Run `supabase_wa_ai_recovery.sql` (needs supabase_phase246 to exist — it pulls the AI secret
+   from `wa_ai_reply_dispatch`). VERIFY → recovery_col 1 · dispatch_fn t · dispatch_locked f · cron 1.
+2. Re-run `supabase_phase324_hot_lead_routing.sql` (the NULL-owner fallback). VERIFY → prosecdef t,
+   svc_can t, auth_can f.
+3. Re-run `supabase_phase211_anon_execute_sweep.sql` (re-locks `wa_ai_recovery_dispatch`).
+Order: the ai-reply.js answered-marker deploys with the push (before the owner runs the recovery
+SQL) → the double-reply fix is live before the recovery cron ever fires. No APK, no new env.
+
+### Still pending from Batch 2b (owner deferred)
+The 3rd item: a global per-number SEND THROTTLE (a QR-scan burst can't fire an outbound burst) +
+tightening the §227 quality watcher to auto-pause on YELLOW (not only RED). Recommended for the
+twice-flagged number; owner chose the two above first. Offer it again if quality dips.

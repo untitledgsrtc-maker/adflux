@@ -512,6 +512,18 @@ export default async function handler(req) {
   }
   const logOut = async (type, textBody, wamid, mediaUrl) => {
     const atIso = new Date().toISOString()
+    // Mark the conversation ANSWERED independently of the message-row insert. If that
+    // insert transiently fails, last_message_direction must still flip to 'out' so the
+    // ghosted-recovery cron (supabase_wa_ai_recovery.sql) does NOT mistake a sent-but-
+    // unlogged reply for a dropped dispatch and re-fire → a DUPLICATE reply on the live,
+    // twice-flagged number. The §251 trigger also sets these when the insert succeeds;
+    // writing them here first is idempotent + forward-only-safe.
+    try {
+      await sb(`whatsapp_conversations?id=eq.${convId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ updated_at: atIso, last_message_at: atIso, last_message_direction: 'out' }),
+      })
+    } catch { /* answered-marker best-effort */ }
     const row = { conversation_id: convId, wamid, direction: 'out', type, body: textBody, at: atIso }
     if (mediaUrl) row.media_url = mediaUrl   // Phase 263 — so the inbox renders the sent image
     try {
@@ -523,7 +535,6 @@ export default async function handler(req) {
         delete row.media_url
         await sb('whatsapp_messages', { method: 'POST', body: JSON.stringify(row) })
       }
-      await sb(`whatsapp_conversations?id=eq.${convId}`, { method: 'PATCH', body: JSON.stringify({ updated_at: atIso }) })
     } catch { /* the message was sent; a log failure is non-fatal */ }
   }
 
