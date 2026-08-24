@@ -14994,3 +14994,56 @@ Build the scheduling engine that maps **day-since-last-inbound → the matching 
 secret PULLED from wa_ai_reply_dispatch). A per-lead `followup_stage`/`followup_last_at` marker tracks
 where each lead is in the schedule. Templates must be ACTIVE before the engine sends (an unapproved
 template send fails gracefully — safe to build the engine before Meta finishes).
+
+
+---
+
+## 227 · WhatsApp Agent v2 — Batch 4: closed-window cadence ENGINE + quality auto-pause watcher (2026-08-23)
+
+Built the Day-2→30 closed-window cadence + the number-protection watcher. Adversarially reviewed
+(3 lenses: security · spam/WhatsApp-policy · correctness) BEFORE commit → all FIX_THEN_SHIP (no
+P0/P1/BLOCK — core design held); 4 P2 fixes applied. Ships OFF. §45/§46-safe.
+
+### The 4 files (owner RUNS the 2 SQL; the endpoints deploy on push)
+- `supabase_wa_cadence.sql` — `ai_cadence_enabled` (master switch, DEFAULT false) + `followup_stage`
+  /`followup_last_at` markers + `wa_cadence_templates` (schedule as DATA: day→template, seeded with
+  the 8 §226 previews, one active-nurture partial-unique) + `followup_cadence_candidates()` (days-
+  since-last-inbound → highest-unfired-slot template, catch-up no-burst; nurture at stage-30 +30d) +
+  `followup_cadence_mark()` + dispatch + cron (`followup-cadence`, 10:00 IST Mon–Sat) + a §213
+  backfill (already-chased leads start at stage 9). ≤1 template/lead/day via TWO guards
+  (`followup_last_at` 20h AND a template-message-log NOT EXISTS 20h). Stops on reply/Lost/Won/
+  opt-out/DNC/ai_paused.
+- `api/wa/followup-cadence.js` (Edge) — sends the day-slot template, SEND-then-MARK (a pending/
+  frequency-capped template retries next day instead of skipping a slot), logs the substituted text.
+- `supabase_wa_quality_watch.sql` — `wa_quality_log` + dispatch + cron (`wa-quality-watch`, every 4h).
+- `api/wa/quality-watch.js` (Edge) — polls each number's Meta `quality_rating`; on **RED** auto-pauses
+  the risky outbound (nudge + followup + welcome image, then the cadence flag separately) — keeps
+  `ai_enabled` (reactive in-window replies) ON. YELLOW → alert-log. Never auto-re-enables.
+
+### The 4 review fixes (all P2, spam/security on the flagged number — do NOT regress)
+1. **SECURITY** — added the 4 new DEFINER fns (followup_cadence_candidates/mark/dispatch +
+   wa_quality_watch_dispatch) to the `supabase_phase211_anon_execute_sweep.sql` re-lock list + VERIFY-D.
+   Without it, re-running the §211 sweep's blanket `GRANT … TO authenticated` would re-open them → a
+   rep could fire `followup_cadence_dispatch` = off-schedule template blast. **Owner re-runs
+   supabase_phase211 too.** (§86 foot-gun: any new REVOKEd fn MUST be added to that sweep's re-lock.)
+2. **SPAM (nurture fan-out)** — the nurture branch was a plain JOIN with no LIMIT → a 2nd active
+   nurture row would double-send same-day. Fixed: nurture branch → JOIN LATERAL … LIMIT 1 + a
+   partial-unique index (`(true) WHERE is_nurture AND is_active`) so at most one active nurture exists.
+3. **SPAM (cross-system double)** — no code-level mutual exclusion between the cadence and the §213
+   chase (both could fire same-day if the cadence's log-write was lost). Fixed: §213's
+   `ai_quote_followup_candidates()` now gates `AND COALESCE(a.ai_cadence_enabled,false)=false` — the
+   cadence SUPERSEDES §213, code-enforced (no manual flag-off needed). **Owner re-runs
+   supabase_ai_quote_followup.sql AFTER supabase_wa_cadence.sql** (the guard references the new column).
+4. **CORRECTNESS (auto-pause silent no-op)** — quality-watch set action='auto_paused' before the PATCH
+   + a missing ai_cadence_enabled column would 400 the whole 4-flag write → no pause but logged
+   "paused". Fixed: pause the pre-existing flags first (guaranteed columns), the new cadence flag in a
+   separate best-effort write, and action reflects the ACTUAL result (auto_paused / pause_failed).
+
+### DEPLOY ORDER + SWITCH-OVER (owner)
+Run in Studio, in order: (1) `supabase_wa_cadence.sql` (creates ai_cadence_enabled) → (2)
+`supabase_ai_quote_followup.sql` (re-run — adds the §213 self-disable guard) → (3)
+`supabase_phase211_anon_execute_sweep.sql` (re-run — re-lock the 4 new fns) → (4)
+`supabase_wa_quality_watch.sql`. All ship OFF. When the `followup_*` templates are ACTIVE on Meta:
+`UPDATE whatsapp_accounts SET ai_cadence_enabled=true WHERE purpose='marketing'` (this AUTO-disables
+§213 via fix 3; optionally also set ai_followup_enabled=false + `SELECT cron.unschedule('ai-quote-
+followup')`). KILL SWITCH: `ai_cadence_enabled=false`. The quality watcher auto-pauses everything on RED.

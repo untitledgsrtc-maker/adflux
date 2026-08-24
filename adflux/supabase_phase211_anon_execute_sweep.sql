@@ -76,7 +76,13 @@ BEGIN
                         'ai_quote_followup_candidates', 'ai_quote_followup_mark',
                         'ai_quote_followup_dispatch',
                         'quote_nudge_candidates', 'quote_nudge_mark',
-                        'quote_nudge_dispatch')
+                        'quote_nudge_dispatch',
+                        -- §227 cadence engine + quality watcher: SECURITY DEFINER, REVOKED —
+                        -- only the service-role Edge endpoints reach them. Re-lock here so a
+                        -- sweep re-run's blanket GRANT (step 2) can't re-open them (a rep could
+                        -- otherwise fire followup_cadence_dispatch → off-schedule template blast).
+                        'followup_cadence_candidates', 'followup_cadence_mark',
+                        'followup_cadence_dispatch', 'wa_quality_watch_dispatch')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
   END LOOP;
@@ -135,7 +141,9 @@ WHERE n.nspname = 'public'
                     'ai_build_quote','flag_lead_hot_from_wa',
                     'ai_quote_followup_candidates','ai_quote_followup_mark',
                     'ai_quote_followup_dispatch',
-                    'quote_nudge_candidates','quote_nudge_mark','quote_nudge_dispatch')
+                    'quote_nudge_candidates','quote_nudge_mark','quote_nudge_dispatch',
+                    'followup_cadence_candidates','followup_cadence_mark',
+                    'followup_cadence_dispatch','wa_quality_watch_dispatch')
 ORDER BY p.proname;
 
 SELECT 'Phase 211 anon-execute sweep applied' AS status;

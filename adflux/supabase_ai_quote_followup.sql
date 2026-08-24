@@ -130,6 +130,7 @@ AS $$
   JOIN public.whatsapp_accounts a  ON a.id = cv.whatsapp_account_id
   LEFT JOIN public.ai_quote_followups f ON f.lead_id = lq.lead_id
   WHERE a.ai_followup_enabled = true
+    AND COALESCE(a.ai_cadence_enabled, false) = false   -- §227: the cadence (supabase_wa_cadence.sql) SUPERSEDES this chase; if it's on for the account this self-disables. Code-enforced mutual exclusion → no reliance on a manual flag-off or a best-effort log-write (prevents a same-day double template on the flagged number). NOTE: run supabase_wa_cadence.sql (creates ai_cadence_enabled) BEFORE re-running this file.
     AND a.phone_number_id IS NOT NULL
     AND cv.customer_wa_id ~ '^[0-9]{10,15}$'
     AND COALESCE(l.stage, '')        NOT IN ('Won', 'Lost')
