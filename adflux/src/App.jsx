@@ -69,6 +69,8 @@ const CampaignChatbotV2 = lazyWithRetry(() => import('./pages/v2/CampaignChatbot
 const WorkV2 = lazyWithRetry(() => import('./pages/v2/WorkV2'))
 // Phase 230 — Operations module (screen-maintenance field app + Head overview).
 const OpsWorkV2 = lazyWithRetry(() => import('./pages/v2/OpsWorkV2'))
+// Phase 230 (Phase 2) — Operation Head desk console.
+const OpsHeadV2 = lazyWithRetry(() => import('./pages/v2/OpsHeadV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
 const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
 const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
@@ -318,11 +320,11 @@ function RootRedirect() {
   if (role === 'hr')                              return <Navigate to="/hr" replace />
   // Phase 182 — Accounts login lands on the payroll shell.
   if (role === 'accounts')                        return <Navigate to="/people" replace />
-  // Phase 230 — Operations module. Both ops roles land on /ops:
-  // operation_executive → the mobile field app; operation_head → the
-  // interim network overview (full Head desktop dashboard is Phase 2).
+  // Phase 230 — Operations module. operation_executive → the mobile field
+  // app (/ops); operation_head → the desk console (/ops-dashboard, Phase 2).
   // Keyed on `role` (not team_role — ops isn't a sales flavor).
-  if (role === 'operation_head' || role === 'operation_executive') return <Navigate to="/ops" replace />
+  if (role === 'operation_head')       return <Navigate to="/ops-dashboard" replace />
+  if (role === 'operation_executive')  return <Navigate to="/ops" replace />
   return <Navigate to="/dashboard" replace />
 }
 
@@ -429,8 +431,9 @@ export default function App() {
           <Route path="/leads/new"                 element={<RequireNonAgency><LeadFormV2 /></RequireNonAgency>} />
           <Route path="/leads/:id"                 element={<RequireNonAgency><LeadDetailV2 /></RequireNonAgency>} />
           <Route path="/work"                      element={<WorkV2 />} />
-          {/* Phase 230 — Operations field app / Head overview. */}
+          {/* Phase 230 — Operations field app (exec) + Head desk console. */}
           <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
+          <Route path="/ops-dashboard"             element={<RequireOps><OpsHeadV2 /></RequireOps>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
               direct reports + today's metrics. Sales head + TC head
               land here on app open via RootRedirect. */}

@@ -252,10 +252,12 @@ const ACCOUNTS_NAV = [
   { to: '/finance',           label: 'Finance',        icon: IndianRupee },
 ]
 
-// Phase 230 (2026-08-25) — Operations module. Both ops roles get a single
-// /ops entry (operation_executive → the mobile field app; operation_head →
-// the interim network overview). Phase 2 will split the Head a wider nav.
-const OPS_NAV = [
+// Phase 230 (2026-08-25) — Operations module. Head → the desk console
+// (/ops-dashboard, Phase 2); exec → the mobile field app (/ops).
+const OPS_HEAD_NAV = [
+  { to: '/ops-dashboard',     label: 'Operations',     icon: Tv },
+]
+const OPS_EXEC_NAV = [
   { to: '/ops',               label: 'Operations',     icon: Tv },
 ]
 
@@ -552,7 +554,7 @@ export function V2AppShell() {
     isManager      ? MANAGER_NAV :
     isHR           ? HR_NAV :
     isAccounts     ? ACCOUNTS_NAV :
-    isOps          ? OPS_NAV :
+    isOps          ? (profile?.role === 'operation_head' ? OPS_HEAD_NAV : OPS_EXEC_NAV) :
     isTelecaller   ? TELECALLER_NAV :
     isAgency       ? AGENCY_NAV :
                      SALES_NAV
@@ -565,7 +567,7 @@ export function V2AppShell() {
     isManager      ? MOBILE_NAV_MANAGER :
     isHR           ? HR_NAV :
     isAccounts     ? ACCOUNTS_NAV :
-    isOps          ? OPS_NAV :
+    isOps          ? (profile?.role === 'operation_head' ? OPS_HEAD_NAV : OPS_EXEC_NAV) :
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES

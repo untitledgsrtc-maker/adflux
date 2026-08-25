@@ -6,9 +6,8 @@
 //   • operation_executive → the mobile FIELD app (Gujarati-first): check
 //     in, see the ticket queue assigned to me, report a fault, open a
 //     ticket → call the depot + log the fix + attach a photo.
-//   • operation_head      → a compact network overview (screens up/down +
-//     open tickets + field-team headcount). The full Head desktop
-//     dashboard is Phase 2; this is a useful interim.
+//   • operation_head      → redirected to the desk console /ops-dashboard
+//     (OpsHeadV2, Phase 2). This page is the field-tech surface only.
 //
 // Reuses the sales stack: gps_pings (background GPS tracks the exec like a
 // rep), work_sessions (attendance / check-in), call_logs (depot calls,
@@ -24,6 +23,7 @@ import {
   AlertTriangle, MonitorSmartphone, RefreshCw, ChevronDown, ChevronUp,
   PlayCircle, Building2,
 } from 'lucide-react'
+import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
@@ -131,7 +131,8 @@ export default function OpsWorkV2() {
   )
 
   if (role === 'operation_head') {
-    return <OpsHeadOverview lang={lang} langBar={langBar} />
+    // Phase 2 — the Head lives on the full desk console (/ops-dashboard).
+    return <Navigate to="/ops-dashboard" replace />
   }
   return <OpsExecApp profile={profile} lang={lang} langBar={langBar} />
 }
@@ -656,83 +657,6 @@ function ReportFaultModal({ lang, uid, depots, issueTypes, screensByDepot, onClo
             : <><Plus size={17} strokeWidth={1.6} />{t('save', lang)}</>}
         </button>
       </div>
-    </div>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   HEAD — interim network overview (full desktop dashboard = Phase 2)
-   ═══════════════════════════════════════════════════════════════════ */
-
-function OpsHeadOverview({ lang, langBar }) {
-  const [loading, setLoading] = useState(true)
-  const [counts, setCounts] = useState({ total: 0, online: 0, offline: 0, unknown: 0, openTickets: 0 })
-  const [team, setTeam] = useState([])
-
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        const headCount = (status) => supabase.from('ops_screens')
-          .select('id', { count: 'exact', head: true }).eq('is_active', true)
-          .eq('status', status).then(r => r.count || 0)
-        const [total, online, offline, unknown, openTk, techs] = await Promise.all([
-          supabase.from('ops_screens').select('id', { count: 'exact', head: true }).eq('is_active', true).then(r => r.count || 0),
-          headCount('online'), headCount('offline'), headCount('unknown'),
-          supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).in('status', ['open', 'in_progress']).then(r => r.count || 0),
-          supabase.from('users').select('id, name').eq('role', 'operation_executive').eq('is_active', true).order('name'),
-        ])
-        if (!alive) return
-        setCounts({ total, online, offline, unknown, openTickets: openTk })
-        setTeam(techs.data || [])
-      } finally { if (alive) setLoading(false) }
-    })()
-    return () => { alive = false }
-  }, [])
-
-  const wrap = { maxWidth: 900, margin: '0 auto', padding: '16px 16px 40px', display: 'flex', flexDirection: 'column', gap: 14 }
-
-  if (loading) {
-    return (
-      <div style={{ ...wrap, alignItems: 'center', paddingTop: 60 }}>
-        <Loader2 size={30} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2)', animation: 'spin 1s linear infinite' }} />
-      </div>
-    )
-  }
-
-  return (
-    <div style={wrap}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 24, fontWeight: 800, fontFamily: 'var(--v2-display)' }}>{t('network', lang)}</div>
-        {langBar}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-        <Stat n={counts.total} label={t('total_screens', lang)} lang={lang} tone="green" />
-        <div style={card}>
-          <div style={{ fontFamily: 'var(--v2-display)', fontSize: 30, fontWeight: 800, color: 'var(--v2-green)' }}>{numL(counts.online, lang)}</div>
-          <div style={{ fontSize: 13, color: 'var(--v2-ink-1)', marginTop: 2 }}>{t('online', lang)}</div>
-        </div>
-        <div style={card}>
-          <div style={{ fontFamily: 'var(--v2-display)', fontSize: 30, fontWeight: 800, color: 'var(--v2-rose)' }}>{numL(counts.offline, lang)}</div>
-          <div style={{ fontSize: 13, color: 'var(--v2-ink-1)', marginTop: 2 }}>{t('offline', lang)}</div>
-        </div>
-        <Stat n={counts.openTickets} label={t('open_tickets', lang)} lang={lang} tone="rose" />
-      </div>
-
-      <div style={{ ...card, background: 'var(--v2-tint-warning)', border: '1px solid var(--v2-tint-warning-bd)', color: 'var(--v2-ink-0)', fontSize: 13 }}>
-        {t('head_phase2', lang)}
-      </div>
-
-      <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{t('field_team', lang)} · {numL(team.length, lang)}</div>
-      {team.map(u => (
-        <div key={u.id} style={{ ...card, display: 'flex', alignItems: 'center', gap: 10, padding: 12 }}>
-          <span style={{ width: 32, height: 32, borderRadius: 999, background: 'var(--v2-bg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Wrench size={16} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2)' }} />
-          </span>
-          <span style={{ fontWeight: 600 }}>{u.name || '—'}</span>
-        </div>
-      ))}
     </div>
   )
 }
