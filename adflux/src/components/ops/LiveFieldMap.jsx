@@ -123,6 +123,12 @@ export default function LiveFieldMap({ users = [], pingByUser = {}, activeIds = 
         disableDefaultUI: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: true,
       })
       mapRef.current = map; map.__google = google; setMapReady(true)
+      // Google Maps renders grey if the container's size settled AFTER
+      // construction (card/flex layout). Trigger a resize + re-centre a beat
+      // later so tiles paint on load without a manual window resize.
+      const repaint = () => { try { map.setOptions({ styles: DARK_MAP_STYLE }); google.maps.event.trigger(map, 'resize'); map.setCenter({ lat: 22.3072, lng: 73.1812 }) } catch { /* */ } }
+      setTimeout(repaint, 250)
+      setTimeout(repaint, 800)
     })()
     return () => { cancelled = true; mapRef.current = null; markersRef.current = {}; setMapReady(false) }
   }, [])
