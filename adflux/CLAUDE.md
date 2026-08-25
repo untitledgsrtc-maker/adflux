@@ -15559,20 +15559,30 @@ BEFORE the frontend switches. A design workflow produced exact SQL + shadow-comp
   monthly_scores: team_role IN sales/agency + is_active). Guardian P2: a single bad
   user now errors the whole page (atomic RPC) vs one row before — acceptable (the
   canonical runs clean per-user); add a per-row BEGIN…EXCEPTION only if it surfaces.
-- **⚠ C1 (₹3/km TA trigger) — HELD, owner decision.** The report's biggest DB win =
-  fire `compute_daily_ta` only on check-in/check-out + the 23:50 cron instead of every
-  GPS ping (~1,500×/rep/day). **It REVERSES the owner's explicit Phase 34Z.67c
-  "every-ping is perfect" decision** — reps would see a stale ~0 km all day until the
-  cron. Paid km ends identical (cron backstops), but the live km view regresses. Do
-  NOT build without explicit owner re-approval + a shadow-compare proving end-of-day
-  daily_ta.km_traveled is byte-identical old-vs-new.
-- **HELD for owner shadow-review:** team_chase_counts (H4/H7/M17/M21 — stops the team
-  dashboard downloading all sent+won quotes + the whole payments table; re-implements
-  client chase logic → scrutinize the shadow) · M19 finance_pnl_summary_fast (33 scans
-  → 2) · H9 (defer meeting score off the synchronous save path — score→incentive,
-  becomes eventually-consistent ≤1 cron min) · M20 (lead_activities RLS `lead_id IN
-  (SELECT...)` → correlated `EXISTS` on the leads PK — plan-only, visibility
-  byte-identical, but it's the hottest table's frozen RLS).
+- **✅ Batch-2 — team_chase_counts (H4/H7/M17/M21) SHIPPED** (`supabase_phase323_team_chase_counts.sql`,
+  additive DEFINER RPC + shadow-compare). Stops the constantly-open Team Live
+  dashboard downloading ALL sent + ALL won quotes + the WHOLE payments table (all
+  ~1000-capped) to derive per-rep chase counts — aggregates it in Postgres, ~1
+  row/rep. Logic verified byte-for-byte vs TeamDashboardV2 L631-668. Gate =
+  is_team_viewer OR admin (+ NULL-role Studio permit for the shadow); co_owner
+  (Vishal) NOT admitted → keeps his RLS raw path. Frontend switch = admin+viewer →
+  the RPC; co_owner/hr/sales_manager keep their raw path.
+- **❌ C1 (₹3/km TA trigger) — REJECTED by owner 2026-08-25. Do NOT re-propose.**
+  It would fire `compute_daily_ta` only on check-in/check-out + the nightly cron
+  instead of every GPS ping — but that REVERSES the owner's Phase 34Z.67c "every-ping
+  is perfect" call: reps would see a stale ~0 km all day until the cron. Owner keeps
+  every-ping. Leave the TA trigger alone.
+- **DEFERRED — M19 finance_pnl_summary_fast** (33 scans → 2, CTE-materialize income).
+  Assessed + SKIPPED: it's an 18-scan / ~15-split restructure of a heavily-worked
+  (§171/§218/§274) SECURITY DEFINER money-display fn, for an occasionally-opened
+  admin page on a small (~1000-row) finance_transactions table where the scans are
+  cheap. Wrong risk/value (§16/§45). Only revisit if the P&L page becomes a real
+  bottleneck.
+- **HELD for owner shadow-review (pay/frozen):** H9 (defer meeting score off the
+  synchronous save path — score→incentive, becomes eventually-consistent ≤1 cron
+  min) · M20 (lead_activities RLS `lead_id IN (SELECT...)` → correlated `EXISTS` on
+  the leads PK — plan-only, visibility byte-identical, but the hottest table's frozen
+  RLS).
 
 ### HELD-BACK column trims (NOT done — need a careful pass)
 The `select('*')` → explicit-column trims (H2 leads-notes, M9/M11 admin/inbox) + M2
