@@ -224,8 +224,11 @@ export default function LeadsV2() {
   // 50/page; rep can pick 100 / 200 / 500. Resetting any filter or
   // search drops back to page 1 via the useEffect below.
   const [pageSize, setPageSize] = useState(() => {
+    // Phase 323 (perf) — default 50; max 200. The old 500 option rendered 500
+    // lead rows at once (heavy on a 6k+ list). Dropping it from the allow-list
+    // means anyone with a saved 500 auto-resets to 50 on next load.
     const saved = parseInt(localStorage.getItem('leads_page_size') || '50', 10)
-    return [50, 100, 200, 500].includes(saved) ? saved : 50
+    return [50, 100, 200].includes(saved) ? saved : 50
   })
   const [page, setPage] = useState(1)
 
@@ -1520,7 +1523,6 @@ export default function LeadsV2() {
                     <option value={50}>50</option>
                     <option value={100}>100</option>
                     <option value={200}>200</option>
-                    <option value={500}>500</option>
                   </select>
                 </label>
               </div>

@@ -77,12 +77,25 @@ export default function ClientsV2() {
     // RLS handles the admin-vs-sales visibility. We just order by
     // most-recently-active so the clients a rep has worked lately sit
     // at the top.
-    const { data: clientRows, error } = await supabase
-      .from('clients')
-      .select('*')
-      .order('last_quote_at', { ascending: false, nullsFirst: false })
-
-    if (!error) setClients(clientRows || [])
+    // Phase 323 (audit M12) — chunked .range() fetch so the client list isn't
+    // silently capped at PostgREST's ~1000 rows (§66/§151) as clients grow (every
+    // quote save upserts one). Keeps select('*') — a column trim is §234-held here
+    // (the edit modal spreads the whole row). Paginate the FETCH only.
+    const PAGE = 1000
+    let from = 0, all = [], error = null
+    for (;;) {
+      const { data, error: err } = await supabase
+        .from('clients')
+        .select('*')
+        .order('last_quote_at', { ascending: false, nullsFirst: false })
+        .range(from, from + PAGE - 1)
+      if (err) { error = err; break }
+      all = all.concat(data || [])
+      if (!data || data.length < PAGE) break
+      from += PAGE
+      if (from >= 20000) break
+    }
+    if (!error) setClients(all)
 
     // Admin needs to see the owner name. One extra query is fine vs
     // embedding a users(name) join, because the join would require an

@@ -1040,6 +1040,7 @@ function monthLabel(ym) { const [y, m] = (ym || '').split('-'); return m ? `${MO
 
 function RegisterTab() {
   const [rows, setRows] = useState([]); const [banks, setBanks] = useState([]); const [heads, setHeads] = useState([])
+  const [limit, setLimit] = useState(500) // Phase 323 (audit M2) — render only the first N rows (grows to the 1060+ fetch)
   const [loading, setLoading] = useState(true); const [fBucket, setFBucket] = useState('all'); const [fBank, setFBank] = useState('all'); const [q, setQ] = useState('')
   const [fCompany, setFCompany] = useState('all'); const [fSegment, setFSegment] = useState('all'); const [fMonth, setFMonth] = useState('all')
   const [hideSweep, setHideSweep] = useState(false)   // show all by default (hiding all-transfer imports looked empty); chip to declutter
@@ -1166,11 +1167,22 @@ function RegisterTab() {
     return true
   }), [rows, hideSweep, fBucket, fBank, fCompany, fSegment, fMonth, q])
   const sweepCount = rows.filter(r => r.bucket === 'internal_transfer').length
+  // Phase 323 (audit M2) — accurate per-month subtotals from the FULL filtered
+  // set, but render only the first `limit` rows: the Register grew to 1060+ rows,
+  // each with two <select> dropdowns (~30k DOM nodes) + a full re-render on every
+  // retag. Subtotals stay correct because they read monthTotals (full), not the
+  // sliced rows.
+  const monthTotals = useMemo(() => {
+    const t = {}
+    filtered.forEach(r => { const m = (r.txn_date || '').slice(0, 7); const g = (t[m] = t[m] || { inn: 0, out: 0, n: 0 }); const a = +r.amount || 0; if (r.direction === 'in') g.inn += a; else g.out += a; g.n += 1 })
+    return t
+  }, [filtered])
   const groups = useMemo(() => {
     const g = {}
-    filtered.forEach(r => { const m = (r.txn_date || '').slice(0, 7); (g[m] = g[m] || []).push(r) })
+    filtered.slice(0, limit).forEach(r => { const m = (r.txn_date || '').slice(0, 7); (g[m] = g[m] || []).push(r) })
     return Object.entries(g).sort((a, b) => b[0].localeCompare(a[0]))
-  }, [filtered])
+  }, [filtered, limit])
+  useEffect(() => { setLimit(500) }, [hideSweep, fBucket, fBank, fCompany, fSegment, fMonth, q]) // reset paging on filter change
   const reviewCount = rows.filter(r => r.bucket === 'review').length
   if (loading) return <Spin />
 
@@ -1227,11 +1239,12 @@ function RegisterTab() {
           </tr></thead>
           <tbody>
             {groups.flatMap(([m, rs]) => {
-              const inn = rs.filter(r => r.direction === 'in').reduce((s, r) => s + (+r.amount || 0), 0)
-              const out = rs.filter(r => r.direction === 'out').reduce((s, r) => s + (+r.amount || 0), 0)
+              // Phase 323 (audit M2) — subtotals + count from the FULL month, not the sliced rows.
+              const mt = monthTotals[m] || { inn: 0, out: 0, n: rs.length }
+              const inn = mt.inn, out = mt.out
               const head = (
                 <tr key={'h' + m} style={{ background: 'var(--surface-2, #334155)' }}>
-                  <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={4}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 11 }}>&middot; {rs.length} txns</span></td>
+                  <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={4}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 11 }}>&middot; {mt.n} txns</span></td>
                   <td style={{ ...tdL, fontSize: 11.5 }} colSpan={3}><span style={{ color: 'var(--success)' }}>In {fmtINR(inn)}</span> &nbsp; <span style={{ color: 'var(--danger)' }}>Out {fmtINR(out)}</span> &nbsp; <b>Net {fmtINR(inn - out)}</b></td>
                 </tr>
               )
@@ -1259,6 +1272,14 @@ function RegisterTab() {
           </tbody>
         </table>
         {filtered.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-subtle)' }}>No transactions match.</div>}
+        {/* Phase 323 (audit M2) — reveal the rest of the sliced rows on demand. */}
+        {filtered.length > limit && (
+          <div style={{ padding: 14, textAlign: 'center', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--text-subtle)', fontSize: 12, alignSelf: 'center' }}>Showing {limit} of {filtered.length}</span>
+            <button onClick={() => setLimit(l => l + 500)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontSize: 12.5 }}>Show more</button>
+            <button onClick={() => setLimit(filtered.length)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}>Show all {filtered.length}</button>
+          </div>
+        )}
       </div>
     </Card>
   )

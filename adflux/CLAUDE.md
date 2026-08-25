@@ -15584,14 +15584,33 @@ BEFORE the frontend switches. A design workflow produced exact SQL + shadow-comp
   the leads PK — plan-only, visibility byte-identical, but the hottest table's frozen
   RLS).
 
-### HELD-BACK column trims (NOT done — need a careful pass)
-The `select('*')` → explicit-column trims (H2 leads-notes, M9/M11 admin/inbox) + M2
-(Finance Register virtualization) + M12 (Clients pagination). Reason: the codebase
-already got bitten by exactly this — AdminDashboardDesktop's `quotes.select('*')`
-carries a comment that `*` was CHOSEN after a missing column silently zeroed the
-dashboard. Replacing `*` with an enumerated list on a live frozen list risks that
-schema-drift regression (§45) → column-by-column with the exact read-set verified +
-tested, not in a batch. Owner asked to do these AFTER Tier 3.
+### Column trims + pagination — DONE via an enumeration pass (guardian PASS)
+A workflow enumerated the exact read-columns per `select('*')` site (grep every field
+the list touches). Outcome:
+- **H2 useLeads — TRIMMED.** `SELECT_COLUMNS` = explicit 20-col list + the 2 embeds,
+  dropping `notes` + `notes_legacy_telecaller` (the list never renders them). Every
+  column grep-verified (LeadsV2 is the sole consumer) + schema-verified. ⚠ inclusive-
+  select foot-gun: a NEW leads column the list renders MUST be added here too.
+- **M12 ClientsV2 — PAGINATED** (chunked `.range()` fetch; was silently capped at
+  1000). Kept `*` (the edit modal spreads the whole row → a trim is fragile).
+- **M2 FinanceV2 Register — RENDER-PAGINATED** (`filtered.slice(0,limit)` + a full-set
+  `monthTotals` memo so month subtotals stay accurate + a Show-more/all control). The
+  fetch was already `.range()`-paged; the win was the 1060-row × 2-dropdown render.
+- **M11 inbox conversations — KEPT `*`.** Documented deploy-before-SQL `*`-decision
+  (an explicit list naming last_message_at would 400 before the sort-fallback) + zero
+  perf gain (narrow, already-paginated table). Trimming = all cost, no benefit.
+- **M9 AdminDashboardDesktop quotes — KEPT `*` (HIGH risk).** The `*` is a documented,
+  battle-tested decision: an earlier enumerated list contained the nonexistent
+  `ref_number` → PostgREST returned null → EVERY KPI silently zeroed. The code STILL
+  references `q.ref_number` as a `quote_number || ref_number` fallback in 4+ render
+  sites, so a grep-driven trim re-adds it + reproduces the all-zeros bug. Do NOT trim.
+- **Leads per-page cap** (owner ask 2026-08-25): dropped the heavy **500** option
+  (`[50,100,200,500]`→`[50,100,200]`, removed the `<option>`). Default is already 50;
+  a rep with a saved 500 auto-resets to 50 on next load (500 no longer in the
+  allow-list). Rendering 500 lead rows on a 6k+ list was the heavy part.
+- FOOT-GUN: replacing `select('*')` with an explicit list on a live list is a
+  schema-drift landmine — enumerate the EXACT read-set + schema-verify every name
+  first, and KEEP `*` where there's a documented *-decision (M9) or zero benefit (M11).
 
 ### Perf foot-guns (don't repeat)
 - ❌ manualChunks OBJECT form silently mis-homes Vite's preload helper + shared deps
