@@ -85,37 +85,36 @@ export default function ManagerDashboardV2() {
         // unanswered) so the count matches GpsTrack's qualified
         // bucket. .or() preserves legacy rows where direction=NULL.
         // Phase 93.24 — lead-tied calls only.
-        const { data: callRows } = await supabase
-          .from('call_logs')
-          .select('user_id, outcome')
-          .in('user_id', repIds)
-          .gte('created_at', startUtc)
-          .gte('duration_seconds', 10)
-          .or('direction.is.null,direction.neq.missed')
-          .not('lead_id', 'is', null)
-
-        // 3. Today's meetings per rep (lead_activities activity_type='meeting').
-        const { data: meetRows } = await supabase
-          .from('lead_activities')
-          .select('user_id')
-          .in('user_id', repIds)
-          .eq('activity_type', 'meeting')
-          .gte('created_at', startUtc)
-
-        // 4. Open leads per rep (stage not in Won/Lost).
-        const { data: leadRows } = await supabase
-          .from('leads')
-          .select('assigned_to')
-          .in('assigned_to', repIds)
-          .not('stage', 'in', '(Won,Lost)')
-
-        // 5. Latest GPS ping per rep (today only).
-        const { data: pingRows } = await supabase
-          .from('gps_pings')
-          .select('user_id, created_at')
-          .in('user_id', repIds)
-          .gte('created_at', startUtc)
-          .order('created_at', { ascending: false })
+        // Perf (audit M13) — queries 2-5 all depend only on repIds+startUtc and
+        // are mutually independent → one parallel wave, not 4 serial round-trips.
+        const [
+          { data: callRows },   // 2. Today's calls per rep (>=10s, lead-tied, not missed).
+          { data: meetRows },   // 3. Today's meetings per rep (activity_type='meeting').
+          { data: leadRows },   // 4. Open leads per rep (stage not in Won/Lost).
+          { data: pingRows },   // 5. Latest GPS ping per rep (today only).
+        ] = await Promise.all([
+          supabase.from('call_logs')
+            .select('user_id, outcome')
+            .in('user_id', repIds)
+            .gte('created_at', startUtc)
+            .gte('duration_seconds', 10)
+            .or('direction.is.null,direction.neq.missed')
+            .not('lead_id', 'is', null),
+          supabase.from('lead_activities')
+            .select('user_id')
+            .in('user_id', repIds)
+            .eq('activity_type', 'meeting')
+            .gte('created_at', startUtc),
+          supabase.from('leads')
+            .select('assigned_to')
+            .in('assigned_to', repIds)
+            .not('stage', 'in', '(Won,Lost)'),
+          supabase.from('gps_pings')
+            .select('user_id, created_at')
+            .in('user_id', repIds)
+            .gte('created_at', startUtc)
+            .order('created_at', { ascending: false }),
+        ])
 
         const calls   = {}
         const conn    = {}

@@ -100,24 +100,30 @@ export default async function handler(req) {
   const ist30    = new Date(istNow.getTime() + 30 * 86400000).toISOString().slice(0, 10)
   const istMidnightUtc = new Date(`${istToday}T00:00:00+05:30`).toISOString()
 
-  const user = (await sbRows(`users?id=eq.${uid}&select=name&limit=1`))?.[0] || {}
-  const firstName = String(user.name || '').trim().split(/\s+/)[0] || 'there'
-  const tgtRow = (await sbRows(`daily_targets?user_id=eq.${uid}&select=min_calls&limit=1`))?.[0]
-  const callsTarget = Number(tgtRow?.min_calls) > 0 ? Number(tgtRow.min_calls) : 50
-  const callsDone = await sbCount(`call_logs?user_id=eq.${uid}&call_at=gte.${istMidnightUtc}`)
+  // Perf (audit M5) — all 7 reads are independent + uid-scoped; fire them in
+  // ONE parallel wave instead of 7 sequential Edge→Supabase round-trips per
+  // greeting/nudge. Derivations stay identical, just after the single await.
+  const [userRows, tgtRows, callsDone, fups, renewals, msdRows, quotes] = await Promise.all([
+    sbRows(`users?id=eq.${uid}&select=name&limit=1`),
+    sbRows(`daily_targets?user_id=eq.${uid}&select=min_calls&limit=1`),
+    sbCount(`call_logs?user_id=eq.${uid}&call_at=gte.${istMidnightUtc}`),
+    sbRows(`follow_ups?assigned_to=eq.${uid}&is_done=eq.false&follow_up_date=lte.${istToday}&select=follow_up_date,note,leads(name)&order=follow_up_date.asc&limit=40`),
+    sbRows(`quotes?created_by=eq.${uid}&status=eq.won&campaign_end_date=gte.${istToday}&campaign_end_date=lte.${ist30}&select=client_name,client_company,campaign_end_date&order=campaign_end_date.asc&limit=10`),
+    sbRows(`monthly_sales_data?staff_id=eq.${uid}&month_year=eq.${istMonth}&select=new_client_revenue,renewal_revenue&limit=1`),
+    sbRows(`quotes?created_by=eq.${uid}&select=id,quote_number,client_name,client_company,status,total_amount&order=created_at.desc&limit=30`),
+  ])
 
-  const fups = await sbRows(`follow_ups?assigned_to=eq.${uid}&is_done=eq.false&follow_up_date=lte.${istToday}&select=follow_up_date,note,leads(name)&order=follow_up_date.asc&limit=40`)
+  const user = userRows?.[0] || {}
+  const firstName = String(user.name || '').trim().split(/\s+/)[0] || 'there'
+  const tgtRow = tgtRows?.[0]
+  const callsTarget = Number(tgtRow?.min_calls) > 0 ? Number(tgtRow.min_calls) : 50
+
   const dueToday = fups.filter((f) => f.follow_up_date === istToday)
   const overdue  = fups.filter((f) => f.follow_up_date < istToday)
   const fupLabel = (f) => (f.leads && f.leads.name && String(f.leads.name).trim()) || (f.note ? String(f.note).slice(0, 30) : 'a lead')
 
-  const renewals = await sbRows(`quotes?created_by=eq.${uid}&status=eq.won&campaign_end_date=gte.${istToday}&campaign_end_date=lte.${ist30}&select=client_name,client_company,campaign_end_date&order=campaign_end_date.asc&limit=10`)
-
-  const msdRow = (await sbRows(`monthly_sales_data?staff_id=eq.${uid}&month_year=eq.${istMonth}&select=new_client_revenue,renewal_revenue&limit=1`))?.[0]
+  const msdRow = msdRows?.[0]
   const businessMonth = (Number(msdRow?.new_client_revenue) || 0) + (Number(msdRow?.renewal_revenue) || 0)
-
-  // the rep's recent quotes — for Claude to answer quote questions + resolve a "send PDF"
-  const quotes = await sbRows(`quotes?created_by=eq.${uid}&select=id,quote_number,client_name,client_company,status,total_amount&order=created_at.desc&limit=30`)
 
   // ── the fixed day snapshot (greetings + Claude-failure fallback) ──
   const snapshot = () => {

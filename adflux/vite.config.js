@@ -76,16 +76,49 @@ export default defineConfig({
   // the heavy, page-specific libs each get their own cached chunk so they load
   // ONLY with the pages that import them (a rep never downloads reactflow, the
   // PDF stack, xlsx, or the map loader) and stay cached across app updates.
+  //
+  // Phase 323 (perf audit C3) — the object form above mis-homed a SHARED module
+  // (react/jsx-runtime + Vite's preload helper) into the `pdf` chunk, which made
+  // the ENTRY statically import pdf → the whole 602 KB react-pdf/jspdf/html2canvas
+  // stack downloaded on EVERY cold open, for all 22 users, even reps who never
+  // render a PDF. The FUNCTION form fixes it: only node_modules are chunked, by
+  // path; Vite's own preload helper (not in node_modules) stays in the entry, and
+  // jsx-runtime lands in react-vendor (always loaded) — never in pdf. So pdf/flow/
+  // sheet/maps become TRULY load-on-demand. Cold path ~810 KB → ~210 KB gz.
+  //
+  // ORDER MATTERS: `@react-pdf/renderer` and `reactflow` both contain "react" in
+  // their path, so they MUST be matched before the generic react-vendor branch or
+  // they'd wrongly ride the always-loaded react-vendor chunk (re-creating the bug).
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'supabase': ['@supabase/supabase-js'],
-          'pdf': ['@react-pdf/renderer', 'html2canvas', 'jspdf'],
-          'maps': ['leaflet', '@googlemaps/js-api-loader'],
-          'flow': ['reactflow'],
-          'sheet': ['xlsx'],
+        manualChunks(id) {
+          // Vite's dynamic-import/preload helper (minified `_`) is imported by
+          // EVERY dynamic import. Left unmatched, Rollup parks it inside a lazy
+          // vendor chunk (it landed in `pdf`), forcing pdf to load on every cold
+          // open. Pin it (+ Rollup's commonjs helper) into the always-loaded
+          // react-vendor chunk so the heavy chunks stay truly lazy.
+          if (id.includes('vite/preload-helper') || id.includes('vite/modulepreload') ||
+              id.includes('vite/dynamic-import-helper') || id.includes('commonjsHelpers')) return 'react-vendor'
+          if (!id.includes('node_modules')) return undefined
+          // Heavy, page-specific libs — load-on-demand. Check BEFORE react-vendor
+          // (`@react-pdf/renderer` + `reactflow` both contain "react" in the path).
+          if (id.includes('@react-pdf') || id.includes('html2canvas') ||
+              id.includes('jspdf') || id.includes('pdfkit') || id.includes('fontkit')) return 'pdf'
+          if (id.includes('reactflow') || id.includes('@reactflow')) return 'flow'
+          if (id.includes('/xlsx')) return 'sheet'
+          if (id.includes('/leaflet') || id.includes('@googlemaps')) return 'maps'
+          if (id.includes('@supabase')) return 'supabase'
+          // zustand is a dep of BOTH the app's global stores (authStore etc., always
+          // loaded) AND reactflow — so it MUST live in an eager chunk, or the store
+          // tree drags the whole `flow` chunk onto the cold path (it did). Pin eager.
+          if (id.includes('/zustand')) return 'react-vendor'
+          // React runtime — always loaded (the entry needs it). jsx-runtime lands
+          // here, NOT in pdf, which is the whole point.
+          if (id.includes('/react-dom') || id.includes('/react-router') ||
+              id.includes('/react/') || id.includes('/scheduler')) return 'react-vendor'
+          // Everything else in node_modules → Rollup's default vendor split.
+          return undefined
         },
       },
     },

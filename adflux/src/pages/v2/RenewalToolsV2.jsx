@@ -183,26 +183,23 @@ export default function RenewalToolsV2() {
     }
     let rows = qRows || []
 
-    // Unit counts (number of quote_cities rows per campaign).
+    // Perf (audit M15) — the quote_cities unit-count and the privileged users
+    // name-merge both derive from `rows` and are independent → one parallel wave
+    // instead of two serial round-trips. Behavior identical.
     if (rows.length > 0) {
       const ids = rows.map(r => r.id)
-      const { data: cities } = await supabase
-        .from('quote_cities')
-        .select('quote_id')
-        .in('quote_id', ids)
+      const uids = isPrivileged ? Array.from(new Set(rows.map(r => r.created_by).filter(Boolean))) : []
+      const [citiesRes, usersRes] = await Promise.all([
+        supabase.from('quote_cities').select('quote_id').in('quote_id', ids),
+        uids.length > 0
+          ? supabase.from('users').select('id, name').in('id', uids)
+          : Promise.resolve({ data: [] }),
+      ])
       const cnt = {}
-      ;(cities || []).forEach(c => { cnt[c.quote_id] = (cnt[c.quote_id] || 0) + 1 })
+      ;(citiesRes.data || []).forEach(c => { cnt[c.quote_id] = (cnt[c.quote_id] || 0) + 1 })
       rows = rows.map(r => ({ ...r, unit_count: cnt[r.id] || 0 }))
-    }
-
-    if (isPrivileged && rows.length > 0) {
-      const uids = Array.from(new Set(rows.map(r => r.created_by).filter(Boolean)))
       if (uids.length > 0) {
-        const { data: users } = await supabase
-          .from('users')
-          .select('id, name')
-          .in('id', uids)
-        const byId = Object.fromEntries((users || []).map(u => [u.id, u.name]))
+        const byId = Object.fromEntries((usersRes.data || []).map(u => [u.id, u.name]))
         rows = rows.map(r => ({ ...r, users: { name: byId[r.created_by] || '—' } }))
       }
     }

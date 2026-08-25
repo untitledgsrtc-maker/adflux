@@ -130,7 +130,7 @@ export default function AdminDashboardDesktop() {
     // stationary reps visible.
     const liveCutoffIso = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
-    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes, hotLeadsRes, briefLogRes, sourceAttribRes, wsCheckedOutRes] = await Promise.all([
+    const [quotesRes, paymentsAllRes, paymentsApprRes, pendingPayRes, profilesRes, msdRes, usersRes, settingsRes, dailyTargetsRes, followupsDoneTodayRes, pendingLeavesRes, pendingTaRes, liveGpsRes, hotLeadsRes, briefLogRes, sourceAttribRes, wsCheckedOutRes, followupsDueRes] = await Promise.all([
       // Use `*` to be tolerant of schema drift — earlier we enumerated
       // columns including `ref_number`, and a single missing column
       // would silently return an empty array (not throw), which made
@@ -234,6 +234,13 @@ export default function AdminDashboardDesktop() {
       supabase.from('work_sessions')
         .select('user_id, check_out_at, auto_checked_out')
         .eq('work_date', todayDate),
+      // Perf (audit M8) — team-wide follow-ups-due count. Depends only on
+      // todayDate (known above) so it rides the batch as the 18th element
+      // instead of a separate serial round-trip later. head:count = no rows.
+      supabase.from('follow_ups')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_done', false)
+        .lte('follow_up_date', todayDate),
     ])
 
     const allQuotes    = quotesRes.data       || []
@@ -716,15 +723,8 @@ export default function AdminDashboardDesktop() {
     // from already-fetched data, no extra round-trips.
     //
     // Follow-ups due today across the whole team (admin sees all reps).
-    // We need a separate query because the existing follow-ups data we
-    // load is per-rep-completed-today (used by the per-rep activity
-    // strip). Inline this small fetch since it's cheap and only runs
-    // for admin.
-    const followupsDueRes = await supabase
-      .from('follow_ups')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_done', false)
-      .lte('follow_up_date', todayDate)
+    // Perf (audit M8) — folded into the main Promise.all above (18th element)
+    // so it no longer costs a separate serial round-trip on every dashboard load.
     const followupsDueCount = followupsDueRes.count || 0
 
     // Govt proposals waiting on OC copy upload — proposals in 'draft'
