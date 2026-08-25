@@ -55,6 +55,7 @@ export default function OpsHeadV2() {
   const [pingByUser, setPingByUser] = useState({})
   const [sessByUser, setSessByUser] = useState({})
   const [kmByUser, setKmByUser] = useState({})
+  const [uptimeByUser, setUptimeByUser] = useState({})
 
   const today = istTodayISO()
 
@@ -82,16 +83,21 @@ export default function OpsHeadV2() {
 
       const execIds = execs.map(e => e.id)
       if (execIds.length) {
-        const [pingRes, wsRes, taRes] = await Promise.all([
+        const mStart = `${today.slice(0, 8)}01`   // first of this IST month
+        const [pingRes, wsRes, taRes, upRes] = await Promise.all([
           supabase.rpc('latest_ping_per_user', { p_since: `${today}T00:00:00+05:30`, p_until: `${today}T23:59:59+05:30` }),
           supabase.from('work_sessions').select('user_id, check_in_at, check_out_at, auto_checked_out').eq('work_date', today).in('user_id', execIds),
           supabase.from('daily_ta').select('user_id, km_traveled').eq('ta_date', today).in('user_id', execIds),
+          supabase.from('ops_uptime_daily').select('user_id, uptime_pct, screens_total').gte('work_date', mStart).in('user_id', execIds),
         ])
         const pm = {}; (pingRes.data || []).forEach(p => { if (!pm[p.user_id]) pm[p.user_id] = { lat: p.lat, lng: p.lng, captured_at: p.captured_at } })
         const sm = {}; (wsRes.data || []).forEach(w => { sm[w.user_id] = w })
         const km = {}; (taRes.data || []).forEach(k => { km[k.user_id] = k.km_traveled })
-        setPingByUser(pm); setSessByUser(sm); setKmByUser(km)
-      } else { setPingByUser({}); setSessByUser({}); setKmByUser({}) }
+        // avg uptime this month per tech (rows with real measurement only)
+        const acc = {}; (upRes.data || []).forEach(r => { if (r.screens_total > 0) { const a = (acc[r.user_id] ||= { sum: 0, n: 0 }); a.sum += Number(r.uptime_pct); a.n += 1 } })
+        const up = {}; Object.keys(acc).forEach(id => { up[id] = Math.round((acc[id].sum / acc[id].n) * 10) / 10 })
+        setPingByUser(pm); setSessByUser(sm); setKmByUser(km); setUptimeByUser(up)
+      } else { setPingByUser({}); setSessByUser({}); setKmByUser({}); setUptimeByUser({}) }
     } catch (e) { setErr(e?.message || 'load failed') } finally { setLoading(false) }
   }, [today])
 
@@ -123,12 +129,16 @@ export default function OpsHeadV2() {
       out[t.id] = {
         working: !!(w?.check_in_at && !w?.check_out_at && !w?.auto_checked_out),
         km: kmByUser[t.id] || 0, up, down, openTickets: tkCount[t.id] || 0,
+        uptime: uptimeByUser[t.id] ?? null,
         depotNames: (depotsOf[t.id] || []).map(did => depots.find(d => d.id === did)?.name).filter(Boolean),
         ageMin,
       }
     })
     return out
-  }, [techs, depots, screensByDepot, tickets, sessByUser, pingByUser, kmByUser])
+  }, [techs, depots, screensByDepot, tickets, sessByUser, pingByUser, kmByUser, uptimeByUser])
+
+  // overdue tickets — open past 48h (SLA band)
+  const overdue = useMemo(() => tickets.filter(t => t.opened_at && (Date.now() - new Date(t.opened_at).getTime()) > 48 * 3600 * 1000), [tickets])
 
   const activeIds = useMemo(() => new Set(techs.filter(t => perTech[t.id]?.working).map(t => t.id)), [techs, perTech])
   const mapUsers = useMemo(() => techs.map(t => ({
@@ -197,6 +207,17 @@ export default function OpsHeadV2() {
         </div>
       </div>
 
+      {/* overdue-tickets SLA band */}
+      {overdue.length > 0 && (
+        <div className="lead-card" style={{ marginBottom: 14, borderColor: 'var(--danger)', background: 'var(--danger-soft, rgba(239,68,68,.08))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', flexWrap: 'wrap' }}>
+            <AlertTriangle size={18} style={{ color: 'var(--danger)' }} />
+            <span style={{ fontWeight: 700, color: 'var(--danger)' }}>{overdue.length} ticket{overdue.length === 1 ? '' : 's'} overdue</span>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>open more than 48h — {overdue.slice(0, 3).map(t => t.depot?.name).filter(Boolean).join(', ')}{overdue.length > 3 ? '…' : ''}</span>
+          </div>
+        </div>
+      )}
+
       {/* live field map */}
       <div className="lead-card" style={{ marginBottom: 14, padding: 0, overflow: 'hidden' }}>
         <div className="lead-card-head" style={{ padding: '12px 16px' }}>
@@ -241,6 +262,7 @@ export default function OpsHeadV2() {
                   <div className="lead-rep-kpi"><div className={`num ${p.openTickets ? 'dng' : ''}`}>{p.openTickets || 0}</div><div className="lbl">Open tickets</div></div>
                   <div className="lead-rep-kpi"><div className={`num ${p.up ? 'suc' : ''}`}>{p.up || 0}</div><div className="lbl">Screens up</div></div>
                   <div className="lead-rep-kpi"><div className={`num ${p.down ? 'dng' : ''}`}>{p.down || 0}</div><div className="lbl">Screens down</div></div>
+                  <div className="lead-rep-kpi"><div className={`num ${p.uptime == null ? '' : p.uptime >= 90 ? 'suc' : 'warn'}`}>{p.uptime == null ? '—' : `${p.uptime}%`}</div><div className="lbl">Uptime (mo)</div></div>
                 </div>
               </div>
             )

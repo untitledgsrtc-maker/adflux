@@ -85,6 +85,15 @@ export const STR = {
   uploading:       { gu: 'ફોટો ચઢે છે…',                en: 'Uploading…' },
   fix_saved:       { gu: 'સાચવાઈ ગયું',                 en: 'Saved' },
 
+  // — your pay (exec) —
+  your_pay:        { gu: 'તમારો પગાર (અંદાજ)',           en: 'Your pay so far' },
+  uptime_month:    { gu: 'આ મહિને સ્ક્રીન ચાલુ',          en: 'Screen uptime this month' },
+  est_variable:    { gu: 'અંદાજિત ચલ પગાર',              en: 'Estimated variable pay' },
+  pay_hint:        { gu: 'સ્ક્રીન વધુ ચાલુ → વધુ પગાર. અંદાજ માત્ર.',
+                     en: 'More uptime → more pay. Indicative only.' },
+  pay_nodata:      { gu: 'હજી પૂરતી માહિતી નથી',          en: 'Not enough data yet' },
+  navigate:        { gu: 'રસ્તો બતાવો',                  en: 'Navigate' },
+
   // — head overview —
   network:         { gu: 'સ્ક્રીન નેટવર્ક',             en: 'Screen network' },
   total_screens:   { gu: 'કુલ સ્ક્રીન',                 en: 'Total screens' },

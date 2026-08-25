@@ -21,13 +21,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Wrench, MapPin, Phone, CheckCircle2, Loader2, Plus, X, Camera,
   AlertTriangle, MonitorSmartphone, RefreshCw, ChevronDown, ChevronUp,
-  PlayCircle, Building2,
+  PlayCircle, Building2, Navigation,
 } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
-import { dialPhone } from '../../utils/openExternal'
+import { dialPhone, openExternalUrl } from '../../utils/openExternal'
 import { istTodayISO } from '../../utils/istDate'
 import { resizeImage } from '../../utils/leadDedup'
 import {
@@ -65,6 +65,27 @@ function cleanPhone(raw) {
   const d = String(raw).replace(/\D/g, '')
   if (d.length < 10) return null
   return d.length === 10 ? '91' + d : d
+}
+
+// Indicative variable pay from uptime — MUST match OpsAdminV2.indicativeVariable
+// (SLA band 90→97%, 70/30 split, >75 score = full 30% cap). Display only; real
+// pay = the Salary sheet once uptime pay (Phase 4) is turned on.
+function indicativeVariable(salary, uptimePct) {
+  const score = Math.max(0, Math.min(100, ((uptimePct - 90) / 7) * 100))
+  const frac = score > 75 ? 1 : score < 50 ? 0 : score / 100
+  return Math.round((Number(salary) || 0) * 0.30 * frac)
+}
+
+// Directions link to a depot — lat/lng if we have them, else the depot name.
+function depotMapsUrl(depot) {
+  if (!depot) return null
+  if (depot.lat != null && depot.lng != null) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${depot.lat},${depot.lng}`
+  }
+  if (depot.name) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(depot.name + ', Gujarat')}`
+  }
+  return null
 }
 
 /* ─── shared styling (v2 tokens only — §6) ─────────────────────────── */
@@ -154,6 +175,7 @@ function OpsExecApp({ profile, lang, langBar }) {
   const [checkingIn, setCheckingIn] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
+  const [pay, setPay] = useState(null)               // ops_my_uptime_pay (Phase 6)
 
   const today = istTodayISO()
   const uid = profile?.id
@@ -169,7 +191,7 @@ function OpsExecApp({ profile, lang, langBar }) {
         supabase.from('ops_tickets')
           .select('id, type, status, priority, cause, notes, photo_path, opened_at, ' +
                   'screen:ops_screens!ops_tickets_screen_id_fkey(id,name), ' +
-                  'depot:ops_depots!ops_tickets_depot_id_fkey(id,name), ' +
+                  'depot:ops_depots!ops_tickets_depot_id_fkey(id,name,lat,lng), ' +
                   'issue:ops_issue_types!ops_tickets_issue_type_id_fkey(id,issue_en,issue_gu,solution_en,solution_gu)')
           .eq('assigned_to', uid)
           .in('status', ['open', 'in_progress'])
@@ -220,6 +242,17 @@ function OpsExecApp({ profile, lang, langBar }) {
   }, [uid, today])
 
   useEffect(() => { load() }, [load])
+
+  // Your pay so far (Phase 6). Best-effort — the RPC ships in
+  // supabase_ops_p6_admin_cockpit.sql; a missing RPC just hides the card.
+  useEffect(() => {
+    if (!uid) return
+    let alive = true
+    supabase.rpc('ops_my_uptime_pay').then(({ data, error }) => {
+      if (alive && !error && data && typeof data === 'object') setPay(data)
+    }, () => {})
+    return () => { alive = false }
+  }, [uid])
 
   // Refresh when the field tech returns to the app (came back from the
   // dialer / camera). No realtime — ops tables aren't in the publication.
@@ -334,6 +367,32 @@ function OpsExecApp({ profile, lang, langBar }) {
         <Stat n={tickets.length} label={t('open_tickets', lang)} lang={lang} tone="rose" />
         <Stat n={resolvedCount} label={t('resolved_today', lang)} lang={lang} tone="green" />
       </div>
+
+      {/* your pay so far (Phase 6) */}
+      {pay?.has_data && (
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{t('your_pay', lang)}</div>
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{dateL(today, lang).replace(/\s?\d+,?/, '')}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <div style={{
+                fontFamily: 'var(--v2-display)', fontSize: 30, fontWeight: 800,
+                color: Number(pay.uptime_pct) >= 90 ? 'var(--v2-green)' : 'var(--v2-amber)',
+              }}>{numL(Math.round(Number(pay.uptime_pct) || 0), lang)}%</div>
+              <div style={{ fontSize: 13, color: 'var(--v2-ink-1)', marginTop: 2 }}>{t('uptime_month', lang)}</div>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--v2-display)', fontSize: 30, fontWeight: 800, color: 'var(--v2-ink-0)' }}>
+                ₹{numL(indicativeVariable(pay.salary, pay.uptime_pct), lang)}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--v2-ink-1)', marginTop: 2 }}>{t('est_variable', lang)}</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 10 }}>{t('pay_hint', lang)}</div>
+        </div>
+      )}
 
       {/* report a fault */}
       <button onClick={() => setReportOpen(true)} style={btnGhost}>
@@ -481,6 +540,11 @@ function TicketCard({ tk, lang, expanded, onToggle, contacts, uid, onChanged }) 
           {/* screen / depot */}
           <Row icon={MonitorSmartphone} label={t('screen', lang)} value={tk.screen?.name} />
           <Row icon={Building2} label={t('depot', lang)} value={tk.depot?.name} />
+          {depotMapsUrl(tk.depot) && (
+            <button onClick={() => openExternalUrl(depotMapsUrl(tk.depot))} style={{ ...btnGhost, color: 'var(--v2-blue)', borderColor: 'var(--v2-blue)' }}>
+              <Navigation size={16} strokeWidth={1.6} />{t('navigate', lang)}
+            </button>
+          )}
           {!isPhoto && issueLabel && <Row icon={AlertTriangle} label={t('problem', lang)} value={issueLabel} />}
           {!isPhoto && solLabel && (
             <div style={{ background: 'var(--v2-bg-2)', borderRadius: 'var(--v2-r-sm)', padding: '10px 12px' }}>

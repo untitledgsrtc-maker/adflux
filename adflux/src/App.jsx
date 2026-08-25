@@ -71,6 +71,8 @@ const WorkV2 = lazyWithRetry(() => import('./pages/v2/WorkV2'))
 const OpsWorkV2 = lazyWithRetry(() => import('./pages/v2/OpsWorkV2'))
 // Phase 230 (Phase 2) — Operation Head desk console.
 const OpsHeadV2 = lazyWithRetry(() => import('./pages/v2/OpsHeadV2'))
+// Phase 230 (Phase 6) — admin Operations owner cockpit.
+const OpsAdminV2 = lazyWithRetry(() => import('./pages/v2/OpsAdminV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
 const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
 const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
@@ -434,6 +436,7 @@ export default function App() {
           {/* Phase 230 — Operations field app (exec) + Head desk console. */}
           <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
           <Route path="/ops-dashboard"             element={<RequireOps><OpsHeadV2 /></RequireOps>} />
+          <Route path="/ops-admin"                 element={<RequirePrivileged><OpsAdminV2 /></RequirePrivileged>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
               direct reports + today's metrics. Sales head + TC head
               land here on app open via RootRedirect. */}

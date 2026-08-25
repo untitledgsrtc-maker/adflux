@@ -15396,3 +15396,83 @@ flag so a noisy CMS can't spam the queue.
   shape (§35); it only PATCHes existing screens (new external_ids are skipped, seed them first).
 - ❌ check-sql-schema false-positives on PL/pgSQL FOR-loop record fields (`r.uid`) + dotted URL literals
   (`app.untitledad`) — documented (§72#15/§212), not real.
+
+
+---
+
+## 233 · Operations Module Phase 6 — the 3 role dashboards (admin cockpit + Head/exec adds) (2026-08-25)
+
+After Phases 0-5 (§230-§232), the owner ran a /brainstorming pass + AskUserQuestion on
+"what should admin, Operation Head, and operation_executive each SEE" → picked: admin =
+a WIDER owner cockpit with ALL 4 sections (Uptime health+trend · Money · Team performance ·
+Ticket flow); Head + exec get ALL 4 adds (tech sees own pay · navigate to station · Head
+overdue tickets · Head per-tech uptime). Also promoted Dixita (dixita@untitledad.in) →
+operation_head (team_role=NULL first, or RootRedirect keys team_role BEFORE role and sales
+routing wins), moved her 14 leads to Jayna (telecaller_id), + created testope@untitledad.in
+as operation_executive under her. Design spec: `docs/superpowers/specs/2026-08-25-ops-dashboards-design.md`.
+Additive, §45-safe. Guardian PASS on the 2 frozen touches; full `npm run build` PASS.
+
+### What shipped
+- **NEW `src/pages/v2/OpsAdminV2.jsx`** (admin/co_owner, `/ops-admin`) — the owner cockpit,
+  lead-* theme (purple KPI hero + trend SVG + leaderboard table, matching /team-dashboard's
+  look per the owner's "all dashboards must look the same"). Reads ONE server-side
+  aggregation RPC `ops_admin_cockpit(p_days)` (§66). Sections: uptime today (live from
+  ops_screens) + month + trend + worst stations · ticket flow (open/faults/avg-fix/photo)
+  · per-tech leaderboard (uptime/tickets-closed/km/attendance) · **payroll (ADMIN ONLY,
+  §153 — `v_is_admin` gates the `payroll` field so co_owner/govt-partner never sees org
+  ops pay)**. `indicativeVariable(salary, uptimePct)` = the SLA band (clamp((uptime-90)/7
+  *100,0,100) → >75 full / <50 zero / else score/100) × salary × 0.30 — the SAME curve as
+  the Phase-4 pay trigger; indicative only, real pay = the Salary sheet once uptime pay is
+  on.
+- **NEW `supabase_ops_p6_admin_cockpit.sql`** (owner RUNS) — `ops_admin_cockpit(int)`
+  (SECURITY DEFINER, `SET search_path`, gated `admin/co_owner/operation_head` + fail-closed
+  NULL role → `'{}'`, REVOKE PUBLIC/anon + GRANT authenticated; payroll field added ONLY
+  `IF v_is_admin`) + `ops_my_uptime_pay()` (self-scoped DEFINER → `{uptime_pct, salary,
+  has_data}` for auth.uid(), feeds the exec pay card).
+- **OpsHeadV2.jsx** (`/ops-dashboard`) Phase-6 adds: a per-tech **monthly-uptime** avg
+  (4th query in load()'s Promise.all over ops_uptime_daily from month-start, client-avg
+  where screens_total>0 → `uptimeByUser`) → an **"Uptime (mo)"** KPI cell on each tech
+  card (green ≥90 / amber else / "—" no data) + an **overdue-tickets band** (tickets
+  `opened_at < now−48h`) above the map.
+- **OpsWorkV2.jsx** (`/ops`, the Gujarati field app) exec adds: a **"Your pay so far"**
+  card (uptime % + est. variable ₹ via `ops_my_uptime_pay`, best-effort — a missing RPC
+  just hides it) + a **Navigate** button per ticket (`depotMapsUrl`: Google Maps directions
+  to the depot lat/lng, else the depot name; added `lat,lng` to the ticket's depot embed).
+- **opsStrings.js** — added the exec labels (your_pay / uptime_month / est_variable /
+  pay_hint / pay_nodata / navigate), gu-first (§231 pattern).
+- **Frozen (§28, guardian PASS, additive):** App.jsx (lazy OpsAdminV2 + `/ops-admin`
+  under RequirePrivileged) · V2AppShell.jsx (ADMIN_NAV "Operations" repointed
+  `/ops-dashboard` → `/ops-admin`; a "Live console" link inside the cockpit jumps to the
+  Head's /ops-dashboard; SALES/TELECALLER/AGENCY navs + the background-GPS skip list
+  BYTE-UNCHANGED — operation_executive stays tracked, operation_head skipped).
+
+### Contracts / notes
+- Deploy-before-SQL safe: OpsAdminV2 reads `ops_admin_cockpit` (missing → empty cockpit,
+  no crash) + OpsWorkV2 reads `ops_my_uptime_pay` (missing → card hidden). Nothing breaks
+  before the owner runs the p6 SQL.
+- `ops_admin_cockpit` payroll is **admin-only** (§153) — co_owner (Vishal, govt-partner)
+  gets the operational cockpit but NOT org-wide ops pay, mirroring the §42/§153 doctrine.
+- The exec pay card + admin payroll BOTH use the identical `indicativeVariable` curve → one
+  definition, two surfaces (§71). The Phase-4 pay TRIGGER uses the same 90/97 SLA transform
+  → the displayed indicative == what the pay engine will pay once uptime pay is turned on.
+- `today.slice(0,8)+'01'` = the IST month-start for the Head uptime avg (today = istTodayISO).
+- ops_uptime_daily reads: Head via the Phase-0 `ops_uptime_manage` (FOR ALL head/admin),
+  exec pay via the DEFINER RPC (bypasses RLS) — both covered, no new policy.
+
+### Owner action
+1. Run `supabase_ops_p6_admin_cockpit.sql` in Supabase Studio (VERIFY: both fns present +
+   SECURITY DEFINER; `SELECT public.ops_admin_cockpit(30)` as admin → full payload incl.
+   payroll).
+2. Frontend is pushed (JS → live-update reaches the APK on next open; no APK rebuild).
+   Smoke: admin → sidebar "Operations" opens the owner cockpit (/ops-admin — trends +
+   money + leaderboard + ticket flow; "Live console" → /ops-dashboard); operation_head →
+   /ops-dashboard tech cards show the "Uptime (mo)" cell + an overdue band if any ticket is
+   >48h old; operation_executive → /ops (Gujarati) shows "Your pay so far" + a Navigate
+   button on each ticket.
+
+### Foot-guns
+- ❌ Exposing org-wide ops PAYROLL on a co_owner-readable RPC — gate the payroll field on
+  `role='admin'` (§153), not the RPC's role gate (which admits operation_head/co_owner for
+  the operational view).
+- ❌ A per-tech uptime cell that reads `ops_uptime_daily` before the Phase-4 pay flow
+  writes it → all "—" (graceful, not a bug; fills once uptime is recorded).
