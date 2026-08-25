@@ -71,29 +71,65 @@ export default function useAutoRefresh(loadFn, {
       pollId = setInterval(fire, pollSeconds * 1000)
     }
 
-    // Phase 88.6 — Realtime channels on lead_activities +
-    // follow_ups. Unique channel name per mount so multiple pages
-    // using the hook get isolated subscriptions (Supabase merges
-    // them server-side on the same connection). Failure modes:
-    // - Table not in publication → silent no-op, fire() still
-    //   covered by visibility/focus listeners.
-    // - WebSocket disconnect → Supabase reconnects automatically.
+    // Phase 88.6 — Realtime channels on lead_activities + follow_ups.
     // Phase 318 — own-rows filter when userId is set (rep call pages).
+    //
+    // Phase 323 (audit M7) — REJOIN ON ERROR. Previously `.subscribe()` had no
+    // status callback, so a channel that hit CHANNEL_ERROR / TIMED_OUT (routine
+    // on flaky 4G) was never re-joined → reps silently stopped seeing live
+    // updates until a tab-focus. Now we rebuild the channel with exponential
+    // backoff on error, and refetch once after a genuine RECONNECT (to catch
+    // events missed while the socket was down). The visibility/focus/poll
+    // fallbacks stay as the safety net; a `disposed` guard prevents any rejoin
+    // firing after unmount, and the backoff prevents a resubscribe loop.
     const laF = userId ? { filter: `created_by=eq.${userId}` } : {}
     const fuF = userId ? { filter: `assigned_to=eq.${userId}` } : {}
-    const channel = supabase
-      .channel(`auto-refresh-${Math.random().toString(36).slice(2, 10)}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lead_activities', ...laF }, fire)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lead_activities', ...laF }, fire)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follow_ups', ...fuF }, fire)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'follow_ups', ...fuF }, fire)
-      .subscribe()
+    let channel = null
+    let retryId = null
+    let attempt = 0
+    let disposed = false
+    let everErrored = false
+
+    function subscribe() {
+      channel = supabase
+        .channel(`auto-refresh-${Math.random().toString(36).slice(2, 10)}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lead_activities', ...laF }, fire)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lead_activities', ...laF }, fire)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follow_ups', ...fuF }, fire)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'follow_ups', ...fuF }, fire)
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            attempt = 0
+            if (everErrored) { everErrored = false; fire() } // catch up after a reconnect
+          } else if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !disposed) {
+            everErrored = true
+            scheduleRejoin()
+          }
+          // 'CLOSED' fires on our own teardown too — the disposed guard covers it.
+        })
+    }
+
+    function scheduleRejoin() {
+      if (disposed || retryId) return
+      const delay = Math.min(30000, 1000 * 2 ** attempt) // 1,2,4,8,16,30s cap
+      attempt += 1
+      retryId = setTimeout(() => {
+        retryId = null
+        if (disposed) return
+        try { if (channel) supabase.removeChannel(channel) } catch { /* */ }
+        subscribe()
+      }, delay)
+    }
+
+    subscribe()
 
     return () => {
+      disposed = true
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('focus', fire)
       if (pollId) clearInterval(pollId)
-      try { supabase.removeChannel(channel) } catch { /* */ }
+      if (retryId) clearTimeout(retryId)
+      try { if (channel) supabase.removeChannel(channel) } catch { /* */ }
     }
   }, [enabled, pollSeconds, userId])
 }

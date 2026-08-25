@@ -78,7 +78,9 @@ export function useLeadTasks({ userId } = {}) {
         .channel(channelName)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'lead_tasks' },
+          // Phase 323 (audit C2) — scope to the rep's own tasks so every OTHER
+          // rep's lead_tasks change doesn't re-fetch this rep's panel (§57 churn).
+          { event: '*', schema: 'public', table: 'lead_tasks', ...(userId ? { filter: `assigned_to=eq.${userId}` } : {}) },
           () => { fetchTasks() }   // cheap re-fetch; volume is small
         )
         .subscribe()

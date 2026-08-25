@@ -629,7 +629,12 @@ export default function LeadDetailV2() {
   // poll on lead detail so call_logs / activities refetch even
   // without a visibility-change trigger. Visibility + focus still
   // fire as before for instant return-from-dialer refresh.
-  useAutoRefresh(() => load(true), { enabled: !!id, pollSeconds: 20 })  // Phase 71 — silent background refresh
+  // Phase 71 — silent background refresh. Phase 323 (audit H5) — scope the
+  // realtime sub to the viewer's own rows for a rep (admin/co_owner keep the
+  // global sub, they open any rep's lead); a dedicated lead-detail channel +
+  // the 20s poll already cover THIS lead's changes, so the global sub was pure
+  // cross-rep churn (every rep's activity anywhere reloaded the open lead).
+  useAutoRefresh(() => load(true), { enabled: !!id, pollSeconds: 20, userId: isPrivileged ? null : profile?.id })
 
   /* ─── Phase 35 PR 2 — OCR conflict apply ───
      Called from the batch modal's "Apply" button. Merges the

@@ -11,7 +11,7 @@
 // wa_msg_admin + RequirePrivileged route). Touches NO existing flow / frozen
 // table / hot path (§45) — new page, reads new tables only.
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'   // Phase 205 — rep vs admin scope
 import {
@@ -150,6 +150,7 @@ export default function CampaignInboxV2() {
   const [tplLoading, setTplLoading] = useState(false)
 
   const lastSigRef = useRef(null)
+  const lastMsgSigRef = useRef(null)   // Phase 323 (audit H1) — message-pane skip-guard
   const loadThreads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     // Phase 251 — sort by last MESSAGE (in OR out), not last inbound. A thread
@@ -251,7 +252,14 @@ export default function CampaignInboxV2() {
     }
     // Don't blank the open conversation on a transient (silent) error.
     if (error) { if (!silent) toastError(error, 'Could not load messages.') }
-    else setMsgs(data || [])
+    else {
+      // Phase 323 (audit H1) — skip setMsgs on a silent poll when nothing changed,
+      // so the open chat's bubbles (up to 500) don't re-render every 12s while the
+      // rep is mid-reply. Mirrors the thread-list guard (lastSigRef).
+      const rows = data || []
+      const sig = rows.map(m => `${m.id}:${m.status || ''}:${m.body ? m.body.length : 0}:${m.media_url || m.media_id || ''}`).join('|')
+      if (!(silent && sig === lastMsgSigRef.current)) { lastMsgSigRef.current = sig; setMsgs(rows) }
+    }
     if (!silent) setMsgLoading(false)
   }, [])
 
@@ -320,7 +328,10 @@ export default function CampaignInboxV2() {
       .then(({ data }) => setTcs(data || []))
   }, [isPrivileged])
 
-  const sel = threads.find((t) => t.id === selId) || null
+  // Phase 323 (audit M1) — memoize the derived lists so they don't recompute on
+  // every render (incl. every composer keystroke), which re-scanned up to 4,000
+  // threads with per-thread date math each time.
+  const sel = useMemo(() => threads.find((t) => t.id === selId) || null, [threads, selId])
   // Phase 205 read-only gate — a Sales Head (team viewer, can_view_team_dashboard)
   // READS every rep's chat but may only WRITE on their own assigned thread. Admin /
   // co_owner / sales_manager write anywhere. All writes are already server-gated
@@ -330,31 +341,33 @@ export default function CampaignInboxV2() {
   const ownThread = !!(sel && profile?.id && sel.assigned_to === profile.id)
   // Sales Head replies on ANY thread (server-gated in api/wa/send*.js on is_sales_head).
   const canWriteThread = isPrivileged || isSalesHead || ownThread
-  const openCount = threads.filter((t) => windowOpen(t.window_expires_at)).length
+  const openCount = useMemo(() => threads.filter((t) => windowOpen(t.window_expires_at)).length, [threads])
 
   // Phase 258 — filter the loaded threads by the search box (name OR number)
   // and the status chip. Client-side only; the full list stays in `threads`.
-  const searchQ = convSearch.trim().toLowerCase()
-  const searchDigits = searchQ.replace(/\D/g, '')
-  const filteredThreads = threads.filter((t) => {
-    const isOpen = windowOpen(t.window_expires_at)
-    // Phase 259 — team filter (privileged only; reps see own threads via RLS §243)
-    if (isPrivileged && convTeam !== 'all') {
-      if (convTeam === '__none__') { if (t.assigned_to) return false }
-      else if (t.assigned_to !== convTeam) return false
-    }
-    if (convFilter === 'open' && !isOpen) return false
-    if (convFilter === 'needs' && isOpen) return false
-    if (convFilter === 'reply' && !(t.last_message_direction === 'in' && isOpen)) return false
-    if (!searchQ) return true
-    const name = String(t.customer_name || '').toLowerCase()
-    if (name.includes(searchQ)) return true
-    if (searchDigits.length >= 3) {
-      const phone = String(t.customer_wa_id || '').replace(/\D/g, '')
-      if (phone.includes(searchDigits)) return true
-    }
-    return false
-  })
+  const filteredThreads = useMemo(() => {
+    const searchQ = convSearch.trim().toLowerCase()
+    const searchDigits = searchQ.replace(/\D/g, '')
+    return threads.filter((t) => {
+      const isOpen = windowOpen(t.window_expires_at)
+      // Phase 259 — team filter (privileged only; reps see own threads via RLS §243)
+      if (isPrivileged && convTeam !== 'all') {
+        if (convTeam === '__none__') { if (t.assigned_to) return false }
+        else if (t.assigned_to !== convTeam) return false
+      }
+      if (convFilter === 'open' && !isOpen) return false
+      if (convFilter === 'needs' && isOpen) return false
+      if (convFilter === 'reply' && !(t.last_message_direction === 'in' && isOpen)) return false
+      if (!searchQ) return true
+      const name = String(t.customer_name || '').toLowerCase()
+      if (name.includes(searchQ)) return true
+      if (searchDigits.length >= 3) {
+        const phone = String(t.customer_wa_id || '').replace(/\D/g, '')
+        if (phone.includes(searchDigits)) return true
+      }
+      return false
+    })
+  }, [threads, isPrivileged, convTeam, convFilter, convSearch])
 
   // Load the selected conversation's lead (powers the assigned/reassign pill +
   // Create quote). One small read per conversation-open; campaign admin page.

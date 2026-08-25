@@ -445,6 +445,11 @@ export default function LeadsV2() {
     return filtered.slice(start, start + pageSize)
   }, [filtered, page, pageSize])
 
+  // Phase 323 (audit M4) — evaluate "does any lead allow reassign" ONCE per
+  // render instead of once per rendered row (it was called inside the row map,
+  // up to 500× — each a full .some() scan of the filtered set).
+  const showCheckboxCol = useMemo(() => filtered.some(canReassign), [filtered]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Phase 323 — load calls + presentation-time for the leads on THIS page only.
   // Lazy + cached: never aggregates over the whole (6000+) list, so the main
   // load stays unchanged (§45). RPC is SECURITY INVOKER → RLS scopes it, and it
@@ -1196,7 +1201,7 @@ export default function LeadsV2() {
                 {/* Phase 93.10 — header checkbox shows if ANY row in
                     the current filtered view can be reassigned. Same
                     rule as the per-row checkboxes below. */}
-                {filtered.some(canReassign) && (
+                {showCheckboxCol && (
                   <th style={{ width: 32 }}>
                     <input
                       type="checkbox"
@@ -1260,7 +1265,7 @@ export default function LeadsV2() {
                       role that can reassign this lead. Sales / TC see
                       checkbox only on rows they own. Admin / co_owner /
                       sales_manager see all. */}
-                  {filtered.some(canReassign) && (
+                  {showCheckboxCol && (
                     <td className="td-check" onClick={(e) => e.stopPropagation()}>
                       {canReassign(l) ? (
                         <input

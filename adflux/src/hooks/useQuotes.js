@@ -59,7 +59,10 @@ export function useQuotes() {
       let q = supabase
         .from('quotes')
         // cap-ok — paginated by runPaged() below (§66/§152), not a bare unbounded select
-        .select('*, quote_cities(*), payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
+        // Phase 323 (audit H3) — dropped the quote_cities(*) embed: QuotesV2 never
+        // reads line-items (verified), so embedding every line-item row per quote
+        // was pure dead weight on every list load. team_all_quotes RPC can mirror.
+        .select('*, payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
         .order('created_at', { ascending: false })
       // Phase 11g — agency behaves like sales: own quotes only; admin sees all.
       if (profile?.role === 'sales' || profile?.role === 'agency') {

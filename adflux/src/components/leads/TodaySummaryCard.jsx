@@ -145,7 +145,13 @@ export default function TodaySummaryCard({ userId, session }) {
   // userId / session change. Auto-refresh on tab resume + realtime
   // sub on follow_ups so the count drops the moment a row flips to
   // is_done = true.
-  useAutoRefresh(load, { enabled: !!userId })
+  // Phase 323 (audit C2) — pass userId so the SHARED hook's realtime sub fires
+  // only on THIS rep's follow_ups (assigned_to) + activities (created_by), not
+  // every rep's punch (§57 cross-rep churn — this card mounts on every /work).
+  // The separate follow_ups channel below is KEPT: it covers follow_ups DELETE
+  // (the shared hook subs INSERT/UPDATE only) and is already scoped to userId,
+  // so it adds no cross-rep churn — a harmless debounced double-fire at worst.
+  useAutoRefresh(load, { enabled: !!userId, userId })
 
   // Phase 34Z.69 — fix #11: debounce the realtime callback so
   // visibilitychange + realtime + focus don't triple-fire load()

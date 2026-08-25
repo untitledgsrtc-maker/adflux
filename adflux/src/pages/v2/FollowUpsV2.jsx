@@ -210,7 +210,11 @@ export default function FollowUpsV2() {
   useEffect(() => { load() }, [load])
   // Phase 34Z.59 — refetch on tab-resume so completed follow-ups
   // disappear from the queue without a manual reload.
-  useAutoRefresh(load, { enabled: !!profile?.id })
+  // Phase 323 (audit M3) — scope the realtime sub to the rep's own rows so a
+  // normal rep's Follow-ups page isn't reloaded on every OTHER rep's activity
+  // org-wide. Admin + team-viewing modes legitimately need cross-rep rows, so
+  // they keep the global sub (userId null).
+  useAutoRefresh(load, { enabled: !!profile?.id, userId: (isPrivileged || teamViewing || viewingOther) ? null : profile?.id })
 
   // Bucket rows by date — labels chosen to read like a person would
   // describe them ("Overdue" not "<TODAY"; "Today" not "=TODAY").
