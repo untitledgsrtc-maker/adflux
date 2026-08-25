@@ -481,21 +481,31 @@ export default function TeamDashboardV2() {
         // touch is stale. Owner: "daily quote followup". Fetched as
         // a broad list; we filter client-side to status='sent' AND
         // updated_at > 3d ago. (DB has no last_chase_at column.)
-        supabase.from('quotes')
-          .select('id, created_by, status, updated_at, total_amount')
-          .eq('status', 'sent'),
+        // Phase 323 (H7/M17) — admin gets per-rep chase counts from the
+        // team_chase_counts RPC below (un-capped, aggregated), so it skips this
+        // whole-table download. co_owner (govt RLS-scoped) still fetches for the
+        // client-side chase path (the RPC gate doesn't admit co_owner).
+        (profile?.role === 'admin')
+          ? Promise.resolve({ data: [] })
+          : supabase.from('quotes')
+              .select('id, created_by, status, updated_at, total_amount')
+              .eq('status', 'sent'),
         // Phase 82 — payment-chase: status='won' quotes. Joined to
         // payments client-side to compute (total_amount − received)
         // and count rows where balance > 0. Owner: "daily payment
         // follow up".
-        supabase.from('quotes')
-          .select('id, created_by, status, total_amount')
-          .eq('status', 'won'),
+        (profile?.role === 'admin')
+          ? Promise.resolve({ data: [] })
+          : supabase.from('quotes')
+              .select('id, created_by, status, total_amount')
+              .eq('status', 'won'),
         // Phase 82 — sum approved payments per quote_id. Joins
         // with the won-quotes list above to produce per-rep
         // unsettled-quote counts.
-        supabase.from('payments')
-          .select('quote_id, amount_received, approval_status'),
+        (profile?.role === 'admin')
+          ? Promise.resolve({ data: [] })
+          : supabase.from('payments')
+              .select('quote_id, amount_received, approval_status'),
         // Phase 93.4 — overdue follow-ups (not gated by period filter;
         // overdue is always-now). Pulled separately from fuRes which
         // is window-gated. Pending only.
@@ -628,9 +638,26 @@ export default function TeamDashboardV2() {
       })
       setFollowUpsByUser(fuMap)
 
+      // Phase 323 (H4/H7/M17) — admin + team-viewer get per-rep chase counts from
+      // ONE aggregation RPC (un-capped, aggregated server-side; no whole-table
+      // download). co_owner (govt-scoped) + any RPC failure fall through to the
+      // client-side path below (which reads their RLS-scoped rows).
+      let chaseFromRpc = false
+      if (profile?.role === 'admin' || (canViewTeam && !isPrivileged)) {
+        const { data: cc, error: ccErr } = await supabase.rpc('team_chase_counts', { p_period_end: period.endIso })
+        if (!ccErr && Array.isArray(cc)) {
+          const qMap = {}, pMap = {}
+          cc.forEach((r) => { if (r.created_by) { qMap[r.created_by] = Number(r.quote_chase) || 0; pMap[r.created_by] = Number(r.pay_chase) || 0 } })
+          setQuoteChaseByUser(qMap)
+          setPaymentChaseByUser(pMap)
+          chaseFromRpc = true
+        }
+      }
+
       // Phase 82 — quote-chase: status='sent' quotes whose latest
       // updated_at is older than 3 days from period.endIso. These
       // are the "you sent it, nobody chased — go follow up" quotes.
+      if (!chaseFromRpc) {
       const threeDaysMs = 3 * 24 * 60 * 60 * 1000
       const cutoff      = new Date(period.endIso).getTime() - threeDaysMs
       const qcMap = {}
@@ -663,6 +690,7 @@ export default function TeamDashboardV2() {
         }
       })
       setPaymentChaseByUser(pcMap)
+      } // end chase fallback (!chaseFromRpc)
 
       // Phase 93.4 — overdue follow-ups (per assigned_to). Used to
       // replace empty Quote Chase tile for TC reps.
