@@ -15158,3 +15158,81 @@ SQL) → the double-reply fix is live before the recovery cron ever fires. No AP
 The 3rd item: a global per-number SEND THROTTLE (a QR-scan burst can't fire an outbound burst) +
 tightening the §227 quality watcher to auto-pause on YELLOW (not only RED). Recommended for the
 twice-flagged number; owner chose the two above first. Offer it again if quality dips.
+
+
+---
+
+## 230 · Operations Module — design + Phase 0 foundation (2026-08-25)
+
+Owner greenlit a screen-maintenance "Operations" module for the physical GSRTC LED network (separate
+from sales). Two roles: **operation_head** (desktop, runs the network) + **operation_executive**
+(mobile roving field tech, tracked like a sales rep). Reuses the sales stack almost entirely. His live
+signage CMS at **aiadflux.com** (265 screens, live status/uptime/GPS/camera-audience/media-reports) is
+the future real-data source — an API-spec doc was written for his CMS dev; the module reads OUR tables
+now (manual) and the API flips real data later.
+
+### Locked design decisions (owner, 25 Aug)
+- Execution = own INTERNAL roving field team (GPS/calls/attendance tracked); depot electricians stay
+  external contacts they call. Head MANAGES the exec team (manager_id chain).
+- Build NOW on manual data; the aiadflux API flips real data later (adapter, Phase 5).
+- **Pay = 70/30 fixed+variable, variable driven by UPTIME** (more downtime → less pay). Full 30% at
+  ≥97% uptime → 0 below 90%. **Field team gets ₹3/km TA** like reps.
+- **Operation Head owns uptime + closes tickets — Sales Head NOT involved** (owner reversed his earlier
+  "sales head too").
+- **Gujarati-first field UI** (execs don't read English); head/admin English.
+- Sales rep "Request live photo" on a Won campaign → a photo-request task in the field queue → photo
+  back to the rep.
+- Head can REASSIGN a depot (`ops_depots.assigned_to`) or a ticket to another exec — moves the work AND
+  the uptime-pay attribution.
+- Screens = `ops_screens` as a CHILD of the `cities` master (cities keeps station-level counts).
+
+### Reuse map (recon-verified — real files)
+- **Pay**: the salary engine is role-agnostic from monthly_score up (70/30, >75%→full var, leave, net)
+  reading ONE number `daily_performance.score_pct`. The ONLY per-role branch is
+  `db/functions/compute_daily_score.sql`. Phase-4 hook = ADD an ops branch there writing
+  `score_pct = uptime %`; then monthly_score → compute_monthly_salary pay ops 70/30 with ZERO edits.
+  Plus: ops roles in SalaryAdminV2 fetch (line 82) + a `staff_incentive_profiles` row per ops hire
+  (auto-create is sales-only). FROZEN §72 money fn → guardian + shadow-compare + owner-verify.
+- **Calls**: quickLogCall chain (WorkV2:722 / TelecallerV2:503) + call_logs + PostCallOutcomeModal.
+  call_logs `_own`/`_manager` are NOT role-gated → ops works free. §170/§173 dedup + §92 STOP-rule apply.
+  ⚠ duration capture is LEAD-keyed (fetchAndPatchCallDuration early-returns on !leadId) → an ops
+  "call the depot" (ticket-keyed, no lead) logs a call_logs row but skips the fancy duration capture.
+- **GPS/attendance/map/day-summary**: gps_pings + backgroundGps.js + compute_daily_ta + work_sessions +
+  RepMapPanel/GpsTrackV2/TeamDashboardV2 + DaySummaryCard — all user_id-keyed → reuse by adding
+  operation_executive to the gps_pings RLS (role-gated) + operation_head to the V2AppShell:400
+  background-GPS SKIP-list (head=desktop not tracked; exec=tracked). TA auto-fires ₹3/km per ping.
+  km single source = `daily_ta.km_traveled`.
+- **i18n**: NONE exists (no i18next / t()). Build a `{gu,en}` STR label-table (GovtProposalRenderer:46
+  pattern) + gujaratiNumber.js for the ops-exec UI — greenfield, scoped, not app-wide.
+- **Photo**: clone the lead_photos PRIVATE-bucket pattern (supabase_phase33d) + PhotoCapture.jsx +
+  resizeImage → the ops-photos bucket, served via createSignedUrl.
+- **WhatsApp alerts**: openWhatsApp (free deep-link, Gujarati) or send-template.js (approved gu template).
+- **Sales-photo hook**: QuoteDetail.jsx:523 button row, gated `status='won'`; stations = quote_cities.
+
+### Phase 0 SHIPPED + RUN (`supabase_ops_p0_foundation.sql`, owner ran it 25 Aug — "Success")
+Additive + §45-safe: roles added to users_role_check (re-added with all 9 current + the 2 new — the
+highest-risk line, review-verified complete); 6 `ops_*` tables (ops_depots w/ assigned_to reassign,
+ops_screens child of cities, ops_issue_types gu/en, ops_depot_contacts, ops_tickets [type
+fault|photo_request], ops_uptime_daily); RLS (head/admin manage, exec owns their tickets + reads
+masters, sales raises photo-requests; NEW ADDITIVE ops policies on gps_pings + daily_ta — frozen sales
+policies UNTOUCHED; work_sessions/call_logs already role-neutral); a private `ops-photos` bucket; seed
+(11 bilingual issue types, depots from cities, screens from cities.screens). Adversarial review = SHIP
+(role-CHECK complete, frozen untouched, fail-closed, idempotent); 2 tightenings applied (ops-photos
+read scoped to the ops team only; sales_request pins type+requested_by+created_by, drops the redundant
+head). check-sql-schema OK. Idempotent → safe to re-run if the pre-tightening version was pasted first.
+
+### NEXT
+1. Owner runs the VERIFY (roles_ok t, ops_tables 6, bucket 1, seed>0).
+2. Create the ops team: ≥1 operation_head + N operation_executive, `exec.manager_id = head`, assign
+   `ops_depots.assigned_to` per exec (+ `staff_incentive_profiles.monthly_salary` for pay, Phase 4).
+3. Build Phase 1 (mobile /ops field app, Gujarati) → 2 head dashboard → 3 sales-photo bridge →
+   4 uptime pay (money, guarded) → 5 aiadflux API adapter + alerts. Plans published as Claude artifacts
+   (design + build plan — not in the repo).
+
+### Foot-guns
+- ❌ Editing the frozen `compute_daily_score` for ops pay = money + §72 → ADD a branch, never a copy;
+  guardian + shadow-compare + owner-verify before it goes live.
+- ❌ Pinning an RLS WITH CHECK column to its OLD value needs a self-referential subquery = the §172c
+  recursion trap; do NOT lock ops-ticket columns that way (accepted the P3 audit-integrity nit instead).
+- ❌ ops "call the depot" isn't lead-keyed → the sales duration-capture util (lead_id-filtered) won't
+  fill it; log the call_logs row ticket-keyed, accept no auto-duration.
