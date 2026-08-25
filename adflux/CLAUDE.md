@@ -15236,3 +15236,74 @@ head). check-sql-schema OK. Idempotent → safe to re-run if the pre-tightening 
   recursion trap; do NOT lock ops-ticket columns that way (accepted the P3 audit-integrity nit instead).
 - ❌ ops "call the depot" isn't lead-keyed → the sales duration-capture util (lead_id-filtered) won't
   fill it; log the call_logs row ticket-keyed, accept no auto-duration.
+
+
+---
+
+## 231 · Operations Module Phase 1 — /ops field app (Gujarati) + Head overview SHIPPED (2026-08-25)
+
+The exec field app + interim Head overview on top of Phase 0 (§230). Additive, §45-safe (no sales/
+frozen contract touched — 2 new files + purely-additive edits to 2 frozen files). Guardian PASS
+(verified against `git diff`), full `npm run build` PASS. Self-pushed (§211). **No SQL** (Phase 0 SQL
+`0f78f92` already run), **no APK** (JS → live-update reaches the APK on next open; no native touch).
+
+### The 2 new files
+- `src/utils/opsStrings.js` — the module's SCOPED i18n table (NOT app-wide; none exists). `STR` =
+  `{gu,en}` per label + `t(key,lang)` (falls back gu→en→key, never crashes) + `numL`/`dateL`/`timeL`
+  (Gujarati digits via `gujaratiNumber.js`) + `getOpsLang`/`setOpsLang` (localStorage `ops_lang`,
+  **default 'gu'** — the field team reads Gujarati, §230). Add a key here → use it. Reusable for any
+  future ops surface.
+- `src/pages/v2/OpsWorkV2.jsx` — ONE route, role-branched:
+  - **operation_executive** → the mobile FIELD app: header + language toggle (ગુ/EN) · check-in
+    (insert-or-update `work_sessions` for me+today + a `gps_ping` source='checkin' — ops has NO
+    plan/startDay flow so it can't just `.update()` a missing row) · open/resolved-today stat cards ·
+    **Report a fault** bottom-sheet (pick depot→screen→issue→priority → `ops_tickets` insert
+    type='fault' assigned_to=me, §47 useRef save-latch) · ticket queue (`ops_tickets` assigned_to=me,
+    status open/in_progress, joined to screen/depot/issue) → expand → bilingual problem+solution,
+    depot contacts (Call = `dialPhone` + a best-effort ticket-keyed `call_logs` audit row, §230:
+    no lead → no duration capture), status Open→In Progress→Resolved, log cause+notes, photo →
+    `ops-photos` private bucket + `photo_path`. Refreshes on visibilitychange/focus (ops tables
+    aren't in the realtime publication → NO useAutoRefresh).
+  - **operation_head** → interim network overview (screen up/down/total counts + open-ticket count +
+    field-team headcount, all count-head queries). Full Head desktop dashboard = Phase 2.
+
+### The 2 FROZEN-file additive edits (§28, guardian PASS)
+- `src/App.jsx` — lazy import `OpsWorkV2`; a NEW `RequireOps` guard (operation_head/operation_executive
+  /admin/co_owner, else →/dashboard); a RootRedirect branch (both ops roles →/ops, keyed on `role` not
+  `team_role`) BEFORE the /dashboard fallback; `<Route path="/ops">` after /work (§10: literal, no
+  param shadow).
+- `src/components/v2/V2AppShell.jsx` — a NEW `OPS_NAV` (one entry →/ops, icon `Tv` already imported);
+  `operation_head` appended to the background-GPS SKIP list (desk role); `isOps` + `isOps ? OPS_NAV :`
+  in BOTH baseNav + baseMobileNav; ops role labels in the 3 topbar ternaries. SALES_NAV/TELECALLER_NAV/
+  AGENCY_NAV/MOBILE_NAV_* BYTE-UNCHANGED; PostCallOutcomeModal/useAutoRefresh/push untouched.
+
+### THE GPS CONTRACT (do NOT regress)
+operation_executive is DELIBERATELY NOT in the GPS skip → it starts background GPS = **tracked like a
+field rep** (the head sees them on the map; ₹3/km TA auto-fires per ping, §230). operation_head IS
+skipped (desk). Any future edit to the V2AppShell:412 skip list must keep operation_executive OUT of it.
+
+### Owner action / smoke
+Push done. Create the ops team (§230 NEXT): ≥1 operation_head + N operation_executive with
+`exec.manager_id=head` + `ops_depots.assigned_to` per exec. Then: an operation_executive logs in →
+lands on `/ops` (Gujarati) → checks in → "Report a fault" creates a ticket → the ticket appears in the
+queue → open it → Call the depot / Start work / log cause / add a photo / Mark resolved. An
+operation_head → `/ops` shows the network overview. A sales/telecaller user hitting `/ops` bounces to
+their dashboard (RequireOps). Field-app data flows in once tickets exist (Phase 2 head-created + Phase 3
+sales photo-requests); until then the exec's queue seeds from their own "Report a fault".
+
+### NEXT (Phase 2→5, §230)
+Phase 2 = the Head desktop dashboard (depot/screen grid, uptime, ticket board, reassign a depot/ticket
+to another exec, live field-team map reusing TeamDashboardV2). Phase 3 = the sales "Request live photo"
+bridge at QuoteDetail (won campaign → a photo_request ticket in the field queue → photo back to the rep).
+Phase 4 = uptime 70/30 pay (ADD an ops branch to the FROZEN `db/functions/compute_daily_score.sql`
+writing `score_pct = uptime %` → guardian + shadow-compare + owner-verify; §72 money fn — NEVER a copy).
+Phase 5 = the aiadflux CMS API adapter (flip `ops_screens.status`/uptime to real data by `external_id`)
++ WhatsApp downtime alerts.
+
+### Foot-guns (this phase)
+- ❌ ops has NO plan/startDay flow → a `work_sessions` `.update().eq(user_id).eq(work_date)` silently
+  affects 0 rows (no row exists). Insert-if-missing-else-update for the ops check-in.
+- ❌ ops i18n is a SCOPED `{gu,en}` table (opsStrings.js), not an app-wide framework — the label
+  fallback (gu→en→key) means a half-translation degrades, never crashes.
+- ❌ keep operation_executive OUT of the V2AppShell GPS skip list (it must stay tracked); only
+  operation_head (desk) is skipped.

@@ -67,6 +67,8 @@ const CampaignBroadcastV2 = lazyWithRetry(() => import('./pages/v2/CampaignBroad
 const CampaignIntegrationsV2 = lazyWithRetry(() => import('./pages/v2/CampaignIntegrationsV2'))
 const CampaignChatbotV2 = lazyWithRetry(() => import('./pages/v2/CampaignChatbotV2'))
 const WorkV2 = lazyWithRetry(() => import('./pages/v2/WorkV2'))
+// Phase 230 — Operations module (screen-maintenance field app + Head overview).
+const OpsWorkV2 = lazyWithRetry(() => import('./pages/v2/OpsWorkV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
 const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
 const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
@@ -254,6 +256,18 @@ function RequireNonAgency({ children }) {
   return children
 }
 
+// Phase 230 — Operations module route guard. Only the two ops roles
+// (plus admin/co_owner for oversight) may reach /ops; everyone else
+// bounces to their own dashboard. Additive — no existing guard changed.
+function RequireOps({ children }) {
+  const { profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  const role = profile?.role
+  if (role === 'operation_head' || role === 'operation_executive'
+      || role === 'admin' || role === 'co_owner') return children
+  return <Navigate to="/dashboard" replace />
+}
+
 function RootRedirect() {
   const { user, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
@@ -304,6 +318,11 @@ function RootRedirect() {
   if (role === 'hr')                              return <Navigate to="/hr" replace />
   // Phase 182 — Accounts login lands on the payroll shell.
   if (role === 'accounts')                        return <Navigate to="/people" replace />
+  // Phase 230 — Operations module. Both ops roles land on /ops:
+  // operation_executive → the mobile field app; operation_head → the
+  // interim network overview (full Head desktop dashboard is Phase 2).
+  // Keyed on `role` (not team_role — ops isn't a sales flavor).
+  if (role === 'operation_head' || role === 'operation_executive') return <Navigate to="/ops" replace />
   return <Navigate to="/dashboard" replace />
 }
 
@@ -410,6 +429,8 @@ export default function App() {
           <Route path="/leads/new"                 element={<RequireNonAgency><LeadFormV2 /></RequireNonAgency>} />
           <Route path="/leads/:id"                 element={<RequireNonAgency><LeadDetailV2 /></RequireNonAgency>} />
           <Route path="/work"                      element={<WorkV2 />} />
+          {/* Phase 230 — Operations field app / Head overview. */}
+          <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
               direct reports + today's metrics. Sales head + TC head
               land here on app open via RootRedirect. */}

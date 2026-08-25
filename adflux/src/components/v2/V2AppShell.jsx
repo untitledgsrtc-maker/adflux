@@ -252,6 +252,13 @@ const ACCOUNTS_NAV = [
   { to: '/finance',           label: 'Finance',        icon: IndianRupee },
 ]
 
+// Phase 230 (2026-08-25) — Operations module. Both ops roles get a single
+// /ops entry (operation_executive → the mobile field app; operation_head →
+// the interim network overview). Phase 2 will split the Head a wider nav.
+const OPS_NAV = [
+  { to: '/ops',               label: 'Operations',     icon: Tv },
+]
+
 const MOBILE_NAV_ADMIN = [
   { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
   { to: '/pending-approvals', label: 'Approve',        icon: CheckSquare },
@@ -401,7 +408,10 @@ export function V2AppShell() {
     if (!profile?.id) return
     const role = (profile?.role || '').toLowerCase()
     // Phase 182 — accounts is an office-only finance role; skip the watcher.
-    if (role === 'telecaller' || role === 'agency' || role === 'accounts') return
+    // Phase 230 — operation_head is a desk role; skip it too. The roving
+    // operation_executive is NOT skipped → it's tracked like a field rep.
+    if (role === 'telecaller' || role === 'agency' || role === 'accounts'
+        || role === 'operation_head') return
     startBackgroundGps(profile.id).catch((e) =>
       console.warn('[v2-shell] bg-gps start failed:', e?.message || e)
     )
@@ -536,11 +546,13 @@ export function V2AppShell() {
   const isAgency     = profile?.role === 'agency'
   const isHR         = profile?.role === 'hr'   // Phase 109 — HR login
   const isAccounts   = profile?.role === 'accounts'   // Phase 182 — Accounts login
+  const isOps        = profile?.role === 'operation_head' || profile?.role === 'operation_executive'  // Phase 230
   const baseNav =
     isPrivileged   ? ADMIN_NAV :
     isManager      ? MANAGER_NAV :
     isHR           ? HR_NAV :
     isAccounts     ? ACCOUNTS_NAV :
+    isOps          ? OPS_NAV :
     isTelecaller   ? TELECALLER_NAV :
     isAgency       ? AGENCY_NAV :
                      SALES_NAV
@@ -553,6 +565,7 @@ export function V2AppShell() {
     isManager      ? MOBILE_NAV_MANAGER :
     isHR           ? HR_NAV :
     isAccounts     ? ACCOUNTS_NAV :
+    isOps          ? OPS_NAV :
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES
@@ -639,6 +652,7 @@ export function V2AppShell() {
               : isAccounts ? 'Accounts'
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
+              : isOps ? (profile?.role === 'operation_head' ? 'Operation Head' : 'Field Tech')
               : 'Sales'
             }</div>
           </div>
@@ -829,6 +843,7 @@ export function V2AppShell() {
                 : isAccounts ? 'Accounts'
                 : isTelecaller ? 'Telecaller'
                 : isAgency ? 'Agency'
+                : isOps ? (profile?.role === 'operation_head' ? 'Operation Head' : 'Field Tech')
                 : 'Sales'
               }</div>
             </div>
@@ -941,6 +956,7 @@ export function V2AppShell() {
               : isAccounts ? 'Accounts'
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
+              : isOps ? (profile?.role === 'operation_head' ? 'Operation Head' : 'Field Tech')
               : 'Sales'
             }</div>
                 </div>
