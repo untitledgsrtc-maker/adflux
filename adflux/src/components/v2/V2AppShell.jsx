@@ -109,6 +109,9 @@ const ADMIN_NAV = [
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   // Campaign module — list/create campaigns (QR & Locations one click in). Token-free.
   { to: '/campaigns',         label: 'Campaigns',      icon: Megaphone },
+  // Phase 230 — Operations (GSRTC LED screen maintenance). Admin opens the
+  // Head console; RequireOps admits admin/co_owner for oversight.
+  { to: '/ops-dashboard',     label: 'Operations',     icon: Tv },
 ]
 
 const SALES_NAV = [
