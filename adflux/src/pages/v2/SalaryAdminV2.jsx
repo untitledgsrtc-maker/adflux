@@ -124,17 +124,24 @@ export default function SalaryAdminV2({ embedded = false }) {
     }
     setTaBreakdown(tb)
 
-    // Phase 182 — RPC per rep, now run in parallel (Promise.all preserves
-    // array order, so `out` is identical to the old sequential build — just
-    // not one-at-a-time). Salary tab re-runs this on every tab-focus, so the
-    // serial 24-RPC chain was the sluggishness.
-    const out = await Promise.all((usersRes.data || []).map(async (u) => {
-      const { data, error: rpcErr } = await supabase.rpc('compute_monthly_salary', {
-        p_user_id: u.id, p_year: y, p_month: m,
-      })
-      if (rpcErr) return { user: u, error: rpcErr.message }
+    // Phase 323 (audit H6) — ONE server-side batch RPC (was ~24 parallel
+    // compute_monthly_salary calls re-fired on every tab-focus). compute_monthly_salaries
+    // loops the SAME frozen canonical per user → byte-identical per-user jsonb
+    // (shadow-verified). usersRes still drives name/role/order/filter/CSV; join by id.
+    const { data: batch, error: batchErr } = await supabase.rpc('compute_monthly_salaries', {
+      p_year: y, p_month: m,
+    })
+    if (batchErr) {
+      // deploy-before-SQL / transient: surface per-row (existing error UI), never a wrong number.
+      setRows((usersRes.data || []).map(u => ({ user: u, error: batchErr.message })))
+      setLoading(false)
+      return
+    }
+    const salByUser = new Map((batch || []).map(b => [b.user_id, b.result]))
+    const out = (usersRes.data || []).map((u) => {
+      const data = salByUser.get(u.id)
       return { user: u, ...((data && typeof data === 'object') ? data : {}) }
-    }))
+    })
     setRows(out)
     setLoading(false)
   }

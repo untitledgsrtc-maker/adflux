@@ -15476,3 +15476,121 @@ Additive, §45-safe. Guardian PASS on the 2 frozen touches; full `npm run build`
   the operational view).
 - ❌ A per-tech uptime cell that reads `ops_uptime_daily` before the Phase-4 pay flow
   writes it → all "—" (graceful, not a bug; fills once uptime is recorded).
+
+
+---
+
+## 234 · Phase 323 — full performance audit + fixes (Tier 1/2/3) + /quotes won_at bug (2026-08-25)
+
+Owner: "make sure all my team using this and current flow doesn't affect — just
+speed up superfast" (§45 binds every item). A prior session ran an **8-lens
+read-only perf audit** → an Artifact report (33 findings: 3 Critical / 9 High /
+21 Medium), each with file:line + fix. This session fixed it in risk-tiered
+batches. Report Artifact: `cc92bc66-785c-41aa-8e6f-ad6a73b53674` (read via
+WebFetch — a claude.ai/code/artifact URL, fetchable via login).
+
+### Tier 1 — cold-open bundle + serial→parallel (commit `8c6f5fb`, PUSHED)
+- **C3 (the marquee win) — `vite.config.js` manualChunks OBJECT→FUNCTION form.**
+  The object form let Rollup mis-home Vite's **preload helper** (minified `_`) into
+  the lazy `pdf` chunk AND **zustand** (a dep of BOTH reactflow AND the app's stores)
+  into `flow` → the entry statically imported pdf+flow → the **602KB PDF stack +
+  reactflow downloaded on EVERY cold open** for all 22 users. Fix: pin the
+  preload/commonjs helpers + zustand into the always-loaded `react-vendor` chunk;
+  match `@react-pdf`/`reactflow` BEFORE the generic `react` branch (both contain
+  "react" in the path). Result: **cold-path JS 810KB → 188KB gz** (pdf 583/sheet
+  139/flow 45 now lazy). VERIFY: index.html modulepreload = ONLY react-vendor +
+  supabase; the entry chunk statically imports only those two.
+- M5/M8/M13/M15: serial DB reads → `Promise.all` (team-assistant 7→1, AdminDash
+  folded a stray query into its batch, ManagerDash 4→1, RenewalTools 2→1).
+
+### Tier 2 — realtime hardening + re-render/over-fetch (commit `2d6fd50`, PUSHED)
+- **M7 — `useAutoRefresh` (the §28 FROZEN hook, 6 mounts): rejoin-on-error.**
+  `.subscribe()` had no status callback → a channel that hit CHANNEL_ERROR/TIMED_OUT
+  (routine on 4G) never rejoined → reps silently went stale. Now: re-subscribe on
+  error with exp backoff (1..30s), refetch once after a RECONNECT (not first
+  connect), `disposed` guard blocks post-unmount rejoin, §318 userId filter +
+  visibility/focus/poll fallbacks preserved. Signature/return unchanged → all 6
+  mounts benefit with no call-site change.
+- **C2/H5/M3 — own-rows realtime scoping** (mirror the shipped §318 pattern, additive
+  `userId`): TodaySummaryCard + LeadDetailV2 + FollowUpsV2 + useLeadTasks sub to the
+  rep's OWN rows; admin/team-view keep the global sub. Kills the cross-rep reload
+  churn (§57), incl. mid-call. TodaySummaryCard KEPT its manual follow_ups channel
+  (the shared hook does INSERT/UPDATE only; a filtered realtime DELETE can't carry
+  assigned_to → the manual channel covers follow_ups DELETE).
+- H1 (inbox msg-pane skip-guard, mirrors the thread-list `lastSigRef`) · M1 (inbox
+  sel/openCount/filteredThreads memoized) · M4 (LeadsV2 `filtered.some(canReassign)`
+  once/render not once/row) · H3 (dropped the dead `quote_cities(*)` embed from the
+  quotes list — QuotesV2 never reads it).
+
+### /quotes won_at bug — every Won deal dated the same day (commit `ea8c4e6`, SQL RUN)
+Owner: "Won — all quotes have the same date." The Won-tab Date column shows
+`quotes.won_at`; every won deal showed **17 Aug 2026**. ROOT: the §214 Phase 311
+backfill dated existing wons by `won_at = COALESCE(updated_at, created_at)`, and a
+bulk edit on 17 Aug (the Phase 274 govt-TDS backfill, §217) bumped every quote's
+`updated_at` → all wons collapsed to 17 Aug. §214 itself flagged this as needing a
+one-time correction. Code (`quoteDateOf`→`won_at`) is correct; the DATA was wrong.
+FIX: `supabase_phase311_won_at_correction.sql` (owner-run, diagnostic+fix+verify in
+one file) re-derives `won_at` from the **first approved payment_date** (money-in =
+the real win date), else created_at. Owner ran it → 38 won: **24 dated by real
+payment, 14 by created_at** (won with no approved payment — worth a glance, §217
+UA-2026-0203 class). The Phase-311 trigger dates NEW wins correctly (won_at=now()
+on the transition); this fixed HISTORY only. won_at does NOT feed pay (pay =
+payments.payment_date via rebuild_monthly_sales).
+- ⚠ The /quotes STATUS filter WORKS — an earlier "Won shows all quotes" screenshot
+  was caught MID-FETCH (the effect re-fetches won-only on filters.status change).
+- FOOT-GUN: `won_at = updated_at` as a backfill proxy is fragile — ANY later bulk
+  edit (a TDS/GST/media backfill) bumps updated_at and re-dates every won deal.
+  Date a "won" event from a real signal (first approved payment), never last-touch.
+
+### Tier 3 — money/DB (SHADOW-COMPARE required, §71 rule 3)
+Money changes ship with an owner-verified shadow-compare (new==old on real data)
+BEFORE the frontend switches. A design workflow produced exact SQL + shadow-compares
++ risk/revert per item.
+- **Batch-1 SHIPPED — additive batch RPCs (SQL commit `1d8bccf`, RUN + shadow-verified
+  0 rows; frontend commit `<this>`):** `compute_monthly_salaries(y,m)` (H6) +
+  `monthly_scores(month_start)` (M14) — each LOOPS the frozen §72 canonical per user
+  → **byte-identical by construction**, replacing SalaryAdminV2's ~24 parallel calls +
+  MasterV2 PerformanceTab's N parallel calls (re-fired on every tab-focus) with ONE
+  each. `supabase_phase323_tier3_batch_rpcs.sql` carries both RPCs + both
+  shadow-compares. Deploy-order safe (JS-before-SQL → RPC 404s into an error UI, never
+  a wrong number). Revert = git-revert the frontend; the additive fn goes dormant.
+  **CONTRACT: the batch RPC's WHERE (user set) MUST stay in lockstep with the page's
+  users query** (compute_monthly_salaries: role IN sales/telecaller/admin/co_owner;
+  monthly_scores: team_role IN sales/agency + is_active). Guardian P2: a single bad
+  user now errors the whole page (atomic RPC) vs one row before — acceptable (the
+  canonical runs clean per-user); add a per-row BEGIN…EXCEPTION only if it surfaces.
+- **⚠ C1 (₹3/km TA trigger) — HELD, owner decision.** The report's biggest DB win =
+  fire `compute_daily_ta` only on check-in/check-out + the 23:50 cron instead of every
+  GPS ping (~1,500×/rep/day). **It REVERSES the owner's explicit Phase 34Z.67c
+  "every-ping is perfect" decision** — reps would see a stale ~0 km all day until the
+  cron. Paid km ends identical (cron backstops), but the live km view regresses. Do
+  NOT build without explicit owner re-approval + a shadow-compare proving end-of-day
+  daily_ta.km_traveled is byte-identical old-vs-new.
+- **HELD for owner shadow-review:** team_chase_counts (H4/H7/M17/M21 — stops the team
+  dashboard downloading all sent+won quotes + the whole payments table; re-implements
+  client chase logic → scrutinize the shadow) · M19 finance_pnl_summary_fast (33 scans
+  → 2) · H9 (defer meeting score off the synchronous save path — score→incentive,
+  becomes eventually-consistent ≤1 cron min) · M20 (lead_activities RLS `lead_id IN
+  (SELECT...)` → correlated `EXISTS` on the leads PK — plan-only, visibility
+  byte-identical, but it's the hottest table's frozen RLS).
+
+### HELD-BACK column trims (NOT done — need a careful pass)
+The `select('*')` → explicit-column trims (H2 leads-notes, M9/M11 admin/inbox) + M2
+(Finance Register virtualization) + M12 (Clients pagination). Reason: the codebase
+already got bitten by exactly this — AdminDashboardDesktop's `quotes.select('*')`
+carries a comment that `*` was CHOSEN after a missing column silently zeroed the
+dashboard. Replacing `*` with an enumerated list on a live frozen list risks that
+schema-drift regression (§45) → column-by-column with the exact read-set verified +
+tested, not in a batch. Owner asked to do these AFTER Tier 3.
+
+### Perf foot-guns (don't repeat)
+- ❌ manualChunks OBJECT form silently mis-homes Vite's preload helper + shared deps
+  (zustand) into a LAZY vendor chunk → the entry back-imports it → the heavy chunk
+  loads on every cold open. Use the FUNCTION form + pin the preload/commonjs helpers +
+  any dep shared with the always-loaded tree into react-vendor. VERIFY via the
+  index.html modulepreload set + the entry chunk's static imports.
+- ❌ A money/DB change shipped without an owner-verified shadow-compare (§71 rule 3).
+  Prefer an ADDITIVE fn (loop the frozen canonical → byte-identical by construction)
+  over editing a §72 canonical.
+- ❌ A perf "fix" that reverses a prior owner decision (C1 vs 34Z.67c) — flag it, get
+  re-approval, never ship on the perf argument alone.

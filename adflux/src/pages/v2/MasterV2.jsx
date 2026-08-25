@@ -2138,12 +2138,16 @@ function PerformanceTab() {
     const monthStart = new Date()
     monthStart.setDate(1)
     const ms = monthStart.toISOString().slice(0, 10)
-    // Phase 182 — monthly_score per rep in parallel (Promise.all preserves
-    // order → `rows` identical to the old sequential build).
-    const rows = await Promise.all((users || []).map(async (u) => {
-      const { data: s } = await supabase
-        .rpc('monthly_score', { p_user_id: u.id, p_month_start: ms })
-      return { user: u, score: Array.isArray(s) && s.length > 0 ? s[0] : null }
+    // Phase 323 (audit M14) — ONE batch RPC (was N parallel monthly_score calls
+    // on every load). monthly_scores loops the SAME frozen monthly_score and
+    // returns one row per user with the same score columns + user_id
+    // (shadow-verified). Falls back to null scores if the RPC isn't deployed yet.
+    const { data: batch, error: batchErr } = await supabase
+      .rpc('monthly_scores', { p_month_start: ms })
+    const scoreByUser = new Map((Array.isArray(batch) ? batch : []).map(b => [b.user_id, b]))
+    const rows = (users || []).map((u) => ({
+      user: u,
+      score: batchErr ? null : (scoreByUser.get(u.id) || null),
     }))
     setReps(rows)
     setLoading(false)
