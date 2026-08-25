@@ -15307,3 +15307,92 @@ Phase 5 = the aiadflux CMS API adapter (flip `ops_screens.status`/uptime to real
   fallback (gu→en→key) means a half-translation degrades, never crashes.
 - ❌ keep operation_executive OUT of the V2AppShell GPS skip list (it must stay tracked); only
   operation_head (desk) is skipped.
+
+
+---
+
+## 232 · Operations Module Phases 2-5 SHIPPED (2026-08-25)
+
+Phases 2-5 built end-to-end after Phase 1 (§231). Recon-first (a 5-agent parallel sweep mapped
+QuoteDetail, the pay/salary chain, exact ops RLS, field-tracking reuse). All additive, §45-safe
+(no sales/frozen contract touched); every frozen-file edit guardian-PASS + `npm run build` PASS.
+Self-pushed (§211). Commits: 2=`ab55df3` · 3=`037b363` · 4=`e0bbad1` · 5=`74fc9f7`.
+
+### Phase 2 — Operation Head desk console (`/ops-dashboard`, `ab55df3`)
+`src/pages/v2/OpsHeadV2.jsx` (NEW). 4 tabs: **Overview** (screen online/offline/unknown/total +
+open-tickets + techs-on-duty KPIs + a "Record uptime" button → `rpc('ops_recompute_uptime_today')`,
+no-ops until the Phase 4 SQL runs) · **Screens** (depot board; reassign a depot to another tech →
+`ops_depots.assigned_to`) · **Tickets** (all open/in-progress; reassign → `ops_tickets.assigned_to`) ·
+**Field team** (roster: on-duty, km today, GPS-freshness dot, open-ticket count). Field tracking
+reuses the sales infra: `latest_ping_per_user` RPC (SECURITY INVOKER → scoped by the Phase-0
+`gps_pings_ops_head` policy), `daily_ta` batch (`ta_ops_head`), `work_sessions` (manager_id chain —
+needs `exec.manager_id = head`). Head has FOR ALL on ops_depots/screens/tickets (Phase 0) so the
+reassign writes go through RLS. Frozen edits (guardian PASS): App.jsx (lazy OpsHeadV2, RootRedirect
+head → `/ops-dashboard`, `/ops-dashboard` route under RequireOps), V2AppShell (`OPS_NAV` split →
+`OPS_HEAD_NAV`/`OPS_EXEC_NAV`, role-specific pick). OpsWorkV2 head branch now `<Navigate to=
+"/ops-dashboard">` (dropped the Phase-1 interim overview).
+
+### Phase 3 — sales "Request live photo" → field queue + readback (`037b363`) — NO SQL
+`src/components/ops/OpsPhotoRequest.jsx` (NEW): `<OpsPhotoRequestButton>` (won **LED_OTHER** quotes
+only → inserts an `ops_tickets` photo_request via the Phase-0 `ops_tickets_sales_request` RLS; the
+Head routes it to a tech on the Phase-2 ticket board; the tech photographs it, Phase-1 queue) +
+`<OpsLivePhotos>` (rep reads their requests back via `ops_tickets_sales_read` + views the returned
+photo). `api/ops/photo-url.js` (NEW, **EDGE**): the ops-photos bucket RLS (`ops_photos_read`)
+excludes sales, so a rep can't client-side sign even their own ticket → this Edge fn verifies ticket
+ownership (requested_by / ops / admin) with the service role, then signs 600s. Mounted additively in
+QuoteDetail (money-adjacent, NOT §28 frozen — payment/status/PDF untouched). **No SQL, no new env**
+(Phase-0 RLS + bucket + existing SUPABASE env cover it) — works on deploy. **LED_OTHER-only** because
+QuoteDetail redirects GOVERNMENT (GSRTC_LED) to `/proposal/:id` — extend the button to
+GovtProposalDetailV2 later for govt campaigns (a 2-line mount).
+
+### Phase 4 — uptime → 70/30 pay (`e0bbad1`, `supabase_ops_p4_uptime_pay.sql`) — MONEY, OWNER-RUN
+The pay mechanism, built but NOT flipped live (§71 rule 3). Approach recon-verified + adversarially
+reviewed = **SHIP** (2 advisories, both handled): a NEW `SECURITY DEFINER` trigger on
+`ops_uptime_daily` writes `daily_performance.score_pct` — the frozen `db/functions/compute_daily_score.sql`
+is **BYTE-UNTOUCHED** (§72). From there the role-agnostic chain (monthly_score → base → compute_monthly_salary)
+pays ops execs 70/30 with ZERO edits (no role gate excludes operation_executive; pay = monthly_salary ×
+avg(score_pct)). Pieces: `ops_recompute_uptime_today(uuid)` (snapshots each tech's assigned screens'
+current statuses → uptime = online/(online+offline); role-gated head/admin/service, §41 fail-closed) +
+the trigger (SLA transform `LEAST(100,GREATEST(0,(uptime-90)/(97-90)*100))` → score_pct; is_excluded on
+off-day / no-data; guarded to operation_executive rows only, advisory 6a). 90/97 are owner-tunable
+constants; the file's **Part-3 shadow-compare** prints the exact uptime→pay curve for owner-verify.
+**FROZEN CONTRACTS:** compute_daily_score stays untouched — pay ops via the SEPARATE trigger, never by
+editing it. Ops execs must never log meeting `lead_activities` (they're on /ops not WorkV2) or the two
+writers fight the `daily_performance` PK. **ACTIVATION CAVEAT (advisory 2a):** an all-excluded month
+(screens never report) → monthly_score's "0 days → full cap" pays FULL variable (opposite of intent) —
+so activate ops pay ONLY once real daily uptime flows (Phase 5 live), and don't set a monthly_salary on
+an exec whose screens aren't reporting yet.
+
+### Phase 5 — aiadflux CMS sync adapter (`74fc9f7`) — INERT until API wired
+`api/ops/sync.js` (NEW, **EDGE**): pulls live screen status from the owner's aiadflux CMS → PATCHes
+`ops_screens.status/last_response_at` by `external_id` (online/offline groups, chunked, never inserts) →
+recomputes uptime (Phase 4 signal). **INERT until `AIADFLUX_API_URL`+`AIADFLUX_API_KEY` env set** (returns
+`skipped:'not configured'`); `x-ops-secret` gated; tolerant `mapScreen()` (verify vs the real API shape +
+test on a preview deploy before activating, §35). `supabase_ops_p5_sync.sql` (owner-run when API live):
+`ops_aiadflux_sync_dispatch()` (pg_net POST, REVOKEd from client roles, service_role only) + a COMMENTED
+`cron.schedule` (owner uncomments to start the 10-min pull). Phase 5.1 hooks (auto-ticket on new-offline +
+WhatsApp downtime alert) documented, not built — build once the data flow is proven, opt-in behind an env
+flag so a noisy CMS can't spam the queue.
+
+### OWNER ACTIONS (in order)
+1. **Create the ops team** (§231): ≥1 `operation_head` + N `operation_executive`, each exec
+   `manager_id = head` (for the head's field-team check-in column) + assign `ops_depots.assigned_to`.
+2. **Phase 2/3 need nothing else** — they're live on deploy. Smoke: head → `/ops-dashboard` (4 tabs,
+   reassign works); a rep on a WON private-LED quote → "Request live photo" → appears on the head's
+   ticket board → assign a tech → tech's `/ops` queue → photo → rep sees it on the quote.
+3. **Phase 4 (money) — only when ready:** read the Part-3 shadow-compare in `supabase_ops_p4_uptime_pay.sql`,
+   confirm/adjust the 90/97 curve, create a `staff_incentive_profiles` row (monthly_salary) per exec, then
+   run the file. Don't activate until real uptime flows (caveat above).
+4. **Phase 5 — when the CMS dev delivers the API:** set the 3 Vercel envs (OPS_SYNC_SECRET, AIADFLUX_API_URL,
+   AIADFLUX_API_KEY), verify `mapScreen()` vs the real shape on a preview, fill `<OPS_SYNC_SECRET>` in the
+   SQL, run it, uncomment the cron.
+
+### Foot-guns
+- ❌ Pay an ops exec by editing the frozen `compute_daily_score` — use the SEPARATE Phase-4 trigger; the
+  frozen money fn stays byte-untouched (§72).
+- ❌ A `daily_performance` writer with no role guard clobbers a sales rep's meeting score if an ops_uptime_daily
+  row is mis-inserted for their id — the trigger guards to operation_executive rows only (advisory 6a).
+- ❌ Ship the aiadflux sync active/untested — it's inert until env + must be preview-tested vs the real API
+  shape (§35); it only PATCHes existing screens (new external_ids are skipped, seed them first).
+- ❌ check-sql-schema false-positives on PL/pgSQL FOR-loop record fields (`r.uid`) + dotted URL literals
+  (`app.untitledad`) — documented (§72#15/§212), not real.
