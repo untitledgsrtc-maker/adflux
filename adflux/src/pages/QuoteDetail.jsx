@@ -119,6 +119,8 @@ export default function QuoteDetail() {
   const [activeTab, setActiveTab]           = useState('overview')
   const [statusOpen, setStatusOpen]         = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  // Phase 230 — bumps the OpsLivePhotos readback after a rep sends a request.
+  const [opsPhotoKey, setOpsPhotoKey] = useState(0)
   const [pdfLoading, setPdfLoading]         = useState(false)
   const [error, setError]                   = useState('')
   const [statusMsg, setStatusMsg]           = useState('')
@@ -535,7 +537,7 @@ export default function QuoteDetail() {
           </button>
           {/* Phase 230 — Operations: request a live photo of the ad on the screens
               (won private-LED only; the button self-hides otherwise). */}
-          <OpsPhotoRequestButton quote={quote} profile={profile} />
+          <OpsPhotoRequestButton quote={quote} profile={profile} onRequested={() => setOpsPhotoKey(k => k + 1)} />
           {/* Phase 29b — Delete (hard remove from DB), drafts only.
               Phase 11b's DB trigger blocks delete on non-draft quotes
               so the button is hidden when status != 'draft' to avoid
@@ -814,7 +816,7 @@ export default function QuoteDetail() {
 
           {/* Phase 230 — Operations: live photos the field team sent back
               (self-hides when there are no requests). */}
-          <OpsLivePhotos quote={quote} profile={profile} />
+          <OpsLivePhotos quote={quote} profile={profile} refreshKey={opsPhotoKey} />
 
           {/* Phase 34D — incentive forecast. Hidden for admin + for
               already-won/lost quotes. Tells the rep how much closing
