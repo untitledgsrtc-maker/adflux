@@ -209,11 +209,17 @@ export default function AdminDashboardDesktop() {
       // captures every enqueued push with success/error; brief pushes
       // are tagged kind='morning_brief' per Phase 34Z.61.
       (async () => {
+        // Phase 323 (fix) — push_log's real columns are `tag` + `enqueued_at`
+        // (NOT kind/created_at/success/error_msg — those never existed, so this
+        // query 400'd on every load since §41.3). The morning push tags
+        // 'morning-checkin-<YYYY-MM-DD>' (Phase 34Z.61), not 'morning_brief'.
+        // push_log records the ENQUEUE only (no FCM delivery receipt), so the
+        // honest metric is "sent today".
         return supabase.from('push_log')
-          .select('id, user_id, success, error_msg, created_at, kind')
-          .eq('kind', 'morning_brief')
-          .gte('created_at', `${todayDate}T00:00:00`)
-          .lte('created_at', `${todayDate}T23:59:59`)
+          .select('id, user_id, tag, enqueued_at')
+          .like('tag', 'morning-checkin-%')
+          .gte('enqueued_at', `${todayDate}T00:00:00`)
+          .lte('enqueued_at', `${todayDate}T23:59:59`)
       })(),
       // Phase 47.7 — source attribution. Pull every lead's source +
       // stage to compute "Cronberry 23% convert vs JustDial 4%" type
@@ -288,11 +294,15 @@ export default function AdminDashboardDesktop() {
       .slice(0, 3)
     // Phase 41.3 — Brief delivery stats. push_log entries for today
     // with kind='morning_brief'. delivered / failed / total counts.
+    // Phase 323 (fix) — push_log records the ENQUEUE only (no FCM delivery
+    // receipt: no success/error_msg columns), so "sent" (enqueued) is the honest
+    // metric. delivered = sent; failed unknown → 0. Was reading r.success on a
+    // column that doesn't exist.
     const briefRows = briefLogRes?.data || []
     const briefStats = {
       total:     briefRows.length,
-      delivered: briefRows.filter(r => r.success).length,
-      failed:    briefRows.filter(r => !r.success).length,
+      delivered: briefRows.length,
+      failed:    0,
     }
 
     // Phase 47.7 — source attribution: per source count + won-count

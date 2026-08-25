@@ -15629,3 +15629,42 @@ the list touches). Outcome:
   over editing a §72 canonical.
 - ❌ A perf "fix" that reverses a prior owner decision (C1 vs 34Z.67c) — flag it, get
   re-approval, never ship on the perf argument alone.
+
+
+---
+
+## 235 · Phase 323 — BriefDeliveryCard push_log 400 (pre-existing dead card) fixed (2026-08-25)
+
+Owner pasted a console 400: `push_log?select=id,user_id,success,error_msg,created_at,
+kind&kind=eq.morning_brief … 400`. The admin dashboard's **Morning-brief card**
+(`AdminDashboardDesktop.jsx:212`, §41.3, shipped 2026-05-27) queried FOUR columns that
+DO NOT EXIST on `push_log`, so it has been 400ing on EVERY admin dashboard load since it
+shipped. **NOT caused by the §234 perf work** — the only perf-era touch to that
+Promise.all was adding `followupsDueRes`; the broken query is original.
+
+### Root cause (verify against the real schema, not the query)
+`push_log` (`supabase_phase34z69_push_audit_fixes.sql`) columns = `id, request_id,
+user_id, title, body, url, **tag**, **enqueued_at**`. It is an **ENQUEUE audit only** —
+`enqueue_push` inserts request_id/user_id/title/body/url/tag; there is **NO
+success/error_msg** (no FCM delivery receipt). The query used `kind` (real col = `tag`),
+`created_at` (real = `enqueued_at`), + `success`/`error_msg` (don't exist), and filtered
+`kind='morning_brief'` while the morning push (`supabase_phase34z61_morning_checkin_push.sql`)
+tags `'morning-checkin-<YYYY-MM-DD>'` (per-day), never `'morning_brief'`. Four wrong
+columns + a wrong tag value.
+
+### Fix (`AdminDashboardDesktop.jsx`, JS-only, guardian-not-needed — admin card, not §28)
+- Query → `select('id, user_id, tag, enqueued_at')`, `.like('tag','morning-checkin-%')`,
+  `.gte/.lte('enqueued_at', today bounds)`.
+- `briefStats` → `total = briefRows.length` (reps enqueued today); **delivered = total,
+  failed = 0** (push_log has no delivery receipt → "sent/enqueued" is the honest metric;
+  was `.filter(r => r.success)` on a nonexistent column). The card's "Delivered to N/team"
+  now reads the real send count instead of erroring.
+
+### CONTRACT / foot-gun
+- `push_log` is ENQUEUE-only — there is NO per-message success/failure on it. A card that
+  wants true delivered/failed must source it from the `push_failures` view (§34Z.70), NOT
+  push_log. Do NOT re-add `success`/`error_msg`/`kind`/`created_at` to a push_log query.
+- ❌ FOOT-GUN: schema-check a table against its REAL columns (`push_log` = tag/enqueued_at,
+  enqueue-only), not against what a query "looks like it wants" — this 400'd silently for
+  ~3 months because the card renders 0/0/0 on error instead of throwing visibly.
+- Pushed with this doc entry (§93). No SQL, no APK. The 400 stops on deploy.
