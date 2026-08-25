@@ -15587,10 +15587,16 @@ BEFORE the frontend switches. A design workflow produced exact SQL + shadow-comp
 ### Column trims + pagination — DONE via an enumeration pass (guardian PASS)
 A workflow enumerated the exact read-columns per `select('*')` site (grep every field
 the list touches). Outcome:
-- **H2 useLeads — TRIMMED.** `SELECT_COLUMNS` = explicit 20-col list + the 2 embeds,
-  dropping `notes` + `notes_legacy_telecaller` (the list never renders them). Every
-  column grep-verified (LeadsV2 is the sole consumer) + schema-verified. ⚠ inclusive-
-  select foot-gun: a NEW leads column the list renders MUST be added here too.
+- **H2 useLeads — ATTEMPTED then REVERTED (`b8ee03f`).** The explicit list named
+  `stage_changed_at` (+ `handoff_sla_due_at`), which exist in phase SQL FILES
+  (`supabase_phase34l_*`, `supabase_phase34_*`) but were NEVER RUN on the live DB →
+  PostgREST 400'd the WHOLE leads list (the most-used sales surface went down). Back
+  to `*`. THE LESSON: the enumeration workflow AND the guardian both "schema-verified"
+  against SQL FILES — a file that ADDs a column ≠ that column existing live. NEVER
+  trust a `.sql` grep for a live column check. To re-attempt a `*`→list trim, verify
+  every column against the LIVE DB (owner runs `SELECT column_name FROM
+  information_schema.columns WHERE table_name='leads'`), never against repo SQL. Given
+  the risk vs the modest notes over-fetch, `*` is the right call for the leads list.
 - **M12 ClientsV2 — PAGINATED** (chunked `.range()` fetch; was silently capped at
   1000). Kept `*` (the edit modal spreads the whole row → a trim is fragile).
 - **M2 FinanceV2 Register — RENDER-PAGINATED** (`filtered.slice(0,limit)` + a full-set
