@@ -18,18 +18,15 @@
 import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Phase 323 (audit H2) — explicit column list instead of `*`, so the two big
-// free-text columns the LIST never renders (notes, notes_legacy_telecaller —
-// Cronberry stuffs remarks into these) aren't shipped for every lead, esp. on
-// the Team-all view. Every column below is a grep-verified LeadsV2 read (the
-// sole useLeads consumer) + schema-verified to exist. ⚠ inclusive-select
-// foot-gun: any NEW leads column the list renders MUST be added here too.
+// Phase 323 (audit H2) — REVERTED to `*`. The explicit column list named
+// stage_changed_at (and handoff_sla_due_at), which exist in phase SQL FILES but
+// were never run on the live DB → PostgREST 400'd the whole leads list. `*` is
+// drift-proof (returns whatever columns exist, never 400s on a missing one).
+// The notes/notes_legacy over-fetch is not worth risking the most-used sales
+// list. Re-attempt the trim ONLY against a LIVE `information_schema.columns`
+// check (SQL files ≠ live schema — the §234 foot-gun, now proven).
 const SELECT_COLUMNS = `
-  id, name, company, phone, email,
-  stage, segment, source, city, industry,
-  lost_reason, won_at, created_at, expected_value,
-  heat, last_contact_at, handoff_sla_due_at, stage_changed_at,
-  assigned_to, telecaller_id,
+  *,
   assigned:assigned_to (id, name, team_role, city),
   telecaller:telecaller_id (id, name, team_role)
 `
