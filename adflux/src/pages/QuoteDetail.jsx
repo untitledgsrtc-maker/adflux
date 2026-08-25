@@ -42,6 +42,8 @@ import SendEmailModal from '../components/v2/SendEmailModal'
 import { confirmDialog } from '../components/v2/ConfirmDialog'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
 import { FollowUpList } from '../components/followups/FollowUpList'
+// Phase 230 — Operations module: request a live screen photo + read it back.
+import { OpsPhotoRequestButton, OpsLivePhotos } from '../components/ops/OpsPhotoRequest'
 import { formatCurrency, formatDate, formatPhone, todayISO } from '../utils/formatters'
 import { STATUS_LABELS } from '../utils/constants'
 
@@ -531,6 +533,9 @@ export default function QuoteDetail() {
           <button className="btn btn-sec btn-sm" onClick={handleDownloadPDF} disabled={pdfLoading}>
             <Download size={14} /> {pdfLoading ? 'Generating…' : 'PDF'}
           </button>
+          {/* Phase 230 — Operations: request a live photo of the ad on the screens
+              (won private-LED only; the button self-hides otherwise). */}
+          <OpsPhotoRequestButton quote={quote} profile={profile} />
           {/* Phase 29b — Delete (hard remove from DB), drafts only.
               Phase 11b's DB trigger blocks delete on non-draft quotes
               so the button is hidden when status != 'draft' to avoid
@@ -806,6 +811,10 @@ export default function QuoteDetail() {
 
           {/* Payment Summary */}
           <PaymentSummary totalAmount={quote.total_amount} totalPaid={totalPaid} hasFinalPayment={hasFinalPayment} payments={payments} />
+
+          {/* Phase 230 — Operations: live photos the field team sent back
+              (self-hides when there are no requests). */}
+          <OpsLivePhotos quote={quote} profile={profile} />
 
           {/* Phase 34D — incentive forecast. Hidden for admin + for
               already-won/lost quotes. Tells the rep how much closing
