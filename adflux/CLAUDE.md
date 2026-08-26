@@ -15715,8 +15715,10 @@ commit's work against the whole doc, since phase NUMBERS collide/renumber and ca
 §52) found ~30 shipped features that never got a CLAUDE.md entry because their "Phase N" number
 collided with an unrelated §. Each entry below was re-verified via `git show` on the commit AND
 confirmed still-live at HEAD (a commit adding a file ≠ it survived — cf §50). Grouped by area.
-This is documentation only — no code touched. (Phases 36/38/40/41 in the audit's last chunk are
-already covered by §30/§31.)
+This is documentation only — no code touched. NOTE: the HR / People / TA-DA module (Phase 36–41)
+is documented in the WORKSPACE-ROOT CLAUDE.md (`~/Documents/untitled-os2/CLAUDE.md` §30/§31, which
+does NOT push) but was absent from THIS repo doc — §238 below backfills it. (The two CLAUDE.md
+files diverged early: this repo doc's §30 is Telecaller, the workspace-root doc's §30 is HR.)
 
 ### WhatsApp / campaign backfill (Phase 198 → 217)
 
@@ -15907,3 +15909,64 @@ Partial items (fold into existing sections):
 - **§77 — add** (Phase 188, `1667ec8`): `adflux/public/deck/adflux-console.html` — single self-contained 10k-line offline dashboard console for the GSRTC deck; 4 in-page tabs (dashboard + screen-settings + audience analytics + media report), shared navy sidebar, frozen map tiles + inlined chart engine/assets; companion `media-report.pdf` (relative). Deck-only.
 - **§75/§77 — add** (Phase 187.6, `3096be2`): `led-deck-final.html` tablet support — swipe left/right slide nav (guarded: ignores swipes starting on map / dashboard iframe / links / controls / overview; thresholds >60px, horizontal-dominant, <700ms) + `@media (pointer:coarse)` nav buttons 38→46px. Desktop unchanged, deck-only.
 - **§85 — add** (Phase 44.1, `d34389a`): new `components/leads/LeadsCollectedChart.jsx` — daily "Leads Collected" bar chart, default last 30 days, from/to + segment + source filters, queries `leads` (`id, created_at, segment, source`), fills zero-count days. Mounted at top of `LeadsV2.jsx` (frozen §28) via one import + one mount line; read-only, no store/table/quote-action change.
+
+
+---
+
+## 238 · CLAUDE.md backfill #2 — HR/People/TA-DA module + original dashboard routes (2026-08-25)
+
+The full-history audit's last chunks surfaced 8 more gaps ABSENT from this repo doc (the HR-module
+detail lives in the non-pushing workspace-root CLAUDE.md §30/§31 — see §237 note). All verified via
+`git show` + live at HEAD. The repo doc already references the downstream machinery (TotalPayableCard,
+salary_payouts, TaPayoutsAdminV2, ta_da_requests, eligible_for_paid_leave) — this backfills the BUILD.
+
+### HR / TA-DA / People module (Phase 36 → 41)
+
+**TA/DA Approve-Reject queue (Phase 36.3, `8e22a2e`)** — `TaPayoutsAdminV2.jsx` (+180): admin queue
+to Approve/Reject rep TA/DA claim requests. The admin surface for the claim flow.
+
+**Claim kinds → Hotel + Other (Phase 36.7, `813ebc3`)** — `supabase_phase36_7_claim_kinds_hotel_other.sql`
+widens `ta_da_requests.kind` enum to **`ta_override | da_night | hotel | other`**; `TaDaRequestPanel.jsx`
+tab state `'ta'|'da'` → `'ta'|'da'|'hotel'|'other'`; `TaPayoutsAdminV2` reads the new kinds.
+
+**Hard-cap DA + Hotel at city ceiling (Phase 36.9 + .9.1, `3859b13`)** — `TaDaRequestPanel.jsx`: new
+`cityCeiling` state `{ daily_da, hotel_rate }` fetched from `city_da_ceilings`; caps a rep's DA/Hotel
+claim at the city ceiling. .9.1 fixed the lookup case (`.eq('city')` → `.ilike(city)` — master had
+`Bhavnagar`, reps typed `BHAVNAGAR`).
+- ❌ FOOT-GUN: comparing a user-entered city against a master value is case-sensitive — use `.ilike()`.
+
+**Rep-side Leave History panel (Phase 36.11 + .11.1, `4499b0f`)** — NEW `RepLeaveHistory.jsx` (156)
+mounted on `MyOfferV2` (`/my-offer`); rep sees their own leave history. .11.1 = mobile-first card
+layout (the 5-col grid overflowed iPhone). Needs `leaves.admin_note` column (run separately).
+
+**People module — consolidate 4 admin pages (Phase 38 → 38.2, `66fe030`)** — NEW `PeopleV2.jsx` (141)
+tab-shell at route **`/people`** (`?tab=` param) mounting Team / Incentives / Salary / Leaves / TA
+sub-pages via an `embedded` prop (suppresses each page's own head). `V2AppShell` ADMIN_NAV collapsed
+5 entries → one **People**; MOBILE_NAV_ADMIN `/team` → `/people`. SALES/TELECALLER/AGENCY navs
+untouched. Old routes (`/team /incentives /admin/leaves /admin/salary`) kept as deep-links.
+- Pattern: a consolidated admin shell mounts existing pages with an `embedded` prop — reused later.
+
+**People polish (Phase 40, `4b6e3da`)** — `StaffTable.jsx` + `SalaryAdminV2.jsx` + `incentives.css`:
+Total-Salary column, incentive-page chrome match, TA tooltip. (The chrome-match was later reverted per
+the workspace-root §31 log — the Salary tab was re-styled again in Phase 41.4.)
+
+**Admin dashboard — add gaps (Phase 41.2, `d0b4577`)** — `AdminDashboardDesktop.jsx` (+282): the
+SegmentToggle pill, AdminActionsCard, RepsInFieldCard, CashForecastCard. Part of the Phase 41.1→41.3
+admin-dashboard restructure (kill-duplication → add-gaps → polish); the frozen-baseline for that work
+is the workspace-root §31 (Phase 41.8, commit `3859955`).
+
+### Original Lead + Team dashboard routes (Phase 16, `2de4e35`, 2026-05-06)
+The ORIGINAL creation of two now-core routes (predates every later dashboard section):
+- NEW `LeadDashboardV2.jsx` (349) at **`/lead-dashboard`** — pipeline overview: teal hero (Total /
+  Hot-idle-24h / SLA breaches / Pipeline ₹ / Win rate), 6-col stage rail, AI briefing card, hot-leads
+  top-6 table. Ported from AdminLeadDash.
+- NEW `TeamDashboardV2.jsx` (286) at **`/team-dashboard`** (privileged) — purple field-activity hero,
+  rep grid + per-rep 3-KPI block + call-target bar. Ported from AdminTeamDash. Reps from
+  `users.team_role IN (sales, agency, sales_manager)`.
+- `V2AppShell` nav + `App.jsx` routes added. Both files were heavily reshaped by every later dashboard
+  phase (§234 perf, §316, the §237 112.x series) — this is their birth commit.
+
+### Audit CLOSED
+Full-history feature-coverage audit complete: 10/10 chunks, 1,697 commits. Final: DOCUMENTED 49 ·
+TRIVIAL 75 · MISSING 37 · PARTIAL 19 (56 gaps). All 56 now backfilled (§237 = 48, §238 = 8). The
+TRIVIAL set (crash-fixes, reverts, sub-version tweaks, collision-noise) intentionally not documented.
