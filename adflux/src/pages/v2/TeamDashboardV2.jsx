@@ -329,7 +329,8 @@ export default function TeamDashboardV2() {
       // path (the else branch) — byte-unchanged, zero regression risk.
       let repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes,
           policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes,
-          actGeoRes, qualifiedRes, callbacksRes, monthQuotesRes, monthWonRes
+          actGeoRes, qualifiedRes, callbacksRes, monthQuotesRes, monthWonRes,
+          bundleChase = null   // Phase 323 (M21) — per-rep chase counts inside the bundle
       if (!isPrivileged && canViewTeam) {
         const { data: b, error: bErr } = await supabase.rpc('team_dashboard_bundle', {
           p_start_of_day: startOfDay,
@@ -354,6 +355,9 @@ export default function TeamDashboardV2() {
         quoteSentRes   = wrap(b?.quote_sent)
         quoteWonRes    = wrap(b?.quote_won)
         paymentsRes    = wrap(b?.payments)
+        // Phase 323 (M21) — per-rep chase counts pre-aggregated in the bundle
+        // (team_chase_counts delegate). null on an old bundle → falls through.
+        bundleChase    = Array.isArray(b?.chase) ? b.chase : null
         overdueFuRes   = wrap(b?.overdue_fu)
         actGeoRes      = wrap(b?.act_geo)
         qualifiedRes   = wrap(b?.qualified)
@@ -502,10 +506,22 @@ export default function TeamDashboardV2() {
         // Phase 82 — sum approved payments per quote_id. Joins
         // with the won-quotes list above to produce per-rep
         // unsettled-quote counts.
+        // M17 — admin/team-viewer never reach here (they get pay_chase from the
+        // team_chase_counts RPC above, so the admin branch below is []). co_owner
+        // (govt-scoped §42/§153, NOT admitted to that DEFINER RPC) IS the caller
+        // of the `:` branch — and an unfiltered .select() downloads the whole
+        // (RLS-scoped) payments table into the browser and silently caps at ~1000
+        // rows. Replace it with a SECURITY INVOKER GROUP-BY RPC: same per-quote
+        // paid sums, computed server-side under the caller's own govt RLS (no
+        // leak, un-capped). Deploy-safe: on RPC error (missing/404 before the SQL
+        // is run) fall back to the byte-identical client-side aggregation.
         (profile?.role === 'admin')
           ? Promise.resolve({ data: [] })
-          : supabase.from('payments')
-              .select('quote_id, amount_received, approval_status'),
+          : (async () => {
+              const rpc = await supabase.rpc('team_payment_sums')
+              if (!rpc.error && Array.isArray(rpc.data)) return { data: rpc.data, error: null, _summed: true }
+              return supabase.from('payments').select('quote_id, amount_received, approval_status')
+            })(),
         // Phase 93.4 — overdue follow-ups (not gated by period filter;
         // overdue is always-now). Pulled separately from fuRes which
         // is window-gated. Pending only.
@@ -643,7 +659,16 @@ export default function TeamDashboardV2() {
       // download). co_owner (govt-scoped) + any RPC failure fall through to the
       // client-side path below (which reads their RLS-scoped rows).
       let chaseFromRpc = false
-      if (profile?.role === 'admin' || (canViewTeam && !isPrivileged)) {
+      if (bundleChase) {
+        // Phase 323 (M21) — chase counts came pre-aggregated INSIDE the bundle
+        // (viewer path, new SQL) → one round-trip, no separate RPC, heavy-arm
+        // fallback skipped. Byte-identical to team_chase_counts (shadow-verified).
+        const qMap = {}, pMap = {}
+        bundleChase.forEach((r) => { if (r.created_by) { qMap[r.created_by] = Number(r.quote_chase) || 0; pMap[r.created_by] = Number(r.pay_chase) || 0 } })
+        setQuoteChaseByUser(qMap)
+        setPaymentChaseByUser(pMap)
+        chaseFromRpc = true
+      } else if (profile?.role === 'admin' || (canViewTeam && !isPrivileged)) {
         const { data: cc, error: ccErr } = await supabase.rpc('team_chase_counts', { p_period_end: period.endIso })
         if (!ccErr && Array.isArray(cc)) {
           const qMap = {}, pMap = {}
@@ -675,11 +700,21 @@ export default function TeamDashboardV2() {
       // quote_id, then iterate won quotes counting unsettled ones
       // per created_by.
       const paidByQuote = {}
-      ;(paymentsRes.data || []).forEach((p) => {
-        if (!p.quote_id) return
-        if (p.approval_status && p.approval_status !== 'approved') return
-        paidByQuote[p.quote_id] = (paidByQuote[p.quote_id] || 0) + (Number(p.amount_received) || 0)
-      })
+      if (paymentsRes._summed) {
+        // M17 — RPC returns pre-aggregated {quote_id, paid} per quote (approved-or-
+        // null filter already applied server-side). Same map, un-capped.
+        ;(paymentsRes.data || []).forEach((p) => {
+          if (!p.quote_id) return
+          paidByQuote[p.quote_id] = Number(p.paid) || 0
+        })
+      } else {
+        // Fallback — raw payment rows summed client-side (byte-identical to pre-M17).
+        ;(paymentsRes.data || []).forEach((p) => {
+          if (!p.quote_id) return
+          if (p.approval_status && p.approval_status !== 'approved') return
+          paidByQuote[p.quote_id] = (paidByQuote[p.quote_id] || 0) + (Number(p.amount_received) || 0)
+        })
+      }
       const pcMap = {}
       ;(quoteWonRes.data || []).forEach((q) => {
         if (!q.created_by) return

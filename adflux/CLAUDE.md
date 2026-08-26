@@ -16022,3 +16022,22 @@ were not executable from the sandbox, so the SHADOW is the real gate.
 ### Still open after this: M18 (inbox RLS InitPlan short-circuit) + M6 (drop @react-pdf, 3-component
 refactor — biggest/riskiest, its own pass). H9/M20 held for your shadow-review; C1/H2/M9/M11/M19 are
 decisions (rejected/reverted/kept).
+
+### §239 update — frontends WIRED (2026-08-26, after owner shadow-verified 0-diff)
+Owner ran the combined verifier (`supabase_phase323_shadow_verify_all.sql`) → **"No rows returned"** =
+all 5 RPCs match the client math byte-for-byte. Frontends switched (each RPC-call has a fallback to
+the old client aggregation on RPC-error → deploy-safe):
+- **M10** `admin_source_attribution` → AdminDashboardDesktop (source card). ✅
+- **M17** `team_payment_sums` → TeamDashboardV2 (co_owner payment-sum path, `_summed` branch). ✅
+- **M21** `team_dashboard_bundle.chase` arm → TeamDashboardV2 (viewer chase counts, one round-trip). ✅
+- **M16** `get_my_settled_this_month` → SalesDashboard (§28 FROZEN — guardian PASS, no findings). ✅
+- **H4** `admin_dashboard_kpis` — **RPC built + shadow-verified, frontend DEFERRED.** Its fetch can't
+  be removed (feeds ~7 top-N lists + the leaderboard) → wiring gives ZERO perf gain, only KPI accuracy
+  past the ~1000-row cap the org (~300 quotes) hasn't hit. Repointing ~16 money-KPI fields on a live
+  dashboard for no present benefit fails §16/§45. Wire it when quote/payment volume nears 1000.
+- ⚠ NOTE: the M17 frontend edit was applied by a design-workflow draft agent (uncommitted in the tree);
+  reviewed the diff — clean + matches spec — and kept it. Build green (3010 modules, exit 0).
+
+### Perf backlog remaining (after this batch)
+M18 (inbox RLS admin/viewer InitPlan short-circuit — SQL) · M6 (drop @react-pdf, 3-component refactor)
+· H9 / M20 (held for owner shadow-review) · H4 frontend (deferred, above). C1/H2/M9/M11/M19 = decisions.

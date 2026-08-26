@@ -225,13 +225,29 @@ export default function AdminDashboardDesktop() {
       // stage to compute "Cronberry 23% convert vs JustDial 4%" type
       // breakdown. Filtered to last 90 days so old batches don't
       // dilute current performance.
+      // Phase 323 (audit M10) — server-side GROUP BY RPC dodges the ~1000-row
+      // PostgREST cap on the raw-lead pull. Falls back to the (capped) client
+      // aggregation if the RPC is missing (pre-SQL). Byte-identical below the cap.
       (async () => {
+        const rpc = await supabase.rpc('admin_source_attribution', { p_days: 90 })
+        if (!rpc.error && Array.isArray(rpc.data)) {
+          return { agg: rpc.data.map(r => ({ source: r.source, total: Number(r.total), won: Number(r.won) })) }
+        }
         const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-        return supabase.from('leads')
+        const { data } = await supabase.from('leads')
           .select('source, stage')
           .not('source', 'is', null)
           .gte('created_at', cutoff)
           .limit(20000)
+        const m = new Map()
+        for (const l of (data || [])) {
+          const key = (l.source || '').trim() || '—'
+          const row = m.get(key) || { source: key, total: 0, won: 0 }
+          row.total += 1
+          if (l.stage === 'Won') row.won += 1
+          m.set(key, row)
+        }
+        return { agg: Array.from(m.values()) }
       })(),
       // Phase 110c (2026-06-02) — reps who CHECKED OUT today, to drop them
       // from "Reps in field right now" (a finished rep keeps a fresh
@@ -305,17 +321,10 @@ export default function AdminDashboardDesktop() {
       failed:    0,
     }
 
-    // Phase 47.7 — source attribution: per source count + won-count
-    // + conversion %. Sorted by conversion desc; top 6 surfaced.
-    const sourceAgg = new Map()
-    for (const l of (sourceAttribRes?.data || [])) {
-      const key = (l.source || '').trim() || '—'
-      const row = sourceAgg.get(key) || { source: key, total: 0, won: 0 }
-      row.total += 1
-      if (l.stage === 'Won') row.won += 1
-      sourceAgg.set(key, row)
-    }
-    const sourceAttrib = Array.from(sourceAgg.values())
+    // Phase 47.7 / 323 (M10) — source attribution: rows come server-aggregated
+    // {source,total,won} from the RPC (or the fallback loop above), then
+    // conversion %, sorted desc, top 6 — byte-identical to the old inline loop.
+    const sourceAttrib = (sourceAttribRes?.agg || [])
       .map(r => ({ ...r, pct: r.total > 0 ? Math.round((r.won / r.total) * 100) : 0 }))
       .sort((a, b) => b.pct - a.pct || b.total - a.total)
       .slice(0, 6)

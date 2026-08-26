@@ -99,19 +99,16 @@ export default function SalesDashboardV2() {
     // get_team_leaderboard SECURITY DEFINER RPC returns aggregated
     // inputs only — no raw row leakage. See supabase_phase3d.sql.
     //
-    // We still fetch lbQuotes + lbPayments separately because the
-    // rep's own settled-this-month KPI needs the settle map (built
-    // from payment_date).
-    const [{ data: lbQuotes }, { data: lbPayments }, lbRpcRes, lbUsersRes] = await Promise.all([
-      supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
-      supabase.from('payments')
-        .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
-        .eq('approval_status', 'approved'),
+    // Phase 323 (M16) — the rep's own settled-this-month total now comes from a
+    // server-side RPC (get_my_settled_this_month), replacing the whole-org
+    // quotes+payments download that PostgREST silently capped at ~1000 rows and
+    // that fed ONLY this one KPI (the leaderboard is get_team_leaderboard).
+    const [lbRpcRes, lbUsersRes, mySettledRes] = await Promise.all([
       supabase.rpc('get_team_leaderboard', { p_month_keys: [monthKey] }),
       // Names-only fallback when the RPC isn't deployed yet
       supabase.from('users').select('id, name').eq('role', 'sales'),
+      supabase.rpc('get_my_settled_this_month', { p_month_start: monthStartIso, p_month_end: monthEndIso }),
     ])
-    const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
 
     let leaderboard
     if (lbRpcRes?.data && lbRpcRes.data.length > 0) {
@@ -160,15 +157,30 @@ export default function SalesDashboardV2() {
       }))
     }
 
-    // My settled-this-month total (drives the "Settled" KPI)
-    const mySettledValue = (lbQuotes || [])
-      .filter(q => q.created_by === uid)
-      .reduce((s, q) => {
-        const settle = lbSettleMap.get(q.id)
-        if (!settle) return s
-        if (settle.settledAt < monthStartIso || settle.settledAt >= monthEndIso) return s
-        return s + (Number(q.total_amount) || 0)
-      }, 0)
+    // My settled-this-month total (drives the "Settled" KPI). Server-side RPC;
+    // on RPC error (missing pre-SQL) fall back to the byte-identical client math
+    // over the whole-org quotes+payments (shadow-verified 0-diff).
+    let mySettledValue = 0
+    if (mySettledRes && !mySettledRes.error && mySettledRes.data != null) {
+      mySettledValue = Number(mySettledRes.data) || 0
+    } else {
+      if (mySettledRes?.error) console.warn('[settled] RPC unavailable, using fallback.', mySettledRes.error)
+      const [{ data: lbQuotes }, { data: lbPayments }] = await Promise.all([
+        supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
+        supabase.from('payments')
+          .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
+          .eq('approval_status', 'approved'),
+      ])
+      const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
+      mySettledValue = (lbQuotes || [])
+        .filter(q => q.created_by === uid)
+        .reduce((s, q) => {
+          const settle = lbSettleMap.get(q.id)
+          if (!settle) return s
+          if (settle.settledAt < monthStartIso || settle.settledAt >= monthEndIso) return s
+          return s + (Number(q.total_amount) || 0)
+        }, 0)
+    }
 
     // ─── Incentive math ───
     const multiplier  = prof?.sales_multiplier ?? settings.default_multiplier ?? 5
