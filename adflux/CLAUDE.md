@@ -16041,3 +16041,19 @@ the old client aggregation on RPC-error → deploy-safe):
 ### Perf backlog remaining (after this batch)
 M18 (inbox RLS admin/viewer InitPlan short-circuit — SQL) · M6 (drop @react-pdf, 3-component refactor)
 · H9 / M20 (held for owner shadow-review) · H4 frontend (deferred, above). C1/H2/M9/M11/M19 = decisions.
+
+### §239 update #2 — M18 drafted (2026-08-26); M6 SKIPPED
+- **M18** `supabase_phase323_m18_inbox_rls_shortcircuit.sql` (owner runs): prepends the cheap
+  `get_my_role() IN ('admin','co_owner') OR is_team_viewer()` InitPlan terms to `wa_conv_self_or_lead`
+  + `wa_msg_via_conv` so a privileged/viewer caller's per-row correlated EXISTS is short-circuited on
+  the 12s inbox poll (~4,000 convs). **Visibility PROVABLY unchanged** — those callers already see
+  every row via wa_conv_admin / wa_conv_team_viewer / wa_msg_admin, so the added OR-terms can't widen
+  the set; a normal rep gets both terms false → the policy reduces to the original. Idempotent, off-peak.
+  ⚠ Could not EXPLAIN/test from the sandbox — the app is the visibility check (same as p6). Owner runs
+  it + confirms the inbox thread list is unchanged for admin + a rep.
+- **M6 SKIPPED (owner-confirmed 2026-08-26)** — C3 already took @react-pdf off the COLD path (it's a
+  lazy chunk, loads only when a rep makes a PDF). M6 would only shrink an on-demand chunk while being a
+  high-risk refactor of 3 money-PDF components (quote / salary slip / offer letter). Bad risk/value now.
+- **Perf backlog now CLOSED to owner-decision items only**: H9 + M20 (held for your shadow-review),
+  H4 frontend (deferred until >1000 quotes). Everything else (C1-C3, H1-H8, M1-M17, M21) = done or a
+  logged decision (C1/H2/M9/M11/M19). 33 findings resolved.
