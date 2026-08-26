@@ -15668,3 +15668,38 @@ columns + a wrong tag value.
   enqueue-only), not against what a query "looks like it wants" — this 400'd silently for
   ~3 months because the card renders 0/0/0 on error instead of throwing visibly.
 - Pushed with this doc entry (§93). No SQL, no APK. The 400 stops on deploy.
+
+
+---
+
+## 236 · Phase 323 — H8: poll interval no longer fires while backgrounded (2026-08-25)
+
+Owner asked to fix ONLY audit-finding H8: TelecallerV2's 20s auto-refresh kept re-running
+its ~10-query load while the tab was BACKGROUNDED (during the dialer handoff — the exact
+mid-call churn window). The interval lives in the shared §28-FROZEN `useAutoRefresh` hook
+(not TelecallerV2 directly), so the guard goes there.
+
+### The one-line change (`src/hooks/useAutoRefresh.js`, guardian PASS)
+`fire()` gained a first-line guard: `if (document.visibilityState !== 'visible') return`.
+So the `setInterval(fire, pollSeconds*1000)` poll no-ops while hidden. **Nothing else
+touched** — interval length, `pollSeconds`, the §318 `userId` realtime scope, the §M7
+CHANNEL_ERROR rejoin, the visibilitychange + focus listeners, the debounce, the return
+value — all byte-identical.
+
+### Why it's safe (guardian-verified, no P0-P3)
+- No staleness on return: the `visibilitychange` listener already calls `fire()` when the
+  tab becomes visible → a fresh fetch the moment the rep comes back. The guard runs BEFORE
+  `lastRunRef` is touched, so a skipped hidden call never consumes the debounce window.
+- focus/visibilitychange callers already imply a visible page → the guard is a no-op for
+  them; only the interval path is gated.
+- One nuance (accepted): a realtime channel that RECONNECTS while the tab is hidden now
+  skips its catch-up `fire()` — harmless, `everErrored` is already cleared and the
+  foreground `onVisibility` fetch supersedes it on return.
+- Applies uniformly to all 6 frozen mount-sites (WorkV2, LeadDetailV2, FollowUpsV2,
+  QuotesV2, MyPerformanceV2, TaPayoutsAdminV2 + TelecallerV2) — same H8 anti-pattern
+  everywhere, one shared-hook definition (§71), not a per-page patch.
+
+### Audit tally update
+H8 moves from the §234 "still-open" list → FIXED. Remaining open perf items (owner's
+backlog): H4, M6, M10, M16, M18, M21 (M12/M17 partial). C1/H2/H9/M9/M11/M19/M20 are
+deliberate decisions (rejected/reverted/held/kept). JS-only, no SQL, no APK.

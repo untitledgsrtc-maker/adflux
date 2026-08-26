@@ -53,6 +53,13 @@ export default function useAutoRefresh(loadFn, {
     const DEBOUNCE_MS = 800
 
     function fire() {
+      // Phase 323 (audit H8) — skip the poll while the tab is backgrounded
+      // (TelecallerV2 kept re-running its ~10-query load during the dialer
+      // handoff). The visibilitychange listener refetches on return, so nothing
+      // goes stale. Only the setInterval path is affected — the focus /
+      // visibilitychange callers already imply a visible page. Interval length
+      // unchanged.
+      if (document.visibilityState !== 'visible') return
       const now = Date.now()
       if (now - lastRunRef.current < DEBOUNCE_MS) return
       lastRunRef.current = now
