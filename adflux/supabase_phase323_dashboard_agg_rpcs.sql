@@ -616,7 +616,10 @@ SELECT
   r.total AS rpc_total, i.total AS inline_total,
   r.won   AS rpc_won,   i.won   AS inline_won
 FROM rpc r
-FULL OUTER JOIN inline i ON i.source IS NOT DISTINCT FROM r.source
+-- both sides' `source` is non-null (RPC filters NULL + normalizes empty -> '—'),
+-- so a plain equijoin is correct AND hash/merge-joinable (IS NOT DISTINCT FROM is
+-- NOT joinable in a FULL JOIN -> Postgres 0A000).
+FULL OUTER JOIN inline i ON i.source = r.source
 WHERE r.source IS NULL          -- source only in inline (missing from RPC)
    OR i.source IS NULL          -- source only in RPC (missing from inline)
    OR r.total IS DISTINCT FROM i.total
