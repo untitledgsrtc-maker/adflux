@@ -15703,3 +15703,207 @@ value — all byte-identical.
 H8 moves from the §234 "still-open" list → FIXED. Remaining open perf items (owner's
 backlog): H4, M6, M10, M16, M18, M21 (M12/M17 partial). C1/H2/H9/M9/M11/M19/M20 are
 deliberate decisions (rejected/reverted/held/kept). JS-only, no SQL, no APK.
+
+
+---
+
+## 237 · CLAUDE.md backfill — undocumented history (feature-coverage audit, 2026-08-25)
+
+Owner asked to verify EVERY commit since project start (1,697 commits) is documented, not just
+recent work. A full-history FEATURE-coverage audit (9 parallel agents keyword-matching each
+commit's work against the whole doc, since phase NUMBERS collide/renumber and can't be matched —
+§52) found ~30 shipped features that never got a CLAUDE.md entry because their "Phase N" number
+collided with an unrelated §. Each entry below was re-verified via `git show` on the commit AND
+confirmed still-live at HEAD (a commit adding a file ≠ it survived — cf §50). Grouped by area.
+This is documentation only — no code touched. (Phases 36/38/40/41 in the audit's last chunk are
+already covered by §30/§31.)
+
+### WhatsApp / campaign backfill (Phase 198 → 217)
+
+Four shipped campaign-module commits never landed in CLAUDE.md (phase numbers collided with unrelated §; audit's "§111" reference is stale — no such section exists). All in the campaign module (NOT frozen), all additive.
+
+**WhatsApp broadcast — send the approved template's exact language (Phase 198, `a8f8872`)**
+Fixes Meta error `#132001`. `CampaignBroadcastV2.jsx` `sendTest` + `sendBroadcast` now resolve the template from `approvedList` (approved rows only) instead of all `templates`, and send `selTpl.language` exactly — the old blind `|| 'en'` fallback sent an `en_US`/Gujarati-approved template as `'en'` → Meta rejected. Blocks with a clear toast when the picked template isn't approved or has no language. Picker option now keyed `${t.name}|${t.language}` and labelled "name · language" (handles same-name multi-language). Endpoint `/api/wa/broadcast` (actions `test` / `create`).
+- File: `adflux/src/pages/v2/CampaignBroadcastV2.jsx`.
+- ❌ FOOT-GUN: never hardcode `template_language: 'en'` on a WhatsApp send — a template approved in another language re-triggers `#132001`. Send `selTpl.language`, never a fallback.
+
+**WhatsApp welcome auto-reply — free reply on first inbound (Phase 201, `f37ab5f`)**
+Owner chose the free path over paid marketing broadcasts: auto-reply anyone who messages the number first (service message, free in the 24h window). The webhook already sent `acct.auto_reply_text` on a conversation's first inbound when `auto_reply_enabled` — but the two columns never existed and had no UI. This finishes it.
+- SQL `adflux/supabase_phase201_welcome_autoreply.sql`: `whatsapp_accounts.auto_reply_enabled boolean NOT NULL DEFAULT false` + `auto_reply_text text`.
+- `CampaignChatbotV2.jsx` Greeting node now editable: welcome textarea + "Save welcome" + Welcome-reply ON/OFF toggle (`toggleWelcome` / `saveGreeting` write the two columns).
+- CONTRACT: welcome auto-reply is INDEPENDENT of the keyword chatbot (`bot_enabled` / `campaign_bot_rules`) — the welcome fires on first message regardless of whether the bot is ON.
+
+**Bot replies — {{1}}/{{name}} personalize + image/video/PDF media (Phase 203, `ada0b81`)**
+Two chatbot asks: `{{1}}` wasn't becoming the person's name, and replies were text-only. Applies to BOTH the welcome and keyword replies.
+- `adflux/api/wa/webhook.js`: `personalize(text, name)` swaps `{{1}}` and `{{name}}` (case-insensitive) for the customer's WhatsApp profile name, fallback `"there"`. `botSend(pnid, to, text, mediaUrl, mediaType)` sends media (`image`/`video`/`document` by `link`, text as `caption`) when a media URL is set, else plain text — bot replies are free service messages so no template needed. `getBotRules` now selects `media_url, media_type` with a tolerant fallback query if those columns aren't run yet.
+- SQL `adflux/supabase_phase203_bot_media.sql`: `whatsapp_accounts.auto_reply_media_url` / `auto_reply_media_type` (welcome), `campaign_bot_rules.media_url` / `media_type` (keyword reply). `media_type ∈ image | video | document` (NULL = text only).
+- `CampaignChatbotV2.jsx`: Greeting node + each keyword rule get an image/video/PDF upload to the existing `campaign-media` bucket (Phase 199) with view/remove.
+
+**Stop GPS-off signals reaching telecallers (Phase 217, `81ea920`)**
+Telecaller = `role='telecaller'`, NOT GPS-tracked (background GPS skips them, `V2AppShell:378`). Three surfaces wrongly signalled "GPS off" to/about a TC; all three gated off.
+- `adflux/supabase_phase60_attendance.sql` `tick_attendance()` §7b GPS-off cron scan: `role IN ('sales','telecaller')` → `role = 'sales'`. A TC never pings → "no fresh ping in 30 min" was always true → it push-spammed every checked-in TC a "GPS off — for TA kms" every 15 min, 9:30–19:45 IST. The §7a check-in / §7c internet-off / §7e mark-absent scans KEEP TC (they legitimately apply).
+- `adflux/src/pages/v2/TeamDashboardV2.jsx`: rep-card GPS pill gated behind `gpsTracked = !isTC` (`isTC = r.team_role === 'telecaller'`); Online + Push pills stay. Display-only.
+- `adflux/src/utils/whatsappSummary.js` `formatDaySummaryText`: TC evening report drops the always-zero GPS uptime / GPS off / KM lines when `isTC`; Internet-lost + force-stop lines stay.
+- ❌ FOOT-GUN: don't emit any GPS-derived signal (push, pill, report line) for a telecaller — they aren't GPS-tracked, so GPS uptime/off/KM is always 0/noise. Gate on `team_role === 'telecaller'` (NOT `role` — `r.role` isn't selected in either TeamDashboard data path).
+
+### B2 — Quotes / proposals / storage backfill
+
+**GSRTC LED — per-proposal per-slot rate override by grade** (Phase 195, `afced24`)
+Owner can bulk-discount the DAVP per-slot rate on one GSRTC LED proposal without touching the master. `Step3Stations.jsx` gains a "Bulk set Rate by grade" panel (A/B/C boxes → apply to every selected station of that grade) + a per-row Rate cell (placeholder = master rate, type to override). `effectiveValues` + monthly recompute read `rate_override`, falling back to the station master `davp_per_slot_rate` when blank. `CreateGovtGsrtcLedV2.jsx` saves the effective rate into `unit_rate`/`offered_rate` (proposal + PDF read these), keeps `listed_rate` = master DAVP rate, and persists the raw override so an EDIT round-trips it back into Step-3.
+- SQL `supabase_phase195_gsrtc_rate_override.sql`: `ALTER TABLE public.quote_cities ADD COLUMN IF NOT EXISTS rate_override numeric` (nullable; NULL = use master). Additive, idempotent, `NOTIFY pgrst`. Mirrors the Phase 7 `daily_spots_override`/`days_override` pattern. No other flow reads the column.
+
+**Private-lead brochure email** (Phase 177 `fcfb5d6` + `139c66d`, Phase 177.1 `2d228c7`)
+PRIVATE lead Email action opens a pre-meeting intro draft with the company brochure attached (native) or linked (web). GOVERNMENT/non-private lead Email stays byte-identical plain mailto; no-email leads still open the log modal.
+- SQL `supabase_phase177_company_brochure.sql`: `ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS brochure_url text`. Idempotent, `NOTIFY pgrst`, no RLS change.
+- `MasterV2.jsx` Companies tab: brochure PDF uploader → existing `company-assets` bucket, `kind=brochure` (mirrors Phase 80 thank-you-url).
+- `src/utils/leadEmailDraft.js` (NEW): `buildLeadEmailDraft({ lead, company, rep })` → `{ subject, body }`; company name read from the `segment='PRIVATE'` companies row per §4 (falls back to legal name only so the draft still composes).
+- `src/utils/downloadToCache.js` (NEW): remote file → Capacitor cache → local uri; native-only, returns null on web/failure, never throws.
+- `LeadDetailV2.jsx` (§28 frozen — guardian PASS): `handleLeadBrochureEmail` best-effort native download-to-cache → ShareDirect, always falls back to mailto; Email branch gated on `segment==='PRIVATE'` only.
+- `api/brochure.js` (NEW serverless): `/api/brochure` 302-redirects to the current PRIVATE `brochure_url` (branded + stable across re-uploads). Reads via `SUPABASE_SERVICE_ROLE_KEY` (already set for `/api/pdf`); `company-assets` is public so no token gate. No `vercel.json` change (api/ already excluded from the SPA rewrite). `LeadDetailV2` web-fallback links `window.location.origin + /api/brochure`; native attach still uses the real file URL.
+
+**Quote delete rules — role-aware + payment-locked** (Phase 74, `13e2581`)
+Replaces the Phase 11b blanket "block every non-draft delete" with an owner-approved matrix. sales/telecaller: delete any quote except Won. admin/co_owner: any except Won-with-payments (must delete payments rows first).
+- SQL `supabase_phase74_quote_delete_rules.sql`: rewrites `quotes_no_delete_after_draft()` — `SECURITY DEFINER SET search_path=public` so `get_my_role()` resolves; branches on `status='won'` (check payments + role) else allow. Defensively drops both legacy trigger names (`quotes_block_delete` + `quotes_no_delete_after_draft`) before re-attaching.
+- `QuotesV2.jsx` (§28 frozen — guardian PASS): `canDeleteQuote(q)` mirrors the trigger (false when Won-with-payments OR Won + non-privileged role) using the `q.payments` array joined in `useQuotes.js`; 2 render sites swap `status==='draft'` → `canDeleteQuote(q)` so Sent/Negotiating/Lost/Nurture now show Delete; trigger stays authoritative.
+
+**PARTIAL:**
+- §63 — add: Phase 176 (`d3d35db`) — govt proposal **email + WhatsApp body** now branch on `quote.proposal_language === 'en'` (in `GovtProposalDetailV2.jsx` `handleWhatsApp` + email/mailto), not just the PDF attachment. Gujarati path byte-identical (null/'gu'); `en` is a new branch only.
+- §9 — add: Phase 8 (`6af95a5`) — `supabase_phase8_storage_oc_copy_locked_pdf.sql` creates the private `quote-attachments` Storage bucket (4 RLS policies gated on `bucket_id='quote-attachments' AND auth.uid() IS NOT NULL`, 100MB limit); adds `quotes.locked_proposal_pdf_url` + `quotes.locked_proposal_pdf_at` (the locked snapshot is the single source of truth for what reached the govt body); adds `OC_COPY` (`display_order` 7) to `attachment_templates`. `src/utils/proposalPdf.js` (NEW) does html2canvas → jsPDF A4 locked PDF on Mark Sent + a pdf-lib combined download (locked proposal + every uploaded attachment in display order; skips pasted URLs/CORS + unsupported MIME). Mark Sent gates on OC copy, Mark Won gates on PO copy; blue "Letter PDF locked on …" banner after Sent. Locked PDF does NOT re-render on later edits.
+
+### Renewal Tools tabs + Telecaller "Today" hub (backfill)
+
+`RenewalToolsV2.jsx` (route `/renewal-tools`) is NOT in the §28 frozen list. All three renewal commits are additive to it; `campaign_end_date` / `campaign_start_date` on `quotes` are read in ~10 other files (WhatsApp, WonPaymentModal, RenewalReminderBanner) — none touched.
+
+**Renewal Tools — Expired Campaigns tab** (Phase 105, `ead8a94`)
+- Added a tab toggle (`Renewing · 60d | Expired`), `const [tab, setTab] = useState('renewing')`. Renewing tab query/buckets/table byte-identical to the pre-existing 60-day list.
+- `loadExpired()`: `quotes` where `status='won'` AND `campaign_end_date < today`, `.order('campaign_end_date', desc)` — NO upper bound (all expired). From/To date filter narrows on `campaign_end_date` (`expFrom`/`expTo` state); Clear resets. Cols: Quote / Client / Rep / Value / Duration (`campaign_start_date → campaign_end_date`) / "N days ago" / Renew. Mobile cards mirror.
+- Privilege scope: admin/co_owner all, rep sees own (`.eq('created_by', profile.id)`) + the two-query name merge (no `users(name)` embed).
+
+**Renewal Tools — Active Campaigns tab** (Phase 108, `f2b633c`)
+- 3rd tab (`Renewing · 60d | Active | Expired`) as a card grid. `loadActive()`: `quotes` where `status='won'`, `campaign_start_date <= today+14`, `campaign_end_date >= today`. Unit counts from a second `quote_cities` count query merged client-side (`unit_count`).
+- Per-card status via `campaignStatus(q)`: `SOON` (not started, amber) / `ENDING` (≤7d left, rose) / `LIVE` (>7d left, green) + days-left + progress bar (% duration elapsed). `MEDIA[media_type]` → label·unit map: `AUTO_HOOD`→Auto-rickshaw·units, `GSRTC_LED`→GSRTC·stations, `HOARDING`→Hoarding·sites, `LED_OTHER`→LED·units, `MALL`→Mall·sites, `CINEMA`→Cinema·screens, `DIGITAL`→Digital·spots, `OTHER_MEDIA`→Other media·units.
+- Status colors use `--success/danger/warning` + matching `-soft` tokens (no hardcoded hex).
+
+**Renewals — Expired wrong-column + TC nav + clickable card** (Phase 159, `7fde132`)
+- ❌ FOOT-GUN: `loadExpired()` (and `durationLabel`) selected `campaign_months` — that column does NOT exist on `quotes`; the real one is **`gsrtc_campaign_months`** (Phase 6). The `.select()` 400-errored → caught → Expired tab always 0. Active/Renewing don't select it, so only Expired broke. Renamed to `gsrtc_campaign_months` in both places. When reading campaign length off `quotes`, use `gsrtc_campaign_months`.
+- Added `{ to: '/renewal-tools', label: 'Renewals', icon: Repeat }` to `TELECALLER_NAV` (sidebar/drawer only; `MOBILE_NAV_TELECALLER` bottom nav stays 4 tabs). TC closes deals too so they own renewable campaigns.
+- Active card now clickable: `onClick={() => navigate(quoteRoute(q))}`, `quoteRoute` → `/proposal/:id` for `AUTO_HOOD`/`GSRTC_LED`, else `/quotes/:id` (§10).
+
+**Telecaller landing → "Today" hub** (Phase 104, `0907acd`)
+- Route `/telecaller` unchanged; relabeled + restructured to mirror the sales `/work` Today page (call-shaped, no meetings/GPS). `TELECALLER_NAV` + `MOBILE_NAV_TELECALLER` `/telecaller` entry label `Call Queue`/`Queue` → **"Today"**, icon `Phone` → `Sun`. Sales/admin navs untouched.
+- V2Hero footer trimmed to connect-rate only. Old 4-card lead-stat-strip → 6-tile `m-card` grid (byte-identical styling to sales `TodaySummaryCard`): **Callbacks · Connected · Qualified · In-queue · Hand-offs · SLA**. Dead `<Stat>` component removed.
+- Guardian PASS: PostCallOutcomeModal chain, `useAutoRefresh`, push-enrollment (V2AppShell only), stage/cadence/activity_type all untouched.
+
+**Last-quote backreference on /telecaller hero** (Phase 51, `6c942a7`)
+- When Next Call advances to a lead, fetch newest `quotes` row: `.eq('lead_id', leadId).order('created_at', desc).limit(1)` selecting `id, quote_number, ref_number, total_amount, status, media_type, created_at`. Inline hero pill "Last quote · {quote_number || ref_number} · amount · status chip · age". Hidden when none; fetch errors log to console only. Tap → `/proposal/:id` (govt `AUTO_HOOD`/`GSRTC_LED`) or `/quotes/:id` (§10).
+
+- **Trivial fixes (collapsed):** Phase 104.1 (`2f560c8`) + 104.2 (`9c6bd76`) fixed the resulting `/telecaller` white-screen — 104.1 made `ProposedIncentiveCard` return null on incomplete payload (a TC has no `staff_incentive_profile`) + null-safe `forecast.wonAge?.stale`, and added new `src/components/v2/ErrorBoundary.jsx` wrapping the `/telecaller` route in `App.jsx` (on-screen crash card w/ Reload). 104.2 removed a duplicate `<ProposedIncentiveCard>` body-mount in TelecallerV2 — ❌ FOOT-GUN: V2AppShell already renders it above `<Outlet/>` for non-privileged roles; two mounts open the same realtime topic `incentive-<userId>` and the 2nd `.on()`-after-`subscribe()` throws → white screen. Net: TC incentive card comes from the shell, never a page body mount.
+- **Trivial fix:** Phase 161 (`333ce76`) — `OfferDetailModal.jsx` convert-to-user (`admin_create_user` RPC, always `p_role='sales'`) now passes `p_city: offer.city || 'Vadodara'` instead of `|| null`, so a converted rep is never city-less (a null city broke the TA/DA claim window + DA/Hotel ceiling lookup — Mayur). Add-Member form already required City, so it was never the leak.
+
+**§47 — add (Phase 54, `71a33c9`, telecaller live-audit F1/F2/F3/F5):** F2 is a FROZEN-file (§28 PostCallOutcomeModal) contract change — `callAudit.js` default `outcome` flipped `'connected'` → **`'no_answer'`** (tel-tap no longer auto-counts as connected, which had inflated connect-rate to 100%); PostCallOutcomeModal now extends its Phase 47.8 fire-and-forget `call_logs` patch to write `outcome` from the rep's modal pick — `positive|neutral|negative → 'connected'`, `callback → 'callback_requested'`, skip-modal stays `'no_answer'`. F3: TelecallerV2 `load()` widens the `follow_ups` lead embed (city, segment, stage, source, heat, last_contact_at, do_not_call, wa_opt_out) so `nextCall` falls through to `callbacks[0]?.leads` when the queue is empty (and DNC/WA gates read correct values). F1: TotalPayableCard "Incentive earned" → "Incentive already paid" (the RPC `incentive` field is SUM of paid `incentive_payouts`, not a forecast). F5: `MyOfferV2` header copy swaps to "Expenses & Leave" for `role='telecaller'`. No SQL, no schema change.
+
+### Team / manager dashboards + drill-downs (backfill — phase numbers collided with unrelated §§, audit missed them)
+
+**Manager dashboard MVP + Bug-2 fix + admin reassign** (Phase 61, `7076a30` + `2d54223`)
+- Surfaces the `team_role='sales_manager'` concept (Jubin = sales head `role='sales'`, Renuka = TC head `role='telecaller'` — both keep their base role's daily workflow). `useAuth` gains `isManager` / `isManagerSales` / `isManagerTelecaller`, all keyed off `team_role`, NOT `role`.
+- New `ManagerDashboardV2.jsx` at route `/manager` (guard `RequireManager` = isPrivileged OR isManager). `RootRedirect` lands sales_manager on `/manager` BEFORE the telecaller/sales branches. Data = direct reports via `users.manager_id = profile.id` (Phase 42 column); per-rep today = calls + connected (`call_logs.outcome='connected'`), meetings (`lead_activities activity_type='meeting'`), open leads (`leads` stage NOT IN Won/Lost), last `gps_pings` age. Tap rep → `/admin/calls/:userId`.
+- New `TeamManagerAssignV2.jsx` — admin reassigns a rep via inline manager dropdown (UPDATE `users.manager_id`); sales reps pair with sales heads, telecallers with TC heads. Mounted BOTH at `/admin/team-assign` (RequirePrivileged) AND as PeopleV2's 6th tab **Assign** (`embedded` prop suppresses own page-head, §30 pattern).
+- `V2AppShell`: new `MANAGER_NAV` (leads with "My Team"→/manager) + `MOBILE_NAV_MANAGER`; manager branch sits ABOVE telecaller in the nav ternary so Renuka gets MANAGER_NAV, not TELECALLER_NAV.
+- **Bug 2 fix**: `TeamDashboardV2` gate was `profile.role IN ('admin','co_owner','sales_manager')` — both heads BLOCKED because sales_manager is a `team_role` value. Now `role IN ('admin','co_owner') OR team_role==='sales_manager'`.
+- ❌ FOOT-GUN: `sales_manager` is a `team_role`, never a `role`. Gating on `role==='sales_manager'` matches nobody.
+
+**TeamDashboard date filter + follow-up / quote-chase / payment-chase KPIs** (Phase 82, `2743f67`)
+- `PeriodPicker` mounted in `TeamDashboardV2` page-head (same component as Admin/Sales dashboards); load() queries + useEffect deps driven by `period.startIso` / `period.endIso` (default today).
+- 3 new per-rep KPI maps rendered in a 2nd `.lead-rep-kpis` row: `followUpsByUser` (follow_ups by `assigned_to`, `is_done` → done/total, traffic-light on pending), `quoteChaseByUser` (quotes `status='sent'` by `created_by` whose `updated_at` is >3d before period.endIso — "sent it, nobody chased"), `paymentChaseByUser` (quotes `status='won'` by `created_by` where summed approved payments < `total_amount` — "won but not collected").
+- Columns confirmed: follow_ups(`assigned_to, is_done, follow_up_date, done_at`); quotes(`created_by, status, updated_at, total_amount`); payments(`quote_id, amount_received, approval_status`='approved'). No `last_chase_at` column exists — 3-day staleness computed client-side vs period.endIso.
+
+**TeamDashboard split calls (total vs connected) + telecaller evening summary** (Phase 83, `a6bdf84`)
+- `TeamDashboardV2` call_logs select adds `outcome`; new `connectedByUser` map. Calls KPI big number = `{connected}/{target}`, sub-label `· {total} total`. `callPct` color band (green ≥80 / amber ≥50 / rose <50) now uses connected-vs-target (matches TelecallerV2 hero, Phase 43.2). Owner: "Rima 336 calls" was the raw tel-tap count.
+- `TelecallerV2` imports `DaySummaryCard` from `../../components/work/DaySummaryCard`, mounted above V2Hero unconditional (card's own 7 PM IST auto-show + admin-skip + TC meeting/site-visit hiding handle visibility).
+- Guardian PASS: quickLogCall tel:→1.5s→modal chain + `useAutoRefresh` untouched.
+
+**Admin server-side URL-shortener cascade + PostgREST 400 fixes** (Phase 86, `cdd0cc5`) — audit's "§72" is a phase-number collision (§72 = unrelated Phase 178 compute_daily_score); genuinely undocumented.
+- 86.2: `adflux/api/shorten.js` rebuilt from single-provider (is.gd only) to a server-side cascade — `cleanuri` (POST form-urlencoded, JSON) → `is.gd` (GET plaintext) → `tinyurl` (GET plaintext, result validated `^https?://tinyurl.com/`). First success wins, 4s timeout PER provider (was one 5s). Rate limit (Phase 85.4) + Cache-Control 1h preserved. Kills the browser-side cleanuri/is.gd CORS cascade in `src/utils/whatsapp.js`.
+- 86.1: dropped nonexistent `quotes.ref_number` from two `quotes(...)` PostgREST embeds in `AdminDashboardDesktop.jsx` (payments-approval selects) that were 400ing; `quote_number` stays sole identifier. This is the ORIGIN of the documented "ref_number does not exist" foot-gun (later M9 keeps `select('*')` for exactly this reason).
+- 86.1: `follow_ups` completions column is `done_at`, NOT `completed_at` — swapped in both `AdminDashboardDesktop.jsx` and `SalesDashboardDesktop.jsx` (select + gte/lte window). Stale `completed_at` was the PaymentsApproval 400.
+
+**GpsTrack date picker + per-call history + missed/no-answer split + status-pill relax** (Phase 90.2, `6df9f83`) — audit's "§42" is a phase-number collision (§42 = unrelated Phase 98 gpsDistance thresholds); genuinely undocumented.
+- `GpsTrackV2`: `<input type="date">` in header (max today, min 90d back) → `navigate('/admin/gps/${userId}/${next}')` (route already accepts `:date`, no router change).
+- Call breakdown split into separate buckets via Phase 56l `direction` column: `missed`=`direction='missed'` (inbound, rep didn't pick), `noAnswer`=`direction='outgoing'` AND (duration=0/NULL) AND outcome≠'connected', `short`=1–9s, `qualified`=≥10s, `connectedQualified`=qualified AND outcome='connected'.
+- New per-call history table (`callRows`, cap 2000/day) — select `id, call_at, duration_seconds, outcome, direction, client_phone, notes, lead:lead_id(id,name,company)`; columns Time / Direction / Lead-phone / Duration / Outcome / Note; row click → `/leads/:id`.
+- `TeamDashboardV2` rep-card status pills relaxed to day-scale so lunch/long-meetings stop flipping red: `gpsOn = pingMins <= 720` (12h, was 30min); `onlineOk = lastSeenMins <= 1440` (24h, was 3h; derived from `push_subscriptions.last_seen_at`). Push pill unchanged (binary).
+
+**Team-viewer per-rep drill-down RPCs** (Phase 194, `b070883`) — §116/§84 reference "the §194 pattern" but never define it; this is that definition (a genuine PARTIAL of §116, which is a later clone).
+- `supabase_phase194_team_drilldowns.sql` (NEW) — two gated SECURITY DEFINER STABLE RPCs, gate `is_team_viewer() OR COALESCE(get_my_role() IN ('admin','co_owner'), false)`, fail-closed on NULL role, read-only:
+  - `team_rep_daytrack(p_user_id, p_from, p_to, p_date)` → jsonb `{user, pings, session, activities(LIMIT 50), voice(LIMIT 20), gps_off, calls(LIMIT 2000), ta_km}` (ta_km from `daily_ta.km_traveled`).
+  - `team_rep_followups(p_rep_id)` → jsonb `{follow_ups(+ lead + payments), nurture_leads(LIMIT 50)}`.
+- `App.jsx`: both `/admin/gps/:userId` + `/admin/gps/:userId/:date` routes switched `RequirePrivileged` → `RequireTeamView` so a `can_view_team_dashboard` viewer can drill in.
+- `GpsTrackV2` (viewer branch loads via `team_rep_daytrack`; admin `Promise.all` byte-unchanged; `daily_ta` effect gated admin-only, viewer gets ta_km from bundle). `FollowUpsV2` (§28 FROZEN, guardian PASS): `viewingOther` (flagged viewer + `?rep`≠self) reads `team_rep_followups` and renders READ-ONLY via `readOnly` on Section/Row + NurtureSection/NurtureRow; rep/admin path byte-unchanged.
+
+### Admin Team-dashboard rep cards + shared PeriodPicker (Phase 112.x, 2026-06-04)
+
+Owner thread on `/team-dashboard` (`src/pages/v2/TeamDashboardV2.jsx`, admin-only, NOT §28 frozen): *"admin dashboard data with meet, overdue follow up, today follow up, quote chase, pay chase. i dont need voice."* Series 112.1 → 112.7 reshaped every rep card; two side commits fixed the shared PeriodPicker and the rep lead-detail map. All render-only / read-only — no money/score/save path, no SQL.
+
+**Rep card tiles — drop Voice, universal Overdue F-up** (Phase 112.1, `21d1072`)
+- `TeamDashboardV2.jsx`. Voice tile removed from every card; hero stat row `Voice logs` dropped (5 → 4 stats); dead `totalVoiceToday` useMemo removed. `voiceByUser` fetch left in place (write-only now, no regression).
+- Overdue F-up tile (was TC-only, Phase 93.5) now shown for ALL reps — `overdueFuByUser` already computed role-agnostically, no new query. Row-2 `F-up` label → `Today F-up`.
+
+**Hero headcount == green cards + fill TC card cells** (Phase 112.2 + 112.3, `e58652a`)
+- 112.2: hero `Reps active now` (`live` useMemo) dropped the 90-min GPS-ping gate (Phase 84) — now checked-in + not-checked-out only, matching the card `in field` pill rule (Phase 88.7). Hero was under-counting (8 in-field cards, hero said 3; the diff had GPS off). `X not checked-in` subtitle now truthful.
+- 112.3: 2 read-only SELECTs added to the admin `Promise.all` (now 16). TC-only tiles fill the 2 cells freed by hidden Meet + N/A Quote/Pay-chase: **Qualified** = `lead_activities` `activity_type='call'` + `outcome='positive'` today, grouped by `created_by` (`qualifiedByUser`); **Callbacks due** = open `follow_ups` (`is_done=false`) with `follow_up_date` today..today+2, grouped by `assigned_to` (`callbacksDueByUser`, window built via UTC add to avoid IST drift). TC card = Calls · Overdue F-up · Qualified / Today F-up · Connect rate · Callbacks due.
+
+**Sales card tracks leads + meetings, not calls** (Phase 112.4, `792ca16`)
+- Field reps make ~0 calls, so the Calls tile read 0/target and the work-line progress bar (call %) sat at 0% ("not going ahead"). Sales cards: 2nd tile Calls → **Leads** (`counters.new_leads` / `leadsTarget`); progress bar call% → **meetings %** (`counters.meetings` / `meetingsTarget`). Targets read from `users.daily_targets` JSONB (`r.daily_targets`, defaults `new_leads` 10, `meetings` 5). TC cards keep Calls (connected/target) + the call-% bar. Reuses already-fetched `daily_counters` — no new query.
+
+**Per-rep monthly quote/won VALUE capsules** (Phase 112.5 → 112.7, `766948d` → `e6246a9`)
+- 112.5: 2 read-only SELECTs added to `Promise.all` (now 18) — quotes created this CALENDAR month + quotes won (`status='won'`) this month, per `created_by`, window from `thisMonth()` (`src/utils/period.js`), independent of the date filter. First shipped as a bottom text line.
+- 112.7 superseded that line with 2 header capsules (right of name, left of status pill): blue `{N} quote(s) · ₹X`, green `{N} won · ₹Y`. Both month SELECTs now also select `total_amount` (summed per rep → `monthQuoteAmtByUser` / `monthWonAmtByUser`); compact ₹ via `formatLakh`, full ₹ on hover via `formatCurrency`.
+- ❌ FOOT-GUN: `quotes` has no `won_at` — won-month is proxied by `updated_at` (per §33). Don't treat it as a real won timestamp.
+
+**Span-aware PeriodPicker arrows** (Phase 112.6, `7acd2ff`)
+- `src/utils/period.js` + `src/components/v2/PeriodPicker.jsx` (shared by 3 dashboards). The `< >` arrows called `shiftMonth()` unconditionally, so on the Team day-view `<` jumped a whole month and `>` greyed out. New exports: `shiftPeriod(period, delta)` — month periods route to the unchanged `shiftMonth`; range periods step by their own span length (Today ±1 day, Last 7 days ±7 days) — and `canShiftNext(period)` — next-arrow disabled when the next window would start after today (covers month + day views). PeriodPicker swapped `shiftMonth`/`isFutureMonth` → `shiftPeriod`/`canShiftNext` + `period` aria/title. `shiftMonth` + `isFutureMonth` kept exported. Admin + Sales month dashboards route through `shiftMonth` → byte-identical; only Team's day view gains day-stepping.
+
+**RepMapPanel km == admin /admin/gps map** (Phase 112, `e2cb527`) — PARTIAL, overlaps the existing GPS-distance-filter contract
+- `src/components/leads/RepMapPanel.jsx` ("Today on the map" on rep lead-detail). Was summing raw great-circle distance over every `gps_pings` row (GPS jitter + speed spikes counted) → higher km than `/admin/gps` and the TA payout. Now imports `summariseTrack` + `cleanTrack` from `src/utils/gpsDistance` (same pure helpers used by GpsTrackV2 + TaDaRequestPanel; `gpsDistance.js` itself NOT edited). `gps_pings` query now selects `accuracy_m` and paginates ALL pings (1000/page via `.range`) instead of `.limit(2000)`, so a >2000-ping day isn't truncated. `trackKm = Number(summariseTrack(rawPings).km)` (filtered — == admin), `trackPts = cleanTrack(rawPings)` (cleaned polyline). Two display gates switched `trackPts.length` → `rawPings.length`. Display-only — `compute_daily_ta` / `daily_ta` money path + `compute_daily_score` untouched. sales-module-guardian PASS.
+
+### Batch B6 — attendance / push / voice / pdf-cleanup / deck backfill
+
+**Attendance / check-in module — sales + telecaller (Phase 60, `971701a`)**
+First daily-attendance gate. New route `/check-in` → `CheckInV2.jsx` (RequireAuth, OUTSIDE V2AppShell — no sidebar/topbar). `CheckInGate.jsx` wraps V2AppShell and redirects **sales + telecaller** roles to `/check-in` on every authenticated page mount until they've checked in today (other roles pass through). New files: `components/v2/CheckInGate.jsx`, `components/v2/SwipeToCheckIn.jsx` (swipe-to-check-in control), `hooks/useCheckinStatus.js`, `supabase_phase60_attendance.sql`.
+- SQL: `work_sessions` gains `check_in_status text` (CHECK `on_time|late|half_day|absent`), `late_minutes int`, `auto_checked_out boolean DEFAULT false`; partial index `idx_work_sessions_today_no_checkin`. New `attendance_warnings` table (`kind` CHECK `no_checkin|gps_off|internet_off|admin_escalation|auto_checkout|marked_absent`; admin-all + self-select RLS).
+- RPCs: `record_checkin(p_lat, p_lng)` SECURITY DEFINER (writes today's `work_sessions` row), `is_checked_in_today()`, `enqueue_attendance_reminder()`, `tick_attendance()`, plus helpers `ist_today()`, `ist_now()`, `user_first_name(uuid)`, `is_workday_for(uuid, date)`.
+- CONTRACT (status thresholds, IST clock): ≤ 09:30 = `on_time` (late_minutes 0); 09:30–11:30 = `late`; after 11:30 = `half_day`.
+
+**Late-reason + today's-plan + uniform /work landing (Phase 60.2+60.3, `4433d36`)**
+`supabase_phase60_2_late_reason.sql`: `work_sessions.late_reason text` added; `record_checkin` re-signed to `record_checkin(p_lat, p_lng, p_reason)` (3rd param, idempotent COALESCE keeps existing reason); `is_checked_in_today()` now returns `late_reason` in payload. `CheckInV2`: late-reason modal opens when returned status is `late`/`half_day` (rep enters one-liner or skips → row keeps `reason=null`); richer "Today's plan" card (follow-ups due today/overdue from `follow_ups` + meeting count logged today); after check-in **all roles navigate to `/work`** (telecallers too — daily-plan muscle memory).
+
+**Universal LocalNotifications — OEM-immune push delivery (Phase 96.0, `d78b13a`)**
+Closes the Vivo/Xiaomi/Realme (FunTouch/MIUI/ColorOS) background-FCM throttle: server enqueued ~282/day, device popped ~2/week; foreground app suppressed the FCM tray entirely. Fix backs follow-up reminders with `@capacitor/local-notifications` (new dep) + AlarmManager, which runs independent of FCM (survives process death, OEM kills, offline, battery saver).
+- New `src/utils/scheduleFollowUpAlarm.js` — cancel-then-schedule, stable id from uuid hash, native-only guard, past-dated skip. `nativePush.js` mirrors a `untitled_default` LocalNotifications channel + tap listener + schedules on every FCM receipt (tray pops in foreground AND background). `useFollowUps.js` wires schedule/cancel into markDone / reschedule / createFollowUp.
+- Frozen files, additive only (guardian PASS): `PostCallOutcomeModal.jsx` schedules an alarm on `follow_ups` insert success (captures id via `select('id')` + array unwrap); `V2AppShell.jsx` cold-start backfill reads open follow-ups for next 7 days and schedules alarms (covers reinstall + pre-96 rows).
+- Edge Function `notify-rep/index.ts` → **DATA-ONLY FCM payload**: top-level `notification` and `android.notification` blocks REMOVED; client owns the tray 100%; `priority='high'` REQUIRED.
+- ❌ FOOT-GUN: do NOT re-add a top-level `notification` (or `android.notification`) field to `notify-rep`. With it present FCM auto-displays only in background, suppresses the in-app receive handler, and breaks the schedule-on-receive path; data-only delivery is also capped at a few/day per device without `priority='high'`.
+
+**Voice-First V1 — record / transcribe / classify / log (Phase 20, `017be4d`)**
+Rep speaks a voice note → Whisper-1 transcribes → Claude Haiku classifies → `lead_activities` row inserted. Single sync request, no background queue in V1.
+- `supabase_phase20_voice.sql`: `voice_logs` table (`lead_id`, `user_id`, `transcript`, `language_detected`, `classified jsonb`, `activity_id` FK, `status` pending/transcribing/classifying/completed/failed, `error_message`, audit ts); RLS rep-own / sales_manager direct-reports / admin-all; added to realtime publication.
+- Edge Function `supabase/functions/voice-process/index.ts`: base64 audio + mime + lead_id + duration + language hint; caller JWT used for all writes (RLS applies); Whisper multipart transcription; Haiku strict-JSON classification; inserts sanitized `lead_activities` (activity_type + outcome) then patches `voice_logs`.
+- `VoiceLogV2.jsx`: MediaRecorder flow (idle→recording→recorded→sending→done), RLS-scoped lead picker (top 80 recent), Gujarati/Hindi/English hint chips bias Whisper, 60s cap, error states for mic-denied / no-MediaRecorder / API failures. `LeadDetailV2.jsx` action row gets a **Voice** button deep-linking `/voice?lead={id}` to skip the picker.
+- Owner action: run SQL, set `OPENAI_API_KEY` in Edge Function settings, `supabase functions deploy voice-process`.
+
+**Legacy quote-PDF storage cleanup buttons (Phase 81.5.1, `9bd2dba`; Phase 81.5.2, `6b10ddd`)**
+New **Maintenance** tab in `MasterV2.jsx` (admin one-time utilities). 81.5.1 "Purge legacy quote PDFs": lists everything under bucket `quote-pdfs`, removes only objects whose name contains a slash (old `quote-pdfs/{ref}/{ts}.pdf` folder layout); new flat `quote-pdfs/<ref>.pdf` uploads have no slash and are safe; idempotent (re-run deletes 0). 81.5.2 adds two more ops via extracted `<CleanupCard>` sub-component: purge govt combined PDFs (bucket `quote-attachments`, filename `99-combined.pdf`, folder ≠ `_master`) and purge WON govt proposal files (`quotes` where `segment='GOVERNMENT' AND status='won'` → delete every file in each won quote's UUID folder; `_master` never matches). Drafts/sent/negotiating/lost untouched. Imports `Wrench` (lucide) + `toastError/toastSuccess`.
+
+**Deck "Get a quote" pre-fills New-Quote notes (Phase 187.8, `07a15ad`)**
+`led-deck-final.html` quote links append `?pkg=<tier>`; `CreateQuoteV2.jsx` (frozen §28, additive) reads `searchParams.get('pkg')` → `DECK_PKG` map → seeds `prefill.client_notes` ONLY. `location.state.prefill` (ClientsV2 / renewal) always wins; no `?pkg` → miss → null → behaviour byte-identical. Rep still fills client + cities.
+
+---
+
+Partial items (fold into existing sections):
+
+- **§44.9 — add** (Phase 81.4, `9087b08`): brand-domain PDF URL + size compress. `vercel.json` rewrite `/pdf/(.*)` → `kompjctmisnitjpbjalh.supabase.co/storage/v1/object/public/quote-pdfs/$1` (SPA catch-all now excludes `/api/` AND `/pdf/`). `uploadQuotePDFHtml` returns `https://app.untitledad.in/pdf/...` on hosts matching `/(^|\.)untitledad\.in$/`, raw Supabase URL on localhost/branch. `api/shorten.js` `ALLOWED_HOST_SUFFIXES` += `untitledad.in`. Size (~10MB→~2-3MB): `captureToCanvas` `scale` param (2 for text/summary pages, 1.5 for photo + thank-you), `addCanvasAsPages` JPEG quality 0.92→0.85, new `CityModal.compressPhoto` browser-side pre-upload compression (`createImageBitmap`→canvas).
+- **§34 — add** (Phase 73, `b5ecc6a`): `TeamDashboardV2.jsx` reads each rep's calls target from the `daily_targets` table (Phase 49) via a `policyByUser` map keyed by user_id; falls back to `users.daily_targets` JSONB (default 20), TC reps default 50 when both absent. Meet tile hidden when `team_role='telecaller'` (TC card = Calls + Voice only). Render-layer only.
+- **§60 — add** (Phase 72, `29043bf`): `supabase_phase72_lead_lifecycle.sql` — trigger `trg_lead_close_followups_on_terminal` (AFTER UPDATE OF stage ON leads; Lost/Won → open `follow_ups.is_done=true` + open `lead_tasks` closed); `run_nurture_revisit()` RPC + pg_cron `nurture-revisit-daily` at 03:30 UTC (09:00 IST) spawns a today follow_up for `telecaller_id||assigned_to` when `leads.revisit_date <= today` then bumps `revisit_date` +30 days. `ChangeStageModal.jsx` drops the Phase 31N restriction (Nurture now reachable from any stage). `LeadsV2.jsx` adds `lostReasonFilter` ("Price problem" first) + `outcomeFilter`, both cleared by Reset / Clear-all.
+- **§77 — add** (Phase 188, `1667ec8`): `adflux/public/deck/adflux-console.html` — single self-contained 10k-line offline dashboard console for the GSRTC deck; 4 in-page tabs (dashboard + screen-settings + audience analytics + media report), shared navy sidebar, frozen map tiles + inlined chart engine/assets; companion `media-report.pdf` (relative). Deck-only.
+- **§75/§77 — add** (Phase 187.6, `3096be2`): `led-deck-final.html` tablet support — swipe left/right slide nav (guarded: ignores swipes starting on map / dashboard iframe / links / controls / overview; thresholds >60px, horizontal-dominant, <700ms) + `@media (pointer:coarse)` nav buttons 38→46px. Desktop unchanged, deck-only.
+- **§85 — add** (Phase 44.1, `d34389a`): new `components/leads/LeadsCollectedChart.jsx` — daily "Leads Collected" bar chart, default last 30 days, from/to + segment + source filters, queries `leads` (`id, created_at, segment, source`), fills zero-count days. Mounted at top of `LeadsV2.jsx` (frozen §28) via one import + one mount line; read-only, no store/table/quote-action change.
