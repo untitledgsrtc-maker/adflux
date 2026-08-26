@@ -56,6 +56,10 @@ export default function ClientsV2() {
   const [editing, setEditing] = useState(null) // client row currently in edit modal
   const [saveErr, setSaveErr] = useState('')
   const [saving, setSaving] = useState(false)
+  // Phase 323 (audit M12) — render only the first N rows (the fetch already loads
+  // the whole book via chunked .range()). Grows on Show-more; resets on filter change.
+  const [limit, setLimit] = useState(200)
+  useEffect(() => { setLimit(200) }, [search, repFilter])
   // Phase 33L — duplicate-merge tool. Admin-only. Toggled open via
   // the "Find duplicates" button below the header. Groups clients
   // by normalized phone (or company when phone empty) and surfaces
@@ -372,7 +376,7 @@ export default function ClientsV2() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(c => (
+                {filtered.slice(0, limit).map(c => (
                   <tr key={c.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
                     <td style={tdStyle}>
                       {/* Company is the primary identifier (B2B —
@@ -439,6 +443,15 @@ export default function ClientsV2() {
                 ))}
               </tbody>
             </table>
+            {filtered.length > limit && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, padding: '14px 0 4px' }}>
+                <span style={{ fontSize: 12.5, color: 'var(--v2-ink-2)', alignSelf: 'center' }}>
+                  Showing {limit} of {filtered.length}
+                </span>
+                <button onClick={() => setLimit(l => l + 200)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--v2-line)', background: 'var(--v2-bg-1, var(--surface))', color: 'var(--v2-ink-0, var(--text))', cursor: 'pointer', fontSize: 12.5 }}>Show more</button>
+                <button onClick={() => setLimit(filtered.length)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--v2-yellow, #FFE600)', color: 'var(--v2-ink-0, #0f172a)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}>Show all {filtered.length}</button>
+              </div>
+            )}
           </div>
         )}
       </div>

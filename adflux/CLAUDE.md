@@ -15970,3 +15970,55 @@ The ORIGINAL creation of two now-core routes (predates every later dashboard sec
 Full-history feature-coverage audit complete: 10/10 chunks, 1,697 commits. Final: DOCUMENTED 49 ·
 TRIVIAL 75 · MISSING 37 · PARTIAL 19 (56 gaps). All 56 now backfilled (§237 = 48, §238 = 8). The
 TRIVIAL set (crash-fixes, reverts, sub-version tweaks, collision-noise) intentionally not documented.
+
+
+---
+
+## 239 · Phase 323 perf backlog — dashboard aggregation RPCs (H4/M10/M16/M17/M21) + M12 (2026-08-26)
+
+Finishing the ⬜/🟡 perf-audit tail. H8 was fixed earlier (§236). This batch: M12 shipped; the 5
+dashboard aggregation findings get additive server-side GROUP BY RPCs (owner-run, shadow-gated).
+
+### M12 SHIPPED — Clients render pagination (`ClientsV2.jsx`, not §28 frozen)
+The chunked `.range()` fetch (loads the whole client book) still mapped EVERY row. Added
+`useState(200)` limit + `filtered.slice(0, limit)` + Show-more/Show-all + reset-on-filter effect.
+Pure frontend, no SQL. Fetch cap was already fixed (§234); this fixes the render.
+
+### The 5 aggregation RPCs — `supabase_phase323_dashboard_agg_rpcs.sql` (SQL committed, NOT yet wired)
+Each RPC reproduces the current client math byte-for-byte + drops a whole-table download that
+PostgREST silently caps at ~1000 rows (§66). Drafted by reading the exact client aggregation;
+**each carries a shadow-compare in the file's bottom section**.
+- **M10 `admin_source_attribution(p_days)`** (LOW, INVOKER) — the /dashboard "Source · 90d" card
+  aggregated 90d leads client-side (capped). Server GROUP BY source → {source, total, won}.
+- **M17 `team_payment_sums()`** (LOW, INVOKER) — TeamDashboardV2 admin path pulled the WHOLE
+  payments table to sum approved per quote_id. `SUM(amount_received) FILTER(approved) GROUP BY
+  quote_id`. Display-only unsettled-count.
+- **M21 `team_dashboard_bundle`** (LOW) — the §193/§316 gated team-VIEWER bundle jsonb_agg'd every
+  quote + the whole payments table. New `chase` arm = the already-shadow-proven team_chase_counts
+  (§H7); the heavy quotesSent/quotesWon/payments arms shrink to per-rep aggregates.
+- **M16 `get_my_settled_this_month(...)`** (MONEY + §28 FROZEN SalesDashboard.jsx — frontend needs
+  guardian) — the rep leaderboard "Settled · this month" pulled whole-org quotes+payments. Faithful
+  transcription of `getSettlement()` (final-flag-wins, settle-date=clearing payment_date).
+- **H4 `admin_dashboard_kpis(...)`** (MONEY, INVOKER) — /dashboard KPIs summed unbounded quotes +
+  approved payments client-side → wrong past 1000 rows. RPC returns the ~13 aggregate KPIs correct
+  at any row count. ⚠ SCOPE: the fetch is NOT removed — it still feeds ~7 top-N lists + the rep
+  leaderboard (those stay cap-vulnerable; a true top-6-outstanding could be missed beyond row 1000
+  — a bigger server-side-top-N follow-up). This fixes only the money-KPI accuracy cap.
+
+### DEPLOY DISCIPLINE (§71 rule 3 — money = shadow-verify BEFORE cutover)
+SQL is committed but the FRONTEND SWITCHES ARE HELD. Mirrors the Tier-3 batch (§234): SQL first →
+owner runs it + the shadow-compares → confirms 0-diff → THEN the frontend commits (each calls its
+RPC with a fallback to the current client aggregation on RPC-error, so deploy-safe either order).
+The money ones (H4, M16) especially must not go live on untested numbers. `check-sql-schema.sh`
+FAILs only on the documented CTE/record-alias false-positive (§72#15) — no real error; the RPCs
+were not executable from the sandbox, so the SHADOW is the real gate.
+
+### Owner action
+1. Run `supabase_phase323_dashboard_agg_rpcs.sql` in Supabase Studio (creates the 5 RPCs — harmless,
+   nothing calls them yet).
+2. Run the 5 shadow-compare blocks at the bottom of the file; paste back any non-zero diff or syntax
+   error. All 5 clean → I wire the frontends (guardian on the frozen SalesDashboard for M16).
+
+### Still open after this: M18 (inbox RLS InitPlan short-circuit) + M6 (drop @react-pdf, 3-component
+refactor — biggest/riskiest, its own pass). H9/M20 held for your shadow-review; C1/H2/M9/M11/M19 are
+decisions (rejected/reverted/kept).
