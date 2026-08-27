@@ -258,6 +258,11 @@ export default async function handler(req) {
     await fetch(`${SUPABASE_URL}/rest/v1/rpc/ops_recompute_uptime_today`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
   } catch { /* Phase 4 SQL not run yet — statuses still synced */ }
 
+  // 5 · reconcile offline tickets (open/auto-cancel per station) — best-effort
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/rpc/ops_reconcile_offline_tickets`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
+  } catch { /* Phase 2 SQL not run yet — statuses still synced */ }
+
   return j({
     ok: true,
     screens_received: received, upserted: rows.length,
