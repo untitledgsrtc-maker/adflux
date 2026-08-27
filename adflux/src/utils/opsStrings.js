@@ -164,6 +164,20 @@ export const STR = {
   still_offline_q: { gu: 'CMS હજુ બંધ બતાવે છે — તોય સુધારેલું નોંધવું?', en: 'The CMS still shows this offline — mark fixed anyway?' },
   fixed_by:        { gu: 'સુધાર્યું',                   en: 'Fixed by' },
 
+  // — F4 triage (time-aware fault list) —
+  hours_window:    { gu: 'સ્ક્રીન ૭ સવાર–૯ રાત',        en: 'Screens 7 AM–9 PM' },
+  now_word:        { gu: 'હમણાં',                       en: 'now' },
+  on_hours_now:    { gu: 'ચાલુ કલાક',                   en: 'on-hours' },
+  off_hours_now:   { gu: 'બંધ કલાક',                    en: 'off-hours' },
+  signal_lost:     { gu: 'સિગ્નલ ગયું · કારણ નક્કી કરો', en: 'signal lost · confirm reason' },
+  timer_fault:     { gu: 'ટાઈમર · હજુ ચાલુ છે',          en: 'timer · still on' },
+  still_on:        { gu: 'હજુ ચાલુ',                    en: 'still on' },
+  all_quiet:       { gu: 'બધું શાંત · સ્ક્રીન રાત્રે બંધ છે', en: 'All quiet · screens off for the night' },
+  screens_word:    { gu: 'સ્ક્રીન',                     en: 'screens' },
+  stations_word:   { gu: 'સ્ટેશન',                      en: 'stations' },
+  timer_faults_w:  { gu: 'ટાઈમર ખરાબી',                 en: 'timer faults' },
+  worst_first:     { gu: 'સૌથી ખરાબ પહેલા',             en: 'worst first' },
+
   // — Me tab (self-scoped) —
   tab_mystats:     { gu: 'મારું',                      en: 'Me' },
   my_salary_mo:    { gu: 'મારો પગાર · આ મહિને',         en: 'My salary · this month' },

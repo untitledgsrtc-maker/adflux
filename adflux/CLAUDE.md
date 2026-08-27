@@ -16819,3 +16819,46 @@ auto-vs-manual + confirm-classify · F5 map/route (the big one; exec is GPS-trac
 depots carry lat/lng) · F8 proof-photo + online-check on close. Tier 3: SLA/escalation,
 offline capture, per-screen MTTR, roles/push, station contacts (fixes F9's dead call
 button — the head adds contacts, §242).
+
+
+---
+
+## 250 · Ops F4 — time-aware triaged fault list + the 7 AM–9 PM rule (2026-08-27)
+
+The §249 Tier-2 F4, owner-approved (mockup + "Yes — build it"). Replaces the Open-tab
+grouped/individual tile grid on `/ops-tickets` (§246-§248) with ONE worst-first fault
+list, keyed to the operating window. Additive, `OpsTicketsV2.jsx` + `opsStrings.js` (not
+§28-frozen) + NEW `src/utils/opsHours.js`. Build PASS. Self-pushed.
+
+### THE OPERATING-HOURS RULE (owner: "screen time is 7am to 9pm … ams sometimes happned
+after 9pm also screen works so its isues of timer")
+`src/utils/opsHours.js` is the ONE source (§71). Window **07:00–21:00 IST**. A fault =
+actual state ≠ expected state:
+- **on-hours (7 AM–9 PM):** should be ON → `offline` = a fault (fix it).
+- **off-hours (9 PM–7 AM):** should be OFF → `offline` = normal/quiet; a screen still
+  `online` = a **TIMER fault** (the timer didn't turn it off).
+Helpers: `isOnHours()`, `istClock()`, `faultStatus(onHours)`, `screenFaultKind(status,
+onHours)`, `faultAgeHours(last_response_at)` (null→9999), `ageLabel(h,lang)`,
+`severityOf(ageHours,clusterCount)` (2 = down>48h OR ≥5-screen cluster; 1 = >6h; 0 = normal).
+
+### What F4 changed in OpsTicketsV2
+- Open-tab screen query is **time-aware**: `.eq('status', onHours ? 'offline' : 'online')`
+  + selects `last_response_at`; `onHours` stored in state at load so the fault set + labels
+  agree. `screens` is now the TIME-AWARE fault set (not always-offline).
+- Open tab = ONE worst-first list (severity stripe left-border + station · N-screens/screen
+  · type · age), sorted severity desc then age desc. Grouped/individual toggle GONE (kills
+  the F6 double-scroll). Type = on-hours "signal lost · confirm reason" (F7 hook) / off-hours
+  "timer · still on". Age from `last_response_at`; timer faults show "still on".
+- Time-context header ("Screens 7 AM–9 PM · now HH:MM · [on/off chip]") + time-aware count.
+  Off-hours + no timer faults → "all quiet". `openSheet` pre-fills the Timer issue off-hours;
+  IssueSheet status line is time-aware. MeTab worst-stations filters `screens` to
+  `status==='offline'` (reads right on-hours, empties off-hours).
+
+### FOOT-GUNS / follow-ups (the 7-9 rule must spread — else these two lie)
+- ❌ The §243 auto-ticket engine still auto-opens a ticket on ANY offline screen → after
+  9 PM it would open 264 false tickets for screens the timer correctly turned off. It MUST
+  adopt `isOnHours()` before it runs unattended. NOT yet done.
+- ❌ Uptime % (`ops_recompute_uptime_today` / §233 pay) counts offline against the whole day
+  → a perfect screen correctly off 9 PM–7 AM reads ~58%. Uptime must count only 7 AM–9 PM, or
+  the pay curve is wrong. NOT yet done — flag before ops uptime pay (p4) goes live.
+- Severity uses screen-COUNT as the station-size proxy (no per-station traffic/revenue data).

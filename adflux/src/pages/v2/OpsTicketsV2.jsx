@@ -7,7 +7,7 @@
 // call_logs (ops_ticket_id) + ops_my_uptime_pay. Gujarati-first (§231). Built on
 // the same lead-* classes + global tokens as OpsAdminV2 so it matches the cockpit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, MapPin, Phone, AlertTriangle, ChevronRight, Camera, Check, Wrench, Clock } from 'lucide-react'
+import { Loader2, MapPin, Phone, ChevronRight, Camera, Check, Wrench, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
@@ -15,6 +15,7 @@ import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { istTodayISO } from '../../utils/istDate'
+import { isOnHours, istClock, faultAgeHours, ageLabel, severityOf } from '../../utils/opsHours'
 
 // Map an ops outcome label -> the sales call_logs.outcome enum (never widen the enum).
 const OUTCOME_DB = { reached: 'connected', will_come: 'connected', fixed_call: 'connected', no_answer: 'no_answer' }
@@ -31,7 +32,6 @@ function estVariable(salary, uptimePct) {
 // design-system tokens (global, matches OpsAdminV2 / leads.css)
 const secLbl = { fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }
 const fieldSel = { width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 12px', fontSize: 15 }
-const tile = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 46, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'left' }
 const CHIP = { danger: ['var(--danger-soft)', 'var(--danger)'], amber: ['var(--warning-soft)', 'var(--warning)'], green: ['var(--success-soft)', 'var(--success)'] }
 function chip(text, tone) {
   const [bg, fg] = CHIP[tone] || CHIP.danger
@@ -51,7 +51,7 @@ export default function OpsTicketsV2() {
   const [err, setErr] = useState('')
   const [tab, setTab] = useState('open')
   const [cityId, setCityId] = useState('')      // '' = all my stations
-  const [grouped, setGrouped] = useState(true)
+  const [onHours, setOnHours] = useState(isOnHours())   // 7 AM–9 PM window (F4)
 
   const [depots, setDepots] = useState([])
   const [issueTypes, setIssueTypes] = useState([])
@@ -88,8 +88,14 @@ export default function OpsTicketsV2() {
 
       if (!depotIds.length) { setScreens([]); setProc([]); setFixed([]); setContactsByDepot({}); setIssueTypes([]); setCallsByTicket({}); setStats(null); return }
 
+      // F4: the fault set depends on the operating window (7 AM–9 PM). On-hours a
+      // screen SHOULD be on → offline = a fault. Off-hours it should be off →
+      // offline is normal (quiet), a screen still ONLINE is a TIMER fault.
+      const nowOn = isOnHours()
+      setOnHours(nowOn)
+
       const [scr, it, ct, pRes, fRes] = await Promise.all([
-        supabase.from('ops_screens').select('id, name, status, depot_id').in('depot_id', depotIds).eq('is_active', true).eq('status', 'offline'),
+        supabase.from('ops_screens').select('id, name, status, depot_id, last_response_at').in('depot_id', depotIds).eq('is_active', true).eq('status', nowOn ? 'offline' : 'online'),
         supabase.from('ops_issue_types').select('id, issue_en, issue_gu, display_order').eq('is_active', true).order('display_order'),
         supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone, display_order').in('depot_id', depotIds).order('display_order'),
         supabase.from('ops_tickets')
@@ -164,7 +170,13 @@ export default function OpsTicketsV2() {
     screens.forEach(s => { byD[s.depot_id] = (byD[s.depot_id] || 0) + 1; m[s.id] = byD[s.depot_id] }); return m
   }, [screens])
 
-  function openSheet(screenIds, depotId) { setSheet({ screenIds, depotId }); setIssueId(''); setOtherText(''); setNotes(''); setPhotoFile(null); if (fileRef.current) fileRef.current.value = '' }
+  function openSheet(screenIds, depotId) {
+    setSheet({ screenIds, depotId })
+    // off-hours the fault is a timer issue → pre-fill the Timer reason if seeded
+    const timer = !onHours ? issueTypes.find(x => /timer/i.test(x.issue_en || '')) : null
+    setIssueId(timer?.id || '')
+    setOtherText(''); setNotes(''); setPhotoFile(null); if (fileRef.current) fileRef.current.value = ''
+  }
 
   async function submitIssue() {
     if (savingRef.current || busy) return
@@ -270,9 +282,17 @@ export default function OpsTicketsV2() {
         ))}
       </div>
 
-      {tab === 'open' && cityScreens.length > 0 && (
-        <div style={{ ...secLbl, marginBottom: 12, color: 'var(--text-secondary)', letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
-          {cityScreens.length} {lang === 'gu' ? 'સ્ક્રીન બંધ' : 'screens down'} · {new Set(cityScreens.map(s => s.depot_id)).size} {lang === 'gu' ? 'સ્ટેશન' : 'stations'}
+      {tab === 'open' && (
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-subtle, var(--text-muted))', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <Clock size={12} />{t('hours_window', lang)} · {t('now_word', lang)} {istClock()}
+          </span>
+          {chip(t(onHours ? 'on_hours_now' : 'off_hours_now', lang), onHours ? 'green' : 'amber')}
+          {cityScreens.length > 0 && (
+            <span style={{ fontSize: 12.5, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+              {cityScreens.length} {t(onHours ? 'screens_word' : 'timer_faults_w', lang)}{onHours ? ` ${t('down_word2', lang)}` : ''} · {new Set(cityScreens.map(s => s.depot_id)).size} {t('stations_word', lang)}
+            </span>
+          )}
         </div>
       )}
 
@@ -289,39 +309,41 @@ export default function OpsTicketsV2() {
   function empty(txt) { return <div style={{ textAlign: 'center', padding: '52px 12px', color: 'var(--text-muted)', fontSize: 14 }}>{txt}</div> }
 
   function OpenTab() {
-    if (!cityScreens.length) return empty(t('no_open', lang))
+    // F4: one worst-first fault list (no grouped/individual toggle — the double
+    // scroll is gone). Off-hours + no timer faults = the "all quiet" good state.
+    if (!cityScreens.length) return empty(t(onHours ? 'no_open' : 'all_quiet', lang))
+
+    // group by station, then rank stations worst-first (severity, then age)
     const byDepot = {}; cityScreens.forEach(s => { (byDepot[s.depot_id] = byDepot[s.depot_id] || []).push(s) })
+    const rows = Object.entries(byDepot).map(([did, list]) => {
+      const oldest = onHours ? Math.max(...list.map(s => faultAgeHours(s.last_response_at))) : 0
+      const sev = onHours ? severityOf(oldest, list.length) : (list.length >= 5 ? 2 : 1)
+      return { did, list, oldest, sev }
+    }).sort((a, b) => b.sev - a.sev || b.oldest - a.oldest)
+
+    const SEV = { 2: 'var(--danger)', 1: 'var(--warning)', 0: 'var(--text-subtle, var(--text-muted))' }
     return (
-      <>
-        <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 4, marginBottom: 14, maxWidth: isDesktop ? 320 : '100%' }}>
-          <button onClick={() => setGrouped(true)} style={{ flex: 1, border: 'none', borderRadius: 7, padding: '8px 0', fontSize: 13, fontWeight: grouped ? 700 : 500, cursor: 'pointer', background: grouped ? 'var(--surface-3)' : 'transparent', color: grouped ? 'var(--accent)' : 'var(--text-muted)' }}>{t('grouped', lang)}</button>
-          <button onClick={() => setGrouped(false)} style={{ flex: 1, border: 'none', borderRadius: 7, padding: '8px 0', fontSize: 13, fontWeight: !grouped ? 700 : 500, cursor: 'pointer', background: !grouped ? 'var(--surface-3)' : 'transparent', color: !grouped ? 'var(--accent)' : 'var(--text-muted)' }}>{t('individual', lang)}</button>
-        </div>
-        <div style={gridWrap}>{grouped
-          ? Object.entries(byDepot).map(([did, list]) => (
-            <div key={did} className="lead-card" style={{ padding: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontWeight: 700, fontSize: 15 }}>{depotName(did)}</span>
-                {chip(`${list.length} ${t('down_word2', lang)}`, 'danger')}
+      <div style={gridWrap}>{rows.map(r => {
+        const ids = r.list.map(s => s.id)
+        const one = r.list.length === 1
+        const typeLabel = onHours ? t('signal_lost', lang) : t('timer_fault', lang)
+        const ageStr = onHours ? ageLabel(r.oldest, lang) : t('still_on', lang)
+        return (
+          <button key={r.did} onClick={() => openSheet(ids, r.did)} className="lead-card"
+            style={{ padding: '13px 14px', borderLeft: `4px solid ${SEV[r.sev]}`, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 44 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                <span style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{depotName(r.did)}</span>
+                {!one && chip(`${r.list.length} ${t('down_word2', lang)}`, r.sev === 2 ? 'danger' : 'amber')}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {list.map(s => (
-                  <button key={s.id} onClick={() => openSheet([s.id], did)} style={tile}>
-                    <span style={{ fontWeight: 600 }}>{t('screen', lang)} {screenNo[s.id]}</span>
-                    <AlertTriangle size={15} style={{ color: 'var(--danger)', flexShrink: 0 }} />
-                  </button>
-                ))}
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {one ? `${r.list[0].name || `${t('screen', lang)} ${screenNo[r.list[0].id] || ''}`} · ` : ''}{typeLabel} · {ageStr}
               </div>
-              <button onClick={() => openSheet(list.map(s => s.id), did)} className="lead-btn" style={{ width: '100%', marginTop: 12, justifyContent: 'center', color: 'var(--accent)', borderColor: 'var(--accent)', fontWeight: 700 }}>{t('log_whole', lang)}</button>
             </div>
-          ))
-          : cityScreens.map(s => (
-            <button key={s.id} onClick={() => openSheet([s.id], s.depot_id)} style={{ ...tile, minHeight: 58, padding: 14 }}>
-              <span><span style={{ fontWeight: 600, fontSize: 15 }}>{t('screen', lang)} {screenNo[s.id]}</span><br /><span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{depotName(s.depot_id)}</span></span>
-              <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            </button>
-          ))}</div>
-      </>
+            <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          </button>
+        )
+      })}</div>
     )
   }
 
@@ -364,7 +386,9 @@ export default function OpsTicketsV2() {
 
   function MeTab() {
     const s = stats
-    const byDepot = {}; screens.forEach(sc => { byDepot[sc.depot_id] = (byDepot[sc.depot_id] || 0) + 1 })
+    // `screens` is the time-aware fault set (F4); worst = down stations only, so
+    // this reads correctly on-hours and quietly empties off-hours.
+    const byDepot = {}; screens.filter(sc => sc.status === 'offline').forEach(sc => { byDepot[sc.depot_id] = (byDepot[sc.depot_id] || 0) + 1 })
     const worst = Object.entries(byDepot).sort((a, b) => b[1] - a[1]).slice(0, 3)
     const ring = s?.uptimePct != null ? s.uptimePct : 0
     const total = (s?.base || 0) + (s?.variable || 0)
@@ -426,7 +450,7 @@ export default function OpsTicketsV2() {
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 9000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setSheet(null)}>
         <div className="lead-card" style={{ width: '100%', maxWidth: 480, margin: 0, borderRadius: '16px 16px 0 0', maxHeight: '85vh', overflowY: 'auto', padding: 16 }} onClick={e => e.stopPropagation()}>
           <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}>{label}</div>
-          <div style={{ fontSize: 12.5, color: 'var(--danger)', marginBottom: 14 }}>{t('offline', lang)}</div>
+          <div style={{ fontSize: 12.5, color: onHours ? 'var(--danger)' : 'var(--warning)', marginBottom: 14 }}>{onHours ? t('offline', lang) : t('timer_fault', lang)}</div>
           <div style={secLbl}>{t('cause', lang)}</div>
           <select value={issueId} onChange={e => setIssueId(e.target.value)} style={{ ...fieldSel, marginTop: 6 }}>
             <option value="">{t('pick_issue', lang)}</option>
