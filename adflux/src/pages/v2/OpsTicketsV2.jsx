@@ -183,7 +183,8 @@ export default function OpsTicketsV2() {
       const preset = issueId !== 'other' ? issueTypes.find(x => x.id === issueId) : null
       const rows = sheet.screenIds.map(sid => ({
         type: 'fault', source: 'manual', status: 'in_progress',
-        depot_id: sheet.depotId, screen_id: sid, assigned_to: uid,
+        depot_id: sheet.depotId, screen_id: sid,
+        created_by: uid, assigned_to: uid,   // exec INSERT policy needs created_by=auth.uid(); read/update need assigned_to=auth.uid()
         issue_type_id: preset ? preset.id : null,
         cause, notes: notes.trim() || null, photo_path,
       }))
