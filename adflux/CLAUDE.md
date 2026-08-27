@@ -16199,3 +16199,93 @@ backfill (Navigate falls back to a name search). Ops-console auto-refresh (manua
 1db3cfa Ops audit fixes: crash + sync-doubling + honesty + redirect + depot contacts
 74d99f9 Ops Phase 1: real aiadflux screen+depot sync + debug echo (inert until API key)
 ```
+
+
+---
+
+## 241 · Operations module GO-LIVE — real aiadflux data flowing (2026-08-27)
+
+Continues §240. The Operations module is now LIVE on real CMS data, end-to-end,
+verified in the owner's browser. Owner walked through the deploy with Claude (Vercel
+env + SQL + the debug/run URLs). Self-pushed (§211).
+
+### The aiadflux API — REAL shape confirmed (SUPERSEDES §240's tolerant guesses)
+Debugged live via `?debug=1` (per-endpoint probe). Findings:
+- Base `https://api.adfluxcms.com/api/v1`, auth **`Authorization: Bearer <key>` ONLY**
+  (a dual Bearer + X-API-Key header was suspected in the 500; Bearer-only is the
+  guide's primary and what we ship).
+- **`GET /groups` returns HTTP 500** — a genuine CMS-side bug (`{"error":{"code":
+  "internal_error","message":"Failed to retrieve groups."}}`). Do NOT depend on it.
+- **`GET /screens` WORKS** (200) and is the single source: `{screens:[...], totalScreens,
+  totalPages, currentPage}`. Each screen EMBEDS everything:
+  - `id` (uuid) → external_id · `name` ("DWARKA 10") · `status` ("online"/"offline")
+  - `group_id` (int, e.g. 17) + `Group` {id,name:"DWARKA GSRTC BUS STAND"} + `location`
+    (depot-name string) → the depot
+  - `location_settings` {latitude,longitude,city,...} → GPS · `orientation` · `last_response`
+  - plus License/cameras/Playlists/info/schedules/player_settings (unused for now).
+- **`GET /health/summary` WORKS** (200): `{screens_total:265, online, offline_today,
+  offline_1_2_days, offline_3_days_plus, cameras:{...}, content:{...}}` — a ready
+  network-health rollup (candidate for the cockpit later).
+
+### `api/ops/sync.js` — REWRITTEN to source from /screens only (commit 3ab4573)
+Because /groups is broken, the sync builds everything from /screens:
+1. paginate /screens (per_page=200; de-dup Set guards an API that ignores paging),
+2. build/link ops_depots from the screens' embedded `Group` (external_group_id =
+   aiadflux group_id; fuzzy name-match to the seed depots via norm(); backfill depot
+   GPS from a member screen),
+3. UPSERT ops_screens in ONE uniform batch (status is just a column now) with real
+   status/last_response/orientation/lat/lng; link depot_id via a separate PATCH
+   (never nulls an unresolved screen's depot),
+4. retire the 294 NULL-external_id placeholder screens (only after a clean, non-empty
+   sync — received>0 && all-upserts-ok),
+5. best-effort ops_recompute_uptime_today.
+- NEW `GET ?run=1&secret=<OPS_SYNC_SECRET>` fires the sync from a browser (owner had
+  no way to POST). POST stays the cron path. `?debug=1` = the per-endpoint probe.
+- FIRST REAL RUN RESULT: `screens_received:265, online:218, offline:47, unknown:0,
+  unresolved_depot:0, placeholders_retired:true`. Cockpit shows Valsad 14/14 down,
+  Gandhinagar 9/20, Godhra 9/10, etc. — depots built + linked correctly.
+- ⚠ mapGroup + the /groups call are GONE. To adjust a field, edit mapScreen() only.
+
+### What's LIVE now (verified in-browser)
+- Real 265 screens, 218 online / 47 offline, auto-refreshing every **10 min**
+  (pg_cron `ops-aiadflux-sync` jobid 23 → `ops_aiadflux_sync_dispatch()` POSTs the
+  endpoint with x-ops-secret).
+- /ops-admin cockpit (owner view): uptime today 82.3%, "Not reporting 0" honesty stat,
+  worst-stations, ticket flow, leaderboard, admin-only payroll.
+- /ops-dashboard head console: 265 screens · 218 online · Screens-by-station with the
+  assign-tech + Who-to-call buttons.
+- /ops exec field app (Gujarati).
+
+### SQL that was RUN this session (owner, in Studio)
+1. `supabase_ops_p1_screen_sync.sql` — ops_depots.external_group_id + partial-unique
+   index + work_sessions_ops_head policy. RUN.
+2. p6 cockpit RPCs (`ops_admin_cockpit`, `ops_my_uptime_pay`) — RUN.
+3. p5 auto-sync — `ops_aiadflux_sync_dispatch()` + `cron.schedule('ops-aiadflux-sync',
+   '*/10 * * * *', ...)` with the secret filled — RUN (jobid 23).
+NOT yet run: p4 uptime pay (money — review the SLA curve first, §240).
+
+### Vercel env (owner set, Production, redeployed)
+`AIADFLUX_API_KEY` (his raw key — never handled by Claude), `OPS_SYNC_SECRET`
+= `untitledopssync2026` (URL-safe; the first random one had a symbol that broke the
+URL query → forbidden — FOOT-GUN: an OPS/gate secret used in a browser URL must be
+alphanumeric-only, no &/#/+/space), `AIADFLUX_API_URL` = the base.
+
+### STILL owner-side (in-app, no code/SQL) — the module is otherwise complete
+1. Add REAL operation_executive users (only a "test"/testope placeholder exists) via
+   HR → Add Member, then run `supabase_ops_team_wire.sql`.
+2. Assign depots to techs (Screens by station → Assigned tech) — required for tickets
+   + uptime-pay attribution.
+3. Add depot contacts (Who to call) — the manager built in §240.
+4. p4 uptime pay when ready (money, guarded).
+
+### Phase 2 (deferred): inbound webhook (screen.offline → auto-ticket + WhatsApp
+alert). The CMS webhook targets adfluxcrm.com — re-point to our domain + confirm the
+X-Aiadflux-Signature algo before building. The /health/summary + /screens/{id}/uptime
+endpoints work if a richer cockpit is wanted later.
+
+### Commits (untitled-os)
+```
+3ab4573 Ops sync: source everything from /screens (their /groups broken) + real field map
+727bfe6 Ops sync debug: probe /groups /screens /health independently + Bearer-only
+(741d99f6/1db3cfa/9a0d5be/41bc561 = §240 batch)
+```
