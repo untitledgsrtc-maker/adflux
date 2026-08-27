@@ -84,13 +84,18 @@ BEGIN
       END IF;
 
     ELSE
-      -- depot fully back online: cancel an UNTOUCHED auto-ticket (a blip)
+      -- depot fully back online: auto-cancel an UNTOUCHED auto-ticket ONLY if it
+      -- was a recent blip (opened within the last day). OWNER RULE (2026-08-27):
+      -- a ticket open MORE THAN ONE DAY is a real, lingering fault — it must STAY
+      -- open even if the screen flickers back, so a tech actually confirms/closes
+      -- it. Never auto-close a >1-day-old auto-ticket.
       UPDATE public.ops_tickets
          SET status = 'cancelled',
              resolved_at = now(),
              notes = COALESCE(notes,'') || ' [auto-recovered]',
              updated_at = now()
-       WHERE depot_id = d.id AND source = 'auto_offline' AND status = 'open';
+       WHERE depot_id = d.id AND source = 'auto_offline' AND status = 'open'
+         AND opened_at >= now() - interval '1 day';
       GET DIAGNOSTICS v_row = ROW_COUNT;
       v_cancelled := v_cancelled + v_row;
     END IF;

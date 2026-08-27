@@ -16958,3 +16958,28 @@ BOTTOM bar. Ops was reusing OPS_EXEC_NAV for both desktop + mobile. Split it:
   is a possible later swap (zero friction, still fills the roster).
 - **Log KEPT** as the home's "Log a fault" button → `/ops-log` (log a problem on ANY screen,
   incl. one that's still online — the down-list can't). Folded into the home, not a tab.
+
+
+---
+
+## 252 · OPS RULE — auto-tickets open >1 day never auto-close (2026-08-27)
+
+Owner rule: **an ops auto-ticket that has been open MORE THAN ONE DAY must NOT be
+auto-closed — it stays open** even if the screen flickers back online. A multi-day
+outage is a real, lingering fault; a human (the head/tech) must confirm + close it, not
+have it silently auto-recovered away.
+
+Encoded in the §243 reconcile engine — `ops_reconcile_offline_tickets()` (canonical =
+`supabase_ops_p2_auto_tickets.sql`). The auto-cancel ("depot back online → cancel the
+UNTOUCHED blip ticket") branch now carries `AND opened_at >= now() - interval '1 day'`.
+So: a screen that blips offline then recovers within a day → its untouched `open`
+auto-ticket auto-cancels (`[auto-recovered]`, no tech trip wasted). A screen down >1 day
+that recovers → the auto-ticket STAYS `open` (a tech resolves it manually). A tech-touched
+ticket (`in_progress`/`resolved`) was never auto-cancelled regardless (only `status='open'`).
+
+- FROZEN: do NOT drop the `opened_at >= now() - interval '1 day'` guard — that would
+  auto-close lingering multi-day faults the owner wants kept open.
+- Owner RE-RUNS `supabase_ops_p2_auto_tickets.sql` in Studio (idempotent CREATE OR REPLACE).
+- ⚠ still-open (§250): the reconcile engine must also adopt the 7-9 rule (`isOnHours`) so it
+  doesn't open 264 false tickets at 9 PM when the timer correctly turns screens off — a
+  separate fix before it runs unattended.
