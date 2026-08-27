@@ -16761,3 +16761,61 @@ ops_tickets"** (owner hit it on Submit). BOTH OpsTicketsV2 + OpsLogV2 fixed to s
 - ❌ FOOT-GUN: any exec-facing insert into `ops_tickets` MUST set `created_by =
   the tech` (INSERT policy) AND `assigned_to = the tech` (SELECT/UPDATE policy).
   Admin/head go through `ops_tickets_manage` FOR ALL and don't need either.
+
+
+---
+
+## 249 · Ops Tier-1 — trust: counts + vocab + station cleanup (2026-08-27)
+
+Owner pasted a field-ops diagnostic (F1-F9). Picked Tier 1 (F1 counts / F3 vocab /
+F2 station dedupe). Two of the nine were ALREADY fixed today: F8 "resolve didn't
+respond" = the §248 `created_by` RLS bug; F6 double-axis scroll = the §247/§248
+2-col vertical grid. Plan: `docs/superpowers/plans/2026-08-27-ops-tier1-trust.md`.
+
+### THE FAULT MODEL (the one definition — do NOT let counts drift again)
+A **fault = an offline screen** (CMS ground truth). "Screens down" = offline
+`ops_screens`. "Stations affected" = distinct depots with ≥1 offline screen. Tickets
+(manual + auto) are the WORK on top of faults. **Every count labels its unit** so no
+two numbers read as contradicting (F1's trust-killer: OpsTicketsV2 counted screens
+= 59, OpsWorkV2 counts open+in_progress *tickets* = 17 — same word, different unit).
+OpsTicketsV2 Open tab now shows "N screens down · M stations".
+
+### F3 — one word: ખરાબી (fault)
+The entity was ટિકિટ / કામ / ખરાબી in different places. Standardized on **ખરાબી**
+(`tickets_title`/`my_tickets`/`open_tickets` in opsStrings). Statuses (Open/In
+process/Fixed) + `down_word2`=બંધ ("down") are unchanged — only the entity noun unified.
+
+### F2 — station registry dedupe/de-test (the dups are a CMS problem)
+The aiadflux CMS has multiple groups (different `group_id`) for one physical station
++ a test group → the §241 sync made a depot for each. Fixes:
+- **sync (`api/ops/sync.js`)**: `norm()` now strips `gidc|bus stop|stand` too (so
+  "Ankleshwar Gidc" == "ANKLESHWAR GSRTC" → one depot); skips `test` groups.
+  Collapses case/suffix dups on future syncs.
+- **`supabase_ops_p4_station_cleanup.sql`** (owner runs, diagnostic-first):
+  PART 1 lists depots by `norm_key` (dups share it) + screen counts; PART 2
+  deactivates test rows (safe now); PART 2b is a fill-in merge helper (move
+  screens+tickets A→B, deactivate A) for **typo-dups** (Dwrka vs Dwarka, Chikhli vs
+  Chikli) that norm CANNOT collapse. Non-destructive: deactivate (is_active=false),
+  NEVER DELETE (old tickets FK a depot).
+
+### Foot-guns / contracts
+- ❌ The station dups are ultimately a **CMS data problem** — our norm + merge is a
+  stopgap; the permanent single-source fix is deduping the groups in aiadflux. A
+  typo-level dup (Dwrka/Dwarka) can only be merged manually or fixed in the CMS.
+- ❌ NEVER DELETE an ops_depot — deactivate (`is_active=false`); ops_tickets/screens
+  FK it. The sync + all views filter `is_active`.
+- A fault's ONE count = offline screens; always label station-vs-screen.
+
+### Owner action
+1. Push carries the frontend (labels + vocab) + the sync fix (Vercel redeploys the
+   Edge fn). 2. Run `supabase_ops_p4_station_cleanup.sql` PART 1 in Studio → paste
+   the result → I write the exact PART 2b merges for the typo-dups; run PART 2 (test
+   rows) now. 3. Reopen `/ops-tickets`: the Open count reads "N screens down · M
+   stations"; the fault word is ખરાબી.
+
+### Remaining from the diagnostic (next sprints, owner-picked order)
+Tier 2: F4 triage (age + type + severity sort — `last_response_at` gives age) · F7
+auto-vs-manual + confirm-classify · F5 map/route (the big one; exec is GPS-tracked +
+depots carry lat/lng) · F8 proof-photo + online-check on close. Tier 3: SLA/escalation,
+offline capture, per-screen MTTR, roles/push, station contacts (fixes F9's dead call
+button — the head adds contacts, §242).
