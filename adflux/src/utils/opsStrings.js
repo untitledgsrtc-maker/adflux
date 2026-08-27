@@ -163,6 +163,25 @@ export const STR = {
   n_calls:         { gu: 'ફોન',                        en: 'call(s)' },
   still_offline_q: { gu: 'CMS હજુ બંધ બતાવે છે — તોય સુધારેલું નોંધવું?', en: 'The CMS still shows this offline — mark fixed anyway?' },
   fixed_by:        { gu: 'સુધાર્યું',                   en: 'Fixed by' },
+
+  // — Me tab (self-scoped) —
+  tab_mystats:     { gu: 'મારું',                      en: 'Me' },
+  my_salary_mo:    { gu: 'મારો પગાર · આ મહિને',         en: 'My salary · this month' },
+  sal_base:        { gu: 'બેઝ',                        en: 'Base' },
+  sal_variable:    { gu: 'ચલ',                         en: 'Variable' },
+  var_fills:       { gu: 'અપટાઇમ સાથે ભરાશે',           en: 'fills in with uptime' },
+  uptime_short:    { gu: 'ચાલુ',                       en: 'uptime' },
+  my_calls:        { gu: 'મારા ફોન',                   en: 'My calls' },
+  calls_month:     { gu: 'આ મહિને',                    en: 'this month' },
+  calls_today:     { gu: 'આજે',                        en: 'today' },
+  my_stations:     { gu: 'મારા સ્ટેશન',                en: 'My stations' },
+  up_word:         { gu: 'ચાલુ',                       en: 'up' },
+  fixed_this_mo:   { gu: 'આ મહિને સુધાર્યા',            en: 'Fixed this month' },
+  avg_fix:         { gu: 'સરેરાશ સમય',                 en: 'avg to fix' },
+  worst_now:       { gu: 'અત્યારે સૌથી ખરાબ',           en: 'Worst stations right now' },
+  scoped_note:     { gu: 'ફક્ત તમારા સ્ટેશન · નેટવર્ક રિપોર્ટ પ્રમાણે', en: 'Your stations only · updates as the network reports' },
+  no_stats:        { gu: 'હજી પૂરતી માહિતી નથી',        en: 'Not enough data yet' },
+  hrs:             { gu: 'ક',                          en: 'h' },
 }
 
 // Resolve a label. Falls back gu → en → key so a missing translation is

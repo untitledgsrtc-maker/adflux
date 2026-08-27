@@ -11,6 +11,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
+import { istTodayISO } from '../../utils/istDate'
 
 const card  = { background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)', borderRadius: 14, padding: 14 }
 const lbl   = { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--v2-ink-2, #94a3b8)', display: 'block', marginBottom: 6 }
@@ -21,9 +23,21 @@ const ink2  = 'var(--v2-ink-2, #94a3b8)'
 // Map an ops outcome label -> the sales call_logs.outcome enum (never widen the enum).
 const OUTCOME_DB = { reached: 'connected', will_come: 'connected', fixed_call: 'connected', no_answer: 'no_answer' }
 
+// Indicative variable pay from uptime — mirrors the §233 OpsAdmin curve + the
+// §230/§184 70/30 model (display-only; real pay = the salary sheet). uptimePct is
+// the raw uptime %; the 90->97 SLA transform, then >75 full / <50 zero / else linear.
+function estVariable(salary, uptimePct) {
+  if (!salary || uptimePct == null) return 0
+  const sla = Math.max(0, Math.min(100, (uptimePct - 90) / 7 * 100))
+  const factor = sla > 75 ? 1 : sla < 50 ? 0 : sla / 100
+  return Math.round(salary * 0.30 * factor)
+}
+
 export default function OpsTicketsV2() {
   const { profile } = useAuth()
   const uid = profile?.id
+  const isDesktop = useIsDesktop()
+  const gridWrap = { display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill, minmax(340px, 1fr))' : '1fr', gap: 12, alignItems: 'start' }
   const [lang, setLang] = useState(getOpsLang())
   const flip = () => { const n = lang === 'gu' ? 'en' : 'gu'; setLang(n); setOpsLang(n) }
   const nm = (row, base) => (lang === 'gu' ? row?.[`${base}_gu`] : row?.[`${base}_en`]) || row?.[`${base}_en`] || ''
@@ -41,6 +55,7 @@ export default function OpsTicketsV2() {
   const [proc, setProc] = useState([])           // my in_progress manual tickets
   const [fixed, setFixed] = useState([])         // my resolved manual tickets
   const [callsByTicket, setCallsByTicket] = useState({})
+  const [stats, setStats] = useState(null)       // Me tab: { monthly, base, variable, hasPay, uptimePct, up, down, fixedMo, avgFixH, callsMo, callsToday }
 
   const [sheet, setSheet] = useState(null)       // { screenIds:[], depotId } | null
   const [issueId, setIssueId] = useState('')
@@ -66,7 +81,7 @@ export default function OpsTicketsV2() {
       setDepots(myDepots)
       const depotIds = myDepots.map(d => d.id)
 
-      if (!depotIds.length) { setScreens([]); setProc([]); setFixed([]); setContactsByDepot({}); setIssueTypes([]); setCallsByTicket({}); return }
+      if (!depotIds.length) { setScreens([]); setProc([]); setFixed([]); setContactsByDepot({}); setIssueTypes([]); setCallsByTicket({}); setStats(null); return }
 
       const [scr, it, ct, pRes, fRes] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status, depot_id').in('depot_id', depotIds).eq('is_active', true).eq('status', 'offline'),
@@ -94,6 +109,39 @@ export default function OpsTicketsV2() {
         const cl = await supabase.from('call_logs').select('id, ops_ticket_id, outcome, notes, call_at').in('ops_ticket_id', tIds).order('call_at', { ascending: false })
         const cbt = {}; (cl.data || []).forEach(r => { (cbt[r.ops_ticket_id] = cbt[r.ops_ticket_id] || []).push(r) }); setCallsByTicket(cbt)
       } else setCallsByTicket({})
+
+      // ── Me tab (self-scoped; RPC + small reads) — best-effort, keeps prior on failure ──
+      try {
+        const monthStart = istTodayISO().slice(0, 8) + '01'
+        const dayStart = istTodayISO() + 'T00:00:00+05:30'
+        const [payRes, cntRes, fixRes, callRes] = await Promise.all([
+          supabase.rpc('ops_my_uptime_pay'),
+          supabase.from('ops_screens').select('status').in('depot_id', depotIds).eq('is_active', true),
+          supabase.from('ops_tickets').select('created_at, resolved_at').eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', monthStart),
+          supabase.from('call_logs').select('call_at').eq('user_id', uid).gte('call_at', monthStart),
+        ])
+        const pay = Array.isArray(payRes.data) ? payRes.data[0] : payRes.data
+        const monthly = pay ? Number(pay.salary) || 0 : 0
+        const hasPay = !!(pay && pay.has_data && monthly > 0)
+        const uptimePct = pay && pay.has_data ? Math.round(Number(pay.uptime_pct) || 0) : null
+        const cnt = cntRes.data || []
+        const fx = fixRes.data || []
+        const durs = fx.map(r => (r.resolved_at && r.created_at) ? (new Date(r.resolved_at) - new Date(r.created_at)) / 3600000 : null).filter(v => v != null && v >= 0)
+        const calls = callRes.data || []
+        setStats({
+          monthly,
+          base: monthly ? Math.round(monthly * 0.70) : 0,
+          variable: hasPay ? estVariable(monthly, pay.uptime_pct) : 0,
+          hasPay,
+          uptimePct,
+          up: cnt.filter(s => s.status === 'online').length,
+          down: cnt.filter(s => s.status === 'offline').length,
+          fixedMo: fx.length,
+          avgFixH: durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : null,
+          callsMo: calls.length,
+          callsToday: calls.filter(c => c.call_at >= dayStart).length,
+        })
+      } catch { /* keep prior stats */ }
     } catch (e) { setErr(e?.message || 'load failed') }
   }, [uid])
 
@@ -192,7 +240,7 @@ export default function OpsTicketsV2() {
   const cnt = { open: cityScreens.length, proc: cityProc.length, fixed: cityFixed.length }
 
   return (
-    <div style={{ padding: '14px 14px 40px', maxWidth: 480, margin: '0 auto' }}>
+    <div style={{ padding: '14px 14px 40px', maxWidth: isDesktop ? 1120 : 480, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ fontSize: 17, fontWeight: 700 }}>{t('tickets_title', lang)}</span>
         <button onClick={flip} className="btn btn-ghost btn-sm" style={{ fontWeight: 700 }}>{lang === 'gu' ? 'EN' : 'ગુ'}</button>
@@ -207,9 +255,9 @@ export default function OpsTicketsV2() {
 
       {/* tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--v2-line, #334155)', marginBottom: 14 }}>
-        {[['open', t('tab_open', lang), 'var(--danger)'], ['proc', t('tab_proc', lang), 'var(--v2-amber, #F59E0B)'], ['fixed', t('tab_fixed', lang), 'var(--v2-green, #10B981)']].map(([k, label, col]) => (
-          <button key={k} onClick={() => setTab(k)} style={{ flex: 1, background: 'none', border: 'none', borderBottom: `2px solid ${tab === k ? yellow : 'transparent'}`, padding: '9px 0', fontSize: 14, fontWeight: tab === k ? 700 : 400, color: tab === k ? 'var(--v2-ink-0, #f1f5f9)' : ink2, cursor: 'pointer' }}>
-            {label} <span style={{ color: col }}>{cnt[k]}</span>
+        {[['open', t('tab_open', lang), 'var(--danger)'], ['proc', t('tab_proc', lang), 'var(--v2-amber, #F59E0B)'], ['fixed', t('tab_fixed', lang), 'var(--v2-green, #10B981)'], ['mystats', t('tab_mystats', lang), '']].map(([k, label, col]) => (
+          <button key={k} onClick={() => setTab(k)} style={{ flex: 1, background: 'none', border: 'none', borderBottom: `2px solid ${tab === k ? yellow : 'transparent'}`, padding: '9px 0', fontSize: 13, fontWeight: tab === k ? 700 : 400, color: tab === k ? 'var(--v2-ink-0, #f1f5f9)' : ink2, cursor: 'pointer' }}>
+            {label}{col ? <> <span style={{ color: col }}>{cnt[k]}</span></> : null}
           </button>
         ))}
       </div>
@@ -217,6 +265,7 @@ export default function OpsTicketsV2() {
       {tab === 'open' && <OpenTab />}
       {tab === 'proc' && <ProcTab />}
       {tab === 'fixed' && <FixedTab />}
+      {tab === 'mystats' && <MeTab />}
 
       {sheet && <IssueSheet />}
       {callFor && <CallSheet />}
@@ -234,16 +283,16 @@ export default function OpsTicketsV2() {
           <button onClick={() => setGrouped(true)}  className="btn btn-sm" style={{ flex: 1, ...(grouped ? { borderColor: yellow, color: yellow } : {}) }}>{t('grouped', lang)}</button>
           <button onClick={() => setGrouped(false)} className="btn btn-sm" style={{ flex: 1, ...(!grouped ? { borderColor: yellow, color: yellow } : {}) }}>{t('individual', lang)}</button>
         </div>
-        {grouped
+        <div style={gridWrap}>{grouped
           ? Object.entries(byDepot).map(([did, list]) => (
-            <div key={did} style={{ ...card, marginBottom: 10 }}>
+            <div key={did} style={card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700, fontSize: 14 }}>{depotName(did)}</span>
                 <span style={{ fontSize: 11, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)', borderRadius: 999, padding: '2px 8px' }}>{list.length} {t('down_word2', lang)}</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
                 {list.map(s => (
-                  <button key={s.id} onClick={() => openSheet([s.id], did)} className="btn btn-sm" style={{ justifyContent: 'space-between' }}>
+                  <button key={s.id} onClick={() => openSheet([s.id], did)} className="btn btn-sm" style={{ justifyContent: 'space-between', minHeight: 44 }}>
                     <span>{t('screen', lang)} {screenNo[s.id]}</span><AlertTriangle size={14} style={{ color: 'var(--danger)' }} />
                   </button>
                 ))}
@@ -252,22 +301,22 @@ export default function OpsTicketsV2() {
             </div>
           ))
           : cityScreens.map(s => (
-            <button key={s.id} onClick={() => openSheet([s.id], s.depot_id)} className="btn" style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8, padding: 12 }}>
+            <button key={s.id} onClick={() => openSheet([s.id], s.depot_id)} className="btn" style={{ width: '100%', justifyContent: 'space-between', padding: 12, minHeight: 48 }}>
               <span style={{ textAlign: 'left' }}><span style={{ fontWeight: 600 }}>{t('screen', lang)} {screenNo[s.id]}</span><br /><span style={{ fontSize: 12, color: ink2 }}>{depotName(s.depot_id)}</span></span>
               <ChevronRight size={16} />
             </button>
-          ))}
+          ))}</div>
       </>
     )
   }
 
   function ProcTab() {
     if (!cityProc.length) return empty(t('no_proc', lang))
-    return cityProc.map(tk => {
+    return <div style={gridWrap}>{cityProc.map(tk => {
       const calls = callsByTicket[tk.id] || []
       const contact = (contactsByDepot[tk.depot_id] || [])[0]
       return (
-        <div key={tk.id} style={{ ...card, marginBottom: 10 }}>
+        <div key={tk.id} style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>{tk.screen?.name || (t('screen', lang) + ' ' + (screenNo[tk.screen_id] || ''))}</span>
             <span style={{ fontSize: 11, background: 'var(--warning-soft, rgba(245,158,11,.12))', color: 'var(--v2-amber, #F59E0B)', borderRadius: 999, padding: '2px 8px' }}>{t('in_process', lang)}</span>
@@ -281,13 +330,13 @@ export default function OpsTicketsV2() {
           <button onClick={() => markFixed(tk)} disabled={busy} className="btn btn-sm" style={{ width: '100%', marginTop: 10 }}>{t('mark_fixed', lang)} <Check size={14} /></button>
         </div>
       )
-    })
+    })}</div>
   }
 
   function FixedTab() {
     if (!cityFixed.length) return empty(t('no_fixed', lang))
-    return cityFixed.map(f => (
-      <div key={f.id} style={{ ...card, marginBottom: 8 }}>
+    return <div style={gridWrap}>{cityFixed.map(f => (
+      <div key={f.id} style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ fontWeight: 700, fontSize: 14 }}>{f.screen?.name || t('screen', lang)}</span>
           <span style={{ fontSize: 11, background: 'var(--success-soft, rgba(16,185,129,.12))', color: 'var(--v2-green, #10B981)', borderRadius: 999, padding: '2px 8px' }}>{t('fixed_word', lang)}</span>
@@ -295,7 +344,70 @@ export default function OpsTicketsV2() {
         <div style={{ fontSize: 12, color: ink2, marginTop: 2 }}>{f.depot?.name || depotName(f.depot_id)} · {f.issue ? nm(f.issue, 'issue') : (f.cause || t('fault', lang))}</div>
         {f.resolved_at && <div style={{ fontSize: 11, color: ink2, marginTop: 6 }}>{new Date(f.resolved_at).toLocaleString('en-GB')}</div>}
       </div>
-    ))
+    ))}</div>
+  }
+
+  function MeTab() {
+    const s = stats
+    const byDepot = {}; screens.forEach(sc => { byDepot[sc.depot_id] = (byDepot[sc.depot_id] || 0) + 1 })
+    const worst = Object.entries(byDepot).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    const ring = s?.uptimePct != null ? s.uptimePct : 0
+    const total = (s?.base || 0) + (s?.variable || 0)
+    return (
+      <div style={gridWrap}>
+        {/* my salary */}
+        <div style={{ ...card, background: 'var(--success-soft, rgba(16,185,129,.12))' }}>
+          <div style={{ fontSize: 12, color: 'var(--v2-green, #10B981)' }}>{t('my_salary_mo', lang)}</div>
+          {s?.monthly ? <>
+            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--v2-green, #10B981)' }}>₹{total.toLocaleString('en-IN')}</div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 4, fontSize: 11, color: 'var(--v2-green, #10B981)' }}>
+              <span>{t('sal_base', lang)} ₹{(s.base).toLocaleString('en-IN')}</span>
+              <span>+ {t('sal_variable', lang)} ₹{(s.variable).toLocaleString('en-IN')}{!s.hasPay ? ` · ${t('var_fills', lang)}` : ''}</span>
+            </div>
+          </> : <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--v2-green, #10B981)', marginTop: 4 }}>{t('no_stats', lang)}</div>}
+        </div>
+        {/* uptime + my calls */}
+        <div style={{ ...card, display: 'flex', gap: 12 }}>
+          <div style={{ width: 88, height: 88, flexShrink: 0, borderRadius: '50%', background: `conic-gradient(var(--v2-green, #10B981) 0 ${ring}%, var(--v2-bg-2, #0f172a) ${ring}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'var(--v2-bg-1, #1e293b)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{s?.uptimePct != null ? `${s.uptimePct}%` : '—'}</span>
+              <span style={{ fontSize: 10, color: ink2 }}>{t('uptime_short', lang)}</span>
+            </div>
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <span style={{ fontSize: 12, color: ink2 }}>{t('my_calls', lang)}</span>
+            <span style={{ fontSize: 24, fontWeight: 700 }}>{s?.callsMo ?? 0}</span>
+            <span style={{ fontSize: 11, color: ink2 }}>{t('calls_month', lang)} · {s?.callsToday ?? 0} {t('calls_today', lang)}</span>
+          </div>
+        </div>
+        {/* stations + fixed */}
+        <div style={{ ...card, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 12, color: ink2 }}>{t('my_stations', lang)}</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{depots.length}</div>
+            <div style={{ fontSize: 11, color: ink2 }}><span style={{ color: 'var(--v2-green, #10B981)' }}>{s?.up ?? 0} {t('up_word', lang)}</span> · <span style={{ color: 'var(--danger)' }}>{s?.down ?? 0} {t('down_word2', lang)}</span></div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: ink2 }}>{t('fixed_this_mo', lang)}</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{s?.fixedMo ?? 0}</div>
+            <div style={{ fontSize: 11, color: ink2 }}>{s?.avgFixH != null ? `${t('avg_fix', lang)} ${s.avgFixH}${t('hrs', lang)}` : '—'}</div>
+          </div>
+        </div>
+        {/* worst stations */}
+        {worst.length > 0 && (
+          <div style={card}>
+            <div style={{ fontSize: 12, color: ink2, marginBottom: 8 }}>{t('worst_now', lang)}</div>
+            {worst.map(([did, n], i) => (
+              <div key={did} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderTop: i ? '1px solid var(--v2-line, #334155)' : 'none' }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{depotName(did)}</span>
+                <span style={{ fontSize: 11, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)', borderRadius: 999, padding: '2px 10px' }}>{n} {t('down_word2', lang)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: 'var(--v2-ink-3, #64748b)', textAlign: 'center' }}>{t('scoped_note', lang)}</div>
+      </div>
+    )
   }
 
   function IssueSheet() {
