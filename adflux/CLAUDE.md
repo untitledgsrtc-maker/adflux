@@ -17158,3 +17158,16 @@ build-first quick wins (all additive, NOT §28-frozen, 3-lens adversarial review
   on-site fix card (auto-diagnosed cause), "can't fix → escalate" outcome, after-photo at close, and THE
   big rock = **offline-first capture** (his job is where signal is worst — every save silently fails today).
   Plus a MONEY fix: uptime counted only 7 AM–9 PM (§254.1 note) — shadow-compare before it feeds pay.
+
+### 254.5 · Log-a-fault now creates `in_progress` (was `open` → invisible on the home) (2026-08-28)
+Owner: "in home i can't see the ticket I generated in the in-process / fixed box." ROOT: OpsLogV2
+("Log a fault", the primary yellow button) inserted `status='open'`, but the home pills + the
+OpsTickets tabs only surface `in_progress` (In-process) + `resolved` (Fixed) manual tickets — and the
+OpsTickets "Open" tab shows offline SCREENS, not open tickets. So a logged fault was orphaned: no home
+pill, no ticket tab, nowhere. Fix: OpsLogV2 insert `status='open'` → **`'in_progress'`** (a logged
+fault = the tech taking it on). Now it shows in the home **In-process** pill (§the owner's exact words)
+AND the OpsTickets In-process tab (`assigned_to=uid, source='manual', status='in_progress'`) where it's
+actionable (→ Mark fixed). Blast-radius verified: NO code filtered manual `status='open'` (that WAS the
+gap); the §243 auto-ticket engine creates `source='auto_offline'` `open` tickets, untouched (source-
+scoped). One-line change; OpsHomeV2 unchanged. FOOT-GUN: an insert status that no read surface matches =
+an invisible record — make a created record land in a list/count the user actually looks at.
