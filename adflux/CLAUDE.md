@@ -16289,3 +16289,69 @@ endpoints work if a richer cockpit is wanted later.
 727bfe6 Ops sync debug: probe /groups /screens /health independently + Bearer-only
 (741d99f6/1db3cfa/9a0d5be/41bc561 = §240 batch)
 ```
+
+
+---
+
+## 242 · Operations module — per-station "Station board" wired from the led-dashboard mockup (2026-08-27, `6369cec`)
+
+Owner shared `led-dashboard.html` (a standalone localStorage per-station ops dashboard,
+in ~/Downloads) + a screenshot: "i want this to be wored" (= wire this design to the real
+ops data, make it a functional page not a standalone HTML). Built it as a NEW React page.
+Additive, §45-safe; guardian PASS on the 2 frozen-file touches; build green; self-pushed
+(§211). NO SQL, NO APK — reads existing ops_* tables + writes ops_depot_contacts /
+ops_issue_types, both already RLS-granted to head/admin by Phase 0 (§230).
+
+### The page (`src/pages/v2/OpsStationV2.jsx`, route `/ops-station`, NOT §28 frozen)
+The mockup, live: a **station picker** (`ops_depots`, `?depot=` deep-link) → **4 KPI cards**
+(Total / Working / Not working / Open issues, from `ops_screens` live status + open
+`ops_tickets`) → a **screen-wall grid** (one tile per real screen, coloured green/amber/red
+by `screenState`: in_progress ticket → amber, offline OR open ticket → red, else online →
+green) → **editable depot contacts** (`ops_depot_contacts` role_en + phone, inline add/save-
+on-blur/remove) → the **issue → solution reference** (`ops_issue_types` issue_en/solution_en,
+an Edit toggle to change/add/remove). App tokens only (§5); Lucide (§7).
+
+### What I DROPPED from the mockup on purpose (do NOT re-add)
+The mockup's own **hardcoded-password login** (`AUTH_PASSWORD='adflux2026'`) + **localStorage
+persistence** — the app already has real Supabase auth + tables, so those were a downgrade.
+The screen-wall status is now **automatic from the live aiadflux CMS data** (§241), NOT the
+mockup's manual issue-logging list. Issue-LOGGING stays in the exec field app / head console
+(the existing ticket flow, §231/§232) — the station board is a status + contacts + reference
+view, not a second ticket creator.
+
+### Frozen touches (§28, additive, guardian PASS — read the git diff, PASS no contracts touched)
+- `App.jsx`: lazy `OpsStationV2` + `<Route path="/ops-station" element={<RequireOps>…}>` after
+  `/ops-dashboard` (literal, no §10 shadow; reuses RequireOps = head/exec/admin/co_owner).
+- `V2AppShell.jsx`: `OPS_HEAD_NAV` gained a "Station board" entry (LayoutDashboard, already
+  imported); the existing entry relabeled "Operations" → "Live console". SALES/TELECALLER/
+  AGENCY/OPS_EXEC/MOBILE_NAV_* + the background-GPS skip list byte-unchanged. Only
+  operation_head sees the new nav entry.
+
+### Data-integrity verified before commit
+Every query column exists in the live Phase-0 schema (ops_depots.name/is_active ·
+ops_screens.name/status/depot_id/is_active · ops_tickets.screen_id/status/type/issue_type_id/
+depot_id · ops_depot_contacts.role_en/name/phone/display_order · ops_issue_types.issue_en/
+solution_en/display_order/is_active) → no 400s. RLS: the `_manage` FOR ALL policy on
+ops_depot_contacts + ops_issue_types admits admin/co_owner/operation_head → the inline CRUD
+works for them; operation_executive is SELECT-only → an exec's edit toast-fails gracefully
+(the nav surfaces the board to head only). Deploy-order safe: all data already live (§241).
+
+### CONTRACTS / notes
+- Station board = a STATUS + contacts + issue-reference view. Ticket CREATION lives in the
+  exec app / head console (§231/§232) — do NOT fork a second ticket creator here.
+- `screenState` treats a rare `status='unknown'` screen as "working" (green). Post-§241 sync
+  all screens are online/offline (placeholders retired) so unknowns are near-nonexistent; the
+  head console's "Not reporting" stat (§240) is the honesty surface for unmeasured screens.
+- Contacts fill in as the head adds them here OR via the Live-console "Who to call" manager
+  (§240) — same `ops_depot_contacts` table, both work.
+
+### Owner smoke
+Vercel auto-deploys `6369cec`. As operation_head (or admin) → sidebar **Station board** →
+pick a station → live KPIs + a screen-wall grid coloured by real online/offline + add a
+depot contact (electrician/manager) + Edit the issue→solution list. No SQL, no APK; the
+Live console (/ops-dashboard) + owner cockpit (/ops-admin) are unchanged.
+
+### Optional follow-up (NOT built, §16 scope)
+Cross-link: make the Live-console "Screens by station" rows deep-link to
+`/ops-station?depot=<id>` so the two head views connect. A ~2-line additive edit to OpsHeadV2
+when the owner wants it.
