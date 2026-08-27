@@ -228,8 +228,13 @@ export default async function handler(req) {
     else unresolvedDepot++
   }
   try {
+    // upsert, tolerant of a not-yet-added camera_active column (retry without it)
+    const upsertScreens = async (batch) => {
+      if (await sbUpsert('ops_screens', batch, 'external_id')) return true
+      return sbUpsert('ops_screens', batch.map(({ camera_active, ...r }) => r), 'external_id')
+    }
     let allOk = true
-    for (let i = 0; i < rows.length; i += 200) { if (!(await sbUpsert('ops_screens', rows.slice(i, i + 200), 'external_id'))) allOk = false }
+    for (let i = 0; i < rows.length; i += 200) { if (!(await upsertScreens(rows.slice(i, i + 200)))) allOk = false }
     // link depots — a separate PATCH so an unresolved screen keeps depot_id null (not wiped)
     for (const depot_id of Object.keys(depotLinks)) {
       const ids = depotLinks[depot_id]
