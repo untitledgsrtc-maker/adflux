@@ -113,7 +113,7 @@ DECLARE v_role text := public.get_my_role(); v_assigned uuid; v_status text;
 BEGIN
   SELECT assigned_to, status INTO v_assigned, v_status FROM public.ops_tickets WHERE id = p_ticket;
   IF NOT FOUND THEN RAISE EXCEPTION 'ticket not found'; END IF;
-  IF v_role IS NULL OR NOT (v_role IN ('admin','co_owner','operation_head') OR v_assigned = auth.uid()) THEN
+  IF v_role IS NULL OR NOT (v_role IN ('admin','co_owner','operation_head') OR (v_assigned IS NOT NULL AND v_assigned = auth.uid())) THEN
     RAISE EXCEPTION 'not allowed';
   END IF;
   IF v_status <> 'open' THEN RAISE EXCEPTION 'ticket is not open'; END IF;
@@ -127,7 +127,7 @@ DECLARE v_role text := public.get_my_role(); v_assigned uuid; v_status text; v_d
 BEGIN
   SELECT assigned_to, status, depot_id INTO v_assigned, v_status, v_depot FROM public.ops_tickets WHERE id = p_ticket;
   IF NOT FOUND THEN RAISE EXCEPTION 'ticket not found'; END IF;
-  IF v_role IS NULL OR NOT (v_role IN ('admin','co_owner','operation_head') OR v_assigned = auth.uid()) THEN
+  IF v_role IS NULL OR NOT (v_role IN ('admin','co_owner','operation_head') OR (v_assigned IS NOT NULL AND v_assigned = auth.uid())) THEN
     RAISE EXCEPTION 'not allowed';
   END IF;
   IF v_status <> 'in_progress' THEN RAISE EXCEPTION 'ticket must be in progress to close'; END IF;
