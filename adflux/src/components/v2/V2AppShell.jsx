@@ -259,7 +259,8 @@ const ACCOUNTS_NAV = [
 // Phase 230 (2026-08-25) — Operations module. Head → the desk console
 // (/ops-dashboard, Phase 2); exec → the mobile field app (/ops).
 const OPS_HEAD_NAV = [
-  { to: '/ops-dashboard',     label: 'Operations',     icon: Tv },
+  { to: '/ops-dashboard',     label: 'Live console',   icon: Tv },
+  { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
 ]
 const OPS_EXEC_NAV = [
   { to: '/ops',               label: 'Operations',     icon: Tv },
