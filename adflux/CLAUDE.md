@@ -16986,3 +16986,34 @@ ticket (`in_progress`/`resolved`) was never auto-cancelled regardless (only `sta
 - ⚠ still-open (§250): the reconcile engine must also adopt the 7-9 rule (`isOnHours`) so it
   doesn't open 264 false tickets at 9 PM when the timer correctly turns screens off — a
   separate fix before it runs unattended.
+
+
+---
+
+## 253 · Ops-exec "NO DATA" = unassigned stations (root cause, 2026-08-27)
+
+Owner: the operation_executive module (Home / Tickets / My Performance) shows no real
+data. ROOT CAUSE (4-investigator trace): every ops-exec screen is scoped to
+`ops_depots.assigned_to = the exec`, and **NOTHING auto-assigns that** — not the aiadflux
+sync (`api/ops/sync.js` only writes external_group_id/is_active/lat/lng/depot_id, never
+assigned_to), not the p0 seed, not `supabase_ops_team_wire.sql` (explicitly defers it).
+Assigning a station to a tech is a MANUAL head step (`OpsHeadV2.jsx:195` — Live console →
+Screens by station → Assigned tech) that wasn't done → the exec owns 0 stations →
+`.in('depot_id', [NIL])` matches nothing → zero screens/faults/fixes/uptime. **The code is
+correct; the setup step is missing.** The 265 CMS screens ARE real + depot-linked (§241);
+the exec just isn't connected to any of them.
+- Uptime/salary card empty is SEPARATE + EXPECTED: `ops_uptime_daily` = 0 rows (owner-run
+  diagnostic confirmed) — p4 uptime-pay was never run/recorded; the card correctly reads
+  "no uptime data yet".
+- Fixes 0 / no calls = the exec has logged no tickets/calls yet (new module, no history).
+- FILES: `supabase_ops_exec_nodata_diagnostic.sql` (4 read-only checks: per-tech station
+  ownership · ops users exist · screens real+linked · uptime rows) +
+  `supabase_ops_assign_stations.sql` (bulk-assign all active stations to one tech by email;
+  non-destructive, re-runnable, guarded so a bad email nulls no one).
+- ⚠ SYNC RISK to watch (screens investigator): `sync.js` sets `ops_screens.depot_id` via a
+  SEPARATE fire-and-forget PATCH (`sbPatch`, no `.ok` check, no throw). If it silently
+  failed, screens would be real+status but `depot_id` NULL → even an assigned tech sees 0
+  screens. Diagnostic query 3 (`screens_with_NO_station`) is the arbiter; if >0, harden the
+  PATCH.
+- FOOT-GUN: any new ops-exec surface scoped by `assigned_to` shows NOTHING until stations
+  are assigned — assignment is the prerequisite, not the sync or p4.
