@@ -16668,3 +16668,51 @@ ticket-linked. **Sales rows keep it NULL → zero impact on the sales call flow,
    screens (Grouped/Individual) → tap → pick problem + notes + photo → Submit → In
    process ticket with the depot contact → Call (dials + records) → outcome → Save
    → Mark fixed → Fixed tab with the call history.
+
+
+---
+
+## 247 · Ops-exec dashboard — Me tab + responsive width (2026-08-27, `d8df78b`)
+
+Owner /ui-ux-pro-max review of the live `/ops-tickets` (§246): "UI looks off." Root
+= NOT the design — the page was a **480px mobile column stranded on a desktop**
+(built mobile-first for the field tech's phone). Owner also asked (mockup-approved):
+add the exec's OWN scoped metrics as a **4th tab**, incl. my calls + my salary.
+
+### Two changes (one file, `OpsTicketsV2.jsx` — NOT §28-frozen, no guardian, NO SQL/APK)
+1. **Responsive** — `useIsDesktop` → single column on phone, `repeat(auto-fill,
+   minmax(340px, 1fr))` grid on desktop (container maxWidth 480→1120). Every tab
+   (Open/In process/Fixed/Me) uses the shared `gridWrap`. Touch targets bumped to
+   ≥44px (§2). The field tech's phone view is unchanged; desktop now fills the width.
+2. **4th "Me" tab (મારું)** — the exec's own mini-cockpit, folding my-calls + my-salary
+   in (owner chose ONE personal tab over 6 tabs). Contents, ALL self-scoped:
+   - **My salary this month** = base (monthly×0.70) + variable (uptime curve), from
+     `ops_my_uptime_pay` (§233, already RUN). Variable via `estVariable()` — mirrors
+     the §233 OpsAdmin indicative curve + §230/§184 70/30 (90→97 SLA, >75 full / <50
+     zero). **Display-only** — deliberately NOT a `compute_monthly_salary` call (dodges
+     the §184 "0 working days → full variable cap" trap for an ops exec with no
+     daily_performance rows). "Not enough data yet" when no salary/uptime.
+   - **Uptime ring**, **My calls** (this month + today, from `call_logs` user_id=me),
+     **My stations up/down** (screen-status count on my depots), **Fixed this month +
+     avg time-to-fix** (my resolved manual tickets this IST month), **Worst stations**
+     (offline screens grouped by my depots, top 3).
+
+### CONTRACTS / foot-guns
+- **All Me-tab data is `assigned_to = me` / my-depots scoped.** NEVER widen to
+  network-wide data, other techs, or P&L — that's the admin cockpit (§233/§240,
+  RLS-gated). `ops_my_uptime_pay` is the self-scoped DEFINER RPC (§233).
+- Uptime + salary-variable show "—"/"not enough data yet" until **uptime-pay (p4)** is
+  turned on (uptime recording); **station health, calls, and fixes are real
+  immediately**. Not a bug.
+- IST month start = `istTodayISO().slice(0,8)+'01'` (NOT UTC, §42 F-D001); today =
+  `istTodayISO()+'T00:00:00+05:30'`.
+- The Me-tab load is best-effort try/caught (keeps prior stats on failure) → a missing
+  RPC/column never breaks the dashboard (§45 deploy-safe).
+- 4 tabs is the cap for the phone bar — do NOT add a 5th; new personal metrics go as
+  a section INSIDE Me.
+
+### Owner action
+Nothing to run — no SQL (reuses the §233 RPC), no APK. Deployed on push. Smoke: as
+an ops exec on **desktop** → cards fill the width; the **Me** tab shows salary +
+uptime + my calls + stations up/down + fixed-this-month + worst stations. On a phone
+it's the single column as before.
