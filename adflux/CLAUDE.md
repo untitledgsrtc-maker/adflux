@@ -16716,3 +16716,36 @@ Nothing to run — no SQL (reuses the §233 RPC), no APK. Deployed on push. Smok
 an ops exec on **desktop** → cards fill the width; the **Me** tab shows salary +
 uptime + my calls + stations up/down + fixed-this-month + worst stations. On a phone
 it's the single column as before.
+
+
+---
+
+## 248 · Ops-exec dashboard rebuilt on the lead-* design system (2026-08-27)
+
+Owner (twice): "not happy with design · use OUR design rules." The §246/§247
+OpsTicketsV2 used raw inline styles + `--v2-*` tokens → looked bare beside the
+polished pages. Rebuilt it on the SAME system as OpsAdminV2 (the cockpit the owner
+approved): the `lead-*` classes in `src/styles/leads.css` + GLOBAL tokens.
+
+### The design contract (do NOT regress to raw inline / --v2-* on ops pages)
+- **`lead-root`** page wrapper (responsive width + padding — the design-system
+  container; drop the manual maxWidth hack).
+- **`lead-page-head`** + `lead-page-eyebrow` ("Operations · field") + `lead-page-title`.
+- **`lead-card`** for every card; `lead-card-head`/`lead-card-title`/`lead-card-sub`.
+- **`lead-btn`** / **`lead-btn lead-btn-primary`** for actions.
+- **Chips** = the OpsAdmin pill: `background var(--danger-soft|warning-soft|success-soft)`
+  + matching color, radius 999 (N down / In process / Fixed).
+- **Numbers** in `var(--font-display)` (Space Grotesk), the counts + KPIs.
+- **GLOBAL tokens** (`--text`, `--text-muted`, `--border`, `--surface`/`-2`/`-3`,
+  `--danger`/`-soft`, `--success`/`-soft`, `--warning`/`-soft`, `--accent` brand
+  yellow) — NOT `--v2-*` (OpsAdminV2 proves global tokens + lead-* render inside
+  V2AppShell).
+- Segmented pill tabs (active = `--surface-3` fill), bordered tap-tiles (fixes the
+  faint `.btn-sm` border), a gradient salary card + conic uptime ring on the Me tab.
+
+### Contract / foot-guns
+- **Match OpsAdminV2's idiom** for any new ops surface — it's the owner-approved
+  reference. leads.css (`lead-*`) is the shared design system; §0 pre-work reading.
+- Zero logic change this rebuild — load/handlers/data (§246/§247) byte-identical;
+  only the render/styling moved to the design system. Not §28-frozen, no guardian,
+  no SQL/APK. Deploys on push.
