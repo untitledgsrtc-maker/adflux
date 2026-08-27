@@ -40,7 +40,7 @@ export const STR = {
   check_in_hint:   { gu: 'દિવસ શરૂ કરવા ચેક-ઇન કરો',    en: 'Check in to start your day' },
 
   // — stats —
-  open_tickets:    { gu: 'ખુલ્લા કામ',                  en: 'Open tickets' },
+  open_tickets:    { gu: 'ખુલ્લી ખરાબી',                en: 'Open faults' },
   resolved_today:  { gu: 'આજે પૂરા કરેલા',              en: 'Resolved today' },
 
   // — fault report —
@@ -56,7 +56,7 @@ export const STR = {
   report_saved:    { gu: 'ખરાબી નોંધાઈ ગઈ',             en: 'Fault reported' },
 
   // — ticket queue / detail —
-  my_tickets:      { gu: 'મારા કામ',                    en: 'My tickets' },
+  my_tickets:      { gu: 'મારી ખરાબી',                  en: 'My faults' },
   no_tickets:      { gu: 'અત્યારે કોઈ કામ બાકી નથી',    en: 'Nothing pending right now' },
   photo_request:   { gu: 'ફોટો જોઈએ છે',               en: 'Photo request' },
   fault:           { gu: 'ખરાબી',                       en: 'Fault' },
@@ -136,7 +136,7 @@ export const STR = {
                      en: 'Full dashboard coming next phase — for now, live counts + open tickets.' },
 
   // — exec ticket dashboard —
-  tickets_title:   { gu: 'ટિકિટ',                     en: 'Tickets' },
+  tickets_title:   { gu: 'ખરાબી',                     en: 'Faults' },
   tab_open:        { gu: 'ખુલ્લા',                     en: 'Open' },
   tab_proc:        { gu: 'ચાલુ',                       en: 'In process' },
   tab_fixed:       { gu: 'સુધારેલા',                   en: 'Fixed' },

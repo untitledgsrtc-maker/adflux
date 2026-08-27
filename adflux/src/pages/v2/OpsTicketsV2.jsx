@@ -270,6 +270,12 @@ export default function OpsTicketsV2() {
         ))}
       </div>
 
+      {tab === 'open' && cityScreens.length > 0 && (
+        <div style={{ ...secLbl, marginBottom: 12, color: 'var(--text-secondary)', letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
+          {cityScreens.length} {lang === 'gu' ? 'સ્ક્રીન બંધ' : 'screens down'} · {new Set(cityScreens.map(s => s.depot_id)).size} {lang === 'gu' ? 'સ્ટેશન' : 'stations'}
+        </div>
+      )}
+
       {tab === 'open' && <OpenTab />}
       {tab === 'proc' && <ProcTab />}
       {tab === 'fixed' && <FixedTab />}
