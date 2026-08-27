@@ -16355,3 +16355,109 @@ Live console (/ops-dashboard) + owner cockpit (/ops-admin) are unchanged.
 Cross-link: make the Live-console "Screens by station" rows deep-link to
 `/ops-station?depot=<id>` so the two head views connect. A ~2-line additive edit to OpsHeadV2
 when the owner wants it.
+
+
+---
+
+## 243 · Operations auto-ticket flow — offline screen → ticket → guarded lifecycle → head approval (2026-08-27)
+
+Built via /brainstorming → spec → plan → subagent-driven execution (fresh implementer + spec
++ correctness reviewer per task). Spec: `docs/superpowers/specs/2026-08-27-ops-auto-ticket-flow-design.md`.
+Plan: `docs/superpowers/plans/2026-08-27-ops-auto-ticket-flow.md`. The deferred §241 "Phase 2
+inbound webhook", built off the SYNC (owner chose the 10-min sync trigger over a CMS webhook —
+a future webhook just flips `ops_screens.status` faster into the SAME engine, no rebuild). All
+additive, §45-safe (no §28-frozen sales file, no money path). Ops files are NOT §28-frozen.
+
+### The state machine (ONE ticket per station)
+```
+[sync: depot has offline screens, no open auto-ticket]
+   │ auto-create (source='auto_offline', assign depot.assigned_to) + alert (in-app+push+WhatsApp)
+   ▼ OPEN ─tech Start─▶ IN_PROGRESS ─tech Resolve*─▶ RESOLVED ─head Approve*─▶ APPROVED ✓
+   │                        ▲                            │
+   │ sync: back online,     └──── head Reject ──────────┘
+   │ still untouched
+   ▼ CANCELLED (auto-recovered blip — no tech trip wasted)
+  *guarded: can't Resolve OR Approve while the station has an offline screen (live CMS check).
+   After APPROVED, a fresh drop auto-opens a new ticket.
+```
+
+### Pieces (all in ONE owner-run file `supabase_ops_p2_auto_tickets.sql` + 3 code files)
+- **Schema** (§1): `ops_tickets.status` gains `'approved'`; `source` gains `'auto_offline'`; +
+  `approved_by`/`approved_at`/`down_count`.
+- **Engine** `ops_reconcile_offline_tickets()` (§2, SECURITY DEFINER, EXCEPTION-wrapped): called
+  at the END of every `api/ops/sync.js` run (+ the cron + the /ops-admin Record-uptime button).
+  Per depot: a **`pg_advisory_xact_lock(hashtext('ops_reconcile:'||depot))`** (closes the TOCTOU
+  race — three concurrent callers), then open ONE auto-ticket if offline>0 AND no open/in_progress
+  auto-ticket, else auto-cancel an UNTOUCHED (`status='open'`) auto-ticket. Never touches
+  in_progress/resolved/approved/manual/sales_request. Fires `enqueue_push` (§96) + `ops_ticket_wa_dispatch`
+  best-effort per open. `v_cancelled` ACCUMULATES across the loop (GET DIAGNOSTICS + sum).
+- **Guard RPCs** (§3): `ops_ticket_start` (open→in_progress) · `ops_ticket_resolve`
+  (in_progress→resolved, BLOCKS while offline) · `ops_ticket_approve` (HEAD only, resolved→approved,
+  BLOCKS while offline, sets approved_by/at) · `ops_ticket_reject` (HEAD only, resolved→in_progress).
+  All SECURITY DEFINER, fail-closed on NULL role (§41), FROM-state-checked, REVOKE PUBLIC/anon +
+  GRANT authenticated.
+- **WhatsApp** (§4): `ops_ticket_wa_dispatch(uuid)` pg_net-POSTs to `api/ops/ticket-wa.js` (Edge,
+  §219); the ops secret is PULLED from the live `ops_aiadflux_sync_dispatch` via a `pg_get_functiondef`
+  regex (§197 trick — no literal secret in the file). REVOKEd from client roles + service_role only.
+- **Frontend** (not frozen): `OpsWorkV2` tech Start/Resolve → the guarded RPCs (a blocked resolve
+  toasts "screens still offline"), + an "Auto" chip on `source='auto_offline'`. `OpsHeadV2` gains an
+  "Awaiting approval" section (resolved tickets) with Approve/Reject → the RPCs.
+- `api/ops/sync.js`: one best-effort `ops_reconcile_offline_tickets` call after the uptime recompute.
+- `scripts/create-ops-ticket-template.py`: creates the gu Utility template `ops_ticket_alert`
+  ({{1}}=depot, {{2}}=count) on the marketing WABA.
+
+### FROZEN CONTRACTS (do NOT regress)
+- ONE ticket per depot per outage — enforced by the `NOT EXISTS ... status IN ('open','in_progress')`
+  dedup + the per-depot advisory lock. Do NOT drop the lock (the sync cron + Record-uptime button +
+  sync.js all call the engine concurrently).
+- The CMS "screens still offline" guard on BOTH resolve AND approve is the whole point of live status
+  — never make close/approve trust-only.
+- Auto-cancel only touches `status='open'` (an untouched blip). A tech's `in_progress` ticket survives
+  a flicker → the human close→approve flow.
+- The two tech-action guards MUST null-guard the assigned-tech check:
+  `(v_assigned IS NOT NULL AND v_assigned = auth.uid())` — a bare `v_assigned = auth.uid()` on a
+  NULL assigned_to (unassigned auto-ticket) yields NULL → the §41 3VL trap → a non-privileged user
+  could start/resolve it. (This bug was written into the plan and CAUGHT by the security reviewer.)
+- The WA dispatch secret stays PULLED from `ops_aiadflux_sync_dispatch` — no literal secret in the SQL.
+
+### Foot-guns (from the two review catches)
+- ❌ A check-then-act (dedup NOT EXISTS → INSERT) with 3 concurrent callers is a TOCTOU race →
+  duplicate tickets + double pushes. Advisory-lock per depot (the `ai_build_quote` pattern).
+- ❌ `v_col = auth.uid()` where the column is nullable → NULL under 3VL → `IF NULL` skips the RAISE →
+  privilege bypass (§41). Guard `col IS NOT NULL AND col = auth.uid()`. (I keep re-writing this trap;
+  the two-stage review is why it didn't ship.)
+
+### OWNER RUN-LIST
+1. **SQL**: paste `supabase_ops_p2_auto_tickets.sql` into Supabase Studio (ONE file, all 4 sections),
+   then run the VERIFY SELECT at the bottom → expect `five_fns = 5` + both CHECK defs listing the new
+   values. **If you re-run it after an earlier partial run, it's idempotent — safe.**
+2. **Frontend** deploys with the push (Vercel) — tech `/ops` + head `/ops-dashboard` pick it up on
+   next open. `api/ops/sync.js` reconcile is live once the SQL is run.
+3. **Depot → tech**: assign each depot to a tech (head console → Screens by station → Assigned tech,
+   §240) so auto-tickets auto-assign; unassigned depots open unassigned tickets the head assigns.
+4. **WhatsApp (optional fast-follow)**: `TOKEN='<fresh Meta token>' python3 scripts/create-ops-ticket-template.py`
+   → wait for `ops_ticket_alert` Active in WhatsApp Manager → set Vercel env `OPS_WA_PHONE_NUMBER_ID`
+   (= `1209093615625212`, §119; `CAMPAIGN_WA_TOKEN` + `OPS_SYNC_SECRET` already set) → put each tech's
+   number in `users.whatsapp_number` (§197). Inert/skipped until then; in-app + push work regardless.
+
+### ACCEPTANCE smoke (owner, in Studio)
+`UPDATE ops_screens SET status='offline' WHERE depot_id='<depot>' AND is_active;` then
+`SELECT public.ops_reconcile_offline_tickets();` → `{"opened":1,"cancelled":0}` + one open auto-ticket
+assigned to the depot's tech. Run again → `{"opened":0}` (dedup). Flip online + reconcile → the
+untouched ticket goes `cancelled`. With a screen offline, the app Resolve toasts "screens still
+offline — cannot close yet"; all-online → Resolve + head Approve succeed. As a non-head,
+`SELECT public.ops_ticket_approve('<ticket>');` → `ERROR: head only`.
+
+### Commits (untitled-os)
+```
+8a3538f Ops p2: WhatsApp ticket-alert template script + engine pg_net dispatch
+e3f690d Ops p2: WhatsApp ticket-alert Edge endpoint (inert until configured)
+d69d230 Ops p2: head Awaiting-approval section (approve/reject via guarded RPCs)
+f10438d Ops p2: tech Start/Resolve via guarded RPCs + auto chip on auto-tickets
+aac0377 Ops p2: call ops_reconcile_offline_tickets at end of each sync run
+2c480f0 Ops p2: null-guard the assigned-tech check in start/resolve (close §41 3VL bypass)
+27fe5b8 Ops p2: guarded lifecycle RPCs (start/resolve/approve/reject) + VERIFY
+f2fef5d Ops p2: advisory lock in reconcile to close the concurrent-open TOCTOU race
+302a7ad Ops p2: ops_reconcile_offline_tickets engine (per-station open + auto-cancel + push)
+ac93a03 Ops p2: ops_tickets schema for auto-ticket flow (approved status + approver + down_count)
+```
