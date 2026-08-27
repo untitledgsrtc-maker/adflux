@@ -208,6 +208,15 @@ export const STR = {
   scoped_note:     { gu: 'ફક્ત તમારા સ્ટેશન · નેટવર્ક રિપોર્ટ પ્રમાણે', en: 'Your stations only · updates as the network reports' },
   no_stats:        { gu: 'હજી પૂરતી માહિતી નથી',        en: 'Not enough data yet' },
   hrs:             { gu: 'ક',                          en: 'h' },
+
+  // — network snapshot (home) —
+  my_network:      { gu: 'તમારું નેટવર્ક',              en: 'Your network' },
+  camera_off:      { gu: 'કૅમેરા બંધ',                  en: 'Camera off' },
+  no_depot:        { gu: 'તમને હજી કોઈ સ્ટેશન સોંપાયું નથી', en: 'No stations assigned to you yet' },
+  no_depot_hint:   { gu: 'હેડને તમારા સ્ટેશન સોંપવા કહો', en: 'Ask your head to assign your stations' },
+  fixed_this_wk:   { gu: 'આ અઠવાડિયે',                  en: 'This week' },
+  avg_uptime:      { gu: 'સરેરાશ ચાલુ',                 en: 'Avg uptime' },
+  station_map:     { gu: 'મારા સ્ટેશન · નકશો',           en: 'My stations · map' },
 }
 
 // Resolve a label. Falls back gu → en → key so a missing translation is

@@ -17017,3 +17017,66 @@ the exec just isn't connected to any of them.
   PATCH.
 - FOOT-GUN: any new ops-exec surface scoped by `assigned_to` shows NOTHING until stations
   are assigned — assignment is the prerequisite, not the sync or p4.
+
+
+---
+
+## 254 · Ops-exec home — network snapshot wired + station map (ui-ux-pro-max) (2026-08-27)
+
+Owner mockup-approved (Artifact + "wire this new design, brand not spoiled") the
+network snapshot for the field-tech home `/ops-home` (`OpsHomeV2.jsx`, NOT §28-frozen).
+Ran the ui-ux-pro-max skill as a QUALITY LENS on the LOCKED brand — NOT to generate a
+new palette (the owner's whole ask = keep the brand). Additive, §45-safe (no frozen
+file, no sales flow — the mid-turn "check sales executive flow / don't edit executive
+flow" honored: zero code touched outside the ops home). Build PASS (82 modules), brand
+check clean (no `#facc15`), self-pushed (§211).
+
+### What shipped (3 files)
+- **Network snapshot card** (the owner's core ask) — a 2×2 tile grid at the top of the
+  home: **કુલ સ્ક્રીન (total assigned)** · **ચાલુ (online)** · **બંધ (offline** → taps to
+  /ops-down**)** · **કૅમેરા બંધ (camera off)** + a sub-strip **સ્ટેશન · આજે સુધાર્યા ·
+  ચાલુ (in-process)**. Live-dot "દર ૧૦ મિનિટ".
+- **camera-off is REAL data** — `ops_screens.camera_active` (`false` = camera present but
+  Inactive; the sync's `mapScreen` already writes it from the aiadflux `cameras[].status`).
+- **avg-uptime this month** + **fixed-this-week** added to the my-month mini (now 5 stats:
+  fixed-mo · this-week · avg-to-fix · avg-uptime · calls). avg-uptime from `ops_uptime_daily`
+  (avg `uptime_pct` where `screens_total>0`; `—` until p4 records uptime).
+- **NEW `src/components/ops/OpsStationsMap.jsx`** — small Google-Maps station map (green pin
+  = station all-up, red = has a down screen) from `ops_depots.lat/lng`. Same loader options
+  as LiveFieldMap/GpsTrackV2 (`VITE_GOOGLE_ROADS_KEY`, `libraries:['geometry']`, §70.6.1).
+  **Returns null when there's no map key OR no station has coords** → can never show a broken
+  grey box on the tech's primary screen.
+- **§253 empty state** — when the tech has NO assigned depot, the home shows "તમને હજી કોઈ
+  સ્ટેશન સોંપાયું નથી · હેડને સોંપવા કહો" INSTEAD of a wall of zeros (the §253 no-data root
+  cause, told plainly).
+- New Gujarati labels in `opsStrings.js` (my_network / camera_off / no_depot / fixed_this_wk
+  / avg_uptime / station_map).
+
+### The "brand not spoiled" contract (ui-ux-pro-max applied to the LOCKED system)
+- **Semantic color TOKENS ONLY** — every tile/number/border uses `var(--success|danger|
+  warning|accent|surface-2|border|text|text-muted|*-soft)`, NEVER a raw hex (the mockup used
+  hardcoded hex; the wired page must not — §5/§16). Brand check confirms no `#facc15`.
+- **color-not-only** (§skill 6) — each status tile = Lucide icon + text label + colored number
+  + soft bg, never color alone (Monitor/Wifi/WifiOff/VideoOff).
+- **tabular-nums** on every stat number (`fontVariantNumeric`) + Space Grotesk (`--font-display`).
+- **≥44px touch tiles** (minHeight 90) + the offline tile is a real button → /ops-down.
+- Matches the OpsAdminV2/lead-* idiom (§248) — the owner-approved reference.
+
+### DEPLOY-ORDER SAFETY (the important foot-gun)
+The screens fetch selects `camera_active`; if `supabase_ops_camera_status.sql` was NOT run,
+PostgREST 400s that column → the load **retries the select WITHOUT `camera_active`** (checks
+`error.code==='42703'` / `/camera_active/i`) → the camera tile shows `—` instead of crashing
+the home. So the page is safe whether or not the camera SQL has been run. FOOT-GUN: a frontend
+`.select()` naming a not-yet-migrated column 400s the whole query — always retry without it
+(the §135 `media_url` / sync `camera_active` pattern) on a page that can deploy before its SQL.
+
+### Owner action
+- Push is done (JS → the APK gets it on next open; no APK rebuild). The snapshot (total/
+  online/offline), stations/fixed/in-process, avg-uptime, fixed-this-week, and the station map
+  are LIVE on real data now.
+- To light up the **camera-off** tile with real numbers: run `supabase_ops_camera_status.sql`
+  in Supabase Studio (adds `ops_screens.camera_active`), then the next 10-min sync populates it
+  (until then the tile shows `—`, not a false 0).
+- avg-uptime + the pay card stay `—` until uptime is recorded (p4, §234) — expected, not a bug.
+- The map needs `VITE_GOOGLE_ROADS_KEY` (already set — the other 4 app maps use it) + assigned
+  depots with lat/lng (the sync backfills depot lat/lng from a member screen); else it hides.
