@@ -17080,3 +17080,28 @@ the home. So the page is safe whether or not the camera SQL has been run. FOOT-G
 - avg-uptime + the pay card stay `—` until uptime is recorded (p4, §234) — expected, not a bug.
 - The map needs `VITE_GOOGLE_ROADS_KEY` (already set — the other 4 app maps use it) + assigned
   depots with lat/lng (the sync backfills depot lat/lng from a member screen); else it hides.
+
+### 254.1 · Auto-ticket engine now 7 AM–9 PM-gated (the §250/§252 gap, surfaced live)
+Owner fired a manual sync at **00:33 IST** → `{online:0, offline:265}`. That is CORRECT — the
+timers turned every screen off for the night (§250 7 AM–9 PM rule), NOT an outage. But it exposed
+the flagged gap: `ops_reconcile_offline_tickets` (§243) opened ~21 false "station down" auto-tickets
+(one per depot) for screens the timer correctly turned off, and would have blasted the assigned
+tech a WhatsApp + push alert at midnight (contained tonight only because no real exec is assigned
+yet, §253).
+- **FIX (SQL, `supabase_ops_p2_auto_tickets.sql` — owner RE-RUNS):** added `v_on_hours` (`extract(hour
+  FROM (now() AT TIME ZONE 'Asia/Kolkata')) >= 7 AND < 21` — mirrors `opsHours.js` isOnHours EXACTLY)
+  and prepended `v_on_hours AND` to the open-branch inner IF. Off-hours, offline is expected → NO
+  ticket, NO alert. On-hours unchanged; the §252 auto-cancel ELSE, the >1-day-no-close guard, the
+  per-depot advisory lock, the one-ticket dedup, and the EXCEPTION wrapper are all byte-unchanged.
+  3-lens adversarial review (correctness + Postgres/blast-radius + JS) = unanimous SHIP, zero findings.
+- **FIX (JS, OpsHomeV2 snapshot):** off-hours the "offline" tile goes `tone='neutral'` (not danger-red)
+  + a "બધું શાંત · સ્ક્રીન રાત્રે બંધ છે" note — so 265-offline-at-midnight isn't a false red alarm.
+- **Tonight's ~21 false tickets self-heal at 7 AM** — when screens come back online (v_down=0) the
+  §252 auto-cancel branch cancels them (opened <1 day, untouched). No manual cleanup required; a
+  scoped cancel is optional. FUTURE nights won't open any (once the SQL is re-run).
+- **STILL a follow-up (not built, §16 scope):** the reconcile detects OFFLINE only; a screen still
+  ONLINE off-hours is a TIMER fault (§250) — auto-detecting + ticketing those is a separate feature.
+  The home fault list already surfaces timer faults ("timer · still on") + the tech logs them via the app.
+- FOOT-GUN: any auto-ticket / alert engine that reacts to `ops_screens.status='offline'` MUST gate on
+  `isOnHours()` (SQL: `extract(hour FROM now() AT TIME ZONE 'Asia/Kolkata')` in [7,21)), or it fires
+  ~264 false tickets + alerts every night when the timers correctly turn the screens off.

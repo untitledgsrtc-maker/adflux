@@ -186,9 +186,11 @@ export default function OpsHomeV2() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
             <SnapTile icon={Monitor} n={net.total} label={t('total_screens', lang)} tone="neutral" />
             <SnapTile icon={Wifi} n={net.online} label={t('online', lang)} tone="success" />
-            <SnapTile icon={WifiOff} n={net.offline} label={t('offline', lang)} tone="danger" onClick={() => nav('/ops-down')} />
+            <SnapTile icon={WifiOff} n={net.offline} label={t('offline', lang)} tone={onHours ? 'danger' : 'neutral'} onClick={() => nav('/ops-down')} />
             <SnapTile icon={VideoOff} n={net.cameraOff != null ? net.cameraOff : '—'} label={t('camera_off', lang)} tone="warning" />
           </div>
+          {/* off-hours: offline is normal (timer, §250) — not an alarm */}
+          {!onHours && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 10, textAlign: 'center' }}>{t('all_quiet', lang)}</div>}
           <div style={{ display: 'flex', marginTop: 13, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <SubStat val={depots.length} label={t('stations_word', lang)} />
             <SubStat val={s.fixedToday ?? 0} label={t('fixed_today_w', lang)} border />

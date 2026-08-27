@@ -42,7 +42,15 @@ DECLARE
   v_row       int;
   v_opened    int := 0;
   v_cancelled int := 0;
+  v_on_hours  boolean;
 BEGIN
+  -- 7 AM–9 PM IST operating window (§250). Off-hours a screen SHOULD be off, so
+  -- offline is EXPECTED (the timer turned it off) — do NOT open a fault ticket
+  -- or blast the tech a "station down" alert at night. Mirrors opsHours.js
+  -- isOnHours() exactly (on = IST hour >= 7 AND < 21).
+  v_on_hours := (extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata')) >= 7
+             AND extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata')) <  21);
+
   FOR d IN SELECT id, name, assigned_to FROM public.ops_depots WHERE is_active LOOP
     -- serialize concurrent reconciles per depot (sync cron + Record-uptime button)
     PERFORM pg_advisory_xact_lock(hashtext('ops_reconcile:' || d.id::text));
@@ -52,7 +60,8 @@ BEGIN
      WHERE depot_id = d.id AND is_active AND status = 'offline';
 
     IF v_down > 0 THEN
-      IF NOT EXISTS (
+      -- ON-HOURS only: off-hours, offline is normal (timer) → never auto-open (§250).
+      IF v_on_hours AND NOT EXISTS (
         SELECT 1 FROM public.ops_tickets
          WHERE depot_id = d.id AND source = 'auto_offline'
            AND status IN ('open','in_progress')
