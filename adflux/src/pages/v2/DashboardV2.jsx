@@ -18,6 +18,7 @@
 //
 // This file owns ZERO data fetching. It's a router, not a page.
 
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import SalesDashboardV2 from './SalesDashboard'
@@ -33,7 +34,7 @@ export default function DashboardV2() {
   // Privileged set (admin / owner / co_owner) all get the admin
   // dashboard. Sales reps get the sales dashboard. Agency gets
   // their own commission-focused Home (Phase 101.B).
-  const { isPrivileged, isAgency, loading } = useAuth()
+  const { isPrivileged, isAgency, loading, profile } = useAuth()
   const isDesktop = useIsDesktop()
 
   if (loading) {
@@ -43,6 +44,11 @@ export default function DashboardV2() {
       </div>
     )
   }
+
+  // Ops users must never see the sales dashboard (leak fix, 2026-08-27).
+  // Bounce them to their own home — mirrors RootRedirect's ops landing.
+  if (profile?.role === 'operation_head')      return <Navigate to="/ops-down" replace />
+  if (profile?.role === 'operation_executive') return <Navigate to="/ops-log" replace />
 
   if (isPrivileged) return <AdminDashboardDesktop />
   // Phase 101.B — agency branch. Same /dashboard URL, role-aware

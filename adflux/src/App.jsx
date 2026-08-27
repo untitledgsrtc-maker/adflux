@@ -77,6 +77,8 @@ const OpsAdminV2 = lazyWithRetry(() => import('./pages/v2/OpsAdminV2'))
 const OpsStationV2 = lazyWithRetry(() => import('./pages/v2/OpsStationV2'))
 // Ops redesign (2026-08-27) — the primary "Log a screen issue" screen.
 const OpsLogV2 = lazyWithRetry(() => import('./pages/v2/OpsLogV2'))
+// Ops redesign (2026-08-27) — "Down now" live board (head home).
+const OpsDownV2 = lazyWithRetry(() => import('./pages/v2/OpsDownV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
 const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
 const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
@@ -309,7 +311,7 @@ function RootRedirect() {
   // the ops role FIRST so login-landing matches the sidebar nav (which already
   // gates on isOps before the sales branches). operation_executive → the primary
   // Log-a-screen-issue screen (/ops-log); operation_head → the desk console.
-  if (role === 'operation_head')       return <Navigate to="/ops-dashboard" replace />
+  if (role === 'operation_head')       return <Navigate to="/ops-down" replace />
   if (role === 'operation_executive')  return <Navigate to="/ops-log" replace />
   // Phase 61 (19 May 2026) — sales_manager (Jubin + Renuka) lands
   // on /manager (their team-lead dashboard). Branch BEFORE the base
@@ -443,6 +445,7 @@ export default function App() {
           <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
           <Route path="/ops-dashboard"             element={<RequireOps><OpsHeadV2 /></RequireOps>} />
           <Route path="/ops-log"                   element={<RequireOps><OpsLogV2 /></RequireOps>} />
+          <Route path="/ops-down"                  element={<RequireOps><OpsDownV2 /></RequireOps>} />
           <Route path="/ops-station"               element={<RequireOps><OpsStationV2 /></RequireOps>} />
           <Route path="/ops-admin"                 element={<RequirePrivileged><OpsAdminV2 /></RequirePrivileged>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's

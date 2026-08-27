@@ -5,6 +5,7 @@
 // ops_screens / ops_issue_types; writes ops_tickets (source='manual'). Gujarati-
 // first (§231) via opsStrings. Ops roles + admin. Additive; app v2 tokens.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { MapPin, Phone, Monitor, Camera, Loader2, Check, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
@@ -15,6 +16,7 @@ const lbl = { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterS
 const field = { width: '100%', boxSizing: 'border-box', background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-0, #f1f5f9)', border: '1px solid var(--v2-line, #334155)', borderRadius: 10, padding: '11px 12px', fontSize: 15 }
 
 export default function OpsLogV2() {
+  const [params] = useSearchParams()
   const [lang, setLang] = useState(getOpsLang())
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -75,6 +77,11 @@ export default function OpsLogV2() {
   }, [])
 
   useEffect(() => { (async () => { setLoading(true); await loadShell(); setLoading(false) })() }, [loadShell])
+  // Preselect a city from ?depot= (the Down-now "Log what's wrong" deep-link).
+  useEffect(() => {
+    const pre = params.get('depot')
+    if (pre && depots.some(d => d.id === pre)) setDepotId(pre)
+  }, [depots, params])
   useEffect(() => { loadCity(depotId) }, [depotId, loadCity])
   useEffect(() => { loadRecent(screenId) }, [screenId, loadRecent])
 

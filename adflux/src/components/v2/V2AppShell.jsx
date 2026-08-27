@@ -63,7 +63,7 @@ import {
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
   Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone, MessageCircle,
-  IndianRupee, GraduationCap,
+  IndianRupee, GraduationCap, Activity,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -259,12 +259,14 @@ const ACCOUNTS_NAV = [
 // Phase 230 (2026-08-25) — Operations module. Head → the desk console
 // (/ops-dashboard, Phase 2); exec → the mobile field app (/ops).
 const OPS_HEAD_NAV = [
+  { to: '/ops-down',          label: 'Down now',       icon: Activity },
   { to: '/ops-log',           label: 'Log issue',      icon: FileText },
   { to: '/ops-dashboard',     label: 'Live console',   icon: Tv },
   { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
 ]
 const OPS_EXEC_NAV = [
   { to: '/ops-log',           label: 'Log issue',      icon: FileText },
+  { to: '/ops-down',          label: 'Down now',       icon: Activity },
   { to: '/ops',               label: 'Operations',     icon: Tv },
 ]
 
