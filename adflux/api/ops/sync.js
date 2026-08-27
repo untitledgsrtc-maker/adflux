@@ -62,7 +62,7 @@ const asList = (b) => Array.isArray(b) ? b
 // normalize a depot/group name for fuzzy first-run matching
 // "Godhra Bus Stand" and "Godhra GSRTC Bus Stand" both -> "godhra"
 const norm = (s) => String(s || '').toLowerCase()
-  .replace(/gsrtc|bus\s*stand|depot|station/g, '').replace(/[^a-z0-9]/g, '')
+  .replace(/gsrtc|gidc|bus\s*stand|bus\s*stop|stand|depot|station/g, '').replace(/[^a-z0-9]/g, '')
 
 // aiadflux screen -> mapped fields | null. Real shape confirmed 2026-08-27: the
 // screen EMBEDS its depot as `Group` {id,name} + `group_id` (int) + `location`
@@ -201,6 +201,7 @@ export default async function handler(req) {
     const depots = await sbGet('ops_depots?select=id,name,external_group_id,lat,lng')
     for (const gid of Object.keys(groups)) {
       const g = groups[gid]
+      if (/\btest\b/i.test(g.name || '')) continue   // never make a depot for a test group (F2)
       let d = depots.find(x => x.external_group_id === gid)
       if (!d && g.name) d = depots.find(x => !x.external_group_id && norm(x.name) && norm(x.name) === norm(g.name))
       if (d) {
