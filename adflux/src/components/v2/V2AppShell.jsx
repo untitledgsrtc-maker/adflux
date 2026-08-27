@@ -259,10 +259,12 @@ const ACCOUNTS_NAV = [
 // Phase 230 (2026-08-25) — Operations module. Head → the desk console
 // (/ops-dashboard, Phase 2); exec → the mobile field app (/ops).
 const OPS_HEAD_NAV = [
+  { to: '/ops-log',           label: 'Log issue',      icon: FileText },
   { to: '/ops-dashboard',     label: 'Live console',   icon: Tv },
   { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
 ]
 const OPS_EXEC_NAV = [
+  { to: '/ops-log',           label: 'Log issue',      icon: FileText },
   { to: '/ops',               label: 'Operations',     icon: Tv },
 ]
 
@@ -933,6 +935,7 @@ export function V2AppShell() {
               already covers TC. Dropping the !isTelecaller exclusion. */}
           {!isPrivileged
             && !isAccounts /* Phase 182 — no rep incentive card for the finance role */
+            && !isOps /* Ops redesign 2026-08-27 — no sales incentive card on ops pages */
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 0 }}>

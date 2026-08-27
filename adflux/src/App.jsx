@@ -75,6 +75,8 @@ const OpsHeadV2 = lazyWithRetry(() => import('./pages/v2/OpsHeadV2'))
 const OpsAdminV2 = lazyWithRetry(() => import('./pages/v2/OpsAdminV2'))
 // Phase 230 — per-station Operations board (KPIs + screen wall + contacts + issue ref).
 const OpsStationV2 = lazyWithRetry(() => import('./pages/v2/OpsStationV2'))
+// Ops redesign (2026-08-27) — the primary "Log a screen issue" screen.
+const OpsLogV2 = lazyWithRetry(() => import('./pages/v2/OpsLogV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
 const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
 const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
@@ -305,10 +307,10 @@ function RootRedirect() {
   // Phase 230 (audit fix) — Operations roles win over any residual team_role.
   // An ops user may still carry a stale team_role='sales'/'telecaller'; check
   // the ops role FIRST so login-landing matches the sidebar nav (which already
-  // gates on isOps before the sales branches). operation_executive → the mobile
-  // field app (/ops); operation_head → the desk console (/ops-dashboard).
+  // gates on isOps before the sales branches). operation_executive → the primary
+  // Log-a-screen-issue screen (/ops-log); operation_head → the desk console.
   if (role === 'operation_head')       return <Navigate to="/ops-dashboard" replace />
-  if (role === 'operation_executive')  return <Navigate to="/ops" replace />
+  if (role === 'operation_executive')  return <Navigate to="/ops-log" replace />
   // Phase 61 (19 May 2026) — sales_manager (Jubin + Renuka) lands
   // on /manager (their team-lead dashboard). Branch BEFORE the base
   // role checks so a sales-flavored manager doesn't fall through
@@ -440,6 +442,7 @@ export default function App() {
           {/* Phase 230 — Operations field app (exec) + Head desk console. */}
           <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
           <Route path="/ops-dashboard"             element={<RequireOps><OpsHeadV2 /></RequireOps>} />
+          <Route path="/ops-log"                   element={<RequireOps><OpsLogV2 /></RequireOps>} />
           <Route path="/ops-station"               element={<RequireOps><OpsStationV2 /></RequireOps>} />
           <Route path="/ops-admin"                 element={<RequirePrivileged><OpsAdminV2 /></RequirePrivileged>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
