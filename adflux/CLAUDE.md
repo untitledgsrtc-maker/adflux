@@ -16461,3 +16461,71 @@ f2fef5d Ops p2: advisory lock in reconcile to close the concurrent-open TOCTOU r
 302a7ad Ops p2: ops_reconcile_offline_tickets engine (per-station open + auto-cancel + push)
 ac93a03 Ops p2: ops_tickets schema for auto-ticket flow (approved status + approver + down_count)
 ```
+
+
+---
+
+## 244 · Operations module REDESIGN — Log-a-screen-issue is the primary ops screen (2026-08-27, `1533d24`)
+
+Owner rejected the §243 auto-ticket lifecycle outright ("worst module i ever seen … not happy
+with the flow" — he ticked ALL FOUR of UX / lifecycle / invisible / wrong-approach). Root cause of
+the miss: I ran a **text** brainstorm (abstract per-station vs per-screen, approval steps) for a
+**UI-oriented, non-technical owner who lives on what he can see** (CLAUDE.md preamble). He approved
+words, not an experience. Fix: showed him a **clickable mockup** (visualize widget) of exactly the
+screen he wanted, he confirmed, then built it. LESSON: for this owner, "plan" = SHOW a real screen,
+never a text spec. Reuse the visual-companion / show_widget path for any ops/UI design with him.
+
+### What he actually wanted (his sketch, verbatim)
+A dead-simple fault LOG, no lifecycle/approval:
+`City dropdown → contacts auto-appear → Screen dropdown → What was wrong (dropdown) + Notes + Photo → Save.`
+Plus: **remove the Proposed Incentive card from the ops pages** (sales feature, nonsense for ops).
+
+### Shipped — `src/pages/v2/OpsLogV2.jsx` (route `/ops-log`, the new PRIMARY ops screen)
+- City = `ops_depots` (20 stations). On select → **contacts auto-appear** (`ops_depot_contacts`,
+  tap-to-call) + the **screen dropdown** (`ops_screens`, numbered "Screen 1..N", real name as a
+  caption). On screen select → **What was wrong** (dropdown from `ops_issue_types` + "Other → type
+  it") + **Notes** + **Upload photo** (→ `ops-photos` private bucket). Save → ONE `ops_tickets` row
+  (`type='fault', source='manual', status='open'`, cause = the issue name or the Other text,
+  issue_type_id for presets, notes, photo_path). NO lifecycle, NO approval.
+- Below the form: **"logged on this screen"** — the last 5 issues on that screen (the owner's
+  "where do I see them" — answered by default as a per-screen history).
+- Gujarati-first (`opsStrings`, §231) with a ગુ/EN toggle. §47 save-latch. Reads/writes ONLY ops_*
+  tables — no new schema for the page.
+
+### The issue list is DATA (owner-editable) — `supabase_ops_p3_issue_types.sql` (owner RUNS)
+The dropdown reads `ops_issue_types WHERE is_active`. p3 **deactivates** the generic §230 seeds
+(non-destructive — old tickets keep their FK) and seeds the owner's 10 (gu+en, display_order):
+Power cut · Light bill not paid · Software issue · Wiring problem · Ethernet/internet issue · Timer
+issue · Pigeon/bird nest problem · Switch problem · Display/screen damage/blank · Cleaning required.
+Idempotent + re-runnable (dedup on issue_en). **Until p3 runs, the dropdown shows the old generic
+11**; after p3, his 10. To change the list later: edit `ops_issue_types` (a future Master tab).
+
+### Frozen touches (§28, additive, guardian PASS)
+- `App.jsx`: lazy `OpsLogV2` + `/ops-log` route (RequireOps); `operation_executive` RootRedirect
+  landing `/ops` → **`/ops-log`** (they log issues as their main job now).
+- `V2AppShell.jsx`: "Log issue" (`FileText`) is the FIRST entry in `OPS_HEAD_NAV` + `OPS_EXEC_NAV`
+  (the old surfaces stay reachable — exec keeps `/ops` for check-in; head keeps Live console +
+  Station board). The `ProposedIncentiveCard` mount gate gained `&& !isOps` → the sales incentive
+  card no longer shows for operation_head/operation_executive. SALES/TELECALLER/AGENCY nav + the
+  GPS skip list byte-unchanged.
+
+### What this SUPERSEDES / coexists with
+- The §243 auto-ticket lifecycle (open→in_progress→resolved→approved + head approval + the guarded
+  RPCs) is NO LONGER the ops experience — `/ops-log` is the front door. The §243 SQL is already run
+  (harmless): `ops_tickets` still has the columns; the auto-engine still auto-opens rows on offline
+  (which now simply appear in the per-screen "logged on this screen" list). The guarded RPCs +
+  Awaiting-approval section still exist on the head console but are no longer the primary flow. If
+  the owner wants the auto-open kept and the approval dropped entirely, that's a small follow-up.
+- The §242 Station board + §240/§241 head console/admin cockpit are untouched (real network data,
+  reachable from the nav).
+
+### Owner run-list
+1. Run `supabase_ops_p3_issue_types.sql` in Studio (VERIFY: active_count = 10). Without it the
+   dropdown shows the old generic list.
+2. Frontend auto-deploys — open `/ops-log`, pick a city → contacts + screens → log an issue. The
+   exec lands here on login. Assign depot→tech (head console) so contacts populate per station.
+
+### Foot-gun (the big one)
+- ❌ Running a TEXT design process for a UI-oriented owner who evaluates by seeing → an approved
+  spec that misses on every axis once it's real. SHOW a clickable mockup first (show_widget /
+  visual companion); "1st plan only" from him means "show me the screen," not "write me a doc."
