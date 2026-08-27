@@ -16529,3 +16529,58 @@ Idempotent + re-runnable (dedup on issue_en). **Until p3 runs, the dropdown show
 - ❌ Running a TEXT design process for a UI-oriented owner who evaluates by seeing → an approved
   spec that misses on every axis once it's real. SHOW a clickable mockup first (show_widget /
   visual companion); "1st plan only" from him means "show me the screen," not "write me a doc."
+
+
+---
+
+## 245 · Operations "Down now" board + sales-dashboard leak CLOSED (2026-08-27, `089dbf4`)
+
+Owner (frustrated after 5 screenshots): the ops module has too many overlapping surfaces + "when
+I log in OPE its showing this" (a screenshot of the SALES dashboard). Two fixes, one commit.
+
+### THE LEAK (real code bug) — an ops user at /dashboard saw the SALES dashboard
+`DashboardV2` (the /dashboard role switcher) sends any non-privileged/non-agency user to the
+SALES desktop/mobile dashboard. An ops role reaching /dashboard (stale deep-link, back button,
+a bookmarked URL) therefore rendered the rep sales dashboard. Fix (`DashboardV2.jsx`, additive,
+AFTER the loading guard, BEFORE isPrivileged): `operation_head → <Navigate to="/ops-down">`,
+`operation_executive → <Navigate to="/ops-log">`. Admin/co_owner (isPrivileged) / agency / sales
+/ telecaller routing byte-unchanged (isPrivileged + isAgency never match ops roles). Guardian PASS.
+- ⚠ The OTHER half of the owner's "OPE sees sales dashboard" report was NOT a code bug — proven
+  via claude-in-chrome logged-in-as-testope: /ops-log + / both rendered the correct ops screen →
+  it was the phone's STALE CACHED BUNDLE (PWA/SW serving old JS). Owner reinstalls the test-phone
+  app to clear it. (§240-style: when a flag+code+RPC are all correct but a rep "still sees the old
+  thing", suspect the stale bundle before writing more code.)
+
+### THE "Down now" board (`OpsDownV2.jsx`, /ops-down) — the consolidation surface
+The live "what is offline RIGHT NOW" view, to replace the cramped Operations queue as the ops
+front door. Reads `ops_screens` (offline grouped by depot) + `ops_depots` (+ tech via
+`users!ops_depots_assigned_to_fkey`) + `ops_tickets` open (reason/who's-on-it via the
+assigned_to + issue_type embeds) + `ops_depot_contacts`. Renders: network uptime % (online/
+(online+offline)) + total screens-down; then station cards sorted by down-count (name·reason,
+N/total down, progress bar, tech-on-it) → expand → the down screens + who-to-call (tap-to-dial)
++ a "Log what's wrong" button → `/ops-log?depot=<id>`. Gujarati-first (`opsStrings`, §231),
+visibility/focus auto-refresh (ops tables aren't in the realtime publication). NOT §28-frozen.
+
+### Wiring (frozen touches §28, additive, guardian PASS)
+- `V2AppShell`: "Down now" (Activity icon) added to OPS_HEAD_NAV + OPS_EXEC_NAV. **P0 the guardian
+  caught: `Activity` was NOT imported** — the nav arrays are top-level consts, so a bare `Activity`
+  reference would `ReferenceError` at module load = white-screen for EVERY role (the build does NOT
+  catch an undefined identifier). Added `Activity` to the lucide import. FOOT-GUN: a top-level nav
+  const referencing an un-imported icon white-screens the whole app; `npm run build` passes anyway
+  (esbuild doesn't flag undefined globals) — the guardian's full-file grep is what caught it.
+- `App.jsx`: `/ops-down` route (RequireOps) + RootRedirect `operation_head → /ops-down` (was
+  /ops-dashboard). `operation_executive` still → /ops-log (§244).
+- `OpsLogV2`: `?depot=` preselect (useSearchParams) so the Down-now "Log what's wrong" button
+  lands on the right station.
+
+### The ops surface map now (owner-facing)
+- operation_head lands on **/ops-down** (Down now = front door) · Live console (/ops-dashboard) ·
+  Station board (/ops-station) · Log issue (/ops-log) all in OPS_HEAD_NAV.
+- operation_executive lands on **/ops-log** (their job = log faults) · Down now · Operations (/ops
+  check-in) in OPS_EXEC_NAV.
+- admin owner cockpit = /ops-admin (§240). The §243 auto-ticket lifecycle still runs underneath
+  (auto-opens rows on offline) — those now simply surface in Down now + the per-screen history.
+
+### Owner action
+Auto-deploys (`089dbf4`). React to the live /ops-down screen. **Reinstall the test-phone app**
+(clear the stale cache) so testope lands on /ops-log, not the old /dashboard. No SQL, no APK.
