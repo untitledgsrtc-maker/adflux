@@ -265,9 +265,9 @@ const OPS_HEAD_NAV = [
   { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
 ]
 const OPS_EXEC_NAV = [
+  { to: '/ops-tickets',       label: 'Tickets',        icon: LayoutDashboard },
   { to: '/ops-log',           label: 'Log issue',      icon: FileText },
-  { to: '/ops-down',          label: 'Down now',       icon: Activity },
-  { to: '/ops',               label: 'Operations',     icon: Tv },
+  { to: '/ops',               label: 'Check in',       icon: Tv },
 ]
 
 const MOBILE_NAV_ADMIN = [
