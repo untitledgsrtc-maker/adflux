@@ -16749,3 +16749,15 @@ approved): the `lead-*` classes in `src/styles/leads.css` + GLOBAL tokens.
 - Zero logic change this rebuild — load/handlers/data (§246/§247) byte-identical;
   only the render/styling moved to the design system. Not §28-frozen, no guardian,
   no SQL/APK. Deploys on push.
+
+
+### §248 addendum — exec ops_tickets INSERT needs `created_by=auth.uid()` (RLS foot-gun)
+The p0 `ops_tickets_exec_insert` policy is `WITH CHECK (role='operation_executive'
+AND created_by = auth.uid())` — NOT assigned_to. An exec insert that sets only
+`assigned_to` → **"new row violates row-level security policy for table
+ops_tickets"** (owner hit it on Submit). BOTH OpsTicketsV2 + OpsLogV2 fixed to set
+`created_by: uid` (INSERT gate) AND `assigned_to: uid` (the exec read/update gate is
+`assigned_to=auth.uid()`, so without it the tech can't see/close their own ticket).
+- ❌ FOOT-GUN: any exec-facing insert into `ops_tickets` MUST set `created_by =
+  the tech` (INSERT policy) AND `assigned_to = the tech` (SELECT/UPDATE policy).
+  Admin/head go through `ops_tickets_manage` FOR ALL and don't need either.
