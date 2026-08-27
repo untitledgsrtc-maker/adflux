@@ -88,7 +88,7 @@ export default function OpsTicketsV2() {
 
       const [scr, it, ct, pRes, fRes] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status, depot_id, last_response_at').in('depot_id', depotIds).eq('is_active', true).eq('status', nowOn ? 'offline' : 'online'),
-        supabase.from('ops_issue_types').select('id, issue_en, issue_gu, display_order').eq('is_active', true).order('display_order'),
+        supabase.from('ops_issue_types').select('id, issue_en, issue_gu, solution_en, solution_gu, display_order').eq('is_active', true).order('display_order'),
         supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone, display_order').in('depot_id', depotIds).order('display_order'),
         supabase.from('ops_tickets')
           .select('id, screen_id, depot_id, cause, notes, created_at, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu), screen:ops_screens!ops_tickets_screen_id_fkey(name), depot:ops_depots!ops_tickets_depot_id_fkey(name)')
@@ -450,6 +450,17 @@ export default function OpsTicketsV2() {
             <option value="other">{t('other_issue', lang)}</option>
           </select>
           {issueId === 'other' && <input value={otherText} onChange={e => setOtherText(e.target.value)} placeholder={t('cause_ph', lang)} style={{ ...fieldSel, marginTop: 8 }} />}
+          {/* inline Gujarati fix steps for the picked issue */}
+          {(() => {
+            const sel = issueId && issueId !== 'other' ? issueTypes.find(x => x.id === issueId) : null
+            const sol = sel && nm(sel, 'solution')
+            return sol ? (
+              <div style={{ marginTop: 10, background: 'var(--success-soft)', border: '1px solid var(--success)', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--success)', marginBottom: 4 }}>{t('fix_steps', lang)}</div>
+                <div style={{ fontSize: 13.5, color: 'var(--text)', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{sol}</div>
+              </div>
+            ) : null
+          })()}
           <div style={{ ...secLbl, marginTop: 14 }}>{t('notes', lang)}</div>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder={t('notes_ph', lang)} style={{ ...fieldSel, marginTop: 6, resize: 'none' }} />
           <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={e => setPhotoFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />

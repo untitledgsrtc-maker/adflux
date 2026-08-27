@@ -16,13 +16,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, MapPin, ChevronRight, FilePlus, Activity, AlertCircle, Monitor, Wifi, WifiOff, VideoOff } from 'lucide-react'
+import { Loader2, MapPin, ChevronRight, FilePlus, Activity, AlertCircle, Monitor, Wifi, WifiOff, VideoOff, Navigation } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
 import { isOnHours, faultAgeHours, ageLabel, severityOf } from '../../utils/opsHours'
 import { istTodayISO } from '../../utils/istDate'
+import { depotMapsUrl } from '../../utils/opsMaps'
+import { openExternalUrl } from '../../utils/openExternal'
 import OpsStationsMap from '../../components/ops/OpsStationsMap'
 
 const NIL = '00000000-0000-0000-0000-000000000000'
@@ -85,13 +87,15 @@ export default function OpsHomeV2() {
         cameraOff: camKnown ? allScreens.filter(s => s.camera_active === false).length : null,
       })
 
-      const [inProc, fixedTd, fixMo, fixedWk, calls, upRows, ws] = await Promise.all([
+      const [inProc, fixedTd, fixMo, fixedWk, calls, upRows, taDay, taMo, ws] = await Promise.all([
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).eq('source', 'manual').eq('status', 'in_progress'),
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', dayStart),
         supabase.from('ops_tickets').select('created_at, resolved_at').eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', monthStart),
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', weekAgo),
         supabase.from('call_logs').select('call_at').eq('user_id', uid).gte('call_at', monthStart),
         supabase.from('ops_uptime_daily').select('uptime_pct, screens_total').eq('user_id', uid).gte('work_date', monthStart),
+        supabase.from('daily_ta').select('bike_amount').eq('user_id', uid).eq('ta_date', istTodayISO()).maybeSingle(),
+        supabase.from('daily_ta').select('bike_amount, km_traveled').eq('user_id', uid).gte('ta_date', monthStart),
         supabase.from('work_sessions').select('id').eq('user_id', uid).eq('work_date', istTodayISO()).maybeSingle(),
       ])
 
@@ -101,21 +105,26 @@ export default function OpsHomeV2() {
       const nameOf = id => myDepots.find(d => d.id === id)?.name || '—'
       const byDepot = {}; faultScreens.forEach(s => { (byDepot[s.depot_id] = byDepot[s.depot_id] || []).push(s) })
       const rows = Object.entries(byDepot).map(([did, list]) => {
+        const dd = myDepots.find(d => d.id === did)
         const oldest = nowOn ? Math.max(...list.map(s => faultAgeHours(s.last_response_at))) : 0
         const sev = nowOn ? severityOf(oldest, list.length) : (list.length >= 5 ? 2 : 1)
-        return { did, name: nameOf(did), list, oldest, sev }
+        return { did, name: nameOf(did), lat: dd?.lat, lng: dd?.lng, list, oldest, sev }
       }).sort((a, b) => b.sev - a.sev || b.oldest - a.oldest)
       setFaults(rows)
 
       const fx = fixMo.data || []
       const durs = fx.map(r => (r.resolved_at && r.created_at) ? (new Date(r.resolved_at) - new Date(r.created_at)) / 3600000 : null).filter(v => v != null && v >= 0)
       const up = (upRows.data || []).filter(r => (r.screens_total || 0) > 0)
+      const taRows = taMo.data || []
       setStats({
         inProc: inProc.count || 0, fixedToday: fixedTd.count || 0,
         fixedMo: fx.length, fixedWk: fixedWk.count || 0,
         avgFixH: durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : null,
         avgUptime: up.length ? Math.round(up.reduce((a, r) => a + Number(r.uptime_pct || 0), 0) / up.length) : null,
         callsMo: (calls.data || []).length,
+        travelToday: Math.round(Number(taDay.data?.bike_amount || 0)),
+        travelMo: Math.round(taRows.reduce((a, r) => a + Number(r.bike_amount || 0), 0)),
+        kmMo: Math.round(taRows.reduce((a, r) => a + Number(r.km_traveled || 0), 0)),
       })
       setCheckedIn(!!ws.data)
     } catch (e) { setErr(e?.message || 'load failed') }
@@ -198,6 +207,20 @@ export default function OpsHomeV2() {
         </div>
       )}
 
+      {/* ₹3/km travel earned — real banked pay the tech controls (→ My Performance) */}
+      {!noDepots && (
+        <button onClick={() => nav('/ops-performance')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'var(--success-soft)', border: '1px solid var(--success)', borderRadius: 12, padding: '13px 15px', marginBottom: 14, cursor: 'pointer', textAlign: 'left' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t('travel_earned', lang)}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 22, fontWeight: 700, color: 'var(--success)', marginTop: 3 }}>₹{(s.travelMo ?? 0).toLocaleString('en-IN')} <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>· {t('calls_month', lang)}</span></div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>₹{(s.travelToday ?? 0).toLocaleString('en-IN')}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{t('calls_today', lang)} · {s.kmMo ?? 0} km</div>
+          </div>
+        </button>
+      )}
+
       {!noDepots && (
         <>
           {/* live down strip */}
@@ -222,14 +245,22 @@ export default function OpsHomeV2() {
                   const one = r.list.length === 1
                   const typeLabel = onHours ? t('signal_lost', lang) : t('timer_fault', lang)
                   const ageStr = onHours ? ageLabel(r.oldest, lang) : t('still_on', lang)
+                  const mapUrl = depotMapsUrl(r)
                   return (
-                    <button key={r.did} onClick={() => nav('/ops-tickets')} className="lead-card" style={{ padding: '12px 13px', borderLeft: `4px solid ${SEV[r.sev]}`, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? (r.list[0].name || r.name) : r.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? '' : `${r.list.length} ${t('screens_word', lang)} · `}{typeLabel} · {ageStr}</div>
-                      </div>
-                      <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    </button>
+                    <div key={r.did} className="lead-card" style={{ padding: '10px 12px', borderLeft: `4px solid ${SEV[r.sev]}`, display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                      <button onClick={() => nav('/ops-tickets')} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', padding: '2px 0', color: 'inherit' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? (r.list[0].name || r.name) : r.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? '' : `${r.list.length} ${t('screens_word', lang)} · `}{typeLabel} · {ageStr}</div>
+                        </div>
+                        <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      </button>
+                      {mapUrl && (
+                        <button onClick={() => openExternalUrl(mapUrl)} title={t('navigate', lang)} aria-label={t('navigate', lang)} style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 10, border: '1px solid var(--blue, #3B82F6)', background: 'transparent', color: 'var(--blue, #3B82F6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                          <Navigation size={17} />
+                        </button>
+                      )}
+                    </div>
                   )
                 })}
               </div>

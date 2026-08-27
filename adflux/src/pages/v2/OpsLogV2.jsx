@@ -47,7 +47,7 @@ export default function OpsLogV2() {
     try {
       const [dRes, itRes] = await Promise.all([
         supabase.from('ops_depots').select('id, name').eq('is_active', true).order('name'),
-        supabase.from('ops_issue_types').select('id, issue_en, issue_gu, display_order').eq('is_active', true).order('display_order'),
+        supabase.from('ops_issue_types').select('id, issue_en, issue_gu, solution_en, solution_gu, display_order').eq('is_active', true).order('display_order'),
       ])
       if (dRes.error) throw dRes.error
       setDepots(dRes.data || [])
@@ -187,6 +187,18 @@ export default function OpsLogV2() {
           {issueId === 'other' && (
             <input value={otherText} onChange={e => setOtherText(e.target.value)} placeholder={t('cause_ph', lang)} style={{ ...field, marginTop: 8 }} />
           )}
+
+          {/* inline Gujarati fix steps for the picked issue (owner fills them via Station board) */}
+          {(() => {
+            const sel = issueId && issueId !== 'other' ? issueTypes.find(x => x.id === issueId) : null
+            const sol = sel && nm(sel, 'solution')
+            return sol ? (
+              <div style={{ marginTop: 10, background: 'var(--v2-green-soft, rgba(16,185,129,.12))', border: '1px solid var(--v2-green, #10B981)', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--v2-green, #10B981)', marginBottom: 4 }}>{t('fix_steps', lang)}</div>
+                <div style={{ fontSize: 13.5, color: 'var(--v2-ink-0, #f1f5f9)', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{sol}</div>
+              </div>
+            ) : null
+          })()}
 
           <label style={{ ...lbl, marginTop: 14 }}>{t('notes', lang)}</label>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder={t('notes_ph', lang)} style={{ ...field, resize: 'none' }} />

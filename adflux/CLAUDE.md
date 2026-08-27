@@ -17133,3 +17133,28 @@ where OpsUptimeCard is still mounted) — the right place for it. WHY it read so
 uptime is 0% (p4 not recording yet AND night = all screens off → 0%), so the card projected ₹0
 variable + a red "below 90%" — demotivating on the daily operational screen. The my-month mini
 keeps a neutral "avg uptime" STAT (a number, not the pay projection) — kept.
+
+### 254.4 · Field-tech roadmap + the 3 quick wins shipped (2026-08-28)
+Analyzed the LIVE `/ops-home` (via Claude-in-Chrome, logged in as the `test` exec — 264 screens, 20
+stations, real data) from a field-tech POV — a 6-persona panel (plan · travel · fix · close · motivate
+· vs field-service best-practice). Full roadmap = a private Artifact ("Field Tech Roadmap"). Headline
+insight: **almost every gap is data you already collect but never show the tech** — his GPS, his ₹3/km,
+the fault history, the Gujarati fix steps. Mostly wiring, not building. Shipped the owner-approved 3
+build-first quick wins (all additive, NOT §28-frozen, 3-lens adversarial review = all SHIP):
+1. **Navigate button** on the down surfaces — NEW `src/utils/opsMaps.js` `depotMapsUrl(depot)` (directions
+   to the depot GPS, else a name search; OpsWorkV2 keeps its own local copy, §16). Added to the OpsHome
+   worst-first fault rows (the row is now a `<div>` with two SIBLING buttons — inner → /ops-tickets, a
+   ≥44px Navigate → `openExternalUrl(depotMapsUrl(r))` — never a nested `<button>`) + the OpsDown
+   expanded view. `depots`/rows now carry lat/lng.
+2. **₹/km travel-earned card** on the home — reads `daily_ta.bike_amount` (today + this month) + km, via
+   the `ta_self_read` RLS (exec reads own). Green, pure-positive, taps → /ops-performance. Fills the gap
+   the removed pay card left with banked pay the tech controls (0 at night is legitimate, not a bug).
+3. **Inline Gujarati fix steps** — OpsLogV2 + OpsTicketsV2 issue selects now also fetch
+   `ops_issue_types.solution_en/solution_gu`; picking an issue renders its solution in a green box
+   (`whiteSpace:pre-line`, guarded to non-empty). The columns EXIST (p0/p3, seeded NULL) → the head
+   FILLS the steps per issue via the Station board editor; empty → the box hides.
+- Deploy-safe: solution columns exist (no 400); daily_ta self-read is role-agnostic; depotMapsUrl null-safe.
+- NEXT (roadmap, not built): "Plan my morning" (urgency × distance ordering), per-station trip briefing,
+  on-site fix card (auto-diagnosed cause), "can't fix → escalate" outcome, after-photo at close, and THE
+  big rock = **offline-first capture** (his job is where signal is worst — every save silently fails today).
+  Plus a MONEY fix: uptime counted only 7 AM–9 PM (§254.1 note) — shadow-compare before it feeds pay.

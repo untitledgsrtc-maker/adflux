@@ -209,6 +209,10 @@ export const STR = {
   no_stats:        { gu: 'હજી પૂરતી માહિતી નથી',        en: 'Not enough data yet' },
   hrs:             { gu: 'ક',                          en: 'h' },
 
+  // — field-tech quick wins (2026-08-28) —
+  travel_earned:   { gu: 'ટ્રાવેલ કમાણી',               en: 'Travel earned' },
+  fix_steps:       { gu: 'કેવી રીતે ઠીક કરવું',          en: 'How to fix' },
+
   // — network snapshot (home) —
   my_network:      { gu: 'તમારું નેટવર્ક',              en: 'Your network' },
   camera_off:      { gu: 'કૅમેરા બંધ',                  en: 'Camera off' },

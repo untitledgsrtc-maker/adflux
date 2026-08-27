@@ -6,10 +6,12 @@
 // Gujarati-first (§231). App v2 tokens.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Activity, RefreshCw, Phone, Loader2, CheckCircle2, FilePlus, ChevronDown } from 'lucide-react'
+import { Activity, RefreshCw, Phone, Loader2, CheckCircle2, FilePlus, ChevronDown, Navigation } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { t, getOpsLang, setOpsLang, numL } from '../../utils/opsStrings'
 import { toastSuccess } from '../../components/v2/Toast'
+import { depotMapsUrl } from '../../utils/opsMaps'
+import { openExternalUrl } from '../../utils/openExternal'
 
 const card = { background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)', borderRadius: 14, padding: 14 }
 
@@ -31,7 +33,7 @@ export default function OpsDownV2() {
     try {
       const [sRes, dRes, tRes, cRes] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status, depot_id').eq('is_active', true),
-        supabase.from('ops_depots').select('id, name, assigned_to, tech:users!ops_depots_assigned_to_fkey(id,name)').eq('is_active', true).order('name'),
+        supabase.from('ops_depots').select('id, name, lat, lng, assigned_to, tech:users!ops_depots_assigned_to_fkey(id,name)').eq('is_active', true).order('name'),
         supabase.from('ops_tickets').select('id, depot_id, cause, opened_at, assigned_to, tech:users!ops_tickets_assigned_to_fkey(name), issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en,issue_gu)').in('status', ['open', 'in_progress']).order('opened_at', { ascending: true }),
         supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone, display_order').order('display_order'),
       ])
@@ -58,8 +60,8 @@ export default function OpsDownV2() {
       const d = (byDepot[s.depot_id] ||= { total: 0, down: [] })
       d.total++; if (s.status === 'offline') d.down.push(s)
     })
-    const depotName = {}, depotTech = {}
-    depots.forEach(d => { depotName[d.id] = d.name; depotTech[d.id] = d.tech?.name || null })
+    const depotName = {}, depotTech = {}, depotLL = {}
+    depots.forEach(d => { depotName[d.id] = d.name; depotTech[d.id] = d.tech?.name || null; depotLL[d.id] = { lat: d.lat, lng: d.lng } })
     // latest open ticket per depot → reason + who's on it (tickets are asc, so last wins)
     const tkByDepot = {}; tickets.forEach(tk => { tkByDepot[tk.depot_id] = tk })
     const rows = Object.entries(byDepot)
@@ -68,7 +70,7 @@ export default function OpsDownV2() {
         const tk = tkByDepot[depotId]
         const reason = tk ? (tk.issue ? nm(tk.issue, 'issue') : tk.cause) : null
         const tech = (tk && tk.tech?.name) || depotTech[depotId] || null
-        return { depotId, name: depotName[depotId] || '—', down: v.down.length, total: v.total, screens: v.down, reason, tech, since: tk?.opened_at || null }
+        return { depotId, name: depotName[depotId] || '—', lat: depotLL[depotId]?.lat, lng: depotLL[depotId]?.lng, down: v.down.length, total: v.total, screens: v.down, reason, tech, since: tk?.opened_at || null }
       })
       .sort((a, b) => b.down - a.down)
     const uptime = (online + offline) > 0 ? Math.round(online / (online + offline) * 100) : 100
@@ -159,7 +161,12 @@ export default function OpsDownV2() {
                       </div>
                     ))}
                 </div>
-                <button onClick={() => nav(`/ops-log?depot=${r.depotId}`)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 11, borderRadius: 10, border: '1px solid var(--v2-line, #334155)', background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-0, #f1f5f9)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                {depotMapsUrl(r) && (
+                  <button onClick={() => openExternalUrl(depotMapsUrl(r))} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 13, borderRadius: 10, border: '1px solid var(--v2-blue, #3B82F6)', background: 'transparent', color: 'var(--v2-blue, #3B82F6)', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 8 }}>
+                    <Navigation size={16} />{t('navigate', lang)}
+                  </button>
+                )}
+                <button onClick={() => nav(`/ops-log?depot=${r.depotId}`)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 13, borderRadius: 10, border: '1px solid var(--v2-line, #334155)', background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-0, #f1f5f9)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                   <FilePlus size={16} />{t('log_whats_wrong', lang)}
                 </button>
               </div>
