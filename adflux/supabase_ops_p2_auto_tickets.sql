@@ -66,6 +66,9 @@ BEGIN
            CASE WHEN v_down >= 5 THEN 'high' ELSE 'normal' END, now())
         RETURNING id INTO v_ticket;
         v_opened := v_opened + 1;
+        BEGIN
+          PERFORM public.ops_ticket_wa_dispatch(v_ticket);
+        EXCEPTION WHEN OTHERS THEN NULL; END;
 
         -- native push to the assigned tech (best-effort; enqueue_push is §96)
         IF d.assigned_to IS NOT NULL THEN
@@ -195,3 +198,38 @@ NOTIFY pgrst, 'reload schema';
 --      ('ops_reconcile_offline_tickets','ops_ticket_start','ops_ticket_resolve','ops_ticket_approve','ops_ticket_reject')) AS five_fns,
 --   (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='ops_tickets_status_check') AS status_check,
 --   (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='ops_tickets_source_check') AS source_check;
+
+-- ==== SECTION 4 · WhatsApp dispatch (fast-follow; inert until api/ops/ticket-wa live) ====
+-- Fires a WhatsApp ticket-alert to the assigned tech via pg_net -> api/ops/ticket-wa.
+-- The secret is PULLED from the live ops_aiadflux_sync_dispatch (§197 trick) so no
+-- literal secret sits in this file. Best-effort; a failure never affects ticket creation.
+CREATE OR REPLACE FUNCTION public.ops_ticket_wa_dispatch(p_ticket uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp, extensions AS $$
+DECLARE
+  v_phone text; v_depot text; v_count int; v_secret text; v_url text;
+BEGIN
+  SELECT u.whatsapp_number, d.name, t.down_count
+    INTO v_phone, v_depot, v_count
+    FROM public.ops_tickets t
+    JOIN public.ops_depots  d ON d.id = t.depot_id
+    LEFT JOIN public.users  u ON u.id = t.assigned_to
+   WHERE t.id = p_ticket;
+  IF v_phone IS NULL OR length(regexp_replace(v_phone, '\D', '', 'g')) < 10 THEN RETURN; END IF;
+
+  -- pull the ops secret + build the endpoint url from the live sync-dispatch fn
+  v_secret := substring(pg_get_functiondef('public.ops_aiadflux_sync_dispatch()'::regprocedure)
+                        FROM 'x-ops-secret''\s*,\s*''([^'']+)''');
+  v_url    := substring(pg_get_functiondef('public.ops_aiadflux_sync_dispatch()'::regprocedure)
+                        FROM 'https://[^'']+/api/ops/sync');
+  IF v_secret IS NULL OR v_url IS NULL THEN RETURN; END IF;
+  v_url := replace(v_url, '/api/ops/sync', '/api/ops/ticket-wa');
+
+  PERFORM net.http_post(
+    url := v_url,
+    headers := jsonb_build_object('Content-Type','application/json','x-ops-secret', v_secret),
+    body := jsonb_build_object('phone', v_phone, 'depot', v_depot, 'count', COALESCE(v_count,0)));
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+REVOKE ALL ON FUNCTION public.ops_ticket_wa_dispatch(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ops_ticket_wa_dispatch(uuid) TO service_role;
