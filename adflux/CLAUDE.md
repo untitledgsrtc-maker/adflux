@@ -16916,3 +16916,28 @@ reads `ops_my_uptime_pay` (§233, self-scoped) for uptime + salary; base = ×0.7
   byte-unchanged; `/calls` + `/my-offer` routes reused as-is (no route change).
 - ❌ Do NOT reuse the sales `MyPerformanceV2` for ops — it mounts the revenue / incentive-
   slab / campaign / presentation cards a tech has no data for. Compose the ops-right set.
+
+### 251.2 — ONE operations home (owner: "wire one professional dashboard")
+Owner rejected the 6-item ops-exec scatter (Tickets · Log issue · Check in + the trio).
+Built `src/pages/v2/OpsHomeV2.jsx` at `/ops-home` — a single professional field-tech home
+that pulls the operational surfaces into one screen (mockup-approved §244):
+- **check-in nudge** (a banner → `/ops` when `work_sessions` has no row for today IST),
+- **pay + uptime hero** (uptime ring + this-month base+variable from `ops_my_uptime_pay` +
+  `estVariable`),
+- **live down strip** ("N of your screens down · M stations" → `/ops-down`; time-aware via
+  `isOnHours`),
+- **worst-first fault list** (the F4 triage, top 4 + "See all N" → `/ops-tickets`),
+- **Log a fault** → `/ops-log`, **In process / Fixed today** pills → `/ops-tickets`,
+- **My month** mini (fixed / avg-to-fix / calls) → `/ops-performance`.
+Read-only (navigates to the deep-link routes; no writes). Gujarati-first, lead-* tokens,
+`useAutoRefresh({ userId })` (§318). Optional city filter shown only when the exec owns >1
+depot.
+
+**Nav collapsed** (V2AppShell §28, guardian): `OPS_EXEC_NAV` = **Home · My Performance ·
+My Calls · My Offer** (was Tickets/Log/Check-in + trio). The dropped operational routes
+(`/ops-tickets`, `/ops-log`, `/ops`, `/ops-down`) STAY as routes (deep-links reached from
+the home) — nothing removed, just folded. RootRedirect `operation_executive` → `/ops-home`
+(was `/ops-tickets`). `OPS_HEAD_NAV` UNCHANGED (the head keeps the cockpit; an equivalent
+head home is a later ask). SALES/TELECALLER/AGENCY navs + routes untouched.
+- ❌ FOOT-GUN: an un-imported nav icon in a top-level const white-screens every role at
+  load (§245) — Home reuses `LayoutDashboard` (already imported), not a new icon.

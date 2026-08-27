@@ -82,6 +82,7 @@ const OpsDownV2 = lazyWithRetry(() => import('./pages/v2/OpsDownV2'))
 // Ops redesign (2026-08-27) — exec ticket dashboard (Open/In process/Fixed).
 const OpsTicketsV2 = lazyWithRetry(() => import('./pages/v2/OpsTicketsV2'))
 const OpsMyPerformanceV2 = lazyWithRetry(() => import('./pages/v2/OpsMyPerformanceV2'))
+const OpsHomeV2 = lazyWithRetry(() => import('./pages/v2/OpsHomeV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
 const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
 const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
@@ -315,7 +316,7 @@ function RootRedirect() {
   // gates on isOps before the sales branches). operation_executive → the primary
   // Log-a-screen-issue screen (/ops-log); operation_head → the desk console.
   if (role === 'operation_head')       return <Navigate to="/ops-down" replace />
-  if (role === 'operation_executive')  return <Navigate to="/ops-tickets" replace />
+  if (role === 'operation_executive')  return <Navigate to="/ops-home" replace />
   // Phase 61 (19 May 2026) — sales_manager (Jubin + Renuka) lands
   // on /manager (their team-lead dashboard). Branch BEFORE the base
   // role checks so a sales-flavored manager doesn't fall through
@@ -452,6 +453,7 @@ export default function App() {
           <Route path="/ops-station"               element={<RequireOps><OpsStationV2 /></RequireOps>} />
           <Route path="/ops-tickets"               element={<RequireOps><OpsTicketsV2 /></RequireOps>} />
           <Route path="/ops-performance"           element={<RequireOps><OpsMyPerformanceV2 /></RequireOps>} />
+          <Route path="/ops-home"                  element={<RequireOps><OpsHomeV2 /></RequireOps>} />
           <Route path="/ops-admin"                 element={<RequirePrivileged><OpsAdminV2 /></RequirePrivileged>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
               direct reports + today's metrics. Sales head + TC head

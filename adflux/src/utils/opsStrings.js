@@ -178,6 +178,18 @@ export const STR = {
   timer_faults_w:  { gu: 'ટાઈમર ખરાબી',                 en: 'timer faults' },
   worst_first:     { gu: 'સૌથી ખરાબ પહેલા',             en: 'worst first' },
 
+  // — ops home (one dashboard) —
+  home_kicker:     { gu: 'ઓપરેશન · ફિલ્ડ',              en: 'Operations · field' },
+  pay_month:       { gu: 'તમારો પગાર · આ મહિને',         en: 'Your pay · this month' },
+  needs_you:       { gu: 'તમારે જોવાનું · સૌથી ખરાબ પહેલા', en: 'Needs you · worst first' },
+  see_all:         { gu: 'બધું જુઓ',                   en: 'See all' },
+  live_board:      { gu: 'લાઇવ બોર્ડ',                  en: 'Live board' },
+  fixed_today_w:   { gu: 'આજે સુધાર્યા',                en: 'Fixed today' },
+  my_month:        { gu: 'આ મહિનો',                    en: 'My month' },
+  my_perf:         { gu: 'મારું પરફોર્મન્સ',            en: 'My performance' },
+  start_day_ban:   { gu: 'ચેક-ઇન બાકી — દિવસ શરૂ કરો',   en: 'Not checked in — start your day' },
+  all_up_short:    { gu: 'બધી સ્ક્રીન ચાલુ',            en: 'All your screens are up' },
+
   // — Me tab (self-scoped) —
   tab_mystats:     { gu: 'મારું',                      en: 'Me' },
   my_salary_mo:    { gu: 'મારો પગાર · આ મહિને',         en: 'My salary · this month' },

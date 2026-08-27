@@ -268,11 +268,11 @@ const OPS_HEAD_NAV = [
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
+// Phase 251.2 — ONE operations home (owner: "wire one professional dashboard").
+// The home (/ops-home) folds Tickets / Down-now / Log-issue / Check-in; those
+// routes stay as deep-links reached from the home's strip + list + buttons.
 const OPS_EXEC_NAV = [
-  { to: '/ops-tickets',       label: 'Tickets',        icon: LayoutDashboard },
-  { to: '/ops-log',           label: 'Log issue',      icon: FileText },
-  { to: '/ops',               label: 'Check in',       icon: Tv },
-  // Phase 251 — personal section (same trio the sales rep gets).
+  { to: '/ops-home',          label: 'Home',           icon: LayoutDashboard },
   { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
