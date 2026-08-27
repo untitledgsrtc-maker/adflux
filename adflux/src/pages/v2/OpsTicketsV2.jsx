@@ -16,18 +16,10 @@ import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { istTodayISO } from '../../utils/istDate'
 import { isOnHours, istClock, faultAgeHours, ageLabel, severityOf } from '../../utils/opsHours'
+import { estVariable } from '../../utils/opsPay'
 
 // Map an ops outcome label -> the sales call_logs.outcome enum (never widen the enum).
 const OUTCOME_DB = { reached: 'connected', will_come: 'connected', fixed_call: 'connected', no_answer: 'no_answer' }
-
-// Indicative variable pay from uptime — mirrors the §233 OpsAdmin curve + the
-// §230/§184 70/30 model (display-only). 90->97 SLA transform, then >75 full / <50 zero.
-function estVariable(salary, uptimePct) {
-  if (!salary || uptimePct == null) return 0
-  const sla = Math.max(0, Math.min(100, (uptimePct - 90) / 7 * 100))
-  const factor = sla > 75 ? 1 : sla < 50 ? 0 : sla / 100
-  return Math.round(salary * 0.30 * factor)
-}
 
 // design-system tokens (global, matches OpsAdminV2 / leads.css)
 const secLbl = { fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }

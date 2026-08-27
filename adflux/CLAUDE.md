@@ -16862,3 +16862,52 @@ onHours)`, `faultAgeHours(last_response_at)` (null→9999), `ageLabel(h,lang)`,
   → a perfect screen correctly off 9 PM–7 AM reads ~58%. Uptime must count only 7 AM–9 PM, or
   the pay curve is wrong. NOT yet done — flag before ops uptime pay (p4) goes live.
 - Severity uses screen-COUNT as the station-size proxy (no per-station traffic/revenue data).
+
+
+---
+
+## 251 · Ops personal trio — My Performance / My Calls / My Offer (reuse the sales format) (2026-08-27)
+
+Owner: give the operation roles the SAME professional "My Performance / My Calls /
+My Offer" a sales rep gets, using the EXISTING format ("no need to recreate"). Approved
+via a clickable mockup (§244 — show, don't spec). Additive, §45-safe. Build PASS +
+guardian + correctness review. Self-pushed.
+
+### What's reuse vs new
+- **My Calls** — REUSE `/calls` (`CallLogsV2`) unchanged. Own-view gate
+  (`canViewTarget = isOwnView || isPrivileged`) always passes → an ops exec sees their
+  own depot calls (we already log them with `ops_ticket_id`, §246). Zero code change.
+- **My Offer** — REUSE `/my-offer` (`MyOfferV2`) unchanged. Role-agnostic (offer letter +
+  salary + Expenses & Leave); the TA panel fits the exec's ₹3/km travel (§230). No ops
+  bounce (agency/TC branches only; ops falls through to a safe render / empty state).
+- **My Performance** — NEW `src/pages/v2/OpsMyPerformanceV2.jsx` at NEW route
+  `/ops-performance`. **NOT** the §28-frozen sales `MyPerformanceV2` (it mounts revenue /
+  campaign / presentation cards meaningless to a tech). Composes: NEW `OpsUptimeCard`
+  (a faithful clone of `PerformanceScoreCard`'s format — lead-card + score ring +
+  Base/Variable/Projected grid + milestone box + status banner — driven by UPTIME) +
+  ops KPI tiles (fixed / avg-to-fix / calls / stations) + REUSED `SalarySlipsCard` (§79).
+
+### The uptime pay curve — ONE source (§71)
+`src/utils/opsPay.js` holds `estVariable(salary, uptimePct)` (extracted VERBATIM from the
+OpsTicketsV2 "Me" tab §233/§247 — both now import it; the local copy was deleted) +
+`uptimeTone` + `UPTIME_FLOOR/TARGET/MAX` (90/95/97, the owner's plain framing). The card
+reads `ops_my_uptime_pay` (§233, self-scoped) for uptime + salary; base = ×0.70, variable
+= estVariable, projected = base + variable. Milestones 90 floor / 95 target / 97 max.
+
+### FROZEN CONTRACTS / foot-guns
+- **INDICATIVE, display-only.** OpsUptimeCard writes NOTHING and does NOT touch
+  compute_monthly_salary / monthly_score / the p4 uptime trigger. The EXACT pay curve is
+  still owner-pending (§240 — align §230 + p4 + estVariable before ops pay p4 goes live).
+- **Real numbers need uptime-pay p4 (§234).** `ops_my_uptime_pay` returns
+  `has_data=false` until the screens report uptime → the card shows a "no data yet" empty
+  state (like a sales rep before their first meeting). My Offer + My Calls work now.
+- **Operation head — flat salary DEFAULT.** The exec's variable = their own screens'
+  uptime; the head runs the network, isn't attributed screens → head's My Performance =
+  network uptime + team fixes + flat salary, NO personal variable, captioned "team-uptime
+  pay model pending." Owner can flip the head to team-average-uptime pay later — NOT baked.
+- **Frozen touches (§28, additive, guardian):** App.jsx (lazy `OpsMyPerformanceV2` +
+  `/ops-performance` route under RequireOps) + V2AppShell (the trio appended to
+  OPS_EXEC_NAV + OPS_HEAD_NAV). SALES/TELECALLER/AGENCY navs + the GPS skip list
+  byte-unchanged; `/calls` + `/my-offer` routes reused as-is (no route change).
+- ❌ Do NOT reuse the sales `MyPerformanceV2` for ops — it mounts the revenue / incentive-
+  slab / campaign / presentation cards a tech has no data for. Compose the ops-right set.

@@ -263,11 +263,19 @@ const OPS_HEAD_NAV = [
   { to: '/ops-log',           label: 'Log issue',      icon: FileText },
   { to: '/ops-dashboard',     label: 'Live console',   icon: Tv },
   { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
+  // Phase 251 — personal section (same trio the sales rep gets).
+  { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
+  { to: '/calls',             label: 'My Calls',       icon: Phone },
+  { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
 const OPS_EXEC_NAV = [
   { to: '/ops-tickets',       label: 'Tickets',        icon: LayoutDashboard },
   { to: '/ops-log',           label: 'Log issue',      icon: FileText },
   { to: '/ops',               label: 'Check in',       icon: Tv },
+  // Phase 251 — personal section (same trio the sales rep gets).
+  { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
+  { to: '/calls',             label: 'My Calls',       icon: Phone },
+  { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
 
 const MOBILE_NAV_ADMIN = [
