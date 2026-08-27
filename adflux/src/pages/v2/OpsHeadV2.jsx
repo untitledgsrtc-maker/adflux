@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { istTodayISO } from '../../utils/istDate'
+import { isOnHours } from '../../utils/opsHours'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import LiveFieldMap from '../../components/ops/LiveFieldMap'
 
@@ -144,6 +145,9 @@ export default function OpsHeadV2() {
     return h
   }, [screens])
 
+  // network-wide cameras reporting Inactive (camera_active === false)
+  const camOff = useMemo(() => Object.values(camByScreen).filter(v => v === false).length, [camByScreen])
+
   const screensByDepot = useMemo(() => {
     const m = {}
     screens.forEach(s => { const d = (m[s.depot_id] ||= { online: 0, offline: 0, total: 0 }); d[s.status] = (d[s.status] || 0) + 1; d.total += 1 })
@@ -241,6 +245,7 @@ export default function OpsHeadV2() {
   }
 
   const niceTime = new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false })
+  const onHours = isOnHours()   // 7 AM–9 PM operating window (§250) — off-hours, offline is expected (timer off)
 
   if (loading) {
     return <div className="lead-root" style={{ textAlign: 'center', paddingTop: 60 }}><Loader2 size={30} strokeWidth={1.6} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} /></div>
@@ -275,7 +280,8 @@ export default function OpsHeadV2() {
         </div>
         <div className="lead-hero-stats">
           <HeroStat label="Screens online"  value={health.online}  delta={`of ${health.total}`}       up={health.online > 0} />
-          <HeroStat label="Screens offline" value={health.offline} delta={health.offline ? 'down now' : 'all up'} down={health.offline > 0} />
+          <HeroStat label="Screens offline" value={health.offline} delta={!onHours ? 'off for night' : health.offline ? 'down now' : 'all up'} down={onHours && health.offline > 0} />
+          <HeroStat label="Cameras off"     value={camOff}         delta={camOff ? 'not reporting' : 'all reporting'} down={camOff > 0} />
           <HeroStat label="Open tickets"    value={tickets.length} delta="fault + photo"              down={tickets.length > 0} />
           <HeroStat label="Techs on duty"   value={`${liveCount} / ${techs.length}`} delta={`${techs.length - liveCount} off`} down={liveCount < techs.length} />
         </div>
@@ -387,7 +393,7 @@ export default function OpsHeadV2() {
       {/* Screen-wise status — each screen's display + camera badge */}
       <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
         <div className="lead-card-head" style={{ padding: '12px 16px', flexWrap: 'wrap', gap: 10 }}>
-          <div><div className="lead-card-title">Screens</div><div className="lead-card-sub">Every screen — display + camera status. {screenRows.length} shown.</div></div>
+          <div><div className="lead-card-title">Screens</div><div className="lead-card-sub">Every screen — display + camera status. {screenRows.length} shown{camOff ? ` · ${camOff} camera${camOff === 1 ? '' : 's'} off` : ''}.</div></div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap' }}>
             <select value={scrStation} onChange={e => setScrStation(e.target.value)} style={selBox}>
               <option value="all">All stations</option>

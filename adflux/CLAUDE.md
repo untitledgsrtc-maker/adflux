@@ -17105,3 +17105,20 @@ yet, §253).
 - FOOT-GUN: any auto-ticket / alert engine that reacts to `ops_screens.status='offline'` MUST gate on
   `isOnHours()` (SQL: `extract(hour FROM now() AT TIME ZONE 'Asia/Kolkata')` in [7,21)), or it fires
   ~264 false tickets + alerts every night when the timers correctly turn the screens off.
+
+### 254.2 · Head console snapshot parity — camera-off count + night-aware hero (2026-08-27)
+Owner: "put the same network snapshot on the operation head's console." The head console
+(`OpsHeadV2.jsx`, `/ops-dashboard`) is DELIBERATELY matched to /team-dashboard (purple hero,
+§232 owner directive) — so I completed the head's EXISTING hero with the snapshot's missing
+dimension rather than bolting a clashing duplicate tile card under it (that would be redundant
+counts = off-brand, the exact thing the owner guards against):
+- Added a **"Cameras off"** hero stat (network-wide `camByScreen` values === false) — the head
+  already had online/offline/total + per-screen camera badges, but no camera-off COUNT.
+- **Night-aware** (§250): off-hours the "Screens offline" hero stat reads "off for night" (not red
+  "down now") — same all-265-offline-at-midnight is expected (timers off), not an alarm.
+- Screens board sub now shows "· N cameras off" (the board's Show-down-only filter already catches
+  `cam===false`).
+- Display-only, ops page (not §28-frozen). Camera count is resilient (the `camByScreen` load
+  already tolerates the camera_active column not existing).
+- NOTE: the head's snapshot is NETWORK-WIDE (all active screens); the exec home's snapshot is
+  scoped to `ops_depots.assigned_to=me`. Same content, different scope by role — correct.
