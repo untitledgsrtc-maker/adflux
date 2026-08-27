@@ -39,7 +39,8 @@ const j = (o, s = 200) => new Response(JSON.stringify(o), {
   status: s, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
 })
 const sbH  = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'content-type': 'application/json' }
-const cmsH = { Authorization: `Bearer ${AIADFLUX_KEY}`, 'X-API-Key': AIADFLUX_KEY, accept: 'application/json' }
+// Bearer only (the API guide's primary; some servers 500 on a dual auth header).
+const cmsH = { Authorization: `Bearer ${AIADFLUX_KEY}`, accept: 'application/json' }
 
 // tolerant CMS fetch with a 12s timeout; returns the parsed body (throws on !ok)
 async function cms(path) {
@@ -124,21 +125,30 @@ export default async function handler(req) {
   if (!OPS_SECRET || secret !== OPS_SECRET) return j({ error: 'forbidden' }, 403)
   if (!AIADFLUX_KEY) return j({ ok: true, skipped: 'not configured' })
 
-  // ── DEBUG echo: reveal the exact CMS field shape (no writes) ──
+  // ── DEBUG: probe each CMS endpoint INDEPENDENTLY (no writes) — reveals the
+  //    field shape AND which endpoints work vs error, so a broken /groups doesn't
+  //    hide a working /screens. ──
   if (url.searchParams.get('debug')) {
-    try {
-      const [g, s] = await Promise.all([cms('/groups'), cms('/screens?per_page=2')])
-      const gl = asList(g), sl = asList(s)
-      return j({
-        ok: true, debug: true, base: AIADFLUX_URL,
-        groups_count: gl.length, groups_sample: gl[0] || null,
-        screens_count: sl.length, screens_sample: sl[0] || null,
-        wrapper_keys: {
-          groups: g && typeof g === 'object' && !Array.isArray(g) ? Object.keys(g) : 'array',
-          screens: s && typeof s === 'object' && !Array.isArray(s) ? Object.keys(s) : 'array',
-        },
-      })
-    } catch (e) { return j({ ok: false, error: 'aiadflux_unreachable', detail: String(e?.message || e).slice(0, 160) }, 502) }
+    async function probe(path) {
+      try {
+        const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 12000)
+        const r = await fetch(`${AIADFLUX_URL}${path}`, { headers: cmsH, signal: ac.signal })
+        clearTimeout(to)
+        const text = await r.text()
+        let body; try { body = JSON.parse(text) } catch { body = text.slice(0, 400) }
+        const list = Array.isArray(body) ? body : asList(body)
+        return {
+          status: r.status, ok: r.ok,
+          count: list.length,
+          sample: list[0] ?? (r.ok ? body : String(typeof body === 'object' ? JSON.stringify(body) : body).slice(0, 400)),
+          wrapper_keys: body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body) : 'array',
+        }
+      } catch (e) { return { error: String(e?.message || e).slice(0, 200) } }
+    }
+    const [groups, screens, health] = await Promise.all([
+      probe('/groups'), probe('/screens?per_page=2'), probe('/health/summary'),
+    ])
+    return j({ ok: true, debug: true, base: AIADFLUX_URL, auth: 'Bearer', groups, screens, health })
   }
 
   if (req.method !== 'POST') return j({ error: 'method — POST to sync, or GET ?debug=1 to inspect' }, 405)
