@@ -277,6 +277,19 @@ const OPS_EXEC_NAV = [
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
+// Phase 251.3 — ops MOBILE bottom nav = operational only (owner: no personal
+// trio in the bottom bar). The trio lives on the desktop sidebar + the ⋯ drawer.
+const MOBILE_NAV_OPS_EXEC = [
+  { to: '/ops-home',          label: 'Home',           icon: LayoutDashboard },
+  { to: '/ops-down',          label: 'Down now',       icon: Activity },
+  { to: '/ops-log',           label: 'Log',            icon: FileText },
+]
+const MOBILE_NAV_OPS_HEAD = [
+  { to: '/ops-down',          label: 'Down now',       icon: Activity },
+  { to: '/ops-dashboard',     label: 'Console',        icon: Tv },
+  { to: '/ops-station',       label: 'Stations',       icon: LayoutDashboard },
+  { to: '/ops-log',           label: 'Log',            icon: FileText },
+]
 
 const MOBILE_NAV_ADMIN = [
   { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
@@ -584,7 +597,7 @@ export function V2AppShell() {
     isManager      ? MOBILE_NAV_MANAGER :
     isHR           ? HR_NAV :
     isAccounts     ? ACCOUNTS_NAV :
-    isOps          ? (profile?.role === 'operation_head' ? OPS_HEAD_NAV : OPS_EXEC_NAV) :
+    isOps          ? (profile?.role === 'operation_head' ? MOBILE_NAV_OPS_HEAD : MOBILE_NAV_OPS_EXEC) :
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES
@@ -879,20 +892,34 @@ export function V2AppShell() {
                   no Clients, no Score. Agency uses Home + Quotes +
                   Earnings + Offer (sidebar / bottom-nav already cover).
                   Other roles unchanged. */}
-              {!isAgency && (
+              {!isAgency && !isOps && (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/follow-ups') }}>
                   <ClockIcon size={18} /> <span>Follow-ups</span>
                 </button>
               )}
-              <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/quotes') }}>
-                <FileText size={18} /> <span>Quotes</span>
-              </button>
-              {!isAgency && (
+              {!isOps && (
+                <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/quotes') }}>
+                  <FileText size={18} /> <span>Quotes</span>
+                </button>
+              )}
+              {!isAgency && !isOps && (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/clients') }}>
                   <Users size={18} /> <span>Clients</span>
                 </button>
               )}
-              {isAgency ? (
+              {isOps ? (
+                <>
+                  <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/ops-performance') }}>
+                    <TrendingUp size={18} /> <span>My Performance</span>
+                  </button>
+                  <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/calls') }}>
+                    <Phone size={18} /> <span>My Calls</span>
+                  </button>
+                  <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-offer') }}>
+                    <FileText size={18} /> <span>My Offer</span>
+                  </button>
+                </>
+              ) : isAgency ? (
                 <>
                   <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-performance') }}>
                     <TrendingUp size={18} /> <span>My Earnings</span>

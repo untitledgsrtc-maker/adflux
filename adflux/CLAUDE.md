@@ -16941,3 +16941,20 @@ the home) — nothing removed, just folded. RootRedirect `operation_executive` �
 head home is a later ask). SALES/TELECALLER/AGENCY navs + routes untouched.
 - ❌ FOOT-GUN: an un-imported nav icon in a top-level const white-screens every role at
   load (§245) — Home reuses `LayoutDashboard` (already imported), not a new icon.
+
+### 251.3 — ops MOBILE bottom nav = operational only; trio → sidebar + ⋯ drawer
+Owner: don't want the personal trio (My Performance / My Calls / My Offer) in the mobile
+BOTTOM bar. Ops was reusing OPS_EXEC_NAV for both desktop + mobile. Split it:
+- NEW `MOBILE_NAV_OPS_EXEC` = **Home · Down now · Log** (operational). NEW
+  `MOBILE_NAV_OPS_HEAD` = Down now · Console · Stations · Log. `baseMobileNav` ops branch
+  now uses these; desktop `baseNav` keeps OPS_EXEC_NAV/OPS_HEAD_NAV (Home + trio).
+- The ⋯ avatar drawer was sales-only (Follow-ups/Quotes/Clients/Score — wrong routes for
+  ops). Gated those `&& !isOps`; added an `isOps` branch = the trio (My Performance /
+  My Calls / My Offer) so it's reachable on mobile. NON-ops drawer + mobile nav are
+  byte-identical (isOps=false → the guards collapse to the old conditions).
+- **Check-in KEPT** (soft nudge on the home): it feeds the head's "techs on duty" roster.
+  It does NOT drive ops pay or TA — background GPS starts on login, ₹3/km fires from pings,
+  pay from screen uptime — so a tech never needs to tap it for money. Auto-check-in-on-login
+  is a possible later swap (zero friction, still fills the roster).
+- **Log KEPT** as the home's "Log a fault" button → `/ops-log` (log a problem on ANY screen,
+  incl. one that's still online — the down-list can't). Folded into the home, not a tab.
