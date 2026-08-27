@@ -16584,3 +16584,87 @@ visibility/focus auto-refresh (ops tables aren't in the realtime publication). N
 ### Owner action
 Auto-deploys (`089dbf4`). React to the live /ops-down screen. **Reinstall the test-phone app**
 (clear the stale cache) so testope lands on /ops-log, not the old /dashboard. No SQL, no APK.
+
+
+---
+
+## 246 · Operation-executive ticket dashboard (`/ops-tickets`) — the exec home (2026-08-27)
+
+Owner drew it, approved a clickable mockup (visualize widget), spec → plan →
+built. The operation_executive's SINGLE home, consolidating the three cluttered
+ops-exec surfaces (§240-§245) into ONE tabbed dashboard. Spec:
+`docs/superpowers/specs/2026-08-27-ops-exec-ticket-dashboard-design.md`; plan:
+`docs/superpowers/plans/2026-08-27-ops-exec-ticket-dashboard.md`. On origin
+(`untitled-os`), self-pushed. Owner runs ONE SQL file; no APK.
+
+### The flow (NEW `src/pages/v2/OpsTicketsV2.jsx`, route `/ops-tickets`)
+Assigned-city dropdown (`ops_depots` where `assigned_to = me`) + **3 tabs Open /
+In process / Fixed**:
+- **Open** = the exec's offline screens (live CMS `ops_screens.status='offline'`
+  in my depots) MINUS screens with my in-progress manual ticket. Grouped (one
+  station card → tap a screen, or "Log the whole station") / Individual toggle.
+- Tap a screen → sheet: What was wrong (`ops_issue_types`, owner's 10 §244, +
+  Other) + notes + photo → **Submit → In process**. Creates a manual per-screen
+  `ops_tickets` row.
+- **In process** = my `source='manual' status='in_progress'` tickets. Each shows
+  the depot contact + **Call** → tel: (user gesture) + outcome sheet → one
+  `call_logs` row per call. Call history on the ticket.
+- **Mark fixed** → `status='resolved'` → **Fixed** tab (with the call history).
+
+### CONSOLIDATION (the un-cluttering)
+`/ops-tickets` is the exec's RootRedirect landing (was `/ops-log`). OPS_EXEC_NAV =
+Tickets · Log issue · Check in (`/ops`). `/ops-down` dropped from the exec nav
+(it's now the Open tab) but the route + `/ops-log` stay reachable (§45 — nothing
+removed). operation_head is UNCHANGED (`/ops-down` home + Live console + Station
+board + `/ops-admin` cockpit).
+
+### The ONE schema add — `supabase_ops_p3_ticket_calls.sql` (owner RUNS)
+`call_logs.ops_ticket_id` (nullable uuid → ops_tickets ON DELETE SET NULL + a
+partial index). "Record every call like sales" = a real `call_logs` row per call,
+ticket-linked. **Sales rows keep it NULL → zero impact on the sales call flow, the
+§92 STOP-rule, or the §170/§173 dedup.** No new RLS (the exec already inserts own
+`call_logs`, §230/§47).
+
+### FROZEN CONTRACTS / decisions (do NOT regress)
+- **Manual ticket = `source='manual'`, `status='in_progress'`, `assigned_to=me`**
+  (direct RLS insert — the OpsLogV2 pattern; the exec RLS on ops_tickets requires
+  `assigned_to = auth.uid()`, so the insert MUST set it). Picking the issue = start
+  work (no separate Start click). Auto `auto_offline` depot tickets (§243) are the
+  head's aggregate and are excluded from the exec view (`source='manual'` filter).
+- **Fixed = `status='resolved'`. NO head approval** (rejected §244). The §243
+  approval RPCs stay head-only/dormant.
+- **Mark fixed = SOFT warn, not hard block** — a client check of the screen's live
+  `ops_screens.status`; if still offline → `confirmDialog` → direct UPDATE
+  `status='resolved'`. Deliberately NOT the §243 `ops_ticket_resolve` RPC (which
+  hard-blocks) — a tech's physical fix can beat the 10-min CMS re-sync.
+- **NEVER widen the sales `call_logs.outcome` CHECK enum for ops.** Map:
+  Reached/Will come/Fixed-on-call → `'connected'`; No answer → `'no_answer'`; the
+  exact ops label goes in `notes`. Ops call = `lead_id` NULL + `ops_ticket_id` set.
+- Gujarati-first (`opsStrings`, §231). Not §28-frozen EXCEPT App.jsx + V2AppShell
+  (guardian PASS this build).
+
+### Foot-guns
+- ❌ Widening the sales `call_logs.outcome` enum for ops values — map to the two
+  existing values + store the label in `notes`.
+- ❌ (accepted P3) the §170/§173 `call_logs` dedup BEFORE-INSERT trigger could
+  theoretically fold an ops call into a same-phone tel-tap audit within 60s — a
+  depot-contact number colliding with a rep's just-tapped lead is implausible; if
+  it ever bites, add `AND NEW.ops_ticket_id IS NULL` to the dedup trigger (do NOT
+  touch the frozen trigger pre-emptively, §16/§45).
+- ❌ (accepted transient) a screen marked fixed while the CMS still shows offline
+  reappears in Open until the ≤10-min sync flips it online (the soft-warn already
+  flagged it; the tech accepted). Bounded, harmless (a rare second ticket).
+- ❌ An un-imported lucide icon in the OPS_EXEC_NAV top-level const white-screens
+  every role at load (§245) — used LayoutDashboard (already imported).
+
+### Owner run-list
+1. Run `supabase_ops_p3_ticket_calls.sql` in Studio (VERIFY: has_col=1,
+   has_index=1). Until then the Call-save errors; the rest works.
+2. Everything else deploys on push (Vercel). **operation_executive now lands on
+   `/ops-tickets`.** Log-issue + Down-now still reachable.
+3. Depot→tech must be assigned (head console → Screens by station → Assigned tech)
+   so a station shows in an exec's city dropdown + its contacts appear.
+4. Smoke (exec, assigned depot with an offline screen): city → Open lists offline
+   screens (Grouped/Individual) → tap → pick problem + notes + photo → Submit → In
+   process ticket with the depot contact → Call (dials + records) → outcome → Save
+   → Mark fixed → Fixed tab with the call history.
