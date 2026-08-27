@@ -26,6 +26,7 @@ export const STR = {
   refresh:         { gu: 'ફરી લોડ કરો',                 en: 'Refresh' },
   loading:         { gu: 'લોડ થાય છે…',                 en: 'Loading…' },
   error_generic:   { gu: 'કંઈક ખોટું થયું',             en: 'Something went wrong' },
+  save_failed:     { gu: 'સેવ નિષ્ફળ',                  en: 'Save failed' },
   retry:           { gu: 'ફરી પ્રયત્ન કરો',             en: 'Try again' },
   save:            { gu: 'સાચવો',                       en: 'Save' },
   saving:          { gu: 'સાચવે છે…',                    en: 'Saving…' },
@@ -74,6 +75,7 @@ export const STR = {
   st_resolved:     { gu: 'પૂરું થયું',                  en: 'Resolved' },
   start_work:      { gu: 'કામ શરૂ કરો',                 en: 'Start work' },
   mark_resolved:   { gu: 'પૂરું થયું તરીકે નોંધો',      en: 'Mark resolved' },
+  auto:            { gu: 'ઓટો',                         en: 'Auto' },
 
   // — fix log —
   cause:           { gu: 'શું ખરાબ હતું?',              en: 'What was wrong?' },

@@ -189,7 +189,7 @@ function OpsExecApp({ profile, lang, langBar }) {
           .select('id, check_in_at, work_date')
           .eq('user_id', uid).eq('work_date', today).maybeSingle(),
         supabase.from('ops_tickets')
-          .select('id, type, status, priority, cause, notes, photo_path, opened_at, ' +
+          .select('id, type, status, source, down_count, priority, cause, notes, photo_path, opened_at, ' +
                   'screen:ops_screens!ops_tickets_screen_id_fkey(id,name), ' +
                   'depot:ops_depots!ops_tickets_depot_id_fkey(id,name,lat,lng), ' +
                   'issue:ops_issue_types!ops_tickets_issue_type_id_fkey(id,issue_en,issue_gu,solution_en,solution_gu)')
@@ -468,13 +468,20 @@ function TicketCard({ tk, lang, expanded, onToggle, contacts, uid, onChanged }) 
   async function setStatus(status) {
     setBusy(true)
     try {
-      const patch = { status }
-      if (status === 'resolved') patch.resolved_at = new Date().toISOString()
-      const { error } = await supabase.from('ops_tickets').update(patch).eq('id', tk.id)
-      if (error) throw error
+      let error
+      if (status === 'in_progress') {
+        ;({ error } = await supabase.rpc('ops_ticket_start', { p_ticket: tk.id }))
+      } else if (status === 'resolved') {
+        ;({ error } = await supabase.rpc('ops_ticket_resolve', {
+          p_ticket: tk.id, p_cause: cause.trim() || null, p_notes: notes.trim() || null,
+        }))
+      }
+      if (error) { toastError(error, t('save_failed', lang)); return }
       toastSuccess(t(status === 'resolved' ? 'st_resolved' : 'st_in_progress', lang))
-      await onChanged()
-    } catch (e) { toastError(e, t('error_generic', lang)) } finally { setBusy(false) }
+      if (onChanged) await onChanged()
+    } catch (e) {
+      toastError(e, t('save_failed', lang))
+    } finally { setBusy(false) }
   }
 
   async function saveFix() {
@@ -523,8 +530,16 @@ function TicketCard({ tk, lang, expanded, onToggle, contacts, uid, onChanged }) 
           {isPhoto ? <Camera size={18} strokeWidth={1.6} /> : <Wrench size={18} strokeWidth={1.6} />}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {isPhoto ? t('photo_request', lang) : (issueLabel || t('fault', lang))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <span style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+              {isPhoto ? t('photo_request', lang) : (issueLabel || t('fault', lang))}
+            </span>
+            {tk.source === 'auto_offline' && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 999,
+                background: 'var(--v2-tint-blue, rgba(59,130,246,.12))', color: 'var(--v2-blue, #3B82F6)', flexShrink: 0 }}>
+                {t('auto', lang)}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--v2-ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {[tk.screen?.name, tk.depot?.name].filter(Boolean).join(' · ')}
