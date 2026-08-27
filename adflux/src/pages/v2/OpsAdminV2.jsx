@@ -107,6 +107,7 @@ export default function OpsAdminV2() {
           <HeroStat label="Uptime today"   value={`${d.uptime_today ?? 0}%`}  delta={`${sc.online ?? 0}/${(sc.online ?? 0) + (sc.offline ?? 0)} reporting`} up={(d.uptime_today ?? 0) >= 90} down={(d.uptime_today ?? 0) < 90 && (sc.online ?? 0) + (sc.offline ?? 0) > 0} />
           <HeroStat label="Uptime (month)" value={`${d.uptime_month ?? 0}%`}  delta="avg this month" up={(d.uptime_month ?? 0) >= 90} />
           <HeroStat label="Offline now"    value={sc.offline ?? 0}            delta={`of ${sc.total ?? 0} screens`} down={(sc.offline ?? 0) > 0} />
+          <HeroStat label="Not reporting"  value={sc.unknown ?? 0}            delta={(sc.unknown ?? 0) > 0 ? 'live sync off / unmeasured' : 'all screens measured'} down={(sc.unknown ?? 0) > 0} />
           <HeroStat label="Open tickets"   value={tk.open ?? 0}               delta={`${tk.faults_month ?? 0} faults this month`} down={(tk.open ?? 0) > 0} />
         </div>
       </div>

@@ -78,11 +78,16 @@ function mapScreen(s) {
   const raw = s?.status ?? s?.state ?? s?.online ?? s?.is_online
   if (raw === true || raw === 'online' || raw === 'up' || raw === 'active' || raw === 1) status = 'online'
   else if (raw === false || raw === 'offline' || raw === 'down' || raw === 'inactive' || raw === 0) status = 'offline'
+  // `group` may be a name string ("Godhra Bus Stand", per the webhook sample),
+  // a nested object {id,name}, or absent (then a sibling group_id/group_name).
+  const g = s?.group
+  const gObj = g && typeof g === 'object' && !Array.isArray(g)
   return {
     external_id,
     name: String(s?.name ?? s?.screen_name ?? s?.title ?? external_id).trim(),
     status,
-    group_ref: String(s?.group_id ?? s?.group ?? s?.group_name ?? '').trim(),
+    group_id: String(s?.group_id ?? (gObj ? (g.id ?? g.group_id ?? g.uuid ?? '') : '')).trim(),
+    group_name: String(gObj ? (g.name ?? g.group_name ?? g.title ?? '') : (typeof g === 'string' ? g : (s?.group_name ?? ''))).trim(),
   }
 }
 
@@ -168,25 +173,31 @@ export default async function handler(req) {
   // 2 · SCREENS → paginated upsert into ops_screens by external_id (creates new)
   let received = 0, online = 0, offline = 0, unresolvedDepot = 0
   const onlineRows = [], offlineRows = [], unknownRows = [], depotLinks = {}
+  const seen = new Set()   // de-dup + guard against an API that ignores paging
   try {
     for (let page = 1; page <= 60; page++) {
       const list = asList(await cms(`/screens?page=${page}&per_page=200`))
       if (!list.length) break
-      received += list.length
+      let newInPage = 0
       for (const raw of list) {
-        const m = mapScreen(raw); if (!m) continue
+        const m = mapScreen(raw); if (!m || seen.has(m.external_id)) continue
+        seen.add(m.external_id); newInPage++; received++
         if (m.status === 'online') { online++; onlineRows.push({ external_id: m.external_id, name: m.name, status: 'online', last_response_at: nowIso, updated_at: nowIso }) }
         else if (m.status === 'offline') { offline++; offlineRows.push({ external_id: m.external_id, name: m.name, status: 'offline', updated_at: nowIso }) }
         else unknownRows.push({ external_id: m.external_id, name: m.name, updated_at: nowIso })
-        const depot_id = groupMap[m.group_ref] || nameMap[norm(m.group_ref)] || null
+        const depot_id = groupMap[m.group_id] || nameMap[norm(m.group_name)] || nameMap[norm(m.group_id)] || null
         if (depot_id) { const a = depotLinks[depot_id] || (depotLinks[depot_id] = []); a.push(m.external_id) }
         else unresolvedDepot++
       }
-      if (list.length < 200) break
+      // stop if the page returned only rows we've already seen (API returned the
+      // full list ignoring page/per_page) or a short/last page
+      if (list.length < 200 || newInPage === 0) break
     }
+    const batchTotal = onlineRows.length + offlineRows.length + unknownRows.length
     // uniform-column upsert batches (status/last_response_at differ per batch,
     // so each status class is its own batch — never nulls an unrelated column)
-    const chunkUpsert = async (rows) => { for (let i = 0; i < rows.length; i += 200) await sbUpsert('ops_screens', rows.slice(i, i + 200), 'external_id') }
+    let allUpsertsOk = true
+    const chunkUpsert = async (rows) => { for (let i = 0; i < rows.length; i += 200) { if (!(await sbUpsert('ops_screens', rows.slice(i, i + 200), 'external_id'))) allUpsertsOk = false } }
     if (onlineRows.length)  await chunkUpsert(onlineRows)
     if (offlineRows.length) await chunkUpsert(offlineRows)
     if (unknownRows.length) await chunkUpsert(unknownRows)
@@ -197,6 +208,16 @@ export default async function handler(req) {
         const inList = ids.slice(i, i + 150).map(encodeURIComponent).join(',')
         await sbPatch('ops_screens', `external_id=in.(${inList})`, { depot_id })
       }
+    }
+    // retire the Phase-0 placeholder screens (external_id NULL, seeded from
+    // cities.screens) now that the real CMS screens are in — ONLY after a clean,
+    // non-empty sync so a failed/empty pull can never wipe the seed. A ticket
+    // that referenced a placeholder keeps its depot (ops_tickets.screen_id is
+    // ON DELETE SET NULL). No-op on later syncs (no placeholders left).
+    var placeholdersRetired = false
+    if (received > 0 && batchTotal > 0 && allUpsertsOk) {
+      const dr = await fetch(`${SUPABASE_URL}/rest/v1/ops_screens?external_id=is.null`, { method: 'DELETE', headers: { ...sbH, Prefer: 'return=minimal' } })
+      placeholdersRetired = dr.ok
     }
   } catch (e) { return j({ ok: false, error: 'screens_failed', detail: String(e?.message || e).slice(0, 160), depots_linked: depotsLinked }, 502) }
 
@@ -209,6 +230,7 @@ export default async function handler(req) {
     ok: true, depots_linked: depotsLinked,
     screens_received: received, upserted: onlineRows.length + offlineRows.length + unknownRows.length,
     online, offline, unknown: unknownRows.length, unresolved_depot: unresolvedDepot,
+    placeholders_retired: placeholdersRetired,
   })
 }
 

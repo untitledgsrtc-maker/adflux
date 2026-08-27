@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Users as UsersIcon, Wrench, Camera, Wifi, WifiOff, Loader2, RefreshCw, Timer,
+  Wrench, Camera, Loader2, RefreshCw, Timer, AlertTriangle, Phone, Plus, Trash2, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -27,6 +27,7 @@ import LiveFieldMap from '../../components/ops/LiveFieldMap'
 const th = { textAlign: 'left', fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 700, padding: '9px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.04em' }
 const td = { fontSize: 14, color: 'var(--text)', padding: '11px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle' }
 const selBox = { background: 'var(--surface-2, var(--surface))', color: 'var(--text)', border: '1px solid var(--border-strong, var(--border))', borderRadius: 8, padding: '7px 9px', fontSize: 13, maxWidth: 190 }
+const inp = { width: '100%', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border-strong, var(--border))', borderRadius: 'var(--radius, 10px)', padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }
 
 function HeroStat({ label, value, delta, up, down }) {
   return (
@@ -56,13 +57,19 @@ export default function OpsHeadV2() {
   const [sessByUser, setSessByUser] = useState({})
   const [kmByUser, setKmByUser] = useState({})
   const [uptimeByUser, setUptimeByUser] = useState({})
+  const [contactsByDepot, setContactsByDepot] = useState({})   // depot_id -> [contact]
+
+  // depot-contacts manager ("Who to call" — the exec Call-the-depot data)
+  const [cDepot, setCDepot] = useState(null)                   // depot being managed
+  const [cForm, setCForm] = useState({ role_en: '', name: '', phone: '' })
+  const [cBusy, setCBusy] = useState(false)
 
   const today = istTodayISO()
 
   const load = useCallback(async () => {
     setErr('')
     try {
-      const [tkUsers, scRes, depRes, tickRes] = await Promise.all([
+      const [tkUsers, scRes, depRes, tickRes, conRes] = await Promise.all([
         supabase.from('users').select('id, name, profile_image_url').eq('role', 'operation_executive').eq('is_active', true).order('name'),
         supabase.from('ops_screens').select('id, status, depot_id').eq('is_active', true),
         supabase.from('ops_depots').select('id, name, assigned_to, city:cities!ops_depots_city_id_fkey(name)').eq('is_active', true).order('name'),
@@ -73,6 +80,7 @@ export default function OpsHeadV2() {
                   'issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en)')
           .in('status', ['open', 'in_progress'])
           .order('priority', { ascending: false }).order('opened_at', { ascending: true }),
+        supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone').order('display_order'),
       ])
       if (scRes.error) throw scRes.error
       const execs = tkUsers.data || []
@@ -80,6 +88,8 @@ export default function OpsHeadV2() {
       setScreens(scRes.data || [])
       setDepots(depRes.data || [])
       setTickets(tickRes.data || [])
+      const cbd = {}; (conRes.data || []).forEach(c => { (cbd[c.depot_id] = cbd[c.depot_id] || []).push(c) })
+      setContactsByDepot(cbd)
 
       const execIds = execs.map(e => e.id)
       if (execIds.length) {
@@ -164,6 +174,24 @@ export default function OpsHeadV2() {
       if (error) throw error
       toastSuccess("Today's uptime recorded")
     } catch (e) { toastError(e, 'Uptime snapshot needs the Phase 4 SQL run first') } finally { setSnapping(false) }
+  }
+  async function addContact() {
+    const name = cForm.name.trim(), phone = cForm.phone.trim(), role_en = cForm.role_en.trim()
+    if (!cDepot || (!name && !phone)) return
+    setCBusy(true)
+    const { error } = await supabase.from('ops_depot_contacts').insert([{
+      depot_id: cDepot.id, role_en: role_en || null, name: name || null, phone: phone || null,
+      display_order: (contactsByDepot[cDepot.id]?.length || 0) + 1,
+    }])
+    setCBusy(false)
+    if (error) return toastError(error, 'Could not add contact')
+    setCForm({ role_en: '', name: '', phone: '' })
+    toastSuccess('Contact added'); load()
+  }
+  async function delContact(id) {
+    const { error } = await supabase.from('ops_depot_contacts').delete().eq('id', id)
+    if (error) return toastError(error, 'Could not remove')
+    toastSuccess('Removed'); load()
   }
 
   const niceTime = new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false })
@@ -273,15 +301,16 @@ export default function OpsHeadV2() {
       {/* Screens board — reassign a depot */}
       <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
         <div className="lead-card-head" style={{ padding: '12px 16px' }}>
-          <div><div className="lead-card-title">Screens by station</div><div className="lead-card-sub">Reassign a station to another tech.</div></div>
+          <div><div className="lead-card-title">Screens by station</div><div className="lead-card-sub">Reassign a station, and set who a tech should call for each depot.</div></div>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
-            <thead><tr><th style={th}>Station</th><th style={th}>City</th><th style={th}>Screens</th><th style={th}>Online</th><th style={th}>Offline</th><th style={th}>Assigned tech</th></tr></thead>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+            <thead><tr><th style={th}>Station</th><th style={th}>City</th><th style={th}>Screens</th><th style={th}>Online</th><th style={th}>Offline</th><th style={th}>Assigned tech</th><th style={th}>Who to call</th></tr></thead>
             <tbody>
-              {depots.length === 0 && <tr><td style={{ ...td, color: 'var(--text-muted)' }} colSpan={6}>No stations.</td></tr>}
+              {depots.length === 0 && <tr><td style={{ ...td, color: 'var(--text-muted)' }} colSpan={7}>No stations.</td></tr>}
               {depots.map(d => {
                 const s = screensByDepot[d.id] || { online: 0, offline: 0, total: 0 }
+                const nc = contactsByDepot[d.id]?.length || 0
                 return (
                   <tr key={d.id}>
                     <td style={{ ...td, fontWeight: 600 }}>{d.name}</td>
@@ -294,6 +323,12 @@ export default function OpsHeadV2() {
                         <option value="">— unassigned —</option>
                         {techs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
+                    </td>
+                    <td style={td}>
+                      <button className="btn btn-sec btn-sm" onClick={() => { setCDepot(d); setCForm({ role_en: '', name: '', phone: '' }) }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: nc ? 'var(--text)' : 'var(--warning)' }}>
+                        <Phone size={14} strokeWidth={1.6} /> {nc || 'Add'} {nc ? `contact${nc === 1 ? '' : 's'}` : ''}
+                      </button>
                     </td>
                   </tr>
                 )
@@ -334,6 +369,42 @@ export default function OpsHeadV2() {
           </table>
         </div>
       </div>
+
+      {/* depot-contacts manager — the exec "Call the depot" data (was seed-only) */}
+      {cDepot && (
+        <div onClick={() => !cBusy && setCDepot(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg, 14px)', padding: 20, maxHeight: '86vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>Who to call · {cDepot.name}</div>
+              <button onClick={() => !cBusy && setCDepot(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 0, marginBottom: 14, lineHeight: 1.5 }}>
+              The field tech sees these numbers on a ticket at this station — electrician, depot manager, screen service, etc.
+            </p>
+            {(contactsByDepot[cDepot.id] || []).length === 0 && (
+              <div style={{ fontSize: 13.5, color: 'var(--text-muted)', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>No contacts yet — add the first one below.</div>
+            )}
+            {(contactsByDepot[cDepot.id] || []).map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{c.name || c.role_en || 'Contact'}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{[c.role_en, c.phone].filter(Boolean).join(' · ') || '—'}</div>
+                </div>
+                <button onClick={() => delContact(c.id)} title="Remove" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={16} /></button>
+              </div>
+            ))}
+            <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
+              <input value={cForm.role_en} onChange={e => setCForm(f => ({ ...f, role_en: e.target.value }))} placeholder="Role (e.g. Electrician, Depot manager)" style={inp} />
+              <input value={cForm.name} onChange={e => setCForm(f => ({ ...f, name: e.target.value }))} placeholder="Name (optional)" style={inp} />
+              <input value={cForm.phone} onChange={e => setCForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone number" inputMode="tel" style={inp} />
+              <button className="btn btn-primary" onClick={addContact} disabled={cBusy || (!cForm.name.trim() && !cForm.phone.trim())}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 }}>
+                {cBusy ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={16} />} Add contact
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

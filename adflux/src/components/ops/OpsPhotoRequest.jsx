@@ -50,7 +50,15 @@ export function OpsPhotoRequestButton({ quote, profile, onRequested }) {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
-  if (!isScreenCampaign(quote) || !profile?.id) return null
+  // Only roles that actually have an ops_tickets INSERT path may see the button
+  // (else the tap 42501s): sales/agency/telecaller via ops_tickets_sales_request,
+  // admin/co_owner/operation_head via ops_tickets_manage. accounts/hr/office_staff/
+  // staff have neither. Check role OR team_role — a sales rep can carry either.
+  const r = profile?.role, tr = profile?.team_role
+  const canRequestPhoto =
+    ['sales', 'agency', 'telecaller', 'admin', 'co_owner', 'operation_head'].includes(r) ||
+    ['sales', 'agency', 'telecaller'].includes(tr)
+  if (!isScreenCampaign(quote) || !profile?.id || !canRequestPhoto) return null
 
   async function send() {
     if (saving) return

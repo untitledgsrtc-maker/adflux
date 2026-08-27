@@ -561,8 +561,8 @@ function TicketCard({ tk, lang, expanded, onToggle, contacts, uid, onChanged }) 
             ) : contacts.map(c => (
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid var(--v2-line)' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name || (lang === 'gu' ? c.role_gu : c.role_en) || '—'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{(lang === 'gu' ? c.role_gu : c.role_en) || ''} {c.phone}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name || (lang === 'gu' ? (c.role_gu || c.role_en) : c.role_en) || '—'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{(lang === 'gu' ? (c.role_gu || c.role_en) : c.role_en) || ''} {c.phone}</div>
                 </div>
                 <button onClick={() => callContact(c)} disabled={!c.phone} style={{
                   ...btnGhost, padding: '8px 12px', color: 'var(--v2-green)', borderColor: 'var(--v2-green)',

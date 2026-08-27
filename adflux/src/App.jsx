@@ -300,6 +300,13 @@ function RootRedirect() {
   // first, then fall back to role for admin/co_owner.
   const role     = profile?.role
   const teamRole = profile?.team_role
+  // Phase 230 (audit fix) — Operations roles win over any residual team_role.
+  // An ops user may still carry a stale team_role='sales'/'telecaller'; check
+  // the ops role FIRST so login-landing matches the sidebar nav (which already
+  // gates on isOps before the sales branches). operation_executive → the mobile
+  // field app (/ops); operation_head → the desk console (/ops-dashboard).
+  if (role === 'operation_head')       return <Navigate to="/ops-dashboard" replace />
+  if (role === 'operation_executive')  return <Navigate to="/ops" replace />
   // Phase 61 (19 May 2026) — sales_manager (Jubin + Renuka) lands
   // on /manager (their team-lead dashboard). Branch BEFORE the base
   // role checks so a sales-flavored manager doesn't fall through
@@ -322,11 +329,6 @@ function RootRedirect() {
   if (role === 'hr')                              return <Navigate to="/hr" replace />
   // Phase 182 — Accounts login lands on the payroll shell.
   if (role === 'accounts')                        return <Navigate to="/people" replace />
-  // Phase 230 — Operations module. operation_executive → the mobile field
-  // app (/ops); operation_head → the desk console (/ops-dashboard, Phase 2).
-  // Keyed on `role` (not team_role — ops isn't a sales flavor).
-  if (role === 'operation_head')       return <Navigate to="/ops-dashboard" replace />
-  if (role === 'operation_executive')  return <Navigate to="/ops" replace />
   return <Navigate to="/dashboard" replace />
 }
 
