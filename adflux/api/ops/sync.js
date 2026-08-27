@@ -19,7 +19,7 @@
 // DEBUG (no writes): GET ...?debug=1&secret=<OPS_SYNC_SECRET> echoes the RAW first
 //    /groups + /screens object so the exact CMS field names can be confirmed. The
 //    map below is tolerant (id/name/status/group per the API guide + webhook sample);
-//    if a field name differs, adjust mapGroup()/mapScreen() and redeploy.
+//    if a field name differs, adjust mapScreen() and redeploy.
 //
 // WHY EDGE: the app is AT the Vercel Hobby 12-Node-fn cap (§219); Edge doesn't count.
 // Auth: x-ops-secret == OPS_SYNC_SECRET (pg_cron dispatch) OR ?secret= (owner/debug).
@@ -64,31 +64,31 @@ const asList = (b) => Array.isArray(b) ? b
 const norm = (s) => String(s || '').toLowerCase()
   .replace(/gsrtc|bus\s*stand|depot|station/g, '').replace(/[^a-z0-9]/g, '')
 
-// aiadflux group -> { gid, gname }
-function mapGroup(g) {
-  return {
-    gid: String(g?.id ?? g?.group_id ?? g?.uuid ?? '').trim(),
-    gname: String(g?.name ?? g?.group_name ?? g?.group ?? g?.title ?? '').trim(),
-  }
-}
-// aiadflux screen -> { external_id, name, status, group_ref } | null
+// aiadflux screen -> mapped fields | null. Real shape confirmed 2026-08-27: the
+// screen EMBEDS its depot as `Group` {id,name} + `group_id` (int) + `location`
+// (depot name string), and its GPS in `location_settings` {latitude,longitude}.
+// So the whole sync sources from /screens — /groups (a broken CMS endpoint) unused.
 function mapScreen(s) {
-  const external_id = String(s?.external_id ?? s?.id ?? s?.screen_id ?? s?.uuid ?? '').trim()
+  const external_id = String(s?.id ?? s?.external_id ?? s?.screen_id ?? s?.uuid ?? '').trim()
   if (!external_id) return null
   let status = 'unknown'
   const raw = s?.status ?? s?.state ?? s?.online ?? s?.is_online
   if (raw === true || raw === 'online' || raw === 'up' || raw === 'active' || raw === 1) status = 'online'
   else if (raw === false || raw === 'offline' || raw === 'down' || raw === 'inactive' || raw === 0) status = 'offline'
-  // `group` may be a name string ("Godhra Bus Stand", per the webhook sample),
-  // a nested object {id,name}, or absent (then a sibling group_id/group_name).
-  const g = s?.group
-  const gObj = g && typeof g === 'object' && !Array.isArray(g)
+  const G = s?.Group || s?.group || null
+  const gObj = G && typeof G === 'object' && !Array.isArray(G)
+  const ls = (s?.location_settings && typeof s.location_settings === 'object') ? s.location_settings : {}
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) && n !== 0 ? n : null }
   return {
     external_id,
     name: String(s?.name ?? s?.screen_name ?? s?.title ?? external_id).trim(),
     status,
-    group_id: String(s?.group_id ?? (gObj ? (g.id ?? g.group_id ?? g.uuid ?? '') : '')).trim(),
-    group_name: String(gObj ? (g.name ?? g.group_name ?? g.title ?? '') : (typeof g === 'string' ? g : (s?.group_name ?? ''))).trim(),
+    group_id: String(s?.group_id ?? (gObj ? (G.id ?? G.group_id ?? '') : '') ?? '').trim(),
+    group_name: String((gObj ? (G.name ?? G.description ?? '') : (typeof G === 'string' ? G : '')) || s?.location || s?.group_name || '').trim(),
+    lat: num(ls.latitude),
+    lng: num(ls.longitude),
+    orientation: s?.orientation ? String(s.orientation).toUpperCase() : null,
+    last_response: s?.last_response || s?.last_response_at || null,
   }
 }
 
@@ -151,39 +151,19 @@ export default async function handler(req) {
     return j({ ok: true, debug: true, base: AIADFLUX_URL, auth: 'Bearer', groups, screens, health })
   }
 
-  if (req.method !== 'POST') return j({ error: 'method — POST to sync, or GET ?debug=1 to inspect' }, 405)
+  // POST (cron dispatch) or a secret-gated GET ?run=1 (owner fires it from a browser).
+  if (req.method !== 'POST' && !url.searchParams.get('run')) {
+    return j({ error: 'method — POST (or GET ?run=1) to sync, or GET ?debug=1 to inspect' }, 405)
+  }
 
   const nowIso = new Date().toISOString()
 
-  // 1 · GROUPS → link/create depots, build the group->depot map
-  const groupMap = {}, nameMap = {}
-  let depotsLinked = 0
-  try {
-    const groups = asList(await cms('/groups')).map(mapGroup).filter(g => g.gid || g.gname)
-    const depots = await sbGet('ops_depots?select=id,name,external_group_id')
-    for (const g of groups) {
-      let d = g.gid && depots.find(x => x.external_group_id === g.gid)
-      if (!d && g.gname) d = depots.find(x => !x.external_group_id && norm(x.name) && norm(x.name) === norm(g.gname))
-      if (d) {
-        if (g.gid && d.external_group_id !== g.gid) {
-          await sbPatch('ops_depots', `id=eq.${d.id}`, { external_group_id: g.gid, updated_at: nowIso })
-          d.external_group_id = g.gid; depotsLinked++
-        }
-      } else {
-        d = await sbInsertReturn('ops_depots', { name: g.gname || `Depot ${g.gid}`, external_group_id: g.gid || null, is_active: true })
-        if (d) { depots.push({ id: d.id, name: d.name, external_group_id: g.gid || null }); depotsLinked++ }
-      }
-      if (d) {
-        if (g.gid) groupMap[g.gid] = d.id
-        if (g.gname) nameMap[norm(g.gname)] = d.id
-      }
-    }
-  } catch (e) { return j({ ok: false, error: 'groups_failed', detail: String(e?.message || e).slice(0, 160) }, 502) }
-
-  // 2 · SCREENS → paginated upsert into ops_screens by external_id (creates new)
-  let received = 0, online = 0, offline = 0, unresolvedDepot = 0
-  const onlineRows = [], offlineRows = [], unknownRows = [], depotLinks = {}
+  // 1 · pull ALL screens (paginated). Each screen embeds its depot (Group {id,name})
+  //     + group_id + GPS, so the whole sync sources from /screens — /groups is a
+  //     broken CMS endpoint (HTTP 500) and is never called.
+  const screens = []
   const seen = new Set()   // de-dup + guard against an API that ignores paging
+  let received = 0
   try {
     for (let page = 1; page <= 60; page++) {
       const list = asList(await cms(`/screens?page=${page}&per_page=200`))
@@ -191,27 +171,58 @@ export default async function handler(req) {
       let newInPage = 0
       for (const raw of list) {
         const m = mapScreen(raw); if (!m || seen.has(m.external_id)) continue
-        seen.add(m.external_id); newInPage++; received++
-        if (m.status === 'online') { online++; onlineRows.push({ external_id: m.external_id, name: m.name, status: 'online', last_response_at: nowIso, updated_at: nowIso }) }
-        else if (m.status === 'offline') { offline++; offlineRows.push({ external_id: m.external_id, name: m.name, status: 'offline', updated_at: nowIso }) }
-        else unknownRows.push({ external_id: m.external_id, name: m.name, updated_at: nowIso })
-        const depot_id = groupMap[m.group_id] || nameMap[norm(m.group_name)] || nameMap[norm(m.group_id)] || null
-        if (depot_id) { const a = depotLinks[depot_id] || (depotLinks[depot_id] = []); a.push(m.external_id) }
-        else unresolvedDepot++
+        seen.add(m.external_id); newInPage++; received++; screens.push(m)
       }
-      // stop if the page returned only rows we've already seen (API returned the
-      // full list ignoring page/per_page) or a short/last page
-      if (list.length < 200 || newInPage === 0) break
+      if (list.length < 200 || newInPage === 0) break   // last/short page or repeat
     }
-    const batchTotal = onlineRows.length + offlineRows.length + unknownRows.length
-    // uniform-column upsert batches (status/last_response_at differ per batch,
-    // so each status class is its own batch — never nulls an unrelated column)
-    let allUpsertsOk = true
-    const chunkUpsert = async (rows) => { for (let i = 0; i < rows.length; i += 200) { if (!(await sbUpsert('ops_screens', rows.slice(i, i + 200), 'external_id'))) allUpsertsOk = false } }
-    if (onlineRows.length)  await chunkUpsert(onlineRows)
-    if (offlineRows.length) await chunkUpsert(offlineRows)
-    if (unknownRows.length) await chunkUpsert(unknownRows)
-    // depot links — a separate PATCH so it NEVER nulls depot_id on an unresolved screen
+  } catch (e) { return j({ ok: false, error: 'screens_failed', detail: String(e?.message || e).slice(0, 160) }, 502) }
+
+  // 2 · build the depot map from the screens' embedded groups. Link an aiadflux
+  //     group to an existing seed depot (by external_group_id, then fuzzy name),
+  //     else create one; backfill its GPS from a member screen.
+  const groupMap = {}   // aiadflux group_id -> ops_depots.id
+  let depotsLinked = 0, depotsCreated = 0
+  try {
+    const groups = {}   // group_id -> { name, lat, lng }
+    for (const m of screens) {
+      const gid = m.group_id; if (!gid) continue
+      const g = groups[gid] || (groups[gid] = { name: m.group_name, lat: null, lng: null })
+      if (!g.name && m.group_name) g.name = m.group_name
+      if (g.lat == null && m.lat != null) { g.lat = m.lat; g.lng = m.lng }
+    }
+    const depots = await sbGet('ops_depots?select=id,name,external_group_id,lat,lng')
+    for (const gid of Object.keys(groups)) {
+      const g = groups[gid]
+      let d = depots.find(x => x.external_group_id === gid)
+      if (!d && g.name) d = depots.find(x => !x.external_group_id && norm(x.name) && norm(x.name) === norm(g.name))
+      if (d) {
+        const patch = {}
+        if (d.external_group_id !== gid) { patch.external_group_id = gid; depotsLinked++ }
+        if (d.lat == null && g.lat != null) { patch.lat = g.lat; patch.lng = g.lng }
+        if (Object.keys(patch).length) { patch.updated_at = nowIso; await sbPatch('ops_depots', `id=eq.${d.id}`, patch); d.external_group_id = gid }
+      } else {
+        d = await sbInsertReturn('ops_depots', { name: g.name || `Depot ${gid}`, external_group_id: gid, lat: g.lat, lng: g.lng, is_active: true })
+        if (d) { depots.push({ id: d.id, name: d.name, external_group_id: gid, lat: g.lat, lng: g.lng }); depotsCreated++ }
+      }
+      if (d) groupMap[gid] = d.id
+    }
+  } catch (e) { return j({ ok: false, error: 'depots_failed', detail: String(e?.message || e).slice(0, 160) }, 502) }
+
+  // 3 · upsert screens (ONE uniform batch — status is just a column now) + link depots
+  let online = 0, offline = 0, unknownN = 0, unresolvedDepot = 0
+  let placeholdersRetired = false
+  const rows = [], depotLinks = {}
+  for (const m of screens) {
+    if (m.status === 'online') online++; else if (m.status === 'offline') offline++; else unknownN++
+    rows.push({ external_id: m.external_id, name: m.name, status: m.status, last_response_at: m.last_response, orientation: m.orientation, lat: m.lat, lng: m.lng, updated_at: nowIso })
+    const depot_id = groupMap[m.group_id] || null
+    if (depot_id) { const a = depotLinks[depot_id] || (depotLinks[depot_id] = []); a.push(m.external_id) }
+    else unresolvedDepot++
+  }
+  try {
+    let allOk = true
+    for (let i = 0; i < rows.length; i += 200) { if (!(await sbUpsert('ops_screens', rows.slice(i, i + 200), 'external_id'))) allOk = false }
+    // link depots — a separate PATCH so an unresolved screen keeps depot_id null (not wiped)
     for (const depot_id of Object.keys(depotLinks)) {
       const ids = depotLinks[depot_id]
       for (let i = 0; i < ids.length; i += 150) {
@@ -220,26 +231,25 @@ export default async function handler(req) {
       }
     }
     // retire the Phase-0 placeholder screens (external_id NULL, seeded from
-    // cities.screens) now that the real CMS screens are in — ONLY after a clean,
-    // non-empty sync so a failed/empty pull can never wipe the seed. A ticket
-    // that referenced a placeholder keeps its depot (ops_tickets.screen_id is
-    // ON DELETE SET NULL). No-op on later syncs (no placeholders left).
-    var placeholdersRetired = false
-    if (received > 0 && batchTotal > 0 && allUpsertsOk) {
+    // cities.screens) now the real CMS screens are in — ONLY after a clean, non-empty
+    // sync so a failed/empty pull can never wipe the seed. A ticket that referenced a
+    // placeholder keeps its depot (ops_tickets.screen_id is ON DELETE SET NULL).
+    if (received > 0 && rows.length > 0 && allOk) {
       const dr = await fetch(`${SUPABASE_URL}/rest/v1/ops_screens?external_id=is.null`, { method: 'DELETE', headers: { ...sbH, Prefer: 'return=minimal' } })
       placeholdersRetired = dr.ok
     }
-  } catch (e) { return j({ ok: false, error: 'screens_failed', detail: String(e?.message || e).slice(0, 160), depots_linked: depotsLinked }, 502) }
+  } catch (e) { return j({ ok: false, error: 'upsert_failed', detail: String(e?.message || e).slice(0, 160), depots_linked: depotsLinked, depots_created: depotsCreated }, 502) }
 
-  // 3 · recompute today's uptime (the Phase-4 pay signal) — best-effort
+  // 4 · recompute today's uptime (the Phase-4 pay signal) — best-effort
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/rpc/ops_recompute_uptime_today`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
   } catch { /* Phase 4 SQL not run yet — statuses still synced */ }
 
   return j({
-    ok: true, depots_linked: depotsLinked,
-    screens_received: received, upserted: onlineRows.length + offlineRows.length + unknownRows.length,
-    online, offline, unknown: unknownRows.length, unresolved_depot: unresolvedDepot,
+    ok: true,
+    screens_received: received, upserted: rows.length,
+    online, offline, unknown: unknownN,
+    depots_linked: depotsLinked, depots_created: depotsCreated, unresolved_depot: unresolvedDepot,
     placeholders_retired: placeholdersRetired,
   })
 }
