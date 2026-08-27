@@ -16922,8 +16922,11 @@ Owner rejected the 6-item ops-exec scatter (Tickets · Log issue · Check in + t
 Built `src/pages/v2/OpsHomeV2.jsx` at `/ops-home` — a single professional field-tech home
 that pulls the operational surfaces into one screen (mockup-approved §244):
 - **check-in nudge** (a banner → `/ops` when `work_sessions` has no row for today IST),
-- **pay + uptime hero** (uptime ring + this-month base+variable from `ops_my_uptime_pay` +
-  `estVariable`),
+- **pay + uptime** = the full `<OpsUptimeCard scope="exec" />` (owner wanted the professional
+  card on the home too, 2026-08-27) — the SAME card as My Performance: ring +
+  Base/Variable/Projected + milestones + status + the "no uptime data yet" empty state,
+  self-fetching `ops_my_uptime_pay`. (Replaced the earlier simple green hero; the home no
+  longer fetches pay itself — the card does.)
 - **live down strip** ("N of your screens down · M stations" → `/ops-down`; time-aware via
   `isOnHours`),
 - **worst-first fault list** (the F4 triage, top 4 + "See all N" → `/ops-tickets`),

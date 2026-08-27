@@ -15,11 +15,10 @@ import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
 import { isOnHours, faultAgeHours, ageLabel, severityOf } from '../../utils/opsHours'
-import { estVariable } from '../../utils/opsPay'
 import { istTodayISO } from '../../utils/istDate'
+import OpsUptimeCard from '../../components/incentives/OpsUptimeCard'
 
 const NIL = '00000000-0000-0000-0000-000000000000'
-const fmtINR = n => '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Number(n) || 0))
 const SEV = { 2: 'var(--danger)', 1: 'var(--warning)', 0: 'var(--text-subtle, var(--text-muted))' }
 
 export default function OpsHomeV2() {
@@ -51,14 +50,13 @@ export default function OpsHomeV2() {
       const monthStart = istTodayISO().slice(0, 8) + '01'
       const dayStart = istTodayISO() + 'T00:00:00+05:30'
 
-      const [scr, inProc, fixedTd, fixMo, calls, payRes, ws] = await Promise.all([
+      const [scr, inProc, fixedTd, fixMo, calls, ws] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status, depot_id, last_response_at')
           .in('depot_id', depotIds.length ? depotIds : [NIL]).eq('is_active', true).eq('status', nowOn ? 'offline' : 'online'),
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).eq('source', 'manual').eq('status', 'in_progress'),
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', dayStart),
         supabase.from('ops_tickets').select('created_at, resolved_at').eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', monthStart),
         supabase.from('call_logs').select('call_at').eq('user_id', uid).gte('call_at', monthStart),
-        supabase.rpc('ops_my_uptime_pay'),
         supabase.from('work_sessions').select('id').eq('user_id', uid).eq('work_date', istTodayISO()).maybeSingle(),
       ])
 
@@ -71,13 +69,9 @@ export default function OpsHomeV2() {
       }).sort((a, b) => b.sev - a.sev || b.oldest - a.oldest)
       setFaults(rows)
 
-      const pay = Array.isArray(payRes.data) ? payRes.data[0] : payRes.data
-      const sal = pay ? Number(pay.salary) || 0 : 0
-      const up = pay && pay.has_data ? Math.round(Number(pay.uptime_pct) || 0) : null
       const fx = fixMo.data || []
       const durs = fx.map(r => (r.resolved_at && r.created_at) ? (new Date(r.resolved_at) - new Date(r.created_at)) / 3600000 : null).filter(v => v != null && v >= 0)
       setStats({
-        up, salary: sal, base: Math.round(sal * 0.70), variable: up != null ? estVariable(sal, up) : 0,
         inProc: inProc.count || 0, fixedToday: fixedTd.count || 0,
         fixedMo: fx.length, avgFixH: durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : null,
         callsMo: (calls.data || []).length,
@@ -126,21 +120,8 @@ export default function OpsHomeV2() {
         </div>
       )}
 
-      {/* pay + uptime hero */}
-      <div className="lead-card" style={{ padding: 16, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 16, background: 'linear-gradient(120deg, rgba(16,185,129,.16), rgba(16,185,129,.04))', borderColor: 'rgba(16,185,129,.32)' }}>
-        <svg viewBox="0 0 100 100" width="80" height="80" style={{ flexShrink: 0 }}>
-          <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,.10)" strokeWidth="9" />
-          {s.up != null && <circle cx="50" cy="50" r="42" fill="none" stroke="var(--success)" strokeWidth="9" strokeLinecap="round" strokeDasharray={`${(s.up / 100) * 264} 264`} transform="rotate(-90 50 50)" />}
-          <text x="50" y="56" textAnchor="middle" fontFamily="Space Grotesk, system-ui" fontWeight="700" fontSize="21" fill="var(--text)">{s.up != null ? `${s.up}%` : '—'}</text>
-        </svg>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, color: 'var(--success)' }}>{t('pay_month', lang)}</div>
-          {s.salary ? <>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, color: 'var(--success)', lineHeight: 1.1 }}>{fmtINR(s.base + s.variable)}</div>
-            <div style={{ fontSize: 11.5, color: 'var(--success)' }}>{t('sal_base', lang)} {fmtINR(s.base)} · + {t('sal_variable', lang)} {fmtINR(s.variable)}</div>
-          </> : <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--success)', marginTop: 4 }}>{t('no_stats', lang)}</div>}
-        </div>
-      </div>
+      {/* pay + uptime — the full professional card (same as My Performance) */}
+      <OpsUptimeCard scope="exec" />
 
       {/* live down strip */}
       <button onClick={() => nav('/ops-down')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: screensDown ? 'var(--danger-soft)' : 'var(--success-soft)', border: `1px solid ${screensDown ? 'var(--danger)' : 'var(--success)'}`, borderRadius: 12, padding: '12px 14px', marginBottom: 14, cursor: 'pointer' }}>
