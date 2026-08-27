@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Wrench, Camera, Loader2, RefreshCw, Timer, AlertTriangle, Phone, Plus, Trash2, X,
+  Wrench, Camera, Loader2, RefreshCw, Timer, AlertTriangle, Phone, Plus, Trash2, X, Monitor,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -42,6 +42,16 @@ function HeroStat({ label, value, delta, up, down }) {
 function chipInline(text, color, bg) {
   return <span style={{ background: bg, color, fontSize: 12, fontWeight: 700, padding: '3px 9px', borderRadius: 999, whiteSpace: 'nowrap' }}>{text}</span>
 }
+// circular tinted status badge — green (up) / red (down) / grey (unknown/no camera)
+function StatusIcon({ Icon, on, title }) {
+  const color = on === true ? 'var(--success)' : on === false ? 'var(--danger)' : 'var(--text-subtle, var(--text-muted))'
+  const bg = on === true ? 'var(--success-soft, rgba(16,185,129,.12))' : on === false ? 'var(--danger-soft, rgba(239,68,68,.12))' : 'rgba(148,163,184,.12)'
+  return (
+    <span title={title} style={{ display: 'inline-flex', width: 34, height: 34, borderRadius: 999, background: bg, alignItems: 'center', justifyContent: 'center', color, opacity: on === null || on === undefined ? 0.5 : 1 }}>
+      <Icon size={17} strokeWidth={1.7} />
+    </span>
+  )
+}
 
 export default function OpsHeadV2() {
   const profile = useAuthStore(s => s.profile)
@@ -58,6 +68,9 @@ export default function OpsHeadV2() {
   const [kmByUser, setKmByUser] = useState({})
   const [uptimeByUser, setUptimeByUser] = useState({})
   const [contactsByDepot, setContactsByDepot] = useState({})   // depot_id -> [contact]
+  const [camByScreen, setCamByScreen] = useState({})           // screen_id -> camera_active
+  const [scrStation, setScrStation] = useState('all')          // screen-list station filter
+  const [scrOffOnly, setScrOffOnly] = useState(false)          // screen-list: offline only
 
   // depot-contacts manager ("Who to call" — the exec Call-the-depot data)
   const [cDepot, setCDepot] = useState(null)                   // depot being managed
@@ -71,7 +84,7 @@ export default function OpsHeadV2() {
     try {
       const [tkUsers, scRes, depRes, tickRes, conRes] = await Promise.all([
         supabase.from('users').select('id, name, profile_image_url').eq('role', 'operation_executive').eq('is_active', true).order('name'),
-        supabase.from('ops_screens').select('id, status, depot_id').eq('is_active', true),
+        supabase.from('ops_screens').select('id, name, status, depot_id').eq('is_active', true).order('name'),
         supabase.from('ops_depots').select('id, name, assigned_to, city:cities!ops_depots_city_id_fkey(name)').eq('is_active', true).order('name'),
         supabase.from('ops_tickets')
           .select('id, type, status, priority, assigned_to, opened_at, ' +
@@ -90,6 +103,10 @@ export default function OpsHeadV2() {
       setTickets(tickRes.data || [])
       const cbd = {}; (conRes.data || []).forEach(c => { (cbd[c.depot_id] = cbd[c.depot_id] || []).push(c) })
       setContactsByDepot(cbd)
+      // per-screen camera status — resilient (the column may not exist before the SQL runs)
+      const camRes = await supabase.from('ops_screens').select('id, camera_active').eq('is_active', true)
+      const cm = {}; (camRes.data || []).forEach(c => { cm[c.id] = c.camera_active })
+      setCamByScreen(cm)
 
       const execIds = execs.map(e => e.id)
       if (execIds.length) {
@@ -149,6 +166,15 @@ export default function OpsHeadV2() {
 
   // overdue tickets — open past 48h (SLA band)
   const overdue = useMemo(() => tickets.filter(t => t.opened_at && (Date.now() - new Date(t.opened_at).getTime()) > 48 * 3600 * 1000), [tickets])
+
+  // per-screen status list (screen online/offline + camera on/off), filterable
+  const screenRows = useMemo(() => {
+    const nameOf = {}; depots.forEach(d => { nameOf[d.id] = d.name })
+    let list = screens.map(s => ({ id: s.id, name: s.name, status: s.status, depot_id: s.depot_id, station: nameOf[s.depot_id] || '—', cam: camByScreen[s.id] }))
+    if (scrStation !== 'all') list = list.filter(s => s.depot_id === scrStation)
+    if (scrOffOnly) list = list.filter(s => s.status !== 'online' || s.cam === false)
+    return list.sort((a, b) => (a.station || '').localeCompare(b.station || '') || (a.name || '').localeCompare(b.name || ''))
+  }, [screens, depots, camByScreen, scrStation, scrOffOnly])
 
   const activeIds = useMemo(() => new Set(techs.filter(t => perTech[t.id]?.working).map(t => t.id)), [techs, perTech])
   const mapUsers = useMemo(() => techs.map(t => ({
@@ -333,6 +359,46 @@ export default function OpsHeadV2() {
                   </tr>
                 )
               })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Screen-wise status — each screen's display + camera badge */}
+      <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
+        <div className="lead-card-head" style={{ padding: '12px 16px', flexWrap: 'wrap', gap: 10 }}>
+          <div><div className="lead-card-title">Screens</div><div className="lead-card-sub">Every screen — display + camera status. {screenRows.length} shown.</div></div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap' }}>
+            <select value={scrStation} onChange={e => setScrStation(e.target.value)} style={selBox}>
+              <option value="all">All stations</option>
+              {depots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            <button onClick={() => setScrOffOnly(v => !v)} className="btn btn-sec btn-sm"
+              style={{ color: scrOffOnly ? 'var(--danger)' : 'var(--text-muted)' }}>
+              {scrOffOnly ? 'Showing down only' : 'Show down only'}
+            </button>
+          </div>
+        </div>
+        <div style={{ overflowX: 'auto', maxHeight: 520, overflowY: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+            <thead><tr>
+              <th style={th}>Screen</th><th style={th}>Station</th>
+              <th style={{ ...th, textAlign: 'center' }}>Status</th>
+            </tr></thead>
+            <tbody>
+              {screenRows.length === 0 && <tr><td style={{ ...td, color: 'var(--text-muted)' }} colSpan={3}>No screens.</td></tr>}
+              {screenRows.map(s => (
+                <tr key={s.id}>
+                  <td style={{ ...td, fontWeight: 600 }}>{s.name}</td>
+                  <td style={{ ...td, color: 'var(--text-muted)' }}>{s.station}</td>
+                  <td style={{ ...td, textAlign: 'center' }}>
+                    <span style={{ display: 'inline-flex', gap: 8, justifyContent: 'center' }}>
+                      <StatusIcon Icon={Monitor} on={s.status === 'online'} title={s.status === 'online' ? 'Screen online' : 'Screen offline'} />
+                      <StatusIcon Icon={Camera} on={s.cam === true ? true : s.cam === false ? false : null} title={s.cam === true ? 'Camera active' : s.cam === false ? 'Camera inactive' : 'No camera'} />
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

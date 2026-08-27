@@ -79,6 +79,13 @@ function mapScreen(s) {
   const gObj = G && typeof G === 'object' && !Array.isArray(G)
   const ls = (s?.location_settings && typeof s.location_settings === 'object') ? s.location_settings : {}
   const num = (v) => { const n = Number(v); return Number.isFinite(n) && n !== 0 ? n : null }
+  // camera (AI-audience) status: cameras[].status Active/Inactive is authoritative;
+  // fall back to the player_settings.camera_status enabled flag; null = no camera.
+  const cams = Array.isArray(s?.cameras) ? s.cameras : []
+  const hasCam = (s?.License?.has_camera === true) || cams.length > 0
+  let camera_active = null
+  if (hasCam && cams.length) camera_active = cams.some(c => String(c?.status || '').toLowerCase() === 'active')
+  else if (hasCam) camera_active = (s?.player_settings?.camera_status === true)
   return {
     external_id,
     name: String(s?.name ?? s?.screen_name ?? s?.title ?? external_id).trim(),
@@ -89,6 +96,7 @@ function mapScreen(s) {
     lng: num(ls.longitude),
     orientation: s?.orientation ? String(s.orientation).toUpperCase() : null,
     last_response: s?.last_response || s?.last_response_at || null,
+    camera_active,
   }
 }
 
@@ -214,7 +222,7 @@ export default async function handler(req) {
   const rows = [], depotLinks = {}
   for (const m of screens) {
     if (m.status === 'online') online++; else if (m.status === 'offline') offline++; else unknownN++
-    rows.push({ external_id: m.external_id, name: m.name, status: m.status, last_response_at: m.last_response, orientation: m.orientation, lat: m.lat, lng: m.lng, updated_at: nowIso })
+    rows.push({ external_id: m.external_id, name: m.name, status: m.status, camera_active: m.camera_active, last_response_at: m.last_response, orientation: m.orientation, lat: m.lat, lng: m.lng, updated_at: nowIso })
     const depot_id = groupMap[m.group_id] || null
     if (depot_id) { const a = depotLinks[depot_id] || (depotLinks[depot_id] = []); a.push(m.external_id) }
     else unresolvedDepot++
