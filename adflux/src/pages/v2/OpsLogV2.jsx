@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { MapPin, Phone, Monitor, Camera, Loader2, Check, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 
@@ -17,6 +18,7 @@ const field = { width: '100%', boxSizing: 'border-box', background: 'var(--v2-bg
 
 export default function OpsLogV2() {
   const [params] = useSearchParams()
+  const { profile } = useAuth()
   const [lang, setLang] = useState(getOpsLang())
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -110,6 +112,7 @@ export default function OpsLogV2() {
       const { error } = await supabase.from('ops_tickets').insert([{
         type: 'fault', source: 'manual', status: 'open',
         depot_id: depotId, screen_id: screenId,
+        created_by: profile?.id, assigned_to: profile?.id,   // exec INSERT needs created_by=auth.uid(); read needs assigned_to=auth.uid()
         issue_type_id: preset ? preset.id : null,
         cause, notes: notes.trim() || null, photo_path,
       }])
