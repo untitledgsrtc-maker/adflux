@@ -16057,3 +16057,31 @@ M18 (inbox RLS admin/viewer InitPlan short-circuit — SQL) · M6 (drop @react-p
 - **Perf backlog now CLOSED to owner-decision items only**: H9 + M20 (held for your shadow-review),
   H4 frontend (deferred until >1000 quotes). Everything else (C1-C3, H1-H8, M1-M17, M21) = done or a
   logged decision (C1/H2/M9/M11/M19). 33 findings resolved.
+
+### §239 update #3 — M20 drafted; H9 NOT RECOMMENDED (2026-08-26)
+- **M20** `supabase_phase323_m20_lead_activities_rls.sql` (owner runs after shadow): rewrites the
+  `lead_activities_via_lead` policy `lead_id IN (SELECT id FROM leads)` → correlated
+  `EXISTS(SELECT 1 FROM leads l WHERE l.id = lead_activities.lead_id)`. Semantically IDENTICAL (both
+  run under the caller's leads RLS; null lead_id excluded by both) — the shadow proves 0 row-set
+  diff. Frozen hottest-table RLS (§28/§40) → shadow + app smoke before relying on it. NOTE: modern
+  Postgres often already plans IN as a semi-join, so the speed-up may be modest — low-risk cleanup.
+- **H9 NOT RECOMMENDED (verified against the live DB):**
+  - Part (b) "move the meeting score off the synchronous save path — the nightly cron backstops it"
+    is UNSAFE: there is **NO score-recompute cron**. `compute_daily_score` runs ONLY via the
+    AFTER-INSERT trigger `trg_recompute_score_on_activity` (supabase_phase34z66) + the manual
+    `backfill_performance` RPC. Removing/deferring that trigger → scores stop updating (incentive
+    breaks). The finding's premise (a cron exists) is false. Doing it safely would require FIRST
+    adding a nightly score cron AND accepting the score lags (no live update after a meeting) — a
+    real UX/incentive-timing regression, not worth it.
+  - Part (a) "fold the contact-count bump into the aftermath UPDATE" merges two frozen §72 canonicals
+    (lead_activity_after_insert — bumps contact_attempts_count + soft-auto-Lost at ≥15; the aftermath
+    — heat/stage/followup) whose ordering the auto-Lost logic depends on, for a negligible lock-time
+    win (both are single-row UPDATEs on the just-inserted activity's lead; contention only under
+    concurrent activity on the SAME lead, rare). High money/auto-Lost risk, tiny gain. §88.4 already
+    consolidated 3 triggers → 1 aftermath; the save path is fast enough.
+  → Recommend leaving H9 as-is. If the score-latency tradeoff is ever wanted, it's a deliberate
+    "add a score cron + defer the trigger" project, not a perf-cleanup.
+
+### Perf audit — FINAL: 33/33 resolved. Shipped: C2/C3, H1/H3/H5/H6/H7/H8, M1-M5, M7/M8, M10/M12-
+M18(run)/M21. Owner-run pending: M20 (drafted, shadow-gated). Deferred: H4 frontend (>1000 quotes).
+Decisions: C1(reject)/H2(revert)/M9/M11(keep *)/M19(defer)/M6(skip)/H9(not recommended, above).
