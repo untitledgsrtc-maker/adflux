@@ -16085,3 +16085,117 @@ M18 (inbox RLS admin/viewer InitPlan short-circuit — SQL) · M6 (drop @react-p
 ### Perf audit — FINAL: 33/33 resolved. Shipped: C2/C3, H1/H3/H5/H6/H7/H8, M1-M5, M7/M8, M10/M12-
 M18(run)/M21. Owner-run pending: M20 (drafted, shadow-gated). Deferred: H4 frontend (>1000 quotes).
 Decisions: C1(reject)/H2(revert)/M9/M11(keep *)/M19(defer)/M6(skip)/H9(not recommended, above).
+
+
+---
+
+## 240 · Operations module → REAL aiadflux data (Phase 1) + full audit-fix batch (2026-08-27)
+
+Owner: the Operations module (§230-§233, built Aug 25) "feels very bad / only one
+tab." Received the aiadflux CMS API + credentials. Anchored the module on REAL data
+and ran a 7-agent read-only audit → fixed every code gap. All on origin (`untitled-os`).
+Self-pushed (§211 — the sandbox CAN push now; §14's "cannot push" is dead).
+
+### THE VERDICT (7-agent audit, wf_bffd8bec) — NOT a UI gap
+Every ops surface is BUILT: OpsAdminV2 (/ops-admin) = a 5-section admin cockpit,
+OpsHeadV2 (/ops-dashboard) = a 6-section desk console, OpsWorkV2 (/ops) = a complete
+Gujarati field app. "Only one tab / feels thin" = **data starvation** (unrun SQL +
+inert sync → a wall of zeros; 294 seed screens all status='unknown', uptime 0) + **3
+real code bugs** that bite once data exists. Adding tabs would not help — they'd show
+zeros. The fix is real data + running the SQL + creating the ops team.
+
+### Phase 1 — the real CMS sync (api/ops/sync.js, rewritten; §45-safe, inert until env)
+The old stub only PATCHed existing screens. The rewrite mirrors the aiadflux CMS
+(read-only API, base `https://api.adfluxcms.com/api/v1`, `Authorization: Bearer <key>`):
+- `GET /groups` → link/create ops_depots (stamp aiadflux group id onto the matching
+  depot via `external_group_id`; fuzzy name-match on first run, exact-by-id after).
+- `GET /screens` paginated (per_page=200) → **UPSERT ops_screens by external_id
+  (creates NEW screens)**, live status/name, linked to depot; then recompute uptime.
+- `?debug=1&secret=<OPS_SYNC_SECRET>` (GET) echoes the raw first /groups + /screens
+  object — lock the exact field names before the first real sync (no Postman).
+- INERT until `AIADFLUX_API_KEY` set in Vercel env (returns `{skipped}`). Writes ONLY
+  ops_* tables. `supabase_ops_p1_screen_sync.sql` adds `ops_depots.external_group_id`.
+- API guide facts (from Api-Usage-Guide.pdf): endpoints /groups /screens /screens/{id}
+  /health/summary /screens/{id}/uptime|status-log /audience /media-reports /playlists
+  /billing/summary /licenses. Screen shape (webhook sample): `{id, name, group, status}`.
+  Webhook → `X-Aiadflux-Signature`, events screen.offline/online/content_failed +
+  camera.* → currently targets **adfluxcrm.com** (a DIFFERENT domain — Phase 2 re-point).
+
+### Code fixes shipped (all ops files NOT §28-frozen except App.jsx, guardian PASS)
+- **[P1] OpsHeadV2** — `AlertTriangle` used (overdue-ticket band) but NOT imported →
+  white-screen crash the instant any ticket ages >48h. Added to the lucide import.
+- **[P1] api/ops/sync.js** — the 294 Phase-0 seed screens have `external_id NULL`, so a
+  real sync ADDED ~265 rows next to them → ~559 total (worse!). Now **auto-retires**
+  placeholders (`DELETE ops_screens WHERE external_id IS NULL`) ONLY after a clean
+  non-empty sync (received>0 && all upserts ok) — a failed/empty pull never wipes the
+  seed. + pagination guard (a `seen` Set breaks the loop if the API ignores page/
+  per_page and returns the full list) + handle `group` as a nested object.
+- **[P2] OpsAdminV2** — added a **"Not reporting"** hero stat (`sc.unknown`) so 294
+  unmeasured screens stop reading as a falsely-healthy "0 offline / 0%".
+- **[P2] App.jsx (§28, guardian PASS)** — RootRedirect now checks the ops role BEFORE
+  the team_role branches, so an ops user with a stale `team_role='sales'` lands on /ops
+  not /work. Pure bugfix — no non-ops landing changes (ops roles are distinct literals).
+- **[P2] supabase_ops_p1** — added `work_sessions_ops_head` SELECT policy. p0 gave the
+  head ops policies on gps_pings + daily_ta but NOT work_sessions → it fell back to the
+  sales manager_id=auth.uid() policy → the "Techs on duty" pill never lit unless every
+  exec's manager_id = the head. Additive, mirrors gps_pings_ops_head.
+- **[P3] OpsPhotoRequest** — the "Request live photo" button rendered for ANY viewer of
+  a won LED_OTHER quote → accounts/hr/staff got a 42501 on tap. Gated on role (sales/
+  agency/telecaller via ops_tickets_sales_request; admin/co_owner/operation_head via
+  _manage). Checks role OR team_role (a sales rep can carry either).
+- **NEW FEATURE — depot-contacts manager** (OpsHeadV2, Screens board "Who to call"
+  column → modal). `ops_depot_contacts` was seed-only with NO app UI → the exec's
+  "Call the depot" was permanently empty. The head can now add/remove contacts
+  (role/name/phone) per depot in-app — no SQL. OpsWorkV2 exec display falls back
+  role_gu→role_en so English-entered contacts show in Gujarati mode.
+
+### CONTRACTS / foot-guns
+- The sync `?debug=1` echo is the field-map lock. If a group/screen field name differs
+  from the tolerant map (id/name/status/group), adjust mapGroup()/mapScreen() + redeploy
+  — never guess past the debug echo.
+- Placeholder auto-retire is gated on received>0 + all-upserts-ok — do NOT loosen it, or
+  a bad pull wipes the seed screens.
+- p4 uptime attribution chains `ops_screens.depot_id → ops_depots.assigned_to → tech`.
+  The sync sets depot_id; the HEAD assigns depots to techs (Screens board UI). Both
+  required for a tech's uptime to compute — not a bug, a workflow step.
+- `latest_ping_per_user` (OpsHeadV2 field-team map) is defined in
+  `supabase_phase183_latest_ping_rpc.sql` (shared with /team-dashboard) — already live
+  if that map works.
+- **Money curve DEFERRED (owner decision, §71):** indicativeVariable stacks the >75/<50
+  bands on the 90→97 SLA transform → effective full-variable only at ≥95.25% uptime, zero
+  below 93.5% — tighter than the §230 doc's 90→97 intent. Matches the p4 trigger, so it's
+  consistent with the engine. Owner picks ONE curve + aligns §230 + p4 trigger +
+  indicativeVariable (dedupe the OpsWorkV2/OpsAdminV2 copies) BEFORE ops uptime pay is on.
+
+### OWNER RUN-LIST (blocks the module going live — I did all the code)
+1. **Vercel env** (untitled-os project → Settings → Environment Variables → Production):
+   `AIADFLUX_API_KEY` (the raw key — never pasted to me), `OPS_SYNC_SECRET` (any long
+   random string), `AIADFLUX_API_URL` = `https://api.adfluxcms.com/api/v1`. Redeploy.
+2. **Debug the field map**: GET `https://app.untitledad.in/api/ops/sync?debug=1&secret=
+   <OPS_SYNC_SECRET>` → paste the JSON to me → I confirm/adjust the sync mapping.
+3. **Run SQL** (Supabase Studio, in order): `supabase_ops_p0_foundation.sql` (if not
+   already — was run 25 Aug), `supabase_ops_p1_screen_sync.sql` (NEW: external_group_id
+   + work_sessions_ops_head policy), `supabase_ops_p6_admin_cockpit.sql` (the cockpit
+   RPCs — un-thins /ops-admin). p4 (uptime pay, MONEY) + p5 (sync cron) = later.
+4. **Create the ops team** (HR → Add Member): ≥1 operation_head + N operation_executive,
+   then run `supabase_ops_team_wire.sql` (auto-points every exec's manager_id at the
+   head + clears stale team_role — no id lookups).
+5. **Fire the first sync**: POST `/api/ops/sync` with header `x-ops-secret: <OPS_SYNC_
+   SECRET>` (or wait for the p5 cron) → ~265 real screens flow in, the 294 placeholders
+   auto-retire, statuses go real.
+6. **In-app, no SQL**: the head assigns depots to techs (Screens board → Assigned tech)
+   + adds depot contacts (Who to call). Field techs then have real work + contacts.
+
+### Still NOT built (owner-aware, deferred)
+Phase 2 inbound webhook receiver (auto-open a fault ticket on screen.offline + WhatsApp
+downtime alert) — needs the CMS webhook re-pointed off adfluxcrm.com + the signature algo
+confirmed. Photo-request auto-routing (head routes manually today). ops_depots.lat/lng
+backfill (Navigate falls back to a name search). Ops-console auto-refresh (manual Refresh
++ 10-min sync cadence for now). MOBILE_NAV_ADMIN Operations entry (sidebar-only on mobile).
+
+### Commits (untitled-os)
+```
+9a0d5be Ops: team-wire SQL (manager_id + clear team_role)
+1db3cfa Ops audit fixes: crash + sync-doubling + honesty + redirect + depot contacts
+74d99f9 Ops Phase 1: real aiadflux screen+depot sync + debug echo (inert until API key)
+```
