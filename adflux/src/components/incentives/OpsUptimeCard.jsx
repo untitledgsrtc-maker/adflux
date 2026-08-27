@@ -98,32 +98,23 @@ export default function OpsUptimeCard({ scope = 'exec' }) {
           </svg>
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
-          {isHead ? (
-            <>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>Screens live during 7 AM–9 PM, across the whole network.</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px', fontSize: 13 }}>
-                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Salary this month</span>
-                <span className="mono" style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 16 }}>{salary ? fmtINR(salary) : '—'}</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-subtle, var(--text-muted))', marginTop: 6 }}>Flat salary — team-uptime pay model pending.</div>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>Your screens live during 7 AM–9 PM, averaged this month.</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px', fontSize: 13 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Base (70%)</span>
-                <span className="mono" style={{ color: 'var(--text)' }}>{fmtINR(base)}</span>
-                <span style={{ color: 'var(--text-muted)' }}>Variable (30%)</span>
-                <span className="mono" style={{ color: variable === 0 ? 'var(--danger)' : 'var(--text)' }}>{fmtINR(variable)} / {fmtINR(cap)}</span>
-                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Projected total</span>
-                <span className="mono" style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 16 }}>{fmtINR(projected)}</span>
-              </div>
-            </>
-          )}
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
+            {isHead
+              ? 'The whole network live during 7 AM–9 PM, averaged this month.'
+              : 'Your screens live during 7 AM–9 PM, averaged this month.'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-muted)' }}>Base (70%)</span>
+            <span className="mono" style={{ color: 'var(--text)' }}>{fmtINR(base)}</span>
+            <span style={{ color: 'var(--text-muted)' }}>Variable (30%)</span>
+            <span className="mono" style={{ color: variable === 0 ? 'var(--danger)' : 'var(--text)' }}>{fmtINR(variable)} / {fmtINR(cap)}</span>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Projected total</span>
+            <span className="mono" style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 16 }}>{fmtINR(projected)}</span>
+          </div>
         </div>
       </div>
 
-      {!isHead && (
+      {(
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', fontSize: 12 }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>What's driving your variable</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: 12 }}>
@@ -138,19 +129,21 @@ export default function OpsUptimeCard({ scope = 'exec' }) {
               pendColor="var(--text-muted)" />
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
-            Uptime = share of your screens live during 7 AM–9 PM, averaged this month.
+            {isHead
+              ? "Uptime = share of the whole network's screens live during 7 AM–9 PM."
+              : 'Uptime = share of your screens live during 7 AM–9 PM, averaged this month.'}
           </div>
         </div>
       )}
 
-      {!isHead && (
+      {(
         <div style={{
           marginTop: 12, padding: '8px 12px', borderRadius: 8,
           background: tone === 'danger' ? 'rgba(239,68,68,.08)' : tone === 'success' ? 'rgba(16,185,129,.08)' : 'rgba(245,158,11,.08)',
           border: `1px solid ${ringColor}`, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6,
         }}>
           {tone === 'danger'
-            ? <><AlertTriangle size={13} color="var(--danger)" /> Below 90% — variable is zero. Get your screens back up to unlock it.</>
+            ? <><AlertTriangle size={13} color="var(--danger)" /> Below 90% — variable is zero. Get {isHead ? 'the network' : 'your screens'} back up to unlock it.</>
             : tone === 'success'
               ? <><TrendingUp size={13} color="var(--success)" /> Full variable payout on track.</>
               : <><TrendingDown size={13} color="var(--warning)" /> Variable scales with uptime — reach {UPTIME_MAX}% to max it.</>}

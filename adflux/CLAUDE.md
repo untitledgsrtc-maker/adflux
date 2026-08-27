@@ -16901,10 +16901,15 @@ reads `ops_my_uptime_pay` (§233, self-scoped) for uptime + salary; base = ×0.7
 - **Real numbers need uptime-pay p4 (§234).** `ops_my_uptime_pay` returns
   `has_data=false` until the screens report uptime → the card shows a "no data yet" empty
   state (like a sales rep before their first meeting). My Offer + My Calls work now.
-- **Operation head — flat salary DEFAULT.** The exec's variable = their own screens'
-  uptime; the head runs the network, isn't attributed screens → head's My Performance =
-  network uptime + team fixes + flat salary, NO personal variable, captioned "team-uptime
-  pay model pending." Owner can flip the head to team-average-uptime pay later — NOT baked.
+- **Operation head — team/NETWORK-uptime variable** (owner "yes go" 2026-08-27). The
+  exec's variable = their own screens' uptime; the head runs the whole network → the head's
+  My Performance shows the SAME Base/Variable/Projected + milestones + status, driven by the
+  NETWORK uptime (all active screens). OpsUptimeCard `scope='head'` reads network
+  online/(online+offline) as the pay driver; the exec/head render is unified (copy differs).
+  ⚠ MONEY FOLLOW-UP: the §234 p4 uptime-pay trigger pays only `operation_executive` rows
+  (network uptime for the head is NOT yet a pay input). So the head's variable is INDICATIVE
+  display today; before ops pay p4 goes live, the p4 trigger must be extended to pay the head
+  on network/team uptime (a money-fn change → §71 rule 3 shadow-compare + owner-verify).
 - **Frozen touches (§28, additive, guardian):** App.jsx (lazy `OpsMyPerformanceV2` +
   `/ops-performance` route under RequireOps) + V2AppShell (the trio appended to
   OPS_EXEC_NAV + OPS_HEAD_NAV). SALES/TELECALLER/AGENCY navs + the GPS skip list
