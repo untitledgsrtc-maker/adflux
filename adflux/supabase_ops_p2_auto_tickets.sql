@@ -44,6 +44,9 @@ DECLARE
   v_cancelled int := 0;
 BEGIN
   FOR d IN SELECT id, name, assigned_to FROM public.ops_depots WHERE is_active LOOP
+    -- serialize concurrent reconciles per depot (sync cron + Record-uptime button)
+    PERFORM pg_advisory_xact_lock(hashtext('ops_reconcile:' || d.id::text));
+
     SELECT count(*) INTO v_down
       FROM public.ops_screens
      WHERE depot_id = d.id AND is_active AND status = 'offline';
