@@ -63,6 +63,7 @@ export default function OpsHeadV2() {
   const [screens, setScreens] = useState([])
   const [depots, setDepots] = useState([])
   const [tickets, setTickets] = useState([])
+  const [approvals, setApprovals] = useState([])
   const [pingByUser, setPingByUser] = useState({})
   const [sessByUser, setSessByUser] = useState({})
   const [kmByUser, setKmByUser] = useState({})
@@ -82,7 +83,7 @@ export default function OpsHeadV2() {
   const load = useCallback(async () => {
     setErr('')
     try {
-      const [tkUsers, scRes, depRes, tickRes, conRes] = await Promise.all([
+      const [tkUsers, scRes, depRes, tickRes, conRes, apprRes] = await Promise.all([
         supabase.from('users').select('id, name, profile_image_url').eq('role', 'operation_executive').eq('is_active', true).order('name'),
         supabase.from('ops_screens').select('id, name, status, depot_id').eq('is_active', true).order('name'),
         supabase.from('ops_depots').select('id, name, assigned_to, city:cities!ops_depots_city_id_fkey(name)').eq('is_active', true).order('name'),
@@ -94,6 +95,12 @@ export default function OpsHeadV2() {
           .in('status', ['open', 'in_progress'])
           .order('priority', { ascending: false }).order('opened_at', { ascending: true }),
         supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone').order('display_order'),
+        supabase.from('ops_tickets')
+          .select('id, type, priority, assigned_to, down_count, resolved_at, cause, notes, ' +
+                  'depot:ops_depots!ops_tickets_depot_id_fkey(id,name), ' +
+                  'tech:users!ops_tickets_assigned_to_fkey(id,name)')
+          .eq('status', 'resolved')
+          .order('resolved_at', { ascending: true }),
       ])
       if (scRes.error) throw scRes.error
       const execs = tkUsers.data || []
@@ -101,6 +108,7 @@ export default function OpsHeadV2() {
       setScreens(scRes.data || [])
       setDepots(depRes.data || [])
       setTickets(tickRes.data || [])
+      setApprovals(apprRes.data || [])
       const cbd = {}; (conRes.data || []).forEach(c => { (cbd[c.depot_id] = cbd[c.depot_id] || []).push(c) })
       setContactsByDepot(cbd)
       // per-screen camera status — resilient (the column may not exist before the SQL runs)
@@ -192,6 +200,18 @@ export default function OpsHeadV2() {
     const { error } = await supabase.from('ops_tickets').update({ assigned_to: techId || null }).eq('id', ticketId)
     if (error) return toastError(error, 'Reassign failed')
     toastSuccess('Ticket reassigned'); load()
+  }
+  async function approveTicket(id) {
+    const { error } = await supabase.rpc('ops_ticket_approve', { p_ticket: id })
+    if (error) return toastError(error, 'Could not approve')
+    toastSuccess('Approved'); load()
+  }
+  async function rejectTicket(id) {
+    const reason = window.prompt('Reason for sending back to the tech (optional):')
+    if (reason === null) return
+    const { error } = await supabase.rpc('ops_ticket_reject', { p_ticket: id, p_reason: reason || null })
+    if (error) return toastError(error, 'Could not reject')
+    toastSuccess('Sent back'); load()
   }
   async function snapshotUptime() {
     setSnapping(true)
@@ -403,6 +423,34 @@ export default function OpsHeadV2() {
           </table>
         </div>
       </div>
+
+      {/* Awaiting approval — resolved tickets the head signs off */}
+      {approvals.length > 0 && (
+        <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
+          <div className="lead-card-head" style={{ padding: '12px 16px' }}>
+            <div><div className="lead-card-title">Awaiting approval</div><div className="lead-card-sub">{approvals.length} resolved ticket(s) to sign off.</div></div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+              <thead><tr><th style={th}>Station</th><th style={th}>Tech</th><th style={th}>Cause</th><th style={th}>Resolved</th><th style={th}></th></tr></thead>
+              <tbody>
+                {approvals.map(a => (
+                  <tr key={a.id}>
+                    <td style={{ ...td, fontWeight: 600 }}>{a.depot?.name || '—'}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)' }}>{a.tech?.name || 'Unassigned'}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)' }}>{a.cause || '—'}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)' }}>{a.resolved_at ? new Date(a.resolved_at).toLocaleDateString('en-GB') : '—'}</td>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      <button className="btn btn-sm" onClick={() => approveTicket(a.id)} style={{ background: 'var(--success)', color: 'var(--accent-fg, #0f172a)', marginRight: 6 }}>Approve</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => rejectTicket(a.id)}>Reject</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Tickets board — reassign a ticket */}
       <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
