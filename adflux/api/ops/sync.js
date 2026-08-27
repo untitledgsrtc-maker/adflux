@@ -198,7 +198,7 @@ export default async function handler(req) {
       if (!g.name && m.group_name) g.name = m.group_name
       if (g.lat == null && m.lat != null) { g.lat = m.lat; g.lng = m.lng }
     }
-    const depots = await sbGet('ops_depots?select=id,name,external_group_id,lat,lng')
+    const depots = await sbGet('ops_depots?select=id,name,external_group_id,lat,lng,is_active')
     for (const gid of Object.keys(groups)) {
       const g = groups[gid]
       if (/\btest\b/i.test(g.name || '')) continue   // never make a depot for a test group (F2)
@@ -207,6 +207,7 @@ export default async function handler(req) {
       if (d) {
         const patch = {}
         if (d.external_group_id !== gid) { patch.external_group_id = gid; depotsLinked++ }
+        if (d.is_active === false) patch.is_active = true   // a live CMS group reactivates a deactivated depot (never leave a linked depot dark)
         if (d.lat == null && g.lat != null) { patch.lat = g.lat; patch.lng = g.lng }
         if (Object.keys(patch).length) { patch.updated_at = nowIso; await sbPatch('ops_depots', `id=eq.${d.id}`, patch); d.external_group_id = gid }
       } else {

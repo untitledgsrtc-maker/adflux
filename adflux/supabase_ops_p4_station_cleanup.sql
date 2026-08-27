@@ -22,13 +22,13 @@ UPDATE public.ops_screens SET is_active = false, updated_at = now()
 UPDATE public.ops_depots SET is_active = false, updated_at = now()
  WHERE name ILIKE '%test%';
 
--- ==== PART 2b · MERGE A DUP PAIR (fill from PART 1, then run per pair) =======
--- Keep the CANONICAL depot (B, usually the uppercase "… GSRTC …" one with more
--- screens); move the DUP's (A) screens + tickets onto B, then deactivate A.
--- REPLACE the two uuids and run once per dup pair:
---   UPDATE public.ops_screens SET depot_id = '<B_canonical>', updated_at = now() WHERE depot_id = '<A_dup>';
---   UPDATE public.ops_tickets  SET depot_id = '<B_canonical>', updated_at = now() WHERE depot_id = '<A_dup>';
---   UPDATE public.ops_depots   SET is_active = false, updated_at = now() WHERE id = '<A_dup>';
+-- ==== PART 2b · DEDUPE (safe to run — confirmed by the 27 Aug diagnostic) ====
+-- Every dup/orphan is an UNUSED SEED row: external_group_id IS NULL and 0 screens
+-- (Ankleshwar Gidc / Chikhli / Dwrka / Surat (City) dups of the GSRTC ones, plus
+-- Ahmedabad / Vadodara orphans). No screen-merge needed — just deactivate them.
+-- Every REAL station carries an external_group_id (a live CMS group + screens).
+UPDATE public.ops_depots SET is_active = false, updated_at = now()
+ WHERE external_group_id IS NULL;
 
 NOTIFY pgrst, 'reload schema';
 
