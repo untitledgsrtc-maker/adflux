@@ -17122,3 +17122,14 @@ counts = off-brand, the exact thing the owner guards against):
   already tolerates the camera_active column not existing).
 - NOTE: the head's snapshot is NETWORK-WIDE (all active screens); the exec home's snapshot is
   scoped to `ops_depots.assigned_to=me`. Same content, different scope by role — correct.
+
+### 254.3 · Pay/uptime card REMOVED from the exec home (owner, 2026-08-27) — SUPERSEDES §251.2
+Owner saw the `OpsUptimeCard scope="exec"` live on `/ops-home` ("0% · Variable ₹0 · Below 90% —
+variable is zero") and said "i dont want at home". Reversed §251.2's "put the pay card on the
+home". Removed `<OpsUptimeCard scope="exec" />` + its import from `OpsHomeV2.jsx`. The home is now
+purely OPERATIONAL (network snapshot · down strip · worst-first faults · log · in-process/fixed
+pills · my-month mini · station map). Pay/uptime lives on **My Performance** (`/ops-performance`,
+where OpsUptimeCard is still mounted) — the right place for it. WHY it read so bad on the home:
+uptime is 0% (p4 not recording yet AND night = all screens off → 0%), so the card projected ₹0
+variable + a red "below 90%" — demotivating on the daily operational screen. The my-month mini
+keeps a neutral "avg uptime" STAT (a number, not the pay projection) — kept.

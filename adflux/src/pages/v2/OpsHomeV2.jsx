@@ -23,7 +23,6 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
 import { isOnHours, faultAgeHours, ageLabel, severityOf } from '../../utils/opsHours'
 import { istTodayISO } from '../../utils/istDate'
-import OpsUptimeCard from '../../components/incentives/OpsUptimeCard'
 import OpsStationsMap from '../../components/ops/OpsStationsMap'
 
 const NIL = '00000000-0000-0000-0000-000000000000'
@@ -198,9 +197,6 @@ export default function OpsHomeV2() {
           </div>
         </div>
       )}
-
-      {/* pay + uptime — the full professional card (same as My Performance) */}
-      <OpsUptimeCard scope="exec" />
 
       {!noDepots && (
         <>
