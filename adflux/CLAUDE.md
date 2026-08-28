@@ -17171,3 +17171,35 @@ actionable (→ Mark fixed). Blast-radius verified: NO code filtered manual `sta
 gap); the §243 auto-ticket engine creates `source='auto_offline'` `open` tickets, untouched (source-
 scoped). One-line change; OpsHomeV2 unchanged. FOOT-GUN: an insert status that no read surface matches =
 an invisible record — make a created record land in a list/count the user actually looks at.
+
+
+---
+
+## 255 · Ops p4 uptime pay — 7 AM–9 PM night-gate baked in (pre-live, MONEY) (2026-08-27, `faa510e`)
+
+Closes the §250/§254.1/§254.4 open flag ("uptime counted the whole 24h → the pay curve reads a perfect
+screen at ~58% because it's correctly off 9 PM–7 AM"). `ops_recompute_uptime_today` (in
+`supabase_ops_p4_uptime_pay.sql`, the MONEY file, still owner-deferred §234) now early-RETURNs off-hours:
+`v_hour := extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata'))::int; IF v_hour < 7 OR v_hour >= 21 THEN
+RETURN;` — placed AFTER the role check, BEFORE the FOR loop. Off-hours (screens intentionally OFF, timers)
+there is NO INSERT/UPDATE to ops_uptime_daily → the `ops_uptime_to_daily_performance` trigger never fires
+→ `daily_performance.score_pct` FREEZES at the last on-hours snapshot (the real daytime uptime), instead of
+crashing to 0% and tanking pay for hours the tech was never expected to keep screens on.
+
+### CONTRACT (do NOT regress)
+- The gate window `[7, 21)` IST matches `src/utils/opsHours.js isOnHours()` (`hour >= 7 && hour < 21`) AND
+  the §254.1 auto-ticket engine gate EXACTLY — so pay + tickets agree on "operating hours". Change one →
+  change all three (§71).
+- The role check runs BEFORE the night-gate → an unauthorized off-hours caller still gets the RAISE
+  (security not softened by the RETURN).
+- Doc notes live in the file's OWNER banner + Part 1 description + inline at the IF.
+- This is baked into the SQL but the file is STILL owner-deferred (§234 — p4 uptime pay not turned on).
+  When the owner eventually runs p4, the night-gate ships with it → ops uptime pay can NEVER count the
+  full 24h. Shadow-compare (Part 3) + owner-verify the 90/97 curve BEFORE it goes live (§71 rule 3).
+- check-sql-schema.sh flags `r.uid`/`r.known_total`/`r.up` — the documented PL/pgSQL FOR-loop record-field
+  false-positives (§72#15/§254), not real errors.
+
+### Foot-gun
+- ❌ An uptime/pay recompute that snapshots screen status must gate on operating hours (`isOnHours`) — a
+  24h count reads a perfect timer-off screen as a failure and tanks pay. The auto-ticket engine (§254.1)
+  and this pay recompute share the ONE 7 AM–9 PM window.
