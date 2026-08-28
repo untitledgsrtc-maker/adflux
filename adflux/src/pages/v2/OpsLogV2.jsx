@@ -29,6 +29,7 @@ export default function OpsLogV2() {
   const [contacts, setContacts] = useState([])
   const [screens, setScreens] = useState([])
   const [screenId, setScreenId] = useState('')
+  const [showAll, setShowAll] = useState(false)   // dropdown lists OFFLINE (faulty) screens by default; toggle to log a working screen (cleaning/damage)
   const [recent, setRecent] = useState([])
 
   const [issueId, setIssueId] = useState('')      // '' | <ops_issue_types.id> | 'other'
@@ -57,7 +58,7 @@ export default function OpsLogV2() {
 
   // 2 · a city's contacts + screens
   const loadCity = useCallback(async (id) => {
-    setContacts([]); setScreens([]); setScreenId(''); setRecent([])
+    setContacts([]); setScreens([]); setScreenId(''); setRecent([]); setShowAll(false)
     if (!id) return
     try {
       const [cRes, sRes] = await Promise.all([
@@ -97,6 +98,19 @@ export default function OpsLogV2() {
   const screenLabel = useMemo(() => {
     const m = {}; screens.forEach((s, i) => { m[s.id] = `${t('screen', lang)} ${i + 1}` }); return m
   }, [screens, lang])
+  // Log a fault on a DOWN screen: default the picker to offline screens only (owner ask 2026-08-28).
+  // Fallback to all when none are offline (never a dead-end) or when the tech toggles "show all"
+  // (to log a working screen — cleaning / damage). Always keep the currently-selected screen visible.
+  const offlineScreens = useMemo(() => screens.filter(s => s.status === 'offline'), [screens])
+  const shownScreens = useMemo(() => {
+    const base = (showAll || offlineScreens.length === 0) ? screens : offlineScreens
+    if (screenId && screenId !== '__all__' && !base.some(s => s.id === screenId)) {
+      const sel = screens.find(s => s.id === screenId)
+      if (sel) return [sel, ...base]
+    }
+    return base
+  }, [screens, offlineScreens, showAll, screenId])
+  const hiddenWorking = !showAll && offlineScreens.length > 0 && offlineScreens.length < screens.length
   const canSave = depotId && screenId && issueId && (issueId !== 'other' || otherText.trim())
 
   async function save() {
@@ -105,7 +119,7 @@ export default function OpsLogV2() {
     savingRef.current = true; setBusy(true)
     try {
       // "All screens" (whole station) → one ticket per active screen at the depot.
-      const targetScreens = screenId === '__all__' ? screens.map(s => s.id) : [screenId]
+      const targetScreens = screenId === '__all__' ? shownScreens.map(s => s.id) : [screenId]
       let photo_path = null
       if (photoFile) {
         const ext = (photoFile.name.split('.').pop() || 'jpg').toLowerCase()
@@ -176,10 +190,15 @@ export default function OpsLogV2() {
             <label style={{ ...lbl, marginTop: 14 }}><Monitor size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t('screen', lang)}</label>
             <select value={screenId} onChange={e => setScreenId(e.target.value)} style={field}>
               <option value="">{t('pick_screen', lang)}</option>
-              {screens.length > 1 && <option value="__all__">{t('all_screens', lang)}</option>}
-              {screens.map((s, i) => <option key={s.id} value={s.id}>{s.name || `${t('screen', lang)} ${i + 1}`}</option>)}
+              {shownScreens.length > 1 && <option value="__all__">{t('all_screens', lang)}</option>}
+              {shownScreens.map((s, i) => <option key={s.id} value={s.id}>{s.name || `${t('screen', lang)} ${i + 1}`}</option>)}
             </select>
-            {screenId && <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 4 }}>{screens.find(s => s.id === screenId)?.name}</div>}
+            {hiddenWorking && (
+              <button type="button" onClick={() => setShowAll(true)} style={{ background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', fontSize: 12.5, cursor: 'pointer', marginTop: 6, padding: 0, textAlign: 'left' }}>
+                {t('show_all_screens', lang)}
+              </button>
+            )}
+            {screenId && screenId !== '__all__' && <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 4 }}>{screens.find(s => s.id === screenId)?.name}</div>}
           </>
         )}
       </div>

@@ -92,6 +92,7 @@ export const STR = {
   screen:          { gu: 'સ્ક્રીન',                     en: 'Screen' },
   pick_screen:     { gu: 'સ્ક્રીન પસંદ કરો',            en: 'Pick a screen' },
   all_screens:     { gu: 'બધી સ્ક્રીન (આખું સ્ટેશન)',    en: 'All screens (whole station)' },
+  show_all_screens:{ gu: 'બધી સ્ક્રીન બતાવો',          en: 'Show all screens' },
   other_issue:     { gu: 'બીજું (લખો)',                en: 'Other (type it)' },
   upload_photo:    { gu: 'ફોટો અપલોડ કરો',             en: 'Upload photo' },
   save_issue:      { gu: 'ખરાબી સાચવો',                en: 'Save issue' },
