@@ -47,7 +47,7 @@ export default function DashboardV2() {
 
   // Ops users must never see the sales dashboard (leak fix, 2026-08-27).
   // Bounce them to their own home — mirrors RootRedirect's ops landing.
-  if (profile?.role === 'operation_head')      return <Navigate to="/ops-down" replace />
+  if (profile?.role === 'operation_head')      return <Navigate to="/ops-command" replace />
   if (profile?.role === 'operation_executive') return <Navigate to="/ops-home" replace />
 
   if (isPrivileged) return <AdminDashboardDesktop />

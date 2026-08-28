@@ -71,6 +71,7 @@ const WorkV2 = lazyWithRetry(() => import('./pages/v2/WorkV2'))
 const OpsWorkV2 = lazyWithRetry(() => import('./pages/v2/OpsWorkV2'))
 // Phase 230 (Phase 2) — Operation Head desk console.
 const OpsHeadV2 = lazyWithRetry(() => import('./pages/v2/OpsHeadV2'))
+const OpsCommandV2 = lazyWithRetry(() => import('./pages/v2/OpsCommandV2'))
 // Phase 230 (Phase 6) — admin Operations owner cockpit.
 const OpsAdminV2 = lazyWithRetry(() => import('./pages/v2/OpsAdminV2'))
 // Phase 230 — per-station Operations board (KPIs + screen wall + contacts + issue ref).
@@ -317,7 +318,7 @@ function RootRedirect() {
   // the ops role FIRST so login-landing matches the sidebar nav (which already
   // gates on isOps before the sales branches). operation_executive → the primary
   // Log-a-screen-issue screen (/ops-log); operation_head → the desk console.
-  if (role === 'operation_head')       return <Navigate to="/ops-down" replace />
+  if (role === 'operation_head')       return <Navigate to="/ops-command" replace />
   if (role === 'operation_executive')  return <Navigate to="/ops-home" replace />
   // Phase 61 (19 May 2026) — sales_manager (Jubin + Renuka) lands
   // on /manager (their team-lead dashboard). Branch BEFORE the base
@@ -449,6 +450,7 @@ export default function App() {
           <Route path="/work"                      element={<WorkV2 />} />
           {/* Phase 230 — Operations field app (exec) + Head desk console. */}
           <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
+          <Route path="/ops-command"               element={<RequireOps><OpsCommandV2 /></RequireOps>} />
           <Route path="/ops-dashboard"             element={<RequireOps><OpsHeadV2 /></RequireOps>} />
           <Route path="/ops-log"                   element={<RequireOps><OpsLogV2 /></RequireOps>} />
           <Route path="/ops-down"                  element={<RequireOps><OpsDownV2 /></RequireOps>} />
