@@ -17306,3 +17306,11 @@ in_progress ticket for that screen, §254.5). `OpsLogV2` gained a `?screen=` pre
 the depot's screens load) + shows the real `ops_screens.name` in its screen dropdown (was a generic
 `Screen N` index — same fix as §256.1). opsStrings: `log_short` + `which_screens` relabelled "tap to log".
 Ops pages (not frozen), build PASS.
+
+### 256.3 · "All screens" log + bigger home tiles (2026-08-28)
+Owner (Gandhinagar has ~20 screens): a "select all screens" option + bigger In-process/Fixed tiles.
+- `OpsLogV2` screen dropdown gains an **"All screens (whole station)"** option (shown when >1 screen) →
+  `save()` inserts one in_progress ticket per active screen at the depot (single-screen path unchanged);
+  `loadRecent` guards `__all__`; photo key uses `<depot>/all/`. opsStrings `all_screens`.
+- `OpsHomeV2`: the In-process / Fixed-today pills → bigger tap TILES (big count + label, warning/success
+  colored). Ops pages, build PASS.

@@ -91,6 +91,7 @@ export const STR = {
   no_contacts:     { gu: 'કોઈ સંપર્ક ઉમેર્યો નથી',      en: 'No contacts added yet' },
   screen:          { gu: 'સ્ક્રીન',                     en: 'Screen' },
   pick_screen:     { gu: 'સ્ક્રીન પસંદ કરો',            en: 'Pick a screen' },
+  all_screens:     { gu: 'બધી સ્ક્રીન (આખું સ્ટેશન)',    en: 'All screens (whole station)' },
   other_issue:     { gu: 'બીજું (લખો)',                en: 'Other (type it)' },
   upload_photo:    { gu: 'ફોટો અપલોડ કરો',             en: 'Upload photo' },
   save_issue:      { gu: 'ખરાબી સાચવો',                en: 'Save issue' },

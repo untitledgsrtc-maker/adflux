@@ -71,7 +71,7 @@ export default function OpsLogV2() {
 
   // 3 · issues already logged on the chosen screen
   const loadRecent = useCallback(async (sid) => {
-    if (!sid) { setRecent([]); return }
+    if (!sid || sid === '__all__') { setRecent([]); return }
     const { data } = await supabase.from('ops_tickets')
       .select('id, cause, notes, photo_path, created_at, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu)')
       .eq('screen_id', sid).order('created_at', { ascending: false }).limit(5)
@@ -104,23 +104,26 @@ export default function OpsLogV2() {
     if (!canSave) { toastError(new Error(''), t('need_screen', lang)); return }
     savingRef.current = true; setBusy(true)
     try {
+      // "All screens" (whole station) → one ticket per active screen at the depot.
+      const targetScreens = screenId === '__all__' ? screens.map(s => s.id) : [screenId]
       let photo_path = null
       if (photoFile) {
         const ext = (photoFile.name.split('.').pop() || 'jpg').toLowerCase()
-        const key = `${depotId}/${screenId}/${Date.now()}.${ext}`
+        const key = `${depotId}/${screenId === '__all__' ? 'all' : screenId}/${Date.now()}.${ext}`
         const up = await supabase.storage.from('ops-photos').upload(key, photoFile, { upsert: false })
         if (up.error) { toastError(up.error, t('save_failed', lang)); return }
         photo_path = key
       }
       const preset = issueId !== 'other' ? issueTypes.find(x => x.id === issueId) : null
       const cause = preset ? preset.issue_en : otherText.trim()
-      const { error } = await supabase.from('ops_tickets').insert([{
+      const rows = targetScreens.map(sid => ({
         type: 'fault', source: 'manual', status: 'in_progress',   // a logged fault is the tech taking it on → shows in the home In-process box + the Tickets In-process tab (actionable → Mark fixed)
-        depot_id: depotId, screen_id: screenId,
+        depot_id: depotId, screen_id: sid,
         created_by: profile?.id, assigned_to: profile?.id,   // exec INSERT needs created_by=auth.uid(); read needs assigned_to=auth.uid()
         issue_type_id: preset ? preset.id : null,
         cause, notes: notes.trim() || null, photo_path,
-      }])
+      }))
+      const { error } = await supabase.from('ops_tickets').insert(rows)
       if (error) { toastError(error, t('save_failed', lang)); return }
       toastSuccess(t('issue_saved', lang))
       setIssueId(''); setOtherText(''); setNotes(''); setPhotoFile(null)
@@ -173,6 +176,7 @@ export default function OpsLogV2() {
             <label style={{ ...lbl, marginTop: 14 }}><Monitor size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t('screen', lang)}</label>
             <select value={screenId} onChange={e => setScreenId(e.target.value)} style={field}>
               <option value="">{t('pick_screen', lang)}</option>
+              {screens.length > 1 && <option value="__all__">{t('all_screens', lang)}</option>}
               {screens.map((s, i) => <option key={s.id} value={s.id}>{s.name || `${t('screen', lang)} ${i + 1}`}</option>)}
             </select>
             {screenId && <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 4 }}>{screens.find(s => s.id === screenId)?.name}</div>}

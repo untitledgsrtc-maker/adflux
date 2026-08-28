@@ -231,9 +231,15 @@ export default function OpsHomeV2() {
       {!noDepots && (
         <>
           <button onClick={() => nav('/ops-log')} className="lead-btn lead-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '13px', fontSize: 15, fontWeight: 700, marginBottom: 10 }}><FilePlus size={16} /> {t('report_fault', lang)}</button>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-            <button onClick={() => nav('/ops-tickets')} className="lead-btn" style={{ flex: 1, justifyContent: 'center' }}>{t('in_process', lang)} · {s.inProc ?? 0}</button>
-            <button onClick={() => nav('/ops-tickets')} className="lead-btn" style={{ flex: 1, justifyContent: 'center' }}>{t('fixed_today_w', lang)} · {s.fixedToday ?? 0}</button>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+            <button onClick={() => nav('/ops-tickets')} className="lead-card" style={{ flex: 1, padding: '15px 12px', textAlign: 'center', cursor: 'pointer', color: 'inherit', display: 'block' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 27, fontWeight: 800, color: 'var(--warning)', lineHeight: 1 }}>{s.inProc ?? 0}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{t('in_process', lang)}</div>
+            </button>
+            <button onClick={() => nav('/ops-tickets')} className="lead-card" style={{ flex: 1, padding: '15px 12px', textAlign: 'center', cursor: 'pointer', color: 'inherit', display: 'block' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 27, fontWeight: 800, color: 'var(--success)', lineHeight: 1 }}>{s.fixedToday ?? 0}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{t('fixed_today_w', lang)}</div>
+            </button>
           </div>
 
           {/* my month */}
