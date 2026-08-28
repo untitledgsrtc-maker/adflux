@@ -263,6 +263,7 @@ const OPS_HEAD_NAV = [
   { to: '/ops-log',           label: 'Log issue',      icon: FileText },
   { to: '/ops-dashboard',     label: 'Live console',   icon: Tv },
   { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
+  { to: '/ops-tickets',       label: 'Tickets',        icon: CheckSquare },
   // Phase 251 — personal section (same trio the sales rep gets).
   { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },

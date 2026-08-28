@@ -96,11 +96,13 @@ export default function OpsMyPerformanceV2() {
 
       {/* Grand-total payable — the same consolidated card a sales rep gets
           (base + variable + incentive + TA/DA − unpaid-leave). Reads the
-          single-source compute_monthly_salary RPC; renders for ops (only
-          agency is excluded). Variable here follows the monthly score
-          (uptime-derived once uptime pay is recording), so it stays in
-          step with the uptime card above. */}
-      <TotalPayableCard key={`tp-${refreshKey}`} />
+          single-source compute_monthly_salary RPC; variable follows the
+          monthly score (uptime-derived once uptime pay is recording).
+          EXEC only: the head's pay model is flat/pending (§251), and with no
+          uptime score rows compute_monthly_salary would read a §184
+          full-variable cap — so the head keeps the uptime projection card
+          above as the payable surface, not this one. */}
+      {!isHead && <TotalPayableCard key={`tp-${refreshKey}`} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
         <Tile label="Fixed this month" val={kpi?.fixedMo ?? '—'} />

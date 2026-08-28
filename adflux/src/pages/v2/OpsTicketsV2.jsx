@@ -34,6 +34,8 @@ function chip(text, tone) {
 export default function OpsTicketsV2() {
   const { profile } = useAuth()
   const uid = profile?.id
+  // Head / admin see the whole NETWORK ticket queue (they own no depots); exec sees own.
+  const isHead = ['operation_head', 'admin', 'co_owner'].includes(profile?.role)
   const isDesktop = useIsDesktop()
   const gridWrap = { display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr', gap: 14, alignItems: 'start' }
   const [lang, setLang] = useState(getOpsLang())
@@ -41,7 +43,7 @@ export default function OpsTicketsV2() {
   const nm = (row, base) => (lang === 'gu' ? row?.[`${base}_gu`] : row?.[`${base}_en`]) || row?.[`${base}_en`] || ''
 
   const [params] = useSearchParams()
-  const TAB_KEYS = ['open', 'proc', 'fixed', 'mystats']
+  const TAB_KEYS = isHead ? ['open', 'proc', 'fixed'] : ['open', 'proc', 'fixed', 'mystats']   // head has no personal "Me" tab (his pay is on /ops-performance)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   // Deep-link the tab from ?tab= (home In-process / Fixed tiles land here).
@@ -76,8 +78,9 @@ export default function OpsTicketsV2() {
   const load = useCallback(async () => {
     if (!uid) return
     try {
-      const dRes = await supabase.from('ops_depots')
-        .select('id, name, assigned_to').eq('assigned_to', uid).eq('is_active', true).order('name')
+      let dQ = supabase.from('ops_depots').select('id, name, assigned_to').eq('is_active', true).order('name')
+      if (!isHead) dQ = dQ.eq('assigned_to', uid)   // head → all stations; exec → own
+      const dRes = await dQ
       if (dRes.error) throw dRes.error
       const myDepots = dRes.data || []
       setDepots(myDepots)
@@ -91,16 +94,21 @@ export default function OpsTicketsV2() {
       const nowOn = isOnHours()
       setOnHours(nowOn)
 
+      // proc/fixed: head sees the whole team's manual tickets; exec sees own.
+      let pQ = supabase.from('ops_tickets')
+        .select('id, screen_id, depot_id, cause, notes, created_at, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu), screen:ops_screens!ops_tickets_screen_id_fkey(name), depot:ops_depots!ops_tickets_depot_id_fkey(name)')
+        .eq('source', 'manual').eq('status', 'in_progress').order('created_at', { ascending: false })
+      let fQ = supabase.from('ops_tickets')
+        .select('id, screen_id, depot_id, cause, notes, resolved_at, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu), screen:ops_screens!ops_tickets_screen_id_fkey(name), depot:ops_depots!ops_tickets_depot_id_fkey(name)')
+        .eq('source', 'manual').eq('status', 'resolved').order('resolved_at', { ascending: false }).limit(isHead ? 60 : 30)
+      if (!isHead) { pQ = pQ.eq('assigned_to', uid); fQ = fQ.eq('assigned_to', uid) }
+
       const [scr, it, ct, pRes, fRes] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status, depot_id, last_response_at').in('depot_id', depotIds).eq('is_active', true).eq('status', nowOn ? 'offline' : 'online'),
         supabase.from('ops_issue_types').select('id, issue_en, issue_gu, solution_en, solution_gu, display_order').eq('is_active', true).order('display_order'),
         supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone, display_order').in('depot_id', depotIds).order('display_order'),
-        supabase.from('ops_tickets')
-          .select('id, screen_id, depot_id, cause, notes, created_at, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu), screen:ops_screens!ops_tickets_screen_id_fkey(name), depot:ops_depots!ops_tickets_depot_id_fkey(name)')
-          .eq('assigned_to', uid).eq('source', 'manual').eq('status', 'in_progress').order('created_at', { ascending: false }),
-        supabase.from('ops_tickets')
-          .select('id, screen_id, depot_id, cause, notes, resolved_at, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu), screen:ops_screens!ops_tickets_screen_id_fkey(name), depot:ops_depots!ops_tickets_depot_id_fkey(name)')
-          .eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').order('resolved_at', { ascending: false }).limit(30),
+        pQ,
+        fQ,
       ])
       setIssueTypes(it.data || [])
       const cbd = {}; (ct.data || []).forEach(c => { (cbd[c.depot_id] = cbd[c.depot_id] || []).push(c) }); setContactsByDepot(cbd)
@@ -260,7 +268,7 @@ export default function OpsTicketsV2() {
   if (err) return <div className="lead-root"><div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 12, padding: '12px 16px', fontSize: 13 }}>{err} <button className="lead-btn" onClick={() => { setErr(''); load() }} style={{ marginLeft: 10 }}>{t('retry', lang)}</button></div></div>
 
   const cnt = { open: cityScreens.length, proc: cityProc.length, fixed: cityFixed.length }
-  const tabs = [['open', t('tab_open', lang), 'var(--danger)'], ['proc', t('tab_proc', lang), 'var(--warning)'], ['fixed', t('tab_fixed', lang), 'var(--success)'], ['mystats', t('tab_mystats', lang), '']]
+  const tabs = [['open', t('tab_open', lang), 'var(--danger)'], ['proc', t('tab_proc', lang), 'var(--warning)'], ['fixed', t('tab_fixed', lang), 'var(--success)'], ...(isHead ? [] : [['mystats', t('tab_mystats', lang), '']])]
 
   return (
     <div className="lead-root">
