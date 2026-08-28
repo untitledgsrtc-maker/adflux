@@ -138,6 +138,7 @@ export default function OpsHomeV2() {
   const top = cityFaults.slice(0, 4)
   const noDepots = depots.length === 0
   const stationCount = cityId ? 1 : depots.length
+  const downHref = cityId ? `/ops-down?depot=${cityId}` : '/ops-down'   // carry the city filter into the Down-now board
 
   return (
     <div className="lead-root">
@@ -186,15 +187,15 @@ export default function OpsHomeV2() {
             </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
-            <SnapTile icon={Monitor} n={net.total} label={t('total_screens', lang)} tone="neutral" onClick={() => nav('/ops-down')} />
-            <SnapTile icon={Wifi} n={net.online} label={t('online', lang)} tone="success" onClick={() => nav('/ops-down')} />
-            <SnapTile icon={WifiOff} n={net.offline} label={t('offline', lang)} tone={onHours ? 'danger' : 'neutral'} onClick={() => nav('/ops-down')} />
-            <SnapTile icon={VideoOff} n={net.cameraOff != null ? net.cameraOff : '—'} label={t('camera_off', lang)} tone="warning" onClick={() => nav('/ops-down')} />
+            <SnapTile icon={Monitor} n={net.total} label={t('total_screens', lang)} tone="neutral" onClick={() => nav(downHref)} />
+            <SnapTile icon={Wifi} n={net.online} label={t('online', lang)} tone="success" onClick={() => nav(downHref)} />
+            <SnapTile icon={WifiOff} n={net.offline} label={t('offline', lang)} tone={onHours ? 'danger' : 'neutral'} onClick={() => nav(downHref)} />
+            <SnapTile icon={VideoOff} n={net.cameraOff != null ? net.cameraOff : '—'} label={t('camera_off', lang)} tone="warning" onClick={() => nav(downHref)} />
           </div>
           {/* off-hours: offline is normal (timer, §250) — not an alarm */}
           {!onHours && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 10, textAlign: 'center' }}>{t('all_quiet', lang)}</div>}
           <div style={{ display: 'flex', marginTop: 13, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            <SubStat val={stationCount} label={t('stations_word', lang)} onClick={() => nav('/ops-down')} />
+            <SubStat val={stationCount} label={t('stations_word', lang)} onClick={() => nav(downHref)} />
             <SubStat val={s.fixedToday ?? 0} label={t('fixed_today_w', lang)} border onClick={() => nav('/ops-tickets')} />
             <SubStat val={s.inProc ?? 0} label={t('in_process', lang)} border onClick={() => nav('/ops-tickets')} />
           </div>
@@ -206,7 +207,7 @@ export default function OpsHomeV2() {
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t('needs_you', lang)}</span>
-            {cityFaults.length > top.length && <button onClick={() => nav('/ops-down')} style={{ background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>{t('see_all', lang)} {cityFaults.length}<ChevronRight size={13} /></button>}
+            {cityFaults.length > top.length && <button onClick={() => nav(downHref)} style={{ background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>{t('see_all', lang)} {cityFaults.length}<ChevronRight size={13} /></button>}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
             {top.map(r => {

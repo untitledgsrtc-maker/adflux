@@ -5,8 +5,8 @@
 // ops_depot_contacts — no writes. Head lands here; exec + admin can open it.
 // Gujarati-first (§231). App v2 tokens.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Activity, RefreshCw, Phone, Loader2, CheckCircle2, FilePlus, ChevronDown } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Activity, RefreshCw, Phone, Loader2, CheckCircle2, FilePlus, ChevronDown, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { t, getOpsLang, setOpsLang, numL } from '../../utils/opsStrings'
 import { toastSuccess } from '../../components/v2/Toast'
@@ -15,6 +15,8 @@ const card = { background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v
 
 export default function OpsDownV2() {
   const nav = useNavigate()
+  const [params] = useSearchParams()
+  const depotFilter = params.get('depot')   // carried from the home city filter → scope the board to one station
   const [lang, setLang] = useState(getOpsLang())
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -51,9 +53,10 @@ export default function OpsDownV2() {
   }, [load])
 
   const { uptime, downCount, rows } = useMemo(() => {
+    const scoped = depotFilter ? screens.filter(s => s.depot_id === depotFilter) : screens
     let online = 0, offline = 0
     const byDepot = {}
-    screens.forEach(s => {
+    scoped.forEach(s => {
       if (s.status === 'online') online++; else if (s.status === 'offline') offline++
       const d = (byDepot[s.depot_id] ||= { total: 0, down: [] })
       d.total++; if (s.status === 'offline') d.down.push(s)
@@ -73,7 +76,7 @@ export default function OpsDownV2() {
       .sort((a, b) => b.down - a.down)
     const uptime = (online + offline) > 0 ? Math.round(online / (online + offline) * 100) : 100
     return { uptime, downCount: offline, rows }
-  }, [screens, depots, tickets, lang])
+  }, [screens, depots, tickets, lang, depotFilter])
 
   const ago = (iso) => {
     if (!iso) return ''
@@ -99,6 +102,14 @@ export default function OpsDownV2() {
           <button onClick={flip} className="btn btn-ghost btn-sm" style={{ fontWeight: 700 }}>{lang === 'gu' ? 'EN' : 'ગુ'}</button>
         </div>
       </div>
+
+      {/* city filter carried from home */}
+      {depotFilter && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--v2-tint-blue, rgba(59,130,246,.12))', border: '1px solid var(--v2-blue, #3B82F6)', borderRadius: 999, padding: '5px 6px 5px 12px', marginBottom: 12, fontSize: 13 }}>
+          <span style={{ fontWeight: 600 }}>{depots.find(d => d.id === depotFilter)?.name || '—'}</span>
+          <button onClick={() => nav('/ops-down')} aria-label={t('close', lang)} style={{ border: 'none', background: 'transparent', color: 'var(--v2-blue, #3B82F6)', cursor: 'pointer', display: 'inline-flex', padding: 2 }}><X size={15} /></button>
+        </div>
+      )}
 
       {/* top numbers */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
