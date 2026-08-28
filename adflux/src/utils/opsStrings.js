@@ -252,6 +252,25 @@ export const STR = {
   not_checked_in:  { gu: 'ચેક-ઇન બાકી',                 en: 'Not checked in yet' },
   back:            { gu: 'પાછળ',                        en: 'Back' },
   tech_none:       { gu: 'આ ટૅકની માહિતી મળી નથી',       en: 'No data for this tech' },
+
+  // — approvals (head approves the field team's leave + TA/DA) —
+  approvals:       { gu: 'મંજૂરી બાકી',                 en: 'Approvals' },
+  leave_requests:  { gu: 'રજા અરજી',                    en: 'Leave requests' },
+  ta_claims:       { gu: 'TA/DA ક્લેમ',                 en: 'TA/DA claims' },
+  approve:         { gu: 'મંજૂર',                       en: 'Approve' },
+  reject:          { gu: 'નકારો',                       en: 'Reject' },
+  no_pending_appr: { gu: 'મંજૂરી માટે કંઈ બાકી નથી',     en: 'Nothing waiting for approval' },
+  half_day:        { gu: 'અડધો દિવસ',                   en: 'Half day' },
+  paid_leave:      { gu: 'પગાર સાથે',                   en: 'Paid' },
+  unpaid_leave:    { gu: 'પગાર વગર',                    en: 'Unpaid' },
+  reject_note_ph:  { gu: 'નકારવાનું કારણ (વૈકલ્પિક)',    en: 'Reason for rejecting (optional)' },
+  approved_ok:     { gu: 'મંજૂર થયું',                  en: 'Approved' },
+  rejected_ok:     { gu: 'નકારાયું',                    en: 'Rejected' },
+  receipt:         { gu: 'રસીદ',                        en: 'Receipt' },
+  kind_ta:         { gu: 'TA (કિમી)',                   en: 'TA (km)' },
+  kind_da:         { gu: 'DA (રાત)',                    en: 'DA (night)' },
+  kind_hotel:      { gu: 'હોટેલ',                       en: 'Hotel' },
+  kind_other:      { gu: 'બીજું',                       en: 'Other' },
 }
 
 // Resolve a label. Falls back gu → en → key so a missing translation is

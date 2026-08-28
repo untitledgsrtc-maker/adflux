@@ -5,14 +5,14 @@
 // ops reads — no new SQL. AdFlux brand tokens (§5), Gujarati-first (§231).
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, RefreshCw, Monitor, WifiOff, VideoOff, UserX, Clock, ChevronRight, Activity, Tv, LayoutDashboard, CheckSquare } from 'lucide-react'
+import { Loader2, RefreshCw, Monitor, WifiOff, VideoOff, UserX, Clock, ChevronRight, Activity, Tv, LayoutDashboard, CheckSquare, CalendarOff, Wallet } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { t, getOpsLang, setOpsLang, numL } from '../../utils/opsStrings'
 import { isOnHours } from '../../utils/opsHours'
 
 const upTone = (p) => (p == null ? 'muted' : p >= 90 ? 'success' : p >= 75 ? 'warning' : 'danger')
-const toneVar = { success: 'var(--success)', warning: 'var(--warning)', danger: 'var(--danger)', muted: 'var(--text-muted)' }
+const toneVar = { success: 'var(--success)', warning: 'var(--warning)', danger: 'var(--danger)', muted: 'var(--text-muted)', blue: 'var(--blue, #3B82F6)' }
 
 export default function OpsCommandV2() {
   const nav = useNavigate()
@@ -27,23 +27,25 @@ export default function OpsCommandV2() {
   const load = useCallback(async () => {
     try {
       const cutoff = new Date(Date.now() - 48 * 3600 * 1000).toISOString()
-      const [ck, scr, dep, ov] = await Promise.all([
+      const [ck, scr, dep, ov, ap] = await Promise.all([
         supabase.rpc('ops_admin_cockpit', { p_days: 30 }),
         supabase.from('ops_screens').select('status, camera_active, depot_id').eq('is_active', true),
         supabase.from('ops_depots').select('id, assigned_to').eq('is_active', true),
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).in('status', ['open', 'in_progress']).lt('opened_at', cutoff),
+        supabase.rpc('ops_pending_approvals'),   // best-effort — empty until the p8 SQL runs
       ])
       if (ck.error) throw ck.error
       const cockpit = ck.data || {}
       const screens = scr.data || []
       const depots = dep.data || []
+      const pend = ap.error ? {} : (ap.data || {})
       const camOff = screens.filter(s => s.camera_active === false).length
       // depots with >=1 offline screen and no tech assigned = unassigned faults
       const offByDepot = {}
       screens.forEach(s => { if (s.status === 'offline') offByDepot[s.depot_id] = (offByDepot[s.depot_id] || 0) + 1 })
       const noTech = new Set(depots.filter(d => !d.assigned_to).map(d => d.id))
       const unassigned = Object.keys(offByDepot).filter(id => noTech.has(id)).length
-      setData({ cockpit, camOff, unassigned, overdue: ov.count || 0 })
+      setData({ cockpit, camOff, unassigned, overdue: ov.count || 0, leaveN: (pend.leaves || []).length, taN: (pend.ta || []).length })
       setErr('')
     } catch (e) { setErr(e?.message || 'load failed') }
   }, [])
@@ -74,7 +76,7 @@ export default function OpsCommandV2() {
   if (loading) return <div className="lead-root" style={{ textAlign: 'center', paddingTop: 60 }}><Loader2 size={30} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} /></div>
   if (err) return <div className="lead-root"><div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 12, padding: '12px 16px', fontSize: 13 }}>{err} <button className="lead-btn" onClick={() => { setErr(''); load() }} style={{ marginLeft: 10 }}>{t('retry', lang)}</button></div></div>
 
-  const nothingNeeded = data.unassigned === 0 && data.overdue === 0
+  const nothingNeeded = data.unassigned === 0 && data.overdue === 0 && !data.leaveN && !data.taN
 
   return (
     <div className="lead-root">
@@ -108,6 +110,12 @@ export default function OpsCommandV2() {
           )}
           {data.overdue > 0 && (
             <AlertRow icon={Clock} tone="warning" label={t('overdue_48h', lang)} n={data.overdue} onClick={() => nav('/ops-tickets?tab=proc')} />
+          )}
+          {data.leaveN > 0 && (
+            <AlertRow icon={CalendarOff} tone="blue" label={t('leave_requests', lang)} n={data.leaveN} onClick={() => nav('/ops-approvals')} />
+          )}
+          {data.taN > 0 && (
+            <AlertRow icon={Wallet} tone="blue" label={t('ta_claims', lang)} n={data.taN} onClick={() => nav('/ops-approvals')} />
           )}
         </div>
       )}
@@ -172,7 +180,7 @@ function Tile({ icon: Icon, n, label, tone = 'muted', sub, note, onClick }) {
 
 function AlertRow({ icon: Icon, tone, label, n, onClick }) {
   const c = toneVar[tone]
-  const bg = tone === 'danger' ? 'var(--danger-soft)' : tone === 'warning' ? 'var(--warning-soft)' : 'var(--surface-2)'
+  const bg = tone === 'danger' ? 'var(--danger-soft)' : tone === 'warning' ? 'var(--warning-soft)' : tone === 'blue' ? 'var(--blue-soft)' : 'var(--surface-2)'
   return (
     <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 10, background: bg, border: 'none', borderRadius: 12, padding: '12px 14px', width: '100%', cursor: 'pointer', textAlign: 'left', color: 'inherit', minHeight: 48 }}>
       <Icon size={19} style={{ color: c, flexShrink: 0 }} />
