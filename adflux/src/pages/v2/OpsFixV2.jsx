@@ -89,7 +89,9 @@ export default function OpsFixV2() {
         <>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', margin: '16px 0 6px' }}>{t('which_screens', lang)}</div>
           <div className="lead-card" style={{ padding: '11px 13px', fontSize: 14.5, lineHeight: 1.6, marginBottom: 18 }}>
-            {down.map((s, i) => `${t('screen', lang)} ${numL(i + 1, lang)}`).join(' · ')}
+            {down.some(s => s.name)
+              ? down.map(s => s.name || `${t('screen', lang)}`).join(' · ')
+              : down.map((s, i) => `${t('screen', lang)} ${numL(i + 1, lang)}`).join(' · ')}
           </div>
         </>
       )}

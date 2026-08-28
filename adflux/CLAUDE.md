@@ -17269,3 +17269,31 @@ buttons, first thing on screen) + which screens off + one "fixed · photo" butto
   skill / show_widget), never a text spec — §244. An approved-by-words design gets rejected on sight.
 - ❌ A snapshot that a city filter only half-scopes (faults narrow, big numbers don't) LIES to a
   multi-station tech. Scope the whole surface off the same `cityId`, or don't filter at all.
+
+### 256.1 · Contacts imported + 4 OpsTicketsV2/OpsFixV2 fixes (2026-08-28)
+- **Real GSRTC contacts imported** — the owner shared `~/Downloads/led-dashboard.html`; its `CITY_SEED`
+  holds the real per-station depot/electrician/cleaning/canteen numbers. Generated
+  `supabase_ops_import_contacts.sql` (94 rows, idempotent, matches a station to `ops_depots` by a
+  normalized name that strips BUS STAND/GSRTC/GIDC/(CITY); owner RAN it) → `/ops-fix` "Who to call" now
+  shows real numbers + green call buttons (verified live on Surendranagar). 19/20 matched; Chikhli's
+  depot is typo'd in the CMS ("Chikli") → `supabase_ops_import_contacts_chikhli.sql` patches it by a
+  `CHIKL%` prefix match. Both files are owner-run one-offs (untracked, like the other diagnostic SQLs).
+- **Fault ages are REAL** (not a bug) — a live read proved 226 screens got a fresh `last_response_at`
+  within the hour (the sync writes it), so the 59–152-day offline ages = screens genuinely dark for
+  months (a real ops backlog / lost revenue), not a stale field. `ops_fault_age_diagnostic.sql` is the
+  reusable check (online-vs-offline freshness).
+- **4 fixes (OpsTicketsV2 + OpsFixV2, ops pages, not §28-frozen, build PASS):**
+  1. **Back to Open** — new `reopen(ticket)` sets `status='open'` (+`resolved_at=null`) so an In-process
+     (or Fixed) ticket's screen returns to the Open tab. Buttons added to ProcTab + FixedTab.
+  2. **"No contacts added yet" shown with a contact** — ProcTab printed `contact.name || t('no_contacts')`,
+     but imported contacts have `name=NULL` → wrong. Now shows the ROLE (`nm(contact,'role')`) as the
+     primary line when name is null; "no contacts" only when there's truly no contact.
+  3. **Real screen name** — the IssueSheet label + `/ops-fix` "which screens are off" used a generated
+     `Screen N` index. Now use the real `ops_screens.name` (e.g. "SURENDRANAGAR 14") with the index only
+     as a fallback. (ProcTab/FixedTab titles already used `tk.screen.name` — correct.)
+  - ⚠ Minor known debt: `reopen` sets a manual ticket to `status='open'`; re-logging that screen INSERTs
+    a fresh in_progress ticket, leaving the old 'open' row orphaned (invisible in the UI, harmless). The
+    exec has no DELETE policy on ops_tickets, so status-flip is the reopen mechanism; unify later if it
+    accumulates.
+- FOOT-GUN: a contact-name fallback of "no contacts added yet" fires when a real contact simply has a
+  NULL name — fall back to the ROLE/phone, and reserve the empty-state text for a genuinely empty list.

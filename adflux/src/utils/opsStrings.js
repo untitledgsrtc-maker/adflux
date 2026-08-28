@@ -147,6 +147,7 @@ export const STR = {
   submit_proc:     { gu: 'સાચવો → ચાલુમાં',            en: 'Submit → In process' },
   in_process:      { gu: 'ચાલુ છે',                    en: 'In process' },
   mark_fixed:      { gu: 'સુધારાયું',                  en: 'Mark fixed' },
+  reopen:          { gu: 'પાછું ઓપનમાં',               en: 'Back to open' },
   fixed_word:      { gu: 'સુધારેલું',                  en: 'Fixed' },
   no_open:         { gu: 'બધી સ્ક્રીન ચાલુ છે',         en: 'All screens up' },
   no_proc:         { gu: 'કંઈ ચાલુ નથી',               en: 'Nothing in process' },

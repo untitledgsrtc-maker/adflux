@@ -240,6 +240,17 @@ export default function OpsTicketsV2() {
     } finally { setBusy(false) }
   }
 
+  // undo: send a ticket back to Open (its screen reappears in the Open tab).
+  async function reopen(ticket) {
+    if (busy) return
+    setBusy(true)
+    try {
+      const { error } = await supabase.from('ops_tickets').update({ status: 'open', resolved_at: null }).eq('id', ticket.id)
+      if (error) { toastError(error, t('save_failed', lang)); return }
+      toastSuccess(t('reopen', lang)); setTab('open'); await load()
+    } finally { setBusy(false) }
+  }
+
   if (loading) return <div className="lead-root" style={{ textAlign: 'center', paddingTop: 60 }}><Loader2 size={30} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} /></div>
   if (err) return <div className="lead-root"><div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 12, padding: '12px 16px', fontSize: 13 }}>{err} <button className="lead-btn" onClick={() => { setErr(''); load() }} style={{ marginLeft: 10 }}>{t('retry', lang)}</button></div></div>
 
@@ -352,11 +363,17 @@ export default function OpsTicketsV2() {
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 12px' }}>{tk.depot?.name || depotName(tk.depot_id)} · {tk.issue ? nm(tk.issue, 'issue') : (tk.cause || t('fault', lang))}</div>
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13.5 }}><Phone size={13} style={{ verticalAlign: -1, marginRight: 5, color: 'var(--text-muted)' }} />{contact?.name || t('no_contacts', lang)}<br /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{contact ? ((lang === 'gu' ? contact.role_gu : contact.role_en) || contact.role_en || '') + ' · ' + (contact.phone || '') : ''}</span></span>
+            <span style={{ fontSize: 13.5 }}><Phone size={13} style={{ verticalAlign: -1, marginRight: 5, color: 'var(--text-muted)' }} />
+              {contact ? (contact.name || nm(contact, 'role') || t('call', lang)) : t('no_contacts', lang)}
+              <br /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{contact ? [contact.name ? nm(contact, 'role') : null, contact.phone].filter(Boolean).join(' · ') : ''}</span>
+            </span>
             {contact && <button onClick={() => startCall(tk)} className="lead-btn" style={{ color: 'var(--success)', borderColor: 'var(--success)', flexShrink: 0 }}><Phone size={14} /> {t('call', lang)}</button>}
           </div>
           {calls.length > 0 && <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 10 }}>{calls.length} {t('n_calls', lang)} · {calls[0].notes || calls[0].outcome}</div>}
-          <button onClick={() => markFixed(tk)} disabled={busy} className="lead-btn lead-btn-primary" style={{ width: '100%', marginTop: 12, justifyContent: 'center' }}>{t('mark_fixed', lang)} <Check size={14} /></button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button onClick={() => reopen(tk)} disabled={busy} className="lead-btn" style={{ justifyContent: 'center' }}>{t('reopen', lang)}</button>
+            <button onClick={() => markFixed(tk)} disabled={busy} className="lead-btn lead-btn-primary" style={{ flex: 1, justifyContent: 'center' }}>{t('mark_fixed', lang)} <Check size={14} /></button>
+          </div>
         </div>
       )
     })}</div>
@@ -372,6 +389,7 @@ export default function OpsTicketsV2() {
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{f.depot?.name || depotName(f.depot_id)} · {f.issue ? nm(f.issue, 'issue') : (f.cause || t('fault', lang))}</div>
         {f.resolved_at && <div style={{ fontSize: 12, color: 'var(--text-subtle, var(--text-muted))', marginTop: 8 }}>{new Date(f.resolved_at).toLocaleString('en-GB')}</div>}
+        <button onClick={() => reopen(f)} disabled={busy} className="lead-btn" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>{t('reopen', lang)}</button>
       </div>
     ))}</div>
   }
@@ -437,7 +455,8 @@ export default function OpsTicketsV2() {
 
   function IssueSheet() {
     const n = sheet.screenIds.length
-    const label = n > 1 ? `${n} ${t('screen', lang)} · ${depotName(sheet.depotId)}` : `${t('screen', lang)} ${screenNo[sheet.screenIds[0]] || ''} · ${depotName(sheet.depotId)}`
+    const names = sheet.screenIds.map(id => screens.find(s => s.id === id)?.name).filter(Boolean)
+    const label = `${names.length ? names.join(', ') : `${n} ${t('screen', lang)}`} · ${depotName(sheet.depotId)}`
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 9000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setSheet(null)}>
         <div className="lead-card" style={{ width: '100%', maxWidth: 480, margin: 0, borderRadius: '16px 16px 0 0', maxHeight: '85vh', overflowY: 'auto', padding: 16 }} onClick={e => e.stopPropagation()}>
