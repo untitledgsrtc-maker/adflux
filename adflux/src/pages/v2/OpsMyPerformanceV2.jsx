@@ -15,8 +15,13 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
+import { CalendarOff } from 'lucide-react'
 import OpsUptimeCard from '../../components/incentives/OpsUptimeCard'
 import SalarySlipsCard from '../../components/incentives/SalarySlipsCard'
+import TaDaRequestPanel from '../../components/incentives/TaDaRequestPanel'
+import RepLeaveHistory from '../../components/leads/RepLeaveHistory'
+import { RequestLeaveModal } from '../../components/leads/RepDayTools'
+import { toastSuccess } from '../../components/v2/Toast'
 import '../../styles/incentives.css'
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000'
@@ -27,6 +32,8 @@ export default function OpsMyPerformanceV2() {
   const isHead = profile?.role === 'operation_head'
   const [kpi, setKpi] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [leaveOpen, setLeaveOpen] = useState(false)
+  const [leaveRefresh, setLeaveRefresh] = useState(0)
 
   const load = useCallback(async () => {
     if (!uid) return
@@ -100,6 +107,29 @@ export default function OpsMyPerformanceV2() {
       </div>
 
       <SalarySlipsCard key={`slip-${refreshKey}`} />
+
+      {/* TA / DA claim — the field exec's travel (₹3/km) + DA / hotel, same panel
+          a sales rep gets on /my-offer. Self-scoped to the signed-in user. */}
+      <TaDaRequestPanel />
+
+      {/* Leave — request + history, same surface a sales rep gets on /my-offer.
+          leaves RLS is role-agnostic → real for an ops exec today. */}
+      {uid && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+          <button className="v2d-cta" onClick={() => setLeaveOpen(true)}>
+            <CalendarOff size={15} />
+            <span>Request leave</span>
+          </button>
+        </div>
+      )}
+      {uid && <RepLeaveHistory userId={uid} refreshKey={leaveRefresh} />}
+      {leaveOpen && (
+        <RequestLeaveModal
+          userId={uid}
+          onClose={() => setLeaveOpen(false)}
+          onSaved={() => { toastSuccess('Leave request submitted — admin will approve.'); setLeaveRefresh(k => k + 1) }}
+        />
+      )}
     </div>
   )
 }
