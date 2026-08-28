@@ -17546,3 +17546,54 @@ Has a PREVIEW SELECT + a VERIFY(=0) block.
 - Ops files, not §28 frozen — no guardian. Frontend deploys on push. Owner runs p2b in Studio.
 - Files: `src/utils/opsPay.js`, `src/pages/v2/OpsWorkV2.jsx`, `src/pages/v2/OpsAdminV2.jsx`,
   `supabase_ops_p2b_reopen_miscancelled.sql`, `CLAUDE.md`.
+
+
+---
+
+## 261 · PARKED mid-activation — ops sync cron (RESUME 2026-08-29) 
+
+Turning ON the ops auto-detect + daily-uptime pipeline (unblocks pay §258). Got to
+the last step, hit a config blocker, parked ~01:40 IST 2026-08-29 to finish next day.
+
+### Goal
+Schedule `api/ops/sync.js` (every 10 min) so: offline screens auto-open tickets +
+WhatsApp the tech (no human) AND daily uptime rows land → then set ops-exec salaries
+so uptime pay (§258) goes live.
+
+### Everything is CODE-COMPLETE — nothing to build
+- `api/ops/sync.js` — pulls aiadflux → upserts screens → `ops_recompute_uptime_today`
+  (uptime rows, night-gated) → `ops_reconcile_offline_tickets` (auto-tickets + WA).
+- `api/ops/ticket-wa.js` — Meta WhatsApp sender (Gujarati template `ops_ticket_alert`).
+- `supabase_ops_p2_auto_tickets.sql` `ops_ticket_wa_dispatch` — scrapes secret + URL
+  from the p5 dispatch fn (§260-verified), sends WA on ticket open.
+- `supabase_ops_p5_sync.sql` — the pg_cron dispatch (`ops_aiadflux_sync_dispatch`) +
+  the commented `cron.schedule('ops-aiadflux-sync','*/10 * * * *', …)` block.
+
+### THE BLOCKER (diagnosed, not yet fixed)
+p5 was RUN but `<OPS_SYNC_SECRET>` on line 30 was **never replaced** — the dispatch fn
+carries the literal placeholder. Confirmed: a test-fire returned **403 forbidden**
+(`net._http_response`); `pg_get_functiondef(...)` shows `secret_in_fn = <OPS_SYNC_SECRET>`.
+The endpoint rejects the placeholder. (A manual `?run=1&secret=` sync DID work at 01:00 IST
+= 264 screens, so the REAL secret exists in Vercel `OPS_SYNC_SECRET`; it just isn't in p5.)
+WhatsApp is configured — a `200 {"quality":"GREEN"}` number-health response was seen.
+
+### RESUME STEPS (tomorrow, in order)
+1. Vercel → Settings → Env Vars → reveal + copy `OPS_SYNC_SECRET`.
+2. Studio: edit p5 line 30, replace `<OPS_SYNC_SECRET>` with that exact value (keep the
+   single quotes). **STUDIO ONLY — never commit the real secret; repo p5 keeps the placeholder.**
+3. Re-run p5 (whole file).
+4. Re-fire + confirm 200:
+   `SELECT public.ops_aiadflux_sync_dispatch();`  → wait ~15s →
+   `SELECT status_code, left(content,80) FROM net._http_response ORDER BY created DESC LIMIT 1;`
+   Want **200**. Then `now() - max(updated_at)` on `ops_screens` drops to seconds.
+5. On 200: uncomment + run p5 Part 2 (the `cron.schedule` block). Cadence = every 10 min,
+   all day (owner's call; night pulls are harmless — recompute/reconcile are night-gated).
+   Verify: `SELECT * FROM cron.job WHERE jobname='ops-aiadflux-sync';`
+6. Let uptime rows land a few WORKDAYS (`ops_uptime_daily` filling daily) → THEN set each
+   ops-exec `staff_incentive_profiles.monthly_salary`. **NOT before** (§184: a zero-measured
+   month pays the full 30% variable — the overpay trap).
+
+### Do NOT
+- Do NOT set an ops-exec salary until step 6's rows are confirmed landing daily.
+- Do NOT commit the real secret into p5 (repo copy stays `<OPS_SYNC_SECRET>`).
+- Cron is NOT scheduled yet — until step 5, the sync only fires on a manual dispatch/`?run=1`.
