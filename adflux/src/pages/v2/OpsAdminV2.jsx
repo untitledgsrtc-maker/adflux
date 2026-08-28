@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom'
 import { Tv, Wifi, WifiOff, Wrench, Camera, Users as UsersIcon, Loader2, RefreshCw, ArrowRight, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { estVariable } from '../../utils/opsPay'
 
 const th = { textAlign: 'left', fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 700, padding: '9px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.04em' }
 const td = { fontSize: 14, color: 'var(--text)', padding: '11px 12px', borderBottom: '1px solid var(--border)' }
@@ -28,15 +29,7 @@ function HeroStat({ label, value, delta, up, down }) {
   )
 }
 
-// indicative variable = salary × 30% × band(SLA-transform(uptime)) — mirrors
-// the Phase-4 trigger + monthly_score bands (>75 full / <50 zero / 50-75 prop).
-// Owner 2026-08-28: SLA 75→95 (full at ≥95% uptime, zero below ~85%). MUST stay
-// in lockstep with OpsWorkV2.indicativeVariable + p4 v_floor 75 / v_ceiling 95 (§71).
-function indicativeVariable(salary, uptimePct) {
-  const score = Math.max(0, Math.min(100, ((uptimePct - 75) / 20) * 100))
-  const frac = score > 75 ? 1 : score < 50 ? 0 : score / 100
-  return Math.round((Number(salary) || 0) * 0.30 * frac)
-}
+// indicative uptime bonus = utils/opsPay.estVariable (the ONE curve, §71/§258).
 
 function TrendChart({ points }) {
   if (!points || points.length < 2) {
@@ -80,7 +73,7 @@ export default function OpsAdminV2() {
   const sc = d.screens || {}
   const tk = d.tickets || {}
   const payroll = d.payroll || null
-  const payTotal = useMemo(() => (payroll || []).reduce((s, r) => s + indicativeVariable(r.salary, r.uptime_pct), 0), [payroll])
+  const payTotal = useMemo(() => (payroll || []).reduce((s, r) => s + estVariable(r.salary, r.uptime_pct), 0), [payroll])
   const salTotal = useMemo(() => (payroll || []).reduce((s, r) => s + (Number(r.salary) || 0), 0), [payroll])
 
   if (loading) return <div className="lead-root" style={{ textAlign: 'center', paddingTop: 60 }}><Loader2 size={30} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} /></div>
@@ -179,7 +172,7 @@ export default function OpsAdminV2() {
                     <td style={{ ...td, fontWeight: 600 }}>{r.name}</td>
                     <td style={{ ...td, fontFamily: 'var(--font-display)' }}>₹{Number(r.salary || 0).toLocaleString('en-IN')}</td>
                     <td style={td}>{r.uptime_pct}%</td>
-                    <td style={{ ...td, fontFamily: 'var(--font-display)', color: 'var(--success)' }}>₹{indicativeVariable(r.salary, r.uptime_pct).toLocaleString('en-IN')}</td>
+                    <td style={{ ...td, fontFamily: 'var(--font-display)', color: 'var(--success)' }}>₹{estVariable(r.salary, r.uptime_pct).toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
                 {payroll.length > 0 && (

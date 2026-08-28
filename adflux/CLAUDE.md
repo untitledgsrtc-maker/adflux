@@ -17504,3 +17504,45 @@ blip** may auto-clear when its depot comes fully back online.
   REPLACE — re-creates the reconcile function with the new guard). No new columns.
 - check-sql-schema.sh: OK (clean, no false-positives this file). Ops file, not §28
   frozen — no guardian. Frontend unchanged.
+
+
+---
+
+## 260 · Ops cleanup — reopen mis-cancelled tickets + dedup the pay curve (2026-08-28)
+
+Two owner-requested cleanups. The dedup uncovered (and fixed) a §258 MISS.
+
+### A · §258 MISS FIXED — the pay curve lived in FIVE places, 3 still at old 90/97
+§258 changed OpsWorkV2 + OpsAdminV2 local `indicativeVariable` to 75/95 but MISSED
+`src/utils/opsPay.js estVariable` — still `(uptime-90)/7`. That util feeds **OpsTicketsV2
+"Me" tab** + **OpsUptimeCard (My Performance)**. So those two surfaces showed the OLD
+90/97 bonus while OpsWork/OpsAdmin showed 75/95 — a live money-display contradiction
+(caught during the dedup, not in prod for long — p4 pay isn't on yet, all figures indicative).
+
+**Fix — `opsPay.js` is now THE ONE curve (§71 single source):**
+- `estVariable`: `(uptime-90)/7` → `(uptime-75)/20`. Doc rewritten (owner 2026-08-28, §258).
+- Milestones: `UPTIME_FLOOR 90→85` (below = zero), `UPTIME_TARGET 95` (unchanged),
+  `UPTIME_MAX 97→95` (full). `uptimeTone` follows. Known cosmetic: TARGET==MAX==95 now
+  (owner's full line IS the target), so OpsUptimeCard's "target"/"max" milestone rows both
+  read 95 — harmless, collapse to 2 rows later if owner cares.
+- `OpsWorkV2` + `OpsAdminV2`: dropped their local `indicativeVariable`, now
+  `import { estVariable } from '../../utils/opsPay'`. All 4 ops pay surfaces
+  (OpsWork, OpsAdmin, OpsTickets, OpsUptimeCard) share ONE function → can't diverge again.
+- LOCKSTEP (§71): `opsPay.estVariable` ↔ `supabase_ops_p4_uptime_pay.sql` (v_floor 75 /
+  v_ceiling 95). Change one → change both. This is now the only frontend curve.
+
+### B · Reopen tickets the old 24h rule wrongly cancelled (§259 follow-up)
+`supabase_ops_p2b_reopen_miscancelled.sql` (NEW, one-time, owner runs once). Un-cancels
+ONLY `source='auto_offline'` + `status='cancelled'` + `[auto-recovered]` tickets whose
+cancel day ≠ open day (IST) — the previous-day faults the rolling-24h rule shouldn't have
+touched. Restores `status='open'`, clears `resolved_at`, tags `[reopened §259]`. Same-day
+blips left alone. Safe/reversible (no delete), idempotent (2nd run matches nothing). The
+reopened tickets were opened on a previous day → §259 reconcile will NOT re-cancel them.
+Has a PREVIEW SELECT + a VERIFY(=0) block.
+
+### Checks / deploy
+- esbuild parse OK (opsPay.js + OpsWork + OpsAdmin + OpsUptimeCard + OpsTickets) ·
+  check-jsx-brand clean · `npm run build` OK (249 precache) · check-sql-schema OK (p2b).
+- Ops files, not §28 frozen — no guardian. Frontend deploys on push. Owner runs p2b in Studio.
+- Files: `src/utils/opsPay.js`, `src/pages/v2/OpsWorkV2.jsx`, `src/pages/v2/OpsAdminV2.jsx`,
+  `supabase_ops_p2b_reopen_miscancelled.sql`, `CLAUDE.md`.

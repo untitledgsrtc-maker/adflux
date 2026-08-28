@@ -1,29 +1,32 @@
-// src/utils/opsPay.js — the ONE ops uptime→variable-pay curve (§71).
+// src/utils/opsPay.js — THE ONE ops uptime→variable-pay curve (§71, §258).
 //
-// Extracted verbatim from the OpsTicketsV2 "Me" tab (§233/§247) so the
-// exec's My Performance card and the ticket dashboard show the IDENTICAL
-// number. Field-team pay = 70% base + 30% variable, the variable driven by
-// screen uptime.
+// The single source for the field-team indicative bonus. Every ops surface that
+// shows an uptime bonus imports from here — OpsTicketsV2 "Me" tab, OpsUptimeCard
+// (My Performance), OpsWorkV2, OpsAdminV2 — so they can never disagree (§260 folded
+// the OpsWork/OpsAdmin local copies into this). Field-team pay = 70% base + 30%
+// variable, the variable driven by screen uptime.
 //
-// INDICATIVE / display-only. The live pay (once uptime-pay p4 §234 is on)
-// reads compute_monthly_salary; the EXACT curve is still owner-pending
-// (§240 — align §230 + the p4 trigger + this). Do not treat as the payslip.
+// INDICATIVE / display-only. The live pay (once uptime-pay p4 §234 is on) reads
+// compute_monthly_salary. This MUST stay in lockstep with the p4 trigger
+// (supabase_ops_p4_uptime_pay.sql v_floor 75 / v_ceiling 95) — change one, change both.
 //
-// Curve: SLA transform (uptime-90)/7×100, then >75 → full, <50 → zero, else
-// proportional, × salary × 0.30.
+// CURVE (owner 2026-08-28, §258): SLA transform (uptime-75)/20×100, then the frozen
+// monthly_score band >75 → full, <50 → zero, else proportional, × salary × 0.30.
+// Effect: full bonus at ≥95% uptime, zero below ~85%, graded 85–90%.
 export function estVariable(salary, uptimePct) {
   if (!salary || uptimePct == null) return 0
-  const sla = Math.max(0, Math.min(100, (uptimePct - 90) / 7 * 100))
+  const sla = Math.max(0, Math.min(100, (uptimePct - 75) / 20 * 100))
   const factor = sla > 75 ? 1 : sla < 50 ? 0 : sla / 100
   return Math.round(salary * 0.30 * factor)
 }
 
-// Owner-facing uptime milestones (raw %) — the plain 90/95/97 framing (§230).
-export const UPTIME_FLOOR = 90    // variable unlocks
-export const UPTIME_TARGET = 95   // team target
-export const UPTIME_MAX = 97      // full variable
+// Owner-facing uptime milestones (raw %) — the 75/95 curve (§258): below 85 = zero
+// bonus, 95 = full bonus. (TARGET == MAX here since owner's full line IS the target.)
+export const UPTIME_FLOOR = 85    // below this → zero variable
+export const UPTIME_TARGET = 95   // team target = full variable
+export const UPTIME_MAX = 95      // full variable
 
-// Ring / status tone by raw uptime, per the owner's 90→97 rule.
+// Ring / status tone by raw uptime, per the owner's 75/95 rule.
 export function uptimeTone(uptimePct) {
   if (uptimePct == null) return 'muted'
   if (uptimePct < UPTIME_FLOOR) return 'danger'

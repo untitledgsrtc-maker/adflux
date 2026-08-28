@@ -30,6 +30,7 @@ import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { dialPhone, openExternalUrl } from '../../utils/openExternal'
 import { istTodayISO } from '../../utils/istDate'
 import { resizeImage } from '../../utils/leadDedup'
+import { estVariable } from '../../utils/opsPay'
 import {
   STR, t, numL, dateL, timeL, getOpsLang, setOpsLang,
 } from '../../utils/opsStrings'
@@ -67,16 +68,7 @@ function cleanPhone(raw) {
   return d.length === 10 ? '91' + d : d
 }
 
-// Indicative variable pay from uptime — MUST match OpsAdminV2.indicativeVariable
-// (SLA band 75→95%, 70/30 split, >75 score = full 30% cap). Owner 2026-08-28:
-// full bonus at ≥95% uptime, zero below ~85%, graded 85–90%. Display only; real
-// pay = the Salary sheet once uptime pay (Phase 4) is turned on. Keep in lockstep
-// with supabase_ops_p4_uptime_pay.sql (v_floor 75 / v_ceiling 95) — §71.
-function indicativeVariable(salary, uptimePct) {
-  const score = Math.max(0, Math.min(100, ((uptimePct - 75) / 20) * 100))
-  const frac = score > 75 ? 1 : score < 50 ? 0 : score / 100
-  return Math.round((Number(salary) || 0) * 0.30 * frac)
-}
+// Indicative uptime bonus lives in utils/opsPay.estVariable (the ONE curve, §71/§258).
 
 // Directions link to a depot — lat/lng if we have them, else the depot name.
 function depotMapsUrl(depot) {
@@ -387,7 +379,7 @@ function OpsExecApp({ profile, lang, langBar }) {
             </div>
             <div>
               <div style={{ fontFamily: 'var(--v2-display)', fontSize: 30, fontWeight: 800, color: 'var(--v2-ink-0)' }}>
-                ₹{numL(indicativeVariable(pay.salary, pay.uptime_pct), lang)}
+                ₹{numL(estVariable(pay.salary, pay.uptime_pct), lang)}
               </div>
               <div style={{ fontSize: 13, color: 'var(--v2-ink-1)', marginTop: 2 }}>{t('est_variable', lang)}</div>
             </div>
