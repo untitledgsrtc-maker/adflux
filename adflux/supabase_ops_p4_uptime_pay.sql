@@ -19,6 +19,14 @@
 --    them; before real screen statuses, uptime reads 0 and the day is
 --    EXCLUDED as "no screen data" so it can't tank anyone's pay). ──
 --
+-- ── NIGHT-GATE (MONEY, §250/§254.1): the uptime recompute RUNS ONLY 7 AM–9 PM IST.
+--    Off-hours the LED screens are intentionally OFF (timers), so a live snapshot
+--    would read all-offline → 0% → and TANK the tech's pay for hours they were never
+--    expected to keep screens on. Off-hours the recompute early-RETURNs and
+--    ops_uptime_daily KEEPS its last on-hours value. So the pay signal reflects only
+--    operating-hours uptime — which is correct. Matches opsHours.js isOnHours() +
+--    the §254.1 auto-ticket gate, so pay + tickets agree. ──
+--
 -- Prerequisites for an ops exec to actually be paid (recon):
 --   1. A staff_incentive_profiles row with monthly_salary > 0 (auto-create is
 --      sales-only → create it by hand). The 70/30 cap is hardcoded, not a column.
@@ -41,6 +49,13 @@
 -- (no data yet) are excluded from BOTH so a pre-aiadflux day reads
 -- screens_total=0 and the trigger excludes it (never a false 0%).
 -- Called by: the Head "Record uptime" button (OpsHeadV2) + the Phase 5 sync.
+--
+-- NIGHT-GATE (MONEY, §250/§254.1): the recompute RUNS ONLY 7 AM–9 PM IST. Off-hours
+-- the LED screens are intentionally OFF (timers), so a live snapshot reads all-offline
+-- → uptime 0% → would TANK the tech's pay for hours they were never expected to keep
+-- screens on. Off-hours the function early-RETURNs → ops_uptime_daily KEEPS its LAST
+-- on-hours value. The 7 AM–9 PM window matches src/utils/opsHours.js isOnHours() and
+-- the §254.1 auto-ticket engine's gate EXACTLY, so pay + tickets agree.
 CREATE OR REPLACE FUNCTION public.ops_recompute_uptime_today(p_user_id uuid DEFAULT NULL)
 RETURNS void
 LANGUAGE plpgsql
@@ -51,12 +66,24 @@ DECLARE
   r       record;
   v_today date := (now() AT TIME ZONE 'Asia/Kolkata')::date;
   v_role  text := public.get_my_role();
+  v_hour  int  := extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata'))::int;
 BEGIN
   -- Head/admin (or a service-role/cron call → null role) only. A known
   -- non-privileged role is blocked; the recompute is deterministic from live
   -- screen data (no caller input steers a value) so this is defence-in-depth.
   IF v_role IS NOT NULL AND v_role NOT IN ('admin', 'co_owner', 'operation_head') THEN
     RAISE EXCEPTION 'not authorized to recompute ops uptime';
+  END IF;
+
+  -- ── NIGHT-GATE (MONEY): OPERATING HOURS ONLY, 7 AM–9 PM IST ──────────────
+  -- Off-hours the LED screens are intentionally OFF (timers, §250/§254.1), so a
+  -- live snapshot reads all-offline → uptime 0% → would TANK the tech's uptime
+  -- pay for hours they were never expected to keep screens on. Skip the recompute
+  -- off-hours → ops_uptime_daily KEEPS its LAST on-hours value (the real daytime
+  -- uptime). Matches src/utils/opsHours.js isOnHours() exactly (hour >= 7 AND < 21)
+  -- and the §254.1 auto-ticket engine's own 7 AM–9 PM gate, so pay + tickets agree.
+  IF v_hour < 7 OR v_hour >= 21 THEN
+    RETURN;
   END IF;
 
   FOR r IN
