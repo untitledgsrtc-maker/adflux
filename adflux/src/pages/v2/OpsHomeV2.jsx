@@ -249,12 +249,16 @@ export default function OpsHomeV2() {
               <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t('my_month', lang)}</span>
               <button onClick={() => nav('/ops-performance')} style={{ background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>{t('my_perf', lang)}<ChevronRight size={13} /></button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px 8px', textAlign: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 10px', textAlign: 'center' }}>
               <MiniStat val={s.fixedMo ?? 0} label={t('fixed_this_mo', lang)} />
               <MiniStat val={s.fixedWk ?? 0} label={t('fixed_this_wk', lang)} />
               <MiniStat val={s.avgFixH != null ? `${s.avgFixH}${t('hrs', lang)}` : '—'} label={t('avg_fix', lang)} />
               <MiniStat val={s.avgUptime != null ? `${s.avgUptime}%` : '—'} label={t('avg_uptime', lang)} />
-              <MiniStat val={s.callsMo ?? 0} label={t('my_calls', lang)} />
+            </div>
+            {/* My calls on its own row — call activity, not a screen-fix stat, so not crammed with the 4 above */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 13, borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13.5, color: 'var(--text-muted)', fontWeight: 600 }}>{t('my_calls', lang)}</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 23, fontWeight: 800, color: 'var(--text)' }}>{s.callsMo ?? 0}</span>
             </div>
           </div>
         </>
