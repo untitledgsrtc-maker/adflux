@@ -30,8 +30,10 @@ function HeroStat({ label, value, delta, up, down }) {
 
 // indicative variable = salary × 30% × band(SLA-transform(uptime)) — mirrors
 // the Phase-4 trigger + monthly_score bands (>75 full / <50 zero / 50-75 prop).
+// Owner 2026-08-28: SLA 75→95 (full at ≥95% uptime, zero below ~85%). MUST stay
+// in lockstep with OpsWorkV2.indicativeVariable + p4 v_floor 75 / v_ceiling 95 (§71).
 function indicativeVariable(salary, uptimePct) {
-  const score = Math.max(0, Math.min(100, ((uptimePct - 90) / 7) * 100))
+  const score = Math.max(0, Math.min(100, ((uptimePct - 75) / 20) * 100))
   const frac = score > 75 ? 1 : score < 50 ? 0 : score / 100
   return Math.round((Number(salary) || 0) * 0.30 * frac)
 }

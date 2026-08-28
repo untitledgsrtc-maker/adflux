@@ -12,7 +12,7 @@
 --
 -- ── OWNER: THIS IS A MONEY CHANGE. RUN IT ONLY WHEN YOU ARE READY TO TURN ON
 --    OPS UPTIME PAY. Read the SHADOW-COMPARE (Part 3) FIRST — it prints the
---    exact uptime→pay curve. The two SLA thresholds (90 / 97) are ONE line
+--    exact uptime→pay curve. The two SLA thresholds (75 / 95) are ONE line
 --    each in ops_uptime_to_daily_performance() — tell me to change them and
 --    re-run. Nothing pays until (a) this runs AND (b) real uptime rows exist
 --    (the Head "Record uptime" button or the Phase 5 aiadflux sync writes
@@ -126,8 +126,8 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_floor    numeric := 90;   -- SLA: uptime <= 90% → 0 pay signal   (owner-tunable)
-  v_ceiling  numeric := 97;   -- SLA: uptime >= 97% → full pay signal (owner-tunable)
+  v_floor    numeric := 75;   -- SLA floor: raw score 0 at 75% uptime; real ZERO-bonus line ~85% via the monthly band (owner 2026-08-28)
+  v_ceiling  numeric := 95;   -- SLA ceiling: full pay signal at 95% uptime; real FULL-bonus line ~91% via the monthly band (owner 2026-08-28)
   v_score    numeric;
   v_excluded boolean;
   v_reason   text;
@@ -177,21 +177,21 @@ NOTIFY pgrst, 'reload schema';
 -- Run this SELECT after the file. It shows, for a spread of monthly-average
 -- uptimes, the score_pct the transform produces AND which monthly_score band
 -- it lands in (>75 → FULL 30% variable · <50 → ZERO · 50–75 → proportional).
--- Change the 90/97 constants above + re-run if the cut-offs aren't what you want.
+-- Change the 75/95 constants above + re-run if the cut-offs aren't what you want.
 --
 --   SELECT up.uptime,
---          LEAST(100, GREATEST(0, round((up.uptime - 90) / (97 - 90) * 100, 2))) AS score_pct,
+--          LEAST(100, GREATEST(0, round((up.uptime - 75) / (95 - 75) * 100, 2))) AS score_pct,
 --          CASE
---            WHEN LEAST(100, GREATEST(0, round((up.uptime - 90) / (97 - 90) * 100, 2))) > 75 THEN 'FULL 30% variable'
---            WHEN LEAST(100, GREATEST(0, round((up.uptime - 90) / (97 - 90) * 100, 2))) < 50 THEN 'ZERO variable'
+--            WHEN LEAST(100, GREATEST(0, round((up.uptime - 75) / (95 - 75) * 100, 2))) > 75 THEN 'FULL 30% variable'
+--            WHEN LEAST(100, GREATEST(0, round((up.uptime - 75) / (95 - 75) * 100, 2))) < 50 THEN 'ZERO variable'
 --            ELSE 'proportional'
 --          END AS monthly_band
---     FROM (VALUES (88.0),(90.0),(92.0),(93.5),(95.0),(95.5),(96.0),(97.0),(98.0),(100.0)) AS up(uptime)
+--     FROM (VALUES (82.0),(84.0),(85.0),(88.0),(90.0),(91.0),(92.0),(95.0),(97.0),(100.0)) AS up(uptime)
 --    ORDER BY up.uptime;
 --
--- Expected (with 90/97): <=90 → 0 → ZERO · 93.5 → 50 → proportional · 95.5 → ~78.6 → FULL ·
---                        >=97 → 100 → FULL. So ~≥95.5% avg uptime earns the full 30%,
---                        <=90% earns none, 90–95.5% is graded. (Tunable via the two constants.)
+-- Expected (with 75/95): <85 → <50 → ZERO · 85 → 50 → proportional · 90 → 75 → proportional (¾) ·
+--                        >=91 → >75 → FULL. So ~≥91% avg uptime earns the full 30%,
+--                        <85% earns none, 85–90% is graded. (Owner 2026-08-28; tunable via the two constants.)
 
 -- ── VERIFY (structure) ──
 -- SELECT

@@ -15453,7 +15453,7 @@ Additive, §45-safe. Guardian PASS on the 2 frozen touches; full `npm run build`
 - `ops_admin_cockpit` payroll is **admin-only** (§153) — co_owner (Vishal, govt-partner)
   gets the operational cockpit but NOT org-wide ops pay, mirroring the §42/§153 doctrine.
 - The exec pay card + admin payroll BOTH use the identical `indicativeVariable` curve → one
-  definition, two surfaces (§71). The Phase-4 pay TRIGGER uses the same 90/97 SLA transform
+  definition, two surfaces (§71). The Phase-4 pay TRIGGER uses the same SLA transform (now 75/95, owner 2026-08-28, §258)
   → the displayed indicative == what the pay engine will pay once uptime pay is turned on.
 - `today.slice(0,8)+'01'` = the IST month-start for the Head uptime avg (today = istTodayISO).
 - ops_uptime_daily reads: Head via the Phase-0 `ops_uptime_manage` (FOR ALL head/admin),
@@ -16161,11 +16161,12 @@ The old stub only PATCHed existing screens. The rewrite mirrors the aiadflux CMS
 - `latest_ping_per_user` (OpsHeadV2 field-team map) is defined in
   `supabase_phase183_latest_ping_rpc.sql` (shared with /team-dashboard) — already live
   if that map works.
-- **Money curve DEFERRED (owner decision, §71):** indicativeVariable stacks the >75/<50
-  bands on the 90→97 SLA transform → effective full-variable only at ≥95.25% uptime, zero
-  below 93.5% — tighter than the §230 doc's 90→97 intent. Matches the p4 trigger, so it's
-  consistent with the engine. Owner picks ONE curve + aligns §230 + p4 trigger +
-  indicativeVariable (dedupe the OpsWorkV2/OpsAdminV2 copies) BEFORE ops uptime pay is on.
+- **Money curve DEFERRED (owner decision, §71) — RESOLVED 2026-08-28 → 75/95, see §258:**
+  indicativeVariable stacks the >75/<50 bands on the SLA transform. (Historical: the deferred
+  90→97 curve gave effective full-variable only at ≥95.25% uptime, zero below 93.5%.) Owner
+  picked ONE curve on 2026-08-28 — floor 75 / ceiling 95 → full at ≥95% uptime, zero below
+  ~85%, graded 85–90% — and it is applied in lockstep to the p4 trigger + BOTH
+  OpsWorkV2/OpsAdminV2 indicativeVariable copies (§258). Still not live until daily uptime rows land.
 
 ### OWNER RUN-LIST (blocks the module going live — I did all the code)
 1. **Vercel env** (untitled-os project → Settings → Environment Variables → Production):
@@ -17195,7 +17196,7 @@ crashing to 0% and tanking pay for hours the tech was never expected to keep scr
 - Doc notes live in the file's OWNER banner + Part 1 description + inline at the IF.
 - This is baked into the SQL but the file is STILL owner-deferred (§234 — p4 uptime pay not turned on).
   When the owner eventually runs p4, the night-gate ships with it → ops uptime pay can NEVER count the
-  full 24h. Shadow-compare (Part 3) + owner-verify the 90/97 curve BEFORE it goes live (§71 rule 3).
+  full 24h. Shadow-compare (Part 3) + owner-verify the 75/95 curve (set 2026-08-28, §258) BEFORE it goes live (§71 rule 3).
 - check-sql-schema.sh flags `r.uid`/`r.known_total`/`r.up` — the documented PL/pgSQL FOR-loop record-field
   false-positives (§72#15/§254), not real errors.
 
@@ -17407,3 +17408,58 @@ can be online with its camera off).
   until uptime pay (p4, §255) records.
 - FOOT-GUN (HR): the p8 approval RPCs are ops-scoped ONLY by the `users.role='operation_executive'`
   JOIN on every read + write — that JOIN IS the security boundary; it is not decoration.
+
+
+---
+
+## 258 · Ops uptime-pay curve LOCKED → 75/95 (owner decision, MONEY) (2026-08-28)
+
+Owner walked the p4 pay curve and set it. Supersedes every earlier 90/97 mention
+(§230/§234/§240/§255 — those are now history). This is the single source of truth
+for the ops uptime→pay curve.
+
+### The decision (owner, 2026-08-28)
+- **Full 30% variable at ≥95% monthly-average uptime.** ("above 95% = 100% variable")
+- **Zero variable below 85% uptime.** ("below 85% = zero variable")
+- **85–90% graded** between.
+- Owner accepted the disclosed generosity: because the frozen monthly_score band rounds a
+  high average up (>75 score → full cap), **91–94% also lands full**, not only 95%+. Effective
+  graded slope is 85→90%, full above ~90%. Favorable to the tech, no clawback — owner said "ok go".
+
+### Encoded as floor 75 / ceiling 95 (NOT 85/95 — the band shifts the knobs)
+The raw SLA transform is `score = clamp((uptime − floor)/(ceiling − floor) × 100)`. It then
+feeds the frozen monthly_score band (>75 → full · <50 → zero · 50–75 → proportional). To make
+the *real* (post-band) lines land at owner's 95/85, the knobs are **v_floor = 75, v_ceiling = 95**
+(NOT 85/95 — 85/95 would zero-out below 90%, wrong). Worked table (₹20,000 tech, ₹6,000 cap):
+
+| Month avg uptime | Bonus | Take-home |
+|---|---|---|
+| 95%+ | ₹6,000 (full) | ₹20,000 |
+| 91–94% | ₹6,000 (full) | ₹20,000 |
+| 90% | ₹4,500 | ₹18,500 |
+| 88% | ₹3,900 | ₹17,900 |
+| 86% | ₹3,300 | ₹17,300 |
+| 85% | ₹3,000 | ₹17,000 |
+| below 85% | ₹0 | ₹14,000 |
+
+### Applied in THREE lockstep surfaces (§71 — change one → change all three)
+1. `supabase_ops_p4_uptime_pay.sql` — `v_floor := 75`, `v_ceiling := 95` in
+   `ops_uptime_to_daily_performance()`. Shadow-compare (Part 3) + banner updated to 75/95.
+2. `src/pages/v2/OpsWorkV2.jsx` `indicativeVariable()` — transform `(uptimePct − 75) / 20`.
+3. `src/pages/v2/OpsAdminV2.jsx` `indicativeVariable()` — transform `(uptimePct − 75) / 20`.
+   (Both frontend copies already carried the >75/<50 `frac` band; only the transform changed.
+   Still two copies — dedup into a shared util is a future §16 cleanup, not this batch.)
+
+### STILL NOT LIVE — activation gate unchanged (§184 / §234)
+Setting the curve does NOT turn pay on. p4 must be RUN in Studio to install the trigger, AND
+real daily uptime rows must land every workday (Phase 5 aiadflux sync live, or the head presses
+"Record uptime" daily) BEFORE any ops exec gets a `staff_incentive_profiles.monthly_salary`.
+Reason: monthly_score's "0 working days → full cap" rule (§184) would overpay the full 30% for a
+month with zero measured days. Order: (a) confirm daily uptime rows land → (b) run p4 → (c) set
+salaries. Night-gate (7 AM–9 PM IST, §255) ships inside p4 so a 24h count can never tank pay.
+
+### Checks (this batch, no guardian — ops files not §28 frozen; App.jsx/V2AppShell untouched)
+- `check-sql-schema.sh` on p4: the `r.uid`/`r.known_total`/`r.up` flags are the documented
+  PL/pgSQL FOR-loop record-field false-positives (§255/§72#15), not real errors.
+- `check-jsx-brand.sh` clean · esbuild parse OK (both jsx) · `npm run build` ✓ (82 modules).
+- Frontend deploys on push (Vercel → APK on next open). SQL run is owner's, when he's ready.

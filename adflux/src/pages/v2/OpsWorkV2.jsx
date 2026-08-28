@@ -68,10 +68,12 @@ function cleanPhone(raw) {
 }
 
 // Indicative variable pay from uptime — MUST match OpsAdminV2.indicativeVariable
-// (SLA band 90→97%, 70/30 split, >75 score = full 30% cap). Display only; real
-// pay = the Salary sheet once uptime pay (Phase 4) is turned on.
+// (SLA band 75→95%, 70/30 split, >75 score = full 30% cap). Owner 2026-08-28:
+// full bonus at ≥95% uptime, zero below ~85%, graded 85–90%. Display only; real
+// pay = the Salary sheet once uptime pay (Phase 4) is turned on. Keep in lockstep
+// with supabase_ops_p4_uptime_pay.sql (v_floor 75 / v_ceiling 95) — §71.
 function indicativeVariable(salary, uptimePct) {
-  const score = Math.max(0, Math.min(100, ((uptimePct - 90) / 7) * 100))
+  const score = Math.max(0, Math.min(100, ((uptimePct - 75) / 20) * 100))
   const frac = score > 75 ? 1 : score < 50 ? 0 : score / 100
   return Math.round((Number(salary) || 0) * 0.30 * frac)
 }
