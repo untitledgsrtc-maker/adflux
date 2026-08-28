@@ -174,7 +174,7 @@ export default function OpsDownV2() {
                       </div>
                     ))}
                 </div>
-                <button onClick={() => nav(`/ops-log?depot=${r.depotId}`)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 13, borderRadius: 10, border: '1px solid var(--v2-line, #334155)', background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-0, #f1f5f9)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={() => nav(`/ops-log?depot=${r.depotId}${camera ? '&filter=camera' : ''}`)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 13, borderRadius: 10, border: '1px solid var(--v2-line, #334155)', background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-0, #f1f5f9)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                   <FilePlus size={16} />{t('log_whats_wrong', lang)}
                 </button>
               </div>

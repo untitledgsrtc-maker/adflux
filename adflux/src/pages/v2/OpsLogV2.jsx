@@ -63,7 +63,7 @@ export default function OpsLogV2() {
     try {
       const [cRes, sRes] = await Promise.all([
         supabase.from('ops_depot_contacts').select('id, role_en, role_gu, name, phone, display_order').eq('depot_id', id).order('display_order'),
-        supabase.from('ops_screens').select('id, name, status').eq('depot_id', id).eq('is_active', true).order('name'),
+        supabase.from('ops_screens').select('id, name, status, camera_active').eq('depot_id', id).eq('is_active', true).order('name'),
       ])
       setContacts(cRes.data || [])
       setScreens(sRes.data || [])
@@ -98,19 +98,24 @@ export default function OpsLogV2() {
   const screenLabel = useMemo(() => {
     const m = {}; screens.forEach((s, i) => { m[s.id] = `${t('screen', lang)} ${i + 1}` }); return m
   }, [screens, lang])
-  // Log a fault on a DOWN screen: default the picker to offline screens only (owner ask 2026-08-28).
-  // Fallback to all when none are offline (never a dead-end) or when the tech toggles "show all"
-  // (to log a working screen — cleaning / damage). Always keep the currently-selected screen visible.
-  const offlineScreens = useMemo(() => screens.filter(s => s.status === 'offline'), [screens])
+  // Log a fault on a DOWN screen: default the picker to the FAULTY screens only (owner ask 2026-08-28).
+  // From the camera board (?filter=camera) the faulty set = cameras-off screens; otherwise offline
+  // screens. Fallback to all when none are faulty (never a dead-end) or when the tech toggles
+  // "show all" (to log a working screen — cleaning / damage). Always keep the selected screen visible.
+  const camMode = params.get('filter') === 'camera'
+  const faultyScreens = useMemo(
+    () => screens.filter(s => camMode ? s.camera_active === false : s.status === 'offline'),
+    [screens, camMode]
+  )
   const shownScreens = useMemo(() => {
-    const base = (showAll || offlineScreens.length === 0) ? screens : offlineScreens
+    const base = (showAll || faultyScreens.length === 0) ? screens : faultyScreens
     if (screenId && screenId !== '__all__' && !base.some(s => s.id === screenId)) {
       const sel = screens.find(s => s.id === screenId)
       if (sel) return [sel, ...base]
     }
     return base
-  }, [screens, offlineScreens, showAll, screenId])
-  const hiddenWorking = !showAll && offlineScreens.length > 0 && offlineScreens.length < screens.length
+  }, [screens, faultyScreens, showAll, screenId])
+  const hiddenWorking = !showAll && faultyScreens.length > 0 && faultyScreens.length < screens.length
   const canSave = depotId && screenId && issueId && (issueId !== 'other' || otherText.trim())
 
   async function save() {
