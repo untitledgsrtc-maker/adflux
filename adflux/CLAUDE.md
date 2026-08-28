@@ -17463,3 +17463,44 @@ salaries. Night-gate (7 AM–9 PM IST, §255) ships inside p4 so a 24h count can
   PL/pgSQL FOR-loop record-field false-positives (§255/§72#15), not real errors.
 - `check-jsx-brand.sh` clean · esbuild parse OK (both jsx) · `npm run build` ✓ (82 modules).
 - Frontend deploys on push (Vercel → APK on next open). SQL run is owner's, when he's ready.
+
+
+---
+
+## 259 · Auto-ticket close rule → calendar-day IST (owner, data-integrity) (2026-08-28)
+
+Owner restated the multi-day-fault rule; tightened the auto-cancel guard from a
+rolling 24h to a **calendar-day IST** boundary. Supersedes the §241/§254 "opened
+within the last 1 day" (2026-08-27) version.
+
+### The rule (owner, 2026-08-28)
+A screen-offline auto-ticket must be **saved (stay open) until the screen is back
+online OR a tech closes it manually** — and a ticket **from any previous calendar
+day is a real lingering fault**, never auto-closed. Only a **same-day (today, IST)
+blip** may auto-clear when its depot comes fully back online.
+
+### The fix — one guard line in `ops_reconcile_offline_tickets()` (p2)
+`supabase_ops_p2_auto_tickets.sql`, the depot-back-online ELSE branch:
+- WAS: `AND opened_at >= now() - interval '1 day'` (rolling 24h — a ticket opened
+  yesterday 8 PM was only ~15h old this morning → auto-cancelled → owner saw
+  "yesterday's ticket closed").
+- NOW: `AND (opened_at AT TIME ZONE 'Asia/Kolkata')::date = (now() AT TIME ZONE
+  'Asia/Kolkata')::date` — only a ticket opened **today (IST)** can auto-cancel.
+  Anything from a previous day stays open until manual close.
+
+### What is (and isn't) auto-closed — the full contract
+- Auto-cancellable: `source='auto_offline'` AND `status='open'` AND depot fully
+  back online AND **opened today (IST)**. Marked `[auto-recovered]`.
+- NEVER auto-closed: any ticket opened on a previous day · `in_progress` (a tech
+  started it) · `resolved`/`approved` · **manual** (`source<>'auto_offline'`, e.g.
+  logged via ખરાબી નોંધાવો) · `sales_request`.
+- Night (7 AM–9 PM gate, §250): engine off → nothing opens or closes. Screens read
+  offline (timers) but the open tickets persist untouched.
+- Reconcile is the ONLY auto-close path (grep-verified: p2 line ~102 cancel + line
+  ~155 the manual resolve RPC; no cron/trigger/frontend closes tickets).
+
+### Run + checks
+- Owner RE-RUNS `supabase_ops_p2_auto_tickets.sql` in Studio (idempotent, CREATE OR
+  REPLACE — re-creates the reconcile function with the new guard). No new columns.
+- check-sql-schema.sh: OK (clean, no false-positives this file). Ops file, not §28
+  frozen — no guardian. Frontend unchanged.
