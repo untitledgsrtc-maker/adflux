@@ -139,6 +139,7 @@ export default function OpsHomeV2() {
   const noDepots = depots.length === 0
   const stationCount = cityId ? 1 : depots.length
   const downHref = cityId ? `/ops-down?depot=${cityId}` : '/ops-down'   // carry the city filter into the Down-now board
+  const camHref = cityId ? `/ops-down?view=camera&depot=${cityId}` : '/ops-down?view=camera'   // camera-off tile → the cameras-off board
 
   return (
     <div className="lead-root">
@@ -190,7 +191,7 @@ export default function OpsHomeV2() {
             <SnapTile icon={Monitor} n={net.total} label={t('total_screens', lang)} tone="neutral" onClick={() => nav(downHref)} />
             <SnapTile icon={Wifi} n={net.online} label={t('online', lang)} tone="success" onClick={() => nav(downHref)} />
             <SnapTile icon={WifiOff} n={net.offline} label={t('offline', lang)} tone={onHours ? 'danger' : 'neutral'} onClick={() => nav(downHref)} />
-            <SnapTile icon={VideoOff} n={net.cameraOff != null ? net.cameraOff : '—'} label={t('camera_off', lang)} tone="warning" onClick={() => nav(downHref)} />
+            <SnapTile icon={VideoOff} n={net.cameraOff != null ? net.cameraOff : '—'} label={t('camera_off', lang)} tone="warning" onClick={() => nav(camHref)} />
           </div>
           {/* off-hours: offline is normal (timer, §250) — not an alarm */}
           {!onHours && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 10, textAlign: 'center' }}>{t('all_quiet', lang)}</div>}

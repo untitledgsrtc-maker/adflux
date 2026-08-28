@@ -17,6 +17,7 @@ export default function OpsDownV2() {
   const nav = useNavigate()
   const [params] = useSearchParams()
   const depotFilter = params.get('depot')   // carried from the home city filter → scope the board to one station
+  const camera = params.get('view') === 'camera'   // camera = show the cameras-off screens instead of offline ones
   const [lang, setLang] = useState(getOpsLang())
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -32,7 +33,7 @@ export default function OpsDownV2() {
   const load = useCallback(async () => {
     try {
       const [sRes, dRes, tRes, cRes] = await Promise.all([
-        supabase.from('ops_screens').select('id, name, status, depot_id').eq('is_active', true),
+        supabase.from('ops_screens').select('id, name, status, camera_active, depot_id').eq('is_active', true),
         supabase.from('ops_depots').select('id, name, lat, lng, assigned_to, tech:users!ops_depots_assigned_to_fkey(id,name)').eq('is_active', true).order('name'),
         supabase.from('ops_tickets').select('id, depot_id, cause, opened_at, assigned_to, tech:users!ops_tickets_assigned_to_fkey(name), issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en,issue_gu)').in('status', ['open', 'in_progress']).order('opened_at', { ascending: true }),
         supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone, display_order').order('display_order'),
@@ -54,12 +55,15 @@ export default function OpsDownV2() {
 
   const { uptime, downCount, rows } = useMemo(() => {
     const scoped = depotFilter ? screens.filter(s => s.depot_id === depotFilter) : screens
+    // camera view scores on camera_active (on/off); down view on status (online/offline)
+    const isGood = (s) => camera ? s.camera_active === true : s.status === 'online'
+    const isBad = (s) => camera ? s.camera_active === false : s.status === 'offline'
     let online = 0, offline = 0
     const byDepot = {}
     scoped.forEach(s => {
-      if (s.status === 'online') online++; else if (s.status === 'offline') offline++
+      if (isGood(s)) online++; else if (isBad(s)) offline++
       const d = (byDepot[s.depot_id] ||= { total: 0, down: [] })
-      d.total++; if (s.status === 'offline') d.down.push(s)
+      d.total++; if (isBad(s)) d.down.push(s)
     })
     const depotName = {}, depotTech = {}, depotLL = {}
     depots.forEach(d => { depotName[d.id] = d.name; depotTech[d.id] = d.tech?.name || null; depotLL[d.id] = { lat: d.lat, lng: d.lng } })
@@ -76,7 +80,7 @@ export default function OpsDownV2() {
       .sort((a, b) => b.down - a.down)
     const uptime = (online + offline) > 0 ? Math.round(online / (online + offline) * 100) : 100
     return { uptime, downCount: offline, rows }
-  }, [screens, depots, tickets, lang, depotFilter])
+  }, [screens, depots, tickets, lang, depotFilter, camera])
 
   const ago = (iso) => {
     if (!iso) return ''
@@ -95,7 +99,7 @@ export default function OpsDownV2() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Activity size={20} style={{ color: 'var(--v2-blue, #3B82F6)' }} />
-          <span style={{ fontSize: 17, fontWeight: 700 }}>{t('down_now', lang)}</span>
+          <span style={{ fontSize: 17, fontWeight: 700 }}>{camera ? t('cameras_off', lang) : t('down_now', lang)}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={() => { load(); toastSuccess(t('refresh', lang)) }} title={t('refresh', lang)} style={{ background: 'transparent', border: 'none', color: 'var(--v2-ink-2, #94a3b8)', cursor: 'pointer', display: 'inline-flex' }}><RefreshCw size={16} /></button>
@@ -107,18 +111,18 @@ export default function OpsDownV2() {
       {depotFilter && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--v2-tint-blue, rgba(59,130,246,.12))', border: '1px solid var(--v2-blue, #3B82F6)', borderRadius: 999, padding: '5px 6px 5px 12px', marginBottom: 12, fontSize: 13 }}>
           <span style={{ fontWeight: 600 }}>{depots.find(d => d.id === depotFilter)?.name || '—'}</span>
-          <button onClick={() => nav('/ops-down')} aria-label={t('close', lang)} style={{ border: 'none', background: 'transparent', color: 'var(--v2-blue, #3B82F6)', cursor: 'pointer', display: 'inline-flex', padding: 2 }}><X size={15} /></button>
+          <button onClick={() => nav(camera ? '/ops-down?view=camera' : '/ops-down')} aria-label={t('close', lang)} style={{ border: 'none', background: 'transparent', color: 'var(--v2-blue, #3B82F6)', cursor: 'pointer', display: 'inline-flex', padding: 2 }}><X size={15} /></button>
         </div>
       )}
 
       {/* top numbers */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
         <div style={{ flex: 1, background: 'var(--v2-green-soft, rgba(16,185,129,.12))', borderRadius: 12, padding: '12px 14px' }}>
-          <div style={{ fontSize: 12, color: 'var(--v2-green, #10B981)', fontWeight: 700 }}>{t('network_uptime', lang)}</div>
+          <div style={{ fontSize: 12, color: 'var(--v2-green, #10B981)', fontWeight: 700 }}>{camera ? t('cam_working', lang) : t('network_uptime', lang)}</div>
           <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--v2-green, #10B981)' }}>{numL(uptime, lang)}<span style={{ fontSize: 16 }}>%</span></div>
         </div>
         <div style={{ flex: 1, background: 'var(--danger-soft, rgba(239,68,68,.12))', borderRadius: 12, padding: '12px 14px' }}>
-          <div style={{ fontSize: 12, color: 'var(--danger, #EF4444)', fontWeight: 700 }}>{t('screens_down', lang)}</div>
+          <div style={{ fontSize: 12, color: 'var(--danger, #EF4444)', fontWeight: 700 }}>{camera ? t('cameras_off', lang) : t('screens_down', lang)}</div>
           <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--danger, #EF4444)' }}>{numL(downCount, lang)}</div>
           <div style={{ fontSize: 11, color: 'var(--v2-ink-2, #94a3b8)' }}>{numL(rows.length, lang)} {t('across_stations', lang)}</div>
         </div>
@@ -126,7 +130,7 @@ export default function OpsDownV2() {
 
       {rows.length === 0 && (
         <div style={{ ...card, textAlign: 'center', padding: '28px 16px', color: 'var(--v2-green, #10B981)' }}>
-          <CheckCircle2 size={28} style={{ marginBottom: 8 }} /><div style={{ fontWeight: 700 }}>{t('all_up', lang)}</div>
+          <CheckCircle2 size={28} style={{ marginBottom: 8 }} /><div style={{ fontWeight: 700 }}>{camera ? t('all_cam_ok', lang) : t('all_up', lang)}</div>
         </div>
       )}
 
