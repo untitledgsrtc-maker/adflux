@@ -17297,3 +17297,12 @@ buttons, first thing on screen) + which screens off + one "fixed · photo" butto
     accumulates.
 - FOOT-GUN: a contact-name fallback of "no contacts added yet" fires when a real contact simply has a
   NULL name — fall back to the ROLE/phone, and reserve the empty-state text for a genuinely empty list.
+
+### 256.2 · Per-screen problem logging from /ops-fix (2026-08-28)
+Owner: "i also can add problem in individual screen." On `/ops-fix` the "which screens are off" list was
+static text — now each offline screen is a tappable card → `/ops-log?depot=<id>&screen=<screenId>` which
+lands on the Log screen with that depot + screen preselected → pick the problem → save (creates an
+in_progress ticket for that screen, §254.5). `OpsLogV2` gained a `?screen=` preselect effect (fires when
+the depot's screens load) + shows the real `ops_screens.name` in its screen dropdown (was a generic
+`Screen N` index — same fix as §256.1). opsStrings: `log_short` + `which_screens` relabelled "tap to log".
+Ops pages (not frozen), build PASS.

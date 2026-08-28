@@ -7,7 +7,7 @@
 // ops_screens / ops_depot_contacts (RLS: the exec owns the depot).
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Loader2, ArrowLeft, Phone, WifiOff, Wrench } from 'lucide-react'
+import { Loader2, ArrowLeft, Phone, WifiOff, Wrench, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { t, getOpsLang, setOpsLang, numL } from '../../utils/opsStrings'
 import { openExternalUrl } from '../../utils/openExternal'
@@ -84,14 +84,19 @@ export default function OpsFixV2() {
           </div>
         ))}
 
-      {/* which screens are off — simple list */}
+      {/* which screens are off — tap a screen to log its problem */}
       {down.length > 0 && (
         <>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', margin: '16px 0 6px' }}>{t('which_screens', lang)}</div>
-          <div className="lead-card" style={{ padding: '11px 13px', fontSize: 14.5, lineHeight: 1.6, marginBottom: 18 }}>
-            {down.some(s => s.name)
-              ? down.map(s => s.name || `${t('screen', lang)}`).join(' · ')
-              : down.map((s, i) => `${t('screen', lang)} ${numL(i + 1, lang)}`).join(' · ')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+            {down.map((s, i) => (
+              <button key={s.id} onClick={() => nav(`/ops-log?depot=${depotId}&screen=${s.id}`)} className="lead-card"
+                style={{ padding: '12px 13px', display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+                <WifiOff size={16} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name || `${t('screen', lang)} ${numL(i + 1, lang)}`}</span>
+                <span style={{ fontSize: 12.5, color: 'var(--blue, #3B82F6)', display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>{t('log_short', lang)}<ChevronRight size={15} /></span>
+              </button>
+            ))}
           </div>
         </>
       )}

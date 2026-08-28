@@ -79,12 +79,17 @@ export default function OpsLogV2() {
   }, [])
 
   useEffect(() => { (async () => { setLoading(true); await loadShell(); setLoading(false) })() }, [loadShell])
-  // Preselect a city from ?depot= (the Down-now "Log what's wrong" deep-link).
+  // Preselect a city from ?depot= (the Down-now / station-fix deep-link).
   useEffect(() => {
     const pre = params.get('depot')
     if (pre && depots.some(d => d.id === pre)) setDepotId(pre)
   }, [depots, params])
   useEffect(() => { loadCity(depotId) }, [depotId, loadCity])
+  // Preselect a screen from ?screen= (tap a screen on the station-fix page → log it).
+  useEffect(() => {
+    const pre = params.get('screen')
+    if (pre && screens.some(s => s.id === pre)) setScreenId(pre)
+  }, [screens, params])
   useEffect(() => { loadRecent(screenId) }, [screenId, loadRecent])
 
   const depot = depots.find(d => d.id === depotId)
@@ -168,7 +173,7 @@ export default function OpsLogV2() {
             <label style={{ ...lbl, marginTop: 14 }}><Monitor size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t('screen', lang)}</label>
             <select value={screenId} onChange={e => setScreenId(e.target.value)} style={field}>
               <option value="">{t('pick_screen', lang)}</option>
-              {screens.map((s, i) => <option key={s.id} value={s.id}>{`${t('screen', lang)} ${i + 1}`}</option>)}
+              {screens.map((s, i) => <option key={s.id} value={s.id}>{s.name || `${t('screen', lang)} ${i + 1}`}</option>)}
             </select>
             {screenId && <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 4 }}>{screens.find(s => s.id === screenId)?.name}</div>}
           </>

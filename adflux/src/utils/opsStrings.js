@@ -215,9 +215,10 @@ export const STR = {
   fix_steps:       { gu: 'કેવી રીતે ઠીક કરવું',          en: 'How to fix' },
 
   // — station fix screen (tap a station → contacts + call + fix) —
-  which_screens:   { gu: 'કઈ સ્ક્રીન બંધ',              en: 'Which screens are off' },
+  which_screens:   { gu: 'કઈ સ્ક્રીન બંધ · નોંધ કરવા ટૅપ કરો', en: 'Which screens are off · tap to log' },
   fix_it:          { gu: 'ઠીક થઈ ગયું · ફોટો',           en: 'Fixed · add photo' },
   go_home:         { gu: 'ઘર',                          en: 'Home' },
+  log_short:       { gu: 'નોંધો',                       en: 'Log' },
 
   // — network snapshot (home) —
   my_network:      { gu: 'તમારું નેટવર્ક',              en: 'Your network' },
