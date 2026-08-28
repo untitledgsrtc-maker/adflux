@@ -17,6 +17,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { CalendarOff } from 'lucide-react'
 import OpsUptimeCard from '../../components/incentives/OpsUptimeCard'
+import TotalPayableCard from '../../components/incentives/TotalPayableCard'
 import SalarySlipsCard from '../../components/incentives/SalarySlipsCard'
 import TaDaRequestPanel from '../../components/incentives/TaDaRequestPanel'
 import RepLeaveHistory from '../../components/leads/RepLeaveHistory'
@@ -92,6 +93,14 @@ export default function OpsMyPerformanceV2() {
       </div>
 
       <OpsUptimeCard key={`up-${refreshKey}`} scope={isHead ? 'head' : 'exec'} />
+
+      {/* Grand-total payable — the same consolidated card a sales rep gets
+          (base + variable + incentive + TA/DA − unpaid-leave). Reads the
+          single-source compute_monthly_salary RPC; renders for ops (only
+          agency is excluded). Variable here follows the monthly score
+          (uptime-derived once uptime pay is recording), so it stays in
+          step with the uptime card above. */}
+      <TotalPayableCard key={`tp-${refreshKey}`} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
         <Tile label="Fixed this month" val={kpi?.fixedMo ?? '—'} />
