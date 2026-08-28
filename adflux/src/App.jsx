@@ -72,6 +72,8 @@ const OpsWorkV2 = lazyWithRetry(() => import('./pages/v2/OpsWorkV2'))
 // Phase 230 (Phase 2) — Operation Head desk console.
 const OpsHeadV2 = lazyWithRetry(() => import('./pages/v2/OpsHeadV2'))
 const OpsCommandV2 = lazyWithRetry(() => import('./pages/v2/OpsCommandV2'))
+// Command center per-tech drill-down (2026-08-28) — tap a tech → their detail.
+const OpsTechV2 = lazyWithRetry(() => import('./pages/v2/OpsTechV2'))
 // Phase 230 (Phase 6) — admin Operations owner cockpit.
 const OpsAdminV2 = lazyWithRetry(() => import('./pages/v2/OpsAdminV2'))
 // Phase 230 — per-station Operations board (KPIs + screen wall + contacts + issue ref).
@@ -451,6 +453,7 @@ export default function App() {
           {/* Phase 230 — Operations field app (exec) + Head desk console. */}
           <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
           <Route path="/ops-command"               element={<RequireOps><OpsCommandV2 /></RequireOps>} />
+          <Route path="/ops-tech/:userId"          element={<RequireOps><OpsTechV2 /></RequireOps>} />
           <Route path="/ops-dashboard"             element={<RequireOps><OpsHeadV2 /></RequireOps>} />
           <Route path="/ops-log"                   element={<RequireOps><OpsLogV2 /></RequireOps>} />
           <Route path="/ops-down"                  element={<RequireOps><OpsDownV2 /></RequireOps>} />

@@ -73,12 +73,14 @@ BEGIN
     ), '[]'::jsonb),
     'leaderboard', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
+        'user_id', u.id,
         'name', u.name,
         'uptime_pct', COALESCE((SELECT round(avg(uptime_pct), 1) FROM public.ops_uptime_daily o WHERE o.user_id = u.id AND o.work_date >= v_mstart AND o.screens_total > 0), 0),
         'tickets_closed', (SELECT count(*) FROM public.ops_tickets t WHERE t.assigned_to = u.id AND t.status = 'resolved' AND t.resolved_at >= v_mstart),
         'avg_fix_hours', COALESCE((SELECT round(avg(extract(epoch FROM (t.resolved_at - t.opened_at)) / 3600), 1) FROM public.ops_tickets t WHERE t.assigned_to = u.id AND t.status = 'resolved' AND t.resolved_at >= v_mstart), 0),
         'km', COALESCE((SELECT round(sum(km_traveled), 1) FROM public.daily_ta ta WHERE ta.user_id = u.id AND ta.ta_date >= v_mstart), 0),
-        'attendance', (SELECT count(*) FROM public.work_sessions ws WHERE ws.user_id = u.id AND ws.work_date >= v_mstart AND ws.check_in_at IS NOT NULL)
+        'attendance', (SELECT count(*) FROM public.work_sessions ws WHERE ws.user_id = u.id AND ws.work_date >= v_mstart AND ws.check_in_at IS NOT NULL),
+        'on_duty', EXISTS (SELECT 1 FROM public.work_sessions ws WHERE ws.user_id = u.id AND ws.work_date = v_today AND ws.check_in_at IS NOT NULL AND ws.check_out_at IS NULL AND COALESCE(ws.auto_checked_out, false) = false)
       ) ORDER BY u.name)
       FROM public.users u WHERE u.role = 'operation_executive' AND u.is_active
     ), '[]'::jsonb),

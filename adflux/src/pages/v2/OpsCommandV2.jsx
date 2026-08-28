@@ -123,18 +123,24 @@ export default function OpsCommandV2() {
         <div className="lead-card" style={{ padding: '4px 0', marginBottom: 18 }}>
           {techs.map((tk, i) => {
             const tone = upTone(tk.uptime_pct)
+            const tap = tk.user_id ? () => nav(`/ops-tech/${tk.user_id}`) : undefined
+            const El = tap ? 'button' : 'div'
             return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderTop: i ? '1px solid var(--border)' : 'none' }}>
+              <El key={tk.user_id || i} onClick={tap} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderTop: i ? '1px solid var(--border)' : 'none', width: '100%', background: 'none', border: 'none', textAlign: 'left', color: 'inherit', cursor: tap ? 'pointer' : 'default' }}>
                 <span style={{ width: 8, height: 8, borderRadius: 999, background: toneVar[tone], flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tk.name || '—'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 14.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tk.name || '—'}</span>
+                    {tk.on_duty && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, color: 'var(--success)', flexShrink: 0 }}><span style={{ width: 5, height: 5, borderRadius: 999, background: 'var(--success)' }} />{t('on_duty', lang)}</span>}
+                  </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{numL(tk.tickets_closed || 0, lang)} {t('fixes_word', lang)}{tk.avg_fix_hours ? ` · ${numL(tk.avg_fix_hours, lang)}h ${t('avg_fix', lang).toLowerCase()}` : ''} · {numL(tk.km || 0, lang)} km</div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 18, fontWeight: 700, color: toneVar[tone], lineHeight: 1 }}>{numL(Math.round(tk.uptime_pct || 0), lang)}%</div>
                   <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{t('uptime_word', lang)}</div>
                 </div>
-              </div>
+                {tap && <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
+              </El>
             )
           })}
         </div>

@@ -246,6 +246,12 @@ export const STR = {
   fixed_this_wk:   { gu: 'આ અઠવાડિયે',                  en: 'This week' },
   avg_uptime:      { gu: 'સરેરાશ ચાલુ',                 en: 'Avg uptime' },
   station_map:     { gu: 'મારા સ્ટેશન · નકશો',           en: 'My stations · map' },
+
+  // — per-tech drill-down (command center) —
+  on_duty:         { gu: 'ડ્યુટી પર',                   en: 'on duty' },
+  not_checked_in:  { gu: 'ચેક-ઇન બાકી',                 en: 'Not checked in yet' },
+  back:            { gu: 'પાછળ',                        en: 'Back' },
+  tech_none:       { gu: 'આ ટૅકની માહિતી મળી નથી',       en: 'No data for this tech' },
 }
 
 // Resolve a label. Falls back gu → en → key so a missing translation is
