@@ -17314,3 +17314,96 @@ Owner (Gandhinagar has ~20 screens): a "select all screens" option + bigger In-p
   `loadRecent` guards `__all__`; photo key uses `<depot>/all/`. opsStrings `all_screens`.
 - `OpsHomeV2`: the In-process / Fixed-today pills → bigger tap TILES (big count + label, warning/success
   colored). Ops pages, build PASS.
+
+
+---
+
+## 257 · Operation-HEAD command center — finish the head flow (2026-08-28)
+
+Owner brainstorm "finish operation_head flow / manage 10 techs" → a manager's cockpit. Six commits
+(4 command-center + 2 camera-board), all on origin (`untitled-os`, HEAD `e92212a`, pushed via §211).
+Additive; ops files NOT §28-frozen except App.jsx + V2AppShell (guardian PASS each). 3 SQL owner-run.
+Spec: `docs/superpowers/specs/2026-08-28-ops-head-command-center-design.md`.
+
+### The head's home — OpsCommandV2 (`/ops-command`, `1affd45`) — NO new SQL
+The head now LANDS on a command center (was `/ops-down`). Four sections, AdFlux brand (§5 tokens,
+Space Grotesk numbers, Lucide), Gujarati-first (`opsStrings`, §231):
+- **Network health strip** (2×2 tiles): uptime · screens-down · total · cameras-off. **Off-hours
+  aware** (§250 `isOnHours` — the "down" tile goes neutral + "all quiet" at night; the cam-off tile
+  taps → `/ops-down?view=camera`).
+- **Needs you queue** — unassigned faults (→ `/ops-tickets?tab=open`) · overdue >48h (→
+  `?tab=proc`) · leave requests + TA claims (→ `/ops-approvals`). Each best-effort-fetched, degrades
+  to none until its SQL runs; "all handled" when empty.
+- **Per-tech scorecard** — worst-first, uptime colour-coded (≥90 green / ≥75 amber / else red),
+  fixes · avg-fix · km, on-duty pill, tap → `/ops-tech/:userId`.
+- **Quick links** — Down now / Tickets / Live console / Station board.
+Reads the EXISTING `ops_admin_cockpit` RPC (§233, already head-accessible) + head-readable ops reads.
+Frozen wiring (additive): App.jsx head RootRedirect `/ops-down` → `/ops-command`; V2AppShell
+`OPS_HEAD_NAV` gains **Command center** (Gauge) as the FIRST entry + mobile Home; `DashboardV2` head
+redirect → `/ops-command`. Sales/exec navs byte-unchanged.
+
+### Network Tickets queue for the head — OpsTicketsV2 (`465e848`)
+The exec Tickets page (§246) becomes head-aware: `isHead = role IN operation_head/admin/co_owner`.
+- Head → the WHOLE-NETWORK manual-ticket queue (all depots, all techs' `source='manual'` tickets,
+  Fixed capped 60); exec → own (`assigned_to=uid`, cap 30) — one query builder, gated by `isHead`.
+- Head has **NO personal "Me" tab** (`TAB_KEYS` drops `mystats` for head — his pay is on
+  `/ops-performance`, not a queue tab).
+- **OpsMyPerformanceV2**: `TotalPayableCard` is now `{!isHead && ...}`. ⚠ MONEY — with no ops uptime
+  score rows yet, `compute_monthly_salary` would read a §184 "0 working days → full variable cap" →
+  over-pay the head. So the head's payable surface stays the **uptime projection card** (§251), NOT
+  TotalPayableCard. Do NOT mount TotalPayableCard for the head until uptime pay is recording.
+
+### Per-tech drill-down — OpsTechV2 (`/ops-tech/:userId`, `f975a0d`) + p7 SQL
+Tap a tech on the scorecard → their detail: stations (up/down/cam-off) + uptime + km/travel + calls
+(today + month) — ONE gated bundle RPC `ops_tech_detail(p_user_id)` (`supabase_ops_p7_tech_detail.sql`,
+NEW). DEFINER, §66 server-side aggregation, gated admin/co_owner/operation_head + §41 fail-closed
+NULL, **scoped to a LIVE `operation_executive`** (never leaks an arbitrary user).
+- `ops_admin_cockpit` (p6, **re-run**) leaderboard rows gain `user_id` + `on_duty` → the scorecard is
+  tappable + shows who's in the field right now.
+
+### Head approves the field team's leave + TA/DA — OpsApprovalsV2 (`/ops-approvals`, `e92212a`) + p8 SQL
+The "Needs you" leave/TA rows → a light approvals page: approve/reject each, inline reject-note.
+`supabase_ops_p8_approvals.sql` (NEW) = 5 gated DEFINER RPCs (`ops_pending_approvals` +
+`ops_approve/reject_leave` + `ops_approve/reject_ta_request`). Adversarial security review:
+FIX_THEN_SHIP, no defect (3 fixes applied — VERIFY regex, admin_note preserve, is_active on writes).
+
+**MONEY-SAFE CONTRACT (do NOT regress):** every read + write JOINs `users.role='operation_executive'
+AND is_active` → an ops head can **ONLY EVER touch a FIELD TECH's** leave/TA row, **never a sales
+rep's**. Drop that JOIN and the ops head can approve sales-rep leave = a pay/HR breach. Gate =
+admin/co_owner/operation_head, §41 NULL fail-closed. A leave flip re-runs `compute_daily_score`
+(the §72 canonical — NEVER redefines it, so a leave day is re-scored); TA needs no recompute (the
+§36.8 `ta_da_requests` status-change trigger recomputes `daily_ta`). All 5 REVOKE PUBLIC/anon + GRANT
+authenticated. admin/co_owner keep their EXISTING HR/accounts approval path unchanged (§45) — these
+are the ops branch.
+
+### Camera-off board (`b73779e` + `a99d42a`) — cameras ≠ offline
+Owner: the "53 cameras off" snapshot tile went to `/ops-down` which shows OFFLINE screens (a screen
+can be online with its camera off).
+- `OpsDownV2` `?view=camera` → a real cameras-off board: it scores **`camera_active`** (on/off), NOT
+  `status` (online/offline). The command-center cam-off tile + head snapshot link here.
+- `OpsLogV2` `?filter=camera` → "Log a fault" from the cameras-off board defaults the screen picker to
+  **cameras-off** screens (`camera_active=false`), not the §256 offline default; the camera board's log
+  button passes it. Offline flow byte-unchanged; the "Show all" escape + fallback (none-faulty → all)
+  still apply.
+- FOOT-GUN: a board/picker for cameras must score `camera_active`, never `status` — an online screen
+  with its camera dead is a camera fault, not a down screen; the two sets differ.
+
+### Owner run-list
+1. Run 3 SQL in Supabase Studio: `supabase_ops_p6_admin_cockpit.sql` (**re-run** — adds user_id +
+   on_duty to the leaderboard) · `supabase_ops_p7_tech_detail.sql` (NEW) · `supabase_ops_p8_approvals.sql`
+   (NEW). Each has a VERIFY block.
+2. Frontend deploys on push (Vercel; reaches the APK on next open — no APK rebuild).
+3. Smoke as operation_head: land on `/ops-command` → network health + "Needs you" (unassigned/overdue/
+   leave/TA) + tech scorecard → tap a tech → `/ops-tech/:id` detail → tap Tickets → the whole-network
+   manual queue (no "Me" tab) → a leave/TA row → `/ops-approvals` → approve/reject. The cam-off tile →
+   the cameras-off board.
+
+### Deploy-order / contracts
+- Deploy-before-SQL safe: the "Needs you" leave/TA rows + the tech-detail page + the approvals page all
+  degrade to empty/error-graceful until p7/p8 run; the scorecard tap is guarded until `user_id` lands
+  (p6 re-run). OpsCommandV2 itself works immediately (reads the already-live p6 cockpit RPC).
+- FOOT-GUN (money): never mount `TotalPayableCard` for the operation_head while ops uptime score rows
+  are absent — the §184 zero-days-→-full-cap rule over-pays. Head pay = the uptime projection card
+  until uptime pay (p4, §255) records.
+- FOOT-GUN (HR): the p8 approval RPCs are ops-scoped ONLY by the `users.role='operation_executive'`
+  JOIN on every read + write — that JOIN IS the security boundary; it is not decoration.
