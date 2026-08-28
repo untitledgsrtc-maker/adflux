@@ -196,8 +196,8 @@ export default function OpsHomeV2() {
           {!onHours && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 10, textAlign: 'center' }}>{t('all_quiet', lang)}</div>}
           <div style={{ display: 'flex', marginTop: 13, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <SubStat val={stationCount} label={t('stations_word', lang)} onClick={() => nav(downHref)} />
-            <SubStat val={s.fixedToday ?? 0} label={t('fixed_today_w', lang)} border onClick={() => nav('/ops-tickets')} />
-            <SubStat val={s.inProc ?? 0} label={t('in_process', lang)} border onClick={() => nav('/ops-tickets')} />
+            <SubStat val={s.fixedToday ?? 0} label={t('fixed_today_w', lang)} border onClick={() => nav('/ops-tickets?tab=fixed')} />
+            <SubStat val={s.inProc ?? 0} label={t('in_process', lang)} border onClick={() => nav('/ops-tickets?tab=proc')} />
           </div>
         </div>
       )}
@@ -233,11 +233,11 @@ export default function OpsHomeV2() {
         <>
           <button onClick={() => nav('/ops-log')} className="lead-btn lead-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '13px', fontSize: 15, fontWeight: 700, marginBottom: 10 }}><FilePlus size={16} /> {t('report_fault', lang)}</button>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-            <button onClick={() => nav('/ops-tickets')} className="lead-card" style={{ flex: 1, padding: '15px 12px', textAlign: 'center', cursor: 'pointer', color: 'inherit', display: 'block' }}>
+            <button onClick={() => nav('/ops-tickets?tab=proc')} className="lead-card" style={{ flex: 1, padding: '15px 12px', textAlign: 'center', cursor: 'pointer', color: 'inherit', display: 'block' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 27, fontWeight: 800, color: 'var(--warning)', lineHeight: 1 }}>{s.inProc ?? 0}</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{t('in_process', lang)}</div>
             </button>
-            <button onClick={() => nav('/ops-tickets')} className="lead-card" style={{ flex: 1, padding: '15px 12px', textAlign: 'center', cursor: 'pointer', color: 'inherit', display: 'block' }}>
+            <button onClick={() => nav('/ops-tickets?tab=fixed')} className="lead-card" style={{ flex: 1, padding: '15px 12px', textAlign: 'center', cursor: 'pointer', color: 'inherit', display: 'block' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 27, fontWeight: 800, color: 'var(--success)', lineHeight: 1 }}>{s.fixedToday ?? 0}</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{t('fixed_today_w', lang)}</div>
             </button>

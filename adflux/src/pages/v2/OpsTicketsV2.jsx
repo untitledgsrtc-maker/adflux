@@ -7,6 +7,7 @@
 // call_logs (ops_ticket_id) + ops_my_uptime_pay. Gujarati-first (§231). Built on
 // the same lead-* classes + global tokens as OpsAdminV2 so it matches the cockpit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Loader2, MapPin, Phone, ChevronRight, Camera, Check, Wrench, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -39,9 +40,13 @@ export default function OpsTicketsV2() {
   const flip = () => { const n = lang === 'gu' ? 'en' : 'gu'; setLang(n); setOpsLang(n) }
   const nm = (row, base) => (lang === 'gu' ? row?.[`${base}_gu`] : row?.[`${base}_en`]) || row?.[`${base}_en`] || ''
 
+  const [params] = useSearchParams()
+  const TAB_KEYS = ['open', 'proc', 'fixed', 'mystats']
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
-  const [tab, setTab] = useState('open')
+  // Deep-link the tab from ?tab= (home In-process / Fixed tiles land here).
+  const [tab, setTab] = useState(() => (TAB_KEYS.includes(params.get('tab')) ? params.get('tab') : 'open'))
+  useEffect(() => { const p = params.get('tab'); if (TAB_KEYS.includes(p)) setTab(p) }, [params])
   const [cityId, setCityId] = useState('')      // '' = all my stations
   const [onHours, setOnHours] = useState(isOnHours())   // 7 AM–9 PM window (F4)
 
