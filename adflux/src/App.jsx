@@ -83,6 +83,8 @@ const OpsDownV2 = lazyWithRetry(() => import('./pages/v2/OpsDownV2'))
 const OpsTicketsV2 = lazyWithRetry(() => import('./pages/v2/OpsTicketsV2'))
 const OpsMyPerformanceV2 = lazyWithRetry(() => import('./pages/v2/OpsMyPerformanceV2'))
 const OpsHomeV2 = lazyWithRetry(() => import('./pages/v2/OpsHomeV2'))
+// Ops redesign (2026-08-28) — simple per-station fix screen (contacts + call).
+const OpsFixV2 = lazyWithRetry(() => import('./pages/v2/OpsFixV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
 const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
 const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
@@ -454,6 +456,7 @@ export default function App() {
           <Route path="/ops-tickets"               element={<RequireOps><OpsTicketsV2 /></RequireOps>} />
           <Route path="/ops-performance"           element={<RequireOps><OpsMyPerformanceV2 /></RequireOps>} />
           <Route path="/ops-home"                  element={<RequireOps><OpsHomeV2 /></RequireOps>} />
+          <Route path="/ops-fix/:depotId"          element={<RequireOps><OpsFixV2 /></RequireOps>} />
           <Route path="/ops-admin"                 element={<RequirePrivileged><OpsAdminV2 /></RequirePrivileged>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
               direct reports + today's metrics. Sales head + TC head

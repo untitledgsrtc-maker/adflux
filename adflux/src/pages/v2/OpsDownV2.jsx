@@ -6,12 +6,10 @@
 // Gujarati-first (§231). App v2 tokens.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Activity, RefreshCw, Phone, Loader2, CheckCircle2, FilePlus, ChevronDown, Navigation } from 'lucide-react'
+import { Activity, RefreshCw, Phone, Loader2, CheckCircle2, FilePlus, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { t, getOpsLang, setOpsLang, numL } from '../../utils/opsStrings'
 import { toastSuccess } from '../../components/v2/Toast'
-import { depotMapsUrl } from '../../utils/opsMaps'
-import { openExternalUrl } from '../../utils/openExternal'
 
 const card = { background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)', borderRadius: 14, padding: 14 }
 
@@ -161,11 +159,6 @@ export default function OpsDownV2() {
                       </div>
                     ))}
                 </div>
-                {depotMapsUrl(r) && (
-                  <button onClick={() => openExternalUrl(depotMapsUrl(r))} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 13, borderRadius: 10, border: '1px solid var(--v2-blue, #3B82F6)', background: 'transparent', color: 'var(--v2-blue, #3B82F6)', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 8 }}>
-                    <Navigation size={16} />{t('navigate', lang)}
-                  </button>
-                )}
                 <button onClick={() => nav(`/ops-log?depot=${r.depotId}`)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 13, borderRadius: 10, border: '1px solid var(--v2-line, #334155)', background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-0, #f1f5f9)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                   <FilePlus size={16} />{t('log_whats_wrong', lang)}
                 </button>

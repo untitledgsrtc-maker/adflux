@@ -17203,3 +17203,69 @@ crashing to 0% and tanking pay for hours the tech was never expected to keep scr
 - ❌ An uptime/pay recompute that snapshots screen status must gate on operating hours (`isOnHours`) — a
   24h count reads a perfect timer-off screen as a failure and tanks pay. The auto-ticket engine (§254.1)
   and this pay recompute share the ONE 7 AM–9 PM window.
+
+
+---
+
+## 256 · Ops-home simplify-for-staff + offline→contacts one-screen flow (2026-08-28)
+
+Owner analysed the LIVE /ops-home (via claude-in-chrome, logged in as the `test` exec — 264 real
+screens, 20 stations, real aiadflux data) + a 4-lens Workflow audit (design 8.5/10, UX flagged real
+issues). Then two hard directives: **(1) must feel simple + easy for low-literacy field staff; (2) when
+a screen is offline the tech must SEE ALL CONTACT DATA right there — the old flow was "very confusing".**
+Redesign approved via a tappable mockup FIRST (§244 — this owner evaluates by seeing, not specs), then
+shipped. Additive; guardian on the frozen App.jsx touch; build PASS.
+
+### The confusing flow that was fixed
+Old: home fault row → `/ops-tickets` (generic Open tab) → In-process → Call. 3-4 taps + a re-scan to
+reach a contact. New: home fault row → **NEW `/ops-fix/:depotId`** → who-to-call (big green call
+buttons, first thing on screen) + which screens off + one "fixed · photo" button. One screen, no drill.
+
+### What shipped
+- **NEW `src/pages/v2/OpsFixV2.jsx`** (route `/ops-fix/:depotId`, RequireOps, NOT §28-frozen): the simple
+  per-station action screen. Loads ops_depots (by id) + its offline ops_screens + its ops_depot_contacts
+  (RLS: the exec owns the depot). Contacts-FIRST, each = name/role + a ≥52px green `openExternalUrl('tel:')`
+  call button. Then which-screens list, then a green "ઠીક થઈ ગયું · ફોટો" → `/ops-log?depot=<id>`. No
+  map/route. Gujarati-first (`opsStrings`, added `which_screens`/`fix_it`/`go_home`).
+- **`OpsHomeV2.jsx` rewritten** (not frozen): (a) network snapshot KEPT but every tile + sub-stat is now
+  **clickable → `/ops-down` (or `/ops-tickets` for fixed/in-process)** (owner: "numbers perfect at home but
+  it should be clickable and navigate to that area"); (b) **REMOVED** the travel-earned card + the station
+  map (owner: "travel/map not needed"); (c) **REMOVED** the standalone down strip + the Navigate/route
+  button on fault rows (owner: "remove location navigation"); (d) worst-fault rows now tap → `/ops-fix/:id`
+  (was the generic /ops-tickets); (e) **city filter now scopes the snapshot too** (`net` moved to a
+  `useMemo` over `screensAll` filtered by `cityId`) — fixes the audit P1 where a city pick narrowed only the
+  fault list while the big numbers stayed network-wide (a lie); (f) the action area (report/pills/my-month)
+  is gated behind `!noDepots` so the §253 "no stations" empty state stays clean (fixes the empty-state leak).
+  SnapTile icon chip raw `rgba(255,255,255,.05)` → `var(--surface-3)` (removes the design lens's lone raw
+  literal).
+- **`OpsDownV2.jsx`**: removed the Navigate/route button + its `depotMapsUrl`/`Navigation`/`openExternalUrl`
+  imports (owner: remove location navigation). Station→contacts→tap-to-dial expand kept.
+- **`App.jsx` (§28 FROZEN, additive)**: lazy `OpsFixV2` + the `/ops-fix/:depotId` route (guardian).
+
+### The LIVE data findings from the same session (owner to act — NOT code bugs)
+1. **Fault ages read 59–152 DAYS** (Surendranagar 152d, Junagadh 72d, Morbi 71d, Gandhinagar 59d). Either
+   real months-long outages OR `ops_screens.last_response_at` = the last-*online* stamp (so an offline
+   screen reads "152d" misleadingly). Reconcile one dark screen in the DB — this changes the whole ops story.
+2. **41% avg uptime** — the §255 night-gate (count-all-24h) issue; live 41% proves `ops_uptime_daily` HAS
+   rows (someone recorded uptime), so **running `supabase_ops_p4_uptime_pay.sql` (has the night-gate) makes
+   this real**. The design-lens assumption "avg-uptime shows — because 0 rows" was WRONG per live reality.
+3. **Station map base tiles blank** (pins on empty canvas, only a benign `google.maps.Marker` deprecation
+   warning) — but the map is now REMOVED from the home anyway, so moot there. If the head/admin maps
+   (/team-dashboard, /admin/gps) also show blank tiles, the `VITE_GOOGLE_ROADS_KEY` is Roads-scoped / tile
+   billing is off; else env-specific.
+
+### Contracts / notes
+- **`test` exec now owns 20 stations** — §253's "no exec owns any depot" blocker is RESOLVED for this exec
+  (someone ran `supabase_ops_assign_stations.sql`). The page is live + populated. New execs still need a
+  head to assign depots (`ops_depots.assigned_to`).
+- The `/ops-fix/:depotId` screen reuses the proven OpsDownV2 contacts pattern (ops_depot_contacts, tap-to-
+  dial). Contacts fill in as the head adds them (Live console "Who to call" §240 / Station board §242).
+- Workflow audit caveat: 2 of 4 lenses (correctness, data-root-cause) returned placeholder "probe" junk
+  (agent failure — burned tokens reading, submitted the schema example back). Verified correctness
+  empirically instead (live page renders clean, no console errors, math checks 215+49=264).
+
+### Foot-gun
+- ❌ For a UI-oriented, non-technical owner, run a SHOW-first process (tappable mockup via the visualize
+  skill / show_widget), never a text spec — §244. An approved-by-words design gets rejected on sight.
+- ❌ A snapshot that a city filter only half-scopes (faults narrow, big numbers don't) LIES to a
+  multi-station tech. Scope the whole surface off the same `cityId`, or don't filter at all.

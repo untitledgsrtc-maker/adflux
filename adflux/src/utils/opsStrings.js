@@ -213,6 +213,11 @@ export const STR = {
   travel_earned:   { gu: 'ટ્રાવેલ કમાણી',               en: 'Travel earned' },
   fix_steps:       { gu: 'કેવી રીતે ઠીક કરવું',          en: 'How to fix' },
 
+  // — station fix screen (tap a station → contacts + call + fix) —
+  which_screens:   { gu: 'કઈ સ્ક્રીન બંધ',              en: 'Which screens are off' },
+  fix_it:          { gu: 'ઠીક થઈ ગયું · ફોટો',           en: 'Fixed · add photo' },
+  go_home:         { gu: 'ઘર',                          en: 'Home' },
+
   // — network snapshot (home) —
   my_network:      { gu: 'તમારું નેટવર્ક',              en: 'Your network' },
   camera_off:      { gu: 'કૅમેરા બંધ',                  en: 'Camera off' },
