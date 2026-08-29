@@ -17648,3 +17648,40 @@ zero-measured-month → full-30%-cap overpay. That's the ONLY step left for pay 
 ### Doc-only commit (no repo code/secret changed)
 The activation was all Studio + Vercel side. This §262 note is the record; nothing in the
 repo changed except CLAUDE.md.
+
+
+---
+
+## 263 · Pending register + session close (2026-08-29)
+
+Single place to see what's open after the 2026-08-29 ops session (§258–§262 shipped).
+
+### Shipped + live this session
+| Ref | What | How it went live |
+|---|---|---|
+| §258 | Ops uptime-pay curve → 75/95 (full ≥95%, zero <85%) | p4 run |
+| §259 | Auto-ticket close = calendar-day IST (prev-day faults never auto-close) | p2 run |
+| §260 | Dedup pay curve to ONE `opsPay.estVariable` (fixed a §258 miss) + reopen mis-cancelled tickets | p2b run + push |
+| §262 | Ops sync cron LIVE — `*/10 * * * *` jobid 24; offline → auto-ticket + WhatsApp + uptime rows | secret rotated, cron scheduled |
+
+Branch `untitled-os` at `de67a07`, origin 0/0. All SQL run.
+
+### IMMEDIATE next actions (in order)
+1. **Tomorrow after 7 AM IST** — run §262's acceptance check: `ops_uptime_daily` fills for
+   today + `ops_tickets` auto-opening for offline depots + a real WhatsApp lands on a tech.
+2. **After a few workdays of clean uptime rows** — set each ops-exec
+   `staff_incentive_profiles.monthly_salary`. This is the FINAL step to turn uptime pay
+   (§258) live. NEVER before rows land (§184 overpay trap).
+
+### Still parked (owner's call, nothing broken)
+- **Camera-off auto-ticketing** (§255) — reconcile auto-tickets OFFLINE only; a camera-dead
+  screen has a board (§257) but no auto-ticket. Additive if wanted.
+- **P&L module** — spec only, zero code (Sprint 3; §29 §7.5/§8.2).
+- **Govt invoice template + TDS columns on `payments`** — needed before the first Govt deal
+  collects (Sprint 4; §23).
+- **§33 score inflation** — `compute_daily_score` doesn't yet apply the auto-check-in/scheduled
+  meeting exclusions the ticket-counter does → past incentive scores slightly high. Un-started.
+
+### Ops module status
+Field + head daily flow fully usable. Auto-detect + uptime pipeline LIVE (§262). Only uptime
+PAY is gated (needs rows → salaries). Everything else in the module is shipped.
