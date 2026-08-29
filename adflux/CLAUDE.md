@@ -17597,3 +17597,54 @@ WhatsApp is configured — a `200 {"quality":"GREEN"}` number-health response wa
 - Do NOT set an ops-exec salary until step 6's rows are confirmed landing daily.
 - Do NOT commit the real secret into p5 (repo copy stays `<OPS_SYNC_SECRET>`).
 - Cron is NOT scheduled yet — until step 5, the sync only fires on a manual dispatch/`?run=1`.
+
+
+---
+
+## 262 · Ops sync cron LIVE — auto-detect pipeline ON (2026-08-29)
+
+§261 resolved. The 10-min aiadflux sync is scheduled and firing. Offline screens now
+auto-open tickets + WhatsApp the tech with NO human, and daily uptime rows land on
+their own — the last gate before uptime pay (§258).
+
+### What went live
+- `cron.job` **jobid 24** `ops-aiadflux-sync`, schedule `*/10 * * * *`, active=true →
+  calls `ops_aiadflux_sync_dispatch()` → POST `app.untitledad.in/api/ops/sync` → screens
+  refresh → `ops_recompute_uptime_today` (uptime rows, night-gated) + `ops_reconcile_offline_tickets`
+  (auto-tickets + `ops_ticket_wa_dispatch` WhatsApp).
+- Test-fire returned **HTTP 200** (`net._http_response`). WhatsApp confirmed configured
+  (a `quality:"GREEN"` number-health response was seen earlier).
+
+### The §261 blocker — how it was fixed (secret ROTATED)
+Owner did not remember the old `OPS_SYNC_SECRET`, and Vercel "Copy to Clipboard" is a
+Pro-only feature (locked) + the value is a write-only Secret ("can't reveal after saving").
+So we **rotated** it: set a FRESH value in Vercel env (Edit → new value → Save →
+**Redeploy** untitled-os so the Edge fn picks it up), and put the SAME value in p5 line 30's
+`ops_aiadflux_sync_dispatch()`. `ops_ticket_wa_dispatch` (p2) scrapes the secret + URL
+from that fn, so WhatsApp uses it too. **The live secret is in Vercel env + the DB fn ONLY —
+the repo p5 keeps the `<OPS_SYNC_SECRET>` placeholder (never committed).** To rotate again:
+new value in BOTH Vercel (+redeploy) and p5 line 30 (re-run p5).
+
+### Timing note (why nothing "happened" tonight)
+Scheduled ~01:50 IST (off-hours). The recompute + reconcile are night-gated (7 AM–9 PM IST,
+§250/§255), so overnight the cron only refreshes screen status — uptime rows + auto-tickets
+start firing from **7 AM IST**. Correct, not a fault.
+
+### REMAINING gate before real pay (§184) — do NOT skip
+Uptime pay (§258) still needs REAL daily rows first. Tomorrow-morning acceptance check
+(run after 7 AM IST):
+```sql
+-- today's uptime rows landing (one per active ops-exec depot-owner):
+SELECT count(*), min(uptime_pct), max(uptime_pct)
+  FROM public.ops_uptime_daily WHERE work_date = (now() AT TIME ZONE 'Asia/Kolkata')::date;
+-- auto-tickets opening for offline depots:
+SELECT count(*) FROM public.ops_tickets
+ WHERE source='auto_offline' AND status IN ('open','in_progress');
+```
+Once `ops_uptime_daily` fills every workday for a few days → THEN set each ops-exec
+`staff_incentive_profiles.monthly_salary`. Setting salary before rows land = the §184
+zero-measured-month → full-30%-cap overpay. That's the ONLY step left for pay to go live.
+
+### Doc-only commit (no repo code/secret changed)
+The activation was all Studio + Vercel side. This §262 note is the record; nothing in the
+repo changed except CLAUDE.md.
