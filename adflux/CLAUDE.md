@@ -17730,3 +17730,52 @@ Do NOT re-run any ad-hoc "night false-positive" ticket cleanup. The engine is ni
 bulk night-cancel violates the §259 calendar-day rule. If a NEW ticket-close path ever
 appears (a 4th mole), it MUST honor the calendar-day rule + get a matching reopen — same
 discipline as §33's meeting-KPI exclusions.
+
+
+---
+
+## 265 · Ops sync was NEVER actually live until now — Vercel secret Save didn't persist (2026-08-30)
+
+CORRECTS §262/§263. The §262 "sync cron LIVE" claim was WRONG: the sync had been returning
+**403 forbidden on every cron fire** since setup. The "200" seen during §262 setup was a
+**WhatsApp response** (`{"sent":1}`) that happened to land in `net._http_response` — NOT the
+sync. Verified by dashboard mismatch: our app showed 0 online / 264 offline while the aiadflux
+CMS showed 76 online / 189 offline.
+
+### Root cause (two Vercel gotchas, stacked)
+1. During the §262 rotation, the new `OPS_SYNC_SECRET` **never saved** to Vercel — the env row
+   still read "Updated Aug 27" (proof it never took). Only p5 (the DB dispatch fn) got the new
+   value. So the two secrets never matched → 403. The `p5_secret_state` check confirmed p5 had
+   a real value while the mismatch was Vercel-side.
+2. Even once saved, a Vercel env change **only applies after a redeploy** — the running
+   production deployment keeps the old value until rebuilt.
+
+### The fix (2026-08-30 ~21:30 IST)
+- Re-saved `OPS_SYNC_SECRET` in Vercel (row then read "Updated 2m ago" = it took) + confirmed
+  a Production redeploy went **Ready** (commit 61c91d5, app.untitledad.in current).
+- Fired `ops_aiadflux_sync_dispatch()` → `ops_screens` freshness went from **1 day 20h stale →
+  age 2m**. Live counts: online 22 / offline 242, cameras 20 on / 244 off — sensible for
+  ~21:30 IST (network powering down on night timers; matches the CMS's earlier 21:02 reading
+  minus the extra 28 min of power-down).
+
+### How to VERIFY the sync — the right way (do NOT trust a net._http_response 200)
+Other cron dispatches (WhatsApp `{"sent":1}`, etc.) also write to `net._http_response`, so a
+lone 200 there is NOT proof the sync ran. Verify by:
+- `SELECT now() - max(updated_at) FROM ops_screens WHERE is_active;` → must be **seconds**.
+- `SELECT status, count(*) FROM ops_screens WHERE is_active GROUP BY status;` → must track the
+  aiadflux CMS dashboard (allowing for time-of-day power-down).
+- For the sync's OWN http result, filter: `... WHERE content LIKE '%received%' OR content LIKE
+  '%screens%'` — don't read `LIMIT 1` blindly.
+
+### STILL TO CONFIRM (tomorrow ~2 PM daytime)
+At peak hours `ops_screens` online should climb back to match the CMS closely. If the daytime
+counts still diverge (e.g. our online << CMS online, or cameras 20 vs CMS 73 persists in
+daylight), then `api/ops/sync.js mapScreen()` is misreading a CMS status/camera field →
+inspect via `GET /api/ops/sync?debug=1&secret=<OPS_SYNC_SECRET>` and adjust the mapping.
+
+### Hardening (future, not tonight)
+The secret lives in BOTH Vercel env AND the p5 dispatch fn body (p2 scrapes it from p5). This
+dual-maintenance broke twice. A future refactor should move it to Supabase Vault
+(`vault.decrypted_secrets`) read by the dispatch fn, so there's ONE source. Until then: any
+rotation = set Vercel (Save → confirm "Updated" date flips → Redeploy → Ready) AND p5 line 30
+to the identical value, then verify by `ops_screens` freshness.
