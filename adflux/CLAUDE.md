@@ -17811,3 +17811,35 @@ A **"Down > 1 day"** band above the worst-first list on the exec Home:
   27th, today 30th) will show with a "3 દિવસ" badge.
 - Follow-up option if owner wants more: also unhide auto_offline tickets inside the OpsTicketsV2
   Open tab (today it's manual-only) — deferred; the Home band is the direct answer.
+
+
+---
+
+## 267 · Fix the "Down > 1 day" band — measure the SCREEN, not the ticket (2026-08-29)
+
+§266 shipped wrong: the band read "Bhachau Bus Stand · 3 દિવસ" but those screens had just
+dropped **today** (CMS last-response 09:02 PM). Root cause: §266 measured the **auto_offline
+ticket's `opened_at`** (Aug 27, from the §264 reopen) — but that ticket is STALE. A screen can
+recover and re-fail; the previous-day ticket stays open (§259 only cancels same-day), so its
+`opened_at` no longer reflects the current outage. Ticket age ≠ how long the screen is dark.
+
+### The fix (`OpsHomeV2.jsx`)
+The band now measures each screen's OWN **`last_response_at`** (which `api/ops/sync.js` writes
+from the CMS — mapScreen line 98, upsert line 227), NOT any ticket:
+- Aged = screens `status='offline'` whose `last_response_at` is on a **previous IST calendar
+  day** (`daysSince(last_response_at) >= 1`), grouped by depot, max days-dark per depot.
+- `daysSince()` no longer clamps to ≥1 (0 = responded today). A screen that responded today —
+  including a **night timer-off** (responded a few hours ago) — is `daysSince 0` → **excluded**.
+- Removed the `ops_tickets` query entirely; uses the already-loaded `allScreens`.
+- Result: Bhachau (responded today) drops OUT of the band; only genuinely multi-day-dark
+  screens (no response since a prior day) show, with the TRUE day count.
+
+### The lesson (add to the ops mental model)
+"How long has a screen been down" = the **screen's `last_response_at`**, full stop. NEVER an
+auto_offline ticket's `opened_at` — those go stale across recover/re-fail cycles because the
+§259 reconcile only auto-closes same-day tickets. Any future "aged fault" view must read
+`last_response_at`. (This also means the §264 reopened tickets are display-irrelevant now — they
+linger as open records but no longer drive the day count; ticket hygiene is a separate concern.)
+
+- Depends on the sync being live (§265) so `last_response_at` is fresh. brand/esbuild/build OK.
+  Ops file, not §28 frozen.

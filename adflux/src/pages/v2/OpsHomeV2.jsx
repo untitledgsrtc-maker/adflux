@@ -23,10 +23,11 @@ import { istTodayISO } from '../../utils/istDate'
 const NIL = '00000000-0000-0000-0000-000000000000'
 const SEV = { 2: 'var(--danger)', 1: 'var(--warning)', 0: 'var(--text-subtle, var(--text-muted))' }
 
-// whole IST calendar-days an auto-ticket has been open — the §259 "more than one
-// day" basis (opened on a previous IST calendar day). Query already ensures ≥1.
-const daysSince = (iso) => Math.max(1, Math.round(
-  (Date.parse(istTodayISO()) - Date.parse(new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }))) / 864e5))
+// whole IST calendar-days since a timestamp (0 = today, 1 = yesterday, …). Used to
+// measure how long a screen has ACTUALLY been dark from its own last_response_at —
+// NOT a ticket's opened_at (a reopened/stale ticket would misreport a fresh outage).
+const daysSince = (iso) => Math.round(
+  (Date.parse(istTodayISO()) - Date.parse(new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }))) / 864e5)
 
 export default function OpsHomeV2() {
   const { profile } = useAuth()
@@ -105,17 +106,22 @@ export default function OpsHomeV2() {
       }).sort((a, b) => b.sev - a.sev || b.oldest - a.oldest)
       setFaults(rows)
 
-      // "Down > 1 day" — auto_offline tickets opened on a PREVIOUS IST calendar day
-      // (§259/§264), still open. Shown even OFF-HOURS: a screen down since yesterday
-      // is a genuine multi-day fault, not tonight's timer-off. Oldest first.
-      const agedRes = await supabase.from('ops_tickets')
-        .select('id, depot_id, down_count, opened_at, depot:ops_depots!ops_tickets_depot_id_fkey(name)')
-        .in('depot_id', inDepots).eq('source', 'auto_offline').in('status', ['open', 'in_progress'])
-        .lt('opened_at', dayStart).order('opened_at', { ascending: true })
-      setAged((agedRes.data || []).map(r => ({
-        id: r.id, did: r.depot_id, name: r.depot?.name || nameOf(r.depot_id),
-        count: r.down_count || 0, days: daysSince(r.opened_at),
-      })))
+      // "Down > 1 day" — screens whose OWN last_response_at falls on a PREVIOUS IST
+      // calendar day = genuinely dark for a day+. Measured from the screen, NOT an
+      // auto-ticket (a reopened/stale ticket from an earlier outage would misreport a
+      // screen that only just dropped — the Bhachau "3 days" bug). A night timer-off
+      // responded a few hours ago → daysSince 0 → correctly excluded.
+      const agedBy = {}
+      allScreens.forEach(sc => {
+        if (sc.status !== 'offline' || !sc.last_response_at) return
+        const d = daysSince(sc.last_response_at)
+        if (d < 1) return
+        const e = agedBy[sc.depot_id] || (agedBy[sc.depot_id] = { count: 0, days: 0 })
+        e.count++; if (d > e.days) e.days = d
+      })
+      setAged(Object.entries(agedBy).map(([did, e]) => ({
+        id: did, did, name: nameOf(did), count: e.count, days: e.days,
+      })).sort((a, b) => b.days - a.days || b.count - a.count))
 
       const fx = fixMo.data || []
       const durs = fx.map(r => (r.resolved_at && r.created_at) ? (new Date(r.resolved_at) - new Date(r.created_at)) / 3600000 : null).filter(v => v != null && v >= 0)
