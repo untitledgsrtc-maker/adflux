@@ -17685,3 +17685,48 @@ Branch `untitled-os` at `de67a07`, origin 0/0. All SQL run.
 ### Ops module status
 Field + head daily flow fully usable. Auto-detect + uptime pipeline LIVE (§262). Only uptime
 PAY is gated (needs rows → salaries). Everything else in the module is shipped.
+
+
+---
+
+## 264 · Ticket-close whack-a-mole — 3rd path found: `[night false-positive]` (2026-08-29)
+
+Owner: "more than one day ticket again closed, why?" — after §259 (calendar-day rule) +
+§260 (p2b reopen). Same §33-style whack-a-mole, but for TICKET CLOSES: fix one close-path,
+another one is found closing multi-day tickets. This was the THIRD.
+
+### Diagnosis (evidence, not theory)
+- Live `ops_reconcile_offline_tickets` IS the §259 calendar-day version — verified
+  `has_ist_guard=true`, `still_has_old_24h=false`. So the reconcile is NOT the culprit.
+- The cancelled multi-day tickets carried note `[night false-positive]`, NOT the reconcile's
+  `[auto-recovered]`. `SELECT ... FROM pg_proc WHERE pg_get_functiondef LIKE '%night
+  false-positive%'` → **no rows**; no `cron.job` command writes it. And all affected rows
+  shared ONE identical `updated_at` (2026-08-27 19:12:53 UTC) → a **single ad-hoc UPDATE**,
+  run once, ~2026-08-28 00:42 IST (a prior session's manual night cleanup, pre-night-gate).
+- So it is NOT recurring — nothing closes them now. The rows just stayed wrongly cancelled
+  because §260's p2b matched `[auto-recovered]` only.
+
+### The THREE historical ticket-close paths (the ticket-close contract)
+| Path | Tag | Status | Fix |
+|---|---|---|---|
+| Reconcile rolling-24h (old) | `[auto-recovered]` | superseded | §259 → calendar-day IST guard |
+| Reconcile recovered same-day (correct) | `[auto-recovered]` | LIVE, correct | keeps (same-day blip only) |
+| Ad-hoc night cleanup (one-time) | `[night false-positive]` | BANNED | §264 → reopen + do-not-rerun |
+
+Only a **same-day** auto_offline ticket may auto-close (depot back online, opened today IST).
+Everything opened a previous day, plus in_progress / resolved / manual / sales_request, is
+protected. This is the frozen ticket-close contract (extends §259).
+
+### The fix — `supabase_ops_p2c_reopen_night_falsepos.sql` (NEW, owner runs once)
+Un-cancels `source='auto_offline'` + `status='cancelled'` + note `[night false-positive]`
+where open-day ≠ cancel-day (IST). Restores `status='open'`, clears `resolved_at`, tags
+`[reopened §264]`. Same-night false positives (opened+cancelled same IST day = a genuine
+timer-off) stay cancelled. Safe/reversible/idempotent; §259 reconcile won't re-cancel
+(previous-day). PREVIEW + VERIFY(=0) blocks. check-sql-schema OK.
+
+### ⛔ BAN (do not repeat)
+Do NOT re-run any ad-hoc "night false-positive" ticket cleanup. The engine is night-gated
+(§250/§254/§255) — it never opens tickets at night, so no night cleanup is needed, and any
+bulk night-cancel violates the §259 calendar-day rule. If a NEW ticket-close path ever
+appears (a 4th mole), it MUST honor the calendar-day rule + get a matching reopen — same
+discipline as §33's meeting-KPI exclusions.
