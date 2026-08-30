@@ -6,9 +6,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Monitor, MonitorCheck, MonitorX, AlertTriangle, Phone, Plus, X, MapPin,
-  Wrench, Loader2, RefreshCw,
+  Wrench, Loader2, RefreshCw, FilePlus,
 } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
@@ -42,6 +42,7 @@ function KpiCard({ title, value, Icon, color }) {
 export default function OpsStationV2() {
   const profile = useAuthStore(s => s.profile)
   const [params, setParams] = useSearchParams()
+  const nav = useNavigate()
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
 
@@ -163,6 +164,8 @@ export default function OpsStationV2() {
             </select>
           </span>
           <button className="btn btn-sec btn-sm" onClick={refresh} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><RefreshCw size={14} /> Refresh</button>
+          {/* field-tech action: log a fault for THIS station (owner §269) */}
+          <button onClick={() => depotId && nav(`/ops-log?depot=${depotId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent)', color: 'var(--accent-fg, #0f172a)', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}><FilePlus size={14} /> Log fault</button>
         </div>
       </div>
 
@@ -210,6 +213,7 @@ export default function OpsStationV2() {
                 <input defaultValue={c.phone || ''} placeholder="Phone" inputMode="tel" onBlur={e => { if (e.target.value !== (c.phone || '')) saveContact(c.id, { phone: e.target.value }) }}
                   style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 13, padding: '8px 0', flex: 1, outline: 'none' }} />
               </span>
+              {c.phone && <a href={`tel:${String(c.phone).replace(/[^0-9+]/g, '')}`} title="Call" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, background: 'var(--success-soft, rgba(16,185,129,.12))', color: 'var(--success)', border: '1px solid var(--success)', flexShrink: 0, textDecoration: 'none' }}><Phone size={15} /></a>}
               <button onClick={() => removeContact(c.id)} title="Remove" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={18} /></button>
             </div>
           ))}

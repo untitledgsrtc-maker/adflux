@@ -17867,3 +17867,30 @@ contacts) → fine on the exec's phone. No change needed in OpsStationV2.
   action. If the owner wants the tech to resolve from the board, add a log/fix button there
   (follow-up). For now the Home "ખરાબી નોંધાવો" button + call flow cover logging.
 - brand/esbuild/build OK. Ops file, not §28 frozen. Owner verifies the tap on his phone.
+
+
+---
+
+## 269 · Station Board field actions — Log fault + tap-to-call (2026-08-29)
+
+§268 sent the exec's city-tap to the Station Board (`OpsStationV2`), but that page was built
+admin-first: contacts render as EDIT INPUTS (not callable) and there was NO log/fix action. So
+a field tech landing there could see the numbers but not dial, and couldn't record a fault.
+Owner "yes go" → added both.
+
+### Added to `OpsStationV2.jsx`
+- **"Log fault" button** in the header (brand `--accent` yellow, FilePlus icon) →
+  `/ops-log?depot=:id`. `OpsLogV2` ALREADY seeds its station from `?depot=` (lines 84–87), so it
+  lands on the Gujarati log flow with the station prefilled — no OpsLogV2 change needed.
+- **Tap-to-call** on each contact: a green `<a href="tel:…">` phone button next to the edit
+  input (digits sanitized `[^0-9+]`). Coexists with the admin edit input — admin still edits,
+  tech now dials.
+
+### Notes / still-open
+- OpsStationV2 is still **English-labelled** ("who to call", "Refresh", "screen wall status") —
+  a Gujarati-first localization for the field tech is a follow-up if the owner wants it (the
+  exec pages elsewhere are §231 Gujarati-first; this shared admin board is not).
+- OpsStationV2 has no "mark screen fixed" flow (the log flow logs; resolving a manual ticket is
+  on OpsTicketsV2). Add a resolve action here only if the owner asks.
+- brand/esbuild/build OK. Ops file, not §28 frozen. Uses `--accent`/`--success`/`--accent-fg`
+  tokens only.
