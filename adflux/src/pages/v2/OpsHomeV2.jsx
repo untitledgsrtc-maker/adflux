@@ -1,8 +1,9 @@
 // src/pages/v2/OpsHomeV2.jsx — the ONE operations home for the field tech.
 // Owner redesign (2026-08-28): keep it DEAD SIMPLE for low-literacy staff.
 //   • the network snapshot stays, but every tile is CLICKABLE → opens that area
-//   • the worst-first fault list is the action — tap a station → /ops-fix/:id
-//     (who to call + which screens off + fix), NOT a generic list
+//   • the worst-first fault list + the "down > 1 day" band are the action — tap a
+//     station → /ops-station?depot=:id (the Station Board: screen wall + who to call
+//     + open issues, owner 2026-08-29), NOT a generic list
 //   • travel card + station map REMOVED from the home (owner: "not needed")
 //   • no location/route button (owner: "remove location navigation")
 // Gujarati-first (§231), lead-* tokens. The action area (report / pills /
@@ -237,7 +238,7 @@ export default function OpsHomeV2() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
             {cityAged.map(r => (
-              <button key={r.id} onClick={() => nav(`/ops-fix/${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: '4px solid var(--danger)', display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+              <button key={r.id} onClick={() => nav(`/ops-station?depot=${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: '4px solid var(--danger)', display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
                   <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{r.count} {t('screens_word', lang)} · {lang === 'gu' ? 'બંધ' : 'down'}</div>
@@ -263,7 +264,7 @@ export default function OpsHomeV2() {
               const typeLabel = onHours ? t('signal_lost', lang) : t('timer_fault', lang)
               const ageStr = onHours ? ageLabel(r.oldest, lang) : t('still_on', lang)
               return (
-                <button key={r.did} onClick={() => nav(`/ops-fix/${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: `4px solid ${SEV[r.sev]}`, display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+                <button key={r.did} onClick={() => nav(`/ops-station?depot=${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: `4px solid ${SEV[r.sev]}`, display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? (r.list[0].name || r.name) : r.name}</div>
                     <div style={{ fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? '' : `${r.list.length} ${t('screens_word', lang)} · `}{typeLabel} · {ageStr}</div>

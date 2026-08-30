@@ -17843,3 +17843,27 @@ linger as open records but no longer drive the day count; ticket hygiene is a se
 
 - Depends on the sync being live (§265) so `last_response_at` is fresh. brand/esbuild/build OK.
   Ops file, not §28 frozen.
+
+
+---
+
+## 268 · City tap → Station Board (screen wall + who-to-call) (2026-08-29)
+
+Owner liked the Station Board UI (`OpsStationV2` — KPI tiles + 20-box screen wall + who-to-call
++ open issues) and asked: tap any city → open THAT, filtered to the city. Previously the Home
+worst-list + the §266/§267 "Down > 1 day" band tapped to `/ops-fix/:id` (OpsFixV2, the simpler
+call-first action screen).
+
+### Change (`OpsHomeV2.jsx`)
+Both city taps (worst-first list + "Down > 1 day" band) now navigate to
+**`/ops-station?depot=:id`**. `OpsStationV2` already reads `?depot=` (its `depotId` state seeds
+from the param) and is responsive (auto-fit KPI grid, flex-wrap screen wall, single-column
+contacts) → fine on the exec's phone. No change needed in OpsStationV2.
+
+### Notes
+- `/ops-fix/:depotId` (OpsFixV2) stays a live route (URL-reachable) but nothing on Home links to
+  it now. Keep it — it's the call-first mobile screen; a future toggle could offer both.
+- OpsStationV2 is view + contacts + issue-type editing; it has no "mark fixed / log fault"
+  action. If the owner wants the tech to resolve from the board, add a log/fix button there
+  (follow-up). For now the Home "ખરાબી નોંધાવો" button + call flow cover logging.
+- brand/esbuild/build OK. Ops file, not §28 frozen. Owner verifies the tap on his phone.
