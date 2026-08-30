@@ -17779,3 +17779,35 @@ dual-maintenance broke twice. A future refactor should move it to Supabase Vault
 (`vault.decrypted_secrets`) read by the dispatch fn, so there's ONE source. Until then: any
 rotation = set Vercel (Save → confirm "Updated" date flips → Redeploy → Ready) AND p5 line 30
 to the identical value, then verify by `ops_screens` freshness.
+
+
+---
+
+## 266 · Exec Home "Down > 1 day" band — surface the multi-day auto tickets (2026-08-29)
+
+Owner: "where is the more-than-1-day offline screen ticket?" — after reopening 10 of them
+(§264). Root gap: **the app showed auto_offline tickets NOWHERE.** `OpsTicketsV2` (all tabs)
+filters `source='manual'` only, so the auto-generated offline tickets (incl the §264 reopened)
+never appeared in any ticket view; the Home "worst-first" list is built from LIVE screen status
+(no ticket age, and it flips to "timer" off-hours). So aged faults were invisible.
+
+### Built — `src/pages/v2/OpsHomeV2.jsx` (Option A, owner-chosen)
+A **"Down > 1 day"** band above the worst-first list on the exec Home:
+- Source: `ops_tickets` `source='auto_offline'`, `status IN ('open','in_progress')`, scoped to
+  the exec's depots (`.in('depot_id', inDepots)`), **`opened_at < today-IST-00:00`** (the §259
+  calendar-day "more than one day" basis), oldest-first.
+- Row: depot name + "N screens down" + a red **`{days} દિવસ`/`{days}d`** badge (via a new
+  `daysSince()` helper = whole IST calendar-days). Tap → `/ops-fix/:depotId` (same fix flow).
+- **Shown even OFF-HOURS** (unlike the worst-list): an auto_offline ticket only opens during
+  on-hours (night-gated engine), so an aged one is a genuine multi-day fault, not tonight's
+  timer-off. This is exactly the "which screens are really broken" view the night state hid.
+- Renders only when `cityAged.length > 0`; respects the city filter (`cityAged` useMemo).
+
+### Contract / notes
+- Gujarati-first, lead-* tokens, `--danger` accent, Lucide AlertCircle/ChevronRight, tabular-nums
+  badge — matches §6/§7 + the existing worst-list styling.
+- Ops file, NOT §28 frozen (no guardian). check-jsx-brand clean · esbuild parse OK · build OK.
+- Deploys on push → visible on the live app after a hard refresh. The §264 reopened 10 (opened
+  27th, today 30th) will show with a "3 દિવસ" badge.
+- Follow-up option if owner wants more: also unhide auto_offline tickets inside the OpsTicketsV2
+  Open tab (today it's manual-only) — deferred; the Home band is the direct answer.

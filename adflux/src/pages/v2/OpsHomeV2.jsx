@@ -23,6 +23,11 @@ import { istTodayISO } from '../../utils/istDate'
 const NIL = '00000000-0000-0000-0000-000000000000'
 const SEV = { 2: 'var(--danger)', 1: 'var(--warning)', 0: 'var(--text-subtle, var(--text-muted))' }
 
+// whole IST calendar-days an auto-ticket has been open — the §259 "more than one
+// day" basis (opened on a previous IST calendar day). Query already ensures ≥1.
+const daysSince = (iso) => Math.max(1, Math.round(
+  (Date.parse(istTodayISO()) - Date.parse(new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }))) / 864e5))
+
 export default function OpsHomeV2() {
   const { profile } = useAuth()
   const uid = profile?.id
@@ -39,6 +44,7 @@ export default function OpsHomeV2() {
   const [screensAll, setScreensAll] = useState([])
   const [camKnown, setCamKnown] = useState(true)
   const [stats, setStats] = useState(null)
+  const [aged, setAged] = useState([])            // [{ id, did, name, count, days }] — down > 1 day
   const [checkedIn, setCheckedIn] = useState(true)
 
   const load = useCallback(async () => {
@@ -99,6 +105,18 @@ export default function OpsHomeV2() {
       }).sort((a, b) => b.sev - a.sev || b.oldest - a.oldest)
       setFaults(rows)
 
+      // "Down > 1 day" — auto_offline tickets opened on a PREVIOUS IST calendar day
+      // (§259/§264), still open. Shown even OFF-HOURS: a screen down since yesterday
+      // is a genuine multi-day fault, not tonight's timer-off. Oldest first.
+      const agedRes = await supabase.from('ops_tickets')
+        .select('id, depot_id, down_count, opened_at, depot:ops_depots!ops_tickets_depot_id_fkey(name)')
+        .in('depot_id', inDepots).eq('source', 'auto_offline').in('status', ['open', 'in_progress'])
+        .lt('opened_at', dayStart).order('opened_at', { ascending: true })
+      setAged((agedRes.data || []).map(r => ({
+        id: r.id, did: r.depot_id, name: r.depot?.name || nameOf(r.depot_id),
+        count: r.down_count || 0, days: daysSince(r.opened_at),
+      })))
+
       const fx = fixMo.data || []
       const durs = fx.map(r => (r.resolved_at && r.created_at) ? (new Date(r.resolved_at) - new Date(r.created_at)) / 3600000 : null).filter(v => v != null && v >= 0)
       const up = (upRows.data || []).filter(r => (r.screens_total || 0) > 0)
@@ -130,6 +148,7 @@ export default function OpsHomeV2() {
   }, [screensAll, camKnown, cityId])
 
   const cityFaults = useMemo(() => cityId ? faults.filter(f => f.did === cityId) : faults, [faults, cityId])
+  const cityAged = useMemo(() => cityId ? aged.filter(a => a.did === cityId) : aged, [aged, cityId])
 
   if (loading) return <div className="lead-root" style={{ textAlign: 'center', paddingTop: 60 }}><Loader2 size={30} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} /></div>
   if (err) return <div className="lead-root"><div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 12, padding: '12px 16px', fontSize: 13 }}>{err} <button className="lead-btn" onClick={() => { setErr(''); load() }} style={{ marginLeft: 10 }}>{t('retry', lang)}</button></div></div>
@@ -201,6 +220,28 @@ export default function OpsHomeV2() {
             <SubStat val={s.inProc ?? 0} label={t('in_process', lang)} border onClick={() => nav('/ops-tickets?tab=proc')} />
           </div>
         </div>
+      )}
+
+      {/* Down > 1 day — genuine multi-day faults (auto tickets opened a previous day,
+          §259/§264). Shown even off-hours; these are broken, not a night timer-off. */}
+      {!noDepots && cityAged.length > 0 && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'inline-flex', alignItems: 'center', gap: 5 }}><AlertCircle size={13} />{lang === 'gu' ? '1 દિવસથી વધુ બંધ' : 'Down over 1 day'}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            {cityAged.map(r => (
+              <button key={r.id} onClick={() => nav(`/ops-fix/${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: '4px solid var(--danger)', display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{r.count} {t('screens_word', lang)} · {lang === 'gu' ? 'બંધ' : 'down'}</div>
+                </div>
+                <span style={{ background: 'var(--danger-soft)', color: 'var(--danger)', borderRadius: 999, padding: '4px 10px', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{r.days}{lang === 'gu' ? ' દિવસ' : 'd'}</span>
+                <ChevronRight size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {/* worst-first faults — the action. tap a station → who to call + fix */}
