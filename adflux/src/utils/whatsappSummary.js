@@ -165,7 +165,8 @@ export function formatDaySummaryText(d) {
     lines.push(`• Revisits:      ${revisitStr(a.revisit_tiers)}`)
   }
   lines.push(`• WhatsApp sent: ${a.whatsapp_sent ?? 0}`)
-  lines.push(`• Quotes won:    ${a.quotes_won ?? 0} · ${formatCurrency(a.quotes_won_amount || 0)} (this month)`)
+  lines.push(`• Collected:     ${a.quotes_won ?? 0} · ${formatCurrency(a.quotes_won_amount || 0)} (this month)`)
+  lines.push(`• Conversion:    ${a.quote_conversion_pct ?? 0}% (won ÷ sent, ₹)`)
   lines.push('')
 
   // TRACKING INTEGRITY

@@ -17894,3 +17894,49 @@ Owner "yes go" → added both.
   on OpsTicketsV2). Add a resolve action here only if the owner asks.
 - brand/esbuild/build OK. Ops file, not §28 frozen. Uses `--accent`/`--success`/`--accent-fg`
   tokens only.
+
+
+---
+
+## 270 · Day-summary "Collected" relabel + Quote→Won Conversion % (2026-08-31)
+
+Owner saw Mayur's day-summary "Quotes won: 7 · ₹1,54,251" ≠ the quotes dashboard "6 · ₹1,33,101".
+
+### Root cause (confirmed, NOT a bug)
+Two definitions of "won this month":
+- **Day summary** (`my_quotes_won_month` RPC, phase238): counts a quote when its **final
+  approved payment lands this month** (`payment_date`). = **cash collected**.
+- **Dashboard** (`QuotesV2`): `status='won'` by **won_at**. = **deals closed**.
+The exact gap = **UA-2026-0114 ₹21,150**, won **2026-06-27 (June)** but paid **Aug 24** → the
+summary counts it in Aug (payment date), the dashboard in June (won_at). A June deal, Aug cash.
+
+### Built (owner picked: relabel + Quote→Won %, by amount, won_at, on both)
+- **Relabel** (Option C): day-summary line `Quotes won` → **`Collected`** (`whatsappSummary.js`
+  + `DaySummaryCard.jsx`). Same value — now reads clearly as cash-in, not deals-closed.
+- **Conversion %** (new): `useDaySummary.js` computes `quote_conversion_pct` = won₹ **by won_at
+  this month** ÷ **non-draft** sent₹ this month. Shown as `• Conversion: N% (won ÷ sent, ₹)` in
+  the WhatsApp text + a Row on the card. `QuotesV2` surfaces its existing `convPct` (Phase 277)
+  as a 3rd hero footer-stat. **Numerator uses won_at (not the payment-date RPC)** so a prior-
+  month deal paid this month can't skew the ratio (numerator + denominator stay same-period).
+
+### sales-module-guardian (§28) — FLAG, fixed before commit
+- **P1 FIXED**: my conversion denominator first reused `qSentRes` (created-this-month, INCLUDING
+  drafts) → diverged from QuotesV2 Phase 277 which **excludes drafts** ("drafts aren't sent").
+  Same label, two formulas = the exact inconsistency this batch is fixing. Fix: added `status`
+  to the 6a select and filtered `status !== 'draft'` in the denominator → ONE definition. The
+  existing `quotes_sent` count/₹ line still counts ALL created (unchanged).
+- P3 (serial won_at query — kept out of the frozen Promise.all destructuring on purpose; fine
+  for a once-daily card) and P3 (hex tint mirroring the two existing footer-stat siblings, §16)
+  — non-blocking, left as-is.
+- No lead-stage / cadence / activity_type / push / outcome-modal / useAutoRefresh / day-score /
+  DB-write touch. Display-only. The day SCORE is untouched.
+
+### Files
+`src/hooks/useDaySummary.js`, `src/utils/whatsappSummary.js`,
+`src/components/work/DaySummaryCard.jsx`, `src/pages/v2/QuotesV2.jsx`. esbuild/brand/build OK.
+
+### Still open (owner's call)
+- Cross-surface Conversion % won't be byte-identical: the day-summary is fixed to "this rep,
+  this month"; QuotesV2's is over whatever the user has filtered. Same DEFINITION now (won ÷
+  non-draft-sent), different SCOPE — expected.
+- Lead→Won % (funnel conversion) not built — owner deferred in favor of Quote→Won first.

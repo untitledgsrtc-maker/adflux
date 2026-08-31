@@ -203,8 +203,11 @@ export default function useDaySummary({ dateISO } = {}) {
           .lte('done_at', endISO),
 
         // 6a) quotes created by rep THIS MONTH (sent) — rows for count + ₹.
+        // status also selected (Phase 270) so the conversion denominator can
+        // exclude drafts, matching QuotesV2 Phase 277 (quotes_sent count/₹ below
+        // still count ALL created — that existing metric is unchanged).
         supabase.from('quotes')
-          .select('total_amount')
+          .select('total_amount, status')
           .eq('created_by', profile.id)
           .gte('created_at', monthStartISO)
           .lte('created_at', endISO),
@@ -490,6 +493,21 @@ export default function useDaySummary({ dateISO } = {}) {
       const quotesWonCount  = Number(qWonRes.data?.[0]?.won_count) || 0
       const quotesWonAmount = Number(qWonRes.data?.[0]?.won_amount) || 0
 
+      // Phase 270 — Quote→Won conversion % (by amount). Numerator uses won_at
+      // (deals CLOSED this month), NOT the payment-date RPC above: a deal won a
+      // prior month but paid this month would inflate the ratio against a
+      // same-period SENT denominator. Separate query so the big Promise.all
+      // destructuring above stays byte-untouched (frozen-sales safety, §28).
+      const _wonAtRes = await supabase.from('quotes')
+        .select('total_amount')
+        .eq('created_by', profile.id).eq('status', 'won')
+        .gte('won_at', monthStartISO).lte('won_at', endISO)
+      const _wonAtAmount = (_wonAtRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0)
+      // denominator EXCLUDES drafts — matches QuotesV2 Phase 277 ("drafts aren't
+      // sent"), so the day-summary Conversion % and the dashboard's use ONE definition.
+      const _sentAmount  = (qSentRes.data || []).filter(q => q.status !== 'draft').reduce((s, q) => s + (Number(q.total_amount) || 0), 0)
+      const conversionPct = _sentAmount > 0 ? Math.round((_wonAtAmount / _sentAmount) * 100) : 0
+
       const _summary = {
         repName: profile.name,
         role,
@@ -513,6 +531,7 @@ export default function useDaySummary({ dateISO } = {}) {
           quotes_sent_amount: (qSentRes.data || []).reduce((s, q) => s + (Number(q.total_amount) || 0), 0),
           quotes_won:         quotesWonCount,
           quotes_won_amount:  quotesWonAmount,
+          quote_conversion_pct: conversionPct,   // Phase 270 — won₹(won_at) ÷ sent₹, this month
           qualified,
           // Phase 118 — Sales Day Summary extras.
           follow_ups_real:          followUpsReal,

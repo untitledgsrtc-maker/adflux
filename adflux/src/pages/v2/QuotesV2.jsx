@@ -383,6 +383,7 @@ export default function QuotesV2() {
             footerStats={totals.amount > 0 ? [
               { label: 'collected',   value: formatCurrency(collected),         tint: '#2BD8A0' },
               { label: 'outstanding', value: formatCurrency(totals.outstanding), tint: '#FF6F61' },
+              { label: 'conversion',  value: `${totals.convPct}%`,               tint: '#3B82F6' },
             ] : undefined}
             accent={totals.outstanding === 0 && totals.amount > 0}
           />

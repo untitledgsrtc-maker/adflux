@@ -333,9 +333,14 @@ export default function DaySummaryCard({
           />
           <Row
             icon={<BadgeCheck size={14} strokeWidth={1.6} />}
-            label="Quotes won · month"
+            label="Collected · month"
             value={`${a.quotes_won || 0} · ${formatCurrency(a.quotes_won_amount || 0)}`}
             tone={(a.quotes_won || 0) > 0 ? 'success' : undefined}
+          />
+          <Row
+            icon={<ChevronRight size={14} strokeWidth={1.6} />}
+            label="Conversion · won ÷ sent"
+            value={`${a.quote_conversion_pct || 0}%`}
           />
 
           {/* TRACKING */}
