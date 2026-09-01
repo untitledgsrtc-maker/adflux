@@ -265,6 +265,12 @@ export default async function handler(req) {
     await fetch(`${SUPABASE_URL}/rest/v1/rpc/ops_reconcile_offline_tickets`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
   } catch { /* Phase 2 SQL not run yet — statuses still synced */ }
 
+  // 5b · reconcile camera-off tickets (online-but-camera-dead, §272) — best-effort,
+  // SEPARATE call so a camera-reconcile failure can't affect the offline one above.
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/rpc/ops_reconcile_camera_tickets`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
+  } catch { /* p10 SQL not run yet — statuses + offline tickets still synced */ }
+
   return j({
     ok: true,
     screens_received: received, upserted: rows.length,

@@ -17991,3 +17991,36 @@ says "· tap to log an issue". Colors/state logic unchanged.
 - Chains with §268 (city tap → station board) + §269 (Log-fault button + tap-to-call): the board
   is now the field-tech action surface — tap the station to open it, tap a red screen to log it,
   tap a contact to call. Deploys on push.
+
+
+---
+
+## 273 · Camera-off auto-ticketing — isolated (§255 closed) (2026-08-31)
+
+Owner: "fix [camera-off auto-ticketing] but make sure other current functions don't affect."
+Built FULLY ISOLATED — nothing existing changed:
+
+### New (all additive)
+- `supabase_ops_p10_camera_tickets.sql` (owner runs): a **separate** function
+  `ops_reconcile_camera_tickets()` + extends two CHECKs additively (`type` gains
+  `camera_fault`, `source` gains `auto_camera`).
+  - Camera fault = screen `status='online' AND camera_active=false` (screen UP, camera DEAD).
+    Excludes offline screens (their offline ticket covers them) + null-camera screens.
+  - WHOLE function **night-gated** 7 AM–9 PM IST (off-hours screens are timer-off → nothing to
+    assess; also blocks a night false-cancel). Per depot: one open `auto_camera` ticket,
+    priority `low`. Calendar-day auto-close (§259 rule). Own advisory-lock key.
+- `api/ops/sync.js` step **5b**: a separate best-effort call to the camera reconcile, right
+  after the offline one — wrapped so its failure can't affect step 5 (offline).
+
+### Why nothing else is affected (the owner's constraint)
+- Offline reconcile (`ops_reconcile_offline_tickets`, §259) — **byte-untouched** (separate fn).
+- Cockpit/tech fault metrics (p6/p7, `type='fault'`) — **unchanged** (camera is `camera_fault`).
+- §259 offline auto-cancel (`source='auto_offline'`) — **unchanged** (camera is `auto_camera`).
+- Uptime PAY (§258, `ops_uptime_daily`) — **never written** by the camera path.
+- WhatsApp / ticket-wa — **untouched** (camera opens NO WhatsApp — lower urgency).
+- OpsTicketsV2 renders manual-only, so the new `camera_fault` type breaks no frontend.
+- Deploy-order safe: until p10 is run, sync step 5b 404s → caught → no effect.
+
+### Run + checks
+Owner runs `supabase_ops_p10_camera_tickets.sql` in Studio (VERIFY block inside). sync.js
+deploys on push. check-sql-schema OK · node --check OK. Ops files, not §28 frozen.
