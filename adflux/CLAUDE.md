@@ -17970,3 +17970,24 @@ colors switched from raw `#f1f5f9`/`#64748b` to the file's existing `LINE`/`INK2
 An unpaid current month shows the in-progress RPC-computed figure (same "salary projection"
 pattern MyPerformanceV2 already uses). Nothing writes; the accountant's later payout just flips
 the row from "Pending" to "Paid Rs.X". esbuild/brand/build OK.
+
+
+---
+
+## 272 · Station-board screen wall — tap a screen to log its issue (2026-08-31)
+
+Owner (operation_executive): "on the station board I can't click a red offline screen — I want
+to tap it, open that screen, and punch issues." The screen-wall boxes were plain `<div>`s.
+
+### Change (`OpsStationV2.jsx` screen wall)
+Each screen box is now a `<button>` → `nav('/ops-log?depot=<depotId>&screen=<s.id>')`. `OpsLogV2`
+already seeds BOTH `?depot=` (station) and `?screen=` (the specific screen) from its query params
+(no OpsLogV2 change), so the log form opens prefilled to that exact screen — the tech just picks
+the issue + saves. Box bumped 28→34px / radius 4→6 for a tappable target on mobile; title now
+says "· tap to log an issue". Colors/state logic unchanged.
+
+### Notes
+- Ops file, NOT §28 frozen (no guardian). brand/esbuild/build OK.
+- Chains with §268 (city tap → station board) + §269 (Log-fault button + tap-to-call): the board
+  is now the field-tech action surface — tap the station to open it, tap a red screen to log it,
+  tap a contact to call. Deploys on push.

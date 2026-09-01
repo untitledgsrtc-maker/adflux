@@ -185,8 +185,12 @@ export default function OpsStationV2() {
           : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {screens.map((s, i) => {
                 const st = screenState(s, tkByScreen)
-                return <div key={s.id} title={`${s.name} — ${STATE_LABEL[st]}`}
-                  style={{ width: 28, height: 28, borderRadius: 4, background: STATE_COLOR[st], color: 'var(--accent-fg, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>{i + 1}</div>
+                // tap a screen → log a fault for THAT screen (owner §272): OpsLogV2
+                // prefills both the station and this screen from the query params.
+                return <button key={s.id} type="button"
+                  onClick={() => depotId && nav(`/ops-log?depot=${depotId}&screen=${s.id}`)}
+                  title={`${s.name} — ${STATE_LABEL[st]} · tap to log an issue`}
+                  style={{ width: 34, height: 34, borderRadius: 6, background: STATE_COLOR[st], color: 'var(--accent-fg, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, border: 'none', padding: 0, cursor: 'pointer' }}>{i + 1}</button>
               })}
             </div>}
         <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 11, color: 'var(--text-muted)' }}>
