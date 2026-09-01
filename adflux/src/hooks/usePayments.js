@@ -325,6 +325,26 @@ export async function fetchPendingApprovals() {
     .order('created_at', { ascending: false })
 }
 
+// Admin: APPROVED payments within a DATE WINDOW (caller passes sinceISO, e.g.
+// last 12 months), newest payment first — powers the month-wise "Approved
+// history" section under the pending queue (owner 2026-09-01). Read-only; same
+// shape as fetchPendingApprovals (no approved_by embed — that FK+RLS combo can
+// silently null, §36.6; the row's decided_at is enough). Bounding by DATE (not a
+// flat row cap) means every month SHOWN is complete — no silent mid-month
+// truncation / partial total (§66/§85 row-cap trap). rowLimit is a runaway safety net.
+export async function fetchApprovedPayments(sinceISO, rowLimit = 2000) {
+  let q = supabase
+    .from('payments')
+    .select(`
+      *,
+      users:received_by(name),
+      quotes(id, quote_number, client_name, client_company, total_amount, created_by, sales_person_name, segment, media_type)
+    `)
+    .eq('approval_status', 'approved')
+  if (sinceISO) q = q.gte('payment_date', sinceISO)
+  return q.order('payment_date', { ascending: false }).limit(rowLimit)
+}
+
 // Sales: their own pending payments (powers the "awaiting approval"
 // banner on the sales dashboard). Shows what they've punched that
 // admin hasn't approved or rejected yet.

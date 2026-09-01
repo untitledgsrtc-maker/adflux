@@ -10,7 +10,7 @@
 // of approve/reject actions. Works at both desktop and mobile widths
 // because the layout is flex-column with wrap at the action row.
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle2, XCircle, ExternalLink, RefreshCw, Inbox,
@@ -19,16 +19,24 @@ import {
 import { supabase } from '../../lib/supabase'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { useAuthStore } from '../../store/authStore'
-import { fetchPendingApprovals } from '../../hooks/usePayments'
+import { fetchPendingApprovals, fetchApprovedPayments } from '../../hooks/usePayments'
 // Phase 97.10 (2026-05-28, F-300 + F-301) — swap browser
 // confirm/prompt/alert dialogs for in-app primitives + Lucide icon.
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError } from '../../components/v2/Toast'
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December']
+// group key + label from a payment_date (the payment's own month, not the
+// approval date — most intuitive for "month-wise approved history").
+const monthKey = (d) => { const t = new Date(d); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}` }
+const monthLabel = (k) => { const [y, m] = k.split('-'); return `${MONTHS[Number(m) - 1] || ''} ${y}` }
+
 export default function PendingApprovalsV2() {
   const profile = useAuthStore(s => s.profile)
   const navigate = useNavigate()
   const [rows, setRows]       = useState([])
+  const [approved, setApproved] = useState([])   // month-wise approved history (owner 2026-09-01)
   const [loading, setLoading] = useState(true)
   const [actingId, setActingId] = useState(null)
   // Phase 11j — surface fetch errors to the UI instead of console-only.
@@ -56,6 +64,14 @@ export default function PendingApprovalsV2() {
       data,
     })
     setRows(data || [])
+    // Approved history (month-wise) — read-only, best-effort (a failure here
+    // must not blank the pending queue above). Bounded to the last 12 months so
+    // every SHOWN month is complete (no silent row-cap truncation, §66/§85).
+    const since = new Date()
+    since.setMonth(since.getMonth() - 12, 1)
+    const { data: apprData, error: apprErr } = await fetchApprovedPayments(since.toISOString().slice(0, 10))
+    if (apprErr) console.error('[PendingApprovalsV2] approved-history fetch failed:', apprErr)
+    setApproved(apprData || [])
     setLoading(false)
   }, [profile?.role, profile?.id])
 
@@ -151,6 +167,20 @@ export default function PendingApprovalsV2() {
     }
     closeReject()
   }
+
+  // Group approved payments by their payment_date month, newest month first.
+  const approvedMonths = useMemo(() => {
+    const g = new Map()
+    for (const r of approved) {
+      if (!r.payment_date) continue
+      const k = monthKey(r.payment_date)
+      if (!g.has(k)) g.set(k, { key: k, label: monthLabel(k), rows: [], total: 0 })
+      const e = g.get(k)
+      e.rows.push(r)
+      e.total += Number(r.amount_received) || 0
+    }
+    return [...g.values()].sort((a, b) => (a.key < b.key ? 1 : -1))
+  }, [approved])
 
   return (
     <div className="v2d-pa">
@@ -260,6 +290,52 @@ export default function PendingApprovalsV2() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Approved history — month-wise, read-only (owner 2026-09-01). Grouped by
+          the payment's own month; newest month first. No actions (already decided). */}
+      {!loading && approvedMonths.length > 0 && (
+        <div style={{ marginTop: 30 }}>
+          <div className="v2d-page-kicker" style={{ marginBottom: 4 }}>Approved history</div>
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginBottom: 4 }}>Last 12 months · by payment month.</div>
+          {approvedMonths.map(({ key, label, rows: mrows, total }) => (
+            <div key={key} style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--v2-ink-0, #f5f7fb)' }}>{label}</span>
+                <span className="tabular-nums" style={{ fontSize: 12.5, color: 'var(--v2-ink-2, #94a3b8)' }}>
+                  {mrows.length} approved · {formatCurrency(total)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {mrows.map(r => {
+                  const isGovt = r.quotes?.segment === 'GOVERNMENT'
+                  return (
+                    <div key={r.id} className="v2d-panel" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="tabular-nums" style={{ fontWeight: 700, fontSize: 14, color: 'var(--v2-ink-0, #f5f7fb)' }}>{formatCurrency(r.amount_received)}</span>
+                          {r.is_final_payment && <span className="v2d-pa-final">Final</span>}
+                          <button className="v2d-pa-qlink" onClick={() => navigate(isGovt ? `/proposal/${r.quote_id}` : `/quotes/${r.quote_id}`)} title="Open quote">
+                            {r.quotes?.quote_number || r.quotes?.ref_number || 'Quote'}<ExternalLink size={11} />
+                          </button>
+                        </div>
+                        <div className="v2d-pa-meta" style={{ fontSize: 12 }}>
+                          <span>{r.quotes?.client_name || '—'}</span>
+                          <span>· {r.payment_mode}</span>
+                          <span>· {formatDate(r.payment_date)}</span>
+                          {(r.users?.name || r.quotes?.sales_person_name) && <span>· by {r.users?.name || r.quotes?.sales_person_name}</span>}
+                        </div>
+                      </div>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--success, #10B981)', whiteSpace: 'nowrap' }}>
+                        <CheckCircle2 size={13} /> {formatDate(r.decided_at)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

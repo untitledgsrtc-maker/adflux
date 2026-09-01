@@ -18024,3 +18024,34 @@ Built FULLY ISOLATED — nothing existing changed:
 ### Run + checks
 Owner runs `supabase_ops_p10_camera_tickets.sql` in Studio (VERIFY block inside). sync.js
 deploys on push. check-sql-schema OK · node --check OK. Ops files, not §28 frozen.
+
+
+---
+
+## 274 · Pending Approvals — month-wise approved history (2026-09-01)
+
+Owner: the admin Pending Approvals page showed only the pending queue; approved payments
+vanished with no history ("month wise approved history not there").
+
+### Built (additive, READ-ONLY — approve/reject flow byte-untouched)
+- `usePayments.js` `fetchApprovedPayments(sinceISO, rowLimit=2000)` (NEW) — approved payments
+  within a DATE window, newest payment first. Same select as fetchPendingApprovals; NO
+  approved_by embed (§36.6 null trap).
+- `PendingApprovalsV2.jsx` — loads approved alongside pending (best-effort; a failure logs +
+  can't blank the queue), groups by `payment_date` month (useMemo), renders an "Approved
+  history" section under the queue: month header (label · N approved · ₹total) + read-only rows
+  (amount, client, quote link, mode, date, submitter, green ✓ approved-date).
+
+### sales-module-guardian — PASS (no frozen contract touched); FLAG fixed before commit
+- **P1 (money-correctness) FIXED**: the first cut used a flat `limit(500)` → once total approved
+  exceed 500 the oldest months silently truncate → a month's ₹total could read complete when it's
+  partial (§66/§85 row-cap trap). Fix: bound by a **12-month date window** (`payment_date >=`
+  today−12mo) so every SHOWN month is complete; high limit is only a runaway net; "Last 12 months"
+  note added to the header.
+- P3 FIXED: quote-link fallback now `quote_number || ref_number || 'Quote'` (matches the pending
+  queue's chain). P3 FIXED: the approved fetch error now `console.error`s (kept best-effort, no
+  user banner).
+
+### Notes
+- Admin-only page; no lead/cadence/push/score/DB-write touch (approve/reject unchanged).
+  esbuild/brand/build OK. Realtime `payments` channel already reloads → history refreshes on any approve.
