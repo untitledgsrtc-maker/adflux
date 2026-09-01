@@ -17940,3 +17940,33 @@ summary counts it in Aug (payment date), the dashboard in June (won_at). A June 
   this month"; QuotesV2's is over whatever the user has filtered. Same DEFINITION now (won ÷
   non-draft-sent), different SCOPE — expected.
 - Lead→Won % (funnel conversion) not built — owner deferred in favor of Quote→Won first.
+
+
+---
+
+## 271 · Salary slip downloadable before payment (owner reversal) (2026-08-31)
+
+Owner: "in salary I want they can download even before payment details — just blank the
+payment details if not added." REVERSES the Phase 185 gate (his own 2026-07-02 decision:
+"download a slip ONLY after a full salary_payouts row exists").
+
+### Change (both HR/payroll components, mounted on the frozen MyPerformanceV2 + OpsMyPerformanceV2)
+- `SalarySlipsCard.jsx` — was listing only FULLY-PAID months (`salary_payouts.is_full_payment`).
+  Now merges `recentMonths(4)` (current + 3 prior IST months, new helper off `istTodayISO()`)
+  with any paid month → one row per month `{ month_year, payout|null }`, every month
+  downloadable. Row reads "Paid Rs.X" (green) with a payout, else "Payment pending" (muted).
+  Subtitle "any paid month" → "any month". Agency still gets no card (commission-only).
+- `SalarySlipPDF.jsx` — the PAID row renders "PAID Rs.X on date" (green) when a payout exists,
+  else "PAYMENT · Pending" (neutral, `INK2`/`LINE` constants). Slip downloads either way.
+
+### sales-module-guardian (§28) — PASS, no blockers
+Display-only (no DB write / cadence / stage / activity_type / push / score / RLS touch; every
+read self-scoped to `profile.id`; `compute_monthly_salary` self-gated, unchanged; `recentMonths`
+derives from `istTodayISO()` before month math → no UTC/IST drift). 3 low findings, ALL fixed
+before commit: both stale header comments updated to describe the reversal (P2×2); PDF pending
+colors switched from raw `#f1f5f9`/`#64748b` to the file's existing `LINE`/`INK2` constants (P3).
+
+### Note
+An unpaid current month shows the in-progress RPC-computed figure (same "salary projection"
+pattern MyPerformanceV2 already uses). Nothing writes; the accountant's later payout just flips
+the row from "Pending" to "Paid Rs.X". esbuild/brand/build OK.

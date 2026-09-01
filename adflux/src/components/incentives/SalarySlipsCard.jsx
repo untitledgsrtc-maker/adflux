@@ -1,22 +1,36 @@
 // src/components/incentives/SalarySlipsCard.jsx
 //
-// Phase 185 — "Salary slips" on My Performance. A rep downloads their OWN
-// slip for any month that has been FULLY paid (owner decision 2026-07-02:
-// unlock only after a full salary_payouts row exists).
+// Phase 185 — "Salary slips" on My Performance. A rep downloads their OWN slip
+// for the current + last 3 months, plus any fully-paid month (owner 2026-08-31
+// REVERSED the 2026-07-02 "download only after full payment" gate). An unpaid
+// month still downloads — the PDF payment row shows blank/"Pending".
 //
 // Self-fetching + read-only + RLS-safe: it reads the rep's own salary_payouts
 // (Phase 37 rep-SELECT-own) and, on download, calls compute_monthly_salary for
 // their OWN id (self-or-admin gated). A rep can never see another rep's slip.
-// Additive card — hidden until at least one paid month exists.
+// Additive card — shown for every non-agency rep (agency is commission-only).
 
 import { useState, useEffect } from 'react'
 import { FileText, Download, Loader2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { downloadSalarySlip } from './SalarySlipPDF'
+import { istTodayISO } from '../../utils/istDate'
 
 const MON = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']
+
+// The current IST month + (n-1) prior months as 'YYYY-MM', newest first. Lets a
+// rep pull a slip BEFORE the accountant records payment (owner 2026-08-31).
+function recentMonths(n) {
+  const [y, m] = istTodayISO().slice(0, 7).split('-').map(Number)
+  const out = []
+  for (let i = 0; i < n; i++) {
+    const d = new Date(y, m - 1 - i, 1)
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+  return out
+}
 
 // '2026-06' -> { label:'June 2026', year:2026, month:6 }
 function parseMonth(ym) {
@@ -50,23 +64,21 @@ export default function SalarySlipsCard() {
         .order('month_year', { ascending: false })
       if (cancelled) return
       if (error) { setErr('Could not load your salary slips.'); setRows([]); return }
-      // One slip per month (latest full-payment row wins if duplicates).
-      const seen = new Set()
-      const uniq = []
-      for (const r of data || []) {
-        if (seen.has(r.month_year)) continue
-        seen.add(r.month_year)
-        uniq.push(r)
-      }
-      setRows(uniq)
+      // Merge recent months (current + prior — downloadable even before payment) with
+      // any FULLY-PAID month. One row per month; a payout attaches its amount/date, else null.
+      const paidMap = new Map()
+      for (const r of data || []) if (!paidMap.has(r.month_year)) paidMap.set(r.month_year, r)
+      const months = new Set([...recentMonths(4), ...paidMap.keys()])
+      const list = [...months].sort().reverse().map((my) => ({ month_year: my, payout: paidMap.get(my) || null }))
+      setRows(list)
     })()
     return () => { cancelled = true }
   }, [profile?.id, profile?.role])
 
-  async function handleDownload(payoutRow) {
+  async function handleDownload(row) {
     if (busyMonth) return
-    const { label, year, month } = parseMonth(payoutRow.month_year)
-    setBusyMonth(payoutRow.month_year)
+    const { label, year, month } = parseMonth(row.month_year)
+    setBusyMonth(row.month_year)
     try {
       const { data, error } = await supabase.rpc('compute_monthly_salary', {
         p_user_id: profile.id, p_year: year, p_month: month,
@@ -76,7 +88,7 @@ export default function SalarySlipsCard() {
         rep: { name: profile.name, designation: profile.designation || profile.role },
         monthLabel: label,
         salary: data,
-        payout: { amount_paid: payoutRow.amount_paid, paid_date: payoutRow.paid_date },
+        payout: row.payout || null,   // null → PDF shows "Payment: Pending" (owner 2026-08-31)
       })
     } catch (e) {
       setErr('Could not generate the slip. Try again.')
@@ -114,7 +126,7 @@ export default function SalarySlipsCard() {
             Salary slips
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-subtle, #64748b)' }}>
-            Download your slip for any paid month
+            Download your slip for any month
           </div>
         </div>
       </div>
@@ -150,8 +162,8 @@ export default function SalarySlipsCard() {
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #f1f5f9)' }}>
                   {label}
                 </div>
-                <div className="tabular-nums" style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)', marginTop: 1 }}>
-                  Paid {inr(r.amount_paid)}
+                <div className="tabular-nums" style={{ fontSize: 12, color: r.payout ? 'var(--success, #10B981)' : 'var(--text-subtle, #64748b)', marginTop: 1 }}>
+                  {r.payout ? `Paid ${inr(r.payout.amount_paid)}` : 'Payment pending'}
                 </div>
               </div>
               <button

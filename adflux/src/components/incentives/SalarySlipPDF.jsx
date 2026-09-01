@@ -4,9 +4,11 @@
 //
 // A plain one-page A4 salary slip built from the SAME numbers the payroll
 // function returns (compute_monthly_salary): base 70% + variable 30% +
-// incentive + TA/DA − leave deduction = net payable. Owner decisions
-// (2026-07-02): unlock only after FULL payment recorded (salary_payouts),
-// plain "Untitled" logo header (no legal entity), show the score %.
+// incentive + TA/DA − leave deduction = net payable. Owner decisions:
+// plain "Untitled" logo header (no legal entity), show the score %. The PAID
+// row shows the recorded payout when one exists, else "PAYMENT · Pending"
+// (owner 2026-08-31 REVERSED the 2026-07-02 "download only after full payment"
+// gate — a slip is now downloadable for any recent month, paid or not).
 //
 // Money is display-only here — the figures come straight from the RPC the
 // rep is already allowed to read for themselves (self-gated). No new math.
@@ -170,10 +172,13 @@ export function SalarySlipDocument({ rep, monthLabel, salary, payout }) {
           <Text style={S.netAmt}>{inr(net)}</Text>
         </View>
 
-        {/* Paid */}
-        <View style={S.paidRow}>
-          <Text style={S.paidLabel}>PAID</Text>
-          <Text style={S.paidVal}>{inr(payout?.amount_paid ?? net)} on {fmtDate(payout?.paid_date)}</Text>
+        {/* Paid — blank/Pending until the accountant records a payout (owner 2026-08-31,
+            reverses the Phase 185 download-only-when-paid gate). */}
+        <View style={[S.paidRow, payout ? {} : { backgroundColor: LINE }]}>
+          <Text style={[S.paidLabel, payout ? {} : { color: INK2 }]}>{payout ? 'PAID' : 'PAYMENT'}</Text>
+          <Text style={[S.paidVal, payout ? {} : { color: INK2 }]}>
+            {payout ? `${inr(payout.amount_paid ?? net)} on ${fmtDate(payout.paid_date)}` : 'Pending'}
+          </Text>
         </View>
 
         {/* Footer */}
