@@ -512,6 +512,13 @@ export default function useDaySummary({ dateISO } = {}) {
       const _sentAmount  = (qSentRes.data || []).filter(q => q.status !== 'draft').reduce((s, q) => s + (Number(q.total_amount) || 0), 0)
       const conversionPct = _sentAmount > 0 ? Math.round((_wonAtAmount / _sentAmount) * 100) : 0
 
+      // Phase 277 — "Cash in" = ALL approved payments this month (partials + finals),
+      // via the self-scoped my_cash_in_month RPC. Separate from "Collected"
+      // (my_quotes_won_month = FULL wins only) so a partial installment is visible.
+      const _cashRes = await supabase.rpc('my_cash_in_month', { p_month: wonMonthStr })
+      const cashInCount  = Number(_cashRes.data?.[0]?.cash_count) || 0
+      const cashInAmount = Number(_cashRes.data?.[0]?.cash_amount) || 0
+
       const _summary = {
         repName: profile.name,
         role,
@@ -536,6 +543,8 @@ export default function useDaySummary({ dateISO } = {}) {
           quotes_won:         quotesWonCount,
           quotes_won_amount:  quotesWonAmount,
           quote_conversion_pct: conversionPct,   // Phase 270 — won₹(won_at) ÷ sent₹, this month
+          cash_in_count:        cashInCount,     // Phase 277 — all approved payments this month
+          cash_in_amount:       cashInAmount,
           qualified,
           // Phase 118 — Sales Day Summary extras.
           follow_ups_real:          followUpsReal,

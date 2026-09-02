@@ -18121,3 +18121,36 @@ Display-only: `overdue_follow_ups` is NOT a dayScore input (score = meetings/fol
 quotes). `overdueRes` used nowhere else. NULL-lead join falls through to keep (matches the §200 SQL).
 P3 (per-rep row-fetch has no .limit) — negligible cap risk for own-scoped overdue rows; no action.
 esbuild/build OK.
+
+
+---
+
+## 277 · Day-summary "Cash in" line — partial collections visible (2026-09-02)
+
+Owner (3rd time "Collected" confused him — Mayur, Rima): "Collected" (my_quotes_won_month,
+phase238 = FULL/final wins only) shows 0 even when a rep took a real PARTIAL installment
+(Rima: won a ₹6k deal, collected a ₹3k approved partial + a ₹6k final that was REJECTED →
+Collected 0, but ₹3k real cash in). NOTE: a quote can be `won` WITHOUT full payment (owner
+correction) — so that's NOT a bug; "Collected 0" + Conversion 3% were both correct. The gap
+was only that partial cash was invisible.
+
+### Built (additive, display-only)
+- `supabase_phase277_cash_in_month.sql` (NEW, owner runs): `my_cash_in_month(p_month)` RETURNS
+  (cash_count, cash_amount) — SECURITY DEFINER, self-scoped `q.created_by = auth.uid()`, sums
+  `payments.amount_received` where `approval_status='approved'` AND payment_date in the month.
+  Byte-for-byte the phase238 pattern MINUS the `is_final_payment=true` filter (so partials count).
+- `useDaySummary.js` — separate `rpc('my_cash_in_month', {p_month: wonMonthStr})` await (after the
+  §270 conversion block, Promise.all untouched) → `cash_in_count` + `cash_in_amount` on `actual`.
+- `whatsappSummary.js` — `• Cash in: N · ₹X (this month)` between Collected and Conversion.
+- `DaySummaryCard.jsx` — a "Cash in · month" Row between Collected and Conversion (+Wallet icon).
+
+### The money-metric trio now on the summary (keep them distinct)
+- **Collected** = my_quotes_won_month = deals whose FINAL payment fully landed this month.
+- **Cash in** = my_cash_in_month = ALL approved payments this month (partials + finals) = real cash.
+- **Conversion** = won₹(won_at, §270) ÷ non-draft-sent₹, this month.
+
+### sales-module-guardian — PASS, 0 issues
+Display-only (cash_in_* NOT a dayScore input — score computed before the fetch). No existing
+field/query changed. RPC self-scoped + money-safe (no param selects another rep, REVOKE/GRANT
+correct). No writes / lead / cadence / push / TA touch. Style/tokens on-spec. esbuild/brand/build OK.
+Owner runs the SQL; frontend deploys on push.

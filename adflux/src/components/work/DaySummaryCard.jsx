@@ -24,7 +24,7 @@ import React, { useMemo, useState } from 'react'
 import {
   ClipboardList, Phone, Users, Map as MapIcon,
   BadgeCheck, Wifi, WifiOff, AlertTriangle, Send,
-  X, ChevronRight, Activity, Satellite, LogOut, Calendar,
+  X, ChevronRight, Activity, Satellite, LogOut, Calendar, Wallet,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -336,6 +336,12 @@ export default function DaySummaryCard({
             label="Collected · month"
             value={`${a.quotes_won || 0} · ${formatCurrency(a.quotes_won_amount || 0)}`}
             tone={(a.quotes_won || 0) > 0 ? 'success' : undefined}
+          />
+          <Row
+            icon={<Wallet size={14} strokeWidth={1.6} />}
+            label="Cash in · month"
+            value={`${a.cash_in_count || 0} · ${formatCurrency(a.cash_in_amount || 0)}`}
+            tone={(a.cash_in_amount || 0) > 0 ? 'success' : undefined}
           />
           <Row
             icon={<ChevronRight size={14} strokeWidth={1.6} />}
