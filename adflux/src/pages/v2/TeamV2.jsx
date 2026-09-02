@@ -29,8 +29,10 @@ export default function TeamV2({ embedded = false }) {
   const [filter,  setFilter]   = useState('all')
   const [search,  setSearch]   = useState('')
   const [addOpen, setAddOpen]  = useState(false)
+  const [loadErr, setLoadErr]  = useState('')   // §HR: roster load failed — was a silent "No members found"
 
-  useEffect(() => { fetchMembers(); fetchSettings() }, [])
+  async function load() { setLoadErr(''); const { error } = await fetchMembers(); if (error) setLoadErr('Could not load the team. Please retry.') }
+  useEffect(() => { load(); fetchSettings() /* eslint-disable-next-line */ }, [])
 
   const visible = useMemo(() => members.filter(m => {
     if (!search.trim()) return true
@@ -116,6 +118,10 @@ export default function TeamV2({ embedded = false }) {
 
       {loading ? (
         <div className="v2d-loading"><div className="v2d-spinner" />Loading team…</div>
+      ) : loadErr ? (
+        <div className="v2d-team-body" style={{ textAlign: 'center', padding: 24, color: 'var(--danger, #EF4444)' }}>
+          {loadErr} <button type="button" onClick={load} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', cursor: 'pointer', textDecoration: 'underline', font: 'inherit' }}>Retry</button>
+        </div>
       ) : (
         <div className="v2d-team-body">
           <TeamList

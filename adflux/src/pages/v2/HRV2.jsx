@@ -38,7 +38,7 @@ function matchesFilter(offer, key) {
 
 export default function HRV2() {
   const navigate = useNavigate()
-  const { offers, loading, fetchOffers } = useOffers()
+  const { offers, loading, error, fetchOffers } = useOffers()
   const [filter, setFilter]   = useState('all')
   const [search, setSearch]   = useState('')
   const [sendOpen, setSendOpen] = useState(false)
@@ -157,7 +157,9 @@ export default function HRV2() {
               </td></tr>
             ) : visible.length === 0 ? (
               <tr><td colSpan={6} className="v2d-muted" style={{ textAlign: 'center', padding: 30 }}>
-                {offers.length === 0
+                {error
+                  ? <span style={{ color: 'var(--danger, #EF4444)' }}>Couldn't load offers. <button type="button" onClick={fetchOffers} style={{ background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', cursor: 'pointer', textDecoration: 'underline', padding: 0, font: 'inherit' }}>Retry</button></span>
+                  : offers.length === 0
                   ? 'No offers yet. Click "Send Offer" to create your first.'
                   : 'No offers match your filters.'}
               </td></tr>

@@ -157,6 +157,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   // /admin/ta-payouts so admin can Approve / Reject in one place.
   const [pendingRequests, setPendingRequests] = useState([])
   const [requestActingOn, setRequestActingOn] = useState(null)
+  const [reqErr, setReqErr] = useState('')   // §HR: claim-queue load failed — was a silent blank (admin blind to pending claims)
 
   // Load rep list once.
   useEffect(() => {
@@ -211,13 +212,21 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     // either empty or had no `.users` field, breaking the {req.users?.name}
     // render. Fix — split into two plain selects and merge client-side.
     // No FK embed = no edge cases.
-    const { data: reqs, error: reqErr } = await supabase
+    setReqErr('')
+    const { data: reqs, error: reqError } = await supabase
       .from('ta_da_requests')
       .select('id, user_id, claim_date, kind, claim_km, claim_amount, city, reason, receipt_url, status, created_at')
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
       .limit(50)
-    if (reqErr || !reqs || reqs.length === 0) {
+    if (reqError) {
+      // §HR: a FAILED read must NOT look like "no pending claims" — the panel
+      // hides when empty, so a silent error left admin blind to the queue.
+      setReqErr('Could not load rep claim requests. Please retry.')
+      setPendingRequests([])
+      return
+    }
+    if (!reqs || reqs.length === 0) {
       setPendingRequests([])
       return
     }
@@ -530,6 +539,14 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
               day when the rep stayed overnight. Approve before finance pays out.
             </div>
           </div>
+        </div>
+      )}
+
+      {/* §HR: claim-queue load failed — the panel below hides when empty,
+          so surface the error (with retry) instead of a silent blank. */}
+      {reqErr && (
+        <div className="v2d-panel" style={{ padding: 14, textAlign: 'center', color: 'var(--danger, #EF4444)' }}>
+          {reqErr} <button type="button" onClick={loadRequests} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', cursor: 'pointer', textDecoration: 'underline', font: 'inherit' }}>Retry</button>
         </div>
       )}
 

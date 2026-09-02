@@ -18223,3 +18223,38 @@ approved/rejected TA claim history (#23), polish (#29-38), and 4 OWNER DECISIONS
 D1 one-vs-two payout flow (#25/26/10), D2 does HR hire non-sales roles (#28/12/13/9 — offer-letter
 template), D3 live leave-pay rule (§78 vs "Paid after 9 months" copy, #27), D4 do approved TA
 claims reach payroll (#24, verify). esbuild/brand/build OK.
+
+
+---
+
+## 280 · HR audit batch 2 — load-failed → error+retry states (2026-09-02)
+
+Continues §279. Audit items #16/#17/#19 — the "silent load failure" states where a failed
+DB read looked identical to genuinely-empty data. All ADDITIVE, display-only (no query
+logic / write / cadence / score / TA-math change).
+
+### Fixed
+- **#16 Team roster** (`TeamV2.jsx`, not frozen) — `useTeam.fetchMembers()` returns `{data,
+  error}` but the hook only did `if (!error) setMembers`. Added a local `loadErr` state + a
+  `load()` wrapper that captures the returned `error`; render shows an error+Retry branch
+  distinct from the "No members found" empty state. useTeam.js UNCHANGED (captured the error
+  in the page, not the shared hook).
+- **#17 HR offers** (`HRV2.jsx`, not frozen) — destructured the existing `error` from
+  `useOffers()` (the hook already had it); the offers table empty-state now shows "Couldn't
+  load offers. Retry" on a fetch error, else the "No offers yet" / "No offers match" copy.
+- **#19 TA claim-requests queue** (`TaPayoutsAdminV2.jsx`, §28 FROZEN — guardian PASS) — the
+  pending-claim panel HIDES when empty, so `loadRequests()` swallowing its error left admin
+  BLIND to the queue on a failed read. Added `reqErr` state; `loadRequests()` splits real
+  ERROR (→ set reqErr, empty, return) from genuinely-empty (→ empty, return); renamed the
+  local destructure `error: reqErr` → `error: reqError` to avoid shadowing the new state; an
+  always-visible error strip + Retry renders above the (hidden-when-empty) panel. The
+  §29 `useAutoRefresh(loadRows)` unconditional mount + §279 statusSplit/totals + §275 row→GPS
+  nav all byte-unchanged.
+
+### Notes / contract
+- Pattern for the remaining #18/#21/#22/#23 (SendOffer dropdown, manager search no-match,
+  badge refresh, TA claim history): same — capture the swallowed `error`, render an
+  error+Retry state distinct from empty. Not yet built (minor).
+- The 4 OWNER DECISIONS (D1-D4, §279) still gate audit items #3/#5/#9/#10/#12/#13/#25-28 —
+  re-surface before building those; do NOT guess a payout-flow / HR-hire-scope / leave-rule.
+- esbuild parse + brand check clean on all 3. Frozen file → sales-module-guardian audited.
