@@ -18194,3 +18194,32 @@ Run `supabase_phase33d6_full_cadence.sql` + `db/functions/followup_after_done.sq
 NOT retroactive — existing leads keep their old 6/3 FUs; the 9/8 apply to stage-changes AFTER the
 run. Smoke: one fresh lead New→QuoteSent → 9 then 8 FUs spawn, drops to Nurture only after day 30.
 check-sql-schema OK · esbuild/brand/build OK.
+
+
+---
+
+## 279 · HR audit batch 1 — money-screen bug fixes (2026-09-02)
+
+A 9-agent read-only audit of the whole HR module (People + hiring/onboarding) found HR ~85%
+built, no core feature broken, but flagged 38 gaps. Owner: fix the highest-risk, no-decision
+ones first. This batch = the 4 money bugs.
+
+### Fixed (guardian PASS, no frozen contract touched)
+- **Double-pay guard** (audit #14/#15) — `SalaryPayoutModal.jsx` + `IncentivePayoutModal.jsx`:
+  the payout-history `load()` swallowed the query error → a FAILED read rendered "No payouts
+  recorded yet" → accounts could re-pay someone. Added `loadErr` + `loading` state; load()
+  captures `error`; history area renders loading / error+Retry / empty three-way; **"Record
+  Payout" is disabled while loading or on error** (`disabled={saving || loading || !!loadErr}`).
+  Insert/delete logic byte-unchanged.
+- **TA money display** (audit #3/#4) — `TaPayoutsAdminV2.jsx`: (a) the Approved/Paid/Pending rings'
+  `statusSplit` read `r.total` (nonexistent — column is `total_amount`) → rings always ₹0. Fixed
+  to `r.total_amount` + added `statusSplit.total` as a stable month-total ring denominator. (b) the
+  footer `totals` useMemo reduced `visibleRows` but its dep was `[rows]` → didn't recalc on the
+  status filter / empty-days toggle. Dep → `[visibleRows]`. `useAutoRefresh` mount (§29) intact.
+
+### HR audit — remaining (tracked, not yet built)
+2 stubs (TA receipt upload, Exit/Offboarding), a batch of "load-failed→retry" states (#16-22),
+approved/rejected TA claim history (#23), polish (#29-38), and 4 OWNER DECISIONS gating the rest:
+D1 one-vs-two payout flow (#25/26/10), D2 does HR hire non-sales roles (#28/12/13/9 — offer-letter
+template), D3 live leave-pay rule (§78 vs "Paid after 9 months" copy, #27), D4 do approved TA
+claims reach payroll (#24, verify). esbuild/brand/build OK.

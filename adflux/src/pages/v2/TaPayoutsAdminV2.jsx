@@ -340,7 +340,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       if (r.status === 'paid')     acc.paidTotal     += Number(r.total_amount) || 0
       return acc
     }, { km: 0, da: 0, bike: 0, hotel: 0, total: 0, approvedTotal: 0, paidTotal: 0 })
-  }, [rows])
+  }, [visibleRows])   // §HR fix: was [rows] — footer/grand-total now recalcs when the status filter or empty-days toggle changes
 
   // Phase 36.3 — request approval handlers. Single-row flip on
   // ta_da_requests. Approve → status='approved'; Reject → status=
@@ -484,11 +484,12 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   const statusSplit = useMemo(() => {
     const out = { approved: 0, paid: 0, pending: 0 }
     for (const r of rows) {
-      const amt = Number(r.total || 0)
+      const amt = Number(r.total_amount || 0)   // §HR fix: was r.total (undefined → rings read ₹0)
       if (r.status === 'paid')     out.paid     += amt
       else if (r.status === 'approved') out.approved += amt
       else                          out.pending  += amt
     }
+    out.total = out.approved + out.paid + out.pending   // month total (all rows) — the ring denominator
     return out
   }, [rows])
 
@@ -511,9 +512,9 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       {fUser && rows.length > 0 && (
         <RingMilestoneRow
           items={[
-            { value: Math.round(statusSplit.approved), target: Math.max(1, Math.round(totals.total)), label: 'Approved', sub: fmtINR(statusSplit.approved) },
-            { value: Math.round(statusSplit.paid),     target: Math.max(1, Math.round(totals.total)), label: 'Paid',     sub: fmtINR(statusSplit.paid) },
-            { value: Math.round(statusSplit.pending),  target: Math.max(1, Math.round(totals.total)), label: 'Pending',  sub: fmtINR(statusSplit.pending) },
+            { value: Math.round(statusSplit.approved), target: Math.max(1, Math.round(statusSplit.total)), label: 'Approved', sub: fmtINR(statusSplit.approved) },
+            { value: Math.round(statusSplit.paid),     target: Math.max(1, Math.round(statusSplit.total)), label: 'Paid',     sub: fmtINR(statusSplit.paid) },
+            { value: Math.round(statusSplit.pending),  target: Math.max(1, Math.round(statusSplit.total)), label: 'Pending',  sub: fmtINR(statusSplit.pending) },
           ]}
         />
       )}

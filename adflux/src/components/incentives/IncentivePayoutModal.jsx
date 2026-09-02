@@ -21,18 +21,24 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
   const [paidDate, setPaidDate] = useState(istTodayISO())
   const [saving,   setSaving]   = useState(false)
   const [err,      setErr]      = useState('')
+  const [loadErr,  setLoadErr]  = useState('')   // history read failed — money-safety §HR
+  const [loading,  setLoading]  = useState(true)
 
   useEffect(() => { load() }, [staff?.user_id, monthYear])
 
   async function load() {
     if (!staff?.user_id) return
-    const { data } = await supabase
+    setLoading(true); setLoadErr('')
+    const { data, error } = await supabase
       .from('incentive_payouts')
       .select('*')
       .eq('staff_id', staff.user_id)
       .eq('month_year', monthYear)
       .order('paid_date', { ascending: false })
+    // Money-safe: a FAILED read must NOT look like "nothing paid" (double-pay risk).
+    if (error) { setLoadErr('Could not load payout history — do not record a payout until it loads.'); setPayouts([]); setLoading(false); return }
     setPayouts(data || [])
+    setLoading(false)
   }
 
   const totalPaid   = payouts.reduce((s, p) => s + Number(p.amount_paid || 0), 0)
@@ -158,7 +164,7 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
                 Mark as full & final payment for this month
               </label>
               {err && <div style={{ color: 'var(--danger, #EF4444)', fontSize: '.78rem' }}>{err}</div>}
-              <button className="btn btn-y" disabled={saving} type="submit">
+              <button className="btn btn-y" disabled={saving || loading || !!loadErr} type="submit">
                 {saving ? 'Saving…' : 'Record Payout'}
               </button>
             </form>
@@ -177,7 +183,11 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
             <div style={{ fontSize: '.72rem', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase', marginBottom: 8 }}>
               Payout History
             </div>
-            {payouts.length === 0 ? (
+            {loading ? (
+              <div style={{ fontSize: '.8rem', color: 'var(--text-muted, #94a3b8)' }}>Loading…</div>
+            ) : loadErr ? (
+              <div style={{ fontSize: '.8rem', color: 'var(--danger, #EF4444)' }}>{loadErr} <button type="button" onClick={load} style={{ marginLeft: 6, background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', cursor: 'pointer', textDecoration: 'underline', padding: 0, font: 'inherit' }}>Retry</button></div>
+            ) : payouts.length === 0 ? (
               <div style={{ fontSize: '.8rem', color: 'var(--text-muted, #94a3b8)' }}>No payouts recorded yet.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
