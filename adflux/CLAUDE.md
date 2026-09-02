@@ -18093,3 +18093,31 @@ Reverted a working-tree secret leak: `supabase_ops_p5_sync.sql` line 30 had the 
 `OPS_SYNC_SECRET` written in locally (from a Studio-time edit) — restored to the `<OPS_SYNC_SECRET>`
 placeholder so it can never be committed. The live secret (Vercel env + DB fn) is unaffected.
 esbuild/brand/build OK.
+
+
+---
+
+## 276 · Day-summary "Overdue" count = the §71 canonical (bug fix) (2026-09-02)
+
+Owner: the day-summary "Overdue: N" disagreed with the rep's FollowUpsV2 screen ("0 overdue").
+
+### Root cause
+`useDaySummary` counted overdue with a RAW query (`is_done=false AND follow_up_date < targetDate`,
+head-count) and **no `keepInFollowupQueue` filter**. So it counted follow-ups on **Lost leads** +
+non-nurture-cadence rows on **Nurture leads** — exactly what FollowUpsV2 + TeamDashboardV2 + the
+`team_dashboard_bundle` RPC all EXCLUDE via the §71/§316 canonical `keepInFollowupQueue`
+(`utils/followups.js`: Lost→false, Nurture→only cadence_type==='nurture', else true). The summary
+over-counted; the rep's screen was right.
+
+### Fix (`src/hooks/useDaySummary.js`, 3 lines)
+- import `keepInFollowupQueue` (added to the existing `followups` import).
+- overdueRes query: `.select('id',{count:'exact',head:true})` → `.select('id, cadence_type, lead:leads(stage)')`
+  (same eq/lt filters) — returns rows.
+- `overdue_follow_ups: overdueRes.count` → `(overdueRes.data||[]).filter(keepInFollowupQueue).length`.
+Now a 4th consumer of the ONE canonical definition — the summary + the screen can't disagree again.
+
+### sales-module-guardian — PASS, no blockers
+Display-only: `overdue_follow_ups` is NOT a dayScore input (score = meetings/follow-ups-done/leads/
+quotes). `overdueRes` used nowhere else. NULL-lead join falls through to keep (matches the §200 SQL).
+P3 (per-rep row-fetch has no .limit) — negligible cap risk for own-scoped overdue rows; no action.
+esbuild/build OK.

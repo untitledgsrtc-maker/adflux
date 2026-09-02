@@ -25,7 +25,7 @@
 // DaySummaryCard calls refresh on mount + every 5 min while visible.
 
 import { useEffect, useState, useCallback } from 'react'
-import { isSystemClose } from '../utils/followups'
+import { isSystemClose, keepInFollowupQueue } from '../utils/followups'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 import { istTodayISO, istTodayPlusDays } from '../utils/istDate'
@@ -269,9 +269,13 @@ export default function useDaySummary({ dateISO } = {}) {
           .is('effective_to', null)
           .maybeSingle(),
 
-        // Phase 118 — overdue follow-ups (date < target, still open).
+        // Phase 118 — overdue follow-ups (date < target, still open). Phase 316/§71:
+        // fetch lead.stage + cadence_type and apply keepInFollowupQueue below so this
+        // MATCHES the FollowUpsV2 list + TeamDashboard card. A raw count over-counted
+        // follow-ups on Lost / non-nurture-cadence-on-Nurture leads → summary showed
+        // "Overdue N" while the rep's screen showed 0 (owner 2026-09-02).
         supabase.from('follow_ups')
-          .select('id', { count: 'exact', head: true })
+          .select('id, cadence_type, lead:leads ( stage )')
           .eq('assigned_to', profile.id)
           .eq('is_done', false)
           .lt('follow_up_date', targetDate),
@@ -535,7 +539,7 @@ export default function useDaySummary({ dateISO } = {}) {
           qualified,
           // Phase 118 — Sales Day Summary extras.
           follow_ups_real:          followUpsReal,
-          overdue_follow_ups:       overdueRes.count || 0,
+          overdue_follow_ups:       (overdueRes.data || []).filter(keepInFollowupQueue).length,
           quotes_today:             quotesToday,
           renewal_due:              renewalRes.count || 0,
           quote_outstanding_count:  quoteOutstandingCount,
