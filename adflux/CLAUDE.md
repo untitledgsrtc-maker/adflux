@@ -18055,3 +18055,41 @@ vanished with no history ("month wise approved history not there").
 ### Notes
 - Admin-only page; no lead/cadence/push/score/DB-write touch (approve/reject unchanged).
   esbuild/brand/build OK. Realtime `payments` channel already reloads → history refreshes on any approve.
+
+
+---
+
+## 275 · TA table row → that day's GPS route (2026-09-01)
+
+Owner: on the TA/DA payouts admin table, admin/accounts/HR should tap a day's row to open
+that day's GPS route and verify the km before approving.
+
+### Change (nav + role admission, no TA math / approve logic touched)
+- `TaPayoutsAdminV2.jsx` — each TA `<tr>` → `navigate('/admin/gps/'+r.user_id+'/'+r.ta_date)`
+  (GpsTrackV2, already existed) + cursor/title. `stopPropagation` on the hotel `<input>` + the
+  actions `<div>` (the row's only interactive children) so approve/reject/mark-paid/re-open and
+  the hotel edit-on-blur still work. daily_ta query, TA math, useAutoRefresh mount all untouched.
+- `App.jsx` (§28 FROZEN) — `RequireTeamView` `ok` gained `|| role === 'accounts'` (route-level).
+- `GpsTrackV2.jsx` — in-page `isPrivileged` gained `'accounts'`.
+
+### sales-module-guardian (§28) — PASS on TA/money/tokens; FLAG fixed before commit
+- **P1 FIXED (the §41 foot-gun)**: widening ONLY the route guard left GpsTrackV2's in-page gate
+  (`isPrivileged = ['admin','co_owner','hr']` + the "Admin / co-owner access only" bounce) still
+  rejecting accounts → the feature would've bounced the exact role it was for. Fix: added
+  `'accounts'` to GpsTrackV2's `isPrivileged` in the same commit. Deliberate scope: TeamDashboardV2
+  is now URL-reachable by accounts via the shared route guard, but its OWN in-page gate still
+  bounces them → `/team-dashboard` stays admin-only; accounts get `/admin/gps` only.
+- P3 (row `onClick` lacks role="button"/keyboard) — left as-is; mirrors other click-to-nav table
+  rows in the app (§16), guardian marked low.
+
+### KNOWN follow-up (owner's call — DB, not code)
+GpsTrackV2's `isPrivileged` path does DIRECT `gps_pings` reads. For accounts to actually SEE the
+route (not an empty map), they need `gps_pings` + `work_sessions` RLS — the SAME grant HR got
+2026-08-03. Until that RLS exists for accounts, the page opens but shows no pings for them
+(admin/co_owner/hr already have it). Say the word and I'll prep the RLS SQL.
+
+### Also this turn (hygiene)
+Reverted a working-tree secret leak: `supabase_ops_p5_sync.sql` line 30 had the REAL
+`OPS_SYNC_SECRET` written in locally (from a Studio-time edit) — restored to the `<OPS_SYNC_SECRET>`
+placeholder so it can never be committed. The live secret (Vercel env + DB fn) is unaffected.
+esbuild/brand/build OK.

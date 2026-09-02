@@ -931,7 +931,10 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
               </thead>
               <tbody>
                 {visibleRows.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
+                  <tr key={r.id}
+                    onClick={() => navigate(`/admin/gps/${r.user_id}/${r.ta_date}`)}
+                    title="Open this day's GPS route"
+                    style={{ borderBottom: '1px solid var(--v2-line)', cursor: 'pointer' }}>
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{fmtDateShort(r.ta_date)}</div>
                       <div style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{fmtDow(r.ta_date)}</div>
@@ -973,6 +976,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                         <input
                           type="number"
                           defaultValue={r.hotel_amount || 0}
+                          onClick={e => e.stopPropagation()}
                           onBlur={e => setHotel(r, e.target.value)}
                           style={{
                             width: 80, textAlign: 'right',
@@ -994,7 +998,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                       <span style={statusChipStyle(r.status)}>{r.status}</span>
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 4 }}>
+                      <div onClick={e => e.stopPropagation()} style={{ display: 'inline-flex', gap: 4 }}>
                         {r.status === 'pending' && (
                           <>
                             <button
