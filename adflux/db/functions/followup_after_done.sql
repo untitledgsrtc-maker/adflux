@@ -18,9 +18,11 @@
 --      A Lost lead must NOT get its cadence respawned here. Do NOT add one.
 --    • Truth-1 — `IF NEW.lead_id IS NULL THEN RETURN NEW` (quote-linked FUs, which
 --      have no lead, are skipped — they're handled elsewhere).
---    • Truth-1 — QuoteSent de-stage gate: only a quote_chase seq-3 FU that is DUE
---      (follow_up_date <= IST today) on a QuoteSent lead de-stages it to Nurture.
---      The "must be DUE" + "seq=3" + "stage=QuoteSent" conditions are all required.
+--    • Truth-1 — QuoteSent de-stage gate: only a quote_chase seq-8 FU (§278: the
+--      LAST chase; was seq-3) that is DUE (follow_up_date <= IST today) on a
+--      QuoteSent lead de-stages it to Nurture. "DUE" + "seq=8" + "stage=QuoteSent"
+--      are all required. (Keep this in lockstep with the quote_chase array length
+--      in supabase_phase33d6_full_cadence.sql — 8 days ⇒ seq 8 is the last.)
 --    • Truth-1 — nurture respawn fires ONLY while v_lead.stage = 'Nurture' (the
 --      zombie-nurture gate). Paused leads (cadence_paused) never respawn.
 --    • the auto-skip close of earlier-sequence open FUs in the same cadence
@@ -60,7 +62,7 @@ BEGIN
   IF v_lead.cadence_paused THEN RETURN NEW; END IF;
   v_owner := COALESCE(v_lead.assigned_to, v_lead.created_by);
   IF v_owner IS NULL THEN RETURN NEW; END IF;
-  IF NEW.cadence_type = 'quote_chase' AND NEW.sequence = 3
+  IF NEW.cadence_type = 'quote_chase' AND NEW.sequence = 8   -- §278: last chase (was seq 3 → now 8 after the quote_chase array was extended to 8 FUs)
      AND v_lead.stage = 'QuoteSent'
      AND NEW.follow_up_date <= (now() AT TIME ZONE 'Asia/Kolkata')::date THEN
     UPDATE public.leads SET stage = 'Nurture' WHERE id = NEW.lead_id;
@@ -81,7 +83,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%OLD.is_done IS TRUE%'                    AS flip_guard,
 --   pg_get_functiondef(p.oid) LIKE '%NEW.lead_id IS NULL%'                    AS truth1_quotelinked_skip,
 --   pg_get_functiondef(p.oid) LIKE '%auto-skipped: later FU done%'            AS earlier_fu_close,
---   pg_get_functiondef(p.oid) LIKE '%quote_chase'' AND NEW.sequence = 3%'     AS quotesent_destage_gate,
+--   pg_get_functiondef(p.oid) LIKE '%quote_chase'' AND NEW.sequence = 8%'     AS quotesent_destage_gate,  -- §278: seq 3 → 8
 --   pg_get_functiondef(p.oid) LIKE '%spawn_nurture_followup%'                 AS nurture_respawn,
 --   pg_get_functiondef(p.oid) NOT LIKE '%lost_nurture%'                       AS no_lost_nurture_respawn
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace

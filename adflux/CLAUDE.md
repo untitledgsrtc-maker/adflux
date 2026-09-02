@@ -18154,3 +18154,43 @@ Display-only (cash_in_* NOT a dayScore input — score computed before the fetch
 field/query changed. RPC self-scoped + money-safe (no param selects another rep, REVOKE/GRANT
 correct). No writes / lead / cadence / push / TA touch. Style/tokens on-spec. esbuild/brand/build OK.
 Owner runs the SQL; frontend deploys on push.
+
+
+---
+
+## 278 · Follow-up cadence extended — 9 / 8 days (owner) (2026-09-02)
+
+Owner extended the auto follow-up cadence. Analysis showed most of the ask ALREADY existed —
+"Lost = dead" (§135 BEFORE-INSERT guard) + "repeat every 30 days until Lost" (auto-drop to
+Nurture after quote_chase → nurture 30-day respawn). So the change reduced to 2 arrays + 1 gate.
+
+### The new cadence
+- **New/Working (lead_intro):** days **1,3,5,8,12,17,20,25,30** (was 1,3,5,8,12,17). 6 → **9 FUs**.
+- **QuoteSent (quote_chase):** days **2,5,9,12,18,20,25,30** (was 2,5,9). 3 → **8 FUs**. After the
+  LAST (seq-8) chase done+due → auto-drop to **Nurture** = 30-day repeat until the rep marks Lost.
+- **Lost:** dead, no follow-up (unchanged, §135).
+
+### Files (all edited in place — §72/§178 canonical, so re-running can't revert)
+1. `supabase_phase33d6_full_cadence.sql` — `spawn_lead_intro_cadence` v_days 6→9 + v_hints 9;
+   `spawn_quote_chase_cadence` v_days 3→8 + v_hints 8 (lengths kept equal — v_hints[i] else NULLs
+   the note). cadence_type strings + loop unchanged.
+2. `db/functions/followup_after_done.sql` (§174-locked) — the QuoteSent de-stage gate
+   `quote_chase AND NEW.sequence = 3` → **`= 8`** (drop to Nurture after the LAST chase, not the
+   3rd — REQUIRED, else the lead drops to Nurture after chase 3 with chases 4-8 still open). VERIFY
+   tripwire + header comments updated 3→8. §174 lock (no lost_nurture respawn) intact.
+3. `src/pages/v2/FollowUpsV2.jsx` (§28 FROZEN) — the row chip `Follow-up N of 6` / `Quote chase N
+   of 3` → `of 9` / `of 8` (guardian P1 — else reps see "7 of 6").
+
+### sales-module-guardian — FLAG → P1 fixed, P3 skipped
+P1 (FollowUpsV2 "of 6"/"of 3" literals) FIXED in the same commit. P3 (stale seq-3 in a webhook.js
+comment + a truth1 historical diagnostic SELECT) — no live effect, doc-drift, left. Verified:
+cadence_type enum unchanged; §174 no-lost_nurture-respawn intact; NO other code hardcodes
+quote_chase seq=3 (grep across phase117/128/113/118, TeamDashboard, Telecaller, webhook — all
+filter on cadence_type or quotes.updated_at, none on a seq number); v_hints/v_days parity; §33/
+score/push untouched.
+
+### Owner runs + smoke-test (2 files)
+Run `supabase_phase33d6_full_cadence.sql` + `db/functions/followup_after_done.sql` in Studio.
+NOT retroactive — existing leads keep their old 6/3 FUs; the 9/8 apply to stage-changes AFTER the
+run. Smoke: one fresh lead New→QuoteSent → 9 then 8 FUs spawn, drops to Nurture only after day 30.
+check-sql-schema OK · esbuild/brand/build OK.

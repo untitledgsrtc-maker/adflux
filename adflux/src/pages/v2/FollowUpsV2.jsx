@@ -1008,8 +1008,8 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navi
           {/* Phase 33D.6 — show sequence + cadence type */}
           {row.sequence && row.cadence_type && (
             <span style={{ marginLeft: 8 }}>
-              · {row.cadence_type === 'lead_intro' ? `Follow-up ${row.sequence} of 6`
-                : row.cadence_type === 'quote_chase' ? `Quote chase ${row.sequence} of 3`
+              · {row.cadence_type === 'lead_intro' ? `Follow-up ${row.sequence} of 9`
+                : row.cadence_type === 'quote_chase' ? `Quote chase ${row.sequence} of 8`
                 : row.cadence_type === 'nurture' ? 'Nurture check-in'
                 : row.cadence_type === 'lost_nurture' ? 'Lost · 30-day touch'
                 : /* Phase 34Z.9 — fallback for unknown cadence types

@@ -3,8 +3,9 @@
 -- 11 May 2026
 --
 -- Owner-locked rules:
---   • New/Working leads → 6 follow-ups (days 1, 3, 5, 8, 12, 17)
---   • QuoteSent → 3 follow-ups (days 2, 5, 9). After FU3 done → Nurture.
+--   • New/Working leads → 9 follow-ups (days 1,3,5,8,12,17,20,25,30) [§278]
+--   • QuoteSent → 8 follow-ups (days 2,5,9,12,18,20,25,30) [§278]. After the
+--     LAST (seq-8) done → Nurture (30-day repeat until Lost).
 --   • Nurture / Lost → +30 day FU, repeating (until rep toggles
 --     cadence_paused or moves stage to Won).
 --   • Won → cancel everything.
@@ -40,18 +41,22 @@ $$;
 
 -- ─── 4. Spawn cadence helpers ───────────────────────────────────────
 
--- Pre-quote cadence: 6 follow-ups starting from a base date.
+-- Pre-quote cadence: 9 follow-ups starting from a base date (owner §278,
+-- 2026-09-02: extended from 6 → days 1,3,5,8,12,17,20,25,30).
 CREATE OR REPLACE FUNCTION public.spawn_lead_intro_cadence(
   p_lead_id uuid, p_owner uuid, p_base date
 ) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
-  v_days int[]  := ARRAY[1, 3, 5, 8, 12, 17];
+  v_days int[]  := ARRAY[1, 3, 5, 8, 12, 17, 20, 25, 30];
   v_hints text[] := ARRAY[
     'Call or WhatsApp',
     'Call + send info',
     'Meeting or send quote',
     'Follow-up call',
     'Ask for decision',
+    'Follow-up call',
+    'Check in again',
+    'Re-engage',
     'Final follow-up'
   ];
   i int;
@@ -70,15 +75,23 @@ BEGIN
   END LOOP;
 END $$;
 
--- Quote chase: 3 follow-ups.
+-- Quote chase: 8 follow-ups (owner §278, 2026-09-02: extended from 3 →
+-- days 2,5,9,12,18,20,25,30). After the LAST (seq-8) chase is done+due the
+-- lead auto-drops to Nurture (30-day repeat until Lost) — the de-stage gate
+-- in followup_after_done was bumped seq 3 → 8 to match this longer sequence.
 CREATE OR REPLACE FUNCTION public.spawn_quote_chase_cadence(
   p_lead_id uuid, p_owner uuid, p_base date
 ) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
-  v_days int[]  := ARRAY[2, 5, 9];
+  v_days int[]  := ARRAY[2, 5, 9, 12, 18, 20, 25, 30];
   v_hints text[] := ARRAY[
     'Ask: got the quote? Any questions?',
     'Follow-up call, ask for decision',
+    'Follow-up — any blockers?',
+    'Chase the decision',
+    'Re-confirm interest + timeline',
+    'Nudge for closure',
+    'Check budget / offer help',
     'Final push — discount offer or meeting'
   ];
   i int;
