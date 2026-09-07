@@ -13306,7 +13306,8 @@ lands (a visibilitychange/focus re-check fires when they switch back from WhatsA
   number) user messaging the 95 number hits the CUSTOMER flow (creates a lead + the
   customer AI replies) — so we must NEVER prompt an unmapped rep. The last-10 test
   (not a bare truthiness check — security P3 fix) also rejects a malformed row.
-- **Field roles only** — sales / telecaller / agency. Admin/co_owner/hr/accounts
+- **Field roles only** — sales / telecaller (agency EXCLUDED, §281, owner rule
+  2026-09-02: no lead queue). Admin/co_owner/hr/accounts
   never see it (they don't check in).
 - **Safety valve** — "Start my day without it" appears after they tap Good morning
   + 20s (message didn't register), OR a hard 60s after mount (WhatsApp won't even
@@ -18258,3 +18259,42 @@ logic / write / cadence / score / TA-math change).
 - The 4 OWNER DECISIONS (D1-D4, §279) still gate audit items #3/#5/#9/#10/#12/#13/#25-28 —
   re-surface before building those; do NOT guess a payout-flow / HR-hire-scope / leave-rule.
 - esbuild parse + brand check clean on all 3. Frozen file → sales-module-guardian audited.
+
+
+---
+
+## 281 · Morning greet-gate — agency EXCLUDED + who-gets-it root cause (2026-09-02)
+
+Owner: "morning good-morning popup — many getting it, many not." Analysis (owner
+asked analyse-first): the Phase 314 `MorningGreetGate` (§198) shows only when
+`enabled && isRep && mapped && greeted===false && !bypassed`. The splitter is
+**`mapped`** = `users.whatsapp_number` set (≥10 digits, the §197 field-assistant
+map). The §197 seed set it for 7 field reps (jayna/dhara/rima/kirti/viral/mayur/
+kamina) + brijesh/vishal only → **every unmapped field rep never gets the popup.**
+Live query (2026-09-02) confirmed exactly 4 field reps NULL: Aayushi parmar
+(sales), Jani Ajaykumar (sales), Hamesh Modi (agency), Poonama Bhavnani (agency).
+Diagnostic query is in-chat (active field reps + `gets_gate` mapped-bool +
+`greeted_today`). Code is fine — pure data gap.
+
+### Owner rule (2026-09-02): AGENCY never gets the greet gate
+`MorningGreetGate.FIELD_ROLES` `['sales','telecaller','agency']` → **`['sales',
+'telecaller']`**. Agency = external commission partners with NO lead queue (§214),
+so the assistant's "your day" (calls/follow-ups/renewals) has nothing to show them.
+Now code-enforced (not just their number left NULL) — an agency rep never sees the
+popup even if a whatsapp_number is ever set. Guardian-audited (gate change on the
+frozen check-in surface); does NOT touch WorkV2/TelecallerV2 check-in flow / the
+tel:→modal chain / useAutoRefresh — only the const + comment in this component.
+
+### STILL PENDING (owner to send) — map the 2 SALES reps
+Aayushi parmar + Jani Ajaykumar have `whatsapp_number` NULL → no popup. To fix,
+owner sends their REAL WhatsApp numbers (the number they message the 95 line FROM)
+→ an idempotent `UPDATE users SET whatsapp_number=... WHERE name ILIKE ... AND
+is_active`. ⚠ WRONG number = that rep's "Good morning" hits the CUSTOMER funnel
+(creates a lead + the sales AI replies) — §197/§198 webhook routes rep-vs-customer
+by last-10 match. Not built until owner supplies the numbers. Agency intentionally
+skipped.
+
+### Foot-gun
+- ❌ The greet gate + field-assistant reach ONLY `whatsapp_number`-mapped reps. A
+  new field hire won't get the morning popup / assistant until their number is set.
+  Add mapping to the onboarding checklist, or the feature silently misses new reps.

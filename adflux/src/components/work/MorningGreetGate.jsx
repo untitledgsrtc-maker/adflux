@@ -22,8 +22,10 @@ import { istTodayISO } from '../../utils/istDate'
 //    customer flow (lead + customer AI), so we never prompt them. The mapped test
 //    matches the webhook's last-10-digit expectation, so a MALFORMED whatsapp_number
 //    (whitespace / too short) also doesn't prompt.
-//  • Field roles only (sales / telecaller / agency). Admin / co_owner / hr /
-//    accounts don't check in and never see it.
+//  • Sales + telecaller only. Agency is EXCLUDED (owner rule 2026-09-02): they
+//    are external commission partners with no lead queue, so the assistant's
+//    "your day" (calls / follow-ups / renewals) has nothing to show them.
+//    Admin / co_owner / hr / accounts / ops don't check in and never see it.
 //  • Self-hides once greeted today (per-IST-day), or once the valve is used
 //    (per-IST-day, localStorage) — prompts once each morning, not all day.
 
@@ -33,7 +35,7 @@ const POLL_MS = 4000                        // re-check while the gate is open
 const VALVE_AFTER_SEND_MS = 20000           // escape after they tried + it didn't register
 const VALVE_HARD_MS = 60000                 // ultimate escape (WhatsApp won't even open)
 const ERR_CAP = 4                           // give up fail-open after N consecutive RPC errors
-const FIELD_ROLES = ['sales', 'telecaller', 'agency']
+const FIELD_ROLES = ['sales', 'telecaller']   // agency EXCLUDED — owner rule 2026-09-02 (no lead queue)
 
 export default function MorningGreetGate({ enabled = true }) {
   const profile = useAuthStore(s => s.profile)
