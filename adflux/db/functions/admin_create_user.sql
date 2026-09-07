@@ -13,6 +13,11 @@
 --   • Existing auth.users row is REUSED (id kept, password NOT overwritten).
 --   • public.users upsert preserves designation/city/signature/manager/segment
 --     via COALESCE on conflict.
+-- Phase 282 (2026-09-02): auto-maps whatsapp_number = last-10 of p_signature_mobile
+--   so a new rep is reachable by the greet-gate + assistant at birth (§281). Skips
+--   on <10 digits / another-user clash (never blocks creation); returns
+--   whatsapp_mapped. KEEP the clash pre-check — a raw insert would hit
+--   uq_users_whatsapp_number and abort the whole user creation.
 -- PROVENANCE: live dump 2026-06-24 (phase109 body). SECURITY DEFINER +
 --   search_path public,extensions,auth. SUPERSEDES the phase66 caller-check
 --   (if phase66 is ever re-run, re-run THIS file after it — §109 note).
@@ -30,6 +35,8 @@ DECLARE
   v_email_l     text;
   v_uid         uuid;
   v_existing    record;
+  v_whatsapp    text;
+  v_wa_mapped   boolean := false;
 BEGIN
   -- Caller must be admin / co_owner / hr.
   SELECT role INTO v_caller_role FROM public.users WHERE id = auth.uid();
@@ -77,12 +84,29 @@ BEGIN
     );
   END IF;
 
+  -- Phase 282 — auto-map the rep's mobile to whatsapp_number so EVERY new user
+  -- is reachable by the morning greet-gate + daily WhatsApp assistant the moment
+  -- they're created (§197/§198/§281 — closes the "new hire silently misses it"
+  -- foot-gun). Store the LAST 10 digits (matches the webhook's last-10 rep-vs-
+  -- customer match + the §197 seed format). Skip when the mobile has <10 digits
+  -- OR is already taken by ANOTHER user (the uq_users_whatsapp_number unique
+  -- index) — user creation must NEVER fail on a mobile clash, so we just leave
+  -- whatsapp_number unmapped and report it back.
+  v_whatsapp := NULLIF(right(regexp_replace(COALESCE(p_signature_mobile, ''), '\D', '', 'g'), 10), '');
+  IF v_whatsapp IS NOT NULL AND length(v_whatsapp) = 10
+     AND NOT EXISTS (SELECT 1 FROM public.users u WHERE u.whatsapp_number = v_whatsapp AND u.id <> v_uid) THEN
+    v_wa_mapped := true;
+  ELSE
+    v_whatsapp := NULL;   -- <10 digits or clash → unmapped, creation still succeeds
+  END IF;
+
   -- Upsert public.users.
   INSERT INTO public.users (
     id, email, name, role, team_role, designation,
     signature_mobile, city, is_active, segment_access,
     manager_id,
-    allow_ta, allow_da, allow_hotel, allow_other
+    allow_ta, allow_da, allow_hotel, allow_other,
+    whatsapp_number
   )
   VALUES (
     v_uid, v_email_l, p_name, p_role, p_team_role, p_designation,
@@ -91,7 +115,8 @@ BEGIN
     COALESCE(p_allow_ta, false),
     COALESCE(p_allow_da, false),
     COALESCE(p_allow_hotel, false),
-    COALESCE(p_allow_other, true)
+    COALESCE(p_allow_other, true),
+    v_whatsapp
   )
   ON CONFLICT (id) DO UPDATE
     SET role             = EXCLUDED.role,
@@ -105,14 +130,19 @@ BEGIN
         allow_ta         = EXCLUDED.allow_ta,
         allow_da         = EXCLUDED.allow_da,
         allow_hotel      = EXCLUDED.allow_hotel,
-        allow_other      = EXCLUDED.allow_other;
+        allow_other      = EXCLUDED.allow_other,
+        whatsapp_number  = COALESCE(EXCLUDED.whatsapp_number, public.users.whatsapp_number);
 
   RETURN jsonb_build_object(
-    'id',    v_uid,
-    'email', v_email_l
+    'id',              v_uid,
+    'email',           v_email_l,
+    'whatsapp_mapped', v_wa_mapped
   );
 END $function$;
 
 NOTIFY pgrst, 'reload schema';
 -- VERIFY: LIKE '%v_caller_role IS NULL OR%' (null guard) AND
---         '%HR cannot create admin%' (mint ceiling) — both TRUE.
+--         '%HR cannot create admin%' (mint ceiling) AND
+--         '%whatsapp_number%' (Phase 282 auto-map) — all TRUE.
+-- SELECT pg_get_functiondef('public.admin_create_user(text,text,text,text,text,text,text,text,text,uuid,boolean,boolean,boolean,boolean)'::regprocedure)
+--        LIKE '%whatsapp_number  = COALESCE(EXCLUDED.whatsapp_number%';   -- t

@@ -18298,3 +18298,78 @@ skipped.
 - ❌ The greet gate + field-assistant reach ONLY `whatsapp_number`-mapped reps. A
   new field hire won't get the morning popup / assistant until their number is set.
   Add mapping to the onboarding checklist, or the feature silently misses new reps.
+
+
+---
+
+## 282 · New users auto-map whatsapp_number from a COMPULSORY mobile (2026-09-02)
+
+Owner: "when convert user, mobile number compulsory, map [to whatsapp]." Closes the
+§281 foot-gun (a new field hire silently misses the greet-gate + assistant until
+someone hand-sets their number) — now every new user is mapped at birth.
+
+### The mechanism (ONE RPC change covers BOTH creation paths)
+Both `HRNewUserV2` (Add Member — `form.phone`) and `OfferDetailModal` (convert-to-user
+— `offer.mobile`) already pass the rep's mobile as `p_signature_mobile`. So the fix is
+in the ONE canonical `db/functions/admin_create_user.sql` (§72, edit-in-place):
+- `v_whatsapp = right(regexp_replace(p_signature_mobile,'\D','','g'), 10)` — the LAST
+  10 digits (matches the §197 webhook last-10 rep-vs-customer match + the §198 gate
+  `length>=10` + the seed format).
+- **Clash pre-check** (KEEP IT): map only when the last-10 is ≥10 digits AND not
+  already on ANOTHER user (`uq_users_whatsapp_number` unique index). Else `v_whatsapp
+  := NULL` → user creation NEVER fails on a mobile clash; returns `whatsapp_mapped`
+  bool. A raw insert would hit the unique index and abort the whole creation.
+- INSERT gains `whatsapp_number`; `ON CONFLICT (id) DO UPDATE SET whatsapp_number =
+  COALESCE(EXCLUDED.whatsapp_number, public.users.whatsapp_number)` (a null new value
+  never wipes an existing map). All §41 null-guard + §109 HR-mint-ceiling + auth-reuse
+  contracts byte-unchanged.
+
+### Frontend (`HRNewUserV2.jsx`)
+Phone → **"Mobile *"** required + a pre-submit guard (≥10 digits) + a toast when
+`created.whatsapp_mapped===false` (rare: mobile already used → created but unmapped).
+OfferDetailModal needs NO edit (the RPC maps its `offer.mobile` automatically).
+
+### Backfill (`supabase_phase282_whatsapp_backfill.sql`, owner runs once)
+Maps existing UNMAPPED sales/telecaller reps from `signature_mobile` (last-10), skips
+<10-digit / clashing / already-mapped, idempotent. PART1 preview + PART3 verify SELECTs
+in one file (§154). Closes Aayushi/Jani IF they have a signature_mobile; PART3 lists any
+still unmapped (no mobile on file → edit the member, add Mobile, save → auto-maps).
+
+### CONTRACT / foot-guns
+- ❌ `signature_mobile` MUST be the rep's own WhatsApp — a wrong number routes their
+  greeting into the CUSTOMER funnel (§197). The compulsory field + preview mitigate.
+- ❌ Never remove the clash pre-check in admin_create_user — a duplicate whatsapp_number
+  hits the unique index and aborts the ENTIRE user creation (auth + users).
+- Agency still EXCLUDED from the popup (§281, by role) even when mapped; mapping an
+  agency user's number is harmless (gate excludes them regardless).
+- Scope: Mobile is compulsory for ALL new users (blanket, owner's ask); the gate/
+  assistant still self-gate by role (sales/telecaller only).
+
+
+---
+
+## 283 · Greet popup shows until greeted — before AND after check-in (2026-09-02)
+
+Owner: "many argue they don't get the popup after check-in" (viral/kirti/kamina —
+all mapped). ROOT: the Phase 314 gate mounted on WorkV2 as `<MorningGreetGate
+enabled={!checkedIn} />` = a BEFORE-check-in-only gate. Once a rep checked in →
+`enabled=false` → popup gone for the day, greeted or not. Plus a RACE: the popup only
+renders after `assistant_greeted_today` resolves (~1s); a rep who tapped Check-in in
+that window never saw it. So a mapped rep who checks in first = no popup. (TelecallerV2
+already mounted it `<MorningGreetGate />` — always — so TC was unaffected.)
+
+### Fix (owner Option A, 2026-09-02) — `WorkV2.jsx`, §28 FROZEN, guardian
+`<MorningGreetGate enabled={!checkedIn} />` → `<MorningGreetGate />`. The gate now
+shows whenever mapped + not-greeted-today + not-bypassed, REGARDLESS of check-in —
+kills both the design gap AND the race. Internal gating unchanged (isRep = sales/
+telecaller only §281 · mapped · greeted-today self-hide · per-day bypass valve ·
+60s safety-valve · fail-open) → no lockout. ONE JSX line + a comment; doCheckIn/
+doCheckOut/checkedIn/card gates/tel:→modal chain/useAutoRefresh byte-unchanged.
+
+### Contract / foot-gun
+- The greet popup is now a "until greeted today" gate, not a "before check-in" gate.
+  Both WorkV2 + TelecallerV2 mount it with no `enabled` prop (defaults true). Don't
+  re-add `enabled={!checkedIn}` — that reintroduces the after-check-in blind spot.
+- ❌ A blocking gate wired to a state that flips fast (checkedIn) + a render that waits
+  on an async check = a race where the fast action skips the gate. Gate on the durable
+  condition (greeted-today), not the transient one (checkedIn).

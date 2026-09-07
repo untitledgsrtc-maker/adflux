@@ -1017,7 +1017,12 @@ export default function WorkV2() {
             assistant before check-in (opens the 24h window so the P3 every-2h
             nudge reaches them). Fail-open overlay; self-hides once greeted
             today. §197/§198. */}
-        <MorningGreetGate enabled={!checkedIn} />
+        {/* §283 — show until greeted, regardless of check-in (owner 2026-09-02).
+            Was enabled={!checkedIn} = a before-check-in-only gate → reps who
+            checked in first (viral/kirti/kamina) never got it + a race let a
+            fast check-in skip it. Now it shows whenever mapped + not-greeted-today
+            + not-bypassed; the safety-valve still prevents any lockout. */}
+        <MorningGreetGate />
 
         {/* Phase 35.0 pass 4 — owner directive: Log meeting + Log lead
             buttons sit BETWEEN the purple Incentive card (rendered in

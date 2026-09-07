@@ -153,6 +153,12 @@ export default function HRNewUserV2() {
       toastError(new Error('Missing fields'), 'Name, email and designation are required.')
       return
     }
+    // Phase 282 — mobile compulsory: it auto-maps to whatsapp_number so the new
+    // rep gets the morning greet-gate + daily WhatsApp assistant from day one.
+    if (String(form.phone || '').replace(/\D/g, '').length < 10) {
+      toastError(new Error('Mobile required'), 'A 10-digit mobile number is required (it connects them to the daily WhatsApp assistant).')
+      return
+    }
     if (!form.password || form.password.length < 4) {
       toastError(new Error('Bad password'), 'Set a login password (min 4 chars).')
       return
@@ -203,6 +209,13 @@ export default function HRNewUserV2() {
       setSaving(false)
       toastError(rpcErr, 'Could not create user.')
       return
+    }
+
+    // Phase 282 — surface the rare case where the mobile is already mapped to
+    // another user (unique whatsapp_number): the user is still created, but they
+    // won't get the assistant until the clash is resolved.
+    if (created && created.whatsapp_mapped === false) {
+      toastError(new Error('Mobile not mapped'), 'User created, but this mobile is already linked to another user — they will not get the WhatsApp assistant until the number is fixed.')
     }
 
     // The admin_create_user RPC returns only { id, email }; the success view +
@@ -375,7 +388,7 @@ export default function HRNewUserV2() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <FormField label="Name *" v={form.name} onChange={v => set('name', v)} required />
             <FormField label="Email *" v={form.email} onChange={v => set('email', v)} type="email" required placeholder="firstname@untitledadvertising.in" />
-            <FormField label="Phone" v={form.phone} onChange={v => set('phone', v)} type="tel" />
+            <FormField label="Mobile *" v={form.phone} onChange={v => set('phone', v)} type="tel" required placeholder="10-digit WhatsApp mobile" />
             {/* Phase 66 — login password (creates auth.users row).
                 Min 4 chars enforced server-side. Owner default = 123456
                 for staging; rep can change later via password-reset. */}
