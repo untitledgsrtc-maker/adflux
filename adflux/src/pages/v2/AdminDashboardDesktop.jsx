@@ -727,7 +727,8 @@ export default function AdminDashboardDesktop() {
       trendMonths.push({
         key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
         label: d.toLocaleDateString('en-IN', { month: 'short' }),
-        value: 0,
+        value: 0,   // money received — approved payments that cleared this month
+        won: 0,     // order book — total_amount of quotes WON this month (wonDate)
       })
     }
     paymentsAprFiltered.forEach(p => {
@@ -735,7 +736,15 @@ export default function AdminDashboardDesktop() {
       const m = trendMonths.find(x => x.key === k)
       if (m) m.value += p.amount_received || 0
     })
-    const trendMax = Math.max(1, ...trendMonths.map(m => m.value))
+    // Won series — SAME rule as wonValue above (§71): total_amount of quotes
+    // won this month, bucketed by wonDate (won_at). Respects the segment toggle
+    // via `quotes`. Won = order book; value = cash in; the gap = collections owed.
+    quotes.forEach(q => {
+      if (q.status !== 'won') return
+      const m = trendMonths.find(x => x.key === (wonDate(q) || '').slice(0, 7))
+      if (m) m.won += q.total_amount || 0
+    })
+    const trendMax = Math.max(1, ...trendMonths.map(m => Math.max(m.value, m.won)))
 
     // Dashboard spec — Action Queue counts ──────────────────────────
     // The "what should I act on right now" widget. All counts derived
@@ -1326,24 +1335,47 @@ function Kpi({ label, value, count, tone, dot, sub, cta }) {
 }
 
 function RevenueTrendPanel({ months, max, onMonthClick }) {
+  // Two series on one chart (owner ask 2026-09-07): Won = order book (deals
+  // closed, ghost/outline bar), Received = cash in (approved payments, solid
+  // bar). The gap you see between the two = collections still owed.
+  const rs = (v) => '₹' + Math.round(v || 0).toLocaleString('en-IN')
+  const wonTotal  = months.reduce((s, m) => s + (m.won   || 0), 0)
+  const recvTotal = months.reduce((s, m) => s + (m.value || 0), 0)
+  const outstanding = Math.max(0, wonTotal - recvTotal)
+  const lblK = { fontSize: 10, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }
   return (
     <div className="v2d-panel">
       <div className="v2d-panel-h">
         <div>
           <div className="v2d-panel-t">Revenue trend · last 6 months</div>
           {/* Phase 31F — added "click any bar to drill in" hint so the
-              affordance is discoverable. */}
-          <div className="v2d-panel-s">Approved payments per month · click a bar to open the quotes</div>
+              affordance is discoverable. Owner 2026-09-07 — added the Won series. */}
+          <div className="v2d-panel-s">Won (deals closed) vs Received (cash in) · click a month to open its quotes</div>
         </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
+            <span style={{ width: 12, height: 12, borderRadius: 3, border: '1.5px solid var(--v2-yellow, #FFE600)', background: 'rgba(255,230,0,0.12)' }} /> Won
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(180deg, #FFE600, #f59e0b)' }} /> Received
+          </span>
+        </div>
+      </div>
+      {/* Summary strip — the 6-month totals + the gap at a glance */}
+      <div style={{ display: 'flex', gap: 20, padding: '2px 4px 12px', flexWrap: 'wrap' }}>
+        <div><div style={lblK}>Won</div><div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 15, color: 'var(--v2-ink-0)' }}><Money value={wonTotal} /></div></div>
+        <div><div style={lblK}>Received</div><div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 15, color: 'var(--v2-yellow)' }}><Money value={recvTotal} /></div></div>
+        <div><div style={lblK}>Outstanding</div><div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 15, color: 'var(--v2-amber, #f59e0b)' }}><Money value={outstanding} /></div></div>
       </div>
       <div className="v2d-bars">
         {months.map((m, i) => {
-          const h = Math.max(6, Math.round((m.value / max) * 170))
+          const hRecv = Math.max(4, Math.round((m.value / max) * 150))
+          const hWon  = Math.max(4, Math.round(((m.won || 0) / max) * 150))
           const isCurrent = i === months.length - 1
-          // Phase 31F — render bar columns as buttons when an onMonthClick
-          // handler is provided. Disabled for empty months so dead clicks
-          // don't reach a /quotes view that has nothing to show.
-          const clickable = !!onMonthClick && m.value > 0
+          // Phase 31F — columns are buttons when onMonthClick is provided.
+          // Clickable if either series has value so a won-but-uncollected
+          // month still drills in.
+          const clickable = !!onMonthClick && ((m.value > 0) || (m.won > 0))
           return (
             <button
               key={m.key}
@@ -1351,15 +1383,20 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
               className="v2d-bar-col"
               onClick={clickable ? () => onMonthClick(m.key) : undefined}
               disabled={!clickable}
-              title={clickable ? `Open ${m.label} quotes` : `${m.label}: no revenue`}
+              title={clickable ? `${m.label} · Won ${rs(m.won)} · Received ${rs(m.value)}` : `${m.label}: no revenue`}
               style={{
                 background: 'transparent', border: 0, padding: 0,
                 cursor: clickable ? 'pointer' : 'default',
                 color: 'inherit', font: 'inherit', textAlign: 'inherit',
               }}
             >
-              <div className={`v2d-bar ${isCurrent ? 'is-current' : ''}`} style={{ height: h }}>
-                <div className="v2d-bar-v"><Money value={m.value} /></div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 5, width: '100%', flex: 1, minHeight: 0 }}>
+                {/* Won — ghost/outline (order book) */}
+                <div title={`Won ${rs(m.won)}`} style={{ flex: 1, maxWidth: 22, height: hWon, borderRadius: '6px 6px 0 0', background: 'rgba(255,230,0,0.12)', border: '1.5px solid var(--v2-yellow, #FFE600)' }} />
+                {/* Received — solid (cash in) */}
+                <div className={`v2d-bar ${isCurrent ? 'is-current' : ''}`} style={{ flex: 1, maxWidth: 22, height: hRecv }}>
+                  <div className="v2d-bar-v"><Money value={m.value} /></div>
+                </div>
               </div>
               <div className="v2d-bar-m">{m.label}</div>
             </button>
