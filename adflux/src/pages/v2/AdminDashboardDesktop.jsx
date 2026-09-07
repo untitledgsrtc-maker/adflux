@@ -1335,10 +1335,10 @@ function Kpi({ label, value, count, tone, dot, sub, cta }) {
 }
 
 function RevenueTrendPanel({ months, max, onMonthClick }) {
-  // Two series on ONE chart (owner ask 2026-09-07): Won = order book (deals
-  // closed) and Received = cash in (approved payments). Nested "sold vs
-  // collected" bars — a light Won bar behind a solid Received bar. The airy
-  // yellow rising ABOVE the solid bar = collections still owed.
+  // ONE big 2-part bar per month (owner ask 2026-09-07): each bar's full
+  // height = the deals WON that month; the bright-yellow filled portion =
+  // Received (cash collected); the amber cap on top = still Owed. So the
+  // amber you see = collections owed on this month's closed deals.
   const rs = (v) => '₹' + Math.round(v || 0).toLocaleString('en-IN')
   const cr = (v) => {
     v = Math.round(v || 0)
@@ -1354,23 +1354,27 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
   const Stat = ({ k, v, c, first }) => (
     <div style={{ padding: first ? '0 22px 0 0' : '0 22px', borderLeft: first ? 'none' : '1px solid var(--v2-line)' }}>
       <div style={kSty}>{k}</div>
-      <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 17, color: c, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}><Money value={v} /></div>
+      <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 18, color: c, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}><Money value={v} /></div>
     </div>
   )
   const numSty = { fontFamily: 'var(--v2-display)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }
+  const YELLOW = 'linear-gradient(180deg, #FFE600, #f5c400)'
+  const YELLOW_CUR = 'linear-gradient(180deg, #FFE600, #f59e0b)'
+  const AMBER = 'linear-gradient(180deg, #f59e0b, #c2790a)'
+  const H = 220 // px — bar area is taller/bigger than the old chart
   return (
     <div className="v2d-panel">
       <div className="v2d-panel-h">
         <div>
           <div className="v2d-panel-t">Revenue trend · last 6 months</div>
-          <div className="v2d-panel-s">Won (deals closed) vs Received (cash in) · click a month to open its quotes</div>
+          <div className="v2d-panel-s">Each bar = deals won that month · yellow = collected · amber = still owed · click to open quotes</div>
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(180deg, rgba(255,230,0,0.34), rgba(255,230,0,0.10))', border: '1px solid rgba(255,230,0,0.55)' }} /> Won
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: YELLOW }} /> Received
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(180deg, #FFE600, #f59e0b)' }} /> Received
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: AMBER }} /> Owed
           </span>
         </div>
       </div>
@@ -1380,17 +1384,17 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
         <Stat k="Received" v={recvTotal} c="var(--v2-yellow)" />
         <Stat k="Outstanding" v={outstanding} c="var(--v2-amber, #f59e0b)" />
       </div>
-      <div className="v2d-bars">
+      <div className="v2d-bars" style={{ height: H + 40 }}>
         {months.map((m, i) => {
-          const hWon  = Math.max(3, Math.round(((m.won   || 0) / max) * 140))
-          const hRecv = Math.max(3, Math.round(((m.value || 0) / max) * 140))
+          const owed = Math.max(0, (m.won || 0) - (m.value || 0))
+          const anyVal = (m.value > 0) || (m.won > 0)
+          const solidH = anyVal ? Math.max(3, Math.round(((m.value || 0) / max) * H)) : 0
+          const owedH  = owed > 0 ? Math.max(3, Math.round((owed / max) * H)) : 0
           const isCurrent = i === months.length - 1
-          // Clickable if either series has value so a won-but-uncollected
-          // month still drills in.
-          const clickable = !!onMonthClick && ((m.value > 0) || (m.won > 0))
-          // Only float the Won number when it sits clearly above the Received
-          // top, so the two labels never collide.
-          const showWon = (m.won || 0) > 0 && (hWon - hRecv) >= 22
+          const clickable = !!onMonthClick && anyVal
+          // Float the Won number at the very top only when the amber cap is
+          // tall enough to separate it from the Received number.
+          const showWon = owedH >= 22
           return (
             <button
               key={m.key}
@@ -1398,7 +1402,7 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
               className="v2d-bar-col"
               onClick={clickable ? () => onMonthClick(m.key) : undefined}
               disabled={!clickable}
-              title={clickable ? `${m.label} · Won ${rs(m.won)} · Received ${rs(m.value)}` : `${m.label}: no revenue`}
+              title={clickable ? `${m.label} · Won ${rs(m.won)} · Received ${rs(m.value)} · Owed ${rs(owed)}` : `${m.label}: no revenue`}
               style={{
                 background: 'transparent', border: 0, padding: 0,
                 cursor: clickable ? 'pointer' : 'default',
@@ -1406,18 +1410,19 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
               }}
             >
               <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: 0 }}>
-                {/* Won — light order-book bar, behind */}
-                {(m.won || 0) > 0 && (
-                  <div style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 58, maxWidth: '92%', height: hWon, borderRadius: '7px 7px 0 0', background: 'linear-gradient(180deg, rgba(255,230,0,0.34), rgba(255,230,0,0.10))', border: '1px solid rgba(255,230,0,0.55)' }} />
-                )}
-                {/* Received — solid cash-in bar, in front */}
-                <div style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 30, maxWidth: '54%', height: hRecv, borderRadius: '6px 6px 0 0', background: isCurrent ? 'linear-gradient(180deg, #FFE600, #f59e0b)' : 'linear-gradient(180deg, rgba(255,230,0,.92), rgba(255,230,0,.5))', boxShadow: isCurrent ? '0 0 0 2px rgba(255,230,0,.18)' : 'none' }} />
-                {/* Won number — muted, above the light bar */}
+                {/* One big 2-part bar, bottom-anchored: yellow (collected) + amber (owed) on top */}
+                <div style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 64, maxWidth: '72%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: solidH + owedH }}>
+                  {owedH > 0 && (
+                    <div style={{ height: owedH, borderRadius: '8px 8px 0 0', background: AMBER, borderBottom: '1.5px solid rgba(15,23,42,.45)' }} />
+                  )}
+                  <div style={{ height: solidH, borderRadius: owedH > 0 ? 0 : '8px 8px 0 0', background: isCurrent ? YELLOW_CUR : YELLOW, boxShadow: isCurrent ? '0 0 0 2px rgba(255,230,0,.18)' : 'none' }} />
+                </div>
+                {/* Won number at the very top (only with a clear amber cap) */}
                 {showWon && (
-                  <div style={{ ...numSty, position: 'absolute', bottom: hWon + 4, left: '50%', transform: 'translateX(-50%)', fontSize: 9, fontWeight: 700, color: 'var(--v2-ink-2)' }}>{cr(m.won)}</div>
+                  <div style={{ ...numSty, position: 'absolute', bottom: solidH + owedH + 5, left: '50%', transform: 'translateX(-50%)', fontSize: 10, fontWeight: 700, color: 'var(--v2-ink-2)' }}>{cr(m.won)}</div>
                 )}
-                {/* Received number — bold, above the solid bar */}
-                <div style={{ ...numSty, position: 'absolute', bottom: hRecv + 4, left: '50%', transform: 'translateX(-50%)', fontSize: 10, fontWeight: 700, color: 'var(--v2-ink-0)', textShadow: '0 1px 3px rgba(0,0,0,.55)' }}>{cr(m.value)}</div>
+                {/* Received number at the yellow top */}
+                <div style={{ ...numSty, position: 'absolute', bottom: solidH + 5, left: '50%', transform: 'translateX(-50%)', fontSize: 11, fontWeight: 700, color: 'var(--v2-ink-0)', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{cr(m.value)}</div>
               </div>
               <div className="v2d-bar-m">{m.label}</div>
             </button>
