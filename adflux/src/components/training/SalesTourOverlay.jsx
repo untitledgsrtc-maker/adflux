@@ -18,7 +18,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, X, GraduationCap } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import { useAuthStore } from '../../store/authStore'
 
 const TRACK = 'sales'
 
@@ -78,6 +80,7 @@ const STEPS = [
 
 const SS_ACTIVE = 'salesTourActive'
 const SS_STEP = 'salesTourStep'
+const SS_DISMISSED = 'salesTourDismissed'
 const LS_DONE = 'salesTourDone'
 
 function safeGet(store, key) {
@@ -88,6 +91,20 @@ function safeSet(store, key, val) {
 }
 function safeDel(store, key) {
   try { window[store].removeItem(key) } catch { /* ignore */ }
+}
+
+// Best-effort "who finished" record so the owner can see completions in the
+// training_completions table (in addition to the per-device localStorage flag).
+// One upsert on finish only — never on a hot path, never blocks the UI.
+function recordCompletion() {
+  try {
+    const uid = useAuthStore.getState().profile?.id
+    if (!uid) return
+    supabase
+      .from('training_completions')
+      .upsert({ user_id: uid, track: TRACK }, { onConflict: 'user_id,track', ignoreDuplicates: true })
+      .then(() => {}, () => {})
+  } catch { /* ignore */ }
 }
 
 // Find the first visible element whose text contains `text` (case-insensitive).
@@ -107,6 +124,7 @@ function findByText(text) {
 export default function SalesTourOverlay() {
   const location = useLocation()
   const navigate = useNavigate()
+  const profile = useAuthStore(s => s.profile)
 
   const params = new URLSearchParams(location.search)
   const paramActive = params.get('tour') === TRACK
@@ -148,6 +166,7 @@ export default function SalesTourOverlay() {
       safeDel('sessionStorage', SS_ACTIVE)
       safeDel('sessionStorage', SS_STEP)
       setDone(true)
+      recordCompletion()
       return
     }
     const clamped = Math.max(0, Math.min(STEPS.length - 1, i))
@@ -159,6 +178,9 @@ export default function SalesTourOverlay() {
   const exit = useCallback(() => {
     safeDel('sessionStorage', SS_ACTIVE)
     safeDel('sessionStorage', SS_STEP)
+    // Skipping hides the launch pill for the rest of this session (a gentle
+    // nudge that returns next session unless they actually finish).
+    safeSet('sessionStorage', SS_DISMISSED, '1')
     setDone(false)
     navigate(location.pathname, { replace: true })
   }, [navigate, location.pathname])
@@ -189,7 +211,24 @@ export default function SalesTourOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, done, step, location.pathname])
 
-  if (!active) return null
+  if (!active) {
+    // Launch affordance (§45-safe): a sales rep who hasn't finished gets a
+    // one-tap "Start training" pill on their home page — so they don't need
+    // the ?tour=sales URL. Everyone else, every other page, after completion,
+    // or after a same-session skip → inert (null), exactly as before.
+    const alreadyDone = safeGet('localStorage', LS_DONE) === '1'
+    const dismissed = safeGet('sessionStorage', SS_DISMISSED) === '1'
+    const showLaunch = !alreadyDone && !dismissed &&
+      profile?.role === 'sales' && location.pathname === '/work'
+    if (!showLaunch) return null
+    return (
+      <div style={launchWrap}>
+        <button style={launchBtn} onClick={() => navigate(routeWithParams(0))} aria-label="Start training">
+          <GraduationCap size={16} strokeWidth={2} /> Start training
+        </button>
+      </div>
+    )
+  }
 
   const S = STEPS[step]
 
@@ -298,4 +337,20 @@ const linkBtn = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
   border: 0, background: 'transparent', color: 'var(--v2-ink-2, #6a7590)',
   fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 4,
+}
+const launchWrap = {
+  position: 'fixed',
+  right: 12,
+  bottom: 'calc(74px + env(safe-area-inset-bottom, 0px))',
+  zIndex: 1000,
+  pointerEvents: 'none',
+}
+const launchBtn = {
+  pointerEvents: 'auto',
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  border: 0, cursor: 'pointer',
+  background: 'var(--v2-yellow, #FFE600)', color: 'var(--v2-yellow-ink, #0b1220)',
+  fontFamily: 'var(--v2-sans)', fontWeight: 700, fontSize: 13,
+  padding: '10px 15px', borderRadius: 'var(--v2-r-pill, 999px)',
+  boxShadow: '0 8px 24px rgba(0,0,0,.4)',
 }
