@@ -1141,7 +1141,7 @@ const TADA_ROWS = [
   ['Bhachau (Kutch)', 'C', 700], ['Surendranagar', 'C', 700],
 ]
 
-function TADATable() {
+function TADATable({ vehicleLabel = 'Bike' } = {}) {
   return (
     <View style={{ border: '0.5pt solid ' + BORDER, borderRadius: 3 }}>
       <View style={{
@@ -1153,7 +1153,7 @@ function TADATable() {
         <Text style={{ flex: 1.6, fontSize: 9, color: YELLOW, fontFamily: 'Roboto', fontWeight: 'bold' }}>City / Area</Text>
         <Text style={{ width: 60, fontSize: 9, color: YELLOW, fontFamily: 'Roboto', fontWeight: 'bold' }}>Category</Text>
         <Text style={{ width: 60, fontSize: 9, color: YELLOW, fontFamily: 'Roboto', fontWeight: 'bold' }}>Daily DA</Text>
-        <Text style={{ width: 80, fontSize: 9, color: YELLOW, fontFamily: 'Roboto', fontWeight: 'bold' }}>Bike</Text>
+        <Text style={{ width: 80, fontSize: 9, color: YELLOW, fontFamily: 'Roboto', fontWeight: 'bold' }}>{vehicleLabel}</Text>
         <Text style={{ width: 80, fontSize: 9, color: YELLOW, fontFamily: 'Roboto', fontWeight: 'bold' }}>Hotel (₹, incl. GST)</Text>
       </View>
       {TADA_ROWS.map(([city, cat, hotel], i) => (
@@ -1918,9 +1918,11 @@ function OpsDocument({ offer }) {
           <Row label="Uptime < 85%" value="Variable is ZERO" last />
         </View>
         <Text style={S.para}>
-          Illustration on a Fixed Base of ₹20,000 (maximum variable ₹6,000): 96%
-          → ₹6,000; 95% → ₹6,000; 90% → ₹3,000; 87% → ₹1,200; 85% → ₹0; 84% or
-          below → ₹0. Rounding is applied in your favour. No threshold multiple of
+          Illustration on your Fixed Base of {formatCurrency(fixedBase)} (maximum
+          variable {formatCurrency(maxVariable)}): 96% → {formatCurrency(maxVariable)};
+          95% → {formatCurrency(maxVariable)}; 90% → {formatCurrency(Math.round(maxVariable * 0.5))};
+          87% → {formatCurrency(Math.round(maxVariable * 0.2))}; 85% → {formatCurrency(0)}; 84% or
+          below → {formatCurrency(0)}. Rounding is applied in your favour. No threshold multiple of
           salary, no monthly billing target, no new-client / renewal commission,
           and no flat stretch bonus apply — none of the sales-incentive mechanisms
           attach to this role.
@@ -1960,7 +1962,7 @@ function OpsDocument({ offer }) {
         <Bullet text="Advance → may be drawn each Monday on the planned station-tour programme." />
         <Bullet text="Claims → submitted every Saturday evening with the Daily Visit Report (station, purpose, faults attended, km); settled by the following Tuesday." />
         <Text style={[S.annexSub, { marginTop: 12 }]}>City / Station Hotel Ceilings</Text>
-        <TADATable />
+        <TADATable vehicleLabel="Vehicle" />
         <Text style={[S.para, { marginTop: 14, fontSize: 9, color: GRAY, textAlign: 'center' }]}>
           — End of Document —
         </Text>

@@ -18509,3 +18509,6 @@ role-neutral.
    Convert each accepted offer → the created user gets the RIGHT role (not sales).
    Redline the rendered PDFs; the ops/telecaller/generic wording was drafted from the
    spec + your data — eyeball it.
+
+### §285 redlines applied (2026-09-11, owner-reviewed the rendered PDFs)
+1. Ops uptime **illustration** now computes from the offer's real Fixed Base (`formatCurrency(fixedBase/maxVariable)` + 90%→×0.5 / 87%→×0.2), not a static ₹20,000 example. 2. Ops travel-chart column **"Bike" → "Vehicle"** — `TADATable` gained a `vehicleLabel='Bike'` prop (sales call unchanged → default 'Bike' → sales chart byte-identical; ops passes "Vehicle"). 3. Telecaller commission stays the 5% / 2% rates (owner: no 5× multiplier line). Verified by headless-rendering all 6 variants (sales/ops-exec/ops-head/telecaller/tc-head/generic) → PDF → text: illustration ₹17,500/₹5,250, ops header "Vehicle", sales header still "Bike".
