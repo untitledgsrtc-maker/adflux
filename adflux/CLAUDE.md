@@ -18729,3 +18729,46 @@ so future ops hires are right (§282 also auto-maps their whatsapp from the comp
 Sales + TC + ops-exec guided tours all shipped (`13a3a4a` → `00df1c5` → `9fd7915`), `training_
 completions` table + RLS live (owner ran the SQL). One overlay, `TRACKS` registry. Nothing left
 to build; optional = who-finished panel + ops-HEAD track.
+
+
+---
+
+## 289 · Ops pay — ACTIVATED, but station assignment is the open gap (2026-09-11)
+
+Owner turned ops pay ON (thought it was fully done; verified via the read-only grids
+`supabase_ops_pay_readiness.sql` + `supabase_ops_pay_assignment.sql`). TRUE state as of 11 Sep:
+
+| exec | role | salary | assigned screens | avg uptime | status |
+|---|---|---|---|---|---|
+| GOHIL ANKITKUMAR | operation_executive | ₹20,000 | **0** | 0.0% (fake — 0/0) | ⚠ no stations |
+| GULSHAN YADAV | operation_executive | ₹16,000 | **0** | 0.0% (fake) | ⚠ no stations |
+| test | operation_executive | ₹22,000 | **264 (ALL)** | ~75% | ⚠ TEST account holds whole network + a salary |
+| Dixita | operation_head | ₹25,000 | 264 (network) | 72.7% | head = network uptime (§286), OK |
+
+So: p4 trigger LIVE (`ops_uptime_to_daily_performance` installed), salaries SET for all 4, sync
+cron writing `ops_uptime_daily` daily (§262), pay-trigger writing `daily_performance.score_pct`.
+Ops pay is genuinely ON. But **NOT payable-correct yet** — two problems:
+
+1. **GOHIL + Gulshan own 0 depots** → `ops_recompute_uptime_today` writes screens_total=0 → their
+   0.0% is a 0/0 ARTIFACT, not performance. §184 DANGER: if those 0-screen days are is_excluded,
+   monthly_score's "0 working days → FULL variable cap" pays them the FULL 30% variable for doing
+   nothing (overpay); if not excluded, they get 0 variable (underpay). Either way WRONG.
+2. **`test` is a TEST ops-exec (§288/§253) holding ALL 264 stations + a ₹22k salary** → it would
+   accrue real pay in compute_monthly_salary. Its salary should be cleared / the account
+   deactivated before any payroll; its stations belong to the real techs.
+3. Current network uptime is ~72–76% = BELOW the §258 85% floor → **everyone's variable is ₹0
+   right now** (base-only). Correct per the locked 75/95 curve IF uptime is real; variable only
+   engages ≥85%. This is real screen downtime (a real ops backlog), not a pay bug.
+
+### THE REMAINING OWNER ACTION (before any ops payroll)
+1. **Reassign the 264 stations from `test` → GOHIL + Gulshan** (a depot = one owner). The
+   geographic split (which tech covers which cities) is the OWNER's call — Ops Head console →
+   Screens by station → Assigned tech, or `supabase_ops_assign_stations.sql` (bulk by email).
+2. **Clear `test`'s salary / deactivate the test account** so it can't draw pay.
+3. Let real per-tech uptime land a few workdays.
+4. **Run a `compute_monthly_salary` preview per exec BEFORE paying** (§71 rule 3) — confirm the
+   variable is a real uptime-driven number, not a §184 full-cap artifact.
+- FOOT-GUN: setting an ops-exec salary while they own 0 stations arms the §184 overpay (or a
+  0-variable underpay). Salary + station-assignment must both be real before the exec is paid.
+- Do NOT re-cite "ops pay not activated" — it IS activated; the open item is the station split +
+  the test-account cleanup, not the pay mechanism.
