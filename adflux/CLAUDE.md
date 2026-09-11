@@ -18637,3 +18637,44 @@ SQL is run; frontend deployed. Smoke: sales test account → `/work` shows the "
 pill → tap → the tour walks /work→/leads→…→/my-offer with real-button spotlights → finish
 writes a `training_completions` row. Not-yet-built (offered, owner's call): a small in-app
 admin "who finished training" panel (vs the SQL query); the TC + ops tracks.
+
+### 287.1 · TC + ops tracks — generalized to a TRACKS registry (2026-09-11, `9fd7915`)
+Owner: "finish all other roles." Generalized the sales-only overlay into ONE `TRACKS`
+registry (§71) — `sales`/`tc`/`ops` → `{role, home, lang, steps}`. **The file stays named
+`SalesTourOverlay.jsx` + keeps its default export so the §28-frozen V2AppShell mount import
+needs NO change** (component renamed internally to `TrainingOverlay`; V2AppShell verified
+unchanged by guardian). **No new SQL** — `training_completions.track` is free text, so `'tc'`
+/`'ops'` completions + the §287 RLS work as-is. Sales steps copied verbatim (behavior
+unchanged, guardian-confirmed).
+- **TC track** (English, role `telecaller`, home `/telecaller`): 8 steps — /telecaller
+  `Call now` → `WhatsApp` → `Callbacks due` (the unconditional KPI tile = the reliable ring;
+  Call now/WhatsApp gate on a non-empty queue) → /follow-ups (no ring) → /leads `New Lead` →
+  /quotes `New Quote` → /my-performance (no ring) → /my-offer `Request leave`.
+- **Ops track** (GUJARATI, role `operation_executive`, home `/ops-home`, §231): 6 steps —
+  /ops-home `કુલ સ્ક્રીન` → /ops `હાજરી પુરો (ચેક-ઇન)` → /ops-log (no ring) → /ops-tickets
+  `ખુલ્લા` → /ops-station `Log fault` (that page is English-labelled, §269) → /ops-performance
+  (no ring). Gujarati chrome via an `L` label map (`L.gu`/`L.en`).
+- **step is now DERIVED from the URL param / sessionStorage backup — NOT `useState`** — kills
+  a stale-step race where the launch pill firing on an already-mounted V2AppShell (component
+  never unmounts) rendered the previous track's step. `go()` just navigates `?tour=X&step=n` +
+  writes SS_STEP; the URL/session is the single source of the step.
+- **Launch pill per role-home**: `Object.keys(TRACKS).find(role===profile.role &&
+  home===location.pathname)` → sales pill on /work, tc on /telecaller, ops on /ops-home; null
+  everywhere else / other roles / after that track's localStorage-done or session-dismiss.
+  Fails closed on a null/loading profile.
+- Session keys are now generic + per-track: `tourActive`/`tourStep`/`tourTrack`,
+  `tourDone_<track>` (localStorage), `tourDismissed_<track>` (session). (The §287 sales-only
+  `salesTour*` keys are superseded — negligible: a rep mid-sales-tour just loses their spot,
+  the feature had barely shipped.)
+- Extraction of the real routes + on-screen `find` text was a 2-agent Workflow (TelecallerV2
+  is huge/frozen; ops is 6 Gujarati files) returning file:line-cited step tuples.
+- gates: esbuild · brand · `npm run build` (246 precache) · **sales-module-guardian PASS**
+  (z-1000 reused, `--v2-*`/#FFE600 only, Lucide only, WorkV2/TelecallerV2/PostCallOutcomeModal/
+  useAutoRefresh/push/stage/cadence/score/TA all untouched; the only V2AppShell touch is the
+  pre-existing mount line). Pre-existing P3s (strokeWidth 2 vs 1.6; hardcoded color on `<Check>`
+  — from `13a3a4a`) left per §16.
+- Owner smoke: log in as a telecaller → /telecaller shows "Start training" → tour walks the
+  phone-first flow; log in as an operation_executive → /ops-home shows "તાલીમ શરૂ કરો" → the
+  Gujarati ops tour. Each finish writes a `training_completions` row (track tc/ops).
+- Still not built (owner's call): the in-app "who finished" admin panel; an ops-HEAD track
+  (head lands on /ops-command, a different flow) — exec-only for now.
