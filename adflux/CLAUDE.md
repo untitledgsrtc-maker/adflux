@@ -18422,6 +18422,11 @@ through Add Member landed as `staff`. Fix the master, not just the user (§3).
 `supabase_map_aayushi_whatsapp.sql` (owner ran): `users.whatsapp_number='9974573686'`
 for Aayushi parmar → she now gets the morning greet popup + WhatsApp assistant.
 Still NULL: **Jani Ajaykumar** (other sales rep) — pending his number.
+- **UPDATE 2026-09-11 — Jani DONE:** `supabase_fix_ajay_ankit_gulshan.sql` PART 2 mapped
+  Jani `whatsapp_number = '7041873686'` (clash-guarded, owner ran it) → he now gets the
+  morning greet popup + WhatsApp assistant. So BOTH previously-NULL sales reps (Aayushi +
+  Jani) are mapped; no sales rep is unmapped. (That SQL also set Ankit + Gulshan to
+  role `operation_executive` — the §286 ops-pay techs.) Do NOT re-list Jani as pending.
 - CORRECTION (2026-09-11): Aayushi is a **TELECALLER**, not sales — her DB role was
   wrong (`sales`; §281 diagnostic mis-listed her as sales). `supabase_fix_aayushi_telecaller.sql`
   (owner ran) set role+team_role='telecaller' (designation already 'Telecaller'). Same bug
