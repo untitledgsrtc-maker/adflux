@@ -171,26 +171,10 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
   // against the annual paid quota.
   const [fHalfDay, setFHalfDay] = useState(false)
   const [fEndDate, setFEndDate] = useState('')  // Phase 121 — optional range end; blank = single day
-  // Phase 36.10 — rep chooses Paid or Unpaid. Paid option only
-  // enabled when tenure ≥ 9 months from staff_incentive_profiles
-  // .join_date. Default Paid when eligible, else forced to Unpaid.
-  const [fIsPaid, setFIsPaid] = useState(true)
-  const [paidEligible, setPaidEligible] = useState(false)
-  const [eligLoading, setEligLoading] = useState(true)
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    setEligLoading(true)
-    supabase.rpc('eligible_for_paid_leave', { p_user_id: userId })
-      .then(({ data }) => {
-        if (cancelled) return
-        const ok = !!data
-        setPaidEligible(ok)
-        setFIsPaid(ok)  // Default Paid only if eligible.
-        setEligLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [userId])
+  // §78 (Phase 184 Rule 2, 2026-07-02): EVERY approved leave is deducted at
+  // one day's salary — there is no paid-leave quota anymore. So the rep no
+  // longer picks Paid/Unpaid (the old 9-month `eligible_for_paid_leave` gate
+  // is gone from the UI); a leave request is always recorded as deducted.
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -215,10 +199,9 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
         status: 'pending',
         // Half-day only applies to a single day; ignored on a range.
         is_half_day: isRange ? false : fHalfDay,
-        // Phase 36.10 — paid/unpaid choice. Server-side
-        // eligible_for_paid_leave() is the policy source of truth; the
-        // UI just nudges the rep. If tenure < 9 months, client forces false.
-        is_paid_request: paidEligible ? fIsPaid : false,
+        // §78 — every approved leave deducts (no paid quota), so a leave
+        // request is always recorded as deducted.
+        is_paid_request: false,
         created_by: userId,
       })
       if (!error) { saved++; continue }
@@ -362,51 +345,14 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
           <span>Half-day only (counts as 0.5){fEndDate ? ' · single day only' : ''}</span>
         </label>
 
-        {/* Phase 36.10 — Paid / Unpaid toggle. Paid disabled when
-            tenure < 9 months. */}
-        <div>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-            Pay status
-          </label>
-          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-            {[
-              { key: true,  label: 'Paid leave',   disabled: !paidEligible },
-              { key: false, label: 'Unpaid leave', disabled: false },
-            ].map(opt => {
-              const on = fIsPaid === opt.key
-              return (
-                <button
-                  key={String(opt.key)}
-                  type="button"
-                  onClick={() => !opt.disabled && setFIsPaid(opt.key)}
-                  disabled={opt.disabled || eligLoading}
-                  style={{
-                    flex: 1, padding: '10px 12px', borderRadius: 10,
-                    border: `1px solid ${on ? 'var(--accent, #FFE600)' : 'var(--border)'}`,
-                    background: on ? 'rgba(255,230,0,.14)' : 'var(--surface-2)',
-                    color: opt.disabled
-                      ? 'var(--text-subtle)'
-                      : on ? 'var(--accent, #FFE600)' : 'var(--text)',
-                    fontSize: 13, fontWeight: 600,
-                    cursor: opt.disabled ? 'not-allowed' : 'pointer',
-                    opacity: opt.disabled ? 0.55 : 1,
-                  }}
-                >
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
-          {!eligLoading && !paidEligible && (
-            <div style={{
-              marginTop: 6, fontSize: 11, color: 'var(--text-muted)',
-              padding: '6px 10px', background: 'rgba(255,230,0,.08)',
-              border: '1px dashed var(--accent, #FFE600)', borderRadius: 8,
-            }}>
-              Paid leave is available after 9 months from your joining date.
-              For now your request will be submitted as unpaid.
-            </div>
-          )}
+        {/* §78 — every leave day is deducted at one day's salary (no paid
+            quota). Honest note replaces the old Paid/Unpaid + "9 months" choice. */}
+        <div style={{
+          fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5,
+          padding: '8px 10px', background: 'var(--surface-2)',
+          border: '1px solid var(--border)', borderRadius: 10,
+        }}>
+          Each leave day is deducted at one day’s salary{fHalfDay ? ' (half-day = half a day’s salary)' : ''}.
         </div>
         {err && (
           <div style={{ color: 'var(--danger)', fontSize: 12 }}>
