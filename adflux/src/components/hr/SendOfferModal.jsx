@@ -73,7 +73,7 @@ export function SendOfferModal({ onClose, onCreated }) {
   useEffect(() => {
     let alive = true
     supabase.from('designations')
-      .select('id, name, default_monthly_salary, has_incentive')
+      .select('id, name, auth_role, team_role, default_monthly_salary, has_incentive')
       .eq('is_active', true)
       .order('display_order')
       .then(({ data }) => { if (alive && data) setDesignations(data) })
@@ -152,6 +152,13 @@ export function SendOfferModal({ onClose, onCreated }) {
       // PDF generator falls through to the structured block.
       incentive_text:              null,
       place:                       form.place.trim() || 'Vadodara',
+      // Designation "role signal" snapshot — persisted so the PDF +
+      // convert-to-user flow can branch by role without re-reading the
+      // designations master (which may change after the offer is sent).
+      designation_auth_role:       picked?.auth_role ?? null,
+      designation_team_role:       picked?.team_role ?? null,
+      designation_has_incentive:   picked?.has_incentive ?? null,
+      designation_name:            picked?.name ?? null,
     })
     setSaving(false)
 

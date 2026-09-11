@@ -165,6 +165,13 @@ export default function HROfferLetterV2() {
 
         // Role
         position:      form.position_override.trim() || picked.name,
+        // Designation "role signal" snapshot — so the PDF branches by
+        // role. No DB write here (this page only downloads), but the
+        // OfferLetterPDF reads the same fields the persisted offer carries.
+        designation_auth_role:      picked.auth_role ?? null,
+        designation_team_role:      picked.team_role ?? null,
+        designation_has_incentive:  picked.has_incentive ?? null,
+        designation_name:           picked.name ?? null,
         territory:     user.segment_access === 'GOVERNMENT' ? 'Government segment, Gujarat'
                      : user.segment_access === 'PRIVATE'    ? 'Private segment, Gujarat'
                      : 'Gujarat (all segments)',

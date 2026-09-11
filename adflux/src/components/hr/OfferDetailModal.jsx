@@ -120,6 +120,29 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
     const email = (offer.candidate_email || '').trim().toLowerCase()
     const name  = offer.full_legal_name || offer.candidate_name
 
+    // Phase 285 — mint the user with the RIGHT role from the offer's
+    // designation, not a hardcoded 'sales'. hr_offers carries snapshot
+    // fields (designation_auth_role / _team_role / _has_incentive /
+    // _name, added by supabase_phase285). Resolution order:
+    //   1. the offer's snapshot (Phase-285+ offers),
+    //   2. the legacy sales default (pre-Phase-285 offers — all were sales).
+    // Matches the correct pattern in pages/v2/HRNewUserV2.jsx.
+    const authRole     = offer.designation_auth_role || null
+    const teamRole     = offer.designation_team_role || null
+    const hasIncentive = offer.designation_has_incentive
+    const desigName    = offer.designation_name || null
+
+    const pRole     = authRole || 'sales'
+    const pTeamRole = teamRole || 'sales'
+    // CLAUDE.md §8 — segment scope on users.segment_access applies ONLY to
+    // roles sales + telecaller; every other role = ALL. Compute from the
+    // resolved role (a govt hire keeps ALL, not the old hardcoded PRIVATE).
+    const pSegment  = (pRole === 'sales' || pRole === 'telecaller') ? 'PRIVATE' : 'ALL'
+    // Seed the sales incentive profile only for incentive-earning roles.
+    // has_incentive === false (flat-salary ops/accounts/etc) → skip it;
+    // null (legacy sales offer) or true → seed the sales profile below.
+    const seedIncentive = hasIncentive !== false
+
     // Phase 109.5 — create the user via the idempotent admin_create_user
     // RPC instead of client signUp. signUp threw "User already registered"
     // whenever the auth user already existed — e.g. a prior convert that
@@ -133,16 +156,18 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
       p_email:            email,
       p_password:         password,
       p_name:             name,
-      p_role:             'sales',
-      p_team_role:        'sales',
-      p_designation:      offer.position || null,
+      p_role:             pRole,
+      p_team_role:        pTeamRole,
+      // Give the created user the offer's real designation, not a
+      // sales-shaped one (designation snapshot → offer position → null).
+      p_designation:      desigName || offer.position || null,
       p_signature_mobile: offer.mobile || null,
-      // Phase 161 — convert always creates a SALES rep (above), who needs a
-      // city for the TA/DA claim window + DA/Hotel ceilings. An offer with no
-      // city used to make a city-less rep whose claim window broke (Mayur).
-      // Fall back to Vadodara so it's never null; HR can correct in Team.
+      // Phase 161 — a converted rep needs a city for the TA/DA claim window +
+      // DA/Hotel ceilings. An offer with no city used to make a city-less rep
+      // whose claim window broke (Mayur). Fall back to Vadodara so it's never
+      // null; HR can correct in Team.
       p_city:             offer.city || 'Vadodara',
-      p_segment_access:   'PRIVATE',
+      p_segment_access:   pSegment,
     })
 
     if (rpcErr) {
@@ -163,32 +188,37 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
     // trigger row already exists (normal case) or hasn't fired yet
     // (defensive). Drift between the signed letter and the live
     // profile is the bug this is preventing.
-    const { error: profErr } = await supabase
-      .from('staff_incentive_profiles')
-      .upsert(
-        {
-          user_id:          userId,
-          monthly_salary:   Number(offer.fixed_salary_monthly) || 0,
-          sales_multiplier: Number(offer.incentive_sales_multiplier) || 5,
-          new_client_rate:  Number(offer.incentive_new_client_rate)  || 0.05,
-          renewal_rate:     Number(offer.incentive_renewal_rate)     || 0.02,
-          flat_bonus:       Number(offer.incentive_flat_bonus)       || 0,
-          join_date:        offer.joining_date
-                              || new Date().toISOString().split('T')[0],
-          is_active:        true,
-        },
-        { onConflict: 'user_id' }
-      )
+    // Phase 285 — ONLY for incentive-earning roles. A flat-salary role
+    // (has_incentive === false) must NOT get the 5×/0.05/0.02 sales
+    // profile; skip the upsert entirely for them.
+    if (seedIncentive) {
+      const { error: profErr } = await supabase
+        .from('staff_incentive_profiles')
+        .upsert(
+          {
+            user_id:          userId,
+            monthly_salary:   Number(offer.fixed_salary_monthly) || 0,
+            sales_multiplier: Number(offer.incentive_sales_multiplier) || 5,
+            new_client_rate:  Number(offer.incentive_new_client_rate)  || 0.05,
+            renewal_rate:     Number(offer.incentive_renewal_rate)     || 0.02,
+            flat_bonus:       Number(offer.incentive_flat_bonus)       || 0,
+            join_date:        offer.joining_date
+                                || new Date().toISOString().split('T')[0],
+            is_active:        true,
+          },
+          { onConflict: 'user_id' }
+        )
 
-    if (profErr) {
-      // User row is in — don't block the convert, but surface the
-      // issue so admin knows to open Team page and set rates by hand.
-      setConvertErr(
-        'User created, but seeding the incentive profile failed: '
-        + (profErr.message || 'unknown error')
-        + ' — please set rates manually on the Team page.'
-      )
-      // Continue: still link the offer so status is accurate.
+      if (profErr) {
+        // User row is in — don't block the convert, but surface the
+        // issue so admin knows to open Team page and set rates by hand.
+        setConvertErr(
+          'User created, but seeding the incentive profile failed: '
+          + (profErr.message || 'unknown error')
+          + ' — please set rates manually on the Team page.'
+        )
+        // Continue: still link the offer so status is accurate.
+      }
     }
 
     // Link the offer back to the user.
@@ -387,7 +417,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
                 <>
                   <div style={{ fontSize: '.88rem', marginBottom: 8 }}>
                     This offer has been accepted. You can now create a
-                    Sales user account for <strong>{offer.full_legal_name || offer.candidate_name}</strong>.
+                    user account for <strong>{offer.full_legal_name || offer.candidate_name}</strong>.
                   </div>
                   <button className="btn btn-y" onClick={() => setShowConvertForm(true)}>
                     <UserPlus size={15} style={{ marginRight: 6 }} />
@@ -437,7 +467,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
               background: 'rgba(34,197,94,.05)',
               fontSize: '.88rem',
             }}>
-              Converted to a sales user{offer.converted_at
+              Converted to a user{offer.converted_at
                 ? ` on ${new Date(offer.converted_at).toLocaleDateString('en-IN')}`
                 : ''}.
             </div>

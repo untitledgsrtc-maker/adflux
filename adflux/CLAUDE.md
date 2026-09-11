@@ -18427,3 +18427,85 @@ Still NULL: **Jani Ajaykumar** (other sales rep) — pending his number.
   (owner ran) set role+team_role='telecaller' (designation already 'Telecaller'). Same bug
   class as testope1 above — DB role ≠ real job. Her login email is
   aayushiparmar200@gmail.com (not @untitledad.in).
+
+
+---
+
+## 285 · HR per-role offer letters — ops/telecaller/generic no longer print sales (2026-09-11)
+
+Owner: two operation_executive offer letters printed "Sales Executive" + sales
+commission annexures. ROOT (5-reader audit): there was ONE offer-letter PDF,
+written entirely for field sales; the one signal that says "not sales" (the picked
+designation's role / has_incentive) was collected at send-time but THROWN AWAY —
+never saved on `hr_offers`, never passed to the PDF. So `OfferLetterPDF` guessed the
+role from a free-text position string via `resolveLevel` (3 sales tiers, default
+"Sales Person"), and any non-sales title rendered sales. This is the §109.1 deferred
+item, hit live.
+
+### Shipped — 4-variant offer letter (owner chose full per-role templates)
+- NEW `src/utils/offerTemplate.js` `resolveOfferTemplate({auth_role, has_incentive})`
+  → `sales | ops | telecaller | generic`. THE one source of the split. Rule: ops on
+  `auth_role IN (operation_executive, operation_head)`; sales/telecaller gated on
+  `has_incentive===true`; else generic. Unknown/null → generic (safe).
+- NEW `supabase_phase285_hr_offer_role_signal.sql` (owner RUNS FIRST): adds 4 snapshot
+  cols to `hr_offers` — `designation_auth_role/team_role/has_incentive/name`. Snapshot
+  (not a FK) so a later designation edit never rewrites a sent offer.
+- `OfferLetterPDF.jsx` (+1816/−0 — **sales byte-identical**, proven by 0 deletions):
+  router resolves `tpl` from the offer snapshot (legacy null → 'sales' → old offers
+  render exactly as today) then early-returns Ops/Telecaller/Generic Documents; the
+  sales branch is untouched. Ops = "Operations (LED Screen Network Maintenance)",
+  OPS-FT/OPS-HD grade, 70/30 fixed+uptime variable (full ≥95%, nil <85%, graded
+  85–95% — §258), ₹3/km ops TA/DA (§230, NOT the sales bike chart), station-uptime
+  duties, notice head 60/tech 30/probation 15, NO commission. Telecaller = "TC" grade,
+  inside-sales, **same company incentive as sales (5× / 5% new-client / 2% renewal**,
+  §30 — real `incentive_settings` defaults), targets 50 calls/day · 30% connect · 5
+  qualified/week · zero SLA (`daily_targets`, §49), NO field TA/DA, head (Renuka) notice
+  60d. Generic = designation-name title, PURE fixed salary, no variable/commission/
+  annexure, travel "as per policy".
+- Wiring: `SendOfferModal.jsx` (widened the designations SELECT to include auth_role/
+  team_role — it wasn't selecting them, so the saved signal would've been null — +
+  saves the 4 fields on insert), `HROfferLetterV2.jsx` (sets the 4 on the offer object
+  it passes to the PDF; it only downloads, no insert), `useOffers.js` (4 cols added to
+  the explicit OFFER_COLS select).
+
+### The bigger bug fixed in the same batch — convert-to-user role mint (same class as §284)
+`OfferDetailModal.handleConvert` HARDCODED `p_role='sales'`, `p_team_role='sales'`,
+`p_segment_access='PRIVATE'` + seeded a sales incentive profile for EVERY convert →
+converting any accepted non-sales offer minted a SALES user (a second role-mint path
+alongside the §284 designation.auth_role bug). Now derives p_role/p_team_role from the
+offer's designation snapshot (legacy null → 'sales', all old offers were sales); segment
+= PRIVATE only for sales/telecaller else ALL (§8); the sales incentive seed is gated
+`hasIncentive !== false` (null/legacy/true seed; false skips) — no §41 3VL hole; UI copy
+role-neutral.
+
+### CONTRACTS / foot-guns
+- **Sales letter is byte-frozen** — the variants are additive branches; a changed sales
+  byte is a defect (0-deletions diff is the proof). `resolveLevel`/`levelTitle` are
+  sales-only.
+- **Deploy order (hard):** owner runs `supabase_phase285` in Studio BEFORE the frontend
+  deploys — OFFER_COLS names the 4 columns; a frontend-first deploy 400s the offers list.
+- **Telecaller earns the SAME incentive as sales (§30)** — do NOT invent per-handoff /
+  connect-rate bonuses; those don't exist in the data. The letter states the company
+  5×/5%/2% scheme + the real call targets.
+- ❌ A designation MIS-SEEDED (`has_incentive` not `true`, or a wrong `auth_role`) →
+  silently renders the wrong letter + mints the wrong role (the §284 class). Verify the
+  ops/telecaller/generic designation rows carry the right `auth_role` + `has_incentive`
+  before the first non-sales offer goes out.
+- The letter hardcodes the employer "Untitled Advertising" (inherited byte-for-byte from
+  the sales letter — correct for a single-employer HR doc; NOT the §4 segment→company
+  switch, which is for client quotes). Only revisit if the owner wants a companies-row
+  employer entity.
+- Design spec: `docs/superpowers/specs/2026-09-11-hr-per-role-offer-letters-design.md`
+  (its §3.1 said a `designation_id` FK; shipped `designation_name` instead — the FK
+  re-derive was dropped as dead code, legacy offers use the 'sales' default).
+- All files HR-module — NONE §28-frozen. Reviewed (PASS, no BLOCK): sales-regression,
+  convert 3VL, deploy-order, @react-pdf integrity all clean.
+
+### Owner action
+1. Run `supabase_phase285_hr_offer_role_signal.sql` (VERIFY: 4 columns). 2. Frontend
+   deploys on push. 3. Smoke: send an offer for an Operation Executive → the letter is
+   the Operations letter (uptime pay, ₹3/km, no commission), not sales; send a telecaller
+   + a generic (accounts) offer → correct variants; a sales offer → identical to today.
+   Convert each accepted offer → the created user gets the RIGHT role (not sales).
+   Redline the rendered PDFs; the ops/telecaller/generic wording was drafted from the
+   spec + your data — eyeball it.

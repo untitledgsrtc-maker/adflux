@@ -16,6 +16,8 @@ const OFFER_COLS = `
   incentive_sales_multiplier, incentive_new_client_rate,
   incentive_renewal_rate, incentive_flat_bonus,
   place,
+  designation_auth_role, designation_team_role,
+  designation_has_incentive, designation_name,
   template_id,
   full_legal_name, fathers_name, dob, mobile, personal_email,
   address_line1, address_line2, city, district, state, pincode,
