@@ -18564,3 +18564,76 @@ set: GOHIL 20k / Gulshan 16k / test 22k / Dixita-head 25k) but the numbers expos
 3. Assign GOHIL + Gulshan their stations in the Ops Head console (else they overpay).
 4. Verify per-exec: `ops_uptime_daily` + `daily_performance` rows look right; then a
    compute_monthly_salary preview before the real payout (§71 rule 3).
+
+
+---
+
+## 287 · Training v1 — sales guided in-app TOUR + launch pill + who-finished record (2026-09-11)
+
+Owner rejected every hand-drawn/redrawn "training app" mockup twice ("still not same UI",
+"we already have it") — the hard requirement was the EXACT existing app UI, not a copy. So
+training is a GUIDED TOUR that runs ON the real app: it navigates the rep's real routes,
+shows a bottom coaching card, and spotlights the real on-screen button (next→next→next).
+Nothing is redrawn — it IS the app. Two commits: `13a3a4a` (the overlay) + `00df1c5`
+(launch pill + who-finished DB record). Both on origin (`untitled-os`).
+
+### The component — `src/components/training/SalesTourOverlay.jsx` (NOT §28-frozen)
+Mounted ONCE at the V2AppShell root (`V2AppShell.jsx:34` import + `:1111` mount — the ONLY
+frozen-file touch, additive, guardian-PASS). **§45-safe = renders NULL unless a tour is
+active** (`?tour=sales` in the URL OR sessionStorage `salesTourActive`) — so for every normal
+rep on every normal page it is completely inert (no UI, no cost, no query). When active it:
+navigates the step's real route, draws a yellow spotlight ring around the real button found
+by visible text (`findByText` scans button/a/[role=button]/summary → getBoundingClientRect),
+and shows a bottom coaching card "TRAINING · STEP N OF 8". 8 sales steps: /work "your day"
+(Start My Day) · /work target+pay (Proposed Incentive — a card, no ring, card still shows) ·
+/leads (New Lead) · /leads (My Leads) · /follow-ups · /quotes · /my-performance · /my-offer.
+Uses `--v2-*` tokens + `--v2-r`/`--v2-r-lg`/`--v2-r-pill` radii + Lucide icons, **z-index 1000**
+(the existing §29 FilterDrawer tier — NO new tier). localStorage `salesTourDone` /
+sessionStorage `salesTourActive`/`salesTourStep`/`salesTourDismissed`.
+
+### The two pieces wired in `00df1c5`
+1. **Start Training launch pill** (so reps don't need the `?tour=sales` URL) — a small
+   brand-yellow "Start training" pill (GraduationCap) rendered by the overlay's `!active`
+   branch, gated `profile?.role === 'sales' && location.pathname === '/work' && !alreadyDone
+   && !dismissed`. One tap → `navigate('/work?tour=sales&step=0')` arms the tour. Kept INSIDE
+   the non-frozen overlay (no V2AppShell nav edit needed). Inert for every other role
+   (null profile fails closed `!== 'sales'`), every other page (strict `=== '/work'`), after
+   completion (permanent localStorage `salesTourDone`), and after a same-session skip
+   (`exit()` sets sessionStorage `salesTourDismissed` → pill hidden this session, returns
+   next session as a gentle nudge until they actually finish).
+2. **Who-finished record** — on full-tour finish `go()` (i ≥ STEPS.length) does a best-effort
+   `recordCompletion()`: one fire-and-forget `upsert` to `training_completions`
+   (`{onConflict:'user_id,track', ignoreDuplicates:true}` → INSERT…ON CONFLICT DO NOTHING),
+   IN ADDITION to the per-device localStorage flag. Fires once, only on completion — zero
+   hot-path cost. `uid` from `useAuthStore.getState().profile?.id`; try/caught + `.then(()=>{},
+   ()=>{})` so a failure never blocks the UI (deploy-before-SQL safe).
+
+### DB — `supabase_training_completions.sql` (owner RAN it 2026-09-11, "Success")
+`training_completions (id, user_id→users, track, completed_at, unique(user_id,track))` +
+RLS: `_self_write` INSERT `WITH CHECK (user_id = auth.uid())` · `_read` SELECT
+`user_id = auth.uid() OR public.get_my_role() IN ('admin','co_owner')` (rep sees own, owner
+sees all). Idempotent, `notify pgrst`. The "who finished" query is in the file's footer
+(admin/co_owner: join users, order by completed_at). No UPDATE/DELETE policy — ignoreDuplicates
+→ DO NOTHING → only the INSERT policy is ever evaluated (guardian-verified).
+
+### CONTRACTS / notes
+- **track = the ONE column that scales to TC + ops** — the summary's build order was
+  "1st sales, 2 tc, 3 ops". TC/ops tracks reuse SalesTourOverlay's pattern with their own
+  STEPS/routes + `track='tc'`/`'ops'` (same table, same pill/record machinery). Sales is v1.
+- The tour is the DELIVERED "same UI" answer — do NOT rebuild/redraw a copy of the app for
+  training (the owner rejected that twice). Extend the tour (STEPS + spotlight) instead.
+- Step 2 (Proposed Incentive) target is a CARD not a button → `findByText` returns null → no
+  ring, the coaching card still shows (graceful). Spotlighting non-button targets is an
+  optional future enhancement.
+- gates: esbuild parse · check-jsx-brand · check-sql-schema · `npm run build` (246 precache) ·
+  **sales-module-guardian PASS** (z-1000 reused, `--v2-*`/#FFE600 only, Lucide only, WorkV2/
+  PostCallOutcomeModal/useAutoRefresh/push/stage/cadence/score/TA all untouched).
+- Pre-existing (out-of-scope, §16 — from `13a3a4a`, not this diff): the file uses
+  `strokeWidth={2}` (docs say 1.6, §7) + one hardcoded `color` on a `<Check>` icon. Clean up
+  if the file is next touched.
+
+### Owner action / next
+SQL is run; frontend deployed. Smoke: sales test account → `/work` shows the "Start training"
+pill → tap → the tour walks /work→/leads→…→/my-offer with real-button spotlights → finish
+writes a `training_completions` row. Not-yet-built (offered, owner's call): a small in-app
+admin "who finished training" panel (vs the SQL query); the TC + ops tracks.
