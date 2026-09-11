@@ -18683,3 +18683,49 @@ unchanged, guardian-confirmed).
   Gujarati ops tour. Each finish writes a `training_completions` row (track tc/ops).
 - Still not built (owner's call): the in-app "who finished" admin panel; an ops-HEAD track
   (head lands on /ops-command, a different flow) — exec-only for now.
+
+
+---
+
+## 288 · User-directory corrections consolidated — do NOT re-cite stale role/whatsapp (2026-09-11)
+
+A run of one-off DB fixes (owner-run in Studio) drifted from the doc → this session I
+stale-cited "Jani unmapped" + earlier "Aayushi is sales" + "Ankit is staff". §17: memory goes
+stale. This is the ONE current-truth record so future sessions stop re-citing fixed facts.
+All are owner-run SQL one-offs kept UNTRACKED in the repo root (like the other diagnostic SQLs).
+
+### Current TRUE state (verified against the fix SQLs, 2026-09-11)
+| Person | role | team_role | designation | whatsapp_number | fix SQL |
+|---|---|---|---|---|---|
+| Aayushi parmar (aayushiparmar200@gmail.com) | telecaller | telecaller | Telecaller | 9974573686 | `supabase_fix_aayushi_telecaller.sql` + `supabase_map_aayushi_whatsapp.sql` |
+| Jani Ajaykumar | sales | sales | Sales Executive (was mis-set 'Sales Head') | 7041873686 | `supabase_fix_jani_designation.sql` + `supabase_fix_ajay_ankit_gulshan.sql` |
+| Ankit / testope1 (testope1@untitledad.in) | operation_executive | ops_execution | (Operation Execution) | — | `supabase_fix_ops_execution_role.sql` |
+| Gulshan | operation_executive | ops_execution | Operation Execution | — | `supabase_fix_ajay_ankit_gulshan.sql` |
+
+- **Both previously-NULL sales reps (Aayushi + Jani) are now WhatsApp-mapped** → both get the
+  §198 morning greet popup + §197 assistant. No sales rep is unmapped. Do NOT list either as pending.
+- **testope1 = a TEST ops-exec.** A guarded hard-delete SQL (`supabase_remove_testope1*.sql`)
+  exists but is DIAGNOSTIC/PART-1-only (PART 2 commented) — assume NOT deleted unless verified;
+  it may still clutter the ops roster. The real §286 ops-pay techs are GOHIL + Gulshan (+ test).
+- `supabase_fix_ops_teamrole.sql` tidied every ops row's stale `team_role` ('sales' leftover) →
+  `ops_execution` (COSMETIC — the app gates ops on ROLE, never team_role).
+
+### THE ROOT (same class 3× — §284) + the standing rules
+Every "wrong role / STAFF chip / unmapped" bug traced to **`designations.auth_role` mis-seeds**:
+`HRNewUserV2` mints a new user's `role = designations.auth_role`, so a designation seeded with
+the wrong `auth_role` mints every hire wrong. `supabase_fix_ops_execution_role.sql` fixed the
+MASTER (Operation Execution → auth_role `operation_executive`; Operation Head → `operation_head`)
+so future ops hires are right (§282 also auto-maps their whatsapp from the compulsory mobile).
+- ❌ FOOT-GUN (restated): a gated role's designation `auth_role` MUST equal the exact string the
+  app gates on (`operation_executive`/`operation_head`/`telecaller`/`sales`). Verify the
+  designations master after adding any gated role.
+- ❌ `role` and `team_role` are SEPARATE CHECK constraints with DIFFERENT allowed sets:
+  `operation_executive` is valid for `users_role_check` but NOT `users_team_role_check` (whose
+  ops value is `ops_execution`). Heal `role`; leave `team_role` at its already-valid value.
+- ❌ The chip reads the raw `role` string — a wrong-looking chip means the ROLE is wrong (check
+  the DB), not cosmetic.
+
+### Training feature — COMPLETE (this session's main work, §287 + §287.1)
+Sales + TC + ops-exec guided tours all shipped (`13a3a4a` → `00df1c5` → `9fd7915`), `training_
+completions` table + RLS live (owner ran the SQL). One overlay, `TRACKS` registry. Nothing left
+to build; optional = who-finished panel + ops-HEAD track.
