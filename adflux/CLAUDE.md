@@ -18772,3 +18772,66 @@ Ops pay is genuinely ON. But **NOT payable-correct yet** — two problems:
   0-variable underpay). Salary + station-assignment must both be real before the exec is paid.
 - Do NOT re-cite "ops pay not activated" — it IS activated; the open item is the station split +
   the test-account cleanup, not the pay mechanism.
+
+
+---
+
+## 290 · HR audit — the 4 owner-decisions (D1–D4) resolved (2026-09-11)
+
+Owner picked "HR D1–D4" off the backlog. Grounding each against the LIVE code collapsed the scope:
+**D2 already done, D4 already works, D3 shipped this turn, D1 = a real money redesign gated on a
+shadow-compare (owner-go pending).** The §279/§280 "4 owner decisions" are now settled as below.
+
+### D2 — does HR hire non-sales roles → ALREADY DONE (§285)
+§285 shipped per-role offer letters (sales/ops/telecaller/generic) + the convert-to-user role fix
+(no longer hardcodes p_role='sales'). HR can hire + convert any role correctly. No action. Do NOT
+re-open D2.
+
+### D4 — do approved TA claims reach payroll → VERIFIED WORKING (no action)
+`_compute_monthly_salary_base.sql:108-111` sums `daily_ta.total_amount` for the month into
+`v_ta_da` (a net_payable term), and §36.8's `trg_ta_claim_recompute` merges APPROVED
+`ta_da_requests` into `daily_ta`. So approved TA → daily_ta → compute_monthly_salary → payroll.
+Chain intact.
+
+### D3 — leave UI matches §78 → SHIPPED (`66e4676`)
+See the commit: dropped the misleading "Paid leave / after 9 months" toggle from `RepDayTools.jsx`
+`RequestLeaveModal` (§78 makes the engine deduct EVERY leave at 1 day's salary — the choice was a
+lie). `is_paid_request` now always `false` (inert to pay, §78 engine ignores it). guardian PASS.
+`RepLeaveHistory` chip now honestly shows "Unpaid" for new requests.
+
+### D1 — ONE Salary payout (owner chose consolidate) → PLAN + THE MONEY-SOURCE FINDING (build gated)
+Owner: fold everything into one Salary-tab payout, drop the separate Incentive Payout button. A
+deep ledger map (workflow wf_0265239f) found it is NOT "delete a button" — there's a money-source
+coupling that breaks consolidation both ways:
+- **`net_payable`'s `incentive` term = incentive ALREADY PAID**, not earned:
+  `_compute_monthly_salary_base.sql:103-106` = `SUM(incentive_payouts.amount_paid) WHERE staff_id
+  AND month_year`. `compute_monthly_salary`/`_base` read `incentive_payouts` but NEVER read
+  `salary_payouts` (salary_payouts is a pure disbursement-tracking ledger, §37).
+- **Today = double-pay** (the §39 "very confusing"): pay incentive via the Incentive Payout button
+  (writes incentive_payouts = real cash), then pay the FULL `net_payable` via a Salary payout →
+  net ADDED that already-paid incentive back in → paid twice.
+- **Naive consolidation = underpay**: just remove the Incentive Payout button → no incentive_payouts
+  rows → the incentive term collapses to ₹0 → net_payable loses the whole incentive → one Salary
+  payout silently drops every rep's incentive.
+- **THE FIX (the only clean one):** change the canonical `incentive` term from *paid-so-far* →
+  *EARNED* (mirror `calculateIncentive(profile, monthly_sales_data)` — new_client + renewal revenue
+  × the staff_incentive_profiles/incentive_settings rates). Then `net_payable` = true gross owed
+  (base+variable+**earned**-incentive+ta_da−leave) → ONE Salary payout pays it once. Then remove the
+  2 IncentivePayoutModal mounts (`IncentiveDashboard.jsx:256` + `RepProfileV2.jsx:1120`), relabel the
+  Salary-tab "Incentive" column as EARNED, retire incentive_payouts writes (table kept legacy).
+- ⚠ **This CHANGES `net_payable` for every rep** (wherever earned ≠ paid-so-far) AND edits the
+  §72-frozen salary canonical → §71 rule 3: build the earned-incentive calc + a **shadow-compare**
+  (old net vs new net per rep), owner eyeballs the numbers in Studio FIRST, flip live only after he
+  confirms, never mid-workday, revert-ready. Keep the sales_manager `incentive_override_pct` add
+  (`compute_monthly_salary.sql:126-135`) layering on top of EARNED, not paid.
+- STATUS: **not built — awaiting owner's explicit go** on the mechanism (he approved the direction;
+  the "every rep's net number moves" impact is the thing he must accept + verify via the shadow-
+  compare before the engine change ships).
+- FOOT-GUN: the salary engine's `incentive` reads the PAYMENT ledger (incentive_payouts), not
+  earned incentive — so net_payable is a hybrid (owed base/var/ta minus leave PLUS already-paid
+  incentive), not "what we owe." Any payout/consolidation work MUST account for this or it double-
+  pays / underpays.
+
+### Remaining HR audit tail (minor, unbuilt, §279/§280)
+2 stubs (TA receipt upload, Exit/Offboarding); load-failed→retry on #18/#21/#22; approved/rejected
+TA claim history (#23); polish (#29-38). None gated on a decision now.
