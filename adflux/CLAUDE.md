@@ -18420,5 +18420,10 @@ through Add Member landed as `staff`. Fix the master, not just the user (§3).
 
 ### Also this session — Aayushi parmar WhatsApp mapped (§281/§282)
 `supabase_map_aayushi_whatsapp.sql` (owner ran): `users.whatsapp_number='9974573686'`
-for Aayushi parmar (sales) → she now gets the morning greet popup + WhatsApp assistant.
+for Aayushi parmar → she now gets the morning greet popup + WhatsApp assistant.
 Still NULL: **Jani Ajaykumar** (other sales rep) — pending his number.
+- CORRECTION (2026-09-11): Aayushi is a **TELECALLER**, not sales — her DB role was
+  wrong (`sales`; §281 diagnostic mis-listed her as sales). `supabase_fix_aayushi_telecaller.sql`
+  (owner ran) set role+team_role='telecaller' (designation already 'Telecaller'). Same bug
+  class as testope1 above — DB role ≠ real job. Her login email is
+  aayushiparmar200@gmail.com (not @untitledad.in).
