@@ -31,6 +31,7 @@ import CopilotModal from '../copilot/CopilotModal'
 import GlobalSearchBar from './GlobalSearchBar'
 import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
+import SalesTourOverlay from '../training/SalesTourOverlay'
 import { ToastViewport, pushToast } from './Toast'
 import AppUpdateBanner from './AppUpdateBanner'
 import GpsSetupPrompt from './GpsSetupPrompt'
@@ -1103,6 +1104,11 @@ export function V2AppShell() {
           Preferences flag; renders null on web and after the rep
           has completed (or skipped) onboarding once. */}
       <NativeOnboarding userId={profile?.id} />
+
+      {/* Guided training walkthrough. Renders NULL unless a tour is active
+          (?tour=sales in the URL, or the in-session flag while running) —
+          completely inert for every normal rep on every normal page. */}
+      <SalesTourOverlay />
     </div>
   )
 }
