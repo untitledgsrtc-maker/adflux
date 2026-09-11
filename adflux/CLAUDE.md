@@ -18512,3 +18512,55 @@ role-neutral.
 
 ### §285 redlines applied (2026-09-11, owner-reviewed the rendered PDFs)
 1. Ops uptime **illustration** now computes from the offer's real Fixed Base (`formatCurrency(fixedBase/maxVariable)` + 90%→×0.5 / 87%→×0.2), not a static ₹20,000 example. 2. Ops travel-chart column **"Bike" → "Vehicle"** — `TADATable` gained a `vehicleLabel='Bike'` prop (sales call unchanged → default 'Bike' → sales chart byte-identical; ops passes "Vehicle"). 3. Telecaller commission stays the 5% / 2% rates (owner: no 5× multiplier line). Verified by headless-rendering all 6 variants (sales/ops-exec/ops-head/telecaller/tc-head/generic) → PDF → text: illustration ₹17,500/₹5,250, ops header "Vehicle", sales header still "Bike".
+
+
+---
+
+## 286 · Ops pay — activation findings + head pay wired to network uptime (2026-09-11)
+
+Owner: "turn on Ops PAY." Readiness check found the mechanism LIVE (p4 trigger
+`trg_ops_uptime_to_dp` + `ops_uptime_to_daily_performance` installed; salaries already
+set: GOHIL 20k / Gulshan 16k / test 22k / Dixita-head 25k) but the numbers exposed the
+§184 trap live:
+- **test** (op exec) = all 264 screens (network proxy), ~76% avg uptime → SLA score ~11
+  → <50 → **0 variable → base-only. CORRECT** (real network is below the 85% floor; the
+  incentive is to fix screens).
+- **GOHIL + Gulshan** = **0 stations assigned** → recompute writes screens_total=0 →
+  trigger sets `is_excluded=true` (correct) → they have **0 measured days** → monthly_score's
+  "0 working days → FULL variable cap" would **OVERPAY** them the full 30% for stations they
+  don't have. The §184 trap, confirmed.
+- **Dixita (head)** = no uptime rows → same 0-days → full-cap overpay; head was never wired
+  to the uptime scheme (§251).
+
+### Owner decisions (2026-09-11)
+1. **Station assignment** — owner does it himself in the app (Ops Head console → Screens by
+   station → Assigned tech, §240). ⚠ Until GOHIL/Gulshan have stations, their 0-days →
+   full-cap overpay stands — **assign before any Sept payout.**
+2. **Head pay = whole-network uptime** — wired (below).
+
+### Head-pay wire (money, `supabase_ops_p4_uptime_pay.sql`, edit-in-place §72 — owner RE-RUNS)
+- `ops_recompute_uptime_today`: after the exec loop, a head loop writes each active
+  `operation_head` an `ops_uptime_daily` row whose screens_total/uptime = the WHOLE active
+  network (`ops_screens WHERE is_active`, online/(online+offline)). Same night-gate + SLA
+  transform + pay chain as execs.
+- `ops_uptime_to_daily_performance` trigger role guard widened
+  `operation_executive` → `IN ('operation_executive','operation_head')` so the head's row is
+  scored. Sales still never touched (role-guarded).
+- Effect: Dixita's variable now tracks network uptime (~76% today → score ~5 → ~0 variable →
+  base-only, fair) INSTEAD of the 0-days full-cap overpay. Improves as network uptime rises
+  (≥95% → full 30%). The 75/95 SLA knobs (owner-facing full ≥95% / zero <85%, §258) unchanged.
+
+### CONTRACT / foot-guns
+- An ops exec with **0 assigned stations** = 0 measured days = §184 full-variable overpay.
+  MUST have stations assigned before payout. (A 0-screen DAY is excluded correctly; the trap
+  is a WHOLE month of them.) The head is exempt (scored on network uptime, always has data).
+- Head pay = network uptime via the SAME p4 pipeline; do not add a separate head path.
+- To activate after re-running p4: `SELECT public.ops_recompute_uptime_today();` (populates
+  today's head row + refreshes execs), then verify. The 10-min sync cron keeps it current.
+
+### Owner run-steps
+1. Re-run `supabase_ops_p4_uptime_pay.sql` in Studio (redefines the 2 functions).
+2. `SELECT public.ops_recompute_uptime_today();` → Dixita gets a network-uptime row + score.
+3. Assign GOHIL + Gulshan their stations in the Ops Head console (else they overpay).
+4. Verify per-exec: `ops_uptime_daily` + `daily_performance` rows look right; then a
+   compute_monthly_salary preview before the real payout (§71 rule 3).

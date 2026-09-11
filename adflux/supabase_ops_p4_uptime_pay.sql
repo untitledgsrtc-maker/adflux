@@ -63,10 +63,12 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  r       record;
-  v_today date := (now() AT TIME ZONE 'Asia/Kolkata')::date;
-  v_role  text := public.get_my_role();
-  v_hour  int  := extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata'))::int;
+  r          record;
+  v_today    date := (now() AT TIME ZONE 'Asia/Kolkata')::date;
+  v_role     text := public.get_my_role();
+  v_hour     int  := extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata'))::int;
+  v_net_total int;
+  v_net_up    int;
 BEGIN
   -- Head/admin (or a service-role/cron call → null role) only. A known
   -- non-privileged role is blocked; the recompute is deterministic from live
@@ -106,6 +108,33 @@ BEGIN
           uptime_pct    = EXCLUDED.uptime_pct,
           updated_at    = now();
   END LOOP;
+
+  -- ── Operations Head: variable driven by WHOLE-NETWORK uptime (owner 2026-09-11) ──
+  -- The head owns network-wide uptime, so their daily score = every active screen's
+  -- online ratio (not a personal depot set). Same SLA transform + night-gate + pay
+  -- chain as the execs (the trigger scores operation_head too). Poor network → low
+  -- head variable (fair); this also replaces the 0-measured-days → full-cap overpay.
+  SELECT count(s.id) FILTER (WHERE s.status IN ('online', 'offline')),
+         count(s.id) FILTER (WHERE s.status = 'online')
+    INTO v_net_total, v_net_up
+    FROM public.ops_screens s
+   WHERE s.is_active;
+
+  FOR r IN
+    SELECT u.id AS uid
+      FROM public.users u
+     WHERE u.role = 'operation_head' AND u.is_active
+       AND (p_user_id IS NULL OR u.id = p_user_id)
+  LOOP
+    INSERT INTO public.ops_uptime_daily (user_id, work_date, screens_total, screens_up, uptime_pct)
+    VALUES (r.uid, v_today, v_net_total, v_net_up,
+            CASE WHEN v_net_total > 0 THEN round(v_net_up::numeric / v_net_total * 100, 2) ELSE 0 END)
+    ON CONFLICT (user_id, work_date) DO UPDATE
+      SET screens_total = EXCLUDED.screens_total,
+          screens_up    = EXCLUDED.screens_up,
+          uptime_pct    = EXCLUDED.uptime_pct,
+          updated_at    = now();
+  END LOOP;
 END;
 $$;
 
@@ -132,10 +161,12 @@ DECLARE
   v_excluded boolean;
   v_reason   text;
 BEGIN
-  -- Safety (review advisory 6a): only ever write daily_performance for an
-  -- operation_executive. A hand-inserted ops_uptime_daily row for a sales
-  -- rep's id must NOT clobber that rep's meeting-based score_pct.
-  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = NEW.user_id AND role = 'operation_executive') THEN
+  -- Safety (review advisory 6a): only ever write daily_performance for an ops
+  -- role (executive = own stations; head = whole-network uptime, owner 2026-09-11).
+  -- A hand-inserted ops_uptime_daily row for a sales rep's id must NOT clobber
+  -- that rep's meeting-based score_pct.
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = NEW.user_id
+                   AND role IN ('operation_executive', 'operation_head')) THEN
     RETURN NEW;
   END IF;
 
