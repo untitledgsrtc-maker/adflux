@@ -18373,3 +18373,52 @@ doCheckOut/checkedIn/card gates/tel:→modal chain/useAutoRefresh byte-unchanged
 - ❌ A blocking gate wired to a state that flips fast (checkedIn) + a render that waits
   on an async check = a race where the fast action skips the gate. Gate on the durable
   condition (greeted-today), not the transient one (checkedIn).
+
+
+---
+
+## 284 · Ops hires minted as role='staff' — designation.auth_role mis-seed (2026-09-09)
+
+Owner: testope1 (Ankit) is an ops field tech but his profile chip read **STAFF**.
+Root cause (DB read): `users.role='staff'`, `team_role='ops_execution'`,
+`designation='Operation Execution'`. The app gates ALL ops access on
+`role IN ('operation_executive','operation_head')` (§230; V2AppShell isOps,
+App.jsx RequireOps, RootRedirect) — so a `staff`-role ops user gets NO ops nav and
+the role string renders as the "STAFF" chip.
+
+### The systemic cause (not a one-user typo)
+`HRNewUserV2` mints a new user's role from the picked designation:
+`p_role: pickedDesignation.auth_role` (HRNewUserV2:195). The **"Operation Execution"
+designation master row was seeded `auth_role='staff'`** → EVERY ops hire created
+through Add Member landed as `staff`. Fix the master, not just the user (§3).
+
+### Fix (`supabase_fix_ops_execution_role.sql`, owner ran it — one-off, untracked)
+- PART 2: `UPDATE designations SET auth_role='operation_executive' WHERE name ILIKE
+  'Operation Execution%'` (+ the head designation → 'operation_head'). Future hires
+  now mint the right role.
+- PART 3: heal existing mis-minted users — `UPDATE users SET role='operation_executive'
+  WHERE role='staff' AND (designation ILIKE 'Operation Execution%' OR team_role=
+  'ops_execution')` (+ head variant). Scoped to ops rows so real office-staff are untouched.
+- **role ONLY — team_role LEFT UNTOUCHED.** First attempt also set
+  `team_role='operation_executive'` → `ERROR 23514 users_team_role_check` (that value
+  isn't in the team_role CHECK). Nothing reads team_role for ops (gating is role-only),
+  and the existing `ops_execution` team_role is already a valid CHECK value, so leave it.
+- After: testope1 reopens the app → ops nav + "Field Tech" label, STAFF gone.
+
+### Foot-guns
+- ❌ A designation master row whose `auth_role` doesn't match the app's role-gate
+  values silently mints every hire with the wrong role. When adding a role the app
+  gates on (operation_executive/operation_head, etc.), the matching designation's
+  `auth_role` MUST equal that exact gate string — verify the designations master after
+  adding any new gated role.
+- ❌ `role` and `team_role` have SEPARATE CHECK constraints with different allowed
+  sets. `operation_executive` is valid for `users_role_check` but NOT for
+  `users_team_role_check`. Don't assume a value valid for one column is valid for the
+  other — heal `role` only; leave `team_role` at its already-valid value.
+- The "STAFF" chip = the raw `role` string uppercased, not a designation label —
+  a wrong-looking role chip means the ROLE is wrong, check the DB before assuming cosmetic.
+
+### Also this session — Aayushi parmar WhatsApp mapped (§281/§282)
+`supabase_map_aayushi_whatsapp.sql` (owner ran): `users.whatsapp_number='9974573686'`
+for Aayushi parmar (sales) → she now gets the morning greet popup + WhatsApp assistant.
+Still NULL: **Jani Ajaykumar** (other sales rep) — pending his number.
