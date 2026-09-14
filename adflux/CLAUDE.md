@@ -18850,12 +18850,22 @@ coupling that breaks consolidation both ways:
   default_multiplier too = exact JS mirror). F1 (flat_bonus chain) = a NON-issue: incentive_settings
   has no `flat_bonus` column (only default_flat_bonus), so the 3-level COALESCE matches effective JS
   — do NOT add `s.flat_bonus` (would error). F3 (profile-less user → 0) accepted.
-- PENDING owner: run the two SQL (updated `supabase_hr_d1_earned_incentive_shadow.sql` [F2] +
-  `db/functions/_compute_monthly_salary_base.sql` [flip]) → verify the live Salary tab Sept incentive
-  = earned → THEN STEP 2b frontend (remove the 2 IncentivePayoutModal mounts + relabel the column).
-  ⚠ DOUBLE-PAY GUARD: do NOT disburse any Sept+ incentive via the old Incentive Payout button after
-  the flip (Sept net already pays earned via the one Salary payout). Owner's Sept shadow showed no
-  Sept incentive_payouts disbursed → safe cutover.
+- STEP 2 SQL RUN by owner (2026-09-14): both files run ("Success. No rows returned" on the flip);
+  the engine now pays EARNED incentive Sept+. Re-verified shadow (Mayur +₹2,078, rest 0).
+- STEP 2b SHIPPED (frontend): removed the two Incentive Payout BUTTONS + modal mounts —
+  `IncentiveDashboard.jsx` (dropped the `onPayout` prop → StaffTable's Payout button auto-hides via
+  its `onPayout &&` gate; removed the import/state/mount) + `RepProfileV2.jsx` (removed the "Pay
+  incentive" button/import/state/mount; KEPT the read-only incentive_payouts history as a legacy log,
+  sub now "Now included in the salary payout (earned)" when nothing paid). `IncentivePayoutModal.jsx`
+  + the `incentive_payouts` table are KEPT (legacy: pre-Sept months still read them via the gate).
+  SalaryAdminV2 "Incentive" column NOT relabeled — it reads r.incentive from the RPC (earned Sept+ /
+  paid Aug-), so a blanket "(earned)" label would misstate historical rows; "Incentive" is accurate
+  for both. esbuild/brand/build clean.
+- ⚠ DOUBLE-PAY GUARD (still holds for any manual DB punch): net Sept+ pays earned via the ONE Salary
+  payout; do NOT insert incentive_payouts rows for Sept+ (the UI path is now gone; a manual DB insert
+  would be a phantom net ignores). Aug & earlier untouched.
+- D1 COMPLETE: earned-incentive engine (gated Sept+) + one Salary payout + Incentive-Payout buttons
+  retired. Owner to eyeball the live Salary tab (Sept incentive = earned) as the final smoke.
 - FOOT-GUN: the salary engine's `incentive` reads the PAYMENT ledger (incentive_payouts), not
   earned incentive — so net_payable is a hybrid (owed base/var/ta minus leave PLUS already-paid
   incentive), not "what we owe." Any payout/consolidation work MUST account for this or it double-

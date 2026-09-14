@@ -45,7 +45,7 @@ import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { TeamMemberModal } from '../../components/team/TeamMemberModal'
 import { SalaryPayoutModal } from '../../components/incentives/SalaryPayoutModal'
-import { IncentivePayoutModal } from '../../components/incentives/IncentivePayoutModal'
+// HR D1 (§290): IncentivePayoutModal retired — incentive is earned inside net (Sept+).
 import { istCurrentMonthYM, istCurrentMonthLabel, istTodayISO } from '../../utils/istDate'
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -389,7 +389,6 @@ export default function RepProfileV2() {
   const [editProfileOpen, setEditProfileOpen]   = useState(false)
   const [editTargetsOpen, setEditTargetsOpen]   = useState(false)
   const [salaryPayoutOpen, setSalaryPayoutOpen] = useState(false)
-  const [incentivePayoutOpen, setIncentivePayoutOpen] = useState(false)
 
   // Role gate
   useEffect(() => {
@@ -1003,19 +1002,14 @@ export default function RepProfileV2() {
       </SectionCard>
 
       {/* ─── 5. Incentive ─────────────────────────────────────────── */}
+      {/* HR D1 (§290): "Pay incentive" button removed — incentive is now EARNED
+          inside net_payable (Sept 2026+), paid via the Salary payout. This section
+          is a read-only legacy log of pre-cutover incentive_payouts. */}
       <SectionCard
         title={`Incentive · ${monthLabel}`}
-        sub={`Paid this month: ${fmtINR(monthPaidIncentive)}`}
-        action={
-          <button onClick={() => setIncentivePayoutOpen(true)} style={{
-            background: 'transparent', border: '1px solid var(--v2-line, var(--border))',
-            color: 'var(--v2-ink-1, var(--text))', borderRadius: 10,
-            padding: '8px 12px', cursor: 'pointer', display: 'inline-flex',
-            alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 13,
-          }}>
-            <Gift size={13} /> Pay incentive
-          </button>
-        }
+        sub={monthPaidIncentive > 0
+          ? `Paid this month: ${fmtINR(monthPaidIncentive)}`
+          : 'Now included in the salary payout (earned)'}
       >
         {incentivePayouts.length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
@@ -1113,16 +1107,6 @@ export default function RepProfileV2() {
           monthYear={monthYm}
           computed={safeNum(salary?.netPayable)}
           onClose={() => setSalaryPayoutOpen(false)}
-          onSaved={loadAll}
-        />
-      )}
-      {incentivePayoutOpen && (
-        <IncentivePayoutModal
-          staff={{ user_id: user.id, name: user.name }}
-          monthYear={monthYm}
-          monthLabel={monthLabel}
-          computed={safeNum(salary?.incentive)}
-          onClose={() => setIncentivePayoutOpen(false)}
           onSaved={loadAll}
         />
       )}
