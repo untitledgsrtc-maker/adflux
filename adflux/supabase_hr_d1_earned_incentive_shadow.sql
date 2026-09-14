@@ -42,9 +42,14 @@ BEGIN
   v_ren := COALESCE(v_ren, 0);
 
   v_salary := COALESCE(sip.monthly_salary, 0);
-  v_mult   := COALESCE(NULLIF(sip.sales_multiplier, 0), s.default_multiplier, 5);  -- JS `||`
+  -- mult uses JS `||` (0 → falsy → next): NULLIF both profile + settings so a 0
+  -- default_multiplier can't zero the target (exact mirror of the JS call sites).
+  v_mult   := COALESCE(NULLIF(sip.sales_multiplier, 0), NULLIF(s.default_multiplier, 0), 5);
   v_ncr    := COALESCE(sip.new_client_rate, s.new_client_rate, 0.05);              -- JS `??`
   v_rr     := COALESCE(sip.renewal_rate,    s.renewal_rate,    0.02);              -- JS `??`
+  -- flat_bonus: incentive_settings has ONLY default_flat_bonus (no `flat_bonus`
+  -- column), so the JS `?? settings.flat_bonus` level is a dead reference — this
+  -- 3-level chain matches the effective JS. Do NOT add s.flat_bonus (would error).
   v_fb     := COALESCE(sip.flat_bonus,      s.default_flat_bonus, 10000);          -- JS `??`
 
   v_total     := v_new + v_ren;

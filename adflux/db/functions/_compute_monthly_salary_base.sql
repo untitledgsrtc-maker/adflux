@@ -100,10 +100,22 @@ BEGIN
   v_score_pct      := COALESCE(v_score_row.avg_score_pct, 0);
   v_working_days   := COALESCE(v_score_row.working_days, 0);
 
-  SELECT COALESCE(SUM(amount_paid), 0) INTO v_incentive
-    FROM public.incentive_payouts
-   WHERE staff_id = p_user_id
-     AND month_year = v_month_year;
+  -- HR D1 (§290, 2026-09-14): from the cutover month, net's `incentive` = EARNED
+  -- (public.earned_incentive_for mirrors src/utils/incentiveCalc.js calculateIncentive
+  -- EXACTLY) so ONE Salary payout pays base+variable+EARNED-incentive+TA once — the
+  -- old separate Incentive Payout flow is retired. Months BEFORE the cutover stay
+  -- = incentive PAID (SUM incentive_payouts) so already-settled/paid months (Aug &
+  -- earlier, where incentive was disbursed via the button) NEVER move → no double-pay.
+  -- Cutover shadow-verified 2026-09-14 (owner). Lexical 'YYYY-MM' compare is correct.
+  -- ⚠ requires earned_incentive_for() (supabase_hr_d1_earned_incentive_shadow.sql).
+  IF v_month_year >= '2026-09' THEN
+    v_incentive := public.earned_incentive_for(p_user_id, v_month_year);
+  ELSE
+    SELECT COALESCE(SUM(amount_paid), 0) INTO v_incentive
+      FROM public.incentive_payouts
+     WHERE staff_id = p_user_id
+       AND month_year = v_month_year;
+  END IF;
 
   SELECT COALESCE(SUM(total_amount), 0) INTO v_ta_da
     FROM public.daily_ta

@@ -18837,6 +18837,25 @@ coupling that breaks consolidation both ways:
   drift), remove the 2 IncentivePayoutModal mounts (IncentiveDashboard:256 + RepProfileV2:1120),
   relabel the Salary-tab "Incentive" column as EARNED, retire incentive_payouts writes (table kept
   legacy). Guardian + owner re-verifies via the live engine before it's real.
+- STEP 2 SQL BUILT + reviewed (2026-09-14): owner shadow-verified Sept (only Mayur +₹1,828, an
+  earned-but-unpaid incentive) + Aug (paid reps earned==paid delta 0; Kirti +₹3,200 / Dhara +₹1,340
+  earned-but-never-paid; NO negative deltas = no clawback). Owner decisions: **cutover = Sept 2026
+  forward** (Aug & earlier stay = incentive PAID so already-disbursed months never move → no
+  double-pay); **leave Kirti/Dhara's missed Aug incentive** (Aug untouched by the gate anyway).
+  The flip = `db/functions/_compute_monthly_salary_base.sql` v_incentive IF/ELSE gated on
+  `v_month_year >= '2026-09'` → `earned_incentive_for` else the old paid sum (byte-identical ELSE).
+  Adversarial money-review = FIX_THEN_SHIP: byte-diff confirmed (only the IF/ELSE moved), lexical
+  gate correct, SECDEF/REVOKE correct, sales_manager override composes on top of earned (no
+  double-count), Sept+ never reads incentive_payouts. F2 fix applied (NULLIF the settings
+  default_multiplier too = exact JS mirror). F1 (flat_bonus chain) = a NON-issue: incentive_settings
+  has no `flat_bonus` column (only default_flat_bonus), so the 3-level COALESCE matches effective JS
+  — do NOT add `s.flat_bonus` (would error). F3 (profile-less user → 0) accepted.
+- PENDING owner: run the two SQL (updated `supabase_hr_d1_earned_incentive_shadow.sql` [F2] +
+  `db/functions/_compute_monthly_salary_base.sql` [flip]) → verify the live Salary tab Sept incentive
+  = earned → THEN STEP 2b frontend (remove the 2 IncentivePayoutModal mounts + relabel the column).
+  ⚠ DOUBLE-PAY GUARD: do NOT disburse any Sept+ incentive via the old Incentive Payout button after
+  the flip (Sept net already pays earned via the one Salary payout). Owner's Sept shadow showed no
+  Sept incentive_payouts disbursed → safe cutover.
 - FOOT-GUN: the salary engine's `incentive` reads the PAYMENT ledger (incentive_payouts), not
   earned incentive — so net_payable is a hybrid (owed base/var/ta minus leave PLUS already-paid
   incentive), not "what we owe." Any payout/consolidation work MUST account for this or it double-
