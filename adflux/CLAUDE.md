@@ -18824,9 +18824,19 @@ coupling that breaks consolidation both ways:
   (old net vs new net per rep), owner eyeballs the numbers in Studio FIRST, flip live only after he
   confirms, never mid-workday, revert-ready. Keep the sales_manager `incentive_override_pct` add
   (`compute_monthly_salary.sql:126-135`) layering on top of EARNED, not paid.
-- STATUS: **not built — awaiting owner's explicit go** on the mechanism (he approved the direction;
-  the "every rep's net number moves" impact is the thing he must accept + verify via the shadow-
-  compare before the engine change ships).
+- STATUS (2026-09-14): owner said **go**. STEP 1 SHIPPED — `supabase_hr_d1_earned_incentive_shadow.sql`
+  (owner-run): an additive+inert `earned_incentive_for(uuid, text)` SECDEF helper (REVOKEd from
+  client roles; NOTHING calls it yet) mirroring `calculateIncentive` EXACTLY (target=salary×mult,
+  threshold=salary×2, below→0, else new×0.05+ren×0.02+(total>target?flatBonus:0); sources
+  per-profile→incentive_settings→default; revenue from monthly_sales_data(staff_id,month_year)) +
+  a **read-only shadow-compare** SELECT (per rep: incentive_now_paid vs incentive_earned vs
+  net_delta). check-sql-schema's e.earned/p.my/pay.paid flags = the documented CTE/LATERAL-alias
+  false-positives (§72#15). STEP 2 (the flip — pending owner eyeballing the shadow numbers):
+  edit `_compute_monthly_salary_base.sql:103-106` so `v_incentive := public.earned_incentive_for(
+  p_user_id, v_month_year)` (§72 edit-in-place, so the shadow + engine use the SAME fn = can't
+  drift), remove the 2 IncentivePayoutModal mounts (IncentiveDashboard:256 + RepProfileV2:1120),
+  relabel the Salary-tab "Incentive" column as EARNED, retire incentive_payouts writes (table kept
+  legacy). Guardian + owner re-verifies via the live engine before it's real.
 - FOOT-GUN: the salary engine's `incentive` reads the PAYMENT ledger (incentive_payouts), not
   earned incentive — so net_payable is a hybrid (owed base/var/ta minus leave PLUS already-paid
   incentive), not "what we owe." Any payout/consolidation work MUST account for this or it double-
