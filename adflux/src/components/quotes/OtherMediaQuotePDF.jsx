@@ -316,8 +316,12 @@ function OtherMediaQuoteDocument({ quote, lines, company }) {
     'Booking confirmation subject to slot / inventory availability with the underlying media at time of payment.',
     'Cancellation post-confirmation: 25% cancellation fee applicable on total invoice.',
     'Content violating law, statutory codes, or community standards may be rejected by the media partner without refund.',
-    `Payments via NEFT/RTGS/Cheque in favour of ${co.bank_acc_name || co.name}.${co.bank_name ? ` ${co.bank_name}` : ''}${co.bank_branch ? ` (${co.bank_branch} branch)` : ''}${co.bank_acc_number ? `. A/c No. ${co.bank_acc_number}` : ''}${co.bank_ifsc ? ` · IFSC ${co.bank_ifsc}` : ''}${co.gstin ? `. GSTIN: ${co.gstin}` : ''}.`,
-  ]
+    // Bank / payment line hidden on a No-GST quote (gst_rate = 0) — owner rule:
+    // an informal no-GST quotation carries no bank details. filter(Boolean) drops it.
+    gstApplies
+      ? `Payments via NEFT/RTGS/Cheque in favour of ${co.bank_acc_name || co.name}.${co.bank_name ? ` ${co.bank_name}` : ''}${co.bank_branch ? ` (${co.bank_branch} branch)` : ''}${co.bank_acc_number ? `. A/c No. ${co.bank_acc_number}` : ''}${co.bank_ifsc ? ` · IFSC ${co.bank_ifsc}` : ''}${co.gstin ? `. GSTIN: ${co.gstin}` : ''}.`
+      : null,
+  ].filter(Boolean)
 
   return (
     <Document>

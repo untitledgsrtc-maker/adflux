@@ -18951,3 +18951,47 @@ is how you KNOW, not assume.) All six TRUE → the inflation fix is confirmed li
   saying "un-started"). Before BUILDING a fix for a documented-open item, READ the live/canonical
   code first (§17 verify-first cuts both ways). Here the whole "fix" was already in the code;
   the deliverable was a verify + a doc correction, not a change.
+
+
+---
+
+## 292 · No-GST quote hides the bank block (both quote types) (2026-09-15)
+
+Owner: "when we send a without-GST quote, bank details should not be there — is it even
+possible?" YES — trivially. No-GST is ALREADY a real saved mode (`quotes.gst_rate = 0`) on
+BOTH sales quote types: the private-LED wizard `gstRate` toggle (`WizardShell.jsx:55`, 0.18 =
+GST / 0 = No GST) and the Other-Media `includeGst` checkbox (`CreateQuoteOtherMediaV2.jsx`,
+saves `gst_rate: 0`). The bank block just wasn't gated on it — it rendered unconditionally.
+
+### Change (display-only, gate the bank render on `gst_rate > 0`)
+- `QuotePDFHtml.jsx` (private LED; NOT §28-frozen, but a money renderer — parse+build checked,
+  §44.10) — THREE bank blocks, all gated `{gstRate > 0 ? (…bank…) : <spacer div/>}`:
+  (1) `QuotePDFHtmlDocument` `!letterheadOn` footer Bank cell, (2) its `letterheadOn` compact
+  Bank div, (3) `QuotePage` (the paginated component the §212 AI-render path uses). The empty
+  spacer div preserves the footer/grid layout when hidden.
+- `OtherMediaQuotePDF.jsx` — the T&C "Payments via NEFT/RTGS… A/c No… IFSC…" line is now
+  `gstApplies ? <line> : null` + `.filter(Boolean)` on the TERMS array → the whole payment line
+  (which also bundled GSTIN) drops on a no-GST quote.
+
+### Contracts / notes
+- **GST quotes are byte-unchanged** — the gate is `gstRate > 0`, which every GST quote passes.
+  Only a `gst_rate = 0` quote hides the bank block. Reversible (it's a pure conditional).
+- **One change covers manual + AI:** the AI-quote path (§210/§212) renders via `QuotePage`
+  (gated) + the headless-Chromium `/quote-print` service; but AI quotes are always standard-rate
+  WITH GST, so `gstRate > 0` → bank still shows → no AI regression. The pdf-lib FALLBACK renderer
+  `api/quote/render.js` (§210, hard-fails without bank) is untouched — it's only hit on the AI
+  send path (GST), never a manual no-GST quote (which uses QuotePDFHtml html2canvas). No conflict.
+- **GSTIN is NOT hidden** (owner asked only about bank): it stays in the QuotePDFHtml header
+  (`:355`) + the OtherMedia footer (`:513`). OPEN QUESTION to the owner — also hide the GSTIN
+  line on a no-GST quote? Not built; his call (a no-GST quote arguably shouldn't advertise the
+  GSTIN either, but he said bank).
+- **Operational note flagged to owner:** with bank hidden, the client sees no payment account on
+  a no-GST quotation — intended (informal/off-tax-invoice deal), but he should know (if he'd
+  rather show "bank details on request", that's a 1-line copy change).
+- Govt proposals (GovtProposalRenderer, Auto Hood / GSRTC LED) are a separate renderer with their
+  own DAVP+GST structure — a "no-GST govt quote" isn't a thing → out of scope, untouched.
+
+### Foot-gun
+- ❌ QuotePDFHtml has THREE bank blocks across two components (single-page Document + paginated
+  QuotePage) — a "hide the bank block" change must gate ALL THREE, or the letterhead/paginated
+  variant still leaks it. Grep every `footerLabel>Bank` / `>Bank<` before declaring done.

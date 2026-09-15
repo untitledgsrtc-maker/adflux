@@ -556,6 +556,9 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
       {!letterheadOn && (
         <div style={styles.footer}>
           <div style={styles.footerRow}>
+            {/* Bank details hidden on a No-GST quote (gst_rate = 0) — owner
+                rule: an informal no-GST quotation carries no bank block. */}
+            {gstRate > 0 ? (
             <div style={styles.footerCell}>
               <div style={styles.footerLabel}>Bank</div>
               <div style={styles.footerValue}>{company.bank_name || ''}</div>
@@ -566,6 +569,7 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
               {company.bank_micr && <div>MICR: {company.bank_micr}</div>}
               {company.upi_id && <div>UPI: {company.upi_id}</div>}
             </div>
+            ) : <div style={styles.footerCell} />}
             <div style={styles.footerCell}>
               <div style={styles.footerLabel}>Contact</div>
               {company.phone && <div>Phone: {company.phone}</div>}
@@ -588,6 +592,8 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
       {letterheadOn && (
         <div style={{ marginTop: 24, paddingTop: 14, borderTop: `1px solid ${BORDER}`, fontSize: 10, color: MUTED }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+            {/* No bank block on a No-GST quote (gst_rate = 0). */}
+            {gstRate > 0 ? (
             <div>
               <div style={styles.footerLabel}>Bank</div>
               {company.bank_name && <div><b style={{ color: INK }}>{company.bank_name}</b></div>}
@@ -596,6 +602,7 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
               {company.bank_ifsc && <div>IFSC: {company.bank_ifsc}</div>}
               {company.upi_id && <div>UPI: {company.upi_id}</div>}
             </div>
+            ) : <div />}
             <div style={{ textAlign: 'right' }}>
               <div style={styles.footerLabel}>Prepared by</div>
               <div style={{ color: INK, fontWeight: 600 }}>{repName}</div>
@@ -1048,6 +1055,8 @@ export function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLas
               clears the letterhead's bottom address strip. */}
           <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px solid ${BORDER}`, fontSize: 9.5, color: MUTED, lineHeight: 1.35 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              {/* No bank block on a No-GST quote (gst_rate = 0). */}
+              {gstRate > 0 ? (
               <div>
                 <div style={{ fontSize: 8, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', marginBottom: 1 }}>Bank</div>
                 {company.bank_name && <div><b style={{ color: INK }}>{company.bank_name}</b></div>}
@@ -1056,6 +1065,7 @@ export function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLas
                 {company.bank_ifsc && <div>IFSC: {company.bank_ifsc}</div>}
                 {company.upi_id && <div>UPI: {company.upi_id}</div>}
               </div>
+              ) : <div />}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 8, letterSpacing: '0.12em', color: MUTED, textTransform: 'uppercase', marginBottom: 1 }}>Prepared by</div>
                 <div style={{ color: INK, fontWeight: 600 }}>{repName}</div>
