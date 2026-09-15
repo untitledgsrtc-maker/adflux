@@ -18995,3 +18995,75 @@ saves `gst_rate: 0`). The bank block just wasn't gated on it — it rendered unc
 - ❌ QuotePDFHtml has THREE bank blocks across two components (single-page Document + paginated
   QuotePage) — a "hide the bank block" change must gate ALL THREE, or the letterhead/paginated
   variant still leaks it. Grep every `footerLabel>Bank` / `>Bank<` before declaring done.
+
+
+---
+
+## 293 · DB OUTAGE (Micro maxed) — upgraded Medium + load-cuts (2026-09-15)
+
+The whole app went down for EVERYONE — every browser query failed with "No
+Access-Control-Allow-Origin header." Root cause (NOT CORS, NOT code, NOT paused):
+the staging Supabase **compute was MICRO (t4g.micro, 1 GB RAM)** and it maxed out
+— **CPU 98% · RAM 93%**, and Micro's PostgREST pool is **capped at 15 connections**
+(fixed). The pool exhausted → Postgres refused new TCP connections ("Database not
+usable: CONNECT_TIMEOUT 5s") → auth + data + edge + realtime ALL failed. A 5xx from
+the overloaded gateway carries no CORS header → the browser reports it as CORS. The
+trivial no-query 401 kept working (it never touches the pool) — that split (auth-OK /
+queries-fail) is the diagnostic signature of pool starvation, and it's the mirror-
+image of a CORS misconfig (do NOT chase CORS/allowed-origins for this).
+
+### Why it started NOW ("it worked fine before")
+The last ~5 weeks added ~118 commits of backend load onto the same 1 GB box: the
+whole **Operations module** (aiadflux screen-sync every 10 min + GPS ingest), the
+**WhatsApp AI** + its cron stack (recovery every 5 min, cadence, nudge, quality-
+watch), more users, + data growth (gps_pings/whatsapp_messages/lead_activities).
+Micro was sized for the original sales app; the workload roughly doubled, the box
+didn't → it now tips over at every peak = the recurring "happens many times."
+
+### The fix (done via Claude-in-Chrome on the owner's Supabase dashboard)
+**Upgraded compute MICRO → MEDIUM (t4g.medium, 4 GB, ~$59/mo).** Immediately after:
+**RAM 93%→50%, connections 33/120 (was 15-capped), CPU 98%→36%** → healthy, DB
+accepting connections again. The upgrade reboots the DB (~2-5 min) and permanently
+raises RAM + the pool. NOTE: every tier ≤ Large is still **2-core** — more RAM +
+the load-cuts drop CPU, not a bigger tier; only 2XL+ adds cores. If CPU stays hot
+after the load-cuts, bump to 2XL.
+
+### Load-cuts shipped (so Medium stays cool + it doesn't recur)
+- **CODE (this commit):** debounce AdminDashboardDesktop's `v2d-admin` realtime
+  channel — each team-wide payment/quote change used to re-fire the whole ~18-query
+  dashboard barrage; during business hours (every rep punching payments/quotes) that
+  put every open admin screen into a near-constant reload loop = a major DB-load
+  amplifier. Now collapses a burst into ONE reload per 4s (initial mount load stays
+  immediate). TeamDashboardV2's gps channel was checked + LEFT — it only moves a map
+  marker (cheap), no barrage (the audit over-stated it).
+- **SQL — owner runs `supabase_perf_load_cuts.sql` (one file, off-peak):**
+  1. `statement_timeout='25s'` on authenticated/anon/authenticator → a stuck query
+     frees its pooled connection instead of hanging the pool (cascading outage →
+     isolated slow failures). NOT on postgres/service_role → crons/Edge unaffected.
+  2. 3 missing indexes: `gps_pings(created_at DESC)` · `call_logs(call_at)` ·
+     `payments(payment_date) WHERE approval_status='approved'` — kill the seq-scans
+     that hold connections longest. ⚠ RUN OFF-PEAK (plain CREATE INDEX briefly locks
+     writes; Studio can't do CONCURRENTLY, §315.1).
+  3. Slow + de-collide the 2 heaviest crons via `cron.alter_job`: `ops-aiadflux-sync`
+     */10 → every-15-offset, `wa-ai-recovery` */5 → every-10-offset (both were
+     stacking on the round minute).
+
+### NOT done (bigger follow-up batch, needs care — offer next)
+Wire the already-built `admin_dashboard_kpis` aggregate RPC (§239, built + shadow-
+verified but grep=0 in src) + replace the whole-table dashboard downloads
+(`quotes?select=*`, all-approved-payments, the whole-leads pipeline sum in
+CockpitWidgets) with GROUP BY RPCs · NotificationPanel 60s poll (every page × 22
+devices = ~110 q/min floor) → realtime or 3-5 min · run the drafted M18 inbox RLS
+short-circuit · batch ai-reply.js's per-inbound context reads. These cut the
+sustained baseline further but touch money KPIs / frozen-adjacent surfaces → verify
+before shipping.
+
+### Foot-guns / lessons
+- ❌ "No Access-Control-Allow-Origin" for EVERYONE, persistently, while a trivial
+  REST call succeeds = **pool/DB saturation upstream (5xx w/o CORS), not a CORS bug
+  and not a pause.** Check Supabase → Reports → Database CPU/Connections + the
+  Advisor ("Database not usable") FIRST, not the CORS config.
+- ❌ A realtime channel handler that re-fires a heavy multi-query reload on every
+  team-wide row change = a business-hours self-DDOS. Debounce it (trailing, 3-5s).
+- Sizing: this app outgrew Micro (1 GB). Watch Reports → Database as features keep
+  landing; the next ceiling is CPU (2-core) → 2XL when it pegs after the load-cuts.

@@ -96,13 +96,23 @@ export default function AdminDashboardDesktop() {
   useEffect(() => {
     load(period, segmentFilter)
     // Realtime — one channel, covers everything that moves numbers.
-    // Re-use the current `period` + filter from closure on realtime.
+    // DEBOUNCE (2026-09-15 DB-overload fix): each team-wide payment/quote
+    // change used to re-fire the whole ~18-query dashboard barrage. During
+    // business hours (every rep punching payments/quotes) that put every
+    // open admin screen into a near-constant reload loop — a major DB-load
+    // amplifier that helped saturate the DB. Collapse a burst into ONE
+    // reload per 4s. The initial on-mount load() stays immediate.
+    let reloadTimer = null
+    const scheduleReload = () => {
+      if (reloadTimer) clearTimeout(reloadTimer)
+      reloadTimer = setTimeout(() => load(period, segmentFilter), 4000)
+    }
     const ch = supabase
       .channel('v2d-admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => load(period, segmentFilter))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => load(period, segmentFilter))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, scheduleReload)
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { if (reloadTimer) clearTimeout(reloadTimer); supabase.removeChannel(ch) }
   /* eslint-disable-next-line */ }, [period, segmentFilter])
 
   async function load(activePeriod, activeSegment = 'all') {
@@ -1335,21 +1345,39 @@ function Kpi({ label, value, count, tone, dot, sub, cta }) {
 }
 
 function RevenueTrendPanel({ months, max, onMonthClick }) {
-  // ONE big 2-part bar per month (owner ask 2026-09-07): each bar's full
-  // height = the deals WON that month; the bright-yellow filled portion =
-  // Received (cash collected); the amber cap on top = still Owed. So the
-  // amber you see = collections owed on this month's closed deals.
+  // Grouped columns (owner ask 2026-09-08 "i want this type" — Excel-style):
+  // TWO solid bars per month — Won (deals closed, yellow) LEFT + Received
+  // (cash collected, blue) RIGHT — on a shared linear Y-axis with subtle
+  // gridlines. Exact values on hover; click a month to open its quotes.
   const rs = (v) => '₹' + Math.round(v || 0).toLocaleString('en-IN')
-  const cr = (v) => {
-    v = Math.round(v || 0)
-    if (v >= 1e7) return '₹' + (v / 1e7).toFixed(2) + 'Cr'
-    if (v >= 1e5) return '₹' + (v / 1e5).toFixed(1) + 'L'
-    if (v >= 1000) return '₹' + Math.round(v / 1000) + 'k'
-    return '₹' + v
-  }
   const wonTotal  = months.reduce((s, m) => s + (m.won   || 0), 0)
   const recvTotal = months.reduce((s, m) => s + (m.value || 0), 0)
   const outstanding = Math.max(0, wonTotal - recvTotal)
+  const collPct = wonTotal > 0 ? Math.round((recvTotal / wonTotal) * 100) : 0
+
+  // Nice-number Y axis: round the data max up to a clean ceiling, 4 even steps.
+  const niceMax = (v) => {
+    if (!v || v <= 0) return 1
+    const p = Math.pow(10, Math.floor(Math.log10(v)))
+    const n = v / p
+    const m = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10
+    return m * p
+  }
+  const yTop = niceMax(max)
+  const unit = yTop >= 1e7 ? 'Cr' : yTop >= 1e5 ? 'L' : yTop >= 1000 ? 'k' : ''
+  const uDiv = unit === 'Cr' ? 1e7 : unit === 'L' ? 1e5 : unit === 'k' ? 1000 : 1
+  const axisFmt = (t) => {
+    if (t === 0) return '₹0'
+    const q = t / uDiv
+    return '₹' + (q % 1 === 0 ? q : q.toFixed(1)) + unit
+  }
+  const ticks = [0, 1, 2, 3, 4].map((i) => (yTop / 4) * i)
+
+  const YELLOW = 'linear-gradient(180deg, #FFE600, #f5c400)'
+  const BLUE = 'linear-gradient(180deg, #60A5FA, #3B82F6)'
+  const PLOT = 220 // px plot height
+  const GUTTER = 46 // px y-axis label gutter
+
   const kSty = { fontSize: 10, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }
   const Stat = ({ k, v, c, first }) => (
     <div style={{ padding: first ? '0 22px 0 0' : '0 22px', borderLeft: first ? 'none' : '1px solid var(--v2-line)' }}>
@@ -1357,77 +1385,82 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
       <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 18, color: c, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}><Money value={v} /></div>
     </div>
   )
-  const numSty = { fontFamily: 'var(--v2-display)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }
-  const YELLOW = 'linear-gradient(180deg, #FFE600, #f5c400)'
-  const YELLOW_CUR = 'linear-gradient(180deg, #FFE600, #f59e0b)'
-  const AMBER = 'linear-gradient(180deg, #f59e0b, #c2790a)'
-  const H = 220 // px — bar area is taller/bigger than the old chart
+  const Swatch = ({ bg, label }) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
+      <span style={{ width: 12, height: 12, borderRadius: 3, background: bg }} /> {label}
+    </span>
+  )
+
   return (
     <div className="v2d-panel">
       <div className="v2d-panel-h">
         <div>
           <div className="v2d-panel-t">Revenue trend · last 6 months</div>
-          <div className="v2d-panel-s">Each bar = deals won that month · yellow = collected · amber = still owed · click to open quotes</div>
+          <div className="v2d-panel-s">Won = deals closed · Received = cash collected · hover for exact ₹ · click a month to open quotes</div>
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: YELLOW }} /> Received
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: AMBER }} /> Owed
-          </span>
+          <Swatch bg={YELLOW} label="Won" />
+          <Swatch bg={BLUE} label="Received" />
         </div>
       </div>
-      {/* Summary strip — the 6-month totals + the gap at a glance */}
-      <div style={{ display: 'flex', alignItems: 'stretch', padding: '4px 4px 16px', flexWrap: 'wrap' }}>
-        <Stat k="Won" v={wonTotal} c="var(--v2-ink-0)" first />
-        <Stat k="Received" v={recvTotal} c="var(--v2-yellow)" />
+
+      {/* Summary strip — 6-month totals + the collection rate */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '4px 4px 16px', flexWrap: 'wrap', gap: 8 }}>
+        <Stat k="Won" v={wonTotal} c="var(--v2-yellow)" first />
+        <Stat k="Received" v={recvTotal} c="var(--v2-blue, #3B82F6)" />
         <Stat k="Outstanding" v={outstanding} c="var(--v2-amber, #f59e0b)" />
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 999, background: 'var(--v2-green-soft, rgba(16,185,129,0.12))', color: 'var(--v2-green, #10B981)', fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+          {collPct}% collected
+        </span>
       </div>
-      <div className="v2d-bars" style={{ height: H + 40 }}>
-        {months.map((m, i) => {
-          const owed = Math.max(0, (m.won || 0) - (m.value || 0))
-          const anyVal = (m.value > 0) || (m.won > 0)
-          const solidH = anyVal ? Math.max(3, Math.round(((m.value || 0) / max) * H)) : 0
-          const owedH  = owed > 0 ? Math.max(3, Math.round((owed / max) * H)) : 0
-          const isCurrent = i === months.length - 1
-          const clickable = !!onMonthClick && anyVal
-          // Float the Won number at the very top only when the amber cap is
-          // tall enough to separate it from the Received number.
-          const showWon = owedH >= 22
-          return (
-            <button
-              key={m.key}
-              type="button"
-              className="v2d-bar-col"
-              onClick={clickable ? () => onMonthClick(m.key) : undefined}
-              disabled={!clickable}
-              title={clickable ? `${m.label} · Won ${rs(m.won)} · Received ${rs(m.value)} · Owed ${rs(owed)}` : `${m.label}: no revenue`}
-              style={{
-                background: 'transparent', border: 0, padding: 0,
-                cursor: clickable ? 'pointer' : 'default',
-                color: 'inherit', font: 'inherit', textAlign: 'inherit',
-              }}
-            >
-              <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: 0 }}>
-                {/* One big 2-part bar, bottom-anchored: yellow (collected) + amber (owed) on top */}
-                <div style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 64, maxWidth: '72%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: solidH + owedH }}>
-                  {owedH > 0 && (
-                    <div style={{ height: owedH, borderRadius: '8px 8px 0 0', background: AMBER, borderBottom: '1.5px solid rgba(15,23,42,.45)' }} />
-                  )}
-                  <div style={{ height: solidH, borderRadius: owedH > 0 ? 0 : '8px 8px 0 0', background: isCurrent ? YELLOW_CUR : YELLOW, boxShadow: isCurrent ? '0 0 0 2px rgba(255,230,0,.18)' : 'none' }} />
-                </div>
-                {/* Won number at the very top (only with a clear amber cap) */}
-                {showWon && (
-                  <div style={{ ...numSty, position: 'absolute', bottom: solidH + owedH + 5, left: '50%', transform: 'translateX(-50%)', fontSize: 10, fontWeight: 700, color: 'var(--v2-ink-2)' }}>{cr(m.won)}</div>
-                )}
-                {/* Received number at the yellow top */}
-                <div style={{ ...numSty, position: 'absolute', bottom: solidH + 5, left: '50%', transform: 'translateX(-50%)', fontSize: 11, fontWeight: 700, color: 'var(--v2-ink-0)', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{cr(m.value)}</div>
-              </div>
-              <div className="v2d-bar-m">{m.label}</div>
-            </button>
-          )
-        })}
+
+      {/* Chart: y-axis gutter + plot */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ position: 'relative', width: GUTTER, height: PLOT, flex: `0 0 ${GUTTER}px` }}>
+          {ticks.map((t, i) => (
+            <div key={i} style={{ position: 'absolute', right: 0, bottom: (t / yTop) * PLOT, transform: 'translateY(50%)', fontSize: 9, color: 'var(--v2-ink-2)', fontFamily: 'var(--v2-display)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{axisFmt(t)}</div>
+          ))}
+        </div>
+        <div style={{ position: 'relative', flex: 1, height: PLOT }}>
+          {/* horizontal gridlines, one per tick */}
+          {ticks.map((t, i) => (
+            <div key={i} style={{ position: 'absolute', left: 0, right: 0, bottom: (t / yTop) * PLOT, height: 1, background: 'var(--v2-line)', opacity: t === 0 ? 0.9 : 0.45 }} />
+          ))}
+          {/* grouped bars */}
+          <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${months.length}, 1fr)`, alignItems: 'end' }}>
+            {months.map((m) => {
+              const owed = Math.max(0, (m.won || 0) - (m.value || 0))
+              const wonH = m.won > 0 ? Math.max(3, Math.round((m.won / yTop) * PLOT)) : 0
+              const recvH = m.value > 0 ? Math.max(3, Math.round((m.value / yTop) * PLOT)) : 0
+              const isZero = !(m.won > 0) && !(m.value > 0)
+              const clickable = !!onMonthClick && !isZero
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={clickable ? () => onMonthClick(m.key) : undefined}
+                  disabled={!clickable}
+                  title={clickable ? `${m.label} · Won ${rs(m.won)} · Received ${rs(m.value)} · Owed ${rs(owed)}` : `${m.label}: no revenue`}
+                  style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 6, background: 'transparent', border: 0, padding: 0, cursor: clickable ? 'pointer' : 'default' }}
+                >
+                  <div style={{ width: 24, maxWidth: '38%', height: wonH, background: YELLOW, borderRadius: '4px 4px 0 0' }} />
+                  <div style={{ width: 24, maxWidth: '38%', height: recvH, background: BLUE, borderRadius: '4px 4px 0 0' }} />
+                  {isZero && <span style={{ position: 'absolute', bottom: 2, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'var(--v2-ink-2)' }}>₹0</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* month labels, aligned under the plot columns */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <div style={{ width: GUTTER, flex: `0 0 ${GUTTER}px` }} />
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${months.length}, 1fr)` }}>
+          {months.map((m) => (
+            <div key={m.key} style={{ textAlign: 'center', fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>{m.label}</div>
+          ))}
+        </div>
       </div>
     </div>
   )
