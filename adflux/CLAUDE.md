@@ -19067,3 +19067,51 @@ before shipping.
   team-wide row change = a business-hours self-DDOS. Debounce it (trailing, 3-5s).
 - Sizing: this app outgrew Micro (1 GB). Watch Reports → Database as features keep
   landing; the next ceiling is CPU (2-core) → 2XL when it pegs after the load-cuts.
+
+
+---
+
+## 294 · Post-presentation "Email the pitch" — GSRTC LED email wired into the app (2026-09-15)
+
+Owner: after a rep ends the in-app GSRTC presentation, add an EMAIL option beside the §322
+WhatsApp thank-you — send the GSRTC LED pitch email to the customer. (He'd asked for the pitch
+email; I first built the standalone HTML `public/email/gsrtc-led.html` for manual Gmail send —
+table-based, inline-styled, hosted images, ~600px, NO CSS-animation reliance since Gmail strips
+it. Then via AskUserQuestion he chose "wire it into the app" over an animated-GIF hero.)
+Additive, §45-safe, no §28-frozen file; 3-lens adversarial review (security/correctness/deploy)
+all **SHIP, zero findings**. No SQL, no env, no APK.
+
+### Pieces
+- NEW `src/utils/pitchEmail.js` — `buildPitchEmail({name})` → `{subject, html}`. THE single source
+  of the pitch email BODY (table-based, inline-styled, hosted `app.untitledad.in` images —
+  Gmail-safe; personalises "Hi <name>," when a name is passed, `esc()`-escaped `& < > " '`).
+- `api/email/send.js` (Edge, Resend, §101) — added `kind='pitch'` → from `quotes@untitledad.in`
+  (reuses the verified §101/§102 alias). kind parse → `['offer','pitch'].includes(body.kind) ?
+  body.kind : 'quote'`. `'offer'` stays HR-gated; `'pitch'` is any-authed (like `'quote'`). Sends
+  `body.html` VERBATIM + the rep's §240 signature banner + reply-to/BCC to the rep's real Gmail
+  (users.contact_email). `email_log.kind` is FREE TEXT → logs 'pitch' fine → **no SQL**.
+- `src/pages/v2/PresentView.jsx` (NOT §28 frozen, §181) — loads `leads.email`+`name` for the
+  leadId; the post-"End Presentation" prompt (§322) now offers **WhatsApp thank-you** OR **Email
+  the GSRTC pitch** → an inline To input (prefilled from the lead's email, rep-editable) →
+  `sendPitch()` → `sendAppEmail({kind:'pitch', to, subject, html, relatedId: leadId})`. Client
+  (EMAIL_RE) + server email validation. Failures render **INLINE** (the /present view is OUTSIDE
+  V2AppShell → a toast wouldn't render until exit, §322) so the rep can retry; success toasts on
+  the lead page after exit.
+
+### Contracts / foot-guns
+- **ONE source for the pitch body = `pitchEmail.js`.** The standalone `public/email/gsrtc-led.html`
+  (the owner's manual Gmail copy-paste path) MIRRORS the same card markup — edit BOTH together
+  (LOCKSTEP; the .html's `<head>` adds a `<style>` animation layer Gmail strips anyway). The SEND
+  source of truth is pitchEmail.js; the hosted file is the manual-preview convenience (both live).
+- The email is a WARM follow-up (the lead just watched the deck) from quotes@, ONE-TO-ONE,
+  rep-confirmed in the modal (NOT autonomous) — within the safety boundary; the endpoint enforces
+  auth + single-recipient + server from-address.
+- Deploy-safe: no schema/env/APK; the api change is backward-compatible (quote/offer unchanged).
+  `leads.email` exists (LeadDetailV2 uses it); `quotes@` already verified in Resend.
+- Manual Gmail send still works (§ hosted file at app.untitledad.in/email/gsrtc-led.html) — the
+  app-wire is additive to it, not a replacement.
+
+Owner smoke: run a presentation → End Presentation → "Email the GSRTC pitch" → the To field
+prefills the lead's email → Send → lands from quotes@ with the pitch + the rep's signature banner;
+a reply goes to the rep's Gmail; logged in email_log (kind='pitch'). A lead with no email on file →
+the rep types it. Also open app.untitledad.in/email/gsrtc-led.html to copy-paste a manual send.

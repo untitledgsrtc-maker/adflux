@@ -1,8 +1,9 @@
 // api/email/send.js — EDGE runtime (Phase 235)
 // ─────────────────────────────────────────────────────────────────────────
 // Send an email from the app via Resend (CLAUDE.md §99).
-//   • HR offer  (kind='offer') → from hr@untitledad.in
+//   • HR offer  (kind='offer') → from hr@untitledad.in (HR-only)
 //   • Client quote (kind='quote') → from quotes@untitledad.in
+//   • GSRTC LED pitch (kind='pitch') → from quotes@untitledad.in (post-presentation)
 // reply-to + BCC = the sending rep's REAL Gmail (users.contact_email; their
 // @untitledad.in login is a send-only alias that would bounce). BCC (not CC) so
 // the client never sees the generic Gmail. The client's PDF rides as a base64
@@ -42,6 +43,7 @@ const RESEND_KEY   = process.env.RESEND_API_KEY
 const FROM = {
   offer: 'Untitled Advertising <hr@untitledad.in>',
   quote: 'Untitled Advertising <quotes@untitledad.in>',
+  pitch: 'Untitled Advertising <quotes@untitledad.in>',   // GSRTC LED pitch (post-presentation) — reuses the verified quotes@ alias
 }
 
 // Where replies + the sender's own copy land. The @untitledad.in from-addresses
@@ -119,7 +121,9 @@ export default async function handler(req) {
   // ── body ──
   let body
   try { body = await req.json() } catch { body = {} }
-  const kind = body?.kind === 'offer' ? 'offer' : 'quote'
+  // 'offer' (HR-only) | 'pitch' (GSRTC LED post-presentation) | 'quote' (default) —
+  // all any-authed except offer. Unknown kind falls back to 'quote'.
+  const kind = ['offer', 'pitch'].includes(body?.kind) ? body.kind : 'quote'
   if (kind === 'offer' && !['hr', 'admin', 'co_owner'].includes(role)) {
     return json({ error: 'not_allowed', detail: 'Only HR can send offer emails.' }, 403)
   }

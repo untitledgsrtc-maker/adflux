@@ -5,10 +5,12 @@
 // My Performance log. Additive; touches no frozen sales contract (§45).
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Square, Loader2, Radio, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Square, Loader2, Radio, MessageCircle, Mail } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { buildPitchEmail } from '../../utils/pitchEmail'
+import { sendAppEmail } from '../../utils/sendEmail'
 import {
   startPresentation,
   getActive,
@@ -23,6 +25,8 @@ const fmtClock = (s) => {
   return `${m}:${String(ss).padStart(2, '0')}`
 }
 
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/
+
 export default function PresentView() {
   const { leadId } = useParams()
   const navigate = useNavigate()
@@ -34,12 +38,30 @@ export default function PresentView() {
   const [ending, setEnding] = useState(false)
   const [thanksOpen, setThanksOpen] = useState(false)   // Phase 322 — thank-you prompt
   const [sending, setSending] = useState(false)
+  // Email the GSRTC pitch after the presentation (Resend, kind='pitch').
+  const [leadEmail, setLeadEmail] = useState('')
+  const [leadName, setLeadName] = useState('')
+  const [emailStep, setEmailStep] = useState(false)
+  const [emailTo, setEmailTo] = useState('')
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailErr, setEmailErr] = useState('')
   const endingRef = useRef(false)
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(elapsedSeconds(getActive())), 1000)
     return () => clearInterval(t)
   }, [])
+
+  // Load the lead's email + name to prefill/personalise the pitch email.
+  useEffect(() => {
+    if (!leadId) return
+    let alive = true
+    supabase.from('leads').select('email, name').eq('id', leadId).maybeSingle()
+      .then(({ data }) => {
+        if (alive && data) { setLeadEmail(data.email || ''); setLeadName(data.name || '') }
+      }, () => {})
+    return () => { alive = false }
+  }, [leadId])
 
   const exit = useCallback(
     () => navigate(leadId ? `/leads/${leadId}` : '/work'),
@@ -113,6 +135,27 @@ export default function PresentView() {
     }
     exit()   // the toast shows on the lead page (ToastViewport lives in the shell)
   }, [leadId, sending, exit])
+
+  // Email the GSRTC LED pitch to the customer (single-source template in
+  // pitchEmail.js → sendAppEmail kind='pitch' → api/email/send.js from quotes@).
+  // Inline errors (this view is outside the shell, so a toast wouldn't render
+  // until exit) — a failure keeps the prompt open so the rep can retry.
+  const sendPitch = useCallback(async () => {
+    if (emailSending) return
+    const to = String(emailTo || '').trim()
+    if (!EMAIL_RE.test(to)) { setEmailErr('Enter a valid email address.'); return }
+    setEmailErr('')
+    setEmailSending(true)
+    try {
+      const { subject, html } = buildPitchEmail({ name: leadName })
+      await sendAppEmail({ kind: 'pitch', to, subject, html, relatedId: leadId || null })
+      toastSuccess('Pitch emailed to the customer.')
+      exit()   // the toast shows on the lead page
+    } catch (e) {
+      setEmailErr(e?.message || 'Could not send the email.')
+      setEmailSending(false)
+    }
+  }, [emailTo, emailSending, leadName, leadId, exit])
 
   // Safety net: if the rep leaves via hardware/browser back (no button tap),
   // still log the elapsed time on unmount (fire-and-forget — the view is gone).
@@ -243,9 +286,10 @@ export default function PresentView() {
         </button>
       </div>
 
-      {/* Phase 322 — after "End Presentation", offer to WhatsApp the customer a
-          thank-you + the GSRTC LED brochure from the company number. Inline
-          (ConfirmDialogViewport lives in V2AppShell, which /present is outside of). */}
+      {/* Phase 322 — after "End Presentation", offer to follow up with the
+          customer: a WhatsApp thank-you + brochure from the company number, OR
+          email the GSRTC LED pitch (kind='pitch'). Inline (ConfirmDialogViewport
+          lives in V2AppShell, which /present is outside of). */}
       {thanksOpen && (
         <div
           style={{
@@ -268,45 +312,120 @@ export default function PresentView() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <MessageCircle size={22} style={{ color: 'var(--success, #10B981)' }} />
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text, #f1f5f9)' }}>
-                Send a thank-you?
+                Follow up with the customer
               </h3>
             </div>
-            <p style={{ margin: '0 0 18px', fontSize: 14, lineHeight: 1.5, color: 'var(--text-muted, #94a3b8)' }}>
-              Send the customer a WhatsApp thank-you for meeting today, with the GSRTC
-              LED brochure — from the company number.
-            </p>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={exit}
-                disabled={sending}
-                style={{
-                  flex: 1, padding: '11px 14px', borderRadius: 10,
-                  border: '1px solid var(--border, #334155)', background: 'transparent',
-                  color: 'var(--text, #f1f5f9)', fontSize: 14, fontWeight: 600,
-                  cursor: sending ? 'default' : 'pointer',
-                }}
-              >
-                Skip
-              </button>
-              <button
-                onClick={sendThanks}
-                disabled={sending}
-                style={{
-                  flex: 1.4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '11px 14px', borderRadius: 10, border: 'none',
-                  background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
-                  fontSize: 14, fontWeight: 700, cursor: sending ? 'default' : 'pointer',
-                  opacity: sending ? 0.7 : 1,
-                }}
-              >
-                {sending ? (
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <MessageCircle size={16} />
+
+            {!emailStep ? (
+              <>
+                <p style={{ margin: '0 0 16px', fontSize: 14, lineHeight: 1.5, color: 'var(--text-muted, #94a3b8)' }}>
+                  Send a follow-up from the company — a WhatsApp thank-you with the
+                  GSRTC LED brochure, or the pitch by email.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <button
+                    onClick={sendThanks}
+                    disabled={sending}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      padding: '12px 14px', borderRadius: 10, border: 'none',
+                      background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
+                      fontSize: 14, fontWeight: 700, cursor: sending ? 'default' : 'pointer',
+                      opacity: sending ? 0.7 : 1,
+                    }}
+                  >
+                    {sending ? (
+                      <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    ) : (
+                      <MessageCircle size={16} />
+                    )}
+                    WhatsApp thank-you + brochure
+                  </button>
+                  <button
+                    onClick={() => { setEmailStep(true); setEmailTo(leadEmail || ''); setEmailErr('') }}
+                    disabled={sending}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      padding: '12px 14px', borderRadius: 10,
+                      border: '1px solid var(--border-strong, #475569)', background: 'transparent',
+                      color: 'var(--text, #f1f5f9)', fontSize: 14, fontWeight: 700,
+                      cursor: sending ? 'default' : 'pointer',
+                    }}
+                  >
+                    <Mail size={16} />
+                    Email the GSRTC pitch
+                  </button>
+                  <button
+                    onClick={exit}
+                    disabled={sending}
+                    style={{
+                      padding: '10px 14px', borderRadius: 10, border: 'none', background: 'transparent',
+                      color: 'var(--text-muted, #94a3b8)', fontSize: 14, fontWeight: 600,
+                      cursor: sending ? 'default' : 'pointer',
+                    }}
+                  >
+                    Skip
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: '0 0 10px', fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted, #94a3b8)' }}>
+                  Email the GSRTC LED pitch to the customer.
+                </p>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #94a3b8)', marginBottom: 6 }}>
+                  Send to
+                </label>
+                <input
+                  type="email"
+                  value={emailTo}
+                  onChange={(e) => { setEmailTo(e.target.value); if (emailErr) setEmailErr('') }}
+                  placeholder="name@company.com"
+                  autoFocus
+                  style={{
+                    width: '100%', boxSizing: 'border-box', padding: '11px 12px', borderRadius: 10,
+                    border: `1px solid ${emailErr ? 'var(--danger, #EF4444)' : 'var(--border, #334155)'}`,
+                    background: 'var(--bg, #0f172a)', color: 'var(--text, #f1f5f9)',
+                    fontSize: 14, fontFamily: 'var(--font-sans, system-ui)',
+                  }}
+                />
+                {emailErr && (
+                  <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #EF4444)' }}>{emailErr}</div>
                 )}
-                Send thank-you
-              </button>
-            </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button
+                    onClick={() => { setEmailStep(false); setEmailErr('') }}
+                    disabled={emailSending}
+                    style={{
+                      flex: 1, padding: '11px 14px', borderRadius: 10,
+                      border: '1px solid var(--border, #334155)', background: 'transparent',
+                      color: 'var(--text, #f1f5f9)', fontSize: 14, fontWeight: 600,
+                      cursor: emailSending ? 'default' : 'pointer',
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={sendPitch}
+                    disabled={emailSending}
+                    style={{
+                      flex: 1.4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      padding: '11px 14px', borderRadius: 10, border: 'none',
+                      background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
+                      fontSize: 14, fontWeight: 700, cursor: emailSending ? 'default' : 'pointer',
+                      opacity: emailSending ? 0.7 : 1,
+                    }}
+                  >
+                    {emailSending ? (
+                      <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    ) : (
+                      <Mail size={16} />
+                    )}
+                    Send email
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
