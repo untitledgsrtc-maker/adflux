@@ -2237,11 +2237,14 @@ excluded.
   tapped-but-not-dialed call no longer earns score → no inflated
   incentive. Sales meeting branch byte-unchanged. Live phase97.2
   security gates (`_assert_self_or_admin` + `pg_temp`) preserved.
-- **KNOWN-OPEN (§33):** the meeting branch does NOT yet apply the
-  scheduled/auto-checkin exclusions, so scores on days with
-  scheduled or auto-check-in meetings may be slightly inflated.
-  Counter + report are clean; the score function is not. Separate,
-  un-started task — do NOT assume scores are clean.
+- **~~KNOWN-OPEN (§33)~~ — RESOLVED, see §291 (2026-09-15).** This note is STALE.
+  Phase 113 (#2) + Phase 127 (`0a042c0`/§47.2) DID apply the §33 scheduled +
+  auto-check-in exclusions AND the lead-dedup to `compute_daily_score`'s meeting
+  branch, captured byte-for-byte in the §72 canonical `db/functions/
+  compute_daily_score.sql` (2026-06-23). The forward inflation is FIXED; every
+  score computed since ~5 Jun 2026 is clean. The only genuine remainders are a
+  historical daily_performance backfill (pre-Jun rows, feeds already-PAID months)
+  + a SEPARATE `site_visit`-not-scored under-count — both money-gated, see §291.
 
 ### 44.9 · Quote → PDF → WhatsApp share flow (Phase 111, money flow)
 
@@ -18874,3 +18877,77 @@ coupling that breaks consolidation both ways:
 ### Remaining HR audit tail (minor, unbuilt, §279/§280)
 2 stubs (TA receipt upload, Exit/Offboarding); load-failed→retry on #18/#21/#22; approved/rejected
 TA claim history (#23); polish (#29-38). None gated on a decision now.
+
+
+---
+
+## 291 · §33 score inflation — ALREADY FIXED (doc was stale); 2 real remainders, both money-gated (2026-09-15)
+
+Owner: "do the §33 score-inflation fix." Scouted the live code first (§17 — the doc note
+said NOT fixed; the CODE says fixed). Finding: **the forward inflation is already fixed** and
+the §33/§44.8 "known-open / do NOT assume scores are clean" notes were STALE (they predate
+Phase 113 #2 + Phase 127, both shipped ~5 Jun 2026 and captured in the §72 canonical
+2026-06-23). Nothing to build for the inflation itself.
+
+### What the canonical `db/functions/compute_daily_score.sql` ALREADY has (verified by reading)
+The meeting branch (non-telecaller) is:
+```sql
+SELECT COUNT(DISTINCT COALESCE(la.lead_id::text, la.id::text))          -- Phase 127 lead-dedup
+  INTO v_done FROM lead_activities la
+ WHERE la.created_by = p_user_id AND la.activity_type = v_activity        -- v_activity = 'meeting'
+   AND (la.created_at AT TIME ZONE 'Asia/Kolkata')::date = p_date
+   AND (la.notes IS NULL OR la.notes NOT LIKE 'Meeting scheduled%')       -- §33 excl (Phase 113 #2)
+   AND (la.notes IS NULL OR la.notes NOT LIKE 'I''m here · auto-check-in%'); -- §33 excl (Phase 113 #2)
+```
+The two §33 exclusion strings are **byte-identical** across all three surfaces
+(compute_daily_score, `lead_activity_bump_counter`, `recompute_daily_meetings`) — lockstep
+intact. So a scheduled/auto-check-in meeting no longer earns score → the "scores slightly
+high" inflation is closed since ~5 Jun 2026.
+
+### OWNER — the one thing to run (read-only, confirms live == canonical)
+The canonical's VERIFY block (bottom of the file) proves the LIVE function still carries every
+fix. Paste in Supabase Studio — all six must be TRUE:
+```sql
+SELECT
+  pg_get_functiondef(p.oid) LIKE '%_assert_self_or_admin%'              AS has_97_2_self_gate,
+  pg_get_functiondef(p.oid) LIKE '%min_calls%'                          AS has_113_tc_target,
+  pg_get_functiondef(p.oid) LIKE '%duration_seconds >= 10%'             AS has_110_call_gate,
+  pg_get_functiondef(p.oid) LIKE '%Meeting scheduled%'                  AS has_33_sched_excl,
+  pg_get_functiondef(p.oid) LIKE '%auto-check-in%'                      AS has_33_autocheckin_excl,
+  pg_get_functiondef(p.oid) LIKE '%COUNT(DISTINCT COALESCE(la.lead_id%' AS has_127_lead_dedup
+FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.proname = 'compute_daily_score';
+```
+Any FALSE = an old copy was re-run and stripped a fix → re-run the canonical file to restore.
+(Phase 178 removed the block from all 10 old files, so a revert is unlikely — but the tripwire
+is how you KNOW, not assume.) All six TRUE → the inflation fix is confirmed live, nothing to ship.
+
+### The 2 REAL remainders (both MONEY, both owner-DECISION, NOT built)
+1. **Historical daily_performance backfill.** `compute_daily_score` only re-fires on a NEW
+   activity for that day (trigger `trg_recompute_score_on_activity`, §34Z.66); there is NO
+   score-recompute cron (§239 H9). So `daily_performance` rows for days BEFORE ~5 Jun 2026 that
+   had a scheduled/auto-check-in meeting were computed with the OLD inflated logic and were
+   never recomputed → they still carry a slightly-high `score_pct` that fed those months'
+   VARIABLE salary (score → monthly_score.avg_score_pct → variable 30%; NOT the Sept+ earned
+   incentive, which is revenue-based §290). Re-running compute_daily_score over past dates would
+   change ALREADY-PAID months. **Recommend LEAVE IT** — same no-clawback stance the owner took
+   for D1 (Aug & earlier untouched, §290). Only revisit on his explicit sign-off; it is a
+   backward pay change, never mid-workday (§71 rule 3).
+2. **`site_visit` earns ZERO score (a SEPARATE divergence, an UNDER-count not inflation).**
+   The score counts `activity_type = 'meeting'` ONLY; the §33 counter + delete-heal count
+   `IN ('meeting','site_visit')`. `site_visit` IS a real rep-selectable activity
+   (`LogActivityModal.jsx:76` "Site visit", MapPin; rendered in WorkV2/RepMapPanel). So a rep
+   who logs a site visit gets it in the meeting-KPI counter + the map but NO score credit → the
+   pay engine under-counts their field work. This is the OPPOSITE of the inflation the owner
+   asked about, and going either way is a MONEY change (widening the score to
+   `IN ('meeting','site_visit')` RAISES some reps' scores/variable). Do NOT touch without an
+   owner decision + a shadow-compare (§71 rule 3): is a site visit worth a "meeting" for score?
+   If yes → change the score's `v_activity`/predicate to the IN-set (matching the counter) +
+   shadow old-vs-new per rep + owner-verify before flipping. Flagged, not built.
+
+### Foot-gun (the mirror of §17)
+- ❌ A "KNOWN-OPEN / still not fixed" doc note can be STALE in the FIXED direction — a later
+  phase shipped the fix and the note never got updated (§113/§127 fixed this; §33/§44.8 kept
+  saying "un-started"). Before BUILDING a fix for a documented-open item, READ the live/canonical
+  code first (§17 verify-first cuts both ways). Here the whole "fix" was already in the code;
+  the deliverable was a verify + a doc correction, not a change.
