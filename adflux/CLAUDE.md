@@ -19115,3 +19115,28 @@ Owner smoke: run a presentation → End Presentation → "Email the GSRTC pitch"
 prefills the lead's email → Send → lands from quotes@ with the pitch + the rep's signature banner;
 a reply goes to the rep's Gmail; logged in email_log (kind='pitch'). A lead with no email on file →
 the rep types it. Also open app.untitledad.in/email/gsrtc-led.html to copy-paste a manual send.
+
+### 294.1 · Real footage in the email = an animated GIF hero (2026-09-17)
+
+Owner: "where is real footage" + "i want [app.untitledad.in/led] as email template." EMAIL CANNOT
+PLAY VIDEO — Gmail/Outlook/Apple Mail all strip `<video>` + `<iframe>`. The ONLY way footage plays
+in an email is an animated GIF. So the hero is now a **looping GIF of the real station footage**
+that also taps through to the live /led video.
+- NEW `public/email/station-hero.gif` (1.1 MB, 520px, ~3s loop) — built with ffmpeg from the /led
+  hero source `public/deck/station-hero.mp4`:
+  `ffmpeg -y -ss 1 -t 3 -i public/deck/station-hero.mp4 -vf "fps=8,scale=520:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=80[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5" -loop 0 public/email/station-hero.gif`
+  (a first pass at 600w/128-colors/4s was 3.0 MB → too heavy for mobile email; the above lands ~1.1 MB.)
+- BOTH `public/email/gsrtc-led.html` + `src/utils/pitchEmail.js` (§294 lockstep): the hero swapped
+  from a CSS-`background-image` `<td>` → a **foreground `<img src=…/email/station-hero.gif>`** wrapped
+  in `<a href=app.untitledad.in/led>` + a "▶ Watch it live →" button, headline BELOW the image.
+  This also FIXES a latent bug: **Gmail strips CSS `background-image`** on a `<td>`, so the old
+  station-1.jpg hero never even showed in Gmail — a foreground `<img>` GIF reliably does. Moat
+  headline aligned to /led ("A billboard can't tell you who looked. Ours can.").
+- FOOT-GUN: never put the hero image in a CSS `background`/`background-image` for an email — Gmail
+  drops it. Use a foreground `<img>`. And an email GIF should stay ≲1.5 MB (mobile data) — tune
+  ffmpeg fps/scale/colors, don't ship the first big encode.
+- To refresh the footage: re-run the ffmpeg line against a new `public/deck/*.mp4`, keep it ≲1.5 MB,
+  overwrite `public/email/station-hero.gif`, push (Vercel redeploys the static file at the same URL).
+- The hero GIF shows BROKEN in the local file preview until deployed (absolute app.untitledad.in URL
+  not yet hosted) — verified the GIF itself renders + the rest of the email is intact; it resolves on
+  Vercel deploy.
