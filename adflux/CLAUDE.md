@@ -19140,3 +19140,73 @@ that also taps through to the live /led video.
 - The hero GIF shows BROKEN in the local file preview until deployed (absolute app.untitledad.in URL
   not yet hosted) — verified the GIF itself renders + the rest of the email is intact; it resolves on
   Vercel deploy.
+
+
+---
+
+## 295 · WhatsApp AI "says sending the quote, then never sends it" — Mode A fix (2026-09-18)
+
+Owner: the AI sometimes tells a customer it's sending a quote, but no PDF arrives. Diagnosed FIRST
+(owner ran the read-only diagnostic): **15 of 43 quote-promise turns in 14 days = pure silence**
+(the AI said "sending" then nothing); 28 sent the PDF; **ZERO** refuse/render failures. So it is
+100% **Mode A**, not a build/render bug.
+
+### Root defect (structural)
+The AI's visible chat text and the actual quote-build are DECOUPLED. The PDF only builds when the
+model emits a hidden last-line marker `QUOTE: cities=…; months=…`. The customer-facing "sending your
+quote now" SENTENCE can appear WITHOUT that marker (the model drops/malforms the hidden token while
+keeping the prose — the single most likely divergence; the 300-token cap can also truncate the
+trailing marker line). And the never-ghost safety net + the deferred build were BOTH gated on the
+parsed marker (`quoteReq`) — so a marker-less prose promise skipped both → the customer got the
+promise then TOTAL SILENCE. (Modes B/C — bad city / no owner / render fail — always end in a
+graceful hand-off, never silence; they weren't the problem here.)
+
+### The fix (`api/wa/ai-reply.js`, Edge, not §28-frozen)
+Make the safety net fire on the PROMISE the customer saw, not the hidden marker:
+1. **`extractMonths()`** — a robust month parser: ASCII + Gujarati (૦-૯) + Devanagari (०-९) digits +
+   spelled-out one..twelve. (The §225 recovery net was ASCII-`\d{1,2}`-only.) Deliberately NO "a"
+   ("a month ago"/"in a month" are idioms, not a stated duration).
+2. **`promisedQuote` detector** — true when a QUOTE line was ATTEMPTED (`!!qm`, valid or malformed →
+   covers the malformed-marker case) OR the reply is a genuine IN-PROGRESS quote promise (imminence
+   cue: "sending/preparing … quote", "quote on its way/shortly", "detailed quote — sending it across
+   now"). Excludes offers, questions, "no rush" nurture lines, photo captions (`!photoUrl`), and
+   `hotKind==='quote'` (a price-INTENT flag, not a promise — including it paused the AI on every
+   "how much? → which city?" turn).
+3. **Recovery net** — if `!quoteReq && promisedQuote && !firstContact && conv.lead_id` → rebuild
+   `quoteReq` from the whole conversation's inbound words (covered-city + `extractMonths`). Feeds the
+   SAME `ai_build_quote` RPC, which REFUSES on ambiguity → can never mint a WRONG quote (§210/§221).
+   So a promised quote that CAN be resolved is actually SENT.
+4. **Widened never-ghost hand-off** — gate is now `(quoteReq || promisedQuote) && hotKind!=='human'
+   && !hardLeak && !firstContact && !quoteSent && !quoteHandled` → a promise that can't be rebuilt
+   gets a hand-off + ai_pause, never silence. `hotKind!=='human'` (the human branch already handed
+   off) + `!hardLeak` (the price-leak backstop already handled the turn) avoid a double message.
+5. **Dedup-PDF guard** — if `ai_build_quote` returns `dedup:true` (same cities+months built + SENT
+   for this lead within 10 min), do NOT re-render/re-send the same PDF; mark handled.
+
+### Process (3 adversarial review rounds — the reviews earned their keep)
+Round 1 caught a **P0**: `hotKind==='quote'` in `promisedQuote` would have paused the AI mid-
+qualification on every price-ask + a photo-caption/first-contact/human false-hand-off. Round 2
+caught the offer/question over-match + the HOT:human double-hand-off + a within-10-min duplicate
+PDF. Round 3 caught the last quot-less regex (photo caption) + hardLeak double-message. Final
+verification = a deterministic node test of the exact regexes: **11/11** (real Mode-A promise +
+malformed marker → TRUE; offer/question/nurture/photo/generic/price-ask → FALSE).
+
+### Foot-guns
+- ❌ A safety net keyed on a hidden CONTROL MARKER instead of on what the customer was actually
+  PROMISED in prose → any promise the model makes without a parseable marker is unprotected. Gate the
+  net on the promise (with tight, imminence-required detection), not the marker.
+- ❌ A quote-promise detector that includes a price-INTENT flag (`hotKind==='quote'`) or bare "quot"
+  mentions pauses the AI on healthy qualifying/offer/nurture turns — on a twice-spam-flagged number a
+  false `ai_paused` recreates the very ghosting you're fixing, on the wrong turns. Require an
+  imminence cue + exclude questions/offers/photos; prove it with a deterministic phrase test.
+- ❌ A recovery net that rebuilds a quote on ANY "quot" turn can re-send a duplicate PDF on a
+  post-quote follow-up ("hope the quote was helpful") — honor the RPC's `dedup:true` and skip the
+  re-send.
+- Accepted P3 (rare, benign, strict improvement over silence): a malformed marker that strips the
+  reply to empty can emit "Sharing that with you now." then the hand-off (two texts) — not fixed
+  (reordering risk); it's two coherent messages, never silence.
+
+### Owner action
+Pushed — `ai-reply.js` is Edge, LIVE on Vercel deploy. No SQL, no env, no APK. Re-run the diagnostic
+from §the last message in a week: `no_pdf_silence` should drop toward 0 (promised quotes now either
+send the PDF or hand off). The 28/43 that already worked (valid-marker path) are byte-unchanged.

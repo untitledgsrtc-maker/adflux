@@ -47,6 +47,24 @@ const sb = (path, init = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
   headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'content-type': 'application/json', ...(init.headers || {}) },
 })
 
+// §295 — robust month extraction for the quote-recovery net: ASCII + Gujarati +
+// Devanagari digits + spelled-out one..twelve. Returns 1..12 or 0.
+const GU_DIGITS = '૦૧૨૩૪૫૬૭૮૯', HI_DIGITS = '०१२३४५६७८९'
+// no 'a' — "a month ago" / "in a month" are idioms, not a stated 1-month duration.
+const NUM_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 }
+function extractMonths(text) {
+  const t = String(text || '')
+    .replace(/[૦-૯]/g, (d) => String(GU_DIGITS.indexOf(d)))
+    .replace(/[०-९]/g, (d) => String(HI_DIGITS.indexOf(d)))
+  let m = t.match(/(\d{1,2})\s*(months?|mahin|મહિન|महीन)/i)
+  if (m) return parseInt(m[1], 10)
+  m = t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+months?\b/i)
+  if (m) return NUM_WORDS[m[1].toLowerCase()] || 0
+  m = t.match(/(\d{1,2})\s*(month|mo)\b/i)
+  if (m) return parseInt(m[1], 10)
+  return 0
+}
+
 // The default persona + grounding. Overridable per-account via
 // whatsapp_accounts.ai_system_prompt. Facts here are the REAL network — the
 // model must not invent beyond them, must not quote a final total, must not
@@ -441,8 +459,7 @@ export default async function handler(req) {
       .filter((n) => { try { return new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(said) } catch { return false } })
       .filter((n) => { const k = n.toLowerCase(); if (netSeen.has(k)) return false; netSeen.add(k); return true })
       .slice(0, 8)
-    const mm2 = said.match(/(\d{1,2})\s*(months?|mahin[ao]|mahine|મહિન[ાો]|महीन[ेाो])/i)
-    const netMonths = mm2 ? parseInt(mm2[1], 10) : 0
+    const netMonths = extractMonths(said)
     if (netCities.length && netMonths > 0 && netMonths <= 12) quoteReq = { cities: netCities, months: netMonths }
   }
 
@@ -459,6 +476,52 @@ export default async function handler(req) {
   }
 
   if (!reply && !photoUrl && !quoteReq) return nope('empty_reply')
+
+  // §295 — MODE-A FIX (the "says sending, then silence" bug). The AI often PROMISES a
+  // quote in prose ("preparing your detailed quote — sending it across now" — the prompt
+  // literally tells it to say that) but drops or malforms the hidden QUOTE marker, so
+  // quoteReq stays null. Old code then sent the promise and went SILENT: BOTH the deferred
+  // build AND the never-ghost hand-off were gated on quoteReq. Detect the promise (a QUOTE
+  // line was present even if unparseable, OR the reply text claims a quote is on the way)
+  // and: (a) TRY to build it from the whole conversation (covered city + months), else
+  // (b) the widened never-ghost hand-off below fires — the customer is NEVER left silent.
+  // ONLY a genuine "a quote is being sent RIGHT NOW" signal — tight to avoid a false hand-off +
+  // ai_pause on a healthy chat (this number was spam-flagged twice). EXCLUDES: hotKind==='quote'
+  // (a price-INTENT flag, not a promise — the §225 net already recovers it; including it paused
+  // the AI on every "how much? → which city?" turn); the generic "Sharing that with you now."
+  // fallback (also used for a bare PHOTO: marker); OFFERS + QUESTIONS ("I can prepare a detailed
+  // quote", "shall I send a quote?" — nurture turns that must NOT pause). The malformed-marker
+  // case is covered by !!qm; a real prose promise carries an IMMINENCE cue ("sending it across
+  // now", "on its way", "shortly") AND is not itself a question/offer.
+  // Not a promise if the reply is itself asking/offering, or is a "no rush" nurture line.
+  const notAPromise = /\?/.test(reply) ||
+    /\b(would you like|shall i|do you want|can i help|if you'?d? like|would you prefer|let me know|whenever you'?re ready|when you'?re ready|no rush|no hurry|take your time)\b/i.test(reply)
+  // Every prose clause requires a nearby 'quot' (no quot-less clause — a photo caption like
+  // "sending it across now" must never read as a quote promise); also skip the whole prose
+  // branch on a photo-send turn (!photoUrl) as belt-and-suspenders. The malformed-marker case
+  // is covered by !!qm.
+  const promisedQuote =
+    !!qm ||                                        // a QUOTE: line was attempted (valid or malformed)
+    (!notAPromise && !photoUrl && (
+      /\b(sending|sharing|preparing|generating|putting together)\b[\s\S]{0,40}\bquot/i.test(reply) ||   // "sending/preparing … quote"
+      /\bquot\w*[\s\S]{0,30}\b(on (its|the) way|coming your way|shortly|right away|momentarily|across now)\b/i.test(reply) ||
+      /\bdetailed quot\w*[\s\S]{0,40}\b(now|shortly|right away|across|sending|on (its|the) way)\b/i.test(reply)  // "detailed quote — sending it across now"
+    ))
+
+  // Recovery: promise made but no marker → rebuild quoteReq from the conversation's own
+  // words (covered city + robust months). Feeds the SAME deferred ai_build_quote path,
+  // which REFUSES on any ambiguity → never a wrong quote (§210/§221). A miss just means the
+  // widened hand-off sends instead of silence.
+  if (!quoteReq && promisedQuote && !firstContact && conv.lead_id && allCities.length) {
+    const said = rows.filter((m) => m.direction === 'in').map((m) => String(m.body || '')).join(' \n ')
+    const rSeen = new Set()
+    const rCities = allCities.map((c) => c.name).filter(Boolean)
+      .filter((n) => { try { return new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(said) } catch { return false } })
+      .filter((n) => { const k = n.toLowerCase(); if (rSeen.has(k)) return false; rSeen.add(k); return true })
+      .slice(0, 8)
+    const rMonths = extractMonths(said)
+    if (rCities.length && rMonths > 0 && rMonths <= 12) quoteReq = { cities: rCities, months: rMonths }
+  }
 
   // ── backstop the two HARD rules (no final price, no booking confirmation) ──
   // The system prompt is the primary guard; this catches a jailbreak BEFORE it
@@ -576,7 +639,12 @@ export default async function handler(req) {
   if (quoteReq && conv.lead_id) {
     try {
       const qr = await (await sb('rpc/ai_build_quote', { method: 'POST', body: JSON.stringify({ p_lead_id: conv.lead_id, p_cities: quoteReq.cities, p_months: quoteReq.months }) })).json()
-      if (qr && qr.ok && qr.ref) {
+      if (qr && qr.ok && qr.ref && qr.dedup) {
+        // §295 — an identical quote (same cities + months) was already built + SENT for this
+        // lead within the last 10 min (RPC idempotency). Do NOT re-render/re-send the same PDF
+        // (a duplicate document on a spam-flagged number) — mark handled so the hand-off is skipped.
+        quoteSent = true
+      } else if (qr && qr.ok && qr.ref) {
         // render the PDF server-side → short-lived signed URL.
         let pdfUrl = null
         // PRIMARY: the REAL branded PDF via the headless-Chromium render service
@@ -615,11 +683,14 @@ export default async function handler(req) {
     } catch { /* quote is best-effort — the reply already went */ }
   }
 
-  // NEVER GHOST a promised quote (§133). The customer was just told the quote is coming.
-  // If we could NOT send it — an unresolved/bad city, no rate, no owner, no linked lead,
-  // or the render/send failed — send ONE warm hand-off + pause so a human closes. A quote
-  // that DID build is already a QuoteSent+hot lead in the rep's queue.
-  if (quoteReq && !quoteSent && !quoteHandled) {
+  // NEVER GHOST a promised quote (§133 + §295). The customer was just told the quote is
+  // coming. If we could NOT send it — no marker built (Mode A), an unresolved/bad city, no
+  // rate, no owner, no linked lead, or the render/send failed — send ONE warm hand-off +
+  // pause so a human closes. Gated on (quoteReq || promisedQuote): the KEY fix — the net
+  // now fires on the PROMISE the customer saw, not only on the hidden marker, so a
+  // marker-less "sending your quote" prose promise can never end in silence. A quote that
+  // DID build is already a QuoteSent+hot lead in the rep's queue.
+  if ((quoteReq || promisedQuote) && hotKind !== 'human' && !hardLeak && !firstContact && !quoteSent && !quoteHandled) {
     try {
       const h = 'Thank you! Let me get our team to prepare and share your detailed quote with you shortly.'
       const id = await sendWa({ type: 'text', text: { body: h } })
