@@ -197,6 +197,16 @@ const S = StyleSheet.create({
     marginBottom: 4,
   },
 
+  // Holiday List table
+  hlIntro: { fontSize: 9.5, color: GRAY, marginBottom: 10, lineHeight: 1.4 },
+  hlHead: { flexDirection: 'row', backgroundColor: DARK, padding: '5 10' },
+  hlHeadNo: { width: 44, color: YELLOW, fontFamily: 'Roboto', fontWeight: 'bold', fontSize: 9.5 },
+  hlHeadName: { flex: 1, color: YELLOW, fontFamily: 'Roboto', fontWeight: 'bold', fontSize: 9.5 },
+  hlRow: { flexDirection: 'row', padding: '6 10', borderBottom: '0.5pt solid ' + BORDER },
+  hlNo: { width: 44, fontFamily: 'Roboto', fontWeight: 'bold', fontSize: 10, color: DARK },
+  hlName: { flex: 1, fontSize: 10, color: DARK },
+  hlNote: { marginTop: 12, fontSize: 8.5, color: GRAY, lineHeight: 1.4 },
+
   // Digital-sign stamps
   signRow: {
     flexDirection: 'row',
@@ -1008,13 +1018,14 @@ function OfferDocument({ offer, template }) {
         <TADATable />
 
         <Text style={[S.para, { marginTop: 14, fontSize: 9, color: GRAY, textAlign: 'center' }]}>
-          — End of Document —
+          — Continued: Company Holiday List —
         </Text>
 
         <Text style={S.pageNum} render={({ pageNumber, totalPages }) =>
           `Page ${pageNumber} of ${totalPages}`} fixed />
       </Page>
 
+      <HolidayList />
     </Document>
   )
 }
@@ -1027,6 +1038,64 @@ function Row({ label, value, last }) {
       <Text style={S.termLabel}>{label}</Text>
       <Text style={S.termValue}>{value}</Text>
     </View>
+  )
+}
+
+// ─── official Company Holiday List (FY 2026-27) ───
+// The SAME holiday page is appended to EVERY offer-letter variant (sales / ops /
+// telecaller / generic), so the list the leave clause references ("as per the
+// Company's annual holiday calendar") is actually in the letter. Source of truth:
+// Untitled_Advertising_Holiday_List_FY2026-27 (owner, 2026-09-19). Names only, no
+// dates (the official list is name-only). To update next FY, edit this one array.
+const HOLIDAYS_FY2026_27 = [
+  'Raksha Bandhan',
+  'Janmashtami',
+  'Dussehra',
+  'Diwali',
+  'Gujarati New Year / Bestu Varas',
+  'Bhai Dooj / Bhai Bij',
+  'Extra Diwali Holiday',
+  'Extra Diwali Holiday',
+  'Makar Sankranti / Uttarayan',
+  'Holi',
+]
+
+function HolidayList() {
+  return (
+    <Page size="A4" style={S.page} wrap>
+      <Image src="/letterhead.png" style={S.bgImage} fixed />
+
+      <Text style={S.annexBand}>Annexure — Company Holiday List (FY 2026–27)</Text>
+
+      <Text style={S.hlIntro}>
+        Period: 1 April 2026 to 31 March 2027. The public / festival holidays referenced in
+        the Leave Entitlement clause of this letter, observed by Untitled Advertising for
+        FY 2026–27, are:
+      </Text>
+
+      <View style={S.hlHead}>
+        <Text style={S.hlHeadNo}>No.</Text>
+        <Text style={S.hlHeadName}>Holiday</Text>
+      </View>
+      {HOLIDAYS_FY2026_27.map((h, i) => (
+        <View key={i} style={S.hlRow}>
+          <Text style={S.hlNo}>{i + 1}</Text>
+          <Text style={S.hlName}>{h}</Text>
+        </View>
+      ))}
+
+      <Text style={S.hlNote}>
+        This holiday list is applicable to all employees of Untitled Advertising for the
+        financial year 2026–27 and forms part of this offer letter / employment terms.
+      </Text>
+
+      <Text style={[S.para, { marginTop: 14, fontSize: 9, color: GRAY, textAlign: 'center' }]}>
+        — End of Document —
+      </Text>
+
+      <Text style={S.pageNum} render={({ pageNumber, totalPages }) =>
+        `Page ${pageNumber} of ${totalPages}`} fixed />
+    </Page>
   )
 }
 
@@ -1964,11 +2033,12 @@ function OpsDocument({ offer }) {
         <Text style={[S.annexSub, { marginTop: 12 }]}>City / Station Hotel Ceilings</Text>
         <TADATable vehicleLabel="Vehicle" />
         <Text style={[S.para, { marginTop: 14, fontSize: 9, color: GRAY, textAlign: 'center' }]}>
-          — End of Document —
+          — Continued: Company Holiday List —
         </Text>
         <PageNum />
       </Page>
 
+      <HolidayList />
     </Document>
   )
 }
@@ -2490,11 +2560,12 @@ function TelecallerDocument({ offer }) {
           this letter.
         </Text>
         <Text style={[S.para, { marginTop: 14, fontSize: 9, color: GRAY, textAlign: 'center' }]}>
-          — End of Document —
+          — Continued: Company Holiday List —
         </Text>
         <PageNum />
       </Page>
 
+      <HolidayList />
     </Document>
   )
 }
@@ -2954,11 +3025,12 @@ function GenericDocument({ offer }) {
           field TA/DA scheme applicable to this role.
         </Text>
         <Text style={[S.para, { marginTop: 14, fontSize: 9, color: GRAY, textAlign: 'center' }]}>
-          — End of Document —
+          — Continued: Company Holiday List —
         </Text>
         <PageNum />
       </Page>
 
+      <HolidayList />
     </Document>
   )
 }

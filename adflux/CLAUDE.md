@@ -19210,3 +19210,63 @@ malformed marker → TRUE; offer/question/nurture/photo/generic/price-ask → FA
 Pushed — `ai-reply.js` is Edge, LIVE on Vercel deploy. No SQL, no env, no APK. Re-run the diagnostic
 from §the last message in a week: `no_pdf_silence` should drop toward 0 (promised quotes now either
 send the PDF or hand off). The 28/43 that already worked (valid-marker path) are byte-unchanged.
+
+
+---
+
+## 296 · Official FY2026-27 holiday list wired into ALL offer-letter variants (2026-09-19)
+
+Owner: `Untitled_Advertising_Holiday_List_FY2026-27_Leaves_Only.pdf` "is official leave — kindly wire
+in all offer letters." Added the real 10-holiday list as a final Annexure page on EVERY offer-letter
+variant (`src/components/hr/OfferLetterPDF.jsx`, @react-pdf, §285 4-variant file — HR module, NOT
+§28-frozen). Additive; a 2-lens adversarial review (correctness/regression + content-fidelity) ran
+BEFORE commit → correctness SHIP (all 4 variants render, no scope/hoist/parse issue), content
+FIX_THEN_SHIP (1 real bug + 2 fidelity nits, ALL fixed below). No SQL, no APK — JS-only.
+
+### What shipped
+A module-level `HOLIDAYS_FY2026_27` array (10 names, from the owner's PDF — names only, no dates:
+Raksha Bandhan · Janmashtami · Dussehra · Diwali · Gujarati New Year / Bestu Varas · Bhai Dooj / Bhai
+Bij · Extra Diwali Holiday · Extra Diwali Holiday [listed twice — 2 extra Diwali days] · Makar
+Sankranti / Uttarayan · Holi) + a `function HolidayList()` = one A4 `<Page>` (letterhead bg,
+"Annexure — Company Holiday List (FY 2026–27)" band, intro, a No.|Holiday table, the official note,
+"— End of Document —", page number). Inserted `<HolidayList />` before all 4 `</Document>` via
+`replace_all` (verified: 4 render sites, 1 fn def). The 4 old "— End of Document —" footers on each
+variant's last CONTENT page became "— Continued: Company Holiday List —" so the holiday page is the
+true last page. `hl*` styles added to the StyleSheet.
+
+### The 3 review fixes (do NOT regress)
+- **P1 (real bug) — skipped annexure letter.** First cut hardcoded "Annexure D". Sales + Ops end on
+  Annexure C (A/B/C/D coherent), but **Telecaller + Generic only have Annexures A + B** → they'd read
+  A, B, **D** (no C = a visible error on an employment-terms doc). Fix (the reviewer's uniform
+  alternative, not per-variant lettering): **letter-LESS band "Annexure — Company Holiday List
+  (FY 2026–27)"** + footer "— Continued: Company Holiday List —" → correct on ALL 4 variants, one
+  `replace_all`, no per-variant footer divergence. FOOT-GUN: a hardcoded annexure LETTER on a page
+  appended to multiple documents with different annexure counts skips a letter on the shorter ones —
+  use a letter-less label (or parameterize per variant) when one component is shared across variants.
+- **P3 — fabricated contractual clause.** The note appended "Holiday dates follow the Gujarat
+  calendar…; the Company may substitute or adjust a holiday by prior notice." — NOT in the owner's
+  official PDF. Since the annexure "forms part of the offer letter / employment terms," an
+  unsupplied contractual term is a fabrication → DROPPED; the note is now verbatim to the source
+  (ends at "…forms part of this offer letter / employment terms.").
+- **P3 — wrong cross-reference.** Intro said "the Leave & Holidays clause" but the actual clause is
+  titled "7. Leave Entitlement" in all 4 variants → changed to "the Leave Entitlement clause".
+- Also updated the 2 stale code COMMENTS that still said "Annexure D" (line ~200 + ~1044) so the
+  source matches the letter-less band (not rendered; cleanliness only).
+
+### Contracts / notes
+- The holiday list = names only (the official PDF has no dates); do NOT invent dates. The duplicate
+  "Extra Diwali Holiday" (rows 7+8) is INTENTIONAL (2 extra Diwali days) — keep both.
+- The employer is hardcoded "Untitled Advertising" (matches the §285 letters — a single-employer HR
+  doc, NOT the §4 segment→company switch which is for client quotes).
+- Sales/ops/telecaller/generic offer letters are the §285 4-variant file (HR, not §28-frozen) — no
+  guardian required; the review was content-fidelity + regression, both clean after the fixes.
+- Gates: grep counts (4 footers, 4 render sites, 1 fn, 0 stray "Annexure D"/"Leave & Holidays"/
+  "substitute or adjust" in rendered text), esbuild parse OK, `npm run build` OK (246 precache).
+
+### Owner action
+Pushed (JS-only, no SQL, no APK — deploys on Vercel; reaches the app on next open). Smoke: send/preview
+an offer letter for each role (sales / ops-exec / telecaller / generic/accounts) → the LAST page is the
+Company Holiday List (10 holidays incl. the 2 Extra Diwali rows); the page before it now says
+"— Continued: Company Holiday List —"; no skipped annexure letter on any variant. The rendered PDF
+wording is owner's to eyeball; I verified parse + build + content-fidelity to the official PDF, not the
+visual render.
