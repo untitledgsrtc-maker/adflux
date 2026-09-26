@@ -19270,3 +19270,45 @@ Company Holiday List (10 holidays incl. the 2 Extra Diwali rows); the page befor
 "— Continued: Company Holiday List —"; no skipped annexure letter on any variant. The rendered PDF
 wording is owner's to eyeball; I verified parse + build + content-fidelity to the official PDF, not the
 visual render.
+
+
+---
+
+## 297 · Marketing number 98982 quality LOW — WARMING, all push OFF (do NOT re-arm) (2026-09-26)
+
+WhatsApp Manager showed 98982 73686 (marketing WABA `2870129030006085`) **Quality: Low**. Third quality
+dip on this twice-flagged number (§133 27 Jul + §148 1 Aug spam flags). Diagnosed + owner chose to warm
+it (path A).
+
+### Why Low (recipient block/report rate, not send volume)
+Meta's rolling quality = % of recipients who block / report-spam / mark-not-helpful. This number earns
+it from: the §224 owner-override auto welcome-IMAGE on cold first contact (the top trigger, §133 got it
+flagged the first time this way) + all 22 QR boards concentrated on ONE young number (§196) → high cold,
+never-opted-in volume + old debt (2 flags in a week → low baseline, every new block bites harder).
+
+### LIVE STATE (owner ran, 2026-09-26) — all auto-push already OFF
+```
+919898273686 | ai_welcome_image_url=NULL | ai_followup_enabled=false | ai_nudge_enabled=false | ai_cadence_enabled=false
+```
+The §224 auto-image is null (kill-switch clear) and the §213/§215/§228 push flags are all false → NOTHING
+is actively pushing. That's ~90% of the fix — the residual Low is pure cold-scan volume + reputation debt,
+which only TIME (low negatives) heals.
+
+### THE CONTRACT — do NOT re-tank it (owner decision, path A: warm)
+- **Keep `ai_welcome_image_url=NULL` + all three push flags FALSE on the marketing account while quality
+  is below High.** Re-arming ANY of them (§224 auto-image, §213 followup, §215 nudge, §227/§228 cadence)
+  during recovery is the #1 recovery-killer. A future session MUST NOT flip these back on to "turn a
+  feature on" until quality is High + owner OKs it.
+- Recovery expectation: Low→Medium ~3–7 days, Medium→High ~1–2 weeks with zero new negatives. Watch
+  WhatsApp Manager → 98982 → Quality (+ the §227 `wa_quality_log` table).
+- If it DROPS toward Flagged/Restricted instead of climbing → path B: spread the QR boards back to the
+  aged service number 95815 78261 (reverse §196's `qr_text` replace on a subset — no reprint, both
+  numbers AI-answered + route to Rima; reverses the "one number" funnel). Not done — owner chose warm-first.
+- Note: the reactive AI reply (§115 `ai_enabled`) stays ON — an in-window reply to someone who messaged
+  first is policy-safe; do NOT kill it to chase quality (that kills the whole funnel). The lever is cold
+  VOLUME (board spread) + time, not turning off replies.
+
+### Minor open
+The all-accounts SELECT returned ONLY 919898273686 — the service inbox number 919581578261 (§54) did not
+appear. Likely a partial paste; confirm the service account row still exists (`SELECT display_number FROM
+whatsapp_accounts;`) since it's the live inbox line. Not chased this turn.
