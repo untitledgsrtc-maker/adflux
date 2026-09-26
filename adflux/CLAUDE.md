@@ -19312,3 +19312,52 @@ which only TIME (low negatives) heals.
 The all-accounts SELECT returned ONLY 919898273686 — the service inbox number 919581578261 (§54) did not
 appear. Likely a partial paste; confirm the service account row still exists (`SELECT display_number FROM
 whatsapp_accounts;`) since it's the live inbox line. Not chased this turn.
+**RESOLVED (§298):** both account rows exist + route to Rima; the "missing" service row was a partial paste.
+
+
+---
+
+## 298 · QR boards SPLIT back to the service number 95815 — 98982 warming with ads+website only (2026-09-26)
+
+Path B from §297, executed (owner asked "why Low" while his Meta ads run → the fix that keeps ads on the
+marketing number while removing the low-intent cold load). **SUPERSEDES §196's "all 22 QR boards on 98982"
+and §297's "path B not done".**
+
+### The move (owner ran it)
+```sql
+UPDATE campaign_locations SET qr_text = replace(qr_text,'919898273686','919581578261')
+ WHERE qr_text LIKE '%919898273686%' AND client_name IS NULL;
+```
+Verified: **0 boards on 98982, 22 on 95815.** No reprinting (QR encodes `/api/q/<code>`; only the redirect
+target changed — the §119/§232 contract).
+
+### Current inflow split (the recovery rationale, grounded in the WhatsApp Business Messaging Policy)
+- **98982 (marketing WABA 2870129030006085):** Meta CTWA ads (§264/§266) + the /led website WA CTA
+  (§129.5) ONLY = HIGHER-intent contacts. All business-initiated push OFF (§297: auto-image null,
+  followup/nudge/cadence all false), `ai_enabled=true`. Warming.
+- **95815 (service WABA 122098901360016777):** the 22 QR boards + the existing inbox = the LOW-intent
+  cold-scan load. Aged/clean number, more quality buffer than the twice-flagged 98982.
+- **BOTH accounts route inbound to Rima** (`default_telecaller_id=058b3000-7630-4112-a01f-c42e7e24b6e8`)
+  + both `ai_enabled=true` → no leads lost, QR inbound doesn't error-queue (§53 P0-2 owner-set, verified).
+
+### WhatsApp Business Messaging Policy (read 2026-09-26, whatsappbusiness.com/policy, updated 23 Sep 2026) — how it maps
+- **§1 opt-in is THE rule:** contact only people who (a) gave their number AND (b) opted in. A QR-scan/
+  ad-click where the person MESSAGES FIRST = valid opt-in for the **24-hour reply window ONLY**, NOT for
+  later business-initiated marketing. → replying to inbound is compliant (ads stay on); pushing marketing
+  templates/nudges to one-time scanners is the violation → keep all push flags OFF (§297). This is WHY the
+  number went Low.
+- **§7 Enforcement = "Low" verbatim:** Meta limits messaging on accumulated block/report feedback; ladder
+  = negative feedback → message limits → account limit → termination + org-wide ban. Low is a warning rung.
+- **§2 platform:** in-window automated replies are ALLOWED (ads work fine at Low — inbound-first opt-in),
+  **but the automation MUST offer a clear human-escalation path** (human transfer / phone / email / web
+  support). OPEN COMPLIANCE ITEM: confirm the AI's first reply always surfaces a human route (it hands off
+  on request via §209, but the always-visible-path requirement isn't verified). LED ads are NOT a §4
+  prohibited/regulated vertical; STOP handling (§126/§253) honors §1/§3 opt-out.
+
+### CONTRACT / watch
+- Boards live on 95815 now — do NOT re-cite "all on 98982" (§196 stale). Query `campaign_locations.qr_text`
+  before quoting which number the boards use (§17 — this note drifted from the DB before, §196).
+- Keep 98982's push flags OFF + auto-image null while Low (§297 do-not-re-arm contract).
+- Watch BOTH numbers' Quality tabs; if 95815 (now carrying the scans) dips, revisit the split.
+- The board move reverses §196's single-number funnel — accepted by owner for quality recovery; leads
+  still all reach Rima.
