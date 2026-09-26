@@ -19361,3 +19361,33 @@ target changed — the §119/§232 contract).
 - Watch BOTH numbers' Quality tabs; if 95815 (now carrying the scans) dips, revisit the split.
 - The board move reverses §196's single-number funnel — accepted by owner for quality recovery; leads
   still all reach Rima.
+
+
+---
+
+## 299 · Telecaller "GPS off?" complaint = the battery prompt wearing a satellite icon (2026-09-26)
+
+Owner (a telecaller, Solanki Sneha): "I'm a TC, why am I getting a GPS-off notification?" Diagnosed —
+her DB role IS correctly `telecaller` (not the §284/§288 role-mis-seed), and push_log had ZERO GPS/
+attendance pushes to her → so §217's server-side GPS-off cron fix IS working. The thing she sees is a
+CLIENT prompt: `GpsSetupPrompt` in `mode="battery"` (V2AppShell:957, shown to every telecaller — Phase
+250/§251.2). Its TEXT was already battery-only (it does NOT touch location for TCs), but it wore a
+**Satellite icon** → read as a GPS-off notification. `GpsOffBanner` (the literal "GPS is off" banner)
+was NOT the cause — it mounts only on /work + /leads (sales pages, `isFieldSales`-gated §48), not on
+/telecaller.
+
+### Fix (owner chose "relabel, keep it" — the prompt protects call-outcome capture, §121)
+`src/components/v2/GpsSetupPrompt.jsx` (NOT §28-frozen; V2AppShell mount unchanged → no guardian):
+battery mode now renders a **`BatteryCharging` icon** (was Satellite) + text leads "Battery: … (Not a
+GPS setting.)". GPS mode (sales) unchanged. The prompt STAYS for telecallers — it's the battery-
+whitelist that stops Android killing the app mid-call and losing the post-call outcome popup (§121/
+Phase 250); removing it reintroduces that bug. Only the presentation changed.
+
+### CONTRACT / foot-guns
+- Telecallers are NOT GPS-tracked (§217 doctrine) — but they DO get the BATTERY prompt (§251.2/§121),
+  intentionally. It must never read as GPS: keep the battery icon + battery wording in `mode="battery"`.
+  Do NOT re-add a satellite/GPS icon or location wording to the battery branch.
+- When a rep reports "GPS off notification": FIRST check push_log (server push, §217 cron path) vs a
+  CLIENT prompt (GpsSetupPrompt / GpsOffBanner). Empty push_log = it's a client prompt, not the cron.
+- The role WAS correct here — do not assume the §284/§288 role-mis-seed every time; verify the DB role
+  first (it was `telecaller`), then trace the actual surface.

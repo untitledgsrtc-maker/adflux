@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { Satellite, X } from 'lucide-react'
+import { Satellite, BatteryCharging, X } from 'lucide-react'
 import { requestBatteryUnrestricted, openLocationSettings } from '../../utils/nativeTracking'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,10 +84,12 @@ export default function GpsSetupPrompt({ enabled = false, mode = 'gps' }) {
       border: '1px solid var(--v2-line, #334155)',
       borderRadius: 'var(--v2-r, 14px)', fontSize: 13,
     }}>
-      <Satellite size={18} strokeWidth={1.6} />
+      {mode === 'battery'
+        ? <BatteryCharging size={18} strokeWidth={1.6} />
+        : <Satellite size={18} strokeWidth={1.6} />}
       <span style={{ flex: 1 }}>
         {mode === 'battery'
-          ? 'Set Battery to Unrestricted so the app is not closed during a call — otherwise the outcome popup is lost.'
+          ? 'Battery: set it to Unrestricted so the app is not closed during a call — otherwise the post-call popup is lost. (Not a GPS setting.)'
           : 'Turn on accurate GPS — set Location to "Allow all the time" + Battery to Unrestricted so your km counts.'}
       </span>
       <button
