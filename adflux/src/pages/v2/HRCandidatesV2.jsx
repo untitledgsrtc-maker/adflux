@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Users, Plus, Phone, FileText, Upload, Star, Trash2, UserPlus, X,
+  Users, Plus, Phone, FileText, Upload, Star, Trash2, UserPlus, Send, X,
   ClipboardList, Loader2, Search, Sparkles,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -17,6 +17,7 @@ import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { dialPhone } from '../../utils/openExternal'
 import { syncCandidateCalls } from '../../utils/hrCandidateCallSync'
+import { SendOfferModal } from '../../components/hr/SendOfferModal'
 
 const STAGES = [
   { key: 'applied',     label: 'Applied',     color: 'var(--blue, #3B82F6)' },
@@ -48,6 +49,7 @@ export default function HRCandidatesV2() {
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [callFor, setCallFor] = useState(null)  // candidate being logged
+  const [offerFor, setOfferFor] = useState(null)  // candidate being sent an offer
 
   // call counts + latest outcome per candidate — server-side aggregate RPC
   // (§66/§274: never pull raw call rows to count client-side; the ~1000-row cap
@@ -175,6 +177,7 @@ export default function HRCandidatesV2() {
           {filtered.map(r => (
             <CandidateCard key={r.id} r={r} calls={callMap[r.id]}
               onPatch={patch} onDelete={removeCandidate} onCall={() => setCallFor(r)}
+              onSendOffer={() => setOfferFor(r)}
               onConvert={() => nav('/hr/new-user', { state: { prefill: { name: r.name, email: r.email, phone: r.phone, candidate_id: r.id } } })}
               onReload={load} />
           ))}
@@ -184,13 +187,18 @@ export default function HRCandidatesV2() {
       {callFor && <CallLogModal candidate={callFor} profile={profile}
         onClose={() => setCallFor(null)} onLogged={() => { setCallFor(null); load() }} />}
 
+      {offerFor && <SendOfferModal
+        prefill={{ candidate_name: offerFor.name || '', candidate_email: offerFor.email || '' }}
+        onClose={() => setOfferFor(null)}
+        onCreated={() => { setOfferFor(null); toastSuccess('Offer created — share the link from HR → Offers.') }} />}
+
       <style>{`.spin{animation:hrspin 1s linear infinite}@keyframes hrspin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
 
 // ─── candidate card ──────────────────────────────────────────────────────────
-function CandidateCard({ r, calls, onPatch, onDelete, onCall, onConvert, onReload }) {
+function CandidateCard({ r, calls, onPatch, onDelete, onCall, onSendOffer, onConvert, onReload }) {
   const [busy, setBusy] = useState(false)
   const fileRef = useRef(null)
   const meta = STAGE_META[r.stage] || STAGES[0]
@@ -259,6 +267,11 @@ function CandidateCard({ r, calls, onPatch, onDelete, onCall, onConvert, onReloa
         </button>
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,image/*" style={{ display: 'none' }}
           onChange={e => { uploadResume(e.target.files?.[0]); e.target.value = '' }} />
+        {!r.converted_user_id && (
+          <button onClick={onSendOffer} style={{ ...actBtn, borderColor: 'var(--accent, #FFE600)', color: 'var(--accent)' }}>
+            <Send size={14} /> Send offer
+          </button>
+        )}
         {r.stage === 'hired' && !r.converted_user_id && (
           <button onClick={onConvert} style={{ ...actBtn, borderColor: 'var(--success, #10B981)', color: 'var(--success)' }}>
             <UserPlus size={14} /> Create login

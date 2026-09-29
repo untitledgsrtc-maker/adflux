@@ -36,7 +36,7 @@ function Field({ label, required, error, hint, children }) {
   )
 }
 
-export function SendOfferModal({ onClose, onCreated }) {
+export function SendOfferModal({ onClose, onCreated, prefill }) {
   const { createOffer, markSent } = useOffers()
 
   // Structured incentive defaults mirror the existing Team profile
@@ -44,8 +44,8 @@ export function SendOfferModal({ onClose, onCreated }) {
   // touching them.
   const [form, setForm] = useState({
     designation_id:              '',
-    candidate_name:              '',
-    candidate_email:             '',
+    candidate_name:              prefill?.candidate_name || '',
+    candidate_email:             prefill?.candidate_email || '',
     position:                    'Sales Person',
     territory:                   '',
     joining_date:                '',

@@ -19391,3 +19391,36 @@ Phase 250); removing it reintroduces that bug. Only the presentation changed.
   CLIENT prompt (GpsSetupPrompt / GpsOffBanner). Empty push_log = it's a client prompt, not the cron.
 - The role WAS correct here — do not assume the §284/§288 role-mis-seed every time; verify the DB role
   first (it was `telecaller`), then trace the actual surface.
+
+
+---
+
+## 300 · "Send offer" on the Recruit candidate card (2026-09-29)
+
+Owner (on a hired candidate, Salpesh): "why not there send offer?" The Recruit candidate card
+(`HRCandidatesV2`, §158) had Call / Note / Resume / Replace / **Create login** but NO Send Offer —
+that button lived ONLY on the separate Offers page (`/hr/offers` = HRV2, the "Offers / invites" tile).
+So there was no way to issue a formal offer letter (§285 per-role) from a candidate; the card jumped
+straight to Create login (direct convert). Added it.
+
+### What shipped (HR module, NOT §28-frozen — no guardian)
+- `SendOfferModal.jsx` — new optional `prefill` prop → seeds `candidate_name` + `candidate_email` in
+  the initial form. **Backward-compatible:** HRV2's existing `<SendOfferModal onClose onCreated />`
+  passes no prefill → `prefill?.x || ''` → byte-identical (empty form, as before).
+- `HRCandidatesV2.jsx` — a **"Send offer"** button (Send icon, brand-yellow) on the candidate card,
+  shown when `!r.converted_user_id` (any not-yet-a-login candidate). Opens the lifted `SendOfferModal`
+  prefilled from the candidate (name + email); HR still picks the designation + salary + incentive in
+  the modal. `offerFor` state in the parent, one modal mount (the CallLogModal pattern). On created:
+  toast "share the link from HR → Offers" (SendOfferModal is Phase-1 = creates the `hr_offers` row +
+  gives a copy-link / WhatsApp share in-modal; no email delivery from it — that's the §294 pitch-email
+  path, separate).
+
+### Flow / notes
+- Card actions now: Call · Note · Resume/Replace · **Send offer** (non-converted) · **Create login**
+  (hired + non-converted) · delete. Send offer = issue the formal letter; Create login = the direct
+  convert-to-user (§158). Both remain — HR can offer-then-convert, or convert directly.
+- SendOfferModal defaults are still sales-shaped (position "Sales Person" etc., §109.1) — HR changes
+  the designation dropdown for a non-sales candidate (§285 per-role letter follows the picked
+  designation's role). The prefill only fills name + email; designation/salary stay HR's pick.
+- The offer is created standalone (not yet FK-linked back to the `hr_candidates` row) — a
+  candidate↔offer link is a future nicety, not built. Parse + `npm run build` OK.
