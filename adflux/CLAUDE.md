@@ -19490,3 +19490,46 @@ WhatsApp assistant 2-hourly nudge (`team-nudge.js` skips Sunday only). The tab's
   delete the rest in the new tab (2 Oct 2026 itself was left as-is: flipping it mid-day would have
   auto-marked Kamina absent at 20:30 for a day the app told her was a holiday).
 - Owner to add Dussehra (20 Oct 2026) and the other festival dates BEFORE the day.
+
+
+---
+
+## 302 · Offer-letter holiday page VERIFIED + official festival days → holidays table (2026-10-02)
+
+Owner: "check holiday in offer letter and wire it." Two parts.
+
+### 1 · Offer-letter holiday annexure (§296) — verified on REAL rendered PDFs
+Rendered all four variants (sales / ops-exec / ops-head / telecaller / generic) + a legacy offer (no designation
+snapshot) with a throwaway node harness (esbuild-bundled `OfferLetterPDF.jsx` → `renderToBuffer` → `pdftotext` /
+`pdftoppm`; harness deleted, not committed). Result: the holiday page is the LAST page of every variant (sales 14,
+legacy 14, ops 14, telecaller 12, generic 10 pages), "— Continued: Company Holiday List —" on the page before,
+"— End of Document —" + correct "Page N of N", all 10 rows incl. the two Extra Diwali Holiday rows, letterhead +
+footer correct, layout matches the other annexures; legacy offers default to the sales letter. Every variant's
+leave clause says "typically 10 days" = the 10-row list. One renderer (`OfferDocument`) feeds BOTH the HR download
+(HROfferLetterV2) and the candidate's public OfferForm (`generateOfferLetterBlob`) → both get the page.
+**No code change.** The letter's list is a hardcoded 10-name constant (`HOLIDAYS_FY2026_27`), names only, by design.
+
+### 2 · Fill the holidays TABLE from the letter's list (owner chose this over "letter reads the table")
+`supabase_phase326_holidays_fy2026_27.sql` (owner RUNS, idempotent `ON CONFLICT (holiday_date, name) DO NOTHING`,
+VERIFY lists FY2026-27). Inserts 8 festival rows: Raksha Bandhan 28 Aug 2026 · Janmashtami 4 Sep 2026 (both past,
+record only) · **Dussehra 20 Oct 2026** · Diwali 8 Nov 2026 (a Sunday) · Bestu Varas 10 Nov 2026 · Bhai Bij 11 Nov
+2026 · Makar Sankranti 14 Jan 2027 · Holi 22 Mar 2027. Dates from the Gujarat government 2026 holiday notification
+and Gujarat 2027 calendars (weekdays machine-checked).
+- **CONFIRM before running:** Makar Sankranti (one calendar says Fri 15 Jan 2027, Gujarat's own = 14 Jan) and Holi
+  (22 Mar 2027 per most; one bank list shows the colour day as 23 Mar).
+- **NOT in the file:** the two "Extra Diwali Holiday" days — the company's own call (Diwali is a Sunday this year, so
+  the bonus days are likely around 7/9 Nov, but that is a guess). Owner adds them in Master → Holidays (the chip is
+  there) or sends the dates.
+- The 4 seeded national rows (Republic Day, Independence Day, Gandhi Jayanti, Christmas) are untouched; a commented
+  future-dated DELETE block is in the file for when the owner decides the company works them.
+
+### Why the letter does NOT read the table (decision, so it isn't re-litigated)
+(a) a candidate on the public OfferForm is unauthenticated and `holidays_read_all` needs `auth.uid()` — the table is
+unreadable there; (b) an offer letter is a legal document → needs a snapshot at send time (new `hr_offers` column),
+not a live read; (c) today the table holds 4 national days that would wrongly print in the letter. Revisit only with a
+snapshot-at-send design.
+
+### Foot-gun
+Two lists of "company holidays" now exist by design: the letter's 10-name constant and the `holidays` rows. They are
+NOT linked — if the owner changes the official list, change BOTH (the Master → Holidays "Official list" chips mirror
+the letter's names; they live in `MasterV2.jsx` `HOLIDAY_NAME_CHIPS` vs `OfferLetterPDF.jsx` `HOLIDAYS_FY2026_27`).
