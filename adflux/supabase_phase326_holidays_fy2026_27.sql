@@ -17,13 +17,15 @@
 --   Janmashtami ............... Fri  4 Sep 2026   (already past - recorded for completeness)
 --   Dussehra .................. Tue 20 Oct 2026   <- first one that matters
 --   Diwali .................... Sun  8 Nov 2026   (a Sunday: already off, row is for the record)
+--   Extra Diwali Holiday ...... Mon  9 Nov 2026   (owner: Diwali block = 8 to 12 Nov)
 --   Gujarati New Year (Bestu Varas) Tue 10 Nov 2026
 --   Bhai Dooj / Bhai Bij ...... Wed 11 Nov 2026
+--   Extra Diwali Holiday ...... Thu 12 Nov 2026   (owner: Diwali block = 8 to 12 Nov)
 --   Makar Sankranti / Uttarayan  Thu 14 Jan 2027   (CONFIRM: one calendar says Fri 15 Jan)
 --   Holi ...................... Mon 22 Mar 2027   (CONFIRM: one list shows the colour day as Tue 23 Mar)
 --
--- NOT in this file (dates are the company's own decision - add in Master -> Holidays):
---   * "Extra Diwali Holiday" x2 - the two bonus days around Diwali.
+-- All 10 names on the offer letter are covered: 5 Diwali-block days (8 to 12 Nov,
+-- Mon 9 + Thu 12 are the two "Extra Diwali Holiday" days) + 5 other festivals.
 --
 -- Does NOT touch the 4 seeded national days (Republic Day, Independence Day,
 -- Gandhi Jayanti, Christmas). The company's list does not include them; whether
@@ -35,8 +37,10 @@ INSERT INTO public.holidays (holiday_date, name, type, is_recurring, is_active) 
   ('2026-09-04', 'Janmashtami',                     'gujarat_festival', false, true),
   ('2026-10-20', 'Dussehra',                        'gujarat_festival', false, true),
   ('2026-11-08', 'Diwali',                          'gujarat_festival', false, true),
+  ('2026-11-09', 'Extra Diwali Holiday',            'gujarat_festival', false, true),
   ('2026-11-10', 'Gujarati New Year / Bestu Varas', 'gujarat_festival', false, true),
   ('2026-11-11', 'Bhai Dooj / Bhai Bij',            'gujarat_festival', false, true),
+  ('2026-11-12', 'Extra Diwali Holiday',            'gujarat_festival', false, true),
   ('2027-01-14', 'Makar Sankranti / Uttarayan',     'gujarat_festival', false, true),
   ('2027-03-22', 'Holi',                            'gujarat_festival', false, true)
 ON CONFLICT (holiday_date, name) DO NOTHING;
@@ -54,7 +58,7 @@ ON CONFLICT (holiday_date, name) DO NOTHING;
 -- ---------------------------------------------------------------------------
 
 
--- VERIFY: every holiday in FY2026-27, in date order. Expect the 8 rows above
+-- VERIFY: every holiday in FY2026-27, in date order. Expect the 10 rows above
 -- (plus the seeded national days and anything you added before). A festival that
 -- shows TWICE on the same date means an earlier row used a slightly different
 -- spelling - delete the duplicate in Master -> Holidays.

@@ -19511,17 +19511,17 @@ leave clause says "typically 10 days" = the 10-row list. One renderer (`OfferDoc
 
 ### 2 · Fill the holidays TABLE from the letter's list (owner chose this over "letter reads the table")
 `supabase_phase326_holidays_fy2026_27.sql` (owner RUNS, idempotent `ON CONFLICT (holiday_date, name) DO NOTHING`,
-VERIFY lists FY2026-27). Inserts 8 festival rows: Raksha Bandhan 28 Aug 2026 · Janmashtami 4 Sep 2026 (both past,
-record only) · **Dussehra 20 Oct 2026** · Diwali 8 Nov 2026 (a Sunday) · Bestu Varas 10 Nov 2026 · Bhai Bij 11 Nov
-2026 · Makar Sankranti 14 Jan 2027 · Holi 22 Mar 2027. Dates from the Gujarat government 2026 holiday notification
-and Gujarat 2027 calendars (weekdays machine-checked).
-- **CONFIRM before running:** Makar Sankranti (one calendar says Fri 15 Jan 2027, Gujarat's own = 14 Jan) and Holi
-  (22 Mar 2027 per most; one bank list shows the colour day as 23 Mar).
-- **NOT in the file:** the two "Extra Diwali Holiday" days — the company's own call (Diwali is a Sunday this year, so
-  the bonus days are likely around 7/9 Nov, but that is a guess). Owner adds them in Master → Holidays (the chip is
-  there) or sends the dates.
+VERIFY lists FY2026-27). Inserts **10 festival rows** = every name on the letter: Raksha Bandhan 28 Aug 2026 ·
+Janmashtami 4 Sep 2026 (both past, record only) · **Dussehra 20 Oct 2026** · **Diwali block 8–12 Nov 2026**
+(Diwali Sun 8, Extra Diwali Holiday Mon 9, Bestu Varas Tue 10, Bhai Bij Wed 11, Extra Diwali Holiday Thu 12 —
+owner: "8 to 12 holiday"; the five days = the five Diwali-block entries on the letter, so the two extras are
+Mon 9 + Thu 12) · Makar Sankranti 14 Jan 2027 · Holi 22 Mar 2027. Dates from the Gujarat government 2026 holiday
+notification and Gujarat 2027 calendars (weekdays machine-checked). Owner said "ok go" without changing the two
+dates flagged for confirmation (Makar Sankranti 14 vs 15 Jan; Holi 22 vs 23 Mar) → shipped as 14 Jan / 22 Mar.
 - The 4 seeded national rows (Republic Day, Independence Day, Gandhi Jayanti, Christmas) are untouched; a commented
   future-dated DELETE block is in the file for when the owner decides the company works them.
+- Owner runs the file in Studio (the sandbox cannot run SQL). Until he does, the live table still has NO festival days
+  and Dussehra (20 Oct) would auto-absent-mark everyone who does not check in.
 
 ### Why the letter does NOT read the table (decision, so it isn't re-litigated)
 (a) a candidate on the public OfferForm is unauthenticated and `holidays_read_all` needs `auth.uid()` — the table is
