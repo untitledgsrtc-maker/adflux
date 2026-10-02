@@ -19533,3 +19533,19 @@ snapshot-at-send design.
 Two lists of "company holidays" now exist by design: the letter's 10-name constant and the `holidays` rows. They are
 NOT linked — if the owner changes the official list, change BOTH (the Master → Holidays "Official list" chips mirror
 the letter's names; they live in `MasterV2.jsx` `HOLIDAY_NAME_CHIPS` vs `OfferLetterPDF.jsx` `HOLIDAYS_FY2026_27`).
+
+### 302.1 · Near-miss 2026-10-02 20:06 IST — Gandhi Jayanti row deleted the same day the job would fire
+After the Holidays tab shipped (§301) the 2 Oct 2026 `Gandhi Jayanti` row was missing from the table (the FY2026-27
+VERIFY grid showed 13 rows and no 2 Oct). Effect: 2 Oct became a normal working day for `is_workday_for`, so the 20:30
+IST `tick_attendance` 7e job would have inserted `unpaid_absent` leaves (§78 = full-day salary cut) for everyone with no
+`check_in_at`. At-risk list (owner ran the query): the 4 telecallers — Aayushi, Dhara, Rima, Sneha (100–241 calls each,
+no check-in because TelecallerV2 has no check-in writer, §301) — plus Kamina (sales, no activity). Fix applied by the owner
+at ~20:08, 22 min before the job: re-inserted `('2026-10-02','Gandhi Jayanti','national',true,true)` — a holiday is
+read live every minute, so the job short-circuits (`skipped: holiday`) and nobody is marked. No pay effect.
+- **Lesson / rule: never delete or add a holiday row for TODAY before 20:30 IST without checking who has not checked in.**
+  The tab's delete confirm already says so for today; deleting a PAST date is harmless (the job only acts on today).
+- **Root cause still open:** TCs have no way to check in when the gate is off, so any holiday-on / gate-off day (or any
+  day the owner flips it) makes working telecallers look absent. Option B ("Start my day" on `/telecaller`, TelecallerV2
+  is §28-frozen → guardian first) is the real fix and is NOT built. Until it is, treat every holiday toggle as a pay event.
+- Gandhi Jayanti 2026 stays as a (past) holiday row; whether the company really closes Republic Day / Independence Day /
+  Christmas / Gandhi Jayanti in 2027 is still the owner's decision.
