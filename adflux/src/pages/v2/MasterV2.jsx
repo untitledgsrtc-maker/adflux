@@ -23,7 +23,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Paperclip, UserCheck, Tv, FileText, Upload, Loader2, Plus, Trash2,
   Save, ArrowLeft, FileBox, Building2, Newspaper, MessageCircle, TrendingUp,
-  CheckCircle2, Wrench,
+  CheckCircle2, Wrench, CalendarDays,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -31,6 +31,7 @@ import { uploadAttachment, getSignedUrl, slugifyLabel } from '../../utils/propos
 import { openExternalUrl } from '../../utils/openExternal'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { istTodayISO } from '../../utils/istDate'
 
 const TABS = [
   { key: 'attachments', label: 'Attachments', icon: Paperclip },
@@ -56,6 +57,9 @@ const TABS = [
   { key: 'designations', label: 'Designations', icon: UserCheck },
   // Phase 33E — performance score + variable salary (70/30 split).
   { key: 'performance', label: 'Performance', icon: TrendingUp },
+  // Phase 326 — company holiday calendar (check-in gate, auto-absent,
+  // scoring and follow-up scheduling all read the `holidays` table).
+  { key: 'holidays',    label: 'Holidays',    icon: CalendarDays },
   { key: 'documents',   label: 'Documents',   icon: FileText },
   // Phase 81.5.1 — one-time maintenance utilities. Today: purge
   // legacy quote-pdfs (pre-flat-path layout from Phase 34Z.25).
@@ -142,6 +146,7 @@ export default function MasterV2() {
       {activeTab === 'call_scripts' && <CallScriptsTab />}
       {activeTab === 'designations' && <DesignationsTab />}
       {activeTab === 'performance' && <PerformanceTab />}
+      {activeTab === 'holidays'    && <HolidaysTab />}
       {activeTab === 'documents'   && <DocumentsTab />}
       {activeTab === 'maintenance' && <MaintenanceTab />}
 
@@ -2641,6 +2646,431 @@ function MediaTypesTab() {
         when creating a quote (free-text fallback), but the rows here are
         the canonical list. GST is fixed at 18% across all Other Media
         quotes — there are no per-media tax overrides.
+      </p>
+    </>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 326 — Holidays (company calendar)
+   One table drives: the morning check-in gate, the 9:30 reminders, the
+   8:30 PM auto-absent job (unpaid leave), daily-score exclusion and
+   follow-up scheduling (is_workday_for / is_off_day read `holidays`).
+   RLS: admin writes, everyone reads → co_owner sees this tab read-only.
+   ════════════════════════════════════════════════════════════════════ */
+const HOLIDAY_TYPES = [
+  { key: 'gujarat_festival', label: 'Festival' },
+  { key: 'company_off',      label: 'Company off' },
+  { key: 'national',         label: 'National' },
+]
+// Names straight from the official FY2026-27 holiday list. Click one,
+// then only the date is left to pick (festival dates move every year).
+const HOLIDAY_NAME_CHIPS = [
+  'Raksha Bandhan', 'Janmashtami', 'Dussehra', 'Diwali',
+  'Gujarati New Year / Bestu Varas', 'Bhai Dooj / Bhai Bij',
+  'Extra Diwali Holiday', 'Makar Sankranti / Uttarayan', 'Holi',
+]
+const HOLIDAY_COLS = 'id, holiday_date, name, type, is_active, is_recurring'
+
+function fmtHolidayDate(iso) {
+  // iso = 'YYYY-MM-DD'. Parsed at local midnight so the weekday is the
+  // calendar day's own weekday on any device timezone.
+  const d = new Date(`${iso}T00:00:00`)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return {
+    date: `${dd}/${mm}/${d.getFullYear()}`,
+    day:  d.toLocaleDateString('en-IN', { weekday: 'short' }),
+  }
+}
+
+function daysBetweenISO(fromISO, toISO) {
+  return Math.round((Date.parse(`${toISO}T00:00:00Z`) - Date.parse(`${fromISO}T00:00:00Z`)) / 86400000)
+}
+
+function HolidaysTab() {
+  const profile = useAuthStore(s => s.profile)
+  const canEdit = profile?.role === 'admin'   // holidays_admin_all = admin only
+  const today   = istTodayISO()
+
+  const [rows, setRows]       = useState([])
+  const [loading, setLoading] = useState(true)
+  const [view, setView]       = useState('upcoming')   // 'upcoming' | 'all'
+  const [savingId, setSavingId]       = useState(null)
+  const [statusMsg, setStatusMsg]     = useState('')
+  const [statusError, setStatusError] = useState('')
+  const [loadError, setLoadError]     = useState('')   // set only when the SELECT fails
+  const [newDate, setNewDate] = useState('')
+  const [newName, setNewName] = useState('')
+  const [newType, setNewType] = useState('gujarat_festival')
+  const [adding, setAdding]   = useState(false)
+  const addingRef = useRef(false)   // sync latch — a double-tap can't insert twice
+
+  const load = async () => {
+    setLoading(true)
+    setLoadError('')
+    const { data, error } = await supabase
+      .from('holidays')
+      .select(HOLIDAY_COLS)
+      .order('holiday_date', { ascending: true })
+      .order('name',         { ascending: true })
+    if (error) setLoadError(`Could not load holidays: ${error.message}`)
+    else setRows(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  function flash(msg) {
+    setStatusMsg(msg)
+    setTimeout(() => setStatusMsg(''), 2200)
+  }
+  function writeError(error, fallback) {
+    if (error?.code === '42501' || /row-level security/i.test(error?.message || '')) {
+      return 'Only an admin can change the holiday calendar.'
+    }
+    return `${fallback}: ${error?.message || 'unknown error'}`
+  }
+
+  async function handleAdd() {
+    if (addingRef.current) return
+    const name = newName.trim()
+    if (!newDate) { setStatusError('Pick the date.'); return }
+    if (!name)    { setStatusError('Holiday name is required.'); return }
+    addingRef.current = true
+    setAdding(true)
+    setStatusError('')
+    const { data, error } = await supabase
+      .from('holidays')
+      .insert([{
+        holiday_date: newDate,
+        name,
+        type:         newType,
+        is_recurring: false,
+        is_active:    true,
+        created_by:   profile?.id || null,
+      }])
+      .select(HOLIDAY_COLS)
+      .single()
+    addingRef.current = false
+    setAdding(false)
+    if (error) {
+      setStatusError(error.code === '23505'
+        ? `"${name}" is already on ${fmtHolidayDate(newDate).date}.`
+        : writeError(error, 'Could not add'))
+      return
+    }
+    setRows(prev => [...prev, data].sort((a, b) =>
+      a.holiday_date.localeCompare(b.holiday_date) || a.name.localeCompare(b.name)))
+    setNewDate('')
+    setNewName('')
+    // A past date is hidden by the default Upcoming view — show it, so the
+    // admin sees the row they just added instead of a success with nothing.
+    if (data.holiday_date < today) setView('all')
+    flash(`Added ${name} · ${fmtHolidayDate(data.holiday_date).date}${data.holiday_date < today ? ' (past date)' : ''}.`)
+  }
+
+  // What deleting a row really does depends on WHEN it is and whether
+  // another row still covers the same date. Say that, not a blanket claim.
+  function deleteMessage(r) {
+    const when = fmtHolidayDate(r.holiday_date).date
+    if (rows.some(x => x.id !== r.id && x.holiday_date === r.holiday_date)) {
+      return `Delete "${r.name}" (${when}). Another row covers the same date, so that day stays a holiday.`
+    }
+    if (r.holiday_date < today) {
+      return `Delete "${r.name}" (${when}). This only removes the record. Days that have already passed are not re-scored and no one is re-marked.`
+    }
+    if (r.holiday_date === today) {
+      return `Delete "${r.name}" (TODAY). Today becomes a normal working day: check-in is required, the day is scored, and at 8:30 PM every sales rep and telecaller who has not checked in is marked unpaid absent.`
+    }
+    return `Delete "${r.name}" (${when}). That day becomes a normal working day: check-in is required, the day is scored, and the 8:30 PM job can mark sales reps and telecallers who do not check in as unpaid absent.`
+  }
+
+  // No Active toggle on purpose. The readers of `holidays` disagree about
+  // is_active (score + pushes honor it; the check-in gate and the 8:30 PM
+  // auto-absent job do NOT), so switching a row off would leave the system
+  // half-holiday. Delete is the one operation that means the same thing to
+  // every reader.
+  async function handleDelete(r) {
+    if (!(await confirmDialog({
+      title: 'Delete holiday?',
+      message: deleteMessage(r),
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return
+    setSavingId(r.id)
+    setStatusError('')
+    // .select('id') so a row silently filtered out by RLS (0 rows, no
+    // error) is caught instead of looking deleted.
+    const { data, error } = await supabase
+      .from('holidays')
+      .delete()
+      .eq('id', r.id)
+      .select('id')
+    setSavingId(null)
+    if (error || !data?.length) {
+      setStatusError(error ? writeError(error, 'Delete failed') : 'Not deleted — only an admin can change the calendar.')
+      return
+    }
+    setRows(prev => prev.filter(x => x.id !== r.id))
+    flash('Deleted.')
+  }
+
+  const upcoming   = useMemo(() => rows.filter(r => r.holiday_date >= today), [rows, today])
+  const shown      = view === 'all' ? rows : upcoming
+  // rows are sorted by date, so upcoming[0] is the next one. Any row
+  // counts (the check-in gate ignores is_active), not just active ones.
+  const daysToNext = upcoming.length ? daysBetweenISO(today, upcoming[0].holiday_date) : null
+  const gapWarning = daysToNext == null || daysToNext > 45
+
+  if (loading) return (
+    <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
+      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading holidays…
+    </div>
+  )
+
+  // A failed read must NOT fall through to the "no holiday set" warning and
+  // empty state below — they would claim the calendar is empty when we
+  // simply could not read it.
+  if (loadError) return (
+    <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 10, padding: '12px 14px', fontSize: '.85rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <span style={{ flex: 1, minWidth: 220 }}>{loadError}</span>
+      <button type="button" onClick={load} className="hol-btn"
+        style={{ padding: '6px 14px', borderRadius: 10, border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+        Retry
+      </button>
+    </div>
+  )
+
+  const viewBtn = (key, label) => (
+    <button
+      key={key}
+      type="button"
+      className="hol-btn"
+      aria-pressed={view === key}
+      onClick={() => setView(key)}
+      style={{
+        padding: '6px 12px', borderRadius: 10, border: '1px solid var(--surface-3)',
+        background: view === key ? 'var(--accent)' : 'transparent',
+        color:      view === key ? 'var(--accent-fg)' : 'var(--text-muted)',
+        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+      }}
+    >{label}</button>
+  )
+
+  return (
+    <>
+      {statusMsg && (
+        <div style={{ background: 'var(--success-soft)', border: '1px solid var(--success)', borderRadius: 10, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={14} /> {statusMsg}</div>
+      )}
+      {statusError && (
+        <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 10, padding: '8px 12px', marginBottom: 12, fontSize: '.82rem', color: 'var(--danger)' }}>{statusError}</div>
+      )}
+
+      <style>{`
+        .hol-btn:hover, .hol-chip:hover { border-color: var(--accent) !important; }
+        .hol-btn:focus-visible, .hol-chip:focus-visible, .hol-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .hol-del:hover { background: var(--danger-soft) !important; }
+      `}</style>
+
+      {gapWarning && (
+        <div style={{ background: 'var(--warning-soft)', border: '1px solid var(--warning)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: '.82rem', color: 'var(--text)' }}>
+          <strong>No holiday is set in the next 6 weeks.</strong>{' '}
+          {canEdit ? 'Add the festival days before they arrive. ' : 'Ask an admin to add the festival days before they arrive. '}
+          A closed day that is missing here is treated as a working day, so
+          every sales rep and telecaller who does not check in (and has no
+          approved leave) is marked unpaid absent at 8:30 PM.
+        </div>
+      )}
+
+      {!canEdit && (
+        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginBottom: 12 }}>
+          View only — an admin changes the holiday calendar.
+        </div>
+      )}
+
+      {canEdit && (
+        <div style={{
+          padding: 14, borderRadius: 14,
+          border: '1px solid var(--border)',
+          background: 'var(--surface)',
+          marginBottom: 16,
+        }}>
+          <div style={{
+            display: 'grid',
+            // auto-fit so the form wraps on a phone instead of clipping Add.
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: 10, alignItems: 'end',
+          }}>
+            <FieldBlock label="Date *">
+              <input
+                type="date"
+                value={newDate}
+                onChange={e => setNewDate(e.target.value)}
+                className="govt-input-cell govt-input-cell--wide"
+              />
+            </FieldBlock>
+            <FieldBlock label="Holiday name *">
+              <input
+                type="text"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+                placeholder="e.g. Dussehra"
+                className="govt-input-cell govt-input-cell--wide"
+              />
+            </FieldBlock>
+            <FieldBlock label="Type">
+              <select
+                value={newType}
+                onChange={e => setNewType(e.target.value)}
+                className="govt-input-cell govt-input-cell--wide"
+              >
+                {HOLIDAY_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
+            </FieldBlock>
+            <button
+              type="button"
+              className="hol-btn"
+              onClick={handleAdd}
+              disabled={adding}
+              style={{
+                padding: '8px 14px', borderRadius: 10, border: '1px solid transparent',
+                background: 'var(--accent)', color: 'var(--accent-fg)',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                opacity: adding ? 0.6 : 1,
+              }}
+            >
+              {adding ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
+              Add
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-subtle)', marginRight: 2 }}>Official list:</span>
+            {HOLIDAY_NAME_CHIPS.map(n => (
+              <button
+                key={n}
+                type="button"
+                className="hol-chip"
+                onClick={() => { setNewName(n); setNewType('gujarat_festival') }}
+                style={{
+                  padding: '4px 10px', borderRadius: 999,
+                  border: '1px solid var(--surface-3)', background: 'var(--surface-2)',
+                  color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer',
+                }}
+              >{n}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {viewBtn('upcoming', `Upcoming (${upcoming.length})`)}
+        {viewBtn('all',      `All (${rows.length})`)}
+      </div>
+
+      {shown.length === 0 ? (
+        <div style={{
+          padding: 30, textAlign: 'center', color: 'var(--text-muted)',
+          border: '1px dashed var(--surface-3)', borderRadius: 14,
+        }}>
+          <CalendarDays size={22} style={{ marginBottom: 8, color: 'var(--text-subtle)' }} />
+          <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+            {view === 'all' ? 'No holidays yet' : 'No upcoming holidays'}
+          </div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>
+            {canEdit
+              ? 'Every workday is a normal working day until you add one above.'
+              : 'Every workday is a normal working day until an admin adds one.'}
+          </div>
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto', border: '1px solid var(--surface-3)', borderRadius: 14 }}>
+          <div style={{ minWidth: 480 }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '150px 1fr 130px 52px',
+              background: 'var(--surface-2)',
+              fontSize: 10, fontWeight: 700,
+              color: 'var(--text-subtle)',
+              textTransform: 'uppercase', letterSpacing: '.06em',
+              borderBottom: '1px solid var(--surface-3)',
+            }}>
+              <div style={{ padding: '10px 12px' }}>Date</div>
+              <div style={{ padding: '10px 12px' }}>Holiday</div>
+              <div style={{ padding: '10px 12px' }}>Type</div>
+              <div style={{ padding: '10px 12px' }}></div>
+            </div>
+            {shown.map(r => {
+              const f    = fmtHolidayDate(r.holiday_date)
+              const past = r.holiday_date < today
+              const typeLabel = HOLIDAY_TYPES.find(t => t.key === r.type)?.label || r.type
+              return (
+                <div
+                  key={r.id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '150px 1fr 130px 52px',
+                    alignItems: 'center',
+                    borderBottom: '1px solid var(--surface-3)',
+                    background: 'var(--surface)',
+                    opacity: past ? 0.55 : 1,
+                  }}
+                >
+                  <div style={{ padding: '10px 12px', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                    {f.date} <span style={{ color: 'var(--text-subtle)', fontSize: 11 }}>{f.day}</span>
+                  </div>
+                  <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text)' }}>
+                    {r.name}
+                    {r.is_active === false && (
+                      <span
+                        title="Inactive row. Scoring, the 9:30 check-in push and the daily digests treat this day as a working day, but the check-in screen, check-in reminders, 8 PM auto-checkout and the 8:30 PM auto-absent still treat it as a holiday. Delete the row to make it a working day everywhere."
+                        style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--warning)', background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: 10, fontWeight: 700 }}
+                      >inactive</span>
+                    )}
+                  </div>
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-muted)' }}>{typeLabel}</div>
+                  <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    {savingId === r.id ? (
+                      <Loader2 size={14} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite' }} />
+                    ) : canEdit ? (
+                      <button
+                        type="button"
+                        className="hol-del"
+                        onClick={() => handleDelete(r)}
+                        style={{
+                          background: 'transparent', border: 'none',
+                          color: 'var(--danger)', cursor: 'pointer',
+                          width: 34, height: 34, borderRadius: 10,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                        title={`Delete "${r.name}"`}
+                        aria-label={`Delete ${r.name}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-subtle)', maxWidth: 720 }}>
+        <strong>What a holiday does:</strong> on a holiday the check-in screen
+        does not block anyone, there are no check-in reminders, no 9:30 push
+        and no daily follow-up digests, no 8:30 PM auto-absent (unpaid leave)
+        for sales reps and telecallers, and the day is left out of daily
+        scoring. It does <strong>not</strong> switch off follow-up due-time
+        alerts, the WhatsApp assistant, or the Good-morning popup.
+        Sundays are always off, so they do not need a row. To make a day a
+        working day again, delete its row. Changing a past date does not undo
+        leave rows that were already created. A row marked <em>inactive</em>{' '}
+        (it can only be set outside this screen) still counts as a holiday for
+        check-in and auto-absent but not for scoring. Delete it to make the
+        day a working day everywhere.
       </p>
     </>
   )

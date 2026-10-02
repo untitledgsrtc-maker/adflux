@@ -19424,3 +19424,69 @@ straight to Create login (direct convert). Added it.
   designation's role). The prefill only fills name + email; designation/salary stay HR's pick.
 - The offer is created standalone (not yet FK-linked back to the `hr_candidates` row) — a
   candidate↔offer link is a future nicety, not built. Parse + `npm run build` OK.
+
+
+---
+
+## 301 · Team Dashboard "TCs are off" = holiday calendar + Master → Holidays tab (2026-10-02)
+
+Owner: "why are all TCs not online?" on `/team-dashboard` (Phase 326 = the Holidays tab below; the
+number 301 is this SECTION's, not a phase — "Phase 301" is already §188's investor slide).
+
+### The diagnosis (confirmed with the owner's live SQL)
+The "off" pill (top-right of a rep card) means ONE thing: no `work_sessions.check_in_at` today
+(`TeamDashboardV2` ~L1459, tooltip "Not checked in today"). It does NOT mean offline / not working —
+the 4 TCs had 106/241/214/142 calls and ONLINE ON. Why they had no check-in on 2 Oct:
+- The `holidays` table had `2026-10-02 Gandhi Jayanti` (Phase 12 seed, `is_active=true`). On a holiday
+  `is_workday_for()` = false → `CheckInGate` stops redirecting to `/check-in` for EVERYONE.
+- Sales reps still checked in via WorkV2's own `doCheckIn` ("Start My Day", writes `check_in_at`).
+  **TelecallerV2 has NO check-in writer** (it only reads/updates `check_out_at`) — the morning gate is the
+  TC's only way to check in. Gate off ⇒ TC never checks in ⇒ "off".
+- `bump_daily_counter` auto-creates a `work_sessions` row (counters only, `check_in_at` NULL) on every
+  logged call, so a TC with 241 calls has a row today and still reads "off".
+- Kamina Thakor (sales): no row, zero activity — "off" was TRUE for her.
+
+### The bigger finding — the holiday calendar is wrong in BOTH directions
+- Seeded with 4 national days/yr (Republic Day, Independence Day, Gandhi Jayanti, Christmas) that are NOT on
+  the company's official FY2026-27 list (§296), and the team works them (2 Oct: ~700 TC calls, sales meetings).
+- ZERO festival days exist from 1 Oct onward (no Dussehra 20 Oct, Diwali, Bestu Varas, Bhai Dooj, Extra
+  Diwali ×2, Makar Sankranti, Holi). A MISSING closed day is the dangerous direction: `tick_attendance`
+  7e (20:30 IST) marks every active `sales`/`telecaller` with no `check_in_at` as `unpaid_absent`
+  (leave row, `approved`) — and §78 deducts every leave at 1 day's salary.
+- Past-damage check (owner ran it): `unpaid_absent` since 21 May = 1–3 people/day, NO mass-cut date; the job
+  IS running. Aug 28 / Sep 4 show 0 ⇒ already covered. No pay correction needed so far. Exposure = 20 Oct onward.
+- The Phase 12 plan promised a "Master → Holidays page"; it was NEVER built (no `from('holidays')` in src
+  before this). Rows could only go in via SQL.
+
+### Shipped — Master → Holidays tab (Phase 326, `MasterV2.jsx`, NOT §28-frozen, JS-only, no SQL, no APK)
+`HolidaysTab`: add (date + name + type) / delete, Upcoming|All view, "Official list" name chips (the 9 names
+from the §296 PDF — festival dates move every year, so the admin picks the date), a warning when no holiday
+exists in the next 45 days, admin-only writes (co_owner sees it read-only — `holidays_admin_all` is
+singular-admin, §42), `useRef` insert latch, zero-row-delete detection (`.select('id')`), a load-failure
+state with Retry that does NOT fall through to the "no holiday set" warning, date-aware delete wording
+(past / TODAY / future / sibling row on the same date), hover + focus styles, responsive add form.
+Type must be `national | gujarat_festival | company_off` (CHECK). `UNIQUE(holiday_date, name)` → 23505
+handled. Reviewed by a 3-lens workflow (correctness SHIP, security/copy + design FIX_THEN_SHIP → all
+P2s fixed pre-commit).
+
+### ⚠ FROZEN CONTRACT / FOOT-GUN — `holidays.is_active` is NOT honored uniformly
+Readers that HONOR it: `is_off_day`, `compute_daily_score` (L88), `push_morning_checkin` (34z61),
+follow-up digest (34z84). Readers that IGNORE it: **`is_workday_for` (phase60:126) and `tick_attendance`
+(phase60:348)** — i.e. the check-in gate, the Phase-60 reminders, 8 PM auto-checkout and the 8:30 PM
+auto-absent. So switching a row off leaves the system HALF-holiday (scored as a workday, no gate, no
+absent-marking). **Therefore the tab has NO Active toggle: DELETE is the only operation that means the
+same thing to every reader.** Do not add a toggle without first making `is_workday_for` + `tick_attendance`
+filter `is_active` (optional hardening — both single-copy in phase60; owner-run SQL).
+
+### Also found by the review (NOT fixed — out of this diff, flagged)
+On an active holiday these still run: `MorningGreetGate` (the blocking Good-morning popup — no holiday
+check, frozen-adjacent), `push_followup_due_reminders` / per-task triggers (quiet-hours only), and the
+WhatsApp assistant 2-hourly nudge (`team-nudge.js` skips Sunday only). The tab's footer copy says so.
+
+### Still open
+- **"Start my day" for TCs on `/telecaller`** (option B) — NOT built; TelecallerV2 is §28-frozen →
+  guardian first. Until then a TC shows "off" on any day the gate is off.
+- Decide which of Republic Day / Independence Day / Gandhi Jayanti / Christmas the company really closes;
+  delete the rest in the new tab (2 Oct 2026 itself was left as-is: flipping it mid-day would have
+  auto-marked Kamina absent at 20:30 for a day the app told her was a holiday).
+- Owner to add Dussehra (20 Oct 2026) and the other festival dates BEFORE the day.
