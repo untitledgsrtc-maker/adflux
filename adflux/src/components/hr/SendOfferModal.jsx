@@ -18,6 +18,7 @@ import { supabase } from '../../lib/supabase'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { phoneLast10 } from '../../utils/phone'
 import { formatCurrency } from '../../utils/formatters'
+import { confirmDialog } from '../v2/ConfirmDialog'
 
 function Field({ label, required, error, hint, children }) {
   return (
@@ -121,8 +122,14 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     if (!form.candidate_email.trim()) errs.candidate_email = 'Email is required'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.candidate_email))
       errs.candidate_email = 'Invalid email'
-    if (!form.fixed_salary_monthly || Number(form.fixed_salary_monthly) <= 0)
+    // Phase 307 (owner 5 Oct): salary AND incentive must both be set on every
+    // offer - no default. 0 is a real choice ONLY for an incentive role
+    // (commission-only), and HR must confirm it in handleCreate.
+    const salRaw = String(form.fixed_salary_monthly ?? '').trim()
+    if (salRaw === '' || Number.isNaN(Number(salRaw)) || Number(salRaw) < 0)
       errs.fixed_salary_monthly = 'Enter a monthly salary'
+    else if (Number(salRaw) === 0 && !hasIncentive)
+      errs.fixed_salary_monthly = 'A fixed-salary role cannot be 0'
     if (!form.joining_date) errs.joining_date = 'Pick a joining date'
     // Incentive fields only apply to roles that earn incentive.
     if (hasIncentive) {
@@ -139,6 +146,19 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
   async function handleCreate() {
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
+
+    if (Number(form.fixed_salary_monthly) === 0) {
+      const ok = await confirmDialog({
+        title: 'Commission-only offer?',
+        message: 'Salary is 0, so this person gets NO fixed pay and earns only incentive. '
+          + 'With salary 0 the incentive pays from the FIRST rupee of sales and the flat bonus '
+          + '(' + (Number(form.incentive_flat_bonus || 0)).toLocaleString('en-IN')
+          + ') is paid on any sale. Send the offer like this?',
+        confirmLabel: 'Yes, commission-only',
+        cancelLabel: 'Back',
+      })
+      if (!ok) return
+    }
 
     setSaving(true)
     setServerError('')

@@ -97,11 +97,17 @@ Deno.serve(async (req) => {
     }
     const cj = await cr.json()
     const raw = (cj?.content?.[0]?.text || '').trim()
-    // Strip code fences if Claude wrapped them.
-    const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim()
+    // Pull the JSON object out of whatever Claude wrapped around it. The old
+    // "strip a leading + trailing ``` fence" cleanup broke the moment Claude
+    // added any text after the closing fence (Phase 306 — Scan failed for
+    // everyone with "Claude returned non-JSON"). First "{" to last "}" is
+    // immune to fences, preamble and trailing notes.
+    const a = raw.indexOf('{')
+    const b = raw.lastIndexOf('}')
+    const clean = a >= 0 && b > a ? raw.slice(a, b + 1) : raw
     let parsed: any
     try { parsed = JSON.parse(clean) } catch {
-      return jsonResp({ error: 'Claude returned non-JSON: ' + raw.slice(0, 200) }, 502)
+      return jsonResp({ error: 'Claude returned non-JSON: ' + raw.slice(0, 120) + ' … ' + raw.slice(-120) }, 502)
     }
     return jsonResp({
       ocr_text:         parsed.ocr_text || '',

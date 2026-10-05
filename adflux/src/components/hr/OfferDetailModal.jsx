@@ -17,13 +17,14 @@
 // (admin can tune salary on the Team page afterwards — Phase 1
 // does not carry the offer salary over).
 
-import { useState } from 'react'
-import { X, Download, UserPlus, Copy, Check, MessageSquare } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Download, UserPlus, Copy, Check, MessageSquare, Mail, KeyRound } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useOffers, buildOfferUrl, STATUS_META } from '../../hooks/useOffers'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { formatCurrency } from '../../utils/formatters'
 import { toastError } from '../v2/Toast'
+import SendEmailModal from '../v2/SendEmailModal'
 
 // Phase 109.4 — open a private PAN/Aadhaar card via a short-lived signed
 // URL (the hr-offer-pii bucket is NOT public; staff-only SELECT RLS gates
@@ -40,6 +41,43 @@ async function viewCard(path) {
     .createSignedUrl(path, 600)
   if (error || !data?.signedUrl) { toastError(error, 'Could not open the card.'); return }
   window.open(data.signedUrl, '_blank', 'noopener')
+}
+
+// Phase 307 - one-click Convert. A random temp password (no look-alike
+// characters: no 0/O, 1/l/I) so HR never has to invent one.
+function genPassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  const buf = new Uint32Array(8)
+  crypto.getRandomValues(buf)
+  return Array.from(buf, n => chars[n % chars.length]).join('')
+}
+
+function incentiveText(o, hasIncentive) {
+  if (hasIncentive === false) return ''
+  const mult = Number(o.incentive_sales_multiplier) || 5
+  const nc   = +(((Number(o.incentive_new_client_rate) || 0.05) * 100).toFixed(2))
+  const rr   = +(((Number(o.incentive_renewal_rate)    || 0.02) * 100).toFixed(2))
+  const flat = Number(o.incentive_flat_bonus) || 0
+  return `${mult}x salary target - ${nc}% on new-client revenue - ${rr}% on renewals`
+       + (flat > 0 ? ` - flat bonus Rs ${flat.toLocaleString('en-IN')} above target` : '')
+}
+
+function loginMessage(d) {
+  const first = (d.name || '').trim().split(/\s+/)[0] || 'there'
+  return [
+    `Hi ${first},`,
+    '',
+    'Welcome to Untitled Advertising! Your login is ready.',
+    '',
+    `App: ${d.appUrl}`,
+    `Email: ${d.email}`,
+    d.reused ? 'Password: use your existing password' : `Password: ${d.password}`,
+    d.designation ? `Role: ${d.designation}` : null,
+    d.salary > 0 ? `Fixed salary: Rs ${d.salary.toLocaleString('en-IN')} per month` : 'Pay: commission only',
+    d.incentive ? `Incentive: ${d.incentive}` : null,
+    '',
+    'Please sign in and keep this message safe.',
+  ].filter(l => l !== null).join('\n')
 }
 
 function Row({ label, value }) {
@@ -80,7 +118,21 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
   const { updateOffer, cancelOffer } = useOffers()
   const [converting, setConverting] = useState(false)
   const [convertErr, setConvertErr] = useState('')
-  const [password,   setPassword]   = useState('')
+  const [password,   setPassword]   = useState(() => genPassword())
+  const [existingUser, setExistingUser] = useState(null)
+  const [checking, setChecking] = useState(false)
+  // The password that was ACTUALLY applied to the login. admin_create_user never
+  // overwrites an existing auth user's password, so once the first attempt has
+  // created the login this value is the only one that works - lock it and use
+  // it in the message. Kept in sessionStorage so Cancel/close + reopen after a
+  // failed profile write can't lose or change it. Cleared on success.
+  const pwKey = 'offerConvertPw:' + offer.id
+  const savedPw = (() => { try { return sessionStorage.getItem(pwKey) } catch { return null } })()
+  const appliedPwRef = useRef(savedPw)
+  const reusedRef    = useRef(savedPw ? false : null)
+  const [pwLocked, setPwLocked] = useState(!!savedPw)
+  const [done, setDone] = useState(null)
+  const [emailOpen, setEmailOpen] = useState(false)
   const [showConvertForm, setShowConvertForm] = useState(false)
   const [shortUrlValue, setShort]   = useState('')
   const [copiedKey, setCopiedKey]   = useState(null)
@@ -154,7 +206,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
     // (admin_create_user keeps the admin's session — no signUp/signOut.)
     const { data: created, error: rpcErr } = await supabase.rpc('admin_create_user', {
       p_email:            email,
-      p_password:         password,
+      p_password:         appliedPwRef.current ?? password,
       p_name:             name,
       p_role:             pRole,
       p_team_role:        pTeamRole,
@@ -183,43 +235,67 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
       return
     }
 
-    // Auto-seed the incentive profile with the exact numbers from the
-    // offer letter. Upsert on user_id so this works whether the
-    // trigger row already exists (normal case) or hasn't fired yet
-    // (defensive). Drift between the signed letter and the live
-    // profile is the bug this is preventing.
-    // Phase 285 — ONLY for incentive-earning roles. A flat-salary role
-    // (has_incentive === false) must NOT get the 5×/0.05/0.02 sales
-    // profile; skip the upsert entirely for them.
-    if (seedIncentive) {
-      const { error: profErr } = await supabase
-        .from('staff_incentive_profiles')
-        .upsert(
-          {
-            user_id:          userId,
-            monthly_salary:   Number(offer.fixed_salary_monthly) || 0,
-            sales_multiplier: Number(offer.incentive_sales_multiplier) || 5,
-            new_client_rate:  Number(offer.incentive_new_client_rate)  || 0.05,
-            renewal_rate:     Number(offer.incentive_renewal_rate)     || 0.02,
-            flat_bonus:       Number(offer.incentive_flat_bonus)       || 0,
-            join_date:        offer.joining_date
-                                || new Date().toISOString().split('T')[0],
-            is_active:        true,
-          },
-          { onConflict: 'user_id' }
-        )
+    // First successful create: remember the password that really went in and
+    // whether the login pre-existed. Later retries keep these (never re-derived).
+    if (appliedPwRef.current == null) {
+      appliedPwRef.current = password
+      reusedRef.current    = !!existingUser
+      try { sessionStorage.setItem(pwKey, password) } catch { /* ignore */ }
+      setPwLocked(true)
+    }
 
-      if (profErr) {
-        // User row is in — don't block the convert, but surface the
-        // issue so admin knows to open Team page and set rates by hand.
-        setConvertErr(
-          'User created, but seeding the incentive profile failed: '
-          + (profErr.message || 'unknown error')
-          + ' — please set rates manually on the Team page.'
-        )
-        // Continue: still link the offer so status is accurate.
+    // Phase 307 - ALWAYS write the salary profile (a flat-salary hire's fixed
+    // pay was silently dropped before) and NEVER overwrite a salary already
+    // on file (Phase 327 audit: a convert re-run used to reset it). Incentive
+    // terms come from the SIGNED offer; non-incentive roles get zeros.
+    const salaryNum = Number(offer.fixed_salary_monthly) || 0
+    let profileErr = null
+    {
+      const { data: existingProf, error: exErr } = await supabase
+        .from('staff_incentive_profiles')
+        .select('id, monthly_salary')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (exErr) {
+        profileErr = exErr.message
+      } else if (!(existingProf && Number(existingProf.monthly_salary) > 0)) {
+        const payload = {
+          user_id:        userId,
+          monthly_salary: salaryNum,
+          join_date:      offer.joining_date || new Date().toISOString().split('T')[0],
+          is_active:      true,
+        }
+        if (seedIncentive) {
+          payload.sales_multiplier = Number(offer.incentive_sales_multiplier) || 5
+          payload.new_client_rate  = Number(offer.incentive_new_client_rate)  || 0.05
+          payload.renewal_rate     = Number(offer.incentive_renewal_rate)     || 0.02
+          payload.flat_bonus       = Number(offer.incentive_flat_bonus)       || 0
+        } else {
+          payload.sales_multiplier = 0
+          payload.new_client_rate  = 0
+          payload.renewal_rate     = 0
+          payload.flat_bonus       = 0
+        }
+        const { error: profErr } = await supabase
+          .from('staff_incentive_profiles')
+          .upsert([payload], { onConflict: 'user_id' })
+        if (profErr) profileErr = profErr.message
       }
     }
+    if (profileErr) {
+      // Stop BEFORE linking: Convert is safe to press again (the login is
+      // reused, the password below is unchanged) - never leave a hire with a
+      // login but no pay profile and a "converted" offer.
+      setConvertErr('Login created, but the salary profile did not save: ' + profileErr
+        + ' - press Convert again to retry (safe), or set it in People > Team.')
+      setConverting(false)
+      return
+    }
+
+    // Auto-start the hire's onboarding from their role template (best-effort;
+    // no template for the role -> returns null, no error).
+    const { error: obErr } = await supabase.rpc('create_onboarding_run', { p_user_id: userId })
+    if (obErr) console.warn('[offer-convert] onboarding run failed:', obErr.message)
 
     // Link the offer back to the user.
     const { error: linkErr } = await updateOffer(offer.id, {
@@ -230,12 +306,46 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
     setConverting(false)
 
     if (linkErr) {
-      setConvertErr('User was created but linking to the offer failed: ' + linkErr.message)
+      setConvertErr('User was created but linking to the offer failed: ' + linkErr.message
+        + ' - press Convert again to retry (safe).')
       return
     }
 
+    // Stay open: HR now sends the login (WhatsApp / email) from here.
+    try { sessionStorage.removeItem(pwKey) } catch { /* ignore */ }
+    setShowConvertForm(false)
+    setDone({
+      name:        name,
+      email,
+      password:    appliedPwRef.current,
+      reused:      !!reusedRef.current,
+      appUrl:      window.location.origin,
+      designation: desigName || offer.position || '',
+      salary:      salaryNum,
+      incentive:   incentiveText(offer, hasIncentive),
+    })
     onChanged?.()
-    onClose()
+  }
+
+  async function openConvert() {
+    setConvertErr('')
+    setShowConvertForm(true)
+    if (appliedPwRef.current != null) return   // login already created by an earlier attempt
+    const em = (offer.candidate_email || '').trim().toLowerCase()
+    if (!em) return
+    setChecking(true)
+    // users.email is stored lowercased by admin_create_user -> exact match
+    // (ilike would treat "_" in an address as a wildcard).
+    const { data, error } = await supabase
+      .from('users').select('id').eq('email', em).limit(1)
+    setExistingUser(!error && data && data.length ? data[0] : null)
+    setChecking(false)
+  }
+
+  async function copyLogin() {
+    const text = loginMessage(done)
+    try { await navigator.clipboard.writeText(text); setCopiedKey('login'); setTimeout(() => setCopiedKey(null), 1600) }
+    catch { window.prompt('Copy this message:', text) }
   }
 
   async function handleCancel() {
@@ -404,8 +514,43 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
             </div>
           )}
 
+          {done && (
+            <div style={{
+              marginTop: 12, padding: 14,
+              border: '1px solid var(--brd)', borderRadius: 8,
+              background: 'rgba(34,197,94,.06)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: '.92rem', marginBottom: 8 }}>
+                <KeyRound size={16} /> Login created for {done.name}
+              </div>
+              <pre style={{
+                margin: '0 0 10px', padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                background: 'rgba(0,0,0,.18)', borderRadius: 6, fontSize: '.8rem',
+                fontFamily: 'inherit', lineHeight: 1.5,
+              }}>{loginMessage(done)}</pre>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-y" disabled={!offer.mobile}
+                  title={offer.mobile ? '' : 'No mobile number on this offer'}
+                  onClick={() => openWhatsApp(offer.mobile, loginMessage(done))}>
+                  <MessageSquare size={14} style={{ marginRight: 6 }} /> Send on WhatsApp
+                </button>
+                <button className="btn btn-ghost" onClick={() => setEmailOpen(true)}>
+                  <Mail size={14} style={{ marginRight: 6 }} /> Send by email
+                </button>
+                <button className="btn btn-ghost" onClick={copyLogin}>
+                  {copiedKey === 'login' ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+                </button>
+              </div>
+              <div style={{ fontSize: '.74rem', color: 'var(--gray)', marginTop: 8 }}>
+                {done.reused
+                  ? 'This person already had a login, so their password was not changed.'
+                  : 'Keep this message - the password is not shown again after you close this window.'}
+              </div>
+            </div>
+          )}
+
           {/* Convert-to-user panel */}
-          {isAccepted && (
+          {isAccepted && !done && (
             <div style={{
               marginTop: 12,
               padding: 14,
@@ -419,17 +564,39 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
                     This offer has been accepted. You can now create a
                     user account for <strong>{offer.full_legal_name || offer.candidate_name}</strong>.
                   </div>
-                  <button className="btn btn-y" onClick={() => setShowConvertForm(true)}>
+                  <button className="btn btn-y" onClick={openConvert}>
                     <UserPlus size={15} style={{ marginRight: 6 }} />
                     Convert to User
                   </button>
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: '.88rem', marginBottom: 8 }}>
-                    Set a temporary password for <strong>{offer.candidate_email}</strong>.
-                    Share it with them so they can sign in.
+                  <div style={{ fontSize: '.88rem', fontWeight: 600, marginBottom: 10 }}>
+                    Confirm and create the login
                   </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                    <Row label="Name" value={offer.full_legal_name || offer.candidate_name} />
+                    <Row label="Login email" value={offer.candidate_email} />
+                    <Row label="Mobile (WhatsApp)" value={offer.mobile} />
+                    <Row label="Role" value={offer.designation_name || offer.position} />
+                    <Row label="Joining date" value={offer.joining_date
+                      ? new Date(offer.joining_date).toLocaleDateString('en-IN') : ''} />
+                    <Row label="City" value={offer.city || 'Vadodara'} />
+                    <Row label="Fixed salary" value={Number(offer.fixed_salary_monthly) > 0
+                      ? formatCurrency(Number(offer.fixed_salary_monthly)) + ' / month'
+                      : 'Commission only (no fixed salary)'} />
+                    <Row label="Incentive" value={offer.designation_has_incentive === false
+                      ? 'None (fixed-salary role)' : incentiveText(offer, offer.designation_has_incentive)} />
+                  </div>
+                  {existingUser && !pwLocked && (
+                    <div style={{
+                      background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.35)',
+                      borderRadius: 6, padding: 8, fontSize: '.8rem', color: 'var(--fg)', marginBottom: 8,
+                    }}>
+                      This email already has a login. Convert will link it and keep
+                      its <strong>existing password</strong> (the one below is ignored).
+                    </div>
+                  )}
                   {convertErr && (
                     <div style={{
                       background: 'rgba(229,57,53,.08)',
@@ -440,19 +607,22 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
                       {convertErr}
                     </div>
                   )}
+                  <div style={{ fontSize: '.74rem', color: 'var(--gray)', marginBottom: 4 }}>
+                    {pwLocked ? 'Login already created - this password is locked in' : 'Temporary password (auto-generated - change it if you like)'}
+                  </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <input
                       type="text"
-                      placeholder="Min 6 characters"
-                      value={password}
+                      value={pwLocked ? (appliedPwRef.current || '') : password}
                       onChange={e => setPassword(e.target.value)}
+                      disabled={converting || !!existingUser || pwLocked}
                       style={{ flex: 1 }}
                     />
                     <button className="btn btn-ghost" onClick={() => setShowConvertForm(false)} disabled={converting}>
                       Cancel
                     </button>
-                    <button className="btn btn-y" onClick={handleConvert} disabled={converting}>
-                      {converting ? 'Creating…' : 'Create User'}
+                    <button className="btn btn-y" onClick={handleConvert} disabled={converting || checking}>
+                      {converting ? 'Creating...' : (checking ? 'Checking...' : 'Convert & create login')}
                     </button>
                   </div>
                 </>
@@ -495,6 +665,18 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
           <button className="btn btn-y" onClick={onClose}>Close</button>
         </div>
       </div>
+      {done && (
+        <SendEmailModal
+          open={emailOpen}
+          onClose={() => setEmailOpen(false)}
+          kind="offer"
+          title="Send login details"
+          defaultTo={done.email}
+          defaultSubject="Your Untitled Advertising login"
+          defaultBody={loginMessage(done)}
+          relatedId={offer.id}
+        />
+      )}
     </div>
   )
 }

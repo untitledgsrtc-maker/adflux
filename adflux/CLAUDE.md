@@ -19719,3 +19719,44 @@ Owner ran, in order: `supabase_ops_sept_pay_prep.sql` Part 1 (read-only), `supab
 
 Open: Part 2 run; B10 (call lead-link) next week; compute_daily_score early-return for non-scored roles (§304 #3);
 B7/B8 (HR convert + login link) still waiting on the owner's two decisions.
+
+
+---
+
+## 306 · Scan (OCR) fixed live + HR one-click Convert with login send + explicit salary on offers (2026-10-05)
+
+Owner answered the open questions: salary 0 = both meanings valid and HR must set salary AND incentive
+explicitly on every offer; Convert = ONE button on a confirm sheet; the hire logs in with a personal email;
+Scan was broken on BOTH the Android app and Chrome.
+
+### Scan root cause = server, not the camera (proven by probing the live function)
+`supabase/functions/ocr-business-card` returned HTTP 502 `Claude returned non-JSON` for every image: Claude wraps
+its JSON in a fence and the old cleanup only stripped a fence at the very end, so any trailing text broke the
+parse. That is why app AND Chrome failed (the APK camera work, 96019, is a separate unverified item). Fix: take the
+text from the first `{` to the last `}` (immune to fences/preamble/trailing notes) + the error now shows the raw
+head and tail. **Deployed live with `supabase functions deploy ocr-business-card --project-ref kompjctmisnitjpbjalh`
+(the CLI on the Mac is logged in)** and re-probed 3x -> HTTP 200. Reusable: probe an Edge fn with the anon key from
+`.env` and a tiny base64 image to see the real error.
+
+### HR Convert (src/components/hr/OfferDetailModal.jsx, not frozen)
+- Confirm sheet shows everything that will be created (name, login email, mobile, role, joining, city, fixed salary,
+  incentive terms) + an auto-generated temp password; one "Convert & create login" button.
+- ALWAYS writes the salary profile (flat-salary hires used to lose their fixed pay), NEVER overwrites a salary already
+  on file, zeros for non-incentive roles, stops BEFORE linking if the profile write fails (safe to press again), starts
+  the hire's onboarding run. Stays open afterwards: a login message with Send on WhatsApp (to the offer's mobile),
+  Send by email (SendEmailModal kind 'offer', from hr@) and Copy; includes role, fixed salary and the incentive terms.
+- The password that was ACTUALLY applied is locked after the first successful create and kept in sessionStorage
+  (cleared on success): admin_create_user never overwrites an existing auth user's password, so a retry or a
+  close/reopen must not show a different one. Pre-check uses an exact lowercase email match (ilike treats `_` as a
+  wildcard). Known small gap: an auth user with no public.users row is not detected, so the message would show a
+  password that was never applied.
+
+### SendOfferModal
+Salary must be typed (blank/negative rejected); 0 is allowed only for incentive roles and needs a confirm that says the
+incentive pays from the first rupee plus the flat bonus; fixed-salary roles cannot send 0. Incentive fields stay
+company-standard prefills (5x / 5% / 2% / 10,000) but are still required and shown on the sheet.
+
+### Not done / next
+B10 (forward-only call lead-link on the last 10 digits, `callHistoryIngest.js`, needs the guardian); the compute_daily_score
+early return for ops/hr/accounts; PAN/Aadhaar exposure in the anon fetch_offer_by_token; re-issue the 6 wrong signed
+letters (4 Telecaller, 2 Operation Execution); remove the test operations account after Part 2(ii).
